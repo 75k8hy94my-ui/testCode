@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>連番画像 漫画リーダー</title>
+<style>
+  :root {
+    --bg: #0e0e10;
+    --panel: #1a1a1e;
+    --accent: #e0556f;
+    --text: #e8e8ea;
+    --sub: #9a9aa2;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+    overflow: hidden;
+  }
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* Top bar */
+  #topbar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 6px;
+    padding: 10px 12px; background: var(--panel);
+    border-bottom: 1px solid #2a2a30;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+    z-index: 10;
+  }
+  #topbar.hidden { transform: translateY(-100%); opacity: 0; }
+  #urlInput {
+    flex: 1; min-width: 160px; padding: 8px 10px; border-radius: 6px;
+    border: 1px solid #333; background: #0e0e10; color: var(--text);
+    font-size: 14px;
+  }
+  #urlInput:focus { outline: 1px solid var(--accent); }
+  #loadBtn, .ctrlBtn, .primaryBtn {
+    padding: 8px 14px; border-radius: 6px; border: none;
+    font-size: 14px; cursor: pointer; white-space: nowrap;
+  }
+  #loadBtn, .primaryBtn { background: var(--accent); color: white; }
+  .ctrlBtn { background: #2a2a30; color: var(--text); }
+  .ctrlBtn.active { background: var(--accent); color: white; }
+  .ctrlBtn:hover, #loadBtn:hover, .primaryBtn:hover { filter: brightness(1.15); }
+  .ctrlBtn:disabled, #loadBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+  #status { font-size: 12px; color: var(--sub); min-width: 90px; }
+
+  /* Viewer */
+  #viewer {
+    flex: 1; position: relative; display: flex;
+    align-items: center; justify-content: center;
+    background: #000; overflow: auto;
+  }
+  #imgWrap { position: relative; width: 100%; height: 100%; }
+  #pageStage { position: absolute; inset: 0; overflow: hidden; }
+  .pageSlide {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    will-change: transform;
+  }
+  .pageimg { display: block; }
+
+  .clickzone { position: absolute; top: 0; bottom: 0; cursor: pointer; }
+  .clickzone.left { left: 0; width: 38%; }
+  .clickzone.right { right: 0; width: 38%; }
+  .clickzone.mid { left: 38%; width: 24%; cursor: default; }
+
+  #placeholder {
+    color: var(--sub); font-size: 15px; text-align: center; padding: 20px;
+    line-height: 1.8;
+  }
+  #placeholder code { background: #1a1a1e; padding: 2px 6px; border-radius: 4px; }
+
+  #spinner {
+    display: none; width: 36px; height: 36px;
+    border: 3px solid #333; border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Bottom controls */
+  #controls {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 6px;
+    padding: 10px 14px; background: var(--panel);
+    border-top: 1px solid #2a2a30;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+    z-index: 10;
+  }
+  #controls.hidden { transform: translateY(100%); opacity: 0; }
+  #pageSlider { flex: 1; min-width: 80px; }
+  #pageLabel { font-size: 13px; color: var(--sub); min-width: 70px; text-align: center; white-space: nowrap; }
+
+  .hint { font-size: 11px; color: var(--sub); padding: 4px 14px 0; }
+
+  /* Modal overlays (shared) */
+  .modalOverlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: none; align-items: center; justify-content: center; z-index: 50;
+  }
+  .modalOverlay.show { display: flex; }
+  .modalPanel {
+    background: var(--panel); border-radius: 10px; width: min(520px, 90vw);
+    max-height: 80vh; display: flex; flex-direction: column; padding: 14px;
+  }
+  .panel-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px; font-size: 15px;
+  }
+
+  /* Save dialog */
+  .field-label { font-size: 12px; color: var(--sub); display: block; margin-top: 10px; }
+  #saveDialogPanel input[type="text"], #saveDialogPanel select {
+    width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #333;
+    background: #0e0e10; color: var(--text); font-size: 14px; margin-top: 4px;
+  }
+  #newFolderRow { display: none; gap: 8px; margin-top: 8px; }
+  #newFolderRow input { flex: 1; }
+  .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+  /* Saved list */
+  #listToolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  #listFolderTitle { flex: 1; font-size: 14px; font-weight: bold; }
+  #listNewFolderRow { display: none; gap: 8px; margin-bottom: 10px; }
+  #listNewFolderRow input {
+    flex: 1; padding: 8px 10px; border-radius: 6px; border: 1px solid #333;
+    background: #0e0e10; color: var(--text); font-size: 14px;
+  }
+  #savedListItems { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .saved-item {
+    display: flex; align-items: center; gap: 8px;
+    background: #0e0e10; border: 1px solid #2a2a30; border-radius: 6px; padding: 8px 10px;
+  }
+  .saved-item .url-text, .saved-item .item-text {
+    flex: 1; overflow: hidden; cursor: pointer; min-width: 0;
+  }
+  .folder-name { font-size: 14px; font-weight: bold; }
+  .saved-item .item-title { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .saved-item .item-url { font-size: 11px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .saved-item .url-text:hover, .saved-item .item-text:hover .item-title { color: var(--accent); }
+  .chevron { color: var(--sub); font-size: 16px; }
+  .saved-item button {
+    background: #2a2a30; border: none; color: var(--text); border-radius: 4px;
+    padding: 4px 8px; cursor: pointer; font-size: 12px; white-space: nowrap; flex-shrink: 0;
+  }
+  #savedListEmpty { color: var(--sub); font-size: 13px; text-align: center; padding: 24px 0; }
+
+  /* File sync / export-import */
+  #syncRow, #exportImportRow {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 8px 0; margin-bottom: 6px; border-bottom: 1px solid #2a2a30;
+    font-size: 12px;
+  }
+  #syncStatusText { color: var(--sub); flex: 1; min-width: 120px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <input id="urlInput" type="text" placeholder="例: https://example.com/manga/test/  または .../1.jpg" />
+    <button id="loadBtn">開く</button>
+    <button class="ctrlBtn" id="saveBtn" title="今のURLを保存">URLを保存</button>
+    <button class="ctrlBtn" id="listBtn" title="保存したURLの一覧">リスト</button>
+    <span id="status"></span>
+  </div>
+
+  <div id="viewer" class="fit-contain">
+    <div id="placeholder">
+      上の欄に画像が並んでいるURLを入力してください<br>
+      例: <code>https://example.com/manga/test/</code> でも <code>https://example.com/manga/test/1.jpg</code> でもOK<br>
+      （<code>1.jpg</code>, <code>2.jpg</code> ... のように連番で並んでいる場所）
+    </div>
+    <div id="spinner"></div>
+    <div id="imgWrap" style="display:none;">
+      <div id="pageStage"></div>
+      <div class="clickzone left" id="zoneLeft" title="前のページ"></div>
+      <div class="clickzone mid" id="zoneMid" title="表示/操作バーの切替"></div>
+      <div class="clickzone right" id="zoneRight" title="次のページ"></div>
+    </div>
+  </div>
+
+  <div id="controls" style="display:none;">
+    <button class="ctrlBtn" id="firstBtn" title="最初のページ">|◀</button>
+    <button class="ctrlBtn" id="prevBtn" title="前のページ (←)">◀ 戻る</button>
+    <input type="range" id="pageSlider" min="1" max="1" value="1">
+    <span id="pageLabel">1 / 1</span>
+    <button class="ctrlBtn" id="nextBtn" title="次のページ (→)">進む ▶</button>
+    <button class="ctrlBtn" id="lastBtn" title="最後のページ">▶|</button>
+    <button class="ctrlBtn active" id="animBtn" title="ページ送りアニメーションの切替">ページ送りアニメ:ON</button>
+    <button class="ctrlBtn" id="fitBtn" title="表示モード切替">表示:全体</button>
+    <button class="ctrlBtn" id="fsBtn" title="全画面表示">全画面</button>
+  </div>
+  <div class="hint" id="hintLine" style="display:none;">クリック: 画像左側=戻る、右側=進む、中央=バー表示切替　／　キー: ←戻る・→進む</div>
+</div>
+
+<!-- Save dialog -->
+<div id="saveDialogOverlay" class="modalOverlay">
+  <div id="saveDialogPanel" class="modalPanel">
+    <div class="panel-header"><span>URLを保存</span></div>
+    <label class="field-label" for="saveTitleInput">タイトル</label>
+    <input id="saveTitleInput" type="text" placeholder="例: ○○ 第1巻">
+    <label class="field-label" for="saveFolderSelect">フォルダ</label>
+    <select id="saveFolderSelect"></select>
+    <div id="newFolderRow">
+      <input id="newFolderInput" type="text" placeholder="新しいフォルダ名">
+      <button class="ctrlBtn" id="confirmNewFolderBtn">追加</button>
+    </div>
+    <div class="dialog-actions">
+      <button class="ctrlBtn" id="cancelSaveBtn">キャンセル</button>
+      <button class="primaryBtn" id="confirmSaveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Saved list -->
+<div id="savedListOverlay" class="modalOverlay">
+  <div id="savedListPanel" class="modalPanel">
+    <div class="panel-header">
+      <span>保存したURL</span>
+      <button class="ctrlBtn" id="closeListBtn">閉じる</button>
+    </div>
+    <div id="syncRow">
+      <span id="syncStatusText">未接続</span>
+      <button class="ctrlBtn" id="syncOpenBtn">既存の同期ファイルを選ぶ</button>
+      <button class="ctrlBtn" id="syncNewBtn">新規に同期ファイルを作成</button>
+      <button class="ctrlBtn" id="syncReconnectBtn" style="display:none;">再接続</button>
+      <button class="ctrlBtn" id="syncDisconnectBtn" style="display:none;">同期解除</button>
+    </div>
+    <div id="exportImportRow">
+      <button class="ctrlBtn" id="exportBtn">書き出し(JSON)</button>
+      <button class="ctrlBtn" id="importBtn">読み込み(JSON)</button>
+      <input type="file" id="importFileInput" accept="application/json" style="display:none;">
+    </div>
+    <div id="listToolbar">
+      <button class="ctrlBtn" id="listBackBtn" style="display:none;">← 戻る</button>
+      <span id="listFolderTitle"></span>
+      <button class="ctrlBtn" id="listNewFolderBtn">+ 新しいフォルダ</button>
+    </div>
+    <div id="listNewFolderRow">
+      <input id="listNewFolderInput" type="text" placeholder="新しいフォルダ名">
+      <button class="ctrlBtn" id="listNewFolderConfirmBtn">追加</button>
+    </div>
+    <div id="savedListItems"></div>
+    <div id="savedListEmpty" style="display:none;">保存されたURLはまだありません</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const EXT_CANDIDATES = ['jpg', 'jpeg', 'png', 'webp'];
+  const MAX_PAGES_SAFETY = 2000;
+  const LOAD_TIMEOUT_MS = 8000;
+  const ANIM_DURATION = 280; // ms
+
+  const LAST_URL_KEY = 'mangaReaderLastUrl';
+  const LAST_PAGE_KEY = 'mangaReaderLastPage';
+  const ANIM_KEY = 'mangaReaderAnimEnabled';
+  const SAVED_FOLDERS_KEY = 'mangaReaderSavedFolders';
+  const SAVED_ITEMS_KEY = 'mangaReaderSavedItems';
+  const LEGACY_SAVED_URLS_KEY = 'mangaReaderSavedUrls';
+
+  const els = {
+    urlInput: document.getElementById('urlInput'),
+    loadBtn: document.getElementById('loadBtn'),
+    saveBtn: document.getElementById('saveBtn'),
+    listBtn: document.getElementById('listBtn'),
+    status: document.getElementById('status'),
+    viewer: document.getElementById('viewer'),
+    placeholder: document.getElementById('placeholder'),
+    spinner: document.getElementById('spinner'),
+    imgWrap: document.getElementById('imgWrap'),
+    pageStage: document.getElementById('pageStage'),
+    zoneLeft: document.getElementById('zoneLeft'),
+    zoneRight: document.getElementById('zoneRight'),
+    zoneMid: document.getElementById('zoneMid'),
+    controls: document.getElementById('controls'),
+    topbar: document.getElementById('topbar'),
+    firstBtn: document.getElementById('firstBtn'),
+    nextBtn: document.getElementById('nextBtn'),
+    prevBtn: document.getElementById('prevBtn'),
+    lastBtn: document.getElementById('lastBtn'),
+    animBtn: document.getElementById('animBtn'),
+    fitBtn: document.getElementById('fitBtn'),
+    fsBtn: document.getElementById('fsBtn'),
+    pageSlider: document.getElementById('pageSlider'),
+    pageLabel: document.getElementById('pageLabel'),
+    hintLine: document.getElementById('hintLine'),
+
+    saveDialogOverlay: document.getElementById('saveDialogOverlay'),
+    saveTitleInput: document.getElementById('saveTitleInput'),
+    saveFolderSelect: document.getElementById('saveFolderSelect'),
+    newFolderRow: document.getElementById('newFolderRow'),
+    newFolderInput: document.getElementById('newFolderInput'),
+    confirmNewFolderBtn: document.getElementById('confirmNewFolderBtn'),
+    cancelSaveBtn: document.getElementById('cancelSaveBtn'),
+    confirmSaveBtn: document.getElementById('confirmSaveBtn'),
+
+    savedListOverlay: document.getElementById('savedListOverlay'),
+    listBackBtn: document.getElementById('listBackBtn'),
+    listFolderTitle: document.getElementById('listFolderTitle'),
+    listNewFolderBtn: document.getElementById('listNewFolderBtn'),
+    listNewFolderRow: document.getElementById('listNewFolderRow'),
+    listNewFolderInput: document.getElementById('listNewFolderInput'),
+    listNewFolderConfirmBtn: document.getElementById('listNewFolderConfirmBtn'),
+    savedListItems: document.getElementById('savedListItems'),
+    savedListEmpty: document.getElementById('savedListEmpty'),
+    closeListBtn: document.getElementById('closeListBtn'),
+
+    syncStatusText: document.getElementById('syncStatusText'),
+    syncOpenBtn: document.getElementById('syncOpenBtn'),
+    syncNewBtn: document.getElementById('syncNewBtn'),
+    syncReconnectBtn: document.getElementById('syncReconnectBtn'),
+    syncDisconnectBtn: document.getElementById('syncDisconnectBtn'),
+    syncRow: document.getElementById('syncRow'),
+    exportBtn: document.getElementById('exportBtn'),
+    importBtn: document.getElementById('importBtn'),
+    importFileInput: document.getElementById('importFileInput'),
+  };
+
+  let baseUrl = '';
+  let pages = [];          // detected page URLs, index 0 = page 1
+  let preferredExt = 0;    // index into EXT_CANDIDATES
+  let detecting = false;
+  let detectionDone = false;
+  let detectionHitLimit = false;
+  let currentPage = 1;
+  let pendingResumePage = null;
+
+  let fitModes = ['fit-contain', 'fit-width', 'fit-height'];
+  let fitLabels = { 'fit-contain': '表示:全体', 'fit-width': '表示:幅優先', 'fit-height': '表示:高さ優先' };
+  let fitIndex = 0;
+
+  let animEnabled = true;
+
+  let savedFolders = []; // [{id, name}]
+  let savedItems = [];   // [{id, url, title, folderId, addedAt}]
+  let currentFolderView = null;
+  let pendingSaveUrl = null;
+
+  const syncSupported = !!(window.showOpenFilePicker && window.showSaveFilePicker);
+  let syncFileHandle = null;
+
+  function genId(prefix) {
+    return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+
+  // ---------- persistence ----------
+  try {
+    const last = localStorage.getItem(LAST_URL_KEY);
+    if (last) els.urlInput.value = last;
+  } catch (e) {}
+
+  try {
+    const a = localStorage.getItem(ANIM_KEY);
+    if (a !== null) animEnabled = a === '1';
+  } catch (e) {}
+  els.animBtn.textContent = 'ページ送りアニメ:' + (animEnabled ? 'ON' : 'OFF');
+  els.animBtn.classList.toggle('active', animEnabled);
+
+  function persistAnim() { try { localStorage.setItem(ANIM_KEY, animEnabled ? '1' : '0'); } catch (e) {} }
+  function persistFolders() { try { localStorage.setItem(SAVED_FOLDERS_KEY, JSON.stringify(savedFolders)); } catch (e) {} }
+  function persistItems() { try { localStorage.setItem(SAVED_ITEMS_KEY, JSON.stringify(savedItems)); } catch (e) {} }
+  function persistAll() {
+    persistFolders();
+    persistItems();
+    if (syncFileHandle) writeSyncFile();
+  }
+
+  // Remembers the last page viewed per manga (keyed by baseUrl). If the last
+  // viewed page was the final page (and detection had finished, so we know it
+  // really was the end), resuming should restart from page 1 instead.
+  function persistLastPage() {
+    if (!baseUrl || !pages.length) return;
+    try {
+      const map = JSON.parse(localStorage.getItem(LAST_PAGE_KEY) || '{}');
+      map[baseUrl] = {
+        page: currentPage,
+        wasLast: detectionDone && currentPage === pages.length,
+        savedAt: Date.now(),
+      };
+      localStorage.setItem(LAST_PAGE_KEY, JSON.stringify(map));
+    } catch (e) {}
+  }
+
+  function getResumePage(url) {
+    try {
+      const map = JSON.parse(localStorage.getItem(LAST_PAGE_KEY) || '{}');
+      const rec = map[url];
+      if (rec && !rec.wasLast && rec.page > 1) return rec.page;
+    } catch (e) {}
+    return null;
+  }
+
+  // ---------- file sync (File System Access API: Chrome/Edge only, not Safari) ----------
+  function openHandleDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('mangaReaderSyncDB', 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore('handles'); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbSetHandle(handle) {
+    const db = await openHandleDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('handles', 'readwrite');
+      tx.objectStore('handles').put(handle, 'syncFile');
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function idbGetHandle() {
+    const db = await openHandleDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('handles', 'readonly');
+      const req = tx.objectStore('handles').get('syncFile');
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbClearHandle() {
+    const db = await openHandleDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('handles', 'readwrite');
+      tx.objectStore('handles').delete('syncFile');
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function writeSyncFile() {
+    if (!syncFileHandle) return;
+    try {
+      const writable = await syncFileHandle.createWritable();
+      await writable.write(JSON.stringify({ folders: savedFolders, items: savedItems }, null, 2));
+      await writable.close();
+    } catch (e) {}
+  }
+
+  async function readSyncFile() {
+    if (!syncFileHandle) return;
+    try {
+      const file = await syncFileHandle.getFile();
+      const text = await file.text();
+      if (!text.trim()) return; // newly created empty file
+      const data = JSON.parse(text);
+      if (data && Array.isArray(data.folders) && Array.isArray(data.items)) {
+        savedFolders = data.folders;
+        savedItems = data.items;
+        persistFolders();
+        persistItems();
+        if (isSavedListOpen()) renderSavedList();
+      }
+    } catch (e) {}
+  }
+
+  function updateSyncUI(state) {
+    if (!syncSupported) { els.syncRow.style.display = 'none'; return; }
+    const name = syncFileHandle ? syncFileHandle.name : '';
+    if (state === 'connected') {
+      els.syncOpenBtn.style.display = 'none';
+      els.syncNewBtn.style.display = 'none';
+      els.syncReconnectBtn.style.display = 'none';
+      els.syncDisconnectBtn.style.display = '';
+      els.syncStatusText.textContent = '同期中: ' + name;
+    } else if (state === 'needsReconnect') {
+      els.syncOpenBtn.style.display = 'none';
+      els.syncNewBtn.style.display = 'none';
+      els.syncReconnectBtn.style.display = '';
+      els.syncDisconnectBtn.style.display = '';
+      els.syncStatusText.textContent = '再接続してください: ' + name;
+    } else {
+      els.syncOpenBtn.style.display = '';
+      els.syncNewBtn.style.display = '';
+      els.syncReconnectBtn.style.display = 'none';
+      els.syncDisconnectBtn.style.display = 'none';
+      els.syncStatusText.textContent = '未接続';
+    }
+  }
+
+  async function pickExistingSyncFile() {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+        multiple: false,
+      });
+      const perm = await handle.requestPermission({ mode: 'readwrite' });
+      if (perm !== 'granted') { flashStatus('権限が許可されませんでした'); return; }
+      if (savedItems.length || savedFolders.length) {
+        if (!confirm('選んだファイルの内容でローカルのリストを置き換えます。よろしいですか？')) return;
+      }
+      syncFileHandle = handle;
+      try { await idbSetHandle(handle); } catch (e) {}
+      await readSyncFile();
+      updateSyncUI('connected');
+      flashStatus('同期ファイルに接続しました');
+    } catch (e) { /* user cancelled the picker */ }
+  }
+
+  async function createNewSyncFile() {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: 'manga_reader_urls.json',
+        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+      });
+      syncFileHandle = handle;
+      try { await idbSetHandle(handle); } catch (e) {}
+      await writeSyncFile();
+      updateSyncUI('connected');
+      flashStatus('新しい同期ファイルを作成しました');
+    } catch (e) { /* user cancelled the picker */ }
+  }
+
+  async function reconnectSyncFile() {
+    if (!syncFileHandle) return;
+    try {
+      const perm = await syncFileHandle.requestPermission({ mode: 'readwrite' });
+      if (perm === 'granted') {
+        await readSyncFile();
+        updateSyncUI('connected');
+        flashStatus('再接続しました');
+      } else {
+        flashStatus('許可されませんでした');
+      }
+    } catch (e) { flashStatus('再接続に失敗しました'); }
+  }
+
+  async function disconnectSyncFile() {
+    syncFileHandle = null;
+    try { await idbClearHandle(); } catch (e) {}
+    updateSyncUI('none');
+    flashStatus('同期を解除しました');
+  }
+
+  function exportData() {
+    const data = { folders: savedFolders, items: savedItems };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'manga_reader_urls.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function importDataFromFile(file) {
+    file.text().then((text) => {
+      let data;
+      try { data = JSON.parse(text); } catch (e) { flashStatus('ファイル形式が正しくありません'); return; }
+      if (!data || !Array.isArray(data.folders) || !Array.isArray(data.items)) {
+        flashStatus('ファイル形式が正しくありません');
+        return;
+      }
+      if (!confirm('読み込んだ内容でローカルのリストを置き換えます。よろしいですか？')) return;
+      savedFolders = data.folders;
+      savedItems = data.items;
+      persistFolders();
+      persistItems();
+      if (isSavedListOpen()) renderSavedList();
+      flashStatus('読み込みました');
+    }).catch(() => flashStatus('読み込みに失敗しました'));
+  }
+
+  async function initSync() {
+    if (!syncSupported) { updateSyncUI('none'); return; }
+    try {
+      const handle = await idbGetHandle();
+      if (!handle) { updateSyncUI('none'); return; }
+      syncFileHandle = handle;
+      const perm = await handle.queryPermission({ mode: 'readwrite' });
+      if (perm === 'granted') {
+        await readSyncFile();
+        updateSyncUI('connected');
+      } else {
+        updateSyncUI('needsReconnect');
+      }
+    } catch (e) { updateSyncUI('none'); }
+  }
+
+  // Normalizes a base URL for identity comparisons: scheme (http/https) and
+  // host case differences shouldn't make two saves count as "different".
+  function baseUrlKey(url) {
+    try {
+      const u = new URL(url);
+      return u.hostname.toLowerCase() + u.pathname;
+    } catch (e) {
+      return (url || '').trim().replace(/^https?:\/\//i, '').toLowerCase();
+    }
+  }
+
+  function deriveTitleFromUrl(url) {
+    try {
+      const u = new URL(url);
+      const path = u.pathname.replace(/\/+$/, '');
+      const seg = path.split('/').filter(Boolean).pop();
+      return seg ? decodeURIComponent(seg) : u.hostname;
+    } catch (e) { return url; }
+  }
+
+  function loadSaved() {
+    try { savedFolders = JSON.parse(localStorage.getItem(SAVED_FOLDERS_KEY) || '[]'); }
+    catch (e) { savedFolders = []; }
+    try { savedItems = JSON.parse(localStorage.getItem(SAVED_ITEMS_KEY) || '[]'); }
+    catch (e) { savedItems = []; }
+
+    // migrate from the older flat URL-list format if present and nothing migrated yet
+    if (savedItems.length === 0) {
+      try {
+        const legacy = JSON.parse(localStorage.getItem(LEGACY_SAVED_URLS_KEY) || '[]');
+        if (Array.isArray(legacy) && legacy.length) {
+          savedItems = legacy.map((it) => ({
+            id: genId('i'),
+            url: it.url,
+            title: deriveTitleFromUrl(it.url),
+            folderId: null,
+            addedAt: it.addedAt || Date.now(),
+          }));
+          persistItems();
+        }
+      } catch (e) {}
+    }
+  }
+  loadSaved();
+
+  // ---------- URL parsing ----------
+  // Accepts either a folder URL ("https://example.com/manga/test/") or a direct
+  // link to a numbered page ("https://example.com/manga/test/1.jpg") and returns
+  // the normalized folder URL (always ending in "/") plus an extension hint.
+  function parseInputUrl(input) {
+    let v = (input || '').trim();
+    if (!v) return null;
+    if (!/^https?:\/\//i.test(v)) v = 'https://' + v;
+    let hintExt = null;
+    const m = v.match(/^(.*\/)\d+\.([A-Za-z0-9]+)(?:[?#].*)?$/);
+    if (m) {
+      v = m[1];
+      const idx = EXT_CANDIDATES.indexOf(m[2].toLowerCase());
+      if (idx !== -1) hintExt = idx;
+    } else {
+      // strip any query/hash if the user pasted a folder URL with one
+      v = v.replace(/[?#].*$/, '');
+    }
+    if (!v.endsWith('/')) v += '/';
+    return { baseUrl: v, hintExt: hintExt };
+  }
+
+  // ---------- image loading / detection ----------
+  function loadImage(url) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      let done = false;
+      const timer = setTimeout(() => {
+        if (!done) { done = true; resolve(false); }
+      }, LOAD_TIMEOUT_MS);
+      img.onload = () => { if (!done) { done = true; clearTimeout(timer); resolve(true); } };
+      img.onerror = () => { if (!done) { done = true; clearTimeout(timer); resolve(false); } };
+      img.src = url;
+    });
+  }
+
+  async function findPageUrl(pageNum) {
+    const order = [preferredExt, ...EXT_CANDIDATES.map((_, i) => i).filter((i) => i !== preferredExt)];
+    for (const idx of order) {
+      const ext = EXT_CANDIDATES[idx];
+      const url = baseUrl + pageNum + '.' + ext;
+      const ok = await loadImage(url);
+      if (ok) { preferredExt = idx; return url; }
+    }
+    return null;
+  }
+
+  async function startReading() {
+    const parsed = parseInputUrl(els.urlInput.value);
+    if (!parsed) return;
+    baseUrl = parsed.baseUrl;
+    preferredExt = parsed.hintExt !== null ? parsed.hintExt : 0;
+    try { localStorage.setItem(LAST_URL_KEY, baseUrl); } catch (e) {}
+
+    pages = [];
+    detecting = true;
+    detectionDone = false;
+    detectionHitLimit = false;
+    currentPage = 1;
+    pendingResumePage = getResumePage(baseUrl);
+
+    els.loadBtn.disabled = true;
+    els.placeholder.style.display = 'none';
+    els.imgWrap.style.display = 'none';
+    els.spinner.style.display = 'block';
+    els.status.textContent = '1ページ目を確認中...';
+
+    const firstUrl = await findPageUrl(1);
+    els.loadBtn.disabled = false;
+
+    if (!firstUrl) {
+      els.spinner.style.display = 'none';
+      els.placeholder.style.display = 'block';
+      els.placeholder.innerHTML =
+        '1ページ目が見つかりませんでした。<br>' +
+        '試したURL: ' + EXT_CANDIDATES.map((e) => '<code>' + baseUrl + '1.' + e + '</code>').join(' / ') + '<br>' +
+        'URLや拡張子を確認してください。';
+      els.status.textContent = '';
+      detecting = false;
+      return;
+    }
+
+    pages.push(firstUrl);
+    els.spinner.style.display = 'none';
+    els.imgWrap.style.display = 'block';
+    els.controls.style.display = 'flex';
+    els.hintLine.style.display = 'block';
+    showPage(1);
+    updateStatus();
+    detectMorePages(2);
+  }
+
+  async function detectMorePages(startPage) {
+    let pageNum = startPage;
+    while (pageNum <= MAX_PAGES_SAFETY) {
+      const url = await findPageUrl(pageNum);
+      if (!url) {
+        detectionDone = true;
+        detecting = false;
+        updateStatus();
+        updateSlider();
+        persistLastPage();
+        return;
+      }
+      pages.push(url);
+      pageNum++;
+      updateStatus();
+      updateSlider();
+      if (pendingResumePage !== null && pages.length === pendingResumePage) {
+        jumpToPage(pendingResumePage);
+        pendingResumePage = null;
+      }
+    }
+    detectionHitLimit = true;
+    detectionDone = true;
+    detecting = false;
+    updateStatus();
+    updateSlider();
+    persistLastPage();
+  }
+
+  function updateStatus() {
+    if (detecting) {
+      els.status.textContent = '検出中... ' + pages.length + 'ページ確認済み';
+    } else if (detectionHitLimit) {
+      els.status.textContent = pages.length + 'ページ以上（検出上限）';
+    } else if (detectionDone) {
+      els.status.textContent = '全 ' + pages.length + ' ページ';
+    }
+  }
+
+  function flashStatus(msg) {
+    els.status.textContent = msg;
+    setTimeout(updateStatus, 1500);
+  }
+
+  // ---------- page rendering / navigation ----------
+  function styleImg(img) {
+    const mode = fitModes[fitIndex];
+    img.style.maxWidth = '100%';
+    img.style.maxHeight = '';
+    img.style.width = '';
+    img.style.height = '';
+    img.style.objectFit = '';
+    if (mode === 'fit-contain') {
+      img.style.maxHeight = 'calc(100vh - 110px)';
+      img.style.width = 'auto';
+      img.style.height = 'auto';
+      img.style.objectFit = 'contain';
+    } else if (mode === 'fit-width') {
+      img.style.width = '100%';
+      img.style.height = 'auto';
+    } else { // fit-height
+      img.style.height = 'calc(100vh - 110px)';
+      img.style.width = 'auto';
+    }
+  }
+
+  function makeImg(pNum) {
+    const img = document.createElement('img');
+    img.className = 'pageimg';
+    img.alt = 'page ' + pNum;
+    img.src = pages[pNum - 1];
+    styleImg(img);
+    return img;
+  }
+
+  function renderPage(n, direction) {
+    const newSlide = document.createElement('div');
+    newSlide.className = 'pageSlide';
+    newSlide.appendChild(makeImg(n));
+
+    const prevSlide = els.pageStage.querySelector('.pageSlide.current');
+
+    if (animEnabled && direction && prevSlide) {
+      newSlide.style.transform = direction === 'next' ? 'translateX(100%)' : 'translateX(-100%)';
+      els.pageStage.appendChild(newSlide);
+      prevSlide.classList.remove('current');
+      void newSlide.offsetWidth; // force layout before animating
+      newSlide.style.transition = 'transform ' + ANIM_DURATION + 'ms ease';
+      prevSlide.style.transition = 'transform ' + ANIM_DURATION + 'ms ease';
+      requestAnimationFrame(() => {
+        newSlide.style.transform = 'translateX(0)';
+        prevSlide.style.transform = direction === 'next' ? 'translateX(-100%)' : 'translateX(100%)';
+      });
+      newSlide.classList.add('current');
+      setTimeout(() => { if (prevSlide.parentNode) prevSlide.parentNode.removeChild(prevSlide); }, ANIM_DURATION + 60);
+    } else {
+      els.pageStage.innerHTML = '';
+      newSlide.classList.add('current');
+      els.pageStage.appendChild(newSlide);
+    }
+  }
+
+  function updateSlider() {
+    els.pageSlider.max = Math.max(pages.length, currentPage);
+    els.pageSlider.value = currentPage;
+    const totalLabel = detectionDone ? pages.length : pages.length + '+';
+    els.pageLabel.textContent = currentPage + ' / ' + totalLabel;
+  }
+
+  function preload(pageNum) {
+    if (pageNum >= 1 && pageNum <= pages.length) {
+      const img = new Image();
+      img.src = pages[pageNum - 1];
+    }
+  }
+
+  function showPage(n) {
+    if (!pages.length) return;
+    if (n < 1) n = 1;
+    if (n > pages.length) n = pages.length;
+    const hasCurrent = !!els.pageStage.querySelector('.pageSlide');
+    const direction = !hasCurrent ? null : (n > currentPage ? 'next' : (n < currentPage ? 'prev' : null));
+    currentPage = n;
+    renderPage(n, direction);
+    updateSlider();
+    preload(n + 1);
+    preload(n + 2);
+    preload(n - 1);
+    persistLastPage();
+  }
+
+  // Instant, non-animated jump used when resuming to a saved page on load.
+  function jumpToPage(n) {
+    if (!pages.length) return;
+    if (n < 1) n = 1;
+    if (n > pages.length) n = pages.length;
+    currentPage = n;
+    renderPage(n, null);
+    updateSlider();
+    preload(n + 1);
+    preload(n + 2);
+    preload(n - 1);
+    persistLastPage();
+  }
+
+  function nextPage() { if (currentPage < pages.length) showPage(currentPage + 1); }
+  function prevPage() { if (currentPage > 1) showPage(currentPage - 1); }
+  function goFirst() { showPage(1); }
+  function goLast() { showPage(pages.length); }
+
+  function refreshCurrentView() {
+    if (pages.length) renderPage(currentPage, null);
+  }
+
+  function toggleBars() {
+    els.topbar.classList.toggle('hidden');
+    els.controls.classList.toggle('hidden');
+  }
+
+  function cycleFit() {
+    fitIndex = (fitIndex + 1) % fitModes.length;
+    els.fitBtn.textContent = fitLabels[fitModes[fitIndex]];
+    refreshCurrentView();
+  }
+
+  function toggleAnim() {
+    animEnabled = !animEnabled;
+    els.animBtn.textContent = 'ページ送りアニメ:' + (animEnabled ? 'ON' : 'OFF');
+    els.animBtn.classList.toggle('active', animEnabled);
+    persistAnim();
+  }
+
+  function toggleFullscreen() {
+    const el = document.documentElement;
+    const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+    try {
+      if (!isFs) {
+        const req = el.requestFullscreen || el.webkitRequestFullscreen;
+        if (req) { const r = req.call(el); if (r && r.catch) r.catch(() => {}); }
+      } else {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen;
+        if (exit) { const r = exit.call(document); if (r && r.catch) r.catch(() => {}); }
+      }
+    } catch (e) {}
+  }
+
+  // ---------- save dialog ----------
+  function renderFolderOptions(selectEl, selectedId) {
+    selectEl.innerHTML = '';
+    const optNone = document.createElement('option');
+    optNone.value = '';
+    optNone.textContent = 'フォルダなし';
+    selectEl.appendChild(optNone);
+    savedFolders.forEach((f) => {
+      const o = document.createElement('option');
+      o.value = f.id;
+      o.textContent = f.name;
+      selectEl.appendChild(o);
+    });
+    const optNew = document.createElement('option');
+    optNew.value = '__new__';
+    optNew.textContent = '+ 新しいフォルダを作成';
+    selectEl.appendChild(optNew);
+    selectEl.value = selectedId || '';
+  }
+
+  function openSaveDialog() {
+    const parsed = parseInputUrl(els.urlInput.value);
+    if (!parsed) { flashStatus('URLを入力してください'); return; }
+    pendingSaveUrl = parsed.baseUrl;
+    els.saveTitleInput.value = deriveTitleFromUrl(pendingSaveUrl);
+    renderFolderOptions(els.saveFolderSelect, '');
+    els.newFolderRow.style.display = 'none';
+    els.newFolderInput.value = '';
+    els.saveDialogOverlay.classList.add('show');
+    els.saveTitleInput.focus();
+  }
+  function closeSaveDialog() {
+    els.saveDialogOverlay.classList.remove('show');
+    pendingSaveUrl = null;
+  }
+  function isSaveDialogOpen() { return els.saveDialogOverlay.classList.contains('show'); }
+
+  function confirmSave() {
+    if (!pendingSaveUrl) { closeSaveDialog(); return; }
+    let folderId = els.saveFolderSelect.value;
+    if (folderId === '__new__') folderId = '';
+    if (savedItems.some((it) => baseUrlKey(it.url) === baseUrlKey(pendingSaveUrl))) {
+      flashStatus('既に保存済みです');
+      closeSaveDialog();
+      return;
+    }
+    const title = els.saveTitleInput.value.trim() || deriveTitleFromUrl(pendingSaveUrl);
+    savedItems.unshift({
+      id: genId('i'),
+      url: pendingSaveUrl,
+      title: title,
+      folderId: folderId || null,
+      addedAt: Date.now(),
+    });
+    persistAll();
+    closeSaveDialog();
+    flashStatus('保存しました');
+  }
+
+  // ---------- saved list (with folders) ----------
+  function buildFolderRow(folder) {
+    const row = document.createElement('div');
+    row.className = 'saved-item folder-row';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'url-text folder-name';
+    nameSpan.textContent = folder.name;
+    nameSpan.addEventListener('click', () => { currentFolderView = folder.id; renderSavedList(); });
+
+    const chevron = document.createElement('span');
+    chevron.className = 'chevron';
+    chevron.textContent = '›';
+
+    const delBtn = document.createElement('button');
+    delBtn.textContent = '削除';
+    delBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!confirm('「' + folder.name + '」フォルダと、その中のURLをすべて削除しますか？')) return;
+      savedItems = savedItems.filter((it) => it.folderId !== folder.id);
+      savedFolders = savedFolders.filter((f) => f.id !== folder.id);
+      persistAll();
+      renderSavedList();
+    });
+
+    row.appendChild(nameSpan);
+    row.appendChild(chevron);
+    row.appendChild(delBtn);
+    return row;
+  }
+
+  function buildItemRow(item) {
+    const row = document.createElement('div');
+    row.className = 'saved-item';
+
+    const textWrap = document.createElement('div');
+    textWrap.className = 'item-text';
+    textWrap.title = item.url;
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'item-title';
+    titleEl.textContent = item.title || deriveTitleFromUrl(item.url);
+
+    const urlEl = document.createElement('div');
+    urlEl.className = 'item-url';
+    urlEl.textContent = item.url;
+
+    textWrap.appendChild(titleEl);
+    textWrap.appendChild(urlEl);
+    textWrap.addEventListener('click', () => {
+      els.urlInput.value = item.url;
+      closeSavedList();
+      startReading();
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.textContent = '削除';
+    delBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      savedItems = savedItems.filter((it) => it.id !== item.id);
+      persistAll();
+      renderSavedList();
+    });
+
+    row.appendChild(textWrap);
+    row.appendChild(delBtn);
+    return row;
+  }
+
+  function renderSavedList() {
+    els.listBackBtn.style.display = currentFolderView ? '' : 'none';
+    els.listNewFolderBtn.style.display = currentFolderView ? 'none' : '';
+    els.listNewFolderRow.style.display = 'none';
+
+    if (currentFolderView) {
+      const folder = savedFolders.find((f) => f.id === currentFolderView);
+      els.listFolderTitle.textContent = folder ? folder.name : '';
+    } else {
+      els.listFolderTitle.textContent = '';
+    }
+
+    els.savedListItems.innerHTML = '';
+    let rows = [];
+    if (!currentFolderView) {
+      rows = rows.concat(savedFolders.map((f) => ({ type: 'folder', data: f })));
+      rows = rows.concat(savedItems.filter((it) => !it.folderId).map((it) => ({ type: 'item', data: it })));
+    } else {
+      rows = savedItems.filter((it) => it.folderId === currentFolderView).map((it) => ({ type: 'item', data: it }));
+    }
+
+    if (rows.length === 0) {
+      els.savedListEmpty.style.display = 'block';
+      els.savedListEmpty.textContent = currentFolderView ? 'このフォルダにはまだ何もありません' : '保存されたURLはまだありません';
+    } else {
+      els.savedListEmpty.style.display = 'none';
+      rows.forEach((r) => {
+        els.savedListItems.appendChild(r.type === 'folder' ? buildFolderRow(r.data) : buildItemRow(r.data));
+      });
+    }
+  }
+
+  function openSavedList() { currentFolderView = null; renderSavedList(); els.savedListOverlay.classList.add('show'); }
+  function closeSavedList() { els.savedListOverlay.classList.remove('show'); }
+  function isSavedListOpen() { return els.savedListOverlay.classList.contains('show'); }
+
+  function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen(); }
+
+  // ---------- events ----------
+  els.loadBtn.addEventListener('click', startReading);
+  els.urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') startReading(); });
+
+  els.saveBtn.addEventListener('click', openSaveDialog);
+  els.cancelSaveBtn.addEventListener('click', closeSaveDialog);
+  els.confirmSaveBtn.addEventListener('click', confirmSave);
+  els.saveDialogOverlay.addEventListener('click', (e) => { if (e.target === els.saveDialogOverlay) closeSaveDialog(); });
+  els.saveFolderSelect.addEventListener('change', () => {
+    if (els.saveFolderSelect.value === '__new__') {
+      els.newFolderRow.style.display = 'flex';
+      els.newFolderInput.focus();
+    } else {
+      els.newFolderRow.style.display = 'none';
+    }
+  });
+  els.confirmNewFolderBtn.addEventListener('click', () => {
+    const name = els.newFolderInput.value.trim();
+    if (!name) return;
+    const folder = { id: genId('f'), name: name };
+    savedFolders.push(folder);
+    persistAll();
+    renderFolderOptions(els.saveFolderSelect, folder.id);
+    els.newFolderRow.style.display = 'none';
+  });
+
+  els.syncOpenBtn.addEventListener('click', pickExistingSyncFile);
+  els.syncNewBtn.addEventListener('click', createNewSyncFile);
+  els.syncReconnectBtn.addEventListener('click', reconnectSyncFile);
+  els.syncDisconnectBtn.addEventListener('click', disconnectSyncFile);
+  els.exportBtn.addEventListener('click', exportData);
+  els.importBtn.addEventListener('click', () => els.importFileInput.click());
+  els.importFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) importDataFromFile(file);
+    els.importFileInput.value = '';
+  });
+
+  els.listBtn.addEventListener('click', openSavedList);
+  els.closeListBtn.addEventListener('click', closeSavedList);
+  els.savedListOverlay.addEventListener('click', (e) => { if (e.target === els.savedListOverlay) closeSavedList(); });
+  els.listBackBtn.addEventListener('click', () => { currentFolderView = null; renderSavedList(); });
+  els.listNewFolderBtn.addEventListener('click', () => {
+    const showing = els.listNewFolderRow.style.display === 'flex';
+    els.listNewFolderRow.style.display = showing ? 'none' : 'flex';
+    if (!showing) els.listNewFolderInput.focus();
+  });
+  els.listNewFolderConfirmBtn.addEventListener('click', () => {
+    const name = els.listNewFolderInput.value.trim();
+    if (!name) return;
+    savedFolders.push({ id: genId('f'), name: name });
+    persistAll();
+    els.listNewFolderInput.value = '';
+    els.listNewFolderRow.style.display = 'none';
+    renderSavedList();
+  });
+
+  els.zoneLeft.addEventListener('click', prevPage);
+  els.zoneRight.addEventListener('click', nextPage);
+  els.zoneMid.addEventListener('click', toggleBars);
+  els.firstBtn.addEventListener('click', goFirst);
+  els.lastBtn.addEventListener('click', goLast);
+  els.nextBtn.addEventListener('click', nextPage);
+  els.prevBtn.addEventListener('click', prevPage);
+  els.animBtn.addEventListener('click', toggleAnim);
+  els.fitBtn.addEventListener('click', cycleFit);
+  els.fsBtn.addEventListener('click', toggleFullscreen);
+  els.pageSlider.addEventListener('input', (e) => showPage(parseInt(e.target.value, 10) || 1));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target === els.urlInput || e.target === els.saveTitleInput ||
+        e.target === els.newFolderInput || e.target === els.listNewFolderInput) {
+      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); }
+      return;
+    }
+    if (anyModalOpen()) {
+      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); }
+      return;
+    }
+    switch (e.key) {
+      case 'ArrowLeft': prevPage(); break;   // left = back
+      case 'ArrowRight': nextPage(); break;  // right = forward
+      case 'Home': goFirst(); break;
+      case 'End': goLast(); break;
+      case 'f': case 'F': toggleFullscreen(); break;
+      case 'h': case 'H': toggleBars(); break;
+    }
+  });
+
+  initSync();
+})();
+</script>
+</body>
+</html>
