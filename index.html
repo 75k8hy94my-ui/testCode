@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>連番画像 漫画リーダー</title>
+<title>MangaReader</title>
 <style>
   :root {
     --bg: #0e0e10;
@@ -19,10 +19,11 @@
     font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
     overflow: hidden;
   }
-  #app { display: flex; flex-direction: column; height: 100vh; }
+  #app { position: relative; height: 100vh; overflow: hidden; }
 
-  /* Top bar */
+  /* Top bar (overlays the viewer; hiding it does not change viewer's size) */
   #topbar {
+    position: absolute; top: 0; left: 0; right: 0;
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 6px;
     padding: 10px 12px; background: var(--panel);
     border-bottom: 1px solid #2a2a30;
@@ -33,7 +34,7 @@
   #urlInput {
     flex: 1; min-width: 160px; padding: 8px 10px; border-radius: 6px;
     border: 1px solid #333; background: #0e0e10; color: var(--text);
-    font-size: 14px;
+    font-size: 16px;
   }
   #urlInput:focus { outline: 1px solid var(--accent); }
   #loadBtn, .ctrlBtn, .primaryBtn {
@@ -47,9 +48,11 @@
   .ctrlBtn:disabled, #loadBtn:disabled { opacity: 0.4; cursor: not-allowed; }
   #status { font-size: 12px; color: var(--sub); min-width: 90px; }
 
-  /* Viewer */
+  /* Viewer: always fills the full app area. Topbar/controls float on top of
+     it, so hiding them reveals more of the image instead of leaving blank
+     space behind. */
   #viewer {
-    flex: 1; position: relative; display: flex;
+    position: absolute; inset: 0; display: flex;
     align-items: center; justify-content: center;
     background: #000; overflow: auto;
   }
@@ -80,8 +83,9 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Bottom controls */
+  /* Bottom controls (also overlays the viewer; see #topbar comment above) */
   #controls {
+    position: absolute; bottom: 0; left: 0; right: 0;
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 6px;
     padding: 10px 14px; background: var(--panel);
     border-top: 1px solid #2a2a30;
@@ -91,8 +95,6 @@
   #controls.hidden { transform: translateY(100%); opacity: 0; }
   #pageSlider { flex: 1; min-width: 80px; }
   #pageLabel { font-size: 13px; color: var(--sub); min-width: 70px; text-align: center; white-space: nowrap; }
-
-  .hint { font-size: 11px; color: var(--sub); padding: 4px 14px 0; }
 
   /* Modal overlays (shared) */
   .modalOverlay {
@@ -113,7 +115,7 @@
   .field-label { font-size: 12px; color: var(--sub); display: block; margin-top: 10px; }
   #saveDialogPanel input[type="text"], #saveDialogPanel select {
     width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #333;
-    background: #0e0e10; color: var(--text); font-size: 14px; margin-top: 4px;
+    background: #0e0e10; color: var(--text); font-size: 16px; margin-top: 4px;
   }
   #newFolderRow { display: none; gap: 8px; margin-top: 8px; }
   #newFolderRow input { flex: 1; }
@@ -125,7 +127,7 @@
   #listNewFolderRow { display: none; gap: 8px; margin-bottom: 10px; }
   #listNewFolderRow input {
     flex: 1; padding: 8px 10px; border-radius: 6px; border: 1px solid #333;
-    background: #0e0e10; color: var(--text); font-size: 14px;
+    background: #0e0e10; color: var(--text); font-size: 16px;
   }
   #savedListItems { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 6px; }
   .saved-item {
@@ -153,9 +155,36 @@
     font-size: 12px;
   }
   #syncStatusText { color: var(--sub); flex: 1; min-width: 120px; }
+
+  /* Access lock */
+  #lockOverlay {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
+  }
+  #lockPanel {
+    background: var(--panel); border-radius: 10px; padding: 26px;
+    width: min(300px, 86vw); text-align: center;
+  }
+  #lockPanel p { margin: 0 0 14px; font-size: 14px; color: var(--text); }
+  #lockInput {
+    width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #333;
+    background: #0e0e10; color: var(--text); font-size: 18px; text-align: center;
+    letter-spacing: 6px; margin-bottom: 10px;
+  }
+  #lockError { color: var(--accent); font-size: 12px; min-height: 16px; margin-bottom: 8px; }
+  #lockSubmitBtn { width: 100%; }
 </style>
 </head>
 <body>
+<div id="lockOverlay">
+  <div id="lockPanel">
+    <p>パスコードを入力してください</p>
+    <input id="lockInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off">
+    <div id="lockError"></div>
+    <button class="primaryBtn" id="lockSubmitBtn">進む</button>
+  </div>
+</div>
 <div id="app">
   <div id="topbar">
     <input id="urlInput" type="text" placeholder="例: https://example.com/manga/test/  または .../1.jpg" />
@@ -191,7 +220,6 @@
     <button class="ctrlBtn" id="fitBtn" title="表示モード切替">表示:全体</button>
     <button class="ctrlBtn" id="fsBtn" title="全画面表示">全画面</button>
   </div>
-  <div class="hint" id="hintLine" style="display:none;">クリック: 画像左側=戻る、右側=進む、中央=バー表示切替　／　キー: ←戻る・→進む</div>
 </div>
 
 <!-- Save dialog -->
@@ -285,7 +313,6 @@
     fsBtn: document.getElementById('fsBtn'),
     pageSlider: document.getElementById('pageSlider'),
     pageLabel: document.getElementById('pageLabel'),
-    hintLine: document.getElementById('hintLine'),
 
     saveDialogOverlay: document.getElementById('saveDialogOverlay'),
     saveTitleInput: document.getElementById('saveTitleInput'),
@@ -316,6 +343,11 @@
     exportBtn: document.getElementById('exportBtn'),
     importBtn: document.getElementById('importBtn'),
     importFileInput: document.getElementById('importFileInput'),
+
+    lockOverlay: document.getElementById('lockOverlay'),
+    lockInput: document.getElementById('lockInput'),
+    lockError: document.getElementById('lockError'),
+    lockSubmitBtn: document.getElementById('lockSubmitBtn'),
   };
 
   let baseUrl = '';
@@ -711,7 +743,6 @@
     els.spinner.style.display = 'none';
     els.imgWrap.style.display = 'block';
     els.controls.style.display = 'flex';
-    els.hintLine.style.display = 'block';
     showPage(1);
     updateStatus();
     detectMorePages(2);
@@ -770,7 +801,10 @@
     img.style.height = '';
     img.style.objectFit = '';
     if (mode === 'fit-contain') {
-      img.style.maxHeight = 'calc(100vh - 110px)';
+      // Topbar/controls float on top of the viewer (not beside it), so the
+      // image can always use the full viewport height; hiding the bars
+      // reveals more of the image instead of leaving blank space.
+      img.style.maxHeight = '100vh';
       img.style.width = 'auto';
       img.style.height = 'auto';
       img.style.objectFit = 'contain';
@@ -778,7 +812,7 @@
       img.style.width = '100%';
       img.style.height = 'auto';
     } else { // fit-height
-      img.style.height = 'calc(100vh - 110px)';
+      img.style.height = '100vh';
       img.style.width = 'auto';
     }
   }
@@ -1157,6 +1191,37 @@
       case 'h': case 'H': toggleBars(); break;
     }
   });
+
+  // ---------- access lock ----------
+  const LOCK_KEY = 'mangaReaderUnlocked';
+  const LOCK_CODE = '8122';
+
+  function checkLock() {
+    try {
+      if (localStorage.getItem(LOCK_KEY) === '1') {
+        els.lockOverlay.style.display = 'none';
+        return;
+      }
+    } catch (e) {}
+    els.lockOverlay.style.display = 'flex';
+    els.lockInput.focus();
+  }
+
+  function tryUnlock() {
+    if (els.lockInput.value.trim() === LOCK_CODE) {
+      try { localStorage.setItem(LOCK_KEY, '1'); } catch (e) {}
+      els.lockOverlay.style.display = 'none';
+      els.lockError.textContent = '';
+    } else {
+      els.lockError.textContent = 'コードが違います';
+      els.lockInput.value = '';
+      els.lockInput.focus();
+    }
+  }
+
+  els.lockSubmitBtn.addEventListener('click', tryUnlock);
+  els.lockInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
+  checkLock();
 
   initSync();
 })();
