@@ -33,21 +33,15 @@
     z-index: 10;
   }
   #topbar.hidden { transform: translateY(-100%); opacity: 0; }
-  #urlInput {
-    flex: 1; min-width: 160px; padding: 8px 10px; border-radius: 6px;
-    border: 1px solid #333; background: #0e0e10; color: var(--text);
-    font-size: 16px;
-  }
-  #urlInput:focus { outline: 1px solid var(--accent); }
-  #loadBtn, .ctrlBtn, .primaryBtn {
+  .ctrlBtn, .primaryBtn {
     padding: 8px 14px; border-radius: 6px; border: none;
     font-size: 14px; cursor: pointer; white-space: nowrap;
   }
-  #loadBtn, .primaryBtn { background: var(--accent); color: white; }
+  .primaryBtn { background: var(--accent); color: white; }
   .ctrlBtn { background: #2a2a30; color: var(--text); }
   .ctrlBtn.active { background: var(--accent); color: white; }
-  .ctrlBtn:hover, #loadBtn:hover, .primaryBtn:hover { filter: brightness(1.15); }
-  .ctrlBtn:disabled, #loadBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ctrlBtn:hover, .primaryBtn:hover { filter: brightness(1.15); }
+  .ctrlBtn:disabled, .primaryBtn:disabled { opacity: 0.4; cursor: not-allowed; }
   #status { font-size: 12px; color: var(--sub); min-width: 90px; }
   #currentTitle {
     font-size: 13px; font-weight: 600; color: var(--text);
@@ -194,8 +188,7 @@
 </div>
 <div id="app">
   <div id="topbar">
-    <input id="urlInput" type="text" placeholder="例: https://example.com/manga/test/  または .../1.jpg" />
-    <button id="loadBtn">開く</button>
+    <button class="primaryBtn" id="newBtn">新規</button>
     <button class="ctrlBtn" id="saveBtn" title="今のURLを保存">URLを保存</button>
     <button class="ctrlBtn" id="listBtn" title="保存したURLの一覧">リスト</button>
     <span id="status"></span>
@@ -204,7 +197,7 @@
 
   <div id="viewer" class="fit-contain">
     <div id="placeholder">
-      上の欄に画像が並んでいるURLを入力してください<br>
+      「新規」ボタンを押して、画像が並んでいるURLを入力してください<br>
       例: <code>https://example.com/manga/test/</code> でも <code>https://example.com/manga/test/1.jpg</code> でもOK<br>
       （<code>1.jpg</code>, <code>2.jpg</code> ... のように連番で並んでいる場所）
     </div>
@@ -293,10 +286,11 @@
   const SAVED_FOLDERS_KEY = 'mangaReaderSavedFolders';
   const SAVED_ITEMS_KEY = 'mangaReaderSavedItems';
   const LEGACY_SAVED_URLS_KEY = 'mangaReaderSavedUrls';
+  const HISTORY_FOLDER_ID = '__history__';
+  const HISTORY_FOLDER_NAME = '履歴';
 
   const els = {
-    urlInput: document.getElementById('urlInput'),
-    loadBtn: document.getElementById('loadBtn'),
+    newBtn: document.getElementById('newBtn'),
     saveBtn: document.getElementById('saveBtn'),
     listBtn: document.getElementById('listBtn'),
     status: document.getElementById('status'),
@@ -363,6 +357,7 @@
   let detectionHitLimit = false;
   let currentPage = 1;
   let pendingResumePage = null;
+  let latestRenderId = 0; // guards against a slow-loading page overwriting a newer one
 
   let fitModes = ['fit-contain', 'fit-width', 'fit-height'];
   let fitLabels = { 'fit-contain': '表示:全体', 'fit-width': '表示:幅優先', 'fit-height': '表示:高さ優先' };
@@ -383,11 +378,6 @@
   }
 
   // ---------- persistence ----------
-  try {
-    const last = localStorage.getItem(LAST_URL_KEY);
-    if (last) els.urlInput.value = last;
-  } catch (e) {}
-
   try {
     const a = localStorage.getItem(ANIM_KEY);
     if (a !== null) animEnabled = a === '1';
@@ -627,6 +617,31 @@
     }
   }
 
+  // The "履歴" folder is a reserved, always-present folder that auto-collects
+  // every manga opened via the "新規" button. Created on first use.
+  function ensureHistoryFolder() {
+    if (!savedFolders.some((f) => f.id === HISTORY_FOLDER_ID)) {
+      savedFolders.unshift({ id: HISTORY_FOLDER_ID, name: HISTORY_FOLDER_NAME });
+    }
+  }
+
+  // Auto-adds a newly opened manga to 履歴 (no title prompt: title is derived
+  // from the URL). Re-opening the same manga moves its history entry to the
+  // top instead of piling up duplicates.
+  function addToHistory(url) {
+    ensureHistoryFolder();
+    savedItems = savedItems.filter((it) => !(it.folderId === HISTORY_FOLDER_ID && baseUrlKey(it.url) === baseUrlKey(url)));
+    savedItems.unshift({
+      id: genId('i'),
+      url: url,
+      title: deriveTitleFromUrl(url),
+      folderId: HISTORY_FOLDER_ID,
+      addedAt: Date.now(),
+    });
+    persistAll();
+    updateCurrentTitleDisplay();
+  }
+
   // If the URL currently being viewed matches a saved item (by base URL),
   // show that item's title in the header; otherwise clear it.
   function updateCurrentTitleDisplay() {
@@ -666,6 +681,7 @@
         }
       } catch (e) {}
     }
+    ensureHistoryFolder();
   }
   loadSaved();
 
@@ -716,13 +732,16 @@
     return null;
   }
 
-  async function startReading() {
-    const parsed = parseInputUrl(els.urlInput.value);
+  // url: the manga's folder/page URL. addToHistoryFlag: true when this open
+  // should be auto-recorded into 履歴 (used for the "新規" button only).
+  async function startReading(url, addToHistoryFlag) {
+    const parsed = parseInputUrl(url);
     if (!parsed) return;
     baseUrl = parsed.baseUrl;
     preferredExt = parsed.hintExt !== null ? parsed.hintExt : 0;
     try { localStorage.setItem(LAST_URL_KEY, baseUrl); } catch (e) {}
     updateCurrentTitleDisplay();
+    if (addToHistoryFlag) addToHistory(baseUrl);
 
     pages = [];
     detecting = true;
@@ -731,14 +750,14 @@
     currentPage = 1;
     pendingResumePage = getResumePage(baseUrl);
 
-    els.loadBtn.disabled = true;
+    els.newBtn.disabled = true;
     els.placeholder.style.display = 'none';
     els.imgWrap.style.display = 'none';
     els.spinner.style.display = 'block';
     els.status.textContent = '1ページ目を確認中...';
 
     const firstUrl = await findPageUrl(1);
-    els.loadBtn.disabled = false;
+    els.newBtn.disabled = false;
 
     if (!firstUrl) {
       els.spinner.style.display = 'none';
@@ -839,30 +858,49 @@
     return img;
   }
 
+  // Renders page n into the stage, but only once its image has actually
+  // finished loading. Until then, whatever was previously on screen stays
+  // visible instead of being replaced by a blank/black frame. If the page
+  // changes again before this one finishes loading, the stale result is
+  // dropped (latestRenderId guard) so a slow load can't clobber a newer page.
   function renderPage(n, direction) {
-    const newSlide = document.createElement('div');
-    newSlide.className = 'pageSlide';
-    newSlide.appendChild(makeImg(n));
+    const myId = ++latestRenderId;
+    const img = makeImg(n);
 
-    const prevSlide = els.pageStage.querySelector('.pageSlide.current');
+    const doRender = () => {
+      if (myId !== latestRenderId) return;
 
-    if (animEnabled && direction && prevSlide) {
-      newSlide.style.transform = direction === 'next' ? 'translateX(100%)' : 'translateX(-100%)';
-      els.pageStage.appendChild(newSlide);
-      prevSlide.classList.remove('current');
-      void newSlide.offsetWidth; // force layout before animating
-      newSlide.style.transition = 'transform ' + ANIM_DURATION + 'ms ease';
-      prevSlide.style.transition = 'transform ' + ANIM_DURATION + 'ms ease';
-      requestAnimationFrame(() => {
-        newSlide.style.transform = 'translateX(0)';
-        prevSlide.style.transform = direction === 'next' ? 'translateX(-100%)' : 'translateX(100%)';
-      });
-      newSlide.classList.add('current');
-      setTimeout(() => { if (prevSlide.parentNode) prevSlide.parentNode.removeChild(prevSlide); }, ANIM_DURATION + 60);
+      const newSlide = document.createElement('div');
+      newSlide.className = 'pageSlide';
+      newSlide.appendChild(img);
+
+      const prevSlide = els.pageStage.querySelector('.pageSlide.current');
+
+      if (animEnabled && direction && prevSlide) {
+        newSlide.style.transform = direction === 'next' ? 'translateX(100%)' : 'translateX(-100%)';
+        els.pageStage.appendChild(newSlide);
+        prevSlide.classList.remove('current');
+        void newSlide.offsetWidth; // force layout before animating
+        newSlide.style.transition = 'transform ' + ANIM_DURATION + 'ms ease';
+        prevSlide.style.transition = 'transform ' + ANIM_DURATION + 'ms ease';
+        requestAnimationFrame(() => {
+          newSlide.style.transform = 'translateX(0)';
+          prevSlide.style.transform = direction === 'next' ? 'translateX(-100%)' : 'translateX(100%)';
+        });
+        newSlide.classList.add('current');
+        setTimeout(() => { if (prevSlide.parentNode) prevSlide.parentNode.removeChild(prevSlide); }, ANIM_DURATION + 60);
+      } else {
+        els.pageStage.innerHTML = '';
+        newSlide.classList.add('current');
+        els.pageStage.appendChild(newSlide);
+      }
+    };
+
+    if (img.complete) {
+      doRender();
     } else {
-      els.pageStage.innerHTML = '';
-      newSlide.classList.add('current');
-      els.pageStage.appendChild(newSlide);
+      img.addEventListener('load', doRender, { once: true });
+      img.addEventListener('error', doRender, { once: true });
     }
   }
 
@@ -948,9 +986,8 @@
   }
 
   function openSaveDialog() {
-    const parsed = parseInputUrl(els.urlInput.value);
-    if (!parsed) { flashStatus('URLを入力してください'); return; }
-    pendingSaveUrl = parsed.baseUrl;
+    if (!baseUrl) { flashStatus('表示中の作品がありません'); return; }
+    pendingSaveUrl = baseUrl;
     els.saveTitleInput.value = deriveTitleFromUrl(pendingSaveUrl);
     renderFolderOptions(els.saveFolderSelect, '');
     els.newFolderRow.style.display = 'none';
@@ -1001,20 +1038,23 @@
     chevron.className = 'chevron';
     chevron.textContent = '›';
 
-    const delBtn = document.createElement('button');
-    delBtn.textContent = '削除';
-    delBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (!confirm('「' + folder.name + '」フォルダと、その中のURLをすべて削除しますか？')) return;
-      savedItems = savedItems.filter((it) => it.folderId !== folder.id);
-      savedFolders = savedFolders.filter((f) => f.id !== folder.id);
-      persistAll();
-      renderSavedList();
-    });
-
     row.appendChild(nameSpan);
     row.appendChild(chevron);
-    row.appendChild(delBtn);
+
+    // 履歴 is a reserved, auto-managed folder and can't be deleted as a whole.
+    if (folder.id !== HISTORY_FOLDER_ID) {
+      const delBtn = document.createElement('button');
+      delBtn.textContent = '削除';
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!confirm('「' + folder.name + '」フォルダと、その中のURLをすべて削除しますか？')) return;
+        savedItems = savedItems.filter((it) => it.folderId !== folder.id);
+        savedFolders = savedFolders.filter((f) => f.id !== folder.id);
+        persistAll();
+        renderSavedList();
+      });
+      row.appendChild(delBtn);
+    }
     return row;
   }
 
@@ -1037,9 +1077,8 @@
     textWrap.appendChild(titleEl);
     textWrap.appendChild(urlEl);
     textWrap.addEventListener('click', () => {
-      els.urlInput.value = item.url;
       closeSavedList();
-      startReading();
+      startReading(item.url, false);
     });
 
     const delBtn = document.createElement('button');
@@ -1096,8 +1135,14 @@
   function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen(); }
 
   // ---------- events ----------
-  els.loadBtn.addEventListener('click', startReading);
-  els.urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') startReading(); });
+  function handleNewManga() {
+    const input = window.prompt('URLを入力してください\n例: https://example.com/manga/test/  または .../1.jpg');
+    if (input === null) return; // cancelled
+    const v = input.trim();
+    if (!v) return;
+    startReading(v, true);
+  }
+  els.newBtn.addEventListener('click', handleNewManga);
 
   els.saveBtn.addEventListener('click', openSaveDialog);
   els.cancelSaveBtn.addEventListener('click', closeSaveDialog);
@@ -1163,7 +1208,7 @@
   els.pageSlider.addEventListener('input', (e) => showPage(parseInt(e.target.value, 10) || 1));
 
   document.addEventListener('keydown', (e) => {
-    if (e.target === els.urlInput || e.target === els.saveTitleInput ||
+    if (e.target === els.saveTitleInput ||
         e.target === els.newFolderInput || e.target === els.listNewFolderInput) {
       if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); }
       return;
@@ -1203,6 +1248,13 @@
   els.lockSubmitBtn.addEventListener('click', tryUnlock);
   els.lockInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
   checkLock();
+
+  // No URL bar anymore, so automatically resume the last-viewed manga on
+  // load (not counted as a "新規" open, so it isn't re-added to 履歴).
+  try {
+    const lastUrl = localStorage.getItem(LAST_URL_KEY);
+    if (lastUrl) startReading(lastUrl, false);
+  } catch (e) {}
 
   initSync();
 })();
