@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MangaReader</title>
+<title>連番画像 漫画リーダー</title>
 <style>
   :root {
     --bg: #0e0e10;
@@ -25,7 +26,8 @@
   #topbar {
     position: absolute; top: 0; left: 0; right: 0;
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 6px;
-    padding: 10px 12px; background: var(--panel);
+    padding: 10px 12px; background: rgba(20,20,24,0.55);
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
     border-bottom: 1px solid #2a2a30;
     transition: transform 0.25s ease, opacity 0.25s ease;
     z-index: 10;
@@ -47,6 +49,10 @@
   .ctrlBtn:hover, #loadBtn:hover, .primaryBtn:hover { filter: brightness(1.15); }
   .ctrlBtn:disabled, #loadBtn:disabled { opacity: 0.4; cursor: not-allowed; }
   #status { font-size: 12px; color: var(--sub); min-width: 90px; }
+  #currentTitle {
+    font-size: 13px; font-weight: 600; color: var(--text);
+    max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
 
   /* Viewer: always fills the full app area. Topbar/controls float on top of
      it, so hiding them reveals more of the image instead of leaving blank
@@ -87,7 +93,8 @@
   #controls {
     position: absolute; bottom: 0; left: 0; right: 0;
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 6px;
-    padding: 10px 14px; background: var(--panel);
+    padding: 10px 14px; background: rgba(20,20,24,0.55);
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
     border-top: 1px solid #2a2a30;
     transition: transform 0.25s ease, opacity 0.25s ease;
     z-index: 10;
@@ -192,6 +199,7 @@
     <button class="ctrlBtn" id="saveBtn" title="今のURLを保存">URLを保存</button>
     <button class="ctrlBtn" id="listBtn" title="保存したURLの一覧">リスト</button>
     <span id="status"></span>
+    <span id="currentTitle"></span>
   </div>
 
   <div id="viewer" class="fit-contain">
@@ -211,14 +219,12 @@
 
   <div id="controls" style="display:none;">
     <button class="ctrlBtn" id="firstBtn" title="最初のページ">|◀</button>
-    <button class="ctrlBtn" id="prevBtn" title="前のページ (←)">◀ 戻る</button>
+    <button class="ctrlBtn" id="prevBtn" title="前のページ (←)">◀</button>
     <input type="range" id="pageSlider" min="1" max="1" value="1">
     <span id="pageLabel">1 / 1</span>
-    <button class="ctrlBtn" id="nextBtn" title="次のページ (→)">進む ▶</button>
+    <button class="ctrlBtn" id="nextBtn" title="次のページ (→)">▶</button>
     <button class="ctrlBtn" id="lastBtn" title="最後のページ">▶|</button>
-    <button class="ctrlBtn active" id="animBtn" title="ページ送りアニメーションの切替">ページ送りアニメ:ON</button>
-    <button class="ctrlBtn" id="fitBtn" title="表示モード切替">表示:全体</button>
-    <button class="ctrlBtn" id="fsBtn" title="全画面表示">全画面</button>
+    <button class="ctrlBtn active" id="animBtn" title="ページ送りアニメーションの切替">アニメ</button>
   </div>
 </div>
 
@@ -294,6 +300,7 @@
     saveBtn: document.getElementById('saveBtn'),
     listBtn: document.getElementById('listBtn'),
     status: document.getElementById('status'),
+    currentTitle: document.getElementById('currentTitle'),
     viewer: document.getElementById('viewer'),
     placeholder: document.getElementById('placeholder'),
     spinner: document.getElementById('spinner'),
@@ -309,8 +316,6 @@
     prevBtn: document.getElementById('prevBtn'),
     lastBtn: document.getElementById('lastBtn'),
     animBtn: document.getElementById('animBtn'),
-    fitBtn: document.getElementById('fitBtn'),
-    fsBtn: document.getElementById('fsBtn'),
     pageSlider: document.getElementById('pageSlider'),
     pageLabel: document.getElementById('pageLabel'),
 
@@ -387,7 +392,6 @@
     const a = localStorage.getItem(ANIM_KEY);
     if (a !== null) animEnabled = a === '1';
   } catch (e) {}
-  els.animBtn.textContent = 'ページ送りアニメ:' + (animEnabled ? 'ON' : 'OFF');
   els.animBtn.classList.toggle('active', animEnabled);
 
   function persistAnim() { try { localStorage.setItem(ANIM_KEY, animEnabled ? '1' : '0'); } catch (e) {} }
@@ -623,6 +627,14 @@
     }
   }
 
+  // If the URL currently being viewed matches a saved item (by base URL),
+  // show that item's title in the header; otherwise clear it.
+  function updateCurrentTitleDisplay() {
+    if (!baseUrl) { els.currentTitle.textContent = ''; return; }
+    const match = savedItems.find((it) => baseUrlKey(it.url) === baseUrlKey(baseUrl));
+    els.currentTitle.textContent = match ? match.title : '';
+  }
+
   function deriveTitleFromUrl(url) {
     try {
       const u = new URL(url);
@@ -710,6 +722,7 @@
     baseUrl = parsed.baseUrl;
     preferredExt = parsed.hintExt !== null ? parsed.hintExt : 0;
     try { localStorage.setItem(LAST_URL_KEY, baseUrl); } catch (e) {}
+    updateCurrentTitleDisplay();
 
     pages = [];
     detecting = true;
@@ -876,8 +889,7 @@
     currentPage = n;
     renderPage(n, direction);
     updateSlider();
-    preload(n + 1);
-    preload(n + 2);
+    for (let i = 1; i <= 5; i++) preload(n + i);
     preload(n - 1);
     persistLastPage();
   }
@@ -890,8 +902,7 @@
     currentPage = n;
     renderPage(n, null);
     updateSlider();
-    preload(n + 1);
-    preload(n + 2);
+    for (let i = 1; i <= 5; i++) preload(n + i);
     preload(n - 1);
     persistLastPage();
   }
@@ -910,31 +921,10 @@
     els.controls.classList.toggle('hidden');
   }
 
-  function cycleFit() {
-    fitIndex = (fitIndex + 1) % fitModes.length;
-    els.fitBtn.textContent = fitLabels[fitModes[fitIndex]];
-    refreshCurrentView();
-  }
-
   function toggleAnim() {
     animEnabled = !animEnabled;
-    els.animBtn.textContent = 'ページ送りアニメ:' + (animEnabled ? 'ON' : 'OFF');
     els.animBtn.classList.toggle('active', animEnabled);
     persistAnim();
-  }
-
-  function toggleFullscreen() {
-    const el = document.documentElement;
-    const isFs = document.fullscreenElement || document.webkitFullscreenElement;
-    try {
-      if (!isFs) {
-        const req = el.requestFullscreen || el.webkitRequestFullscreen;
-        if (req) { const r = req.call(el); if (r && r.catch) r.catch(() => {}); }
-      } else {
-        const exit = document.exitFullscreen || document.webkitExitFullscreen;
-        if (exit) { const r = exit.call(document); if (r && r.catch) r.catch(() => {}); }
-      }
-    } catch (e) {}
   }
 
   // ---------- save dialog ----------
@@ -992,6 +982,7 @@
       addedAt: Date.now(),
     });
     persistAll();
+    updateCurrentTitleDisplay();
     closeSaveDialog();
     flashStatus('保存しました');
   }
@@ -1057,6 +1048,7 @@
       e.stopPropagation();
       savedItems = savedItems.filter((it) => it.id !== item.id);
       persistAll();
+      updateCurrentTitleDisplay();
       renderSavedList();
     });
 
@@ -1168,8 +1160,6 @@
   els.nextBtn.addEventListener('click', nextPage);
   els.prevBtn.addEventListener('click', prevPage);
   els.animBtn.addEventListener('click', toggleAnim);
-  els.fitBtn.addEventListener('click', cycleFit);
-  els.fsBtn.addEventListener('click', toggleFullscreen);
   els.pageSlider.addEventListener('input', (e) => showPage(parseInt(e.target.value, 10) || 1));
 
   document.addEventListener('keydown', (e) => {
@@ -1187,29 +1177,20 @@
       case 'ArrowRight': nextPage(); break;  // right = forward
       case 'Home': goFirst(); break;
       case 'End': goLast(); break;
-      case 'f': case 'F': toggleFullscreen(); break;
       case 'h': case 'H': toggleBars(); break;
     }
   });
 
-  // ---------- access lock ----------
-  const LOCK_KEY = 'mangaReaderUnlocked';
+  // ---------- access lock (always required, not remembered between visits) ----------
   const LOCK_CODE = '8122';
 
   function checkLock() {
-    try {
-      if (localStorage.getItem(LOCK_KEY) === '1') {
-        els.lockOverlay.style.display = 'none';
-        return;
-      }
-    } catch (e) {}
     els.lockOverlay.style.display = 'flex';
     els.lockInput.focus();
   }
 
   function tryUnlock() {
     if (els.lockInput.value.trim() === LOCK_CODE) {
-      try { localStorage.setItem(LOCK_KEY, '1'); } catch (e) {}
       els.lockOverlay.style.display = 'none';
       els.lockError.textContent = '';
     } else {
