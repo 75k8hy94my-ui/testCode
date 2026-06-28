@@ -161,6 +161,39 @@
   }
   #syncStatusText { color: var(--sub); flex: 1; min-width: 120px; }
 
+  /* Feed view: TikTok/Shorts-style vertical swipe through a folder's manga */
+  #feedOverlay {
+    position: fixed; inset: 0; background: #000;
+    display: none; z-index: 60;
+  }
+  #feedOverlay.show { display: block; }
+  #feedContainer {
+    height: 100%; overflow-y: auto; scroll-snap-type: y mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .feedSlide {
+    height: 100%; scroll-snap-align: start; scroll-snap-stop: always;
+    position: relative; display: flex; align-items: center; justify-content: center;
+    background: #000; cursor: pointer;
+  }
+  .feedSlide img {
+    max-width: 100%; max-height: 100%; object-fit: contain; display: block;
+  }
+  .feedInfo {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 24px 16px 32px;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.7));
+  }
+  .feedTitle {
+    color: #fff; font-size: 15px; font-weight: 600; text-align: center;
+    max-width: 85vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #feedCloseBtn {
+    position: fixed; top: 14px; right: 14px; z-index: 61;
+    padding: 8px 14px; border-radius: 6px; border: none;
+    background: rgba(40,40,46,0.75); color: #fff; font-size: 14px; cursor: pointer;
+  }
+
   /* Access lock */
   #lockOverlay {
     position: fixed; inset: 0; background: var(--bg);
@@ -266,6 +299,7 @@
     <div id="listToolbar">
       <button class="ctrlBtn" id="listBackBtn" style="display:none;">← 戻る</button>
       <span id="listFolderTitle"></span>
+      <button class="ctrlBtn" id="feedBtn" style="display:none;">一覧</button>
       <button class="ctrlBtn" id="listNewFolderBtn">+ 新しいフォルダ</button>
     </div>
     <div id="listNewFolderRow">
@@ -275,6 +309,12 @@
     <div id="savedListItems"></div>
     <div id="savedListEmpty" style="display:none;">保存されたURLはまだありません</div>
   </div>
+</div>
+
+<!-- Feed view: vertical swipe through a folder's manga (TikTok/Shorts style) -->
+<div id="feedOverlay">
+  <div id="feedContainer"></div>
+  <button id="feedCloseBtn">✕ 閉じる</button>
 </div>
 
 <script>
@@ -336,6 +376,10 @@
     savedListItems: document.getElementById('savedListItems'),
     savedListEmpty: document.getElementById('savedListEmpty'),
     closeListBtn: document.getElementById('closeListBtn'),
+    feedBtn: document.getElementById('feedBtn'),
+    feedOverlay: document.getElementById('feedOverlay'),
+    feedContainer: document.getElementById('feedContainer'),
+    feedCloseBtn: document.getElementById('feedCloseBtn'),
 
     syncStatusText: document.getElementById('syncStatusText'),
     syncOpenBtn: document.getElementById('syncOpenBtn'),
@@ -1022,7 +1066,13 @@
     if (!pendingSaveUrl) { closeSaveDialog(); return; }
     let folderId = els.saveFolderSelect.value;
     if (folderId === '__new__') folderId = '';
-    if (savedItems.some((it) => baseUrlKey(it.url) === baseUrlKey(pendingSaveUrl))) {
+    // 履歴 entries don't count as "already saved" — every 新規-opened manga is
+    // auto-recorded there, but that shouldn't block the user from also saving
+    // it into a real folder. Only block if it's already saved somewhere else.
+    const alreadySavedElsewhere = savedItems.some(
+      (it) => it.folderId !== HISTORY_FOLDER_ID && baseUrlKey(it.url) === baseUrlKey(pendingSaveUrl)
+    );
+    if (alreadySavedElsewhere) {
       flashStatus('既に保存済みです');
       closeSaveDialog();
       return;
@@ -1134,6 +1184,9 @@
       rows = savedItems.filter((it) => it.folderId === currentFolderView).map((it) => ({ type: 'item', data: it }));
     }
 
+    // "一覧" (feed) only makes sense inside a folder that actually has items.
+    els.feedBtn.style.display = (currentFolderView && rows.length) ? '' : 'none';
+
     if (rows.length === 0) {
       els.savedListEmpty.style.display = 'block';
       els.savedListEmpty.textContent = currentFolderView ? 'このフォルダにはまだ何もありません' : '保存されたURLはまだありません';
@@ -1149,7 +1202,68 @@
   function closeSavedList() { els.savedListOverlay.classList.remove('show'); }
   function isSavedListOpen() { return els.savedListOverlay.classList.contains('show'); }
 
-  function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen(); }
+  // ---------- feed view (vertical-swipe browsing within a folder) ----------
+  // A saved item only stores the manga's base URL, not which file extension
+  // its pages use, so the cover image is found the same cascading way page
+  // detection works: try .jpg, then .jpeg/.png/.webp on error, in order.
+  function setupFeedImage(imgEl, baseUrlForItem) {
+    let idx = 0;
+    function tryNext() {
+      if (idx >= EXT_CANDIDATES.length) return;
+      imgEl.src = baseUrlForItem + '1.' + EXT_CANDIDATES[idx];
+      idx++;
+    }
+    imgEl.addEventListener('error', tryNext);
+    tryNext();
+  }
+
+  function buildFeedSlide(item) {
+    const slide = document.createElement('div');
+    slide.className = 'feedSlide';
+
+    const img = document.createElement('img');
+    img.alt = item.title || deriveTitleFromUrl(item.url);
+    setupFeedImage(img, item.url);
+
+    const info = document.createElement('div');
+    info.className = 'feedInfo';
+    const title = document.createElement('div');
+    title.className = 'feedTitle';
+    title.textContent = item.title || deriveTitleFromUrl(item.url);
+    const openBtn = document.createElement('button');
+    openBtn.className = 'primaryBtn';
+    openBtn.textContent = '開く';
+    info.appendChild(title);
+    info.appendChild(openBtn);
+
+    const openThis = () => {
+      closeFeed();
+      closeSavedList();
+      startReading(item.url, false);
+    };
+    openBtn.addEventListener('click', (e) => { e.stopPropagation(); openThis(); });
+    slide.addEventListener('click', openThis);
+
+    slide.appendChild(img);
+    slide.appendChild(info);
+    return slide;
+  }
+
+  function openFeed(folderId) {
+    const items = savedItems.filter((it) => it.folderId === folderId);
+    if (!items.length) return;
+    els.feedContainer.innerHTML = '';
+    items.forEach((it) => els.feedContainer.appendChild(buildFeedSlide(it)));
+    els.feedContainer.scrollTop = 0;
+    els.feedOverlay.classList.add('show');
+  }
+  function closeFeed() {
+    els.feedOverlay.classList.remove('show');
+    els.feedContainer.innerHTML = '';
+  }
+  function isFeedOpen() { return els.feedOverlay.classList.contains('show'); }
+
+  function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen() || isFeedOpen(); }
 
   // ---------- events ----------
   function handleNewManga() {
@@ -1214,6 +1328,9 @@
     renderSavedList();
   });
 
+  els.feedBtn.addEventListener('click', () => { if (currentFolderView) openFeed(currentFolderView); });
+  els.feedCloseBtn.addEventListener('click', closeFeed);
+
   els.zoneLeft.addEventListener('click', prevPage);
   els.zoneRight.addEventListener('click', nextPage);
   els.zoneMid.addEventListener('click', toggleBars);
@@ -1227,11 +1344,11 @@
   document.addEventListener('keydown', (e) => {
     if (e.target === els.saveTitleInput ||
         e.target === els.newFolderInput || e.target === els.listNewFolderInput) {
-      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); }
+      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeFeed(); }
       return;
     }
     if (anyModalOpen()) {
-      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); }
+      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeFeed(); }
       return;
     }
     switch (e.key) {
