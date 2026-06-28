@@ -26,6 +26,14 @@
   }
   #app { position: relative; height: 100vh; overflow: hidden; }
 
+  /* Thin reading-progress line across the very top edge — width tracks
+     currentPage / pages.length. Sits above #topbar (so it stays visible even
+     when the bars are toggled hidden) and is unaffected by toggleBars(). */
+  #readProgressBar {
+    position: absolute; top: 0; left: 0; height: 3px; width: 0%;
+    background: var(--accent); z-index: 12; transition: width 0.2s ease;
+  }
+
   /* Top bar (overlays the viewer; hiding it does not change viewer's size) */
   #topbar {
     position: absolute; top: 0; left: 0; right: 0;
@@ -107,8 +115,9 @@
   #nextVolumeBanner {
     position: absolute; left: 50%; bottom: 80px; transform: translateX(-50%);
     display: none; align-items: center; gap: 10px;
-    background: rgba(20,20,24,0.92); border: 1px solid #2a2a30; border-radius: 10px;
-    padding: 10px 14px; z-index: 15; max-width: 90vw;
+    background: rgba(20,20,24,0.92); border: 1px solid #2a2a30; border-left: 3px solid var(--accent);
+    border-radius: 10px; padding: 10px 14px; z-index: 15; max-width: 90vw;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
   }
   #nextVolumeBanner.show { display: flex; }
   #nextVolumeText {
@@ -124,6 +133,7 @@
   .modalPanel {
     background: var(--panel); border-radius: 10px; width: min(520px, 90vw);
     max-height: 80vh; display: flex; flex-direction: column; padding: 14px;
+    border: 1px solid #2a2a30; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   }
   .panel-header {
     display: flex; justify-content: space-between; align-items: center;
@@ -197,20 +207,29 @@
     display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
     gap: 16px 10px; align-items: start;
   }
-  .book-card { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
+  .book-card {
+    cursor: pointer; display: flex; flex-direction: column; gap: 5px;
+    animation: bookFadeIn 0.22s ease both;
+  }
+  @keyframes bookFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .book-card.reorder-card { cursor: default; }
   .book-cover {
     position: relative; width: 100%; aspect-ratio: 2 / 3; background: #0e0e10;
-    border: 1px solid #2a2a30; border-radius: 4px; overflow: hidden;
-    box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+    border: 1px solid #2a2a30; border-radius: 8px; overflow: hidden;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.45);
+    transition: transform 0.12s ease;
   }
+  .book-card:not(.reorder-card):active .book-cover { transform: scale(0.96); }
   .book-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .book-title {
     font-size: 11px; color: var(--text); text-align: center;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .book-series {
-    font-size: 10px; color: var(--sub); text-align: center;
+    font-size: 10px; color: var(--accent); text-align: center;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    background: rgba(224,85,111,0.16); border-radius: 8px; padding: 1px 7px;
+    align-self: center; max-width: 100%;
   }
   .book-delBtn {
     position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; line-height: 18px;
@@ -228,6 +247,15 @@
     border: none; font-size: 14px; cursor: pointer; padding: 0;
   }
   .book-favBtn.active { color: var(--accent); }
+  /* 並べ替えモード時、編集/削除/お気に入りボタンの代わりに表示する上下移動ボタン */
+  .book-moveBtn {
+    position: absolute; top: 3px; width: 26px; height: 22px; line-height: 20px;
+    text-align: center; border-radius: 6px; background: rgba(20,20,24,0.85); color: var(--text);
+    border: none; font-size: 12px; cursor: pointer; padding: 0;
+  }
+  .book-moveUpBtn { left: 3px; }
+  .book-moveDownBtn { right: 3px; }
+  .book-moveBtn:disabled { opacity: 0.3; cursor: not-allowed; }
   /* Folder card: same Kindle-shelf card shape as a book, but shows a folder
      glyph instead of a page-1 cover thumbnail (used at every level now, not
      just inside a folder). */
@@ -273,6 +301,7 @@
   </div>
 </div>
 <div id="app">
+  <div id="readProgressBar"></div>
   <div id="topbar">
     <button class="primaryBtn" id="newBtn">新規</button>
     <button class="ctrlBtn" id="saveBtn" title="今のURLを保存">URLを保存</button>
@@ -426,6 +455,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       <button class="ctrlBtn" id="listBackBtn" style="display:none;">← 戻る</button>
       <span id="listFolderTitle"></span>
       <button class="ctrlBtn" id="feedBtn" style="display:none;">一覧</button>
+      <button class="ctrlBtn" id="reorderBtn" style="display:none;">並べ替え</button>
       <button class="ctrlBtn" id="listNewFolderBtn">+ 新しいフォルダ</button>
     </div>
     <div id="listNewFolderRow">
@@ -442,6 +472,10 @@ https://cdn.example.org/c/003.webp"></textarea>
   const EXT_CANDIDATES = ['jpg', 'jpeg', 'png', 'webp'];
   const MAX_PAGES_SAFETY = 2000;
   const LOAD_TIMEOUT_MS = 8000;
+  // ページ検出を何件ずつ並列で確認するか。6はブラウザがオリジン毎に張る同時
+  // 接続数の目安に合わせた値で、これより増やしてもキューで待たされるだけなので
+  // 大きくしすぎない。
+  const DETECT_BATCH_SIZE = 6;
   const ANIM_DURATION = 280; // ms
 
   const LAST_URL_KEY = 'mangaReaderLastUrl';
@@ -459,6 +493,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   // lives in, rendered as an extra pinned card at the root level.
   const FAVORITES_FOLDER_ID = '__favorites__';
   const FAVORITES_FOLDER_NAME = 'お気に入り';
+  // シリーズ も同様の仮想フォルダ。実フォルダではなく item.series でグルーピング
+  // した「シリーズ名一覧」を見せ、そこから1つのシリーズに入ると巻数順の一覧に
+  // ドリルダウンする2段階のVirtual View。
+  const SERIES_FOLDER_ID = '__series__';
+  const SERIES_FOLDER_NAME = 'シリーズ';
 
   const els = {
     newBtn: document.getElementById('newBtn'),
@@ -466,6 +505,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     listBtn: document.getElementById('listBtn'),
     status: document.getElementById('status'),
     currentTitle: document.getElementById('currentTitle'),
+    readProgressBar: document.getElementById('readProgressBar'),
     viewer: document.getElementById('viewer'),
     placeholder: document.getElementById('placeholder'),
     spinner: document.getElementById('spinner'),
@@ -517,6 +557,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     savedListEmpty: document.getElementById('savedListEmpty'),
     closeListBtn: document.getElementById('closeListBtn'),
     feedBtn: document.getElementById('feedBtn'),
+    reorderBtn: document.getElementById('reorderBtn'),
 
     exportBtn: document.getElementById('exportBtn'),
     importBtn: document.getElementById('importBtn'),
@@ -632,6 +673,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   // confirmCustomAdd / openItem / startReadingCustom.
   let savedItems = [];
   let currentFolderView = null;
+  let currentSeriesView = null; // series name when drilled into a シリーズ group; null while browsing series names or anywhere else
+  let reorderMode = false; // true while 並べ替え (manual up/down reorder) controls are shown for the current folder view
   let pendingSaveUrl = null;
   // Whether opening the 個別追加/編集 dialog hid an already-open 保存したURL
   // list popup behind it; if so, closing the dialog reopens (and re-renders)
@@ -1059,6 +1102,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     detectionHitLimit = false;
     currentPage = 1;
     pendingResumePage = getResumePage(baseUrl);
+    els.readProgressBar.style.width = '0%'; // avoid a stale bar from the previous manga flashing during the lookup
 
     els.newBtn.disabled = true;
     if (!switchDirection) {
@@ -1096,12 +1140,33 @@ https://cdn.example.org/c/003.webp"></textarea>
     detectMorePages(2, myGeneration);
   }
 
+  // Checks pages in batches of DETECT_BATCH_SIZE in parallel (instead of one
+  // at a time) so detection time no longer grows linearly with page count —
+  // each round-trip now resolves up to DETECT_BATCH_SIZE pages at once. The
+  // pages within a resolved batch are still pushed/shown in order, and the
+  // first missing page found within a batch is treated as the end (same
+  // "first gap = end of manga" assumption the old sequential loop made).
   async function detectMorePages(startPage, generation) {
     let pageNum = startPage;
     while (pageNum <= MAX_PAGES_SAFETY) {
-      const url = await findPageUrl(pageNum);
+      const batchNums = [];
+      for (let i = 0; i < DETECT_BATCH_SIZE && pageNum + i <= MAX_PAGES_SAFETY; i++) batchNums.push(pageNum + i);
+      const results = await Promise.all(batchNums.map((n) => findPageUrl(n)));
       if (generation !== readingGeneration) return; // a newer manga was opened meanwhile; abandon this stale loop
-      if (!url) {
+
+      let hitEnd = false;
+      for (const url of results) {
+        if (!url) { hitEnd = true; break; }
+        pages.push(url);
+        pageNum++;
+        updateStatus();
+        updateSlider();
+        if (pendingResumePage !== null && pages.length === pendingResumePage) {
+          jumpToPage(pendingResumePage);
+          pendingResumePage = null;
+        }
+      }
+      if (hitEnd) {
         detectionDone = true;
         detecting = false;
         updateStatus();
@@ -1109,14 +1174,6 @@ https://cdn.example.org/c/003.webp"></textarea>
         persistLastPage();
         updateNextVolumeBanner();
         return;
-      }
-      pages.push(url);
-      pageNum++;
-      updateStatus();
-      updateSlider();
-      if (pendingResumePage !== null && pages.length === pendingResumePage) {
-        jumpToPage(pendingResumePage);
-        pendingResumePage = null;
       }
     }
     if (generation !== readingGeneration) return;
@@ -1300,6 +1357,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.pageSlider.value = currentPage;
     const totalLabel = detectionDone ? pages.length : pages.length + '+';
     els.pageLabel.textContent = currentPage + ' / ' + totalLabel;
+    els.readProgressBar.style.width = pages.length ? Math.round((currentPage / pages.length) * 100) + '%' : '0%';
   }
 
   function preload(pageNum) {
@@ -1671,7 +1729,12 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     card.appendChild(cover);
     card.appendChild(title);
-    card.addEventListener('click', () => { currentFolderView = folder.id; renderSavedList(); });
+    card.addEventListener('click', () => {
+      currentFolderView = folder.id;
+      currentSeriesView = null;
+      reorderMode = false;
+      renderSavedList();
+    });
     return card;
   }
 
@@ -1692,8 +1755,89 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     card.appendChild(cover);
     card.appendChild(title);
-    card.addEventListener('click', () => { currentFolderView = FAVORITES_FOLDER_ID; renderSavedList(); });
+    card.addEventListener('click', () => {
+      currentFolderView = FAVORITES_FOLDER_ID;
+      currentSeriesView = null;
+      reorderMode = false;
+      renderSavedList();
+    });
     return card;
+  }
+
+  // シリーズ も同じ理屈の仮想フォルダ。この「ルート」カードはシリーズ名一覧
+  // (グループ分けされたシリーズの入口) に入るためのもの。実際のグルーピングは
+  // renderSavedList側で行い、buildSeriesGroupCardで各シリーズの入口カードを作る。
+  function buildSeriesFolderCard() {
+    const card = document.createElement('div');
+    card.className = 'book-card folder-card';
+
+    const cover = document.createElement('div');
+    cover.className = 'book-cover folder-cover';
+    cover.textContent = '📚';
+
+    const title = document.createElement('div');
+    title.className = 'book-title';
+    title.textContent = SERIES_FOLDER_NAME;
+
+    card.appendChild(cover);
+    card.appendChild(title);
+    card.addEventListener('click', () => {
+      currentFolderView = SERIES_FOLDER_ID;
+      currentSeriesView = null;
+      reorderMode = false;
+      renderSavedList();
+    });
+    return card;
+  }
+
+  // 1つのシリーズへの入口カード。group: { name, items } (itemsは巻数順)。
+  function buildSeriesGroupCard(group) {
+    const card = document.createElement('div');
+    card.className = 'book-card folder-card';
+
+    const cover = document.createElement('div');
+    cover.className = 'book-cover folder-cover';
+    cover.textContent = '📚';
+
+    const title = document.createElement('div');
+    title.className = 'book-title';
+    title.textContent = group.name;
+
+    const sub = document.createElement('div');
+    sub.className = 'book-series';
+    sub.textContent = '全' + group.items.length + '巻';
+
+    card.appendChild(cover);
+    card.appendChild(title);
+    card.appendChild(sub);
+    card.addEventListener('click', () => {
+      currentFolderView = SERIES_FOLDER_ID;
+      currentSeriesView = group.name;
+      reorderMode = false;
+      renderSavedList();
+    });
+    return card;
+  }
+
+  // Swaps `item` with its neighbor (direction -1 = up/earlier, +1 =
+  // down/later) within `list` (the same flat array currently rendered for
+  // this view) by finding both items' real positions in the underlying
+  // savedItems array and swapping just those two slots. This works
+  // regardless of where the items actually sit in savedItems, since a
+  // folder's display order is simply whatever order its items happen to
+  // appear in within savedItems.
+  function moveItemInList(item, list, direction) {
+    const idx = list.indexOf(item);
+    const swapIdx = idx + direction;
+    if (idx === -1 || swapIdx < 0 || swapIdx >= list.length) return;
+    const other = list[swapIdx];
+    const realIdxA = savedItems.indexOf(item);
+    const realIdxB = savedItems.indexOf(other);
+    if (realIdxA === -1 || realIdxB === -1) return;
+    savedItems[realIdxA] = other;
+    savedItems[realIdxB] = item;
+    persistAll();
+    renderSavedList();
   }
 
   // item.url is undefined for "custom" (explicit page list) items, so
@@ -1711,9 +1855,13 @@ https://cdn.example.org/c/003.webp"></textarea>
   // thumbnails. Reuses the same cascading-extension cover lookup as the 一覧
   // feed view. Every item also gets an 編集 (edit) button alongside the
   // existing 削除 (delete) one — works for both normal and custom items.
-  function buildBookCard(item, list) {
+  // reorderMode: when true, swaps the normal 編集/削除/お気に入り buttons for
+  // 上下移動 (move up/down) buttons, and disables tap-to-open — so taps in
+  // 並べ替え mode can't accidentally open a manga while the user is busy
+  // rearranging the shelf.
+  function buildBookCard(item, list, reorderMode) {
     const card = document.createElement('div');
-    card.className = 'book-card';
+    card.className = 'book-card' + (reorderMode ? ' reorder-card' : '');
     card.title = itemSubtext(item);
 
     const cover = document.createElement('div');
@@ -1727,41 +1875,60 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
     cover.appendChild(img);
 
-    const editBtn = document.createElement('button');
-    editBtn.className = 'book-editBtn';
-    editBtn.textContent = '✎';
-    editBtn.title = '編集';
-    editBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      openEditItemDialog(item);
-    });
-    cover.appendChild(editBtn);
+    if (reorderMode) {
+      const idx = list.indexOf(item);
+      const upBtn = document.createElement('button');
+      upBtn.className = 'book-moveBtn book-moveUpBtn';
+      upBtn.textContent = '▲';
+      upBtn.title = '上に移動';
+      upBtn.disabled = idx <= 0;
+      upBtn.addEventListener('click', (e) => { e.stopPropagation(); moveItemInList(item, list, -1); });
+      cover.appendChild(upBtn);
 
-    const delBtn = document.createElement('button');
-    delBtn.className = 'book-delBtn';
-    delBtn.textContent = '×';
-    delBtn.title = '削除';
-    delBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (!confirm('「' + itemDisplayTitle(item) + '」を削除します。本当によろしいですか？')) return;
-      savedItems = savedItems.filter((it) => it.id !== item.id);
-      persistAll();
-      updateCurrentTitleDisplay();
-      renderSavedList();
-    });
-    cover.appendChild(delBtn);
+      const downBtn = document.createElement('button');
+      downBtn.className = 'book-moveBtn book-moveDownBtn';
+      downBtn.textContent = '▼';
+      downBtn.title = '下に移動';
+      downBtn.disabled = idx >= list.length - 1;
+      downBtn.addEventListener('click', (e) => { e.stopPropagation(); moveItemInList(item, list, 1); });
+      cover.appendChild(downBtn);
+    } else {
+      const editBtn = document.createElement('button');
+      editBtn.className = 'book-editBtn';
+      editBtn.textContent = '✎';
+      editBtn.title = '編集';
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openEditItemDialog(item);
+      });
+      cover.appendChild(editBtn);
 
-    const favBtn = document.createElement('button');
-    favBtn.className = 'book-favBtn' + (item.favorite ? ' active' : '');
-    favBtn.textContent = item.favorite ? '❤' : '♡';
-    favBtn.title = item.favorite ? 'お気に入りから外す' : 'お気に入りに追加';
-    favBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      item.favorite = !item.favorite;
-      persistAll();
-      renderSavedList();
-    });
-    cover.appendChild(favBtn);
+      const delBtn = document.createElement('button');
+      delBtn.className = 'book-delBtn';
+      delBtn.textContent = '×';
+      delBtn.title = '削除';
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!confirm('「' + itemDisplayTitle(item) + '」を削除します。本当によろしいですか？')) return;
+        savedItems = savedItems.filter((it) => it.id !== item.id);
+        persistAll();
+        updateCurrentTitleDisplay();
+        renderSavedList();
+      });
+      cover.appendChild(delBtn);
+
+      const favBtn = document.createElement('button');
+      favBtn.className = 'book-favBtn' + (item.favorite ? ' active' : '');
+      favBtn.textContent = item.favorite ? '❤' : '♡';
+      favBtn.title = item.favorite ? 'お気に入りから外す' : 'お気に入りに追加';
+      favBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        item.favorite = !item.favorite;
+        persistAll();
+        renderSavedList();
+      });
+      cover.appendChild(favBtn);
+    }
 
     const title = document.createElement('div');
     title.className = 'book-title';
@@ -1775,21 +1942,30 @@ https://cdn.example.org/c/003.webp"></textarea>
       seriesEl.textContent = item.series + ' 第' + item.volume + '巻';
       card.appendChild(seriesEl);
     }
-    card.addEventListener('click', () => {
-      closeSavedList();
-      setReadingListContext(list, list.indexOf(item));
-      openItem(item, false);
-    });
+    if (!reorderMode) {
+      card.addEventListener('click', () => {
+        closeSavedList();
+        setReadingListContext(list, list.indexOf(item));
+        openItem(item, false);
+      });
+    }
     return card;
   }
 
   function renderSavedList() {
+    const inSeriesGroup = currentFolderView === SERIES_FOLDER_ID && !!currentSeriesView;
+    const inSeriesRoot = currentFolderView === SERIES_FOLDER_ID && !currentSeriesView;
+
     els.listBackBtn.style.display = currentFolderView ? '' : 'none';
     els.listNewFolderBtn.style.display = currentFolderView ? 'none' : '';
     els.listNewFolderRow.style.display = 'none';
 
     if (currentFolderView === FAVORITES_FOLDER_ID) {
       els.listFolderTitle.textContent = FAVORITES_FOLDER_NAME;
+    } else if (inSeriesGroup) {
+      els.listFolderTitle.textContent = currentSeriesView;
+    } else if (inSeriesRoot) {
+      els.listFolderTitle.textContent = SERIES_FOLDER_NAME;
     } else if (currentFolderView) {
       const folder = savedFolders.find((f) => f.id === currentFolderView);
       els.listFolderTitle.textContent = folder ? folder.name : '';
@@ -1800,39 +1976,81 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.savedListItems.innerHTML = '';
     els.savedListItems.classList.add('bookshelf'); // bookshelf grid at every level now
 
-    let itemsList; // flat item list for the current view; doubles as swipe context
+    let itemsList = []; // flat item list for the current view; doubles as swipe context
     let folderCards = [];
+    let seriesGroupCards = []; // [{name, items}], only populated at the シリーズ root (list of series names)
     let showFavoritesCard = false;
+    let showSeriesCard = false;
+
     if (!currentFolderView) {
       itemsList = savedItems.filter((it) => !it.folderId);
       folderCards = savedFolders;
       showFavoritesCard = true;
+      showSeriesCard = true;
     } else if (currentFolderView === FAVORITES_FOLDER_ID) {
       // Virtual view: aggregates favorited items regardless of which real
       // folder they actually live in, instead of filtering by folderId.
       itemsList = savedItems.filter((it) => it.favorite);
+    } else if (inSeriesRoot) {
+      // Virtual view: groups every series-tagged item by series name
+      // regardless of which real folder it lives in. Each group's items are
+      // pre-sorted by volume so drilling in shows volume 1, 2, 3... in order.
+      const groups = new Map();
+      savedItems.forEach((it) => {
+        if (!it.series) return;
+        if (!groups.has(it.series)) groups.set(it.series, []);
+        groups.get(it.series).push(it);
+      });
+      seriesGroupCards = Array.from(groups.entries())
+        .map(([name, items]) => ({ name, items: items.slice().sort((a, b) => (a.volume || 0) - (b.volume || 0)) }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    } else if (inSeriesGroup) {
+      itemsList = savedItems.filter((it) => it.series === currentSeriesView)
+        .sort((a, b) => (a.volume || 0) - (b.volume || 0));
     } else {
       itemsList = savedItems.filter((it) => it.folderId === currentFolderView);
     }
 
-    // "一覧" (feed) only makes sense inside a folder/view that actually has items.
-    els.feedBtn.style.display = (currentFolderView && itemsList.length) ? '' : 'none';
+    // "一覧" (feed) only makes sense inside a view that has browsable items —
+    // not at the シリーズ root, which is just a list of series names to drill into.
+    els.feedBtn.style.display = (currentFolderView && itemsList.length && !inSeriesRoot) ? '' : 'none';
 
-    const isEmpty = folderCards.length === 0 && itemsList.length === 0 && !showFavoritesCard;
+    // 並べ替え (manual reorder) only makes sense inside a real folder: a
+    // series' volume list is ordered by volume number, not manually, and
+    // 履歴/お気に入り auto-manage their own order, so all of those are excluded.
+    const reorderable = !!currentFolderView && currentFolderView !== FAVORITES_FOLDER_ID &&
+      currentFolderView !== HISTORY_FOLDER_ID && !inSeriesRoot && !inSeriesGroup && itemsList.length > 1;
+    els.reorderBtn.style.display = reorderable ? '' : 'none';
+    const showReorderControls = reorderable && reorderMode;
+    els.reorderBtn.classList.toggle('active', showReorderControls);
+    els.reorderBtn.textContent = showReorderControls ? '並べ替え完了' : '並べ替え';
+
+    const isEmpty = folderCards.length === 0 && itemsList.length === 0 && seriesGroupCards.length === 0 &&
+      !showFavoritesCard && !showSeriesCard;
     if (isEmpty) {
       els.savedListEmpty.style.display = 'block';
       els.savedListEmpty.textContent = currentFolderView === FAVORITES_FOLDER_ID
         ? 'お気に入りはまだ追加されていません'
-        : (currentFolderView ? 'このフォルダにはまだ何もありません' : '保存されたURLはまだありません');
+        : inSeriesRoot
+          ? 'シリーズはまだ設定されていません'
+          : (currentFolderView ? 'このフォルダにはまだ何もありません' : '保存されたURLはまだありません');
     } else {
       els.savedListEmpty.style.display = 'none';
       if (showFavoritesCard) els.savedListItems.appendChild(buildFavoritesFolderCard());
+      if (showSeriesCard) els.savedListItems.appendChild(buildSeriesFolderCard());
       folderCards.forEach((f) => els.savedListItems.appendChild(buildFolderCard(f)));
-      itemsList.forEach((it) => els.savedListItems.appendChild(buildBookCard(it, itemsList)));
+      seriesGroupCards.forEach((g) => els.savedListItems.appendChild(buildSeriesGroupCard(g)));
+      itemsList.forEach((it) => els.savedListItems.appendChild(buildBookCard(it, itemsList, showReorderControls)));
     }
   }
 
-  function openSavedList() { currentFolderView = null; renderSavedList(); els.savedListOverlay.classList.add('show'); }
+  function openSavedList() {
+    currentFolderView = null;
+    currentSeriesView = null;
+    reorderMode = false;
+    renderSavedList();
+    els.savedListOverlay.classList.add('show');
+  }
   function closeSavedList() { els.savedListOverlay.classList.remove('show'); }
   function isSavedListOpen() { return els.savedListOverlay.classList.contains('show'); }
 
@@ -1941,7 +2159,19 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.listBtn.addEventListener('click', openSavedList);
   els.closeListBtn.addEventListener('click', closeSavedList);
   els.savedListOverlay.addEventListener('click', (e) => { if (e.target === els.savedListOverlay) closeSavedList(); });
-  els.listBackBtn.addEventListener('click', () => { currentFolderView = null; renderSavedList(); });
+  els.listBackBtn.addEventListener('click', () => {
+    // From inside a specific シリーズ, 戻る goes back to the series-name list
+    // first (not straight to the top root) — a two-level back, matching the
+    // two-level drill-in.
+    if (currentFolderView === SERIES_FOLDER_ID && currentSeriesView) {
+      currentSeriesView = null;
+    } else {
+      currentFolderView = null;
+      currentSeriesView = null;
+    }
+    reorderMode = false;
+    renderSavedList();
+  });
   els.listNewFolderBtn.addEventListener('click', () => {
     const showing = els.listNewFolderRow.style.display === 'flex';
     els.listNewFolderRow.style.display = showing ? 'none' : 'flex';
@@ -1962,13 +2192,24 @@ https://cdn.example.org/c/003.webp"></textarea>
   // folder so the reader's vertical swipe can step through the rest.
   els.feedBtn.addEventListener('click', () => {
     if (!currentFolderView) return;
-    const items = currentFolderView === FAVORITES_FOLDER_ID
-      ? savedItems.filter((it) => it.favorite)
-      : savedItems.filter((it) => it.folderId === currentFolderView);
+    let items;
+    if (currentFolderView === FAVORITES_FOLDER_ID) {
+      items = savedItems.filter((it) => it.favorite);
+    } else if (currentFolderView === SERIES_FOLDER_ID) {
+      if (!currentSeriesView) return; // browsing series names; nothing to feed yet
+      items = savedItems.filter((it) => it.series === currentSeriesView).sort((a, b) => (a.volume || 0) - (b.volume || 0));
+    } else {
+      items = savedItems.filter((it) => it.folderId === currentFolderView);
+    }
     if (!items.length) return;
     closeSavedList();
     setReadingListContext(items, 0);
     openItem(items[0], false);
+  });
+
+  els.reorderBtn.addEventListener('click', () => {
+    reorderMode = !reorderMode;
+    renderSavedList();
   });
 
   els.zoneLeft.addEventListener('click', prevPage);
