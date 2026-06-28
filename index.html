@@ -101,6 +101,20 @@
   #pageSlider { flex: 1; min-width: 80px; }
   #pageLabel { font-size: 13px; color: var(--sub); min-width: 70px; text-align: center; white-space: nowrap; }
 
+  /* "次の巻" banner: appears over the viewer, above #controls, once the
+     reader reaches the true last page of a series-tagged manga and a saved
+     item exists for series volume+1. */
+  #nextVolumeBanner {
+    position: absolute; left: 50%; bottom: 80px; transform: translateX(-50%);
+    display: none; align-items: center; gap: 10px;
+    background: rgba(20,20,24,0.92); border: 1px solid #2a2a30; border-radius: 10px;
+    padding: 10px 14px; z-index: 15; max-width: 90vw;
+  }
+  #nextVolumeBanner.show { display: flex; }
+  #nextVolumeText {
+    font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
   /* Modal overlays (shared) */
   .modalOverlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.6);
@@ -194,6 +208,10 @@
     font-size: 11px; color: var(--text); text-align: center;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
+  .book-series {
+    font-size: 10px; color: var(--sub); text-align: center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
   .book-delBtn {
     position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; line-height: 18px;
     text-align: center; border-radius: 50%; background: rgba(20,20,24,0.85); color: var(--text);
@@ -204,6 +222,12 @@
     text-align: center; border-radius: 50%; background: rgba(20,20,24,0.85); color: var(--text);
     border: none; font-size: 12px; cursor: pointer; padding: 0;
   }
+  .book-favBtn {
+    position: absolute; bottom: 3px; right: 3px; width: 22px; height: 22px; line-height: 20px;
+    text-align: center; border-radius: 50%; background: rgba(20,20,24,0.85); color: var(--text);
+    border: none; font-size: 14px; cursor: pointer; padding: 0;
+  }
+  .book-favBtn.active { color: var(--accent); }
   /* Folder card: same Kindle-shelf card shape as a book, but shows a folder
      glyph instead of a page-1 cover thumbnail (used at every level now, not
      just inside a folder). */
@@ -283,6 +307,12 @@
     <button class="ctrlBtn" id="tocAddBtn" title="今のページを目次として追加">目次追加</button>
     <button class="ctrlBtn" id="tocBtn" title="目次を開く" style="display:none;">目次</button>
   </div>
+
+  <div id="nextVolumeBanner">
+    <span id="nextVolumeText"></span>
+    <button class="ctrlBtn" id="nextVolumeDismissBtn" title="閉じる">×</button>
+    <button class="primaryBtn" id="nextVolumeBtn">次の巻を読む</button>
+  </div>
 </div>
 
 <!-- Save dialog -->
@@ -297,6 +327,10 @@
       <input id="newFolderInput" type="text" placeholder="新しいフォルダ名">
       <button class="ctrlBtn" id="confirmNewFolderBtn">追加</button>
     </div>
+    <label class="field-label" for="saveSeriesInput">シリーズ名（任意）</label>
+    <input id="saveSeriesInput" type="text" placeholder="例: ○○">
+    <label class="field-label" for="saveVolumeInput">巻数（シリーズ設定時は必須）</label>
+    <input id="saveVolumeInput" type="number" min="1" step="1" placeholder="例: 1">
     <div class="dialog-actions">
       <button class="ctrlBtn" id="cancelSaveBtn">キャンセル</button>
       <button class="primaryBtn" id="confirmSaveBtn">保存</button>
@@ -316,6 +350,10 @@
       <input id="customNewFolderInput" type="text" placeholder="新しいフォルダ名">
       <button class="ctrlBtn" id="customConfirmNewFolderBtn">追加</button>
     </div>
+    <label class="field-label" for="customSeriesInput">シリーズ名（任意）</label>
+    <input id="customSeriesInput" type="text" placeholder="例: ○○">
+    <label class="field-label" for="customVolumeInput">巻数（シリーズ設定時は必須）</label>
+    <input id="customVolumeInput" type="number" min="1" step="1" placeholder="例: 1">
     <label class="field-label" for="customPagesTextarea">ページURL（1行に1つ、読む順に貼り付け）</label>
     <textarea id="customPagesTextarea" rows="6" placeholder="https://example.com/a/page1.jpg
 https://example.com/b/p2.png
@@ -340,6 +378,10 @@ https://cdn.example.org/c/003.webp"></textarea>
       <input id="editNewFolderInput" type="text" placeholder="新しいフォルダ名">
       <button class="ctrlBtn" id="editConfirmNewFolderBtn">追加</button>
     </div>
+    <label class="field-label" for="editSeriesInput">シリーズ名（任意）</label>
+    <input id="editSeriesInput" type="text" placeholder="例: ○○">
+    <label class="field-label" for="editVolumeInput">巻数（シリーズ設定時は必須）</label>
+    <input id="editVolumeInput" type="number" min="1" step="1" placeholder="例: 1">
     <div id="editUrlRow">
       <label class="field-label" for="editUrlInput">URL</label>
       <input id="editUrlInput" type="text" placeholder="https://example.com/manga/test/">
@@ -411,6 +453,12 @@ https://cdn.example.org/c/003.webp"></textarea>
   const TOC_KEY = 'mangaReaderToc'; // map: { [resumeKey]: [{page, name}, ...] }
   const HISTORY_FOLDER_ID = '__history__';
   const HISTORY_FOLDER_NAME = '履歴';
+  // お気に入り is a virtual, aggregating "folder": unlike 履歴 it isn't stored
+  // in savedFolders and items aren't moved into it — it's just a filtered
+  // view (item.favorite === true) over whatever folder each item already
+  // lives in, rendered as an extra pinned card at the root level.
+  const FAVORITES_FOLDER_ID = '__favorites__';
+  const FAVORITES_FOLDER_NAME = 'お気に入り';
 
   const els = {
     newBtn: document.getElementById('newBtn'),
@@ -442,12 +490,19 @@ https://cdn.example.org/c/003.webp"></textarea>
     tocListEmpty: document.getElementById('tocListEmpty'),
     closeTocBtn: document.getElementById('closeTocBtn'),
 
+    nextVolumeBanner: document.getElementById('nextVolumeBanner'),
+    nextVolumeText: document.getElementById('nextVolumeText'),
+    nextVolumeBtn: document.getElementById('nextVolumeBtn'),
+    nextVolumeDismissBtn: document.getElementById('nextVolumeDismissBtn'),
+
     saveDialogOverlay: document.getElementById('saveDialogOverlay'),
     saveTitleInput: document.getElementById('saveTitleInput'),
     saveFolderSelect: document.getElementById('saveFolderSelect'),
     newFolderRow: document.getElementById('newFolderRow'),
     newFolderInput: document.getElementById('newFolderInput'),
     confirmNewFolderBtn: document.getElementById('confirmNewFolderBtn'),
+    saveSeriesInput: document.getElementById('saveSeriesInput'),
+    saveVolumeInput: document.getElementById('saveVolumeInput'),
     cancelSaveBtn: document.getElementById('cancelSaveBtn'),
     confirmSaveBtn: document.getElementById('confirmSaveBtn'),
 
@@ -474,6 +529,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     customNewFolderRow: document.getElementById('customNewFolderRow'),
     customNewFolderInput: document.getElementById('customNewFolderInput'),
     customConfirmNewFolderBtn: document.getElementById('customConfirmNewFolderBtn'),
+    customSeriesInput: document.getElementById('customSeriesInput'),
+    customVolumeInput: document.getElementById('customVolumeInput'),
     customPagesTextarea: document.getElementById('customPagesTextarea'),
     cancelCustomAddBtn: document.getElementById('cancelCustomAddBtn'),
     confirmCustomAddBtn: document.getElementById('confirmCustomAddBtn'),
@@ -484,6 +541,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     editNewFolderRow: document.getElementById('editNewFolderRow'),
     editNewFolderInput: document.getElementById('editNewFolderInput'),
     editConfirmNewFolderBtn: document.getElementById('editConfirmNewFolderBtn'),
+    editSeriesInput: document.getElementById('editSeriesInput'),
+    editVolumeInput: document.getElementById('editVolumeInput'),
     editUrlRow: document.getElementById('editUrlRow'),
     editUrlInput: document.getElementById('editUrlInput'),
     editPagesRow: document.getElementById('editPagesRow'),
@@ -507,6 +566,15 @@ https://cdn.example.org/c/003.webp"></textarea>
   let currentResumeKey = '';
   let currentlyCustom = false; // true while a custom (fixed page list) manga is open
   let currentToc = []; // [{page, name}] chapter markers for the manga at currentResumeKey, sorted by page
+  // The saved item object behind the manga currently open (if it was opened
+  // via openItem — i.e. from a folder/list/feed/履歴/resume-as-item, or via
+  // the 次の巻 banner), used to look up series/volume for the "next volume"
+  // feature. Opening a raw URL directly (新規, or resuming a plain-URL
+  // LAST_URL_KEY) leaves this null; getCurrentSeriesInfo() falls back to
+  // matching savedItems by base URL in that case.
+  let currentItem = null;
+  let pendingNextVolumeItem = null; // the saved item the 次の巻 banner currently points at
+  let nextVolumeDismissed = false; // true once the user has closed the banner for this page
   let detecting = false;
   let detectionDone = false;
   let detectionHitLimit = false;
@@ -741,6 +809,46 @@ https://cdn.example.org/c/003.webp"></textarea>
   function closeTocList() { els.tocOverlay.classList.remove('show'); }
   function isTocListOpen() { return els.tocOverlay.classList.contains('show'); }
 
+  // ---------- series / next-volume (シリーズ・次の巻) ----------
+  // Resolves the series/volume of whatever manga is currently open. Prefers
+  // currentItem (set by openItem whenever the manga was opened from a saved
+  // item — folder, list, feed, 履歴, resume-as-item, or the 次の巻 banner
+  // itself); falls back to matching savedItems by base URL for a manga
+  // opened directly via 新規 or a plain-URL resume, so series info still
+  // works even without going through the saved list first.
+  function getCurrentSeriesInfo() {
+    let item = currentItem;
+    if (!item && !currentlyCustom && baseUrl) {
+      item = savedItems.find((it) => !Array.isArray(it.pages) && it.url && baseUrlKey(it.url) === baseUrlKey(baseUrl)) || null;
+    }
+    if (!item || !item.series || !item.volume) return null;
+    return { series: item.series, volume: item.volume };
+  }
+
+  function findNextVolumeItem(seriesInfo) {
+    if (!seriesInfo) return null;
+    return savedItems.find((it) => it.series === seriesInfo.series && it.volume === seriesInfo.volume + 1) || null;
+  }
+
+  // Shows/hides the "次の巻" banner based on whether we're truly sitting on
+  // the manga's last page (for a normal 連番URL manga, only once page
+  // detection has finished — otherwise "last page so far" could just mean
+  // detection hasn't caught up yet) and whether a saved item for the next
+  // volume of the same series exists.
+  function updateNextVolumeBanner() {
+    const atLastPage = pages.length > 0 && currentPage === pages.length && (currentlyCustom || detectionDone);
+    if (!atLastPage || nextVolumeDismissed) { hideNextVolumeBanner(); return; }
+    const nextItem = findNextVolumeItem(getCurrentSeriesInfo());
+    if (!nextItem) { hideNextVolumeBanner(); return; }
+    pendingNextVolumeItem = nextItem;
+    els.nextVolumeText.textContent = '次の巻: ' + itemDisplayTitle(nextItem);
+    els.nextVolumeBanner.classList.add('show');
+  }
+  function hideNextVolumeBanner() {
+    pendingNextVolumeItem = null;
+    els.nextVolumeBanner.classList.remove('show');
+  }
+
   function exportData() {
     const data = { folders: savedFolders, items: savedItems };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -939,6 +1047,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     currentResumeKey = baseUrl;
     currentlyCustom = false;
     loadCurrentToc();
+    hideNextVolumeBanner();
     preferredExt = parsed.hintExt !== null ? parsed.hintExt : 0;
     try { localStorage.setItem(LAST_URL_KEY, JSON.stringify({ kind: 'url', value: baseUrl })); } catch (e) {}
     updateCurrentTitleDisplay();
@@ -998,6 +1107,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         updateStatus();
         updateSlider();
         persistLastPage();
+        updateNextVolumeBanner();
         return;
       }
       pages.push(url);
@@ -1016,6 +1126,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     updateStatus();
     updateSlider();
     persistLastPage();
+    updateNextVolumeBanner();
   }
 
   // Opens a "custom" manga: one whose pages were supplied as an explicit,
@@ -1031,6 +1142,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     currentResumeKey = 'custom:' + item.id;
     currentlyCustom = true;
     loadCurrentToc();
+    hideNextVolumeBanner();
     pages = (item.pages || []).slice();
     detecting = false;
     detectionDone = true;
@@ -1068,6 +1180,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // directly) for anything that opens an *item* object rather than a raw
   // typed-in URL.
   function openItem(item, addToHistoryFlag, switchDirection) {
+    currentItem = item || null; // remembered for series/次の巻 lookups
     if (item && Array.isArray(item.pages) && item.pages.length) {
       startReadingCustom(item, switchDirection);
     } else {
@@ -1208,6 +1321,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     for (let i = 1; i <= 5; i++) preload(n + i);
     preload(n - 1);
     persistLastPage();
+    nextVolumeDismissed = false;
+    updateNextVolumeBanner();
   }
 
   // Instant, non-animated jump used when resuming to a saved page on load.
@@ -1221,6 +1336,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     for (let i = 1; i <= 5; i++) preload(n + i);
     preload(n - 1);
     persistLastPage();
+    nextVolumeDismissed = false;
+    updateNextVolumeBanner();
   }
 
   function nextPage() { if (currentPage < pages.length) showPage(currentPage + 1); }
@@ -1320,6 +1437,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     renderFolderOptions(els.saveFolderSelect, '');
     els.newFolderRow.style.display = 'none';
     els.newFolderInput.value = '';
+    els.saveSeriesInput.value = '';
+    els.saveVolumeInput.value = '';
     els.saveDialogOverlay.classList.add('show');
     els.saveTitleInput.focus();
   }
@@ -1344,12 +1463,25 @@ https://cdn.example.org/c/003.webp"></textarea>
       closeSaveDialog();
       return;
     }
+    const seriesVal = els.saveSeriesInput.value.trim();
+    let volumeVal = null;
+    if (seriesVal) {
+      const vol = parseInt(els.saveVolumeInput.value.trim(), 10);
+      if (!els.saveVolumeInput.value.trim() || isNaN(vol) || vol <= 0) {
+        flashStatus('シリーズ設定時は巻数を入力してください');
+        return;
+      }
+      volumeVal = vol;
+    }
     const title = els.saveTitleInput.value.trim() || deriveTitleFromUrl(pendingSaveUrl);
     savedItems.unshift({
       id: genId('i'),
       url: pendingSaveUrl,
       title: title,
       folderId: folderId || null,
+      series: seriesVal || null,
+      volume: volumeVal,
+      favorite: false,
       addedAt: Date.now(),
     });
     persistAll();
@@ -1379,6 +1511,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     renderFolderOptions(els.customFolderSelect, '');
     els.customNewFolderRow.style.display = 'none';
     els.customNewFolderInput.value = '';
+    els.customSeriesInput.value = '';
+    els.customVolumeInput.value = '';
     els.customPagesTextarea.value = '';
     els.customAddOverlay.classList.add('show');
     els.customTitleInput.focus();
@@ -1400,11 +1534,24 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!pageUrls.length) { flashStatus('ページURLを1つ以上入力してください'); return; }
     let folderId = els.customFolderSelect.value;
     if (folderId === '__new__') folderId = '';
+    const seriesVal = els.customSeriesInput.value.trim();
+    let volumeVal = null;
+    if (seriesVal) {
+      const vol = parseInt(els.customVolumeInput.value.trim(), 10);
+      if (!els.customVolumeInput.value.trim() || isNaN(vol) || vol <= 0) {
+        flashStatus('シリーズ設定時は巻数を入力してください');
+        return;
+      }
+      volumeVal = vol;
+    }
     const title = els.customTitleInput.value.trim() || ('無題' + (savedItems.length + 1));
     savedItems.unshift({
       id: genId('i'),
       title: title,
       folderId: folderId || null,
+      series: seriesVal || null,
+      volume: volumeVal,
+      favorite: false,
       pages: pageUrls,
       addedAt: Date.now(),
     });
@@ -1424,6 +1571,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     renderFolderOptions(els.editFolderSelect, item.folderId || '');
     els.editNewFolderRow.style.display = 'none';
     els.editNewFolderInput.value = '';
+    els.editSeriesInput.value = item.series || '';
+    els.editVolumeInput.value = item.volume != null ? String(item.volume) : '';
 
     const isCustom = Array.isArray(item.pages);
     els.editUrlRow.style.display = isCustom ? 'none' : 'block';
@@ -1448,6 +1597,17 @@ https://cdn.example.org/c/003.webp"></textarea>
     const item = savedItems.find((it) => it.id === editingItemId);
     if (!item) { closeEditItemDialog(); return; }
 
+    const seriesVal = els.editSeriesInput.value.trim();
+    let volumeVal = null;
+    if (seriesVal) {
+      const vol = parseInt(els.editVolumeInput.value.trim(), 10);
+      if (!els.editVolumeInput.value.trim() || isNaN(vol) || vol <= 0) {
+        flashStatus('シリーズ設定時は巻数を入力してください');
+        return;
+      }
+      volumeVal = vol;
+    }
+
     const isCustom = Array.isArray(item.pages);
     if (isCustom) {
       const pageUrls = els.editPagesTextarea.value
@@ -1467,6 +1627,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (folderId === '__new__') folderId = '';
     item.folderId = folderId || null;
     item.title = els.editTitleInput.value.trim() || itemDisplayTitle(item);
+    item.series = seriesVal || null;
+    item.volume = volumeVal;
 
     persistAll();
     updateCurrentTitleDisplay();
@@ -1510,6 +1672,27 @@ https://cdn.example.org/c/003.webp"></textarea>
     card.appendChild(cover);
     card.appendChild(title);
     card.addEventListener('click', () => { currentFolderView = folder.id; renderSavedList(); });
+    return card;
+  }
+
+  // お気に入り is a virtual aggregating folder (see FAVORITES_FOLDER_ID
+  // comment above) — its card is built separately from buildFolderCard
+  // since it isn't a real entry in savedFolders and can't be deleted.
+  function buildFavoritesFolderCard() {
+    const card = document.createElement('div');
+    card.className = 'book-card folder-card';
+
+    const cover = document.createElement('div');
+    cover.className = 'book-cover folder-cover';
+    cover.textContent = '❤';
+
+    const title = document.createElement('div');
+    title.className = 'book-title';
+    title.textContent = FAVORITES_FOLDER_NAME;
+
+    card.appendChild(cover);
+    card.appendChild(title);
+    card.addEventListener('click', () => { currentFolderView = FAVORITES_FOLDER_ID; renderSavedList(); });
     return card;
   }
 
@@ -1568,12 +1751,30 @@ https://cdn.example.org/c/003.webp"></textarea>
     });
     cover.appendChild(delBtn);
 
+    const favBtn = document.createElement('button');
+    favBtn.className = 'book-favBtn' + (item.favorite ? ' active' : '');
+    favBtn.textContent = item.favorite ? '❤' : '♡';
+    favBtn.title = item.favorite ? 'お気に入りから外す' : 'お気に入りに追加';
+    favBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      item.favorite = !item.favorite;
+      persistAll();
+      renderSavedList();
+    });
+    cover.appendChild(favBtn);
+
     const title = document.createElement('div');
     title.className = 'book-title';
     title.textContent = itemDisplayTitle(item);
 
     card.appendChild(cover);
     card.appendChild(title);
+    if (item.series) {
+      const seriesEl = document.createElement('div');
+      seriesEl.className = 'book-series';
+      seriesEl.textContent = item.series + ' 第' + item.volume + '巻';
+      card.appendChild(seriesEl);
+    }
     card.addEventListener('click', () => {
       closeSavedList();
       setReadingListContext(list, list.indexOf(item));
@@ -1587,7 +1788,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.listNewFolderBtn.style.display = currentFolderView ? 'none' : '';
     els.listNewFolderRow.style.display = 'none';
 
-    if (currentFolderView) {
+    if (currentFolderView === FAVORITES_FOLDER_ID) {
+      els.listFolderTitle.textContent = FAVORITES_FOLDER_NAME;
+    } else if (currentFolderView) {
       const folder = savedFolders.find((f) => f.id === currentFolderView);
       els.listFolderTitle.textContent = folder ? folder.name : '';
     } else {
@@ -1599,22 +1802,31 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     let itemsList; // flat item list for the current view; doubles as swipe context
     let folderCards = [];
+    let showFavoritesCard = false;
     if (!currentFolderView) {
       itemsList = savedItems.filter((it) => !it.folderId);
       folderCards = savedFolders;
+      showFavoritesCard = true;
+    } else if (currentFolderView === FAVORITES_FOLDER_ID) {
+      // Virtual view: aggregates favorited items regardless of which real
+      // folder they actually live in, instead of filtering by folderId.
+      itemsList = savedItems.filter((it) => it.favorite);
     } else {
       itemsList = savedItems.filter((it) => it.folderId === currentFolderView);
     }
 
-    // "一覧" (feed) only makes sense inside a folder that actually has items.
+    // "一覧" (feed) only makes sense inside a folder/view that actually has items.
     els.feedBtn.style.display = (currentFolderView && itemsList.length) ? '' : 'none';
 
-    const isEmpty = folderCards.length === 0 && itemsList.length === 0;
+    const isEmpty = folderCards.length === 0 && itemsList.length === 0 && !showFavoritesCard;
     if (isEmpty) {
       els.savedListEmpty.style.display = 'block';
-      els.savedListEmpty.textContent = currentFolderView ? 'このフォルダにはまだ何もありません' : '保存されたURLはまだありません';
+      els.savedListEmpty.textContent = currentFolderView === FAVORITES_FOLDER_ID
+        ? 'お気に入りはまだ追加されていません'
+        : (currentFolderView ? 'このフォルダにはまだ何もありません' : '保存されたURLはまだありません');
     } else {
       els.savedListEmpty.style.display = 'none';
+      if (showFavoritesCard) els.savedListItems.appendChild(buildFavoritesFolderCard());
       folderCards.forEach((f) => els.savedListItems.appendChild(buildFolderCard(f)));
       itemsList.forEach((it) => els.savedListItems.appendChild(buildBookCard(it, itemsList)));
     }
@@ -1648,6 +1860,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     const v = input.trim();
     if (!v) return;
     clearReadingListContext();
+    currentItem = null; // raw URL open, not tied to a saved item
     startReading(v, true);
   }
   els.newBtn.addEventListener('click', handleNewManga);
@@ -1749,7 +1962,9 @@ https://cdn.example.org/c/003.webp"></textarea>
   // folder so the reader's vertical swipe can step through the rest.
   els.feedBtn.addEventListener('click', () => {
     if (!currentFolderView) return;
-    const items = savedItems.filter((it) => it.folderId === currentFolderView);
+    const items = currentFolderView === FAVORITES_FOLDER_ID
+      ? savedItems.filter((it) => it.favorite)
+      : savedItems.filter((it) => it.folderId === currentFolderView);
     if (!items.length) return;
     closeSavedList();
     setReadingListContext(items, 0);
@@ -1770,6 +1985,18 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.tocBtn.addEventListener('click', openTocList);
   els.closeTocBtn.addEventListener('click', closeTocList);
   els.tocOverlay.addEventListener('click', (e) => { if (e.target === els.tocOverlay) closeTocList(); });
+
+  els.nextVolumeBtn.addEventListener('click', () => {
+    if (!pendingNextVolumeItem) return;
+    const item = pendingNextVolumeItem;
+    hideNextVolumeBanner();
+    clearReadingListContext(); // next volume isn't necessarily part of the current folder/feed swipe order
+    openItem(item, false);
+  });
+  els.nextVolumeDismissBtn.addEventListener('click', () => {
+    nextVolumeDismissed = true;
+    hideNextVolumeBanner();
+  });
 
   document.addEventListener('keydown', (e) => {
     if (e.target === els.saveTitleInput ||
