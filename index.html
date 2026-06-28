@@ -119,17 +119,19 @@
   /* Save dialog */
   .field-label { font-size: 12px; color: var(--sub); display: block; margin-top: 10px; }
   #saveDialogPanel input[type="text"], #saveDialogPanel select,
-  #customAddPanel input[type="text"], #customAddPanel select {
+  #customAddPanel input[type="text"], #customAddPanel select,
+  #editItemPanel input[type="text"], #editItemPanel select {
     width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #333;
     background: #0e0e10; color: var(--text); font-size: 16px; margin-top: 4px;
   }
-  #customAddPanel textarea {
+  #customAddPanel textarea, #editItemPanel textarea {
     width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #333;
     background: #0e0e10; color: var(--text); font-size: 14px; margin-top: 4px;
     font-family: inherit; resize: vertical;
   }
-  #newFolderRow, #customNewFolderRow { display: none; gap: 8px; margin-top: 8px; }
-  #newFolderRow input, #customNewFolderRow input { flex: 1; }
+  #newFolderRow, #customNewFolderRow, #editNewFolderRow { display: none; gap: 8px; margin-top: 8px; }
+  #newFolderRow input, #customNewFolderRow input, #editNewFolderRow input { flex: 1; }
+  #editUrlRow, #editPagesRow { display: none; }
   .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
   /* Saved list */
@@ -159,6 +161,22 @@
   }
   #savedListEmpty { color: var(--sub); font-size: 13px; text-align: center; padding: 24px 0; }
 
+  /* Table of contents (目次) list */
+  #tocListItems { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .toc-item {
+    display: flex; align-items: center; gap: 8px;
+    background: #0e0e10; border: 1px solid #2a2a30; border-radius: 6px; padding: 8px 10px;
+  }
+  .toc-item .toc-text { flex: 1; overflow: hidden; cursor: pointer; min-width: 0; }
+  .toc-item .toc-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .toc-item .toc-page { font-size: 11px; color: var(--sub); }
+  .toc-item .toc-text:hover .toc-name { color: var(--accent); }
+  .toc-item button {
+    background: #2a2a30; border: none; color: var(--text); border-radius: 4px;
+    padding: 4px 8px; cursor: pointer; font-size: 12px; white-space: nowrap; flex-shrink: 0;
+  }
+  #tocListEmpty { color: var(--sub); font-size: 13px; text-align: center; padding: 24px 0; }
+
   /* Bookshelf grid: shown inside a folder, like a Kindle library — page-1
      cover thumbnails lined up instead of plain text rows. */
   #savedListItems.bookshelf {
@@ -180,6 +198,17 @@
     position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; line-height: 18px;
     text-align: center; border-radius: 50%; background: rgba(20,20,24,0.85); color: var(--text);
     border: none; font-size: 13px; cursor: pointer; padding: 0;
+  }
+  .book-editBtn {
+    position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; line-height: 18px;
+    text-align: center; border-radius: 50%; background: rgba(20,20,24,0.85); color: var(--text);
+    border: none; font-size: 12px; cursor: pointer; padding: 0;
+  }
+  /* Folder card: same Kindle-shelf card shape as a book, but shows a folder
+     glyph instead of a page-1 cover thumbnail (used at every level now, not
+     just inside a folder). */
+  .folder-cover {
+    display: flex; align-items: center; justify-content: center; font-size: 38px;
   }
 
   /* Export/import */
@@ -251,6 +280,8 @@
     <button class="ctrlBtn" id="nextBtn" title="次のページ (→)">▶</button>
     <button class="ctrlBtn" id="lastBtn" title="最後のページ">▶|</button>
     <button class="ctrlBtn active" id="animBtn" title="ページ送りアニメーションの切替">アニメ</button>
+    <button class="ctrlBtn" id="tocAddBtn" title="今のページを目次として追加">目次追加</button>
+    <button class="ctrlBtn" id="tocBtn" title="目次を開く" style="display:none;">目次</button>
   </div>
 </div>
 
@@ -276,7 +307,7 @@
 <!-- Custom (explicit page-list) manga add dialog -->
 <div id="customAddOverlay" class="modalOverlay">
   <div id="customAddPanel" class="modalPanel">
-    <div class="panel-header"><span>個別URL漫画を追加</span></div>
+    <div class="panel-header"><span>個別追加</span></div>
     <label class="field-label" for="customTitleInput">タイトル</label>
     <input id="customTitleInput" type="text" placeholder="例: ○○ 第1巻">
     <label class="field-label" for="customFolderSelect">フォルダ</label>
@@ -296,6 +327,46 @@ https://cdn.example.org/c/003.webp"></textarea>
   </div>
 </div>
 
+<!-- Edit saved item dialog (works for both normal 連番URL items and custom
+     explicit page-list items) -->
+<div id="editItemOverlay" class="modalOverlay">
+  <div id="editItemPanel" class="modalPanel">
+    <div class="panel-header"><span>編集</span></div>
+    <label class="field-label" for="editTitleInput">タイトル</label>
+    <input id="editTitleInput" type="text" placeholder="例: ○○ 第1巻">
+    <label class="field-label" for="editFolderSelect">フォルダ</label>
+    <select id="editFolderSelect"></select>
+    <div id="editNewFolderRow">
+      <input id="editNewFolderInput" type="text" placeholder="新しいフォルダ名">
+      <button class="ctrlBtn" id="editConfirmNewFolderBtn">追加</button>
+    </div>
+    <div id="editUrlRow">
+      <label class="field-label" for="editUrlInput">URL</label>
+      <input id="editUrlInput" type="text" placeholder="https://example.com/manga/test/">
+    </div>
+    <div id="editPagesRow">
+      <label class="field-label" for="editPagesTextarea">ページURL（1行に1つ、読む順・差し替えや途中追加も可）</label>
+      <textarea id="editPagesTextarea" rows="6"></textarea>
+    </div>
+    <div class="dialog-actions">
+      <button class="ctrlBtn" id="cancelEditItemBtn">キャンセル</button>
+      <button class="primaryBtn" id="confirmEditItemBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Table of contents (目次) list dialog -->
+<div id="tocOverlay" class="modalOverlay">
+  <div id="tocPanel" class="modalPanel">
+    <div class="panel-header">
+      <span>目次</span>
+      <button class="ctrlBtn" id="closeTocBtn">閉じる</button>
+    </div>
+    <div id="tocListItems"></div>
+    <div id="tocListEmpty" style="display:none;">目次はまだ追加されていません</div>
+  </div>
+</div>
+
 <!-- Saved list -->
 <div id="savedListOverlay" class="modalOverlay">
   <div id="savedListPanel" class="modalPanel">
@@ -304,10 +375,10 @@ https://cdn.example.org/c/003.webp"></textarea>
       <button class="ctrlBtn" id="closeListBtn">閉じる</button>
     </div>
     <div id="exportImportRow">
-      <button class="ctrlBtn" id="exportBtn">書き出し(JSON)</button>
-      <button class="ctrlBtn" id="importBtn">読み込み(JSON)</button>
+      <button class="ctrlBtn" id="exportBtn">書き出し</button>
+      <button class="ctrlBtn" id="importBtn">読み込み</button>
       <input type="file" id="importFileInput" accept="application/json" style="display:none;">
-      <button class="ctrlBtn" id="addCustomBtn">個別URL漫画を追加</button>
+      <button class="ctrlBtn" id="addCustomBtn">個別追加</button>
     </div>
     <div id="listToolbar">
       <button class="ctrlBtn" id="listBackBtn" style="display:none;">← 戻る</button>
@@ -337,6 +408,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   const SAVED_FOLDERS_KEY = 'mangaReaderSavedFolders';
   const SAVED_ITEMS_KEY = 'mangaReaderSavedItems';
   const LEGACY_SAVED_URLS_KEY = 'mangaReaderSavedUrls';
+  const TOC_KEY = 'mangaReaderToc'; // map: { [resumeKey]: [{page, name}, ...] }
   const HISTORY_FOLDER_ID = '__history__';
   const HISTORY_FOLDER_NAME = '履歴';
 
@@ -363,6 +435,12 @@ https://cdn.example.org/c/003.webp"></textarea>
     animBtn: document.getElementById('animBtn'),
     pageSlider: document.getElementById('pageSlider'),
     pageLabel: document.getElementById('pageLabel'),
+    tocAddBtn: document.getElementById('tocAddBtn'),
+    tocBtn: document.getElementById('tocBtn'),
+    tocOverlay: document.getElementById('tocOverlay'),
+    tocListItems: document.getElementById('tocListItems'),
+    tocListEmpty: document.getElementById('tocListEmpty'),
+    closeTocBtn: document.getElementById('closeTocBtn'),
 
     saveDialogOverlay: document.getElementById('saveDialogOverlay'),
     saveTitleInput: document.getElementById('saveTitleInput'),
@@ -400,6 +478,19 @@ https://cdn.example.org/c/003.webp"></textarea>
     cancelCustomAddBtn: document.getElementById('cancelCustomAddBtn'),
     confirmCustomAddBtn: document.getElementById('confirmCustomAddBtn'),
 
+    editItemOverlay: document.getElementById('editItemOverlay'),
+    editTitleInput: document.getElementById('editTitleInput'),
+    editFolderSelect: document.getElementById('editFolderSelect'),
+    editNewFolderRow: document.getElementById('editNewFolderRow'),
+    editNewFolderInput: document.getElementById('editNewFolderInput'),
+    editConfirmNewFolderBtn: document.getElementById('editConfirmNewFolderBtn'),
+    editUrlRow: document.getElementById('editUrlRow'),
+    editUrlInput: document.getElementById('editUrlInput'),
+    editPagesRow: document.getElementById('editPagesRow'),
+    editPagesTextarea: document.getElementById('editPagesTextarea'),
+    cancelEditItemBtn: document.getElementById('cancelEditItemBtn'),
+    confirmEditItemBtn: document.getElementById('confirmEditItemBtn'),
+
     lockOverlay: document.getElementById('lockOverlay'),
     lockInput: document.getElementById('lockInput'),
     lockError: document.getElementById('lockError'),
@@ -415,6 +506,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // baseUrl, so a synthetic 'custom:<itemId>' key is used instead.
   let currentResumeKey = '';
   let currentlyCustom = false; // true while a custom (fixed page list) manga is open
+  let currentToc = []; // [{page, name}] chapter markers for the manga at currentResumeKey, sorted by page
   let detecting = false;
   let detectionDone = false;
   let detectionHitLimit = false;
@@ -468,11 +560,17 @@ https://cdn.example.org/c/003.webp"></textarea>
   let savedFolders = []; // [{id, name}]
   // [{id, url, title, folderId, addedAt}] for normal 連番ベースURL manga, or
   // [{id, pages: [url, url, ...], title, folderId, addedAt}] (no `url`) for
-  // a "custom" manga added via 個別URL漫画を追加 — see
+  // a "custom" manga added via 個別追加 — see
   // confirmCustomAdd / openItem / startReadingCustom.
   let savedItems = [];
   let currentFolderView = null;
   let pendingSaveUrl = null;
+  // Whether opening the 個別追加/編集 dialog hid an already-open 保存したURL
+  // list popup behind it; if so, closing the dialog reopens (and re-renders)
+  // the list instead of leaving it closed.
+  let customAddReturnToList = false;
+  let editReturnToList = false;
+  let editingItemId = null; // id of the saved item currently open in the 編集 dialog
 
   function genId(prefix) {
     return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -517,6 +615,96 @@ https://cdn.example.org/c/003.webp"></textarea>
     } catch (e) {}
     return null;
   }
+
+  // ---------- table of contents (目次) ----------
+  // Chapter markers are stored per-manga, keyed the same way as the resume
+  // page (currentResumeKey: baseUrl for normal manga, 'custom:<id>' for a
+  // 個別追加 manga), so each manga keeps its own independent 目次.
+  function loadTocMap() {
+    try { return JSON.parse(localStorage.getItem(TOC_KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function persistTocMap(map) {
+    try { localStorage.setItem(TOC_KEY, JSON.stringify(map)); } catch (e) {}
+  }
+  function loadCurrentToc() {
+    const map = loadTocMap();
+    currentToc = (map[currentResumeKey] || []).slice().sort((a, b) => a.page - b.page);
+    updateTocButtonVisibility();
+  }
+  function saveCurrentToc() {
+    const map = loadTocMap();
+    if (currentToc.length) map[currentResumeKey] = currentToc;
+    else delete map[currentResumeKey];
+    persistTocMap(map);
+    updateTocButtonVisibility();
+  }
+  function updateTocButtonVisibility() {
+    els.tocBtn.style.display = currentToc.length ? '' : 'none';
+  }
+
+  function addTocEntry() {
+    if (!pages.length) { flashStatus('表示中の作品がありません'); return; }
+    const existing = currentToc.find((t) => t.page === currentPage);
+    const defaultName = existing ? existing.name : ('第' + (currentToc.length + 1) + '章');
+    const name = window.prompt('目次名を入力してください（' + currentPage + 'ページ目をここで区切ります）', defaultName);
+    if (name === null) return; // cancelled
+    const trimmed = name.trim() || defaultName;
+    currentToc = currentToc.filter((t) => t.page !== currentPage);
+    currentToc.push({ page: currentPage, name: trimmed });
+    currentToc.sort((a, b) => a.page - b.page);
+    saveCurrentToc();
+    flashStatus('目次に追加しました');
+  }
+
+  function renderTocList() {
+    els.tocListItems.innerHTML = '';
+    if (!currentToc.length) {
+      els.tocListEmpty.style.display = 'block';
+      return;
+    }
+    els.tocListEmpty.style.display = 'none';
+    currentToc.forEach((t) => {
+      const row = document.createElement('div');
+      row.className = 'toc-item';
+
+      const text = document.createElement('div');
+      text.className = 'toc-text';
+      const nameEl = document.createElement('div');
+      nameEl.className = 'toc-name';
+      nameEl.textContent = t.name;
+      const pageEl = document.createElement('div');
+      pageEl.className = 'toc-page';
+      pageEl.textContent = t.page + 'ページ';
+      text.appendChild(nameEl);
+      text.appendChild(pageEl);
+      text.addEventListener('click', () => {
+        closeTocList();
+        jumpToPage(t.page);
+      });
+
+      const delBtn = document.createElement('button');
+      delBtn.textContent = '削除';
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!confirm('「' + t.name + '」を目次から削除します。本当によろしいですか？')) return;
+        currentToc = currentToc.filter((x) => x !== t);
+        saveCurrentToc();
+        renderTocList();
+      });
+
+      row.appendChild(text);
+      row.appendChild(delBtn);
+      els.tocListItems.appendChild(row);
+    });
+  }
+
+  function openTocList() {
+    if (!currentToc.length) { flashStatus('目次はまだ追加されていません'); return; }
+    renderTocList();
+    els.tocOverlay.classList.add('show');
+  }
+  function closeTocList() { els.tocOverlay.classList.remove('show'); }
+  function isTocListOpen() { return els.tocOverlay.classList.contains('show'); }
 
   function exportData() {
     const data = { folders: savedFolders, items: savedItems };
@@ -715,6 +903,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     baseUrl = parsed.baseUrl;
     currentResumeKey = baseUrl;
     currentlyCustom = false;
+    loadCurrentToc();
     preferredExt = parsed.hintExt !== null ? parsed.hintExt : 0;
     try { localStorage.setItem(LAST_URL_KEY, JSON.stringify({ kind: 'url', value: baseUrl })); } catch (e) {}
     updateCurrentTitleDisplay();
@@ -795,7 +984,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   // Opens a "custom" manga: one whose pages were supplied as an explicit,
-  // non-sequential URL list via the 個別URL漫画を追加 dialog (see
+  // non-sequential URL list via the 個別追加 dialog (see
   // confirmCustomAdd) rather than a base URL + guessed-extension sequence.
   // All pages are already known up front, so there's no async detection
   // loop — just show the (resume) page immediately. switchDirection mirrors
@@ -806,6 +995,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     baseUrl = '';
     currentResumeKey = 'custom:' + item.id;
     currentlyCustom = true;
+    loadCurrentToc();
     pages = (item.pages || []).slice();
     detecting = false;
     detectionDone = true;
@@ -839,7 +1029,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   // Single entry point for opening a saved item, regardless of whether it's
   // a normal 連番ベースURL manga or a custom (explicit page list) manga
-  // added via the 個別URL漫画を追加 dialog. Use this (not startReading
+  // added via the 個別追加 dialog. Use this (not startReading
   // directly) for anything that opens an *item* object rather than a raw
   // typed-in URL.
   function openItem(item, addToHistoryFlag, switchDirection) {
@@ -1138,7 +1328,18 @@ https://cdn.example.org/c/003.webp"></textarea>
   // under one base URL — each page gets its own arbitrary URL, pasted one
   // per line, in reading order. Added directly to savedItems (no JSON
   // file involved); see openItem/startReadingCustom for how it's read back.
+  // 個別追加/編集 dialogs are opened from inside the 保存したURL list popup,
+  // so if that list is currently open it's hidden first (otherwise the two
+  // overlays sit stacked on top of each other) and reopened — re-rendered,
+  // so any change is reflected — once the dialog is closed.
+  function reopenSavedList() {
+    renderSavedList();
+    els.savedListOverlay.classList.add('show');
+  }
+
   function openCustomAddDialog() {
+    customAddReturnToList = isSavedListOpen();
+    if (customAddReturnToList) closeSavedList();
     els.customTitleInput.value = '';
     renderFolderOptions(els.customFolderSelect, '');
     els.customNewFolderRow.style.display = 'none';
@@ -1149,6 +1350,10 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
   function closeCustomAddDialog() {
     els.customAddOverlay.classList.remove('show');
+    if (customAddReturnToList) {
+      customAddReturnToList = false;
+      reopenSavedList();
+    }
   }
   function isCustomAddDialogOpen() { return els.customAddOverlay.classList.contains('show'); }
 
@@ -1170,42 +1375,107 @@ https://cdn.example.org/c/003.webp"></textarea>
     });
     persistAll();
     closeCustomAddDialog();
-    if (isSavedListOpen()) renderSavedList();
     flashStatus(pageUrls.length + 'ページの漫画を追加しました');
   }
 
+  // ---------- edit saved item dialog (title/folder/URL, and for custom
+  // items the page-URL list — lets pages be replaced or inserted) ----------
+  function openEditItemDialog(item) {
+    editingItemId = item.id;
+    editReturnToList = isSavedListOpen();
+    if (editReturnToList) closeSavedList();
+
+    els.editTitleInput.value = itemDisplayTitle(item);
+    renderFolderOptions(els.editFolderSelect, item.folderId || '');
+    els.editNewFolderRow.style.display = 'none';
+    els.editNewFolderInput.value = '';
+
+    const isCustom = Array.isArray(item.pages);
+    els.editUrlRow.style.display = isCustom ? 'none' : 'block';
+    els.editPagesRow.style.display = isCustom ? 'block' : 'none';
+    els.editUrlInput.value = item.url || '';
+    els.editPagesTextarea.value = isCustom ? item.pages.join('\n') : '';
+
+    els.editItemOverlay.classList.add('show');
+    els.editTitleInput.focus();
+  }
+  function closeEditItemDialog() {
+    els.editItemOverlay.classList.remove('show');
+    editingItemId = null;
+    if (editReturnToList) {
+      editReturnToList = false;
+      reopenSavedList();
+    }
+  }
+  function isEditItemDialogOpen() { return els.editItemOverlay.classList.contains('show'); }
+
+  function confirmEditItem() {
+    const item = savedItems.find((it) => it.id === editingItemId);
+    if (!item) { closeEditItemDialog(); return; }
+
+    const isCustom = Array.isArray(item.pages);
+    if (isCustom) {
+      const pageUrls = els.editPagesTextarea.value
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (!pageUrls.length) { flashStatus('ページURLを1つ以上入力してください'); return; }
+      item.pages = pageUrls; // replaces/inserts/removes pages, in the edited order
+    } else {
+      const newUrl = els.editUrlInput.value.trim();
+      if (!newUrl) { flashStatus('URLを入力してください'); return; }
+      const parsed = parseInputUrl(newUrl);
+      item.url = parsed ? parsed.baseUrl : newUrl;
+    }
+
+    let folderId = els.editFolderSelect.value;
+    if (folderId === '__new__') folderId = '';
+    item.folderId = folderId || null;
+    item.title = els.editTitleInput.value.trim() || itemDisplayTitle(item);
+
+    persistAll();
+    updateCurrentTitleDisplay();
+    closeEditItemDialog();
+    flashStatus('更新しました');
+  }
+
   // ---------- saved list (with folders) ----------
-  function buildFolderRow(folder) {
-    const row = document.createElement('div');
-    row.className = 'saved-item folder-row';
+  // Every level (including the shallowest/top one) renders as a Kindle-style
+  // bookshelf grid now: folders show as folder-icon cards, manga show as
+  // page-1 cover cards (buildBookCard), side by side in the same grid.
+  function buildFolderCard(folder) {
+    const card = document.createElement('div');
+    card.className = 'book-card folder-card';
 
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'url-text folder-name';
-    nameSpan.textContent = folder.name;
-    nameSpan.addEventListener('click', () => { currentFolderView = folder.id; renderSavedList(); });
-
-    const chevron = document.createElement('span');
-    chevron.className = 'chevron';
-    chevron.textContent = '›';
-
-    row.appendChild(nameSpan);
-    row.appendChild(chevron);
+    const cover = document.createElement('div');
+    cover.className = 'book-cover folder-cover';
+    cover.textContent = '📁';
 
     // 履歴 is a reserved, auto-managed folder and can't be deleted as a whole.
     if (folder.id !== HISTORY_FOLDER_ID) {
       const delBtn = document.createElement('button');
-      delBtn.textContent = '削除';
+      delBtn.className = 'book-delBtn';
+      delBtn.textContent = '×';
+      delBtn.title = '削除';
       delBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (!confirm('「' + folder.name + '」フォルダと、その中のURLをすべて削除しますか？')) return;
+        if (!confirm('「' + folder.name + '」フォルダと、その中のURLをすべて削除します。本当によろしいですか？')) return;
         savedItems = savedItems.filter((it) => it.folderId !== folder.id);
         savedFolders = savedFolders.filter((f) => f.id !== folder.id);
         persistAll();
         renderSavedList();
       });
-      row.appendChild(delBtn);
+      cover.appendChild(delBtn);
     }
-    return row;
+
+    const title = document.createElement('div');
+    title.className = 'book-title';
+    title.textContent = folder.name;
+
+    card.appendChild(cover);
+    card.appendChild(title);
+    card.addEventListener('click', () => { currentFolderView = folder.id; renderSavedList(); });
+    return card;
   }
 
   // item.url is undefined for "custom" (explicit page list) items, so
@@ -1219,51 +1489,14 @@ https://cdn.example.org/c/003.webp"></textarea>
     return '';
   }
 
-  function buildItemRow(item, list) {
-    const row = document.createElement('div');
-    row.className = 'saved-item';
-
-    const textWrap = document.createElement('div');
-    textWrap.className = 'item-text';
-    textWrap.title = itemSubtext(item);
-
-    const titleEl = document.createElement('div');
-    titleEl.className = 'item-title';
-    titleEl.textContent = itemDisplayTitle(item);
-
-    const urlEl = document.createElement('div');
-    urlEl.className = 'item-url';
-    urlEl.textContent = itemSubtext(item);
-
-    textWrap.appendChild(titleEl);
-    textWrap.appendChild(urlEl);
-    textWrap.addEventListener('click', () => {
-      closeSavedList();
-      setReadingListContext(list, list.indexOf(item));
-      openItem(item, false);
-    });
-
-    const delBtn = document.createElement('button');
-    delBtn.textContent = '削除';
-    delBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      savedItems = savedItems.filter((it) => it.id !== item.id);
-      persistAll();
-      updateCurrentTitleDisplay();
-      renderSavedList();
-    });
-
-    row.appendChild(textWrap);
-    row.appendChild(delBtn);
-    return row;
-  }
-
-  // Inside a folder, manga are shown as a Kindle-bookshelf-style grid of
-  // page-1 cover thumbnails rather than plain text rows. Reuses the same
-  // cascading-extension cover lookup as the 一覧 feed view.
+  // Manga are shown as a Kindle-bookshelf-style grid of page-1 cover
+  // thumbnails. Reuses the same cascading-extension cover lookup as the 一覧
+  // feed view. Every item also gets an 編集 (edit) button alongside the
+  // existing 削除 (delete) one — works for both normal and custom items.
   function buildBookCard(item, list) {
     const card = document.createElement('div');
     card.className = 'book-card';
+    card.title = itemSubtext(item);
 
     const cover = document.createElement('div');
     cover.className = 'book-cover';
@@ -1276,12 +1509,23 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
     cover.appendChild(img);
 
+    const editBtn = document.createElement('button');
+    editBtn.className = 'book-editBtn';
+    editBtn.textContent = '✎';
+    editBtn.title = '編集';
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditItemDialog(item);
+    });
+    cover.appendChild(editBtn);
+
     const delBtn = document.createElement('button');
     delBtn.className = 'book-delBtn';
     delBtn.textContent = '×';
     delBtn.title = '削除';
     delBtn.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (!confirm('「' + itemDisplayTitle(item) + '」を削除します。本当によろしいですか？')) return;
       savedItems = savedItems.filter((it) => it.id !== item.id);
       persistAll();
       updateCurrentTitleDisplay();
@@ -1316,37 +1560,28 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
 
     els.savedListItems.innerHTML = '';
-    let rows = [];
+    els.savedListItems.classList.add('bookshelf'); // bookshelf grid at every level now
+
     let itemsList; // flat item list for the current view; doubles as swipe context
+    let folderCards = [];
     if (!currentFolderView) {
       itemsList = savedItems.filter((it) => !it.folderId);
-      rows = rows.concat(savedFolders.map((f) => ({ type: 'folder', data: f })));
-      rows = rows.concat(itemsList.map((it) => ({ type: 'item', data: it })));
+      folderCards = savedFolders;
     } else {
       itemsList = savedItems.filter((it) => it.folderId === currentFolderView);
-      rows = itemsList.map((it) => ({ type: 'item', data: it }));
     }
 
     // "一覧" (feed) only makes sense inside a folder that actually has items.
-    els.feedBtn.style.display = (currentFolderView && rows.length) ? '' : 'none';
+    els.feedBtn.style.display = (currentFolderView && itemsList.length) ? '' : 'none';
 
-    // Bookshelf grid only applies inside a folder; the top level (folder
-    // list + any unfiled items) stays a plain text list.
-    const bookshelfMode = !!currentFolderView;
-    els.savedListItems.classList.toggle('bookshelf', bookshelfMode);
-
-    if (rows.length === 0) {
+    const isEmpty = folderCards.length === 0 && itemsList.length === 0;
+    if (isEmpty) {
       els.savedListEmpty.style.display = 'block';
       els.savedListEmpty.textContent = currentFolderView ? 'このフォルダにはまだ何もありません' : '保存されたURLはまだありません';
     } else {
       els.savedListEmpty.style.display = 'none';
-      if (bookshelfMode) {
-        itemsList.forEach((it) => els.savedListItems.appendChild(buildBookCard(it, itemsList)));
-      } else {
-        rows.forEach((r) => {
-          els.savedListItems.appendChild(r.type === 'folder' ? buildFolderRow(r.data) : buildItemRow(r.data, itemsList));
-        });
-      }
+      folderCards.forEach((f) => els.savedListItems.appendChild(buildFolderCard(f)));
+      itemsList.forEach((it) => els.savedListItems.appendChild(buildBookCard(it, itemsList)));
     }
   }
 
@@ -1369,7 +1604,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     tryNext();
   }
 
-  function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen() || isCustomAddDialogOpen(); }
+  function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen() || isCustomAddDialogOpen() || isEditItemDialogOpen() || isTocListOpen(); }
 
   // ---------- events ----------
   function handleNewManga() {
@@ -1434,6 +1669,27 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.customNewFolderRow.style.display = 'none';
   });
 
+  els.cancelEditItemBtn.addEventListener('click', closeEditItemDialog);
+  els.confirmEditItemBtn.addEventListener('click', confirmEditItem);
+  els.editItemOverlay.addEventListener('click', (e) => { if (e.target === els.editItemOverlay) closeEditItemDialog(); });
+  els.editFolderSelect.addEventListener('change', () => {
+    if (els.editFolderSelect.value === '__new__') {
+      els.editNewFolderRow.style.display = 'flex';
+      els.editNewFolderInput.focus();
+    } else {
+      els.editNewFolderRow.style.display = 'none';
+    }
+  });
+  els.editConfirmNewFolderBtn.addEventListener('click', () => {
+    const name = els.editNewFolderInput.value.trim();
+    if (!name) return;
+    const folder = { id: genId('f'), name: name };
+    savedFolders.push(folder);
+    persistAll();
+    renderFolderOptions(els.editFolderSelect, folder.id);
+    els.editNewFolderRow.style.display = 'none';
+  });
+
   els.listBtn.addEventListener('click', openSavedList);
   els.closeListBtn.addEventListener('click', closeSavedList);
   els.savedListOverlay.addEventListener('click', (e) => { if (e.target === els.savedListOverlay) closeSavedList(); });
@@ -1475,16 +1731,23 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.animBtn.addEventListener('click', toggleAnim);
   els.pageSlider.addEventListener('input', (e) => showPage(parseInt(e.target.value, 10) || 1));
 
+  els.tocAddBtn.addEventListener('click', addTocEntry);
+  els.tocBtn.addEventListener('click', openTocList);
+  els.closeTocBtn.addEventListener('click', closeTocList);
+  els.tocOverlay.addEventListener('click', (e) => { if (e.target === els.tocOverlay) closeTocList(); });
+
   document.addEventListener('keydown', (e) => {
     if (e.target === els.saveTitleInput ||
         e.target === els.newFolderInput || e.target === els.listNewFolderInput ||
         e.target === els.customTitleInput || e.target === els.customNewFolderInput ||
-        e.target === els.customPagesTextarea) {
-      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); }
+        e.target === els.customPagesTextarea ||
+        e.target === els.editTitleInput || e.target === els.editNewFolderInput ||
+        e.target === els.editUrlInput || e.target === els.editPagesTextarea) {
+      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); }
       return;
     }
     if (anyModalOpen()) {
-      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); }
+      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); }
       return;
     }
     switch (e.key) {
