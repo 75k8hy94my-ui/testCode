@@ -153,6 +153,29 @@
   }
   #savedListEmpty { color: var(--sub); font-size: 13px; text-align: center; padding: 24px 0; }
 
+  /* Bookshelf grid: shown inside a folder, like a Kindle library — page-1
+     cover thumbnails lined up instead of plain text rows. */
+  #savedListItems.bookshelf {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+    gap: 16px 10px; align-items: start;
+  }
+  .book-card { cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
+  .book-cover {
+    position: relative; width: 100%; aspect-ratio: 2 / 3; background: #0e0e10;
+    border: 1px solid #2a2a30; border-radius: 4px; overflow: hidden;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+  }
+  .book-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .book-title {
+    font-size: 11px; color: var(--text); text-align: center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .book-delBtn {
+    position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; line-height: 18px;
+    text-align: center; border-radius: 50%; background: rgba(20,20,24,0.85); color: var(--text);
+    border: none; font-size: 13px; cursor: pointer; padding: 0;
+  }
+
   /* File sync / export-import */
   #syncRow, #exportImportRow {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -1219,6 +1242,47 @@
     return row;
   }
 
+  // Inside a folder, manga are shown as a Kindle-bookshelf-style grid of
+  // page-1 cover thumbnails rather than plain text rows. Reuses the same
+  // cascading-extension cover lookup as the 一覧 feed view.
+  function buildBookCard(item, list) {
+    const card = document.createElement('div');
+    card.className = 'book-card';
+
+    const cover = document.createElement('div');
+    cover.className = 'book-cover';
+    const img = document.createElement('img');
+    img.alt = item.title || deriveTitleFromUrl(item.url);
+    setupFeedImage(img, item.url);
+    cover.appendChild(img);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'book-delBtn';
+    delBtn.textContent = '×';
+    delBtn.title = '削除';
+    delBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      savedItems = savedItems.filter((it) => it.id !== item.id);
+      persistAll();
+      updateCurrentTitleDisplay();
+      renderSavedList();
+    });
+    cover.appendChild(delBtn);
+
+    const title = document.createElement('div');
+    title.className = 'book-title';
+    title.textContent = item.title || deriveTitleFromUrl(item.url);
+
+    card.appendChild(cover);
+    card.appendChild(title);
+    card.addEventListener('click', () => {
+      closeSavedList();
+      setReadingListContext(list, list.indexOf(item));
+      startReading(item.url, false);
+    });
+    return card;
+  }
+
   function renderSavedList() {
     els.listBackBtn.style.display = currentFolderView ? '' : 'none';
     els.listNewFolderBtn.style.display = currentFolderView ? 'none' : '';
@@ -1246,14 +1310,23 @@
     // "一覧" (feed) only makes sense inside a folder that actually has items.
     els.feedBtn.style.display = (currentFolderView && rows.length) ? '' : 'none';
 
+    // Bookshelf grid only applies inside a folder; the top level (folder
+    // list + any unfiled items) stays a plain text list.
+    const bookshelfMode = !!currentFolderView;
+    els.savedListItems.classList.toggle('bookshelf', bookshelfMode);
+
     if (rows.length === 0) {
       els.savedListEmpty.style.display = 'block';
       els.savedListEmpty.textContent = currentFolderView ? 'このフォルダにはまだ何もありません' : '保存されたURLはまだありません';
     } else {
       els.savedListEmpty.style.display = 'none';
-      rows.forEach((r) => {
-        els.savedListItems.appendChild(r.type === 'folder' ? buildFolderRow(r.data) : buildItemRow(r.data, itemsList));
-      });
+      if (bookshelfMode) {
+        itemsList.forEach((it) => els.savedListItems.appendChild(buildBookCard(it, itemsList)));
+      } else {
+        rows.forEach((r) => {
+          els.savedListItems.appendChild(r.type === 'folder' ? buildFolderRow(r.data) : buildItemRow(r.data, itemsList));
+        });
+      }
     }
   }
 
