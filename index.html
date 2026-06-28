@@ -184,38 +184,6 @@
   }
   #syncStatusText { color: var(--sub); flex: 1; min-width: 120px; }
 
-  /* Feed view: TikTok/Shorts-style vertical swipe through a folder's manga */
-  #feedOverlay {
-    position: fixed; inset: 0; background: #000;
-    display: none; z-index: 60;
-  }
-  #feedOverlay.show { display: block; }
-  #feedContainer {
-    height: 100%; overflow-y: auto; scroll-snap-type: y mandatory;
-    -webkit-overflow-scrolling: touch;
-  }
-  .feedSlide {
-    height: 100%; scroll-snap-align: start; scroll-snap-stop: always;
-    position: relative; display: flex; align-items: center; justify-content: center;
-    background: #000; cursor: pointer;
-  }
-  .feedSlide img {
-    max-width: 100%; max-height: 100%; object-fit: contain; display: block;
-  }
-  .feedInfo {
-    position: absolute; left: 0; right: 0; bottom: 0; padding: 24px 16px 32px;
-    display: flex; flex-direction: column; align-items: center; gap: 10px;
-    background: linear-gradient(transparent, rgba(0,0,0,0.7));
-  }
-  .feedTitle {
-    color: #fff; font-size: 15px; font-weight: 600; text-align: center;
-    max-width: 85vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  #feedCloseBtn {
-    position: fixed; top: 14px; right: 14px; z-index: 61;
-    padding: 8px 14px; border-radius: 6px; border: none;
-    background: rgba(40,40,46,0.75); color: #fff; font-size: 14px; cursor: pointer;
-  }
 
   /* Access lock */
   #lockOverlay {
@@ -334,12 +302,6 @@
   </div>
 </div>
 
-<!-- Feed view: vertical swipe through a folder's manga (TikTok/Shorts style) -->
-<div id="feedOverlay">
-  <div id="feedContainer"></div>
-  <button id="feedCloseBtn">✕ 閉じる</button>
-</div>
-
 <script>
 (function () {
   const EXT_CANDIDATES = ['jpg', 'jpeg', 'png', 'webp'];
@@ -400,9 +362,6 @@
     savedListEmpty: document.getElementById('savedListEmpty'),
     closeListBtn: document.getElementById('closeListBtn'),
     feedBtn: document.getElementById('feedBtn'),
-    feedOverlay: document.getElementById('feedOverlay'),
-    feedContainer: document.getElementById('feedContainer'),
-    feedCloseBtn: document.getElementById('feedCloseBtn'),
 
     syncStatusText: document.getElementById('syncStatusText'),
     syncOpenBtn: document.getElementById('syncOpenBtn'),
@@ -816,7 +775,13 @@
 
   // url: the manga's folder/page URL. addToHistoryFlag: true when this open
   // should be auto-recorded into 履歴 (used for the "新規" button only).
-  async function startReading(url, addToHistoryFlag) {
+  // switchDirection ('up'/'down') means this call was triggered by a
+  // vertical swipe inside the reader (see goToReadingListOffset). In that
+  // case we keep the outgoing manga's page on screen instead of blanking to
+  // a spinner, so renderPage can do a real vertical slide once the new
+  // manga's first page is ready — that's what makes the swipe feel live
+  // instead of an instant cut.
+  async function startReading(url, addToHistoryFlag, switchDirection) {
     const parsed = parseInputUrl(url);
     if (!parsed) return;
     // Each call gets its own "generation" number. If a newer startReading()
@@ -842,9 +807,13 @@
     pendingResumePage = getResumePage(baseUrl);
 
     els.newBtn.disabled = true;
-    els.placeholder.style.display = 'none';
-    els.imgWrap.style.display = 'none';
-    els.spinner.style.display = 'block';
+    if (!switchDirection) {
+      // Normal open (新規/list/resume): no prior page to keep showing, so
+      // blank to a spinner while page 1 is located, same as always.
+      els.placeholder.style.display = 'none';
+      els.imgWrap.style.display = 'none';
+      els.spinner.style.display = 'block';
+    }
     els.status.textContent = '1ページ目を確認中...';
 
     const firstUrl = await findPageUrl(1);
@@ -853,6 +822,7 @@
 
     if (!firstUrl) {
       els.spinner.style.display = 'none';
+      els.imgWrap.style.display = 'none';
       els.placeholder.style.display = 'block';
       els.placeholder.innerHTML =
         '1ページ目が見つかりませんでした。<br>' +
@@ -867,7 +837,7 @@
     els.spinner.style.display = 'none';
     els.imgWrap.style.display = 'block';
     els.controls.style.display = 'flex';
-    showPage(1);
+    showPage(1, switchDirection === 'up' ? 'swipeUp' : switchDirection === 'down' ? 'swipeDown' : null);
     updateStatus();
     detectMorePages(2, myGeneration);
   }
@@ -952,6 +922,17 @@
     return img;
   }
 
+  // 'next'/'prev' are horizontal page turns within the same manga.
+  // 'swipeUp'/'swipeDown' are vertical manga switches (一覧 swipe), entering
+  // and exiting along Y instead of X — same crossfade-and-slide mechanism,
+  // different axis, so it actually reads as a swipe instead of a hard cut.
+  const DIR_TRANSFORMS = {
+    next:      { enter: 'translateX(100%)',  exit: 'translateX(-100%)' },
+    prev:      { enter: 'translateX(-100%)', exit: 'translateX(100%)' },
+    swipeUp:   { enter: 'translateY(100%)',  exit: 'translateY(-100%)' },
+    swipeDown: { enter: 'translateY(-100%)', exit: 'translateY(100%)' },
+  };
+
   // Renders page n into the stage, but only once its image has actually
   // finished loading. Until then, whatever was previously on screen stays
   // visible instead of being replaced by a blank/black frame. If the page
@@ -969,17 +950,18 @@
       newSlide.appendChild(img);
 
       const prevSlide = els.pageStage.querySelector('.pageSlide.current');
+      const t = direction && DIR_TRANSFORMS[direction];
 
-      if (animEnabled && direction && prevSlide) {
-        newSlide.style.transform = direction === 'next' ? 'translateX(100%)' : 'translateX(-100%)';
+      if (animEnabled && t && prevSlide) {
+        newSlide.style.transform = t.enter;
         els.pageStage.appendChild(newSlide);
         prevSlide.classList.remove('current');
         void newSlide.offsetWidth; // force layout before animating
         newSlide.style.transition = 'transform ' + ANIM_DURATION + 'ms ease';
         prevSlide.style.transition = 'transform ' + ANIM_DURATION + 'ms ease';
         requestAnimationFrame(() => {
-          newSlide.style.transform = 'translateX(0)';
-          prevSlide.style.transform = direction === 'next' ? 'translateX(-100%)' : 'translateX(100%)';
+          newSlide.style.transform = 'translate(0, 0)';
+          prevSlide.style.transform = t.exit;
         });
         newSlide.classList.add('current');
         setTimeout(() => { if (prevSlide.parentNode) prevSlide.parentNode.removeChild(prevSlide); }, ANIM_DURATION + 60);
@@ -1012,12 +994,12 @@
     }
   }
 
-  function showPage(n) {
+  function showPage(n, forceDirection) {
     if (!pages.length) return;
     if (n < 1) n = 1;
     if (n > pages.length) n = pages.length;
     const hasCurrent = !!els.pageStage.querySelector('.pageSlide');
-    const direction = !hasCurrent ? null : (n > currentPage ? 'next' : (n < currentPage ? 'prev' : null));
+    const direction = forceDirection || (!hasCurrent ? null : (n > currentPage ? 'next' : (n < currentPage ? 'prev' : null)));
     currentPage = n;
     renderPage(n, direction);
     updateSlider();
@@ -1069,7 +1051,9 @@
     }
     readingListIndex = newIndex;
     const item = readingListItems[newIndex];
-    startReading(item.url, false);
+    // offset > 0 (swiped up, moving to the next item) slides the new page in
+    // from the bottom; offset < 0 (swiped down, previous item) from the top.
+    startReading(item.url, false, offset > 0 ? 'up' : 'down');
   }
 
   let touchStartX = 0, touchStartY = 0, touchActive = false;
@@ -1334,10 +1318,10 @@
   function closeSavedList() { els.savedListOverlay.classList.remove('show'); }
   function isSavedListOpen() { return els.savedListOverlay.classList.contains('show'); }
 
-  // ---------- feed view (vertical-swipe browsing within a folder) ----------
   // A saved item only stores the manga's base URL, not which file extension
   // its pages use, so the cover image is found the same cascading way page
   // detection works: try .jpg, then .jpeg/.png/.webp on error, in order.
+  // Used by the bookshelf grid (buildBookCard) for cover thumbnails.
   function setupFeedImage(imgEl, baseUrlForItem) {
     let idx = 0;
     function tryNext() {
@@ -1349,54 +1333,7 @@
     tryNext();
   }
 
-  function buildFeedSlide(item, list) {
-    const slide = document.createElement('div');
-    slide.className = 'feedSlide';
-
-    const img = document.createElement('img');
-    img.alt = item.title || deriveTitleFromUrl(item.url);
-    setupFeedImage(img, item.url);
-
-    const info = document.createElement('div');
-    info.className = 'feedInfo';
-    const title = document.createElement('div');
-    title.className = 'feedTitle';
-    title.textContent = item.title || deriveTitleFromUrl(item.url);
-    const openBtn = document.createElement('button');
-    openBtn.className = 'primaryBtn';
-    openBtn.textContent = '開く';
-    info.appendChild(title);
-    info.appendChild(openBtn);
-
-    const openThis = () => {
-      closeFeed();
-      closeSavedList();
-      setReadingListContext(list, list.indexOf(item));
-      startReading(item.url, false);
-    };
-    openBtn.addEventListener('click', (e) => { e.stopPropagation(); openThis(); });
-    slide.addEventListener('click', openThis);
-
-    slide.appendChild(img);
-    slide.appendChild(info);
-    return slide;
-  }
-
-  function openFeed(folderId) {
-    const items = savedItems.filter((it) => it.folderId === folderId);
-    if (!items.length) return;
-    els.feedContainer.innerHTML = '';
-    items.forEach((it) => els.feedContainer.appendChild(buildFeedSlide(it, items)));
-    els.feedContainer.scrollTop = 0;
-    els.feedOverlay.classList.add('show');
-  }
-  function closeFeed() {
-    els.feedOverlay.classList.remove('show');
-    els.feedContainer.innerHTML = '';
-  }
-  function isFeedOpen() { return els.feedOverlay.classList.contains('show'); }
-
-  function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen() || isFeedOpen(); }
+  function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen(); }
 
   // ---------- events ----------
   function handleNewManga() {
@@ -1462,8 +1399,17 @@
     renderSavedList();
   });
 
-  els.feedBtn.addEventListener('click', () => { if (currentFolderView) openFeed(currentFolderView); });
-  els.feedCloseBtn.addEventListener('click', closeFeed);
+  // "一覧": jump straight into the reader for the folder's first manga (no
+  // intermediate browsing screen), with swipe context set to the whole
+  // folder so the reader's vertical swipe can step through the rest.
+  els.feedBtn.addEventListener('click', () => {
+    if (!currentFolderView) return;
+    const items = savedItems.filter((it) => it.folderId === currentFolderView);
+    if (!items.length) return;
+    closeSavedList();
+    setReadingListContext(items, 0);
+    startReading(items[0].url, false);
+  });
 
   els.zoneLeft.addEventListener('click', prevPage);
   els.zoneRight.addEventListener('click', nextPage);
@@ -1478,11 +1424,11 @@
   document.addEventListener('keydown', (e) => {
     if (e.target === els.saveTitleInput ||
         e.target === els.newFolderInput || e.target === els.listNewFolderInput) {
-      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeFeed(); }
+      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); }
       return;
     }
     if (anyModalOpen()) {
-      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeFeed(); }
+      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); }
       return;
     }
     switch (e.key) {
