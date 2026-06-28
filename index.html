@@ -286,6 +286,8 @@
       <button class="ctrlBtn" id="exportBtn">書き出し(JSON)</button>
       <button class="ctrlBtn" id="importBtn">読み込み(JSON)</button>
       <input type="file" id="importFileInput" accept="application/json" style="display:none;">
+      <button class="ctrlBtn" id="importCustomBtn">個別URL漫画を追加(JSON)</button>
+      <input type="file" id="importCustomFileInput" accept="application/json" style="display:none;">
     </div>
     <div id="listToolbar">
       <button class="ctrlBtn" id="listBackBtn" style="display:none;">← 戻る</button>
@@ -372,6 +374,8 @@
     exportBtn: document.getElementById('exportBtn'),
     importBtn: document.getElementById('importBtn'),
     importFileInput: document.getElementById('importFileInput'),
+    importCustomBtn: document.getElementById('importCustomBtn'),
+    importCustomFileInput: document.getElementById('importCustomFileInput'),
 
     lockOverlay: document.getElementById('lockOverlay'),
     lockInput: document.getElementById('lockInput'),
@@ -382,6 +386,12 @@
   let baseUrl = '';
   let pages = [];          // detected page URLs, index 0 = page 1
   let preferredExt = 0;    // index into EXT_CANDIDATES
+  // Key used to look up/save resume-page position in LAST_PAGE_KEY. For a
+  // normal 連番ベースURL manga this is just baseUrl; for a "custom" manga
+  // (explicit non-sequential page list, see startReadingCustom) there's no
+  // baseUrl, so a synthetic 'custom:<itemId>' key is used instead.
+  let currentResumeKey = '';
+  let currentlyCustom = false; // true while a custom (fixed page list) manga is open
   let detecting = false;
   let detectionDone = false;
   let detectionHitLimit = false;
@@ -411,9 +421,17 @@
     [readingListIndex - 1, readingListIndex + 1].forEach((idx) => {
       if (idx < 0 || idx >= readingListItems.length) return;
       const item = readingListItems[idx];
-      if (!item || preloadedCoverUrls.has(item.url)) return;
-      preloadedCoverUrls.add(item.url);
-      preloadFirstPage(item.url);
+      if (!item) return;
+      const isCustom = Array.isArray(item.pages) && item.pages.length;
+      const firstPageUrl = isCustom ? item.pages[0] : item.url;
+      if (!firstPageUrl || preloadedCoverUrls.has(firstPageUrl)) return;
+      preloadedCoverUrls.add(firstPageUrl);
+      if (isCustom) {
+        const img = new Image(); // exact URL already known; no extension cascade needed
+        img.src = firstPageUrl;
+      } else {
+        preloadFirstPage(firstPageUrl);
+      }
     });
   }
   function clearReadingListContext() { readingListItems = []; readingListIndex = -1; }
@@ -425,7 +443,11 @@
   let animEnabled = true;
 
   let savedFolders = []; // [{id, name}]
-  let savedItems = [];   // [{id, url, title, folderId, addedAt}]
+  // [{id, url, title, folderId, addedAt}] for normal 連番ベースURL manga, or
+  // [{id, pages: [url, url, ...], title, folderId, addedAt}] (no `url`) for
+  // a "custom" manga added via 個別URL漫画を追加(JSON) — see
+  // importCustomMangaFromFile / openItem / startReadingCustom.
+  let savedItems = [];
   let currentFolderView = null;
   let pendingSaveUrl = null;
 
@@ -456,10 +478,10 @@
   // viewed page was the final page (and detection had finished, so we know it
   // really was the end), resuming should restart from page 1 instead.
   function persistLastPage() {
-    if (!baseUrl || !pages.length) return;
+    if (!currentResumeKey || !pages.length) return;
     try {
       const map = JSON.parse(localStorage.getItem(LAST_PAGE_KEY) || '{}');
-      map[baseUrl] = {
+      map[currentResumeKey] = {
         page: currentPage,
         wasLast: detectionDone && currentPage === pages.length,
         savedAt: Date.now(),
@@ -649,6 +671,54 @@
     }).catch(() => flashStatus('読み込みに失敗しました'));
   }
 
+  // "個別URL漫画を追加(JSON)": unlike importDataFromFile above (which
+  // replaces the whole saved list, for backup/restore), this ADDS one or
+  // more "custom" manga — manga whose pages aren't sequentially-numbered
+  // files under one base URL, so they can't use the normal 連番 detection.
+  // Each entry supplies its own explicit, ordered list of page image URLs.
+  // Accepts a single object, an array of objects, or { manga: [...] }.
+  function importCustomMangaFromFile(file) {
+    file.text().then((text) => {
+      let data;
+      try { data = JSON.parse(text); } catch (e) { flashStatus('JSON形式が正しくありません'); return; }
+      const list = Array.isArray(data) ? data : (data && Array.isArray(data.manga) ? data.manga : [data]);
+      let added = 0;
+      let failed = 0;
+      list.forEach((entry) => {
+        if (!entry || !Array.isArray(entry.pages) || !entry.pages.length ||
+            !entry.pages.every((p) => typeof p === 'string' && p.trim())) {
+          failed++;
+          return;
+        }
+        let folderId = null;
+        if (entry.folder && typeof entry.folder === 'string' && entry.folder.trim()) {
+          const name = entry.folder.trim();
+          let folder = savedFolders.find((f) => f.id !== HISTORY_FOLDER_ID && f.name === name);
+          if (!folder) {
+            folder = { id: genId('f'), name: name };
+            savedFolders.push(folder);
+          }
+          folderId = folder.id;
+        }
+        savedItems.push({
+          id: genId('i'),
+          title: (entry.title && String(entry.title).trim()) || ('無題' + (added + 1)),
+          folderId: folderId,
+          pages: entry.pages.map((p) => String(p).trim()),
+          addedAt: Date.now(),
+        });
+        added++;
+      });
+      if (added) {
+        persistAll();
+        if (isSavedListOpen()) renderSavedList();
+      }
+      if (added && failed) flashStatus(added + '件追加（' + failed + '件は形式エラーでスキップ）');
+      else if (added) flashStatus(added + '件の漫画を追加しました');
+      else flashStatus('追加できる項目がありませんでした（pagesを確認してください）');
+    }).catch(() => flashStatus('読み込みに失敗しました'));
+  }
+
   async function initSync() {
     if (!syncSupported) { updateSyncUI('none'); return; }
     try {
@@ -704,6 +774,11 @@
   // If the URL currently being viewed matches a saved item (by base URL),
   // show that item's title in the header; otherwise clear it.
   function updateCurrentTitleDisplay() {
+    // Custom items (explicit page list) set their own title directly in
+    // startReadingCustom; baseUrl is empty for them, so don't let this
+    // baseUrl-keyed lookup clear it (e.g. when an unrelated item is deleted
+    // from the saved list while a custom manga is on screen).
+    if (currentlyCustom) return;
     if (!baseUrl) { els.currentTitle.textContent = ''; return; }
     const match = savedItems.find((it) => baseUrlKey(it.url) === baseUrlKey(baseUrl));
     els.currentTitle.textContent = match ? match.title : '';
@@ -824,8 +899,10 @@
     // check that this call is still the current generation.
     const myGeneration = ++readingGeneration;
     baseUrl = parsed.baseUrl;
+    currentResumeKey = baseUrl;
+    currentlyCustom = false;
     preferredExt = parsed.hintExt !== null ? parsed.hintExt : 0;
-    try { localStorage.setItem(LAST_URL_KEY, baseUrl); } catch (e) {}
+    try { localStorage.setItem(LAST_URL_KEY, JSON.stringify({ kind: 'url', value: baseUrl })); } catch (e) {}
     updateCurrentTitleDisplay();
     if (addToHistoryFlag) addToHistory(baseUrl);
 
@@ -901,6 +978,60 @@
     updateStatus();
     updateSlider();
     persistLastPage();
+  }
+
+  // Opens a "custom" manga: one whose pages were supplied as an explicit,
+  // non-sequential URL list via JSON import (see importCustomMangaFromFile)
+  // rather than a base URL + guessed-extension sequence. All pages are
+  // already known up front, so there's no async detection loop — just show
+  // the (resume) page immediately. switchDirection mirrors startReading's
+  // vertical-swipe handling so swiping into a custom manga animates the same way.
+  function startReadingCustom(item, switchDirection) {
+    readingGeneration++; // invalidate any still-running sequential detection loop
+    baseUrl = '';
+    currentResumeKey = 'custom:' + item.id;
+    currentlyCustom = true;
+    pages = (item.pages || []).slice();
+    detecting = false;
+    detectionDone = true;
+    detectionHitLimit = false;
+    currentPage = 1;
+    pendingResumePage = getResumePage(currentResumeKey);
+
+    els.currentTitle.textContent = item.title || '無題';
+    try { localStorage.setItem(LAST_URL_KEY, JSON.stringify({ kind: 'item', itemId: item.id })); } catch (e) {}
+
+    if (!pages.length) {
+      els.spinner.style.display = 'none';
+      els.imgWrap.style.display = 'none';
+      els.placeholder.style.display = 'block';
+      els.placeholder.textContent = 'このアイテムにはページがありません。';
+      els.status.textContent = '';
+      return;
+    }
+
+    if (!switchDirection) {
+      els.placeholder.style.display = 'none';
+      els.spinner.style.display = 'none';
+    }
+    els.imgWrap.style.display = 'block';
+    els.controls.style.display = 'flex';
+    const startPage = pendingResumePage || 1;
+    pendingResumePage = null;
+    showPage(startPage, switchDirection === 'up' ? 'swipeUp' : switchDirection === 'down' ? 'swipeDown' : null);
+    updateStatus();
+  }
+
+  // Single entry point for opening a saved item, regardless of whether it's
+  // a normal 連番ベースURL manga or a JSON-imported custom (explicit page
+  // list) manga. Use this (not startReading directly) for anything that
+  // opens an *item* object rather than a raw typed-in URL.
+  function openItem(item, addToHistoryFlag, switchDirection) {
+    if (item && Array.isArray(item.pages) && item.pages.length) {
+      startReadingCustom(item, switchDirection);
+    } else {
+      startReading(item.url, addToHistoryFlag, switchDirection);
+    }
   }
 
   function updateStatus() {
@@ -1084,7 +1215,9 @@
     const item = readingListItems[newIndex];
     // offset > 0 (swiped up, moving to the next item) slides the new page in
     // from the bottom; offset < 0 (swiped down, previous item) from the top.
-    startReading(item.url, false, offset > 0 ? 'up' : 'down');
+    // openItem dispatches to startReading or startReadingCustom depending on
+    // whether this item has a fixed (JSON-imported) page list.
+    openItem(item, false, offset > 0 ? 'up' : 'down');
   }
 
   let touchStartX = 0, touchStartY = 0, touchActive = false;
@@ -1218,28 +1351,39 @@
     return row;
   }
 
+  // item.url is undefined for "custom" (JSON-imported, explicit page list)
+  // items, so title/tooltip fallbacks need to handle that case too.
+  function itemDisplayTitle(item) {
+    return item.title || (item.url ? deriveTitleFromUrl(item.url) : '無題');
+  }
+  function itemSubtext(item) {
+    if (item.url) return item.url;
+    if (Array.isArray(item.pages)) return '個別URL ・ ' + item.pages.length + 'ページ';
+    return '';
+  }
+
   function buildItemRow(item, list) {
     const row = document.createElement('div');
     row.className = 'saved-item';
 
     const textWrap = document.createElement('div');
     textWrap.className = 'item-text';
-    textWrap.title = item.url;
+    textWrap.title = itemSubtext(item);
 
     const titleEl = document.createElement('div');
     titleEl.className = 'item-title';
-    titleEl.textContent = item.title || deriveTitleFromUrl(item.url);
+    titleEl.textContent = itemDisplayTitle(item);
 
     const urlEl = document.createElement('div');
     urlEl.className = 'item-url';
-    urlEl.textContent = item.url;
+    urlEl.textContent = itemSubtext(item);
 
     textWrap.appendChild(titleEl);
     textWrap.appendChild(urlEl);
     textWrap.addEventListener('click', () => {
       closeSavedList();
       setReadingListContext(list, list.indexOf(item));
-      startReading(item.url, false);
+      openItem(item, false);
     });
 
     const delBtn = document.createElement('button');
@@ -1267,8 +1411,12 @@
     const cover = document.createElement('div');
     cover.className = 'book-cover';
     const img = document.createElement('img');
-    img.alt = item.title || deriveTitleFromUrl(item.url);
-    setupFeedImage(img, item.url);
+    img.alt = itemDisplayTitle(item);
+    if (Array.isArray(item.pages) && item.pages.length) {
+      img.src = item.pages[0]; // exact URL already known; no extension cascade needed
+    } else {
+      setupFeedImage(img, item.url);
+    }
     cover.appendChild(img);
 
     const delBtn = document.createElement('button');
@@ -1286,14 +1434,14 @@
 
     const title = document.createElement('div');
     title.className = 'book-title';
-    title.textContent = item.title || deriveTitleFromUrl(item.url);
+    title.textContent = itemDisplayTitle(item);
 
     card.appendChild(cover);
     card.appendChild(title);
     card.addEventListener('click', () => {
       closeSavedList();
       setReadingListContext(list, list.indexOf(item));
-      startReading(item.url, false);
+      openItem(item, false);
     });
     return card;
   }
@@ -1411,6 +1559,13 @@
     els.importFileInput.value = '';
   });
 
+  els.importCustomBtn.addEventListener('click', () => els.importCustomFileInput.click());
+  els.importCustomFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) importCustomMangaFromFile(file);
+    els.importCustomFileInput.value = '';
+  });
+
   els.listBtn.addEventListener('click', openSavedList);
   els.closeListBtn.addEventListener('click', closeSavedList);
   els.savedListOverlay.addEventListener('click', (e) => { if (e.target === els.savedListOverlay) closeSavedList(); });
@@ -1439,7 +1594,7 @@
     if (!items.length) return;
     closeSavedList();
     setReadingListContext(items, 0);
-    startReading(items[0].url, false);
+    openItem(items[0], false);
   });
 
   els.zoneLeft.addEventListener('click', prevPage);
@@ -1496,9 +1651,25 @@
 
   // No URL bar anymore, so automatically resume the last-viewed manga on
   // load (not counted as a "新規" open, so it isn't re-added to 履歴).
+  // LAST_URL_KEY is now a JSON envelope ({kind:'url',value} or
+  // {kind:'item',itemId}) so a custom (explicit page list) manga can be
+  // resumed too; older saved data was a plain URL string, handled below.
   try {
-    const lastUrl = localStorage.getItem(LAST_URL_KEY);
-    if (lastUrl) startReading(lastUrl, false);
+    const raw = localStorage.getItem(LAST_URL_KEY);
+    if (raw) {
+      let resumed = false;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.kind === 'url' && parsed.value) {
+          startReading(parsed.value, false);
+          resumed = true;
+        } else if (parsed && parsed.kind === 'item' && parsed.itemId) {
+          const it = savedItems.find((x) => x.id === parsed.itemId);
+          if (it) { openItem(it, false); resumed = true; }
+        }
+      } catch (e) { /* not JSON: legacy plain-string URL from before this change */ }
+      if (!resumed && /^https?:\/\//i.test(raw)) startReading(raw, false);
+    }
   } catch (e) {}
 
   initSync();
