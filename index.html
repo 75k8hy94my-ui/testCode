@@ -397,7 +397,25 @@
   // page-load auto-resume has no list context, so swiping does nothing then.
   let readingListItems = [];
   let readingListIndex = -1;
-  function setReadingListContext(items, index) { readingListItems = items; readingListIndex = index; }
+  const preloadedCoverUrls = new Set(); // dedup: avoid re-fetching the same manga's page 1 repeatedly
+  function setReadingListContext(items, index) {
+    readingListItems = items;
+    readingListIndex = index;
+    preloadAdjacentManga();
+  }
+  // Preloads page 1 of the manga just above/below the current position in
+  // readingListItems, so swiping up/down shows it instantly instead of
+  // waiting for a network fetch. Cheap to call repeatedly; already-preloaded
+  // URLs are skipped via preloadedCoverUrls.
+  function preloadAdjacentManga() {
+    [readingListIndex - 1, readingListIndex + 1].forEach((idx) => {
+      if (idx < 0 || idx >= readingListItems.length) return;
+      const item = readingListItems[idx];
+      if (!item || preloadedCoverUrls.has(item.url)) return;
+      preloadedCoverUrls.add(item.url);
+      preloadFirstPage(item.url);
+    });
+  }
   function clearReadingListContext() { readingListItems = []; readingListIndex = -1; }
 
   let fitModes = ['fit-contain', 'fit-width', 'fit-height'];
@@ -773,6 +791,18 @@
     return null;
   }
 
+  // Preloads just page 1 of another manga (used for swipe-list neighbors).
+  // Doesn't know the right extension ahead of time, so it cascades through
+  // EXT_CANDIDATES like findPageUrl, but fire-and-forget: a successful
+  // loadImage() call leaves the browser's image cache primed, so the actual
+  // <img> shown later by startReading()/renderPage() loads instantly.
+  async function preloadFirstPage(baseUrlForItem) {
+    for (const ext of EXT_CANDIDATES) {
+      const ok = await loadImage(baseUrlForItem + '1.' + ext);
+      if (ok) return;
+    }
+  }
+
   // url: the manga's folder/page URL. addToHistoryFlag: true when this open
   // should be auto-recorded into 履歴 (used for the "新規" button only).
   // switchDirection ('up'/'down') means this call was triggered by a
@@ -1050,6 +1080,7 @@
       return;
     }
     readingListIndex = newIndex;
+    preloadAdjacentManga();
     const item = readingListItems[newIndex];
     // offset > 0 (swiped up, moving to the next item) slides the new page in
     // from the bottom; offset < 0 (swiped down, previous item) from the top.
