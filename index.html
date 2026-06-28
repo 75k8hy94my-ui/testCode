@@ -118,12 +118,18 @@
 
   /* Save dialog */
   .field-label { font-size: 12px; color: var(--sub); display: block; margin-top: 10px; }
-  #saveDialogPanel input[type="text"], #saveDialogPanel select {
+  #saveDialogPanel input[type="text"], #saveDialogPanel select,
+  #customAddPanel input[type="text"], #customAddPanel select {
     width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #333;
     background: #0e0e10; color: var(--text); font-size: 16px; margin-top: 4px;
   }
-  #newFolderRow { display: none; gap: 8px; margin-top: 8px; }
-  #newFolderRow input { flex: 1; }
+  #customAddPanel textarea {
+    width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #333;
+    background: #0e0e10; color: var(--text); font-size: 14px; margin-top: 4px;
+    font-family: inherit; resize: vertical;
+  }
+  #newFolderRow, #customNewFolderRow { display: none; gap: 8px; margin-top: 8px; }
+  #newFolderRow input, #customNewFolderRow input { flex: 1; }
   .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
   /* Saved list */
@@ -176,13 +182,12 @@
     border: none; font-size: 13px; cursor: pointer; padding: 0;
   }
 
-  /* File sync / export-import */
-  #syncRow, #exportImportRow {
+  /* Export/import */
+  #exportImportRow {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     padding: 8px 0; margin-bottom: 6px; border-bottom: 1px solid #2a2a30;
     font-size: 12px;
   }
-  #syncStatusText { color: var(--sub); flex: 1; min-width: 120px; }
 
 
   /* Access lock */
@@ -268,6 +273,29 @@
   </div>
 </div>
 
+<!-- Custom (explicit page-list) manga add dialog -->
+<div id="customAddOverlay" class="modalOverlay">
+  <div id="customAddPanel" class="modalPanel">
+    <div class="panel-header"><span>個別URL漫画を追加</span></div>
+    <label class="field-label" for="customTitleInput">タイトル</label>
+    <input id="customTitleInput" type="text" placeholder="例: ○○ 第1巻">
+    <label class="field-label" for="customFolderSelect">フォルダ</label>
+    <select id="customFolderSelect"></select>
+    <div id="customNewFolderRow">
+      <input id="customNewFolderInput" type="text" placeholder="新しいフォルダ名">
+      <button class="ctrlBtn" id="customConfirmNewFolderBtn">追加</button>
+    </div>
+    <label class="field-label" for="customPagesTextarea">ページURL（1行に1つ、読む順に貼り付け）</label>
+    <textarea id="customPagesTextarea" rows="6" placeholder="https://example.com/a/page1.jpg
+https://example.com/b/p2.png
+https://cdn.example.org/c/003.webp"></textarea>
+    <div class="dialog-actions">
+      <button class="ctrlBtn" id="cancelCustomAddBtn">キャンセル</button>
+      <button class="primaryBtn" id="confirmCustomAddBtn">追加</button>
+    </div>
+  </div>
+</div>
+
 <!-- Saved list -->
 <div id="savedListOverlay" class="modalOverlay">
   <div id="savedListPanel" class="modalPanel">
@@ -275,19 +303,11 @@
       <span>保存したURL</span>
       <button class="ctrlBtn" id="closeListBtn">閉じる</button>
     </div>
-    <div id="syncRow">
-      <span id="syncStatusText">未接続</span>
-      <button class="ctrlBtn" id="syncOpenBtn">既存の同期ファイルを選ぶ</button>
-      <button class="ctrlBtn" id="syncNewBtn">新規に同期ファイルを作成</button>
-      <button class="ctrlBtn" id="syncReconnectBtn" style="display:none;">再接続</button>
-      <button class="ctrlBtn" id="syncDisconnectBtn" style="display:none;">同期解除</button>
-    </div>
     <div id="exportImportRow">
       <button class="ctrlBtn" id="exportBtn">書き出し(JSON)</button>
       <button class="ctrlBtn" id="importBtn">読み込み(JSON)</button>
       <input type="file" id="importFileInput" accept="application/json" style="display:none;">
-      <button class="ctrlBtn" id="importCustomBtn">個別URL漫画を追加(JSON)</button>
-      <input type="file" id="importCustomFileInput" accept="application/json" style="display:none;">
+      <button class="ctrlBtn" id="addCustomBtn">個別URL漫画を追加</button>
     </div>
     <div id="listToolbar">
       <button class="ctrlBtn" id="listBackBtn" style="display:none;">← 戻る</button>
@@ -365,17 +385,20 @@
     closeListBtn: document.getElementById('closeListBtn'),
     feedBtn: document.getElementById('feedBtn'),
 
-    syncStatusText: document.getElementById('syncStatusText'),
-    syncOpenBtn: document.getElementById('syncOpenBtn'),
-    syncNewBtn: document.getElementById('syncNewBtn'),
-    syncReconnectBtn: document.getElementById('syncReconnectBtn'),
-    syncDisconnectBtn: document.getElementById('syncDisconnectBtn'),
-    syncRow: document.getElementById('syncRow'),
     exportBtn: document.getElementById('exportBtn'),
     importBtn: document.getElementById('importBtn'),
     importFileInput: document.getElementById('importFileInput'),
-    importCustomBtn: document.getElementById('importCustomBtn'),
-    importCustomFileInput: document.getElementById('importCustomFileInput'),
+    addCustomBtn: document.getElementById('addCustomBtn'),
+
+    customAddOverlay: document.getElementById('customAddOverlay'),
+    customTitleInput: document.getElementById('customTitleInput'),
+    customFolderSelect: document.getElementById('customFolderSelect'),
+    customNewFolderRow: document.getElementById('customNewFolderRow'),
+    customNewFolderInput: document.getElementById('customNewFolderInput'),
+    customConfirmNewFolderBtn: document.getElementById('customConfirmNewFolderBtn'),
+    customPagesTextarea: document.getElementById('customPagesTextarea'),
+    cancelCustomAddBtn: document.getElementById('cancelCustomAddBtn'),
+    confirmCustomAddBtn: document.getElementById('confirmCustomAddBtn'),
 
     lockOverlay: document.getElementById('lockOverlay'),
     lockInput: document.getElementById('lockInput'),
@@ -445,14 +468,11 @@
   let savedFolders = []; // [{id, name}]
   // [{id, url, title, folderId, addedAt}] for normal 連番ベースURL manga, or
   // [{id, pages: [url, url, ...], title, folderId, addedAt}] (no `url`) for
-  // a "custom" manga added via 個別URL漫画を追加(JSON) — see
-  // importCustomMangaFromFile / openItem / startReadingCustom.
+  // a "custom" manga added via 個別URL漫画を追加 — see
+  // confirmCustomAdd / openItem / startReadingCustom.
   let savedItems = [];
   let currentFolderView = null;
   let pendingSaveUrl = null;
-
-  const syncSupported = !!(window.showOpenFilePicker && window.showSaveFilePicker);
-  let syncFileHandle = null;
 
   function genId(prefix) {
     return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -471,7 +491,6 @@
   function persistAll() {
     persistFolders();
     persistItems();
-    if (syncFileHandle) writeSyncFile();
   }
 
   // Remembers the last page viewed per manga (keyed by baseUrl). If the last
@@ -497,147 +516,6 @@
       if (rec && !rec.wasLast && rec.page > 1) return rec.page;
     } catch (e) {}
     return null;
-  }
-
-  // ---------- file sync (File System Access API: Chrome/Edge only, not Safari) ----------
-  function openHandleDB() {
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open('mangaReaderSyncDB', 1);
-      req.onupgradeneeded = () => { req.result.createObjectStore('handles'); };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-  }
-  async function idbSetHandle(handle) {
-    const db = await openHandleDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('handles', 'readwrite');
-      tx.objectStore('handles').put(handle, 'syncFile');
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-  }
-  async function idbGetHandle() {
-    const db = await openHandleDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('handles', 'readonly');
-      const req = tx.objectStore('handles').get('syncFile');
-      req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => reject(req.error);
-    });
-  }
-  async function idbClearHandle() {
-    const db = await openHandleDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('handles', 'readwrite');
-      tx.objectStore('handles').delete('syncFile');
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-  }
-
-  async function writeSyncFile() {
-    if (!syncFileHandle) return;
-    try {
-      const writable = await syncFileHandle.createWritable();
-      await writable.write(JSON.stringify({ folders: savedFolders, items: savedItems }, null, 2));
-      await writable.close();
-    } catch (e) {}
-  }
-
-  async function readSyncFile() {
-    if (!syncFileHandle) return;
-    try {
-      const file = await syncFileHandle.getFile();
-      const text = await file.text();
-      if (!text.trim()) return; // newly created empty file
-      const data = JSON.parse(text);
-      if (data && Array.isArray(data.folders) && Array.isArray(data.items)) {
-        savedFolders = data.folders;
-        savedItems = data.items;
-        persistFolders();
-        persistItems();
-        if (isSavedListOpen()) renderSavedList();
-      }
-    } catch (e) {}
-  }
-
-  function updateSyncUI(state) {
-    if (!syncSupported) { els.syncRow.style.display = 'none'; return; }
-    const name = syncFileHandle ? syncFileHandle.name : '';
-    if (state === 'connected') {
-      els.syncOpenBtn.style.display = 'none';
-      els.syncNewBtn.style.display = 'none';
-      els.syncReconnectBtn.style.display = 'none';
-      els.syncDisconnectBtn.style.display = '';
-      els.syncStatusText.textContent = '同期中: ' + name;
-    } else if (state === 'needsReconnect') {
-      els.syncOpenBtn.style.display = 'none';
-      els.syncNewBtn.style.display = 'none';
-      els.syncReconnectBtn.style.display = '';
-      els.syncDisconnectBtn.style.display = '';
-      els.syncStatusText.textContent = '再接続してください: ' + name;
-    } else {
-      els.syncOpenBtn.style.display = '';
-      els.syncNewBtn.style.display = '';
-      els.syncReconnectBtn.style.display = 'none';
-      els.syncDisconnectBtn.style.display = 'none';
-      els.syncStatusText.textContent = '未接続';
-    }
-  }
-
-  async function pickExistingSyncFile() {
-    try {
-      const [handle] = await window.showOpenFilePicker({
-        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
-        multiple: false,
-      });
-      const perm = await handle.requestPermission({ mode: 'readwrite' });
-      if (perm !== 'granted') { flashStatus('権限が許可されませんでした'); return; }
-      if (savedItems.length || savedFolders.length) {
-        if (!confirm('選んだファイルの内容でローカルのリストを置き換えます。よろしいですか？')) return;
-      }
-      syncFileHandle = handle;
-      try { await idbSetHandle(handle); } catch (e) {}
-      await readSyncFile();
-      updateSyncUI('connected');
-      flashStatus('同期ファイルに接続しました');
-    } catch (e) { /* user cancelled the picker */ }
-  }
-
-  async function createNewSyncFile() {
-    try {
-      const handle = await window.showSaveFilePicker({
-        suggestedName: 'manga_reader_urls.json',
-        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
-      });
-      syncFileHandle = handle;
-      try { await idbSetHandle(handle); } catch (e) {}
-      await writeSyncFile();
-      updateSyncUI('connected');
-      flashStatus('新しい同期ファイルを作成しました');
-    } catch (e) { /* user cancelled the picker */ }
-  }
-
-  async function reconnectSyncFile() {
-    if (!syncFileHandle) return;
-    try {
-      const perm = await syncFileHandle.requestPermission({ mode: 'readwrite' });
-      if (perm === 'granted') {
-        await readSyncFile();
-        updateSyncUI('connected');
-        flashStatus('再接続しました');
-      } else {
-        flashStatus('許可されませんでした');
-      }
-    } catch (e) { flashStatus('再接続に失敗しました'); }
-  }
-
-  async function disconnectSyncFile() {
-    syncFileHandle = null;
-    try { await idbClearHandle(); } catch (e) {}
-    updateSyncUI('none');
-    flashStatus('同期を解除しました');
   }
 
   function exportData() {
@@ -669,70 +547,6 @@
       if (isSavedListOpen()) renderSavedList();
       flashStatus('読み込みました');
     }).catch(() => flashStatus('読み込みに失敗しました'));
-  }
-
-  // "個別URL漫画を追加(JSON)": unlike importDataFromFile above (which
-  // replaces the whole saved list, for backup/restore), this ADDS one or
-  // more "custom" manga — manga whose pages aren't sequentially-numbered
-  // files under one base URL, so they can't use the normal 連番 detection.
-  // Each entry supplies its own explicit, ordered list of page image URLs.
-  // Accepts a single object, an array of objects, or { manga: [...] }.
-  function importCustomMangaFromFile(file) {
-    file.text().then((text) => {
-      let data;
-      try { data = JSON.parse(text); } catch (e) { flashStatus('JSON形式が正しくありません'); return; }
-      const list = Array.isArray(data) ? data : (data && Array.isArray(data.manga) ? data.manga : [data]);
-      let added = 0;
-      let failed = 0;
-      list.forEach((entry) => {
-        if (!entry || !Array.isArray(entry.pages) || !entry.pages.length ||
-            !entry.pages.every((p) => typeof p === 'string' && p.trim())) {
-          failed++;
-          return;
-        }
-        let folderId = null;
-        if (entry.folder && typeof entry.folder === 'string' && entry.folder.trim()) {
-          const name = entry.folder.trim();
-          let folder = savedFolders.find((f) => f.id !== HISTORY_FOLDER_ID && f.name === name);
-          if (!folder) {
-            folder = { id: genId('f'), name: name };
-            savedFolders.push(folder);
-          }
-          folderId = folder.id;
-        }
-        savedItems.push({
-          id: genId('i'),
-          title: (entry.title && String(entry.title).trim()) || ('無題' + (added + 1)),
-          folderId: folderId,
-          pages: entry.pages.map((p) => String(p).trim()),
-          addedAt: Date.now(),
-        });
-        added++;
-      });
-      if (added) {
-        persistAll();
-        if (isSavedListOpen()) renderSavedList();
-      }
-      if (added && failed) flashStatus(added + '件追加（' + failed + '件は形式エラーでスキップ）');
-      else if (added) flashStatus(added + '件の漫画を追加しました');
-      else flashStatus('追加できる項目がありませんでした（pagesを確認してください）');
-    }).catch(() => flashStatus('読み込みに失敗しました'));
-  }
-
-  async function initSync() {
-    if (!syncSupported) { updateSyncUI('none'); return; }
-    try {
-      const handle = await idbGetHandle();
-      if (!handle) { updateSyncUI('none'); return; }
-      syncFileHandle = handle;
-      const perm = await handle.queryPermission({ mode: 'readwrite' });
-      if (perm === 'granted') {
-        await readSyncFile();
-        updateSyncUI('connected');
-      } else {
-        updateSyncUI('needsReconnect');
-      }
-    } catch (e) { updateSyncUI('none'); }
   }
 
   // Normalizes a base URL for identity comparisons: scheme (http/https) and
@@ -981,11 +795,12 @@
   }
 
   // Opens a "custom" manga: one whose pages were supplied as an explicit,
-  // non-sequential URL list via JSON import (see importCustomMangaFromFile)
-  // rather than a base URL + guessed-extension sequence. All pages are
-  // already known up front, so there's no async detection loop — just show
-  // the (resume) page immediately. switchDirection mirrors startReading's
-  // vertical-swipe handling so swiping into a custom manga animates the same way.
+  // non-sequential URL list via the 個別URL漫画を追加 dialog (see
+  // confirmCustomAdd) rather than a base URL + guessed-extension sequence.
+  // All pages are already known up front, so there's no async detection
+  // loop — just show the (resume) page immediately. switchDirection mirrors
+  // startReading's vertical-swipe handling so swiping into a custom manga
+  // animates the same way.
   function startReadingCustom(item, switchDirection) {
     readingGeneration++; // invalidate any still-running sequential detection loop
     baseUrl = '';
@@ -1023,9 +838,10 @@
   }
 
   // Single entry point for opening a saved item, regardless of whether it's
-  // a normal 連番ベースURL manga or a JSON-imported custom (explicit page
-  // list) manga. Use this (not startReading directly) for anything that
-  // opens an *item* object rather than a raw typed-in URL.
+  // a normal 連番ベースURL manga or a custom (explicit page list) manga
+  // added via the 個別URL漫画を追加 dialog. Use this (not startReading
+  // directly) for anything that opens an *item* object rather than a raw
+  // typed-in URL.
   function openItem(item, addToHistoryFlag, switchDirection) {
     if (item && Array.isArray(item.pages) && item.pages.length) {
       startReadingCustom(item, switchDirection);
@@ -1216,7 +1032,7 @@
     // offset > 0 (swiped up, moving to the next item) slides the new page in
     // from the bottom; offset < 0 (swiped down, previous item) from the top.
     // openItem dispatches to startReading or startReadingCustom depending on
-    // whether this item has a fixed (JSON-imported) page list.
+    // whether this item has a fixed (explicit page-list) page list.
     openItem(item, false, offset > 0 ? 'up' : 'down');
   }
 
@@ -1317,6 +1133,47 @@
     flashStatus('保存しました');
   }
 
+  // ---------- custom (explicit page-list) manga add dialog ----------
+  // Lets the user add a manga whose pages aren't sequentially-numbered files
+  // under one base URL — each page gets its own arbitrary URL, pasted one
+  // per line, in reading order. Added directly to savedItems (no JSON
+  // file involved); see openItem/startReadingCustom for how it's read back.
+  function openCustomAddDialog() {
+    els.customTitleInput.value = '';
+    renderFolderOptions(els.customFolderSelect, '');
+    els.customNewFolderRow.style.display = 'none';
+    els.customNewFolderInput.value = '';
+    els.customPagesTextarea.value = '';
+    els.customAddOverlay.classList.add('show');
+    els.customTitleInput.focus();
+  }
+  function closeCustomAddDialog() {
+    els.customAddOverlay.classList.remove('show');
+  }
+  function isCustomAddDialogOpen() { return els.customAddOverlay.classList.contains('show'); }
+
+  function confirmCustomAdd() {
+    const pageUrls = els.customPagesTextarea.value
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!pageUrls.length) { flashStatus('ページURLを1つ以上入力してください'); return; }
+    let folderId = els.customFolderSelect.value;
+    if (folderId === '__new__') folderId = '';
+    const title = els.customTitleInput.value.trim() || ('無題' + (savedItems.length + 1));
+    savedItems.unshift({
+      id: genId('i'),
+      title: title,
+      folderId: folderId || null,
+      pages: pageUrls,
+      addedAt: Date.now(),
+    });
+    persistAll();
+    closeCustomAddDialog();
+    if (isSavedListOpen()) renderSavedList();
+    flashStatus(pageUrls.length + 'ページの漫画を追加しました');
+  }
+
   // ---------- saved list (with folders) ----------
   function buildFolderRow(folder) {
     const row = document.createElement('div');
@@ -1351,8 +1208,8 @@
     return row;
   }
 
-  // item.url is undefined for "custom" (JSON-imported, explicit page list)
-  // items, so title/tooltip fallbacks need to handle that case too.
+  // item.url is undefined for "custom" (explicit page list) items, so
+  // title/tooltip fallbacks need to handle that case too.
   function itemDisplayTitle(item) {
     return item.title || (item.url ? deriveTitleFromUrl(item.url) : '無題');
   }
@@ -1512,7 +1369,7 @@
     tryNext();
   }
 
-  function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen(); }
+  function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen() || isCustomAddDialogOpen(); }
 
   // ---------- events ----------
   function handleNewManga() {
@@ -1547,10 +1404,6 @@
     els.newFolderRow.style.display = 'none';
   });
 
-  els.syncOpenBtn.addEventListener('click', pickExistingSyncFile);
-  els.syncNewBtn.addEventListener('click', createNewSyncFile);
-  els.syncReconnectBtn.addEventListener('click', reconnectSyncFile);
-  els.syncDisconnectBtn.addEventListener('click', disconnectSyncFile);
   els.exportBtn.addEventListener('click', exportData);
   els.importBtn.addEventListener('click', () => els.importFileInput.click());
   els.importFileInput.addEventListener('change', (e) => {
@@ -1559,11 +1412,26 @@
     els.importFileInput.value = '';
   });
 
-  els.importCustomBtn.addEventListener('click', () => els.importCustomFileInput.click());
-  els.importCustomFileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) importCustomMangaFromFile(file);
-    els.importCustomFileInput.value = '';
+  els.addCustomBtn.addEventListener('click', openCustomAddDialog);
+  els.cancelCustomAddBtn.addEventListener('click', closeCustomAddDialog);
+  els.confirmCustomAddBtn.addEventListener('click', confirmCustomAdd);
+  els.customAddOverlay.addEventListener('click', (e) => { if (e.target === els.customAddOverlay) closeCustomAddDialog(); });
+  els.customFolderSelect.addEventListener('change', () => {
+    if (els.customFolderSelect.value === '__new__') {
+      els.customNewFolderRow.style.display = 'flex';
+      els.customNewFolderInput.focus();
+    } else {
+      els.customNewFolderRow.style.display = 'none';
+    }
+  });
+  els.customConfirmNewFolderBtn.addEventListener('click', () => {
+    const name = els.customNewFolderInput.value.trim();
+    if (!name) return;
+    const folder = { id: genId('f'), name: name };
+    savedFolders.push(folder);
+    persistAll();
+    renderFolderOptions(els.customFolderSelect, folder.id);
+    els.customNewFolderRow.style.display = 'none';
   });
 
   els.listBtn.addEventListener('click', openSavedList);
@@ -1609,12 +1477,14 @@
 
   document.addEventListener('keydown', (e) => {
     if (e.target === els.saveTitleInput ||
-        e.target === els.newFolderInput || e.target === els.listNewFolderInput) {
-      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); }
+        e.target === els.newFolderInput || e.target === els.listNewFolderInput ||
+        e.target === els.customTitleInput || e.target === els.customNewFolderInput ||
+        e.target === els.customPagesTextarea) {
+      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); }
       return;
     }
     if (anyModalOpen()) {
-      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); }
+      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); }
       return;
     }
     switch (e.key) {
@@ -1671,8 +1541,6 @@
       if (!resumed && /^https?:\/\//i.test(raw)) startReading(raw, false);
     }
   } catch (e) {}
-
-  initSync();
 })();
 </script>
 </body>
