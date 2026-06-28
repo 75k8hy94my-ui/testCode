@@ -656,6 +656,32 @@ https://cdn.example.org/c/003.webp"></textarea>
     flashStatus('目次に追加しました');
   }
 
+  // Cuts out the page range from toc entry `t` (inclusive) up to (but not
+  // including) the next toc entry's page — or to the manga's last page if
+  // `t` is the last entry — and saves that slice as its own independent
+  // "custom" (explicit page-list) item in the saved list, so a long manga
+  // split into 目次 chapters can be pulled out chapter-by-chapter into its
+  // own bookshelf entry.
+  function saveTocRangeAsBook(t, idx) {
+    if (!pages.length) { flashStatus('表示中の作品がありません'); return; }
+    const nextEntry = currentToc[idx + 1];
+    const endPage = nextEntry ? nextEntry.page - 1 : pages.length;
+    if (endPage < t.page) { flashStatus('ページ範囲が不正です'); return; }
+    const pageUrls = pages.slice(t.page - 1, endPage);
+    const title = window.prompt('切り出して保存する本のタイトルを入力してください（' + t.page + '〜' + endPage + 'ページ）', t.name);
+    if (title === null) return; // cancelled
+    const trimmed = title.trim() || t.name;
+    savedItems.unshift({
+      id: genId('i'),
+      title: trimmed,
+      folderId: null,
+      pages: pageUrls,
+      addedAt: Date.now(),
+    });
+    persistAll();
+    flashStatus(pageUrls.length + 'ページを「' + trimmed + '」として保存しました');
+  }
+
   function renderTocList() {
     els.tocListItems.innerHTML = '';
     if (!currentToc.length) {
@@ -663,7 +689,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       return;
     }
     els.tocListEmpty.style.display = 'none';
-    currentToc.forEach((t) => {
+    currentToc.forEach((t, idx) => {
       const row = document.createElement('div');
       row.className = 'toc-item';
 
@@ -682,6 +708,14 @@ https://cdn.example.org/c/003.webp"></textarea>
         jumpToPage(t.page);
       });
 
+      const saveBtn = document.createElement('button');
+      saveBtn.textContent = '切り出して保存';
+      saveBtn.title = 'この目次から次の目次の前までを1つの本として保存';
+      saveBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        saveTocRangeAsBook(t, idx);
+      });
+
       const delBtn = document.createElement('button');
       delBtn.textContent = '削除';
       delBtn.addEventListener('click', (e) => {
@@ -693,6 +727,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       });
 
       row.appendChild(text);
+      row.appendChild(saveBtn);
       row.appendChild(delBtn);
       els.tocListItems.appendChild(row);
     });
