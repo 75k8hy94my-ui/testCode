@@ -5,6 +5,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>連番画像 漫画リーダー</title>
+<!-- Home screen (Add to Home Screen) icon and label for iOS Safari -->
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icon-152.png">
+<meta name="apple-mobile-web-app-title" content="Books">
 <style>
   :root {
     --bg: #0e0e10;
@@ -358,6 +362,7 @@
   let currentPage = 1;
   let pendingResumePage = null;
   let latestRenderId = 0; // guards against a slow-loading page overwriting a newer one
+  let readingGeneration = 0; // guards against an old detection loop polluting a newer manga's page list
 
   let fitModes = ['fit-contain', 'fit-width', 'fit-height'];
   let fitLabels = { 'fit-contain': '表示:全体', 'fit-width': '表示:幅優先', 'fit-height': '表示:高さ優先' };
@@ -737,6 +742,15 @@
   async function startReading(url, addToHistoryFlag) {
     const parsed = parseInputUrl(url);
     if (!parsed) return;
+    // Each call gets its own "generation" number. If a newer startReading()
+    // call comes in before this one finishes (e.g. the user opens another
+    // manga, or re-opens one from 履歴/list, while the previous one is still
+    // detecting pages in the background), the stale call's still-pending
+    // findPageUrl()/detectMorePages() work must not be allowed to keep
+    // pushing into the shared `pages` array — that's what was causing pages
+    // to occasionally show up twice. Every await below is followed by a
+    // check that this call is still the current generation.
+    const myGeneration = ++readingGeneration;
     baseUrl = parsed.baseUrl;
     preferredExt = parsed.hintExt !== null ? parsed.hintExt : 0;
     try { localStorage.setItem(LAST_URL_KEY, baseUrl); } catch (e) {}
@@ -757,6 +771,7 @@
     els.status.textContent = '1ページ目を確認中...';
 
     const firstUrl = await findPageUrl(1);
+    if (myGeneration !== readingGeneration) return; // superseded while we were checking page 1
     els.newBtn.disabled = false;
 
     if (!firstUrl) {
@@ -777,13 +792,14 @@
     els.controls.style.display = 'flex';
     showPage(1);
     updateStatus();
-    detectMorePages(2);
+    detectMorePages(2, myGeneration);
   }
 
-  async function detectMorePages(startPage) {
+  async function detectMorePages(startPage, generation) {
     let pageNum = startPage;
     while (pageNum <= MAX_PAGES_SAFETY) {
       const url = await findPageUrl(pageNum);
+      if (generation !== readingGeneration) return; // a newer manga was opened meanwhile; abandon this stale loop
       if (!url) {
         detectionDone = true;
         detecting = false;
@@ -801,6 +817,7 @@
         pendingResumePage = null;
       }
     }
+    if (generation !== readingGeneration) return;
     detectionHitLimit = true;
     detectionDone = true;
     detecting = false;
