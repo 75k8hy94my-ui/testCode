@@ -436,6 +436,7 @@
     <button class="ctrlBtn" id="nextBtn" title="次のページ (→)">▶</button>
     <button class="ctrlBtn" id="lastBtn" title="最後のページ">▶|</button>
     <button class="ctrlBtn active" id="animBtn" title="ページ送りアニメーションの切替">アニメ</button>
+    <button class="ctrlBtn" id="redetectBtn" title="保存されたページ数情報を消して、最初から再検出します">再検出</button>
     <button class="ctrlBtn" id="tocAddBtn" title="今のページを目次として追加">目次追加</button>
     <button class="ctrlBtn" id="tocBtn" title="目次を開く" style="display:none;">目次</button>
   </div>
@@ -638,6 +639,18 @@ https://cdn.example.org/c/003.webp"></textarea>
   const SAVED_ITEMS_KEY = 'mangaReaderSavedItems';
   const LEGACY_SAVED_URLS_KEY = 'mangaReaderSavedUrls';
   const TOC_KEY = 'mangaReaderToc'; // map: { [resumeKey]: [{page, name}, ...] }
+  // Per-manga "what we already learned" cache: { [baseUrl]: { ext, count, hitLimit } }.
+  // Opening (or swipe-previewing) a manga normally has to probe every page
+  // number against every candidate extension to find where the manga ends —
+  // expensive, and the main reason swiping/preloading could feel stuck under
+  // load (lots of competing probe requests). Once a manga has been opened
+  // once, this remembers the working extension and how many pages were found
+  // so the next visit can render instantly using that, only doing a single
+  // lightweight check (not a full re-scan) to confirm it's still accurate
+  // and to look for any pages added since. See getCachedMangaInfo /
+  // setCachedMangaInfo / clearCachedMangaInfo below.
+  const MANGA_INFO_CACHE_KEY = 'mangaReaderInfoCache';
+  const MANGA_INFO_CACHE_MAX = 300; // cap so long-term use doesn't grow localStorage unbounded
   const HISTORY_FOLDER_ID = '__history__';
   const HISTORY_FOLDER_NAME = '履歴';
   // お気に入り is a virtual, aggregating "folder": unlike 履歴 it isn't stored
@@ -676,6 +689,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     prevBtn: document.getElementById('prevBtn'),
     lastBtn: document.getElementById('lastBtn'),
     animBtn: document.getElementById('animBtn'),
+    redetectBtn: document.getElementById('redetectBtn'),
     pageSlider: document.getElementById('pageSlider'),
     pageLabel: document.getElementById('pageLabel'),
     tocAddBtn: document.getElementById('tocAddBtn'),
@@ -954,6 +968,45 @@ https://cdn.example.org/c/003.webp"></textarea>
       if (rec && !rec.wasLast && rec.page > 1) return rec.page;
     } catch (e) {}
     return null;
+  }
+
+  // ---------- per-manga info cache (extension + known page count) ----------
+  let mangaInfoCache = null; // lazy-loaded from localStorage on first use
+  function loadMangaInfoCache() {
+    if (mangaInfoCache) return mangaInfoCache;
+    try { mangaInfoCache = JSON.parse(localStorage.getItem(MANGA_INFO_CACHE_KEY) || '{}'); }
+    catch (e) { mangaInfoCache = {}; }
+    return mangaInfoCache;
+  }
+  function persistMangaInfoCache() {
+    try { localStorage.setItem(MANGA_INFO_CACHE_KEY, JSON.stringify(mangaInfoCache || {})); } catch (e) {}
+  }
+  function getCachedMangaInfo(baseUrlKey) {
+    return loadMangaInfoCache()[baseUrlKey] || null;
+  }
+  // info: { ext: index into EXT_CANDIDATES, count: known page count, hitLimit: bool }
+  function setCachedMangaInfo(baseUrlKey, info) {
+    const cache = loadMangaInfoCache();
+    delete cache[baseUrlKey]; // re-insert at the end so key order reflects recency for the eviction below
+    cache[baseUrlKey] = info;
+    const keys = Object.keys(cache);
+    if (keys.length > MANGA_INFO_CACHE_MAX) {
+      keys.slice(0, keys.length - MANGA_INFO_CACHE_MAX).forEach((k) => delete cache[k]);
+    }
+    persistMangaInfoCache();
+  }
+  function clearCachedMangaInfo(baseUrlKey) {
+    const cache = loadMangaInfoCache();
+    if (cache[baseUrlKey]) { delete cache[baseUrlKey]; persistMangaInfoCache(); }
+  }
+  // Normalizes a raw URL (which might be missing a scheme, have a trailing
+  // page filename, a stray query string, etc.) to the same baseUrl key that
+  // startReading() itself will end up using — so a cache entry written while
+  // actually reading a manga is reliably found again when later just
+  // preloading/previewing it as a swipe neighbor, and vice versa.
+  function mangaCacheKeyFor(url) {
+    const parsed = parseInputUrl(url);
+    return parsed ? parsed.baseUrl : (url || '');
   }
 
   // ---------- table of contents (目次) ----------
@@ -1532,9 +1585,20 @@ https://cdn.example.org/c/003.webp"></textarea>
   // instantly. Returns the resolved URL (with extension) once found, or
   // null if none of the candidates loaded — callers use this to populate
   // resolvedListPageUrl for the live vertical drag.
-  async function preloadFirstPage(baseUrlForItem) {
+  async function preloadFirstPage(rawUrlForItem) {
+    const key = mangaCacheKeyFor(rawUrlForItem);
+    const cached = getCachedMangaInfo(key);
+    if (cached) {
+      // Known from a previous visit — try that extension first instead of
+      // blindly cascading through all of them again. Still a real
+      // loadImage() check (not a blind guess), so a stale/changed manga
+      // falls straight through to the normal cascade below.
+      const url = key + '1.' + EXT_CANDIDATES[cached.ext];
+      const ok = await loadImage(url);
+      if (ok) return url;
+    }
     for (const ext of EXT_CANDIDATES) {
-      const url = baseUrlForItem + '1.' + ext;
+      const url = key + '1.' + ext;
       const ok = await loadImage(url);
       if (ok) return url;
     }
@@ -1578,6 +1642,28 @@ https://cdn.example.org/c/003.webp"></textarea>
     currentPage = 1;
     pendingResumePage = getResumePage(baseUrl);
     els.readProgressBar.style.width = '0%'; // avoid a stale bar from the previous manga flashing during the lookup
+
+    // Already know this manga from a previous visit — skip the probing
+    // entirely and render immediately using the remembered extension/page
+    // count. A single background check confirms it's still accurate (and
+    // looks for pages added since); see verifyCachedMangaInBackground.
+    const cached = getCachedMangaInfo(baseUrl);
+    if (cached && cached.count > 0) {
+      preferredExt = cached.ext;
+      pages = Array.from({ length: cached.count }, (_, i) => baseUrl + (i + 1) + '.' + EXT_CANDIDATES[cached.ext]);
+      els.newBtn.disabled = false;
+      els.placeholder.style.display = 'none';
+      els.spinner.style.display = 'none';
+      els.imgWrap.style.display = 'block';
+      els.controls.style.display = 'flex';
+      const startPage = pendingResumePage || 1;
+      pendingResumePage = null;
+      showPage(startPage, switchDirection === 'up' ? 'swipeUp' : switchDirection === 'down' ? 'swipeDown' : null);
+      updateStatus();
+      updateCloseButtonVisibility();
+      verifyCachedMangaInBackground(myGeneration);
+      return;
+    }
 
     els.newBtn.disabled = true;
     if (!switchDirection) {
@@ -1657,8 +1743,13 @@ https://cdn.example.org/c/003.webp"></textarea>
         updateSlider();
         persistLastPage();
         updateNextVolumeBanner();
+        setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, hitLimit: false });
         return;
       }
+      // Save progress after every batch (not just at the very end) so an
+      // interrupted detection (manga closed mid-scan) still leaves the next
+      // visit able to resume from here instead of re-probing from page 1.
+      setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, hitLimit: false });
     }
     if (generation !== readingGeneration) return;
     detectionHitLimit = true;
@@ -1668,6 +1759,51 @@ https://cdn.example.org/c/003.webp"></textarea>
     updateSlider();
     persistLastPage();
     updateNextVolumeBanner();
+    setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, hitLimit: true });
+  }
+
+  // Once a cached manga (see startReading) has been rendered instantly from
+  // the remembered extension/page count, this confirms it's still accurate
+  // and looks for anything new past the cached count — without redoing the
+  // expensive full probe from page 1. If even page 1 no longer loads (the
+  // cache was stale — site moved/changed), falls back to a full re-detection
+  // from scratch, same as a never-before-seen manga.
+  async function verifyCachedMangaInBackground(generation) {
+    const firstOk = await loadImage(pages[0]);
+    if (generation !== readingGeneration) return;
+    if (!firstOk) {
+      clearCachedMangaInfo(baseUrl);
+      pages = [];
+      currentPage = 1;
+      detecting = true;
+      detectionDone = false;
+      detectionHitLimit = false;
+      els.status.textContent = 'キャッシュが古いようです。再確認中...';
+      const firstUrl = await findPageUrl(1);
+      if (generation !== readingGeneration) return;
+      if (!firstUrl) {
+        detecting = false;
+        els.imgWrap.style.display = 'none';
+        els.placeholder.style.display = 'block';
+        els.placeholder.innerHTML =
+          '1ページ目が見つかりませんでした。<br>' +
+          '試したURL: ' + EXT_CANDIDATES.map((e) => '<code>' + baseUrl + '1.' + e + '</code>').join(' / ') + '<br>' +
+          'URLや拡張子を確認してください。';
+        els.status.textContent = '';
+        updateCloseButtonVisibility();
+        return;
+      }
+      pages = [firstUrl];
+      els.placeholder.style.display = 'none';
+      els.imgWrap.style.display = 'block';
+      els.controls.style.display = 'flex';
+      showPage(1, null);
+      updateStatus();
+      updateCloseButtonVisibility();
+      detectMorePages(2, generation);
+      return;
+    }
+    detectMorePages(pages.length + 1, generation);
   }
 
   // Opens a "custom" manga: one whose pages were supplied as an explicit,
@@ -3010,6 +3146,18 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.nextBtn.addEventListener('click', nextPage);
   els.prevBtn.addEventListener('click', prevPage);
   els.animBtn.addEventListener('click', toggleAnim);
+  // Manual repair valve for the per-manga info cache: if a bug ever leaves a
+  // wrong (ext, count) recorded for the open manga, this clears that record
+  // and re-opens it, which (with the cache now empty) naturally falls
+  // through startReading's normal full-probe path and re-saves a fresh
+  // record on completion. No-op for custom (explicit page list) manga, which
+  // have nothing to detect.
+  els.redetectBtn.addEventListener('click', () => {
+    if (currentlyCustom || !baseUrl) return;
+    if (!confirm('保存されているページ数の記録を消して、最初から再検出します。よろしいですか？')) return;
+    clearCachedMangaInfo(baseUrl);
+    startReading(baseUrl, false);
+  });
   els.pageSlider.addEventListener('input', (e) => showPage(parseInt(e.target.value, 10) || 1));
 
   els.tocAddBtn.addEventListener('click', addTocEntry);
