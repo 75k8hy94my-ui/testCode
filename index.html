@@ -114,6 +114,14 @@
   }
   .pageimg { display: block; }
 
+  /* セーフモード: 漫画の画像（リーダーのページ・本棚の表紙サムネイル）にだけ
+     モザイク(ぼかし)をかける。アイコン類（❤/📁/📚/× など）は対象外 —
+     これらは別の要素・クラスなのでこのセレクタには含まれない。 */
+  body.safe-mode .pageimg,
+  body.safe-mode .book-cover img {
+    filter: blur(24px);
+  }
+
   .clickzone { position: absolute; top: 0; bottom: 0; cursor: pointer; }
   .clickzone.left { left: 0; width: 38%; }
   .clickzone.right { right: 0; width: 38%; }
@@ -413,6 +421,7 @@
     <button class="ctrlBtn" id="saveBtn" title="今のURLを保存">URLを保存</button>
     <button class="ctrlBtn favToggleBtn" id="favToggleBtn" title="お気に入りに追加" style="display:none;"></button>
     <button class="ctrlBtn" id="listBtn" title="保存したURLの一覧">リスト</button>
+    <button class="ctrlBtn" id="safeModeBtn" title="セーフモード（漫画の画像にモザイクをかけます）">セーフモード</button>
     <span id="status"></span>
     <span id="currentTitle"></span>
   </div>
@@ -635,6 +644,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   const LAST_URL_KEY = 'mangaReaderLastUrl';
   const LAST_PAGE_KEY = 'mangaReaderLastPage';
   const ANIM_KEY = 'mangaReaderAnimEnabled';
+  const SAFE_MODE_KEY = 'mangaReaderSafeMode';
   const SAVED_FOLDERS_KEY = 'mangaReaderSavedFolders';
   const SAVED_ITEMS_KEY = 'mangaReaderSavedItems';
   const LEGACY_SAVED_URLS_KEY = 'mangaReaderSavedUrls';
@@ -670,6 +680,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     closeBtn: document.getElementById('closeBtn'),
     saveBtn: document.getElementById('saveBtn'),
     listBtn: document.getElementById('listBtn'),
+    safeModeBtn: document.getElementById('safeModeBtn'),
     status: document.getElementById('status'),
     currentTitle: document.getElementById('currentTitle'),
     favToggleBtn: document.getElementById('favToggleBtn'),
@@ -907,6 +918,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   let fitIndex = 0;
 
   let animEnabled = true;
+  // セーフモード: trueの間、漫画のページ画像・本棚の表紙サムネイルにモザイク
+  // (ぼかし)をかける（CSSの body.safe-mode 側のルールで実際にぼかす — ここは
+  // 状態の保持・トグル・永続化のみ担当）。アイコン画像はそもそも別クラスなので
+  // 対象にならない。
+  let safeModeEnabled = false;
 
   let savedFolders = []; // [{id, name}]
   // [{id, url, title, folderId, addedAt}] for normal 連番ベースURL manga, or
@@ -937,7 +953,21 @@ https://cdn.example.org/c/003.webp"></textarea>
   } catch (e) {}
   els.animBtn.classList.toggle('active', animEnabled);
 
+  try {
+    const sm = localStorage.getItem(SAFE_MODE_KEY);
+    if (sm !== null) safeModeEnabled = sm === '1';
+  } catch (e) {}
+  document.body.classList.toggle('safe-mode', safeModeEnabled);
+  els.safeModeBtn.classList.toggle('active', safeModeEnabled);
+
   function persistAnim() { try { localStorage.setItem(ANIM_KEY, animEnabled ? '1' : '0'); } catch (e) {} }
+  function persistSafeMode() { try { localStorage.setItem(SAFE_MODE_KEY, safeModeEnabled ? '1' : '0'); } catch (e) {} }
+  function toggleSafeMode() {
+    safeModeEnabled = !safeModeEnabled;
+    document.body.classList.toggle('safe-mode', safeModeEnabled);
+    els.safeModeBtn.classList.toggle('active', safeModeEnabled);
+    persistSafeMode();
+  }
   function persistFolders() { try { localStorage.setItem(SAVED_FOLDERS_KEY, JSON.stringify(savedFolders)); } catch (e) {} }
   function persistItems() { try { localStorage.setItem(SAVED_ITEMS_KEY, JSON.stringify(savedItems)); } catch (e) {} }
   function persistAll() {
@@ -3109,6 +3139,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   });
 
   els.listBtn.addEventListener('click', () => openSavedList(false));
+  els.safeModeBtn.addEventListener('click', toggleSafeMode);
   els.closeListBtn.addEventListener('click', closeSavedList);
   els.savedListOverlay.addEventListener('click', (e) => { if (e.target === els.savedListOverlay) closeSavedList(); });
   els.listBackBtn.addEventListener('click', () => {
