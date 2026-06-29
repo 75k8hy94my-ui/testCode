@@ -203,14 +203,16 @@
   .field-label { font-size: 12px; color: var(--sub); display: block; margin-top: 10px; letter-spacing: 0.01em; }
   #saveDialogPanel input[type="text"], #saveDialogPanel select,
   #customAddPanel input[type="text"], #customAddPanel select,
-  #editItemPanel input[type="text"], #editItemPanel select {
+  #editItemPanel input[type="text"], #editItemPanel select,
+  #githubSyncPanel input[type="text"], #githubSyncPanel input[type="password"], #githubSyncPanel select {
     width: 100%; padding: 9px 11px; border-radius: var(--radius-sm); border: 1px solid var(--border);
     background: var(--bg-soft); color: var(--text); font-size: 16px; margin-top: 4px;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
   #saveDialogPanel input[type="text"]:focus, #saveDialogPanel select:focus,
   #customAddPanel input[type="text"]:focus, #customAddPanel select:focus,
-  #editItemPanel input[type="text"]:focus, #editItemPanel select:focus {
+  #editItemPanel input[type="text"]:focus, #editItemPanel select:focus,
+  #githubSyncPanel input[type="text"]:focus, #githubSyncPanel input[type="password"]:focus, #githubSyncPanel select:focus {
     border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); outline: none;
   }
   #customAddPanel textarea, #editItemPanel textarea {
@@ -546,6 +548,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       <button class="ctrlBtn" id="importBtn">読み込み</button>
       <input type="file" id="importFileInput" accept="application/json" style="display:none;">
       <button class="ctrlBtn" id="addCustomBtn">個別追加</button>
+      <button class="ctrlBtn" id="openGithubSyncBtn">GitHubで同期</button>
     </div>
     <div id="listToolbar">
       <button class="ctrlBtn" id="listBackBtn" style="display:none;">← 戻る</button>
@@ -560,6 +563,34 @@ https://cdn.example.org/c/003.webp"></textarea>
     </div>
     <div id="savedListItems"></div>
     <div id="savedListEmpty" style="display:none;">保存されたURLはまだありません</div>
+  </div>
+</div>
+
+<!-- GitHub sync: pushes/pulls the same {folders, items} JSON that 書き出し/
+     読み込み use, but to/from a private GitHub repo via the Contents API,
+     instead of a manually-downloaded file. The repo/path/token are entered
+     once here and kept only in this browser's localStorage — never written
+     into this app's own (public) repo. -->
+<div id="githubSyncOverlay" class="modalOverlay">
+  <div id="githubSyncPanel" class="modalPanel">
+    <div class="panel-header">
+      <span>GitHubで同期</span>
+      <button class="ctrlBtn" id="closeGithubSyncBtn">閉じる</button>
+    </div>
+    <label class="field-label" for="githubRepoInput">同期専用の非公開リポジトリ（owner/repo）</label>
+    <input id="githubRepoInput" type="text" placeholder="例: yourname/manga-data">
+    <label class="field-label" for="githubPathInput">ファイルパス</label>
+    <input id="githubPathInput" type="text" placeholder="例: data.json">
+    <label class="field-label" for="githubTokenInput">個人アクセストークン（このリポジトリのContents読み書き権限のみに絞ったものを推奨）</label>
+    <input id="githubTokenInput" type="password" placeholder="github_pat_...">
+    <div class="dialog-actions">
+      <button class="ctrlBtn" id="githubSaveSettingsBtn">設定をこの端末に保存</button>
+    </div>
+    <div id="githubSyncStatus" style="font-size:12px;color:var(--sub);margin-top:10px;min-height:16px;"></div>
+    <div class="dialog-actions">
+      <button class="ctrlBtn" id="githubPullBtn">GitHubから読み込む</button>
+      <button class="primaryBtn" id="githubPushBtn">GitHubに保存する</button>
+    </div>
   </div>
 </div>
 
@@ -680,6 +711,17 @@ https://cdn.example.org/c/003.webp"></textarea>
     importBtn: document.getElementById('importBtn'),
     importFileInput: document.getElementById('importFileInput'),
     addCustomBtn: document.getElementById('addCustomBtn'),
+    openGithubSyncBtn: document.getElementById('openGithubSyncBtn'),
+
+    githubSyncOverlay: document.getElementById('githubSyncOverlay'),
+    closeGithubSyncBtn: document.getElementById('closeGithubSyncBtn'),
+    githubRepoInput: document.getElementById('githubRepoInput'),
+    githubPathInput: document.getElementById('githubPathInput'),
+    githubTokenInput: document.getElementById('githubTokenInput'),
+    githubSaveSettingsBtn: document.getElementById('githubSaveSettingsBtn'),
+    githubSyncStatus: document.getElementById('githubSyncStatus'),
+    githubPullBtn: document.getElementById('githubPullBtn'),
+    githubPushBtn: document.getElementById('githubPushBtn'),
 
     customAddOverlay: document.getElementById('customAddOverlay'),
     customTitleInput: document.getElementById('customTitleInput'),
@@ -807,6 +849,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // the list instead of leaving it closed.
   let customAddReturnToList = false;
   let editReturnToList = false;
+  let githubSyncReturnToList = false;
   let editingItemId = null; // id of the saved item currently open in the 編集 dialog
 
   function genId(prefix) {
@@ -1064,22 +1107,193 @@ https://cdn.example.org/c/003.webp"></textarea>
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  // Shared by 読み込み (file import) and GitHub からの読み込み: validates the
+  // {folders, items} shape, confirms with the user, then replaces the local
+  // list and persists/re-renders. Returns whether the replace happened.
+  function applyImportedData(data) {
+    if (!data || !Array.isArray(data.folders) || !Array.isArray(data.items)) {
+      flashStatus('データの形式が正しくありません');
+      return false;
+    }
+    if (!confirm('読み込んだ内容でローカルのリストを置き換えます。よろしいですか？')) return false;
+    savedFolders = data.folders;
+    savedItems = data.items;
+    persistFolders();
+    persistItems();
+    if (isSavedListOpen()) renderSavedList();
+    return true;
+  }
+
   function importDataFromFile(file) {
     file.text().then((text) => {
       let data;
       try { data = JSON.parse(text); } catch (e) { flashStatus('ファイル形式が正しくありません'); return; }
-      if (!data || !Array.isArray(data.folders) || !Array.isArray(data.items)) {
-        flashStatus('ファイル形式が正しくありません');
+      if (applyImportedData(data)) flashStatus('読み込みました');
+    }).catch(() => flashStatus('読み込みに失敗しました'));
+  }
+
+  // ---------- GitHub sync (private repo, Contents API) ----------
+  // Alternative to the manual 書き出し/読み込み file dance: pushes/pulls the
+  // exact same {folders, items} JSON to/from a single file in a private
+  // GitHub repository the user controls, via the Contents API directly from
+  // the browser (api.github.com allows CORS for GET/PUT with an Authorization
+  // header). The repo, file path, and personal access token are entered once
+  // in the GitHubで同期 dialog and kept only in this browser's localStorage —
+  // never written into this app's own (public) repo or any committed file.
+  const GITHUB_SYNC_KEY = 'mangaReaderGithubSync'; // {repo: 'owner/name', path, token}
+
+  function loadGithubSyncSettings() {
+    try { return JSON.parse(localStorage.getItem(GITHUB_SYNC_KEY) || '{}'); }
+    catch (e) { return {}; }
+  }
+  function persistGithubSyncSettings(settings) {
+    try { localStorage.setItem(GITHUB_SYNC_KEY, JSON.stringify(settings)); } catch (e) {}
+  }
+
+  // btoa/atob only handle Latin1, but titles/folder names are Japanese, so
+  // route through TextEncoder/TextDecoder to round-trip multi-byte UTF-8
+  // correctly through GitHub's base64 file content.
+  function utf8ToBase64(str) {
+    const bytes = new TextEncoder().encode(str);
+    let binary = '';
+    bytes.forEach((b) => { binary += String.fromCharCode(b); });
+    return btoa(binary);
+  }
+  function base64ToUtf8(b64) {
+    const binary = atob(b64.replace(/\n/g, ''));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+
+  function githubApiUrl(settings) {
+    return 'https://api.github.com/repos/' + settings.repo + '/contents/' + settings.path;
+  }
+  function setGithubSyncStatus(msg) { els.githubSyncStatus.textContent = msg; }
+
+  function openGithubSyncDialog() {
+    githubSyncReturnToList = isSavedListOpen();
+    if (githubSyncReturnToList) closeSavedList();
+    const settings = loadGithubSyncSettings();
+    els.githubRepoInput.value = settings.repo || '';
+    els.githubPathInput.value = settings.path || 'data.json';
+    els.githubTokenInput.value = settings.token || '';
+    setGithubSyncStatus('');
+    els.githubSyncOverlay.classList.add('show');
+  }
+  function closeGithubSyncDialog() {
+    els.githubSyncOverlay.classList.remove('show');
+    if (githubSyncReturnToList) {
+      githubSyncReturnToList = false;
+      reopenSavedList();
+    }
+  }
+  function isGithubSyncOpen() { return els.githubSyncOverlay.classList.contains('show'); }
+
+  function saveGithubSyncSettingsFromForm() {
+    const repo = els.githubRepoInput.value.trim();
+    const path = els.githubPathInput.value.trim() || 'data.json';
+    const token = els.githubTokenInput.value.trim();
+    if (!repo || !repo.includes('/')) {
+      setGithubSyncStatus('リポジトリは "owner/repo" の形式で入力してください');
+      return;
+    }
+    if (!token) {
+      setGithubSyncStatus('個人アクセストークンを入力してください');
+      return;
+    }
+    persistGithubSyncSettings({ repo, path, token });
+    setGithubSyncStatus('この端末に設定を保存しました');
+  }
+
+  function describeGithubError(e) {
+    const msg = (e && e.message) || '';
+    if (msg.indexOf('401') !== -1 || msg.indexOf('403') !== -1) return 'トークンが無効、または権限が不足しています。設定を確認してください。';
+    if (msg.indexOf('404') !== -1) return 'リポジトリが見つかりません。owner/repo の表記を確認してください。';
+    if (msg.indexOf('409') !== -1) return '他の端末からの更新と競合しました。もう一度「GitHubから読み込む」→「GitHubに保存する」をやり直してください。';
+    return '通信エラーが発生しました: ' + msg;
+  }
+
+  // Fetches the current file (if any) so its sha can be sent back on PUT —
+  // GitHub requires the existing blob's sha to update a file and rejects the
+  // write (409) without it. Returns {sha: null, data: null} if the file
+  // doesn't exist yet, which is the normal first-sync case.
+  async function githubFetchFile(settings) {
+    const res = await fetch(githubApiUrl(settings), {
+      headers: {
+        'Authorization': 'Bearer ' + settings.token,
+        'Accept': 'application/vnd.github+json',
+      },
+    });
+    if (res.status === 404) return { sha: null, data: null };
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    let data = null;
+    try { data = JSON.parse(base64ToUtf8(json.content || '')); } catch (e) { /* leave null; caller decides */ }
+    return { sha: json.sha, data: data };
+  }
+
+  async function githubPush() {
+    const settings = loadGithubSyncSettings();
+    if (!settings.repo || !settings.token) {
+      setGithubSyncStatus('先にリポジトリとトークンを保存してください');
+      return;
+    }
+    els.githubPushBtn.disabled = true;
+    setGithubSyncStatus('GitHubに保存中...');
+    try {
+      const existing = await githubFetchFile(settings);
+      const payload = { folders: savedFolders, items: savedItems };
+      const body = {
+        message: 'manga reader: sync ' + new Date().toISOString(),
+        content: utf8ToBase64(JSON.stringify(payload, null, 2)),
+      };
+      if (existing.sha) body.sha = existing.sha;
+      const res = await fetch(githubApiUrl(settings), {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'Bearer ' + settings.token,
+          'Accept': 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => '');
+        throw new Error('HTTP ' + res.status + (detail ? ': ' + detail.slice(0, 200) : ''));
+      }
+      setGithubSyncStatus('GitHubに保存しました（' + new Date().toLocaleString() + '）');
+    } catch (e) {
+      setGithubSyncStatus(describeGithubError(e));
+    } finally {
+      els.githubPushBtn.disabled = false;
+    }
+  }
+
+  async function githubPull() {
+    const settings = loadGithubSyncSettings();
+    if (!settings.repo || !settings.token) {
+      setGithubSyncStatus('先にリポジトリとトークンを保存してください');
+      return;
+    }
+    els.githubPullBtn.disabled = true;
+    setGithubSyncStatus('GitHubから取得中...');
+    try {
+      const existing = await githubFetchFile(settings);
+      if (!existing.data) {
+        setGithubSyncStatus('まだGitHub側にデータがありません（先に「GitHubに保存する」を実行してください）');
         return;
       }
-      if (!confirm('読み込んだ内容でローカルのリストを置き換えます。よろしいですか？')) return;
-      savedFolders = data.folders;
-      savedItems = data.items;
-      persistFolders();
-      persistItems();
-      if (isSavedListOpen()) renderSavedList();
-      flashStatus('読み込みました');
-    }).catch(() => flashStatus('読み込みに失敗しました'));
+      if (applyImportedData(existing.data)) {
+        setGithubSyncStatus('GitHubから読み込みました（' + new Date().toLocaleString() + '）');
+      } else {
+        setGithubSyncStatus('');
+      }
+    } catch (e) {
+      setGithubSyncStatus(describeGithubError(e));
+    } finally {
+      els.githubPullBtn.disabled = false;
+    }
   }
 
   // Normalizes a base URL for identity comparisons: scheme (http/https) and
@@ -1446,7 +1660,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     updateTocButtonVisibility();
     try { localStorage.removeItem(LAST_URL_KEY); } catch (e) {}
 
-    openSavedList();
+    openSavedList(true);
   }
 
   function updateStatus() {
@@ -2257,12 +2471,18 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
   }
 
-  function openSavedList() {
+  // hideCloseBtn: true when this list is being shown automatically because
+  // nothing else is open (no manga behind it to return to) — in that case
+  // the 閉じる button is hidden, since there's nothing useful to "go back to"
+  // by closing the list. Manual opens (リストボタン) always pass false/omit
+  // it, so 閉じる shows normally.
+  function openSavedList(hideCloseBtn) {
     currentFolderView = null;
     currentSeriesView = null;
     reorderMode = false;
     renderSavedList();
     els.savedListOverlay.classList.add('show');
+    els.closeListBtn.style.display = hideCloseBtn ? 'none' : '';
   }
   function closeSavedList() { els.savedListOverlay.classList.remove('show'); }
   function isSavedListOpen() { return els.savedListOverlay.classList.contains('show'); }
@@ -2282,7 +2502,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     tryNext();
   }
 
-  function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen() || isCustomAddDialogOpen() || isEditItemDialogOpen() || isTocListOpen(); }
+  function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen() || isCustomAddDialogOpen() || isEditItemDialogOpen() || isTocListOpen() || isGithubSyncOpen(); }
 
   // ---------- events ----------
   function handleNewManga() {
@@ -2338,6 +2558,12 @@ https://cdn.example.org/c/003.webp"></textarea>
   });
 
   els.addCustomBtn.addEventListener('click', openCustomAddDialog);
+  els.openGithubSyncBtn.addEventListener('click', openGithubSyncDialog);
+  els.closeGithubSyncBtn.addEventListener('click', closeGithubSyncDialog);
+  els.githubSyncOverlay.addEventListener('click', (e) => { if (e.target === els.githubSyncOverlay) closeGithubSyncDialog(); });
+  els.githubSaveSettingsBtn.addEventListener('click', saveGithubSyncSettingsFromForm);
+  els.githubPushBtn.addEventListener('click', githubPush);
+  els.githubPullBtn.addEventListener('click', githubPull);
   els.cancelCustomAddBtn.addEventListener('click', closeCustomAddDialog);
   els.confirmCustomAddBtn.addEventListener('click', confirmCustomAdd);
   els.customAddOverlay.addEventListener('click', (e) => { if (e.target === els.customAddOverlay) closeCustomAddDialog(); });
@@ -2380,7 +2606,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.editNewFolderRow.style.display = 'none';
   });
 
-  els.listBtn.addEventListener('click', openSavedList);
+  els.listBtn.addEventListener('click', () => openSavedList(false));
   els.closeListBtn.addEventListener('click', closeSavedList);
   els.savedListOverlay.addEventListener('click', (e) => { if (e.target === els.savedListOverlay) closeSavedList(); });
   els.listBackBtn.addEventListener('click', () => {
@@ -2469,12 +2695,13 @@ https://cdn.example.org/c/003.webp"></textarea>
         e.target === els.customTitleInput || e.target === els.customNewFolderInput ||
         e.target === els.customPagesTextarea ||
         e.target === els.editTitleInput || e.target === els.editNewFolderInput ||
-        e.target === els.editUrlInput || e.target === els.editPagesTextarea) {
-      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); }
+        e.target === els.editUrlInput || e.target === els.editPagesTextarea ||
+        e.target === els.githubRepoInput || e.target === els.githubPathInput || e.target === els.githubTokenInput) {
+      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); closeGithubSyncDialog(); }
       return;
     }
     if (anyModalOpen()) {
-      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); }
+      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); closeGithubSyncDialog(); }
       return;
     }
     switch (e.key) {
@@ -2533,7 +2760,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   } catch (e) {}
   // 何も復元されなかった場合（初回起動、または閉じる操作の直後など）は、
   // 空のplaceholderの代わりにリスト（保存したURL）を表示する。
-  if (!resumedOnLoad) openSavedList();
+  if (!resumedOnLoad) openSavedList(true);
 })();
 </script>
 </body>
