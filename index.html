@@ -577,15 +577,17 @@ https://cdn.example.org/c/003.webp"></textarea>
       <span>GitHubで同期</span>
       <button class="ctrlBtn" id="closeGithubSyncBtn">閉じる</button>
     </div>
-    <label class="field-label" for="githubRepoInput">同期専用の非公開リポジトリ（owner/repo）</label>
-    <input id="githubRepoInput" type="text" placeholder="例: yourname/manga-data">
-    <label class="field-label" for="githubPathInput">ファイルパス</label>
-    <input id="githubPathInput" type="text" placeholder="例: data.json">
-    <label class="field-label" for="githubTokenInput">個人アクセストークン（このリポジトリのContents読み書き権限のみに絞ったものを推奨）</label>
-    <input id="githubTokenInput" type="password" placeholder="github_pat_...">
-    <div class="dialog-actions">
-      <button class="ctrlBtn" id="githubSaveSettingsBtn">設定をこの端末に保存</button>
-    </div>
+    <form id="githubSyncForm" autocomplete="on">
+      <label class="field-label" for="githubRepoInput">同期専用の非公開リポジトリ（owner/repo）</label>
+      <input id="githubRepoInput" type="text" name="username" autocomplete="username" placeholder="例: yourname/manga-data">
+      <label class="field-label" for="githubPathInput">ファイルパス</label>
+      <input id="githubPathInput" type="text" name="path" autocomplete="off" placeholder="例: data.json">
+      <label class="field-label" for="githubTokenInput">個人アクセストークン（このリポジトリのContents読み書き権限のみに絞ったものを推奨）</label>
+      <input id="githubTokenInput" type="password" name="password" autocomplete="new-password" placeholder="github_pat_...">
+      <div class="dialog-actions">
+        <button class="ctrlBtn" type="submit" id="githubSaveSettingsBtn">設定をこの端末に保存</button>
+      </div>
+    </form>
     <div id="githubSyncStatus" style="font-size:12px;color:var(--sub);margin-top:10px;min-height:16px;"></div>
     <div class="dialog-actions">
       <button class="ctrlBtn" id="githubPullBtn">GitHubから読み込む</button>
@@ -718,6 +720,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     githubRepoInput: document.getElementById('githubRepoInput'),
     githubPathInput: document.getElementById('githubPathInput'),
     githubTokenInput: document.getElementById('githubTokenInput'),
+    githubSyncForm: document.getElementById('githubSyncForm'),
     githubSaveSettingsBtn: document.getElementById('githubSaveSettingsBtn'),
     githubSyncStatus: document.getElementById('githubSyncStatus'),
     githubPullBtn: document.getElementById('githubPullBtn'),
@@ -791,6 +794,12 @@ https://cdn.example.org/c/003.webp"></textarea>
   let pendingResumePage = null;
   let latestRenderId = 0; // guards against a slow-loading page overwriting a newer one
   let readingGeneration = 0; // guards against an old detection loop polluting a newer manga's page list
+  // Set right before a drag-driven page/manga switch hands off to the normal
+  // showPage()/startReading() pipeline, so that pipeline's own slide-in
+  // transition is skipped for exactly one renderPage() call — the drag
+  // gesture itself already animated the transition live, so replaying it
+  // would visibly double up. Always self-resets after one use.
+  let suppressNextRenderAnim = false;
 
   // Vertical-swipe-in-reader context: when a manga is opened from a folder's
   // list or the 一覧 feed, this remembers that folder's item order so the
@@ -800,9 +809,17 @@ https://cdn.example.org/c/003.webp"></textarea>
   let readingListItems = [];
   let readingListIndex = -1;
   const preloadedCoverUrls = new Set(); // dedup: avoid re-fetching the same manga's page 1 repeatedly
+  // Caches the *resolved* (extension-known) first-page image URL for each
+  // index in readingListItems, as soon as preloadAdjacentManga() figures it
+  // out. The live vertical drag needs this synchronously at drag-start time
+  // (to build a neighbor slide instantly) — unlike preloadedCoverUrls, which
+  // only tracks "have we warmed the cache", this remembers the actual URL.
+  // Cleared whenever the list context changes so indices can't go stale.
+  const resolvedListPageUrl = new Map();
   function setReadingListContext(items, index) {
     readingListItems = items;
     readingListIndex = index;
+    resolvedListPageUrl.clear();
     preloadAdjacentManga();
   }
   // Preloads page 1 of the manga just above/below the current position in
@@ -816,17 +833,32 @@ https://cdn.example.org/c/003.webp"></textarea>
       if (!item) return;
       const isCustom = Array.isArray(item.pages) && item.pages.length;
       const firstPageUrl = isCustom ? item.pages[0] : item.url;
-      if (!firstPageUrl || preloadedCoverUrls.has(firstPageUrl)) return;
-      preloadedCoverUrls.add(firstPageUrl);
+      if (!firstPageUrl) return;
       if (isCustom) {
-        const img = new Image(); // exact URL already known; no extension cascade needed
+        resolvedListPageUrl.set(idx, firstPageUrl); // exact URL already known
+        if (preloadedCoverUrls.has(firstPageUrl)) return;
+        preloadedCoverUrls.add(firstPageUrl);
+        const img = new Image(); // no extension cascade needed
         img.src = firstPageUrl;
       } else {
-        preloadFirstPage(firstPageUrl);
+        if (preloadedCoverUrls.has(firstPageUrl)) return;
+        preloadedCoverUrls.add(firstPageUrl);
+        preloadFirstPage(firstPageUrl).then((resolvedUrl) => {
+          if (resolvedUrl) resolvedListPageUrl.set(idx, resolvedUrl);
+        });
       }
     });
   }
-  function clearReadingListContext() { readingListItems = []; readingListIndex = -1; }
+  // Looks up the already-resolved first-page URL of the manga `offset`
+  // positions away from the one currently open (e.g. offset=1 is "next").
+  // Returns null if out of range or not resolved yet (still detecting) —
+  // callers treat that as "no live neighbor available for this gesture".
+  function neighborListUrlForOffset(offset) {
+    const idx = readingListIndex + offset;
+    if (idx < 0 || idx >= readingListItems.length) return null;
+    return resolvedListPageUrl.get(idx) || null;
+  }
+  function clearReadingListContext() { readingListItems = []; readingListIndex = -1; resolvedListPageUrl.clear(); }
 
   let fitModes = ['fit-contain', 'fit-width', 'fit-height'];
   let fitLabels = { 'fit-contain': '表示:全体', 'fit-width': '表示:幅優先', 'fit-height': '表示:高さ優先' };
@@ -1180,6 +1212,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.githubTokenInput.value = settings.token || '';
     setGithubSyncStatus('');
     els.githubSyncOverlay.classList.add('show');
+    if (!settings.repo || !settings.token) fillGithubFieldsFromKeychain();
   }
   function closeGithubSyncDialog() {
     els.githubSyncOverlay.classList.remove('show');
@@ -1203,7 +1236,36 @@ https://cdn.example.org/c/003.webp"></textarea>
       return;
     }
     persistGithubSyncSettings({ repo, path, token });
+    storeGithubCredential(repo, token);
     setGithubSyncStatus('この端末に設定を保存しました');
+  }
+
+  // Safari (WebKit) は PasswordCredential / navigator.credentials.store に対応しており、
+  // これを呼ぶとフォーム送信のヒューリスティックに頼らず確実に「パスワードを保存」
+  // ダイアログを出せる。iCloudキーチェーンに保存されれば、同じApple IDの他の
+  // Safari（他デバイス）にも自動で同期されるため、トークンの手入力なしに
+  // fillGithubFieldsFromKeychain() で呼び出し元を補完できる。対応していない
+  // ブラウザでは何もしない（=従来通りlocalStorageのみで動作）。
+  function storeGithubCredential(repo, token) {
+    if (typeof PasswordCredential === 'undefined' || !navigator.credentials || !navigator.credentials.store) return;
+    try {
+      const cred = new PasswordCredential({ id: repo, password: token, name: 'GitHub同期 (manga reader)' });
+      navigator.credentials.store(cred).catch(() => {});
+    } catch (e) { /* 対応ブラウザでも環境によって失敗することがあるため無視 */ }
+  }
+
+  // この端末のlocalStorageに設定がまだ無いとき（＝新しい端末・新しいブラウザ
+  // データでこのダイアログを開いたとき）に、ブラウザのパスワードマネージャー
+  // （Safariならキーチェーン、iCloud経由で他デバイスと同期されている可能性がある）
+  // に保存済みの認証情報があれば取得してフォームを埋める。ユーザーの明示的な
+  // 操作（ダイアログを開く）に応じて呼ぶだけで、無断で自動送信などはしない。
+  function fillGithubFieldsFromKeychain() {
+    if (!navigator.credentials || !navigator.credentials.get) return;
+    navigator.credentials.get({ password: true, mediation: 'optional' }).then((cred) => {
+      if (!cred || cred.type !== 'password') return;
+      if (!els.githubRepoInput.value && cred.id) els.githubRepoInput.value = cred.id;
+      if (!els.githubTokenInput.value && cred.password) els.githubTokenInput.value = cred.password;
+    }).catch(() => {});
   }
 
   function describeGithubError(e) {
@@ -1436,14 +1498,19 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   // Preloads just page 1 of another manga (used for swipe-list neighbors).
   // Doesn't know the right extension ahead of time, so it cascades through
-  // EXT_CANDIDATES like findPageUrl, but fire-and-forget: a successful
-  // loadImage() call leaves the browser's image cache primed, so the actual
-  // <img> shown later by startReading()/renderPage() loads instantly.
+  // EXT_CANDIDATES like findPageUrl. A successful loadImage() call leaves
+  // the browser's image cache primed, so the actual <img> shown later by
+  // startReading()/renderPage() (or a live drag neighbor slide) loads
+  // instantly. Returns the resolved URL (with extension) once found, or
+  // null if none of the candidates loaded — callers use this to populate
+  // resolvedListPageUrl for the live vertical drag.
   async function preloadFirstPage(baseUrlForItem) {
     for (const ext of EXT_CANDIDATES) {
-      const ok = await loadImage(baseUrlForItem + '1.' + ext);
-      if (ok) return;
+      const url = baseUrlForItem + '1.' + ext;
+      const ok = await loadImage(url);
+      if (ok) return url;
     }
+    return null;
   }
 
   // url: the manga's folder/page URL. addToHistoryFlag: true when this open
@@ -1703,13 +1770,28 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
   }
 
-  function makeImg(pNum) {
+  function makeImgFromUrl(url, alt) {
     const img = document.createElement('img');
     img.className = 'pageimg';
-    img.alt = 'page ' + pNum;
-    img.src = pages[pNum - 1];
+    img.alt = alt || '';
+    img.src = url;
     styleImg(img);
     return img;
+  }
+  function makeImg(pNum) {
+    return makeImgFromUrl(pages[pNum - 1], 'page ' + pNum);
+  }
+  // Builds a detached .pageSlide (not yet attached to the DOM) wrapping a
+  // single image at the given URL. Used by the live-drag controller to show
+  // a neighbor page/manga sliding in alongside the current one — unlike
+  // renderPage(), this doesn't wait for the load event, since by drag time
+  // the URL has almost always already been preloaded into the browser
+  // cache (see preloadAdjacentManga/preload), so it paints immediately.
+  function makeSlide(url) {
+    const slide = document.createElement('div');
+    slide.className = 'pageSlide';
+    slide.appendChild(makeImgFromUrl(url));
+    return slide;
   }
 
   // 'next'/'prev' are horizontal page turns within the same manga.
@@ -1729,6 +1811,10 @@ https://cdn.example.org/c/003.webp"></textarea>
   // changes again before this one finishes loading, the stale result is
   // dropped (latestRenderId guard) so a slow load can't clobber a newer page.
   function renderPage(n, direction) {
+    if (suppressNextRenderAnim) {
+      direction = null; // the live drag already animated this transition visually
+      suppressNextRenderAnim = false;
+    }
     const myId = ++latestRenderId;
     const img = makeImg(n);
 
@@ -1784,6 +1870,13 @@ https://cdn.example.org/c/003.webp"></textarea>
       img.src = pages[pageNum - 1];
     }
   }
+
+  // Resolved URL of the page right after/before the one on screen, if known
+  // yet — used by the live horizontal drag to build its neighbor slide. The
+  // existing preload() calls in showPage() already keep a few pages ahead
+  // warmed in the browser cache, so by drag time these are normally instant.
+  function nextPageNeighborUrl() { return currentPage < pages.length ? pages[currentPage] : null; }
+  function prevPageNeighborUrl() { return currentPage > 1 ? pages[currentPage - 2] : null; }
 
   function showPage(n, forceDirection) {
     if (!pages.length) return;
@@ -1854,34 +1947,231 @@ https://cdn.example.org/c/003.webp"></textarea>
     openItem(item, false, offset > 0 ? 'up' : 'down');
   }
 
+  // ---------- live drag (TikTok-style connected swipe) ----------
+  // Both axes share one drag controller: horizontal drags turn pages within
+  // the current manga, vertical drags step through readingListItems (the
+  // folder/feed the reader was opened from). While dragging, the current
+  // page and the neighbor page/manga slide together 1:1 with the finger —
+  // they're rigidly "attached" like a filmstrip, so it reads as one
+  // continuous strip of content rather than a page flipping in place. On
+  // release, the drag either finishes the transition (if dragged far or
+  // fast enough) or springs back. This only runs when animEnabled is true;
+  // with animations off, the legacy "decide-at-release, no live preview"
+  // behavior below is used instead (cheaper, no DOM churn mid-drag).
   let touchStartX = 0, touchStartY = 0, touchActive = false;
-  const VERTICAL_SWIPE_THRESHOLD = 60; // px
+  let dragAxis = null;       // null | 'x' | 'y' — locked once the gesture's dominant axis is clear
+  let dragInfo = null;       // { kind:'page'|'manga', dir, offset?, blocked?, reason? }
+  let dragCurrentSlide = null;
+  let dragNeighborSlide = null;
+  let lastMoveX = 0, lastMoveY = 0, lastMoveTime = 0;
+  const VERTICAL_SWIPE_THRESHOLD = 60; // px — legacy-mode commit distance, and the "did they really mean it" gate for the boundary flash message in blocked drags
+  const AXIS_LOCK_PX = 10;          // px of movement before committing to horizontal vs vertical
+  const DRAG_COMMIT_FRACTION = 0.22; // must drag past 22% of the viewport dimension to commit (if not flicked)
+  const DRAG_FLING_VELOCITY = 0.55;  // px/ms — a fast flick commits even with little travel distance
+  const DRAG_FLING_MIN_PX = 24;      // minimum travel before a "fling" is trusted (filters out jitter)
+  const RUBBER_BAND_FACTOR = 0.3;    // damping applied when dragging past a boundary (no neighbor to show)
+  const MIN_DRAG_ANIM_MS = 80;
+
+  function resetDragState() {
+    dragAxis = null;
+    dragInfo = null;
+    dragCurrentSlide = null;
+    dragNeighborSlide = null;
+  }
+
+  function beginDrag(axis, dx, dy) {
+    const current = els.pageStage.querySelector('.pageSlide.current');
+    if (!current) return; // nothing on screen to drag (e.g. spinner) — dragAxis stays null, caller bails
+    dragCurrentSlide = current;
+    dragCurrentSlide.style.transition = 'none';
+    dragAxis = axis;
+    if (axis === 'x') {
+      const dir = dx < 0 ? 'next' : 'prev';
+      const url = dir === 'next' ? nextPageNeighborUrl() : prevPageNeighborUrl();
+      if (!url) { dragInfo = { kind: 'page', dir, blocked: true }; return; }
+      dragInfo = { kind: 'page', dir };
+      dragNeighborSlide = makeSlide(url);
+      dragNeighborSlide.style.transform = dir === 'next' ? 'translateX(100%)' : 'translateX(-100%)';
+    } else {
+      const offset = dy < 0 ? 1 : -1; // swipe up = next manga, down = previous
+      const dir = offset > 0 ? 'swipeUp' : 'swipeDown';
+      const idx = readingListIndex + offset;
+      const inBounds = idx >= 0 && idx < readingListItems.length;
+      const url = inBounds ? resolvedListPageUrl.get(idx) : null;
+      if (!url) { dragInfo = { kind: 'manga', dir, offset, blocked: true, reason: inBounds ? 'notReady' : 'edge' }; return; }
+      dragInfo = { kind: 'manga', dir, offset };
+      dragNeighborSlide = makeSlide(url);
+      dragNeighborSlide.style.transform = dir === 'swipeUp' ? 'translateY(100%)' : 'translateY(-100%)';
+    }
+    dragNeighborSlide.style.transition = 'none';
+    els.pageStage.appendChild(dragNeighborSlide);
+  }
+
+  function updateDragX(dx) {
+    if (dragInfo.blocked) { dragCurrentSlide.style.transform = 'translateX(' + (dx * RUBBER_BAND_FACTOR) + 'px)'; return; }
+    const clamped = dragInfo.dir === 'next' ? Math.min(dx, 0) : Math.max(dx, 0);
+    dragCurrentSlide.style.transform = 'translateX(' + clamped + 'px)';
+    const base = dragInfo.dir === 'next' ? '100%' : '-100%';
+    dragNeighborSlide.style.transform = 'translateX(calc(' + base + ' + ' + clamped + 'px))';
+  }
+  function updateDragY(dy) {
+    if (dragInfo.blocked) { dragCurrentSlide.style.transform = 'translateY(' + (dy * RUBBER_BAND_FACTOR) + 'px)'; return; }
+    const clamped = dragInfo.dir === 'swipeUp' ? Math.min(dy, 0) : Math.max(dy, 0);
+    dragCurrentSlide.style.transform = 'translateY(' + clamped + 'px)';
+    const base = dragInfo.dir === 'swipeUp' ? '100%' : '-100%';
+    dragNeighborSlide.style.transform = 'translateY(calc(' + base + ' + ' + clamped + 'px))';
+  }
+
+  // Applies the rest of showPage()'s / goToReadingListOffset()'s state
+  // changes once a drag's own slide-in animation has visually finished —
+  // the DOM swap already happened in commitDrag(), so this only updates
+  // page/list bookkeeping (and, for manga switches, hands off to the
+  // normal async open pipeline with suppressNextRenderAnim set so it
+  // doesn't replay the transition a second time).
+  function finalizeDragCommit(info) {
+    if (info.kind === 'page') {
+      currentPage = info.dir === 'next' ? currentPage + 1 : currentPage - 1;
+      updateSlider();
+      for (let i = 1; i <= 5; i++) preload(currentPage + i);
+      preload(currentPage - 1);
+      persistLastPage();
+      nextVolumeDismissed = false;
+      updateNextVolumeBanner();
+    } else {
+      suppressNextRenderAnim = true;
+      goToReadingListOffset(info.offset);
+    }
+  }
+
+  function commitDrag(axis, info, delta, dim) {
+    const current = dragCurrentSlide, neighbor = dragNeighborSlide;
+    // Hand off the "current" marker immediately (not after the animation
+    // finishes) so a fast follow-up swipe started mid-transition queries
+    // the right slide via .pageSlide.current — mirrors how renderPage()'s
+    // own tap/keyboard-triggered transitions already do this synchronously.
+    current.classList.remove('current');
+    neighbor.classList.add('current');
+    const finalCurrent = axis === 'x'
+      ? (info.dir === 'next' ? 'translateX(-100%)' : 'translateX(100%)')
+      : (info.dir === 'swipeUp' ? 'translateY(-100%)' : 'translateY(100%)');
+    const remaining = Math.max(dim - Math.abs(delta), 0);
+    const duration = Math.max(MIN_DRAG_ANIM_MS, Math.round(ANIM_DURATION * (remaining / dim)));
+    current.style.transition = 'transform ' + duration + 'ms ease';
+    neighbor.style.transition = 'transform ' + duration + 'ms ease';
+    requestAnimationFrame(() => {
+      current.style.transform = finalCurrent;
+      neighbor.style.transform = 'translate(0, 0)';
+    });
+    setTimeout(() => {
+      neighbor.style.transition = '';
+      neighbor.style.transform = '';
+      if (current.parentNode) current.parentNode.removeChild(current);
+      finalizeDragCommit(info);
+    }, duration + 30);
+  }
+
+  function cancelDrag(axis, info, delta, dim) {
+    const current = dragCurrentSlide, neighbor = dragNeighborSlide;
+    const neighborStart = axis === 'x'
+      ? (info.dir === 'next' ? 'translateX(100%)' : 'translateX(-100%)')
+      : (info.dir === 'swipeUp' ? 'translateY(100%)' : 'translateY(-100%)');
+    const duration = Math.max(MIN_DRAG_ANIM_MS, Math.round(ANIM_DURATION * (Math.abs(delta) / dim)));
+    current.style.transition = 'transform ' + duration + 'ms ease';
+    neighbor.style.transition = 'transform ' + duration + 'ms ease';
+    requestAnimationFrame(() => {
+      current.style.transform = 'translate(0, 0)';
+      neighbor.style.transform = neighborStart;
+    });
+    setTimeout(() => {
+      if (neighbor.parentNode) neighbor.parentNode.removeChild(neighbor);
+      current.style.transition = '';
+      current.style.transform = '';
+    }, duration + 30);
+  }
+
+  // No neighbor available (page/list boundary, or the adjacent manga's
+  // first page hasn't resolved yet) — spring the current slide back to
+  // rest. Only flashes the "最初/最後の作品です" message for a genuine
+  // list boundary that was dragged with real intent, matching the
+  // threshold the old (non-live) swipe used.
+  function finishBlockedDrag(delta, info) {
+    const current = dragCurrentSlide;
+    current.style.transition = 'transform ' + MIN_DRAG_ANIM_MS + 'ms ease';
+    requestAnimationFrame(() => { current.style.transform = 'translate(0, 0)'; });
+    setTimeout(() => { current.style.transition = ''; current.style.transform = ''; }, MIN_DRAG_ANIM_MS + 30);
+    if (info.kind === 'manga' && info.reason === 'edge' && Math.abs(delta) > VERTICAL_SWIPE_THRESHOLD) {
+      flashStatus(info.offset > 0 ? 'これが最後の作品です' : 'これが最初の作品です');
+    }
+  }
+
   function onReaderTouchStart(e) {
     if (e.touches.length !== 1) return;
     touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
+    lastMoveX = touchStartX; lastMoveY = touchStartY; lastMoveTime = performance.now();
     touchActive = true;
+    resetDragState();
   }
   function onReaderTouchMove(e) {
     if (!touchActive || e.touches.length !== 1) return;
-    const dx = e.touches[0].clientX - touchStartX;
-    const dy = e.touches[0].clientY - touchStartY;
-    // Once the gesture is clearly a vertical drag, stop the page from doing
-    // anything else with it (e.g. bounce-scroll) so it reads as a clean swipe.
-    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) e.preventDefault();
+    if (!animEnabled) { legacyOnReaderTouchMove(e); return; }
+    const x = e.touches[0].clientX, y = e.touches[0].clientY;
+    const dx = x - touchStartX, dy = y - touchStartY;
+    if (dragAxis === null) {
+      if (Math.abs(dx) < AXIS_LOCK_PX && Math.abs(dy) < AXIS_LOCK_PX) return; // not enough movement to decide yet
+      beginDrag(Math.abs(dx) > Math.abs(dy) ? 'x' : 'y', dx, dy);
+      if (dragAxis === null) return; // nothing draggable on screen right now
+    }
+    e.preventDefault(); // a real drag — don't let the browser also scroll/bounce
+    if (dragAxis === 'x') updateDragX(dx); else updateDragY(dy);
+    lastMoveX = x; lastMoveY = y; lastMoveTime = performance.now();
   }
   function onReaderTouchEnd(e) {
     if (!touchActive) return;
     touchActive = false;
+    if (!animEnabled) { legacyOnReaderTouchEnd(e); return; }
+    const touch = e.changedTouches[0];
+    if (!touch || dragAxis === null) { resetDragState(); return; } // a plain tap — let the click zones handle it
+    e.preventDefault(); // a real drag, not a tap — don't also trigger the tap-zone click
+    const axis = dragAxis, info = dragInfo;
+    const dx = touch.clientX - touchStartX, dy = touch.clientY - touchStartY;
+    const delta = axis === 'x' ? dx : dy;
+    const dim = axis === 'x' ? els.pageStage.clientWidth : els.pageStage.clientHeight;
+    if (info.blocked) {
+      finishBlockedDrag(delta, info);
+    } else {
+      const dt = Math.max(performance.now() - lastMoveTime, 1);
+      const recentDelta = axis === 'x' ? (touch.clientX - lastMoveX) : (touch.clientY - lastMoveY);
+      const velocity = Math.abs(recentDelta) / dt;
+      const progress = Math.min(Math.abs(delta) / dim, 1);
+      const shouldCommit = progress > DRAG_COMMIT_FRACTION ||
+        (Math.abs(delta) > DRAG_FLING_MIN_PX && velocity > DRAG_FLING_VELOCITY);
+      if (shouldCommit) commitDrag(axis, info, delta, dim);
+      else cancelDrag(axis, info, delta, dim);
+    }
+    resetDragState();
+  }
+
+  // ---------- legacy (animEnabled === false) touch handling ----------
+  // No live preview, no preloading dependency — decides everything at
+  // touchend, same as before this feature existed. Kept as the fallback so
+  // turning animations off still gives the cheapest possible interaction.
+  function legacyOnReaderTouchMove(e) {
+    const dx = e.touches[0].clientX - touchStartX;
+    const dy = e.touches[0].clientY - touchStartY;
+    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) e.preventDefault();
+  }
+  function legacyOnReaderTouchEnd(e) {
     const touch = e.changedTouches[0];
     if (!touch) return;
     const dx = touch.clientX - touchStartX;
     const dy = touch.clientY - touchStartY;
     if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > VERTICAL_SWIPE_THRESHOLD) {
-      e.preventDefault(); // a real swipe, not a tap — don't also trigger the page-turn click
-      goToReadingListOffset(dy < 0 ? 1 : -1); // swipe up = next manga, down = previous
+      e.preventDefault();
+      goToReadingListOffset(dy < 0 ? 1 : -1);
     }
   }
+
   els.imgWrap.addEventListener('touchstart', onReaderTouchStart, { passive: true });
   els.imgWrap.addEventListener('touchmove', onReaderTouchMove, { passive: false });
   els.imgWrap.addEventListener('touchend', onReaderTouchEnd, { passive: false });
@@ -2561,7 +2851,14 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.openGithubSyncBtn.addEventListener('click', openGithubSyncDialog);
   els.closeGithubSyncBtn.addEventListener('click', closeGithubSyncDialog);
   els.githubSyncOverlay.addEventListener('click', (e) => { if (e.target === els.githubSyncOverlay) closeGithubSyncDialog(); });
-  els.githubSaveSettingsBtn.addEventListener('click', saveGithubSyncSettingsFromForm);
+  els.githubSyncForm.addEventListener('submit', (e) => {
+    // 実際のページ送信はしない。ただし preventDefault の前に submit イベントが
+    // 発火することで、SafariなどのブラウザのKeychain保存候補に「ユーザー名
+    // (=リポジトリ)」「パスワード(=トークン)」として認識させ、保存ダイアログを
+    // 出させるための実フォーム送信として扱う。
+    e.preventDefault();
+    saveGithubSyncSettingsFromForm();
+  });
   els.githubPushBtn.addEventListener('click', githubPush);
   els.githubPullBtn.addEventListener('click', githubPull);
   els.cancelCustomAddBtn.addEventListener('click', closeCustomAddDialog);
