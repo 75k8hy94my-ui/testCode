@@ -620,7 +620,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // 接続数の目安に合わせた値で、これより増やしてもキューで待たされるだけなので
   // 大きくしすぎない。
   const DETECT_BATCH_SIZE = 6;
-  const PRELOAD_AHEAD_COUNT = 5; // 現在ページから何ページ先まで先読みするか
+  const PRELOAD_AHEAD_COUNT = 2; // 現在ページから何ページ先まで先読みするか
   const ANIM_DURATION = 280; // ms
 
   // 絵文字(📁❤♡📚)はOS/フォントによって見た目が変わってしまうため、代わりに
@@ -1240,8 +1240,31 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.nextVolumeBanner.classList.remove('show');
   }
 
+  // folders/items に加えて per-manga info cache（拡張子・既知ページ数）も同梱する。
+  // 書き出し/読み込みとGitHub同期の両方で使う共通ペイロード組み立て。
+  function buildSyncPayload() {
+    return { folders: savedFolders, items: savedItems, mangaInfo: loadMangaInfoCache() };
+  }
+
+  // remoteInfo の各エントリでローカルの mangaInfoCache を上書きマージする
+  // （ローカルにしかないエントリは消さない）。setCachedMangaInfo と同じ要領で
+  // 一度 delete してから入れ直し、最近性の順序を保つ。
+  function mergeMangaInfoCache(remoteInfo) {
+    if (!remoteInfo || typeof remoteInfo !== 'object') return;
+    const cache = loadMangaInfoCache();
+    Object.keys(remoteInfo).forEach((key) => {
+      delete cache[key];
+      cache[key] = remoteInfo[key];
+    });
+    const keys = Object.keys(cache);
+    if (keys.length > MANGA_INFO_CACHE_MAX) {
+      keys.slice(0, keys.length - MANGA_INFO_CACHE_MAX).forEach((k) => delete cache[k]);
+    }
+    persistMangaInfoCache();
+  }
+
   function exportData() {
-    const data = { folders: savedFolders, items: savedItems };
+    const data = buildSyncPayload();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1266,6 +1289,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     savedItems = data.items;
     persistFolders();
     persistItems();
+    // ページ数キャッシュは「置き換え」ではなくマージ：他端末で既に読んで
+    // ページ数が分かっている作品の情報を取り込みつつ、ローカルにしかない
+    // キャッシュは消さない。
+    if (data.mangaInfo) mergeMangaInfoCache(data.mangaInfo);
     if (isSavedListOpen()) renderSavedList();
     return true;
   }
@@ -1419,7 +1446,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     setGithubSyncStatus('GitHubに保存中...');
     try {
       const existing = await githubFetchFile(settings);
-      const payload = { folders: savedFolders, items: savedItems };
+      const payload = buildSyncPayload();
       const body = {
         message: 'manga reader: sync ' + new Date().toISOString(),
         content: utf8ToBase64(JSON.stringify(payload, null, 2)),
@@ -1736,81 +1763,21 @@ https://cdn.example.org/c/003.webp"></textarea>
     detectMorePages(2, myGeneration);
   }
 
-  // Narrows down to the last actually-existing page number starting the
-  // search at `from` (everything before `from` — i.e. pages.length entries —
-  // is already confirmed) using doubling strides (from, from+1, +2, +4, +8…)
-  // followed by a binary search of the gap, instead of marching through every
-  // page number in fixed-size batches. Most releases are short (a handful to
-  // a couple dozen pages), so scanning forward DETECT_BATCH_SIZE at a time
-  // wasted a lot of requests at the tail — every non-existent page still
-  // cascades through all of EXT_CANDIDATES before giving up, and a whole
-  // batch's worth of those (rather than just the one real boundary) used to
-  // fire in parallel every time the manga ended mid-batch. This still uses
-  // findPageUrl() for every probe (same per-page extension fallback, so a
-  // manga that mixes extensions between pages is handled exactly as before),
-  // it just probes far fewer page numbers to find where the real end is.
-  // Returns { lastExisting, firstMissing, cache, hitLimit, aborted }: cache
-  // maps every page number actually probed to its resolved URL (or null) so
-  // the sequential fill pass below can reuse them instead of re-fetching.
-  async function scoutPageBoundary(from, generation) {
-    const cache = new Map();
-    const probe = async (n) => {
-      if (cache.has(n)) return cache.get(n);
-      const url = await findPageUrl(n);
-      cache.set(n, url);
-      return url;
-    };
-    if (from > MAX_PAGES_SAFETY) return { lastExisting: from - 1, firstMissing: null, cache, hitLimit: true };
-
-    let lo = from - 1; // last confirmed-existing page number
-    let offset = 0;
+  // ページ番号を1件ずつではなくDETECT_BATCH_SIZE件ずつ並列で確認し、存在しない
+  // ページが出てきたバッチでおしまい。バッチ単位でだけUI更新・キャッシュ保存を
+  // 行う（毎ページごとの更新はしない＝A-1のスロットリングは維持）。
+  async function detectMorePages(startPage, generation) {
+    let pageNum = startPage;
     while (true) {
-      // Bail if a newer manga has since been opened (e.g. the user swiped
-      // away) — same guard the old loop had, just checked between probes
-      // instead of between batches.
-      if (generation !== readingGeneration) return { aborted: true, cache };
-      const n = Math.min(from + offset, MAX_PAGES_SAFETY);
-      const url = await probe(n);
-      if (generation !== readingGeneration) return { aborted: true, cache };
-      if (!url) {
-        let hi = n;
-        while (hi - lo > 1) {
-          if (generation !== readingGeneration) return { aborted: true, cache };
-          const mid = lo + Math.floor((hi - lo) / 2);
-          const midUrl = await probe(mid);
-          if (generation !== readingGeneration) return { aborted: true, cache };
-          if (midUrl) lo = mid; else hi = mid;
-        }
-        return { lastExisting: lo, firstMissing: hi, cache };
-      }
-      lo = n;
-      if (n >= MAX_PAGES_SAFETY) return { lastExisting: lo, firstMissing: null, cache, hitLimit: true };
-      offset = offset === 0 ? 1 : offset * 2;
-    }
-  }
-
-  // Fills pages[from..lastExisting] in order, batching DETECT_BATCH_SIZE at a
-  // time exactly like the old loop did (same UI-update cadence, same
-  // per-batch persistence, same pendingResumePage jump-as-soon-as-reached
-  // behavior) — but reuses scoutPageBoundary's cache so anything it already
-  // confirmed isn't fetched a second time.
-  async function fillKnownPages(from, lastExisting, cache, generation) {
-    let pageNum = from;
-    while (pageNum <= lastExisting) {
-      if (generation !== readingGeneration) return false;
-      const batchEnd = Math.min(pageNum + DETECT_BATCH_SIZE - 1, lastExisting);
+      if (generation !== readingGeneration) return;
+      const batchEnd = Math.min(pageNum + DETECT_BATCH_SIZE - 1, MAX_PAGES_SAFETY);
       const batchNums = [];
       for (let n = pageNum; n <= batchEnd; n++) batchNums.push(n);
-      const results = await Promise.all(batchNums.map((n) => (cache.has(n) ? Promise.resolve(cache.get(n)) : findPageUrl(n))));
-      if (generation !== readingGeneration) return false;
+      const results = await Promise.all(batchNums.map((n) => findPageUrl(n)));
+      if (generation !== readingGeneration) return;
 
       let brokeEarly = false;
       for (const url of results) {
-        // Every page up to lastExisting was already confirmed by
-        // scoutPageBoundary, so this should never come back null — but if a
-        // flaky re-check of a previously-good URL ever does, stop here
-        // instead of pushing a broken entry (same "treat it as the end"
-        // fallback the old code used).
         if (!url) { brokeEarly = true; break; }
         pages.push(url);
         pageNum++;
@@ -1821,28 +1788,20 @@ https://cdn.example.org/c/003.webp"></textarea>
       }
       updateStatus();
       updateSlider();
-      // Save progress after every batch (not just at the very end) so an
-      // interrupted detection (manga closed mid-scan) still leaves the next
-      // visit able to resume from here instead of re-probing from page 1.
       setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, hitLimit: false });
-      if (brokeEarly) return true;
-    }
-    return true;
-  }
 
-  async function detectMorePages(startPage, generation) {
-    const scout = await scoutPageBoundary(startPage, generation);
-    if (scout.aborted || generation !== readingGeneration) return;
-    const finished = await fillKnownPages(startPage, scout.lastExisting, scout.cache, generation);
-    if (!finished || generation !== readingGeneration) return;
-    detectionHitLimit = !!(scout.hitLimit && scout.firstMissing === null && pages.length === scout.lastExisting);
-    detectionDone = true;
-    detecting = false;
-    updateStatus();
-    updateSlider();
-    persistLastPage();
-    updateNextVolumeBanner();
-    setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, hitLimit: detectionHitLimit });
+      if (brokeEarly || pageNum > MAX_PAGES_SAFETY) {
+        detectionHitLimit = pageNum > MAX_PAGES_SAFETY;
+        detectionDone = true;
+        detecting = false;
+        updateStatus();
+        updateSlider();
+        persistLastPage();
+        updateNextVolumeBanner();
+        setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, hitLimit: detectionHitLimit });
+        return;
+      }
+    }
   }
 
   // Once a cached manga (see startReading) has been rendered instantly from
