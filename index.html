@@ -11,53 +11,82 @@
 <meta name="apple-mobile-web-app-title" content="Books">
 <style>
   :root {
-    --bg: #0e0e10;
-    --panel: #1a1a1e;
-    --accent: #e0556f;
-    --text: #e8e8ea;
-    --sub: #9a9aa2;
+    --bg: #0a0c11;
+    --bg-soft: #0f1218;
+    --panel: #161a23;
+    --panel-2: #1d2230;
+    --border: #262b38;
+    --accent: #ff6b4a;
+    --accent-2: #46d9c2;
+    --accent-dim: rgba(255,107,74,0.16);
+    --text: #f1f2f6;
+    --sub: #8d93a3;
+    --radius: 10px;
+    --radius-sm: 7px;
+    --shadow-sm: 0 2px 10px rgba(0,0,0,0.4);
+    --shadow-md: 0 10px 30px rgba(0,0,0,0.55);
+    --ease: cubic-bezier(.22,.85,.32,1);
   }
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0; height: 100%;
     background: var(--bg); color: var(--text);
     font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+    -webkit-font-smoothing: antialiased;
     overflow: hidden;
   }
-  #app { position: relative; height: 100vh; overflow: hidden; }
+  #app {
+    position: relative; height: 100vh; overflow: hidden;
+    background: radial-gradient(ellipse 120% 80% at 50% -10%, #161a26 0%, var(--bg) 55%);
+  }
+  ::selection { background: var(--accent-dim); color: var(--text); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Custom scrollbars for the dark theme (WebKit) */
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2c313f; border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3a4051; }
 
   /* Thin reading-progress line across the very top edge — width tracks
      currentPage / pages.length. Sits above #topbar (so it stays visible even
      when the bars are toggled hidden) and is unaffected by toggleBars(). */
   #readProgressBar {
     position: absolute; top: 0; left: 0; height: 3px; width: 0%;
-    background: var(--accent); z-index: 12; transition: width 0.2s ease;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    z-index: 12; transition: width 0.25s var(--ease);
+    box-shadow: 0 0 8px rgba(255,107,74,0.55);
   }
 
   /* Top bar (overlays the viewer; hiding it does not change viewer's size) */
   #topbar {
     position: absolute; top: 0; left: 0; right: 0;
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 6px;
-    padding: 10px 12px; background: rgba(20,20,24,0.55);
-    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-    border-bottom: 1px solid #2a2a30;
-    transition: transform 0.25s ease, opacity 0.25s ease;
+    padding: 11px 14px; background: rgba(14,16,22,0.68);
+    backdrop-filter: blur(10px) saturate(140%); -webkit-backdrop-filter: blur(10px) saturate(140%);
+    border-bottom: 1px solid var(--border);
+    transition: transform 0.3s var(--ease), opacity 0.3s var(--ease);
     z-index: 10;
   }
   #topbar.hidden { transform: translateY(-100%); opacity: 0; }
   .ctrlBtn, .primaryBtn {
-    padding: 8px 14px; border-radius: 6px; border: none;
-    font-size: 14px; cursor: pointer; white-space: nowrap;
+    padding: 8px 15px; border-radius: var(--radius-sm); border: 1px solid transparent;
+    font-size: 13.5px; font-weight: 500; cursor: pointer; white-space: nowrap;
+    transition: filter 0.15s ease, transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
   }
-  .primaryBtn { background: var(--accent); color: white; }
-  .ctrlBtn { background: #2a2a30; color: var(--text); }
-  .ctrlBtn.active { background: var(--accent); color: white; }
+  .primaryBtn {
+    background: linear-gradient(135deg, var(--accent), #ff8a5c); color: #1a0c08;
+    box-shadow: 0 2px 10px rgba(255,107,74,0.35); font-weight: 600;
+  }
+  .ctrlBtn { background: var(--panel-2); color: var(--text); border-color: var(--border); }
+  .ctrlBtn.active { background: var(--accent-dim); color: var(--accent); border-color: rgba(255,107,74,0.4); }
   /* リーダー上部のお気に入りトグル。アイコン画像1つだけを中央表示する。 */
   .favToggleBtn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; }
   .favToggleBtn img { width: 17px; height: 17px; }
-  .ctrlBtn:hover, .primaryBtn:hover { filter: brightness(1.15); }
-  .ctrlBtn:disabled, .primaryBtn:disabled { opacity: 0.4; cursor: not-allowed; }
-  #status { font-size: 12px; color: var(--sub); min-width: 90px; }
+  .ctrlBtn:hover, .primaryBtn:hover { filter: brightness(1.12); transform: translateY(-1px); }
+  .ctrlBtn:active, .primaryBtn:active { transform: translateY(0); filter: brightness(0.97); }
+  .ctrlBtn:disabled, .primaryBtn:disabled { opacity: 0.38; cursor: not-allowed; transform: none; }
+  #status { font-size: 12px; color: var(--sub); min-width: 90px; letter-spacing: 0.01em; }
   #currentTitle {
     font-size: 13px; font-weight: 600; color: var(--text);
     max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -89,11 +118,11 @@
     color: var(--sub); font-size: 15px; text-align: center; padding: 20px;
     line-height: 1.8;
   }
-  #placeholder code { background: #1a1a1e; padding: 2px 6px; border-radius: 4px; }
+  #placeholder code { background: var(--panel-2); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px; }
 
   #spinner {
-    display: none; width: 36px; height: 36px;
-    border: 3px solid #333; border-top-color: var(--accent); border-radius: 50%;
+    display: none; width: 38px; height: 38px;
+    border: 3px solid #262b38; border-top-color: var(--accent); border-radius: 50%;
     animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -102,26 +131,47 @@
   #controls {
     position: absolute; bottom: 0; left: 0; right: 0;
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 6px;
-    padding: 10px 14px; background: rgba(20,20,24,0.55);
-    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-    border-top: 1px solid #2a2a30;
-    transition: transform 0.25s ease, opacity 0.25s ease;
+    padding: 10px 14px; background: rgba(14,16,22,0.68);
+    backdrop-filter: blur(10px) saturate(140%); -webkit-backdrop-filter: blur(10px) saturate(140%);
+    border-top: 1px solid var(--border);
+    transition: transform 0.3s var(--ease), opacity 0.3s var(--ease);
     z-index: 10;
   }
   #controls.hidden { transform: translateY(100%); opacity: 0; }
   #pageSlider { flex: 1; min-width: 80px; }
   #pageLabel { font-size: 13px; color: var(--sub); min-width: 70px; text-align: center; white-space: nowrap; }
 
+  /* Custom range-slider styling so the page scrubber matches the theme
+     instead of the browser's default grey track/thumb. */
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none; height: 4px; border-radius: 3px;
+    background: var(--panel-2); outline: none; cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--accent); border: 2px solid #1a0c08;
+    box-shadow: 0 0 0 3px var(--accent-dim);
+    transition: transform 0.15s ease;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.12); }
+  input[type="range"]::-moz-range-track { background: var(--panel-2); height: 4px; border-radius: 3px; }
+  input[type="range"]::-moz-range-thumb {
+    width: 16px; height: 16px; border-radius: 50%; background: var(--accent);
+    border: 2px solid #1a0c08; box-shadow: 0 0 0 3px var(--accent-dim);
+  }
+
   /* "次の巻" banner: appears over the viewer, above #controls, once the
      reader reaches the true last page of a series-tagged manga and a saved
      item exists for series volume+1. */
   #nextVolumeBanner {
-    position: absolute; left: 50%; bottom: 80px; transform: translateX(-50%);
+    position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%);
     display: none; align-items: center; gap: 10px;
-    background: rgba(20,20,24,0.92); border: 1px solid #2a2a30; border-left: 3px solid var(--accent);
-    border-radius: 10px; padding: 10px 14px; z-index: 15; max-width: 90vw;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+    background: rgba(18,21,29,0.94); border: 1px solid var(--border); border-left: 3px solid var(--accent);
+    border-radius: var(--radius); padding: 11px 16px; z-index: 15; max-width: 90vw;
+    box-shadow: var(--shadow-md);
+    animation: bannerRise 0.25s var(--ease);
   }
+  @keyframes bannerRise { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
   #nextVolumeBanner.show { display: flex; }
   #nextVolumeText {
     font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -129,169 +179,212 @@
 
   /* Modal overlays (shared) */
   .modalOverlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    position: fixed; inset: 0; background: rgba(6,7,10,0.7);
+    backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
     display: none; align-items: center; justify-content: center; z-index: 50;
+    animation: overlayFade 0.18s ease;
   }
+  @keyframes overlayFade { from { opacity: 0; } to { opacity: 1; } }
   .modalOverlay.show { display: flex; }
   .modalPanel {
-    background: var(--panel); border-radius: 10px; width: min(520px, 90vw);
-    max-height: 80vh; display: flex; flex-direction: column; padding: 14px;
-    border: 1px solid #2a2a30; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    background: var(--panel); border-radius: 14px; width: min(520px, 90vw);
+    max-height: 80vh; display: flex; flex-direction: column; padding: 18px;
+    border: 1px solid var(--border); box-shadow: var(--shadow-md);
+    animation: panelRise 0.22s var(--ease);
   }
+  @keyframes panelRise { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
   .panel-header {
     display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 10px; font-size: 15px;
+    margin-bottom: 12px; font-size: 15px; font-weight: 600;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border);
   }
 
   /* Save dialog */
-  .field-label { font-size: 12px; color: var(--sub); display: block; margin-top: 10px; }
+  .field-label { font-size: 12px; color: var(--sub); display: block; margin-top: 10px; letter-spacing: 0.01em; }
   #saveDialogPanel input[type="text"], #saveDialogPanel select,
   #customAddPanel input[type="text"], #customAddPanel select,
   #editItemPanel input[type="text"], #editItemPanel select {
-    width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #333;
-    background: #0e0e10; color: var(--text); font-size: 16px; margin-top: 4px;
+    width: 100%; padding: 9px 11px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--bg-soft); color: var(--text); font-size: 16px; margin-top: 4px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  #saveDialogPanel input[type="text"]:focus, #saveDialogPanel select:focus,
+  #customAddPanel input[type="text"]:focus, #customAddPanel select:focus,
+  #editItemPanel input[type="text"]:focus, #editItemPanel select:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); outline: none;
   }
   #customAddPanel textarea, #editItemPanel textarea {
-    width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #333;
-    background: #0e0e10; color: var(--text); font-size: 14px; margin-top: 4px;
+    width: 100%; padding: 9px 11px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--bg-soft); color: var(--text); font-size: 14px; margin-top: 4px;
     font-family: inherit; resize: vertical;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  #customAddPanel textarea:focus, #editItemPanel textarea:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); outline: none;
   }
   #newFolderRow, #customNewFolderRow, #editNewFolderRow { display: none; gap: 8px; margin-top: 8px; }
   #newFolderRow input, #customNewFolderRow input, #editNewFolderRow input { flex: 1; }
   #editUrlRow, #editPagesRow { display: none; }
-  .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 
   /* Saved list */
   #listToolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-  #listFolderTitle { flex: 1; font-size: 14px; font-weight: bold; }
+  #listFolderTitle { flex: 1; font-size: 14px; font-weight: 700; }
   #listNewFolderRow { display: none; gap: 8px; margin-bottom: 10px; }
   #listNewFolderRow input {
-    flex: 1; padding: 8px 10px; border-radius: 6px; border: 1px solid #333;
-    background: #0e0e10; color: var(--text); font-size: 16px;
+    flex: 1; padding: 9px 11px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--bg-soft); color: var(--text); font-size: 16px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
-  #savedListItems { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  #listNewFolderRow input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); outline: none; }
+  #savedListItems { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 7px; }
   .saved-item {
     display: flex; align-items: center; gap: 8px;
-    background: #0e0e10; border: 1px solid #2a2a30; border-radius: 6px; padding: 8px 10px;
+    background: var(--bg-soft); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 11px;
+    transition: border-color 0.15s ease, background 0.15s ease;
   }
+  .saved-item:hover { border-color: #353c4c; background: var(--panel-2); }
   .saved-item .url-text, .saved-item .item-text {
     flex: 1; overflow: hidden; cursor: pointer; min-width: 0;
   }
-  .folder-name { font-size: 14px; font-weight: bold; }
+  .folder-name { font-size: 14px; font-weight: 700; }
   .saved-item .item-title { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .saved-item .item-url { font-size: 11px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .saved-item .url-text:hover, .saved-item .item-text:hover .item-title { color: var(--accent); }
   .chevron { color: var(--sub); font-size: 16px; }
   .saved-item button {
-    background: #2a2a30; border: none; color: var(--text); border-radius: 4px;
-    padding: 4px 8px; cursor: pointer; font-size: 12px; white-space: nowrap; flex-shrink: 0;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 5px;
+    padding: 4px 9px; cursor: pointer; font-size: 12px; white-space: nowrap; flex-shrink: 0;
+    transition: filter 0.15s ease;
   }
+  .saved-item button:hover { filter: brightness(1.2); }
   #savedListEmpty { color: var(--sub); font-size: 13px; text-align: center; padding: 24px 0; }
 
   /* Table of contents (目次) list */
-  #tocListItems { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  #tocListItems { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 7px; }
   .toc-item {
     display: flex; align-items: center; gap: 8px;
-    background: #0e0e10; border: 1px solid #2a2a30; border-radius: 6px; padding: 8px 10px;
+    background: var(--bg-soft); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 11px;
+    transition: border-color 0.15s ease, background 0.15s ease;
   }
+  .toc-item:hover { border-color: #353c4c; background: var(--panel-2); }
   .toc-item .toc-text { flex: 1; overflow: hidden; cursor: pointer; min-width: 0; }
   .toc-item .toc-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .toc-item .toc-page { font-size: 11px; color: var(--sub); }
   .toc-item .toc-text:hover .toc-name { color: var(--accent); }
   .toc-item button {
-    background: #2a2a30; border: none; color: var(--text); border-radius: 4px;
-    padding: 4px 8px; cursor: pointer; font-size: 12px; white-space: nowrap; flex-shrink: 0;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 5px;
+    padding: 4px 9px; cursor: pointer; font-size: 12px; white-space: nowrap; flex-shrink: 0;
+    transition: filter 0.15s ease;
   }
+  .toc-item button:hover { filter: brightness(1.2); }
   #tocListEmpty { color: var(--sub); font-size: 13px; text-align: center; padding: 24px 0; }
 
   /* Bookshelf grid: shown inside a folder, like a Kindle library — page-1
      cover thumbnails lined up instead of plain text rows. */
   #savedListItems.bookshelf {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
-    gap: 16px 10px; align-items: start;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(98px, 1fr));
+    gap: 18px 12px; align-items: start;
   }
   .book-card {
-    cursor: pointer; display: flex; flex-direction: column; gap: 5px;
-    animation: bookFadeIn 0.22s ease both;
+    cursor: pointer; display: flex; flex-direction: column; gap: 6px;
+    animation: bookFadeIn 0.25s var(--ease) both;
   }
-  @keyframes bookFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes bookFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
   .book-card.reorder-card { cursor: default; }
   .book-cover {
-    position: relative; width: 100%; aspect-ratio: 2 / 3; background: #0e0e10;
-    border: 1px solid #2a2a30; border-radius: 8px; overflow: hidden;
-    box-shadow: 0 3px 8px rgba(0,0,0,0.45);
-    transition: transform 0.12s ease;
+    position: relative; width: 100%; aspect-ratio: 2 / 3; background: var(--panel-2);
+    border: 1px solid var(--border); border-radius: 9px; overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease), border-color 0.18s var(--ease);
   }
-  .book-card:not(.reorder-card):active .book-cover { transform: scale(0.96); }
+  .book-card:not(.reorder-card):hover .book-cover {
+    transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: #3a4156;
+  }
+  .book-card:not(.reorder-card):active .book-cover { transform: scale(0.96) translateY(0); }
   .book-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .book-title {
-    font-size: 11px; color: var(--text); text-align: center;
+    font-size: 11.5px; color: var(--text); text-align: center;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .book-series {
-    font-size: 10px; color: var(--accent); text-align: center;
+    font-size: 10px; color: var(--accent-2); text-align: center;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    background: rgba(224,85,111,0.16); border-radius: 8px; padding: 1px 7px;
+    background: rgba(70,217,194,0.14); border-radius: 8px; padding: 1px 7px;
     align-self: center; max-width: 100%;
   }
   .book-delBtn {
-    position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; line-height: 18px;
-    text-align: center; border-radius: 50%; background: rgba(20,20,24,0.85); color: var(--text);
-    border: none; font-size: 13px; cursor: pointer; padding: 0;
+    position: absolute; top: 4px; right: 4px; width: 21px; height: 21px; line-height: 19px;
+    text-align: center; border-radius: 50%; background: rgba(10,12,17,0.78); color: var(--text);
+    border: 1px solid rgba(255,255,255,0.08); font-size: 13px; cursor: pointer; padding: 0;
+    backdrop-filter: blur(3px); transition: filter 0.15s ease;
   }
+  .book-delBtn:hover { filter: brightness(1.3); }
   .book-editBtn {
-    position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; line-height: 18px;
-    text-align: center; border-radius: 50%; background: rgba(20,20,24,0.85); color: var(--text);
-    border: none; font-size: 12px; cursor: pointer; padding: 0;
+    position: absolute; top: 4px; left: 4px; width: 21px; height: 21px; line-height: 19px;
+    text-align: center; border-radius: 50%; background: rgba(10,12,17,0.78); color: var(--text);
+    border: 1px solid rgba(255,255,255,0.08); font-size: 12px; cursor: pointer; padding: 0;
+    backdrop-filter: blur(3px); transition: filter 0.15s ease;
   }
+  .book-editBtn:hover { filter: brightness(1.3); }
   .book-favBtn {
-    position: absolute; bottom: 3px; right: 3px; width: 22px; height: 22px;
+    position: absolute; bottom: 4px; right: 4px; width: 23px; height: 23px;
     display: flex; align-items: center; justify-content: center;
-    border-radius: 50%; background: rgba(20,20,24,0.85); color: var(--text);
-    border: none; cursor: pointer; padding: 0;
+    border-radius: 50%; background: rgba(10,12,17,0.78); color: var(--text);
+    border: 1px solid rgba(255,255,255,0.08); cursor: pointer; padding: 0;
+    backdrop-filter: blur(3px); transition: filter 0.15s ease, transform 0.15s ease;
   }
+  .book-favBtn:hover { filter: brightness(1.3); transform: scale(1.08); }
   .book-favBtn img { width: 13px; height: 13px; }
   /* 並べ替えモード時、編集/削除/お気に入りボタンの代わりに表示する上下移動ボタン */
   .book-moveBtn {
-    position: absolute; top: 3px; width: 26px; height: 22px; line-height: 20px;
-    text-align: center; border-radius: 6px; background: rgba(20,20,24,0.85); color: var(--text);
-    border: none; font-size: 12px; cursor: pointer; padding: 0;
+    position: absolute; top: 4px; width: 27px; height: 23px; line-height: 21px;
+    text-align: center; border-radius: 6px; background: rgba(10,12,17,0.85); color: var(--text);
+    border: 1px solid rgba(255,255,255,0.08); font-size: 12px; cursor: pointer; padding: 0;
+    transition: filter 0.15s ease;
   }
-  .book-moveUpBtn { left: 3px; }
-  .book-moveDownBtn { right: 3px; }
+  .book-moveBtn:hover { filter: brightness(1.3); }
+  .book-moveUpBtn { left: 4px; }
+  .book-moveDownBtn { right: 4px; }
   .book-moveBtn:disabled { opacity: 0.3; cursor: not-allowed; }
   /* Folder card: same Kindle-shelf card shape as a book, but shows a folder
      glyph instead of a page-1 cover thumbnail (used at every level now, not
      just inside a folder). */
   .folder-cover {
     display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(160deg, var(--panel-2), var(--bg-soft));
   }
-  .folder-cover img { width: 42%; height: auto; }
+  .folder-cover img { width: 40%; height: auto; opacity: 0.85; }
 
   /* Export/import */
   #exportImportRow {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-    padding: 8px 0; margin-bottom: 6px; border-bottom: 1px solid #2a2a30;
+    padding: 10px 0; margin-bottom: 8px; border-bottom: 1px solid var(--border);
     font-size: 12px;
   }
 
 
   /* Access lock */
   #lockOverlay {
-    position: fixed; inset: 0; background: var(--bg);
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse 120% 80% at 50% -10%, #161a26 0%, var(--bg) 55%);
     display: flex; align-items: center; justify-content: center;
     z-index: 1000;
   }
   #lockPanel {
-    background: var(--panel); border-radius: 10px; padding: 26px;
+    background: var(--panel); border-radius: 16px; padding: 30px 28px;
     width: min(300px, 86vw); text-align: center;
+    border: 1px solid var(--border); box-shadow: var(--shadow-md);
+    animation: panelRise 0.25s var(--ease);
   }
-  #lockPanel p { margin: 0 0 14px; font-size: 14px; color: var(--text); }
+  #lockPanel p { margin: 0 0 16px; font-size: 14px; color: var(--text); font-weight: 500; }
   #lockInput {
-    width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #333;
-    background: #0e0e10; color: var(--text); font-size: 18px; text-align: center;
-    letter-spacing: 6px; margin-bottom: 10px;
+    width: 100%; padding: 11px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--bg-soft); color: var(--text); font-size: 18px; text-align: center;
+    letter-spacing: 6px; margin-bottom: 12px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
+  #lockInput:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); outline: none; }
   #lockError { color: var(--accent); font-size: 12px; min-height: 16px; margin-bottom: 8px; }
   #lockSubmitBtn { width: 100%; }
 </style>
@@ -488,10 +581,10 @@ https://cdn.example.org/c/003.webp"></textarea>
   // テーマ色に合わせて自作したSVGアイコンを使う。ファイルを増やさずシングル
   // ファイル構成を保つため、data URIとしてインライン化している
   // (同内容のSVGファイルは icon-*.svg としても書き出してある)。
-  const ICON_FOLDER = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M3%206a2%202%200%200%201%202-2h4.5a2%202%200%200%201%201.6.8L12.5%206H19a2%202%200%200%201%202%202v9a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2V6z%22%20fill%3D%22%239a9aa2%22%2F%3E%3C%2Fsvg%3E";
-  const ICON_HEART_FILLED = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M12%2020.5l-1.43-1.3C5.4%2014.7%202%2011.6%202%207.9%202%204.9%204.3%202.6%207.2%202.6c1.7%200%203.3.8%204.3%202.1.9-1.3%202.5-2.1%204.2-2.1C18.7%202.6%2021%204.9%2021%207.9c0%203.7-3.4%206.8-8.6%2011.4L12%2020.5z%22%20fill%3D%22%23e0556f%22%2F%3E%3C%2Fsvg%3E";
-  const ICON_HEART_OUTLINE = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M12%2020.5l-1.43-1.3C5.4%2014.7%202%2011.6%202%207.9%202%204.9%204.3%202.6%207.2%202.6c1.7%200%203.3.8%204.3%202.1.9-1.3%202.5-2.1%204.2-2.1C18.7%202.6%2021%204.9%2021%207.9c0%203.7-3.4%206.8-8.6%2011.4L12%2020.5z%22%20fill%3D%22none%22%20stroke%3D%22%23e8e8ea%22%20stroke-width%3D%221.6%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E";
-  const ICON_BOOKS = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Crect%20x%3D%223%22%20y%3D%225%22%20width%3D%224.5%22%20height%3D%2216%22%20rx%3D%220.6%22%20fill%3D%22%239a9aa2%22%2F%3E%3Crect%20x%3D%229.2%22%20y%3D%223%22%20width%3D%224.5%22%20height%3D%2218%22%20rx%3D%220.6%22%20fill%3D%22%239a9aa2%22%2F%3E%3Crect%20x%3D%2215.4%22%20y%3D%226%22%20width%3D%224.5%22%20height%3D%2215%22%20rx%3D%220.6%22%20fill%3D%22%239a9aa2%22%2F%3E%3C%2Fsvg%3E";
+  const ICON_FOLDER = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M3%206a2%202%200%200%201%202-2h4.5a2%202%200%200%201%201.6.8L12.5%206H19a2%202%200%200%201%202%202v9a2%202%200%200%201-2%202H5a2%202%200%200%201-2-2V6z%22%20fill%3D%22%238d93a3%22%2F%3E%3C%2Fsvg%3E";
+  const ICON_HEART_FILLED = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M12%2020.5l-1.43-1.3C5.4%2014.7%202%2011.6%202%207.9%202%204.9%204.3%202.6%207.2%202.6c1.7%200%203.3.8%204.3%202.1.9-1.3%202.5-2.1%204.2-2.1C18.7%202.6%2021%204.9%2021%207.9c0%203.7-3.4%206.8-8.6%2011.4L12%2020.5z%22%20fill%3D%22%23ff6b4a%22%2F%3E%3C%2Fsvg%3E";
+  const ICON_HEART_OUTLINE = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M12%2020.5l-1.43-1.3C5.4%2014.7%202%2011.6%202%207.9%202%204.9%204.3%202.6%207.2%202.6c1.7%200%203.3.8%204.3%202.1.9-1.3%202.5-2.1%204.2-2.1C18.7%202.6%2021%204.9%2021%207.9c0%203.7-3.4%206.8-8.6%2011.4L12%2020.5z%22%20fill%3D%22none%22%20stroke%3D%22%23f1f2f6%22%20stroke-width%3D%221.6%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E";
+  const ICON_BOOKS = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Crect%20x%3D%223%22%20y%3D%225%22%20width%3D%224.5%22%20height%3D%2216%22%20rx%3D%220.6%22%20fill%3D%22%238d93a3%22%2F%3E%3Crect%20x%3D%229.2%22%20y%3D%223%22%20width%3D%224.5%22%20height%3D%2218%22%20rx%3D%220.6%22%20fill%3D%22%238d93a3%22%2F%3E%3Crect%20x%3D%2215.4%22%20y%3D%226%22%20width%3D%224.5%22%20height%3D%2215%22%20rx%3D%220.6%22%20fill%3D%22%238d93a3%22%2F%3E%3C%2Fsvg%3E";
   // ❤/♡それぞれの状態に応じたアイコン画像要素を作る共通ヘルパー。
   function makeHeartIcon(active) {
     const img = document.createElement('img');
