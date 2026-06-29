@@ -115,10 +115,10 @@
   .pageimg { display: block; }
 
   /* セーフモード: 漫画の画像（リーダーのページ・本棚の表紙サムネイル）にだけ
-     モザイク(ぼかし)をかける。アイコン類（❤/📁/📚/× など）は対象外 —
-     これらは別の要素・クラスなのでこのセレクタには含まれない。 */
+     モザイク(ぼかし)をかける。フォルダ/お気に入り/シリーズのアイコン
+     （folder-cover内のimg: 📁❤📚など）は実際の表紙ではないため対象外。 */
   body.safe-mode .pageimg,
-  body.safe-mode .book-cover img {
+  body.safe-mode .book-cover:not(.folder-cover) img {
     filter: blur(24px);
   }
 
@@ -1736,30 +1736,82 @@ https://cdn.example.org/c/003.webp"></textarea>
     detectMorePages(2, myGeneration);
   }
 
-  // Checks pages in batches of DETECT_BATCH_SIZE in parallel (instead of one
-  // at a time) so detection time no longer grows linearly with page count —
-  // each round-trip now resolves up to DETECT_BATCH_SIZE pages at once. The
-  // pages within a resolved batch are still pushed/shown in order, and the
-  // first missing page found within a batch is treated as the end (same
-  // "first gap = end of manga" assumption the old sequential loop made).
-  async function detectMorePages(startPage, generation) {
-    let pageNum = startPage;
-    while (pageNum <= MAX_PAGES_SAFETY) {
-      // Bail before spawning a new batch of requests if a newer manga has
-      // since been opened (e.g. the user swiped away). Without this, rapid
-      // vertical swiping through several manga left each abandoned one's
-      // detection loop free to keep firing fresh batches of parallel image
-      // requests indefinitely, competing for the browser's limited
-      // per-host connections with the preloads that actually matter.
-      if (generation !== readingGeneration) return;
-      const batchNums = [];
-      for (let i = 0; i < DETECT_BATCH_SIZE && pageNum + i <= MAX_PAGES_SAFETY; i++) batchNums.push(pageNum + i);
-      const results = await Promise.all(batchNums.map((n) => findPageUrl(n)));
-      if (generation !== readingGeneration) return; // a newer manga was opened meanwhile; abandon this stale loop
+  // Narrows down to the last actually-existing page number starting the
+  // search at `from` (everything before `from` — i.e. pages.length entries —
+  // is already confirmed) using doubling strides (from, from+1, +2, +4, +8…)
+  // followed by a binary search of the gap, instead of marching through every
+  // page number in fixed-size batches. Most releases are short (a handful to
+  // a couple dozen pages), so scanning forward DETECT_BATCH_SIZE at a time
+  // wasted a lot of requests at the tail — every non-existent page still
+  // cascades through all of EXT_CANDIDATES before giving up, and a whole
+  // batch's worth of those (rather than just the one real boundary) used to
+  // fire in parallel every time the manga ended mid-batch. This still uses
+  // findPageUrl() for every probe (same per-page extension fallback, so a
+  // manga that mixes extensions between pages is handled exactly as before),
+  // it just probes far fewer page numbers to find where the real end is.
+  // Returns { lastExisting, firstMissing, cache, hitLimit, aborted }: cache
+  // maps every page number actually probed to its resolved URL (or null) so
+  // the sequential fill pass below can reuse them instead of re-fetching.
+  async function scoutPageBoundary(from, generation) {
+    const cache = new Map();
+    const probe = async (n) => {
+      if (cache.has(n)) return cache.get(n);
+      const url = await findPageUrl(n);
+      cache.set(n, url);
+      return url;
+    };
+    if (from > MAX_PAGES_SAFETY) return { lastExisting: from - 1, firstMissing: null, cache, hitLimit: true };
 
-      let hitEnd = false;
+    let lo = from - 1; // last confirmed-existing page number
+    let offset = 0;
+    while (true) {
+      // Bail if a newer manga has since been opened (e.g. the user swiped
+      // away) — same guard the old loop had, just checked between probes
+      // instead of between batches.
+      if (generation !== readingGeneration) return { aborted: true, cache };
+      const n = Math.min(from + offset, MAX_PAGES_SAFETY);
+      const url = await probe(n);
+      if (generation !== readingGeneration) return { aborted: true, cache };
+      if (!url) {
+        let hi = n;
+        while (hi - lo > 1) {
+          if (generation !== readingGeneration) return { aborted: true, cache };
+          const mid = lo + Math.floor((hi - lo) / 2);
+          const midUrl = await probe(mid);
+          if (generation !== readingGeneration) return { aborted: true, cache };
+          if (midUrl) lo = mid; else hi = mid;
+        }
+        return { lastExisting: lo, firstMissing: hi, cache };
+      }
+      lo = n;
+      if (n >= MAX_PAGES_SAFETY) return { lastExisting: lo, firstMissing: null, cache, hitLimit: true };
+      offset = offset === 0 ? 1 : offset * 2;
+    }
+  }
+
+  // Fills pages[from..lastExisting] in order, batching DETECT_BATCH_SIZE at a
+  // time exactly like the old loop did (same UI-update cadence, same
+  // per-batch persistence, same pendingResumePage jump-as-soon-as-reached
+  // behavior) — but reuses scoutPageBoundary's cache so anything it already
+  // confirmed isn't fetched a second time.
+  async function fillKnownPages(from, lastExisting, cache, generation) {
+    let pageNum = from;
+    while (pageNum <= lastExisting) {
+      if (generation !== readingGeneration) return false;
+      const batchEnd = Math.min(pageNum + DETECT_BATCH_SIZE - 1, lastExisting);
+      const batchNums = [];
+      for (let n = pageNum; n <= batchEnd; n++) batchNums.push(n);
+      const results = await Promise.all(batchNums.map((n) => (cache.has(n) ? Promise.resolve(cache.get(n)) : findPageUrl(n))));
+      if (generation !== readingGeneration) return false;
+
+      let brokeEarly = false;
       for (const url of results) {
-        if (!url) { hitEnd = true; break; }
+        // Every page up to lastExisting was already confirmed by
+        // scoutPageBoundary, so this should never come back null — but if a
+        // flaky re-check of a previously-good URL ever does, stop here
+        // instead of pushing a broken entry (same "treat it as the end"
+        // fallback the old code used).
+        if (!url) { brokeEarly = true; break; }
         pages.push(url);
         pageNum++;
         if (pendingResumePage !== null && pages.length === pendingResumePage) {
@@ -1767,35 +1819,30 @@ https://cdn.example.org/c/003.webp"></textarea>
           pendingResumePage = null;
         }
       }
-      // Update once per batch (up to DETECT_BATCH_SIZE pages) instead of once
-      // per page — these touch the DOM (slider/label text) and don't need to
-      // run more often than a batch actually lands.
       updateStatus();
       updateSlider();
-      if (hitEnd) {
-        detectionDone = true;
-        detecting = false;
-        updateStatus();
-        updateSlider();
-        persistLastPage();
-        updateNextVolumeBanner();
-        setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, hitLimit: false });
-        return;
-      }
       // Save progress after every batch (not just at the very end) so an
       // interrupted detection (manga closed mid-scan) still leaves the next
       // visit able to resume from here instead of re-probing from page 1.
       setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, hitLimit: false });
+      if (brokeEarly) return true;
     }
-    if (generation !== readingGeneration) return;
-    detectionHitLimit = true;
+    return true;
+  }
+
+  async function detectMorePages(startPage, generation) {
+    const scout = await scoutPageBoundary(startPage, generation);
+    if (scout.aborted || generation !== readingGeneration) return;
+    const finished = await fillKnownPages(startPage, scout.lastExisting, scout.cache, generation);
+    if (!finished || generation !== readingGeneration) return;
+    detectionHitLimit = !!(scout.hitLimit && scout.firstMissing === null && pages.length === scout.lastExisting);
     detectionDone = true;
     detecting = false;
     updateStatus();
     updateSlider();
     persistLastPage();
     updateNextVolumeBanner();
-    setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, hitLimit: true });
+    setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, hitLimit: detectionHitLimit });
   }
 
   // Once a cached manga (see startReading) has been rendered instantly from
@@ -1981,6 +2028,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     const img = document.createElement('img');
     img.className = 'pageimg';
     img.alt = alt || '';
+    img.fetchPriority = 'high'; // this is the slide actually being shown — outrank any background preload() still in flight for other pages
     img.src = url;
     styleImg(img);
     return img;
@@ -2071,15 +2119,50 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.readProgressBar.style.width = pages.length ? Math.round((currentPage / pages.length) * 100) + '%' : '0%';
   }
 
-  const preloadedPageUrls = new Set(); // dedup: skip spinning up another Image() for a URL already preloaded/in flight this session
+  const preloadedPageUrls = new Set(); // URLs that have actually finished downloading — never re-fetch these
+  const inFlightPreloads = new Map(); // url -> Image still in flight, so a stale one can be aborted (see pruneStalePreloads)
   function preload(pageNum) {
     if (pageNum >= 1 && pageNum <= pages.length) {
       const url = pages[pageNum - 1];
-      if (preloadedPageUrls.has(url)) return;
-      preloadedPageUrls.add(url);
+      if (preloadedPageUrls.has(url) || inFlightPreloads.has(url)) return;
       const img = new Image();
+      img.fetchPriority = 'low'; // de-prioritize vs. the actually-visible page's own load (see makeImgFromUrl)
+      inFlightPreloads.set(url, img);
+      img.addEventListener('load', () => { inFlightPreloads.delete(url); preloadedPageUrls.add(url); });
+      img.addEventListener('error', () => { inFlightPreloads.delete(url); }); // allow a later retry instead of giving up forever
       img.src = url;
     }
+  }
+
+  // Cancels any preload still in flight for a URL that's no longer within
+  // the current preload window (e.g. the user advanced several pages, or
+  // jumped, since that preload was kicked off). Setting .src = '' triggers
+  // the spec's "abort the image request" steps, freeing up one of the
+  // browser's limited per-host connections — without this, requests for
+  // pages the user has already scrolled past kept competing for bandwidth
+  // with the page actually on screen now, which is what made it feel like
+  // the *previous* page's preloading had to finish first.
+  function pruneStalePreloads(neededUrls) {
+    inFlightPreloads.forEach((img, url) => {
+      if (!neededUrls.has(url)) {
+        img.src = '';
+        inFlightPreloads.delete(url);
+      }
+    });
+  }
+
+  // The set of page URLs that should still be considered "wanted" once the
+  // current page becomes n — the page itself plus the same look-ahead/back
+  // window preload()/showPage() already maintain. Anything in flight outside
+  // this set is safe to cancel.
+  function preloadWindowUrls(n) {
+    const wanted = new Set();
+    if (n >= 1 && n <= pages.length) wanted.add(pages[n - 1]);
+    for (let i = 1; i <= PRELOAD_AHEAD_COUNT; i++) {
+      if (n + i >= 1 && n + i <= pages.length) wanted.add(pages[n + i - 1]);
+    }
+    if (n - 1 >= 1 && n - 1 <= pages.length) wanted.add(pages[n - 2]);
+    return wanted;
   }
 
   // Resolved URL of the page right after/before the one on screen, if known
@@ -2110,6 +2193,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     const hasCurrent = !!els.pageStage.querySelector('.pageSlide');
     const direction = forceDirection || (!hasCurrent ? null : (n > currentPage ? 'next' : (n < currentPage ? 'prev' : null)));
     currentPage = n;
+    pruneStalePreloads(preloadWindowUrls(n));
     renderPage(n, direction);
     updateSlider();
     for (let i = 1; i <= PRELOAD_AHEAD_COUNT; i++) preload(n + i);
@@ -2125,6 +2209,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (n < 1) n = 1;
     if (n > pages.length) n = pages.length;
     currentPage = n;
+    pruneStalePreloads(preloadWindowUrls(n));
     renderPage(n, null);
     updateSlider();
     for (let i = 1; i <= PRELOAD_AHEAD_COUNT; i++) preload(n + i);
@@ -2282,6 +2367,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   function finalizeDragCommit(info) {
     if (info.kind === 'page') {
       currentPage = info.dir === 'next' ? currentPage + 1 : currentPage - 1;
+      pruneStalePreloads(preloadWindowUrls(currentPage));
       updateSlider();
       for (let i = 1; i <= PRELOAD_AHEAD_COUNT; i++) preload(currentPage + i);
       preload(currentPage - 1);
