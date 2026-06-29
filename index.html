@@ -1049,10 +1049,17 @@ https://cdn.example.org/c/003.webp"></textarea>
   //
   // These helpers probe a manga purely by its key (the normalized base URL,
   // i.e. what mangaCacheKeyFor()/parseInputUrl() produce) and never touch
-  // pages/baseUrl/preferredExt/readingGeneration, so they keep running to
-  // completion in the background no matter what the reader UI does — used
-  // right after a new URL-based item is added (新規 / URLを保存), and from the
-  // 編集 dialog's 「ページ数を取得」 button for items added before this existed.
+  // pages/baseUrl/preferredExt/readingGeneration. IMPORTANT: never start one
+  // of these while detectMorePages is still actively working on the *same*
+  // manga — running both at once doubles the parallel image requests for the
+  // same page numbers, which can exceed the browser's per-origin connection
+  // limit and make a perfectly real page time out and look "missing" (seen
+  // in practice: a manga with dozens of pages getting stuck at 3). So this is
+  // only ever kicked off (a) once detectMorePages has already stopped for
+  // that manga (see handOffIncompleteDetection, called right before
+  // readingGeneration changes in startReading/closeManga), continuing from
+  // pages.length+1 — never page 1 again — or (b) for an item that isn't the
+  // one currently open at all (編集 dialog's 「ページ数を取得」 button).
   const pageCountDetectionInProgress = new Set();
 
   async function probePageAt(key, n, extHint) {
@@ -1067,25 +1074,34 @@ https://cdn.example.org/c/003.webp"></textarea>
     return null;
   }
 
-  async function detectPageCountForKey(key) {
-    const first = await probePageAt(key, 1, null);
-    if (!first) return null; // 1ページ目すら読み込めない＝記録しない
-    let ext = first.ext;
-    let count = 1;
+  // Probes forward from page `fromCount + 1`, batching DETECT_BATCH_SIZE at a
+  // time exactly like detectMorePages. onProgress(count, ext), if given, is
+  // called after every batch so callers can persist partial progress as it
+  // happens (not just at the very end).
+  async function runPageCountLoop(key, fromCount, ext, onProgress) {
+    let count = fromCount;
+    let curExt = ext;
     while (true) {
       const batchNums = [];
       for (let n = count + 1; n <= count + DETECT_BATCH_SIZE && n <= MAX_PAGES_SAFETY; n++) batchNums.push(n);
-      if (!batchNums.length) return { count, ext, hitLimit: true };
-      const results = await Promise.all(batchNums.map((n) => probePageAt(key, n, ext)));
+      if (!batchNums.length) return { count, ext: curExt, hitLimit: true };
+      const results = await Promise.all(batchNums.map((n) => probePageAt(key, n, curExt)));
       let brokeEarly = false;
       for (const r of results) {
         if (!r) { brokeEarly = true; break; }
-        ext = r.ext;
+        curExt = r.ext;
         count++;
       }
-      if (brokeEarly) return { count, ext, hitLimit: false };
-      if (count >= MAX_PAGES_SAFETY) return { count, ext, hitLimit: true };
+      if (onProgress) onProgress(count, curExt);
+      if (brokeEarly) return { count, ext: curExt, hitLimit: false };
+      if (count >= MAX_PAGES_SAFETY) return { count, ext: curExt, hitLimit: true };
     }
+  }
+
+  async function detectPageCountForKey(key) {
+    const first = await probePageAt(key, 1, null);
+    if (!first) return null; // 1ページ目すら読み込めない＝記録しない
+    return runPageCountLoop(key, 1, first.ext);
   }
 
   // opts.force: 既にキャッシュ済みでも取得し直す（編集ダイアログの明示ボタン用）。
@@ -1109,6 +1125,32 @@ https://cdn.example.org/c/003.webp"></textarea>
       })
       .catch(() => { if (o.onDone) o.onDone(null); })
       .finally(() => { pageCountDetectionInProgress.delete(key); });
+  }
+
+  // detectMorePagesがreadingGenerationの変化で中断された直後にだけ呼ぶ想定の
+  // 引き継ぎ専用ルート。pages.length（既に確定済みの最後のページ）の続きから
+  // 始めるので、止まった時点のページをもう一度確認したりはしない。
+  function continuePageCountDetection(key, fromCount, ext) {
+    if (!key || fromCount <= 0 || pageCountDetectionInProgress.has(key)) return;
+    pageCountDetectionInProgress.add(key);
+    runPageCountLoop(key, fromCount, ext, (count, curExt) => {
+      setCachedMangaInfo(key, { ext: curExt, count, hitLimit: false });
+    })
+      .then((result) => {
+        setCachedMangaInfo(key, { ext: result.ext, count: result.count, hitLimit: result.hitLimit });
+      })
+      .catch(() => {})
+      .finally(() => { pageCountDetectionInProgress.delete(key); });
+  }
+
+  // detectMorePagesがまだ終わっていない状態でreadingGenerationが変わる
+  // （別の漫画を開く／閉じる）直前に呼ぶ。続きをcontinuePageCountDetectionに
+  // 引き継いでから呼び出し元がgenerationを進める想定なので、detectMorePages
+  // 自身とは絶対に同時に走らない。
+  function handOffIncompleteDetection() {
+    if (detecting && !detectionDone && baseUrl && pages.length > 0) {
+      continuePageCountDetection(baseUrl, pages.length, preferredExt);
+    }
   }
 
   // Normalizes a raw URL (which might be missing a scheme, have a trailing
@@ -1614,9 +1656,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     });
     persistAll();
     updateCurrentTitleDisplay();
-    // 履歴に入れた時点で、最後まで読まずに閉じてもページ数が記録されるよう
-    // バックグラウンドで検出を進めておく（detectMorePagesとは独立）。
-    ensurePageCountDetected(url);
   }
 
   // If the URL currently being viewed matches a saved item (by base URL),
@@ -1760,6 +1799,10 @@ https://cdn.example.org/c/003.webp"></textarea>
   async function startReading(url, addToHistoryFlag, switchDirection) {
     const parsed = parseInputUrl(url);
     if (!parsed) return;
+    // Before we move on to the next manga, give the one we were just reading
+    // a chance to finish its page count in the background if detectMorePages
+    // hadn't gotten there yet (see handOffIncompleteDetection's comment).
+    handOffIncompleteDetection();
     // Each call gets its own "generation" number. If a newer startReading()
     // call comes in before this one finishes (e.g. the user opens another
     // manga, or re-opens one from 履歴/list, while the previous one is still
@@ -1929,6 +1972,11 @@ https://cdn.example.org/c/003.webp"></textarea>
       detectMorePages(2, generation);
       return;
     }
+    // detectMorePages自身は完了/中断のどちらでもdetecting=falseにするので、ここで
+    // trueにしておかないとhandOffIncompleteDetection()がこの続き探索中の中断を
+    // 検出できない。
+    detecting = true;
+    detectionDone = false;
     detectMorePages(pages.length + 1, generation);
   }
 
@@ -1940,6 +1988,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // startReading's vertical-swipe handling so swiping into a custom manga
   // animates the same way.
   function startReadingCustom(item, switchDirection) {
+    handOffIncompleteDetection(); // 直前の漫画の検出未完了分を引き継ぐ（generationを進める前に）
     readingGeneration++; // invalidate any still-running sequential detection loop
     baseUrl = '';
     currentResumeKey = 'custom:' + item.id;
@@ -1999,6 +2048,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   // 閉じた漫画が復元されないよう LAST_URL_KEY も消す。何も開いていない状態に
   // なるので、リスト（保存したURL）を自動的に開く。
   function closeManga() {
+    // ここでpages/baseUrlがリセットされる前に、検出未完了分の引き継ぎを行う。
+    handOffIncompleteDetection();
     readingGeneration++;
     baseUrl = '';
     pages = [];
@@ -2606,7 +2657,6 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   function confirmSave() {
     if (!pendingSaveUrl) { closeSaveDialog(); return; }
-    const savedUrl = pendingSaveUrl; // closeSaveDialog() below clears pendingSaveUrl
     let folderId = els.saveFolderSelect.value;
     if (folderId === '__new__') folderId = '';
     // 履歴 entries don't count as "already saved" — every 新規-opened manga is
@@ -2645,9 +2695,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     updateCurrentTitleDisplay();
     closeSaveDialog();
     flashStatus('保存しました');
-    // 保存した時点で、その後リーダーを閉じてもページ数が記録されるよう
-    // バックグラウンドで検出を進めておく（detectMorePagesとは独立）。
-    ensurePageCountDetected(savedUrl);
   }
 
   // ---------- custom (explicit page-list) manga add dialog ----------
