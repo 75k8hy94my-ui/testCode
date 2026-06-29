@@ -1626,6 +1626,13 @@ https://cdn.example.org/c/003.webp"></textarea>
   async function detectMorePages(startPage, generation) {
     let pageNum = startPage;
     while (pageNum <= MAX_PAGES_SAFETY) {
+      // Bail before spawning a new batch of requests if a newer manga has
+      // since been opened (e.g. the user swiped away). Without this, rapid
+      // vertical swiping through several manga left each abandoned one's
+      // detection loop free to keep firing fresh batches of parallel image
+      // requests indefinitely, competing for the browser's limited
+      // per-host connections with the preloads that actually matter.
+      if (generation !== readingGeneration) return;
       const batchNums = [];
       for (let i = 0; i < DETECT_BATCH_SIZE && pageNum + i <= MAX_PAGES_SAFETY; i++) batchNums.push(pageNum + i);
       const results = await Promise.all(batchNums.map((n) => findPageUrl(n)));
@@ -2139,6 +2146,14 @@ https://cdn.example.org/c/003.webp"></textarea>
     lastMoveX = touchStartX; lastMoveY = touchStartY; lastMoveTime = performance.now();
     touchActive = true;
     resetDragState();
+    // Cheap retry: if an earlier preload attempt for a neighbor manga timed
+    // out or failed (slow/throttled server, lost race with other in-flight
+    // requests), nothing was re-triggering it except a successful swipe —
+    // so a manga that failed once stayed permanently "blocked" even though
+    // a fresh attempt might well succeed. preloadAdjacentManga() is a no-op
+    // for anything already resolved or currently in flight, so calling it
+    // on every touch start is safe and gives every gesture a fresh chance.
+    preloadAdjacentManga();
   }
   function onReaderTouchMove(e) {
     if (!touchActive || e.touches.length !== 1) return;
