@@ -241,6 +241,8 @@
   #newFolderRow input, #customNewFolderRow input, #editNewFolderRow input { flex: 1; }
   #editUrlRow, #editPagesRow { display: none; }
   .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  .fetchCountRow { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .fetchCountRow #editPageCountStatus { font-size: 12px; color: var(--sub); }
 
   /* Saved list */
   #listToolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
@@ -527,6 +529,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     <div id="editUrlRow">
       <label class="field-label" for="editUrlInput">URL</label>
       <input id="editUrlInput" type="text" placeholder="https://example.com/manga/test/">
+      <div class="fetchCountRow">
+        <button class="ctrlBtn" id="editFetchPageCountBtn" type="button">ページ数を取得</button>
+        <span id="editPageCountStatus"></span>
+      </div>
     </div>
     <div id="editPagesRow">
       <label class="field-label" for="editPagesTextarea">ページURL（1行に1つ、読む順・差し替えや途中追加も可）</label>
@@ -779,6 +785,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     editVolumeInput: document.getElementById('editVolumeInput'),
     editUrlRow: document.getElementById('editUrlRow'),
     editUrlInput: document.getElementById('editUrlInput'),
+    editFetchPageCountBtn: document.getElementById('editFetchPageCountBtn'),
+    editPageCountStatus: document.getElementById('editPageCountStatus'),
     editPagesRow: document.getElementById('editPagesRow'),
     editPagesTextarea: document.getElementById('editPagesTextarea'),
     cancelEditItemBtn: document.getElementById('cancelEditItemBtn'),
@@ -1030,6 +1038,79 @@ https://cdn.example.org/c/003.webp"></textarea>
     const cache = loadMangaInfoCache();
     if (cache[baseUrlKey]) { delete cache[baseUrlKey]; persistMangaInfoCache(); }
   }
+
+  // ---------- standalone page-count detection (independent of the reader) ----------
+  // detectMorePages() drives the *currently open* manga's `pages` array and
+  // deliberately aborts the moment readingGeneration changes (closeManga,
+  // switching manga, etc.) — that's correct for it, since continuing would
+  // mean writing into a `pages` array nobody is looking at anymore. But it
+  // means: open a brand-new manga just to bookmark it, close it right away,
+  // and the page count may only be partially detected.
+  //
+  // These helpers probe a manga purely by its key (the normalized base URL,
+  // i.e. what mangaCacheKeyFor()/parseInputUrl() produce) and never touch
+  // pages/baseUrl/preferredExt/readingGeneration, so they keep running to
+  // completion in the background no matter what the reader UI does — used
+  // right after a new URL-based item is added (新規 / URLを保存), and from the
+  // 編集 dialog's 「ページ数を取得」 button for items added before this existed.
+  const pageCountDetectionInProgress = new Set();
+
+  async function probePageAt(key, n, extHint) {
+    const order = extHint != null
+      ? [extHint, ...EXT_CANDIDATES.map((_, i) => i).filter((i) => i !== extHint)]
+      : EXT_CANDIDATES.map((_, i) => i);
+    for (const idx of order) {
+      const url = key + n + '.' + EXT_CANDIDATES[idx];
+      const ok = await loadImage(url);
+      if (ok) return { url, ext: idx };
+    }
+    return null;
+  }
+
+  async function detectPageCountForKey(key) {
+    const first = await probePageAt(key, 1, null);
+    if (!first) return null; // 1ページ目すら読み込めない＝記録しない
+    let ext = first.ext;
+    let count = 1;
+    while (true) {
+      const batchNums = [];
+      for (let n = count + 1; n <= count + DETECT_BATCH_SIZE && n <= MAX_PAGES_SAFETY; n++) batchNums.push(n);
+      if (!batchNums.length) return { count, ext, hitLimit: true };
+      const results = await Promise.all(batchNums.map((n) => probePageAt(key, n, ext)));
+      let brokeEarly = false;
+      for (const r of results) {
+        if (!r) { brokeEarly = true; break; }
+        ext = r.ext;
+        count++;
+      }
+      if (brokeEarly) return { count, ext, hitLimit: false };
+      if (count >= MAX_PAGES_SAFETY) return { count, ext, hitLimit: true };
+    }
+  }
+
+  // opts.force: 既にキャッシュ済みでも取得し直す（編集ダイアログの明示ボタン用）。
+  // opts.onDone(result|null): 完了時コールバック（result===nullは1ページ目すら
+  // 見つからなかった場合）。同じkeyに対して同時に1つだけ走らせる。
+  function ensurePageCountDetected(key, opts) {
+    const o = opts || {};
+    if (!key || pageCountDetectionInProgress.has(key)) {
+      if (o.onDone) o.onDone(undefined); // already running — caller can ignore
+      return;
+    }
+    if (!o.force && getCachedMangaInfo(key)) {
+      if (o.onDone) o.onDone(getCachedMangaInfo(key));
+      return;
+    }
+    pageCountDetectionInProgress.add(key);
+    detectPageCountForKey(key)
+      .then((result) => {
+        if (result) setCachedMangaInfo(key, { ext: result.ext, count: result.count, hitLimit: result.hitLimit });
+        if (o.onDone) o.onDone(result);
+      })
+      .catch(() => { if (o.onDone) o.onDone(null); })
+      .finally(() => { pageCountDetectionInProgress.delete(key); });
+  }
+
   // Normalizes a raw URL (which might be missing a scheme, have a trailing
   // page filename, a stray query string, etc.) to the same baseUrl key that
   // startReading() itself will end up using — so a cache entry written while
@@ -1533,6 +1614,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     });
     persistAll();
     updateCurrentTitleDisplay();
+    // 履歴に入れた時点で、最後まで読まずに閉じてもページ数が記録されるよう
+    // バックグラウンドで検出を進めておく（detectMorePagesとは独立）。
+    ensurePageCountDetected(url);
   }
 
   // If the URL currently being viewed matches a saved item (by base URL),
@@ -2522,6 +2606,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   function confirmSave() {
     if (!pendingSaveUrl) { closeSaveDialog(); return; }
+    const savedUrl = pendingSaveUrl; // closeSaveDialog() below clears pendingSaveUrl
     let folderId = els.saveFolderSelect.value;
     if (folderId === '__new__') folderId = '';
     // 履歴 entries don't count as "already saved" — every 新規-opened manga is
@@ -2560,6 +2645,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     updateCurrentTitleDisplay();
     closeSaveDialog();
     flashStatus('保存しました');
+    // 保存した時点で、その後リーダーを閉じてもページ数が記録されるよう
+    // バックグラウンドで検出を進めておく（detectMorePagesとは独立）。
+    ensurePageCountDetected(savedUrl);
   }
 
   // ---------- custom (explicit page-list) manga add dialog ----------
@@ -2651,9 +2739,36 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.editPagesRow.style.display = isCustom ? 'block' : 'none';
     els.editUrlInput.value = item.url || '';
     els.editPagesTextarea.value = isCustom ? item.pages.join('\n') : '';
+    els.editPageCountStatus.textContent = '';
+    els.editFetchPageCountBtn.disabled = false;
 
     els.editItemOverlay.classList.add('show');
     els.editTitleInput.focus();
+  }
+
+  // 既存アイテム用：今すぐページ数を（再）取得する。新規追加時の
+  // ensurePageCountDetected と同じ検出ロジックを使うが、編集ダイアログから
+  // の明示操作なのでキャッシュ済みでも force:true で取得し直す。
+  function fetchPageCountForEditingItem() {
+    const item = savedItems.find((it) => it.id === editingItemId);
+    if (!item) return;
+    const raw = els.editUrlInput.value.trim();
+    if (!raw) { els.editPageCountStatus.textContent = 'URLを入力してください'; return; }
+    const parsed = parseInputUrl(raw);
+    const key = parsed ? parsed.baseUrl : raw;
+    const targetId = editingItemId;
+    els.editPageCountStatus.textContent = '取得中…';
+    els.editFetchPageCountBtn.disabled = true;
+    ensurePageCountDetected(key, {
+      force: true,
+      onDone: (result) => {
+        if (editingItemId !== targetId) return; // ダイアログが別アイテムに切り替わっている
+        els.editFetchPageCountBtn.disabled = false;
+        if (result === undefined) { els.editPageCountStatus.textContent = '既に取得中です'; return; }
+        if (!result) { els.editPageCountStatus.textContent = '1ページ目が見つかりませんでした'; return; }
+        els.editPageCountStatus.textContent = result.count + 'ページ確認しました' + (result.hitLimit ? '（上限到達）' : '');
+      },
+    });
   }
   function closeEditItemDialog() {
     els.editItemOverlay.classList.remove('show');
@@ -3196,6 +3311,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   els.cancelEditItemBtn.addEventListener('click', closeEditItemDialog);
   els.confirmEditItemBtn.addEventListener('click', confirmEditItem);
+  els.editFetchPageCountBtn.addEventListener('click', fetchPageCountForEditingItem);
   els.editItemOverlay.addEventListener('click', (e) => { if (e.target === els.editItemOverlay) closeEditItemDialog(); });
   els.editFolderSelect.addEventListener('change', () => {
     if (els.editFolderSelect.value === '__new__') {
