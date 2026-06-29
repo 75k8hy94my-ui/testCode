@@ -620,6 +620,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // 接続数の目安に合わせた値で、これより増やしてもキューで待たされるだけなので
   // 大きくしすぎない。
   const DETECT_BATCH_SIZE = 6;
+  const PRELOAD_AHEAD_COUNT = 5; // 現在ページから何ページ先まで先読みするか
   const ANIM_DURATION = 280; // ms
 
   // 絵文字(📁❤♡📚)はOS/フォントによって見た目が変わってしまうため、代わりに
@@ -1112,6 +1113,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       return;
     }
     els.tocListEmpty.style.display = 'none';
+    const tocFrag = document.createDocumentFragment();
     currentToc.forEach((t, idx) => {
       const row = document.createElement('div');
       row.className = 'toc-item';
@@ -1152,8 +1154,9 @@ https://cdn.example.org/c/003.webp"></textarea>
       row.appendChild(text);
       row.appendChild(saveBtn);
       row.appendChild(delBtn);
-      els.tocListItems.appendChild(row);
+      tocFrag.appendChild(row);
     });
+    els.tocListItems.appendChild(tocFrag);
   }
 
   function openTocList() {
@@ -1759,13 +1762,16 @@ https://cdn.example.org/c/003.webp"></textarea>
         if (!url) { hitEnd = true; break; }
         pages.push(url);
         pageNum++;
-        updateStatus();
-        updateSlider();
         if (pendingResumePage !== null && pages.length === pendingResumePage) {
           jumpToPage(pendingResumePage);
           pendingResumePage = null;
         }
       }
+      // Update once per batch (up to DETECT_BATCH_SIZE pages) instead of once
+      // per page — these touch the DOM (slider/label text) and don't need to
+      // run more often than a batch actually lands.
+      updateStatus();
+      updateSlider();
       if (hitEnd) {
         detectionDone = true;
         detecting = false;
@@ -2065,10 +2071,14 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.readProgressBar.style.width = pages.length ? Math.round((currentPage / pages.length) * 100) + '%' : '0%';
   }
 
+  const preloadedPageUrls = new Set(); // dedup: skip spinning up another Image() for a URL already preloaded/in flight this session
   function preload(pageNum) {
     if (pageNum >= 1 && pageNum <= pages.length) {
+      const url = pages[pageNum - 1];
+      if (preloadedPageUrls.has(url)) return;
+      preloadedPageUrls.add(url);
       const img = new Image();
-      img.src = pages[pageNum - 1];
+      img.src = url;
     }
   }
 
@@ -2102,7 +2112,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     currentPage = n;
     renderPage(n, direction);
     updateSlider();
-    for (let i = 1; i <= 5; i++) preload(n + i);
+    for (let i = 1; i <= PRELOAD_AHEAD_COUNT; i++) preload(n + i);
     preload(n - 1);
     persistLastPage();
     nextVolumeDismissed = false;
@@ -2117,7 +2127,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     currentPage = n;
     renderPage(n, null);
     updateSlider();
-    for (let i = 1; i <= 5; i++) preload(n + i);
+    for (let i = 1; i <= PRELOAD_AHEAD_COUNT; i++) preload(n + i);
     preload(n - 1);
     persistLastPage();
     nextVolumeDismissed = false;
@@ -2179,6 +2189,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   let dragCurrentSlide = null;
   let dragNeighborSlide = null;
   let lastMoveX = 0, lastMoveY = 0, lastMoveTime = 0;
+  let dragRafId = null;       // pending requestAnimationFrame id for the coalesced style write below, or null
+  let pendingDragDelta = 0;   // latest dx (axis 'x') or dy (axis 'y') waiting to be applied on the next frame
   const VERTICAL_SWIPE_THRESHOLD = 60; // px — legacy-mode commit distance, and the "did they really mean it" gate for the boundary flash message in blocked drags
   const AXIS_LOCK_PX = 10;          // px of movement before committing to horizontal vs vertical
   const DRAG_COMMIT_FRACTION = 0.22; // must drag past 22% of the viewport dimension to commit (if not flicked)
@@ -2188,10 +2200,24 @@ https://cdn.example.org/c/003.webp"></textarea>
   const MIN_DRAG_ANIM_MS = 80;
 
   function resetDragState() {
+    if (dragRafId !== null) { cancelAnimationFrame(dragRafId); dragRafId = null; }
     dragAxis = null;
     dragInfo = null;
     dragCurrentSlide = null;
     dragNeighborSlide = null;
+  }
+
+  // touchmove can fire faster than the screen actually repaints; writing
+  // style.transform synchronously on every single event does work that never
+  // gets to show up on screen. This coalesces same-frame moves into one
+  // style write via rAF, applying only the most recent dx/dy once per frame.
+  function scheduleDragFrame(axis, delta) {
+    pendingDragDelta = delta;
+    if (dragRafId !== null) return;
+    dragRafId = requestAnimationFrame(() => {
+      dragRafId = null;
+      if (axis === 'x') updateDragX(pendingDragDelta); else updateDragY(pendingDragDelta);
+    });
   }
 
   function beginDrag(axis, dx, dy) {
@@ -2257,7 +2283,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (info.kind === 'page') {
       currentPage = info.dir === 'next' ? currentPage + 1 : currentPage - 1;
       updateSlider();
-      for (let i = 1; i <= 5; i++) preload(currentPage + i);
+      for (let i = 1; i <= PRELOAD_AHEAD_COUNT; i++) preload(currentPage + i);
       preload(currentPage - 1);
       persistLastPage();
       nextVolumeDismissed = false;
@@ -2358,7 +2384,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       if (dragAxis === null) return; // nothing draggable on screen right now
     }
     e.preventDefault(); // a real drag — don't let the browser also scroll/bounce
-    if (dragAxis === 'x') updateDragX(dx); else updateDragY(dy);
+    scheduleDragFrame(dragAxis, dragAxis === 'x' ? dx : dy);
     lastMoveX = x; lastMoveY = y; lastMoveTime = performance.now();
   }
   function onReaderTouchEnd(e) {
@@ -2988,11 +3014,17 @@ https://cdn.example.org/c/003.webp"></textarea>
           : (currentFolderView ? 'このフォルダにはまだ何もありません' : '保存されたURLはまだありません');
     } else {
       els.savedListEmpty.style.display = 'none';
-      if (showFavoritesCard) els.savedListItems.appendChild(buildFavoritesFolderCard());
-      if (showSeriesCard) els.savedListItems.appendChild(buildSeriesFolderCard());
-      folderCards.forEach((f) => els.savedListItems.appendChild(buildFolderCard(f)));
-      seriesGroupCards.forEach((g) => els.savedListItems.appendChild(buildSeriesGroupCard(g)));
-      itemsList.forEach((it) => els.savedListItems.appendChild(buildBookCard(it, itemsList, showReorderControls)));
+      // Build every card into an off-DOM fragment first and append it once —
+      // appending each card straight onto the live, already-visible container
+      // forces a layout/reflow per card, which adds up once a folder has a
+      // few dozen items.
+      const frag = document.createDocumentFragment();
+      if (showFavoritesCard) frag.appendChild(buildFavoritesFolderCard());
+      if (showSeriesCard) frag.appendChild(buildSeriesFolderCard());
+      folderCards.forEach((f) => frag.appendChild(buildFolderCard(f)));
+      seriesGroupCards.forEach((g) => frag.appendChild(buildSeriesGroupCard(g)));
+      itemsList.forEach((it) => frag.appendChild(buildBookCard(it, itemsList, showReorderControls)));
+      els.savedListItems.appendChild(frag);
     }
   }
 
