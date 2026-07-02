@@ -706,6 +706,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       <span>動画を追加</span>
       <button class="ctrlBtn" id="cancelVideoAddBtn" type="button">キャンセル</button>
     </div>
+    <label class="field-label" for="videoUrlInput">URLから自動入力（任意）</label>
+    <input id="videoUrlInput" type="url" placeholder="https://www.example.com/v/0000/...">
     <label class="field-label" for="videoTitleInput">タイトル（省略可）</label>
     <input id="videoTitleInput" type="text" placeholder="タイトル">
     <label class="field-label" for="videoAInput">A（サービス名・英数字）</label>
@@ -925,6 +927,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     videoListEmpty: document.getElementById('videoListEmpty'),
 
     videoAddOverlay: document.getElementById('videoAddOverlay'),
+    videoUrlInput: document.getElementById('videoUrlInput'),
     videoTitleInput: document.getElementById('videoTitleInput'),
     videoAInput: document.getElementById('videoAInput'),
     videoBInput: document.getElementById('videoBInput'),
@@ -3728,6 +3731,20 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.videoPlayerOverlay.classList.remove('show');
   }
 
+  // https://www.[A].com/v/[B]/... → { a: 'example', b: '0000' }
+  function parseVideoUrl(url) {
+    try {
+      const u = new URL(url.trim());
+      const hostParts = u.hostname.split('.');
+      if (hostParts[0] === 'www') hostParts.shift();
+      const a = hostParts[0];
+      if (!a || !/^[a-zA-Z0-9]+$/.test(a)) return null;
+      const m = u.pathname.match(/\/v\/(\d+)/);
+      if (!m) return null;
+      return { a, b: m[1] };
+    } catch (e) { return null; }
+  }
+
   function updateVideoPreview() {
     const a = els.videoAInput.value.trim();
     const b = els.videoBInput.value.trim();
@@ -3739,12 +3756,14 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   function openAddVideoDialog() {
+    els.videoUrlInput.value = '';
     els.videoTitleInput.value = '';
     els.videoAInput.value = '';
     els.videoBInput.value = '';
     els.videoPreviewUrl.textContent = '';
+    els.videoPreviewUrl.style.color = '';
     els.videoAddOverlay.classList.add('show');
-    els.videoAInput.focus();
+    els.videoUrlInput.focus();
   }
 
   function closeAddVideoDialog() {
@@ -3798,6 +3817,14 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.closeVideoPlayerBtn.addEventListener('click', closeVideoPlayer);
   els.videoAddOverlay.addEventListener('click', (e) => { if (e.target === els.videoAddOverlay) closeAddVideoDialog(); });
   els.videoPlayerOverlay.addEventListener('click', (e) => { if (e.target === els.videoPlayerOverlay) closeVideoPlayer(); });
+  els.videoUrlInput.addEventListener('input', () => {
+    const parsed = parseVideoUrl(els.videoUrlInput.value);
+    if (parsed) {
+      els.videoAInput.value = parsed.a;
+      els.videoBInput.value = parsed.b;
+      updateVideoPreview();
+    }
+  });
   els.videoAInput.addEventListener('input', updateVideoPreview);
   els.videoBInput.addEventListener('input', updateVideoPreview);
 
