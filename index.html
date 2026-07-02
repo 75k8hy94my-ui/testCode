@@ -404,6 +404,75 @@
   #lockInput:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); outline: none; }
   #lockError { color: var(--accent); font-size: 12px; min-height: 16px; margin-bottom: 8px; }
   #lockSubmitBtn { width: 100%; }
+
+  /* ---- Video feature ---- */
+  /* Tab row inside savedListPanel */
+  #listTabRow {
+    display: flex; gap: 0; border-bottom: 1px solid var(--border);
+    margin: 0 -18px 12px; padding: 0 18px;
+  }
+  .listTab {
+    background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--sub); cursor: pointer; font-size: 13.5px; font-weight: 500;
+    padding: 8px 16px; margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .listTab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  /* Manga section / video section both fill the flex column and scroll */
+  #mangaListSection { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+  #videoListSection { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+  #videoListToolbar {
+    display: flex; gap: 8px; padding: 6px 0 10px;
+    border-bottom: 1px solid var(--border); margin-bottom: 8px; flex-shrink: 0;
+  }
+  #videoListItems { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  #videoListEmpty { color: var(--sub); font-size: 13px; padding: 20px 0; text-align: center; }
+  .videoGroup { margin-bottom: 14px; }
+  .videoGroupHeader {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+    color: var(--sub); padding: 3px 0 6px; border-bottom: 1px solid var(--border); margin-bottom: 6px;
+  }
+  .videoItem {
+    display: flex; align-items: center; gap: 8px; padding: 9px 11px;
+    border-radius: var(--radius-sm); background: var(--bg-soft); cursor: pointer;
+    border: 1px solid var(--border); transition: background 0.15s, border-color 0.15s;
+  }
+  .videoItem:hover { background: var(--panel-2); border-color: var(--accent); }
+  .videoItemTitle { flex: 1; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .videoItemId { font-size: 11px; color: var(--sub); flex-shrink: 0; }
+  .videoDeleteBtn {
+    background: none; border: none; color: var(--sub); cursor: pointer;
+    font-size: 13px; padding: 3px 6px; border-radius: 4px; flex-shrink: 0;
+    transition: color 0.15s, background 0.15s;
+  }
+  .videoDeleteBtn:hover { color: var(--accent); background: var(--accent-dim); }
+  /* Video add dialog */
+  #videoAddPanel input[type="text"] {
+    width: 100%; padding: 9px 11px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--bg-soft); color: var(--text); font-size: 16px; margin-top: 4px;
+    transition: border-color 0.15s ease;
+  }
+  #videoAddPanel input[type="text"]:focus {
+    border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-dim);
+  }
+  #videoPreviewUrl { font-size: 11px; color: var(--sub); margin-top: 8px; word-break: break-all; min-height: 16px; }
+  #videoAddActions { display: flex; justify-content: flex-end; margin-top: 16px; }
+  /* Video player overlay — sits above other modals */
+  #videoPlayerOverlay { z-index: 60; }
+  #videoPlayerPanel {
+    background: var(--panel); border-radius: 14px;
+    width: min(900px, 95vw); display: flex; flex-direction: column;
+    border: 1px solid var(--border); box-shadow: var(--shadow-md);
+    animation: panelRise 0.22s var(--ease); overflow: hidden;
+  }
+  #videoPlayerHeader {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    font-size: 14px; font-weight: 600;
+  }
+  /* 16:9 responsive iframe container */
+  #videoPlayerFrame { position: relative; width: 100%; padding-bottom: 56.25%; }
+  #videoPlayerIframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
 </style>
 </head>
 <body>
@@ -561,29 +630,42 @@ https://cdn.example.org/c/003.webp"></textarea>
 <div id="savedListOverlay" class="modalOverlay">
   <div id="savedListPanel" class="modalPanel">
     <div class="panel-header">
-      <span>保存したURL</span>
+      <span id="listPanelTitle">保存したURL</span>
       <button class="ctrlBtn" id="closeListBtn">閉じる</button>
     </div>
-    <div id="exportImportRow">
-      <button class="ctrlBtn" id="exportBtn">書き出し</button>
-      <button class="ctrlBtn" id="importBtn">読み込み</button>
-      <input type="file" id="importFileInput" accept="application/json" style="display:none;">
-      <button class="ctrlBtn" id="addCustomBtn">個別追加</button>
-      <button class="ctrlBtn" id="openGithubSyncBtn">GitHubで同期</button>
+    <div id="listTabRow">
+      <button class="listTab active" id="listTabManga" type="button">漫画</button>
+      <button class="listTab" id="listTabVideo" type="button">動画</button>
     </div>
-    <div id="listToolbar">
-      <button class="ctrlBtn" id="listBackBtn" style="display:none;">← 戻る</button>
-      <span id="listFolderTitle"></span>
-      <button class="ctrlBtn" id="feedBtn" style="display:none;">一覧</button>
-      <button class="ctrlBtn" id="reorderBtn" style="display:none;">並べ替え</button>
-      <button class="ctrlBtn" id="listNewFolderBtn">+ 新しいフォルダ</button>
+    <div id="mangaListSection">
+      <div id="exportImportRow">
+        <button class="ctrlBtn" id="exportBtn">書き出し</button>
+        <button class="ctrlBtn" id="importBtn">読み込み</button>
+        <input type="file" id="importFileInput" accept="application/json" style="display:none;">
+        <button class="ctrlBtn" id="addCustomBtn">個別追加</button>
+        <button class="ctrlBtn" id="openGithubSyncBtn">GitHubで同期</button>
+      </div>
+      <div id="listToolbar">
+        <button class="ctrlBtn" id="listBackBtn" style="display:none;">← 戻る</button>
+        <span id="listFolderTitle"></span>
+        <button class="ctrlBtn" id="feedBtn" style="display:none;">一覧</button>
+        <button class="ctrlBtn" id="reorderBtn" style="display:none;">並べ替え</button>
+        <button class="ctrlBtn" id="listNewFolderBtn">+ 新しいフォルダ</button>
+      </div>
+      <div id="listNewFolderRow">
+        <input id="listNewFolderInput" type="text" placeholder="新しいフォルダ名">
+        <button class="ctrlBtn" id="listNewFolderConfirmBtn">追加</button>
+      </div>
+      <div id="savedListItems"></div>
+      <div id="savedListEmpty" style="display:none;">保存されたURLはまだありません</div>
     </div>
-    <div id="listNewFolderRow">
-      <input id="listNewFolderInput" type="text" placeholder="新しいフォルダ名">
-      <button class="ctrlBtn" id="listNewFolderConfirmBtn">追加</button>
+    <div id="videoListSection" style="display:none;">
+      <div id="videoListToolbar">
+        <button class="ctrlBtn" id="addVideoBtn" type="button">+ 動画を追加</button>
+      </div>
+      <div id="videoListItems"></div>
+      <div id="videoListEmpty" style="display:none;">動画はまだ追加されていません</div>
     </div>
-    <div id="savedListItems"></div>
-    <div id="savedListEmpty" style="display:none;">保存されたURLはまだありません</div>
   </div>
 </div>
 
@@ -613,6 +695,41 @@ https://cdn.example.org/c/003.webp"></textarea>
     <div class="dialog-actions">
       <button class="ctrlBtn" id="githubPullBtn">GitHubから読み込む</button>
       <button class="primaryBtn" id="githubPushBtn">GitHubに保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- Video add dialog -->
+<div id="videoAddOverlay" class="modalOverlay">
+  <div id="videoAddPanel" class="modalPanel">
+    <div class="panel-header">
+      <span>動画を追加</span>
+      <button class="ctrlBtn" id="cancelVideoAddBtn" type="button">キャンセル</button>
+    </div>
+    <label class="field-label" for="videoTitleInput">タイトル（省略可）</label>
+    <input id="videoTitleInput" type="text" placeholder="タイトル">
+    <label class="field-label" for="videoAInput">A（サービス名・英数字）</label>
+    <input id="videoAInput" type="text" placeholder="例: youtube">
+    <label class="field-label" for="videoBInput">B（動画ID・数字）</label>
+    <input id="videoBInput" type="text" inputmode="numeric" placeholder="例: 12345678">
+    <div id="videoPreviewUrl"></div>
+    <div id="videoAddActions">
+      <button class="primaryBtn" id="confirmVideoAddBtn" type="button">追加</button>
+    </div>
+  </div>
+</div>
+
+<!-- Video player overlay -->
+<div id="videoPlayerOverlay" class="modalOverlay">
+  <div id="videoPlayerPanel">
+    <div id="videoPlayerHeader">
+      <span id="videoPlayerTitle"></span>
+      <button class="ctrlBtn" id="closeVideoPlayerBtn" type="button">閉じる</button>
+    </div>
+    <div id="videoPlayerFrame">
+      <iframe id="videoPlayerIframe" frameborder="0" allowfullscreen
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
+      </iframe>
     </div>
   </div>
 </div>
@@ -668,6 +785,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // setCachedMangaInfo / clearCachedMangaInfo below.
   const MANGA_INFO_CACHE_KEY = 'mangaReaderInfoCache';
   const MANGA_INFO_CACHE_MAX = 300; // cap so long-term use doesn't grow localStorage unbounded
+  const SAVED_VIDEOS_KEY = 'mangaReaderVideos';
   const HISTORY_FOLDER_ID = '__history__';
   const HISTORY_FOLDER_NAME = '履歴';
   // お気に入り is a virtual, aggregating "folder": unlike 履歴 it isn't stored
@@ -796,6 +914,28 @@ https://cdn.example.org/c/003.webp"></textarea>
     lockInput: document.getElementById('lockInput'),
     lockError: document.getElementById('lockError'),
     lockSubmitBtn: document.getElementById('lockSubmitBtn'),
+
+    listPanelTitle: document.getElementById('listPanelTitle'),
+    listTabManga: document.getElementById('listTabManga'),
+    listTabVideo: document.getElementById('listTabVideo'),
+    mangaListSection: document.getElementById('mangaListSection'),
+    videoListSection: document.getElementById('videoListSection'),
+    addVideoBtn: document.getElementById('addVideoBtn'),
+    videoListItems: document.getElementById('videoListItems'),
+    videoListEmpty: document.getElementById('videoListEmpty'),
+
+    videoAddOverlay: document.getElementById('videoAddOverlay'),
+    videoTitleInput: document.getElementById('videoTitleInput'),
+    videoAInput: document.getElementById('videoAInput'),
+    videoBInput: document.getElementById('videoBInput'),
+    videoPreviewUrl: document.getElementById('videoPreviewUrl'),
+    cancelVideoAddBtn: document.getElementById('cancelVideoAddBtn'),
+    confirmVideoAddBtn: document.getElementById('confirmVideoAddBtn'),
+
+    videoPlayerOverlay: document.getElementById('videoPlayerOverlay'),
+    videoPlayerTitle: document.getElementById('videoPlayerTitle'),
+    videoPlayerIframe: document.getElementById('videoPlayerIframe'),
+    closeVideoPlayerBtn: document.getElementById('closeVideoPlayerBtn'),
   };
 
   // 閉じるボタンのアイコンは状態によって変わらないため（♡/❤トグルと違い）、
@@ -807,6 +947,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.closeBtn.appendChild(img);
   })();
 
+  let savedVideos = [];    // { id, a, b, title, addedAt }
+  let activeListTab = 'manga'; // 'manga' | 'video'
   let baseUrl = '';
   let pages = [];          // detected page URLs, index 0 = page 1
   let preferredExt = 0;    // index into EXT_CANDIDATES
@@ -1710,6 +1852,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       } catch (e) {}
     }
     ensureHistoryFolder();
+    try { savedVideos = JSON.parse(localStorage.getItem(SAVED_VIDEOS_KEY) || '[]'); }
+    catch (e) { savedVideos = []; }
   }
   loadSaved();
 
@@ -3497,6 +3641,165 @@ https://cdn.example.org/c/003.webp"></textarea>
       case 'h': case 'H': toggleBars(); break;
     }
   });
+
+  // ---------- video list (動画タブ) ----------
+  function persistSavedVideos() {
+    try { localStorage.setItem(SAVED_VIDEOS_KEY, JSON.stringify(savedVideos)); } catch (e) {}
+  }
+
+  function videoEmbedUrl(a, b) {
+    return 'https://www.' + a + '.com/embed/' + b;
+  }
+
+  function renderVideoList() {
+    const frag = document.createDocumentFragment();
+    if (!savedVideos.length) {
+      els.videoListEmpty.style.display = '';
+      els.videoListItems.innerHTML = '';
+      return;
+    }
+    els.videoListEmpty.style.display = 'none';
+
+    // group by a
+    const groups = {};
+    const groupOrder = [];
+    savedVideos.forEach((v) => {
+      if (!groups[v.a]) { groups[v.a] = []; groupOrder.push(v.a); }
+      groups[v.a].push(v);
+    });
+
+    groupOrder.forEach((a) => {
+      const groupDiv = document.createElement('div');
+      groupDiv.className = 'videoGroup';
+
+      const header = document.createElement('div');
+      header.className = 'videoGroupHeader';
+      header.textContent = a;
+      groupDiv.appendChild(header);
+
+      groups[a].forEach((v) => {
+        const item = document.createElement('div');
+        item.className = 'videoItem';
+
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'videoItemTitle';
+        titleSpan.textContent = v.title || (a + ' / ' + v.b);
+
+        const idSpan = document.createElement('span');
+        idSpan.className = 'videoItemId';
+        idSpan.textContent = 'B: ' + v.b;
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'videoDeleteBtn';
+        delBtn.textContent = '削除';
+        delBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteVideo(v.id);
+        });
+
+        item.appendChild(titleSpan);
+        item.appendChild(idSpan);
+        item.appendChild(delBtn);
+        item.addEventListener('click', () => openVideoPlayer(v));
+        groupDiv.appendChild(item);
+      });
+
+      frag.appendChild(groupDiv);
+    });
+
+    els.videoListItems.innerHTML = '';
+    els.videoListItems.appendChild(frag);
+  }
+
+  function deleteVideo(id) {
+    savedVideos = savedVideos.filter((v) => v.id !== id);
+    persistSavedVideos();
+    renderVideoList();
+  }
+
+  function openVideoPlayer(video) {
+    els.videoPlayerTitle.textContent = video.title || (video.a + ' / ' + video.b);
+    els.videoPlayerIframe.src = videoEmbedUrl(video.a, video.b);
+    els.videoPlayerOverlay.classList.add('show');
+  }
+
+  function closeVideoPlayer() {
+    els.videoPlayerIframe.src = ''; // stop playback
+    els.videoPlayerOverlay.classList.remove('show');
+  }
+
+  function updateVideoPreview() {
+    const a = els.videoAInput.value.trim();
+    const b = els.videoBInput.value.trim();
+    if (a && b) {
+      els.videoPreviewUrl.textContent = '→ ' + videoEmbedUrl(a, b);
+    } else {
+      els.videoPreviewUrl.textContent = '';
+    }
+  }
+
+  function openAddVideoDialog() {
+    els.videoTitleInput.value = '';
+    els.videoAInput.value = '';
+    els.videoBInput.value = '';
+    els.videoPreviewUrl.textContent = '';
+    els.videoAddOverlay.classList.add('show');
+    els.videoAInput.focus();
+  }
+
+  function closeAddVideoDialog() {
+    els.videoAddOverlay.classList.remove('show');
+  }
+
+  function confirmVideoAdd() {
+    const a = els.videoAInput.value.trim();
+    const b = els.videoBInput.value.trim();
+    if (!a || !/^[a-zA-Z0-9]+$/.test(a)) {
+      els.videoPreviewUrl.textContent = 'Aは英数字で入力してください';
+      els.videoPreviewUrl.style.color = 'var(--accent)';
+      return;
+    }
+    if (!b || !/^\d+$/.test(b)) {
+      els.videoPreviewUrl.textContent = 'Bは数字のみで入力してください';
+      els.videoPreviewUrl.style.color = 'var(--accent)';
+      return;
+    }
+    els.videoPreviewUrl.style.color = '';
+    const title = els.videoTitleInput.value.trim();
+    savedVideos.unshift({ id: genId('v'), a, b, title, addedAt: Date.now() });
+    persistSavedVideos();
+    renderVideoList();
+    closeAddVideoDialog();
+  }
+
+  function switchListTab(tab) {
+    activeListTab = tab;
+    if (tab === 'manga') {
+      els.listTabManga.classList.add('active');
+      els.listTabVideo.classList.remove('active');
+      els.mangaListSection.style.display = '';
+      els.videoListSection.style.display = 'none';
+      els.listPanelTitle.textContent = '保存したURL';
+    } else {
+      els.listTabVideo.classList.add('active');
+      els.listTabManga.classList.remove('active');
+      els.videoListSection.style.display = '';
+      els.mangaListSection.style.display = 'none';
+      els.listPanelTitle.textContent = '動画';
+      renderVideoList();
+    }
+  }
+
+  els.listTabManga.addEventListener('click', () => switchListTab('manga'));
+  els.listTabVideo.addEventListener('click', () => switchListTab('video'));
+  els.addVideoBtn.addEventListener('click', openAddVideoDialog);
+  els.cancelVideoAddBtn.addEventListener('click', closeAddVideoDialog);
+  els.confirmVideoAddBtn.addEventListener('click', confirmVideoAdd);
+  els.closeVideoPlayerBtn.addEventListener('click', closeVideoPlayer);
+  els.videoAddOverlay.addEventListener('click', (e) => { if (e.target === els.videoAddOverlay) closeAddVideoDialog(); });
+  els.videoPlayerOverlay.addEventListener('click', (e) => { if (e.target === els.videoPlayerOverlay) closeVideoPlayer(); });
+  els.videoAInput.addEventListener('input', updateVideoPreview);
+  els.videoBInput.addEventListener('input', updateVideoPreview);
 
   // ---------- access lock (always required, not remembered between visits) ----------
   const LOCK_CODE = '8122';
