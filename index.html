@@ -470,6 +470,11 @@
     --shadow-sm: 0 1px 3px rgba(0,0,0,.08);
     --shadow-md: 0 20px 55px rgba(0,0,0,.14);
   }
+  .book-reading {
+    font-size: 9px; color: var(--sub); text-align: left;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .book-reading.unread { color: var(--accent); font-weight: 700; }
   html, body { background: var(--bg); }
   #app { background: #000; height: 100dvh; }
   #topbar, #controls {
@@ -562,6 +567,7 @@
     .book-favBtn { right: 4px; bottom: 4px; }
     .book-title { font-size: 10.5px; }
     .book-series { font-size: 8px; }
+    .book-reading { font-size: 8px; }
     .dialog-actions { position: sticky; bottom: 0; padding-top: 10px; background: linear-gradient(transparent, var(--panel) 25%); }
   }
 </style>
@@ -882,6 +888,9 @@ https://cdn.example.org/c/003.webp"></textarea>
   // ドリルダウンする2段階のVirtual View。
   const SERIES_FOLDER_ID = '__series__';
   const SERIES_FOLDER_NAME = 'シリーズ';
+  const UNREAD_FOLDER_ID = '__unread_order__';
+  const UNREAD_FOLDER_NAME = '読んでいない順';
+  const READING_SESSION_MS = 30 * 60 * 1000;
 
   const els = {
     newBtn: document.getElementById('newBtn'),
@@ -1866,20 +1875,56 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
   }
 
+  function relatedReadingItems(item) {
+    if (!item) return [];
+    if (item.url) {
+      const key = baseUrlKey(item.url);
+      return savedItems.filter((it) => it.url && baseUrlKey(it.url) === key);
+    }
+    return [item];
+  }
+
+  function recordReading(item) {
+    const related = relatedReadingItems(item);
+    if (!related.length) return;
+    const now = Date.now();
+    const lastReadAt = Math.max(0, ...related.map((it) => Number(it.lastReadAt) || 0));
+    const previousCount = Math.max(0, ...related.map((it) => Number(it.readCount) || 0));
+    const readCount = !lastReadAt || now - lastReadAt >= READING_SESSION_MS ? previousCount + 1 : previousCount;
+    related.forEach((it) => {
+      it.lastReadAt = now;
+      it.readCount = readCount;
+    });
+    persistItems();
+  }
+
+  function unreadOrderItems() {
+    return savedItems.slice().sort((a, b) => {
+      const aLast = Number(a.lastReadAt) || 0;
+      const bLast = Number(b.lastReadAt) || 0;
+      if (!aLast && bLast) return -1;
+      if (aLast && !bLast) return 1;
+      const countDiff = (Number(a.readCount) || 0) - (Number(b.readCount) || 0);
+      if (countDiff) return countDiff;
+      if (aLast !== bLast) return aLast - bLast;
+      return (Number(a.addedAt) || 0) - (Number(b.addedAt) || 0);
+    });
+  }
+
   // Auto-adds a newly opened manga to 履歴 (no title prompt: title is derived
   // from the URL). Re-opening the same manga moves its history entry to the
   // top instead of piling up duplicates.
   function addToHistory(url) {
     ensureHistoryFolder();
-    savedItems = savedItems.filter((it) => !(it.folderId === HISTORY_FOLDER_ID && baseUrlKey(it.url) === baseUrlKey(url)));
-    savedItems.unshift({
-      id: genId('i'),
-      url: url,
-      title: deriveTitleFromUrl(url),
-      folderId: HISTORY_FOLDER_ID,
-      addedAt: Date.now(),
-    });
-    persistAll();
+    let historyItem = savedItems.find((it) => it.folderId === HISTORY_FOLDER_ID && baseUrlKey(it.url) === baseUrlKey(url));
+    if (historyItem) {
+      savedItems = savedItems.filter((it) => it !== historyItem);
+    } else {
+      historyItem = { id: genId('i'), url, title: deriveTitleFromUrl(url), folderId: HISTORY_FOLDER_ID, addedAt: Date.now() };
+    }
+    savedItems.unshift(historyItem);
+    recordReading(historyItem);
+    persistFolders();
     updateCurrentTitleDisplay();
   }
 
@@ -2263,6 +2308,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // typed-in URL.
   function openItem(item, addToHistoryFlag, switchDirection) {
     currentItem = item || null; // remembered for series/次の巻 lookups
+    if (item) recordReading(item);
     if (item && Array.isArray(item.pages) && item.pages.length) {
       startReadingCustom(item, switchDirection);
     } else {
@@ -2998,6 +3044,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     const seriesData = readSeriesForm(els.saveSeriesInput, els.saveNewSeriesInput, els.saveVolumeInput, null);
     if (!seriesData) return;
     const title = seriesData.title || els.saveTitleInput.value.trim() || deriveTitleFromUrl(pendingSaveUrl);
+    const readingSource = getCurrentItem();
     savedItems.unshift({
       id: genId('i'),
       url: pendingSaveUrl,
@@ -3006,6 +3053,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       series: seriesData.series,
       volume: seriesData.volume,
       favorite: false,
+      lastReadAt: readingSource ? (Number(readingSource.lastReadAt) || null) : null,
+      readCount: readingSource ? (Number(readingSource.readCount) || 0) : 0,
       addedAt: Date.now(),
     });
     persistAll();
@@ -3236,6 +3285,36 @@ https://cdn.example.org/c/003.webp"></textarea>
     return card;
   }
 
+  function buildUnreadFolderCard() {
+    const card = document.createElement('div');
+    card.className = 'book-card folder-card';
+    const items = unreadOrderItems();
+
+    const cover = document.createElement('div');
+    cover.className = 'book-cover folder-cover';
+    appendFolderPreview(cover, items, ICON_BOOKS, '読書記録なし', '未読順');
+
+    const title = document.createElement('div');
+    title.className = 'book-title';
+    title.textContent = UNREAD_FOLDER_NAME;
+
+    const unreadCount = items.filter((it) => !Number(it.lastReadAt)).length;
+    const sub = document.createElement('div');
+    sub.className = 'book-series';
+    sub.textContent = '未読 ' + unreadCount + '冊';
+
+    card.appendChild(cover);
+    card.appendChild(title);
+    card.appendChild(sub);
+    card.addEventListener('click', () => {
+      currentFolderView = UNREAD_FOLDER_ID;
+      currentSeriesView = null;
+      reorderMode = false;
+      renderSavedList();
+    });
+    return card;
+  }
+
   // シリーズ も同じ理屈の仮想フォルダ。この「ルート」カードはシリーズ名一覧
   // (グループ分けされたシリーズの入口) に入るためのもの。実際のグルーピングは
   // renderSavedList側で行い、buildSeriesGroupCardで各シリーズの入口カードを作る。
@@ -3322,6 +3401,13 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (item.url) return item.url;
     if (Array.isArray(item.pages)) return '個別URL ・ ' + item.pages.length + 'ページ';
     return '';
+  }
+
+  function readingRecordText(item) {
+    const lastReadAt = Number(item.lastReadAt) || 0;
+    if (!lastReadAt) return '未読';
+    const d = new Date(lastReadAt);
+    return (Number(item.readCount) || 1) + '回 ・ ' + (d.getMonth() + 1) + '/' + d.getDate();
   }
 
   // Manga are shown as a Kindle-bookshelf-style grid of page-1 cover
@@ -3435,6 +3521,13 @@ https://cdn.example.org/c/003.webp"></textarea>
       seriesEl.textContent = item.series + ' 第' + item.volume + '巻';
       card.appendChild(seriesEl);
     }
+    const readingEl = document.createElement('div');
+    readingEl.className = 'book-reading' + (item.lastReadAt ? '' : ' unread');
+    readingEl.textContent = readingRecordText(item);
+    readingEl.title = item.lastReadAt
+      ? '最終読書: ' + new Date(Number(item.lastReadAt)).toLocaleString('ja-JP') + ' / ' + (Number(item.readCount) || 1) + '回'
+      : 'まだ読んでいません';
+    card.appendChild(readingEl);
     if (!reorderMode) {
       card.addEventListener('click', () => {
         closeSavedList();
@@ -3455,6 +3548,8 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     if (currentFolderView === FAVORITES_FOLDER_ID) {
       els.listFolderTitle.textContent = FAVORITES_FOLDER_NAME;
+    } else if (currentFolderView === UNREAD_FOLDER_ID) {
+      els.listFolderTitle.textContent = UNREAD_FOLDER_NAME;
     } else if (inSeriesGroup) {
       els.listFolderTitle.textContent = currentSeriesView;
     } else if (inSeriesRoot) {
@@ -3474,16 +3569,20 @@ https://cdn.example.org/c/003.webp"></textarea>
     let seriesGroupCards = []; // [{name, items}], only populated at the シリーズ root (list of series names)
     let showFavoritesCard = false;
     let showSeriesCard = false;
+    let showUnreadCard = false;
 
     if (!currentFolderView) {
       itemsList = savedItems.filter((it) => !it.folderId);
       folderCards = savedFolders;
       showFavoritesCard = true;
       showSeriesCard = true;
+      showUnreadCard = true;
     } else if (currentFolderView === FAVORITES_FOLDER_ID) {
       // Virtual view: aggregates favorited items regardless of which real
       // folder they actually live in, instead of filtering by folderId.
       itemsList = savedItems.filter((it) => it.favorite);
+    } else if (currentFolderView === UNREAD_FOLDER_ID) {
+      itemsList = unreadOrderItems();
     } else if (inSeriesRoot) {
       // Virtual view: groups every series-tagged item by series name
       // regardless of which real folder it lives in. Each group's items are
@@ -3512,18 +3611,20 @@ https://cdn.example.org/c/003.webp"></textarea>
     // series' volume list is ordered by volume number, not manually, and
     // 履歴/お気に入り auto-manage their own order, so all of those are excluded.
     const reorderable = !!currentFolderView && currentFolderView !== FAVORITES_FOLDER_ID &&
-      currentFolderView !== HISTORY_FOLDER_ID && !inSeriesRoot && !inSeriesGroup && itemsList.length > 1;
+      currentFolderView !== UNREAD_FOLDER_ID && currentFolderView !== HISTORY_FOLDER_ID && !inSeriesRoot && !inSeriesGroup && itemsList.length > 1;
     els.reorderBtn.style.display = reorderable ? '' : 'none';
     const showReorderControls = reorderable && reorderMode;
     els.reorderBtn.classList.toggle('active', showReorderControls);
     els.reorderBtn.textContent = showReorderControls ? '並べ替え完了' : '並べ替え';
 
     const isEmpty = folderCards.length === 0 && itemsList.length === 0 && seriesGroupCards.length === 0 &&
-      !showFavoritesCard && !showSeriesCard;
+      !showFavoritesCard && !showSeriesCard && !showUnreadCard;
     if (isEmpty) {
       els.savedListEmpty.style.display = 'block';
       els.savedListEmpty.textContent = currentFolderView === FAVORITES_FOLDER_ID
         ? 'お気に入りはまだ追加されていません'
+        : currentFolderView === UNREAD_FOLDER_ID
+          ? '保存された漫画はまだありません'
         : inSeriesRoot
           ? 'シリーズはまだ設定されていません'
           : (currentFolderView ? 'このフォルダにはまだ何もありません' : '保存されたURLはまだありません');
@@ -3534,6 +3635,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       // forces a layout/reflow per card, which adds up once a folder has a
       // few dozen items.
       const frag = document.createDocumentFragment();
+      if (showUnreadCard) frag.appendChild(buildUnreadFolderCard());
       if (showFavoritesCard) frag.appendChild(buildFavoritesFolderCard());
       if (showSeriesCard) frag.appendChild(buildSeriesFolderCard());
       folderCards.forEach((f) => frag.appendChild(buildFolderCard(f)));
@@ -3742,6 +3844,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     let items;
     if (currentFolderView === FAVORITES_FOLDER_ID) {
       items = savedItems.filter((it) => it.favorite);
+    } else if (currentFolderView === UNREAD_FOLDER_ID) {
+      items = unreadOrderItems();
     } else if (currentFolderView === SERIES_FOLDER_ID) {
       if (!currentSeriesView) return; // browsing series names; nothing to feed yet
       items = savedItems.filter((it) => it.series === currentSeriesView).sort((a, b) => (a.volume || 0) - (b.volume || 0));
