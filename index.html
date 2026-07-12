@@ -241,10 +241,12 @@
   }
   #newFolderRow, #customNewFolderRow, #editNewFolderRow { display: none; gap: 8px; margin-top: 8px; }
   #newFolderRow input, #customNewFolderRow input, #editNewFolderRow input { flex: 1; }
-  #editUrlRow, #editPagesRow { display: none; }
+  .seriesNewRow { display: none; margin-top: 8px; }
+  .seriesNewRow input { width: 100%; }
+  input[readonly] { color: var(--sub) !important; background: var(--panel-2) !important; }
+  input:disabled { opacity: .55; }
+  .immutable-note { margin-top: 14px; padding: 9px 11px; border-radius: var(--radius-sm); background: var(--panel-2); color: var(--sub); font-size: 12px; }
   .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
-  .fetchCountRow { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-  .fetchCountRow #editPageCountStatus { font-size: 12px; color: var(--sub); }
 
   /* Saved list */
   #listToolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
@@ -579,6 +581,7 @@
     <button class="ctrlBtn favToggleBtn" id="closeBtn" title="閉じる" style="display:none;"></button>
     <button class="ctrlBtn" id="saveBtn" title="今のURLを保存">URLを保存</button>
     <button class="ctrlBtn favToggleBtn" id="favToggleBtn" title="お気に入りに追加" style="display:none;"></button>
+    <button class="ctrlBtn" id="readerEditBtn" title="表示中の漫画を編集" style="display:none;">編集</button>
     <button class="ctrlBtn" id="listBtn" title="保存したURLの一覧">リスト</button>
     <button class="ctrlBtn" id="safeModeBtn" title="セーフモード（漫画の画像にモザイクをかけます）">セーフモード</button>
     <span id="status"></span>
@@ -628,8 +631,11 @@
       <input id="newFolderInput" type="text" placeholder="新しいフォルダ名">
       <button class="ctrlBtn" id="confirmNewFolderBtn">追加</button>
     </div>
-    <label class="field-label" for="saveSeriesInput">シリーズ名（任意）</label>
-    <input id="saveSeriesInput" type="text" placeholder="例: ○○">
+    <label class="field-label" for="saveSeriesInput">シリーズ（任意）</label>
+    <select id="saveSeriesInput"></select>
+    <div id="saveNewSeriesRow" class="seriesNewRow">
+      <input id="saveNewSeriesInput" type="text" placeholder="新しいシリーズ名">
+    </div>
     <label class="field-label" for="saveVolumeInput">巻数（シリーズ設定時は必須）</label>
     <input id="saveVolumeInput" type="number" min="1" step="1" placeholder="例: 1">
     <div class="dialog-actions">
@@ -651,8 +657,11 @@
       <input id="customNewFolderInput" type="text" placeholder="新しいフォルダ名">
       <button class="ctrlBtn" id="customConfirmNewFolderBtn">追加</button>
     </div>
-    <label class="field-label" for="customSeriesInput">シリーズ名（任意）</label>
-    <input id="customSeriesInput" type="text" placeholder="例: ○○">
+    <label class="field-label" for="customSeriesInput">シリーズ（任意）</label>
+    <select id="customSeriesInput"></select>
+    <div id="customNewSeriesRow" class="seriesNewRow">
+      <input id="customNewSeriesInput" type="text" placeholder="新しいシリーズ名">
+    </div>
     <label class="field-label" for="customVolumeInput">巻数（シリーズ設定時は必須）</label>
     <input id="customVolumeInput" type="number" min="1" step="1" placeholder="例: 1">
     <label class="field-label" for="customPagesTextarea">ページURL（1行に1つ、読む順に貼り付け）</label>
@@ -679,22 +688,14 @@ https://cdn.example.org/c/003.webp"></textarea>
       <input id="editNewFolderInput" type="text" placeholder="新しいフォルダ名">
       <button class="ctrlBtn" id="editConfirmNewFolderBtn">追加</button>
     </div>
-    <label class="field-label" for="editSeriesInput">シリーズ名（任意）</label>
-    <input id="editSeriesInput" type="text" placeholder="例: ○○">
+    <label class="field-label" for="editSeriesInput">シリーズ（任意）</label>
+    <select id="editSeriesInput"></select>
+    <div id="editNewSeriesRow" class="seriesNewRow">
+      <input id="editNewSeriesInput" type="text" placeholder="新しいシリーズ名">
+    </div>
     <label class="field-label" for="editVolumeInput">巻数（シリーズ設定時は必須）</label>
     <input id="editVolumeInput" type="number" min="1" step="1" placeholder="例: 1">
-    <div id="editUrlRow">
-      <label class="field-label" for="editUrlInput">URL</label>
-      <input id="editUrlInput" type="text" placeholder="https://example.com/manga/test/">
-      <div class="fetchCountRow">
-        <button class="ctrlBtn" id="editFetchPageCountBtn" type="button">ページ数を取得</button>
-        <span id="editPageCountStatus"></span>
-      </div>
-    </div>
-    <div id="editPagesRow">
-      <label class="field-label" for="editPagesTextarea">ページURL（1行に1つ、読む順・差し替えや途中追加も可）</label>
-      <textarea id="editPagesTextarea" rows="6"></textarea>
-    </div>
+    <div class="immutable-note">画像URLはこの画面では変更できません</div>
     <div class="dialog-actions">
       <button class="ctrlBtn" id="cancelEditItemBtn">キャンセル</button>
       <button class="primaryBtn" id="confirmEditItemBtn">保存</button>
@@ -900,6 +901,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     status: document.getElementById('status'),
     currentTitle: document.getElementById('currentTitle'),
     favToggleBtn: document.getElementById('favToggleBtn'),
+    readerEditBtn: document.getElementById('readerEditBtn'),
     buildInfo: document.getElementById('buildInfo'),
     readProgressBar: document.getElementById('readProgressBar'),
     viewer: document.getElementById('viewer'),
@@ -939,6 +941,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     newFolderInput: document.getElementById('newFolderInput'),
     confirmNewFolderBtn: document.getElementById('confirmNewFolderBtn'),
     saveSeriesInput: document.getElementById('saveSeriesInput'),
+    saveNewSeriesRow: document.getElementById('saveNewSeriesRow'),
+    saveNewSeriesInput: document.getElementById('saveNewSeriesInput'),
     saveVolumeInput: document.getElementById('saveVolumeInput'),
     cancelSaveBtn: document.getElementById('cancelSaveBtn'),
     confirmSaveBtn: document.getElementById('confirmSaveBtn'),
@@ -980,6 +984,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     customNewFolderInput: document.getElementById('customNewFolderInput'),
     customConfirmNewFolderBtn: document.getElementById('customConfirmNewFolderBtn'),
     customSeriesInput: document.getElementById('customSeriesInput'),
+    customNewSeriesRow: document.getElementById('customNewSeriesRow'),
+    customNewSeriesInput: document.getElementById('customNewSeriesInput'),
     customVolumeInput: document.getElementById('customVolumeInput'),
     customPagesTextarea: document.getElementById('customPagesTextarea'),
     cancelCustomAddBtn: document.getElementById('cancelCustomAddBtn'),
@@ -992,13 +998,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     editNewFolderInput: document.getElementById('editNewFolderInput'),
     editConfirmNewFolderBtn: document.getElementById('editConfirmNewFolderBtn'),
     editSeriesInput: document.getElementById('editSeriesInput'),
+    editNewSeriesRow: document.getElementById('editNewSeriesRow'),
+    editNewSeriesInput: document.getElementById('editNewSeriesInput'),
     editVolumeInput: document.getElementById('editVolumeInput'),
-    editUrlRow: document.getElementById('editUrlRow'),
-    editUrlInput: document.getElementById('editUrlInput'),
-    editFetchPageCountBtn: document.getElementById('editFetchPageCountBtn'),
-    editPageCountStatus: document.getElementById('editPageCountStatus'),
-    editPagesRow: document.getElementById('editPagesRow'),
-    editPagesTextarea: document.getElementById('editPagesTextarea'),
     cancelEditItemBtn: document.getElementById('cancelEditItemBtn'),
     confirmEditItemBtn: document.getElementById('confirmEditItemBtn'),
 
@@ -1583,9 +1585,11 @@ https://cdn.example.org/c/003.webp"></textarea>
     const item = getCurrentItem();
     if (!item) {
       els.favToggleBtn.style.display = 'none';
+      els.readerEditBtn.style.display = 'none';
       return;
     }
     els.favToggleBtn.style.display = '';
+    els.readerEditBtn.style.display = '';
     els.favToggleBtn.innerHTML = '';
     els.favToggleBtn.appendChild(makeHeartIcon(!!item.favorite));
     els.favToggleBtn.title = item.favorite ? 'お気に入りから外す' : 'お気に入りに追加';
@@ -1931,7 +1935,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         els.currentTitle.textContent = '';
       } else {
         const match = savedItems.find((it) => baseUrlKey(it.url) === baseUrlKey(baseUrl));
-        els.currentTitle.textContent = match ? match.title : '';
+        els.currentTitle.textContent = match ? itemDisplayTitle(match) : '';
       }
     }
     updateFavToggleButton();
@@ -2263,7 +2267,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     currentPage = 1;
     pendingResumePage = getResumePage(currentResumeKey);
 
-    els.currentTitle.textContent = item.title || '無題';
+    els.currentTitle.textContent = itemDisplayTitle(item);
     updateFavToggleButton();
     try { localStorage.setItem(LAST_URL_KEY, JSON.stringify({ kind: 'item', itemId: item.id })); } catch (e) {}
 
@@ -2921,6 +2925,70 @@ https://cdn.example.org/c/003.webp"></textarea>
     selectEl.value = selectedId || '';
   }
 
+  function renderSeriesOptions(selectEl, selectedSeries) {
+    const names = Array.from(new Set(savedItems.map((it) => (it.series || '').trim()).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b, 'ja'));
+    if (selectedSeries && !names.includes(selectedSeries)) names.push(selectedSeries);
+    selectEl.innerHTML = '';
+    const none = document.createElement('option');
+    none.value = '';
+    none.textContent = 'シリーズなし';
+    selectEl.appendChild(none);
+    names.forEach((name) => {
+      const option = document.createElement('option');
+      option.value = name;
+      option.textContent = name;
+      selectEl.appendChild(option);
+    });
+    const add = document.createElement('option');
+    add.value = '__new__';
+    add.textContent = '+ 新しいシリーズを作成';
+    selectEl.appendChild(add);
+    selectEl.value = selectedSeries || '';
+  }
+
+  function selectedSeriesName(selectEl, newInput) {
+    return (selectEl.value === '__new__' ? newInput.value : selectEl.value).trim();
+  }
+
+  function seriesTitle(series, volume) {
+    return '第' + volume + '巻 ' + series;
+  }
+
+  function updateSeriesForm(selectEl, newRow, newInput, volumeInput, titleInput) {
+    const hasSeries = !!selectEl.value;
+    const isNew = selectEl.value === '__new__';
+    newRow.style.display = isNew ? 'block' : 'none';
+    volumeInput.disabled = !hasSeries;
+    if (!hasSeries) volumeInput.value = '';
+    titleInput.readOnly = hasSeries;
+    if (hasSeries) {
+      const name = selectedSeriesName(selectEl, newInput);
+      const volume = parseInt(volumeInput.value, 10);
+      titleInput.value = name && volume > 0 ? seriesTitle(name, volume) : 'シリーズ名と巻数から自動設定';
+    }
+  }
+
+  function hasDuplicateSeriesVolume(series, volume, excludedItemId) {
+    return savedItems.some((it) => it.id !== excludedItemId && it.series === series && Number(it.volume) === volume);
+  }
+
+  function readSeriesForm(selectEl, newInput, volumeInput, excludedItemId) {
+    const series = selectedSeriesName(selectEl, newInput);
+    if (!selectEl.value) return { series: null, volume: null, title: null };
+    if (!series) { flashStatus('新しいシリーズ名を入力してください'); return null; }
+    const volume = parseInt(volumeInput.value, 10);
+    if (!volumeInput.value || isNaN(volume) || volume <= 0) {
+      flashStatus('シリーズ設定時は巻数を入力してください');
+      return null;
+    }
+    if (hasDuplicateSeriesVolume(series, volume, excludedItemId)) {
+      flashStatus('同じシリーズに第' + volume + '巻が既にあります');
+      return null;
+    }
+    return { series, volume, title: seriesTitle(series, volume) };
+  }
+
   function openSaveDialog() {
     if (!baseUrl) { flashStatus('表示中の作品がありません'); return; }
     pendingSaveUrl = baseUrl;
@@ -2928,8 +2996,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     renderFolderOptions(els.saveFolderSelect, '');
     els.newFolderRow.style.display = 'none';
     els.newFolderInput.value = '';
-    els.saveSeriesInput.value = '';
+    renderSeriesOptions(els.saveSeriesInput, '');
+    els.saveNewSeriesInput.value = '';
     els.saveVolumeInput.value = '';
+    updateSeriesForm(els.saveSeriesInput, els.saveNewSeriesRow, els.saveNewSeriesInput, els.saveVolumeInput, els.saveTitleInput);
     els.saveDialogOverlay.classList.add('show');
     els.saveTitleInput.focus();
   }
@@ -2954,24 +3024,16 @@ https://cdn.example.org/c/003.webp"></textarea>
       closeSaveDialog();
       return;
     }
-    const seriesVal = els.saveSeriesInput.value.trim();
-    let volumeVal = null;
-    if (seriesVal) {
-      const vol = parseInt(els.saveVolumeInput.value.trim(), 10);
-      if (!els.saveVolumeInput.value.trim() || isNaN(vol) || vol <= 0) {
-        flashStatus('シリーズ設定時は巻数を入力してください');
-        return;
-      }
-      volumeVal = vol;
-    }
-    const title = els.saveTitleInput.value.trim() || deriveTitleFromUrl(pendingSaveUrl);
+    const seriesData = readSeriesForm(els.saveSeriesInput, els.saveNewSeriesInput, els.saveVolumeInput, null);
+    if (!seriesData) return;
+    const title = seriesData.title || els.saveTitleInput.value.trim() || deriveTitleFromUrl(pendingSaveUrl);
     savedItems.unshift({
       id: genId('i'),
       url: pendingSaveUrl,
       title: title,
       folderId: folderId || null,
-      series: seriesVal || null,
-      volume: volumeVal,
+      series: seriesData.series,
+      volume: seriesData.volume,
       favorite: false,
       addedAt: Date.now(),
     });
@@ -3002,8 +3064,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     renderFolderOptions(els.customFolderSelect, '');
     els.customNewFolderRow.style.display = 'none';
     els.customNewFolderInput.value = '';
-    els.customSeriesInput.value = '';
+    renderSeriesOptions(els.customSeriesInput, '');
+    els.customNewSeriesInput.value = '';
     els.customVolumeInput.value = '';
+    updateSeriesForm(els.customSeriesInput, els.customNewSeriesRow, els.customNewSeriesInput, els.customVolumeInput, els.customTitleInput);
     els.customPagesTextarea.value = '';
     els.customAddOverlay.classList.add('show');
     els.customTitleInput.focus();
@@ -3025,23 +3089,15 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!pageUrls.length) { flashStatus('ページURLを1つ以上入力してください'); return; }
     let folderId = els.customFolderSelect.value;
     if (folderId === '__new__') folderId = '';
-    const seriesVal = els.customSeriesInput.value.trim();
-    let volumeVal = null;
-    if (seriesVal) {
-      const vol = parseInt(els.customVolumeInput.value.trim(), 10);
-      if (!els.customVolumeInput.value.trim() || isNaN(vol) || vol <= 0) {
-        flashStatus('シリーズ設定時は巻数を入力してください');
-        return;
-      }
-      volumeVal = vol;
-    }
-    const title = els.customTitleInput.value.trim() || ('無題' + (savedItems.length + 1));
+    const seriesData = readSeriesForm(els.customSeriesInput, els.customNewSeriesInput, els.customVolumeInput, null);
+    if (!seriesData) return;
+    const title = seriesData.title || els.customTitleInput.value.trim() || ('無題' + (savedItems.length + 1));
     savedItems.unshift({
       id: genId('i'),
       title: title,
       folderId: folderId || null,
-      series: seriesVal || null,
-      volume: volumeVal,
+      series: seriesData.series,
+      volume: seriesData.volume,
       favorite: false,
       pages: pageUrls,
       addedAt: Date.now(),
@@ -3051,8 +3107,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     flashStatus(pageUrls.length + 'ページの漫画を追加しました');
   }
 
-  // ---------- edit saved item dialog (title/folder/URL, and for custom
-  // items the page-URL list — lets pages be replaced or inserted) ----------
+  // ---------- edit saved item dialog (metadata only; image URLs are immutable) ----------
   function openEditItemDialog(item) {
     editingItemId = item.id;
     editReturnToList = isSavedListOpen();
@@ -3062,45 +3117,15 @@ https://cdn.example.org/c/003.webp"></textarea>
     renderFolderOptions(els.editFolderSelect, item.folderId || '');
     els.editNewFolderRow.style.display = 'none';
     els.editNewFolderInput.value = '';
-    els.editSeriesInput.value = item.series || '';
+    renderSeriesOptions(els.editSeriesInput, item.series || '');
+    els.editNewSeriesInput.value = '';
     els.editVolumeInput.value = item.volume != null ? String(item.volume) : '';
-
-    const isCustom = Array.isArray(item.pages);
-    els.editUrlRow.style.display = isCustom ? 'none' : 'block';
-    els.editPagesRow.style.display = isCustom ? 'block' : 'none';
-    els.editUrlInput.value = item.url || '';
-    els.editPagesTextarea.value = isCustom ? item.pages.join('\n') : '';
-    els.editPageCountStatus.textContent = '';
-    els.editFetchPageCountBtn.disabled = false;
+    updateSeriesForm(els.editSeriesInput, els.editNewSeriesRow, els.editNewSeriesInput, els.editVolumeInput, els.editTitleInput);
 
     els.editItemOverlay.classList.add('show');
     els.editTitleInput.focus();
   }
 
-  // 既存アイテム用：今すぐページ数を（再）取得する。新規追加時の
-  // ensurePageCountDetected と同じ検出ロジックを使うが、編集ダイアログから
-  // の明示操作なのでキャッシュ済みでも force:true で取得し直す。
-  function fetchPageCountForEditingItem() {
-    const item = savedItems.find((it) => it.id === editingItemId);
-    if (!item) return;
-    const raw = els.editUrlInput.value.trim();
-    if (!raw) { els.editPageCountStatus.textContent = 'URLを入力してください'; return; }
-    const parsed = parseInputUrl(raw);
-    const key = parsed ? parsed.baseUrl : raw;
-    const targetId = editingItemId;
-    els.editPageCountStatus.textContent = '取得中…';
-    els.editFetchPageCountBtn.disabled = true;
-    ensurePageCountDetected(key, {
-      force: true,
-      onDone: (result) => {
-        if (editingItemId !== targetId) return; // ダイアログが別アイテムに切り替わっている
-        els.editFetchPageCountBtn.disabled = false;
-        if (result === undefined) { els.editPageCountStatus.textContent = '既に取得中です'; return; }
-        if (!result) { els.editPageCountStatus.textContent = '1ページ目が見つかりませんでした'; return; }
-        els.editPageCountStatus.textContent = result.count + 'ページ確認しました' + (result.hitLimit ? '（上限到達）' : '');
-      },
-    });
-  }
   function closeEditItemDialog() {
     els.editItemOverlay.classList.remove('show');
     editingItemId = null;
@@ -3115,38 +3140,15 @@ https://cdn.example.org/c/003.webp"></textarea>
     const item = savedItems.find((it) => it.id === editingItemId);
     if (!item) { closeEditItemDialog(); return; }
 
-    const seriesVal = els.editSeriesInput.value.trim();
-    let volumeVal = null;
-    if (seriesVal) {
-      const vol = parseInt(els.editVolumeInput.value.trim(), 10);
-      if (!els.editVolumeInput.value.trim() || isNaN(vol) || vol <= 0) {
-        flashStatus('シリーズ設定時は巻数を入力してください');
-        return;
-      }
-      volumeVal = vol;
-    }
-
-    const isCustom = Array.isArray(item.pages);
-    if (isCustom) {
-      const pageUrls = els.editPagesTextarea.value
-        .split('\n')
-        .map((s) => s.trim())
-        .filter(Boolean);
-      if (!pageUrls.length) { flashStatus('ページURLを1つ以上入力してください'); return; }
-      item.pages = pageUrls; // replaces/inserts/removes pages, in the edited order
-    } else {
-      const newUrl = els.editUrlInput.value.trim();
-      if (!newUrl) { flashStatus('URLを入力してください'); return; }
-      const parsed = parseInputUrl(newUrl);
-      item.url = parsed ? parsed.baseUrl : newUrl;
-    }
+    const seriesData = readSeriesForm(els.editSeriesInput, els.editNewSeriesInput, els.editVolumeInput, item.id);
+    if (!seriesData) return;
 
     let folderId = els.editFolderSelect.value;
     if (folderId === '__new__') folderId = '';
     item.folderId = folderId || null;
-    item.title = els.editTitleInput.value.trim() || itemDisplayTitle(item);
-    item.series = seriesVal || null;
-    item.volume = volumeVal;
+    item.title = seriesData.title || els.editTitleInput.value.trim() || itemDisplayTitle(item);
+    item.series = seriesData.series;
+    item.volume = seriesData.volume;
 
     persistAll();
     updateCurrentTitleDisplay();
@@ -3338,6 +3340,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // item.url is undefined for "custom" (explicit page list) items, so
   // title/tooltip fallbacks need to handle that case too.
   function itemDisplayTitle(item) {
+    if (item.series && Number(item.volume) > 0) return seriesTitle(item.series, Number(item.volume));
     return item.title || (item.url ? deriveTitleFromUrl(item.url) : '無題');
   }
   function itemSubtext(item) {
@@ -3599,6 +3602,19 @@ https://cdn.example.org/c/003.webp"></textarea>
   function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen() || isCustomAddDialogOpen() || isEditItemDialogOpen() || isTocListOpen() || isGithubSyncOpen(); }
 
   // ---------- events ----------
+  function bindSeriesControls(selectEl, newRow, newInput, volumeInput, titleInput) {
+    const refresh = () => updateSeriesForm(selectEl, newRow, newInput, volumeInput, titleInput);
+    selectEl.addEventListener('change', () => {
+      refresh();
+      if (selectEl.value === '__new__') newInput.focus();
+    });
+    newInput.addEventListener('input', refresh);
+    volumeInput.addEventListener('input', refresh);
+  }
+  bindSeriesControls(els.saveSeriesInput, els.saveNewSeriesRow, els.saveNewSeriesInput, els.saveVolumeInput, els.saveTitleInput);
+  bindSeriesControls(els.customSeriesInput, els.customNewSeriesRow, els.customNewSeriesInput, els.customVolumeInput, els.customTitleInput);
+  bindSeriesControls(els.editSeriesInput, els.editNewSeriesRow, els.editNewSeriesInput, els.editVolumeInput, els.editTitleInput);
+
   function handleNewManga() {
     const input = window.prompt('URLを入力してください\n例: https://example.com/manga/test/  または .../1.jpg');
     if (input === null) return; // cancelled
@@ -3619,6 +3635,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     item.favorite = !item.favorite;
     persistAll();
     updateFavToggleButton();
+  });
+  els.readerEditBtn.addEventListener('click', () => {
+    const item = getCurrentItem();
+    if (item) openEditItemDialog(item);
   });
 
   els.saveBtn.addEventListener('click', openSaveDialog);
@@ -3688,7 +3708,6 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   els.cancelEditItemBtn.addEventListener('click', closeEditItemDialog);
   els.confirmEditItemBtn.addEventListener('click', confirmEditItem);
-  els.editFetchPageCountBtn.addEventListener('click', fetchPageCountForEditingItem);
   els.editItemOverlay.addEventListener('click', (e) => { if (e.target === els.editItemOverlay) closeEditItemDialog(); });
   els.editFolderSelect.addEventListener('change', () => {
     if (els.editFolderSelect.value === '__new__') {
@@ -3810,7 +3829,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         e.target === els.customTitleInput || e.target === els.customNewFolderInput ||
         e.target === els.customPagesTextarea ||
         e.target === els.editTitleInput || e.target === els.editNewFolderInput ||
-        e.target === els.editUrlInput || e.target === els.editPagesTextarea ||
+        e.target === els.saveNewSeriesInput || e.target === els.customNewSeriesInput || e.target === els.editNewSeriesInput ||
         e.target === els.githubRepoInput || e.target === els.githubPathInput || e.target === els.githubTokenInput) {
       if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); closeGithubSyncDialog(); }
       return;
