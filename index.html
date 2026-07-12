@@ -397,12 +397,6 @@
     transition: color 0.15s, border-color 0.15s;
   }
   .listTab.active { color: var(--accent); border-bottom-color: var(--accent); }
-  #buildInfo {
-    flex-shrink: 0; margin: -4px 0 10px; padding: 7px 10px;
-    border-radius: 9px; background: var(--panel-2); color: var(--sub);
-    font-size: 11px; line-height: 1.35; font-variant-numeric: tabular-nums;
-  }
-  #buildInfo a { color: var(--accent); font-weight: 700; text-decoration: none; }
   /* Manga section / video section both fill the flex column and scroll */
   #mangaListSection { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
   #videoListSection { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
@@ -724,7 +718,6 @@ https://cdn.example.org/c/003.webp"></textarea>
       <button class="listTab active" id="listTabManga" type="button">漫画</button>
       <button class="listTab" id="listTabVideo" type="button">動画</button>
     </div>
-    <div id="buildInfo" role="status">更新情報を確認中…</div>
     <div id="mangaListSection">
       <div id="exportImportRow">
         <button class="ctrlBtn" id="exportBtn">書き出し</button>
@@ -900,7 +893,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     currentTitle: document.getElementById('currentTitle'),
     favToggleBtn: document.getElementById('favToggleBtn'),
     readerEditBtn: document.getElementById('readerEditBtn'),
-    buildInfo: document.getElementById('buildInfo'),
     readProgressBar: document.getElementById('readProgressBar'),
     viewer: document.getElementById('viewer'),
     placeholder: document.getElementById('placeholder'),
@@ -1035,34 +1027,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     img.alt = '閉じる';
     els.closeBtn.appendChild(img);
   })();
-
-  async function loadBuildInfo() {
-    try {
-      const response = await fetch('https://api.github.com/repos/75k8hy94my-ui/testCode/commits/main', {
-        cache: 'no-store',
-        headers: { Accept: 'application/vnd.github+json' },
-      });
-      if (!response.ok) throw new Error('GitHub API ' + response.status);
-      const commit = await response.json();
-      const shortSha = String(commit.sha || '').slice(0, 7);
-      const committedAt = commit.commit && commit.commit.committer && commit.commit.committer.date;
-      if (!shortSha || !committedAt) throw new Error('Invalid commit data');
-      const timeText = new Date(committedAt).toLocaleString('ja-JP', {
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', hour12: false,
-      });
-      const link = document.createElement('a');
-      link.href = commit.html_url;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.textContent = shortSha;
-      link.title = 'GitHubでこのコミットを確認';
-      els.buildInfo.replaceChildren(document.createTextNode('更新: '), link, document.createTextNode(' ・ ' + timeText));
-    } catch (e) {
-      els.buildInfo.textContent = '更新情報を取得できません（通信後に再読み込みしてください）';
-    }
-  }
-  loadBuildInfo();
 
   let savedVideos = [];    // { id, a, b, title, addedAt }
   let activeListTab = 'manga'; // 'manga' | 'video'
