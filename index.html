@@ -3,7 +3,8 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f5f7">
 <title>連番画像 漫画リーダー</title>
 <!-- Home screen (Add to Home Screen) icon and label for iOS Safari -->
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
@@ -381,30 +382,6 @@
   }
 
 
-  /* Access lock */
-  #lockOverlay {
-    position: fixed; inset: 0;
-    background: radial-gradient(ellipse 120% 80% at 50% -10%, #161a26 0%, var(--bg) 55%);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 1000;
-  }
-  #lockPanel {
-    background: var(--panel); border-radius: 16px; padding: 30px 28px;
-    width: min(300px, 86vw); text-align: center;
-    border: 1px solid var(--border); box-shadow: var(--shadow-md);
-    animation: panelRise 0.25s var(--ease);
-  }
-  #lockPanel p { margin: 0 0 16px; font-size: 14px; color: var(--text); font-weight: 500; }
-  #lockInput {
-    width: 100%; padding: 11px; border-radius: var(--radius-sm); border: 1px solid var(--border);
-    background: var(--bg-soft); color: var(--text); font-size: 18px; text-align: center;
-    letter-spacing: 6px; margin-bottom: 12px;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-  }
-  #lockInput:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); outline: none; }
-  #lockError { color: var(--accent); font-size: 12px; min-height: 16px; margin-bottom: 8px; }
-  #lockSubmitBtn { width: 100%; }
-
   /* ---- Video feature ---- */
   /* Tab row inside savedListPanel */
   #listTabRow {
@@ -473,17 +450,84 @@
   /* 16:9 responsive iframe container */
   #videoPlayerFrame { position: relative; width: 100%; padding-bottom: 56.25%; }
   #videoPlayerIframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+
+  /* 2026 responsive refresh: calm, native-feeling surfaces with iPhone-first density. */
+  :root {
+    --bg: #f5f5f7;
+    --bg-soft: #ffffff;
+    --panel: rgba(255,255,255,.94);
+    --panel-2: #f2f2f7;
+    --border: rgba(60,60,67,.16);
+    --accent: #007aff;
+    --accent-2: #34c759;
+    --accent-dim: rgba(0,122,255,.12);
+    --text: #1d1d1f;
+    --sub: #6e6e73;
+    --radius: 14px;
+    --radius-sm: 10px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,.08);
+    --shadow-md: 0 20px 55px rgba(0,0,0,.14);
+  }
+  html, body { background: var(--bg); }
+  #app { background: #000; height: 100dvh; }
+  #topbar, #controls {
+    border-color: rgba(255,255,255,.12);
+    background: rgba(25,25,27,.72);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    backdrop-filter: blur(22px) saturate(180%);
+  }
+  #topbar { padding-top: max(9px, env(safe-area-inset-top)); }
+  #controls { padding-bottom: max(9px, env(safe-area-inset-bottom)); }
+  #topbar .ctrlBtn, #controls .ctrlBtn { background: rgba(255,255,255,.13); color: #fff; border-color: rgba(255,255,255,.1); }
+  #status, #pageLabel { color: rgba(255,255,255,.7); }
+  #currentTitle { color: #fff; }
+  .primaryBtn { background: var(--accent); color: #fff; box-shadow: none; }
+  .ctrlBtn { background: var(--panel-2); }
+  .ctrlBtn, .primaryBtn { min-height: 38px; border-radius: 10px; font-weight: 600; }
+  .modalOverlay { background: rgba(0,0,0,.32); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+  .modalPanel { width: min(820px, 92vw); max-height: min(88dvh, 900px); border: 0; padding: 20px; }
+  .panel-header { font-size: 17px; border-bottom: 0; padding-bottom: 2px; }
+  #savedListPanel { height: min(780px, 88dvh); }
+  #exportImportRow, #listToolbar, #videoListToolbar {
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; flex-shrink: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+  #exportImportRow::-webkit-scrollbar, #listToolbar::-webkit-scrollbar { display: none; }
+  #listFolderTitle { min-width: 8px; }
+  #savedListItems.bookshelf {
+    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+    gap: 14px 10px; padding: 4px 2px 18px;
+  }
+  .book-card { gap: 5px; min-width: 0; }
+  .book-cover { border: 0; border-radius: 11px; box-shadow: 0 2px 8px rgba(0,0,0,.10); }
+  .book-title { font-size: 12px; line-height: 1.25; text-align: left; }
+  .book-series { font-size: 9px; padding: 2px 5px; align-self: flex-start; max-width: 100%; }
+  .folder-cover { background: linear-gradient(145deg, #eef5ff, #dbeaff); }
+  .book-editBtn, .book-delBtn, .book-favBtn { min-width: 25px; min-height: 25px; }
+  input, select, textarea { border-color: var(--border) !important; background: #fff !important; color: var(--text) !important; }
+
+  @media (max-width: 600px) {
+    #topbar, #controls { flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding-left: 8px; padding-right: 8px; scrollbar-width: none; }
+    #topbar::-webkit-scrollbar, #controls::-webkit-scrollbar { display: none; }
+    #topbar .ctrlBtn, #topbar .primaryBtn, #controls .ctrlBtn { padding: 7px 10px; font-size: 12px; flex: 0 0 auto; }
+    #status { min-width: auto; flex: 0 0 auto; }
+    #currentTitle { max-width: 120px; flex: 0 0 auto; }
+    #pageSlider { min-width: 112px; flex: 0 0 112px; }
+    .modalOverlay { align-items: flex-end; }
+    .modalPanel { width: 100%; max-width: none; max-height: 94dvh; border-radius: 20px 20px 0 0; padding: 16px 14px max(14px, env(safe-area-inset-bottom)); }
+    #savedListPanel { height: 94dvh; }
+    #listTabRow { margin-left: -14px; margin-right: -14px; padding-left: 14px; }
+    #exportImportRow { margin: 0 -2px 8px; padding: 6px 2px 10px; gap: 6px; }
+    #exportImportRow .ctrlBtn, #listToolbar .ctrlBtn { padding: 7px 9px; font-size: 11.5px; min-height: 36px; }
+    #savedListItems.bookshelf { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px 8px; }
+    .book-cover { border-radius: 9px; }
+    .book-title { font-size: 10.5px; }
+    .book-series { font-size: 8px; }
+    .dialog-actions { position: sticky; bottom: 0; padding-top: 10px; background: linear-gradient(transparent, var(--panel) 25%); }
+  }
 </style>
 </head>
 <body>
-<div id="lockOverlay">
-  <div id="lockPanel">
-    <p>パスコードを入力してください</p>
-    <input id="lockInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off">
-    <div id="lockError"></div>
-    <button class="primaryBtn" id="lockSubmitBtn">進む</button>
-  </div>
-</div>
 <div id="app">
   <div id="readProgressBar"></div>
   <div id="topbar">
@@ -912,10 +956,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     cancelEditItemBtn: document.getElementById('cancelEditItemBtn'),
     confirmEditItemBtn: document.getElementById('confirmEditItemBtn'),
 
-    lockOverlay: document.getElementById('lockOverlay'),
-    lockInput: document.getElementById('lockInput'),
-    lockError: document.getElementById('lockError'),
-    lockSubmitBtn: document.getElementById('lockSubmitBtn'),
 
     listPanelTitle: document.getElementById('listPanelTitle'),
     listTabManga: document.getElementById('listTabManga'),
@@ -3827,29 +3867,6 @@ https://cdn.example.org/c/003.webp"></textarea>
   });
   els.videoAInput.addEventListener('input', updateVideoPreview);
   els.videoBInput.addEventListener('input', updateVideoPreview);
-
-  // ---------- access lock (always required, not remembered between visits) ----------
-  const LOCK_CODE = '8122';
-
-  function checkLock() {
-    els.lockOverlay.style.display = 'flex';
-    els.lockInput.focus();
-  }
-
-  function tryUnlock() {
-    if (els.lockInput.value.trim() === LOCK_CODE) {
-      els.lockOverlay.style.display = 'none';
-      els.lockError.textContent = '';
-    } else {
-      els.lockError.textContent = 'コードが違います';
-      els.lockInput.value = '';
-      els.lockInput.focus();
-    }
-  }
-
-  els.lockSubmitBtn.addEventListener('click', tryUnlock);
-  els.lockInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
-  checkLock();
 
   // No URL bar anymore, so automatically resume the last-viewed manga on
   // load (not counted as a "新規" open, so it isn't re-added to 履歴).
