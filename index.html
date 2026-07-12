@@ -245,7 +245,6 @@
   .seriesNewRow input { width: 100%; }
   input[readonly] { color: var(--sub) !important; background: var(--panel-2) !important; }
   input:disabled { opacity: .55; }
-  .immutable-note { margin-top: 14px; padding: 9px 11px; border-radius: var(--radius-sm); background: var(--panel-2); color: var(--sub); font-size: 12px; }
   .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 
   /* Saved list */
@@ -695,7 +694,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     </div>
     <label class="field-label" for="editVolumeInput">巻数（シリーズ設定時は必須）</label>
     <input id="editVolumeInput" type="number" min="1" step="1" placeholder="例: 1">
-    <div class="immutable-note">画像URLはこの画面では変更できません</div>
     <div class="dialog-actions">
       <button class="ctrlBtn" id="cancelEditItemBtn">キャンセル</button>
       <button class="primaryBtn" id="confirmEditItemBtn">保存</button>
@@ -2958,15 +2956,22 @@ https://cdn.example.org/c/003.webp"></textarea>
   function updateSeriesForm(selectEl, newRow, newInput, volumeInput, titleInput) {
     const hasSeries = !!selectEl.value;
     const isNew = selectEl.value === '__new__';
+    const hadSeries = titleInput.dataset.seriesActive === '1';
+    if (hasSeries && !hadSeries) titleInput.dataset.manualTitle = titleInput.value;
     newRow.style.display = isNew ? 'block' : 'none';
     volumeInput.disabled = !hasSeries;
-    if (!hasSeries) volumeInput.value = '';
     titleInput.readOnly = hasSeries;
     if (hasSeries) {
       const name = selectedSeriesName(selectEl, newInput);
       const volume = parseInt(volumeInput.value, 10);
-      titleInput.value = name && volume > 0 ? seriesTitle(name, volume) : 'シリーズ名と巻数から自動設定';
+      titleInput.value = name && volume > 0 ? seriesTitle(name, volume) : '';
+      titleInput.placeholder = 'シリーズ名と巻数から自動設定';
+    } else {
+      if (hadSeries) titleInput.value = titleInput.dataset.manualTitle || '';
+      volumeInput.value = '';
+      titleInput.placeholder = '例: ○○ 第1巻';
     }
+    titleInput.dataset.seriesActive = hasSeries ? '1' : '0';
   }
 
   function hasDuplicateSeriesVolume(series, volume, excludedItemId) {
@@ -2993,6 +2998,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!baseUrl) { flashStatus('表示中の作品がありません'); return; }
     pendingSaveUrl = baseUrl;
     els.saveTitleInput.value = deriveTitleFromUrl(pendingSaveUrl);
+    els.saveTitleInput.dataset.manualTitle = els.saveTitleInput.value;
+    els.saveTitleInput.dataset.seriesActive = '0';
     renderFolderOptions(els.saveFolderSelect, '');
     els.newFolderRow.style.display = 'none';
     els.newFolderInput.value = '';
@@ -3061,6 +3068,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     customAddReturnToList = isSavedListOpen();
     if (customAddReturnToList) closeSavedList();
     els.customTitleInput.value = '';
+    els.customTitleInput.dataset.manualTitle = '';
+    els.customTitleInput.dataset.seriesActive = '0';
     renderFolderOptions(els.customFolderSelect, '');
     els.customNewFolderRow.style.display = 'none';
     els.customNewFolderInput.value = '';
@@ -3114,6 +3123,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (editReturnToList) closeSavedList();
 
     els.editTitleInput.value = itemDisplayTitle(item);
+    els.editTitleInput.dataset.manualTitle = item.series ? (item.title || '') : els.editTitleInput.value;
+    els.editTitleInput.dataset.seriesActive = item.series ? '1' : '0';
     renderFolderOptions(els.editFolderSelect, item.folderId || '');
     els.editNewFolderRow.style.display = 'none';
     els.editNewFolderInput.value = '';
