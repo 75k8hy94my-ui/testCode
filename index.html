@@ -503,6 +503,17 @@
   .book-title { font-size: 12px; line-height: 1.25; text-align: left; }
   .book-series { font-size: 9px; padding: 2px 5px; align-self: flex-start; max-width: 100%; }
   .folder-cover { background: linear-gradient(145deg, #eef5ff, #dbeaff); }
+  .folder-cover > img { width: 40%; height: auto; object-fit: contain; }
+  .folder-preview {
+    position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr; gap: 2px; background: #d1d1d6;
+  }
+  .folder-preview img { width: 100%; height: 100%; object-fit: cover; display: block; min-width: 0; min-height: 0; }
+  .folder-preview.preview-count-1 { display: block; }
+  .folder-preview.preview-count-2 { grid-template-rows: 1fr; }
+  .folder-preview.preview-count-3 img:first-child { grid-row: 1 / 3; }
+  .folder-cover .book-delBtn { z-index: 2; }
+  body.safe-mode .folder-preview img { filter: blur(12px); transform: scale(1.08); }
   .book-editBtn, .book-delBtn, .book-favBtn {
     width: 30px; height: 30px; min-width: 30px; min-height: 30px;
     display: flex; align-items: center; justify-content: center;
@@ -3078,16 +3089,39 @@ https://cdn.example.org/c/003.webp"></textarea>
   // Every level (including the shallowest/top one) renders as a Kindle-style
   // bookshelf grid now: folders show as folder-icon cards, manga show as
   // page-1 cover cards (buildBookCard), side by side in the same grid.
+  function appendFolderPreview(cover, items, emptyIcon, emptyAlt) {
+    const previewItems = items.slice(0, 4);
+    if (!previewItems.length) {
+      const icon = document.createElement('img');
+      icon.src = emptyIcon;
+      icon.alt = emptyAlt;
+      cover.appendChild(icon);
+      return;
+    }
+
+    const preview = document.createElement('div');
+    preview.className = 'folder-preview preview-count-' + previewItems.length;
+    preview.setAttribute('aria-label', previewItems.length + '冊の表紙プレビュー');
+    previewItems.forEach((item) => {
+      const img = document.createElement('img');
+      img.alt = itemDisplayTitle(item);
+      if (Array.isArray(item.pages) && item.pages.length) {
+        img.src = item.pages[0];
+      } else {
+        setupFeedImage(img, item.url);
+      }
+      preview.appendChild(img);
+    });
+    cover.appendChild(preview);
+  }
+
   function buildFolderCard(folder) {
     const card = document.createElement('div');
     card.className = 'book-card folder-card';
 
     const cover = document.createElement('div');
     cover.className = 'book-cover folder-cover';
-    const folderIcon = document.createElement('img');
-    folderIcon.src = ICON_FOLDER;
-    folderIcon.alt = 'フォルダ';
-    cover.appendChild(folderIcon);
+    appendFolderPreview(cover, savedItems.filter((it) => it.folderId === folder.id), ICON_FOLDER, '空のフォルダ');
 
     // 履歴 is a reserved, auto-managed folder and can't be deleted as a whole.
     if (folder.id !== HISTORY_FOLDER_ID) {
@@ -3130,7 +3164,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     const cover = document.createElement('div');
     cover.className = 'book-cover folder-cover';
-    cover.appendChild(makeHeartIcon(true));
+    appendFolderPreview(cover, savedItems.filter((it) => it.favorite), ICON_HEART_FILLED, '空のお気に入り');
 
     const title = document.createElement('div');
     title.className = 'book-title';
@@ -3156,10 +3190,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     const cover = document.createElement('div');
     cover.className = 'book-cover folder-cover';
-    const seriesIcon = document.createElement('img');
-    seriesIcon.src = ICON_BOOKS;
-    seriesIcon.alt = 'シリーズ';
-    cover.appendChild(seriesIcon);
+    appendFolderPreview(cover, savedItems.filter((it) => it.series), ICON_BOOKS, '空のシリーズ');
 
     const title = document.createElement('div');
     title.className = 'book-title';
@@ -3183,10 +3214,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     const cover = document.createElement('div');
     cover.className = 'book-cover folder-cover';
-    const seriesGroupIcon = document.createElement('img');
-    seriesGroupIcon.src = ICON_BOOKS;
-    seriesGroupIcon.alt = 'シリーズ';
-    cover.appendChild(seriesGroupIcon);
+    appendFolderPreview(cover, group.items, ICON_BOOKS, '空のシリーズ');
 
     const title = document.createElement('div');
     title.className = 'book-title';
