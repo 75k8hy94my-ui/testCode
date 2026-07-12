@@ -503,7 +503,19 @@
   .book-title { font-size: 12px; line-height: 1.25; text-align: left; }
   .book-series { font-size: 9px; padding: 2px 5px; align-self: flex-start; max-width: 100%; }
   .folder-cover { background: linear-gradient(145deg, #eef5ff, #dbeaff); }
-  .book-editBtn, .book-delBtn, .book-favBtn { min-width: 25px; min-height: 25px; }
+  .book-editBtn, .book-delBtn, .book-favBtn {
+    width: 30px; height: 30px; min-width: 30px; min-height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    color: #1d1d1f; background: rgba(255,255,255,.96);
+    border: 1px solid rgba(0,0,0,.12); box-shadow: 0 2px 8px rgba(0,0,0,.24);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    font-weight: 800; line-height: 1; opacity: 1;
+  }
+  .book-editBtn { top: 6px; left: 6px; color: #0066cc; font-size: 16px; }
+  .book-delBtn { top: 6px; right: 6px; color: #d70015; font-size: 19px; }
+  .book-favBtn { right: 6px; bottom: 6px; }
+  .book-favBtn img { width: 16px; height: 16px; }
+  .book-editBtn:active, .book-delBtn:active, .book-favBtn:active { transform: scale(.9); }
   input, select, textarea { border-color: var(--border) !important; background: #fff !important; color: var(--text) !important; }
 
   @media (max-width: 600px) {
@@ -521,6 +533,10 @@
     #exportImportRow .ctrlBtn, #listToolbar .ctrlBtn { padding: 7px 9px; font-size: 11.5px; min-height: 36px; }
     #savedListItems.bookshelf { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px 8px; }
     .book-cover { border-radius: 9px; }
+    .book-editBtn, .book-delBtn, .book-favBtn { width: 28px; height: 28px; min-width: 28px; min-height: 28px; }
+    .book-editBtn { top: 4px; left: 4px; }
+    .book-delBtn { top: 4px; right: 4px; }
+    .book-favBtn { right: 4px; bottom: 4px; }
     .book-title { font-size: 10.5px; }
     .book-series { font-size: 8px; }
     .dialog-actions { position: sticky; bottom: 0; padding-top: 10px; background: linear-gradient(transparent, var(--panel) 25%); }
@@ -3269,6 +3285,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       editBtn.className = 'book-editBtn';
       editBtn.textContent = '✎';
       editBtn.title = '編集';
+      editBtn.setAttribute('aria-label', itemDisplayTitle(item) + 'を編集');
       editBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         openEditItemDialog(item);
@@ -3279,6 +3296,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       delBtn.className = 'book-delBtn';
       delBtn.textContent = '×';
       delBtn.title = '削除';
+      delBtn.setAttribute('aria-label', itemDisplayTitle(item) + 'を削除');
       delBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         if (!confirm('「' + itemDisplayTitle(item) + '」を削除します。本当によろしいですか？')) return;
@@ -3293,11 +3311,26 @@ https://cdn.example.org/c/003.webp"></textarea>
       favBtn.className = 'book-favBtn';
       favBtn.appendChild(makeHeartIcon(!!item.favorite));
       favBtn.title = item.favorite ? 'お気に入りから外す' : 'お気に入りに追加';
+      favBtn.setAttribute('aria-label', favBtn.title);
       favBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         item.favorite = !item.favorite;
         persistAll();
-        renderSavedList();
+        favBtn.replaceChildren(makeHeartIcon(!!item.favorite));
+        favBtn.title = item.favorite ? 'お気に入りから外す' : 'お気に入りに追加';
+        favBtn.setAttribute('aria-label', favBtn.title);
+        if (currentFolderView === FAVORITES_FOLDER_ID && !item.favorite) {
+          card.style.transition = 'opacity .16s ease, transform .16s ease';
+          card.style.opacity = '0';
+          card.style.transform = 'scale(.94)';
+          window.setTimeout(() => {
+            card.remove();
+            if (!els.savedListItems.children.length) {
+              els.savedListEmpty.textContent = 'お気に入りはまだ追加されていません';
+              els.savedListEmpty.style.display = 'block';
+            }
+          }, 160);
+        }
       });
       cover.appendChild(favBtn);
     }
