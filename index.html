@@ -111,9 +111,10 @@
   .pageSlide {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
-    will-change: transform;
+    will-change: transform; background: #000;
+    -webkit-backface-visibility: hidden; backface-visibility: hidden;
   }
-  .pageimg { display: block; }
+  .pageimg { display: block; -webkit-backface-visibility: hidden; backface-visibility: hidden; }
 
   /* セーフモード: 漫画の画像（リーダーのページ・本棚の表紙サムネイル）にだけ
      モザイク(ぼかし)をかける。フォルダ/お気に入り/シリーズのアイコン
@@ -2414,6 +2415,24 @@ https://cdn.example.org/c/003.webp"></textarea>
     swipeDown: { enter: 'translateY(-100%)', exit: 'translateY(100%)' },
   };
 
+  function nextPaint() {
+    return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  }
+
+  async function waitForImageReady(img) {
+    if (!img.complete) {
+      await new Promise((resolve, reject) => {
+        img.addEventListener('load', resolve, { once: true });
+        img.addEventListener('error', reject, { once: true });
+      });
+    }
+    if (!img.naturalWidth) throw new Error('画像を読み込めませんでした');
+    if (typeof img.decode === 'function') {
+      try { await img.decode(); } catch (e) { /* Safari may reject even when the loaded image is drawable. */ }
+    }
+    await nextPaint();
+  }
+
   // Renders page n into the stage, but only once its image has actually
   // finished loading. Until then, whatever was previously on screen stays
   // visible instead of being replaced by a blank/black frame. If the page
@@ -2425,10 +2444,13 @@ https://cdn.example.org/c/003.webp"></textarea>
       suppressNextRenderAnim = false;
     }
     const myId = ++latestRenderId;
+    const targetUrl = pages[n - 1];
     const img = makeImg(n);
 
     const doRender = () => {
       if (myId !== latestRenderId) return;
+
+      preloadedPageUrls.add(targetUrl);
 
       const newSlide = document.createElement('div');
       newSlide.className = 'pageSlide';
@@ -2457,12 +2479,9 @@ https://cdn.example.org/c/003.webp"></textarea>
       }
     };
 
-    if (img.complete) {
-      doRender();
-    } else {
-      img.addEventListener('load', doRender, { once: true });
-      img.addEventListener('error', doRender, { once: true });
-    }
+    waitForImageReady(img).then(doRender).catch(() => {
+      if (myId === latestRenderId) flashStatus('画像を読み込めませんでした');
+    });
   }
 
   function updateSlider() {
@@ -2482,7 +2501,14 @@ https://cdn.example.org/c/003.webp"></textarea>
       const img = new Image();
       img.fetchPriority = 'low'; // de-prioritize vs. the actually-visible page's own load (see makeImgFromUrl)
       inFlightPreloads.set(url, img);
-      img.addEventListener('load', () => { inFlightPreloads.delete(url); preloadedPageUrls.add(url); });
+      img.addEventListener('load', async () => {
+        if (typeof img.decode === 'function') {
+          try { await img.decode(); } catch (e) {}
+        }
+        await nextPaint();
+        inFlightPreloads.delete(url);
+        preloadedPageUrls.add(url);
+      });
       img.addEventListener('error', () => { inFlightPreloads.delete(url); }); // allow a later retry instead of giving up forever
       img.src = url;
     }
@@ -2535,9 +2561,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // make the live drag wait for a real load instead of dragging in a
   // blank/black slide that only fills in once the network catches up.
   function isUrlLoaded(url) {
-    const probe = new Image();
-    probe.src = url;
-    return probe.complete && probe.naturalWidth > 0;
+    return preloadedPageUrls.has(url);
   }
 
   function showPage(n, forceDirection) {
