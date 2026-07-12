@@ -395,6 +395,12 @@
     transition: color 0.15s, border-color 0.15s;
   }
   .listTab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  #buildInfo {
+    flex-shrink: 0; margin: -4px 0 10px; padding: 7px 10px;
+    border-radius: 9px; background: var(--panel-2); color: var(--sub);
+    font-size: 11px; line-height: 1.35; font-variant-numeric: tabular-nums;
+  }
+  #buildInfo a { color: var(--accent); font-weight: 700; text-decoration: none; }
   /* Manga section / video section both fill the flex column and scroll */
   #mangaListSection { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
   #videoListSection { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
@@ -514,6 +520,15 @@
   .folder-preview.preview-count-3 img:first-child { grid-row: 1 / 3; }
   .folder-cover .book-delBtn { z-index: 2; }
   body.safe-mode .folder-preview img { filter: blur(12px); transform: scale(1.08); }
+  .folder-kind-badge {
+    position: absolute; left: 5px; bottom: 5px; z-index: 2;
+    display: inline-flex; align-items: center; gap: 3px; max-width: calc(100% - 10px);
+    padding: 3px 6px 3px 4px; border-radius: 999px;
+    color: #fff; background: rgba(20,20,22,.78); box-shadow: 0 1px 5px rgba(0,0,0,.28);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    font-size: 8px; font-weight: 800; line-height: 1; white-space: nowrap;
+  }
+  .folder-kind-badge img { width: 12px; height: 12px; object-fit: contain; filter: brightness(0) invert(1); }
   .book-editBtn, .book-delBtn, .book-favBtn {
     width: 30px; height: 30px; min-width: 30px; min-height: 30px;
     display: flex; align-items: center; justify-content: center;
@@ -709,6 +724,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       <button class="listTab active" id="listTabManga" type="button">漫画</button>
       <button class="listTab" id="listTabVideo" type="button">動画</button>
     </div>
+    <div id="buildInfo" role="status">更新情報を確認中…</div>
     <div id="mangaListSection">
       <div id="exportImportRow">
         <button class="ctrlBtn" id="exportBtn">書き出し</button>
@@ -883,6 +899,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     status: document.getElementById('status'),
     currentTitle: document.getElementById('currentTitle'),
     favToggleBtn: document.getElementById('favToggleBtn'),
+    buildInfo: document.getElementById('buildInfo'),
     readProgressBar: document.getElementById('readProgressBar'),
     viewer: document.getElementById('viewer'),
     placeholder: document.getElementById('placeholder'),
@@ -1017,6 +1034,34 @@ https://cdn.example.org/c/003.webp"></textarea>
     img.alt = '閉じる';
     els.closeBtn.appendChild(img);
   })();
+
+  async function loadBuildInfo() {
+    try {
+      const response = await fetch('https://api.github.com/repos/75k8hy94my-ui/testCode/commits/main', {
+        cache: 'no-store',
+        headers: { Accept: 'application/vnd.github+json' },
+      });
+      if (!response.ok) throw new Error('GitHub API ' + response.status);
+      const commit = await response.json();
+      const shortSha = String(commit.sha || '').slice(0, 7);
+      const committedAt = commit.commit && commit.commit.committer && commit.commit.committer.date;
+      if (!shortSha || !committedAt) throw new Error('Invalid commit data');
+      const timeText = new Date(committedAt).toLocaleString('ja-JP', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+      });
+      const link = document.createElement('a');
+      link.href = commit.html_url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = shortSha;
+      link.title = 'GitHubでこのコミットを確認';
+      els.buildInfo.replaceChildren(document.createTextNode('更新: '), link, document.createTextNode(' ・ ' + timeText));
+    } catch (e) {
+      els.buildInfo.textContent = '更新情報を取得できません（通信後に再読み込みしてください）';
+    }
+  }
+  loadBuildInfo();
 
   let savedVideos = [];    // { id, a, b, title, addedAt }
   let activeListTab = 'manga'; // 'manga' | 'video'
@@ -3089,7 +3134,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // Every level (including the shallowest/top one) renders as a Kindle-style
   // bookshelf grid now: folders show as folder-icon cards, manga show as
   // page-1 cover cards (buildBookCard), side by side in the same grid.
-  function appendFolderPreview(cover, items, emptyIcon, emptyAlt) {
+  function appendFolderPreview(cover, items, emptyIcon, emptyAlt, kindLabel) {
     const previewItems = items.slice(0, 4);
     if (!previewItems.length) {
       const icon = document.createElement('img');
@@ -3113,6 +3158,15 @@ https://cdn.example.org/c/003.webp"></textarea>
       preview.appendChild(img);
     });
     cover.appendChild(preview);
+
+    const badge = document.createElement('span');
+    badge.className = 'folder-kind-badge';
+    const badgeIcon = document.createElement('img');
+    badgeIcon.src = ICON_FOLDER;
+    badgeIcon.alt = '';
+    badge.appendChild(badgeIcon);
+    badge.appendChild(document.createTextNode(kindLabel || 'フォルダ'));
+    cover.appendChild(badge);
   }
 
   function buildFolderCard(folder) {
@@ -3121,7 +3175,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     const cover = document.createElement('div');
     cover.className = 'book-cover folder-cover';
-    appendFolderPreview(cover, savedItems.filter((it) => it.folderId === folder.id), ICON_FOLDER, '空のフォルダ');
+    appendFolderPreview(cover, savedItems.filter((it) => it.folderId === folder.id), ICON_FOLDER, '空のフォルダ', 'フォルダ');
 
     // 履歴 is a reserved, auto-managed folder and can't be deleted as a whole.
     if (folder.id !== HISTORY_FOLDER_ID) {
@@ -3164,7 +3218,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     const cover = document.createElement('div');
     cover.className = 'book-cover folder-cover';
-    appendFolderPreview(cover, savedItems.filter((it) => it.favorite), ICON_HEART_FILLED, '空のお気に入り');
+    appendFolderPreview(cover, savedItems.filter((it) => it.favorite), ICON_HEART_FILLED, '空のお気に入り', 'お気に入り');
 
     const title = document.createElement('div');
     title.className = 'book-title';
@@ -3190,7 +3244,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     const cover = document.createElement('div');
     cover.className = 'book-cover folder-cover';
-    appendFolderPreview(cover, savedItems.filter((it) => it.series), ICON_BOOKS, '空のシリーズ');
+    appendFolderPreview(cover, savedItems.filter((it) => it.series), ICON_BOOKS, '空のシリーズ', 'シリーズ');
 
     const title = document.createElement('div');
     title.className = 'book-title';
@@ -3214,7 +3268,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     const cover = document.createElement('div');
     cover.className = 'book-cover folder-cover';
-    appendFolderPreview(cover, group.items, ICON_BOOKS, '空のシリーズ');
+    appendFolderPreview(cover, group.items, ICON_BOOKS, '空のシリーズ', 'シリーズ');
 
     const title = document.createElement('div');
     title.className = 'book-title';
