@@ -514,7 +514,8 @@
   .book-editBtn { top: 6px; left: 6px; color: #0066cc; font-size: 16px; }
   .book-delBtn { top: 6px; right: 6px; color: #d70015; font-size: 19px; }
   .book-favBtn { right: 6px; bottom: 6px; }
-  .book-favBtn img { width: 16px; height: 16px; }
+  .book-favBtn { color: #8e8e93; font-size: 20px; font-family: Arial, sans-serif; }
+  .book-favBtn.is-favorite { color: #ff3b30; }
   .book-editBtn:active, .book-delBtn:active, .book-favBtn:active { transform: scale(.9); }
   input, select, textarea { border-color: var(--border) !important; background: #fff !important; color: var(--text) !important; }
 
@@ -3309,16 +3310,19 @@ https://cdn.example.org/c/003.webp"></textarea>
 
       const favBtn = document.createElement('button');
       favBtn.className = 'book-favBtn';
-      favBtn.appendChild(makeHeartIcon(!!item.favorite));
-      favBtn.title = item.favorite ? 'お気に入りから外す' : 'お気に入りに追加';
-      favBtn.setAttribute('aria-label', favBtn.title);
+      const updateFavoriteButton = () => {
+        favBtn.textContent = item.favorite ? '♥' : '♡';
+        favBtn.classList.toggle('is-favorite', !!item.favorite);
+        favBtn.title = item.favorite ? 'お気に入りから外す' : 'お気に入りに追加';
+        favBtn.setAttribute('aria-label', favBtn.title);
+        favBtn.setAttribute('aria-pressed', item.favorite ? 'true' : 'false');
+      };
+      updateFavoriteButton();
       favBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         item.favorite = !item.favorite;
         persistAll();
-        favBtn.replaceChildren(makeHeartIcon(!!item.favorite));
-        favBtn.title = item.favorite ? 'お気に入りから外す' : 'お気に入りに追加';
-        favBtn.setAttribute('aria-label', favBtn.title);
+        updateFavoriteButton();
         if (currentFolderView === FAVORITES_FOLDER_ID && !item.favorite) {
           card.style.transition = 'opacity .16s ease, transform .16s ease';
           card.style.opacity = '0';
