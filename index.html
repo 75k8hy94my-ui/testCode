@@ -757,7 +757,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   </div>
 </div>
 
-<!-- GitHub sync: pushes/pulls the same {folders, items} JSON that 書き出し/
+<!-- GitHub sync: pushes/pulls the same {folders, items, videos} JSON that 書き出し/
      読み込み use, but to/from a private GitHub repo via the Contents API,
      instead of a manually-downloaded file. The repo/path/token are entered
      once here and kept only in this browser's localStorage — never written
@@ -1599,7 +1599,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.nextVolumeBanner.classList.remove('show');
   }
 
-  // folders/items に加えて per-manga info cache（拡張子・既知ページ数）も同梱する。
+  // folders/items/videos に加えて per-manga info cache（拡張子・既知ページ数）も同梱する。
   // 書き出し/読み込みとGitHub同期の両方で使う共通ペイロード組み立て。
   function buildSyncPayload() {
     return { folders: savedFolders, items: savedItems, videos: savedVideos, mangaInfo: loadMangaInfoCache() };
@@ -1671,7 +1671,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   // ---------- GitHub sync (private repo, Contents API) ----------
   // Alternative to the manual 書き出し/読み込み file dance: pushes/pulls the
-  // exact same {folders, items} JSON to/from a single file in a private
+  // exact same {folders, items, videos} JSON to/from a single file in a private
   // GitHub repository the user controls, via the Contents API directly from
   // the browser (api.github.com allows CORS for GET/PUT with an Authorization
   // header). The repo, file path, and personal access token are entered once
