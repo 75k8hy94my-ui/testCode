@@ -1215,6 +1215,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   function persistAll() {
     persistFolders();
     persistItems();
+    persistSavedVideos();
   }
 
   // Remembers the last page viewed per manga (keyed by baseUrl). If the last
@@ -1601,7 +1602,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // folders/items に加えて per-manga info cache（拡張子・既知ページ数）も同梱する。
   // 書き出し/読み込みとGitHub同期の両方で使う共通ペイロード組み立て。
   function buildSyncPayload() {
-    return { folders: savedFolders, items: savedItems, mangaInfo: loadMangaInfoCache() };
+    return { folders: savedFolders, items: savedItems, videos: savedVideos, mangaInfo: loadMangaInfoCache() };
   }
 
   // remoteInfo の各エントリでローカルの mangaInfoCache を上書きマージする
@@ -1635,7 +1636,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   // Shared by 読み込み (file import) and GitHub からの読み込み: validates the
-  // {folders, items} shape, confirms with the user, then replaces the local
+  // {folders, items, videos} shape, confirms with the user, then replaces the local
   // list and persists/re-renders. Returns whether the replace happened.
   function applyImportedData(data) {
     if (!data || !Array.isArray(data.folders) || !Array.isArray(data.items)) {
@@ -1645,13 +1646,18 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!confirm('読み込んだ内容でローカルのリストを置き換えます。よろしいですか？')) return false;
     savedFolders = data.folders;
     savedItems = data.items;
+    if (Array.isArray(data.videos)) savedVideos = data.videos;
     persistFolders();
     persistItems();
+    persistSavedVideos();
     // ページ数キャッシュは「置き換え」ではなくマージ：他端末で既に読んで
     // ページ数が分かっている作品の情報を取り込みつつ、ローカルにしかない
     // キャッシュは消さない。
     if (data.mangaInfo) mergeMangaInfoCache(data.mangaInfo);
-    if (isSavedListOpen()) renderSavedList();
+    if (isSavedListOpen()) {
+      renderSavedList();
+      if (activeListTab === 'video') renderVideoList();
+    }
     return true;
   }
 
