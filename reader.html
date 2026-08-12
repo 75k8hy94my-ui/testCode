@@ -306,6 +306,10 @@
   }
   @keyframes bookFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
   .book-card.reorder-card { cursor: default; }
+  .book-card.just-closed .book-cover {
+    border: 3px solid #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.24), 0 5px 16px rgba(34,197,94,.28);
+  }
+  .book-card.just-closed .book-title { color: #15803d; font-weight: 800; }
   .book-cover {
     position: relative; width: 100%; aspect-ratio: 2 / 3; background: var(--panel-2);
     border: 1px solid var(--border); border-radius: 9px; overflow: hidden;
@@ -1189,6 +1193,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   let reorderMode = false; // true while 並べ替え (manual up/down reorder) controls are shown for the current folder view
   // リーダーを閉じたときに戻る、本棚上の表示位置。作品を本棚から開いたときだけ記録する。
   let readerReturnView = null;
+  let recentlyClosedItemId = null;
   let pendingSaveUrl = null;
   // Whether opening the 個別追加/編集 dialog hid an already-open 保存したURL
   // list popup behind it; if so, closing the dialog reopens (and re-renders)
@@ -2205,6 +2210,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // directly) for anything that opens an *item* object rather than a raw
   // typed-in URL.
   function openItem(item, addToHistoryFlag, switchDirection) {
+    recentlyClosedItemId = null;
     currentItem = item || null; // remembered for series/次の巻 lookups
     if (item && Array.isArray(item.pages) && item.pages.length) {
       startReadingCustom(item, switchDirection);
@@ -2219,6 +2225,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   // なるので、リスト（保存したURL）を自動的に開く。
   function closeManga() {
     const returnView = readerReturnView;
+    const closingItem = getCurrentItem();
+    recentlyClosedItemId = closingItem ? closingItem.id : null;
     readerReturnView = null;
     // ここでpages/baseUrlがリセットされる前に、検出未完了分の引き継ぎを行う。
     handOffIncompleteDetection();
@@ -3379,7 +3387,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // rearranging the shelf.
   function buildBookCard(item, list, reorderMode) {
     const card = document.createElement('div');
-    card.className = 'book-card' + (reorderMode ? ' reorder-card' : '');
+    card.className = 'book-card' + (reorderMode ? ' reorder-card' : '') + (item.id === recentlyClosedItemId ? ' just-closed' : '');
     card.title = itemSubtext(item);
 
     const cover = document.createElement('div');
@@ -3723,6 +3731,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     const v = input.trim();
     if (!v) return;
     readerReturnView = null;
+    recentlyClosedItemId = null;
     clearReadingListContext();
     currentItem = null; // raw URL open, not tied to a saved item
     closeSavedList();
