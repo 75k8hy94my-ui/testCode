@@ -1096,6 +1096,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   let pages = [];          // source image URLs, index 0 = page 1
   let splitSpreads = false;
   let preferredExt = 0;    // index into EXT_CANDIDATES
+  let pageNumberWidth = 1; // filename zero-padding width: 1 -> 1.jpg, 2 -> 01.jpg
   // Key used to look up/save resume-page position in LAST_PAGE_KEY. For a
   // normal 連番ベースURL manga this is just baseUrl; for a "custom" manga
   // (explicit non-sequential page list, see startReadingCustom) there's no
@@ -1121,6 +1122,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   let readingGeneration = 0; // guards against an old detection loop polluting a newer manga's page list
 
   function displayedPageCount() { return splitSpreads ? pages.length * 2 : pages.length; }
+  function formatPageNumber(pageNum, width) { return String(pageNum).padStart(Math.max(1, Number(width) || 1), '0'); }
+  function pageUrlFor(key, pageNum, extIndex, width) { return key + formatPageNumber(pageNum, width) + '.' + EXT_CANDIDATES[extIndex]; }
   function sourcePageIndex(displayPage) { return splitSpreads ? Math.floor((displayPage - 1) / 2) : displayPage - 1; }
   function sourceUrlForPage(displayPage) { return pages[sourcePageIndex(displayPage)] || ''; }
   function splitHalfForPage(displayPage) { return splitSpreads ? ((displayPage - 1) % 2 === 0 ? 'right' : 'left') : null; }
@@ -1188,7 +1191,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         img.src = firstPageUrl;
       } else {
         resolvingListIndex.add(idx);
-        preloadFirstPage(firstPageUrl).then((resolvedUrl) => {
+        preloadFirstPage(firstPageUrl, item.numberWidth).then((resolvedUrl) => {
           resolvingListIndex.delete(idx);
           if (myListGen !== readingListGeneration) return; // a different list is active now; discard
           if (resolvedUrl) resolvedListPageUrl.set(idx, resolvedUrl);
@@ -1379,13 +1382,13 @@ https://cdn.example.org/c/003.webp"></textarea>
   // one currently open at all (編集 dialog's 「ページ数を取得」 button).
   const pageCountDetectionInProgress = new Set();
 
-  async function probePageAt(key, n, extHint) {
+  async function probePageAt(key, n, extHint, numberWidth) {
     const order = extHint != null
       ? [extHint, ...EXT_CANDIDATES.map((_, i) => i).filter((i) => i !== extHint)]
       : EXT_CANDIDATES.map((_, i) => i);
     let timedOut = false;
     for (const idx of order) {
-      const url = key + n + '.' + EXT_CANDIDATES[idx];
+      const url = pageUrlFor(key, n, idx, numberWidth);
       const result = await loadImageResult(url);
       if (result === 'loaded') return { kind: 'found', url: url, ext: idx };
       if (result === 'timeout') timedOut = true;
@@ -1397,14 +1400,14 @@ https://cdn.example.org/c/003.webp"></textarea>
   // time exactly like detectMorePages. onProgress(count, ext), if given, is
   // called after every batch so callers can persist partial progress as it
   // happens (not just at the very end).
-  async function runPageCountLoop(key, fromCount, ext, onProgress) {
+  async function runPageCountLoop(key, fromCount, ext, numberWidth, onProgress) {
     let count = fromCount;
     let curExt = ext;
     while (true) {
       const batchNums = [];
       for (let n = count + 1; n <= count + DETECT_BATCH_SIZE && n <= MAX_PAGES_SAFETY; n++) batchNums.push(n);
       if (!batchNums.length) return { count, ext: curExt, hitLimit: true, state: 'complete', retryFrom: null };
-      const results = await Promise.all(batchNums.map((n) => probePageAt(key, n, curExt)));
+      const results = await Promise.all(batchNums.map((n) => probePageAt(key, n, curExt, numberWidth)));
       let endState = null;
       for (const r of results) {
         if (r.kind !== 'found') { endState = r.kind; break; }
@@ -1417,11 +1420,11 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
   }
 
-  async function detectPageCountForKey(key, fromCount, extHint, onProgress) {
-    if (fromCount > 0) return runPageCountLoop(key, fromCount, extHint, onProgress);
-    const first = await probePageAt(key, 1, null);
+  async function detectPageCountForKey(key, fromCount, extHint, numberWidth, onProgress) {
+    if (fromCount > 0) return runPageCountLoop(key, fromCount, extHint, numberWidth, onProgress);
+    const first = await probePageAt(key, 1, null, numberWidth);
     if (first.kind !== 'found') return { count: 0, ext: 0, hitLimit: false, state: first.kind === 'timeout' ? 'retryable' : 'unavailable', retryFrom: first.kind === 'timeout' ? 1 : null };
-    return runPageCountLoop(key, 1, first.ext, onProgress);
+    return runPageCountLoop(key, 1, first.ext, numberWidth, onProgress);
   }
 
   // opts.force: 既にキャッシュ済みでも取得し直す（編集ダイアログの明示ボタン用）。
@@ -1440,13 +1443,14 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
     const fromCount = o.retry && cached ? Number(cached.count) || 0 : 0;
     const extHint = o.retry && cached ? cached.ext : null;
+    const numberWidth = Math.max(1, Number(o.numberWidth || (cached && cached.numberWidth)) || 1);
     pageCountDetectionInProgress.add(key);
-    const task = detectPageCountForKey(key, fromCount, extHint, (count, ext) => {
-      setCachedMangaInfo(key, { ext: ext, count: count, hitLimit: false, state: 'retryable', retryFrom: count + 1 });
+    const task = detectPageCountForKey(key, fromCount, extHint, numberWidth, (count, ext) => {
+      setCachedMangaInfo(key, { ext: ext, count: count, numberWidth: numberWidth, hitLimit: false, state: 'retryable', retryFrom: count + 1 });
       if (o.onProgress) o.onProgress(count, ext);
     })
       .then((result) => {
-        if (result) setCachedMangaInfo(key, { ext: result.ext, count: result.count, hitLimit: result.hitLimit, state: result.state || 'complete', retryFrom: result.retryFrom || null });
+        if (result) setCachedMangaInfo(key, { ext: result.ext, count: result.count, numberWidth: numberWidth, hitLimit: result.hitLimit, state: result.state || 'complete', retryFrom: result.retryFrom || null });
         if (o.onDone) o.onDone(result);
         return result;
       })
@@ -1458,14 +1462,14 @@ https://cdn.example.org/c/003.webp"></textarea>
   // detectMorePagesがreadingGenerationの変化で中断された直後にだけ呼ぶ想定の
   // 引き継ぎ専用ルート。pages.length（既に確定済みの最後のページ）の続きから
   // 始めるので、止まった時点のページをもう一度確認したりはしない。
-  function continuePageCountDetection(key, fromCount, ext) {
+  function continuePageCountDetection(key, fromCount, ext, numberWidth) {
     if (!key || fromCount <= 0 || pageCountDetectionInProgress.has(key)) return;
     pageCountDetectionInProgress.add(key);
-    runPageCountLoop(key, fromCount, ext, (count, curExt) => {
-      setCachedMangaInfo(key, { ext: curExt, count, hitLimit: false, state: 'retryable', retryFrom: count + 1 });
+    runPageCountLoop(key, fromCount, ext, numberWidth, (count, curExt) => {
+      setCachedMangaInfo(key, { ext: curExt, count, numberWidth, hitLimit: false, state: 'retryable', retryFrom: count + 1 });
     })
       .then((result) => {
-        setCachedMangaInfo(key, { ext: result.ext, count: result.count, hitLimit: result.hitLimit, state: result.state || 'complete', retryFrom: result.retryFrom || null });
+        setCachedMangaInfo(key, { ext: result.ext, count: result.count, numberWidth, hitLimit: result.hitLimit, state: result.state || 'complete', retryFrom: result.retryFrom || null });
       })
       .catch(() => {})
       .finally(() => { pageCountDetectionInProgress.delete(key); });
@@ -1477,7 +1481,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // 自身とは絶対に同時に走らない。
   function handOffIncompleteDetection() {
     if (detecting && !detectionDone && baseUrl && pages.length > 0) {
-      continuePageCountDetection(baseUrl, pages.length, preferredExt);
+      continuePageCountDetection(baseUrl, pages.length, preferredExt, pageNumberWidth);
     }
   }
 
@@ -1867,6 +1871,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     } else {
       historyItem = { id: genId('i'), url, title: deriveTitleFromUrl(url), folderId: HISTORY_FOLDER_ID, addedAt: Date.now() };
     }
+    historyItem.numberWidth = pageNumberWidth;
     savedItems.unshift(historyItem);
     recordReading(historyItem);
     persistItems();
@@ -1939,17 +1944,17 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!v) return null;
     if (!/^https?:\/\//i.test(v)) v = 'https://' + v;
     let hintExt = null;
-    const m = v.match(/^(.*\/)\d+\.([A-Za-z0-9]+)(?:[?#].*)?$/);
+    const m = v.match(/^(.*\/)(\d+)\.([A-Za-z0-9]+)(?:[?#].*)?$/);
     if (m) {
       v = m[1];
-      const idx = EXT_CANDIDATES.indexOf(m[2].toLowerCase());
+      const idx = EXT_CANDIDATES.indexOf(m[3].toLowerCase());
       if (idx !== -1) hintExt = idx;
     } else {
       // strip any query/hash if the user pasted a folder URL with one
       v = v.replace(/[?#].*$/, '');
     }
     if (!v.endsWith('/')) v += '/';
-    return { baseUrl: v, hintExt: hintExt };
+    return { baseUrl: v, hintExt: hintExt, numberWidth: m ? m[2].length : null };
   }
 
   // ---------- image loading / detection ----------
@@ -1972,7 +1977,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     let timedOut = false;
     for (const idx of order) {
       const ext = EXT_CANDIDATES[idx];
-      const url = baseUrl + pageNum + '.' + ext;
+      const url = pageUrlFor(baseUrl, pageNum, idx, pageNumberWidth);
       const result = await loadImageResult(url);
       if (result === 'loaded') { preferredExt = idx; return { kind: 'found', url: url }; }
       if (result === 'timeout') timedOut = true;
@@ -1989,20 +1994,22 @@ https://cdn.example.org/c/003.webp"></textarea>
   // instantly. Returns the resolved URL (with extension) once found, or
   // null if none of the candidates loaded — callers use this to populate
   // resolvedListPageUrl for the live vertical drag.
-  async function preloadFirstPage(rawUrlForItem) {
-    const key = mangaCacheKeyFor(rawUrlForItem);
+  async function preloadFirstPage(rawUrlForItem, savedNumberWidth) {
+    const parsed = parseInputUrl(rawUrlForItem);
+    const key = parsed ? parsed.baseUrl : mangaCacheKeyFor(rawUrlForItem);
     const cached = getCachedMangaInfo(key);
+    const numberWidth = Math.max(1, Number((parsed && parsed.numberWidth) || savedNumberWidth || (cached && cached.numberWidth)) || 1);
     if (cached) {
       // Known from a previous visit — try that extension first instead of
       // blindly cascading through all of them again. Still a real
       // loadImage() check (not a blind guess), so a stale/changed manga
       // falls straight through to the normal cascade below.
-      const url = key + '1.' + EXT_CANDIDATES[cached.ext];
+      const url = pageUrlFor(key, 1, cached.ext, numberWidth);
       const ok = await loadImage(url);
       if (ok) return url;
     }
     for (const ext of EXT_CANDIDATES) {
-      const url = key + '1.' + ext;
+      const url = key + formatPageNumber(1, numberWidth) + '.' + ext;
       const ok = await loadImage(url);
       if (ok) return url;
     }
@@ -2037,6 +2044,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     currentResumeKey = baseUrl;
     currentlyCustom = false;
     splitSpreads = !!(currentItem && currentItem.splitSpreads);
+    pageNumberWidth = Math.max(1, Number(parsed.numberWidth || (currentItem && currentItem.numberWidth)) || 1);
     loadCurrentToc();
     hideNextVolumeBanner();
     preferredExt = parsed.hintExt !== null ? parsed.hintExt : 0;
@@ -2059,7 +2067,11 @@ https://cdn.example.org/c/003.webp"></textarea>
     const cached = getCachedMangaInfo(baseUrl);
     if (cached && cached.count > 0) {
       preferredExt = cached.ext;
-      pages = Array.from({ length: cached.count }, (_, i) => baseUrl + (i + 1) + '.' + EXT_CANDIDATES[cached.ext]);
+      pageNumberWidth = Math.max(1, Number(parsed.numberWidth || (currentItem && currentItem.numberWidth) || cached.numberWidth) || 1);
+      if (Number(cached.numberWidth) !== pageNumberWidth) {
+        setCachedMangaInfo(baseUrl, { ...cached, numberWidth: pageNumberWidth });
+      }
+      pages = Array.from({ length: cached.count }, (_, i) => pageUrlFor(baseUrl, i + 1, cached.ext, pageNumberWidth));
       els.placeholder.style.display = 'none';
       els.spinner.style.display = 'none';
       els.imgWrap.style.display = 'block';
@@ -2093,14 +2105,14 @@ https://cdn.example.org/c/003.webp"></textarea>
       if (firstResult.kind === 'timeout') {
         // Keep the timeout visible to the bulk retry tool even when page 1
         // could not be obtained. A later retry starts at page 1.
-        setCachedMangaInfo(baseUrl, { ext: preferredExt, count: 0, hitLimit: false, state: 'retryable', retryFrom: 1 });
+        setCachedMangaInfo(baseUrl, { ext: preferredExt, count: 0, numberWidth: pageNumberWidth, hitLimit: false, state: 'retryable', retryFrom: 1 });
       }
       els.spinner.style.display = 'none';
       els.imgWrap.style.display = 'none';
       els.placeholder.style.display = 'block';
       els.placeholder.innerHTML =
         (firstResult.kind === 'timeout' ? '1ページ目の読み込みがタイムアウトしました。時間をおいて再試行してください。<br>' : '1ページ目が見つかりませんでした。<br>') +
-        '試したURL: ' + EXT_CANDIDATES.map((e) => '<code>' + baseUrl + '1.' + e + '</code>').join(' / ') + '<br>' +
+        '試したURL: ' + EXT_CANDIDATES.map((e) => '<code>' + baseUrl + formatPageNumber(1, pageNumberWidth) + '.' + e + '</code>').join(' / ') + '<br>' +
         'URLや拡張子を確認してください。';
       els.status.textContent = '';
       detecting = false;
@@ -2144,7 +2156,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       }
       updateStatus();
       updateSlider();
-      setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, hitLimit: false, state: endState === 'missing' ? 'complete' : 'retryable', retryFrom: endState === 'missing' ? null : pages.length + 1 });
+      setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, numberWidth: pageNumberWidth, hitLimit: false, state: endState === 'missing' ? 'complete' : 'retryable', retryFrom: endState === 'missing' ? null : pages.length + 1 });
 
       if (brokeEarly || pageNum > MAX_PAGES_SAFETY) {
         detectionHitLimit = pageNum > MAX_PAGES_SAFETY;
@@ -2155,7 +2167,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         persistLastPage();
         updateNextVolumeBanner();
         markCurrentItemReadIfEligible();
-        setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, hitLimit: detectionHitLimit, state: endState === 'timeout' ? 'retryable' : 'complete', retryFrom: endState === 'timeout' ? pages.length + 1 : null });
+        setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, numberWidth: pageNumberWidth, hitLimit: detectionHitLimit, state: endState === 'timeout' ? 'retryable' : 'complete', retryFrom: endState === 'timeout' ? pages.length + 1 : null });
         return;
       }
     }
@@ -2192,7 +2204,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         els.placeholder.style.display = 'block';
         els.placeholder.innerHTML =
           '1ページ目の読み込みがタイムアウトしました。時間をおいて再試行してください。<br>' +
-          '試したURL: ' + EXT_CANDIDATES.map((e) => '<code>' + baseUrl + '1.' + e + '</code>').join(' / ') + '<br>' +
+          '試したURL: ' + EXT_CANDIDATES.map((e) => '<code>' + baseUrl + formatPageNumber(1, pageNumberWidth) + '.' + e + '</code>').join(' / ') + '<br>' +
           'URLや拡張子を確認してください。';
         els.status.textContent = '';
         updateCloseButtonVisibility();
@@ -2296,6 +2308,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     baseUrl = '';
     pages = [];
     splitSpreads = false;
+    pageNumberWidth = 1;
     currentResumeKey = '';
     currentlyCustom = false;
     currentItem = null;
@@ -3179,6 +3192,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       author: normalizedAuthor(els.saveAuthorInput.value),
       tags: parseTags(els.saveTagsInput.value),
       splitSpreads: els.saveSplitSpreadsInput.checked,
+      numberWidth: pageNumberWidth,
       folderId: folderId || null,
       series: seriesData.series,
       volume: seriesData.volume,
@@ -3387,7 +3401,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       if (Array.isArray(item.pages) && item.pages.length) {
         img.src = item.pages[0];
       } else {
-        setupFeedImage(img, item.url);
+        setupFeedImage(img, item.url, item.numberWidth);
       }
       preview.appendChild(img);
     });
@@ -3637,7 +3651,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (Array.isArray(item.pages) && item.pages.length) {
       img.src = item.pages[0]; // exact URL already known; no extension cascade needed
     } else {
-      setupFeedImage(img, item.url);
+      setupFeedImage(img, item.url, item.numberWidth);
     }
     cover.appendChild(img);
 
@@ -3881,11 +3895,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   // its pages use, so the cover image is found the same cascading way page
   // detection works: try .jpg, then .jpeg/.png/.webp on error, in order.
   // Used by the bookshelf grid (buildBookCard) for cover thumbnails.
-  function setupFeedImage(imgEl, baseUrlForItem) {
+  function setupFeedImage(imgEl, baseUrlForItem, numberWidth) {
     let idx = 0;
     function tryNext() {
       if (idx >= EXT_CANDIDATES.length) return;
-      imgEl.src = baseUrlForItem + '1.' + EXT_CANDIDATES[idx];
+      imgEl.src = baseUrlForItem + formatPageNumber(1, numberWidth) + '.' + EXT_CANDIDATES[idx];
       idx++;
     }
     imgEl.addEventListener('error', tryNext);
@@ -3956,6 +3970,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       const result = await ensurePageCountDetected(job.key, {
         force: true,
         retry: mode === 'retry',
+        numberWidth: job.item.numberWidth,
         onProgress: (count) => {
           els.bulkDetectProgress.textContent = '読み込み中 (' + (completed + 1) + ' / ' + jobs.length + ')\n' + itemDisplayTitle(job.item) + '\n' + count + 'ページまで保存しました。';
         }
@@ -3992,7 +4007,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   bindSeriesControls(els.editSeriesInput, els.editNewSeriesRow, els.editNewSeriesInput, els.editVolumeInput, els.editTitleInput);
 
   function promptForMangaUrl() {
-    const input = window.prompt('URLを入力してください\n例: https://example.com/manga/test/  または .../1.jpg');
+    const input = window.prompt('URLを入力してください\n例: https://example.com/manga/test/  または .../1.jpg、.../01.jpg、.../001.jpg');
     if (input === null) return; // cancelled
     const v = input.trim();
     if (!v) return;
