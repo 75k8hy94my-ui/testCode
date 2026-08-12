@@ -270,6 +270,7 @@
   .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 
   /* Saved list */
+  #savedListPanel, #mangaListSection, #videoListSection { background: var(--bg); }
   #listToolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
   #listFolderTitle { flex: 1; font-size: 14px; font-weight: 700; }
   #listNewFolderRow { display: none; gap: 8px; margin-bottom: 10px; }
@@ -279,7 +280,7 @@
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
   #listNewFolderRow input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); outline: none; }
-  #savedListItems { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 7px; }
+  #savedListItems { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 7px; background: var(--bg); }
   .saved-item {
     display: flex; align-items: center; gap: 8px;
     background: var(--bg-soft); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 11px;
@@ -511,7 +512,7 @@
   }
   .book-reading.unread { color: var(--accent); font-weight: 700; }
   html, body { background: var(--bg); }
-  #app { background: #000; height: 100dvh; }
+  #app { background: var(--bg); height: 100dvh; }
   #topbar, #controls {
     border-color: rgba(255,255,255,.12);
     background: rgba(25,25,27,.72);
