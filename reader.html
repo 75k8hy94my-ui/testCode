@@ -485,6 +485,9 @@
   .primaryBtn { background: var(--accent); color: #fff; box-shadow: none; }
   .ctrlBtn { background: var(--panel-2); }
   .ctrlBtn, .primaryBtn { min-height: 38px; border-radius: 10px; font-weight: 600; }
+  .logoutBtn { background: #dc2626 !important; border-color: #dc2626 !important; color: #fff !important; }
+  .logoutBtn:hover { background: #b91c1c !important; border-color: #b91c1c !important; }
+  .logoutBtn:disabled { opacity: .6; cursor: wait; }
   .modalOverlay { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
   .modalPanel { width: 100%; min-height: 100dvh; max-height: none; border: 0; padding: 28px max(24px, env(safe-area-inset-right)) 32px max(24px, env(safe-area-inset-left)); }
   .panel-header { font-size: 17px; border-bottom: 0; padding-bottom: 2px; }
@@ -601,7 +604,7 @@
     <button class="ctrlBtn" id="listBtn" title="保存したURLの一覧">リスト</button>
     <button class="ctrlBtn" type="button" onclick="window.location.href='links.html'" title="保存したWebリンクを管理">リンク管理</button>
     <button class="ctrlBtn" id="safeModeBtn" title="セーフモード（漫画の画像にモザイクをかけます）">セーフモード</button>
-    <button class="ctrlBtn" id="logoutBtn" title="ログアウトして端末内の保存データを消去">ログアウト</button>
+    <button class="ctrlBtn logoutBtn" id="logoutBtn" title="ログアウトして端末内の保存データを消去">ログアウト</button>
     <span id="status"></span>
     <span id="currentTitle"></span>
   </div>
@@ -737,7 +740,10 @@ https://cdn.example.org/c/003.webp"></textarea>
   <div id="savedListPanel" class="modalPanel">
     <div class="panel-header">
       <span id="listPanelTitle">保存したURL</span>
-      <button class="ctrlBtn" id="closeListBtn">閉じる</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="ctrlBtn logoutBtn" id="listLogoutBtn" title="ログアウトして端末内の保存データを消去">ログアウト</button>
+        <button class="ctrlBtn" id="closeListBtn">閉じる</button>
+      </div>
     </div>
     <div id="listTabRow">
       <button class="listTab active" id="listTabManga" type="button">漫画</button>
@@ -971,6 +977,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     bulkDetectBtn: document.getElementById('bulkDetectBtn'),
     openCloudSyncBtn: document.getElementById('openCloudSyncBtn'),
     logoutBtn: document.getElementById('logoutBtn'),
+    listLogoutBtn: document.getElementById('listLogoutBtn'),
 
     bulkDetectOverlay: document.getElementById('bulkDetectOverlay'),
     closeBulkDetectBtn: document.getElementById('closeBulkDetectBtn'),
@@ -3710,9 +3717,10 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.addCustomBtn.addEventListener('click', openCustomAddDialog);
   els.bulkDetectBtn.addEventListener('click', openBulkDetect);
   els.openCloudSyncBtn.addEventListener('click', () => { window.location.href = 'sync.html'; });
-  els.logoutBtn.addEventListener('click', async () => {
+  async function logoutFromReader() {
     if (!confirm('ログアウトしますか？')) return;
     els.logoutBtn.disabled = true;
+    els.listLogoutBtn.disabled = true;
     try {
       await MangaVault.withSession((token) => MangaVault.api('/auth/v1/logout', { method: 'POST', token: token }));
     } catch (e) {
@@ -3728,7 +3736,9 @@ https://cdn.example.org/c/003.webp"></textarea>
       deviceKeys.forEach((key) => localStorage.removeItem(key));
       window.location.replace('index.html');
     }
-  });
+  }
+  els.logoutBtn.addEventListener('click', logoutFromReader);
+  els.listLogoutBtn.addEventListener('click', logoutFromReader);
   els.cancelCustomAddBtn.addEventListener('click', closeCustomAddDialog);
   els.confirmCustomAddBtn.addEventListener('click', confirmCustomAdd);
   els.closeBulkDetectBtn.addEventListener('click', closeBulkDetect);
