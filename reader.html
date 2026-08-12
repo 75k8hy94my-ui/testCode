@@ -698,6 +698,11 @@
     <div id="saveNewSeriesRow" class="seriesNewRow">
       <input id="saveNewSeriesInput" type="text" placeholder="新しいシリーズ名">
     </div>
+    <div id="saveSeriesAuthorRow" class="seriesNewRow">
+      <label class="field-label" for="saveNewSeriesAuthorInput">シリーズの作者</label>
+      <input id="saveNewSeriesAuthorInput" type="text" placeholder="作者名">
+      <label class="checkRow"><input id="saveSeriesNoAuthorInput" type="checkbox">作者を指定しない</label>
+    </div>
     <label class="field-label" for="saveVolumeInput">巻数・話数（シリーズ設定時は必須）</label>
     <input id="saveVolumeInput" type="number" min="0.1" step="0.1" placeholder="例: 1 または 1.5">
     <div class="dialog-actions">
@@ -736,6 +741,11 @@
     <select id="customSeriesInput"></select>
     <div id="customNewSeriesRow" class="seriesNewRow">
       <input id="customNewSeriesInput" type="text" placeholder="新しいシリーズ名">
+    </div>
+    <div id="customSeriesAuthorRow" class="seriesNewRow">
+      <label class="field-label" for="customNewSeriesAuthorInput">シリーズの作者</label>
+      <input id="customNewSeriesAuthorInput" type="text" placeholder="作者名">
+      <label class="checkRow"><input id="customSeriesNoAuthorInput" type="checkbox">作者を指定しない</label>
     </div>
     <label class="field-label" for="customVolumeInput">巻数・話数（シリーズ設定時は必須）</label>
     <input id="customVolumeInput" type="number" min="0.1" step="0.1" placeholder="例: 1 または 1.5">
@@ -780,6 +790,11 @@ https://cdn.example.org/c/003.webp"></textarea>
     <select id="editSeriesInput"></select>
     <div id="editNewSeriesRow" class="seriesNewRow">
       <input id="editNewSeriesInput" type="text" placeholder="新しいシリーズ名">
+    </div>
+    <div id="editSeriesAuthorRow" class="seriesNewRow">
+      <label class="field-label" for="editNewSeriesAuthorInput">シリーズの作者</label>
+      <input id="editNewSeriesAuthorInput" type="text" placeholder="作者名">
+      <label class="checkRow"><input id="editSeriesNoAuthorInput" type="checkbox">作者を指定しない</label>
     </div>
     <label class="field-label" for="editVolumeInput">巻数・話数（シリーズ設定時は必須）</label>
     <input id="editVolumeInput" type="number" min="0.1" step="0.1" placeholder="例: 1 または 1.5">
@@ -1030,6 +1045,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     saveSeriesInput: document.getElementById('saveSeriesInput'),
     saveNewSeriesRow: document.getElementById('saveNewSeriesRow'),
     saveNewSeriesInput: document.getElementById('saveNewSeriesInput'),
+    saveSeriesAuthorRow: document.getElementById('saveSeriesAuthorRow'),
+    saveNewSeriesAuthorInput: document.getElementById('saveNewSeriesAuthorInput'),
+    saveSeriesNoAuthorInput: document.getElementById('saveSeriesNoAuthorInput'),
     saveVolumeInput: document.getElementById('saveVolumeInput'),
     cancelSaveBtn: document.getElementById('cancelSaveBtn'),
     confirmSaveBtn: document.getElementById('confirmSaveBtn'),
@@ -1078,6 +1096,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     customSeriesInput: document.getElementById('customSeriesInput'),
     customNewSeriesRow: document.getElementById('customNewSeriesRow'),
     customNewSeriesInput: document.getElementById('customNewSeriesInput'),
+    customSeriesAuthorRow: document.getElementById('customSeriesAuthorRow'),
+    customNewSeriesAuthorInput: document.getElementById('customNewSeriesAuthorInput'),
+    customSeriesNoAuthorInput: document.getElementById('customSeriesNoAuthorInput'),
     customVolumeInput: document.getElementById('customVolumeInput'),
     customPagesTextarea: document.getElementById('customPagesTextarea'),
     cancelCustomAddBtn: document.getElementById('cancelCustomAddBtn'),
@@ -1100,6 +1121,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     editSeriesInput: document.getElementById('editSeriesInput'),
     editNewSeriesRow: document.getElementById('editNewSeriesRow'),
     editNewSeriesInput: document.getElementById('editNewSeriesInput'),
+    editSeriesAuthorRow: document.getElementById('editSeriesAuthorRow'),
+    editNewSeriesAuthorInput: document.getElementById('editNewSeriesAuthorInput'),
+    editSeriesNoAuthorInput: document.getElementById('editSeriesNoAuthorInput'),
     editVolumeInput: document.getElementById('editVolumeInput'),
     deleteEditItemBtn: document.getElementById('deleteEditItemBtn'),
     cancelEditItemBtn: document.getElementById('cancelEditItemBtn'),
@@ -3124,6 +3148,51 @@ https://cdn.example.org/c/003.webp"></textarea>
     return String(value || '').trim().slice(0, 100);
   }
 
+  function seriesAuthorFor(series) {
+    if (!series) return '';
+    const matchingItems = savedItems.filter((item) => item.series === series);
+    return matchingItems.map((item) => normalizedAuthor(item.author)).find(Boolean) || '';
+  }
+
+  function updateSeriesAuthorForm(selectEl, newSeriesInput, rowEl, newAuthorInput, noAuthorInput, authorInput) {
+    const hasSeries = !!selectEl.value;
+    const isNew = selectEl.value === '__new__';
+    const hadSeries = authorInput.dataset.seriesAuthorActive === '1';
+    if (hasSeries && !hadSeries) authorInput.dataset.manualAuthor = authorInput.value;
+
+    rowEl.style.display = isNew ? 'block' : 'none';
+    authorInput.disabled = hasSeries;
+    if (!hasSeries) {
+      if (hadSeries) authorInput.value = authorInput.dataset.manualAuthor || '';
+    } else if (isNew) {
+      newAuthorInput.disabled = noAuthorInput.checked;
+      authorInput.value = noAuthorInput.checked ? '' : normalizedAuthor(newAuthorInput.value);
+    } else {
+      authorInput.value = seriesAuthorFor(selectedSeriesName(selectEl, newSeriesInput));
+    }
+    authorInput.dataset.seriesAuthorActive = hasSeries ? '1' : '0';
+  }
+
+  function readSeriesAuthorForm(selectEl, newSeriesInput, newAuthorInput, noAuthorInput, authorInput) {
+    if (!selectEl.value) return normalizedAuthor(authorInput.value);
+    const series = selectedSeriesName(selectEl, newSeriesInput);
+    if (selectEl.value !== '__new__' || savedItems.some((item) => item.series === series)) return seriesAuthorFor(series);
+    if (noAuthorInput.checked) return '';
+    const author = normalizedAuthor(newAuthorInput.value);
+    if (!author) {
+      flashStatus('シリーズの作者を入力するか、「作者を指定しない」を選択してください');
+      return null;
+    }
+    return author;
+  }
+
+  function applySeriesAuthor(series, author) {
+    if (!series) return;
+    savedItems.forEach((item) => {
+      if (item.series === series) item.author = author;
+    });
+  }
+
   function parseTags(value) {
     const seen = new Set();
     return String(value || '').split(/[,，\n]/).map((tag) => tag.trim()).filter((tag) => {
@@ -3227,6 +3296,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     pendingSaveUrl = baseUrl;
     els.saveTitleInput.value = deriveTitleFromUrl(pendingSaveUrl);
     els.saveAuthorInput.value = '';
+    els.saveAuthorInput.dataset.manualAuthor = '';
+    els.saveAuthorInput.dataset.seriesAuthorActive = '0';
     els.saveTagsInput.value = '';
     els.saveDoujinInput.checked = false;
     renderSourceWorkOptions(els.saveSourceWorkInput, '');
@@ -3240,8 +3311,11 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.newFolderInput.value = '';
     renderSeriesOptions(els.saveSeriesInput, '');
     els.saveNewSeriesInput.value = '';
+    els.saveNewSeriesAuthorInput.value = '';
+    els.saveSeriesNoAuthorInput.checked = false;
     els.saveVolumeInput.value = '';
     updateSeriesForm(els.saveSeriesInput, els.saveNewSeriesRow, els.saveNewSeriesInput, els.saveVolumeInput, els.saveTitleInput);
+    updateSeriesAuthorForm(els.saveSeriesInput, els.saveNewSeriesInput, els.saveSeriesAuthorRow, els.saveNewSeriesAuthorInput, els.saveSeriesNoAuthorInput, els.saveAuthorInput);
     els.saveDialogOverlay.classList.add('show');
     els.saveTitleInput.focus();
   }
@@ -3268,6 +3342,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
     const seriesData = readSeriesForm(els.saveSeriesInput, els.saveNewSeriesInput, els.saveVolumeInput, null);
     if (!seriesData) return;
+    const seriesAuthor = readSeriesAuthorForm(els.saveSeriesInput, els.saveNewSeriesInput, els.saveNewSeriesAuthorInput, els.saveSeriesNoAuthorInput, els.saveAuthorInput);
+    if (seriesAuthor === null) return;
     const doujinData = readDoujinForm(els.saveDoujinInput, els.saveSourceWorkInput, els.saveNewSourceWorkInput);
     if (!doujinData) return;
     const title = seriesData.title || els.saveTitleInput.value.trim() || deriveTitleFromUrl(pendingSaveUrl);
@@ -3277,7 +3353,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       id: genId('i'),
       url: savedUrl,
       title: title,
-      author: normalizedAuthor(els.saveAuthorInput.value),
+      author: seriesAuthor,
       tags: parseTags(els.saveTagsInput.value),
       isDoujin: doujinData.isDoujin,
       sourceWork: doujinData.sourceWork,
@@ -3292,6 +3368,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       addedAt: Date.now(),
     };
     savedItems.unshift(savedItem);
+    applySeriesAuthor(seriesData.series, seriesAuthor);
 
     // 分割表示を新たに有効にした場合は、現在読んでいる元画像の右半分を
     // 続きとして開く。保存後に同じ作品を開き直すことで、保存した設定を
@@ -3334,6 +3411,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (customAddReturnToList) closeSavedList();
     els.customTitleInput.value = '';
     els.customAuthorInput.value = '';
+    els.customAuthorInput.dataset.manualAuthor = '';
+    els.customAuthorInput.dataset.seriesAuthorActive = '0';
     els.customTagsInput.value = '';
     els.customDoujinInput.checked = false;
     renderSourceWorkOptions(els.customSourceWorkInput, '');
@@ -3347,8 +3426,11 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.customNewFolderInput.value = '';
     renderSeriesOptions(els.customSeriesInput, '');
     els.customNewSeriesInput.value = '';
+    els.customNewSeriesAuthorInput.value = '';
+    els.customSeriesNoAuthorInput.checked = false;
     els.customVolumeInput.value = '';
     updateSeriesForm(els.customSeriesInput, els.customNewSeriesRow, els.customNewSeriesInput, els.customVolumeInput, els.customTitleInput);
+    updateSeriesAuthorForm(els.customSeriesInput, els.customNewSeriesInput, els.customSeriesAuthorRow, els.customNewSeriesAuthorInput, els.customSeriesNoAuthorInput, els.customAuthorInput);
     els.customPagesTextarea.value = '';
     els.customAddOverlay.classList.add('show');
     els.customTitleInput.focus();
@@ -3372,13 +3454,15 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (folderId === '__new__') folderId = '';
     const seriesData = readSeriesForm(els.customSeriesInput, els.customNewSeriesInput, els.customVolumeInput, null);
     if (!seriesData) return;
+    const seriesAuthor = readSeriesAuthorForm(els.customSeriesInput, els.customNewSeriesInput, els.customNewSeriesAuthorInput, els.customSeriesNoAuthorInput, els.customAuthorInput);
+    if (seriesAuthor === null) return;
     const doujinData = readDoujinForm(els.customDoujinInput, els.customSourceWorkInput, els.customNewSourceWorkInput);
     if (!doujinData) return;
     const title = seriesData.title || els.customTitleInput.value.trim() || ('無題' + (savedItems.length + 1));
     savedItems.unshift({
       id: genId('i'),
       title: title,
-      author: normalizedAuthor(els.customAuthorInput.value),
+      author: seriesAuthor,
       tags: parseTags(els.customTagsInput.value),
       isDoujin: doujinData.isDoujin,
       sourceWork: doujinData.sourceWork,
@@ -3390,6 +3474,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       pages: pageUrls,
       addedAt: Date.now(),
     });
+    applySeriesAuthor(seriesData.series, seriesAuthor);
     persistAll();
     closeCustomAddDialog();
     flashStatus(pageUrls.length + 'ページの漫画を追加しました');
@@ -3403,6 +3488,8 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     els.editTitleInput.value = itemDisplayTitle(item);
     els.editAuthorInput.value = item.author || '';
+    els.editAuthorInput.dataset.manualAuthor = els.editAuthorInput.value;
+    els.editAuthorInput.dataset.seriesAuthorActive = '0';
     els.editTagsInput.value = tagsText(item.tags);
     els.editDoujinInput.checked = !!item.isDoujin;
     renderSourceWorkOptions(els.editSourceWorkInput, item.sourceWork || '');
@@ -3416,8 +3503,11 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.editNewFolderInput.value = '';
     renderSeriesOptions(els.editSeriesInput, item.series || '');
     els.editNewSeriesInput.value = '';
+    els.editNewSeriesAuthorInput.value = '';
+    els.editSeriesNoAuthorInput.checked = false;
     els.editVolumeInput.value = item.volume != null ? String(item.volume) : '';
     updateSeriesForm(els.editSeriesInput, els.editNewSeriesRow, els.editNewSeriesInput, els.editVolumeInput, els.editTitleInput);
+    updateSeriesAuthorForm(els.editSeriesInput, els.editNewSeriesInput, els.editSeriesAuthorRow, els.editNewSeriesAuthorInput, els.editSeriesNoAuthorInput, els.editAuthorInput);
 
     els.editItemOverlay.classList.add('show');
     els.editTitleInput.focus();
@@ -3439,6 +3529,8 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     const seriesData = readSeriesForm(els.editSeriesInput, els.editNewSeriesInput, els.editVolumeInput, item.id);
     if (!seriesData) return;
+    const seriesAuthor = readSeriesAuthorForm(els.editSeriesInput, els.editNewSeriesInput, els.editNewSeriesAuthorInput, els.editSeriesNoAuthorInput, els.editAuthorInput);
+    if (seriesAuthor === null) return;
     const doujinData = readDoujinForm(els.editDoujinInput, els.editSourceWorkInput, els.editNewSourceWorkInput);
     if (!doujinData) return;
 
@@ -3446,13 +3538,14 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (folderId === '__new__') folderId = '';
     item.folderId = folderId || null;
     item.title = seriesData.title || els.editTitleInput.value.trim() || itemDisplayTitle(item);
-    item.author = normalizedAuthor(els.editAuthorInput.value);
+    item.author = seriesAuthor;
     item.tags = parseTags(els.editTagsInput.value);
     item.isDoujin = doujinData.isDoujin;
     item.sourceWork = doujinData.sourceWork;
     item.splitSpreads = els.editSplitSpreadsInput.checked;
     item.series = seriesData.series;
     item.volume = seriesData.volume;
+    applySeriesAuthor(seriesData.series, seriesAuthor);
 
     if (currentItem && currentItem.id === item.id) {
       splitSpreads = !!item.splitSpreads;
@@ -4120,6 +4213,17 @@ https://cdn.example.org/c/003.webp"></textarea>
   bindSeriesControls(els.customSeriesInput, els.customNewSeriesRow, els.customNewSeriesInput, els.customVolumeInput, els.customTitleInput);
   bindSeriesControls(els.editSeriesInput, els.editNewSeriesRow, els.editNewSeriesInput, els.editVolumeInput, els.editTitleInput);
 
+  function bindSeriesAuthorControls(selectEl, newSeriesInput, rowEl, newAuthorInput, noAuthorInput, authorInput) {
+    const refresh = () => updateSeriesAuthorForm(selectEl, newSeriesInput, rowEl, newAuthorInput, noAuthorInput, authorInput);
+    selectEl.addEventListener('change', refresh);
+    newSeriesInput.addEventListener('input', refresh);
+    newAuthorInput.addEventListener('input', refresh);
+    noAuthorInput.addEventListener('change', refresh);
+  }
+  bindSeriesAuthorControls(els.saveSeriesInput, els.saveNewSeriesInput, els.saveSeriesAuthorRow, els.saveNewSeriesAuthorInput, els.saveSeriesNoAuthorInput, els.saveAuthorInput);
+  bindSeriesAuthorControls(els.customSeriesInput, els.customNewSeriesInput, els.customSeriesAuthorRow, els.customNewSeriesAuthorInput, els.customSeriesNoAuthorInput, els.customAuthorInput);
+  bindSeriesAuthorControls(els.editSeriesInput, els.editNewSeriesInput, els.editSeriesAuthorRow, els.editNewSeriesAuthorInput, els.editSeriesNoAuthorInput, els.editAuthorInput);
+
   function bindDoujinControls(checkEl, rowEl, selectEl, newRowEl, newInput) {
     const refresh = () => updateDoujinForm(checkEl, rowEl, selectEl, newRowEl);
     checkEl.addEventListener('change', () => {
@@ -4357,7 +4461,9 @@ https://cdn.example.org/c/003.webp"></textarea>
         e.target === els.customTitleInput || e.target === els.customAuthorInput || e.target === els.customTagsInput || e.target === els.customNewSourceWorkInput || e.target === els.customNewFolderInput ||
         e.target === els.customPagesTextarea ||
         e.target === els.editTitleInput || e.target === els.editAuthorInput || e.target === els.editTagsInput || e.target === els.editNewSourceWorkInput || e.target === els.editNewFolderInput ||
-        e.target === els.saveNewSeriesInput || e.target === els.customNewSeriesInput || e.target === els.editNewSeriesInput ||
+        e.target === els.saveNewSeriesInput || e.target === els.saveNewSeriesAuthorInput ||
+        e.target === els.customNewSeriesInput || e.target === els.customNewSeriesAuthorInput ||
+        e.target === els.editNewSeriesInput || e.target === els.editNewSeriesAuthorInput ||
         e.target === els.githubRepoInput || e.target === els.githubPathInput || e.target === els.githubTokenInput) {
       if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); closeBulkDetect(); }
       return;
