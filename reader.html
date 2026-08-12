@@ -613,7 +613,7 @@
 <div id="app">
   <div id="readProgressBar"></div>
   <div id="topbar">
-    <button class="ctrlBtn favToggleBtn" id="closeBtn" title="閉じる" style="display:none;"></button>
+    <button class="ctrlBtn" id="closeBtn" title="閉じる" aria-label="リーダーを閉じる" style="display:none;">×</button>
     <button class="ctrlBtn" id="saveBtn" title="今のURLを保存" style="display:none;">URLを保存</button>
     <button class="ctrlBtn favToggleBtn" id="favToggleBtn" title="お気に入りに追加" style="display:none;"></button>
     <button class="ctrlBtn" id="readerEditBtn" title="表示中の漫画を編集" style="display:none;">編集</button>
@@ -1075,15 +1075,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     videoPlayerIframe: document.getElementById('videoPlayerIframe'),
     closeVideoPlayerBtn: document.getElementById('closeVideoPlayerBtn'),
   };
-
-  // 閉じるボタンのアイコンは状態によって変わらないため（♡/❤トグルと違い）、
-  // 起動時に一度だけ画像をセットする。
-  (function initCloseBtnIcon() {
-    const img = document.createElement('img');
-    img.src = ICON_CLOSE;
-    img.alt = '閉じる';
-    els.closeBtn.appendChild(img);
-  })();
 
   let savedVideos = [];    // { id, a, b, title, addedAt }
   let activeListTab = 'manga'; // 'manga' | 'video'
@@ -1676,10 +1667,11 @@ https://cdn.example.org/c/003.webp"></textarea>
     updateCloseButtonVisibility();
   }
 
-  // 閉じるボタンは漫画を表示中のほか、「URLを保存」が出ている未保存URLの
-  // 読み込み中にも表示する。これで未保存URLでも本棚へ戻れる。
+  // リーダーを開いている間は常に閉じるボタンを出す。保存済みかどうかは
+  // 表示条件ではなく、閉じる際に確認を出すかだけに使う。
   function updateCloseButtonVisibility() {
-    els.closeBtn.style.display = pages.length || hasUnsavedCurrentUrl() ? '' : 'none';
+    const readerIsOpen = !!baseUrl || currentlyCustom || !!currentItem || pages.length > 0;
+    els.closeBtn.style.display = readerIsOpen ? '' : 'none';
   }
 
   function findNextVolumeItem(seriesInfo) {
