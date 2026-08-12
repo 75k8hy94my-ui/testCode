@@ -655,6 +655,14 @@
   html[data-theme="light"] .book-delBtn { color: #b42318; }
   html[data-theme="light"] .book-favBtn.is-favorite { color: #d92d20; }
   html[data-theme="light"] .book-moveBtn { background: rgba(255,255,255,.96); color: #23272a; border-color: rgba(35,39,42,.16); }
+  #app[data-theme="light"] { --bg: #f5f5f7; --bg-soft: #ffffff; --panel: #ffffff; --panel-2: #e3e5e8; --border: #c9ccd1; --text: #23272a; --sub: #5b626b; background: #f5f5f7; }
+  #app[data-theme="light"] #savedListPanel,
+  #app[data-theme="light"] #mangaListSection,
+  #app[data-theme="light"] #videoListSection,
+  #app[data-theme="light"] #savedListItems { background: #f5f5f7; color: #23272a; }
+  #app[data-theme="light"] .book-title { color: #23272a; }
+  #app[data-theme="light"] .book-author,
+  #app[data-theme="light"] .book-reading { color: #5b626b; }
 </style>
 </head>
 <body>
@@ -1422,6 +1430,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   function applyTheme(theme) {
     const selected = theme === 'light' ? 'light' : 'dark';
     document.documentElement.dataset.theme = selected;
+    const app = document.getElementById('app');
+    if (app) app.dataset.theme = selected;
     [els.themeBtn, els.listThemeBtn].forEach((button) => {
       setThemeButtonIcon(button, selected);
       if (button) button.title = selected === 'light' ? 'ダークモードへ' : 'ライトモードへ';
