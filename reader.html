@@ -250,6 +250,7 @@
   #newFolderRow input, #customNewFolderRow input, #editNewFolderRow input { flex: 1; }
   .seriesNewRow { display: none; margin-top: 8px; }
   .seriesNewRow input { width: 100%; }
+  .doujinSourceRow { display: none; }
   input[readonly] { color: var(--sub) !important; background: var(--panel-2) !important; }
   input:disabled { opacity: .55; }
   .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
@@ -677,6 +678,14 @@
     <input id="saveAuthorInput" type="text" placeholder="例: 山田太郎" autocomplete="off">
     <label class="field-label" for="saveTagsInput">タグ</label>
     <input id="saveTagsInput" type="text" placeholder="カンマ区切りで入力　例: ファンタジー, お気に入り" autocomplete="off">
+    <label class="checkRow"><input id="saveDoujinInput" type="checkbox">同人誌</label>
+    <div id="saveDoujinSourceRow" class="doujinSourceRow">
+      <label class="field-label" for="saveSourceWorkInput">元ネタの作品名</label>
+      <select id="saveSourceWorkInput"></select>
+      <div id="saveNewSourceWorkRow" class="seriesNewRow">
+        <input id="saveNewSourceWorkInput" type="text" placeholder="新しい元ネタの作品名">
+      </div>
+    </div>
     <label class="checkRow"><input id="saveSplitSpreadsInput" type="checkbox">見開き画像を左右に分割して読む</label>
     <label class="field-label" for="saveFolderSelect">フォルダ</label>
     <select id="saveFolderSelect"></select>
@@ -708,6 +717,14 @@
     <input id="customAuthorInput" type="text" placeholder="例: 山田太郎" autocomplete="off">
     <label class="field-label" for="customTagsInput">タグ</label>
     <input id="customTagsInput" type="text" placeholder="カンマ区切りで入力　例: ファンタジー, お気に入り" autocomplete="off">
+    <label class="checkRow"><input id="customDoujinInput" type="checkbox">同人誌</label>
+    <div id="customDoujinSourceRow" class="doujinSourceRow">
+      <label class="field-label" for="customSourceWorkInput">元ネタの作品名</label>
+      <select id="customSourceWorkInput"></select>
+      <div id="customNewSourceWorkRow" class="seriesNewRow">
+        <input id="customNewSourceWorkInput" type="text" placeholder="新しい元ネタの作品名">
+      </div>
+    </div>
     <label class="checkRow"><input id="customSplitSpreadsInput" type="checkbox">見開き画像を左右に分割して読む</label>
     <label class="field-label" for="customFolderSelect">フォルダ</label>
     <select id="customFolderSelect"></select>
@@ -744,6 +761,14 @@ https://cdn.example.org/c/003.webp"></textarea>
     <input id="editAuthorInput" type="text" placeholder="例: 山田太郎" autocomplete="off">
     <label class="field-label" for="editTagsInput">タグ</label>
     <input id="editTagsInput" type="text" placeholder="カンマ区切りで入力　例: ファンタジー, お気に入り" autocomplete="off">
+    <label class="checkRow"><input id="editDoujinInput" type="checkbox">同人誌</label>
+    <div id="editDoujinSourceRow" class="doujinSourceRow">
+      <label class="field-label" for="editSourceWorkInput">元ネタの作品名</label>
+      <select id="editSourceWorkInput"></select>
+      <div id="editNewSourceWorkRow" class="seriesNewRow">
+        <input id="editNewSourceWorkInput" type="text" placeholder="新しい元ネタの作品名">
+      </div>
+    </div>
     <label class="checkRow"><input id="editSplitSpreadsInput" type="checkbox">見開き画像を左右に分割して読む</label>
     <label class="field-label" for="editFolderSelect">フォルダ</label>
     <select id="editFolderSelect"></select>
@@ -992,6 +1017,11 @@ https://cdn.example.org/c/003.webp"></textarea>
     saveTitleInput: document.getElementById('saveTitleInput'),
     saveAuthorInput: document.getElementById('saveAuthorInput'),
     saveTagsInput: document.getElementById('saveTagsInput'),
+    saveDoujinInput: document.getElementById('saveDoujinInput'),
+    saveDoujinSourceRow: document.getElementById('saveDoujinSourceRow'),
+    saveSourceWorkInput: document.getElementById('saveSourceWorkInput'),
+    saveNewSourceWorkRow: document.getElementById('saveNewSourceWorkRow'),
+    saveNewSourceWorkInput: document.getElementById('saveNewSourceWorkInput'),
     saveSplitSpreadsInput: document.getElementById('saveSplitSpreadsInput'),
     saveFolderSelect: document.getElementById('saveFolderSelect'),
     newFolderRow: document.getElementById('newFolderRow'),
@@ -1035,6 +1065,11 @@ https://cdn.example.org/c/003.webp"></textarea>
     customTitleInput: document.getElementById('customTitleInput'),
     customAuthorInput: document.getElementById('customAuthorInput'),
     customTagsInput: document.getElementById('customTagsInput'),
+    customDoujinInput: document.getElementById('customDoujinInput'),
+    customDoujinSourceRow: document.getElementById('customDoujinSourceRow'),
+    customSourceWorkInput: document.getElementById('customSourceWorkInput'),
+    customNewSourceWorkRow: document.getElementById('customNewSourceWorkRow'),
+    customNewSourceWorkInput: document.getElementById('customNewSourceWorkInput'),
     customSplitSpreadsInput: document.getElementById('customSplitSpreadsInput'),
     customFolderSelect: document.getElementById('customFolderSelect'),
     customNewFolderRow: document.getElementById('customNewFolderRow'),
@@ -1052,6 +1087,11 @@ https://cdn.example.org/c/003.webp"></textarea>
     editTitleInput: document.getElementById('editTitleInput'),
     editAuthorInput: document.getElementById('editAuthorInput'),
     editTagsInput: document.getElementById('editTagsInput'),
+    editDoujinInput: document.getElementById('editDoujinInput'),
+    editDoujinSourceRow: document.getElementById('editDoujinSourceRow'),
+    editSourceWorkInput: document.getElementById('editSourceWorkInput'),
+    editNewSourceWorkRow: document.getElementById('editNewSourceWorkRow'),
+    editNewSourceWorkInput: document.getElementById('editNewSourceWorkInput'),
     editSplitSpreadsInput: document.getElementById('editSplitSpreadsInput'),
     editFolderSelect: document.getElementById('editFolderSelect'),
     editNewFolderRow: document.getElementById('editNewFolderRow'),
@@ -2992,6 +3032,48 @@ https://cdn.example.org/c/003.webp"></textarea>
     return (selectEl.value === '__new__' ? newInput.value : selectEl.value).trim();
   }
 
+  function renderSourceWorkOptions(selectEl, selectedWork) {
+    const names = Array.from(new Set(savedItems.map((it) => (it.sourceWork || '').trim()).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b, 'ja'));
+    if (selectedWork && !names.includes(selectedWork)) names.push(selectedWork);
+    selectEl.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = '元ネタの作品名を選択';
+    selectEl.appendChild(placeholder);
+    names.forEach((name) => {
+      const option = document.createElement('option');
+      option.value = name;
+      option.textContent = name;
+      selectEl.appendChild(option);
+    });
+    const add = document.createElement('option');
+    add.value = '__new__';
+    add.textContent = '+ 新しい元ネタの作品名を追加';
+    selectEl.appendChild(add);
+    selectEl.value = selectedWork || '';
+  }
+
+  function selectedSourceWorkName(selectEl, newInput) {
+    return (selectEl.value === '__new__' ? newInput.value : selectEl.value).trim().slice(0, 100);
+  }
+
+  function updateDoujinForm(checkEl, rowEl, selectEl, newRowEl) {
+    const enabled = checkEl.checked;
+    rowEl.style.display = enabled ? 'block' : 'none';
+    newRowEl.style.display = enabled && selectEl.value === '__new__' ? 'block' : 'none';
+  }
+
+  function readDoujinForm(checkEl, selectEl, newInput) {
+    if (!checkEl.checked) return { isDoujin: false, sourceWork: '' };
+    const sourceWork = selectedSourceWorkName(selectEl, newInput);
+    if (!sourceWork) {
+      flashStatus('元ネタの作品名を選択または入力してください');
+      return null;
+    }
+    return { isDoujin: true, sourceWork: sourceWork };
+  }
+
   function seriesTitle(series, volume) {
     const numericVolume = Number(volume);
     return '第' + volume + (Number.isInteger(numericVolume) ? '巻' : '話') + ' ' + series;
@@ -3146,6 +3228,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.saveTitleInput.value = deriveTitleFromUrl(pendingSaveUrl);
     els.saveAuthorInput.value = '';
     els.saveTagsInput.value = '';
+    els.saveDoujinInput.checked = false;
+    renderSourceWorkOptions(els.saveSourceWorkInput, '');
+    els.saveNewSourceWorkInput.value = '';
+    updateDoujinForm(els.saveDoujinInput, els.saveDoujinSourceRow, els.saveSourceWorkInput, els.saveNewSourceWorkRow);
     els.saveSplitSpreadsInput.checked = false;
     els.saveTitleInput.dataset.manualTitle = els.saveTitleInput.value;
     els.saveTitleInput.dataset.seriesActive = '0';
@@ -3182,6 +3268,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
     const seriesData = readSeriesForm(els.saveSeriesInput, els.saveNewSeriesInput, els.saveVolumeInput, null);
     if (!seriesData) return;
+    const doujinData = readDoujinForm(els.saveDoujinInput, els.saveSourceWorkInput, els.saveNewSourceWorkInput);
+    if (!doujinData) return;
     const title = seriesData.title || els.saveTitleInput.value.trim() || deriveTitleFromUrl(pendingSaveUrl);
     const readingSource = getCurrentItem();
     const savedUrl = pendingSaveUrl;
@@ -3191,6 +3279,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       title: title,
       author: normalizedAuthor(els.saveAuthorInput.value),
       tags: parseTags(els.saveTagsInput.value),
+      isDoujin: doujinData.isDoujin,
+      sourceWork: doujinData.sourceWork,
       splitSpreads: els.saveSplitSpreadsInput.checked,
       numberWidth: pageNumberWidth,
       folderId: folderId || null,
@@ -3245,6 +3335,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.customTitleInput.value = '';
     els.customAuthorInput.value = '';
     els.customTagsInput.value = '';
+    els.customDoujinInput.checked = false;
+    renderSourceWorkOptions(els.customSourceWorkInput, '');
+    els.customNewSourceWorkInput.value = '';
+    updateDoujinForm(els.customDoujinInput, els.customDoujinSourceRow, els.customSourceWorkInput, els.customNewSourceWorkRow);
     els.customSplitSpreadsInput.checked = false;
     els.customTitleInput.dataset.manualTitle = '';
     els.customTitleInput.dataset.seriesActive = '0';
@@ -3278,12 +3372,16 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (folderId === '__new__') folderId = '';
     const seriesData = readSeriesForm(els.customSeriesInput, els.customNewSeriesInput, els.customVolumeInput, null);
     if (!seriesData) return;
+    const doujinData = readDoujinForm(els.customDoujinInput, els.customSourceWorkInput, els.customNewSourceWorkInput);
+    if (!doujinData) return;
     const title = seriesData.title || els.customTitleInput.value.trim() || ('無題' + (savedItems.length + 1));
     savedItems.unshift({
       id: genId('i'),
       title: title,
       author: normalizedAuthor(els.customAuthorInput.value),
       tags: parseTags(els.customTagsInput.value),
+      isDoujin: doujinData.isDoujin,
+      sourceWork: doujinData.sourceWork,
       splitSpreads: els.customSplitSpreadsInput.checked,
       folderId: folderId || null,
       series: seriesData.series,
@@ -3306,6 +3404,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.editTitleInput.value = itemDisplayTitle(item);
     els.editAuthorInput.value = item.author || '';
     els.editTagsInput.value = tagsText(item.tags);
+    els.editDoujinInput.checked = !!item.isDoujin;
+    renderSourceWorkOptions(els.editSourceWorkInput, item.sourceWork || '');
+    els.editNewSourceWorkInput.value = '';
+    updateDoujinForm(els.editDoujinInput, els.editDoujinSourceRow, els.editSourceWorkInput, els.editNewSourceWorkRow);
     els.editSplitSpreadsInput.checked = !!item.splitSpreads;
     els.editTitleInput.dataset.manualTitle = item.series ? (item.title || '') : els.editTitleInput.value;
     els.editTitleInput.dataset.seriesActive = item.series ? '1' : '0';
@@ -3337,6 +3439,8 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     const seriesData = readSeriesForm(els.editSeriesInput, els.editNewSeriesInput, els.editVolumeInput, item.id);
     if (!seriesData) return;
+    const doujinData = readDoujinForm(els.editDoujinInput, els.editSourceWorkInput, els.editNewSourceWorkInput);
+    if (!doujinData) return;
 
     let folderId = els.editFolderSelect.value;
     if (folderId === '__new__') folderId = '';
@@ -3344,6 +3448,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     item.title = seriesData.title || els.editTitleInput.value.trim() || itemDisplayTitle(item);
     item.author = normalizedAuthor(els.editAuthorInput.value);
     item.tags = parseTags(els.editTagsInput.value);
+    item.isDoujin = doujinData.isDoujin;
+    item.sourceWork = doujinData.sourceWork;
     item.splitSpreads = els.editSplitSpreadsInput.checked;
     item.series = seriesData.series;
     item.volume = seriesData.volume;
@@ -3609,7 +3715,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     return item.title || (item.url ? deriveTitleFromUrl(item.url) : '無題');
   }
   function itemSubtext(item) {
-    if (item.url) return item.url;
+    const doujinText = item.isDoujin && item.sourceWork ? '同人誌 ・ 元ネタ: ' + item.sourceWork : '';
+    if (item.url) return doujinText ? doujinText + '\n' + item.url : item.url;
     if (Array.isArray(item.pages)) return '個別URL ・ ' + (item.splitSpreads ? item.pages.length * 2 : item.pages.length) + 'ページ';
     return '';
   }
@@ -3722,6 +3829,13 @@ https://cdn.example.org/c/003.webp"></textarea>
       authorEl.textContent = item.author;
       authorEl.title = item.author;
       card.appendChild(authorEl);
+    }
+    if (item.isDoujin && item.sourceWork) {
+      const sourceWorkEl = document.createElement('div');
+      sourceWorkEl.className = 'book-author';
+      sourceWorkEl.textContent = '同人誌 ・ ' + item.sourceWork;
+      sourceWorkEl.title = '元ネタの作品名: ' + item.sourceWork;
+      card.appendChild(sourceWorkEl);
     }
     const tags = Array.isArray(item.tags) ? item.tags.filter(Boolean) : [];
     if (tags.length) {
@@ -4006,6 +4120,21 @@ https://cdn.example.org/c/003.webp"></textarea>
   bindSeriesControls(els.customSeriesInput, els.customNewSeriesRow, els.customNewSeriesInput, els.customVolumeInput, els.customTitleInput);
   bindSeriesControls(els.editSeriesInput, els.editNewSeriesRow, els.editNewSeriesInput, els.editVolumeInput, els.editTitleInput);
 
+  function bindDoujinControls(checkEl, rowEl, selectEl, newRowEl, newInput) {
+    const refresh = () => updateDoujinForm(checkEl, rowEl, selectEl, newRowEl);
+    checkEl.addEventListener('change', () => {
+      refresh();
+      if (checkEl.checked) selectEl.focus();
+    });
+    selectEl.addEventListener('change', () => {
+      refresh();
+      if (selectEl.value === '__new__') newInput.focus();
+    });
+  }
+  bindDoujinControls(els.saveDoujinInput, els.saveDoujinSourceRow, els.saveSourceWorkInput, els.saveNewSourceWorkRow, els.saveNewSourceWorkInput);
+  bindDoujinControls(els.customDoujinInput, els.customDoujinSourceRow, els.customSourceWorkInput, els.customNewSourceWorkRow, els.customNewSourceWorkInput);
+  bindDoujinControls(els.editDoujinInput, els.editDoujinSourceRow, els.editSourceWorkInput, els.editNewSourceWorkRow, els.editNewSourceWorkInput);
+
   function promptForMangaUrl() {
     const input = window.prompt('URLを入力してください\n例: https://example.com/manga/test/  または .../1.jpg、.../01.jpg、.../001.jpg');
     if (input === null) return; // cancelled
@@ -4223,11 +4352,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.target === els.saveTitleInput || e.target === els.saveAuthorInput || e.target === els.saveTagsInput ||
+    if (e.target === els.saveTitleInput || e.target === els.saveAuthorInput || e.target === els.saveTagsInput || e.target === els.saveNewSourceWorkInput ||
         e.target === els.newFolderInput || e.target === els.listNewFolderInput ||
-        e.target === els.customTitleInput || e.target === els.customAuthorInput || e.target === els.customTagsInput || e.target === els.customNewFolderInput ||
+        e.target === els.customTitleInput || e.target === els.customAuthorInput || e.target === els.customTagsInput || e.target === els.customNewSourceWorkInput || e.target === els.customNewFolderInput ||
         e.target === els.customPagesTextarea ||
-        e.target === els.editTitleInput || e.target === els.editAuthorInput || e.target === els.editTagsInput || e.target === els.editNewFolderInput ||
+        e.target === els.editTitleInput || e.target === els.editAuthorInput || e.target === els.editTagsInput || e.target === els.editNewSourceWorkInput || e.target === els.editNewFolderInput ||
         e.target === els.saveNewSeriesInput || e.target === els.customNewSeriesInput || e.target === els.editNewSeriesInput ||
         e.target === els.githubRepoInput || e.target === els.githubPathInput || e.target === els.githubTokenInput) {
       if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); closeBulkDetect(); }
