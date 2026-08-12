@@ -331,6 +331,9 @@
     background: rgba(70,217,194,0.14); border-radius: 8px; padding: 1px 7px;
     align-self: center; max-width: 100%;
   }
+  .book-author { font-size: 10px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .book-tags { display: flex; flex-wrap: wrap; gap: 3px; min-height: 0; }
+  .book-tag { max-width: 100%; padding: 2px 5px; border-radius: 6px; background: #edf2ff; color: #3657a7; font-size: 9px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .book-delBtn {
     position: absolute; top: 4px; right: 4px; width: 21px; height: 21px; line-height: 19px;
     text-align: center; border-radius: 50%; background: rgba(10,12,17,0.78); color: var(--text);
@@ -653,6 +656,10 @@
     <div class="panel-header"><span>URLを保存</span></div>
     <label class="field-label" for="saveTitleInput">タイトル</label>
     <input id="saveTitleInput" type="text" placeholder="例: ○○ 第1巻">
+    <label class="field-label" for="saveAuthorInput">作者</label>
+    <input id="saveAuthorInput" type="text" placeholder="例: 山田太郎">
+    <label class="field-label" for="saveTagsInput">タグ</label>
+    <input id="saveTagsInput" type="text" placeholder="カンマ区切りで入力　例: ファンタジー, お気に入り">
     <label class="field-label" for="saveFolderSelect">フォルダ</label>
     <select id="saveFolderSelect"></select>
     <div id="newFolderRow">
@@ -679,6 +686,10 @@
     <div class="panel-header"><span>個別追加</span></div>
     <label class="field-label" for="customTitleInput">タイトル</label>
     <input id="customTitleInput" type="text" placeholder="例: ○○ 第1巻">
+    <label class="field-label" for="customAuthorInput">作者</label>
+    <input id="customAuthorInput" type="text" placeholder="例: 山田太郎">
+    <label class="field-label" for="customTagsInput">タグ</label>
+    <input id="customTagsInput" type="text" placeholder="カンマ区切りで入力　例: ファンタジー, お気に入り">
     <label class="field-label" for="customFolderSelect">フォルダ</label>
     <select id="customFolderSelect"></select>
     <div id="customNewFolderRow">
@@ -710,6 +721,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     <div class="panel-header"><span>編集</span></div>
     <label class="field-label" for="editTitleInput">タイトル</label>
     <input id="editTitleInput" type="text" placeholder="例: ○○ 第1巻">
+    <label class="field-label" for="editAuthorInput">作者</label>
+    <input id="editAuthorInput" type="text" placeholder="例: 山田太郎">
+    <label class="field-label" for="editTagsInput">タグ</label>
+    <input id="editTagsInput" type="text" placeholder="カンマ区切りで入力　例: ファンタジー, お気に入り">
     <label class="field-label" for="editFolderSelect">フォルダ</label>
     <select id="editFolderSelect"></select>
     <div id="editNewFolderRow">
@@ -954,6 +969,8 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     saveDialogOverlay: document.getElementById('saveDialogOverlay'),
     saveTitleInput: document.getElementById('saveTitleInput'),
+    saveAuthorInput: document.getElementById('saveAuthorInput'),
+    saveTagsInput: document.getElementById('saveTagsInput'),
     saveFolderSelect: document.getElementById('saveFolderSelect'),
     newFolderRow: document.getElementById('newFolderRow'),
     newFolderInput: document.getElementById('newFolderInput'),
@@ -994,6 +1011,8 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     customAddOverlay: document.getElementById('customAddOverlay'),
     customTitleInput: document.getElementById('customTitleInput'),
+    customAuthorInput: document.getElementById('customAuthorInput'),
+    customTagsInput: document.getElementById('customTagsInput'),
     customFolderSelect: document.getElementById('customFolderSelect'),
     customNewFolderRow: document.getElementById('customNewFolderRow'),
     customNewFolderInput: document.getElementById('customNewFolderInput'),
@@ -1008,6 +1027,8 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     editItemOverlay: document.getElementById('editItemOverlay'),
     editTitleInput: document.getElementById('editTitleInput'),
+    editAuthorInput: document.getElementById('editAuthorInput'),
+    editTagsInput: document.getElementById('editTagsInput'),
     editFolderSelect: document.getElementById('editFolderSelect'),
     editNewFolderRow: document.getElementById('editNewFolderRow'),
     editNewFolderInput: document.getElementById('editNewFolderInput'),
@@ -2931,10 +2952,30 @@ https://cdn.example.org/c/003.webp"></textarea>
     return { series, volume, title: seriesTitle(series, volume) };
   }
 
+  function normalizedAuthor(value) {
+    return String(value || '').trim().slice(0, 100);
+  }
+
+  function parseTags(value) {
+    const seen = new Set();
+    return String(value || '').split(/[,，\n]/).map((tag) => tag.trim()).filter((tag) => {
+      const key = tag.toLocaleLowerCase();
+      if (!tag || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 12).map((tag) => tag.slice(0, 40));
+  }
+
+  function tagsText(tags) {
+    return Array.isArray(tags) ? tags.filter(Boolean).join(', ') : '';
+  }
+
   function openSaveDialog() {
     if (!baseUrl) { flashStatus('表示中の作品がありません'); return; }
     pendingSaveUrl = baseUrl;
     els.saveTitleInput.value = deriveTitleFromUrl(pendingSaveUrl);
+    els.saveAuthorInput.value = '';
+    els.saveTagsInput.value = '';
     els.saveTitleInput.dataset.manualTitle = els.saveTitleInput.value;
     els.saveTitleInput.dataset.seriesActive = '0';
     renderFolderOptions(els.saveFolderSelect, '');
@@ -2976,6 +3017,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       id: genId('i'),
       url: pendingSaveUrl,
       title: title,
+      author: normalizedAuthor(els.saveAuthorInput.value),
+      tags: parseTags(els.saveTagsInput.value),
       folderId: folderId || null,
       series: seriesData.series,
       volume: seriesData.volume,
@@ -3009,6 +3052,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     customAddReturnToList = isSavedListOpen();
     if (customAddReturnToList) closeSavedList();
     els.customTitleInput.value = '';
+    els.customAuthorInput.value = '';
+    els.customTagsInput.value = '';
     els.customTitleInput.dataset.manualTitle = '';
     els.customTitleInput.dataset.seriesActive = '0';
     renderFolderOptions(els.customFolderSelect, '');
@@ -3045,6 +3090,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     savedItems.unshift({
       id: genId('i'),
       title: title,
+      author: normalizedAuthor(els.customAuthorInput.value),
+      tags: parseTags(els.customTagsInput.value),
       folderId: folderId || null,
       series: seriesData.series,
       volume: seriesData.volume,
@@ -3064,6 +3111,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (editReturnToList) closeSavedList();
 
     els.editTitleInput.value = itemDisplayTitle(item);
+    els.editAuthorInput.value = item.author || '';
+    els.editTagsInput.value = tagsText(item.tags);
     els.editTitleInput.dataset.manualTitle = item.series ? (item.title || '') : els.editTitleInput.value;
     els.editTitleInput.dataset.seriesActive = item.series ? '1' : '0';
     renderFolderOptions(els.editFolderSelect, item.folderId || '');
@@ -3099,6 +3148,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (folderId === '__new__') folderId = '';
     item.folderId = folderId || null;
     item.title = seriesData.title || els.editTitleInput.value.trim() || itemDisplayTitle(item);
+    item.author = normalizedAuthor(els.editAuthorInput.value);
+    item.tags = parseTags(els.editTagsInput.value);
     item.series = seriesData.series;
     item.volume = seriesData.volume;
 
@@ -3461,6 +3512,32 @@ https://cdn.example.org/c/003.webp"></textarea>
       seriesEl.className = 'book-series';
       seriesEl.textContent = 'シリーズ';
       card.appendChild(seriesEl);
+    }
+    if (item.author) {
+      const authorEl = document.createElement('div');
+      authorEl.className = 'book-author';
+      authorEl.textContent = item.author;
+      authorEl.title = item.author;
+      card.appendChild(authorEl);
+    }
+    const tags = Array.isArray(item.tags) ? item.tags.filter(Boolean) : [];
+    if (tags.length) {
+      const tagsEl = document.createElement('div');
+      tagsEl.className = 'book-tags';
+      tagsEl.title = tags.join(', ');
+      tags.slice(0, 3).forEach((tag) => {
+        const tagEl = document.createElement('span');
+        tagEl.className = 'book-tag';
+        tagEl.textContent = tag;
+        tagsEl.appendChild(tagEl);
+      });
+      if (tags.length > 3) {
+        const moreEl = document.createElement('span');
+        moreEl.className = 'book-tag';
+        moreEl.textContent = '+' + (tags.length - 3);
+        tagsEl.appendChild(moreEl);
+      }
+      card.appendChild(tagsEl);
     }
     const readingEl = document.createElement('div');
     readingEl.className = 'book-reading' + (item.lastReadAt ? '' : ' unread');
@@ -3934,11 +4011,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.target === els.saveTitleInput ||
+    if (e.target === els.saveTitleInput || e.target === els.saveAuthorInput || e.target === els.saveTagsInput ||
         e.target === els.newFolderInput || e.target === els.listNewFolderInput ||
-        e.target === els.customTitleInput || e.target === els.customNewFolderInput ||
+        e.target === els.customTitleInput || e.target === els.customAuthorInput || e.target === els.customTagsInput || e.target === els.customNewFolderInput ||
         e.target === els.customPagesTextarea ||
-        e.target === els.editTitleInput || e.target === els.editNewFolderInput ||
+        e.target === els.editTitleInput || e.target === els.editAuthorInput || e.target === els.editTagsInput || e.target === els.editNewFolderInput ||
         e.target === els.saveNewSeriesInput || e.target === els.customNewSeriesInput || e.target === els.editNewSeriesInput ||
         e.target === els.githubRepoInput || e.target === els.githubPathInput || e.target === els.githubTokenInput) {
       if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); closeBulkDetect(); }
