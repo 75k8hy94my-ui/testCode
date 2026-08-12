@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>クラウド同期 | 漫画リーダー</title>
+  <style>
+    :root { --bg:#f5f7fb; --surface:#fff; --text:#1e293b; --sub:#64748b; --line:#dbe3ee; --accent:#2563eb; --accent-dark:#1d4ed8; --danger:#b91c1c; --radius:14px; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; color:var(--text); background:linear-gradient(150deg,#edf4ff 0%,var(--bg) 45%,#f8fafc 100%); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { width:min(100% - 32px,560px); margin:0 auto; padding:42px 0 64px; }
+    header { display:flex; justify-content:space-between; align-items:center; margin-bottom:26px; }
+    h1 { font-size:24px; margin:0; letter-spacing:.03em; }
+    h2 { font-size:18px; margin:0 0 6px; }
+    .back { color:var(--accent); text-decoration:none; font-size:14px; font-weight:700; }
+    .card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:0 14px 36px rgba(15,23,42,.08); padding:24px; }
+    .card + .card { margin-top:16px; }
+    .lead, .description { color:var(--sub); font-size:14px; line-height:1.7; margin:0 0 20px; }
+    label { display:block; font-size:13px; font-weight:700; margin:15px 0 6px; }
+    input { width:100%; padding:12px; border:1px solid var(--line); border-radius:9px; color:var(--text); background:#fbfdff; font:inherit; }
+    input:focus { outline:3px solid rgba(37,99,235,.16); border-color:var(--accent); }
+    button { appearance:none; border:0; border-radius:9px; padding:11px 14px; font:inherit; font-weight:700; cursor:pointer; }
+    button:disabled { opacity:.55; cursor:wait; }
+    .primary { background:var(--accent); color:#fff; }
+    .primary:hover { background:var(--accent-dark); }
+    .secondary { border:1px solid var(--line); background:#fff; color:var(--text); }
+    .danger { border:1px solid #fecaca; background:#fff7f7; color:var(--danger); }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:20px; }
+    .actions button { flex:1 1 150px; }
+    .switch { margin:18px 0 0; color:var(--sub); font-size:14px; text-align:center; }
+    .link-button { color:var(--accent); background:transparent; padding:0; font-size:inherit; font-weight:700; }
+    .status { min-height:1.5em; color:var(--sub); line-height:1.6; font-size:13px; margin:14px 0 0; }
+    .account { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:16px; border-bottom:1px solid var(--line); }
+    .account-email { font-weight:700; overflow-wrap:anywhere; }
+    .notice { margin-top:16px; padding:12px; border:1px solid #bfdbfe; border-radius:10px; background:#eff6ff; color:#1e40af; font-size:13px; line-height:1.65; }
+    .recovery { margin-top:16px; padding:14px; border:1px solid #facc15; border-radius:10px; background:#fefce8; font-size:13px; line-height:1.65; }
+    code { display:block; margin:8px 0; padding:9px; border-radius:7px; background:#fff; overflow-wrap:anywhere; user-select:all; }
+    [hidden] { display:none !important; }
+    @media (max-width:520px) { main { width:min(100% - 24px,560px); padding-top:24px; } .card { padding:18px; } header { align-items:flex-start; gap:12px; flex-direction:column; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>クラウド同期</h1>
+      <a class="back" href="index.html">← 漫画リーダーへ</a>
+    </header>
+
+    <section id="authCard" class="card">
+      <div id="loginView">
+        <h2>ログイン</h2>
+        <form id="loginForm">
+          <label for="loginEmail">メールアドレス</label>
+          <input id="loginEmail" type="email" autocomplete="email" required>
+          <label for="loginPassword">パスワード</label>
+          <input id="loginPassword" type="password" autocomplete="current-password" required>
+          <div class="actions"><button class="primary" type="submit">ログイン</button></div>
+        </form>
+        <p class="switch">アカウントをお持ちでないですか？ <button id="showSignup" class="link-button" type="button">アカウントを作成</button></p>
+      </div>
+
+      <div id="signupView" hidden>
+        <h2>アカウント作成</h2>
+        <form id="signupForm">
+          <label for="signupEmail">メールアドレス</label>
+          <input id="signupEmail" type="email" autocomplete="email" required>
+          <label for="signupPassword">パスワード</label>
+          <input id="signupPassword" type="password" autocomplete="new-password" minlength="8" required>
+          <div class="actions"><button class="primary" type="submit">確認メールを送る</button></div>
+        </form>
+        <p class="switch">すでにアカウントをお持ちですか？ <button id="showLogin" class="link-button" type="button">ログインへ戻る</button></p>
+      </div>
+      <p id="authStatus" class="status" aria-live="polite"></p>
+    </section>
+
+    <section id="vaultView" class="card" hidden>
+      <div class="account">
+        <div><div class="description" style="margin:0 0 3px;">ログイン中</div><div id="accountEmail" class="account-email"></div></div>
+        <button id="logoutBtn" class="danger" type="button">ログアウト</button>
+      </div>
+      <div style="margin-top:20px;">
+        <h2>暗号化保管庫</h2>
+        <p id="vaultState" class="description">保管庫を作成するか、既存の保管庫を開いてください。</p>
+        <label for="vaultPassphrase">保管庫パスフレーズ</label>
+        <input id="vaultPassphrase" type="password" autocomplete="new-password" placeholder="ログイン用とは別の、12文字以上のパスフレーズ">
+        <label for="recoveryKey">または復旧キー</label>
+        <input id="recoveryKey" type="text" autocomplete="off" spellcheck="false" placeholder="作成時に控えた復旧キー">
+        <div class="actions">
+          <button id="createVaultBtn" class="secondary" type="button">新しい保管庫を作成</button>
+          <button id="unlockVaultBtn" class="secondary" type="button">保管庫を開く</button>
+        </div>
+        <div id="recoveryBox" class="recovery" hidden>
+          <strong>復旧キー（今だけ表示）</strong>
+          <code id="recoveryCode"></code>
+          <button id="copyRecoveryBtn" class="secondary" type="button">復旧キーをコピー</button>
+          <div style="margin-top:8px;">パスフレーズを忘れたときに必要です。安全な場所に保管してください。</div>
+        </div>
+        <div class="actions">
+          <button id="pullBtn" class="secondary" type="button">クラウドから読み込む</button>
+          <button id="pushBtn" class="primary" type="button">この端末の内容を保存</button>
+        </div>
+        <p id="vaultStatus" class="status" aria-live="polite"></p>
+        <div class="notice">データはこの端末で暗号化してから保存されます。ログアウトすると、この端末にあるログイン情報と保管庫の状態は消去されます。</div>
+      </div>
+    </section>
+  </main>
+
+  <script src="supabase-config.js"></script>
+  <script>
+  (() => {
+    'use strict';
+    const SESSION_KEY = 'mangaReaderSupabaseSession';
+    const META_KEY = 'mangaReaderSupabaseSyncMeta';
+    const VAULT_VERSION = 1;
+    const KDF_ITERATIONS = 600000;
+    const DATA_KEYS = {
+      folders: 'mangaReaderSavedFolders', items: 'mangaReaderSavedItems', videos: 'mangaReaderVideos', mangaInfo: 'mangaReaderInfoCache'
+    };
+    const config = window.MANGA_READER_SUPABASE || {};
+    const el = (id) => document.getElementById(id);
+    const ui = {
+      authCard: el('authCard'), loginView: el('loginView'), signupView: el('signupView'), authStatus: el('authStatus'),
+      loginForm: el('loginForm'), loginEmail: el('loginEmail'), loginPassword: el('loginPassword'), signupForm: el('signupForm'), signupEmail: el('signupEmail'), signupPassword: el('signupPassword'),
+      showSignup: el('showSignup'), showLogin: el('showLogin'), vaultView: el('vaultView'), accountEmail: el('accountEmail'), logoutBtn: el('logoutBtn'),
+      vaultState: el('vaultState'), vaultPassphrase: el('vaultPassphrase'), recoveryKey: el('recoveryKey'), createVaultBtn: el('createVaultBtn'), unlockVaultBtn: el('unlockVaultBtn'),
+      recoveryBox: el('recoveryBox'), recoveryCode: el('recoveryCode'), copyRecoveryBtn: el('copyRecoveryBtn'), pullBtn: el('pullBtn'), pushBtn: el('pushBtn'), vaultStatus: el('vaultStatus')
+    };
+    let session = loadSession();
+    let activeVault = null;
+
+    function loadSession() { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (_) { return null; } }
+    function saveSession(value) { session = value; if (value) localStorage.setItem(SESSION_KEY, JSON.stringify(value)); else localStorage.removeItem(SESSION_KEY); }
+    function setAuthStatus(text) { ui.authStatus.textContent = text || ''; }
+    function setVaultStatus(text) { ui.vaultStatus.textContent = text || ''; }
+    function setVaultState(text) { ui.vaultState.textContent = text; }
+    function setBusy(button, busy) { button.disabled = busy; }
+    function showLogin() { ui.loginView.hidden = false; ui.signupView.hidden = true; setAuthStatus(''); ui.loginPassword.value = ''; ui.loginEmail.focus(); }
+    function showSignup() { ui.loginView.hidden = true; ui.signupView.hidden = false; setAuthStatus(''); ui.signupPassword.value = ''; ui.signupEmail.focus(); }
+    function render() {
+      const email = session && session.user && session.user.email;
+      ui.authCard.hidden = !!email;
+      ui.vaultView.hidden = !email;
+      if (email) { ui.accountEmail.textContent = email; setVaultState(activeVault ? 'このページでは保管庫を開いています。ページを閉じると自動でロックされます。' : '保管庫を作成するか、既存の保管庫を開いてください。'); }
+      else { showLogin(); }
+    }
+    function assertConfig() { if (!config.url || !config.publishableKey) throw new Error('Supabase の設定が見つかりません。'); }
+    async function api(path, options = {}) {
+      assertConfig();
+      const headers = Object.assign({ apikey: config.publishableKey }, options.headers || {});
+      if (options.token) headers.Authorization = 'Bearer ' + options.token;
+      if (options.body) headers['Content-Type'] = 'application/json';
+      const response = await fetch(config.url + path, Object.assign({}, options, { headers }));
+      if (!response.ok) { const detail = await response.text().catch(() => ''); throw new Error('通信に失敗しました (' + response.status + ')' + (detail ? '。' + detail.slice(0, 140) : '')); }
+      return response.status === 204 ? null : response.json();
+    }
+    async function refreshSession() {
+      if (!session || !session.refresh_token) throw new Error('ログインしてください。');
+      const next = await api('/auth/v1/token?grant_type=refresh_token', { method:'POST', body:JSON.stringify({ refresh_token:session.refresh_token }) });
+      saveSession(next); return next;
+    }
+    async function withSession(work) {
+      if (!session) throw new Error('ログインしてください。');
+      try { return await work(session.access_token, session.user); }
+      catch (error) {
+        if (!String(error.message || '').includes('(401)')) throw error;
+        const next = await refreshSession();
+        return work(next.access_token, next.user);
+      }
+    }
+    function readJSON(key, fallback) { try { const value = JSON.parse(localStorage.getItem(key) || ''); return value == null ? fallback : value; } catch (_) { return fallback; } }
+    function buildPayload() { return { folders:readJSON(DATA_KEYS.folders, []), items:readJSON(DATA_KEYS.items, []), videos:readJSON(DATA_KEYS.videos, []), mangaInfo:readJSON(DATA_KEYS.mangaInfo, {}) }; }
+    function applyPayload(payload) {
+      if (!payload || !Array.isArray(payload.folders) || !Array.isArray(payload.items)) throw new Error('保管庫の形式が正しくありません。');
+      if (!confirm('クラウドの内容で、この端末の保存済みデータを置き換えます。よろしいですか？')) return false;
+      localStorage.setItem(DATA_KEYS.folders, JSON.stringify(payload.folders));
+      localStorage.setItem(DATA_KEYS.items, JSON.stringify(payload.items));
+      localStorage.setItem(DATA_KEYS.videos, JSON.stringify(Array.isArray(payload.videos) ? payload.videos : []));
+      if (payload.mangaInfo && typeof payload.mangaInfo === 'object') localStorage.setItem(DATA_KEYS.mangaInfo, JSON.stringify(payload.mangaInfo));
+      return true;
+    }
+    function b64url(bytes) { let out=''; bytes.forEach((v) => { out += String.fromCharCode(v); }); return btoa(out).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,''); }
+    function fromB64url(value) { const normalized=String(value || '').replace(/-/g,'+').replace(/_/g,'/'); const padded=normalized+'==='.slice((normalized.length+3)%4); const raw=atob(padded); return Uint8Array.from(raw, (c) => c.charCodeAt(0)); }
+    function randomBytes(length) { const bytes=new Uint8Array(length); crypto.getRandomValues(bytes); return bytes; }
+    async function importAes(raw) { return crypto.subtle.importKey('raw', raw, {name:'AES-GCM'}, false, ['encrypt','decrypt']); }
+    async function derivePassphrase(passphrase, salt) { const material=await crypto.subtle.importKey('raw',new TextEncoder().encode(passphrase),'PBKDF2',false,['deriveKey']); return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:KDF_ITERATIONS,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,['encrypt','decrypt']); }
+    async function encrypt(key, bytes) { const iv=randomBytes(12); const ciphertext=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,bytes); return {iv:b64url(iv),ciphertext:b64url(new Uint8Array(ciphertext))}; }
+    async function decrypt(key, encrypted) { return new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:fromB64url(encrypted.iv)},key,fromB64url(encrypted.ciphertext))); }
+    function clearVault() { if (activeVault && activeVault.rawKey) activeVault.rawKey.fill(0); activeVault=null; }
+    async function createVault(passphrase) {
+      if (!window.crypto || !crypto.subtle) throw new Error('このブラウザは暗号化機能に対応していません。');
+      if ((passphrase || '').length < 12) throw new Error('保管庫パスフレーズは12文字以上にしてください。');
+      clearVault();
+      const rawKey=randomBytes(32), recoveryBytes=randomBytes(32), salt=randomBytes(16);
+      const passphraseKey=await derivePassphrase(passphrase,salt), recoveryKey=await importAes(recoveryBytes);
+      activeVault={rawKey,keyWraps:{passphrase:{kdf:{name:'PBKDF2',hash:'SHA-256',iterations:KDF_ITERATIONS,salt:b64url(salt)},encryptedKey:await encrypt(passphraseKey,rawKey)},recovery:{encryptedKey:await encrypt(recoveryKey,rawKey)}}};
+      return 'mrk1_'+b64url(recoveryBytes);
+    }
+    async function unlockVault(envelope, passphrase, recoveryCode) {
+      if (!envelope || envelope.type !== 'manga-reader-vault' || envelope.version !== VAULT_VERSION || !envelope.keyWraps) throw new Error('保管庫の形式が正しくありません。');
+      let rawKey;
+      try {
+        if ((recoveryCode || '').trim()) rawKey=await decrypt(await importAes(fromB64url(recoveryCode.trim().replace(/^mrk1_/,''))),envelope.keyWraps.recovery.encryptedKey);
+        else { if (!passphrase) throw new Error('パスフレーズまたは復旧キーを入力してください。'); const kdf=envelope.keyWraps.passphrase && envelope.keyWraps.passphrase.kdf; if (!kdf || kdf.name !== 'PBKDF2' || kdf.hash !== 'SHA-256') throw new Error('対応していない保管庫です。'); rawKey=await decrypt(await derivePassphrase(passphrase,fromB64url(kdf.salt)),envelope.keyWraps.passphrase.encryptedKey); }
+        if (rawKey.length !== 32) throw new Error('保管庫の鍵が正しくありません。');
+        const key=await importAes(rawKey); JSON.parse(new TextDecoder().decode(await decrypt(key,envelope.data)));
+      } catch (error) { if (rawKey) rawKey.fill(0); throw error.message ? error : new Error('パスフレーズ、復旧キー、または保管庫の内容を確認してください。'); }
+      clearVault(); activeVault={rawKey,keyWraps:envelope.keyWraps};
+    }
+    async function createEnvelope() { if (!activeVault) throw new Error('先に保管庫を作成または開いてください。'); return {type:'manga-reader-vault',version:VAULT_VERSION,createdAt:new Date().toISOString(),algorithm:'AES-256-GCM',keyWraps:activeVault.keyWraps,data:await encrypt(await importAes(activeVault.rawKey),new TextEncoder().encode(JSON.stringify(buildPayload())))}; }
+    async function decryptEnvelope(envelope) { if (!activeVault) throw new Error('先に保管庫を開いてください。'); return JSON.parse(new TextDecoder().decode(await decrypt(await importAes(activeVault.rawKey),envelope.data))); }
+    function getMeta(userId) { return readJSON(META_KEY, {})[userId] || null; }
+    function setMeta(userId, value) { const meta=readJSON(META_KEY, {}); meta[userId]=value || null; localStorage.setItem(META_KEY,JSON.stringify(meta)); }
+    async function fetchVault(token, user) { const rows=await api('/rest/v1/manga_reader_vaults?select=payload,updated_at&user_id=eq.'+encodeURIComponent(user.id),{token}); return rows && rows[0] ? rows[0] : null; }
+    async function login(event) { event.preventDefault(); const email=ui.loginEmail.value.trim(), password=ui.loginPassword.value; if (!email || !password) return; setBusy(ui.loginForm.querySelector('button'),true); try { saveSession(await api('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email,password})})); ui.loginPassword.value=''; setAuthStatus(''); render(); } catch (error) { setAuthStatus(error.message || 'ログインできませんでした。'); } finally { setBusy(ui.loginForm.querySelector('button'),false); } }
+    async function signup(event) { event.preventDefault(); const email=ui.signupEmail.value.trim(), password=ui.signupPassword.value; if (!email || password.length<8) { setAuthStatus('メールアドレスと8文字以上のパスワードを入力してください。'); return; } setBusy(ui.signupForm.querySelector('button'),true); try { const result=await api('/auth/v1/signup',{method:'POST',body:JSON.stringify({email,password})}); ui.signupPassword.value=''; if (result.session) { saveSession(result.session); render(); } else { showLogin(); ui.loginEmail.value=email; setAuthStatus('確認メールを送りました。メール内のリンクを開いた後、ここでログインしてください。'); } } catch (error) { setAuthStatus(error.message || 'アカウントを作成できませんでした。'); } finally { setBusy(ui.signupForm.querySelector('button'),false); } }
+    async function logout() { if (!confirm('ログアウトすると、この端末に残るログイン情報と保管庫の情報を消去します。よろしいですか？')) return; setBusy(ui.logoutBtn,true); try { if (session) await api('/auth/v1/logout',{method:'POST',token:session.access_token}); } catch (_) {} finally { clearVault(); localStorage.removeItem(SESSION_KEY); localStorage.removeItem(META_KEY); session=null; ui.vaultPassphrase.value=''; ui.recoveryKey.value=''; ui.recoveryBox.hidden=true; setVaultStatus(''); render(); setBusy(ui.logoutBtn,false); } }
+    async function openExisting() { setBusy(ui.unlockVaultBtn,true); try { await withSession(async (token,user) => { const record=await fetchVault(token,user); if (!record) throw new Error('クラウド上に保管庫がありません。最初の端末では「新しい保管庫を作成」を使ってください。'); await unlockVault(record.payload,ui.vaultPassphrase.value,ui.recoveryKey.value); ui.vaultPassphrase.value=''; ui.recoveryKey.value=''; setMeta(user.id,record.updated_at); setVaultState('このページでは保管庫を開いています。ページを閉じると自動でロックされます。'); setVaultStatus('保管庫を開きました。'); }); } catch (error) { clearVault(); setVaultState('保管庫を作成するか、既存の保管庫を開いてください。'); setVaultStatus(error.message || '保管庫を開けませんでした。'); } finally { setBusy(ui.unlockVaultBtn,false); } }
+    async function push() { setBusy(ui.pushBtn,true); try { if (!activeVault) throw new Error('先に保管庫を作成または開いてください。'); await withSession(async (token,user) => { const existing=await fetchVault(token,user), known=getMeta(user.id); if (existing && known && existing.updated_at !== known) throw new Error('別の端末で更新されています。先に「クラウドから読み込む」を実行してください。'); if (existing && !known) throw new Error('既存の保管庫があります。上書き防止のため、先に保管庫を開くかクラウドから読み込んでください。'); const rows=await api('/rest/v1/manga_reader_vaults?on_conflict=user_id',{method:'POST',token,headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify({user_id:user.id,payload:await createEnvelope(),updated_at:new Date().toISOString()})}); setMeta(user.id,rows[0] && rows[0].updated_at); setVaultStatus('この端末の内容を暗号化して保存しました（'+new Date().toLocaleString()+'）。'); }); } catch (error) { setVaultStatus(error.message || '保存できませんでした。'); } finally { setBusy(ui.pushBtn,false); } }
+    async function pull() { setBusy(ui.pullBtn,true); try { await withSession(async (token,user) => { const record=await fetchVault(token,user); if (!record) throw new Error('クラウド上に保管庫がありません。'); if (!activeVault) await unlockVault(record.payload,ui.vaultPassphrase.value,ui.recoveryKey.value); const payload=await decryptEnvelope(record.payload); if (applyPayload(payload)) { ui.vaultPassphrase.value=''; ui.recoveryKey.value=''; setMeta(user.id,record.updated_at); setVaultState('このページでは保管庫を開いています。ページを閉じると自動でロックされます。'); setVaultStatus('クラウドの内容を読み込みました。漫画リーダーに戻ると反映されます。'); } }); } catch (error) { setVaultStatus(error.message || '読み込めませんでした。'); } finally { setBusy(ui.pullBtn,false); } }
+    ui.showSignup.addEventListener('click',showSignup); ui.showLogin.addEventListener('click',showLogin); ui.loginForm.addEventListener('submit',login); ui.signupForm.addEventListener('submit',signup); ui.logoutBtn.addEventListener('click',logout);
+    ui.createVaultBtn.addEventListener('click',async () => { setBusy(ui.createVaultBtn,true); try { if (activeVault && !confirm('新しい保管庫を作成すると、現在開いている保管庫の鍵は破棄されます。続けますか？')) return; const code=await createVault(ui.vaultPassphrase.value); ui.vaultPassphrase.value=''; ui.recoveryKey.value=''; ui.recoveryCode.textContent=code; ui.recoveryBox.hidden=false; setVaultState('新しい保管庫を作成しました。復旧キーを控えてから「この端末の内容を保存」を実行してください。'); setVaultStatus('保管庫を作成しました。'); } catch (error) { setVaultStatus(error.message || '保管庫を作成できませんでした。'); } finally { setBusy(ui.createVaultBtn,false); } });
+    ui.unlockVaultBtn.addEventListener('click',openExisting); ui.pushBtn.addEventListener('click',push); ui.pullBtn.addEventListener('click',pull); ui.copyRecoveryBtn.addEventListener('click',async () => { try { await navigator.clipboard.writeText(ui.recoveryCode.textContent); setVaultStatus('復旧キーをコピーしました。'); } catch (_) { setVaultStatus('復旧キーを選択してコピーしてください。'); } });
+    render();
+    if (session) refreshSession().then(render).catch(() => { clearVault(); saveSession(null); render(); });
+  })();
+  </script>
+</body>
+</html>
