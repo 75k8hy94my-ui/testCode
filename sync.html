@@ -21,7 +21,7 @@
         <h2>パスフレーズ</h2>
         <p class="description">入力すると、暗号化された保存内容を自動で読み込みます。</p>
         <label for="vaultPassphrase">保管庫パスフレーズ</label>
-        <input id="vaultPassphrase" type="password" autocomplete="new-password" placeholder="ログイン用とは別のパスフレーズ" autofocus>
+        <input id="vaultPassphrase" name="vault-unlock-key" type="password" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" placeholder="ログイン用とは別のパスフレーズ" autofocus>
         <label for="recoveryKey">または復旧キー</label>
         <input id="recoveryKey" type="text" autocomplete="off" spellcheck="false" placeholder="作成時に控えた復旧キー">
         <p id="status" class="status" aria-live="polite"></p>
