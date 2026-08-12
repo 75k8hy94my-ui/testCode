@@ -511,6 +511,7 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .book-reading.unread { color: var(--accent); font-weight: 700; }
+  .book-card .book-author, .book-card .book-tags, .book-card .book-reading:not(.unread) { display: none !important; }
   html, body { background: var(--bg); }
   #app { background: var(--bg); height: 100dvh; }
   #topbar, #controls {
@@ -4288,6 +4289,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       ? '最終読書: ' + new Date(Number(item.lastReadAt)).toLocaleString('ja-JP') + ' / ' + (Number(item.readCount) || 1) + '回'
       : 'まだ読んでいません';
     card.appendChild(readingEl);
+    if (item.lastReadAt) readingEl.remove();
+    else readingEl.textContent = '未読';
     if (!reorderMode) {
       card.addEventListener('click', () => {
         rememberReaderReturnView();
