@@ -376,6 +376,16 @@
     padding: 10px 0; margin-bottom: 8px; border-bottom: 1px solid var(--border);
     font-size: 12px;
   }
+  #smartListRow {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 2px 0 12px; border-bottom: 1px solid var(--border); margin-bottom: 10px;
+  }
+  .smartListLabel { color: var(--sub); font-size: 12px; font-weight: 700; margin-right: 2px; }
+  .smartListBtn {
+    min-height: 34px; padding: 0 11px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--panel-2); color: var(--text); font: inherit; font-size: 12px; cursor: pointer;
+  }
+  .smartListBtn:hover { border-color: var(--accent); color: var(--accent); }
 
 
   /* ---- Video feature ---- */
@@ -555,6 +565,8 @@
     #listTabRow { margin-left: -14px; margin-right: -14px; padding-left: 14px; }
     #exportImportRow { margin: 0 -2px 8px; padding: 6px 2px 10px; gap: 6px; }
     #exportImportRow .ctrlBtn, #listToolbar .ctrlBtn { padding: 7px 9px; font-size: 11.5px; min-height: 36px; }
+    #smartListRow { gap: 6px; padding-bottom: 10px; }
+    .smartListBtn { min-height: 32px; font-size: 11.5px; }
     #savedListItems.bookshelf { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px 8px; }
     .book-cover { border-radius: 9px; }
     .book-editBtn, .book-delBtn, .book-favBtn { width: 28px; height: 28px; min-width: 28px; min-height: 28px; }
@@ -757,6 +769,11 @@ https://cdn.example.org/c/003.webp"></textarea>
         <button class="ctrlBtn" id="addCustomBtn">個別追加</button>
         <button class="ctrlBtn" id="bulkDetectBtn">一括読み込み</button>
         <button class="ctrlBtn" id="openCloudSyncBtn">クラウド同期</button>
+      </div>
+      <div id="smartListRow">
+        <span class="smartListLabel">スマートリスト</span>
+        <button class="smartListBtn" id="historyListBtn" type="button">履歴</button>
+        <button class="smartListBtn" id="unreadListBtn" type="button">読んでいない順</button>
       </div>
       <div id="listToolbar">
         <button class="ctrlBtn" id="listBackBtn" style="display:none;">← 戻る</button>
@@ -978,6 +995,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     openCloudSyncBtn: document.getElementById('openCloudSyncBtn'),
     logoutBtn: document.getElementById('logoutBtn'),
     listLogoutBtn: document.getElementById('listLogoutBtn'),
+    smartListRow: document.getElementById('smartListRow'),
+    historyListBtn: document.getElementById('historyListBtn'),
+    unreadListBtn: document.getElementById('unreadListBtn'),
 
     bulkDetectOverlay: document.getElementById('bulkDetectOverlay'),
     closeBulkDetectBtn: document.getElementById('closeBulkDetectBtn'),
@@ -1691,6 +1711,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     savedFolders = data.folders;
     savedItems = data.items;
     if (Array.isArray(data.videos)) savedVideos = data.videos;
+    removeHistoryFolderRecord();
     persistFolders();
     persistItems();
     persistSavedVideos();
@@ -1727,12 +1748,13 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
   }
 
-  // The "履歴" folder is a reserved, always-present folder that auto-collects
-  // every manga opened via the "新規" button. Created on first use.
-  function ensureHistoryFolder() {
-    if (!savedFolders.some((f) => f.id === HISTORY_FOLDER_ID)) {
-      savedFolders.unshift({ id: HISTORY_FOLDER_ID, name: HISTORY_FOLDER_NAME });
-    }
+  // 履歴 is a smart list, not a user-editable folder. Older data may still
+  // contain its former folder record, so remove only that display record while
+  // preserving the history items themselves.
+  function removeHistoryFolderRecord() {
+    const before = savedFolders.length;
+    savedFolders = savedFolders.filter((folder) => folder.id !== HISTORY_FOLDER_ID);
+    return before !== savedFolders.length;
   }
 
   function relatedReadingItems(item) {
@@ -1759,7 +1781,9 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   function unreadOrderItems() {
-    return savedItems.slice().sort((a, b) => {
+    // History entries are automatically created reading records, not books to
+    // work through. They must never appear in the unread-priority list.
+    return savedItems.filter((item) => item.folderId !== HISTORY_FOLDER_ID).sort((a, b) => {
       const aLast = Number(a.lastReadAt) || 0;
       const bLast = Number(b.lastReadAt) || 0;
       if (!aLast && bLast) return -1;
@@ -1775,7 +1799,6 @@ https://cdn.example.org/c/003.webp"></textarea>
   // from the URL). Re-opening the same manga moves its history entry to the
   // top instead of piling up duplicates.
   function addToHistory(url) {
-    ensureHistoryFolder();
     let historyItem = savedItems.find((it) => it.folderId === HISTORY_FOLDER_ID && baseUrlKey(it.url) === baseUrlKey(url));
     if (historyItem) {
       savedItems = savedItems.filter((it) => it !== historyItem);
@@ -1784,7 +1807,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
     savedItems.unshift(historyItem);
     recordReading(historyItem);
-    persistFolders();
+    persistItems();
     updateCurrentTitleDisplay();
   }
 
@@ -1839,7 +1862,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         }
       } catch (e) {}
     }
-    ensureHistoryFolder();
+    if (removeHistoryFolderRecord()) persistFolders();
     try { savedVideos = JSON.parse(localStorage.getItem(SAVED_VIDEOS_KEY) || '[]'); }
     catch (e) { savedVideos = []; }
   }
@@ -3157,36 +3180,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     return card;
   }
 
-  function buildUnreadFolderCard() {
-    const card = document.createElement('div');
-    card.className = 'book-card folder-card';
-    const items = unreadOrderItems();
-
-    const cover = document.createElement('div');
-    cover.className = 'book-cover folder-cover';
-    appendFolderPreview(cover, items, ICON_BOOKS, '読書記録なし', '未読順');
-
-    const title = document.createElement('div');
-    title.className = 'book-title';
-    title.textContent = UNREAD_FOLDER_NAME;
-
-    const unreadCount = items.filter((it) => !Number(it.lastReadAt)).length;
-    const sub = document.createElement('div');
-    sub.className = 'book-series';
-    sub.textContent = '未読 ' + unreadCount + '冊';
-
-    card.appendChild(cover);
-    card.appendChild(title);
-    card.appendChild(sub);
-    card.addEventListener('click', () => {
-      currentFolderView = UNREAD_FOLDER_ID;
-      currentSeriesView = null;
-      reorderMode = false;
-      renderSavedList();
-    });
-    return card;
-  }
-
   // シリーズ も同じ理屈の仮想フォルダ。この「ルート」カードはシリーズ名一覧
   // (グループ分けされたシリーズの入口) に入るためのもの。実際のグルーピングは
   // renderSavedList側で行い、buildSeriesGroupCardで各シリーズの入口カードを作る。
@@ -3429,7 +3422,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.listNewFolderBtn.style.display = currentFolderView ? 'none' : '';
     els.listNewFolderRow.style.display = 'none';
 
-    if (currentFolderView === FAVORITES_FOLDER_ID) {
+    if (currentFolderView === HISTORY_FOLDER_ID) {
+      els.listFolderTitle.textContent = HISTORY_FOLDER_NAME;
+    } else if (currentFolderView === FAVORITES_FOLDER_ID) {
       els.listFolderTitle.textContent = FAVORITES_FOLDER_NAME;
     } else if (currentFolderView === UNREAD_FOLDER_ID) {
       els.listFolderTitle.textContent = UNREAD_FOLDER_NAME;
@@ -3452,14 +3447,12 @@ https://cdn.example.org/c/003.webp"></textarea>
     let seriesGroupCards = []; // [{name, items}], only populated at the シリーズ root (list of series names)
     let showFavoritesCard = false;
     let showSeriesCard = false;
-    let showUnreadCard = false;
 
     if (!currentFolderView) {
       itemsList = savedItems.filter((it) => !it.folderId);
-      folderCards = savedFolders;
+      folderCards = savedFolders.filter((folder) => folder.id !== HISTORY_FOLDER_ID);
       showFavoritesCard = true;
       showSeriesCard = true;
-      showUnreadCard = true;
     } else if (currentFolderView === FAVORITES_FOLDER_ID) {
       // Virtual view: aggregates favorited items regardless of which real
       // folder they actually live in, instead of filtering by folderId.
@@ -3501,7 +3494,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.reorderBtn.textContent = showReorderControls ? '並べ替え完了' : '並べ替え';
 
     const isEmpty = folderCards.length === 0 && itemsList.length === 0 && seriesGroupCards.length === 0 &&
-      !showFavoritesCard && !showSeriesCard && !showUnreadCard;
+      !showFavoritesCard && !showSeriesCard;
     if (isEmpty) {
       els.savedListEmpty.style.display = 'block';
       els.savedListEmpty.textContent = currentFolderView === FAVORITES_FOLDER_ID
@@ -3518,13 +3511,21 @@ https://cdn.example.org/c/003.webp"></textarea>
       // forces a layout/reflow per card, which adds up once a folder has a
       // few dozen items.
       const frag = document.createDocumentFragment();
-      if (showUnreadCard) frag.appendChild(buildUnreadFolderCard());
       if (showFavoritesCard) frag.appendChild(buildFavoritesFolderCard());
       if (showSeriesCard) frag.appendChild(buildSeriesFolderCard());
       folderCards.forEach((f) => frag.appendChild(buildFolderCard(f)));
       seriesGroupCards.forEach((g) => frag.appendChild(buildSeriesGroupCard(g)));
       itemsList.forEach((it) => frag.appendChild(buildBookCard(it, itemsList, showReorderControls)));
       els.savedListItems.appendChild(frag);
+    }
+
+    const atRoot = !currentFolderView;
+    els.smartListRow.style.display = atRoot ? 'flex' : 'none';
+    if (atRoot) {
+      const historyCount = savedItems.filter((item) => item.folderId === HISTORY_FOLDER_ID).length;
+      const unreadCount = unreadOrderItems().filter((item) => !Number(item.lastReadAt)).length;
+      els.historyListBtn.textContent = '履歴 (' + historyCount + ')';
+      els.unreadListBtn.textContent = '読んでいない順 (' + unreadCount + ')';
     }
   }
 
@@ -3789,6 +3790,18 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.listBtn.addEventListener('click', () => openSavedList(false));
   els.safeModeBtn.addEventListener('click', toggleSafeMode);
   els.closeListBtn.addEventListener('click', closeSavedList);
+  els.historyListBtn.addEventListener('click', () => {
+    currentFolderView = HISTORY_FOLDER_ID;
+    currentSeriesView = null;
+    reorderMode = false;
+    renderSavedList();
+  });
+  els.unreadListBtn.addEventListener('click', () => {
+    currentFolderView = UNREAD_FOLDER_ID;
+    currentSeriesView = null;
+    reorderMode = false;
+    renderSavedList();
+  });
   els.savedListOverlay.addEventListener('click', (e) => { if (e.target === els.savedListOverlay) closeSavedList(); });
   els.listBackBtn.addEventListener('click', () => {
     // From inside a specific シリーズ, 戻る goes back to the series-name list
