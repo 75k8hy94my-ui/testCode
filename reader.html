@@ -609,6 +609,9 @@
     <button class="ctrlBtn" id="listBtn" title="保存したURLの一覧">リスト</button>
     <button class="ctrlBtn" type="button" onclick="window.location.href='links.html'" title="保存したWebリンクを管理">リンク管理</button>
     <button class="ctrlBtn" id="safeModeBtn" title="セーフモード（漫画の画像にモザイクをかけます）">セーフモード</button>
+    <button class="ctrlBtn active" id="animBtn" title="ページ送りアニメーションの切替">アニメ</button>
+    <button class="ctrlBtn" id="redetectBtn" title="保存されたページ数情報を消して、最初から再検出します">再検出</button>
+    <button class="ctrlBtn" id="tocAddBtn" title="今のページを目次として追加">目次追加</button>
     <button class="ctrlBtn logoutBtn" id="logoutBtn" title="ログアウトして端末内の保存データを消去">ログアウト</button>
     <span id="status"></span>
     <span id="currentTitle"></span>
@@ -632,9 +635,6 @@
     <span id="pageLabel">1 / 1</span>
     <button class="ctrlBtn" id="nextBtn" title="次のページ (→)">▶</button>
     <button class="ctrlBtn" id="lastBtn" title="最後のページ">▶|</button>
-    <button class="ctrlBtn active" id="animBtn" title="ページ送りアニメーションの切替">アニメ</button>
-    <button class="ctrlBtn" id="redetectBtn" title="保存されたページ数情報を消して、最初から再検出します">再検出</button>
-    <button class="ctrlBtn" id="tocAddBtn" title="今のページを目次として追加">目次追加</button>
     <button class="ctrlBtn" id="tocBtn" title="目次を開く" style="display:none;">目次</button>
   </div>
 
@@ -1200,6 +1200,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   let currentFolderView = null;
   let currentSeriesView = null; // series name when drilled into a シリーズ group; null while browsing series names or anywhere else
   let reorderMode = false; // true while 並べ替え (manual up/down reorder) controls are shown for the current folder view
+  // リーダーを閉じたときに戻る、本棚上の表示位置。作品を本棚から開いたときだけ記録する。
+  let readerReturnView = null;
   let pendingSaveUrl = null;
   // Whether opening the 個別追加/編集 dialog hid an already-open 保存したURL
   // list popup behind it; if so, closing the dialog reopens (and re-renders)
@@ -2221,6 +2223,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   // 閉じた漫画が復元されないよう LAST_URL_KEY も消す。何も開いていない状態に
   // なるので、リスト（保存したURL）を自動的に開く。
   function closeManga() {
+    const returnView = readerReturnView;
+    readerReturnView = null;
     // ここでpages/baseUrlがリセットされる前に、検出未完了分の引き継ぎを行う。
     handOffIncompleteDetection();
     readingGeneration++;
@@ -2248,7 +2252,16 @@ https://cdn.example.org/c/003.webp"></textarea>
     updateTocButtonVisibility();
     try { localStorage.removeItem(LAST_URL_KEY); } catch (e) {}
 
-    openSavedList(true);
+    // 本棚から開いた作品は、閉じたときにそのフォルダ／スマートリストへ戻す。
+    // 新規URLや起動時のように閲覧元がない場合は、従来どおり本棚の先頭を表示する。
+    if (returnView) {
+      currentFolderView = returnView.folderId;
+      currentSeriesView = returnView.seriesName;
+      reorderMode = false;
+      openSavedList(true, true);
+    } else {
+      openSavedList(true);
+    }
   }
 
   function updateStatus() {
@@ -3180,6 +3193,11 @@ https://cdn.example.org/c/003.webp"></textarea>
     card.appendChild(title);
     card.addEventListener('click', () => {
       if (folderItems.length === 1) {
+        // 1冊だけのフォルダは直接開くが、閉じた際の戻り先はこのフォルダにする。
+        currentFolderView = folder.id;
+        currentSeriesView = null;
+        reorderMode = false;
+        rememberReaderReturnView();
         closeSavedList();
         setReadingListContext(folderItems, 0);
         openItem(folderItems[0], false);
@@ -3418,6 +3436,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     card.appendChild(readingEl);
     if (!reorderMode) {
       card.addEventListener('click', () => {
+        rememberReaderReturnView();
         closeSavedList();
         setReadingListContext(list, list.indexOf(item));
         openItem(item, false);
@@ -3546,13 +3565,18 @@ https://cdn.example.org/c/003.webp"></textarea>
   // the 閉じる button is hidden, since there's nothing useful to "go back to"
   // by closing the list. Manual opens (リストボタン) always pass false/omit
   // it, so 閉じる shows normally.
-  function openSavedList(hideCloseBtn) {
-    currentFolderView = null;
-    currentSeriesView = null;
-    reorderMode = false;
+  function openSavedList(hideCloseBtn, preserveCurrentView) {
+    if (!preserveCurrentView) {
+      currentFolderView = null;
+      currentSeriesView = null;
+      reorderMode = false;
+    }
     renderSavedList();
     els.savedListOverlay.classList.add('show');
     els.closeListBtn.style.display = hideCloseBtn ? 'none' : '';
+  }
+  function rememberReaderReturnView() {
+    readerReturnView = { folderId: currentFolderView, seriesName: currentSeriesView };
   }
   function closeSavedList() { els.savedListOverlay.classList.remove('show'); }
   function isSavedListOpen() { return els.savedListOverlay.classList.contains('show'); }
@@ -3676,6 +3700,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (input === null) return; // cancelled
     const v = input.trim();
     if (!v) return;
+    readerReturnView = null;
     clearReadingListContext();
     currentItem = null; // raw URL open, not tied to a saved item
     startReading(v, true);
@@ -3861,6 +3886,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       items = savedItems.filter((it) => it.folderId === currentFolderView);
     }
     if (!items.length) return;
+    rememberReaderReturnView();
     closeSavedList();
     setReadingListContext(items, 0);
     openItem(items[0], false);
