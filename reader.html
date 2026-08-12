@@ -1663,19 +1663,23 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   // 履歴は読書記録であって、本棚への保存先ではない。履歴しかない作品には
   // 「URLを保存」を出し、いずれかの本棚／フォルダに保存済みなら隠す。
-  function updateSaveButtonVisibility() {
+  function hasUnsavedCurrentUrl() {
     const savedToBookshelf = !!baseUrl && savedItems.some((item) =>
       item.folderId !== HISTORY_FOLDER_ID && !Array.isArray(item.pages) && item.url &&
       baseUrlKey(item.url) === baseUrlKey(baseUrl)
     );
-    els.saveBtn.style.display = baseUrl && !currentlyCustom && !savedToBookshelf ? '' : 'none';
+    return !!baseUrl && !currentlyCustom && !savedToBookshelf;
   }
 
-  // 閉じるボタンは、何らかの漫画が画面に表示されている間（pages が埋まって
-  // いる間）だけ表示する。新規/履歴/リストどこから開いても、また失敗して
-  // placeholder に戻ったときも、この1関数を呼べば状態に同期する。
+  function updateSaveButtonVisibility() {
+    els.saveBtn.style.display = hasUnsavedCurrentUrl() ? '' : 'none';
+    updateCloseButtonVisibility();
+  }
+
+  // 閉じるボタンは漫画を表示中のほか、「URLを保存」が出ている未保存URLの
+  // 読み込み中にも表示する。これで未保存URLでも本棚へ戻れる。
   function updateCloseButtonVisibility() {
-    els.closeBtn.style.display = pages.length ? '' : 'none';
+    els.closeBtn.style.display = pages.length || hasUnsavedCurrentUrl() ? '' : 'none';
   }
 
   function findNextVolumeItem(seriesInfo) {
@@ -2076,6 +2080,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     const firstUrl = firstResult.url;
     if (myGeneration !== readingGeneration) return; // superseded while we were checking page 1
     if (!firstUrl) {
+      if (firstResult.kind === 'missing') {
+        reopenMangaUrlEntry();
+        return;
+      }
       if (firstResult.kind === 'timeout') {
         // Keep the timeout visible to the bulk retry tool even when page 1
         // could not be obtained. A later retry starts at page 1.
@@ -2165,14 +2173,19 @@ https://cdn.example.org/c/003.webp"></textarea>
       detectionDone = false;
       detectionHitLimit = false;
       els.status.textContent = 'キャッシュが古いようです。再確認中...';
-      const firstUrl = await findPageUrl(1);
+      const recheckedFirst = await findPageResult(1);
+      const firstUrl = recheckedFirst.url;
       if (generation !== readingGeneration) return;
       if (!firstUrl) {
+        if (recheckedFirst.kind === 'missing') {
+          reopenMangaUrlEntry();
+          return;
+        }
         detecting = false;
         els.imgWrap.style.display = 'none';
         els.placeholder.style.display = 'block';
         els.placeholder.innerHTML =
-          '1ページ目が見つかりませんでした。<br>' +
+          '1ページ目の読み込みがタイムアウトしました。時間をおいて再試行してください。<br>' +
           '試したURL: ' + EXT_CANDIDATES.map((e) => '<code>' + baseUrl + '1.' + e + '</code>').join(' / ') + '<br>' +
           'URLや拡張子を確認してください。';
         els.status.textContent = '';
@@ -3870,7 +3883,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   bindSeriesControls(els.customSeriesInput, els.customNewSeriesRow, els.customNewSeriesInput, els.customVolumeInput, els.customTitleInput);
   bindSeriesControls(els.editSeriesInput, els.editNewSeriesRow, els.editNewSeriesInput, els.editVolumeInput, els.editTitleInput);
 
-  function handleNewManga() {
+  function promptForMangaUrl() {
     const input = window.prompt('URLを入力してください\n例: https://example.com/manga/test/  または .../1.jpg');
     if (input === null) return; // cancelled
     const v = input.trim();
@@ -3882,8 +3895,16 @@ https://cdn.example.org/c/003.webp"></textarea>
     closeSavedList();
     startReading(v, true);
   }
+  function reopenMangaUrlEntry() {
+    closeManga();
+    window.setTimeout(promptForMangaUrl, 0);
+  }
+  function handleNewManga() { promptForMangaUrl(); }
   els.newBtn.addEventListener('click', handleNewManga);
-  els.closeBtn.addEventListener('click', closeManga);
+  els.closeBtn.addEventListener('click', () => {
+    if (hasUnsavedCurrentUrl() && !confirm('未保存ですが戻りますか？')) return;
+    closeManga();
+  });
 
   // リーダー上部のお気に入りトグル。currentItem (またはbaseUrl一致の履歴等の
   // アイテム) のfavoriteを直接書き換えて即時保存・表示更新する。
