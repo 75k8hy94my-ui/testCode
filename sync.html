@@ -28,7 +28,7 @@
         <div style="display:flex;gap:8px;margin-top:12px;">
           <button id="passphraseUnlockBtn" type="button">パスフレーズで開く</button>
           <button id="passkeyUnlockBtn" type="button">パスキーで開く</button>
-          <button id="passkeyRegisterBtn" type="button">パスキーを登録</button>
+          <button id="passkeyRegisterBtn" type="button">保管庫を作成してパスキー登録</button>
         </div>
         <label for="recoveryKey">または復旧キー</label>
         <input id="recoveryKey" type="text" autocomplete="off" spellcheck="false" placeholder="作成時に控えた復旧キー">
@@ -107,9 +107,22 @@
       await openAutomatically(input.passphrase,input.recovery);
     }
     async function passkeyRegister() {
-      if (!ui.passphrase.value) { setStatus('登録前に現在のパスフレーズを入力してください。'); return; }
+      const input=validateUnlockInput();
+      if (!input || input.recovery) { setStatus('パスキー登録には12文字以上のパスフレーズを入力してください。'); return; }
       if (opening) return; opening=true; setStatus('パスキーを登録しています…');
-      try { rememberPassphrase(); await MangaVault.registerPasskey(ui.passphrase.value); ui.passphrase.value=''; setStatus('パスキーを登録しました。次回からパスキーで開けます。'); }
+      try {
+        rememberPassphrase();
+        const result=await MangaVault.initialize(input.passphrase,'',buildPayload,applyPayload);
+        await MangaVault.registerPasskey(input.passphrase);
+        ui.passphrase.value='';
+        if (result.created) {
+          ui.unlock.hidden=true; ui.recoveryCode.textContent=result.recoveryCode; ui.recoveryBox.hidden=false;
+          setStatus('保管庫を作成し、パスキーを登録しました。復旧キーを保存してください。');
+          setTimeout(goReader,5500);
+        } else {
+          setStatus('パスキーを登録しました。次回からパスキーで開けます。');
+        }
+      }
       catch (error) { setStatus(error.message || 'パスキーを登録できませんでした。'); }
       finally { opening=false; }
     }
