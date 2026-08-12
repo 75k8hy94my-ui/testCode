@@ -13,6 +13,7 @@
   const b64url = (bytes) => { let text = ''; bytes.forEach((byte) => { text += String.fromCharCode(byte); }); return btoa(text).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, ''); };
   const fromB64url = (value) => { const normalized = String(value || '').replace(/-/g, '+').replace(/_/g, '/'); const raw = atob(normalized + '==='.slice((normalized.length + 3) % 4)); return Uint8Array.from(raw, (char) => char.charCodeAt(0)); };
   const randomBytes = (length) => { const bytes = new Uint8Array(length); crypto.getRandomValues(bytes); return bytes; };
+  const toArrayBuffer = (bytes) => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   const importAes = (raw) => crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
   async function derivePassphrase(passphrase, salt) {
     const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
@@ -20,6 +21,41 @@
   }
   async function encrypt(key, bytes) { const iv = randomBytes(12); const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, bytes); return { iv: b64url(iv), ciphertext: b64url(new Uint8Array(ciphertext)) }; }
   async function decrypt(key, encrypted) { return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64url(encrypted.iv) }, key, fromB64url(encrypted.ciphertext))); }
+  async function passkeyKey(output) { return importAes(new Uint8Array(await crypto.subtle.digest('SHA-256', output))); }
+  function passkeySupported() { return Boolean(window.PublicKeyCredential && navigator.credentials && typeof navigator.credentials.create === 'function' && typeof navigator.credentials.get === 'function'); }
+  async function registerPasskeyCredential(email) {
+    if (!passkeySupported()) throw new Error('このブラウザはパスキーに対応していません。');
+    const salt = randomBytes(32);
+    const credential = await navigator.credentials.create({ publicKey: {
+      challenge: toArrayBuffer(randomBytes(32)),
+      rp: { name: '漫画リーダー', id: location.hostname },
+      user: { id: toArrayBuffer(new TextEncoder().encode(email)), name: email, displayName: email },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
+      timeout: 60000,
+      extensions: { prf: { eval: { first: toArrayBuffer(salt) } } }
+    }});
+    const result = credential && credential.getClientExtensionResults && credential.getClientExtensionResults();
+    const first = result && result.prf && result.prf.results && result.prf.results.first;
+    if (!first) throw new Error('このパスキーまたはブラウザは保管庫解除用PRFに対応していません。');
+    const key = await passkeyKey(new Uint8Array(first));
+    return { id: b64url(new Uint8Array(credential.rawId)), salt: b64url(salt), encryptedKey: await encrypt(key, loadActive().rawKey) };
+  }
+  async function unlockByPasskey(wrapper) {
+    if (!passkeySupported()) throw new Error('このブラウザはパスキーに対応していません。');
+    const id = fromB64url(wrapper.id), salt = fromB64url(wrapper.salt);
+    const credential = await navigator.credentials.get({ publicKey: {
+      challenge: toArrayBuffer(randomBytes(32)),
+      rpId: location.hostname,
+      allowCredentials: [{ type: 'public-key', id: toArrayBuffer(id) }],
+      userVerification: 'required', timeout: 60000,
+      extensions: { prf: { evalByCredential: { [wrapper.id]: { first: toArrayBuffer(salt) } } } }
+    }});
+    const result = credential && credential.getClientExtensionResults && credential.getClientExtensionResults();
+    const first = result && result.prf && result.prf.results && result.prf.results.first;
+    if (!first) throw new Error('パスキーから保管庫解除情報を取得できませんでした。');
+    return new Uint8Array(await decrypt(await passkeyKey(new Uint8Array(first)), wrapper.encryptedKey));
+  }
   function readJSON(key, fallback) { try { const value = JSON.parse(localStorage.getItem(key) || ''); return value == null ? fallback : value; } catch (_) { return fallback; } }
   function loadSession() { return readJSON(SESSION_KEY, null); }
   function saveSession(session) { if (session) localStorage.setItem(SESSION_KEY, JSON.stringify(session)); else localStorage.removeItem(SESSION_KEY); }
@@ -126,5 +162,32 @@
       return { created: true, recoveryCode: created.recoveryCode };
     });
   }
-  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, loadActive, refreshSession, api, withSession, initialize, savePayload };
+  async function registerPasskey(passphrase) {
+    return withSession(async (token, user) => {
+      const record = await fetchRecord(token, user);
+      if (!record) throw new Error('先にパスフレーズで保管庫を作成してください。');
+      await unlock(record.payload, passphrase, '');
+      setMeta(user.id, record.updated_at);
+      const wrapper = await registerPasskeyCredential(user.email);
+      const vault = loadActive();
+      vault.keyWraps.passkey = wrapper;
+      saveActive(vault);
+      const payload = await decryptPayload(record.payload);
+      await savePayload(payload);
+      return true;
+    });
+  }
+  async function initializeWithPasskey(applyPayload) {
+    return withSession(async (token, user) => {
+      const record = await fetchRecord(token, user);
+      if (!record || !record.payload || !record.payload.keyWraps || !record.payload.keyWraps.passkey) throw new Error('このアカウントには保管庫パスキーが登録されていません。');
+      const rawKey = await unlockByPasskey(record.payload.keyWraps.passkey);
+      const vault = { rawKey, keyWraps: record.payload.keyWraps };
+      saveActive(vault);
+      await applyPayload(await decryptPayload(record.payload));
+      setMeta(user.id, record.updated_at);
+      return { created: false };
+    });
+  }
+  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, loadActive, refreshSession, api, withSession, initialize, initializeWithPasskey, registerPasskey, savePayload };
 })();
