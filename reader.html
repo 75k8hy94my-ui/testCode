@@ -128,10 +128,10 @@
   }
   /* Readability preset: applied to the displayed page only. The source image
      stays untouched and is never uploaded or rewritten. */
-  body.image-enhance .pageimg {
+  body.image-enhance .pageimg:not([data-local-enhanced="true"]) {
     filter: brightness(1.08) contrast(1.16) saturate(.92);
   }
-  body.safe-mode.image-enhance .pageimg {
+  body.safe-mode.image-enhance .pageimg:not([data-local-enhanced="true"]) {
     filter: blur(24px) brightness(1.08) contrast(1.16) saturate(.92);
   }
 
@@ -644,7 +644,7 @@
     <button class="ctrlBtn" id="readerEditBtn" title="表示中の漫画を編集" style="display:none;">編集</button>
     <button class="ctrlBtn" type="button" onclick="window.location.href='links.html'" title="保存したWebリンクを管理">リンク管理</button>
     <button class="ctrlBtn" id="safeModeBtn" title="セーフモード（漫画の画像にモザイクをかけます）">セーフモード</button>
-    <button class="ctrlBtn" id="enhanceBtn" title="画像の明るさ・コントラストを自動補正" aria-pressed="true">自動補正</button>
+    <button class="ctrlBtn" id="enhanceBtn" title="ページ画像をブラウザ内で解析して補正（外部送信なし）" aria-pressed="true">自動補正</button>
     <button class="ctrlBtn active" id="animBtn" title="ページ送りアニメーションの切替">アニメ</button>
     <button class="ctrlBtn" id="redetectBtn" title="保存されたページ数情報を消して、最初から再検出します">再検出</button>
     <button class="ctrlBtn" id="tocAddBtn" title="今のページを目次として追加">目次追加</button>
@@ -968,6 +968,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   const ANIM_KEY = 'mangaReaderAnimEnabled';
   const SAFE_MODE_KEY = 'mangaReaderSafeMode';
   const IMAGE_ENHANCE_KEY = 'mangaReaderImageEnhance';
+  const IMAGE_ENHANCE_MAX_PIXELS = 8000000;
+  const IMAGE_ENHANCE_SAMPLE_LIMIT = 140000;
   const SAVED_FOLDERS_KEY = 'mangaReaderSavedFolders';
   const SAVED_ITEMS_KEY = 'mangaReaderSavedItems';
   const LEGACY_SAVED_URLS_KEY = 'mangaReaderSavedUrls';
@@ -1359,6 +1361,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     document.body.classList.toggle('image-enhance', imageEnhanceEnabled);
     els.enhanceBtn.classList.toggle('active', imageEnhanceEnabled);
     els.enhanceBtn.setAttribute('aria-pressed', imageEnhanceEnabled ? 'true' : 'false');
+    refreshVisibleImageEnhancement();
   }
   function toggleImageEnhance() {
     imageEnhanceEnabled = !imageEnhanceEnabled;
@@ -1370,7 +1373,167 @@ https://cdn.example.org/c/003.webp"></textarea>
     document.body.classList.toggle('safe-mode', safeModeEnabled);
     els.safeModeBtn.classList.toggle('active', safeModeEnabled);
     persistSafeMode();
+    refreshVisibleImageEnhancement();
   }
+
+  function clampByte(value) {
+    return Math.max(0, Math.min(255, Math.round(value)));
+  }
+
+  function histogramPercentile(histogram, total, percentile) {
+    const target = Math.max(1, Math.floor(total * percentile));
+    let count = 0;
+    for (let value = 0; value < histogram.length; value++) {
+      count += histogram[value];
+      if (count >= target) return value;
+    }
+    return histogram.length - 1;
+  }
+
+  // Analyze luminance locally, then apply conservative auto-levels while
+  // preserving each pixel's color ratio. This improves washed-out or dark
+  // scans without sending the source image anywhere.
+  function autoCorrectImageData(imageData) {
+    const data = imageData.data;
+    const pixelCount = data.length / 4;
+    if (!pixelCount) return false;
+
+    const histogram = new Uint32Array(256);
+    const sampleStride = Math.max(1, Math.ceil(pixelCount / IMAGE_ENHANCE_SAMPLE_LIMIT));
+    let sampleCount = 0;
+    let luminanceSum = 0;
+    for (let pixel = 0; pixel < pixelCount; pixel += sampleStride) {
+      const offset = pixel * 4;
+      const luminance = 0.2126 * data[offset] + 0.7152 * data[offset + 1] + 0.0722 * data[offset + 2];
+      histogram[Math.max(0, Math.min(255, Math.round(luminance)))]++;
+      luminanceSum += luminance;
+      sampleCount++;
+    }
+
+    const blackPoint = histogramPercentile(histogram, sampleCount, 0.02);
+    const whitePoint = histogramPercentile(histogram, sampleCount, 0.98);
+    const range = Math.max(32, whitePoint - blackPoint);
+    const mean = luminanceSum / Math.max(1, sampleCount) / 255;
+    const normalizedMean = Math.max(0.08, Math.min(0.92, (mean * 255 - blackPoint) / range));
+    const gamma = normalizedMean < 0.42
+      ? Math.max(0.84, Math.min(1, Math.log(0.52) / Math.log(normalizedMean)))
+      : 1;
+    const shouldChange = blackPoint > 8 || whitePoint < 247 || gamma !== 1;
+    if (!shouldChange) return false;
+
+    for (let offset = 0; offset < data.length; offset += 4) {
+      const luminance = 0.2126 * data[offset] + 0.7152 * data[offset + 1] + 0.0722 * data[offset + 2];
+      const normalized = Math.max(0, Math.min(1, (luminance - blackPoint) / range));
+      const corrected = Math.pow(normalized, gamma);
+      const source = luminance / 255;
+      const ratio = source > 0.015 ? corrected / source : corrected > 0 ? corrected / 0.015 : 0;
+      data[offset] = clampByte(data[offset] * ratio);
+      data[offset + 1] = clampByte(data[offset + 1] * ratio);
+      data[offset + 2] = clampByte(data[offset + 2] * ratio);
+    }
+    return true;
+  }
+
+  function loadEnhancementSource(src) {
+    return new Promise((resolve, reject) => {
+      const source = new Image();
+      let settled = false;
+      const finish = (callback, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        callback(value);
+      };
+      const timer = window.setTimeout(() => finish(reject, new Error('image enhancement timeout')), 2500);
+      source.decoding = 'async';
+      if (/^https?:/i.test(src)) source.crossOrigin = 'anonymous';
+      source.onload = () => finish(resolve, source);
+      source.onerror = () => finish(reject, new Error('image enhancement source unavailable'));
+      source.src = src;
+    });
+  }
+
+  function canvasToBlob(canvas) {
+    return new Promise((resolve) => canvas.toBlob(resolve, 'image/png', 1));
+  }
+
+  async function buildLocalEnhancement(src) {
+    const source = await loadEnhancementSource(src);
+    const sourcePixels = source.naturalWidth * source.naturalHeight;
+    if (!sourcePixels) return null;
+    const scale = Math.min(1, Math.sqrt(IMAGE_ENHANCE_MAX_PIXELS / sourcePixels));
+    const width = Math.max(1, Math.round(source.naturalWidth * scale));
+    const height = Math.max(1, Math.round(source.naturalHeight * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return null;
+    context.drawImage(source, 0, 0, width, height);
+    let imageData;
+    try {
+      imageData = context.getImageData(0, 0, width, height);
+    } catch (error) {
+      return null;
+    }
+    if (!autoCorrectImageData(imageData)) return { url: '', analyzed: true };
+    context.putImageData(imageData, 0, 0);
+    const blob = await canvasToBlob(canvas);
+    return { url: blob ? URL.createObjectURL(blob) : '', analyzed: true };
+  }
+
+  function releaseLocalEnhancement(img) {
+    const localUrl = img._localEnhancementUrl;
+    if (localUrl) URL.revokeObjectURL(localUrl);
+    img._localEnhancementUrl = '';
+    img.removeAttribute('data-local-enhanced');
+  }
+
+  function releaseLocalEnhancements(root) {
+    root.querySelectorAll('.pageimg').forEach(releaseLocalEnhancement);
+  }
+
+  function restoreLocalEnhancement(img) {
+    const originalSrc = img.dataset.originalSrc;
+    releaseLocalEnhancement(img);
+    if (originalSrc && img.src !== originalSrc) img.src = originalSrc;
+  }
+
+  async function enhanceImageElement(img) {
+    if (!imageEnhanceEnabled || safeModeEnabled || !img || img.dataset.enhancePending === 'true' || img.dataset.localEnhanced === 'true') return;
+    const originalSrc = img.dataset.originalSrc || img.currentSrc || img.src;
+    if (!originalSrc || originalSrc.startsWith('blob:')) return;
+    img.dataset.originalSrc = originalSrc;
+    img.dataset.enhancePending = 'true';
+    try {
+      const result = await buildLocalEnhancement(originalSrc);
+      if (!result) return;
+      if (!imageEnhanceEnabled || safeModeEnabled || !img.isConnected || img.dataset.originalSrc !== originalSrc) {
+        if (result.url) URL.revokeObjectURL(result.url);
+        return;
+      }
+      if (!result.url) {
+        img.dataset.localEnhanced = 'true';
+        return;
+      }
+      img._localEnhancementUrl = result.url;
+      img.dataset.localEnhanced = 'true';
+      img.src = result.url;
+    } catch (error) {
+      // Cross-origin images without CORS remain visible with the CSS fallback.
+    } finally {
+      img.removeAttribute('data-enhance-pending');
+    }
+  }
+
+  function refreshVisibleImageEnhancement() {
+    const images = els.pageStage ? Array.from(els.pageStage.querySelectorAll('.pageimg')) : [];
+    images.forEach((img) => {
+      if (imageEnhanceEnabled && !safeModeEnabled) enhanceImageElement(img);
+      else restoreLocalEnhancement(img);
+    });
+  }
+
   function persistFolders() { try { localStorage.setItem(SAVED_FOLDERS_KEY, JSON.stringify(savedFolders)); } catch (e) {} scheduleCloudSync(); }
   function persistItems() { try { localStorage.setItem(SAVED_ITEMS_KEY, JSON.stringify(savedItems)); } catch (e) {} scheduleCloudSync(); }
   function persistAll() {
@@ -2420,6 +2583,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.spinner.style.display = 'none';
     els.imgWrap.style.display = 'none';
     els.controls.style.display = 'none';
+    releaseLocalEnhancements(els.pageStage);
+    els.pageStage.innerHTML = '';
     els.placeholder.style.display = 'none';
     els.placeholder.innerHTML = '';
     els.status.textContent = '';
@@ -2600,12 +2765,19 @@ https://cdn.example.org/c/003.webp"></textarea>
           prevSlide.style.transform = t.exit;
         });
         newSlide.classList.add('current');
-        setTimeout(() => { if (prevSlide.parentNode) prevSlide.parentNode.removeChild(prevSlide); }, ANIM_DURATION + 60);
+        setTimeout(() => {
+          if (prevSlide.parentNode) {
+            releaseLocalEnhancements(prevSlide);
+            prevSlide.parentNode.removeChild(prevSlide);
+          }
+        }, ANIM_DURATION + 60);
       } else {
+        releaseLocalEnhancements(els.pageStage);
         els.pageStage.innerHTML = '';
         newSlide.classList.add('current');
         els.pageStage.appendChild(newSlide);
       }
+      if (imageEnhanceEnabled && !safeModeEnabled) enhanceImageElement(img);
     };
 
     waitForImageReady(img).then(doRender).catch(() => {
