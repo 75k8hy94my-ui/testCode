@@ -28,7 +28,8 @@
         <div style="display:flex;gap:8px;margin-top:12px;">
           <button id="passphraseUnlockBtn" type="button">パスフレーズで開く</button>
           <button id="passkeyUnlockBtn" type="button">パスキーで開く</button>
-          <button id="passkeyRegisterBtn" type="button">保管庫を作成してパスキー登録</button>
+          <button id="createVaultBtn" type="button">保管庫を作成</button>
+          <button id="passkeyRegisterBtn" type="button">パスキーを登録</button>
         </div>
         <label for="recoveryKey">または復旧キー</label>
         <input id="recoveryKey" type="text" autocomplete="off" spellcheck="false" placeholder="作成時に控えた復旧キー">
@@ -43,14 +44,14 @@
     </section>
   </main>
   <script src="supabase-config.js"></script>
-  <script src="vault-session.js?v=20260813-vault-one"></script>
+  <script src="vault-session.js?v=20260813-vault-state"></script>
   <script>
   (() => {
     'use strict';
     const DATA_KEYS = { folders:'mangaReaderSavedFolders', items:'mangaReaderSavedItems', videos:'mangaReaderVideos', mangaInfo:'mangaReaderInfoCache', toc:'mangaReaderToc', lastPages:'mangaReaderLastPage' };
     const DEVICE_DATA_KEYS = [DATA_KEYS.folders,DATA_KEYS.items,DATA_KEYS.videos,DATA_KEYS.mangaInfo,DATA_KEYS.toc,DATA_KEYS.lastPages,'mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
     const $ = (id) => document.getElementById(id);
-    const ui = { email:$('accountEmail'), passphrase:$('vaultPassphrase'), savePassphrase:$('savePassphrase'), recovery:$('recoveryKey'), status:$('status'), unlock:$('unlockView'), recoveryBox:$('recoveryBox'), recoveryCode:$('recoveryCode'), copy:$('copyRecoveryBtn'), logout:$('logoutBtn'), passphraseUnlock:$('passphraseUnlockBtn'), passkeyUnlock:$('passkeyUnlockBtn'), passkeyRegister:$('passkeyRegisterBtn') };
+    const ui = { email:$('accountEmail'), passphrase:$('vaultPassphrase'), savePassphrase:$('savePassphrase'), recovery:$('recoveryKey'), status:$('status'), unlock:$('unlockView'), recoveryBox:$('recoveryBox'), recoveryCode:$('recoveryCode'), copy:$('copyRecoveryBtn'), logout:$('logoutBtn'), passphraseUnlock:$('passphraseUnlockBtn'), passkeyUnlock:$('passkeyUnlockBtn'), createVault:$('createVaultBtn'), passkeyRegister:$('passkeyRegisterBtn') };
     const savedPassphraseKey = () => 'mangaReaderSavedVaultPassphrase:' + session.user.id;
     function loadSavedPassphrase() { try { const saved=localStorage.getItem(savedPassphraseKey()); if (saved) { ui.passphrase.value=saved; ui.savePassphrase.checked=true; } } catch (_) {} }
     function rememberPassphrase() { try { if (ui.savePassphrase.checked) localStorage.setItem(savedPassphraseKey(),ui.passphrase.value); else localStorage.removeItem(savedPassphraseKey()); } catch (_) {} }
@@ -70,8 +71,18 @@
     const session = MangaVault.loadSession();
     if (!session || !session.user || !session.user.email) { window.location.replace('index.html'); return; }
     ui.email.textContent=session.user.email;
-    if (MangaVault.loadActive()) goReader();
     let opening = false;
+    async function refreshVaultState() {
+      try {
+        const record = await MangaVault.withSession((token, user) => MangaVault.fetchRecordForUi(token, user));
+        const exists = !!record;
+        ui.passphraseUnlock.hidden = !exists;
+        ui.passkeyUnlock.hidden = !exists;
+        ui.passkeyRegister.hidden = !exists;
+        ui.createVault.hidden = exists;
+        if (!exists) setStatus('保管庫はまだ作成されていません。パスフレーズを入力して作成してください。');
+      } catch (_) {}
+    }
     function validateUnlockInput() {
       const passphrase=ui.passphrase.value, recovery=ui.recovery.value.trim();
       if (!recovery && passphrase.length < 12) { setStatus('パスフレーズは12文字以上で入力してください。'); return; }
@@ -106,28 +117,30 @@
       if (!input || opening) return;
       await openAutomatically(input.passphrase,input.recovery);
     }
+    async function createVault() {
+      const input=validateUnlockInput();
+      if (!input || input.recovery) return;
+      if (opening) return; opening=true; setStatus('保管庫を作成しています…');
+      try { rememberPassphrase(); const result=await MangaVault.initialize(input.passphrase,'',buildPayload,applyPayload); ui.passphrase.value=''; ui.unlock.hidden=true; ui.recoveryCode.textContent=result.recoveryCode; ui.recoveryBox.hidden=false; setStatus('保管庫を作成しました。復旧キーを保存してください。'); setTimeout(goReader,5500); }
+      catch (error) { setStatus(error.message || '保管庫を作成できませんでした。'); }
+      finally { opening=false; }
+    }
     async function passkeyRegister() {
       const input=validateUnlockInput();
       if (!input || input.recovery) { setStatus('パスキー登録には12文字以上のパスフレーズを入力してください。'); return; }
       if (opening) return; opening=true; setStatus('パスキーを登録しています…');
       try {
         rememberPassphrase();
-        const result=await MangaVault.initialize(input.passphrase,'',buildPayload,applyPayload);
         await MangaVault.registerPasskey(input.passphrase);
         ui.passphrase.value='';
-        if (result.created) {
-          ui.unlock.hidden=true; ui.recoveryCode.textContent=result.recoveryCode; ui.recoveryBox.hidden=false;
-          setStatus('保管庫を作成し、パスキーを登録しました。復旧キーを保存してください。');
-          setTimeout(goReader,5500);
-        } else {
-          setStatus('パスキーを登録しました。次回からパスキーで開けます。');
-        }
+        setStatus('パスキーを登録しました。次回からパスキーで開けます。');
       }
       catch (error) { setStatus(error.message || 'パスキーを登録できませんでした。'); }
       finally { opening=false; }
     }
-    ui.passphrase.addEventListener('input',() => { if (ui.savePassphrase.checked) rememberPassphrase(); }); ui.savePassphrase.addEventListener('change',rememberPassphrase); ui.passphraseUnlock.addEventListener('click',passphraseUnlock); ui.passkeyUnlock.addEventListener('click',passkeyUnlock); ui.passkeyRegister.addEventListener('click',passkeyRegister); ui.copy.addEventListener('click',async () => { try { await navigator.clipboard.writeText(ui.recoveryCode.textContent); } catch (_) {} }); ui.logout.addEventListener('click',logout);
+    ui.passphrase.addEventListener('input',() => { if (ui.savePassphrase.checked) rememberPassphrase(); }); ui.savePassphrase.addEventListener('change',rememberPassphrase); ui.passphraseUnlock.addEventListener('click',passphraseUnlock); ui.passkeyUnlock.addEventListener('click',passkeyUnlock); ui.createVault.addEventListener('click',createVault); ui.passkeyRegister.addEventListener('click',passkeyRegister); ui.copy.addEventListener('click',async () => { try { await navigator.clipboard.writeText(ui.recoveryCode.textContent); } catch (_) {} }); ui.logout.addEventListener('click',logout);
     loadSavedPassphrase();
+    refreshVaultState();
   })();
   </script>
 </body>

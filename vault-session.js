@@ -104,6 +104,7 @@
     if (rows && rows.length > 1) throw new Error('このアカウントに複数の保管庫が存在します。安全のため処理を停止しました。');
     return rows && rows[0] ? rows[0] : null;
   }
+  async function fetchRecordForUi(token, user) { return fetchRecord(token, user); }
   async function create(passphrase) {
     if (!window.crypto || !crypto.subtle) throw new Error('このブラウザは暗号化機能に対応していません。');
     if ((passphrase || '').length < 12) throw new Error('保管庫パスフレーズは12文字以上にしてください。');
@@ -203,5 +204,5 @@
       return { created: false };
     });
   }
-  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, loadActive, refreshSession, api, withSession, initialize, initializeWithPasskey, registerPasskey, savePayload };
+  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, loadActive, refreshSession, api, withSession, fetchRecordForUi, initialize, initializeWithPasskey, registerPasskey, savePayload };
 })();
