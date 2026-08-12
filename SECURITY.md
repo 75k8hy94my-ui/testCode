@@ -6,8 +6,8 @@
 
 1. Supabase Dashboardでこのプロジェクトの **SQL Editor** を開きます。
 2. `supabase-schema.sql` の内容をすべて貼り付けて **Run** を押します。
-3. アプリをHTTPSで公開した後、Supabase Dashboardの **Authentication > URL Configuration** で、`Site URL` と `Redirect URLs` にアプリのURLを追加します。
-4. アプリの「クラウド同期」を開き、メールアドレスとログイン用パスワードを入力してアカウントを作成します。
+3. アプリをHTTPSで公開した後、Supabase Dashboardの **Authentication > URL Configuration** で、`Site URL` と `Redirect URLs` にアプリのURLを追加します。公開URLの入口は `index.html`（ログイン画面）です。
+4. `index.html` でメールアドレスとログイン用パスワードを入力してアカウントを作成します。
 5. メール確認後にログインし、ログイン用とは別の保管庫パスフレーズを入力して「新しい保管庫を作成」を押します。
 6. 表示される復旧キーを、パスワード管理アプリなどクラウドとは別の安全な場所に保管します。
 7. 「この端末の内容を保存」を押します。

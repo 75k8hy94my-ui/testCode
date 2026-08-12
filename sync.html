@@ -43,7 +43,7 @@
   <main>
     <header>
       <h1>クラウド同期</h1>
-      <a class="back" href="index.html">← 漫画リーダーへ</a>
+      <a class="back" href="reader.html">← 漫画リーダーへ</a>
     </header>
 
     <section id="authCard" class="card">
@@ -142,10 +142,11 @@
     function showSignup() { ui.loginView.hidden = true; ui.signupView.hidden = false; setAuthStatus(''); ui.signupPassword.value = ''; ui.signupEmail.focus(); }
     function render() {
       const email = session && session.user && session.user.email;
+      if (!email) { window.location.replace('index.html'); return; }
       ui.authCard.hidden = !!email;
       ui.vaultView.hidden = !email;
-      if (email) { ui.accountEmail.textContent = email; setVaultState(activeVault ? 'このページでは保管庫を開いています。ページを閉じると自動でロックされます。' : '保管庫を作成するか、既存の保管庫を開いてください。'); }
-      else { showLogin(); }
+      ui.accountEmail.textContent = email;
+      setVaultState(activeVault ? 'このページでは保管庫を開いています。ページを閉じると自動でロックされます。' : '保管庫を作成するか、既存の保管庫を開いてください。');
     }
     function assertConfig() { if (!config.url || !config.publishableKey) throw new Error('Supabase の設定が見つかりません。'); }
     async function api(path, options = {}) {
