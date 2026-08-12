@@ -126,6 +126,14 @@
   body.safe-mode .book-cover:not(.folder-cover) img {
     filter: blur(24px);
   }
+  /* Readability preset: applied to the displayed page only. The source image
+     stays untouched and is never uploaded or rewritten. */
+  body.image-enhance .pageimg {
+    filter: brightness(1.08) contrast(1.16) saturate(.92);
+  }
+  body.safe-mode.image-enhance .pageimg {
+    filter: blur(24px) brightness(1.08) contrast(1.16) saturate(.92);
+  }
 
   .clickzone { position: absolute; top: 0; bottom: 0; cursor: pointer; }
   .clickzone.left { left: 0; width: 38%; }
@@ -631,6 +639,7 @@
     <button class="ctrlBtn" id="readerEditBtn" title="表示中の漫画を編集" style="display:none;">編集</button>
     <button class="ctrlBtn" type="button" onclick="window.location.href='links.html'" title="保存したWebリンクを管理">リンク管理</button>
     <button class="ctrlBtn" id="safeModeBtn" title="セーフモード（漫画の画像にモザイクをかけます）">セーフモード</button>
+    <button class="ctrlBtn" id="enhanceBtn" title="画像の明るさ・コントラストを自動補正" aria-pressed="true">自動補正</button>
     <button class="ctrlBtn active" id="animBtn" title="ページ送りアニメーションの切替">アニメ</button>
     <button class="ctrlBtn" id="redetectBtn" title="保存されたページ数情報を消して、最初から再検出します">再検出</button>
     <button class="ctrlBtn" id="tocAddBtn" title="今のページを目次として追加">目次追加</button>
@@ -953,6 +962,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   const LAST_PAGE_KEY = 'mangaReaderLastPage';
   const ANIM_KEY = 'mangaReaderAnimEnabled';
   const SAFE_MODE_KEY = 'mangaReaderSafeMode';
+  const IMAGE_ENHANCE_KEY = 'mangaReaderImageEnhance';
   const SAVED_FOLDERS_KEY = 'mangaReaderSavedFolders';
   const SAVED_ITEMS_KEY = 'mangaReaderSavedItems';
   const LEGACY_SAVED_URLS_KEY = 'mangaReaderSavedUrls';
@@ -992,6 +1002,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     closeBtn: document.getElementById('closeBtn'),
     saveBtn: document.getElementById('saveBtn'),
     safeModeBtn: document.getElementById('safeModeBtn'),
+    enhanceBtn: document.getElementById('enhanceBtn'),
     status: document.getElementById('status'),
     currentTitle: document.getElementById('currentTitle'),
     favToggleBtn: document.getElementById('favToggleBtn'),
@@ -1290,6 +1301,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // 状態の保持・トグル・永続化のみ担当）。アイコン画像はそもそも別クラスなので
   // 対象にならない。
   let safeModeEnabled = false;
+  let imageEnhanceEnabled = true;
 
   let savedFolders = []; // [{id, name}]
   // [{id, url, title, folderId, addedAt}] for normal 連番ベースURL manga, or
@@ -1329,8 +1341,25 @@ https://cdn.example.org/c/003.webp"></textarea>
   document.body.classList.toggle('safe-mode', safeModeEnabled);
   els.safeModeBtn.classList.toggle('active', safeModeEnabled);
 
+  try {
+    const ie = localStorage.getItem(IMAGE_ENHANCE_KEY);
+    if (ie !== null) imageEnhanceEnabled = ie === '1';
+  } catch (e) {}
+  applyImageEnhance();
+
   function persistAnim() { try { localStorage.setItem(ANIM_KEY, animEnabled ? '1' : '0'); } catch (e) {} }
   function persistSafeMode() { try { localStorage.setItem(SAFE_MODE_KEY, safeModeEnabled ? '1' : '0'); } catch (e) {} }
+  function persistImageEnhance() { try { localStorage.setItem(IMAGE_ENHANCE_KEY, imageEnhanceEnabled ? '1' : '0'); } catch (e) {} }
+  function applyImageEnhance() {
+    document.body.classList.toggle('image-enhance', imageEnhanceEnabled);
+    els.enhanceBtn.classList.toggle('active', imageEnhanceEnabled);
+    els.enhanceBtn.setAttribute('aria-pressed', imageEnhanceEnabled ? 'true' : 'false');
+  }
+  function toggleImageEnhance() {
+    imageEnhanceEnabled = !imageEnhanceEnabled;
+    applyImageEnhance();
+    persistImageEnhance();
+  }
   function toggleSafeMode() {
     safeModeEnabled = !safeModeEnabled;
     document.body.classList.toggle('safe-mode', safeModeEnabled);
@@ -4369,6 +4398,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   });
 
   els.safeModeBtn.addEventListener('click', toggleSafeMode);
+  els.enhanceBtn.addEventListener('click', toggleImageEnhance);
   els.closeListBtn.addEventListener('click', closeSavedList);
   els.historyListBtn.addEventListener('click', () => {
     currentFolderView = HISTORY_FOLDER_ID;
