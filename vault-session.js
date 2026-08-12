@@ -41,20 +41,26 @@
     const key = await passkeyKey(new Uint8Array(first));
     return { id: b64url(new Uint8Array(credential.rawId)), salt: b64url(salt), encryptedKey: await encrypt(key, loadActive().rawKey) };
   }
-  async function unlockByPasskey(wrapper) {
+  async function unlockByPasskey(wrappers) {
     if (!passkeySupported()) throw new Error('このブラウザはパスキーに対応していません。');
-    const id = fromB64url(wrapper.id), salt = fromB64url(wrapper.salt);
+    const entries = Array.isArray(wrappers) ? wrappers : [wrappers];
+    const allowCredentials = entries.map((entry) => ({ type: 'public-key', id: toArrayBuffer(fromB64url(entry.id)) }));
+    const evalByCredential = {};
+    entries.forEach((entry) => { evalByCredential[entry.id] = { first: toArrayBuffer(fromB64url(entry.salt)) }; });
     const credential = await navigator.credentials.get({ publicKey: {
       challenge: toArrayBuffer(randomBytes(32)),
       rpId: location.hostname,
-      allowCredentials: [{ type: 'public-key', id: toArrayBuffer(id) }],
+      allowCredentials,
       userVerification: 'required', timeout: 60000,
-      extensions: { prf: { evalByCredential: { [wrapper.id]: { first: toArrayBuffer(salt) } } } }
+      extensions: { prf: { evalByCredential } }
     }});
     const result = credential && credential.getClientExtensionResults && credential.getClientExtensionResults();
     const first = result && result.prf && result.prf.results && result.prf.results.first;
     if (!first) throw new Error('パスキーから保管庫解除情報を取得できませんでした。');
-    return new Uint8Array(await decrypt(await passkeyKey(new Uint8Array(first)), wrapper.encryptedKey));
+    const selectedId = b64url(new Uint8Array(credential.rawId));
+    const selected = entries.find((entry) => entry.id === selectedId);
+    if (!selected) throw new Error('登録済みパスキーを特定できませんでした。');
+    return new Uint8Array(await decrypt(await passkeyKey(new Uint8Array(first)), selected.encryptedKey));
   }
   function readJSON(key, fallback) { try { const value = JSON.parse(localStorage.getItem(key) || ''); return value == null ? fallback : value; } catch (_) { return fallback; } }
   function loadSession() { return readJSON(SESSION_KEY, null); }
@@ -170,7 +176,12 @@
       setMeta(user.id, record.updated_at);
       const wrapper = await registerPasskeyCredential(user.email);
       const vault = loadActive();
-      vault.keyWraps.passkey = wrapper;
+      const existing = Array.isArray(vault.keyWraps.passkeys)
+        ? vault.keyWraps.passkeys
+        : (vault.keyWraps.passkey ? [vault.keyWraps.passkey] : []);
+      if (existing.some((entry) => entry.id === wrapper.id)) throw new Error('このパスキーは既に登録されています。');
+      vault.keyWraps.passkeys = existing.concat(wrapper);
+      delete vault.keyWraps.passkey;
       saveActive(vault);
       const payload = await decryptPayload(record.payload);
       await savePayload(payload);
@@ -180,8 +191,10 @@
   async function initializeWithPasskey(applyPayload) {
     return withSession(async (token, user) => {
       const record = await fetchRecord(token, user);
-      if (!record || !record.payload || !record.payload.keyWraps || !record.payload.keyWraps.passkey) throw new Error('このアカウントには保管庫パスキーが登録されていません。');
-      const rawKey = await unlockByPasskey(record.payload.keyWraps.passkey);
+      const keyWraps = record && record.payload && record.payload.keyWraps;
+      const passkeys = keyWraps && (Array.isArray(keyWraps.passkeys) ? keyWraps.passkeys : (keyWraps.passkey ? [keyWraps.passkey] : []));
+      if (!passkeys || !passkeys.length) throw new Error('このアカウントには保管庫パスキーが登録されていません。');
+      const rawKey = await unlockByPasskey(passkeys);
       const vault = { rawKey, keyWraps: record.payload.keyWraps };
       saveActive(vault);
       await applyPayload(await decryptPayload(record.payload));
