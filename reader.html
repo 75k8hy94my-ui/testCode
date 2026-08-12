@@ -521,7 +521,7 @@
   .folder-preview.preview-count-1 { display: block; }
   .folder-preview.preview-count-2 { grid-template-rows: 1fr; }
   .folder-preview.preview-count-3 img:first-child { grid-row: 1 / 3; }
-  .folder-cover .book-delBtn { z-index: 2; }
+  .folder-cover .book-delBtn { top: auto; bottom: 6px; z-index: 2; }
   body.safe-mode .folder-preview img { filter: blur(12px); transform: scale(1.08); }
   .folder-kind-badge {
     position: absolute; left: 5px; bottom: 5px; z-index: 2;
@@ -601,18 +601,15 @@
 <div id="app">
   <div id="readProgressBar"></div>
   <div id="topbar">
-    <button class="primaryBtn" id="newBtn">新規</button>
     <button class="ctrlBtn favToggleBtn" id="closeBtn" title="閉じる" style="display:none;"></button>
-    <button class="ctrlBtn" id="saveBtn" title="今のURLを保存">URLを保存</button>
+    <button class="ctrlBtn" id="saveBtn" title="今のURLを保存" style="display:none;">URLを保存</button>
     <button class="ctrlBtn favToggleBtn" id="favToggleBtn" title="お気に入りに追加" style="display:none;"></button>
     <button class="ctrlBtn" id="readerEditBtn" title="表示中の漫画を編集" style="display:none;">編集</button>
-    <button class="ctrlBtn" id="listBtn" title="保存したURLの一覧">リスト</button>
     <button class="ctrlBtn" type="button" onclick="window.location.href='links.html'" title="保存したWebリンクを管理">リンク管理</button>
     <button class="ctrlBtn" id="safeModeBtn" title="セーフモード（漫画の画像にモザイクをかけます）">セーフモード</button>
     <button class="ctrlBtn active" id="animBtn" title="ページ送りアニメーションの切替">アニメ</button>
     <button class="ctrlBtn" id="redetectBtn" title="保存されたページ数情報を消して、最初から再検出します">再検出</button>
     <button class="ctrlBtn" id="tocAddBtn" title="今のページを目次として追加">目次追加</button>
-    <button class="ctrlBtn logoutBtn" id="logoutBtn" title="ログアウトして端末内の保存データを消去">ログアウト</button>
     <span id="status"></span>
     <span id="currentTitle"></span>
   </div>
@@ -757,12 +754,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     </div>
     <div id="mangaListSection">
       <div id="exportImportRow">
-        <button class="ctrlBtn" id="exportBtn">書き出し</button>
-        <button class="ctrlBtn" id="importBtn">読み込み</button>
-        <input type="file" id="importFileInput" accept="application/json" style="display:none;">
+        <button class="primaryBtn" id="newBtn">新規</button>
         <button class="ctrlBtn" id="addCustomBtn">個別追加</button>
         <button class="ctrlBtn" id="bulkDetectBtn">一括読み込み</button>
-        <button class="ctrlBtn" id="openCloudSyncBtn">クラウド同期</button>
       </div>
       <div id="smartListRow">
         <span class="smartListLabel">スマートリスト</span>
@@ -772,9 +766,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       <div id="listToolbar">
         <button class="ctrlBtn" id="listBackBtn" style="display:none;">← 戻る</button>
         <span id="listFolderTitle"></span>
-        <button class="ctrlBtn" id="feedBtn" style="display:none;">一覧</button>
-        <button class="ctrlBtn" id="reorderBtn" style="display:none;">並べ替え</button>
         <button class="ctrlBtn" id="listNewFolderBtn">+ 新しいフォルダ</button>
+        <button class="ctrlBtn" id="editShelfBtn">編集</button>
       </div>
       <div id="listNewFolderRow">
         <input id="listNewFolderInput" type="text" placeholder="新しいフォルダ名">
@@ -918,7 +911,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     newBtn: document.getElementById('newBtn'),
     closeBtn: document.getElementById('closeBtn'),
     saveBtn: document.getElementById('saveBtn'),
-    listBtn: document.getElementById('listBtn'),
     safeModeBtn: document.getElementById('safeModeBtn'),
     status: document.getElementById('status'),
     currentTitle: document.getElementById('currentTitle'),
@@ -978,16 +970,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     savedListItems: document.getElementById('savedListItems'),
     savedListEmpty: document.getElementById('savedListEmpty'),
     closeListBtn: document.getElementById('closeListBtn'),
-    feedBtn: document.getElementById('feedBtn'),
-    reorderBtn: document.getElementById('reorderBtn'),
+    editShelfBtn: document.getElementById('editShelfBtn'),
 
-    exportBtn: document.getElementById('exportBtn'),
-    importBtn: document.getElementById('importBtn'),
-    importFileInput: document.getElementById('importFileInput'),
     addCustomBtn: document.getElementById('addCustomBtn'),
     bulkDetectBtn: document.getElementById('bulkDetectBtn'),
-    openCloudSyncBtn: document.getElementById('openCloudSyncBtn'),
-    logoutBtn: document.getElementById('logoutBtn'),
     listLogoutBtn: document.getElementById('listLogoutBtn'),
     smartListRow: document.getElementById('smartListRow'),
     historyListBtn: document.getElementById('historyListBtn'),
@@ -1620,6 +1606,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!item) {
       els.favToggleBtn.style.display = 'none';
       els.readerEditBtn.style.display = 'none';
+      updateSaveButtonVisibility();
       return;
     }
     els.favToggleBtn.style.display = '';
@@ -1627,6 +1614,17 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.favToggleBtn.innerHTML = '';
     els.favToggleBtn.appendChild(makeHeartIcon(!!item.favorite));
     els.favToggleBtn.title = item.favorite ? 'お気に入りから外す' : 'お気に入りに追加';
+    updateSaveButtonVisibility();
+  }
+
+  // 履歴は読書記録であって、本棚への保存先ではない。履歴しかない作品には
+  // 「URLを保存」を出し、いずれかの本棚／フォルダに保存済みなら隠す。
+  function updateSaveButtonVisibility() {
+    const savedToBookshelf = !!baseUrl && savedItems.some((item) =>
+      item.folderId !== HISTORY_FOLDER_ID && !Array.isArray(item.pages) && item.url &&
+      baseUrlKey(item.url) === baseUrlKey(baseUrl)
+    );
+    els.saveBtn.style.display = baseUrl && !currentlyCustom && !savedToBookshelf ? '' : 'none';
   }
 
   // 閉じるボタンは、何らかの漫画が画面に表示されている間（pages が埋まって
@@ -2004,7 +2002,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (cached && cached.count > 0) {
       preferredExt = cached.ext;
       pages = Array.from({ length: cached.count }, (_, i) => baseUrl + (i + 1) + '.' + EXT_CANDIDATES[cached.ext]);
-      els.newBtn.disabled = false;
       els.placeholder.style.display = 'none';
       els.spinner.style.display = 'none';
       els.imgWrap.style.display = 'block';
@@ -2018,7 +2015,6 @@ https://cdn.example.org/c/003.webp"></textarea>
       return;
     }
 
-    els.newBtn.disabled = true;
     if (!switchDirection) {
       // Normal open (新規/list/resume): no prior page to keep showing, so
       // blank to a spinner while page 1 is located, same as always.
@@ -2031,8 +2027,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     const firstResult = await findPageResult(1);
     const firstUrl = firstResult.url;
     if (myGeneration !== readingGeneration) return; // superseded while we were checking page 1
-    els.newBtn.disabled = false;
-
     if (!firstUrl) {
       if (firstResult.kind === 'timeout') {
         // Keep the timeout visible to the bulk retry tool even when page 1
@@ -2983,6 +2977,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     });
     persistAll();
     updateCurrentTitleDisplay();
+    updateSaveButtonVisibility();
     closeSaveDialog();
     flashStatus('保存しました');
   }
@@ -3159,7 +3154,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     cover.appendChild(badge);
   }
 
-  function buildFolderCard(folder) {
+  function buildFolderCard(folder, folderList, organizeMode) {
     const card = document.createElement('div');
     card.className = 'book-card folder-card';
     const folderItems = savedItems.filter((item) => item.folderId === folder.id);
@@ -3168,8 +3163,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     cover.className = 'book-cover folder-cover';
     appendFolderPreview(cover, folderItems, ICON_FOLDER, '空のフォルダ', 'フォルダ');
 
-    // 履歴 is a reserved, auto-managed folder and can't be deleted as a whole.
-    if (folder.id !== HISTORY_FOLDER_ID) {
+    // フォルダの削除・並び替えは常時出さず、本棚の編集モードだけで行う。
+    if (organizeMode && folder.id !== HISTORY_FOLDER_ID) {
       const delBtn = document.createElement('button');
       delBtn.className = 'book-delBtn';
       delBtn.textContent = '×';
@@ -3183,6 +3178,23 @@ https://cdn.example.org/c/003.webp"></textarea>
         renderSavedList();
       });
       cover.appendChild(delBtn);
+
+      const idx = folderList.indexOf(folder);
+      const upBtn = document.createElement('button');
+      upBtn.className = 'book-moveBtn book-moveUpBtn';
+      upBtn.textContent = '▲';
+      upBtn.title = '上に移動';
+      upBtn.disabled = idx <= 0;
+      upBtn.addEventListener('click', (e) => { e.stopPropagation(); moveFolderInList(folder, folderList, -1); });
+      cover.appendChild(upBtn);
+
+      const downBtn = document.createElement('button');
+      downBtn.className = 'book-moveBtn book-moveDownBtn';
+      downBtn.textContent = '▼';
+      downBtn.title = '下に移動';
+      downBtn.disabled = idx >= folderList.length - 1;
+      downBtn.addEventListener('click', (e) => { e.stopPropagation(); moveFolderInList(folder, folderList, 1); });
+      cover.appendChild(downBtn);
     }
 
     const title = document.createElement('div');
@@ -3191,7 +3203,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     card.appendChild(cover);
     card.appendChild(title);
-    card.addEventListener('click', () => {
+    if (!organizeMode) card.addEventListener('click', () => {
       if (folderItems.length === 1) {
         // 1冊だけのフォルダは直接開くが、閉じた際の戻り先はこのフォルダにする。
         currentFolderView = folder.id;
@@ -3310,6 +3322,20 @@ https://cdn.example.org/c/003.webp"></textarea>
     savedItems[realIdxA] = other;
     savedItems[realIdxB] = item;
     persistAll();
+    renderSavedList();
+  }
+
+  function moveFolderInList(folder, list, direction) {
+    const idx = list.indexOf(folder);
+    const swapIdx = idx + direction;
+    if (idx === -1 || swapIdx < 0 || swapIdx >= list.length) return;
+    const other = list[swapIdx];
+    const realIdxA = savedFolders.indexOf(folder);
+    const realIdxB = savedFolders.indexOf(other);
+    if (realIdxA === -1 || realIdxB === -1) return;
+    savedFolders[realIdxA] = other;
+    savedFolders[realIdxB] = folder;
+    persistFolders();
     renderSavedList();
   }
 
@@ -3449,8 +3475,18 @@ https://cdn.example.org/c/003.webp"></textarea>
     const inSeriesGroup = currentFolderView === SERIES_FOLDER_ID && !!currentSeriesView;
     const inSeriesRoot = currentFolderView === SERIES_FOLDER_ID && !currentSeriesView;
 
+    const atRoot = !currentFolderView;
+    const isRealFolder = !!currentFolderView && currentFolderView !== FAVORITES_FOLDER_ID &&
+      currentFolderView !== UNREAD_FOLDER_ID && currentFolderView !== HISTORY_FOLDER_ID &&
+      currentFolderView !== SERIES_FOLDER_ID;
+    const canOrganize = atRoot || isRealFolder;
+    const showOrganizeControls = canOrganize && reorderMode;
+
     els.listBackBtn.style.display = currentFolderView ? '' : 'none';
-    els.listNewFolderBtn.style.display = currentFolderView ? 'none' : '';
+    els.listNewFolderBtn.style.display = atRoot ? '' : 'none';
+    els.editShelfBtn.style.display = canOrganize ? '' : 'none';
+    els.editShelfBtn.classList.toggle('active', showOrganizeControls);
+    els.editShelfBtn.textContent = showOrganizeControls ? '編集完了' : '編集';
     els.listNewFolderRow.style.display = 'none';
 
     if (currentFolderView === HISTORY_FOLDER_ID) {
@@ -3510,20 +3546,6 @@ https://cdn.example.org/c/003.webp"></textarea>
       itemsList = savedItems.filter((it) => it.folderId === currentFolderView);
     }
 
-    // "一覧" (feed) only makes sense inside a view that has browsable items —
-    // not at the シリーズ root, which is just a list of series names to drill into.
-    els.feedBtn.style.display = (currentFolderView && itemsList.length && !inSeriesRoot) ? '' : 'none';
-
-    // 並べ替え (manual reorder) only makes sense inside a real folder: a
-    // series' volume list is ordered by volume number, not manually, and
-    // 履歴/お気に入り auto-manage their own order, so all of those are excluded.
-    const reorderable = !!currentFolderView && currentFolderView !== FAVORITES_FOLDER_ID &&
-      currentFolderView !== UNREAD_FOLDER_ID && currentFolderView !== HISTORY_FOLDER_ID && !inSeriesRoot && !inSeriesGroup && itemsList.length > 1;
-    els.reorderBtn.style.display = reorderable ? '' : 'none';
-    const showReorderControls = reorderable && reorderMode;
-    els.reorderBtn.classList.toggle('active', showReorderControls);
-    els.reorderBtn.textContent = showReorderControls ? '並べ替え完了' : '並べ替え';
-
     const isEmpty = folderCards.length === 0 && itemsList.length === 0 && seriesGroupCards.length === 0 &&
       !showFavoritesCard && !showSeriesCard;
     if (isEmpty) {
@@ -3544,13 +3566,12 @@ https://cdn.example.org/c/003.webp"></textarea>
       const frag = document.createDocumentFragment();
       if (showFavoritesCard) frag.appendChild(buildFavoritesFolderCard());
       if (showSeriesCard) frag.appendChild(buildSeriesFolderCard());
-      folderCards.forEach((f) => frag.appendChild(buildFolderCard(f)));
+      folderCards.forEach((f) => frag.appendChild(buildFolderCard(f, folderCards, showOrganizeControls)));
       seriesGroupCards.forEach((g) => frag.appendChild(buildSeriesGroupCard(g)));
-      itemsList.forEach((it) => frag.appendChild(buildBookCard(it, itemsList, showReorderControls)));
+      itemsList.forEach((it) => frag.appendChild(buildBookCard(it, itemsList, showOrganizeControls)));
       els.savedListItems.appendChild(frag);
     }
 
-    const atRoot = !currentFolderView;
     els.smartListRow.style.display = atRoot ? 'flex' : 'none';
     if (atRoot) {
       const historyCount = savedItems.filter((item) => item.folderId === HISTORY_FOLDER_ID).length;
@@ -3703,6 +3724,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     readerReturnView = null;
     clearReadingListContext();
     currentItem = null; // raw URL open, not tied to a saved item
+    closeSavedList();
     startReading(v, true);
   }
   els.newBtn.addEventListener('click', handleNewManga);
@@ -3744,20 +3766,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.newFolderRow.style.display = 'none';
   });
 
-  els.exportBtn.addEventListener('click', exportData);
-  els.importBtn.addEventListener('click', () => els.importFileInput.click());
-  els.importFileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) importDataFromFile(file);
-    els.importFileInput.value = '';
-  });
-
   els.addCustomBtn.addEventListener('click', openCustomAddDialog);
   els.bulkDetectBtn.addEventListener('click', openBulkDetect);
-  els.openCloudSyncBtn.addEventListener('click', () => { window.location.href = 'sync.html'; });
   async function logoutFromReader() {
     if (!confirm('ログアウトしますか？')) return;
-    els.logoutBtn.disabled = true;
     els.listLogoutBtn.disabled = true;
     try {
       await MangaVault.withSession((token) => MangaVault.api('/auth/v1/logout', { method: 'POST', token: token }));
@@ -3775,7 +3787,6 @@ https://cdn.example.org/c/003.webp"></textarea>
       window.location.replace('index.html');
     }
   }
-  els.logoutBtn.addEventListener('click', logoutFromReader);
   els.listLogoutBtn.addEventListener('click', logoutFromReader);
   els.cancelCustomAddBtn.addEventListener('click', closeCustomAddDialog);
   els.confirmCustomAddBtn.addEventListener('click', confirmCustomAdd);
@@ -3825,7 +3836,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.editNewFolderRow.style.display = 'none';
   });
 
-  els.listBtn.addEventListener('click', () => openSavedList(false));
   els.safeModeBtn.addEventListener('click', toggleSafeMode);
   els.closeListBtn.addEventListener('click', closeSavedList);
   els.historyListBtn.addEventListener('click', () => {
@@ -3869,30 +3879,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     renderSavedList();
   });
 
-  // "一覧": jump straight into the reader for the folder's first manga (no
-  // intermediate browsing screen), with swipe context set to the whole
-  // folder so the reader's vertical swipe can step through the rest.
-  els.feedBtn.addEventListener('click', () => {
-    if (!currentFolderView) return;
-    let items;
-    if (currentFolderView === FAVORITES_FOLDER_ID) {
-      items = savedItems.filter((it) => it.favorite);
-    } else if (currentFolderView === UNREAD_FOLDER_ID) {
-      items = unreadOrderItems();
-    } else if (currentFolderView === SERIES_FOLDER_ID) {
-      if (!currentSeriesView) return; // browsing series names; nothing to feed yet
-      items = savedItems.filter((it) => it.series === currentSeriesView).sort((a, b) => (a.volume || 0) - (b.volume || 0));
-    } else {
-      items = savedItems.filter((it) => it.folderId === currentFolderView);
-    }
-    if (!items.length) return;
-    rememberReaderReturnView();
-    closeSavedList();
-    setReadingListContext(items, 0);
-    openItem(items[0], false);
-  });
-
-  els.reorderBtn.addEventListener('click', () => {
+  els.editShelfBtn.addEventListener('click', () => {
     reorderMode = !reorderMode;
     renderSavedList();
   });
