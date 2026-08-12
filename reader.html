@@ -5,7 +5,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f5f5f7">
-<title>連番画像 漫画リーダー</title>
+<title>漫画リーダー</title>
+<link rel="icon" type="image/png" href="icon-bookshelf.png">
 <!-- Home screen (Add to Home Screen) icon and label for iOS Safari -->
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
 <link rel="apple-touch-icon" sizes="152x152" href="icon-152.png">
@@ -70,6 +71,12 @@
     transition: transform 0.3s var(--ease), opacity 0.3s var(--ease);
     z-index: 10;
   }
+  #appBrand {
+    display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto;
+    margin-right: 2px; color: var(--text); font-size: 13px; font-weight: 700;
+    white-space: nowrap;
+  }
+  #appBrand img { width: 28px; height: 28px; object-fit: contain; border-radius: 7px; }
   #topbar.hidden { transform: translateY(-100%); opacity: 0; }
   .ctrlBtn, .primaryBtn {
     padding: 8px 15px; border-radius: var(--radius-sm); border: 1px solid transparent;
@@ -595,6 +602,7 @@
     #topbar .ctrlBtn, #topbar .primaryBtn {
       min-width: 0; padding: 7px 9px; font-size: 12px; flex: 0 1 auto;
     }
+    #appBrand { display: none; }
     #status { min-width: 0; flex: 0 1 auto; }
     #currentTitle { min-width: 0; max-width: none; flex: 1 1 110px; }
     #controls {
@@ -651,6 +659,7 @@
 <div id="app">
   <div id="readProgressBar"></div>
   <div id="topbar">
+    <span id="appBrand"><img src="icon-bookshelf.png" alt=""><span>漫画リーダー</span></span>
     <button class="ctrlBtn" id="closeBtn" title="閉じる" aria-label="リーダーを閉じる" style="display:none;">×</button>
     <button class="ctrlBtn" id="saveBtn" title="今のURLを保存" style="display:none;">URLを保存</button>
     <button class="ctrlBtn favToggleBtn" id="favToggleBtn" title="お気に入りに追加" style="display:none;"></button>
