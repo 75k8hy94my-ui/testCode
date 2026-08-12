@@ -334,13 +334,6 @@
     backdrop-filter: blur(3px); transition: filter 0.15s ease;
   }
   .book-delBtn:hover { filter: brightness(1.3); }
-  .book-editBtn {
-    position: absolute; top: 4px; left: 4px; width: 21px; height: 21px; line-height: 19px;
-    text-align: center; border-radius: 50%; background: rgba(10,12,17,0.78); color: var(--text);
-    border: 1px solid rgba(255,255,255,0.08); font-size: 12px; cursor: pointer; padding: 0;
-    backdrop-filter: blur(3px); transition: filter 0.15s ease;
-  }
-  .book-editBtn:hover { filter: brightness(1.3); }
   .book-favBtn {
     position: absolute; bottom: 4px; right: 4px; width: 23px; height: 23px;
     display: flex; align-items: center; justify-content: center;
@@ -498,6 +491,8 @@
   .logoutBtn { background: #dc2626 !important; border-color: #dc2626 !important; color: #fff !important; }
   .logoutBtn:hover { background: #b91c1c !important; border-color: #b91c1c !important; }
   .logoutBtn:disabled { opacity: .6; cursor: wait; }
+  .dangerBtn { background: #dc2626 !important; border-color: #dc2626 !important; color: #fff !important; }
+  .dangerBtn:hover { background: #b91c1c !important; border-color: #b91c1c !important; }
   .modalOverlay { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
   .modalPanel { width: 100%; min-height: 100dvh; max-height: none; border: 0; padding: 28px max(24px, env(safe-area-inset-right)) 32px max(24px, env(safe-area-inset-left)); }
   .panel-header { font-size: 17px; border-bottom: 0; padding-bottom: 2px; }
@@ -537,7 +532,7 @@
     font-size: 8px; font-weight: 800; line-height: 1; white-space: nowrap;
   }
   .folder-kind-badge img { width: 12px; height: 12px; object-fit: contain; filter: brightness(0) invert(1); }
-  .book-editBtn, .book-delBtn, .book-favBtn {
+  .book-delBtn, .book-favBtn {
     width: 30px; height: 30px; min-width: 30px; min-height: 30px;
     display: flex; align-items: center; justify-content: center;
     color: #1d1d1f; background: rgba(255,255,255,.96);
@@ -545,12 +540,11 @@
     -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
     font-weight: 800; line-height: 1; opacity: 1;
   }
-  .book-editBtn { top: 6px; left: 6px; color: #0066cc; font-size: 16px; }
   .book-delBtn { top: 6px; right: 6px; color: #d70015; font-size: 19px; }
   .book-favBtn { right: 6px; bottom: 6px; }
   .book-favBtn { color: #8e8e93; font-size: 20px; font-family: Arial, sans-serif; }
   .book-favBtn.is-favorite { color: #ff3b30; }
-  .book-editBtn:active, .book-delBtn:active, .book-favBtn:active { transform: scale(.9); }
+  .book-delBtn:active, .book-favBtn:active { transform: scale(.9); }
   input, select, textarea { border-color: var(--border) !important; background: #fff !important; color: var(--text) !important; }
 
   @media (max-width: 600px) {
@@ -569,8 +563,7 @@
     .smartListBtn { min-height: 32px; font-size: 11.5px; }
     #savedListItems.bookshelf { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px 8px; }
     .book-cover { border-radius: 9px; }
-    .book-editBtn, .book-delBtn, .book-favBtn { width: 28px; height: 28px; min-width: 28px; min-height: 28px; }
-    .book-editBtn { top: 4px; left: 4px; }
+    .book-delBtn, .book-favBtn { width: 28px; height: 28px; min-width: 28px; min-height: 28px; }
     .book-delBtn { top: 4px; right: 4px; }
     .book-favBtn { right: 4px; bottom: 4px; }
     .book-title { font-size: 10.5px; }
@@ -729,6 +722,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     <label class="field-label" for="editVolumeInput">巻数（シリーズ設定時は必須）</label>
     <input id="editVolumeInput" type="number" min="1" step="1" placeholder="例: 1">
     <div class="dialog-actions">
+      <button class="ctrlBtn dangerBtn" id="deleteEditItemBtn" type="button">削除</button>
       <button class="ctrlBtn" id="cancelEditItemBtn">キャンセル</button>
       <button class="primaryBtn" id="confirmEditItemBtn">保存</button>
     </div>
@@ -1031,6 +1025,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     editNewSeriesRow: document.getElementById('editNewSeriesRow'),
     editNewSeriesInput: document.getElementById('editNewSeriesInput'),
     editVolumeInput: document.getElementById('editVolumeInput'),
+    deleteEditItemBtn: document.getElementById('deleteEditItemBtn'),
     cancelEditItemBtn: document.getElementById('cancelEditItemBtn'),
     confirmEditItemBtn: document.getElementById('confirmEditItemBtn'),
 
@@ -1780,6 +1775,16 @@ https://cdn.example.org/c/003.webp"></textarea>
     persistItems();
   }
 
+  // A work becomes read after page 5. For a completed short work, its final
+  // page is the threshold instead. Until the end is known, a 1–4 page work
+  // remains unread rather than being marked early.
+  function markCurrentItemReadIfEligible() {
+    const item = getCurrentItem();
+    if (!item || !pages.length) return;
+    const threshold = (currentlyCustom || detectionDone) ? Math.min(5, pages.length) : 5;
+    if (currentPage >= threshold) recordReading(item);
+  }
+
   function unreadOrderItems() {
     // History entries are automatically created reading records, not books to
     // work through. They must never appear in the unread-priority list.
@@ -2091,6 +2096,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         updateSlider();
         persistLastPage();
         updateNextVolumeBanner();
+        markCurrentItemReadIfEligible();
         setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, hitLimit: detectionHitLimit, state: endState === 'timeout' ? 'retryable' : 'complete', retryFrom: endState === 'timeout' ? pages.length + 1 : null });
         return;
       }
@@ -2203,7 +2209,6 @@ https://cdn.example.org/c/003.webp"></textarea>
   // typed-in URL.
   function openItem(item, addToHistoryFlag, switchDirection) {
     currentItem = item || null; // remembered for series/次の巻 lookups
-    if (item) recordReading(item);
     if (item && Array.isArray(item.pages) && item.pages.length) {
       startReadingCustom(item, switchDirection);
     } else {
@@ -2485,6 +2490,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     for (let i = 1; i <= PRELOAD_AHEAD_COUNT; i++) preload(n + i);
     preload(n - 1);
     persistLastPage();
+    markCurrentItemReadIfEligible();
     nextVolumeDismissed = false;
     updateNextVolumeBanner();
     // A real page turn should leave the image unobstructed. Initial opening
@@ -2504,6 +2510,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     for (let i = 1; i <= PRELOAD_AHEAD_COUNT; i++) preload(n + i);
     preload(n - 1);
     persistLastPage();
+    markCurrentItemReadIfEligible();
     nextVolumeDismissed = false;
     updateNextVolumeBanner();
   }
@@ -3084,6 +3091,22 @@ https://cdn.example.org/c/003.webp"></textarea>
     flashStatus('更新しました');
   }
 
+  function deleteEditingItem() {
+    const item = savedItems.find((it) => it.id === editingItemId);
+    if (!item) { closeEditItemDialog(); return; }
+    if (!confirm('「' + itemDisplayTitle(item) + '」を削除します。本当によろしいですか？')) return;
+    const deletingCurrentItem = !!currentItem && currentItem.id === item.id;
+    savedItems = savedItems.filter((it) => it.id !== item.id);
+    persistAll();
+    closeEditItemDialog();
+    if (deletingCurrentItem) {
+      closeManga();
+    } else {
+      updateCurrentTitleDisplay();
+      flashStatus('削除しました');
+    }
+  }
+
   // ---------- saved list (with folders) ----------
   // Every level (including the shallowest/top one) renders as a Kindle-style
   // bookshelf grid now: folders show as folder-icon cards, manga show as
@@ -3304,9 +3327,8 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   // Manga are shown as a Kindle-bookshelf-style grid of page-1 cover
   // thumbnails. Reuses the same cascading-extension cover lookup as the 一覧
-  // feed view. Every item also gets an 編集 (edit) button alongside the
-  // existing 削除 (delete) one — works for both normal and custom items.
-  // reorderMode: when true, swaps the normal 編集/削除/お気に入り buttons for
+  // feed view. Item metadata is edited only from the reader's top-bar button.
+  // reorderMode: when true, shows
   // 上下移動 (move up/down) buttons, and disables tap-to-open — so taps in
   // 並べ替え mode can't accidentally open a manga while the user is busy
   // rearranging the shelf.
@@ -3344,32 +3366,6 @@ https://cdn.example.org/c/003.webp"></textarea>
       downBtn.addEventListener('click', (e) => { e.stopPropagation(); moveItemInList(item, list, 1); });
       cover.appendChild(downBtn);
     } else {
-      const editBtn = document.createElement('button');
-      editBtn.className = 'book-editBtn';
-      editBtn.textContent = '✎';
-      editBtn.title = '編集';
-      editBtn.setAttribute('aria-label', itemDisplayTitle(item) + 'を編集');
-      editBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openEditItemDialog(item);
-      });
-      cover.appendChild(editBtn);
-
-      const delBtn = document.createElement('button');
-      delBtn.className = 'book-delBtn';
-      delBtn.textContent = '×';
-      delBtn.title = '削除';
-      delBtn.setAttribute('aria-label', itemDisplayTitle(item) + 'を削除');
-      delBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (!confirm('「' + itemDisplayTitle(item) + '」を削除します。本当によろしいですか？')) return;
-        savedItems = savedItems.filter((it) => it.id !== item.id);
-        persistAll();
-        updateCurrentTitleDisplay();
-        renderSavedList();
-      });
-      cover.appendChild(delBtn);
-
       const favBtn = document.createElement('button');
       favBtn.className = 'book-favBtn';
       const updateFavoriteButton = () => {
@@ -3783,6 +3779,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   });
 
   els.cancelEditItemBtn.addEventListener('click', closeEditItemDialog);
+  els.deleteEditItemBtn.addEventListener('click', deleteEditingItem);
   els.confirmEditItemBtn.addEventListener('click', confirmEditItem);
   els.editItemOverlay.addEventListener('click', (e) => { if (e.target === els.editItemOverlay) closeEditItemDialog(); });
   els.editFolderSelect.addEventListener('change', () => {
