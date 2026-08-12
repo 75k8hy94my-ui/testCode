@@ -749,6 +749,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         <button class="ctrlBtn" id="importBtn">読み込み</button>
         <input type="file" id="importFileInput" accept="application/json" style="display:none;">
         <button class="ctrlBtn" id="addCustomBtn">個別追加</button>
+        <button class="ctrlBtn" id="bulkDetectBtn">一括読み込み</button>
         <button class="ctrlBtn" id="openCloudSyncBtn">クラウド同期</button>
       </div>
       <div id="listToolbar">
@@ -772,6 +773,21 @@ https://cdn.example.org/c/003.webp"></textarea>
       <div id="videoListItems"></div>
       <div id="videoListEmpty" style="display:none;">動画はまだ追加されていません</div>
     </div>
+  </div>
+</div>
+
+<!-- Bulk page-count detection -->
+<div id="bulkDetectOverlay" class="modalOverlay">
+  <div id="bulkDetectPanel" class="modalPanel">
+    <div class="panel-header"><span>一括読み込み</span><button class="ctrlBtn" id="closeBulkDetectBtn">閉じる</button></div>
+    <p id="bulkDetectSummary" style="font-size:13px;color:var(--sub);line-height:1.6;margin:0 0 14px;"></p>
+    <div id="bulkDetectProgress" style="font-size:14px;line-height:1.7;min-height:3em;"></div>
+    <div class="dialog-actions" style="margin-top:18px;">
+      <button class="primaryBtn" id="bulkDetectAllBtn">未読込の作品を読み込む</button>
+      <button class="ctrlBtn" id="bulkRetryBtn">タイムアウト分を再試行</button>
+      <button class="ctrlBtn" id="bulkCancelBtn">中止</button>
+    </div>
+    <p style="font-size:12px;color:var(--sub);line-height:1.6;margin:18px 0 0;">タイムアウトした作品は、次回は確認済みの続きのページから再試行します。</p>
   </div>
 </div>
 
@@ -952,8 +968,17 @@ https://cdn.example.org/c/003.webp"></textarea>
     importBtn: document.getElementById('importBtn'),
     importFileInput: document.getElementById('importFileInput'),
     addCustomBtn: document.getElementById('addCustomBtn'),
+    bulkDetectBtn: document.getElementById('bulkDetectBtn'),
     openCloudSyncBtn: document.getElementById('openCloudSyncBtn'),
     logoutBtn: document.getElementById('logoutBtn'),
+
+    bulkDetectOverlay: document.getElementById('bulkDetectOverlay'),
+    closeBulkDetectBtn: document.getElementById('closeBulkDetectBtn'),
+    bulkDetectSummary: document.getElementById('bulkDetectSummary'),
+    bulkDetectProgress: document.getElementById('bulkDetectProgress'),
+    bulkDetectAllBtn: document.getElementById('bulkDetectAllBtn'),
+    bulkRetryBtn: document.getElementById('bulkRetryBtn'),
+    bulkCancelBtn: document.getElementById('bulkCancelBtn'),
 
     customAddOverlay: document.getElementById('customAddOverlay'),
     customTitleInput: document.getElementById('customTitleInput'),
@@ -1300,12 +1325,14 @@ https://cdn.example.org/c/003.webp"></textarea>
     const order = extHint != null
       ? [extHint, ...EXT_CANDIDATES.map((_, i) => i).filter((i) => i !== extHint)]
       : EXT_CANDIDATES.map((_, i) => i);
+    let timedOut = false;
     for (const idx of order) {
       const url = key + n + '.' + EXT_CANDIDATES[idx];
-      const ok = await loadImage(url);
-      if (ok) return { url, ext: idx };
+      const result = await loadImageResult(url);
+      if (result === 'loaded') return { kind: 'found', url: url, ext: idx };
+      if (result === 'timeout') timedOut = true;
     }
-    return null;
+    return { kind: timedOut ? 'timeout' : 'missing' };
   }
 
   // Probes forward from page `fromCount + 1`, batching DETECT_BATCH_SIZE at a
@@ -1318,24 +1345,25 @@ https://cdn.example.org/c/003.webp"></textarea>
     while (true) {
       const batchNums = [];
       for (let n = count + 1; n <= count + DETECT_BATCH_SIZE && n <= MAX_PAGES_SAFETY; n++) batchNums.push(n);
-      if (!batchNums.length) return { count, ext: curExt, hitLimit: true };
+      if (!batchNums.length) return { count, ext: curExt, hitLimit: true, state: 'complete', retryFrom: null };
       const results = await Promise.all(batchNums.map((n) => probePageAt(key, n, curExt)));
-      let brokeEarly = false;
+      let endState = null;
       for (const r of results) {
-        if (!r) { brokeEarly = true; break; }
+        if (r.kind !== 'found') { endState = r.kind; break; }
         curExt = r.ext;
         count++;
       }
       if (onProgress) onProgress(count, curExt);
-      if (brokeEarly) return { count, ext: curExt, hitLimit: false };
-      if (count >= MAX_PAGES_SAFETY) return { count, ext: curExt, hitLimit: true };
+      if (endState) return { count, ext: curExt, hitLimit: false, state: endState === 'timeout' ? 'retryable' : 'complete', retryFrom: endState === 'timeout' ? count + 1 : null };
+      if (count >= MAX_PAGES_SAFETY) return { count, ext: curExt, hitLimit: true, state: 'complete', retryFrom: null };
     }
   }
 
-  async function detectPageCountForKey(key) {
+  async function detectPageCountForKey(key, fromCount, extHint, onProgress) {
+    if (fromCount > 0) return runPageCountLoop(key, fromCount, extHint, onProgress);
     const first = await probePageAt(key, 1, null);
-    if (!first) return null; // 1ページ目すら読み込めない＝記録しない
-    return runPageCountLoop(key, 1, first.ext);
+    if (first.kind !== 'found') return { count: 0, ext: 0, hitLimit: false, state: first.kind === 'timeout' ? 'retryable' : 'unavailable', retryFrom: first.kind === 'timeout' ? 1 : null };
+    return runPageCountLoop(key, 1, first.ext, onProgress);
   }
 
   // opts.force: 既にキャッシュ済みでも取得し直す（編集ダイアログの明示ボタン用）。
@@ -1345,20 +1373,28 @@ https://cdn.example.org/c/003.webp"></textarea>
     const o = opts || {};
     if (!key || pageCountDetectionInProgress.has(key)) {
       if (o.onDone) o.onDone(undefined); // already running — caller can ignore
-      return;
+      return Promise.resolve(undefined);
     }
-    if (!o.force && getCachedMangaInfo(key)) {
-      if (o.onDone) o.onDone(getCachedMangaInfo(key));
-      return;
+    const cached = getCachedMangaInfo(key);
+    if (!o.force && cached && cached.state !== 'retryable') {
+      if (o.onDone) o.onDone(cached);
+      return Promise.resolve(cached);
     }
+    const fromCount = o.retry && cached ? Number(cached.count) || 0 : 0;
+    const extHint = o.retry && cached ? cached.ext : null;
     pageCountDetectionInProgress.add(key);
-    detectPageCountForKey(key)
+    const task = detectPageCountForKey(key, fromCount, extHint, (count, ext) => {
+      setCachedMangaInfo(key, { ext: ext, count: count, hitLimit: false, state: 'retryable', retryFrom: count + 1 });
+      if (o.onProgress) o.onProgress(count, ext);
+    })
       .then((result) => {
-        if (result) setCachedMangaInfo(key, { ext: result.ext, count: result.count, hitLimit: result.hitLimit });
+        if (result) setCachedMangaInfo(key, { ext: result.ext, count: result.count, hitLimit: result.hitLimit, state: result.state || 'complete', retryFrom: result.retryFrom || null });
         if (o.onDone) o.onDone(result);
+        return result;
       })
       .catch(() => { if (o.onDone) o.onDone(null); })
       .finally(() => { pageCountDetectionInProgress.delete(key); });
+    return task;
   }
 
   // detectMorePagesがreadingGenerationの変化で中断された直後にだけ呼ぶ想定の
@@ -1368,10 +1404,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!key || fromCount <= 0 || pageCountDetectionInProgress.has(key)) return;
     pageCountDetectionInProgress.add(key);
     runPageCountLoop(key, fromCount, ext, (count, curExt) => {
-      setCachedMangaInfo(key, { ext: curExt, count, hitLimit: false });
+      setCachedMangaInfo(key, { ext: curExt, count, hitLimit: false, state: 'retryable', retryFrom: count + 1 });
     })
       .then((result) => {
-        setCachedMangaInfo(key, { ext: result.ext, count: result.count, hitLimit: result.hitLimit });
+        setCachedMangaInfo(key, { ext: result.ext, count: result.count, hitLimit: result.hitLimit, state: result.state || 'complete', retryFrom: result.retryFrom || null });
       })
       .catch(() => {})
       .finally(() => { pageCountDetectionInProgress.delete(key); });
@@ -1825,29 +1861,33 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   // ---------- image loading / detection ----------
-  function loadImage(url) {
+  function loadImageResult(url) {
     return new Promise((resolve) => {
       const img = new Image();
       let done = false;
       const timer = setTimeout(() => {
-        if (!done) { done = true; resolve(false); }
+        if (!done) { done = true; img.src = ''; resolve('timeout'); }
       }, LOAD_TIMEOUT_MS);
-      img.onload = () => { if (!done) { done = true; clearTimeout(timer); resolve(true); } };
-      img.onerror = () => { if (!done) { done = true; clearTimeout(timer); resolve(false); } };
+      img.onload = () => { if (!done) { done = true; clearTimeout(timer); resolve('loaded'); } };
+      img.onerror = () => { if (!done) { done = true; clearTimeout(timer); resolve('missing'); } };
       img.src = url;
     });
   }
+  async function loadImage(url) { return (await loadImageResult(url)) === 'loaded'; }
 
-  async function findPageUrl(pageNum) {
+  async function findPageResult(pageNum) {
     const order = [preferredExt, ...EXT_CANDIDATES.map((_, i) => i).filter((i) => i !== preferredExt)];
+    let timedOut = false;
     for (const idx of order) {
       const ext = EXT_CANDIDATES[idx];
       const url = baseUrl + pageNum + '.' + ext;
-      const ok = await loadImage(url);
-      if (ok) { preferredExt = idx; return url; }
+      const result = await loadImageResult(url);
+      if (result === 'loaded') { preferredExt = idx; return { kind: 'found', url: url }; }
+      if (result === 'timeout') timedOut = true;
     }
-    return null;
+    return { kind: timedOut ? 'timeout' : 'missing', url: null };
   }
+  async function findPageUrl(pageNum) { return (await findPageResult(pageNum)).url; }
 
   // Preloads just page 1 of another manga (used for swipe-list neighbors).
   // Doesn't know the right extension ahead of time, so it cascades through
@@ -1951,16 +1991,22 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
     els.status.textContent = '1ページ目を確認中...';
 
-    const firstUrl = await findPageUrl(1);
+    const firstResult = await findPageResult(1);
+    const firstUrl = firstResult.url;
     if (myGeneration !== readingGeneration) return; // superseded while we were checking page 1
     els.newBtn.disabled = false;
 
     if (!firstUrl) {
+      if (firstResult.kind === 'timeout') {
+        // Keep the timeout visible to the bulk retry tool even when page 1
+        // could not be obtained. A later retry starts at page 1.
+        setCachedMangaInfo(baseUrl, { ext: preferredExt, count: 0, hitLimit: false, state: 'retryable', retryFrom: 1 });
+      }
       els.spinner.style.display = 'none';
       els.imgWrap.style.display = 'none';
       els.placeholder.style.display = 'block';
       els.placeholder.innerHTML =
-        '1ページ目が見つかりませんでした。<br>' +
+        (firstResult.kind === 'timeout' ? '1ページ目の読み込みがタイムアウトしました。時間をおいて再試行してください。<br>' : '1ページ目が見つかりませんでした。<br>') +
         '試したURL: ' + EXT_CANDIDATES.map((e) => '<code>' + baseUrl + '1.' + e + '</code>').join(' / ') + '<br>' +
         'URLや拡張子を確認してください。';
       els.status.textContent = '';
@@ -1989,13 +2035,14 @@ https://cdn.example.org/c/003.webp"></textarea>
       const batchEnd = Math.min(pageNum + DETECT_BATCH_SIZE - 1, MAX_PAGES_SAFETY);
       const batchNums = [];
       for (let n = pageNum; n <= batchEnd; n++) batchNums.push(n);
-      const results = await Promise.all(batchNums.map((n) => findPageUrl(n)));
+      const results = await Promise.all(batchNums.map((n) => findPageResult(n)));
       if (generation !== readingGeneration) return;
 
       let brokeEarly = false;
-      for (const url of results) {
-        if (!url) { brokeEarly = true; break; }
-        pages.push(url);
+      let endState = null;
+      for (const result of results) {
+        if (result.kind !== 'found') { brokeEarly = true; endState = result.kind; break; }
+        pages.push(result.url);
         pageNum++;
         if (pendingResumePage !== null && pages.length === pendingResumePage) {
           jumpToPage(pendingResumePage);
@@ -2004,7 +2051,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       }
       updateStatus();
       updateSlider();
-      setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, hitLimit: false });
+      setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, hitLimit: false, state: endState === 'missing' ? 'complete' : 'retryable', retryFrom: endState === 'missing' ? null : pages.length + 1 });
 
       if (brokeEarly || pageNum > MAX_PAGES_SAFETY) {
         detectionHitLimit = pageNum > MAX_PAGES_SAFETY;
@@ -2014,7 +2061,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         updateSlider();
         persistLastPage();
         updateNextVolumeBanner();
-        setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, hitLimit: detectionHitLimit });
+        setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, hitLimit: detectionHitLimit, state: endState === 'timeout' ? 'retryable' : 'complete', retryFrom: endState === 'timeout' ? pages.length + 1 : null });
         return;
       }
     }
@@ -2027,9 +2074,10 @@ https://cdn.example.org/c/003.webp"></textarea>
   // cache was stale — site moved/changed), falls back to a full re-detection
   // from scratch, same as a never-before-seen manga.
   async function verifyCachedMangaInBackground(generation) {
-    const firstOk = await loadImage(pages[0]);
+    const firstResult = await loadImageResult(pages[0]);
     if (generation !== readingGeneration) return;
-    if (!firstOk) {
+    if (firstResult === 'timeout') return;
+    if (firstResult !== 'loaded') {
       clearCachedMangaInfo(baseUrl);
       pages = [];
       currentPage = 1;
@@ -3220,6 +3268,17 @@ https://cdn.example.org/c/003.webp"></textarea>
     return '';
   }
 
+  function itemPageCountText(item) {
+    if (Array.isArray(item.pages) && item.pages.length) return item.pages.length + 'ページ';
+    if (!item.url) return '';
+    const info = getCachedMangaInfo(mangaCacheKeyFor(item.url));
+    if (!info) return 'ページ数未取得';
+    const count = Number(info.count) || 0;
+    if (info.state === 'retryable') return count ? count + 'ページまで確認済み' : '再試行待ち';
+    if (info.state === 'unavailable') return 'ページ数を確認できません';
+    return count ? count + 'ページ' : 'ページ数未取得';
+  }
+
   function readingRecordText(item) {
     const lastReadAt = Number(item.lastReadAt) || 0;
     if (!lastReadAt) return '未読';
@@ -3340,7 +3399,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
     const readingEl = document.createElement('div');
     readingEl.className = 'book-reading' + (item.lastReadAt ? '' : ' unread');
-    readingEl.textContent = readingRecordText(item);
+    readingEl.textContent = readingRecordText(item) + ' ・ ' + itemPageCountText(item);
     readingEl.title = item.lastReadAt
       ? '最終読書: ' + new Date(Number(item.lastReadAt)).toLocaleString('ja-JP') + ' / ' + (Number(item.readCount) || 1) + '回'
       : 'まだ読んでいません';
@@ -3493,7 +3552,90 @@ https://cdn.example.org/c/003.webp"></textarea>
     tryNext();
   }
 
-  function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen() || isCustomAddDialogOpen() || isEditItemDialogOpen() || isTocListOpen(); }
+  let bulkDetectRunning = false;
+  let bulkDetectCancelRequested = false;
+
+  function bulkDetectCandidates(mode) {
+    const unique = new Map();
+    savedItems.forEach((item) => {
+      if (!item.url || (Array.isArray(item.pages) && item.pages.length)) return;
+      const key = mangaCacheKeyFor(item.url);
+      if (!key || unique.has(key)) return;
+      const cache = getCachedMangaInfo(key);
+      const include = mode === 'retry'
+        ? cache && cache.state === 'retryable'
+        : !cache;
+      if (include) unique.set(key, { key: key, item: item, cache: cache });
+    });
+    return Array.from(unique.values());
+  }
+
+  function refreshBulkDetectSummary() {
+    const unread = bulkDetectCandidates('all').length;
+    const retryable = bulkDetectCandidates('retry').length;
+    els.bulkDetectSummary.textContent = 'ページ数未保存: ' + unread + '作品 / タイムアウトで再試行可能: ' + retryable + '作品';
+    els.bulkDetectAllBtn.disabled = bulkDetectRunning || unread === 0;
+    els.bulkRetryBtn.disabled = bulkDetectRunning || retryable === 0;
+  }
+
+  function openBulkDetect() {
+    closeSavedList();
+    bulkDetectCancelRequested = false;
+    els.bulkDetectProgress.textContent = '';
+    els.bulkCancelBtn.textContent = '閉じる';
+    refreshBulkDetectSummary();
+    els.bulkDetectOverlay.classList.add('show');
+  }
+
+  function closeBulkDetect() {
+    if (bulkDetectRunning) {
+      bulkDetectCancelRequested = true;
+      els.bulkCancelBtn.disabled = true;
+      els.bulkCancelBtn.textContent = '中止中…';
+      return;
+    }
+    els.bulkDetectOverlay.classList.remove('show');
+    reopenSavedList();
+  }
+
+  async function runBulkDetect(mode) {
+    if (bulkDetectRunning) return;
+    const jobs = bulkDetectCandidates(mode);
+    if (!jobs.length) { refreshBulkDetectSummary(); return; }
+    bulkDetectRunning = true;
+    bulkDetectCancelRequested = false;
+    els.bulkCancelBtn.disabled = false;
+    els.bulkCancelBtn.textContent = '中止';
+    refreshBulkDetectSummary();
+    let completed = 0;
+    let retried = 0;
+    for (const job of jobs) {
+      if (bulkDetectCancelRequested) break;
+      const fromPage = mode === 'retry' && job.cache ? (Number(job.cache.count) || 0) + 1 : 1;
+      els.bulkDetectProgress.textContent = '読み込み中 (' + (completed + 1) + ' / ' + jobs.length + ')\n' + itemDisplayTitle(job.item) + '\n' + fromPage + 'ページ目から確認しています…';
+      const result = await ensurePageCountDetected(job.key, {
+        force: true,
+        retry: mode === 'retry',
+        onProgress: (count) => {
+          els.bulkDetectProgress.textContent = '読み込み中 (' + (completed + 1) + ' / ' + jobs.length + ')\n' + itemDisplayTitle(job.item) + '\n' + count + 'ページまで保存しました。';
+        }
+      });
+      completed++;
+      if (result && result.state === 'retryable') retried++;
+    }
+    bulkDetectRunning = false;
+    els.bulkCancelBtn.disabled = false;
+    els.bulkCancelBtn.textContent = '閉じる';
+    if (bulkDetectCancelRequested) {
+      els.bulkDetectProgress.textContent = completed + '作品まで読み込み、途中で中止しました。';
+    } else {
+      els.bulkDetectProgress.textContent = completed + '作品の読み込みが完了しました。' + (retried ? ' ' + retried + '作品はタイムアウトのため続きから再試行できます。' : '');
+    }
+    refreshBulkDetectSummary();
+    scheduleCloudSync();
+  }
+
+  function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen() || isCustomAddDialogOpen() || isEditItemDialogOpen() || isTocListOpen() || els.bulkDetectOverlay.classList.contains('show'); }
 
   // ---------- events ----------
   function bindSeriesControls(selectEl, newRow, newInput, volumeInput, titleInput) {
@@ -3566,6 +3708,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   });
 
   els.addCustomBtn.addEventListener('click', openCustomAddDialog);
+  els.bulkDetectBtn.addEventListener('click', openBulkDetect);
   els.openCloudSyncBtn.addEventListener('click', () => { window.location.href = 'sync.html'; });
   els.logoutBtn.addEventListener('click', async () => {
     if (!confirm('ログアウトしますか？')) return;
@@ -3588,6 +3731,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   });
   els.cancelCustomAddBtn.addEventListener('click', closeCustomAddDialog);
   els.confirmCustomAddBtn.addEventListener('click', confirmCustomAdd);
+  els.closeBulkDetectBtn.addEventListener('click', closeBulkDetect);
+  els.bulkCancelBtn.addEventListener('click', closeBulkDetect);
+  els.bulkDetectAllBtn.addEventListener('click', () => runBulkDetect('all'));
+  els.bulkRetryBtn.addEventListener('click', () => runBulkDetect('retry'));
+  els.bulkDetectOverlay.addEventListener('click', (e) => { if (e.target === els.bulkDetectOverlay) closeBulkDetect(); });
   els.customAddOverlay.addEventListener('click', (e) => { if (e.target === els.customAddOverlay) closeCustomAddDialog(); });
   els.customFolderSelect.addEventListener('change', () => {
     if (els.customFolderSelect.value === '__new__') {
@@ -3734,11 +3882,11 @@ https://cdn.example.org/c/003.webp"></textarea>
         e.target === els.editTitleInput || e.target === els.editNewFolderInput ||
         e.target === els.saveNewSeriesInput || e.target === els.customNewSeriesInput || e.target === els.editNewSeriesInput ||
         e.target === els.githubRepoInput || e.target === els.githubPathInput || e.target === els.githubTokenInput) {
-      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); }
+      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); closeBulkDetect(); }
       return;
     }
     if (anyModalOpen()) {
-      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); }
+      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); closeBulkDetect(); }
       return;
     }
     switch (e.key) {
