@@ -601,6 +601,7 @@
     <button class="ctrlBtn" id="listBtn" title="保存したURLの一覧">リスト</button>
     <button class="ctrlBtn" type="button" onclick="window.location.href='links.html'" title="保存したWebリンクを管理">リンク管理</button>
     <button class="ctrlBtn" id="safeModeBtn" title="セーフモード（漫画の画像にモザイクをかけます）">セーフモード</button>
+    <button class="ctrlBtn" id="logoutBtn" title="ログアウトして端末内の保存データを消去">ログアウト</button>
     <span id="status"></span>
     <span id="currentTitle"></span>
   </div>
@@ -952,6 +953,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     importFileInput: document.getElementById('importFileInput'),
     addCustomBtn: document.getElementById('addCustomBtn'),
     openCloudSyncBtn: document.getElementById('openCloudSyncBtn'),
+    logoutBtn: document.getElementById('logoutBtn'),
 
     customAddOverlay: document.getElementById('customAddOverlay'),
     customTitleInput: document.getElementById('customTitleInput'),
@@ -3565,6 +3567,25 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   els.addCustomBtn.addEventListener('click', openCustomAddDialog);
   els.openCloudSyncBtn.addEventListener('click', () => { window.location.href = 'sync.html'; });
+  els.logoutBtn.addEventListener('click', async () => {
+    if (!confirm('ログアウトしますか？')) return;
+    els.logoutBtn.disabled = true;
+    try {
+      await MangaVault.withSession((token) => MangaVault.api('/auth/v1/logout', { method: 'POST', token: token }));
+    } catch (e) {
+      // Local logout still must proceed when the network is unavailable.
+    } finally {
+      const deviceKeys = [
+        SAVED_FOLDERS_KEY, SAVED_ITEMS_KEY, SAVED_VIDEOS_KEY, MANGA_INFO_CACHE_KEY,
+        TOC_KEY, LAST_PAGE_KEY, LAST_URL_KEY, LEGACY_SAVED_URLS_KEY,
+        'mangaReaderGithubSync', MangaVault.META_KEY
+      ];
+      MangaVault.clearActive();
+      MangaVault.saveSession(null);
+      deviceKeys.forEach((key) => localStorage.removeItem(key));
+      window.location.replace('index.html');
+    }
+  });
   els.cancelCustomAddBtn.addEventListener('click', closeCustomAddDialog);
   els.confirmCustomAddBtn.addEventListener('click', confirmCustomAdd);
   els.customAddOverlay.addEventListener('click', (e) => { if (e.target === els.customAddOverlay) closeCustomAddDialog(); });
