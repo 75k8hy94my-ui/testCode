@@ -4239,7 +4239,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     let showSeriesCard = false;
 
     if (!currentFolderView) {
-      itemsList = savedItems.filter((it) => !it.folderId);
+      // Series-tagged works belong to the virtual シリーズ shelf at the
+      // root. Do not also render them as individual cards beside that shelf;
+      // works with the same series name are grouped there automatically.
+      itemsList = savedItems.filter((it) => !it.folderId && !it.series);
       folderCards = savedFolders.filter((folder) => folder.id !== HISTORY_FOLDER_ID);
       showFavoritesCard = true;
       showSeriesCard = true;
