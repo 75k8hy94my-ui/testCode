@@ -2476,6 +2476,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (n < 1) n = 1;
     if (n > pages.length) n = pages.length;
     const hasCurrent = !!els.pageStage.querySelector('.pageSlide');
+    const pageChanged = hasCurrent && n !== currentPage;
     const direction = forceDirection || (!hasCurrent ? null : (n > currentPage ? 'next' : (n < currentPage ? 'prev' : null)));
     currentPage = n;
     pruneStalePreloads(preloadWindowUrls(n));
@@ -2486,6 +2487,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     persistLastPage();
     nextVolumeDismissed = false;
     updateNextVolumeBanner();
+    // A real page turn should leave the image unobstructed. Initial opening
+    // and resume jumps keep the controls visible so the reader remains clear.
+    if (pageChanged) hideBars();
   }
 
   // Instant, non-animated jump used when resuming to a saved page on load.
@@ -2516,6 +2520,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   function toggleBars() {
     els.topbar.classList.toggle('hidden');
     els.controls.classList.toggle('hidden');
+  }
+
+  function hideBars() {
+    els.topbar.classList.add('hidden');
+    els.controls.classList.add('hidden');
   }
 
   function toggleAnim() {
