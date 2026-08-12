@@ -218,16 +218,14 @@
   .field-label { font-size: 12px; color: var(--sub); display: block; margin-top: 10px; letter-spacing: 0.01em; }
   #saveDialogPanel input[type="text"], #saveDialogPanel select,
   #customAddPanel input[type="text"], #customAddPanel select,
-  #editItemPanel input[type="text"], #editItemPanel select,
-  #githubSyncPanel input[type="text"], #githubSyncPanel input[type="password"], #githubSyncPanel select {
+  #editItemPanel input[type="text"], #editItemPanel select {
     width: 100%; padding: 9px 11px; border-radius: var(--radius-sm); border: 1px solid var(--border);
     background: var(--bg-soft); color: var(--text); font-size: 16px; margin-top: 4px;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
   #saveDialogPanel input[type="text"]:focus, #saveDialogPanel select:focus,
   #customAddPanel input[type="text"]:focus, #customAddPanel select:focus,
-  #editItemPanel input[type="text"]:focus, #editItemPanel select:focus,
-  #githubSyncPanel input[type="text"]:focus, #githubSyncPanel input[type="password"]:focus, #githubSyncPanel select:focus {
+  #editItemPanel input[type="text"]:focus, #editItemPanel select:focus {
     border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); outline: none;
   }
   #customAddPanel textarea, #editItemPanel textarea {
@@ -731,7 +729,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         <button class="ctrlBtn" id="importBtn">読み込み</button>
         <input type="file" id="importFileInput" accept="application/json" style="display:none;">
         <button class="ctrlBtn" id="addCustomBtn">個別追加</button>
-        <button class="ctrlBtn" id="openGithubSyncBtn">クラウド同期</button>
+        <button class="ctrlBtn" id="openCloudSyncBtn">クラウド同期</button>
       </div>
       <div id="listToolbar">
         <button class="ctrlBtn" id="listBackBtn" style="display:none;">← 戻る</button>
@@ -754,77 +752,6 @@ https://cdn.example.org/c/003.webp"></textarea>
       <div id="videoListItems"></div>
       <div id="videoListEmpty" style="display:none;">動画はまだ追加されていません</div>
     </div>
-  </div>
-</div>
-
-<!-- GitHub sync stores an encrypted vault. GitHub receives ciphertext only. -->
-<div id="githubSyncOverlay" class="modalOverlay">
-  <div id="githubSyncPanel" class="modalPanel">
-    <div class="panel-header">
-      <span>暗号化 GitHub 同期</span>
-      <button class="ctrlBtn" id="closeGithubSyncBtn">閉じる</button>
-    </div>
-    <p style="font-size:12px;color:var(--sub);line-height:1.6;margin:0 0 12px;">保存内容はこの端末内で暗号化されます。GitHub には復号できない暗号文だけが保存されます。</p>
-    <form id="githubSyncForm" autocomplete="off">
-      <label class="field-label" for="githubRepoInput">同期専用の非公開リポジトリ（owner/repo）</label>
-      <input id="githubRepoInput" type="text" name="username" autocomplete="username" placeholder="例: yourname/manga-data">
-      <label class="field-label" for="githubPathInput">暗号化ファイルのパス</label>
-      <input id="githubPathInput" type="text" name="path" autocomplete="off" placeholder="例: manga-vault.enc.json">
-      <label class="field-label" for="githubTokenInput">GitHub アクセストークン（このブラウザを閉じるまでだけ保持）</label>
-      <input id="githubTokenInput" type="password" name="password" autocomplete="new-password" placeholder="github_pat_...">
-      <div class="dialog-actions">
-        <button class="ctrlBtn" type="submit" id="githubSaveSettingsBtn">同期先を保存</button>
-      </div>
-    </form>
-    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);">
-      <div style="font-weight:700;font-size:13px;">暗号化保管庫</div>
-      <div id="vaultState" style="font-size:12px;color:var(--sub);margin:6px 0 10px;line-height:1.5;">未設定</div>
-      <label class="field-label" for="vaultPassphraseInput">保管庫パスフレーズ</label>
-      <input id="vaultPassphraseInput" type="password" autocomplete="new-password" placeholder="12文字以上の固有のパスフレーズ">
-      <label class="field-label" for="vaultRecoveryInput">または復旧キー</label>
-      <input id="vaultRecoveryInput" type="text" autocomplete="off" spellcheck="false" placeholder="作成時に控えた復旧キー">
-      <div class="dialog-actions">
-        <button class="ctrlBtn" type="button" id="vaultCreateBtn">新しい保管庫を作成</button>
-        <button class="ctrlBtn" type="button" id="vaultUnlockBtn">保管庫を開く</button>
-      </div>
-      <div id="vaultRecoveryBox" style="display:none;margin-top:10px;padding:10px;border:1px solid var(--accent);border-radius:8px;font-size:12px;line-height:1.6;">
-        <strong>復旧キー（今だけ表示）</strong><br>
-        <code id="vaultRecoveryCode" style="word-break:break-all;user-select:all;"></code>
-        <div class="dialog-actions"><button class="ctrlBtn" type="button" id="copyRecoveryKeyBtn">復旧キーをコピー</button></div>
-        <div>パスフレーズを忘れたときに必要です。安全な場所に保管してください。</div>
-      </div>
-    </div>
-    <div id="githubSyncStatus" style="font-size:12px;color:var(--sub);margin-top:10px;min-height:16px;"></div>
-    <div class="dialog-actions">
-      <button class="ctrlBtn" id="githubPullBtn">復号して読み込む</button>
-      <button class="primaryBtn" id="githubPushBtn">暗号化して保存</button>
-    </div>
-  </div>
-</div>
-
-<div id="supabaseSyncOverlay" class="modalOverlay">
-  <div class="modalPanel">
-    <div class="panel-header"><span>クラウド同期</span><button class="ctrlBtn" id="closeSupabaseSyncBtn">閉じる</button></div>
-    <p style="font-size:12px;color:var(--sub);line-height:1.6;margin:0 0 12px;">ログインして端末間で同期します。クラウドには暗号文のみを保存します。</p>
-    <label class="field-label" for="supabaseEmailInput">メールアドレス</label>
-    <input id="supabaseEmailInput" type="email" autocomplete="email" placeholder="you@example.com">
-    <label class="field-label" for="supabasePasswordInput">ログイン用パスワード</label>
-    <input id="supabasePasswordInput" type="password" autocomplete="current-password" placeholder="8文字以上">
-    <div class="dialog-actions"><button class="ctrlBtn" type="button" id="supabaseSignupBtn">アカウント作成</button><button class="primaryBtn" type="button" id="supabaseLoginBtn">ログイン</button></div>
-    <div id="supabaseAccountState" style="font-size:12px;color:var(--sub);margin:8px 0;min-height:16px;"></div>
-    <div class="dialog-actions"><button class="ctrlBtn" type="button" id="supabaseLogoutBtn">ログアウト</button></div>
-    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);">
-      <div style="font-weight:700;font-size:13px;">暗号化保管庫</div>
-      <div id="supabaseVaultState" style="font-size:12px;color:var(--sub);margin:6px 0 10px;line-height:1.5;">ログインしてから保管庫を開いてください。</div>
-      <label class="field-label" for="supabaseVaultPassphraseInput">保管庫パスフレーズ</label>
-      <input id="supabaseVaultPassphraseInput" type="password" autocomplete="new-password" placeholder="ログイン用とは別のパスフレーズ">
-      <label class="field-label" for="supabaseVaultRecoveryInput">または復旧キー</label>
-      <input id="supabaseVaultRecoveryInput" type="text" autocomplete="off" spellcheck="false" placeholder="作成時に控えた復旧キー">
-      <div class="dialog-actions"><button class="ctrlBtn" type="button" id="supabaseVaultCreateBtn">新しい保管庫を作成</button><button class="ctrlBtn" type="button" id="supabaseVaultUnlockBtn">保管庫を開く</button></div>
-      <div id="supabaseRecoveryBox" style="display:none;margin-top:10px;padding:10px;border:1px solid var(--accent);border-radius:8px;font-size:12px;line-height:1.6;"><strong>復旧キー（今だけ表示）</strong><br><code id="supabaseRecoveryCode" style="word-break:break-all;user-select:all;"></code><div class="dialog-actions"><button class="ctrlBtn" type="button" id="supabaseCopyRecoveryKeyBtn">復旧キーをコピー</button></div><div>パスフレーズを忘れたときに必要です。安全な場所に保管してください。</div></div>
-    </div>
-    <div id="supabaseSyncStatus" style="font-size:12px;color:var(--sub);margin-top:10px;min-height:16px;"></div>
-    <div class="dialog-actions"><button class="ctrlBtn" type="button" id="supabasePullBtn">復号して読み込む</button><button class="primaryBtn" type="button" id="supabasePushBtn">暗号化して保存</button></div>
   </div>
 </div>
 
@@ -865,7 +792,6 @@ https://cdn.example.org/c/003.webp"></textarea>
   </div>
 </div>
 
-<script src="supabase-config.js"></script>
 <script>
 (function () {
   const EXT_CANDIDATES = ['jpg', 'jpeg', 'png', 'webp'];
@@ -1006,46 +932,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     importBtn: document.getElementById('importBtn'),
     importFileInput: document.getElementById('importFileInput'),
     addCustomBtn: document.getElementById('addCustomBtn'),
-    openGithubSyncBtn: document.getElementById('openGithubSyncBtn'),
-
-    githubSyncOverlay: document.getElementById('githubSyncOverlay'),
-    closeGithubSyncBtn: document.getElementById('closeGithubSyncBtn'),
-    githubRepoInput: document.getElementById('githubRepoInput'),
-    githubPathInput: document.getElementById('githubPathInput'),
-    githubTokenInput: document.getElementById('githubTokenInput'),
-    githubSyncForm: document.getElementById('githubSyncForm'),
-    githubSaveSettingsBtn: document.getElementById('githubSaveSettingsBtn'),
-    githubSyncStatus: document.getElementById('githubSyncStatus'),
-    githubPullBtn: document.getElementById('githubPullBtn'),
-    githubPushBtn: document.getElementById('githubPushBtn'),
-    vaultState: document.getElementById('vaultState'),
-    vaultPassphraseInput: document.getElementById('vaultPassphraseInput'),
-    vaultRecoveryInput: document.getElementById('vaultRecoveryInput'),
-    vaultCreateBtn: document.getElementById('vaultCreateBtn'),
-    vaultUnlockBtn: document.getElementById('vaultUnlockBtn'),
-    vaultRecoveryBox: document.getElementById('vaultRecoveryBox'),
-    vaultRecoveryCode: document.getElementById('vaultRecoveryCode'),
-    copyRecoveryKeyBtn: document.getElementById('copyRecoveryKeyBtn'),
-
-    supabaseSyncOverlay: document.getElementById('supabaseSyncOverlay'),
-    closeSupabaseSyncBtn: document.getElementById('closeSupabaseSyncBtn'),
-    supabaseEmailInput: document.getElementById('supabaseEmailInput'),
-    supabasePasswordInput: document.getElementById('supabasePasswordInput'),
-    supabaseSignupBtn: document.getElementById('supabaseSignupBtn'),
-    supabaseLoginBtn: document.getElementById('supabaseLoginBtn'),
-    supabaseLogoutBtn: document.getElementById('supabaseLogoutBtn'),
-    supabaseAccountState: document.getElementById('supabaseAccountState'),
-    supabaseVaultState: document.getElementById('supabaseVaultState'),
-    supabaseVaultPassphraseInput: document.getElementById('supabaseVaultPassphraseInput'),
-    supabaseVaultRecoveryInput: document.getElementById('supabaseVaultRecoveryInput'),
-    supabaseVaultCreateBtn: document.getElementById('supabaseVaultCreateBtn'),
-    supabaseVaultUnlockBtn: document.getElementById('supabaseVaultUnlockBtn'),
-    supabaseRecoveryBox: document.getElementById('supabaseRecoveryBox'),
-    supabaseRecoveryCode: document.getElementById('supabaseRecoveryCode'),
-    supabaseCopyRecoveryKeyBtn: document.getElementById('supabaseCopyRecoveryKeyBtn'),
-    supabaseSyncStatus: document.getElementById('supabaseSyncStatus'),
-    supabasePullBtn: document.getElementById('supabasePullBtn'),
-    supabasePushBtn: document.getElementById('supabasePushBtn'),
+    openCloudSyncBtn: document.getElementById('openCloudSyncBtn'),
 
     customAddOverlay: document.getElementById('customAddOverlay'),
     customTitleInput: document.getElementById('customTitleInput'),
@@ -1251,7 +1138,6 @@ https://cdn.example.org/c/003.webp"></textarea>
   // the list instead of leaving it closed.
   let customAddReturnToList = false;
   let editReturnToList = false;
-  let githubSyncReturnToList = false;
   let editingItemId = null; // id of the saved item currently open in the 編集 dialog
 
   function genId(prefix) {
@@ -1670,7 +1556,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   // folders/items/videos に加えて per-manga info cache（拡張子・既知ページ数）も同梱する。
-  // 書き出し/読み込みとGitHub同期の両方で使う共通ペイロード組み立て。
+  // 書き出し/読み込みとクラウド同期の両方で使う共通ペイロード組み立て。
   function buildSyncPayload() {
     return { folders: savedFolders, items: savedItems, videos: savedVideos, mangaInfo: loadMangaInfoCache() };
   }
@@ -1705,7 +1591,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  // Shared by 読み込み (file import) and GitHub からの読み込み: validates the
+  // Shared by 読み込み (file import) and クラウドからの読み込み: validates the
   // {folders, items, videos} shape, confirms with the user, then replaces the local
   // list and persists/re-renders. Returns whether the replace happened.
   function applyImportedData(data) {
@@ -1739,524 +1625,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     }).catch(() => flashStatus('読み込みに失敗しました'));
   }
 
-  // ---------- GitHub sync (private repo, Contents API) ----------
-  // Alternative to the manual 書き出し/読み込み file dance: pushes/pulls the
-  // exact same {folders, items, videos} JSON to/from a single file in a private
-  // GitHub repository the user controls, via the Contents API directly from
-  // the browser (api.github.com allows CORS for GET/PUT with an Authorization
-  // header). The repo, file path, and personal access token are entered once
-  // in the GitHubで同期 dialog and kept only in this browser's localStorage —
-  // never written into this app's own (public) repo or any committed file.
-  const GITHUB_SYNC_KEY = 'mangaReaderGithubSync'; // {repo: 'owner/name', path}; never a token
-  const VAULT_SYNC_META_KEY = 'mangaReaderVaultSyncMeta'; // non-secret remote SHA tracking
-  const VAULT_VERSION = 1;
-  const VAULT_KDF_ITERATIONS = 600000;
-  let githubSessionToken = '';
-  let activeVault = null; // { rawKey, keyWraps }; memory-only
-
-  function loadGithubSyncSettings() {
-    try {
-      const settings = JSON.parse(localStorage.getItem(GITHUB_SYNC_KEY) || '{}');
-      // Remove tokens saved by pre-encryption versions of the app.
-      if (settings.token) {
-        delete settings.token;
-        localStorage.setItem(GITHUB_SYNC_KEY, JSON.stringify(settings));
-      }
-      return settings;
-    }
-    catch (e) { return {}; }
-  }
-  function persistGithubSyncSettings(settings) {
-    try { localStorage.setItem(GITHUB_SYNC_KEY, JSON.stringify({ repo: settings.repo, path: settings.path })); } catch (e) {}
-  }
-  function loadVaultSyncMeta() {
-    try { return JSON.parse(localStorage.getItem(VAULT_SYNC_META_KEY) || '{}'); } catch (e) { return {}; }
-  }
-  function vaultTargetId(settings) { return settings.repo + ':' + settings.path; }
-  function setVaultRemoteSha(settings, sha) {
-    const meta = loadVaultSyncMeta();
-    meta[vaultTargetId(settings)] = { sha: sha || null, syncedAt: Date.now() };
-    try { localStorage.setItem(VAULT_SYNC_META_KEY, JSON.stringify(meta)); } catch (e) {}
-  }
-  function getVaultRemoteSha(settings) {
-    const item = loadVaultSyncMeta()[vaultTargetId(settings)];
-    return item && item.sha;
-  }
-
-  // btoa/atob only handle Latin1, but titles/folder names are Japanese, so
-  // route through TextEncoder/TextDecoder to round-trip multi-byte UTF-8
-  // correctly through GitHub's base64 file content.
-  function utf8ToBase64(str) {
-    const bytes = new TextEncoder().encode(str);
-    let binary = '';
-    bytes.forEach((b) => { binary += String.fromCharCode(b); });
-    return btoa(binary);
-  }
-  function base64ToUtf8(b64) {
-    const binary = atob(b64.replace(/\n/g, ''));
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return new TextDecoder().decode(bytes);
-  }
-
-  function bytesToBase64Url(bytes) {
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-  }
-  function base64UrlToBytes(value) {
-    const normalized = String(value || '').replace(/-/g, '+').replace(/_/g, '/');
-    const padded = normalized + '==='.slice((normalized.length + 3) % 4);
-    const binary = atob(padded);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes;
-  }
-  function randomBytes(length) {
-    const bytes = new Uint8Array(length);
-    crypto.getRandomValues(bytes);
-    return bytes;
-  }
-  async function deriveVaultPassphraseKey(passphrase, salt) {
-    const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
-    return crypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt: salt, iterations: VAULT_KDF_ITERATIONS, hash: 'SHA-256' }, material,
-      { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
-    );
-  }
-  async function importAesKey(rawKey) {
-    return crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
-  }
-  async function encryptVaultBytes(key, plaintext) {
-    const iv = randomBytes(12);
-    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, plaintext);
-    return { iv: bytesToBase64Url(iv), ciphertext: bytesToBase64Url(new Uint8Array(ciphertext)) };
-  }
-  async function decryptVaultBytes(key, encrypted) {
-    return new Uint8Array(await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: base64UrlToBytes(encrypted.iv) }, key, base64UrlToBytes(encrypted.ciphertext)
-    ));
-  }
-  function requireWebCrypto() {
-    if (!window.crypto || !crypto.subtle) throw new Error('このブラウザでは安全な暗号化機能（Web Crypto API）が利用できません');
-  }
-  function updateVaultState(message) { els.vaultState.textContent = message; }
-  function clearActiveVault() {
-    if (activeVault && activeVault.rawKey) activeVault.rawKey.fill(0);
-    activeVault = null;
-    updateVaultState('ロック中。同期するにはパスフレーズまたは復旧キーで開いてください。');
-  }
-  async function createNewVault(passphrase) {
-    requireWebCrypto();
-    if ((passphrase || '').length < 12) throw new Error('パスフレーズは12文字以上にしてください');
-    const rawKey = randomBytes(32);
-    const recoveryBytes = randomBytes(32);
-    const salt = randomBytes(16);
-    const passphraseKey = await deriveVaultPassphraseKey(passphrase, salt);
-    const recoveryKey = await importAesKey(recoveryBytes);
-    const passphraseWrap = await encryptVaultBytes(passphraseKey, rawKey);
-    const recoveryWrap = await encryptVaultBytes(recoveryKey, rawKey);
-    activeVault = {
-      rawKey: rawKey,
-      keyWraps: {
-        passphrase: { kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations: VAULT_KDF_ITERATIONS, salt: bytesToBase64Url(salt) }, encryptedKey: passphraseWrap },
-        recovery: { encryptedKey: recoveryWrap }
-      }
-    };
-    const recoveryCode = 'mrk1_' + bytesToBase64Url(recoveryBytes);
-    els.vaultRecoveryCode.textContent = recoveryCode;
-    els.vaultRecoveryBox.style.display = '';
-    els.vaultRecoveryInput.value = '';
-    updateVaultState('新しい保管庫を作成しました。復旧キーを控えてから暗号化して保存してください。');
-    return recoveryCode;
-  }
-  async function createVaultEnvelope(payload) {
-    if (!activeVault) throw new Error('先に保管庫を開いてください');
-    const key = await importAesKey(activeVault.rawKey);
-    const data = await encryptVaultBytes(key, new TextEncoder().encode(JSON.stringify(payload)));
-    return { type: 'manga-reader-vault', version: VAULT_VERSION, createdAt: new Date().toISOString(), algorithm: 'AES-256-GCM', keyWraps: activeVault.keyWraps, data: data };
-  }
-  async function decryptVaultPayload(envelope) {
-    if (!activeVault || !envelope || !envelope.data) throw new Error('保管庫を開いてください');
-    try {
-      const key = await importAesKey(activeVault.rawKey);
-      return JSON.parse(new TextDecoder().decode(await decryptVaultBytes(key, envelope.data)));
-    } catch (e) {
-      throw new Error('復号に失敗しました。パスフレーズ・復旧キー・または保管庫の内容を確認してください');
-    }
-  }
-  async function unlockVault(envelope, passphrase, recoveryCode) {
-    requireWebCrypto();
-    if (!envelope || envelope.type !== 'manga-reader-vault' || envelope.version !== VAULT_VERSION || !envelope.keyWraps) throw new Error('暗号化保管庫の形式が正しくありません');
-    let rawKey;
-    if ((recoveryCode || '').trim()) {
-      const recoveryKey = await importAesKey(base64UrlToBytes(recoveryCode.trim().replace(/^mrk1_/, '')));
-      rawKey = await decryptVaultBytes(recoveryKey, envelope.keyWraps.recovery.encryptedKey);
-    } else {
-      if (!passphrase) throw new Error('パスフレーズまたは復旧キーを入力してください');
-      const config = envelope.keyWraps.passphrase && envelope.keyWraps.passphrase.kdf;
-      if (!config || config.name !== 'PBKDF2' || config.hash !== 'SHA-256') throw new Error('対応していない保管庫の暗号化方式です');
-      const passphraseKey = await deriveVaultPassphraseKey(passphrase, base64UrlToBytes(config.salt));
-      rawKey = await decryptVaultBytes(passphraseKey, envelope.keyWraps.passphrase.encryptedKey);
-    }
-    if (rawKey.length !== 32) throw new Error('保管庫の鍵が正しくありません');
-    // Authenticate before publishing this key as the active in-memory vault.
-    try {
-      const key = await importAesKey(rawKey);
-      JSON.parse(new TextDecoder().decode(await decryptVaultBytes(key, envelope.data)));
-    } catch (e) {
-      rawKey.fill(0);
-      throw new Error('復号に失敗しました。パスフレーズ・復旧キー・または保管庫の内容を確認してください');
-    }
-    activeVault = { rawKey: rawKey, keyWraps: envelope.keyWraps };
-    updateVaultState('このタブでは保管庫を開いています。ページを閉じると自動でロックされます。');
-  }
-
-  // ---------- Supabase account sync ----------
-  const SUPABASE_SESSION_KEY = 'mangaReaderSupabaseSession';
-  const SUPABASE_SYNC_META_KEY = 'mangaReaderSupabaseSyncMeta';
-  const supabaseConfig = window.MANGA_READER_SUPABASE || {};
-  let supabaseSession = null;
-
-  function setSupabaseStatus(message) { els.supabaseSyncStatus.textContent = message; }
-  function setSupabaseAccountState(message) { els.supabaseAccountState.textContent = message; }
-  function setSupabaseVaultState(message) { els.supabaseVaultState.textContent = message; }
-  function loadSupabaseSession() {
-    try { return JSON.parse(localStorage.getItem(SUPABASE_SESSION_KEY) || 'null'); } catch (e) { return null; }
-  }
-  function persistSupabaseSession(session) {
-    supabaseSession = session;
-    try {
-      if (session) localStorage.setItem(SUPABASE_SESSION_KEY, JSON.stringify(session));
-      else localStorage.removeItem(SUPABASE_SESSION_KEY);
-    } catch (e) {}
-    renderSupabaseAccountState();
-  }
-  function renderSupabaseAccountState() {
-    const email = supabaseSession && supabaseSession.user && supabaseSession.user.email;
-    setSupabaseAccountState(email ? 'ログイン中: ' + email : 'ログインしていません');
-  }
-  function assertSupabaseConfig() {
-    if (!supabaseConfig.url || !supabaseConfig.publishableKey) throw new Error('Supabaseの接続設定が見つかりません');
-  }
-  async function supabaseFetch(path, options) {
-    assertSupabaseConfig();
-    const opts = options || {};
-    const headers = Object.assign({ apikey: supabaseConfig.publishableKey }, opts.headers || {});
-    if (opts.token) headers.Authorization = 'Bearer ' + opts.token;
-    if (opts.body) headers['Content-Type'] = 'application/json';
-    const response = await fetch(supabaseConfig.url + path, Object.assign({}, opts, { headers: headers }));
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      throw new Error('Supabase HTTP ' + response.status + (detail ? ': ' + detail.slice(0, 220) : ''));
-    }
-    return response.status === 204 ? null : response.json();
-  }
-  async function refreshSupabaseSession() {
-    if (!supabaseSession || !supabaseSession.refresh_token) throw new Error('ログインしてください');
-    const session = await supabaseFetch('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: JSON.stringify({ refresh_token: supabaseSession.refresh_token }) });
-    persistSupabaseSession(session);
-    return session;
-  }
-  async function withSupabaseSession(work) {
-    if (!supabaseSession) throw new Error('先にログインしてください');
-    try { return await work(supabaseSession.access_token, supabaseSession.user); }
-    catch (e) {
-      if (String(e.message || '').indexOf('HTTP 401') === -1) throw e;
-      const refreshed = await refreshSupabaseSession();
-      return work(refreshed.access_token, refreshed.user);
-    }
-  }
-  async function supabaseSignUp() {
-    const email = els.supabaseEmailInput.value.trim();
-    const password = els.supabasePasswordInput.value;
-    if (!email || !password || password.length < 8) throw new Error('メールアドレスと8文字以上のログイン用パスワードを入力してください');
-    const result = await supabaseFetch('/auth/v1/signup', { method: 'POST', body: JSON.stringify({ email: email, password: password }) });
-    if (result.session) {
-      persistSupabaseSession(result.session);
-      els.supabasePasswordInput.value = '';
-      setSupabaseStatus('アカウントを作成してログインしました。');
-    } else {
-      setSupabaseStatus('確認メールを送信しました。メール内のリンクを開いてからログインしてください。');
-    }
-  }
-  async function supabaseLogin() {
-    const email = els.supabaseEmailInput.value.trim();
-    const password = els.supabasePasswordInput.value;
-    if (!email || !password) throw new Error('メールアドレスとログイン用パスワードを入力してください');
-    const session = await supabaseFetch('/auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify({ email: email, password: password }) });
-    persistSupabaseSession(session);
-    els.supabasePasswordInput.value = '';
-    setSupabaseStatus('ログインしました。');
-  }
-  async function supabaseLogout() {
-    if (supabaseSession) {
-      try { await supabaseFetch('/auth/v1/logout', { method: 'POST', token: supabaseSession.access_token }); } catch (e) {}
-    }
-    persistSupabaseSession(null);
-    clearActiveVault();
-    setSupabaseVaultState('ログインしてから保管庫を開いてください。');
-    setSupabaseStatus('ログアウトしました。');
-  }
-  function loadSupabaseSyncMeta() {
-    try { return JSON.parse(localStorage.getItem(SUPABASE_SYNC_META_KEY) || '{}'); } catch (e) { return {}; }
-  }
-  function getSupabaseUpdatedAt(userId) { return loadSupabaseSyncMeta()[userId]; }
-  function setSupabaseUpdatedAt(userId, updatedAt) {
-    const meta = loadSupabaseSyncMeta(); meta[userId] = updatedAt || null;
-    try { localStorage.setItem(SUPABASE_SYNC_META_KEY, JSON.stringify(meta)); } catch (e) {}
-  }
-  async function fetchSupabaseVault(token, user) {
-    const rows = await supabaseFetch('/rest/v1/manga_reader_vaults?select=payload,updated_at&user_id=eq.' + encodeURIComponent(user.id), { token: token });
-    return rows && rows[0] ? rows[0] : null;
-  }
-  async function openSupabaseVault() {
-    els.supabaseVaultUnlockBtn.disabled = true;
-    try {
-      await withSupabaseSession(async (token, user) => {
-        const record = await fetchSupabaseVault(token, user);
-        if (!record) throw new Error('クラウド上に保管庫がありません。最初の端末では「新しい保管庫を作成」を使ってください');
-        await unlockVault(record.payload, els.supabaseVaultPassphraseInput.value, els.supabaseVaultRecoveryInput.value);
-        els.supabaseVaultPassphraseInput.value = '';
-        els.supabaseVaultRecoveryInput.value = '';
-        setSupabaseUpdatedAt(user.id, record.updated_at);
-        setSupabaseVaultState('このタブでは保管庫を開いています。ページを閉じると自動でロックされます。');
-        setSupabaseStatus('保管庫を開きました。');
-      });
-    } catch (e) { clearActiveVault(); setSupabaseVaultState('ロック中。'); setSupabaseStatus(describeGithubError(e)); }
-    finally { els.supabaseVaultUnlockBtn.disabled = false; }
-  }
-  async function supabasePush() {
-    els.supabasePushBtn.disabled = true;
-    try {
-      if (!activeVault) throw new Error('先に保管庫を作成または開いてください');
-      await withSupabaseSession(async (token, user) => {
-        const existing = await fetchSupabaseVault(token, user);
-        const lastUpdated = getSupabaseUpdatedAt(user.id);
-        if (existing && lastUpdated && existing.updated_at !== lastUpdated) throw new Error('別の端末で更新されています。先に「復号して読み込む」を実行してください');
-        if (existing && !lastUpdated) throw new Error('既存の保管庫があります。上書き防止のため、先に「保管庫を開く」または「復号して読み込む」を実行してください');
-        const rows = await supabaseFetch('/rest/v1/manga_reader_vaults?on_conflict=user_id', {
-          method: 'POST', token: token,
-          headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
-          body: JSON.stringify({ user_id: user.id, payload: await createVaultEnvelope(buildSyncPayload()), updated_at: new Date().toISOString() })
-        });
-        setSupabaseUpdatedAt(user.id, rows[0] && rows[0].updated_at);
-        setSupabaseStatus('暗号化してクラウドに保存しました（' + new Date().toLocaleString() + '）');
-      });
-    } catch (e) { setSupabaseStatus(describeGithubError(e)); }
-    finally { els.supabasePushBtn.disabled = false; }
-  }
-  async function supabasePull() {
-    els.supabasePullBtn.disabled = true;
-    try {
-      await withSupabaseSession(async (token, user) => {
-        const record = await fetchSupabaseVault(token, user);
-        if (!record) throw new Error('クラウド上に保管庫がありません。最初の端末では「新しい保管庫を作成」→「暗号化して保存」を実行してください');
-        if (!activeVault) await unlockVault(record.payload, els.supabaseVaultPassphraseInput.value, els.supabaseVaultRecoveryInput.value);
-        const payload = await decryptVaultPayload(record.payload);
-        if (applyImportedData(payload)) {
-          setSupabaseUpdatedAt(user.id, record.updated_at);
-          setSupabaseVaultState('このタブでは保管庫を開いています。ページを閉じると自動でロックされます。');
-          setSupabaseStatus('クラウドから復号して読み込みました（' + new Date().toLocaleString() + '）');
-        }
-      });
-    } catch (e) { setSupabaseStatus(describeGithubError(e)); }
-    finally { els.supabasePullBtn.disabled = false; }
-  }
-  function openSupabaseSyncDialog() {
-    githubSyncReturnToList = isSavedListOpen();
-    if (githubSyncReturnToList) closeSavedList();
-    els.supabaseEmailInput.value = (supabaseSession && supabaseSession.user && supabaseSession.user.email) || '';
-    els.supabasePasswordInput.value = '';
-    els.supabaseVaultPassphraseInput.value = '';
-    els.supabaseVaultRecoveryInput.value = '';
-    els.supabaseRecoveryBox.style.display = 'none';
-    renderSupabaseAccountState();
-    setSupabaseVaultState(activeVault ? 'このタブでは保管庫を開いています。ページを閉じると自動でロックされます。' : 'ログインしてから保管庫を開いてください。');
-    setSupabaseStatus('');
-    els.supabaseSyncOverlay.classList.add('show');
-  }
-  function closeSupabaseSyncDialog() {
-    els.supabaseSyncOverlay.classList.remove('show');
-    if (githubSyncReturnToList) { githubSyncReturnToList = false; reopenSavedList(); }
-  }
-
-  function githubApiUrl(settings) {
-    return 'https://api.github.com/repos/' + settings.repo + '/contents/' + settings.path;
-  }
-  function setGithubSyncStatus(msg) { els.githubSyncStatus.textContent = msg; }
-
-  function openGithubSyncDialog() {
-    githubSyncReturnToList = isSavedListOpen();
-    if (githubSyncReturnToList) closeSavedList();
-    const settings = loadGithubSyncSettings();
-    els.githubRepoInput.value = settings.repo || '';
-    els.githubPathInput.value = settings.path || 'manga-vault.enc.json';
-    els.githubTokenInput.value = githubSessionToken;
-    els.vaultPassphraseInput.value = '';
-    els.vaultRecoveryInput.value = '';
-    els.vaultRecoveryBox.style.display = 'none';
-    updateVaultState(activeVault ? 'このタブでは保管庫を開いています。ページを閉じると自動でロックされます。' : 'ロック中。同期するにはパスフレーズまたは復旧キーで開いてください。');
-    setGithubSyncStatus('');
-    els.githubSyncOverlay.classList.add('show');
-  }
-  function closeGithubSyncDialog() {
-    els.githubSyncOverlay.classList.remove('show');
-    if (githubSyncReturnToList) {
-      githubSyncReturnToList = false;
-      reopenSavedList();
-    }
-  }
-  function isGithubSyncOpen() { return els.githubSyncOverlay.classList.contains('show'); }
-
-  function saveGithubSyncSettingsFromForm() {
-    const repo = els.githubRepoInput.value.trim();
-    const path = els.githubPathInput.value.trim() || 'manga-vault.enc.json';
-    const token = els.githubTokenInput.value.trim();
-    if (!repo || !repo.includes('/')) {
-      setGithubSyncStatus('リポジトリは "owner/repo" の形式で入力してください');
-      return;
-    }
-    const previous = loadGithubSyncSettings();
-    if ((previous.repo && previous.repo !== repo) || (previous.path && previous.path !== path)) clearActiveVault();
-    persistGithubSyncSettings({ repo, path });
-    githubSessionToken = token;
-    setGithubSyncStatus(token ? '同期先を保存しました。トークンはこのブラウザを閉じるまでだけ保持します。' : '同期先を保存しました。同期時にアクセストークンを入力してください。');
-  }
-
-  function describeGithubError(e) {
-    const msg = (e && e.message) || '';
-    if (msg.indexOf('401') !== -1 || msg.indexOf('403') !== -1) return 'トークンが無効、または権限が不足しています。設定を確認してください。';
-    if (msg.indexOf('404') !== -1) return 'リポジトリが見つかりません。owner/repo の表記を確認してください。';
-    if (msg.indexOf('409') !== -1) return '他の端末からの更新と競合しました。もう一度「GitHubから読み込む」→「GitHubに保存する」をやり直してください。';
-    return '通信エラーが発生しました: ' + msg;
-  }
-
-  function currentGithubSettings() {
-    const repo = els.githubRepoInput.value.trim();
-    const path = els.githubPathInput.value.trim() || 'manga-vault.enc.json';
-    const token = els.githubTokenInput.value.trim() || githubSessionToken;
-    if (!repo || !repo.includes('/')) throw new Error('同期先リポジトリを owner/repo 形式で入力してください');
-    if (!token) throw new Error('GitHub アクセストークンを入力してください');
-    const previous = loadGithubSyncSettings();
-    if ((previous.repo && previous.repo !== repo) || (previous.path && previous.path !== path)) clearActiveVault();
-    githubSessionToken = token;
-    persistGithubSyncSettings({ repo, path });
-    return { repo: repo, path: path, token: token };
-  }
-
-  // Fetches ciphertext and its SHA. GitHub's SHA makes overwrite conflicts detectable.
-  async function githubFetchFile(settings) {
-    const res = await fetch(githubApiUrl(settings), {
-      headers: {
-        'Authorization': 'Bearer ' + settings.token,
-        'Accept': 'application/vnd.github+json',
-      },
-    });
-    if (res.status === 404) return { sha: null, text: null, envelope: null };
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const json = await res.json();
-    const text = base64ToUtf8(json.content || '');
-    let envelope = null;
-    try { envelope = JSON.parse(text); } catch (e) {}
-    return { sha: json.sha, text: text, envelope: envelope };
-  }
-
-  async function githubPutFile(settings, content, sha) {
-    const body = { message: 'manga reader: encrypted vault sync ' + new Date().toISOString(), content: utf8ToBase64(content) };
-    if (sha) body.sha = sha;
-    const res = await fetch(githubApiUrl(settings), {
-      method: 'PUT',
-      headers: { 'Authorization': 'Bearer ' + settings.token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '');
-      throw new Error('HTTP ' + res.status + (detail ? ': ' + detail.slice(0, 200) : ''));
-    }
-    return res.json();
-  }
-
-  async function githubPush() {
-    els.githubPushBtn.disabled = true;
-    setGithubSyncStatus('暗号化してGitHubに保存中...');
-    try {
-      const settings = currentGithubSettings();
-      if (!activeVault) throw new Error('先に「新しい保管庫を作成」または「保管庫を開く」を実行してください');
-      const existing = await githubFetchFile(settings);
-      const knownSha = getVaultRemoteSha(settings);
-      if (existing.sha && knownSha && existing.sha !== knownSha) {
-        throw new Error('別の端末で更新されています。先に「復号して読み込む」を実行して内容を確認してください');
-      }
-      if (existing.sha && !knownSha) {
-        throw new Error('既存の保管庫があります。上書き防止のため、先に「保管庫を開く」または「復号して読み込む」を実行してください');
-      }
-      const result = await githubPutFile(settings, JSON.stringify(await createVaultEnvelope(buildSyncPayload())), existing.sha);
-      setVaultRemoteSha(settings, result.content && result.content.sha);
-      setGithubSyncStatus('暗号化してGitHubに保存しました（' + new Date().toLocaleString() + '）');
-    } catch (e) {
-      setGithubSyncStatus(describeGithubError(e));
-    } finally {
-      els.githubPushBtn.disabled = false;
-    }
-  }
-
-  async function githubPull() {
-    els.githubPullBtn.disabled = true;
-    setGithubSyncStatus('GitHubから取得して復号中...');
-    try {
-      const settings = currentGithubSettings();
-      const existing = await githubFetchFile(settings);
-      if (!existing.envelope) {
-        let legacy = null;
-        try { legacy = JSON.parse(existing.text || ''); } catch (e) {}
-        if (legacy && Array.isArray(legacy.folders) && Array.isArray(legacy.items)) {
-          if (confirm('GitHub上に旧形式の平文データが見つかりました。読み込んだ後、新しい保管庫を作成して暗号化保存してください。読み込みますか？')) {
-            if (applyImportedData(legacy)) {
-              setVaultRemoteSha(settings, existing.sha);
-              setGithubSyncStatus('旧形式のデータを読み込みました。続けて「新しい保管庫を作成」→「暗号化して保存」を実行してください。');
-            }
-          }
-        } else {
-          setGithubSyncStatus('暗号化保管庫がまだありません。新しい保管庫を作成してから保存してください。');
-        }
-        return;
-      }
-      if (!activeVault) await unlockVault(existing.envelope, els.vaultPassphraseInput.value, els.vaultRecoveryInput.value);
-      const payload = await decryptVaultPayload(existing.envelope);
-      if (applyImportedData(payload)) {
-        setVaultRemoteSha(settings, existing.sha);
-        setGithubSyncStatus('GitHubから復号して読み込みました（' + new Date().toLocaleString() + '）');
-      } else {
-        setGithubSyncStatus('');
-      }
-    } catch (e) {
-      setGithubSyncStatus(describeGithubError(e));
-    } finally {
-      els.githubPullBtn.disabled = false;
-    }
-  }
-
-  async function openExistingVault() {
-    els.vaultUnlockBtn.disabled = true;
-    try {
-      const settings = currentGithubSettings();
-      setGithubSyncStatus('暗号化保管庫を確認中...');
-      const existing = await githubFetchFile(settings);
-      if (!existing.envelope) throw new Error('GitHub上に暗号化保管庫が見つかりません。最初の端末では「新しい保管庫を作成」を使ってください');
-      await unlockVault(existing.envelope, els.vaultPassphraseInput.value, els.vaultRecoveryInput.value);
-      setVaultRemoteSha(settings, existing.sha);
-      els.vaultPassphraseInput.value = '';
-      els.vaultRecoveryInput.value = '';
-      setGithubSyncStatus('保管庫を開きました。必要に応じて「復号して読み込む」を実行してください。');
-    } catch (e) {
-      clearActiveVault();
-      setGithubSyncStatus(describeGithubError(e));
-    } finally {
-      els.vaultUnlockBtn.disabled = false;
-    }
-  }
-
+  // Cloud synchronization lives in sync.html so the reader itself has no account or vault dialog.
   // Normalizes a base URL for identity comparisons: scheme (http/https) and
   // host case differences shouldn't make two saves count as "different".
   function baseUrlKey(url) {
@@ -4077,7 +3446,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     tryNext();
   }
 
-  function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen() || isCustomAddDialogOpen() || isEditItemDialogOpen() || isTocListOpen() || isGithubSyncOpen(); }
+  function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen() || isCustomAddDialogOpen() || isEditItemDialogOpen() || isTocListOpen(); }
 
   // ---------- events ----------
   function bindSeriesControls(selectEl, newRow, newInput, volumeInput, titleInput) {
@@ -4150,77 +3519,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   });
 
   els.addCustomBtn.addEventListener('click', openCustomAddDialog);
-  els.openGithubSyncBtn.addEventListener('click', openSupabaseSyncDialog);
-  els.closeGithubSyncBtn.addEventListener('click', closeGithubSyncDialog);
-  els.githubSyncOverlay.addEventListener('click', (e) => { if (e.target === els.githubSyncOverlay) closeGithubSyncDialog(); });
-  els.githubSyncForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    saveGithubSyncSettingsFromForm();
-  });
-  els.githubPushBtn.addEventListener('click', githubPush);
-  els.githubPullBtn.addEventListener('click', githubPull);
-  els.vaultCreateBtn.addEventListener('click', async () => {
-    els.vaultCreateBtn.disabled = true;
-    try {
-      if (activeVault && !confirm('新しい保管庫を作成すると、現在開いている保管庫の鍵はこのタブから破棄されます。続けますか？')) return;
-      if (activeVault) clearActiveVault();
-      await createNewVault(els.vaultPassphraseInput.value);
-      els.vaultPassphraseInput.value = '';
-      setGithubSyncStatus('保管庫を作成しました。復旧キーを安全な場所へ保管してから「暗号化して保存」を実行してください。');
-    } catch (e) {
-      setGithubSyncStatus(describeGithubError(e));
-    } finally {
-      els.vaultCreateBtn.disabled = false;
-    }
-  });
-  els.vaultUnlockBtn.addEventListener('click', openExistingVault);
-  els.copyRecoveryKeyBtn.addEventListener('click', async () => {
-    const code = els.vaultRecoveryCode.textContent;
-    if (!code) return;
-    try {
-      await navigator.clipboard.writeText(code);
-      setGithubSyncStatus('復旧キーをコピーしました。パスワード管理アプリなど安全な場所へ保管してください。');
-    } catch (e) {
-      setGithubSyncStatus('復旧キーを選択してコピーしてください。');
-    }
-  });
-  els.closeSupabaseSyncBtn.addEventListener('click', closeSupabaseSyncDialog);
-  els.supabaseSyncOverlay.addEventListener('click', (e) => { if (e.target === els.supabaseSyncOverlay) closeSupabaseSyncDialog(); });
-  els.supabaseSignupBtn.addEventListener('click', async () => {
-    els.supabaseSignupBtn.disabled = true;
-    try { await supabaseSignUp(); } catch (e) { setSupabaseStatus(describeGithubError(e)); }
-    finally { els.supabaseSignupBtn.disabled = false; }
-  });
-  els.supabaseLoginBtn.addEventListener('click', async () => {
-    els.supabaseLoginBtn.disabled = true;
-    try { await supabaseLogin(); } catch (e) { setSupabaseStatus(describeGithubError(e)); }
-    finally { els.supabaseLoginBtn.disabled = false; }
-  });
-  els.supabaseLogoutBtn.addEventListener('click', supabaseLogout);
-  els.supabaseVaultCreateBtn.addEventListener('click', async () => {
-    els.supabaseVaultCreateBtn.disabled = true;
-    try {
-      if (!supabaseSession) throw new Error('先にログインしてください');
-      if (activeVault && !confirm('新しい保管庫を作成すると、現在開いている保管庫の鍵はこのタブから破棄されます。続けますか？')) return;
-      if (activeVault) clearActiveVault();
-      const recoveryCode = await createNewVault(els.supabaseVaultPassphraseInput.value);
-      els.supabaseVaultPassphraseInput.value = '';
-      els.supabaseRecoveryCode.textContent = recoveryCode;
-      els.supabaseRecoveryBox.style.display = '';
-      setSupabaseVaultState('新しい保管庫を作成しました。復旧キーを控えてから暗号化して保存してください。');
-      setSupabaseStatus('保管庫を作成しました。復旧キーを安全な場所へ保管してください。');
-    } catch (e) { setSupabaseStatus(describeGithubError(e)); }
-    finally { els.supabaseVaultCreateBtn.disabled = false; }
-  });
-  els.supabaseVaultUnlockBtn.addEventListener('click', openSupabaseVault);
-  els.supabaseCopyRecoveryKeyBtn.addEventListener('click', async () => {
-    const code = els.supabaseRecoveryCode.textContent;
-    if (!code) return;
-    try { await navigator.clipboard.writeText(code); setSupabaseStatus('復旧キーをコピーしました。安全な場所へ保管してください。'); }
-    catch (e) { setSupabaseStatus('復旧キーを選択してコピーしてください。'); }
-  });
-  els.supabasePullBtn.addEventListener('click', supabasePull);
-  els.supabasePushBtn.addEventListener('click', supabasePush);
+  els.openCloudSyncBtn.addEventListener('click', () => { window.location.href = 'sync.html'; });
   els.cancelCustomAddBtn.addEventListener('click', closeCustomAddDialog);
   els.confirmCustomAddBtn.addEventListener('click', confirmCustomAdd);
   els.customAddOverlay.addEventListener('click', (e) => { if (e.target === els.customAddOverlay) closeCustomAddDialog(); });
@@ -4369,11 +3668,11 @@ https://cdn.example.org/c/003.webp"></textarea>
         e.target === els.editTitleInput || e.target === els.editNewFolderInput ||
         e.target === els.saveNewSeriesInput || e.target === els.customNewSeriesInput || e.target === els.editNewSeriesInput ||
         e.target === els.githubRepoInput || e.target === els.githubPathInput || e.target === els.githubTokenInput) {
-      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); closeGithubSyncDialog(); }
+      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); }
       return;
     }
     if (anyModalOpen()) {
-      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); closeGithubSyncDialog(); }
+      if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); }
       return;
     }
     switch (e.key) {
@@ -4567,8 +3866,6 @@ https://cdn.example.org/c/003.webp"></textarea>
   });
   els.videoAInput.addEventListener('input', updateVideoPreview);
   els.videoBInput.addEventListener('input', updateVideoPreview);
-
-  supabaseSession = loadSupabaseSession();
 
   // No URL bar anymore, so automatically resume the last-viewed manga on
   // load (not counted as a "新規" open, so it isn't re-added to 履歴).
