@@ -3126,10 +3126,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   function buildFolderCard(folder) {
     const card = document.createElement('div');
     card.className = 'book-card folder-card';
+    const folderItems = savedItems.filter((item) => item.folderId === folder.id);
 
     const cover = document.createElement('div');
     cover.className = 'book-cover folder-cover';
-    appendFolderPreview(cover, savedItems.filter((it) => it.folderId === folder.id), ICON_FOLDER, '空のフォルダ', 'フォルダ');
+    appendFolderPreview(cover, folderItems, ICON_FOLDER, '空のフォルダ', 'フォルダ');
 
     // 履歴 is a reserved, auto-managed folder and can't be deleted as a whole.
     if (folder.id !== HISTORY_FOLDER_ID) {
@@ -3155,6 +3156,12 @@ https://cdn.example.org/c/003.webp"></textarea>
     card.appendChild(cover);
     card.appendChild(title);
     card.addEventListener('click', () => {
+      if (folderItems.length === 1) {
+        closeSavedList();
+        setReadingListContext(folderItems, 0);
+        openItem(folderItems[0], false);
+        return;
+      }
       currentFolderView = folder.id;
       currentSeriesView = null;
       reorderMode = false;
