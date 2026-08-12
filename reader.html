@@ -206,6 +206,17 @@
     display: flex; flex-direction: column; padding: 28px max(24px, env(safe-area-inset-right)) 32px max(24px, env(safe-area-inset-left));
     border: 0; box-shadow: none;
   }
+  #metadataSuggestions {
+    position: fixed; display: none; z-index: 70; max-height: 210px; overflow-y: auto;
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md); padding: 4px;
+  }
+  #metadataSuggestions.show { display: block; }
+  .metadataSuggestion {
+    display: block; width: 100%; padding: 9px 10px; border: 0; border-radius: 7px;
+    background: transparent; color: var(--text); text-align: left; font: inherit; cursor: pointer;
+  }
+  .metadataSuggestion:hover, .metadataSuggestion:focus { background: var(--accent-dim); outline: none; }
   .panel-header {
     display: flex; justify-content: space-between; align-items: center;
     margin-bottom: 12px; font-size: 15px; font-weight: 600;
@@ -654,6 +665,8 @@
   </div>
 </div>
 
+<div id="metadataSuggestions" role="listbox" aria-label="入力候補"></div>
+
 <!-- Save dialog -->
 <div id="saveDialogOverlay" class="modalOverlay">
   <div id="saveDialogPanel" class="modalPanel">
@@ -661,9 +674,9 @@
     <label class="field-label" for="saveTitleInput">タイトル</label>
     <input id="saveTitleInput" type="text" placeholder="例: ○○ 第1巻">
     <label class="field-label" for="saveAuthorInput">作者</label>
-    <input id="saveAuthorInput" type="text" placeholder="例: 山田太郎">
+    <input id="saveAuthorInput" type="text" placeholder="例: 山田太郎" autocomplete="off">
     <label class="field-label" for="saveTagsInput">タグ</label>
-    <input id="saveTagsInput" type="text" placeholder="カンマ区切りで入力　例: ファンタジー, お気に入り">
+    <input id="saveTagsInput" type="text" placeholder="カンマ区切りで入力　例: ファンタジー, お気に入り" autocomplete="off">
     <label class="checkRow"><input id="saveSplitSpreadsInput" type="checkbox">見開き画像を左右に分割して読む</label>
     <label class="field-label" for="saveFolderSelect">フォルダ</label>
     <select id="saveFolderSelect"></select>
@@ -692,9 +705,9 @@
     <label class="field-label" for="customTitleInput">タイトル</label>
     <input id="customTitleInput" type="text" placeholder="例: ○○ 第1巻">
     <label class="field-label" for="customAuthorInput">作者</label>
-    <input id="customAuthorInput" type="text" placeholder="例: 山田太郎">
+    <input id="customAuthorInput" type="text" placeholder="例: 山田太郎" autocomplete="off">
     <label class="field-label" for="customTagsInput">タグ</label>
-    <input id="customTagsInput" type="text" placeholder="カンマ区切りで入力　例: ファンタジー, お気に入り">
+    <input id="customTagsInput" type="text" placeholder="カンマ区切りで入力　例: ファンタジー, お気に入り" autocomplete="off">
     <label class="checkRow"><input id="customSplitSpreadsInput" type="checkbox">見開き画像を左右に分割して読む</label>
     <label class="field-label" for="customFolderSelect">フォルダ</label>
     <select id="customFolderSelect"></select>
@@ -728,9 +741,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     <label class="field-label" for="editTitleInput">タイトル</label>
     <input id="editTitleInput" type="text" placeholder="例: ○○ 第1巻">
     <label class="field-label" for="editAuthorInput">作者</label>
-    <input id="editAuthorInput" type="text" placeholder="例: 山田太郎">
+    <input id="editAuthorInput" type="text" placeholder="例: 山田太郎" autocomplete="off">
     <label class="field-label" for="editTagsInput">タグ</label>
-    <input id="editTagsInput" type="text" placeholder="カンマ区切りで入力　例: ファンタジー, お気に入り">
+    <input id="editTagsInput" type="text" placeholder="カンマ区切りで入力　例: ファンタジー, お気に入り" autocomplete="off">
     <label class="checkRow"><input id="editSplitSpreadsInput" type="checkbox">見開き画像を左右に分割して読む</label>
     <label class="field-label" for="editFolderSelect">フォルダ</label>
     <select id="editFolderSelect"></select>
@@ -975,6 +988,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     nextVolumeDismissBtn: document.getElementById('nextVolumeDismissBtn'),
 
     saveDialogOverlay: document.getElementById('saveDialogOverlay'),
+    metadataSuggestions: document.getElementById('metadataSuggestions'),
     saveTitleInput: document.getElementById('saveTitleInput'),
     saveAuthorInput: document.getElementById('saveAuthorInput'),
     saveTagsInput: document.getElementById('saveTagsInput'),
@@ -3028,6 +3042,90 @@ https://cdn.example.org/c/003.webp"></textarea>
   function tagsText(tags) {
     return Array.isArray(tags) ? tags.filter(Boolean).join(', ') : '';
   }
+
+  function metadataCandidates(kind) {
+    const values = kind === 'author'
+      ? savedItems.map((item) => normalizedAuthor(item.author))
+      : savedItems.flatMap((item) => Array.isArray(item.tags) ? item.tags : []);
+    const seen = new Set();
+    return values.filter((value) => {
+      const text = String(value || '').trim();
+      const key = text.toLocaleLowerCase();
+      if (!text || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).sort((a, b) => a.localeCompare(b, 'ja'));
+  }
+
+  function activeMetadataQuery(input, kind) {
+    if (kind === 'author') return input.value.trim();
+    const value = input.value;
+    const lastSeparator = Math.max(value.lastIndexOf(','), value.lastIndexOf('，'), value.lastIndexOf('\n'));
+    return value.slice(lastSeparator + 1).trim();
+  }
+
+  function hideMetadataSuggestions() {
+    els.metadataSuggestions.classList.remove('show');
+    els.metadataSuggestions.replaceChildren();
+  }
+
+  function applyMetadataSuggestion(input, kind, value) {
+    if (kind === 'author') {
+      input.value = value;
+    } else {
+      const source = input.value;
+      const lastSeparator = Math.max(source.lastIndexOf(','), source.lastIndexOf('，'), source.lastIndexOf('\n'));
+      input.value = (lastSeparator < 0 ? '' : source.slice(0, lastSeparator + 1) + ' ') + value;
+    }
+    hideMetadataSuggestions();
+    input.focus();
+  }
+
+  function showMetadataSuggestions(input, kind) {
+    const query = activeMetadataQuery(input, kind).toLocaleLowerCase();
+    const matches = metadataCandidates(kind)
+      .filter((value) => !query || value.toLocaleLowerCase().includes(query))
+      .sort((a, b) => {
+        const aStarts = a.toLocaleLowerCase().startsWith(query);
+        const bStarts = b.toLocaleLowerCase().startsWith(query);
+        return Number(bStarts) - Number(aStarts) || a.localeCompare(b, 'ja');
+      })
+      .slice(0, 8);
+    if (!matches.length) { hideMetadataSuggestions(); return; }
+
+    const rect = input.getBoundingClientRect();
+    els.metadataSuggestions.replaceChildren();
+    matches.forEach((value) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'metadataSuggestion';
+      button.setAttribute('role', 'option');
+      button.textContent = value;
+      button.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        applyMetadataSuggestion(input, kind, value);
+      });
+      els.metadataSuggestions.appendChild(button);
+    });
+    els.metadataSuggestions.style.left = rect.left + 'px';
+    els.metadataSuggestions.style.top = (rect.bottom + 4) + 'px';
+    els.metadataSuggestions.style.width = rect.width + 'px';
+    els.metadataSuggestions.classList.add('show');
+  }
+
+  function bindMetadataSuggestions(input, kind) {
+    input.addEventListener('focus', () => showMetadataSuggestions(input, kind));
+    input.addEventListener('input', () => showMetadataSuggestions(input, kind));
+    input.addEventListener('blur', () => window.setTimeout(hideMetadataSuggestions, 120));
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') hideMetadataSuggestions();
+    });
+  }
+
+  [
+    [els.saveAuthorInput, 'author'], [els.customAuthorInput, 'author'], [els.editAuthorInput, 'author'],
+    [els.saveTagsInput, 'tag'], [els.customTagsInput, 'tag'], [els.editTagsInput, 'tag'],
+  ].forEach(([input, kind]) => bindMetadataSuggestions(input, kind));
 
   function openSaveDialog() {
     if (!baseUrl) { flashStatus('表示中の作品がありません'); return; }
