@@ -645,6 +645,22 @@
   html[data-theme="light"] #status, html[data-theme="light"] #pageLabel { color: #5b626b; }
   html[data-theme="light"] #currentTitle { color: #23272a; }
   html[data-theme="light"] .modalOverlay, html[data-theme="light"] .modalPanel { background: #f5f5f7; }
+  html[data-theme="dark"] {
+    --bg: #0a0c11; --bg-soft: #0f1218; --panel: #161a23; --panel-2: #1d2230;
+    --border: #262b38; --accent: #ff6b4a; --accent-2: #46d9c2;
+    --accent-dim: rgba(255,107,74,.16); --text: #f1f2f6; --sub: #8d93a3;
+    --shadow-sm: 0 2px 10px rgba(0,0,0,.4); --shadow-md: 0 10px 30px rgba(0,0,0,.55);
+  }
+  html[data-theme="dark"] #app,
+  html[data-theme="dark"] #savedListPanel,
+  html[data-theme="dark"] #mangaListSection,
+  html[data-theme="dark"] #videoListSection,
+  html[data-theme="dark"] #savedListItems { background: #0a0c11; color: #f1f2f6; }
+  html[data-theme="dark"] .book-title,
+  html[data-theme="dark"] .book-author,
+  html[data-theme="dark"] .book-reading,
+  html[data-theme="dark"] #listPanelTitle,
+  html[data-theme="dark"] #listFolderTitle { color: #f1f2f6; }
   html[data-theme="light"] #savedListItems { color: #23272a; }
   html[data-theme="light"] .book-cover { background: #e3e5e8; border-color: #c9ccd1; box-shadow: 0 2px 8px rgba(35,39,42,.12); }
   html[data-theme="light"] .folder-cover { background: linear-gradient(145deg, #eef5ff, #dbeaff); }
