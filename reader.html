@@ -116,6 +116,8 @@
     -webkit-backface-visibility: hidden; backface-visibility: hidden;
   }
   .pageimg { display: block; -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+  .spreadCrop { position: relative; overflow: hidden; flex: 0 0 auto; }
+  .spreadCrop .pageimg { position: absolute; top: 0; max-width: none; max-height: none; }
 
   /* セーフモード: 漫画の画像（リーダーのページ・本棚の表紙サムネイル）にだけ
      モザイク(ぼかし)をかける。フォルダ/お気に入り/シリーズのアイコン
@@ -334,6 +336,8 @@
   .book-author { font-size: 10px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .book-tags { display: flex; flex-wrap: wrap; gap: 3px; min-height: 0; }
   .book-tag { max-width: 100%; padding: 2px 5px; border-radius: 6px; background: #edf2ff; color: #3657a7; font-size: 9px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .checkRow { display: flex; align-items: center; gap: 9px; margin: 14px 0 4px; font-size: 13px; color: var(--text); cursor: pointer; }
+  .checkRow input { width: 18px; height: 18px; accent-color: var(--accent); flex: 0 0 auto; }
   .book-delBtn {
     position: absolute; top: 4px; right: 4px; width: 21px; height: 21px; line-height: 19px;
     text-align: center; border-radius: 50%; background: rgba(10,12,17,0.78); color: var(--text);
@@ -660,6 +664,7 @@
     <input id="saveAuthorInput" type="text" placeholder="例: 山田太郎">
     <label class="field-label" for="saveTagsInput">タグ</label>
     <input id="saveTagsInput" type="text" placeholder="カンマ区切りで入力　例: ファンタジー, お気に入り">
+    <label class="checkRow"><input id="saveSplitSpreadsInput" type="checkbox">見開き画像を左右に分割して読む</label>
     <label class="field-label" for="saveFolderSelect">フォルダ</label>
     <select id="saveFolderSelect"></select>
     <div id="newFolderRow">
@@ -690,6 +695,7 @@
     <input id="customAuthorInput" type="text" placeholder="例: 山田太郎">
     <label class="field-label" for="customTagsInput">タグ</label>
     <input id="customTagsInput" type="text" placeholder="カンマ区切りで入力　例: ファンタジー, お気に入り">
+    <label class="checkRow"><input id="customSplitSpreadsInput" type="checkbox">見開き画像を左右に分割して読む</label>
     <label class="field-label" for="customFolderSelect">フォルダ</label>
     <select id="customFolderSelect"></select>
     <div id="customNewFolderRow">
@@ -725,6 +731,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     <input id="editAuthorInput" type="text" placeholder="例: 山田太郎">
     <label class="field-label" for="editTagsInput">タグ</label>
     <input id="editTagsInput" type="text" placeholder="カンマ区切りで入力　例: ファンタジー, お気に入り">
+    <label class="checkRow"><input id="editSplitSpreadsInput" type="checkbox">見開き画像を左右に分割して読む</label>
     <label class="field-label" for="editFolderSelect">フォルダ</label>
     <select id="editFolderSelect"></select>
     <div id="editNewFolderRow">
@@ -971,6 +978,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     saveTitleInput: document.getElementById('saveTitleInput'),
     saveAuthorInput: document.getElementById('saveAuthorInput'),
     saveTagsInput: document.getElementById('saveTagsInput'),
+    saveSplitSpreadsInput: document.getElementById('saveSplitSpreadsInput'),
     saveFolderSelect: document.getElementById('saveFolderSelect'),
     newFolderRow: document.getElementById('newFolderRow'),
     newFolderInput: document.getElementById('newFolderInput'),
@@ -1013,6 +1021,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     customTitleInput: document.getElementById('customTitleInput'),
     customAuthorInput: document.getElementById('customAuthorInput'),
     customTagsInput: document.getElementById('customTagsInput'),
+    customSplitSpreadsInput: document.getElementById('customSplitSpreadsInput'),
     customFolderSelect: document.getElementById('customFolderSelect'),
     customNewFolderRow: document.getElementById('customNewFolderRow'),
     customNewFolderInput: document.getElementById('customNewFolderInput'),
@@ -1029,6 +1038,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     editTitleInput: document.getElementById('editTitleInput'),
     editAuthorInput: document.getElementById('editAuthorInput'),
     editTagsInput: document.getElementById('editTagsInput'),
+    editSplitSpreadsInput: document.getElementById('editSplitSpreadsInput'),
     editFolderSelect: document.getElementById('editFolderSelect'),
     editNewFolderRow: document.getElementById('editNewFolderRow'),
     editNewFolderInput: document.getElementById('editNewFolderInput'),
@@ -1078,7 +1088,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   let savedVideos = [];    // { id, a, b, title, addedAt }
   let activeListTab = 'manga'; // 'manga' | 'video'
   let baseUrl = '';
-  let pages = [];          // detected page URLs, index 0 = page 1
+  let pages = [];          // source image URLs, index 0 = page 1
+  let splitSpreads = false;
   let preferredExt = 0;    // index into EXT_CANDIDATES
   // Key used to look up/save resume-page position in LAST_PAGE_KEY. For a
   // normal 連番ベースURL manga this is just baseUrl; for a "custom" manga
@@ -1103,6 +1114,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   let pendingResumePage = null;
   let latestRenderId = 0; // guards against a slow-loading page overwriting a newer one
   let readingGeneration = 0; // guards against an old detection loop polluting a newer manga's page list
+
+  function displayedPageCount() { return splitSpreads ? pages.length * 2 : pages.length; }
+  function sourcePageIndex(displayPage) { return splitSpreads ? Math.floor((displayPage - 1) / 2) : displayPage - 1; }
+  function sourceUrlForPage(displayPage) { return pages[sourcePageIndex(displayPage)] || ''; }
+  function splitHalfForPage(displayPage) { return splitSpreads ? ((displayPage - 1) % 2 === 0 ? 'left' : 'right') : null; }
   // Set right before a drag-driven page/manga switch hands off to the normal
   // showPage()/startReading() pipeline, so that pipeline's own slide-in
   // transition is skipped for exactly one renderPage() call — the drag
@@ -1287,7 +1303,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       const map = JSON.parse(localStorage.getItem(LAST_PAGE_KEY) || '{}');
       map[currentResumeKey] = {
         page: currentPage,
-        wasLast: detectionDone && currentPage === pages.length,
+        wasLast: detectionDone && currentPage === displayedPageCount(),
         savedAt: Date.now(),
       };
       localStorage.setItem(LAST_PAGE_KEY, JSON.stringify(map));
@@ -1520,9 +1536,9 @@ https://cdn.example.org/c/003.webp"></textarea>
   function saveTocRangeAsBook(t, idx) {
     if (!pages.length) { flashStatus('表示中の作品がありません'); return; }
     const nextEntry = currentToc[idx + 1];
-    const endPage = nextEntry ? nextEntry.page - 1 : pages.length;
+    const endPage = nextEntry ? nextEntry.page - 1 : displayedPageCount();
     if (endPage < t.page) { flashStatus('ページ範囲が不正です'); return; }
-    const pageUrls = pages.slice(t.page - 1, endPage);
+    const pageUrls = pages.slice(sourcePageIndex(t.page), sourcePageIndex(endPage) + 1);
     const title = window.prompt('切り出して保存する本のタイトルを入力してください（' + t.page + '〜' + endPage + 'ページ）', t.name);
     if (title === null) return; // cancelled
     const trimmed = title.trim() || t.name;
@@ -1531,6 +1547,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       title: trimmed,
       folderId: null,
       pages: pageUrls,
+      splitSpreads: splitSpreads,
       addedAt: Date.now(),
     });
     persistAll();
@@ -1675,7 +1692,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // detection hasn't caught up yet) and whether a saved item for the next
   // volume of the same series exists.
   function updateNextVolumeBanner() {
-    const atLastPage = pages.length > 0 && currentPage === pages.length && (currentlyCustom || detectionDone);
+    const atLastPage = pages.length > 0 && currentPage === displayedPageCount() && (currentlyCustom || detectionDone);
     if (!atLastPage || nextVolumeDismissed) { hideNextVolumeBanner(); return; }
     const nextItem = findNextVolumeItem(getCurrentSeriesInfo());
     if (!nextItem) { hideNextVolumeBanner(); return; }
@@ -1811,7 +1828,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   function markCurrentItemReadIfEligible() {
     const item = getCurrentItem();
     if (!item || !pages.length) return;
-    const threshold = (currentlyCustom || detectionDone) ? Math.min(5, pages.length) : 5;
+    const threshold = (currentlyCustom || detectionDone) ? Math.min(5, displayedPageCount()) : 5;
     if (currentPage >= threshold) recordReading(item);
   }
 
@@ -2009,6 +2026,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     baseUrl = parsed.baseUrl;
     currentResumeKey = baseUrl;
     currentlyCustom = false;
+    splitSpreads = !!(currentItem && currentItem.splitSpreads);
     loadCurrentToc();
     hideNextVolumeBanner();
     preferredExt = parsed.hintExt !== null ? parsed.hintExt : 0;
@@ -2105,7 +2123,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         if (result.kind !== 'found') { brokeEarly = true; endState = result.kind; break; }
         pages.push(result.url);
         pageNum++;
-        if (pendingResumePage !== null && pages.length === pendingResumePage) {
+        if (pendingResumePage !== null && displayedPageCount() >= pendingResumePage) {
           jumpToPage(pendingResumePage);
           pendingResumePage = null;
         }
@@ -2192,6 +2210,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     baseUrl = '';
     currentResumeKey = 'custom:' + item.id;
     currentlyCustom = true;
+    splitSpreads = !!item.splitSpreads;
     loadCurrentToc();
     hideNextVolumeBanner();
     pages = (item.pages || []).slice();
@@ -2257,6 +2276,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     readingGeneration++;
     baseUrl = '';
     pages = [];
+    splitSpreads = false;
     currentResumeKey = '';
     currentlyCustom = false;
     currentItem = null;
@@ -2293,11 +2313,11 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   function updateStatus() {
     if (detecting) {
-      els.status.textContent = '検出中... ' + pages.length + 'ページ確認済み';
+      els.status.textContent = '検出中... ' + displayedPageCount() + 'ページ確認済み';
     } else if (detectionHitLimit) {
-      els.status.textContent = pages.length + 'ページ以上（検出上限）';
+      els.status.textContent = displayedPageCount() + 'ページ以上（検出上限）';
     } else if (detectionDone) {
-      els.status.textContent = '全 ' + pages.length + ' ページ';
+      els.status.textContent = '全 ' + displayedPageCount() + ' ページ';
     }
   }
 
@@ -2331,17 +2351,43 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
   }
 
-  function makeImgFromUrl(url, alt) {
+  function makeImgFromUrl(url, alt, splitHalf) {
     const img = document.createElement('img');
     img.className = 'pageimg';
     img.alt = alt || '';
     img.fetchPriority = 'high'; // this is the slide actually being shown — outrank any background preload() still in flight for other pages
     img.src = url;
-    styleImg(img);
-    return img;
+    if (!splitHalf) {
+      styleImg(img);
+      return { node: img, img: img };
+    }
+
+    const crop = document.createElement('div');
+    crop.className = 'spreadCrop';
+    crop.appendChild(img);
+    const layout = () => {
+      if (!img.naturalWidth || !img.naturalHeight) return;
+      const mode = fitModes[fitIndex];
+      const width = window.innerWidth, height = window.innerHeight;
+      const scale = mode === 'fit-width'
+        ? (width * 2) / img.naturalWidth
+        : mode === 'fit-height'
+          ? height / img.naturalHeight
+          : Math.min((width * 2) / img.naturalWidth, height / img.naturalHeight);
+      const fullWidth = Math.max(1, Math.round(img.naturalWidth * scale));
+      const fullHeight = Math.max(1, Math.round(img.naturalHeight * scale));
+      crop.style.width = Math.ceil(fullWidth / 2) + 'px';
+      crop.style.height = fullHeight + 'px';
+      img.style.width = fullWidth + 'px';
+      img.style.height = fullHeight + 'px';
+      img.style.left = splitHalf === 'right' ? -Math.ceil(fullWidth / 2) + 'px' : '0';
+    };
+    img.addEventListener('load', layout, { once: true });
+    if (img.complete) layout();
+    return { node: crop, img: img };
   }
   function makeImg(pNum) {
-    return makeImgFromUrl(pages[pNum - 1], 'page ' + pNum);
+    return makeImgFromUrl(sourceUrlForPage(pNum), 'page ' + pNum, splitHalfForPage(pNum));
   }
   // Builds a detached .pageSlide (not yet attached to the DOM) wrapping a
   // single image at the given URL. Used by the live-drag controller to show
@@ -2349,10 +2395,10 @@ https://cdn.example.org/c/003.webp"></textarea>
   // renderPage(), this doesn't wait for the load event, since by drag time
   // the URL has almost always already been preloaded into the browser
   // cache (see preloadAdjacentManga/preload), so it paints immediately.
-  function makeSlide(url) {
+  function makeSlide(url, splitHalf) {
     const slide = document.createElement('div');
     slide.className = 'pageSlide';
-    slide.appendChild(makeImgFromUrl(url));
+    slide.appendChild(makeImgFromUrl(url, '', splitHalf).node);
     return slide;
   }
 
@@ -2396,8 +2442,9 @@ https://cdn.example.org/c/003.webp"></textarea>
       suppressNextRenderAnim = false;
     }
     const myId = ++latestRenderId;
-    const targetUrl = pages[n - 1];
-    const img = makeImg(n);
+    const targetUrl = sourceUrlForPage(n);
+    const visual = makeImg(n);
+    const img = visual.img;
 
     const doRender = () => {
       if (myId !== latestRenderId) return;
@@ -2406,7 +2453,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
       const newSlide = document.createElement('div');
       newSlide.className = 'pageSlide';
-      newSlide.appendChild(img);
+      newSlide.appendChild(visual.node);
 
       const prevSlide = els.pageStage.querySelector('.pageSlide.current');
       const t = direction && DIR_TRANSFORMS[direction];
@@ -2437,18 +2484,19 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   function updateSlider() {
-    els.pageSlider.max = Math.max(pages.length, currentPage);
+    const count = displayedPageCount();
+    els.pageSlider.max = Math.max(count, currentPage);
     els.pageSlider.value = currentPage;
-    const totalLabel = detectionDone ? pages.length : pages.length + '+';
+    const totalLabel = detectionDone ? count : count + '+';
     els.pageLabel.textContent = currentPage + ' / ' + totalLabel;
-    els.readProgressBar.style.width = pages.length ? Math.round((currentPage / pages.length) * 100) + '%' : '0%';
+    els.readProgressBar.style.width = count ? Math.round((currentPage / count) * 100) + '%' : '0%';
   }
 
   const preloadedPageUrls = new Set(); // URLs that have actually finished downloading — never re-fetch these
   const inFlightPreloads = new Map(); // url -> Image still in flight, so a stale one can be aborted (see pruneStalePreloads)
   function preload(pageNum) {
-    if (pageNum >= 1 && pageNum <= pages.length) {
-      const url = pages[pageNum - 1];
+    if (pageNum >= 1 && pageNum <= displayedPageCount()) {
+      const url = sourceUrlForPage(pageNum);
       if (preloadedPageUrls.has(url) || inFlightPreloads.has(url)) return;
       const img = new Image();
       img.fetchPriority = 'low'; // de-prioritize vs. the actually-visible page's own load (see makeImgFromUrl)
@@ -2489,11 +2537,12 @@ https://cdn.example.org/c/003.webp"></textarea>
   // this set is safe to cancel.
   function preloadWindowUrls(n) {
     const wanted = new Set();
-    if (n >= 1 && n <= pages.length) wanted.add(pages[n - 1]);
+    const count = displayedPageCount();
+    if (n >= 1 && n <= count) wanted.add(sourceUrlForPage(n));
     for (let i = 1; i <= PRELOAD_AHEAD_COUNT; i++) {
-      if (n + i >= 1 && n + i <= pages.length) wanted.add(pages[n + i - 1]);
+      if (n + i >= 1 && n + i <= count) wanted.add(sourceUrlForPage(n + i));
     }
-    if (n - 1 >= 1 && n - 1 <= pages.length) wanted.add(pages[n - 2]);
+    if (n - 1 >= 1 && n - 1 <= count) wanted.add(sourceUrlForPage(n - 1));
     return wanted;
   }
 
@@ -2501,8 +2550,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   // yet — used by the live horizontal drag to build its neighbor slide. The
   // existing preload() calls in showPage() already keep a few pages ahead
   // warmed in the browser cache, so by drag time these are normally instant.
-  function nextPageNeighborUrl() { return currentPage < pages.length ? pages[currentPage] : null; }
-  function prevPageNeighborUrl() { return currentPage > 1 ? pages[currentPage - 2] : null; }
+  function nextPageNeighborUrl() { return currentPage < displayedPageCount() ? sourceUrlForPage(currentPage + 1) : null; }
+  function prevPageNeighborUrl() { return currentPage > 1 ? sourceUrlForPage(currentPage - 1) : null; }
 
   // Whether a URL has actually finished downloading into the browser's
   // cache already — as opposed to merely having a preload() request fired
@@ -2519,7 +2568,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   function showPage(n, forceDirection) {
     if (!pages.length) return;
     if (n < 1) n = 1;
-    if (n > pages.length) n = pages.length;
+    if (n > displayedPageCount()) n = displayedPageCount();
     const hasCurrent = !!els.pageStage.querySelector('.pageSlide');
     const pageChanged = hasCurrent && n !== currentPage;
     const direction = forceDirection || (!hasCurrent ? null : (n > currentPage ? 'next' : (n < currentPage ? 'prev' : null)));
@@ -2542,7 +2591,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   function jumpToPage(n) {
     if (!pages.length) return;
     if (n < 1) n = 1;
-    if (n > pages.length) n = pages.length;
+    if (n > displayedPageCount()) n = displayedPageCount();
     currentPage = n;
     pruneStalePreloads(preloadWindowUrls(n));
     renderPage(n, null);
@@ -2555,10 +2604,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     updateNextVolumeBanner();
   }
 
-  function nextPage() { if (currentPage < pages.length) showPage(currentPage + 1); }
+  function nextPage() { if (currentPage < displayedPageCount()) showPage(currentPage + 1); }
   function prevPage() { if (currentPage > 1) showPage(currentPage - 1); }
   function goFirst() { showPage(1); }
-  function goLast() { showPage(pages.length); }
+  function goLast() { showPage(displayedPageCount()); }
 
   function refreshCurrentView() {
     if (pages.length) renderPage(currentPage, null);
@@ -2667,7 +2716,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         return;
       }
       dragInfo = { kind: 'page', dir };
-      dragNeighborSlide = makeSlide(url);
+      dragNeighborSlide = makeSlide(url, splitHalfForPage(dir === 'next' ? currentPage + 1 : currentPage - 1));
       dragNeighborSlide.style.transform = dir === 'next' ? 'translateX(100%)' : 'translateX(-100%)';
     } else {
       const offset = dy < 0 ? 1 : -1; // swipe up = next manga, down = previous
@@ -2677,7 +2726,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       const url = inBounds ? resolvedListPageUrl.get(idx) : null;
       if (!url) { dragInfo = { kind: 'manga', dir, offset, blocked: true, reason: inBounds ? 'notReady' : 'edge' }; return; }
       dragInfo = { kind: 'manga', dir, offset };
-      dragNeighborSlide = makeSlide(url);
+      const neighborItem = readingListItems[idx];
+      dragNeighborSlide = makeSlide(url, neighborItem && neighborItem.splitSpreads ? 'left' : null);
       dragNeighborSlide.style.transform = dir === 'swipeUp' ? 'translateY(100%)' : 'translateY(-100%)';
     }
     dragNeighborSlide.style.transition = 'none';
@@ -2980,6 +3030,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.saveTitleInput.value = deriveTitleFromUrl(pendingSaveUrl);
     els.saveAuthorInput.value = '';
     els.saveTagsInput.value = '';
+    els.saveSplitSpreadsInput.checked = false;
     els.saveTitleInput.dataset.manualTitle = els.saveTitleInput.value;
     els.saveTitleInput.dataset.seriesActive = '0';
     renderFolderOptions(els.saveFolderSelect, '');
@@ -3023,6 +3074,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       title: title,
       author: normalizedAuthor(els.saveAuthorInput.value),
       tags: parseTags(els.saveTagsInput.value),
+      splitSpreads: els.saveSplitSpreadsInput.checked,
       folderId: folderId || null,
       series: seriesData.series,
       volume: seriesData.volume,
@@ -3058,6 +3110,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.customTitleInput.value = '';
     els.customAuthorInput.value = '';
     els.customTagsInput.value = '';
+    els.customSplitSpreadsInput.checked = false;
     els.customTitleInput.dataset.manualTitle = '';
     els.customTitleInput.dataset.seriesActive = '0';
     renderFolderOptions(els.customFolderSelect, '');
@@ -3096,6 +3149,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       title: title,
       author: normalizedAuthor(els.customAuthorInput.value),
       tags: parseTags(els.customTagsInput.value),
+      splitSpreads: els.customSplitSpreadsInput.checked,
       folderId: folderId || null,
       series: seriesData.series,
       volume: seriesData.volume,
@@ -3117,6 +3171,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.editTitleInput.value = itemDisplayTitle(item);
     els.editAuthorInput.value = item.author || '';
     els.editTagsInput.value = tagsText(item.tags);
+    els.editSplitSpreadsInput.checked = !!item.splitSpreads;
     els.editTitleInput.dataset.manualTitle = item.series ? (item.title || '') : els.editTitleInput.value;
     els.editTitleInput.dataset.seriesActive = item.series ? '1' : '0';
     renderFolderOptions(els.editFolderSelect, item.folderId || '');
@@ -3154,8 +3209,17 @@ https://cdn.example.org/c/003.webp"></textarea>
     item.title = seriesData.title || els.editTitleInput.value.trim() || itemDisplayTitle(item);
     item.author = normalizedAuthor(els.editAuthorInput.value);
     item.tags = parseTags(els.editTagsInput.value);
+    item.splitSpreads = els.editSplitSpreadsInput.checked;
     item.series = seriesData.series;
     item.volume = seriesData.volume;
+
+    if (currentItem && currentItem.id === item.id) {
+      splitSpreads = !!item.splitSpreads;
+      currentPage = Math.min(currentPage, Math.max(1, displayedPageCount()));
+      refreshCurrentView();
+      updateSlider();
+      persistLastPage();
+    }
 
     persistAll();
     updateCurrentTitleDisplay();
@@ -3411,16 +3475,16 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
   function itemSubtext(item) {
     if (item.url) return item.url;
-    if (Array.isArray(item.pages)) return '個別URL ・ ' + item.pages.length + 'ページ';
+    if (Array.isArray(item.pages)) return '個別URL ・ ' + (item.splitSpreads ? item.pages.length * 2 : item.pages.length) + 'ページ';
     return '';
   }
 
   function itemPageCountText(item) {
-    if (Array.isArray(item.pages) && item.pages.length) return item.pages.length + 'ページ';
+    if (Array.isArray(item.pages) && item.pages.length) return (item.splitSpreads ? item.pages.length * 2 : item.pages.length) + 'ページ';
     if (!item.url) return '';
     const info = getCachedMangaInfo(mangaCacheKeyFor(item.url));
     if (!info) return 'ページ数未取得';
-    const count = Number(info.count) || 0;
+    const count = (Number(info.count) || 0) * (item.splitSpreads ? 2 : 1);
     if (info.state === 'retryable') return count ? count + 'ページまで確認済み' : '再試行待ち';
     if (info.state === 'unavailable') return 'ページ数を確認できません';
     return count ? count + 'ページ' : 'ページ数未取得';
