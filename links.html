@@ -275,6 +275,14 @@
     transition: .2s ease;
   }
   .toast.show { transform: translate(-50%, 0); opacity: 1; }
+  html[data-theme="light"] {
+    color-scheme: light; --bg: #f5f6f8; --panel: #ffffff; --panel-2: #eef0f2;
+    --border: #d5d8dc; --text: #23272a; --sub: #5b626b; --accent: #5865f2;
+  }
+  html[data-theme="light"] body { background: #f5f6f8; }
+  html[data-theme="light"] .card { background: #fff; box-shadow: 0 5px 20px rgba(35,39,42,.08); }
+  html[data-theme="light"] .note { color: #4b525a; }
+  html[data-theme="light"] .tag { border-color: #d5d8dc; background: #eef0f2; color: #4b525a; }
   @media (min-width: 660px) {
     body { padding-left: 24px; padding-right: 24px; }
     .card { padding: 18px; }
@@ -285,7 +293,7 @@
 <main>
   <div class="topline">
     <a class="back" href="index.html" aria-label="ホームへ戻る">← ホーム</a>
-    <button class="primary" id="addBtn" type="button">＋ 追加</button>
+    <div style="display:flex;gap:8px;align-items:center;"><button class="secondary" id="themeBtn" type="button" aria-label="テーマ切替">☀️</button><button class="primary" id="addBtn" type="button">＋ 追加</button></div>
   </div>
 
   <header class="hero">
@@ -353,6 +361,7 @@
   const MAX_IMPORT_ITEMS = 5000;
   const els = {
     addBtn: document.getElementById('addBtn'),
+    themeBtn: document.getElementById('themeBtn'),
     summary: document.getElementById('summary'),
     searchInput: document.getElementById('searchInput'),
     clearSearchBtn: document.getElementById('clearSearchBtn'),
@@ -375,6 +384,14 @@
     cancelBtn: document.getElementById('cancelBtn'),
     toast: document.getElementById('toast'),
   };
+  const THEME_KEY = 'mangaReaderTheme';
+  function applyTheme(theme) {
+    const selected = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = selected;
+    els.themeBtn.textContent = selected === 'light' ? '🌙' : '☀️';
+    try { localStorage.setItem(THEME_KEY, selected); } catch (_) {}
+  }
+  applyTheme(localStorage.getItem(THEME_KEY));
 
   let items = loadItems();
   let activeFilter = 'all';
@@ -752,6 +769,7 @@
   }
 
   els.addBtn.addEventListener('click', () => openEditor());
+  els.themeBtn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'));
   els.cancelBtn.addEventListener('click', () => { closeEditor(); clearCaptureQuery(); });
   els.editForm.addEventListener('submit', submitEditor);
   els.editDialog.addEventListener('cancel', () => { clearCaptureQuery(); });

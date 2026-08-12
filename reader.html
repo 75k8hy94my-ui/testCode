@@ -71,12 +71,6 @@
     transition: transform 0.3s var(--ease), opacity 0.3s var(--ease);
     z-index: 10;
   }
-  #appBrand {
-    display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto;
-    margin-right: 2px; color: var(--text); font-size: 13px; font-weight: 700;
-    white-space: nowrap;
-  }
-  #appBrand img { width: 28px; height: 28px; object-fit: contain; border-radius: 7px; }
   #topbar.hidden { transform: translateY(-100%); opacity: 0; }
   .ctrlBtn, .primaryBtn {
     padding: 8px 15px; border-radius: var(--radius-sm); border: 1px solid transparent;
@@ -99,6 +93,10 @@
   #currentTitle {
     font-size: 13px; font-weight: 600; color: var(--text);
     max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #readerMeta {
+    display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+    min-width: 0; margin-left: auto; flex: 1 1 180px;
   }
 
   /* Viewer: always fills the full app area. Topbar/controls float on top of
@@ -602,9 +600,9 @@
     #topbar .ctrlBtn, #topbar .primaryBtn {
       min-width: 0; padding: 7px 9px; font-size: 12px; flex: 0 1 auto;
     }
-    #appBrand { display: none; }
     #status { min-width: 0; flex: 0 1 auto; }
-    #currentTitle { min-width: 0; max-width: none; flex: 1 1 110px; }
+    #readerMeta { flex: 1 1 100%; order: 20; justify-content: space-between; margin-left: 0; }
+    #currentTitle { min-width: 0; max-width: 58%; flex: 1 1 auto; }
     #controls {
       display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 6px; overflow: hidden; padding-left: 8px; padding-right: 8px;
@@ -629,6 +627,22 @@
     .book-reading { font-size: 8px; }
     .dialog-actions { position: sticky; bottom: 0; padding-top: 10px; background: linear-gradient(transparent, var(--panel) 25%); }
   }
+  html[data-theme="light"] {
+    --bg: #f5f5f7; --bg-soft: #ffffff; --panel: #ffffff; --panel-2: #e3e5e8;
+    --border: #c9ccd1; --text: #23272a; --sub: #5b626b;
+  }
+  html[data-theme="light"] #app { background: #f5f5f7; }
+  html[data-theme="light"] #viewer { background: #e7e9ec; }
+  html[data-theme="light"] #topbar, html[data-theme="light"] #controls {
+    background: rgba(255,255,255,.88); border-color: #d1d5da;
+    -webkit-backdrop-filter: blur(18px) saturate(130%); backdrop-filter: blur(18px) saturate(130%);
+  }
+  html[data-theme="light"] #topbar .ctrlBtn, html[data-theme="light"] #controls .ctrlBtn {
+    background: #fff; color: #23272a; border-color: #c9ccd1;
+  }
+  html[data-theme="light"] #status, html[data-theme="light"] #pageLabel { color: #5b626b; }
+  html[data-theme="light"] #currentTitle { color: #23272a; }
+  html[data-theme="light"] .modalOverlay, html[data-theme="light"] .modalPanel { background: #f5f5f7; }
 </style>
 </head>
 <body>
@@ -659,7 +673,7 @@
 <div id="app">
   <div id="readProgressBar"></div>
   <div id="topbar">
-    <span id="appBrand"><img src="icon-bookshelf.png" alt=""><span>漫画リーダー</span></span>
+    <button class="ctrlBtn" id="themeBtn" type="button" title="テーマ切替">☀️</button>
     <button class="ctrlBtn" id="closeBtn" title="閉じる" aria-label="リーダーを閉じる" style="display:none;">×</button>
     <button class="ctrlBtn" id="saveBtn" title="今のURLを保存" style="display:none;">URLを保存</button>
     <button class="ctrlBtn favToggleBtn" id="favToggleBtn" title="お気に入りに追加" style="display:none;"></button>
@@ -670,8 +684,7 @@
     <button class="ctrlBtn active" id="animBtn" title="ページ送りアニメーションの切替">アニメ</button>
     <button class="ctrlBtn" id="redetectBtn" title="保存されたページ数情報を消して、最初から再検出します">再検出</button>
     <button class="ctrlBtn" id="tocAddBtn" title="今のページを目次として追加">目次追加</button>
-    <span id="status"></span>
-    <span id="currentTitle"></span>
+    <span id="readerMeta"><span id="currentTitle"></span><span id="status"></span></span>
   </div>
 
   <div id="viewer" class="fit-contain">
@@ -1025,6 +1038,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   const UNREAD_FOLDER_ID = '__unread_order__';
   const UNREAD_FOLDER_NAME = '読んでいない順';
   const READING_SESSION_MS = 30 * 60 * 1000;
+  const THEME_KEY = 'mangaReaderTheme';
 
   const els = {
     newBtn: document.getElementById('newBtn'),
@@ -1032,6 +1046,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     saveBtn: document.getElementById('saveBtn'),
     safeModeBtn: document.getElementById('safeModeBtn'),
     enhanceBtn: document.getElementById('enhanceBtn'),
+    themeBtn: document.getElementById('themeBtn'),
     status: document.getElementById('status'),
     currentTitle: document.getElementById('currentTitle'),
     favToggleBtn: document.getElementById('favToggleBtn'),
@@ -1378,6 +1393,14 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   function persistAnim() { try { localStorage.setItem(ANIM_KEY, animEnabled ? '1' : '0'); } catch (e) {} }
   function persistSafeMode() { try { localStorage.setItem(SAFE_MODE_KEY, safeModeEnabled ? '1' : '0'); } catch (e) {} }
+  function applyTheme(theme) {
+    const selected = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = selected;
+    els.themeBtn.textContent = selected === 'light' ? '🌙' : '☀️';
+    els.themeBtn.title = selected === 'light' ? 'ダークモードへ' : 'ライトモードへ';
+    try { localStorage.setItem(THEME_KEY, selected); } catch (e) {}
+  }
+  applyTheme(localStorage.getItem(THEME_KEY));
   function persistImageEnhance() { try { localStorage.setItem(IMAGE_ENHANCE_KEY, imageEnhanceEnabled ? '1' : '0'); } catch (e) {} }
   function applyImageEnhance() {
     document.body.classList.toggle('image-enhance', imageEnhanceEnabled);
@@ -4600,6 +4623,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   els.safeModeBtn.addEventListener('click', toggleSafeMode);
   els.enhanceBtn.addEventListener('click', toggleImageEnhance);
+  els.themeBtn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'));
   els.closeListBtn.addEventListener('click', closeSavedList);
   els.historyListBtn.addEventListener('click', () => {
     currentFolderView = HISTORY_FOLDER_ID;
