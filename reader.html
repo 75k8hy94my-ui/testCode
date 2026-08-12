@@ -671,8 +671,8 @@
     <div id="saveNewSeriesRow" class="seriesNewRow">
       <input id="saveNewSeriesInput" type="text" placeholder="新しいシリーズ名">
     </div>
-    <label class="field-label" for="saveVolumeInput">巻数（シリーズ設定時は必須）</label>
-    <input id="saveVolumeInput" type="number" min="1" step="1" placeholder="例: 1">
+    <label class="field-label" for="saveVolumeInput">巻数・話数（シリーズ設定時は必須）</label>
+    <input id="saveVolumeInput" type="number" min="0.1" step="0.1" placeholder="例: 1 または 1.5">
     <div class="dialog-actions">
       <button class="ctrlBtn" id="cancelSaveBtn">キャンセル</button>
       <button class="primaryBtn" id="confirmSaveBtn">保存</button>
@@ -701,8 +701,8 @@
     <div id="customNewSeriesRow" class="seriesNewRow">
       <input id="customNewSeriesInput" type="text" placeholder="新しいシリーズ名">
     </div>
-    <label class="field-label" for="customVolumeInput">巻数（シリーズ設定時は必須）</label>
-    <input id="customVolumeInput" type="number" min="1" step="1" placeholder="例: 1">
+    <label class="field-label" for="customVolumeInput">巻数・話数（シリーズ設定時は必須）</label>
+    <input id="customVolumeInput" type="number" min="0.1" step="0.1" placeholder="例: 1 または 1.5">
     <label class="field-label" for="customPagesTextarea">ページURL（1行に1つ、読む順に貼り付け）</label>
     <textarea id="customPagesTextarea" rows="6" placeholder="https://example.com/a/page1.jpg
 https://example.com/b/p2.png
@@ -736,8 +736,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     <div id="editNewSeriesRow" class="seriesNewRow">
       <input id="editNewSeriesInput" type="text" placeholder="新しいシリーズ名">
     </div>
-    <label class="field-label" for="editVolumeInput">巻数（シリーズ設定時は必須）</label>
-    <input id="editVolumeInput" type="number" min="1" step="1" placeholder="例: 1">
+    <label class="field-label" for="editVolumeInput">巻数・話数（シリーズ設定時は必須）</label>
+    <input id="editVolumeInput" type="number" min="0.1" step="0.1" placeholder="例: 1 または 1.5">
     <div class="dialog-actions">
       <button class="ctrlBtn dangerBtn" id="deleteEditItemBtn" type="button">削除</button>
       <button class="ctrlBtn" id="cancelEditItemBtn">キャンセル</button>
@@ -1663,7 +1663,10 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   function findNextVolumeItem(seriesInfo) {
     if (!seriesInfo) return null;
-    return savedItems.find((it) => it.series === seriesInfo.series && it.volume === seriesInfo.volume + 1) || null;
+    const currentVolume = Number(seriesInfo.volume);
+    return savedItems
+      .filter((item) => item.series === seriesInfo.series && Number(item.volume) > currentVolume)
+      .sort((a, b) => Number(a.volume) - Number(b.volume))[0] || null;
   }
 
   // Shows/hides the "次の巻" banner based on whether we're truly sitting on
@@ -2908,7 +2911,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   function seriesTitle(series, volume) {
-    return '第' + volume + '巻 ' + series;
+    const numericVolume = Number(volume);
+    return '第' + volume + (Number.isInteger(numericVolume) ? '巻' : '話') + ' ' + series;
   }
 
   function updateSeriesForm(selectEl, newRow, newInput, volumeInput, titleInput) {
@@ -2921,7 +2925,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     titleInput.readOnly = hasSeries;
     if (hasSeries) {
       const name = selectedSeriesName(selectEl, newInput);
-      const volume = parseInt(volumeInput.value, 10);
+      const volume = Number(volumeInput.value);
       titleInput.value = name && volume > 0 ? seriesTitle(name, volume) : '';
       titleInput.placeholder = 'シリーズ名と巻数から自動設定';
     } else {
@@ -2940,7 +2944,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     const series = selectedSeriesName(selectEl, newInput);
     if (!selectEl.value) return { series: null, volume: null, title: null };
     if (!series) { flashStatus('新しいシリーズ名を入力してください'); return null; }
-    const volume = parseInt(volumeInput.value, 10);
+    const volume = Number(volumeInput.value);
     if (!volumeInput.value || isNaN(volume) || volume <= 0) {
       flashStatus('シリーズ設定時は巻数を入力してください');
       return null;
