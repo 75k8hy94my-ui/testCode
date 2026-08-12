@@ -678,7 +678,6 @@
     <button class="ctrlBtn" id="saveBtn" title="今のURLを保存" style="display:none;">URLを保存</button>
     <button class="ctrlBtn favToggleBtn" id="favToggleBtn" title="お気に入りに追加" style="display:none;"></button>
     <button class="ctrlBtn" id="readerEditBtn" title="表示中の漫画を編集" style="display:none;">編集</button>
-    <button class="ctrlBtn" type="button" onclick="window.location.href='links.html'" title="保存したWebリンクを管理">リンク管理</button>
     <button class="ctrlBtn" id="safeModeBtn" title="セーフモード（漫画の画像にモザイクをかけます）">セーフモード</button>
     <button class="ctrlBtn" id="enhanceBtn" title="ページ画像をブラウザ内で解析して補正（外部送信なし）" aria-pressed="true">自動補正</button>
     <button class="ctrlBtn active" id="animBtn" title="ページ送りアニメーションの切替">アニメ</button>
@@ -880,6 +879,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     <div id="listTabRow">
       <button class="listTab active" id="listTabManga" type="button">漫画</button>
       <button class="listTab" id="listTabVideo" type="button">動画</button>
+      <button class="listTab" id="listTabLinks" type="button" onclick="window.location.href='links.html'">リンク管理</button>
     </div>
     <div id="mangaListSection">
       <div id="exportImportRow">
@@ -888,7 +888,6 @@ https://cdn.example.org/c/003.webp"></textarea>
         <button class="ctrlBtn" id="bulkDetectBtn">一括読み込み</button>
       </div>
       <div id="smartListRow">
-        <span class="smartListLabel">スマートリスト</span>
         <button class="smartListBtn" id="historyListBtn" type="button">履歴</button>
         <button class="smartListBtn" id="unreadListBtn" type="button">読んでいない順</button>
       </div>
