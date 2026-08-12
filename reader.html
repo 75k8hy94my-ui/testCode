@@ -1461,7 +1461,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   function persistAnim() { try { localStorage.setItem(ANIM_KEY, animEnabled ? '1' : '0'); } catch (e) {} }
   function persistSafeMode() { try { localStorage.setItem(SAFE_MODE_KEY, safeModeEnabled ? '1' : '0'); } catch (e) {} }
-  function applyTheme(theme) {
+  function applyTheme(theme, sync = false) {
     const selected = theme === 'light' ? 'light' : 'dark';
     document.documentElement.dataset.theme = selected;
     const app = document.getElementById('app');
@@ -1473,6 +1473,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       if (button) button.title = selected === 'light' ? 'ダークモードへ' : 'ライトモードへ';
     });
     try { localStorage.setItem(THEME_KEY, selected); } catch (e) {}
+    if (sync && typeof scheduleCloudSync === 'function') scheduleCloudSync();
   }
   applyTheme(localStorage.getItem(THEME_KEY));
   function persistImageEnhance() { try { localStorage.setItem(IMAGE_ENHANCE_KEY, imageEnhanceEnabled ? '1' : '0'); } catch (e) {} }
@@ -2102,7 +2103,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // folders/items/videos に加えて per-manga info cache（拡張子・既知ページ数）も同梱する。
   // 書き出し/読み込みとクラウド同期の両方で使う共通ペイロード組み立て。
   function buildSyncPayload() {
-    return { folders: savedFolders, items: savedItems, videos: savedVideos, mangaInfo: loadMangaInfoCache(), toc: loadTocMap(), lastPages: (() => { try { return JSON.parse(localStorage.getItem(LAST_PAGE_KEY) || '{}'); } catch (e) { return {}; } })() };
+    return { folders: savedFolders, items: savedItems, videos: savedVideos, mangaInfo: loadMangaInfoCache(), toc: loadTocMap(), lastPages: (() => { try { return JSON.parse(localStorage.getItem(LAST_PAGE_KEY) || '{}'); } catch (e) { return {}; } })(), theme: document.documentElement.dataset.theme === 'light' ? 'light' : 'dark' };
   }
 
   // remoteInfo の各エントリでローカルの mangaInfoCache を上書きマージする
@@ -4711,8 +4712,8 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   els.safeModeBtn.addEventListener('click', toggleSafeMode);
   els.enhanceBtn.addEventListener('click', toggleImageEnhance);
-  els.themeBtn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'));
-  els.listThemeBtn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'));
+  els.themeBtn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light', true));
+  els.listThemeBtn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light', true));
   els.closeListBtn.addEventListener('click', closeSavedList);
   els.historyListBtn.addEventListener('click', () => {
     currentFolderView = HISTORY_FOLDER_ID;
