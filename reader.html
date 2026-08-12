@@ -1109,7 +1109,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   function displayedPageCount() { return splitSpreads ? pages.length * 2 : pages.length; }
   function sourcePageIndex(displayPage) { return splitSpreads ? Math.floor((displayPage - 1) / 2) : displayPage - 1; }
   function sourceUrlForPage(displayPage) { return pages[sourcePageIndex(displayPage)] || ''; }
-  function splitHalfForPage(displayPage) { return splitSpreads ? ((displayPage - 1) % 2 === 0 ? 'left' : 'right') : null; }
+  function splitHalfForPage(displayPage) { return splitSpreads ? ((displayPage - 1) % 2 === 0 ? 'right' : 'left') : null; }
   // Set right before a drag-driven page/manga switch hands off to the normal
   // showPage()/startReading() pipeline, so that pipeline's own slide-in
   // transition is skipped for exactly one renderPage() call — the drag
@@ -2732,7 +2732,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       if (!url) { dragInfo = { kind: 'manga', dir, offset, blocked: true, reason: inBounds ? 'notReady' : 'edge' }; return; }
       dragInfo = { kind: 'manga', dir, offset };
       const neighborItem = readingListItems[idx];
-      dragNeighborSlide = makeSlide(url, neighborItem && neighborItem.splitSpreads ? 'left' : null);
+      dragNeighborSlide = makeSlide(url, neighborItem && neighborItem.splitSpreads ? 'right' : null);
       dragNeighborSlide.style.transform = dir === 'swipeUp' ? 'translateY(100%)' : 'translateY(-100%)';
     }
     dragNeighborSlide.style.transition = 'none';
@@ -3073,9 +3073,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!seriesData) return;
     const title = seriesData.title || els.saveTitleInput.value.trim() || deriveTitleFromUrl(pendingSaveUrl);
     const readingSource = getCurrentItem();
-    savedItems.unshift({
+    const savedUrl = pendingSaveUrl;
+    const savedItem = {
       id: genId('i'),
-      url: pendingSaveUrl,
+      url: savedUrl,
       title: title,
       author: normalizedAuthor(els.saveAuthorInput.value),
       tags: parseTags(els.saveTagsInput.value),
@@ -3087,11 +3088,28 @@ https://cdn.example.org/c/003.webp"></textarea>
       lastReadAt: readingSource ? (Number(readingSource.lastReadAt) || null) : null,
       readCount: readingSource ? (Number(readingSource.readCount) || 0) : 0,
       addedAt: Date.now(),
-    });
+    };
+    savedItems.unshift(savedItem);
+
+    // 分割表示を新たに有効にした場合は、現在読んでいる元画像の右半分を
+    // 続きとして開く。保存後に同じ作品を開き直すことで、保存した設定を
+    // リーダー全体（ページ数・スライダー・画像表示）へ一貫して反映する。
+    if (savedItem.splitSpreads && baseUrlKey(baseUrl) === baseUrlKey(savedUrl)) {
+      try {
+        const map = JSON.parse(localStorage.getItem(LAST_PAGE_KEY) || '{}');
+        map[savedUrl] = {
+          page: Math.max(1, currentPage * 2 - 1),
+          wasLast: false,
+          savedAt: Date.now(),
+        };
+        localStorage.setItem(LAST_PAGE_KEY, JSON.stringify(map));
+      } catch (e) {}
+    }
     persistAll();
     updateCurrentTitleDisplay();
     updateSaveButtonVisibility();
     closeSaveDialog();
+    if (savedItem.splitSpreads) openItem(savedItem, false);
     flashStatus('保存しました');
   }
 
