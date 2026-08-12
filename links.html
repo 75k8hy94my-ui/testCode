@@ -62,6 +62,8 @@
     font-weight: 750;
   }
   .secondary { padding: 0 14px; }
+  .theme-icon { display: block; width: 18px; height: 18px; }
+  .favorite-icon { display: block; width: 18px; height: 18px; }
   .hero { padding: 22px 2px 16px; }
   h1 { margin: 0; font-size: clamp(26px, 7vw, 38px); letter-spacing: -.03em; }
   .summary { margin: 7px 0 0; color: var(--sub); }
@@ -293,7 +295,7 @@
 <main>
   <div class="topline">
     <a class="back" href="index.html" aria-label="ホームへ戻る">← ホーム</a>
-    <div style="display:flex;gap:8px;align-items:center;"><button class="secondary" id="themeBtn" type="button" aria-label="テーマ切替">☀️</button><button class="primary" id="addBtn" type="button">＋ 追加</button></div>
+    <div style="display:flex;gap:8px;align-items:center;"><button class="secondary" id="themeBtn" type="button" aria-label="テーマ切替"></button><button class="primary" id="addBtn" type="button">＋ 追加</button></div>
   </div>
 
   <header class="hero">
@@ -388,7 +390,9 @@
   function applyTheme(theme) {
     const selected = theme === 'light' ? 'light' : 'dark';
     document.documentElement.dataset.theme = selected;
-    els.themeBtn.textContent = selected === 'light' ? '🌙' : '☀️';
+    els.themeBtn.innerHTML = selected === 'light'
+      ? '<svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 15.2A8.5 8.5 0 0 1 8.8 3.5a8.6 8.6 0 1 0 11.7 11.7z"></path></svg>'
+      : '<svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path></svg>';
     try { localStorage.setItem(THEME_KEY, selected); } catch (_) {}
   }
   applyTheme(localStorage.getItem(THEME_KEY));
@@ -555,7 +559,9 @@
     const favorite = document.createElement('button');
     favorite.type = 'button';
     favorite.className = 'favorite-btn' + (item.favorite ? ' active' : '');
-    favorite.textContent = item.favorite ? '★' : '☆';
+    favorite.innerHTML = item.favorite
+      ? '<svg class="favorite-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3z"></path></svg>'
+      : '<svg class="favorite-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3z"></path></svg>';
     favorite.title = item.favorite ? 'お気に入りから外す' : 'お気に入りに追加';
     favorite.setAttribute('aria-label', favorite.title);
     favorite.addEventListener('click', () => {
