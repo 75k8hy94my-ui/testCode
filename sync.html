@@ -48,7 +48,7 @@
   <script>
   (() => {
     'use strict';
-    const DATA_KEYS = { folders:'mangaReaderSavedFolders', items:'mangaReaderSavedItems', videos:'mangaReaderVideos', mangaInfo:'mangaReaderInfoCache', toc:'mangaReaderToc', lastPages:'mangaReaderLastPage' };
+    const DATA_KEYS = { folders:'mangaReaderSavedFolders', items:'mangaReaderSavedItems', videos:'mangaReaderVideos', mangaInfo:'mangaReaderInfoCache', toc:'mangaReaderToc', lastPages:'mangaReaderLastPage', theme:'mangaReaderTheme' };
     const DEVICE_DATA_KEYS = [DATA_KEYS.folders,DATA_KEYS.items,DATA_KEYS.videos,DATA_KEYS.mangaInfo,DATA_KEYS.toc,DATA_KEYS.lastPages,'mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
     const $ = (id) => document.getElementById(id);
     const ui = { email:$('accountEmail'), passphrase:$('vaultPassphrase'), savePassphrase:$('savePassphrase'), recovery:$('recoveryKey'), status:$('status'), unlock:$('unlockView'), recoveryBox:$('recoveryBox'), recoveryCode:$('recoveryCode'), copy:$('copyRecoveryBtn'), logout:$('logoutBtn'), passphraseUnlock:$('passphraseUnlockBtn'), passkeyUnlock:$('passkeyUnlockBtn'), createVault:$('createVaultBtn'), passkeyRegister:$('passkeyRegisterBtn') };
@@ -56,7 +56,7 @@
     function loadSavedPassphrase() { try { const saved=localStorage.getItem(savedPassphraseKey()); if (saved) { ui.passphrase.value=saved; ui.savePassphrase.checked=true; } } catch (_) {} }
     function rememberPassphrase() { try { if (ui.savePassphrase.checked) localStorage.setItem(savedPassphraseKey(),ui.passphrase.value); else localStorage.removeItem(savedPassphraseKey()); } catch (_) {} }
     const readJSON = (key, fallback) => { try { const value=JSON.parse(localStorage.getItem(key)||''); return value == null ? fallback : value; } catch (_) { return fallback; } };
-    const buildPayload = () => ({ folders:readJSON(DATA_KEYS.folders,[]), items:readJSON(DATA_KEYS.items,[]), videos:readJSON(DATA_KEYS.videos,[]), mangaInfo:readJSON(DATA_KEYS.mangaInfo,{}), toc:readJSON(DATA_KEYS.toc,{}), lastPages:readJSON(DATA_KEYS.lastPages,{}) });
+    const buildPayload = () => ({ folders:readJSON(DATA_KEYS.folders,[]), items:readJSON(DATA_KEYS.items,[]), videos:readJSON(DATA_KEYS.videos,[]), mangaInfo:readJSON(DATA_KEYS.mangaInfo,{}), toc:readJSON(DATA_KEYS.toc,{}), lastPages:readJSON(DATA_KEYS.lastPages,{}), theme:localStorage.getItem(DATA_KEYS.theme) === 'light' ? 'light' : 'dark' });
     function applyPayload(data) {
       if (!data || !Array.isArray(data.folders) || !Array.isArray(data.items)) throw new Error('保管庫の形式が正しくありません。');
       localStorage.setItem(DATA_KEYS.folders,JSON.stringify(data.folders));
@@ -65,6 +65,7 @@
       localStorage.setItem(DATA_KEYS.mangaInfo,JSON.stringify(data.mangaInfo && typeof data.mangaInfo === 'object' ? data.mangaInfo : {}));
       localStorage.setItem(DATA_KEYS.toc,JSON.stringify(data.toc && typeof data.toc === 'object' ? data.toc : {}));
       localStorage.setItem(DATA_KEYS.lastPages,JSON.stringify(data.lastPages && typeof data.lastPages === 'object' ? data.lastPages : {}));
+      if (data.theme === 'light' || data.theme === 'dark') localStorage.setItem(DATA_KEYS.theme, data.theme);
     }
     function setStatus(text) { ui.status.textContent=text || ''; }
     function goReader() { window.location.replace('reader.html'); }
