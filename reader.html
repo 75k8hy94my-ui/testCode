@@ -873,6 +873,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     <div class="panel-header">
       <span id="listPanelTitle">保存したURL</span>
       <div style="display:flex;gap:8px;align-items:center;">
+        <button class="ctrlBtn" id="listThemeBtn" type="button" title="テーマ切替" aria-label="テーマ切替"></button>
         <button class="ctrlBtn logoutBtn" id="listLogoutBtn" title="ログアウトして端末内の保存データを消去">ログアウト</button>
         <button class="ctrlBtn" id="closeListBtn">閉じる</button>
       </div>
@@ -1059,6 +1060,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     safeModeBtn: document.getElementById('safeModeBtn'),
     enhanceBtn: document.getElementById('enhanceBtn'),
     themeBtn: document.getElementById('themeBtn'),
+    listThemeBtn: document.getElementById('listThemeBtn'),
     status: document.getElementById('status'),
     currentTitle: document.getElementById('currentTitle'),
     favToggleBtn: document.getElementById('favToggleBtn'),
@@ -1408,8 +1410,10 @@ https://cdn.example.org/c/003.webp"></textarea>
   function applyTheme(theme) {
     const selected = theme === 'light' ? 'light' : 'dark';
     document.documentElement.dataset.theme = selected;
-    setThemeButtonIcon(els.themeBtn, selected);
-    els.themeBtn.title = selected === 'light' ? 'ダークモードへ' : 'ライトモードへ';
+    [els.themeBtn, els.listThemeBtn].forEach((button) => {
+      setThemeButtonIcon(button, selected);
+      if (button) button.title = selected === 'light' ? 'ダークモードへ' : 'ライトモードへ';
+    });
     try { localStorage.setItem(THEME_KEY, selected); } catch (e) {}
   }
   applyTheme(localStorage.getItem(THEME_KEY));
@@ -4636,6 +4640,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.safeModeBtn.addEventListener('click', toggleSafeMode);
   els.enhanceBtn.addEventListener('click', toggleImageEnhance);
   els.themeBtn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'));
+  els.listThemeBtn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'));
   els.closeListBtn.addEventListener('click', closeSavedList);
   els.historyListBtn.addEventListener('click', () => {
     currentFolderView = HISTORY_FOLDER_ID;
