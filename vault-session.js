@@ -100,7 +100,8 @@
     }
   }
   async function fetchRecord(token, user) {
-    const rows = await api('/rest/v1/manga_reader_vaults?select=payload,updated_at&user_id=eq.' + encodeURIComponent(user.id), { token });
+    const rows = await api('/rest/v1/manga_reader_vaults?select=payload,updated_at&user_id=eq.' + encodeURIComponent(user.id) + '&limit=2', { token });
+    if (rows && rows.length > 1) throw new Error('このアカウントに複数の保管庫が存在します。安全のため処理を停止しました。');
     return rows && rows[0] ? rows[0] : null;
   }
   async function create(passphrase) {
