@@ -567,15 +567,18 @@
 </head>
 <body>
 <script src="supabase-config.js"></script>
+<script src="vault-session.js"></script>
 <script>
 (() => {
   const sessionKey = 'mangaReaderSupabaseSession';
   const loginUrl = 'index.html';
+  const vaultUrl = 'sync.html';
   const showLogin = () => window.location.replace(loginUrl);
   try {
     const session = JSON.parse(localStorage.getItem(sessionKey) || 'null');
     const config = window.MANGA_READER_SUPABASE || {};
     if (!session || !session.refresh_token || !config.url || !config.publishableKey) { showLogin(); return; }
+    if (!window.MangaVault || !MangaVault.loadActive()) { window.location.replace(vaultUrl); return; }
     fetch(config.url + '/auth/v1/token?grant_type=refresh_token', {
       method: 'POST', headers: { apikey: config.publishableKey, 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: session.refresh_token })
@@ -1182,12 +1185,33 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.safeModeBtn.classList.toggle('active', safeModeEnabled);
     persistSafeMode();
   }
-  function persistFolders() { try { localStorage.setItem(SAVED_FOLDERS_KEY, JSON.stringify(savedFolders)); } catch (e) {} }
-  function persistItems() { try { localStorage.setItem(SAVED_ITEMS_KEY, JSON.stringify(savedItems)); } catch (e) {} }
+  function persistFolders() { try { localStorage.setItem(SAVED_FOLDERS_KEY, JSON.stringify(savedFolders)); } catch (e) {} scheduleCloudSync(); }
+  function persistItems() { try { localStorage.setItem(SAVED_ITEMS_KEY, JSON.stringify(savedItems)); } catch (e) {} scheduleCloudSync(); }
   function persistAll() {
     persistFolders();
     persistItems();
     persistSavedVideos();
+  }
+
+  let cloudSyncTimer = null;
+  let cloudSyncRunning = false;
+  let cloudSyncDirty = false;
+  function scheduleCloudSync() {
+    if (!window.MangaVault || !MangaVault.loadActive()) return;
+    clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = setTimeout(runCloudSync, 800);
+  }
+  async function runCloudSync() {
+    if (cloudSyncRunning) { cloudSyncDirty = true; return; }
+    cloudSyncRunning = true;
+    try {
+      await MangaVault.savePayload(buildSyncPayload());
+    } catch (error) {
+      flashStatus(error && error.message ? error.message : 'クラウド同期に失敗しました');
+    } finally {
+      cloudSyncRunning = false;
+      if (cloudSyncDirty) { cloudSyncDirty = false; scheduleCloudSync(); }
+    }
   }
 
   // Remembers the last page viewed per manga (keyed by baseUrl). If the last
@@ -1203,6 +1227,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         savedAt: Date.now(),
       };
       localStorage.setItem(LAST_PAGE_KEY, JSON.stringify(map));
+      scheduleCloudSync();
     } catch (e) {}
   }
 
@@ -1225,6 +1250,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
   function persistMangaInfoCache() {
     try { localStorage.setItem(MANGA_INFO_CACHE_KEY, JSON.stringify(mangaInfoCache || {})); } catch (e) {}
+    scheduleCloudSync();
   }
   function getCachedMangaInfo(baseUrlKey) {
     return loadMangaInfoCache()[baseUrlKey] || null;
@@ -1378,6 +1404,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
   function persistTocMap(map) {
     try { localStorage.setItem(TOC_KEY, JSON.stringify(map)); } catch (e) {}
+    scheduleCloudSync();
   }
   function loadCurrentToc() {
     const map = loadTocMap();
@@ -1574,7 +1601,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // folders/items/videos に加えて per-manga info cache（拡張子・既知ページ数）も同梱する。
   // 書き出し/読み込みとクラウド同期の両方で使う共通ペイロード組み立て。
   function buildSyncPayload() {
-    return { folders: savedFolders, items: savedItems, videos: savedVideos, mangaInfo: loadMangaInfoCache() };
+    return { folders: savedFolders, items: savedItems, videos: savedVideos, mangaInfo: loadMangaInfoCache(), toc: loadTocMap(), lastPages: (() => { try { return JSON.parse(localStorage.getItem(LAST_PAGE_KEY) || '{}'); } catch (e) { return {}; } })() };
   }
 
   // remoteInfo の各エントリでローカルの mangaInfoCache を上書きマージする
@@ -1622,6 +1649,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     persistFolders();
     persistItems();
     persistSavedVideos();
+    if (data.toc && typeof data.toc === 'object') localStorage.setItem(TOC_KEY, JSON.stringify(data.toc));
+    if (data.lastPages && typeof data.lastPages === 'object') localStorage.setItem(LAST_PAGE_KEY, JSON.stringify(data.lastPages));
     // ページ数キャッシュは「置き換え」ではなくマージ：他端末で既に読んで
     // ページ数が分かっている作品の情報を取り込みつつ、ローカルにしかない
     // キャッシュは消さない。
@@ -3703,6 +3732,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // ---------- video list (動画タブ) ----------
   function persistSavedVideos() {
     try { localStorage.setItem(SAVED_VIDEOS_KEY, JSON.stringify(savedVideos)); } catch (e) {}
+    scheduleCloudSync();
   }
 
   function videoEmbedUrl(a, b) {
