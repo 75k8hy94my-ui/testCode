@@ -663,6 +663,24 @@
   #app[data-theme="light"] .book-title { color: #23272a; }
   #app[data-theme="light"] .book-author,
   #app[data-theme="light"] .book-reading { color: #5b626b; }
+  #savedListOverlay[data-theme="light"],
+  #savedListOverlay[data-theme="light"] #savedListPanel,
+  #savedListOverlay[data-theme="light"] #mangaListSection,
+  #savedListOverlay[data-theme="light"] #videoListSection,
+  #savedListOverlay[data-theme="light"] #savedListItems { background: #f5f5f7 !important; color: #23272a !important; }
+  #savedListOverlay[data-theme="light"] #listTabRow,
+  #savedListOverlay[data-theme="light"] #exportImportRow,
+  #savedListOverlay[data-theme="light"] #smartListRow,
+  #savedListOverlay[data-theme="light"] #listToolbar { color: #23272a !important; }
+  #savedListOverlay[data-theme="light"] #listPanelTitle,
+  #savedListOverlay[data-theme="light"] #listFolderTitle,
+  #savedListOverlay[data-theme="light"] .book-title,
+  #savedListOverlay[data-theme="light"] .book-author,
+  #savedListOverlay[data-theme="light"] .book-reading { color: #23272a !important; }
+  #savedListOverlay[data-theme="light"] .book-series { color: #148276 !important; }
+  #savedListOverlay[data-theme="light"] .smartListBtn,
+  #savedListOverlay[data-theme="light"] .listTab,
+  #savedListOverlay[data-theme="light"] .ctrlBtn { color: #23272a; }
 </style>
 </head>
 <body>
@@ -1432,6 +1450,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     document.documentElement.dataset.theme = selected;
     const app = document.getElementById('app');
     if (app) app.dataset.theme = selected;
+    const savedListOverlay = document.getElementById('savedListOverlay');
+    if (savedListOverlay) savedListOverlay.dataset.theme = selected;
     [els.themeBtn, els.listThemeBtn].forEach((button) => {
       setThemeButtonIcon(button, selected);
       if (button) button.title = selected === 'light' ? 'ダークモードへ' : 'ライトモードへ';
