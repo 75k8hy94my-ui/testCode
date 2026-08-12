@@ -86,6 +86,7 @@
   /* リーダー上部のお気に入りトグル。アイコン画像1つだけを中央表示する。 */
   .favToggleBtn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; }
   .favToggleBtn img { width: 17px; height: 17px; }
+  .themeIcon { display: block; width: 17px; height: 17px; }
   .ctrlBtn:hover, .primaryBtn:hover { filter: brightness(1.12); transform: translateY(-1px); }
   .ctrlBtn:active, .primaryBtn:active { transform: translateY(0); filter: brightness(0.97); }
   .ctrlBtn:disabled, .primaryBtn:disabled { opacity: 0.38; cursor: not-allowed; transform: none; }
@@ -126,7 +127,7 @@
 
   /* セーフモード: 漫画の画像（リーダーのページ・本棚の表紙サムネイル）にだけ
      モザイク(ぼかし)をかける。フォルダ/お気に入り/シリーズのアイコン
-     （folder-cover内のimg: 📁❤📚など）は実際の表紙ではないため対象外。 */
+     （folder-cover内の生成アイコンなど）は実際の表紙ではないため対象外。 */
   body.safe-mode .pageimg,
   body.safe-mode .book-cover:not(.folder-cover) img {
     filter: blur(24px);
@@ -673,7 +674,7 @@
 <div id="app">
   <div id="readProgressBar"></div>
   <div id="topbar">
-    <button class="ctrlBtn" id="themeBtn" type="button" title="テーマ切替">☀️</button>
+    <button class="ctrlBtn" id="themeBtn" type="button" title="テーマ切替" aria-label="テーマ切替"></button>
     <button class="ctrlBtn" id="closeBtn" title="閉じる" aria-label="リーダーを閉じる" style="display:none;">×</button>
     <button class="ctrlBtn" id="saveBtn" title="今のURLを保存" style="display:none;">URLを保存</button>
     <button class="ctrlBtn favToggleBtn" id="favToggleBtn" title="お気に入りに追加" style="display:none;"></button>
@@ -978,7 +979,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   const PRELOAD_AHEAD_COUNT = 2; // 現在ページから何ページ先まで先読みするか
   const ANIM_DURATION = 280; // ms
 
-  // 絵文字(📁❤♡📚)はOS/フォントによって見た目が変わってしまうため、代わりに
+  // 絵文字はOS/フォントによって見た目が変わってしまうため、代わりに
   // テーマ色に合わせて自作したSVGアイコンを使う。ファイルを増やさずシングル
   // ファイル構成を保つため、data URIとしてインライン化している
   // (同内容のSVGファイルは icon-*.svg としても書き出してある)。
@@ -989,7 +990,19 @@ https://cdn.example.org/c/003.webp"></textarea>
   // 漫画を閉じるボタン用のバツ印アイコン（同内容のSVGファイルは icon-close.svg
   // としても書き出してある）。
   const ICON_CLOSE = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M6%206L18%2018M18%206L6%2018%22%20fill%3D%22none%22%20stroke%3D%22%23f1f2f6%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E";
-  // ❤/♡それぞれの状態に応じたアイコン画像要素を作る共通ヘルパー。
+  const ICON_SUN = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23f1f2f6%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%224%22%2F%3E%3Cpath%20d%3D%22M12%202v2M12%2020v2M4.93%204.93l1.42%201.42M17.65%2017.65l1.42%201.42M2%2012h2M20%2012h2M4.93%2019.07l1.42-1.42M17.65%206.35l1.42-1.42%22%2F%3E%3C%2Fsvg%3E";
+  const ICON_MOON = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23f1f2f6%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M20.5%2015.2A8.5%208.5%200%200%201%208.8%203.5%208.6%208.6%200%201%200%2020.5%2015.2z%22%2F%3E%3C%2Fsvg%3E";
+  function setThemeButtonIcon(button, selected) {
+    if (!button) return;
+    button.replaceChildren();
+    const icon = document.createElement('img');
+    icon.className = 'themeIcon';
+    icon.src = selected === 'light' ? ICON_MOON : ICON_SUN;
+    icon.alt = '';
+    icon.setAttribute('aria-hidden', 'true');
+    button.appendChild(icon);
+  }
+  // お気に入り状態に応じたアイコン画像要素を作る共通ヘルパー。
   function makeHeartIcon(active) {
     const img = document.createElement('img');
     img.src = active ? ICON_HEART_FILLED : ICON_HEART_OUTLINE;
@@ -1395,7 +1408,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   function applyTheme(theme) {
     const selected = theme === 'light' ? 'light' : 'dark';
     document.documentElement.dataset.theme = selected;
-    els.themeBtn.textContent = selected === 'light' ? '🌙' : '☀️';
+    setThemeButtonIcon(els.themeBtn, selected);
     els.themeBtn.title = selected === 'light' ? 'ダークモードへ' : 'ライトモードへ';
     try { localStorage.setItem(THEME_KEY, selected); } catch (e) {}
   }
@@ -1955,7 +1968,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     return { series: item.series, volume: item.volume };
   }
 
-  // Keeps the reader's topbar ♡/❤ button in sync with the underlying saved
+  // Keeps the reader's topbar favorite button in sync with the underlying saved
   // item's favorite flag. Hidden entirely when the manga on screen doesn't
   // correspond to any saved item yet (e.g. a brand-new 新規 URL before its
   // 履歴 entry exists).
@@ -4125,7 +4138,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       const favBtn = document.createElement('button');
       favBtn.className = 'book-favBtn';
       const updateFavoriteButton = () => {
-        favBtn.textContent = item.favorite ? '♥' : '♡';
+        favBtn.replaceChildren(makeHeartIcon(!!item.favorite));
         favBtn.classList.toggle('is-favorite', !!item.favorite);
         favBtn.title = item.favorite ? 'お気に入りから外す' : 'お気に入りに追加';
         favBtn.setAttribute('aria-label', favBtn.title);
