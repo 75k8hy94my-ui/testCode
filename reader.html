@@ -200,15 +200,16 @@
     position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%);
     display: none; align-items: center; gap: 10px;
     background: rgba(18,21,29,0.94); border: 1px solid var(--border); border-left: 3px solid var(--accent);
-    border-radius: var(--radius); padding: 11px 16px; z-index: 15; max-width: 90vw;
+    border-radius: var(--radius); padding: 11px 16px; z-index: 15; width: min(520px, 94vw);
     box-shadow: var(--shadow-md);
     animation: bannerRise 0.25s var(--ease);
   }
   @keyframes bannerRise { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
   #nextVolumeBanner.show { display: flex; }
   #nextVolumeText {
-    font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    flex: 1; min-width: 0; font-size: 13px; color: var(--text); white-space: normal; overflow-wrap: anywhere; line-height: 1.4;
   }
+  #nextVolumeCover { width: 48px; height: 72px; flex: 0 0 48px; object-fit: cover; border-radius: 5px; background: var(--panel-2); }
 
   /* Full-screen task views (not popups) */
   .modalOverlay {
@@ -624,6 +625,10 @@
     #controls .ctrlBtn { width: 100%; min-width: 0; padding: 6px 1px; font-size: 11px; }
     #pageSlider { width: 100%; min-width: 0; flex: none; }
     #pageLabel { min-width: 0; width: auto; font-size: 12px; }
+    #nextVolumeBanner { bottom: 76px; gap: 8px; padding: 8px 10px; }
+    #nextVolumeCover { width: 40px; height: 60px; flex-basis: 40px; }
+    #nextVolumeText { font-size: 12px; }
+    #nextVolumeBanner .ctrlBtn, #nextVolumeBanner .primaryBtn { padding: 6px 8px; font-size: 11px; }
     .modalPanel { width: 100%; min-height: 100dvh; max-width: none; max-height: none; border-radius: 0; padding: 18px 14px max(18px, env(safe-area-inset-bottom)); }
     #savedListPanel { height: auto; }
     #listTabRow { margin-left: -14px; margin-right: -14px; padding-left: 14px; }
@@ -784,6 +789,7 @@
   </div>
 
   <div id="nextVolumeBanner">
+    <img id="nextVolumeCover" alt="おすすめ作品の表紙">
     <span id="nextVolumeText"></span>
     <button class="ctrlBtn" id="nextVolumeDismissBtn" title="閉じる">×</button>
     <button class="primaryBtn" id="nextVolumeBtn">次の巻を読む</button>
@@ -1171,6 +1177,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     nextVolumeBanner: document.getElementById('nextVolumeBanner'),
     nextVolumeText: document.getElementById('nextVolumeText'),
+    nextVolumeCover: document.getElementById('nextVolumeCover'),
     nextVolumeBtn: document.getElementById('nextVolumeBtn'),
     nextVolumeDismissBtn: document.getElementById('nextVolumeDismissBtn'),
 
@@ -2115,6 +2122,13 @@ https://cdn.example.org/c/003.webp"></textarea>
   // detection has finished — otherwise "last page so far" could just mean
   // detection hasn't caught up yet) and whether a saved item for the next
   // volume of the same series exists.
+  function setNextVolumeCover(item) {
+    if (!item || !els.nextVolumeCover) return;
+    els.nextVolumeCover.alt = itemDisplayTitle(item);
+    if (Array.isArray(item.pages) && item.pages.length) els.nextVolumeCover.src = item.pages[0];
+    else setupFeedImage(els.nextVolumeCover, item.url, item.numberWidth);
+  }
+
   function updateNextVolumeBanner() {
     const atLastPage = pages.length > 0 && currentPage === displayedPageCount() && (currentlyCustom || detectionDone);
     if (!atLastPage || nextVolumeDismissed) { hideNextVolumeBanner(); return; }
@@ -2125,20 +2139,23 @@ https://cdn.example.org/c/003.webp"></textarea>
         .sort((a, b) => Number(!a.lastReadAt) - Number(!b.lastReadAt) || Number(!!b.favorite) - Number(!!a.favorite) || Number(b.updatedAt || b.addedAt) - Number(a.updatedAt || a.addedAt))[0];
       if (recommendation) {
         pendingNextVolumeItem = recommendation;
+        setNextVolumeCover(recommendation);
         els.nextVolumeText.textContent = 'おすすめ: ' + itemDisplayTitle(recommendation);
-        els.nextVolumeBtn.textContent = 'おすすめを読む';
+        els.nextVolumeBtn.textContent = '読む';
         els.nextVolumeBanner.classList.add('show');
         return;
       }
       hideNextVolumeBanner(); return;
     }
     pendingNextVolumeItem = nextItem;
+    setNextVolumeCover(nextItem);
     els.nextVolumeBtn.textContent = '次の巻を読む';
     els.nextVolumeText.textContent = '次の巻: ' + itemDisplayTitle(nextItem);
     els.nextVolumeBanner.classList.add('show');
   }
   function hideNextVolumeBanner() {
     pendingNextVolumeItem = null;
+    if (els.nextVolumeCover) els.nextVolumeCover.removeAttribute('src');
     els.nextVolumeBanner.classList.remove('show');
   }
 
