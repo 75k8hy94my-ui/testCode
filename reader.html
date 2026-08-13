@@ -735,6 +735,8 @@
   .author-group-count { color: var(--sub); font-size: 10px; margin-top: 3px; }
   .filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
   .filter-row input { flex: 1 1 130px; min-width: 100px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-soft); color: var(--text); }
+  .bookshelf-pagination { display: flex; justify-content: center; align-items: center; gap: 10px; padding: 14px 0 4px; }
+  .bookshelf-pagination span { min-width: 74px; color: var(--sub); font-size: 12px; text-align: center; }
   html[data-theme="dark"] #authorCardPanel input { background: #1d2230 !important; color: #f1f2f6 !important; border-color: #4a5263 !important; }
   html[data-theme="dark"] #authorCardPanel input::placeholder { color: #969dad !important; opacity: 1; }
   html[data-theme="dark"] #saveDialogPanel input::placeholder,
@@ -1077,6 +1079,11 @@ https://cdn.example.org/c/003.webp"></textarea>
       </div>
       <div id="savedListItems"></div>
       <div id="savedListEmpty" style="display:none;">保存されたURLはまだありません</div>
+      <div id="bookshelfPagination" style="display:none;" class="bookshelf-pagination">
+        <button class="ctrlBtn" id="bookshelfPrevBtn" type="button">前へ</button>
+        <span id="bookshelfPageLabel"></span>
+        <button class="ctrlBtn" id="bookshelfNextBtn" type="button">次へ</button>
+      </div>
     </div>
     <div id="videoListSection" style="display:none;">
       <div id="videoListToolbar">
@@ -1244,6 +1251,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   const READING_SESSION_MS = 30 * 60 * 1000;
   const THEME_KEY = 'mangaReaderTheme';
   const GROUP_AUTHOR_KEY = 'mangaReaderGroupByAuthor';
+  const BOOKSHELF_PAGE_SIZE = 25;
 
   const els = {
     newBtn: document.getElementById('newBtn'),
@@ -1337,6 +1345,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     filterSourceInput: document.getElementById('filterSourceInput'),
     applyFilterBtn: document.getElementById('applyFilterBtn'),
     clearFilterBtn: document.getElementById('clearFilterBtn'),
+    bookshelfPagination: document.getElementById('bookshelfPagination'),
+    bookshelfPrevBtn: document.getElementById('bookshelfPrevBtn'),
+    bookshelfNextBtn: document.getElementById('bookshelfNextBtn'),
+    bookshelfPageLabel: document.getElementById('bookshelfPageLabel'),
     bulkEditOverlay: document.getElementById('bulkEditOverlay'),
     bulkEditSelectionText: document.getElementById('bulkEditSelectionText'),
     bulkAuthorInput: document.getElementById('bulkAuthorInput'),
@@ -1616,6 +1628,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   const bulkSelectedIds = new Set();
   let bulkEditUndoSnapshot = null;
   let shelfFilters = { series: '', author: '', tags: '', source: '' };
+  let bookshelfPage = 1;
   let authorCards = [];
   let editingAuthorCardId = null;
   let currentFolderView = null;
@@ -4954,6 +4967,28 @@ https://cdn.example.org/c/003.webp"></textarea>
         (!shelfFilters.tags || normalizedFilter(tags).includes(normalizedFilter(shelfFilters.tags))) &&
         (!shelfFilters.source || normalizedFilter(item.sourceWork).includes(normalizedFilter(shelfFilters.source)));
     });
+    if (groupByAuthorEnabled && !bulkEditMode && !inAuthorView && !inSeriesRoot) {
+      const groups = new Map();
+      itemsList.forEach((item) => {
+        const name = String(item.author || '').trim();
+        if (name) { if (!groups.has(name)) groups.set(name, []); groups.get(name).push(item); }
+      });
+      authorGroupCards = Array.from(groups.entries()).map(([name, items]) => ({ name, items }));
+    }
+    const ungroupedItems = itemsList.filter((item) => !String(item.author || '').trim());
+    const pagedEntries = groupByAuthorEnabled && !bulkEditMode && !inAuthorView && !inSeriesRoot
+      ? authorGroupCards.concat(ungroupedItems)
+      : itemsList;
+    const totalShelfPages = Math.max(1, Math.ceil(pagedEntries.length / BOOKSHELF_PAGE_SIZE));
+    bookshelfPage = Math.min(Math.max(1, bookshelfPage), totalShelfPages);
+    const pageStart = (bookshelfPage - 1) * BOOKSHELF_PAGE_SIZE;
+    const visibleEntries = pagedEntries.slice(pageStart, pageStart + BOOKSHELF_PAGE_SIZE);
+    const visibleAuthorGroups = visibleEntries.filter((entry) => entry && Array.isArray(entry.items));
+    const visibleItems = visibleEntries.filter((entry) => !Array.isArray(entry.items));
+    els.bookshelfPagination.style.display = totalShelfPages > 1 ? 'flex' : 'none';
+    els.bookshelfPrevBtn.disabled = bookshelfPage <= 1;
+    els.bookshelfNextBtn.disabled = bookshelfPage >= totalShelfPages;
+    els.bookshelfPageLabel.textContent = bookshelfPage + ' / ' + totalShelfPages;
     const isEmpty = folderCards.length === 0 && itemsList.length === 0 && seriesGroupCards.length === 0 &&
       !showFavoritesCard && !showSeriesCard;
     if (isEmpty) {
@@ -4977,10 +5012,10 @@ https://cdn.example.org/c/003.webp"></textarea>
       folderCards.forEach((f) => frag.appendChild(buildFolderCard(f, folderCards, showOrganizeControls)));
       seriesGroupCards.forEach((g) => frag.appendChild(buildSeriesGroupCard(g)));
       if (groupByAuthorEnabled && !bulkEditMode && authorGroupCards.length) {
-        authorGroupCards.forEach((group) => frag.appendChild(buildAuthorGroupCard(group)));
-        itemsList.filter((item) => !String(item.author || '').trim()).forEach((it) => frag.appendChild(buildBookCard(it, itemsList, showOrganizeControls)));
+        visibleAuthorGroups.forEach((group) => frag.appendChild(buildAuthorGroupCard(group)));
+        visibleItems.forEach((it) => frag.appendChild(buildBookCard(it, itemsList, showOrganizeControls)));
       } else {
-        itemsList.forEach((it) => frag.appendChild(buildBookCard(it, itemsList, showOrganizeControls)));
+        visibleItems.forEach((it) => frag.appendChild(buildBookCard(it, itemsList, showOrganizeControls)));
       }
       els.savedListItems.appendChild(frag);
     }
@@ -5358,9 +5393,12 @@ https://cdn.example.org/c/003.webp"></textarea>
   });
   els.groupAuthorBtn.addEventListener('click', () => {
     groupByAuthorEnabled = !groupByAuthorEnabled;
+    bookshelfPage = 1;
     try { localStorage.setItem(GROUP_AUTHOR_KEY, groupByAuthorEnabled ? '1' : '0'); } catch (e) {}
     renderSavedList();
   });
+  els.bookshelfPrevBtn.addEventListener('click', () => { if (bookshelfPage > 1) { bookshelfPage--; renderSavedList(); } });
+  els.bookshelfNextBtn.addEventListener('click', () => { bookshelfPage++; renderSavedList(); });
   els.savedListOverlay.addEventListener('click', (e) => { if (e.target === els.savedListOverlay) closeSavedList(); });
   els.listBackBtn.addEventListener('click', () => {
     // From inside a specific シリーズ, 戻る goes back to the series-name list
@@ -5408,10 +5446,12 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.filterBtn.addEventListener('click', () => { els.filterRow.style.display = els.filterRow.style.display === 'none' ? 'flex' : 'none'; });
   els.applyFilterBtn.addEventListener('click', () => {
     shelfFilters = { series: els.filterSeriesInput.value.trim(), author: els.filterAuthorInput.value.trim(), tags: els.filterTagsInput.value.trim(), source: els.filterSourceInput.value.trim() };
+    bookshelfPage = 1;
     renderSavedList();
   });
   els.clearFilterBtn.addEventListener('click', () => {
     shelfFilters = { series: '', author: '', tags: '', source: '' };
+    bookshelfPage = 1;
     els.filterSeriesInput.value = ''; els.filterAuthorInput.value = ''; els.filterTagsInput.value = ''; els.filterSourceInput.value = '';
     renderSavedList();
   });
