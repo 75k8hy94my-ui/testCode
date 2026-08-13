@@ -723,7 +723,7 @@
   .author-link-row input { margin-top: 0 !important; min-width: 0; }
   .author-link-remove { min-width: 38px; padding: 8px 6px; }
   .author-card-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 14px; }
-  .author-card { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-soft); }
+  .author-card { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-soft); cursor: pointer; }
   .author-card-name { font-weight: 700; color: var(--text); margin-bottom: 8px; overflow-wrap: anywhere; }
   .author-card-links { display: flex; flex-direction: column; gap: 5px; }
   .author-card-links a { color: var(--accent-2); font-size: 12px; overflow-wrap: anywhere; }
@@ -1038,6 +1038,9 @@ https://cdn.example.org/c/003.webp"></textarea>
         <button class="ctrlBtn" id="addCustomBtn">個別追加</button>
         <button class="ctrlBtn" id="bulkDetectBtn">一括読み込み</button>
         <button class="ctrlBtn" id="authorCardsBtn" type="button">作者カード</button>
+        <button class="ctrlBtn" id="backupExportBtn" type="button">バックアップ保存</button>
+        <button class="ctrlBtn" id="backupImportBtn" type="button">バックアップ読込</button>
+        <input id="backupFileInput" type="file" accept="application/json,.json" style="display:none;">
       </div>
       <div id="smartListRow">
         <button class="smartListBtn" id="historyListBtn" type="button">履歴</button>
@@ -1289,6 +1292,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     closeListBtn: document.getElementById('closeListBtn'),
     editShelfBtn: document.getElementById('editShelfBtn'),
     authorCardsBtn: document.getElementById('authorCardsBtn'),
+    backupExportBtn: document.getElementById('backupExportBtn'),
+    backupImportBtn: document.getElementById('backupImportBtn'),
+    backupFileInput: document.getElementById('backupFileInput'),
     authorCardOverlay: document.getElementById('authorCardOverlay'),
     authorCardList: document.getElementById('authorCardList'),
     authorCardEmpty: document.getElementById('authorCardEmpty'),
@@ -1550,6 +1556,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   let editingAuthorCardId = null;
   let currentFolderView = null;
   let currentSeriesView = null; // series name when drilled into a シリーズ group; null while browsing series names or anywhere else
+  let currentAuthorView = null;
   let reorderMode = false; // true while 並べ替え (manual up/down reorder) controls are shown for the current folder view
   // リーダーを閉じたときに戻る、本棚上の表示位置。作品を本棚から開いたときだけ記録する。
   let readerReturnView = null;
@@ -2312,7 +2319,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'manga_reader_urls.json';
+    a.download = 'manga_reader_backup.json';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -2910,6 +2917,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (returnView) {
       currentFolderView = returnView.folderId;
       currentSeriesView = returnView.seriesName;
+      currentAuthorView = returnView.authorName || null;
       reorderMode = false;
       openSavedList(true, true);
     } else {
@@ -4651,7 +4659,12 @@ https://cdn.example.org/c/003.webp"></textarea>
       const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'ctrlBtn'; edit.textContent = '編集'; edit.addEventListener('click', () => openAuthorCardEditor(card));
       const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'ctrlBtn dangerBtn'; remove.textContent = '削除';
       remove.addEventListener('click', () => { if (!confirm('この作者カードを削除しますか？')) return; authorCards = authorCards.filter((item) => item.id !== card.id); persistAuthorCards(); renderAuthorCards(); });
-      actions.append(edit, remove); box.append(name, links, actions); els.authorCardList.appendChild(box);
+      actions.append(edit, remove); box.append(name, links, actions);
+      box.addEventListener('click', (event) => {
+        if (event.target.closest('button, a')) return;
+        openAuthorWorks(card);
+      });
+      els.authorCardList.appendChild(box);
     });
   }
   function openAuthorCards() {
@@ -4662,6 +4675,13 @@ https://cdn.example.org/c/003.webp"></textarea>
     closeAuthorCardEditor();
     els.authorCardOverlay.classList.remove('show');
     if (authorCardReturnToList) { authorCardReturnToList = false; openSavedList(false, true); }
+  }
+  function openAuthorWorks(card) {
+    currentFolderView = null;
+    currentSeriesView = null;
+    currentAuthorView = card.name;
+    closeAuthorCards();
+    renderSavedList();
   }
   function saveAuthorCard() {
     const name = els.authorCardNameInput.value.trim();
@@ -4681,15 +4701,16 @@ https://cdn.example.org/c/003.webp"></textarea>
   function renderSavedList() {
     const inSeriesGroup = currentFolderView === SERIES_FOLDER_ID && !!currentSeriesView;
     const inSeriesRoot = currentFolderView === SERIES_FOLDER_ID && !currentSeriesView;
+    const inAuthorView = !!currentAuthorView;
 
-    const atRoot = !currentFolderView;
+    const atRoot = !currentFolderView && !inAuthorView;
     const isRealFolder = !!currentFolderView && currentFolderView !== FAVORITES_FOLDER_ID &&
       currentFolderView !== UNREAD_FOLDER_ID && currentFolderView !== HISTORY_FOLDER_ID &&
       currentFolderView !== SERIES_FOLDER_ID;
     const canOrganize = atRoot || isRealFolder;
     const showOrganizeControls = canOrganize && reorderMode;
 
-    els.listBackBtn.style.display = currentFolderView ? '' : 'none';
+    els.listBackBtn.style.display = currentFolderView || inAuthorView ? '' : 'none';
     els.listNewFolderBtn.style.display = atRoot ? '' : 'none';
     els.editShelfBtn.style.display = canOrganize ? '' : 'none';
     els.editShelfBtn.classList.toggle('active', showOrganizeControls);
@@ -4706,6 +4727,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       els.listFolderTitle.textContent = currentSeriesView;
     } else if (inSeriesRoot) {
       els.listFolderTitle.textContent = SERIES_FOLDER_NAME;
+    } else if (inAuthorView) {
+      els.listFolderTitle.textContent = currentAuthorView;
     } else if (currentFolderView) {
       const folder = savedFolders.find((f) => f.id === currentFolderView);
       els.listFolderTitle.textContent = folder ? folder.name : '';
@@ -4722,7 +4745,11 @@ https://cdn.example.org/c/003.webp"></textarea>
     let showFavoritesCard = false;
     let showSeriesCard = false;
 
-    if (!currentFolderView) {
+    if (inAuthorView) {
+      const authorCard = authorCards.find((card) => card.name === currentAuthorView || card.circleName === currentAuthorView);
+      const names = authorCard ? [authorCard.name, authorCard.circleName].filter(Boolean) : [currentAuthorView];
+      itemsList = savedItems.filter((it) => names.includes(String(it.author || '').trim()));
+    } else if (!currentFolderView) {
       // Series-tagged works belong to the virtual シリーズ shelf at the
       // root. Do not also render them as individual cards beside that shelf;
       // works with the same series name are grouped there automatically.
@@ -4800,6 +4827,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!preserveCurrentView) {
       currentFolderView = null;
       currentSeriesView = null;
+      currentAuthorView = null;
       reorderMode = false;
     }
     renderSavedList();
@@ -4807,7 +4835,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.closeListBtn.style.display = hideCloseBtn ? 'none' : '';
   }
   function rememberReaderReturnView() {
-    readerReturnView = { folderId: currentFolderView, seriesName: currentSeriesView };
+    readerReturnView = { folderId: currentFolderView, seriesName: currentSeriesView, authorName: currentAuthorView };
   }
   function closeSavedList() {
     const isRealFolder = currentFolderView && currentFolderView !== FAVORITES_FOLDER_ID && currentFolderView !== UNREAD_FOLDER_ID && currentFolderView !== HISTORY_FOLDER_ID && currentFolderView !== SERIES_FOLDER_ID;
@@ -5057,6 +5085,13 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.cancelCustomAddBtn.addEventListener('click', closeCustomAddDialog);
   els.confirmCustomAddBtn.addEventListener('click', confirmCustomAdd);
   els.authorCardsBtn.addEventListener('click', openAuthorCards);
+  els.backupExportBtn.addEventListener('click', exportData);
+  els.backupImportBtn.addEventListener('click', () => els.backupFileInput.click());
+  els.backupFileInput.addEventListener('change', (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (file) importDataFromFile(file);
+    event.target.value = '';
+  });
   els.closeAuthorCardBtn.addEventListener('click', closeAuthorCards);
   els.authorCardOverlay.addEventListener('click', (e) => { if (e.target === els.authorCardOverlay) closeAuthorCards(); });
   els.newAuthorCardBtn.addEventListener('click', () => openAuthorCardEditor(null));
@@ -5148,7 +5183,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     // From inside a specific シリーズ, 戻る goes back to the series-name list
     // first (not straight to the top root) — a two-level back, matching the
     // two-level drill-in.
-    if (currentFolderView === SERIES_FOLDER_ID && currentSeriesView) {
+    if (currentAuthorView) {
+      currentAuthorView = null;
+    } else if (currentFolderView === SERIES_FOLDER_ID && currentSeriesView) {
       currentSeriesView = null;
     } else {
       currentFolderView = null;
