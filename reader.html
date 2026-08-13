@@ -2595,8 +2595,21 @@ https://cdn.example.org/c/003.webp"></textarea>
       v = v.replace(/[?#].*$/, '');
     }
     if (!v.endsWith('/')) v += '/';
-    return { baseUrl: v, hintExt: hintExt, numberWidth: m ? m[3].length : null,
-      pattern: m && (m[2] || m[4]) ? { prefix: m[2], suffix: m[4], width: m[3].length } : null };
+    let numberWidth = m ? m[3].length : null;
+    let pattern = null;
+    if (m) {
+      let prefix = m[2];
+      let suffix = m[4];
+      // Long numeric identifiers often end with a three-digit page number:
+      // ****2026080519001.jpg -> prefix ****2026080519 + page 001.
+      // Keep the identifier intact while numbering the final 001/002/... part.
+      if (!suffix && m[3].length >= 7 && /[^0-9]/.test(prefix)) {
+        prefix += m[3].slice(0, -3);
+        numberWidth = 3;
+      }
+      if (prefix || suffix) pattern = { prefix: prefix, suffix: suffix, width: numberWidth };
+    }
+    return { baseUrl: v, hintExt: hintExt, numberWidth: numberWidth, pattern: pattern };
   }
 
   // ---------- image loading / detection ----------
