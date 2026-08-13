@@ -3945,6 +3945,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!seriesData) return;
     const seriesAuthor = readSeriesAuthorForm(els.saveSeriesInput, els.saveNewSeriesInput, els.saveNewSeriesAuthorInput, els.saveSeriesNoAuthorInput, els.saveAuthorInput);
     if (seriesAuthor === null) return;
+    ensureAuthorCardForName(seriesAuthor);
     const doujinData = readDoujinForm(els.saveDoujinInput, els.saveSourceWorkInput, els.saveNewSourceWorkInput);
     if (!doujinData) return;
     const title = seriesData.title || els.saveTitleInput.value.trim() || deriveTitleFromUrl(pendingSaveUrl);
@@ -4058,6 +4059,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!seriesData) return;
     const seriesAuthor = readSeriesAuthorForm(els.customSeriesInput, els.customNewSeriesInput, els.customNewSeriesAuthorInput, els.customSeriesNoAuthorInput, els.customAuthorInput);
     if (seriesAuthor === null) return;
+    ensureAuthorCardForName(seriesAuthor);
     const doujinData = readDoujinForm(els.customDoujinInput, els.customSourceWorkInput, els.customNewSourceWorkInput);
     if (!doujinData) return;
     const title = seriesData.title || els.customTitleInput.value.trim() || ('無題' + (savedItems.length + 1));
@@ -4133,6 +4135,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!seriesData) return;
     const seriesAuthor = readSeriesAuthorForm(els.editSeriesInput, els.editNewSeriesInput, els.editNewSeriesAuthorInput, els.editSeriesNoAuthorInput, els.editAuthorInput);
     if (seriesAuthor === null) return;
+    ensureAuthorCardForName(seriesAuthor);
     const doujinData = readDoujinForm(els.editDoujinInput, els.editSourceWorkInput, els.editNewSourceWorkInput);
     if (!doujinData) return;
 
@@ -4582,6 +4585,14 @@ https://cdn.example.org/c/003.webp"></textarea>
       label: String(link && link.label || '').trim(),
       url: String(link && link.url || '').trim()
     })).filter((link) => link.label && /^https?:\/\//i.test(link.url));
+  }
+  function ensureAuthorCardForName(authorName) {
+    const name = String(authorName || '').trim();
+    if (!name) return;
+    const exists = authorCards.some((card) => card.name === name || card.circleName === name);
+    if (exists) return;
+    authorCards.unshift({ id: genId('a'), name: name, circleName: '', links: [], createdAt: Date.now() });
+    persistAuthorCards();
   }
   function addAuthorLinkRow(link) {
     const row = document.createElement('div');
