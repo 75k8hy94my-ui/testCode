@@ -1038,6 +1038,9 @@ https://cdn.example.org/c/003.webp"></textarea>
         <button class="ctrlBtn" id="addCustomBtn">個別追加</button>
         <button class="ctrlBtn" id="bulkDetectBtn">一括読み込み</button>
         <button class="ctrlBtn" id="authorCardsBtn" type="button">作者カード</button>
+        <button class="ctrlBtn" id="backupExportBtn" type="button">バックアップ保存</button>
+        <button class="ctrlBtn" id="backupImportBtn" type="button">バックアップ読込</button>
+        <input id="backupFileInput" type="file" accept="application/json,.json" style="display:none;">
       </div>
       <div id="smartListRow">
         <button class="smartListBtn" id="historyListBtn" type="button">履歴</button>
@@ -1289,6 +1292,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     closeListBtn: document.getElementById('closeListBtn'),
     editShelfBtn: document.getElementById('editShelfBtn'),
     authorCardsBtn: document.getElementById('authorCardsBtn'),
+    backupExportBtn: document.getElementById('backupExportBtn'),
+    backupImportBtn: document.getElementById('backupImportBtn'),
+    backupFileInput: document.getElementById('backupFileInput'),
     authorCardOverlay: document.getElementById('authorCardOverlay'),
     authorCardList: document.getElementById('authorCardList'),
     authorCardEmpty: document.getElementById('authorCardEmpty'),
@@ -2313,7 +2319,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'manga_reader_urls.json';
+    a.download = 'manga_reader_backup.json';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -5079,6 +5085,13 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.cancelCustomAddBtn.addEventListener('click', closeCustomAddDialog);
   els.confirmCustomAddBtn.addEventListener('click', confirmCustomAdd);
   els.authorCardsBtn.addEventListener('click', openAuthorCards);
+  els.backupExportBtn.addEventListener('click', exportData);
+  els.backupImportBtn.addEventListener('click', () => els.backupFileInput.click());
+  els.backupFileInput.addEventListener('change', (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (file) importDataFromFile(file);
+    event.target.value = '';
+  });
   els.closeAuthorCardBtn.addEventListener('click', closeAuthorCards);
   els.authorCardOverlay.addEventListener('click', (e) => { if (e.target === els.authorCardOverlay) closeAuthorCards(); });
   els.newAuthorCardBtn.addEventListener('click', () => openAuthorCardEditor(null));
