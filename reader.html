@@ -56,9 +56,9 @@
      when the bars are toggled hidden) and is unaffected by toggleBars(). */
   #readProgressBar {
     position: absolute; top: 0; left: 0; height: 3px; width: 0%;
-    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    background: var(--accent);
     z-index: 12; transition: width 0.25s var(--ease);
-    box-shadow: 0 0 8px rgba(255,107,74,0.55);
+    box-shadow: 0 0 8px var(--accent-dim);
   }
 
   /* Top bar (overlays the viewer; hiding it does not change viewer's size) */
@@ -99,6 +99,7 @@
     display: flex; align-items: center; justify-content: flex-end; gap: 8px;
     min-width: 0; margin-left: auto; flex: 1 1 180px;
   }
+  #moreBtn, #mobileMoreMenu { display: none; }
 
   /* Viewer: always fills the full app area. Topbar/controls float on top of
      it, so hiding them reveals more of the image instead of leaving blank
@@ -596,22 +597,31 @@
     /* Keep the reader controls inside the viewport on narrow phones.
        The old horizontal scroller was especially awkward on iPhone SE. */
     #topbar {
-      flex-wrap: wrap; overflow-x: hidden; overflow-y: auto; gap: 5px;
-      max-height: 34dvh; padding-left: 8px; padding-right: 8px;
+      flex-wrap: nowrap; overflow: visible; gap: 5px;
+      max-height: none; padding-left: 8px; padding-right: 8px;
       align-content: flex-start;
     }
     #topbar .ctrlBtn, #topbar .primaryBtn {
       min-width: 0; padding: 7px 9px; font-size: 12px; flex: 0 1 auto;
     }
+    #topbar > #themeBtn,
+    #topbar > #saveBtn,
+    #topbar > #animBtn,
+    #topbar > #redetectBtn,
+    #topbar > #tocAddBtn { display: none !important; }
+    #moreBtn { display: inline-flex; align-items: center; justify-content: center; min-width: 38px; padding: 7px 9px; }
+    #mobileMoreMenu { position: absolute; top: calc(100% + 6px); right: 8px; display: none; flex-direction: column; gap: 5px; min-width: 150px; padding: 8px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-md); z-index: 30; }
+    #mobileMoreMenu.show { display: flex; }
+    #mobileMoreMenu .ctrlBtn { width: 100%; text-align: left; }
     #status { min-width: 0; flex: 0 1 auto; }
     #readerMeta { flex: 1 1 100%; order: 20; justify-content: space-between; margin-left: 0; }
     #currentTitle { min-width: 0; max-width: 58%; flex: 1 1 auto; }
     #controls {
-      display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 6px; overflow: hidden; padding-left: 8px; padding-right: 8px;
+      display: grid !important; grid-template-columns: 28px 28px minmax(40px, 1fr) 42px 28px 28px 34px;
+      gap: 4px; overflow: hidden; padding-left: 6px; padding-right: 6px;
     }
-    #controls .ctrlBtn { width: 100%; min-width: 0; padding: 7px 4px; font-size: 12px; }
-    #pageSlider { grid-column: span 2; width: 100%; min-width: 0; flex: none; }
+    #controls .ctrlBtn { width: 100%; min-width: 0; padding: 6px 1px; font-size: 11px; }
+    #pageSlider { width: 100%; min-width: 0; flex: none; }
     #pageLabel { min-width: 0; width: auto; font-size: 12px; }
     .modalPanel { width: 100%; min-height: 100dvh; max-width: none; max-height: none; border-radius: 0; padding: 18px 14px max(18px, env(safe-area-inset-bottom)); }
     #savedListPanel { height: auto; }
@@ -740,7 +750,15 @@
     <button class="ctrlBtn active" id="animBtn" title="ページ送りアニメーションの切替">アニメ</button>
     <button class="ctrlBtn" id="redetectBtn" title="保存されたページ数情報を消して、最初から再検出します">再検出</button>
     <button class="ctrlBtn" id="tocAddBtn" title="今のページを目次として追加">目次追加</button>
+    <button class="ctrlBtn" id="moreBtn" type="button" aria-label="その他の操作">⋯</button>
     <span id="readerMeta"><span id="currentTitle"></span><span id="status"></span></span>
+    <div id="mobileMoreMenu" role="menu">
+      <button class="ctrlBtn" type="button" data-menu-action="theme">テーマ切替</button>
+      <button class="ctrlBtn" type="button" data-menu-action="save">URLを保存</button>
+      <button class="ctrlBtn" type="button" data-menu-action="anim">アニメ</button>
+      <button class="ctrlBtn" type="button" data-menu-action="redetect">再検出</button>
+      <button class="ctrlBtn" type="button" data-menu-action="toc">目次追加</button>
+    </div>
   </div>
 
   <div id="viewer" class="fit-contain">
@@ -1117,6 +1135,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     safeModeBtn: document.getElementById('safeModeBtn'),
     enhanceBtn: document.getElementById('enhanceBtn'),
     themeBtn: document.getElementById('themeBtn'),
+    moreBtn: document.getElementById('moreBtn'),
+    mobileMoreMenu: document.getElementById('mobileMoreMenu'),
     listThemeBtn: document.getElementById('listThemeBtn'),
     status: document.getElementById('status'),
     currentTitle: document.getElementById('currentTitle'),
@@ -1430,6 +1450,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // リーダーを閉じたときに戻る、本棚上の表示位置。作品を本棚から開いたときだけ記録する。
   let readerReturnView = null;
   let recentlyClosedItemId = null;
+  let recentlyClosedFolderId = null;
   let pendingSaveUrl = null;
   // Whether opening the 個別追加/編集 dialog hid an already-open 保存したURL
   // list popup behind it; if so, closing the dialog reopens (and re-renders)
@@ -1479,6 +1500,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (sync && typeof scheduleCloudSync === 'function') scheduleCloudSync();
   }
   applyTheme(localStorage.getItem(THEME_KEY));
+  els.safeModeBtn.textContent = 'ぼかし';
+  els.safeModeBtn.title = '画像をぼかす';
+  els.enhanceBtn.textContent = '補正';
+  els.enhanceBtn.title = 'ページ画像を補正';
   function persistImageEnhance() { try { localStorage.setItem(IMAGE_ENHANCE_KEY, imageEnhanceEnabled ? '1' : '0'); } catch (e) {} }
   function applyImageEnhance() {
     document.body.classList.toggle('image-enhance', imageEnhanceEnabled);
@@ -2093,8 +2118,21 @@ https://cdn.example.org/c/003.webp"></textarea>
     const atLastPage = pages.length > 0 && currentPage === displayedPageCount() && (currentlyCustom || detectionDone);
     if (!atLastPage || nextVolumeDismissed) { hideNextVolumeBanner(); return; }
     const nextItem = findNextVolumeItem(getCurrentSeriesInfo());
-    if (!nextItem) { hideNextVolumeBanner(); return; }
+    if (!nextItem) {
+      const currentId = getCurrentItem() && getCurrentItem().id;
+      const recommendation = savedItems.filter((item) => item.id !== currentId && !Array.isArray(item.pages))
+        .sort((a, b) => Number(!a.lastReadAt) - Number(!b.lastReadAt) || Number(!!b.favorite) - Number(!!a.favorite) || Number(b.updatedAt || b.addedAt) - Number(a.updatedAt || a.addedAt))[0];
+      if (recommendation) {
+        pendingNextVolumeItem = recommendation;
+        els.nextVolumeText.textContent = 'おすすめ: ' + itemDisplayTitle(recommendation);
+        els.nextVolumeBtn.textContent = 'おすすめを読む';
+        els.nextVolumeBanner.classList.add('show');
+        return;
+      }
+      hideNextVolumeBanner(); return;
+    }
     pendingNextVolumeItem = nextItem;
+    els.nextVolumeBtn.textContent = '次の巻を読む';
     els.nextVolumeText.textContent = '次の巻: ' + itemDisplayTitle(nextItem);
     els.nextVolumeBanner.classList.add('show');
   }
@@ -2913,7 +2951,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.pageSlider.value = currentPage;
     const totalLabel = detectionDone ? count : count + '+';
     els.pageLabel.textContent = currentPage + ' / ' + totalLabel;
-    els.readProgressBar.style.width = count ? Math.round((currentPage / count) * 100) + '%' : '0%';
+    const progress = count > 1 ? ((currentPage - 1) / (count - 1)) * 100 : 0;
+    els.readProgressBar.style.width = Math.max(0, Math.min(100, Math.round(progress))) + '%';
   }
 
   const preloadedPageUrls = new Set(); // URLs that have actually finished downloading — never re-fetch these
@@ -3159,7 +3198,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   function updateDragX(dx) {
-    if (dragInfo.blocked) { dragCurrentSlide.style.transform = 'translateX(' + (dx * RUBBER_BAND_FACTOR) + 'px)'; return; }
+    if (dragInfo.blocked) { dragCurrentSlide.style.transform = dragInfo.kind === 'page' ? 'translateX(0)' : 'translateX(' + (dx * RUBBER_BAND_FACTOR) + 'px)'; return; }
     const clamped = dragInfo.dir === 'next' ? Math.min(dx, 0) : Math.max(dx, 0);
     dragCurrentSlide.style.transform = 'translateX(' + clamped + 'px)';
     const base = dragInfo.dir === 'next' ? '100%' : '-100%';
@@ -3946,7 +3985,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   function buildFolderCard(folder, folderList, organizeMode) {
     const card = document.createElement('div');
-    card.className = 'book-card folder-card';
+    card.className = 'book-card folder-card' + (folder.id === recentlyClosedFolderId ? ' just-closed' : '');
     const folderItems = savedItems.filter((item) => item.folderId === folder.id);
 
     const cover = document.createElement('div');
@@ -3994,6 +4033,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     card.appendChild(cover);
     card.appendChild(title);
     if (!organizeMode) card.addEventListener('click', () => {
+      recentlyClosedFolderId = null;
       if (folderItems.length === 1) {
         // 1冊だけのフォルダは直接開くが、閉じた際の戻り先はこのフォルダにする。
         currentFolderView = folder.id;
@@ -4433,7 +4473,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   function rememberReaderReturnView() {
     readerReturnView = { folderId: currentFolderView, seriesName: currentSeriesView };
   }
-  function closeSavedList() { els.savedListOverlay.classList.remove('show'); }
+  function closeSavedList() {
+    const isRealFolder = currentFolderView && currentFolderView !== FAVORITES_FOLDER_ID && currentFolderView !== UNREAD_FOLDER_ID && currentFolderView !== HISTORY_FOLDER_ID && currentFolderView !== SERIES_FOLDER_ID;
+    if (isRealFolder) recentlyClosedFolderId = currentFolderView;
+    els.savedListOverlay.classList.remove('show');
+  }
   function isSavedListOpen() { return els.savedListOverlay.classList.contains('show'); }
 
   // A saved item only stores the manga's base URL, not which file extension
@@ -4719,6 +4763,20 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.enhanceBtn.addEventListener('click', toggleImageEnhance);
   els.themeBtn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light', true));
   els.listThemeBtn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light', true));
+  els.moreBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    els.mobileMoreMenu.classList.toggle('show');
+  });
+  els.mobileMoreMenu.addEventListener('click', (e) => {
+    const action = e.target.closest('[data-menu-action]')?.dataset.menuAction;
+    if (!action) return;
+    const target = { theme: els.themeBtn, save: els.saveBtn, anim: els.animBtn, redetect: els.redetectBtn, toc: els.tocAddBtn }[action];
+    if (target) target.click();
+    els.mobileMoreMenu.classList.remove('show');
+  });
+  document.addEventListener('click', (e) => {
+    if (!els.mobileMoreMenu.contains(e.target) && e.target !== els.moreBtn) els.mobileMoreMenu.classList.remove('show');
+  });
   els.closeListBtn.addEventListener('click', closeSavedList);
   els.historyListBtn.addEventListener('click', () => {
     currentFolderView = HISTORY_FOLDER_ID;
