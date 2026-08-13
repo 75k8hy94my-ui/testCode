@@ -713,6 +713,23 @@
   html[data-theme="dark"] #editItemPanel textarea {
     background: #1d2230 !important; color: #f1f2f6 !important; border-color: #4a5263 !important;
   }
+  #authorCardPanel input[type="text"], #authorCardPanel input[type="url"] {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--bg-soft); color: var(--text); font-size: 16px; margin-top: 4px;
+  }
+  #authorCardPanel input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); outline: none; }
+  #authorLinksEditor { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+  .author-link-row { display: grid; grid-template-columns: minmax(90px, .35fr) minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+  .author-link-row input { margin-top: 0 !important; min-width: 0; }
+  .author-link-remove { min-width: 38px; padding: 8px 6px; }
+  .author-card-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 14px; }
+  .author-card { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-soft); }
+  .author-card-name { font-weight: 700; color: var(--text); margin-bottom: 8px; overflow-wrap: anywhere; }
+  .author-card-links { display: flex; flex-direction: column; gap: 5px; }
+  .author-card-links a { color: var(--accent-2); font-size: 12px; overflow-wrap: anywhere; }
+  .author-card-actions { display: flex; gap: 6px; margin-top: 10px; }
+  html[data-theme="dark"] #authorCardPanel input { background: #1d2230 !important; color: #f1f2f6 !important; border-color: #4a5263 !important; }
+  html[data-theme="dark"] #authorCardPanel input::placeholder { color: #969dad !important; opacity: 1; }
   html[data-theme="dark"] #saveDialogPanel input::placeholder,
   html[data-theme="dark"] #saveDialogPanel textarea::placeholder,
   html[data-theme="dark"] #editItemPanel input::placeholder,
@@ -967,6 +984,25 @@ https://cdn.example.org/c/003.webp"></textarea>
 </div>
 
 <!-- Table of contents (目次) list dialog -->
+<!-- Author cards -->
+<div id="authorCardOverlay" class="modalOverlay">
+  <div id="authorCardPanel" class="modalPanel">
+    <div class="panel-header"><span>作者カード</span><button class="ctrlBtn" id="closeAuthorCardBtn" type="button">閉じる</button></div>
+    <div id="authorCardList" class="author-card-list"></div>
+    <div id="authorCardEmpty" style="display:none;color:var(--sub);font-size:13px;padding:14px 0;">作者カードはまだありません</div>
+    <div id="authorCardEditor" style="display:none;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+      <div class="panel-header" style="font-size:15px;padding-bottom:8px;"><span id="authorCardEditorTitle">作者カードを作成</span></div>
+      <label class="field-label" for="authorCardNameInput">作者名</label>
+      <input id="authorCardNameInput" type="text" placeholder="作者名">
+      <label class="field-label">リンク</label>
+      <div id="authorLinksEditor"></div>
+      <button class="ctrlBtn" id="addAuthorLinkBtn" type="button" style="margin-top:9px;">リンクを追加</button>
+      <div class="dialog-actions" style="margin-top:14px;"><button class="ctrlBtn" id="cancelAuthorCardBtn" type="button">キャンセル</button><button class="primaryBtn" id="saveAuthorCardBtn" type="button">保存</button></div>
+    </div>
+    <div class="dialog-actions" style="margin-top:16px;"><button class="primaryBtn" id="newAuthorCardBtn" type="button">作者カードを作成</button></div>
+  </div>
+</div>
+
 <div id="tocOverlay" class="modalOverlay">
   <div id="tocPanel" class="modalPanel">
     <div class="panel-header">
@@ -999,6 +1035,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         <button class="primaryBtn" id="newBtn">新規</button>
         <button class="ctrlBtn" id="addCustomBtn">個別追加</button>
         <button class="ctrlBtn" id="bulkDetectBtn">一括読み込み</button>
+        <button class="ctrlBtn" id="authorCardsBtn" type="button">作者カード</button>
       </div>
       <div id="smartListRow">
         <button class="smartListBtn" id="historyListBtn" type="button">履歴</button>
@@ -1148,6 +1185,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   const MANGA_INFO_CACHE_KEY = 'mangaReaderInfoCache';
   const MANGA_INFO_CACHE_MAX = 300; // cap so long-term use doesn't grow localStorage unbounded
   const SAVED_VIDEOS_KEY = 'mangaReaderVideos';
+  const AUTHOR_CARDS_KEY = 'mangaReaderAuthorCards';
   const HISTORY_FOLDER_ID = '__history__';
   const HISTORY_FOLDER_NAME = '履歴';
   // お気に入り is a virtual, aggregating "folder": unlike 履歴 it isn't stored
@@ -1248,6 +1286,19 @@ https://cdn.example.org/c/003.webp"></textarea>
     savedListEmpty: document.getElementById('savedListEmpty'),
     closeListBtn: document.getElementById('closeListBtn'),
     editShelfBtn: document.getElementById('editShelfBtn'),
+    authorCardsBtn: document.getElementById('authorCardsBtn'),
+    authorCardOverlay: document.getElementById('authorCardOverlay'),
+    authorCardList: document.getElementById('authorCardList'),
+    authorCardEmpty: document.getElementById('authorCardEmpty'),
+    authorCardEditor: document.getElementById('authorCardEditor'),
+    authorCardEditorTitle: document.getElementById('authorCardEditorTitle'),
+    authorCardNameInput: document.getElementById('authorCardNameInput'),
+    authorLinksEditor: document.getElementById('authorLinksEditor'),
+    addAuthorLinkBtn: document.getElementById('addAuthorLinkBtn'),
+    newAuthorCardBtn: document.getElementById('newAuthorCardBtn'),
+    cancelAuthorCardBtn: document.getElementById('cancelAuthorCardBtn'),
+    saveAuthorCardBtn: document.getElementById('saveAuthorCardBtn'),
+    closeAuthorCardBtn: document.getElementById('closeAuthorCardBtn'),
 
     addCustomBtn: document.getElementById('addCustomBtn'),
     bulkDetectBtn: document.getElementById('bulkDetectBtn'),
@@ -1492,6 +1543,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   // a "custom" manga added via 個別追加 — see
   // confirmCustomAdd / openItem / startReadingCustom.
   let savedItems = [];
+  let authorCards = [];
+  let editingAuthorCardId = null;
   let currentFolderView = null;
   let currentSeriesView = null; // series name when drilled into a シリーズ group; null while browsing series names or anywhere else
   let reorderMode = false; // true while 並べ替え (manual up/down reorder) controls are shown for the current folder view
@@ -1756,9 +1809,11 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   function persistFolders() { try { localStorage.setItem(SAVED_FOLDERS_KEY, JSON.stringify(savedFolders)); } catch (e) {} scheduleCloudSync(); }
   function persistItems() { try { localStorage.setItem(SAVED_ITEMS_KEY, JSON.stringify(savedItems)); } catch (e) {} scheduleCloudSync(); }
+  function persistAuthorCards() { try { localStorage.setItem(AUTHOR_CARDS_KEY, JSON.stringify(authorCards)); } catch (e) {} scheduleCloudSync(); }
   function persistAll() {
     persistFolders();
     persistItems();
+    persistAuthorCards();
     persistSavedVideos();
   }
 
@@ -2227,7 +2282,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // folders/items/videos に加えて per-manga info cache（拡張子・既知ページ数）も同梱する。
   // 書き出し/読み込みとクラウド同期の両方で使う共通ペイロード組み立て。
   function buildSyncPayload() {
-    return { folders: savedFolders, items: savedItems, videos: savedVideos, mangaInfo: loadMangaInfoCache(), toc: loadTocMap(), lastPages: (() => { try { return JSON.parse(localStorage.getItem(LAST_PAGE_KEY) || '{}'); } catch (e) { return {}; } })(), theme: document.documentElement.dataset.theme === 'light' ? 'light' : 'dark' };
+    return { folders: savedFolders, items: savedItems, videos: savedVideos, authorCards: authorCards, mangaInfo: loadMangaInfoCache(), toc: loadTocMap(), lastPages: (() => { try { return JSON.parse(localStorage.getItem(LAST_PAGE_KEY) || '{}'); } catch (e) { return {}; } })(), theme: document.documentElement.dataset.theme === 'light' ? 'light' : 'dark' };
   }
 
   // remoteInfo の各エントリでローカルの mangaInfoCache を上書きマージする
@@ -2271,10 +2326,12 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!confirm('読み込んだ内容でローカルのリストを置き換えます。よろしいですか？')) return false;
     savedFolders = data.folders;
     savedItems = data.items;
+    if (Array.isArray(data.authorCards)) authorCards = data.authorCards;
     if (Array.isArray(data.videos)) savedVideos = data.videos;
     removeHistoryFolderRecord();
     persistFolders();
     persistItems();
+    persistAuthorCards();
     persistSavedVideos();
     if (data.toc && typeof data.toc === 'object') localStorage.setItem(TOC_KEY, JSON.stringify(data.toc));
     if (data.lastPages && typeof data.lastPages === 'object') localStorage.setItem(LAST_PAGE_KEY, JSON.stringify(data.lastPages));
@@ -2436,6 +2493,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (removeHistoryFolderRecord()) persistFolders();
     try { savedVideos = JSON.parse(localStorage.getItem(SAVED_VIDEOS_KEY) || '[]'); }
     catch (e) { savedVideos = []; }
+    try { authorCards = JSON.parse(localStorage.getItem(AUTHOR_CARDS_KEY) || '[]'); }
+    catch (e) { authorCards = []; }
   }
   loadSaved();
 
@@ -4515,6 +4574,73 @@ https://cdn.example.org/c/003.webp"></textarea>
     return card;
   }
 
+  function normalizeAuthorLinks(links) {
+    return (Array.isArray(links) ? links : []).map((link) => ({
+      label: String(link && link.label || '').trim(),
+      url: String(link && link.url || '').trim()
+    })).filter((link) => link.label && /^https?:\/\//i.test(link.url));
+  }
+  function addAuthorLinkRow(link) {
+    const row = document.createElement('div');
+    row.className = 'author-link-row';
+    const label = document.createElement('input');
+    label.type = 'text'; label.placeholder = 'サービス名'; label.value = link && link.label || '';
+    const url = document.createElement('input');
+    url.type = 'url'; url.placeholder = 'https://...'; url.value = link && link.url || '';
+    const remove = document.createElement('button');
+    remove.type = 'button'; remove.className = 'ctrlBtn author-link-remove'; remove.textContent = '削除';
+    remove.addEventListener('click', () => row.remove());
+    row.append(label, url, remove);
+    els.authorLinksEditor.appendChild(row);
+  }
+  function openAuthorCardEditor(card) {
+    editingAuthorCardId = card ? card.id : null;
+    els.authorCardEditorTitle.textContent = card ? '作者カードを編集' : '作者カードを作成';
+    els.authorCardNameInput.value = card ? card.name : '';
+    els.authorLinksEditor.replaceChildren();
+    (card ? card.links : []).forEach(addAuthorLinkRow);
+    if (!card) addAuthorLinkRow();
+    els.authorCardEditor.style.display = 'block';
+    els.authorCardNameInput.focus();
+  }
+  function closeAuthorCardEditor() {
+    editingAuthorCardId = null;
+    els.authorCardEditor.style.display = 'none';
+  }
+  function renderAuthorCards() {
+    els.authorCardList.replaceChildren();
+    els.authorCardEmpty.style.display = authorCards.length ? 'none' : 'block';
+    authorCards.forEach((card) => {
+      const box = document.createElement('div'); box.className = 'author-card';
+      const name = document.createElement('div'); name.className = 'author-card-name'; name.textContent = card.name;
+      const links = document.createElement('div'); links.className = 'author-card-links';
+      normalizeAuthorLinks(card.links).forEach((link) => {
+        const a = document.createElement('a'); a.href = link.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+        a.textContent = link.label; links.appendChild(a);
+      });
+      if (!links.children.length) { const empty = document.createElement('span'); empty.style.color = 'var(--sub)'; empty.textContent = 'リンクなし'; links.appendChild(empty); }
+      const actions = document.createElement('div'); actions.className = 'author-card-actions';
+      const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'ctrlBtn'; edit.textContent = '編集'; edit.addEventListener('click', () => openAuthorCardEditor(card));
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'ctrlBtn dangerBtn'; remove.textContent = '削除';
+      remove.addEventListener('click', () => { if (!confirm('この作者カードを削除しますか？')) return; authorCards = authorCards.filter((item) => item.id !== card.id); persistAuthorCards(); renderAuthorCards(); });
+      actions.append(edit, remove); box.append(name, links, actions); els.authorCardList.appendChild(box);
+    });
+  }
+  function openAuthorCards() { closeSavedList(); closeAuthorCardEditor(); renderAuthorCards(); els.authorCardOverlay.classList.add('show'); }
+  function saveAuthorCard() {
+    const name = els.authorCardNameInput.value.trim();
+    if (!name) { els.authorCardNameInput.focus(); flashStatus('作者名を入力してください'); return; }
+    const links = Array.from(els.authorLinksEditor.querySelectorAll('.author-link-row')).map((row) => ({ label: row.children[0].value, url: row.children[1].value }));
+    const validLinks = normalizeAuthorLinks(links);
+    const duplicate = authorCards.find((card) => card.name === name && card.id !== editingAuthorCardId);
+    if (duplicate) { flashStatus('同じ作者名のカードがすでにあります'); return; }
+    if (editingAuthorCardId) {
+      const card = authorCards.find((item) => item.id === editingAuthorCardId);
+      if (card) { card.name = name; card.links = validLinks; }
+    } else authorCards.unshift({ id: genId('a'), name, links: validLinks, createdAt: Date.now() });
+    persistAuthorCards(); closeAuthorCardEditor(); renderAuthorCards(); flashStatus('作者カードを保存しました');
+  }
+
   function renderSavedList() {
     const inSeriesGroup = currentFolderView === SERIES_FOLDER_ID && !!currentSeriesView;
     const inSeriesRoot = currentFolderView === SERIES_FOLDER_ID && !currentSeriesView;
@@ -4878,7 +5004,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       // Local logout still must proceed when the network is unavailable.
     } finally {
       const deviceKeys = [
-        SAVED_FOLDERS_KEY, SAVED_ITEMS_KEY, SAVED_VIDEOS_KEY, MANGA_INFO_CACHE_KEY,
+        SAVED_FOLDERS_KEY, SAVED_ITEMS_KEY, SAVED_VIDEOS_KEY, AUTHOR_CARDS_KEY, MANGA_INFO_CACHE_KEY,
         TOC_KEY, LAST_PAGE_KEY, LAST_URL_KEY, LEGACY_SAVED_URLS_KEY,
         'mangaReaderGithubSync', MangaVault.META_KEY
       ];
@@ -4891,6 +5017,13 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.listLogoutBtn.addEventListener('click', logoutFromReader);
   els.cancelCustomAddBtn.addEventListener('click', closeCustomAddDialog);
   els.confirmCustomAddBtn.addEventListener('click', confirmCustomAdd);
+  els.authorCardsBtn.addEventListener('click', openAuthorCards);
+  els.closeAuthorCardBtn.addEventListener('click', () => { closeAuthorCardEditor(); els.authorCardOverlay.classList.remove('show'); });
+  els.authorCardOverlay.addEventListener('click', (e) => { if (e.target === els.authorCardOverlay) { closeAuthorCardEditor(); els.authorCardOverlay.classList.remove('show'); } });
+  els.newAuthorCardBtn.addEventListener('click', () => openAuthorCardEditor(null));
+  els.addAuthorLinkBtn.addEventListener('click', () => addAuthorLinkRow());
+  els.cancelAuthorCardBtn.addEventListener('click', closeAuthorCardEditor);
+  els.saveAuthorCardBtn.addEventListener('click', saveAuthorCard);
   els.closeBulkDetectBtn.addEventListener('click', closeBulkDetect);
   els.bulkCancelBtn.addEventListener('click', closeBulkDetect);
   els.bulkDetectAllBtn.addEventListener('click', () => runBulkDetect('all'));
