@@ -2249,7 +2249,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!item || !els.nextVolumeCover) return;
     els.nextVolumeCover.alt = itemDisplayTitle(item);
     if (Array.isArray(item.pages) && item.pages.length) els.nextVolumeCover.src = item.pages[0];
-    else setupFeedImage(els.nextVolumeCover, item.url, item.numberWidth);
+    else setupFeedImage(els.nextVolumeCover, item.url, item.numberWidth, item.pagePattern);
   }
 
   function updateNextVolumeBanner() {
@@ -4202,7 +4202,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       if (Array.isArray(item.pages) && item.pages.length) {
         img.src = item.pages[0];
       } else {
-        setupFeedImage(img, item.url, item.numberWidth);
+        setupFeedImage(img, item.url, item.numberWidth, item.pagePattern);
       }
       preview.appendChild(img);
     });
@@ -4459,7 +4459,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       img.src = coverSourceCache.get(source) || source; // exact URL already known; no extension cascade needed
       img.addEventListener('load', () => coverSourceCache.set(source, img.currentSrc || img.src), { once: true });
     } else {
-      setupFeedImage(img, item.url, item.numberWidth);
+      setupFeedImage(img, item.url, item.numberWidth, item.pagePattern);
     }
     cover.appendChild(img);
 
@@ -4791,8 +4791,10 @@ https://cdn.example.org/c/003.webp"></textarea>
   // Used by the bookshelf grid (buildBookCard) for cover thumbnails.
   function setupFeedImage(imgEl, baseUrlForItem, numberWidth, itemPattern) {
     const parsed = parseInputUrl(baseUrlForItem);
-    const pattern = itemPattern || (parsed && parsed.pattern) || null;
     const folderUrl = parsed ? parsed.baseUrl : baseUrlForItem;
+    const cached = getCachedMangaInfo(folderUrl);
+    const pattern = itemPattern || (parsed && parsed.pattern) || (cached && cached.pattern) || null;
+    const resolvedWidth = numberWidth || (cached && cached.numberWidth) || 1;
     const cacheKey = baseUrlForItem + '|' + String(numberWidth || 1);
     const cachedSource = coverSourceCache.get(cacheKey);
     if (cachedSource) {
@@ -4802,7 +4804,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     let idx = 0;
     function tryNext() {
       if (idx >= EXT_CANDIDATES.length) return;
-      imgEl.src = pageUrlFor(folderUrl, 1, idx, numberWidth, pattern);
+      imgEl.src = pageUrlFor(folderUrl, 1, idx, resolvedWidth, pattern);
       idx++;
     }
     imgEl.addEventListener('load', () => {
