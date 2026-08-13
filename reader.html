@@ -994,6 +994,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       <div class="panel-header" style="font-size:15px;padding-bottom:8px;"><span id="authorCardEditorTitle">作者カードを作成</span></div>
       <label class="field-label" for="authorCardNameInput">作者名</label>
       <input id="authorCardNameInput" type="text" placeholder="作者名">
+      <label class="field-label" for="authorCardCircleInput">サークル名（任意）</label>
+      <input id="authorCardCircleInput" type="text" placeholder="作者と同一人物のサークル名">
       <label class="field-label">リンク</label>
       <div id="authorLinksEditor"></div>
       <button class="ctrlBtn" id="addAuthorLinkBtn" type="button" style="margin-top:9px;">リンクを追加</button>
@@ -1293,6 +1295,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     authorCardEditor: document.getElementById('authorCardEditor'),
     authorCardEditorTitle: document.getElementById('authorCardEditorTitle'),
     authorCardNameInput: document.getElementById('authorCardNameInput'),
+    authorCardCircleInput: document.getElementById('authorCardCircleInput'),
     authorLinksEditor: document.getElementById('authorLinksEditor'),
     addAuthorLinkBtn: document.getElementById('addAuthorLinkBtn'),
     newAuthorCardBtn: document.getElementById('newAuthorCardBtn'),
@@ -4597,6 +4600,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     editingAuthorCardId = card ? card.id : null;
     els.authorCardEditorTitle.textContent = card ? '作者カードを編集' : '作者カードを作成';
     els.authorCardNameInput.value = card ? card.name : '';
+    els.authorCardCircleInput.value = card ? (card.circleName || '') : '';
     els.authorLinksEditor.replaceChildren();
     (card ? card.links : []).forEach(addAuthorLinkRow);
     if (!card) addAuthorLinkRow();
@@ -4612,7 +4616,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.authorCardEmpty.style.display = authorCards.length ? 'none' : 'block';
     authorCards.forEach((card) => {
       const box = document.createElement('div'); box.className = 'author-card';
-      const name = document.createElement('div'); name.className = 'author-card-name'; name.textContent = card.name;
+      const name = document.createElement('div'); name.className = 'author-card-name';
+      name.textContent = card.circleName ? card.name + '（' + card.circleName + '）' : card.name;
       const links = document.createElement('div'); links.className = 'author-card-links';
       normalizeAuthorLinks(card.links).forEach((link) => {
         const a = document.createElement('a'); a.href = link.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
@@ -4629,15 +4634,16 @@ https://cdn.example.org/c/003.webp"></textarea>
   function openAuthorCards() { closeSavedList(); closeAuthorCardEditor(); renderAuthorCards(); els.authorCardOverlay.classList.add('show'); }
   function saveAuthorCard() {
     const name = els.authorCardNameInput.value.trim();
+    const circleName = els.authorCardCircleInput.value.trim();
     if (!name) { els.authorCardNameInput.focus(); flashStatus('作者名を入力してください'); return; }
     const links = Array.from(els.authorLinksEditor.querySelectorAll('.author-link-row')).map((row) => ({ label: row.children[0].value, url: row.children[1].value }));
     const validLinks = normalizeAuthorLinks(links);
-    const duplicate = authorCards.find((card) => card.name === name && card.id !== editingAuthorCardId);
+    const duplicate = authorCards.find((card) => card.id !== editingAuthorCardId && [card.name, card.circleName].filter(Boolean).some((value) => value === name || value === circleName));
     if (duplicate) { flashStatus('同じ作者名のカードがすでにあります'); return; }
     if (editingAuthorCardId) {
       const card = authorCards.find((item) => item.id === editingAuthorCardId);
-      if (card) { card.name = name; card.links = validLinks; }
-    } else authorCards.unshift({ id: genId('a'), name, links: validLinks, createdAt: Date.now() });
+      if (card) { card.name = name; card.circleName = circleName; card.links = validLinks; }
+    } else authorCards.unshift({ id: genId('a'), name, circleName, links: validLinks, createdAt: Date.now() });
     persistAuthorCards(); closeAuthorCardEditor(); renderAuthorCards(); flashStatus('作者カードを保存しました');
   }
 
