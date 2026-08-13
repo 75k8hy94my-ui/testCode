@@ -955,6 +955,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     <input id="editTitleInput" type="text" placeholder="例: ○○ 第1巻">
     <label class="field-label" for="editAuthorInput">作者</label>
     <input id="editAuthorInput" type="text" placeholder="例: 山田太郎" autocomplete="off">
+    <label class="field-label" for="editAlternateUrlsInput">追加URL（1行1つ）</label>
+    <textarea id="editAlternateUrlsInput" rows="3" placeholder="同じ作品の別URLを入力"></textarea>
     <label class="field-label" for="editTagsInput">タグ</label>
     <input id="editTagsInput" type="text" placeholder="カンマ区切りで入力　例: ファンタジー, お気に入り" autocomplete="off">
     <label class="checkRow"><input id="editDoujinInput" type="checkbox">同人誌</label>
@@ -1424,6 +1426,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     editItemOverlay: document.getElementById('editItemOverlay'),
     editTitleInput: document.getElementById('editTitleInput'),
     editAuthorInput: document.getElementById('editAuthorInput'),
+    editAlternateUrlsInput: document.getElementById('editAlternateUrlsInput'),
     editTagsInput: document.getElementById('editTagsInput'),
     editDoujinInput: document.getElementById('editDoujinInput'),
     editDoujinSourceRow: document.getElementById('editDoujinSourceRow'),
@@ -1580,7 +1583,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         img.src = firstPageUrl;
       } else {
         resolvingListIndex.add(idx);
-        preloadFirstPage(firstPageUrl, item.numberWidth).then((resolvedUrl) => {
+        preloadFirstPage(firstPageUrl, item.numberWidth, item.pagePattern).then((resolvedUrl) => {
           resolvingListIndex.delete(idx);
           if (myListGen !== readingListGeneration) return; // a different list is active now; discard
           if (resolvedUrl) resolvedListPageUrl.set(idx, resolvedUrl);
@@ -2662,11 +2665,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   // instantly. Returns the resolved URL (with extension) once found, or
   // null if none of the candidates loaded — callers use this to populate
   // resolvedListPageUrl for the live vertical drag.
-  async function preloadFirstPage(rawUrlForItem, savedNumberWidth) {
+  async function preloadFirstPage(rawUrlForItem, savedNumberWidth, savedPattern) {
     const parsed = parseInputUrl(rawUrlForItem);
     const key = parsed ? parsed.baseUrl : mangaCacheKeyFor(rawUrlForItem);
     const cached = getCachedMangaInfo(key);
-    const pattern = (parsed && parsed.pattern) || (cached && cached.pattern) || null;
+    const pattern = savedPattern || (parsed && parsed.pattern) || (cached && cached.pattern) || null;
     const numberWidth = Math.max(1, Number((parsed && parsed.numberWidth) || savedNumberWidth || (cached && cached.numberWidth)) || 1);
     if (cached) {
       // Known from a previous visit — try that extension first instead of
@@ -2954,13 +2957,30 @@ https://cdn.example.org/c/003.webp"></textarea>
   // added via the 個別追加 dialog. Use this (not startReading
   // directly) for anything that opens an *item* object rather than a raw
   // typed-in URL.
-  function openItem(item, addToHistoryFlag, switchDirection) {
+  async function openItem(item, addToHistoryFlag, switchDirection) {
     recentlyClosedItemId = null;
     currentItem = item || null; // remembered for series/次の巻 lookups
     if (item && Array.isArray(item.pages) && item.pages.length) {
       startReadingCustom(item, switchDirection);
     } else {
-      startReading(item.url, addToHistoryFlag, switchDirection);
+      const candidates = [item && item.url].concat(Array.isArray(item && item.alternateUrls) ? item.alternateUrls : []).filter(Boolean);
+      let selectedUrl = item && item.url;
+      if (candidates.length > 1) {
+        try {
+          selectedUrl = await Promise.any(candidates.map(async (candidate) => {
+            const first = await preloadFirstPage(candidate, item.numberWidth, candidate === item.url ? item.pagePattern : null);
+            if (!first) throw new Error('unavailable');
+            return candidate;
+          }));
+        } catch (e) {}
+        if (currentItem !== item) return;
+        if (selectedUrl && selectedUrl !== item.url) {
+          item.alternateUrls = Array.from(new Set([item.url].concat(item.alternateUrls || []).filter((url) => url && url !== selectedUrl)));
+          item.url = selectedUrl;
+          persistItems();
+        }
+      }
+      startReading(selectedUrl, addToHistoryFlag, switchDirection);
     }
   }
 
@@ -4194,6 +4214,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     els.editTitleInput.value = itemDisplayTitle(item);
     els.editAuthorInput.value = item.author || '';
+    els.editAlternateUrlsInput.value = Array.isArray(item.alternateUrls) ? item.alternateUrls.join('\n') : '';
     els.editAuthorInput.dataset.manualAuthor = els.editAuthorInput.value;
     els.editAuthorInput.dataset.seriesAuthorActive = '0';
     els.editTagsInput.value = tagsText(item.tags);
@@ -4246,6 +4267,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     item.folderId = folderId || null;
     item.title = seriesData.title || els.editTitleInput.value.trim() || itemDisplayTitle(item);
     item.author = seriesAuthor;
+    item.alternateUrls = Array.from(new Set(els.editAlternateUrlsInput.value.split(/\r?\n/).map((url) => url.trim()).filter((url) => /^https?:\/\//i.test(url) && url !== item.url)));
     item.tags = parseTags(els.editTagsInput.value);
     item.isDoujin = doujinData.isDoujin;
     item.sourceWork = doujinData.sourceWork;
