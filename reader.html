@@ -733,6 +733,8 @@
   .author-group-card .author-group-covers img { width: 100%; height: 100%; object-fit: cover; min-width: 0; }
   .author-group-name { margin-top: 7px; color: var(--text); font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .author-group-count { color: var(--sub); font-size: 10px; margin-top: 3px; }
+  .filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+  .filter-row input { flex: 1 1 130px; min-width: 100px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-soft); color: var(--text); }
   html[data-theme="dark"] #authorCardPanel input { background: #1d2230 !important; color: #f1f2f6 !important; border-color: #4a5263 !important; }
   html[data-theme="dark"] #authorCardPanel input::placeholder { color: #969dad !important; opacity: 1; }
   html[data-theme="dark"] #saveDialogPanel input::placeholder,
@@ -1057,6 +1059,17 @@ https://cdn.example.org/c/003.webp"></textarea>
         <span id="listFolderTitle"></span>
         <button class="ctrlBtn" id="listNewFolderBtn">+ 新しいフォルダ</button>
         <button class="ctrlBtn" id="editShelfBtn">編集</button>
+        <button class="ctrlBtn" id="bulkEditBtn" type="button">一括編集</button>
+        <button class="ctrlBtn" id="undoBulkEditBtn" type="button" style="display:none;">もとに戻す</button>
+        <button class="ctrlBtn" id="filterBtn" type="button">絞り込み</button>
+      </div>
+      <div id="filterRow" style="display:none;" class="filter-row">
+        <input id="filterSeriesInput" type="text" placeholder="シリーズ">
+        <input id="filterAuthorInput" type="text" placeholder="作者">
+        <input id="filterTagsInput" type="text" placeholder="タグ">
+        <input id="filterSourceInput" type="text" placeholder="元ネタ">
+        <button class="ctrlBtn" id="applyFilterBtn" type="button">適用</button>
+        <button class="ctrlBtn" id="clearFilterBtn" type="button">解除</button>
       </div>
       <div id="listNewFolderRow">
         <input id="listNewFolderInput" type="text" placeholder="新しいフォルダ名">
@@ -1072,6 +1085,22 @@ https://cdn.example.org/c/003.webp"></textarea>
       <div id="videoListItems"></div>
       <div id="videoListEmpty" style="display:none;">動画はまだ追加されていません</div>
     </div>
+  </div>
+</div>
+
+<div id="bulkEditOverlay" class="modalOverlay">
+  <div id="bulkEditPanel" class="modalPanel">
+    <div class="panel-header"><span>一括編集</span><button class="ctrlBtn" id="closeBulkEditBtn" type="button">閉じる</button></div>
+    <p id="bulkEditSelectionText" style="color:var(--sub);font-size:13px;">選択した作品を編集します。空欄・「変更しない」はその項目を変更しません。</p>
+    <label class="field-label">作者</label><input id="bulkAuthorInput" type="text" placeholder="変更しない">
+    <label class="field-label">タグ</label><input id="bulkTagsInput" type="text" placeholder="変更しない（空にするとタグを消去）">
+    <label class="field-label">元ネタ</label><input id="bulkSourceInput" type="text" placeholder="変更しない">
+    <label class="field-label">シリーズ</label><input id="bulkSeriesInput" type="text" placeholder="変更しない">
+    <label class="field-label">巻数</label><input id="bulkVolumeInput" type="number" step="0.1" placeholder="変更しない">
+    <label class="field-label">フォルダ</label><select id="bulkFolderSelect"></select>
+    <label class="field-label">お気に入り</label><select id="bulkFavoriteSelect"><option value="">変更しない</option><option value="1">追加</option><option value="0">解除</option></select>
+    <label class="field-label">見開き分割</label><select id="bulkSplitSelect"><option value="">変更しない</option><option value="1">有効</option><option value="0">無効</option></select>
+    <div class="dialog-actions"><button class="ctrlBtn" id="cancelBulkEditBtn" type="button">キャンセル</button><button class="primaryBtn" id="applyBulkEditBtn" type="button">適用</button></div>
   </div>
 </div>
 
@@ -1298,6 +1327,29 @@ https://cdn.example.org/c/003.webp"></textarea>
     savedListEmpty: document.getElementById('savedListEmpty'),
     closeListBtn: document.getElementById('closeListBtn'),
     editShelfBtn: document.getElementById('editShelfBtn'),
+    bulkEditBtn: document.getElementById('bulkEditBtn'),
+    undoBulkEditBtn: document.getElementById('undoBulkEditBtn'),
+    filterBtn: document.getElementById('filterBtn'),
+    filterRow: document.getElementById('filterRow'),
+    filterSeriesInput: document.getElementById('filterSeriesInput'),
+    filterAuthorInput: document.getElementById('filterAuthorInput'),
+    filterTagsInput: document.getElementById('filterTagsInput'),
+    filterSourceInput: document.getElementById('filterSourceInput'),
+    applyFilterBtn: document.getElementById('applyFilterBtn'),
+    clearFilterBtn: document.getElementById('clearFilterBtn'),
+    bulkEditOverlay: document.getElementById('bulkEditOverlay'),
+    bulkEditSelectionText: document.getElementById('bulkEditSelectionText'),
+    bulkAuthorInput: document.getElementById('bulkAuthorInput'),
+    bulkTagsInput: document.getElementById('bulkTagsInput'),
+    bulkSourceInput: document.getElementById('bulkSourceInput'),
+    bulkSeriesInput: document.getElementById('bulkSeriesInput'),
+    bulkVolumeInput: document.getElementById('bulkVolumeInput'),
+    bulkFolderSelect: document.getElementById('bulkFolderSelect'),
+    bulkFavoriteSelect: document.getElementById('bulkFavoriteSelect'),
+    bulkSplitSelect: document.getElementById('bulkSplitSelect'),
+    closeBulkEditBtn: document.getElementById('closeBulkEditBtn'),
+    cancelBulkEditBtn: document.getElementById('cancelBulkEditBtn'),
+    applyBulkEditBtn: document.getElementById('applyBulkEditBtn'),
     authorCardsBtn: document.getElementById('authorCardsBtn'),
     backupExportBtn: document.getElementById('backupExportBtn'),
     backupImportBtn: document.getElementById('backupImportBtn'),
@@ -1560,6 +1612,10 @@ https://cdn.example.org/c/003.webp"></textarea>
   // a "custom" manga added via 個別追加 — see
   // confirmCustomAdd / openItem / startReadingCustom.
   let savedItems = [];
+  let bulkEditMode = false;
+  const bulkSelectedIds = new Set();
+  let bulkEditUndoSnapshot = null;
+  let shelfFilters = { series: '', author: '', tags: '', source: '' };
   let authorCards = [];
   let editingAuthorCardId = null;
   let currentFolderView = null;
@@ -4258,7 +4314,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       delBtn.title = '削除';
       delBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (!confirm('「' + folder.name + '」フォルダと、その中のURLをすべて削除します。本当によろしいですか？')) return;
+        if (folderItems.length && !confirm('「' + folder.name + '」フォルダと、その中のURLをすべて削除します。本当によろしいですか？')) return;
         savedItems = savedItems.filter((it) => it.folderId !== folder.id);
         savedFolders = savedFolders.filter((f) => f.id !== folder.id);
         persistAll();
@@ -4469,6 +4525,14 @@ https://cdn.example.org/c/003.webp"></textarea>
     const card = document.createElement('div');
     card.className = 'book-card' + (reorderMode ? ' reorder-card' : '') + (item.id === recentlyClosedItemId ? ' just-closed' : '');
     card.title = itemSubtext(item);
+    if (bulkEditMode) {
+      const select = document.createElement('input');
+      select.type = 'checkbox'; select.className = 'bulk-select'; select.checked = bulkSelectedIds.has(item.id);
+      select.title = '一括編集の対象にする';
+      select.addEventListener('click', (e) => e.stopPropagation());
+      select.addEventListener('change', () => { if (select.checked) bulkSelectedIds.add(item.id); else bulkSelectedIds.delete(item.id); updateBulkEditButton(); });
+      card.appendChild(select);
+    }
 
     const cover = document.createElement('div');
     cover.className = 'book-cover';
@@ -4589,7 +4653,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     card.appendChild(readingEl);
     if (item.lastReadAt) readingEl.remove();
     else readingEl.textContent = '未読';
-    if (!reorderMode) {
+    if (!reorderMode && !bulkEditMode) {
       card.addEventListener('click', () => {
         rememberReaderReturnView();
         closeSavedList();
@@ -4724,6 +4788,54 @@ https://cdn.example.org/c/003.webp"></textarea>
     persistAuthorCards(); closeAuthorCardEditor(); renderAuthorCards(); flashStatus('作者カードを保存しました');
   }
 
+  function updateBulkEditButton() {
+    els.bulkEditBtn.textContent = bulkEditMode ? '選択完了 (' + bulkSelectedIds.size + ')' : '一括編集';
+    els.bulkEditBtn.classList.toggle('active', bulkEditMode);
+    els.undoBulkEditBtn.style.display = bulkEditUndoSnapshot ? '' : 'none';
+  }
+  function openBulkEditDialog() {
+    if (!bulkSelectedIds.size) { flashStatus('編集する作品を選択してください'); return; }
+    renderFolderOptions(els.bulkFolderSelect, '');
+    const first = document.createElement('option'); first.value = ''; first.textContent = '変更しない';
+    els.bulkFolderSelect.insertBefore(first, els.bulkFolderSelect.firstChild);
+    els.bulkAuthorInput.value = ''; els.bulkTagsInput.value = ''; els.bulkSourceInput.value = ''; els.bulkSeriesInput.value = ''; els.bulkVolumeInput.value = '';
+    els.bulkFavoriteSelect.value = ''; els.bulkSplitSelect.value = '';
+    els.bulkEditSelectionText.textContent = bulkSelectedIds.size + '作品を一括編集します。空欄・「変更しない」は変更されません。';
+    els.bulkEditOverlay.classList.add('show');
+  }
+  function closeBulkEditDialog() { els.bulkEditOverlay.classList.remove('show'); }
+  function applyBulkEdit() {
+    const targets = savedItems.filter((item) => bulkSelectedIds.has(item.id));
+    if (!targets.length) return closeBulkEditDialog();
+    bulkEditUndoSnapshot = targets.map((item) => ({ id: item.id, data: JSON.parse(JSON.stringify(item)) }));
+    const author = els.bulkAuthorInput.value.trim();
+    const tagsTextValue = els.bulkTagsInput.value.trim();
+    const source = els.bulkSourceInput.value.trim();
+    const series = els.bulkSeriesInput.value.trim();
+    const volume = els.bulkVolumeInput.value.trim();
+    targets.forEach((item) => {
+      if (author) item.author = author;
+      if (tagsTextValue) item.tags = parseTags(tagsTextValue);
+      if (source) { item.sourceWork = source; item.isDoujin = true; }
+      if (series) item.series = series;
+      if (volume) item.volume = Number(volume);
+      if (els.bulkFolderSelect.value) item.folderId = els.bulkFolderSelect.value === '__none__' ? null : els.bulkFolderSelect.value;
+      if (els.bulkFavoriteSelect.value) item.favorite = els.bulkFavoriteSelect.value === '1';
+      if (els.bulkSplitSelect.value) item.splitSpreads = els.bulkSplitSelect.value === '1';
+    });
+    if (author) ensureAuthorCardForName(author);
+    persistAll(); closeBulkEditDialog(); bulkEditMode = false; bulkSelectedIds.clear(); updateBulkEditButton(); renderSavedList();
+    flashStatus('一括編集しました。「もとに戻す」で取り消せます');
+  }
+  function undoBulkEdit() {
+    if (!bulkEditUndoSnapshot) return;
+    bulkEditUndoSnapshot.forEach((entry) => {
+      const index = savedItems.findIndex((item) => item.id === entry.id);
+      if (index !== -1) savedItems[index] = entry.data;
+    });
+    bulkEditUndoSnapshot = null; persistAll(); updateBulkEditButton(); renderSavedList(); flashStatus('一括編集をもとに戻しました');
+  }
+
   function renderSavedList() {
     const inSeriesGroup = currentFolderView === SERIES_FOLDER_ID && !!currentSeriesView;
     const inSeriesRoot = currentFolderView === SERIES_FOLDER_ID && !currentSeriesView;
@@ -4741,6 +4853,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.editShelfBtn.style.display = canOrganize ? '' : 'none';
     els.editShelfBtn.classList.toggle('active', showOrganizeControls);
     els.editShelfBtn.textContent = showOrganizeControls ? '編集完了' : '編集';
+    updateBulkEditButton();
     els.listNewFolderRow.style.display = 'none';
 
     if (currentFolderView === HISTORY_FOLDER_ID) {
@@ -4810,7 +4923,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       itemsList = savedItems.filter((it) => it.folderId === currentFolderView);
     }
 
-    if (groupByAuthorEnabled && !inAuthorView && !inSeriesRoot && itemsList.length) {
+    if (groupByAuthorEnabled && !bulkEditMode && !inAuthorView && !inSeriesRoot && itemsList.length) {
       const groups = new Map();
       itemsList.forEach((item) => {
         const name = String(item.author || '').trim();
@@ -4820,6 +4933,14 @@ https://cdn.example.org/c/003.webp"></textarea>
       });
       authorGroupCards = Array.from(groups.entries()).map(([name, items]) => ({ name, items }));
     }
+    const normalizedFilter = (value) => String(value || '').trim().toLocaleLowerCase('ja');
+    itemsList = itemsList.filter((item) => {
+      const tags = Array.isArray(item.tags) ? item.tags.join(' ') : '';
+      return (!shelfFilters.series || normalizedFilter(item.series).includes(normalizedFilter(shelfFilters.series))) &&
+        (!shelfFilters.author || normalizedFilter(item.author).includes(normalizedFilter(shelfFilters.author))) &&
+        (!shelfFilters.tags || normalizedFilter(tags).includes(normalizedFilter(shelfFilters.tags))) &&
+        (!shelfFilters.source || normalizedFilter(item.sourceWork).includes(normalizedFilter(shelfFilters.source)));
+    });
     const isEmpty = folderCards.length === 0 && itemsList.length === 0 && seriesGroupCards.length === 0 &&
       !showFavoritesCard && !showSeriesCard;
     if (isEmpty) {
@@ -4842,7 +4963,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       if (showSeriesCard) frag.appendChild(buildSeriesFolderCard());
       folderCards.forEach((f) => frag.appendChild(buildFolderCard(f, folderCards, showOrganizeControls)));
       seriesGroupCards.forEach((g) => frag.appendChild(buildSeriesGroupCard(g)));
-      if (groupByAuthorEnabled && authorGroupCards.length) {
+      if (groupByAuthorEnabled && !bulkEditMode && authorGroupCards.length) {
         authorGroupCards.forEach((group) => frag.appendChild(buildAuthorGroupCard(group)));
         itemsList.filter((item) => !String(item.author || '').trim()).forEach((it) => frag.appendChild(buildBookCard(it, itemsList, showOrganizeControls)));
       } else {
@@ -5260,6 +5381,25 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   els.editShelfBtn.addEventListener('click', () => {
     reorderMode = !reorderMode;
+    renderSavedList();
+  });
+  els.bulkEditBtn.addEventListener('click', () => {
+    if (bulkEditMode) openBulkEditDialog();
+    else { bulkEditMode = true; bulkSelectedIds.clear(); updateBulkEditButton(); renderSavedList(); }
+  });
+  els.undoBulkEditBtn.addEventListener('click', undoBulkEdit);
+  els.closeBulkEditBtn.addEventListener('click', closeBulkEditDialog);
+  els.cancelBulkEditBtn.addEventListener('click', closeBulkEditDialog);
+  els.applyBulkEditBtn.addEventListener('click', applyBulkEdit);
+  els.bulkEditOverlay.addEventListener('click', (e) => { if (e.target === els.bulkEditOverlay) closeBulkEditDialog(); });
+  els.filterBtn.addEventListener('click', () => { els.filterRow.style.display = els.filterRow.style.display === 'none' ? 'flex' : 'none'; });
+  els.applyFilterBtn.addEventListener('click', () => {
+    shelfFilters = { series: els.filterSeriesInput.value.trim(), author: els.filterAuthorInput.value.trim(), tags: els.filterTagsInput.value.trim(), source: els.filterSourceInput.value.trim() };
+    renderSavedList();
+  });
+  els.clearFilterBtn.addEventListener('click', () => {
+    shelfFilters = { series: '', author: '', tags: '', source: '' };
+    els.filterSeriesInput.value = ''; els.filterAuthorInput.value = ''; els.filterTagsInput.value = ''; els.filterSourceInput.value = '';
     renderSavedList();
   });
 
