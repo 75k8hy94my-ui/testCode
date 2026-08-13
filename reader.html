@@ -2500,6 +2500,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     catch (e) { authorCards = []; }
   }
   loadSaved();
+  syncAuthorCardsFromSavedItems();
 
   // ---------- URL parsing ----------
   // Accepts either a folder URL ("https://example.com/manga/test/") or a direct
@@ -4593,6 +4594,16 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (exists) return;
     authorCards.unshift({ id: genId('a'), name: name, circleName: '', links: [], createdAt: Date.now() });
     persistAuthorCards();
+  }
+  function syncAuthorCardsFromSavedItems() {
+    let changed = false;
+    savedItems.forEach((item) => {
+      const name = String(item.author || '').trim();
+      if (!name || authorCards.some((card) => card.name === name || card.circleName === name)) return;
+      authorCards.unshift({ id: genId('a'), name: name, circleName: '', links: [], createdAt: Date.now() });
+      changed = true;
+    });
+    if (changed) persistAuthorCards();
   }
   function addAuthorLinkRow(link) {
     const row = document.createElement('div');
