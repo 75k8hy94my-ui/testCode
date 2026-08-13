@@ -1561,6 +1561,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // the list instead of leaving it closed.
   let customAddReturnToList = false;
   let editReturnToList = false;
+  let authorCardReturnToList = false;
   let editingItemId = null; // id of the saved item currently open in the 編集 dialog
 
   function genId(prefix) {
@@ -2500,6 +2501,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     catch (e) { authorCards = []; }
   }
   loadSaved();
+  syncAuthorCardsFromSavedItems();
 
   // ---------- URL parsing ----------
   // Accepts either a folder URL ("https://example.com/manga/test/") or a direct
@@ -3945,6 +3947,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!seriesData) return;
     const seriesAuthor = readSeriesAuthorForm(els.saveSeriesInput, els.saveNewSeriesInput, els.saveNewSeriesAuthorInput, els.saveSeriesNoAuthorInput, els.saveAuthorInput);
     if (seriesAuthor === null) return;
+    ensureAuthorCardForName(seriesAuthor);
     const doujinData = readDoujinForm(els.saveDoujinInput, els.saveSourceWorkInput, els.saveNewSourceWorkInput);
     if (!doujinData) return;
     const title = seriesData.title || els.saveTitleInput.value.trim() || deriveTitleFromUrl(pendingSaveUrl);
@@ -4058,6 +4061,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!seriesData) return;
     const seriesAuthor = readSeriesAuthorForm(els.customSeriesInput, els.customNewSeriesInput, els.customNewSeriesAuthorInput, els.customSeriesNoAuthorInput, els.customAuthorInput);
     if (seriesAuthor === null) return;
+    ensureAuthorCardForName(seriesAuthor);
     const doujinData = readDoujinForm(els.customDoujinInput, els.customSourceWorkInput, els.customNewSourceWorkInput);
     if (!doujinData) return;
     const title = seriesData.title || els.customTitleInput.value.trim() || ('無題' + (savedItems.length + 1));
@@ -4133,6 +4137,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!seriesData) return;
     const seriesAuthor = readSeriesAuthorForm(els.editSeriesInput, els.editNewSeriesInput, els.editNewSeriesAuthorInput, els.editSeriesNoAuthorInput, els.editAuthorInput);
     if (seriesAuthor === null) return;
+    ensureAuthorCardForName(seriesAuthor);
     const doujinData = readDoujinForm(els.editDoujinInput, els.editSourceWorkInput, els.editNewSourceWorkInput);
     if (!doujinData) return;
 
@@ -4583,6 +4588,24 @@ https://cdn.example.org/c/003.webp"></textarea>
       url: String(link && link.url || '').trim()
     })).filter((link) => link.label && /^https?:\/\//i.test(link.url));
   }
+  function ensureAuthorCardForName(authorName) {
+    const name = String(authorName || '').trim();
+    if (!name) return;
+    const exists = authorCards.some((card) => card.name === name || card.circleName === name);
+    if (exists) return;
+    authorCards.unshift({ id: genId('a'), name: name, circleName: '', links: [], createdAt: Date.now() });
+    persistAuthorCards();
+  }
+  function syncAuthorCardsFromSavedItems() {
+    let changed = false;
+    savedItems.forEach((item) => {
+      const name = String(item.author || '').trim();
+      if (!name || authorCards.some((card) => card.name === name || card.circleName === name)) return;
+      authorCards.unshift({ id: genId('a'), name: name, circleName: '', links: [], createdAt: Date.now() });
+      changed = true;
+    });
+    if (changed) persistAuthorCards();
+  }
   function addAuthorLinkRow(link) {
     const row = document.createElement('div');
     row.className = 'author-link-row';
@@ -4631,7 +4654,15 @@ https://cdn.example.org/c/003.webp"></textarea>
       actions.append(edit, remove); box.append(name, links, actions); els.authorCardList.appendChild(box);
     });
   }
-  function openAuthorCards() { closeSavedList(); closeAuthorCardEditor(); renderAuthorCards(); els.authorCardOverlay.classList.add('show'); }
+  function openAuthorCards() {
+    authorCardReturnToList = isSavedListOpen();
+    closeSavedList(); closeAuthorCardEditor(); renderAuthorCards(); els.authorCardOverlay.classList.add('show');
+  }
+  function closeAuthorCards() {
+    closeAuthorCardEditor();
+    els.authorCardOverlay.classList.remove('show');
+    if (authorCardReturnToList) { authorCardReturnToList = false; openSavedList(false, true); }
+  }
   function saveAuthorCard() {
     const name = els.authorCardNameInput.value.trim();
     const circleName = els.authorCardCircleInput.value.trim();
@@ -5026,8 +5057,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.cancelCustomAddBtn.addEventListener('click', closeCustomAddDialog);
   els.confirmCustomAddBtn.addEventListener('click', confirmCustomAdd);
   els.authorCardsBtn.addEventListener('click', openAuthorCards);
-  els.closeAuthorCardBtn.addEventListener('click', () => { closeAuthorCardEditor(); els.authorCardOverlay.classList.remove('show'); });
-  els.authorCardOverlay.addEventListener('click', (e) => { if (e.target === els.authorCardOverlay) { closeAuthorCardEditor(); els.authorCardOverlay.classList.remove('show'); } });
+  els.closeAuthorCardBtn.addEventListener('click', closeAuthorCards);
+  els.authorCardOverlay.addEventListener('click', (e) => { if (e.target === els.authorCardOverlay) closeAuthorCards(); });
   els.newAuthorCardBtn.addEventListener('click', () => openAuthorCardEditor(null));
   els.addAuthorLinkBtn.addEventListener('click', () => addAuthorLinkRow());
   els.cancelAuthorCardBtn.addEventListener('click', closeAuthorCardEditor);
