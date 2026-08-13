@@ -697,17 +697,27 @@
   html[data-theme="dark"] .book-favBtn { background: rgba(10,12,17,.88); color: #f1f2f6; border-color: rgba(255,255,255,.28); }
   html[data-theme="light"] .book-favBtn:not(.is-favorite) img { filter: brightness(0) saturate(100%); opacity: .72; }
   html[data-theme="light"] .book-moveBtn { background: rgba(255,255,255,.96); color: #23272a; border-color: rgba(35,39,42,.16); }
+  html[data-theme="dark"] #saveDialogPanel,
+  html[data-theme="dark"] #saveDialogPanel .panel-header,
   html[data-theme="dark"] #editItemPanel,
   html[data-theme="dark"] #editItemPanel .panel-header { color: #f1f2f6; }
+  html[data-theme="dark"] #saveDialogPanel .field-label,
+  html[data-theme="dark"] #saveDialogPanel .checkRow,
   html[data-theme="dark"] #editItemPanel .field-label,
   html[data-theme="dark"] #editItemPanel .checkRow { color: #c7cbd6; }
+  html[data-theme="dark"] #saveDialogPanel input,
+  html[data-theme="dark"] #saveDialogPanel select,
+  html[data-theme="dark"] #saveDialogPanel textarea,
   html[data-theme="dark"] #editItemPanel input,
   html[data-theme="dark"] #editItemPanel select,
   html[data-theme="dark"] #editItemPanel textarea {
     background: #1d2230 !important; color: #f1f2f6 !important; border-color: #4a5263 !important;
   }
+  html[data-theme="dark"] #saveDialogPanel input::placeholder,
+  html[data-theme="dark"] #saveDialogPanel textarea::placeholder,
   html[data-theme="dark"] #editItemPanel input::placeholder,
   html[data-theme="dark"] #editItemPanel textarea::placeholder { color: #969dad !important; opacity: 1; }
+  html[data-theme="dark"] #saveDialogPanel option,
   html[data-theme="dark"] #editItemPanel option { background: #1d2230; color: #f1f2f6; }
   #app[data-theme="light"] { --bg: #f5f5f7; --bg-soft: #ffffff; --panel: #ffffff; --panel-2: #e3e5e8; --border: #c9ccd1; --text: #23272a; --sub: #5b626b; background: #f5f5f7; }
   #app[data-theme="light"] #savedListPanel,
