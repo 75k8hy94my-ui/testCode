@@ -116,6 +116,10 @@
      that fights visibly with our live drag for the rest of the gesture. */
   #imgWrap { position: relative; width: 100%; height: 100%; touch-action: none; }
   #pageStage { position: absolute; inset: 0; overflow: hidden; }
+  #pageStage.vertical-scroll { position: relative; inset: auto; height: 100%; overflow-y: auto; overflow-x: hidden; display: block; -webkit-overflow-scrolling: touch; }
+  #pageStage.vertical-scroll .pageSlide { position: relative; inset: auto; width: 100%; min-height: 0; display: flex; transform: none !important; transition: none !important; background: #000; }
+  #pageStage.vertical-scroll .pageimg { width: 100% !important; height: auto !important; max-width: 100%; max-height: none; object-fit: contain; }
+  #pageStage.vertical-scroll .pageSlide.current { outline: 2px solid var(--accent); outline-offset: -2px; }
   .pageSlide {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
@@ -1503,6 +1507,9 @@ https://cdn.example.org/c/003.webp"></textarea>
   function toggleVerticalScroll() {
     verticalScrollEnabled = !verticalScrollEnabled;
     try { localStorage.setItem(VERTICAL_SCROLL_KEY, verticalScrollEnabled ? '1' : '0'); } catch (e) {}
+    els.pageStage.classList.toggle('vertical-scroll', verticalScrollEnabled);
+    if (verticalScrollEnabled && pages.length) renderVerticalPages(currentPage);
+    else if (!verticalScrollEnabled && pages.length) showPage(currentPage, null);
     updateVerticalScrollMenu();
   }
   function persistSafeMode() { try { localStorage.setItem(SAFE_MODE_KEY, safeModeEnabled ? '1' : '0'); } catch (e) {} }
@@ -2928,6 +2935,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // changes again before this one finishes loading, the stale result is
   // dropped (latestRenderId guard) so a slow load can't clobber a newer page.
   function renderPage(n, direction) {
+    if (verticalScrollEnabled) { renderVerticalPages(n); return; }
     if (suppressNextRenderAnim) {
       direction = null; // the live drag already animated this transition visually
       suppressNextRenderAnim = false;
@@ -2979,6 +2987,46 @@ https://cdn.example.org/c/003.webp"></textarea>
     waitForImageReady(img).then(doRender).catch(() => {
       if (myId === latestRenderId) flashStatus('画像を読み込めませんでした');
     });
+  }
+
+  function renderVerticalPages(targetPage) {
+    els.pageStage.classList.add('vertical-scroll');
+    releaseLocalEnhancements(els.pageStage);
+    els.pageStage.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    for (let page = 1; page <= displayedPageCount(); page++) {
+      const slide = document.createElement('div');
+      slide.className = 'pageSlide vertical-page' + (page === targetPage ? ' current' : '');
+      slide.dataset.page = String(page);
+      const visual = makeImg(page);
+      visual.img.loading = 'lazy';
+      visual.img.fetchPriority = page === targetPage ? 'high' : 'low';
+      slide.appendChild(visual.node);
+      fragment.appendChild(slide);
+    }
+    els.pageStage.appendChild(fragment);
+    requestAnimationFrame(() => {
+      const target = els.pageStage.querySelector('[data-page="' + targetPage + '"]');
+      if (target) els.pageStage.scrollTop = Math.max(0, target.offsetTop - 8);
+      updateVerticalCurrentPage();
+    });
+  }
+
+  function updateVerticalCurrentPage() {
+    if (!verticalScrollEnabled) return;
+    const stageTop = els.pageStage.getBoundingClientRect().top;
+    let closest = null, distance = Infinity;
+    els.pageStage.querySelectorAll('.vertical-page').forEach((slide) => {
+      const distanceFromTop = Math.abs(slide.getBoundingClientRect().top - stageTop - 8);
+      if (distanceFromTop < distance) { distance = distanceFromTop; closest = slide; }
+    });
+    if (!closest) return;
+    const page = Number(closest.dataset.page) || 1;
+    currentPage = page;
+    els.pageStage.querySelectorAll('.vertical-page.current').forEach((slide) => slide.classList.remove('current'));
+    closest.classList.add('current');
+    updateSlider();
+    persistLastPage();
   }
 
   function updateSlider() {
@@ -3381,6 +3429,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!animEnabled) { legacyOnReaderTouchMove(e); return; }
     const x = e.touches[0].clientX, y = e.touches[0].clientY;
     const dx = x - touchStartX, dy = y - touchStartY;
+    if (verticalScrollEnabled && Math.abs(dy) >= Math.abs(dx)) return;
     if (dragAxis === null) {
       if (Math.abs(dx) < AXIS_LOCK_PX && Math.abs(dy) < AXIS_LOCK_PX) return; // not enough movement to decide yet
       beginDrag(Math.abs(dx) > Math.abs(dy) ? 'x' : 'y', dx, dy);
@@ -3396,6 +3445,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!animEnabled) { legacyOnReaderTouchEnd(e); return; }
     const touch = e.changedTouches[0];
     if (!touch || dragAxis === null) { resetDragState(); return; } // a plain tap — let the click zones handle it
+    if (verticalScrollEnabled && Math.abs(touch.clientY - touchStartY) >= Math.abs(touch.clientX - touchStartX)) { resetDragState(); return; }
     e.preventDefault(); // a real drag, not a tap — don't also trigger the tap-zone click
     const axis = dragAxis, info = dragInfo;
     const dx = touch.clientX - touchStartX, dy = touch.clientY - touchStartY;
@@ -3444,6 +3494,9 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.imgWrap.addEventListener('touchstart', onReaderTouchStart, { passive: true });
   els.imgWrap.addEventListener('touchmove', onReaderTouchMove, { passive: false });
   els.imgWrap.addEventListener('touchend', onReaderTouchEnd, { passive: false });
+  els.pageStage.addEventListener('scroll', () => {
+    if (verticalScrollEnabled) updateVerticalCurrentPage();
+  }, { passive: true });
 
   // ---------- save dialog ----------
   function renderFolderOptions(selectEl, selectedId) {
