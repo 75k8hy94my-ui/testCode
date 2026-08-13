@@ -117,6 +117,9 @@
   #imgWrap { position: relative; width: 100%; height: 100%; touch-action: none; }
   #pageStage { position: absolute; inset: 0; overflow: hidden; }
   #pageStage.vertical-scroll { position: relative; inset: auto; height: 100%; overflow-y: auto; overflow-x: hidden; display: block; -webkit-overflow-scrolling: touch; }
+  #imgWrap.vertical-scroll { touch-action: pan-y; overflow: hidden; }
+  #imgWrap.vertical-scroll .clickzone { display: none; }
+  #imgWrap.vertical-scroll #pageStage { z-index: 1; touch-action: pan-y; overflow-y: scroll; }
   #pageStage.vertical-scroll .pageSlide { position: relative; inset: auto; width: 100%; min-height: 0; display: flex; transform: none !important; transition: none !important; background: #000; }
   #pageStage.vertical-scroll .pageimg { width: 100% !important; height: auto !important; max-width: 100%; max-height: none; object-fit: contain; }
   #pageStage.vertical-scroll .pageSlide.current { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -1520,6 +1523,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     verticalScrollEnabled = !verticalScrollEnabled;
     try { localStorage.setItem(VERTICAL_SCROLL_KEY, verticalScrollEnabled ? '1' : '0'); } catch (e) {}
     els.pageStage.classList.toggle('vertical-scroll', verticalScrollEnabled);
+    els.imgWrap.classList.toggle('vertical-scroll', verticalScrollEnabled);
     if (verticalScrollEnabled && pages.length) renderVerticalPages(currentPage);
     else if (!verticalScrollEnabled && pages.length) showPage(currentPage, null);
     updateVerticalScrollMenu();
@@ -3002,6 +3006,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   function renderVerticalPages(targetPage) {
+    els.imgWrap.classList.add('vertical-scroll');
     els.pageStage.classList.add('vertical-scroll');
     releaseLocalEnhancements(els.pageStage);
     els.pageStage.innerHTML = '';
