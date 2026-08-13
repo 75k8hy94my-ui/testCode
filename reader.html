@@ -728,6 +728,11 @@
   .author-card-links { display: flex; flex-direction: column; gap: 5px; }
   .author-card-links a { color: var(--accent-2); font-size: 12px; overflow-wrap: anywhere; }
   .author-card-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .author-group-card { padding: 9px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-soft); cursor: pointer; }
+  .author-group-card .author-group-covers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 6px; background: var(--panel-2); }
+  .author-group-card .author-group-covers img { width: 100%; height: 100%; object-fit: cover; min-width: 0; }
+  .author-group-name { margin-top: 7px; color: var(--text); font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .author-group-count { color: var(--sub); font-size: 10px; margin-top: 3px; }
   html[data-theme="dark"] #authorCardPanel input { background: #1d2230 !important; color: #f1f2f6 !important; border-color: #4a5263 !important; }
   html[data-theme="dark"] #authorCardPanel input::placeholder { color: #969dad !important; opacity: 1; }
   html[data-theme="dark"] #saveDialogPanel input::placeholder,
@@ -1045,6 +1050,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       <div id="smartListRow">
         <button class="smartListBtn" id="historyListBtn" type="button">履歴</button>
         <button class="smartListBtn" id="unreadListBtn" type="button">読んでいない順</button>
+        <button class="smartListBtn" id="groupAuthorBtn" type="button">作者でまとめる</button>
       </div>
       <div id="listToolbar">
         <button class="ctrlBtn" id="listBackBtn" style="display:none;">← 戻る</button>
@@ -1208,6 +1214,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   const UNREAD_FOLDER_NAME = '読んでいない順';
   const READING_SESSION_MS = 30 * 60 * 1000;
   const THEME_KEY = 'mangaReaderTheme';
+  const GROUP_AUTHOR_KEY = 'mangaReaderGroupByAuthor';
 
   const els = {
     newBtn: document.getElementById('newBtn'),
@@ -1315,6 +1322,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     smartListRow: document.getElementById('smartListRow'),
     historyListBtn: document.getElementById('historyListBtn'),
     unreadListBtn: document.getElementById('unreadListBtn'),
+    groupAuthorBtn: document.getElementById('groupAuthorBtn'),
 
     bulkDetectOverlay: document.getElementById('bulkDetectOverlay'),
     closeBulkDetectBtn: document.getElementById('closeBulkDetectBtn'),
@@ -1557,6 +1565,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   let currentFolderView = null;
   let currentSeriesView = null; // series name when drilled into a シリーズ group; null while browsing series names or anywhere else
   let currentAuthorView = null;
+  let groupByAuthorEnabled = false;
   let reorderMode = false; // true while 並べ替え (manual up/down reorder) controls are shown for the current folder view
   // リーダーを閉じたときに戻る、本棚上の表示位置。作品を本棚から開いたときだけ記録する。
   let readerReturnView = null;
@@ -1582,6 +1591,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   } catch (e) {}
   els.animBtn.classList.toggle('active', animEnabled);
   try { verticalScrollEnabled = localStorage.getItem(VERTICAL_SCROLL_KEY) === '1'; } catch (e) {}
+  try { groupByAuthorEnabled = localStorage.getItem(GROUP_AUTHOR_KEY) === '1'; } catch (e) {}
 
   try {
     const sm = localStorage.getItem(SAFE_MODE_KEY);
@@ -4683,6 +4693,22 @@ https://cdn.example.org/c/003.webp"></textarea>
     closeAuthorCards();
     renderSavedList();
   }
+  function buildAuthorGroupCard(group) {
+    const card = document.createElement('div');
+    card.className = 'author-group-card';
+    const covers = document.createElement('div'); covers.className = 'author-group-covers';
+    group.items.slice(0, 2).forEach((item) => {
+      const img = document.createElement('img'); img.alt = itemDisplayTitle(item); img.loading = 'lazy';
+      if (Array.isArray(item.pages) && item.pages.length) img.src = item.pages[0];
+      else setupFeedImage(img, item.url, item.numberWidth, item.pagePattern);
+      covers.appendChild(img);
+    });
+    const name = document.createElement('div'); name.className = 'author-group-name'; name.textContent = group.name;
+    const count = document.createElement('div'); count.className = 'author-group-count'; count.textContent = group.items.length + '作品';
+    card.append(covers, name, count);
+    card.addEventListener('click', () => openAuthorWorks({ name: group.name }));
+    return card;
+  }
   function saveAuthorCard() {
     const name = els.authorCardNameInput.value.trim();
     const circleName = els.authorCardCircleInput.value.trim();
@@ -4742,6 +4768,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     let itemsList = []; // flat item list for the current view; doubles as swipe context
     let folderCards = [];
     let seriesGroupCards = []; // [{name, items}], only populated at the シリーズ root (list of series names)
+    let authorGroupCards = [];
     let showFavoritesCard = false;
     let showSeriesCard = false;
 
@@ -4783,6 +4810,16 @@ https://cdn.example.org/c/003.webp"></textarea>
       itemsList = savedItems.filter((it) => it.folderId === currentFolderView);
     }
 
+    if (groupByAuthorEnabled && !inAuthorView && !inSeriesRoot && itemsList.length) {
+      const groups = new Map();
+      itemsList.forEach((item) => {
+        const name = String(item.author || '').trim();
+        if (!name) return;
+        if (!groups.has(name)) groups.set(name, []);
+        groups.get(name).push(item);
+      });
+      authorGroupCards = Array.from(groups.entries()).map(([name, items]) => ({ name, items }));
+    }
     const isEmpty = folderCards.length === 0 && itemsList.length === 0 && seriesGroupCards.length === 0 &&
       !showFavoritesCard && !showSeriesCard;
     if (isEmpty) {
@@ -4805,7 +4842,12 @@ https://cdn.example.org/c/003.webp"></textarea>
       if (showSeriesCard) frag.appendChild(buildSeriesFolderCard());
       folderCards.forEach((f) => frag.appendChild(buildFolderCard(f, folderCards, showOrganizeControls)));
       seriesGroupCards.forEach((g) => frag.appendChild(buildSeriesGroupCard(g)));
-      itemsList.forEach((it) => frag.appendChild(buildBookCard(it, itemsList, showOrganizeControls)));
+      if (groupByAuthorEnabled && authorGroupCards.length) {
+        authorGroupCards.forEach((group) => frag.appendChild(buildAuthorGroupCard(group)));
+        itemsList.filter((item) => !String(item.author || '').trim()).forEach((it) => frag.appendChild(buildBookCard(it, itemsList, showOrganizeControls)));
+      } else {
+        itemsList.forEach((it) => frag.appendChild(buildBookCard(it, itemsList, showOrganizeControls)));
+      }
       els.savedListItems.appendChild(frag);
     }
 
@@ -4815,6 +4857,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       const unreadCount = unreadOrderItems().filter((item) => !Number(item.lastReadAt)).length;
       els.historyListBtn.textContent = '履歴 (' + historyCount + ')';
       els.unreadListBtn.textContent = '読んでいない順 (' + unreadCount + ')';
+      els.groupAuthorBtn.classList.toggle('active', groupByAuthorEnabled);
+      els.groupAuthorBtn.textContent = groupByAuthorEnabled ? '作者まとめを解除' : '作者でまとめる';
     }
   }
 
@@ -5176,6 +5220,11 @@ https://cdn.example.org/c/003.webp"></textarea>
     currentFolderView = UNREAD_FOLDER_ID;
     currentSeriesView = null;
     reorderMode = false;
+    renderSavedList();
+  });
+  els.groupAuthorBtn.addEventListener('click', () => {
+    groupByAuthorEnabled = !groupByAuthorEnabled;
+    try { localStorage.setItem(GROUP_AUTHOR_KEY, groupByAuthorEnabled ? '1' : '0'); } catch (e) {}
     renderSavedList();
   });
   els.savedListOverlay.addEventListener('click', (e) => { if (e.target === els.savedListOverlay) closeSavedList(); });
