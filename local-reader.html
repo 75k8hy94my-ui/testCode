@@ -124,9 +124,10 @@
       function confirmLeaving(){return !syncAbortController||window.confirm('同期中です。移動すると同期が中断される可能性があります。移動しますか？');}
       async function syncToCloud(){
         if(!pages.length || ui.syncButton.disabled)return;
-        const userSession=session();
+        let userSession=session();
         if(!userSession || !userSession.access_token || !userSession.user){ ui.syncStatus.textContent='先にログインしてください'; setTimeout(()=>location.href='sync.html',700); return; }
         if(!window.MangaVault || !MangaVault.loadActive()){ ui.syncStatus.textContent='保管庫を開いてから同期してください'; setTimeout(()=>location.href='sync.html',700); return; }
+        try{const refreshed=await MangaVault.refreshSession();if(refreshed&&refreshed.access_token)userSession=refreshed;}catch(_){/* 現在のアクセストークンが有効ならそのまま続行 */}
         const config=window.MANGA_READER_SUPABASE||{}; if(!config.url||!config.publishableKey){ui.syncStatus.textContent='Supabase設定が見つかりません';return;}
         ui.syncButton.disabled=true; ui.cancelSync.hidden=false; syncAbortController=new AbortController(); setSyncLock(true); ui.syncStatus.textContent='同期を準備しています…'; notifySync('同期を準備しています…');
         const folderId='local-'+crypto.randomUUID(); const folderPath=userSession.user.id+'/'+folderId; const uploaded=[];
