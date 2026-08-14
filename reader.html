@@ -4799,14 +4799,6 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     card.appendChild(cover);
     card.appendChild(title);
-    if (!reorderMode && !bulkEditMode) {
-      const editBtn = document.createElement('button');
-      editBtn.className = 'ctrlBtn book-editBtn';
-      editBtn.type = 'button';
-      editBtn.textContent = 'タイトル等を編集';
-      editBtn.addEventListener('click', (event) => { event.stopPropagation(); openEditItemDialog(item); });
-      card.appendChild(editBtn);
-    }
     if (item.series) {
       const seriesEl = document.createElement('div');
       seriesEl.className = 'book-series';
