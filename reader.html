@@ -1057,6 +1057,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       <div id="smartListRow">
         <button class="smartListBtn" id="historyListBtn" type="button">履歴</button>
         <button class="smartListBtn" id="unreadListBtn" type="button">読んでいない順</button>
+        <button class="smartListBtn" id="syncedListBtn" type="button">同期済み</button>
         <button class="smartListBtn" id="groupAuthorBtn" type="button">作者でまとめる</button>
       </div>
       <div id="listToolbar">
@@ -1067,6 +1068,11 @@ https://cdn.example.org/c/003.webp"></textarea>
         <button class="ctrlBtn" id="bulkEditBtn" type="button">一括編集</button>
         <button class="ctrlBtn" id="undoBulkEditBtn" type="button" style="display:none;">もとに戻す</button>
         <button class="ctrlBtn" id="filterBtn" type="button">絞り込み</button>
+        <select class="ctrlBtn" id="shelfSortSelect" aria-label="本棚の並び順">
+          <option value="added-desc">新しい順</option>
+          <option value="title-asc">タイトル順</option>
+          <option value="synced-first">同期済みを上</option>
+        </select>
       </div>
       <div id="filterRow" style="display:none;" class="filter-row">
         <input id="filterSeriesInput" type="text" placeholder="シリーズ">
@@ -1251,6 +1257,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   const SERIES_FOLDER_NAME = 'シリーズ';
   const UNREAD_FOLDER_ID = '__unread_order__';
   const UNREAD_FOLDER_NAME = '読んでいない順';
+  const SYNCED_FOLDER_ID = '__synced__';
+  const SYNCED_FOLDER_NAME = '同期済み';
   const READING_SESSION_MS = 30 * 60 * 1000;
   const THEME_KEY = 'mangaReaderTheme';
   const GROUP_AUTHOR_KEY = 'mangaReaderGroupByAuthor';
@@ -1390,7 +1398,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     smartListRow: document.getElementById('smartListRow'),
     historyListBtn: document.getElementById('historyListBtn'),
     unreadListBtn: document.getElementById('unreadListBtn'),
+    syncedListBtn: document.getElementById('syncedListBtn'),
     groupAuthorBtn: document.getElementById('groupAuthorBtn'),
+    shelfSortSelect: document.getElementById('shelfSortSelect'),
 
     bulkDetectOverlay: document.getElementById('bulkDetectOverlay'),
     closeBulkDetectBtn: document.getElementById('closeBulkDetectBtn'),
@@ -1634,6 +1644,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   const bulkSelectedIds = new Set();
   let bulkEditUndoSnapshot = null;
   let shelfFilters = { series: '', author: '', tags: '', source: '' };
+  let shelfSort = 'added-desc';
   let bookshelfPage = 1;
   let authorCards = [];
   let editingAuthorCardId = null;
@@ -4963,7 +4974,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     const atRoot = !currentFolderView && !inAuthorView;
     const isRealFolder = !!currentFolderView && currentFolderView !== FAVORITES_FOLDER_ID &&
-      currentFolderView !== UNREAD_FOLDER_ID && currentFolderView !== HISTORY_FOLDER_ID &&
+      currentFolderView !== UNREAD_FOLDER_ID && currentFolderView !== SYNCED_FOLDER_ID && currentFolderView !== HISTORY_FOLDER_ID &&
       currentFolderView !== SERIES_FOLDER_ID;
     const canOrganize = atRoot || isRealFolder;
     const showOrganizeControls = canOrganize && reorderMode;
@@ -4982,6 +4993,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       els.listFolderTitle.textContent = FAVORITES_FOLDER_NAME;
     } else if (currentFolderView === UNREAD_FOLDER_ID) {
       els.listFolderTitle.textContent = UNREAD_FOLDER_NAME;
+    } else if (currentFolderView === SYNCED_FOLDER_ID) {
+      els.listFolderTitle.textContent = SYNCED_FOLDER_NAME;
     } else if (inSeriesGroup) {
       els.listFolderTitle.textContent = currentSeriesView;
     } else if (inSeriesRoot) {
@@ -5023,6 +5036,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       itemsList = savedItems.filter((it) => it.favorite);
     } else if (currentFolderView === UNREAD_FOLDER_ID) {
       itemsList = unreadOrderItems();
+    } else if (currentFolderView === SYNCED_FOLDER_ID) {
+      itemsList = savedItems.filter((it) => it.localSync);
     } else if (inSeriesRoot) {
       // Virtual view: groups every series-tagged item by series name
       // regardless of which real folder it lives in. Each group's items are
@@ -5061,6 +5076,13 @@ https://cdn.example.org/c/003.webp"></textarea>
         (!shelfFilters.tags || normalizedFilter(tags).includes(normalizedFilter(shelfFilters.tags))) &&
         (!shelfFilters.source || normalizedFilter(item.sourceWork).includes(normalizedFilter(shelfFilters.source)));
     });
+    if (shelfSort === 'title-asc') {
+      itemsList.sort((a, b) => itemDisplayTitle(a).localeCompare(itemDisplayTitle(b), 'ja'));
+    } else if (shelfSort === 'synced-first') {
+      itemsList.sort((a, b) => Number(!!b.localSync) - Number(!!a.localSync) || (Number(b.addedAt) || 0) - (Number(a.addedAt) || 0));
+    } else {
+      itemsList.sort((a, b) => (Number(b.addedAt) || 0) - (Number(a.addedAt) || 0));
+    }
     if (groupByAuthorEnabled && !bulkEditMode && !inAuthorView && !inSeriesRoot) {
       const groups = new Map();
       itemsList.forEach((item) => {
@@ -5091,6 +5113,8 @@ https://cdn.example.org/c/003.webp"></textarea>
         ? 'お気に入りはまだ追加されていません'
         : currentFolderView === UNREAD_FOLDER_ID
           ? '保存された漫画はまだありません'
+        : currentFolderView === SYNCED_FOLDER_ID
+          ? '同期済みの漫画はまだありません'
         : inSeriesRoot
           ? 'シリーズはまだ設定されていません'
           : (currentFolderView ? 'このフォルダにはまだ何もありません' : '保存されたURLはまだありません');
@@ -5145,7 +5169,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     readerReturnView = { folderId: currentFolderView, seriesName: currentSeriesView, authorName: currentAuthorView };
   }
   function closeSavedList() {
-    const isRealFolder = currentFolderView && currentFolderView !== FAVORITES_FOLDER_ID && currentFolderView !== UNREAD_FOLDER_ID && currentFolderView !== HISTORY_FOLDER_ID && currentFolderView !== SERIES_FOLDER_ID;
+    const isRealFolder = currentFolderView && currentFolderView !== FAVORITES_FOLDER_ID && currentFolderView !== UNREAD_FOLDER_ID && currentFolderView !== SYNCED_FOLDER_ID && currentFolderView !== HISTORY_FOLDER_ID && currentFolderView !== SERIES_FOLDER_ID;
     if (isRealFolder) recentlyClosedFolderId = currentFolderView;
     els.savedListOverlay.classList.remove('show');
   }
@@ -5484,6 +5508,19 @@ https://cdn.example.org/c/003.webp"></textarea>
     currentFolderView = UNREAD_FOLDER_ID;
     currentSeriesView = null;
     reorderMode = false;
+    renderSavedList();
+  });
+  els.syncedListBtn.addEventListener('click', () => {
+    currentFolderView = SYNCED_FOLDER_ID;
+    currentSeriesView = null;
+    currentAuthorView = null;
+    bookshelfPage = 1;
+    reorderMode = false;
+    renderSavedList();
+  });
+  els.shelfSortSelect.addEventListener('change', () => {
+    shelfSort = els.shelfSortSelect.value;
+    bookshelfPage = 1;
     renderSavedList();
   });
   els.groupAuthorBtn.addEventListener('click', () => {
