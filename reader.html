@@ -1058,6 +1058,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         <button class="smartListBtn" id="historyListBtn" type="button">履歴</button>
         <button class="smartListBtn" id="unreadListBtn" type="button">読んでいない順</button>
         <button class="smartListBtn" id="syncedListBtn" type="button">同期済み</button>
+        <button class="smartListBtn" id="transferBudgetBtn" type="button">通信量</button>
         <button class="smartListBtn" id="groupAuthorBtn" type="button">作者でまとめる</button>
       </div>
       <div id="listToolbar">
@@ -1399,6 +1400,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     historyListBtn: document.getElementById('historyListBtn'),
     unreadListBtn: document.getElementById('unreadListBtn'),
     syncedListBtn: document.getElementById('syncedListBtn'),
+    transferBudgetBtn: document.getElementById('transferBudgetBtn'),
     groupAuthorBtn: document.getElementById('groupAuthorBtn'),
     shelfSortSelect: document.getElementById('shelfSortSelect'),
 
@@ -1493,6 +1495,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   let localSyncObjectUrls = [];
   let localCoverObjectUrls = [];
   let localSyncPaths = [];
+  let localSyncBytes = [];
   let localSyncItemId = '';
   let localSyncSigning = new Map();
   let splitSpreads = false;
@@ -1649,6 +1652,41 @@ https://cdn.example.org/c/003.webp"></textarea>
   let bulkEditUndoSnapshot = null;
   let shelfFilters = { series: '', author: '', tags: '', source: '' };
   let shelfSort = 'added-desc';
+  const TRANSFER_LIMIT_KEY = 'mangaReaderStorageTransferLimitDaily';
+  const TRANSFER_USAGE_KEY = 'mangaReaderStorageTransferUsageDaily';
+  const DEFAULT_DAILY_TRANSFER_LIMIT = 150 * 1024 * 1024;
+
+  function transferDayKey() { return new Date().toISOString().slice(0, 10); }
+  function transferLimitBytes() {
+    const value = Number(localStorage.getItem(TRANSFER_LIMIT_KEY));
+    return Number.isFinite(value) && value > 0 ? value : DEFAULT_DAILY_TRANSFER_LIMIT;
+  }
+  function transferUsageBytes() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(TRANSFER_USAGE_KEY) || 'null');
+      return saved && saved.day === transferDayKey() ? Number(saved.bytes) || 0 : 0;
+    } catch (_) { return 0; }
+  }
+  function recordTransferEstimate(bytes) {
+    const amount = Math.max(0, Number(bytes) || 0);
+    if (transferUsageBytes() + amount > transferLimitBytes()) return false;
+    localStorage.setItem(TRANSFER_USAGE_KEY, JSON.stringify({ day: transferDayKey(), bytes: transferUsageBytes() + amount }));
+    return true;
+  }
+  function formatTransferBytes(bytes) {
+    const value = Number(bytes) || 0;
+    if (value >= 1024 * 1024 * 1024) return (value / 1024 / 1024 / 1024).toFixed(2) + 'GB';
+    return Math.round(value / 1024 / 1024) + 'MB';
+  }
+  function configureTransferBudget() {
+    const current = transferLimitBytes() / 1024 / 1024;
+    const input = prompt('1日の画像通信量上限をMBで設定してください。\n今日の使用量: ' + formatTransferBytes(transferUsageBytes()) + ' / ' + formatTransferBytes(transferLimitBytes()), String(Math.round(current)));
+    if (input === null) return;
+    const mb = Number(input);
+    if (!Number.isFinite(mb) || mb <= 0) { flashStatus('正しい通信量上限を入力してください'); return; }
+    localStorage.setItem(TRANSFER_LIMIT_KEY, String(Math.round(mb * 1024 * 1024)));
+    flashStatus('1日の通信量上限を ' + Math.round(mb) + 'MB に設定しました');
+  }
   let bookshelfPage = 1;
   let authorCards = [];
   let editingAuthorCardId = null;
@@ -2944,12 +2982,13 @@ https://cdn.example.org/c/003.webp"></textarea>
       const path = (Array.isArray(item.storagePaths) && item.storagePaths[0]) || localStoragePathFromUrl(item.pages && item.pages[0]);
       if (!session || !session.access_token || !path || !config.url) return;
       const encodedPath = path.split('/').map((part) => encodeURIComponent(part)).join('/');
-      const signedUrl = await signPrivateLocalUrl(config, session.access_token, encodedPath);
+      const signedUrl = await signPrivateLocalUrl(config, session.access_token, encodedPath, undefined, item.storageBytes && item.storageBytes[0]);
       if (signedUrl && img.isConnected) img.src = signedUrl;
     } catch (_) {}
   }
 
-  async function signPrivateLocalUrl(config, token, encodedPath, signal) {
+  async function signPrivateLocalUrl(config, token, encodedPath, signal, estimatedBytes) {
+    if (!recordTransferEstimate(estimatedBytes)) throw new Error('本日の画像通信量上限に達したため、画像取得を停止しました。通信量ボタンから上限を変更できます。');
     const response = await fetch(config.url + '/storage/v1/object/sign/local-manga/' + encodedPath, {
       method: 'POST',
       headers: { apikey: config.publishableKey, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
@@ -2974,13 +3013,14 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   async function loadPrivateLocalPages(item) {
-    if (!item.localSync) { localSyncPaths = []; localSyncItemId = ''; localSyncSigning = new Map(); return (item.pages || []).slice(); }
+    if (!item.localSync) { localSyncPaths = []; localSyncBytes = []; localSyncItemId = ''; localSyncSigning = new Map(); return (item.pages || []).slice(); }
     const session = JSON.parse(localStorage.getItem('mangaReaderSupabaseSession') || 'null');
     const config = window.MANGA_READER_SUPABASE || {};
     const paths = (Array.isArray(item.storagePaths) && item.storagePaths.length ? item.storagePaths : (item.pages || []).map(localStoragePathFromUrl)).filter(Boolean);
     if (!session || !session.access_token || !config.url || paths.length !== (item.pages || []).length) throw new Error('同期画像の保存先情報がありません。もう一度同期してください。');
     clearLocalSyncObjectUrls();
     localSyncPaths = paths;
+    localSyncBytes = Array.isArray(item.storageBytes) ? item.storageBytes : paths.map(() => 0);
     localSyncItemId = item.id;
     localSyncSigning = new Map();
     const urls = new Array(paths.length).fill('');
@@ -2988,7 +3028,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     const firstTimer = setTimeout(() => firstController.abort(), 10000);
     try {
       const firstPath = paths[0].split('/').map((part) => encodeURIComponent(part)).join('/');
-      urls[0] = await signPrivateLocalUrl(config, session.access_token, firstPath, firstController.signal);
+      urls[0] = await signPrivateLocalUrl(config, session.access_token, firstPath, firstController.signal, localSyncBytes[0]);
     } catch (error) {
       if (error.name === 'AbortError') throw new Error('1ページ目の読み込みが10秒でタイムアウトしました。StorageのSELECTポリシーを確認してください。');
       throw error;
@@ -3007,7 +3047,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     for (let index = first; index <= last; index++) {
       if (pages[index] || localSyncSigning.has(index)) continue;
       const encodedPath = localSyncPaths[index].split('/').map((part) => encodeURIComponent(part)).join('/');
-      const task = signPrivateLocalUrl(config, session.access_token, encodedPath).then((url) => { pages[index] = url; return url; }).catch(() => '');
+      const task = signPrivateLocalUrl(config, session.access_token, encodedPath, undefined, localSyncBytes[index]).then((url) => { pages[index] = url; return url; }).catch(() => '');
       localSyncSigning.set(index, task);
       tasks.push(task);
     }
@@ -3027,7 +3067,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         const index = next++;
         if (pages[index] || localSyncSigning.has(index)) continue;
         const encodedPath = localSyncPaths[index].split('/').map((part) => encodeURIComponent(part)).join('/');
-        const task = signPrivateLocalUrl(config, session.access_token, encodedPath).then((url) => { pages[index] = url; return url; }).catch(() => '');
+        const task = signPrivateLocalUrl(config, session.access_token, encodedPath, undefined, localSyncBytes[index]).then((url) => { pages[index] = url; return url; }).catch(() => '');
         localSyncSigning.set(index, task);
         await task;
       }
@@ -4471,11 +4511,13 @@ https://cdn.example.org/c/003.webp"></textarea>
     for (const folderId of folderNames) {
       const entries = await listObjects(session.user.id + '/' + folderId + '/');
       const folderPrefix = session.user.id + '/' + folderId + '/';
-      const names = entries.map((entry) => relativeName(entry.name, folderPrefix)).filter((name) => !name.endsWith('/') && !name.includes('/') && /\.(avif|bmp|gif|jpe?g|png|webp)$/i.test(name));
-      if (!names.length) continue;
+      const files = entries.map((entry) => ({ name: relativeName(entry.name, folderPrefix), bytes: Number(entry.metadata && entry.metadata.size) || 0 })).filter((entry) => !entry.name.endsWith('/') && !entry.name.includes('/') && /\.(avif|bmp|gif|jpe?g|png|webp)$/i.test(entry.name));
+      if (!files.length) continue;
+      const names = files.map((entry) => entry.name);
+      const storageBytes = files.map((entry) => entry.bytes);
       const paths = names.map((name) => session.user.id + '/' + folderId + '/' + name);
       const old = existingByFolder.get(folderId);
-      const item = old ? Object.assign({}, old, { pages: paths.map((path) => config.url + '/storage/v1/object/public/local-manga/' + path.split('/').map((part) => encodeURIComponent(part)).join('/')), storagePaths: paths }) : { id: 'local-item-' + folderId, title: folderId, folderId, pages: paths.map((path) => config.url + '/storage/v1/object/public/local-manga/' + path.split('/').map((part) => encodeURIComponent(part)).join('/')), storagePaths: paths, pageMeta: [], favoriteOnly: false, addedAt: Date.now(), localSync: true };
+      const item = old ? Object.assign({}, old, { pages: paths.map((path) => config.url + '/storage/v1/object/public/local-manga/' + path.split('/').map((part) => encodeURIComponent(part)).join('/')), storagePaths: paths, storageBytes }) : { id: 'local-item-' + folderId, title: folderId, folderId, pages: paths.map((path) => config.url + '/storage/v1/object/public/local-manga/' + path.split('/').map((part) => encodeURIComponent(part)).join('/')), storagePaths: paths, storageBytes, pageMeta: [], favoriteOnly: false, addedAt: Date.now(), localSync: true };
       storageItems.push(item);
     }
     const nonLocalItems = savedItems.filter((item) => !item.localSync);
@@ -5668,6 +5710,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       els.syncedListBtn.textContent = '同期済み';
     }
   });
+  els.transferBudgetBtn.addEventListener('click', configureTransferBudget);
   els.shelfSortSelect.addEventListener('change', () => {
     shelfSort = els.shelfSortSelect.value;
     bookshelfPage = 1;
