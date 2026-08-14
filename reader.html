@@ -3052,7 +3052,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     recentlyClosedItemId = null;
     currentItem = item || null; // remembered for series/次の巻 lookups
     if (item && Array.isArray(item.pages) && item.pages.length) {
-      startReadingCustom(item, switchDirection);
+      await startReadingCustom(item, switchDirection);
     } else {
       const candidates = [item && item.url].concat(Array.isArray(item && item.alternateUrls) ? item.alternateUrls : []).filter(Boolean);
       let selectedUrl = item && item.url;
@@ -4868,7 +4868,10 @@ https://cdn.example.org/c/003.webp"></textarea>
         rememberReaderReturnView();
         closeSavedList();
         setReadingListContext(list, list.indexOf(item));
-        openItem(item, false);
+        flashStatus('読み込み中…');
+        openItem(item, false).catch((error) => {
+          flashStatus(error && error.message ? error.message : '漫画を開けませんでした');
+        });
       });
     }
     return card;
