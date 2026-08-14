@@ -2941,27 +2941,23 @@ https://cdn.example.org/c/003.webp"></textarea>
       const path = (Array.isArray(item.storagePaths) && item.storagePaths[0]) || localStoragePathFromUrl(item.pages && item.pages[0]);
       if (!session || !session.access_token || !path || !config.url) return;
       const encodedPath = path.split('/').map((part) => encodeURIComponent(part)).join('/');
-      const blob = await fetchPrivateLocalObject(config, session.access_token, encodedPath);
-      if (!blob) return;
-      const objectUrl = URL.createObjectURL(blob);
-      if (img.isConnected) {
-        localCoverObjectUrls.push(objectUrl);
-        img.src = objectUrl;
-      } else {
-        URL.revokeObjectURL(objectUrl);
-      }
+      const signedUrl = await signPrivateLocalUrl(config, session.access_token, encodedPath);
+      if (signedUrl && img.isConnected) img.src = signedUrl;
     } catch (_) {}
   }
 
-  async function fetchPrivateLocalObject(config, token, encodedPath) {
-    const headers = { apikey: config.publishableKey, Authorization: 'Bearer ' + token };
-    let lastStatus = 0;
-    for (const endpoint of ['/storage/v1/object/download/local-manga/', '/storage/v1/object/local-manga/']) {
-      const response = await fetch(config.url + endpoint + encodedPath, { headers });
-      lastStatus = response.status;
-      if (response.ok) return response.blob();
-    }
-    throw new Error('Storage画像の取得に失敗しました（HTTP ' + lastStatus + '）。');
+  async function signPrivateLocalUrl(config, token, encodedPath) {
+    const response = await fetch(config.url + '/storage/v1/object/sign/local-manga/' + encodedPath, {
+      method: 'POST',
+      headers: { apikey: config.publishableKey, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expiresIn: 3600 })
+    });
+    if (!response.ok) throw new Error('Storage画像の署名URLを取得できませんでした（HTTP ' + response.status + '）。');
+    const data = await response.json();
+    const value = data.signedURL || data.signedUrl || '';
+    if (!value) throw new Error('Storage画像の署名URLが空です。');
+    if (/^https?:\/\//i.test(value)) return value;
+    return config.url + (value.startsWith('/storage/v1') ? value : '/storage/v1' + (value.startsWith('/') ? value : '/' + value));
   }
 
   function localStoragePathFromUrl(value) {
@@ -2980,12 +2976,16 @@ https://cdn.example.org/c/003.webp"></textarea>
     const paths = (Array.isArray(item.storagePaths) && item.storagePaths.length ? item.storagePaths : (item.pages || []).map(localStoragePathFromUrl)).filter(Boolean);
     if (!session || !session.access_token || !config.url || paths.length !== (item.pages || []).length) throw new Error('同期画像の保存先情報がありません。もう一度同期してください。');
     clearLocalSyncObjectUrls();
-    const urls = [];
-    for (const path of paths) {
-      const encodedPath = path.split('/').map((part) => encodeURIComponent(part)).join('/');
-      const objectUrl = URL.createObjectURL(await fetchPrivateLocalObject(config, session.access_token, encodedPath));
-      localSyncObjectUrls.push(objectUrl); urls.push(objectUrl);
-    }
+    const urls = new Array(paths.length);
+    let next = 0;
+    const worker = async () => {
+      while (next < paths.length) {
+        const index = next++;
+        const encodedPath = paths[index].split('/').map((part) => encodeURIComponent(part)).join('/');
+        urls[index] = await signPrivateLocalUrl(config, session.access_token, encodedPath);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(8, paths.length) }, worker));
     return urls;
   }
 
