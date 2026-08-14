@@ -1498,6 +1498,31 @@ https://cdn.example.org/c/003.webp"></textarea>
   let localSyncBytes = [];
   let localSyncItemId = '';
   let localSyncSigning = new Map();
+  let imageCacheDbPromise = null;
+  const IMAGE_CACHE_DB = 'mangaReaderImageCache';
+
+  function imageCacheDb() {
+    if (imageCacheDbPromise) return imageCacheDbPromise;
+    imageCacheDbPromise = new Promise((resolve, reject) => {
+      const request = indexedDB.open(IMAGE_CACHE_DB, 1);
+      request.onupgradeneeded = () => request.result.createObjectStore('images', { keyPath: 'path' });
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    return imageCacheDbPromise;
+  }
+  async function readImageCache(path) {
+    try {
+      const db = await imageCacheDb();
+      return await new Promise((resolve, reject) => { const tx = db.transaction('images', 'readonly'); const req = tx.objectStore('images').get(path); req.onsuccess = () => resolve(req.result || null); req.onerror = () => reject(req.error); });
+    } catch (_) { return null; }
+  }
+  async function writeImageCache(path, blob) {
+    try {
+      const db = await imageCacheDb();
+      await new Promise((resolve, reject) => { const tx = db.transaction('images', 'readwrite'); tx.objectStore('images').put({ path, blob, size: blob.size || 0, cachedAt: Date.now() }); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
+    } catch (_) {}
+  }
   let splitSpreads = false;
   let preferredExt = 0;    // index into EXT_CANDIDATES
   let pageNumberWidth = 1; // filename zero-padding width: 1 -> 1.jpg, 2 -> 01.jpg
@@ -2981,9 +3006,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       const config = window.MANGA_READER_SUPABASE || {};
       const path = (Array.isArray(item.storagePaths) && item.storagePaths[0]) || localStoragePathFromUrl(item.pages && item.pages[0]);
       if (!session || !session.access_token || !path || !config.url) return;
-      const encodedPath = path.split('/').map((part) => encodeURIComponent(part)).join('/');
-      const signedUrl = await signPrivateLocalUrl(config, session.access_token, encodedPath, undefined, item.storageBytes && item.storageBytes[0]);
-      if (signedUrl && img.isConnected) img.src = signedUrl;
+      const objectUrl = await loadCachedLocalImage(config, session.access_token, path, item.storageBytes && item.storageBytes[0]);
+      if (objectUrl && img.isConnected) { localCoverObjectUrls.push(objectUrl); img.src = objectUrl; }
     } catch (_) {}
   }
 
@@ -3001,6 +3025,18 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!value) throw new Error('Storage画像の署名URLが空です。');
     if (/^https?:\/\//i.test(value)) return value;
     return config.url + (value.startsWith('/storage/v1') ? value : '/storage/v1' + (value.startsWith('/') ? value : '/' + value));
+  }
+
+  async function loadCachedLocalImage(config, token, path, estimatedBytes) {
+    const cached = await readImageCache(path);
+    if (cached && cached.blob) return URL.createObjectURL(cached.blob);
+    const encodedPath = path.split('/').map((part) => encodeURIComponent(part)).join('/');
+    const signedUrl = await signPrivateLocalUrl(config, token, encodedPath, undefined, estimatedBytes);
+    const response = await fetch(signedUrl);
+    if (!response.ok) throw new Error('画像本体を取得できませんでした（HTTP ' + response.status + '）。');
+    const blob = await response.blob();
+    await writeImageCache(path, blob);
+    return URL.createObjectURL(blob);
   }
 
   function localStoragePathFromUrl(value) {
@@ -3027,8 +3063,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     const firstController = new AbortController();
     const firstTimer = setTimeout(() => firstController.abort(), 10000);
     try {
-      const firstPath = paths[0].split('/').map((part) => encodeURIComponent(part)).join('/');
-      urls[0] = await signPrivateLocalUrl(config, session.access_token, firstPath, firstController.signal, localSyncBytes[0]);
+      urls[0] = await loadCachedLocalImage(config, session.access_token, paths[0], localSyncBytes[0]);
     } catch (error) {
       if (error.name === 'AbortError') throw new Error('1ページ目の読み込みが10秒でタイムアウトしました。StorageのSELECTポリシーを確認してください。');
       throw error;
@@ -3046,8 +3081,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     const tasks = [];
     for (let index = first; index <= last; index++) {
       if (pages[index] || localSyncSigning.has(index)) continue;
-      const encodedPath = localSyncPaths[index].split('/').map((part) => encodeURIComponent(part)).join('/');
-      const task = signPrivateLocalUrl(config, session.access_token, encodedPath, undefined, localSyncBytes[index]).then((url) => { pages[index] = url; return url; }).catch(() => '');
+      const task = loadCachedLocalImage(config, session.access_token, localSyncPaths[index], localSyncBytes[index]).then((url) => { pages[index] = url; localSyncObjectUrls.push(url); return url; }).catch(() => '');
       localSyncSigning.set(index, task);
       tasks.push(task);
     }
@@ -3066,8 +3100,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       while (next < localSyncPaths.length) {
         const index = next++;
         if (pages[index] || localSyncSigning.has(index)) continue;
-        const encodedPath = localSyncPaths[index].split('/').map((part) => encodeURIComponent(part)).join('/');
-        const task = signPrivateLocalUrl(config, session.access_token, encodedPath, undefined, localSyncBytes[index]).then((url) => { pages[index] = url; return url; }).catch(() => '');
+        const task = loadCachedLocalImage(config, session.access_token, localSyncPaths[index], localSyncBytes[index]).then((url) => { pages[index] = url; localSyncObjectUrls.push(url); return url; }).catch(() => '');
         localSyncSigning.set(index, task);
         await task;
       }
