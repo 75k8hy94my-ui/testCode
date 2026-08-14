@@ -1046,6 +1046,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     <div id="mangaListSection">
       <div id="exportImportRow">
         <button class="primaryBtn" id="newBtn">新規</button>
+        <button class="ctrlBtn" id="localReaderBtn" type="button">ローカル漫画を読む</button>
         <button class="ctrlBtn" id="addCustomBtn">個別追加</button>
         <button class="ctrlBtn" id="bulkDetectBtn">一括読み込み</button>
         <button class="ctrlBtn" id="authorCardsBtn" type="button">作者カード</button>
@@ -1257,6 +1258,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   const els = {
     newBtn: document.getElementById('newBtn'),
+    localReaderBtn: document.getElementById('localReaderBtn'),
     closeBtn: document.getElementById('closeBtn'),
     saveBtn: document.getElementById('saveBtn'),
     safeModeBtn: document.getElementById('safeModeBtn'),
@@ -5254,6 +5256,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
   function handleNewManga() { promptForMangaUrl(); }
   els.newBtn.addEventListener('click', handleNewManga);
+  els.localReaderBtn.addEventListener('click', () => { window.location.href = 'local-reader.html'; });
   els.closeBtn.addEventListener('click', () => {
     if (hasUnsavedCurrentUrl() && !confirm('未保存ですが戻りますか？')) return;
     closeManga();
