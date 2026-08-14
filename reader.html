@@ -1480,6 +1480,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   let activeListTab = 'manga'; // 'manga' | 'video'
   let baseUrl = '';
   let pages = [];          // source image URLs, index 0 = page 1
+  let localSyncObjectUrls = [];
   let splitSpreads = false;
   let preferredExt = 0;    // index into EXT_CANDIDATES
   let pageNumberWidth = 1; // filename zero-padding width: 1 -> 1.jpg, 2 -> 01.jpg
@@ -2911,7 +2912,39 @@ https://cdn.example.org/c/003.webp"></textarea>
   // loop — just show the (resume) page immediately. switchDirection mirrors
   // startReading's vertical-swipe handling so swiping into a custom manga
   // animates the same way.
-  function startReadingCustom(item, switchDirection) {
+  function clearLocalSyncObjectUrls() {
+    localSyncObjectUrls.forEach((url) => URL.revokeObjectURL(url));
+    localSyncObjectUrls = [];
+  }
+
+  function localStoragePathFromUrl(value) {
+    try {
+      const pathname = new URL(value).pathname;
+      const marker = '/storage/v1/object/public/local-manga/';
+      if (!pathname.includes(marker)) return '';
+      return pathname.slice(pathname.indexOf(marker) + marker.length).split('/').map((part) => decodeURIComponent(part)).join('/');
+    } catch (_) { return ''; }
+  }
+
+  async function loadPrivateLocalPages(item) {
+    if (!item.localSync) return (item.pages || []).slice();
+    const session = JSON.parse(localStorage.getItem('mangaReaderSupabaseSession') || 'null');
+    const config = window.MANGA_READER_SUPABASE || {};
+    const paths = (Array.isArray(item.storagePaths) && item.storagePaths.length ? item.storagePaths : (item.pages || []).map(localStoragePathFromUrl)).filter(Boolean);
+    if (!session || !session.access_token || !config.url || paths.length !== (item.pages || []).length) throw new Error('同期画像の保存先情報がありません。もう一度同期してください。');
+    clearLocalSyncObjectUrls();
+    const urls = [];
+    for (const path of paths) {
+      const encodedPath = path.split('/').map((part) => encodeURIComponent(part)).join('/');
+      const response = await fetch(config.url + '/storage/v1/object/local-manga/' + encodedPath, { headers: { apikey: config.publishableKey, Authorization: 'Bearer ' + session.access_token } });
+      if (!response.ok) throw new Error('非公開の同期画像を読み込めませんでした（ログイン状態またはStorage権限を確認してください）。');
+      const objectUrl = URL.createObjectURL(await response.blob());
+      localSyncObjectUrls.push(objectUrl); urls.push(objectUrl);
+    }
+    return urls;
+  }
+
+  async function startReadingCustom(item, switchDirection) {
     handOffIncompleteDetection(); // 直前の漫画の検出未完了分を引き継ぐ（generationを進める前に）
     readingGeneration++; // invalidate any still-running sequential detection loop
     baseUrl = '';
@@ -2920,7 +2953,18 @@ https://cdn.example.org/c/003.webp"></textarea>
     splitSpreads = !!item.splitSpreads;
     loadCurrentToc();
     hideNextVolumeBanner();
-    pages = (item.pages || []).slice();
+    try {
+      pages = await loadPrivateLocalPages(item);
+    } catch (error) {
+      pages = [];
+      els.spinner.style.display = 'none';
+      els.imgWrap.style.display = 'none';
+      els.placeholder.style.display = 'block';
+      els.placeholder.textContent = error.message || '同期画像を読み込めませんでした。';
+      els.status.textContent = '';
+      updateCloseButtonVisibility();
+      return;
+    }
     detecting = false;
     detectionDone = true;
     detectionHitLimit = false;
@@ -2998,6 +3042,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     // ここでpages/baseUrlがリセットされる前に、検出未完了分の引き継ぎを行う。
     handOffIncompleteDetection();
     readingGeneration++;
+    clearLocalSyncObjectUrls();
     baseUrl = '';
     pages = [];
     splitSpreads = false;
@@ -4292,10 +4337,35 @@ https://cdn.example.org/c/003.webp"></textarea>
     flashStatus('更新しました');
   }
 
-  function deleteEditingItem() {
+  async function removeLocalSyncStorage(item) {
+    if (!item.localSync) return;
+    const session = JSON.parse(localStorage.getItem('mangaReaderSupabaseSession') || 'null');
+    const config = window.MANGA_READER_SUPABASE || {};
+    const paths = (Array.isArray(item.storagePaths) && item.storagePaths.length ? item.storagePaths : (item.pages || []).map(localStoragePathFromUrl)).filter(Boolean);
+    if (!session || !session.access_token || !config.url || !paths.length) throw new Error('同期画像の保存先を確認できません。');
+    const response = await fetch(config.url + '/storage/v1/object/remove', {
+      method: 'POST',
+      headers: { apikey: config.publishableKey, Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefixes: paths })
+    });
+    if (!response.ok) throw new Error('Storage上の画像を削除できませんでした。先にStorage権限を確認してください。');
+  }
+
+  async function deleteEditingItem() {
     const item = savedItems.find((it) => it.id === editingItemId);
     if (!item) { closeEditItemDialog(); return; }
-    if (!confirm('「' + itemDisplayTitle(item) + '」を削除します。本当によろしいですか？')) return;
+    const prompt = item.localSync
+      ? '「' + itemDisplayTitle(item) + '」と、Supabase Storageに保存した画像を完全に削除します。本当によろしいですか？'
+      : '「' + itemDisplayTitle(item) + '」を削除します。本当によろしいですか？';
+    if (!confirm(prompt)) return;
+    if (item.localSync) {
+      try {
+        await removeLocalSyncStorage(item);
+      } catch (error) {
+        flashStatus(error.message || 'Storage上の画像を削除できませんでした');
+        return;
+      }
+    }
     const deletingCurrentItem = !!currentItem && currentItem.id === item.id;
     savedItems = savedItems.filter((it) => it.id !== item.id);
     persistAll();

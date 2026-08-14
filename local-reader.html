@@ -130,7 +130,7 @@
         try{const refreshed=await MangaVault.refreshSession();if(refreshed&&refreshed.access_token)userSession=refreshed;}catch(_){/* 現在のアクセストークンが有効ならそのまま続行 */}
         const config=window.MANGA_READER_SUPABASE||{}; if(!config.url||!config.publishableKey){ui.syncStatus.textContent='Supabase設定が見つかりません';return;}
         ui.syncButton.disabled=true; ui.cancelSync.hidden=false; syncAbortController=new AbortController(); setSyncLock(true); ui.syncStatus.textContent='同期を準備しています…'; notifySync('同期を準備しています…');
-        const folderId='local-'+crypto.randomUUID(); const folderPath=userSession.user.id+'/'+folderId; const uploaded=[];
+        const folderId='local-'+crypto.randomUUID(); const folderPath=userSession.user.id+'/'+folderId; const uploaded=[]; const storagePaths=[];
         try{
           const authCheck=await fetch(config.url+'/auth/v1/user',{headers:{apikey:config.publishableKey,Authorization:'Bearer '+userSession.access_token},signal:syncAbortController.signal});
           if(!authCheck.ok)throw new Error('ログインセッションが無効です。いったんログアウトして、もう一度ログインしてください。');
@@ -138,11 +138,11 @@
           for(let i=0;i<pages.length;i++){
             const file=pages[i]; const path=folderPath+'/'+String(i+1).padStart(5,'0')+'-'+safePart(file.name); const response=await fetch(config.url+'/storage/v1/object/'+STORAGE_BUCKET+'/'+path,{method:'POST',headers:{apikey:config.publishableKey,Authorization:'Bearer '+userSession.access_token,'Content-Type':file.type||'application/octet-stream'},body:file,signal:syncAbortController.signal});
             if(!response.ok){const detail=await response.text().catch(()=>'');if(response.status===404)throw new Error('Storageバケット「'+STORAGE_BUCKET+'」が見つかりません。');if(response.status===401||response.status===403)throw new Error('Storageへの書き込み権限がありません。Storageポリシーとログイン状態を確認してください。'+(detail?' '+detail.slice(0,180):''));throw new Error('画像 '+(i+1)+' のアップロードに失敗しました ('+response.status+')'+(detail?' '+detail.slice(0,180):''));}
-            uploaded.push(config.url+'/storage/v1/object/public/'+STORAGE_BUCKET+'/'+path); ui.syncStatus.textContent='アップロード中 '+(i+1)+' / '+pages.length; notifySync('アップロード中 '+(i+1)+' / '+pages.length,'');
+            uploaded.push(config.url+'/storage/v1/object/public/'+STORAGE_BUCKET+'/'+path); storagePaths.push(path); ui.syncStatus.textContent='アップロード中 '+(i+1)+' / '+pages.length; notifySync('アップロード中 '+(i+1)+' / '+pages.length,'');
           }
           const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key)||'')??fallback}catch(_){return fallback}};
           const folders=read('mangaReaderSavedFolders',[]), items=read('mangaReaderSavedItems',[]);
-          const itemId='local-item-'+crypto.randomUUID(); folders.push({id:folderId,name:currentFolder,addedAt:Date.now()}); items.push({id:itemId,title:currentFolder,folderId,pages:uploaded,pageMeta:manifest(),favoriteOnly,addedAt:Date.now(),localSync:true}); cloudItem={id:itemId,folderId};
+          const itemId='local-item-'+crypto.randomUUID(); folders.push({id:folderId,name:currentFolder,addedAt:Date.now()}); items.push({id:itemId,title:currentFolder,folderId,pages:uploaded,storagePaths,pageMeta:manifest(),favoriteOnly,addedAt:Date.now(),localSync:true}); cloudItem={id:itemId,folderId};
           await MangaVault.savePayload({folders,items,videos:read('mangaReaderVideos',[]),mangaInfo:read('mangaReaderInfoCache',{}),toc:read('mangaReaderToc',{}),lastPages:read('mangaReaderLastPage',{}),theme:localStorage.getItem('mangaReaderTheme')==='light'?'light':'dark'});
           localStorage.setItem('mangaReaderSavedFolders',JSON.stringify(folders)); localStorage.setItem('mangaReaderSavedItems',JSON.stringify(items)); ui.syncStatus.textContent='同期対象に追加しました'; ui.syncButton.textContent='同期済み'; notifySync('同期が完了しました（'+pages.length+'ページ）','success',true);
         }catch(error){if(error.name==='AbortError'){ui.syncStatus.textContent='同期を中止しました';notifySync('同期を中止しました','error');}else{ui.syncStatus.textContent=error.message||'同期できませんでした';notifySync(ui.syncStatus.textContent,'error');}}
