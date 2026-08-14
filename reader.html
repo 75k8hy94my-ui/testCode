@@ -4397,13 +4397,20 @@ https://cdn.example.org/c/003.webp"></textarea>
       if (!response.ok) throw new Error('Storageのフォルダ一覧を取得できませんでした。');
       return response.json();
     };
+    const relativeName = (value, prefix) => {
+      const raw = String(value || '');
+      if (raw.startsWith(prefix)) return raw.slice(prefix.length).replace(/^\/+/, '');
+      return raw.replace(/^\/+/, '').split('/').filter(Boolean).pop() || '';
+    };
     const root = await listObjects(session.user.id + '/');
-    const folderNames = root.map((entry) => String(entry.name || '')).filter((name) => name.startsWith('local-') && !name.includes('/'));
+    const rootPrefix = session.user.id + '/';
+    const folderNames = root.map((entry) => relativeName(entry.name, rootPrefix)).filter((name) => name.startsWith('local-') && !name.includes('/'));
     const existingByFolder = new Map(savedItems.filter((item) => item.localSync && item.folderId).map((item) => [item.folderId, item]));
     const storageItems = [];
     for (const folderId of folderNames) {
       const entries = await listObjects(session.user.id + '/' + folderId + '/');
-      const names = entries.map((entry) => String(entry.name || '')).filter((name) => !name.endsWith('/') && /\.(avif|bmp|gif|jpe?g|png|webp)$/i.test(name));
+      const folderPrefix = session.user.id + '/' + folderId + '/';
+      const names = entries.map((entry) => relativeName(entry.name, folderPrefix)).filter((name) => !name.endsWith('/') && !name.includes('/') && /\.(avif|bmp|gif|jpe?g|png|webp)$/i.test(name));
       if (!names.length) continue;
       const paths = names.map((name) => session.user.id + '/' + folderId + '/' + name);
       const old = existingByFolder.get(folderId);
