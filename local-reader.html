@@ -133,7 +133,7 @@
         try{
           for(let i=0;i<pages.length;i++){
             const file=pages[i]; const path=folderPath+'/'+String(i+1).padStart(5,'0')+'-'+safePart(file.name); const response=await fetch(config.url+'/storage/v1/object/'+STORAGE_BUCKET+'/'+path,{method:'POST',headers:{apikey:config.publishableKey,Authorization:'Bearer '+userSession.access_token,'Content-Type':file.type||'application/octet-stream','x-upsert':'true'},body:file,signal:syncAbortController.signal});
-            if(!response.ok){const detail=await response.text().catch(()=>'');if(response.status===404||response.status===400)throw new Error('Storageバケット「'+STORAGE_BUCKET+'」が見つかりません。supabase-schema.sqlをSupabaseで実行してください。');if(response.status===401||response.status===403)throw new Error('Storageへの書き込み権限がありません。ログイン状態とStorageポリシーを確認してください。');throw new Error('画像 '+(i+1)+' のアップロードに失敗しました ('+response.status+')'+(detail?' '+detail.slice(0,120):''));}
+            if(!response.ok){const detail=await response.text().catch(()=>'');if(response.status===404)throw new Error('Storageバケット「'+STORAGE_BUCKET+'」が見つかりません。');if(response.status===401||response.status===403)throw new Error('Storageへの書き込み権限がありません。ログイン状態とStorageポリシーを確認してください。');throw new Error('画像 '+(i+1)+' のアップロードに失敗しました ('+response.status+')'+(detail?' '+detail.slice(0,180):''));}
             uploaded.push(config.url+'/storage/v1/object/public/'+STORAGE_BUCKET+'/'+path); ui.syncStatus.textContent='アップロード中 '+(i+1)+' / '+pages.length; notifySync('アップロード中 '+(i+1)+' / '+pages.length,'');
           }
           const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key)||'')??fallback}catch(_){return fallback}};
