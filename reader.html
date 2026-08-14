@@ -5599,6 +5599,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     currentAuthorView = null;
     bookshelfPage = 1;
     reorderMode = false;
+    bulkEditMode = false;
+    bulkSelectedIds.clear();
+    updateBulkEditButton();
     els.syncedListBtn.disabled = true;
     els.syncedListBtn.textContent = '同期済みを確認中…';
     try {
