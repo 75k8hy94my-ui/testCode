@@ -1492,6 +1492,9 @@ https://cdn.example.org/c/003.webp"></textarea>
   let pages = [];          // source image URLs, index 0 = page 1
   let localSyncObjectUrls = [];
   let localCoverObjectUrls = [];
+  let localSyncPaths = [];
+  let localSyncItemId = '';
+  let localSyncSigning = new Map();
   let splitSpreads = false;
   let preferredExt = 0;    // index into EXT_CANDIDATES
   let pageNumberWidth = 1; // filename zero-padding width: 1 -> 1.jpg, 2 -> 01.jpg
@@ -2971,12 +2974,15 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   async function loadPrivateLocalPages(item) {
-    if (!item.localSync) return (item.pages || []).slice();
+    if (!item.localSync) { localSyncPaths = []; localSyncItemId = ''; localSyncSigning = new Map(); return (item.pages || []).slice(); }
     const session = JSON.parse(localStorage.getItem('mangaReaderSupabaseSession') || 'null');
     const config = window.MANGA_READER_SUPABASE || {};
     const paths = (Array.isArray(item.storagePaths) && item.storagePaths.length ? item.storagePaths : (item.pages || []).map(localStoragePathFromUrl)).filter(Boolean);
     if (!session || !session.access_token || !config.url || paths.length !== (item.pages || []).length) throw new Error('同期画像の保存先情報がありません。もう一度同期してください。');
     clearLocalSyncObjectUrls();
+    localSyncPaths = paths;
+    localSyncItemId = item.id;
+    localSyncSigning = new Map();
     const urls = new Array(paths.length).fill('');
     const firstController = new AbortController();
     const firstTimer = setTimeout(() => firstController.abort(), 10000);
@@ -2987,23 +2993,46 @@ https://cdn.example.org/c/003.webp"></textarea>
       if (error.name === 'AbortError') throw new Error('1ページ目の読み込みが10秒でタイムアウトしました。StorageのSELECTポリシーを確認してください。');
       throw error;
     } finally { clearTimeout(firstTimer); }
-    if (paths.length > 1) {
-      (async () => {
-        let next = 1;
-        const worker = async () => {
-          while (next < paths.length) {
-            const index = next++;
-            try {
-              const encodedPath = paths[index].split('/').map((part) => encodeURIComponent(part)).join('/');
-              urls[index] = await signPrivateLocalUrl(config, session.access_token, encodedPath);
-            } catch (_) { /* 後続ページは次回のページ移動時に再試行 */ }
-          }
-          if (currentItem && currentItem.id === item.id && verticalScrollEnabled) renderVerticalPages(currentPage);
-        };
-        await Promise.all(Array.from({ length: Math.min(8, paths.length - 1) }, worker));
-      })();
-    }
+    localSyncSigning.set(0, Promise.resolve(urls[0]));
     return urls;
+  }
+
+  async function ensureLocalSyncWindow(centerIndex) {
+    if (!localSyncPaths.length || !currentItem || currentItem.id !== localSyncItemId) return;
+    const session = JSON.parse(localStorage.getItem('mangaReaderSupabaseSession') || 'null');
+    const config = window.MANGA_READER_SUPABASE || {};
+    if (!session || !session.access_token || !config.url) return;
+    const first = Math.max(0, centerIndex - 5), last = Math.min(localSyncPaths.length - 1, centerIndex + 5);
+    const tasks = [];
+    for (let index = first; index <= last; index++) {
+      if (pages[index] || localSyncSigning.has(index)) continue;
+      const encodedPath = localSyncPaths[index].split('/').map((part) => encodeURIComponent(part)).join('/');
+      const task = signPrivateLocalUrl(config, session.access_token, encodedPath).then((url) => { pages[index] = url; return url; }).catch(() => '');
+      localSyncSigning.set(index, task);
+      tasks.push(task);
+    }
+    await Promise.all(tasks);
+    if (currentItem && currentItem.id === localSyncItemId && verticalScrollEnabled) renderVerticalPages(currentPage);
+    if (tasks.length) setTimeout(() => warmLocalSyncRest(), 0);
+  }
+
+  async function warmLocalSyncRest() {
+    if (!localSyncPaths.length || !currentItem || currentItem.id !== localSyncItemId) return;
+    const session = JSON.parse(localStorage.getItem('mangaReaderSupabaseSession') || 'null');
+    const config = window.MANGA_READER_SUPABASE || {};
+    if (!session || !session.access_token || !config.url) return;
+    let next = 0;
+    const worker = async () => {
+      while (next < localSyncPaths.length) {
+        const index = next++;
+        if (pages[index] || localSyncSigning.has(index)) continue;
+        const encodedPath = localSyncPaths[index].split('/').map((part) => encodeURIComponent(part)).join('/');
+        const task = signPrivateLocalUrl(config, session.access_token, encodedPath).then((url) => { pages[index] = url; return url; }).catch(() => '');
+        localSyncSigning.set(index, task);
+        await task;
+      }
+    };
+    await Promise.all([worker(), worker()]);
   }
 
   async function startReadingCustom(item, switchDirection) {
@@ -3276,13 +3305,19 @@ https://cdn.example.org/c/003.webp"></textarea>
   // changes again before this one finishes loading, the stale result is
   // dropped (latestRenderId guard) so a slow load can't clobber a newer page.
   function renderPage(n, direction) {
+    const targetUrl = sourceUrlForPage(n);
+    if (localSyncPaths.length && currentItem && currentItem.id === localSyncItemId && !targetUrl) {
+      ensureLocalSyncWindow(n - 1).then(() => {
+        if (currentItem && currentItem.id === localSyncItemId && sourceUrlForPage(n)) renderPage(n, direction);
+      });
+      return;
+    }
     if (verticalScrollEnabled) { renderVerticalPages(n); return; }
     if (suppressNextRenderAnim) {
       direction = null; // the live drag already animated this transition visually
       suppressNextRenderAnim = false;
     }
     const myId = ++latestRenderId;
-    const targetUrl = sourceUrlForPage(n);
     const visual = makeImg(n);
     const img = visual.img;
 
