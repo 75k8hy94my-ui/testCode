@@ -4362,6 +4362,40 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!response.ok) throw new Error('Storage上の画像を削除できませんでした。先にStorage権限を確認してください。');
   }
 
+  async function reconcileLocalSyncItemsFromStorage() {
+    const session = JSON.parse(localStorage.getItem('mangaReaderSupabaseSession') || 'null');
+    const config = window.MANGA_READER_SUPABASE || {};
+    if (!session || !session.access_token || !session.user || !config.url) throw new Error('ログイン状態を確認できません。');
+    const headers = { apikey: config.publishableKey, Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' };
+    const listObjects = async (prefix) => {
+      const response = await fetch(config.url + '/storage/v1/object/list/local-manga', { method: 'POST', headers, body: JSON.stringify({ prefix, limit: 1000, offset: 0, sortBy: { column: 'name', order: 'asc' } }) });
+      if (!response.ok) throw new Error('Storageのフォルダ一覧を取得できませんでした。');
+      return response.json();
+    };
+    const root = await listObjects(session.user.id + '/');
+    const folderNames = root.map((entry) => String(entry.name || '')).filter((name) => name.startsWith('local-') && !name.includes('/'));
+    const existingByFolder = new Map(savedItems.filter((item) => item.localSync && item.folderId).map((item) => [item.folderId, item]));
+    const storageItems = [];
+    for (const folderId of folderNames) {
+      const entries = await listObjects(session.user.id + '/' + folderId + '/');
+      const names = entries.map((entry) => String(entry.name || '')).filter((name) => !name.endsWith('/') && /\.(avif|bmp|gif|jpe?g|png|webp)$/i.test(name));
+      if (!names.length) continue;
+      const paths = names.map((name) => session.user.id + '/' + folderId + '/' + name);
+      const old = existingByFolder.get(folderId);
+      const item = old ? Object.assign({}, old, { pages: paths.map((path) => config.url + '/storage/v1/object/public/local-manga/' + path.split('/').map((part) => encodeURIComponent(part)).join('/')), storagePaths: paths }) : { id: 'local-item-' + folderId, title: folderId, folderId, pages: paths.map((path) => config.url + '/storage/v1/object/public/local-manga/' + path.split('/').map((part) => encodeURIComponent(part)).join('/')), storagePaths: paths, pageMeta: [], favoriteOnly: false, addedAt: Date.now(), localSync: true };
+      storageItems.push(item);
+    }
+    const nonLocalItems = savedItems.filter((item) => !item.localSync);
+    savedItems = nonLocalItems.concat(storageItems);
+    const storageFolderIds = new Set(storageItems.map((item) => item.folderId));
+    savedFolders = savedFolders.filter((folder) => !String(folder.id || '').startsWith('local-') || storageFolderIds.has(folder.id));
+    storageItems.forEach((item) => { if (!savedFolders.some((folder) => folder.id === item.folderId)) savedFolders.push({ id: item.folderId, name: item.title, addedAt: item.addedAt }); });
+    localStorage.setItem(SAVED_ITEMS_KEY, JSON.stringify(savedItems));
+    localStorage.setItem(SAVED_FOLDERS_KEY, JSON.stringify(savedFolders));
+    try { await MangaVault.savePayload(buildSyncPayload()); } catch (_) {}
+    return storageItems.length;
+  }
+
   async function deleteEditingItem() {
     const item = savedItems.find((it) => it.id === editingItemId);
     if (!item) { closeEditItemDialog(); return; }
@@ -5510,13 +5544,25 @@ https://cdn.example.org/c/003.webp"></textarea>
     reorderMode = false;
     renderSavedList();
   });
-  els.syncedListBtn.addEventListener('click', () => {
+  els.syncedListBtn.addEventListener('click', async () => {
     currentFolderView = SYNCED_FOLDER_ID;
     currentSeriesView = null;
     currentAuthorView = null;
     bookshelfPage = 1;
     reorderMode = false;
-    renderSavedList();
+    els.syncedListBtn.disabled = true;
+    els.syncedListBtn.textContent = '同期済みを確認中…';
+    try {
+      const count = await reconcileLocalSyncItemsFromStorage();
+      renderSavedList();
+      flashStatus('Storage上のフォルダを確認しました（' + count + '件）');
+    } catch (error) {
+      renderSavedList();
+      flashStatus(error.message || 'Storageの一覧を取得できませんでした');
+    } finally {
+      els.syncedListBtn.disabled = false;
+      els.syncedListBtn.textContent = '同期済み';
+    }
   });
   els.shelfSortSelect.addEventListener('change', () => {
     shelfSort = els.shelfSortSelect.value;
