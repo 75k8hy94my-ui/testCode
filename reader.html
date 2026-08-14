@@ -2946,11 +2946,12 @@ https://cdn.example.org/c/003.webp"></textarea>
     } catch (_) {}
   }
 
-  async function signPrivateLocalUrl(config, token, encodedPath) {
+  async function signPrivateLocalUrl(config, token, encodedPath, signal) {
     const response = await fetch(config.url + '/storage/v1/object/sign/local-manga/' + encodedPath, {
       method: 'POST',
       headers: { apikey: config.publishableKey, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ expiresIn: 3600 })
+      body: JSON.stringify({ expiresIn: 3600 }),
+      signal
     });
     if (!response.ok) throw new Error('Storage画像の署名URLを取得できませんでした（HTTP ' + response.status + '）。');
     const data = await response.json();
@@ -2976,16 +2977,32 @@ https://cdn.example.org/c/003.webp"></textarea>
     const paths = (Array.isArray(item.storagePaths) && item.storagePaths.length ? item.storagePaths : (item.pages || []).map(localStoragePathFromUrl)).filter(Boolean);
     if (!session || !session.access_token || !config.url || paths.length !== (item.pages || []).length) throw new Error('同期画像の保存先情報がありません。もう一度同期してください。');
     clearLocalSyncObjectUrls();
-    const urls = new Array(paths.length);
-    let next = 0;
-    const worker = async () => {
-      while (next < paths.length) {
-        const index = next++;
-        const encodedPath = paths[index].split('/').map((part) => encodeURIComponent(part)).join('/');
-        urls[index] = await signPrivateLocalUrl(config, session.access_token, encodedPath);
-      }
-    };
-    await Promise.all(Array.from({ length: Math.min(8, paths.length) }, worker));
+    const urls = new Array(paths.length).fill('');
+    const firstController = new AbortController();
+    const firstTimer = setTimeout(() => firstController.abort(), 10000);
+    try {
+      const firstPath = paths[0].split('/').map((part) => encodeURIComponent(part)).join('/');
+      urls[0] = await signPrivateLocalUrl(config, session.access_token, firstPath, firstController.signal);
+    } catch (error) {
+      if (error.name === 'AbortError') throw new Error('1ページ目の読み込みが10秒でタイムアウトしました。StorageのSELECTポリシーを確認してください。');
+      throw error;
+    } finally { clearTimeout(firstTimer); }
+    if (paths.length > 1) {
+      (async () => {
+        let next = 1;
+        const worker = async () => {
+          while (next < paths.length) {
+            const index = next++;
+            try {
+              const encodedPath = paths[index].split('/').map((part) => encodeURIComponent(part)).join('/');
+              urls[index] = await signPrivateLocalUrl(config, session.access_token, encodedPath);
+            } catch (_) { /* 後続ページは次回のページ移動時に再試行 */ }
+          }
+          if (currentItem && currentItem.id === item.id && verticalScrollEnabled) renderVerticalPages(currentPage);
+        };
+        await Promise.all(Array.from({ length: Math.min(8, paths.length - 1) }, worker));
+      })();
+    }
     return urls;
   }
 
