@@ -60,9 +60,9 @@
       const natural = new Intl.Collator(undefined, {numeric:true, sensitivity:'base'});
       function clearUrls(){ urls.forEach(url => URL.revokeObjectURL(url)); urls=[]; }
       function fileName(file){ return file.webkitRelativePath || file.name; }
-      function sortFiles(files){ return [...files].filter(file => imageTypes.test(file.type) || /\.(avif|bmp|gif|jpe?g|png|svg|webp)$/i.test(file.name)).sort((a,b) => natural.compare(fileName(a),fileName(b))); }
+      function sortFiles(files){ return Array.from(files || []).filter(file => imageTypes.test(file.type || '') || /\.(avif|bmp|gif|jpe?g|jfif|png|svg|webp)$/i.test(file.name)).sort((a,b) => natural.compare(fileName(a),fileName(b))); }
       function loadFiles(fileList){
-        const files = sortFiles(fileList); if(!files.length){ ui.status.textContent='画像ファイルが見つかりません'; return; }
+        const files = sortFiles(fileList); if(!files.length){ ui.status.textContent=fileList && fileList.length ? '画像として読み込めるファイルが見つかりません（JPG / PNG / WEBPなどを選択してください）' : 'フォルダが選択されていません'; return; }
         clearUrls(); pages = files; urls = files.map(file => URL.createObjectURL(file));
         const first = fileName(files[0]), folder = first.includes('/') ? first.split('/')[0] : '選択した画像';
         currentFolder = folder; ui.folder.textContent = folder; ui.empty.hidden=true; ui.reader.hidden=false; ui.bottom.hidden=false; ui.syncButton.hidden=false; ui.syncButton.disabled=false; ui.syncButton.textContent='同期対象に追加'; ui.syncStatus.textContent=''; ui.reader.replaceChildren();
@@ -98,7 +98,8 @@
         }catch(error){ui.syncStatus.textContent=error.message||'同期できませんでした';}
         finally{ui.syncButton.disabled=false;}
       }
-      ui.open.addEventListener('click',()=>ui.input.click()); ui.emptyOpen.addEventListener('click',()=>ui.input.click()); ui.input.addEventListener('change',e=>loadFiles(e.target.files)); ui.mode.addEventListener('change',e=>setMode(e.target.value)); ui.sort.addEventListener('click',reverseOrder); ui.syncButton.addEventListener('click',syncToCloud); ui.reader.addEventListener('scroll',()=>{if(!framePending){framePending=true;requestAnimationFrame(()=>{framePending=false;updateCounter();});}}); ui.toggle.addEventListener('click',toggleBars);
+      function chooseFolder(){ ui.input.value=''; ui.input.click(); }
+      ui.open.addEventListener('click',chooseFolder); ui.emptyOpen.addEventListener('click',chooseFolder); ui.input.addEventListener('change',e=>loadFiles(e.target.files)); ui.mode.addEventListener('change',e=>setMode(e.target.value)); ui.sort.addEventListener('click',reverseOrder); ui.syncButton.addEventListener('click',syncToCloud); ui.reader.addEventListener('scroll',()=>{if(!framePending){framePending=true;requestAnimationFrame(()=>{framePending=false;updateCounter();});}}); ui.toggle.addEventListener('click',toggleBars);
       ui.fullscreen.addEventListener('click',()=>{if(!document.fullscreenElement)ui.app.requestFullscreen?.();else document.exitFullscreen?.();});
       ['dragenter','dragover'].forEach(type=>ui.drop.addEventListener(type,e=>{e.preventDefault();ui.drop.classList.add('dragging');})); ['dragleave','drop'].forEach(type=>ui.drop.addEventListener(type,e=>{e.preventDefault();ui.drop.classList.remove('dragging');})); ui.drop.addEventListener('drop',e=>loadFiles(e.dataTransfer.files));
       document.addEventListener('keydown',e=>{if(e.key.toLowerCase()==='m'){toggleBars();return;}if(!pages.length)return; if(e.key==='ArrowRight'||e.key==='ArrowDown'){e.preventDefault();ui.reader.scrollBy(ui.reader.classList.contains('vertical')?{top:window.innerHeight*.85,behavior:'smooth'}:{left:ui.reader.clientWidth*.85,behavior:'smooth'});}if(e.key==='ArrowLeft'||e.key==='ArrowUp'){e.preventDefault();ui.reader.scrollBy(ui.reader.classList.contains('vertical')?{top:-window.innerHeight*.85,behavior:'smooth'}:{left:-ui.reader.clientWidth*.85,behavior:'smooth'});}});
