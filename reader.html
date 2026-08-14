@@ -1491,6 +1491,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   let baseUrl = '';
   let pages = [];          // source image URLs, index 0 = page 1
   let localSyncObjectUrls = [];
+  let localCoverObjectUrls = [];
   let splitSpreads = false;
   let preferredExt = 0;    // index into EXT_CANDIDATES
   let pageNumberWidth = 1; // filename zero-padding width: 1 -> 1.jpg, 2 -> 01.jpg
@@ -2926,6 +2927,30 @@ https://cdn.example.org/c/003.webp"></textarea>
   function clearLocalSyncObjectUrls() {
     localSyncObjectUrls.forEach((url) => URL.revokeObjectURL(url));
     localSyncObjectUrls = [];
+  }
+
+  function clearLocalCoverObjectUrls() {
+    localCoverObjectUrls.forEach((url) => URL.revokeObjectURL(url));
+    localCoverObjectUrls = [];
+  }
+
+  async function loadLocalCover(item, img) {
+    try {
+      const session = JSON.parse(localStorage.getItem('mangaReaderSupabaseSession') || 'null');
+      const config = window.MANGA_READER_SUPABASE || {};
+      const path = (Array.isArray(item.storagePaths) && item.storagePaths[0]) || localStoragePathFromUrl(item.pages && item.pages[0]);
+      if (!session || !session.access_token || !path || !config.url) return;
+      const encodedPath = path.split('/').map((part) => encodeURIComponent(part)).join('/');
+      const response = await fetch(config.url + '/storage/v1/object/local-manga/' + encodedPath, { headers: { apikey: config.publishableKey, Authorization: 'Bearer ' + session.access_token } });
+      if (!response.ok) return;
+      const objectUrl = URL.createObjectURL(await response.blob());
+      if (img.isConnected) {
+        localCoverObjectUrls.push(objectUrl);
+        img.src = objectUrl;
+      } else {
+        URL.revokeObjectURL(objectUrl);
+      }
+    } catch (_) {}
   }
 
   function localStoragePathFromUrl(value) {
@@ -4708,8 +4733,12 @@ https://cdn.example.org/c/003.webp"></textarea>
     img.fetchPriority = 'low';
     if (Array.isArray(item.pages) && item.pages.length) {
       const source = item.pages[0];
-      img.src = coverSourceCache.get(source) || source; // exact URL already known; no extension cascade needed
-      img.addEventListener('load', () => coverSourceCache.set(source, img.currentSrc || img.src), { once: true });
+      if (item.localSync) {
+        loadLocalCover(item, img);
+      } else {
+        img.src = coverSourceCache.get(source) || source; // exact URL already known; no extension cascade needed
+        img.addEventListener('load', () => coverSourceCache.set(source, img.currentSrc || img.src), { once: true });
+      }
     } else {
       setupFeedImage(img, item.url, item.numberWidth, item.pagePattern);
     }
@@ -4770,6 +4799,14 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     card.appendChild(cover);
     card.appendChild(title);
+    if (!reorderMode && !bulkEditMode) {
+      const editBtn = document.createElement('button');
+      editBtn.className = 'ctrlBtn book-editBtn';
+      editBtn.type = 'button';
+      editBtn.textContent = 'タイトル等を編集';
+      editBtn.addEventListener('click', (event) => { event.stopPropagation(); openEditItemDialog(item); });
+      card.appendChild(editBtn);
+    }
     if (item.series) {
       const seriesEl = document.createElement('div');
       seriesEl.className = 'book-series';
@@ -5002,6 +5039,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   function renderSavedList() {
+    clearLocalCoverObjectUrls();
     const inSeriesGroup = currentFolderView === SERIES_FOLDER_ID && !!currentSeriesView;
     const inSeriesRoot = currentFolderView === SERIES_FOLDER_ID && !currentSeriesView;
     const inAuthorView = !!currentAuthorView;
@@ -5060,8 +5098,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       // Series-tagged works belong to the virtual シリーズ shelf at the
       // root. Do not also render them as individual cards beside that shelf;
       // works with the same series name are grouped there automatically.
-      itemsList = savedItems.filter((it) => !it.folderId && !it.series);
-      folderCards = savedFolders.filter((folder) => folder.id !== HISTORY_FOLDER_ID);
+      itemsList = savedItems.filter((it) => (!it.folderId || it.localSync) && !it.series);
+      folderCards = savedFolders.filter((folder) => folder.id !== HISTORY_FOLDER_ID && !String(folder.id || '').startsWith('local-'));
       showFavoritesCard = true;
       showSeriesCard = true;
     } else if (currentFolderView === FAVORITES_FOLDER_ID) {
