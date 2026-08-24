@@ -33,3 +33,10 @@ Supabaseのデータベース内容が漏えいしても、保管庫パスフレ
 保管庫の「一括読み込み」は、保存済みURLのうちページ数が未検出の作品を順に調べ、結果を通常の同期データとして保存します。1作品につき最大6ページを並列に確認しますが、複数作品は同時に読まず、サイトへの負荷を抑えます。
 
 画像取得がタイムアウトした場合は、確認できた最後のページ数を保持して「途中から再試行」の対象にします。再試行では既に確認済みのページを読み直さず、次のページから続けます。ファイルが存在しないことを確認できた場合だけ、その作品のページ数を確定します。
+## Vault and Storage threat model
+
+- Vault metadata and content are encrypted in the browser with AES-GCM before being sent to Supabase.
+- Local manga image blobs are stored in a private Supabase Storage bucket protected by authentication and RLS.
+- The Storage image blobs themselves are not currently end-to-end encrypted on the client.
+- The account login password and the vault passphrase/recovery key are separate credentials. Resetting the account password does not reset vault access.
+- Vault writes use a database-side revision CAS. A stale client receives a conflict and its local data is not deleted.

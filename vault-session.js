@@ -14,6 +14,13 @@
   const fromB64url = (value) => { const normalized = String(value || '').replace(/-/g, '+').replace(/_/g, '/'); const raw = atob(normalized + '==='.slice((normalized.length + 3) % 4)); return Uint8Array.from(raw, (char) => char.charCodeAt(0)); };
   const randomBytes = (length) => { const bytes = new Uint8Array(length); crypto.getRandomValues(bytes); return bytes; };
   const toArrayBuffer = (bytes) => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  function passkeyRpId() {
+    const host = String(location.hostname || '').toLowerCase();
+    const isIpAddress = /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) || host.includes(':');
+    const isLocalhost = host === 'localhost' || host.endsWith('.localhost');
+    if (isIpAddress || (!isLocalhost && location.protocol !== 'https:')) throw new Error('Passkeyを使うには、localhostまたはHTTPSのドメインで開いてください。127.0.0.1では登録できません。');
+    return host;
+  }
   const importAes = (raw) => crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
   async function derivePassphrase(passphrase, salt) {
     const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
@@ -23,13 +30,14 @@
   async function decrypt(key, encrypted) { return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64url(encrypted.iv) }, key, fromB64url(encrypted.ciphertext))); }
   async function passkeyKey(output) { return importAes(new Uint8Array(await crypto.subtle.digest('SHA-256', output))); }
   function passkeySupported() { return Boolean(window.PublicKeyCredential && navigator.credentials && typeof navigator.credentials.create === 'function' && typeof navigator.credentials.get === 'function'); }
-  async function registerPasskeyCredential(email) {
+  async function registerPasskeyCredential(user) {
     if (!passkeySupported()) throw new Error('このブラウザはパスキーに対応していません。');
+    const rpId = passkeyRpId();
     const salt = randomBytes(32);
     const credential = await navigator.credentials.create({ publicKey: {
       challenge: toArrayBuffer(randomBytes(32)),
-      rp: { name: '漫画リーダー', id: location.hostname },
-      user: { id: toArrayBuffer(new TextEncoder().encode(email)), name: email, displayName: email },
+      rp: { name: '漫画リーダー', id: rpId },
+      user: { id: toArrayBuffer(new TextEncoder().encode(user.id)), name: user.email, displayName: user.email },
       pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
       authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
       timeout: 60000,
@@ -37,19 +45,26 @@
     }});
     const result = credential && credential.getClientExtensionResults && credential.getClientExtensionResults();
     const first = result && result.prf && result.prf.results && result.prf.results.first;
-    if (!first) throw new Error('このパスキーまたはブラウザは保管庫解除用PRFに対応していません。');
-    const key = await passkeyKey(new Uint8Array(first));
+    let prfOutput = first;
+    if (!prfOutput) {
+      const fallback = await navigator.credentials.get({ publicKey: { challenge: toArrayBuffer(randomBytes(32)), rpId, allowCredentials: [{ type: 'public-key', id: credential.rawId }], userVerification: 'required', timeout: 60000, extensions: { prf: { evalByCredential: { [b64url(new Uint8Array(credential.rawId))]: { first: toArrayBuffer(salt) } } } } } });
+      const fallbackResult = fallback && fallback.getClientExtensionResults && fallback.getClientExtensionResults();
+      prfOutput = fallbackResult && fallbackResult.prf && fallbackResult.prf.results && fallbackResult.prf.results.first;
+    }
+    if (!prfOutput) throw new Error('このパスキーまたはブラウザは保管庫解除用PRFに対応していません。');
+    const key = await passkeyKey(new Uint8Array(prfOutput));
     return { id: b64url(new Uint8Array(credential.rawId)), salt: b64url(salt), encryptedKey: await encrypt(key, loadActive().rawKey) };
   }
   async function unlockByPasskey(wrappers) {
     if (!passkeySupported()) throw new Error('このブラウザはパスキーに対応していません。');
+    const rpId = passkeyRpId();
     const entries = Array.isArray(wrappers) ? wrappers : [wrappers];
     const allowCredentials = entries.map((entry) => ({ type: 'public-key', id: toArrayBuffer(fromB64url(entry.id)) }));
     const evalByCredential = {};
     entries.forEach((entry) => { evalByCredential[entry.id] = { first: toArrayBuffer(fromB64url(entry.salt)) }; });
     const credential = await navigator.credentials.get({ publicKey: {
       challenge: toArrayBuffer(randomBytes(32)),
-      rpId: location.hostname,
+      rpId,
       allowCredentials,
       userVerification: 'required', timeout: 60000,
       extensions: { prf: { evalByCredential } }
@@ -100,9 +115,17 @@
     }
   }
   async function fetchRecord(token, user) {
-    const rows = await api('/rest/v1/manga_reader_vaults?select=payload,updated_at&user_id=eq.' + encodeURIComponent(user.id) + '&limit=2', { token });
+    let rows;
+    let legacyRevision = false;
+    try {
+      rows = await api('/rest/v1/manga_reader_vaults?select=payload,revision,updated_at&user_id=eq.' + encodeURIComponent(user.id) + '&limit=2', { token });
+    } catch (error) {
+      if (!String(error.message || '').includes('(400)')) throw error;
+      rows = await api('/rest/v1/manga_reader_vaults?select=payload,updated_at&user_id=eq.' + encodeURIComponent(user.id) + '&limit=2', { token });
+      legacyRevision = true;
+    }
     if (rows && rows.length > 1) throw new Error('このアカウントに複数の保管庫が存在します。安全のため処理を停止しました。');
-    return rows && rows[0] ? rows[0] : null;
+    return rows && rows[0] ? Object.assign({}, rows[0], legacyRevision ? { legacyRevision: true, revision: 1 } : {}) : null;
   }
   async function fetchRecordForUi(token, user) { return fetchRecord(token, user); }
   async function create(passphrase) {
@@ -147,12 +170,18 @@
   async function savePayload(payload) {
     return withSession(async (token, user) => {
       const existing = await fetchRecord(token, user);
+      if (existing && existing.legacyRevision) throw new Error('Supabaseのrevision migrationが未適用です。supabase-schema.sqlをSQL Editorで実行してから保存してください。');
       const known = getMeta(user.id);
-      if (existing && known && existing.updated_at !== known) throw new Error('別の端末で更新されています。いったんログインし直して最新の保管庫を読み込んでください。');
+      const knownRevision = typeof known === 'object' ? known.revision : null;
+      if (existing && knownRevision == null) throw new Error('保管庫の同期状態を確認できません。保管庫を再読込してから変更してください。');
       if (existing && !known) throw new Error('保管庫を読み込んでから変更してください。');
-      const rows = await api('/rest/v1/manga_reader_vaults?on_conflict=user_id', { method: 'POST', token, headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify({ user_id: user.id, payload: await envelope(payload), updated_at: new Date().toISOString() }) });
-      setMeta(user.id, rows[0] && rows[0].updated_at);
-      return rows[0];
+      if (existing) {
+        const rows = await api('/rest/v1/rpc/update_manga_reader_vault', { method: 'POST', token, body: JSON.stringify({ expected_revision: knownRevision, new_payload: await envelope(payload) }) });
+        if (!rows || !rows.length) throw new Error('別の端末で更新されています。現在の端末の変更はまだ残っています。クラウドを再読込してから再試行してください。');
+        setMeta(user.id, rows[0]); return Object.assign({}, existing, rows[0]);
+      }
+      const rows = await api('/rest/v1/manga_reader_vaults?on_conflict=user_id', { method: 'POST', token, headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify({ user_id: user.id, payload: await envelope(payload), revision: 1, updated_at: new Date().toISOString() }) });
+      setMeta(user.id, rows[0] && { revision: rows[0].revision, updatedAt: rows[0].updated_at }); return rows[0];
     });
   }
   async function initialize(passphrase, recoveryCode, buildPayload, applyPayload) {
@@ -161,12 +190,12 @@
       if (record) {
         await unlock(record.payload, passphrase, recoveryCode);
         await applyPayload(await decryptPayload(record.payload));
-        setMeta(user.id, record.updated_at);
+        setMeta(user.id, { revision: record.revision || 1, updatedAt: record.updated_at });
         return { created: false };
       }
       const created = await create(passphrase);
       const rows = await api('/rest/v1/manga_reader_vaults?on_conflict=user_id', { method: 'POST', token, headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify({ user_id: user.id, payload: await envelope(buildPayload()), updated_at: new Date().toISOString() }) });
-      setMeta(user.id, rows[0] && rows[0].updated_at);
+      setMeta(user.id, rows[0] && { revision: rows[0].revision || 1, updatedAt: rows[0].updated_at });
       return { created: true, recoveryCode: created.recoveryCode };
     });
   }
@@ -175,8 +204,8 @@
       const record = await fetchRecord(token, user);
       if (!record) throw new Error('先にパスフレーズで保管庫を作成してください。');
       await unlock(record.payload, passphrase, '');
-      setMeta(user.id, record.updated_at);
-      const wrapper = await registerPasskeyCredential(user.email);
+      setMeta(user.id, { revision: record.revision || 1, updatedAt: record.updated_at });
+      const wrapper = await registerPasskeyCredential(user);
       const vault = loadActive();
       const existing = Array.isArray(vault.keyWraps.passkeys)
         ? vault.keyWraps.passkeys
@@ -200,7 +229,7 @@
       const vault = { rawKey, keyWraps: record.payload.keyWraps };
       saveActive(vault);
       await applyPayload(await decryptPayload(record.payload));
-      setMeta(user.id, record.updated_at);
+      setMeta(user.id, { revision: record.revision || 1, updatedAt: record.updated_at });
       return { created: false };
     });
   }

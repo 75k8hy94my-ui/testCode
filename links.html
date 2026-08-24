@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0c11">
 <title>漫画リーダー</title>
-<link rel="icon" type="image/png" href="icon-bookshelf.png">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-bookshelf.png">
+<link rel="icon" type="image/png" href="icon-152.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
 <style>
   :root {
     color-scheme: dark;
@@ -238,6 +238,22 @@
     box-shadow: var(--shadow);
   }
   dialog::backdrop { background: rgba(0, 0, 0, .68); backdrop-filter: blur(5px); }
+  .screenView {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    width: 100%;
+    min-height: 100dvh;
+    overflow-y: auto;
+    padding: max(18px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
+    border: 0;
+    border-radius: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .screenView.show { display: block; }
+  .screenView > form { width: min(560px, 100%); margin: 0 auto; }
   form { padding: 20px; }
   .dialog-title { margin: 0 0 18px; font-size: 21px; }
   label { display: block; margin-top: 13px; color: var(--sub); font-size: 13px; }
@@ -289,6 +305,29 @@
     body { padding-left: 24px; padding-right: 24px; }
     .card { padding: 18px; }
   }
+  /* Liquid Glass is reserved for navigation, controls and transient
+     surfaces; saved link cards remain a stable reading surface. */
+  .primary, .secondary, .icon-btn, .filter-btn, #searchInput {
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    backdrop-filter: blur(18px) saturate(160%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.34), inset 0 -1px 0 rgba(0,0,0,.16), 0 6px 18px rgba(0,0,0,.12);
+    transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+  }
+  .primary { background: linear-gradient(145deg, rgba(122,162,255,.92), rgba(83,121,225,.64)); border-color: rgba(255,255,255,.46); color: #fff; }
+  .secondary, .filter-btn { background: linear-gradient(145deg, rgba(255,255,255,.16), rgba(255,255,255,.055)); border-color: rgba(255,255,255,.20); }
+  .primary:hover, .secondary:hover, .filter-btn:hover, .icon-btn:hover { transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255,255,255,.42), 0 9px 22px rgba(0,0,0,.18); }
+  .primary:active, .secondary:active, .filter-btn:active, .icon-btn:active { transform: scale(.98); }
+  #searchInput { background: linear-gradient(145deg, rgba(255,255,255,.16), rgba(255,255,255,.055)); border-color: rgba(255,255,255,.22); }
+  dialog { background: linear-gradient(145deg, rgba(31,37,52,.88), rgba(16,20,28,.76)); border-color: rgba(255,255,255,.24); -webkit-backdrop-filter: blur(30px) saturate(170%); backdrop-filter: blur(30px) saturate(170%); box-shadow: 0 24px 70px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.28); }
+  dialog::backdrop { background: rgba(5,7,12,.46); -webkit-backdrop-filter: blur(20px) saturate(135%); backdrop-filter: blur(20px) saturate(135%); }
+  label input, label textarea { background: rgba(10,14,22,.48); border-color: rgba(255,255,255,.18); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+  .tag { background: rgba(122,162,255,.12); border-color: rgba(122,162,255,.28); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+  .toast { background: linear-gradient(145deg, rgba(37,43,57,.82), rgba(20,24,32,.68)); border-color: rgba(255,255,255,.24); -webkit-backdrop-filter: blur(26px) saturate(160%); backdrop-filter: blur(26px) saturate(160%); }
+  html[data-theme="light"] .primary { background: linear-gradient(145deg, rgba(88,101,242,.92), rgba(88,101,242,.66)); }
+  html[data-theme="light"] .secondary, html[data-theme="light"] .filter-btn, html[data-theme="light"] #searchInput { background: linear-gradient(145deg, rgba(255,255,255,.72), rgba(255,255,255,.34)); border-color: rgba(255,255,255,.86); box-shadow: inset 0 1px 0 rgba(255,255,255,.96), 0 6px 18px rgba(60,60,67,.10); }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .primary, .secondary, .icon-btn, .filter-btn, #searchInput, dialog, .toast { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  }
 </style>
 </head>
 <body>
@@ -325,7 +364,7 @@
   </footer>
 </main>
 
-<dialog id="editDialog">
+<section id="editDialog" class="screenView" role="region" aria-labelledby="dialogTitle" aria-hidden="true">
   <form id="editForm">
     <h2 class="dialog-title" id="dialogTitle">リンクを追加</h2>
     <input id="itemId" type="hidden">
@@ -351,7 +390,7 @@
       <button class="primary" type="submit">保存</button>
     </div>
   </form>
-</dialog>
+</section>
 
 <div class="toast" id="toast" role="status"></div>
 
@@ -386,6 +425,34 @@
     cancelBtn: document.getElementById('cancelBtn'),
     toast: document.getElementById('toast'),
   };
+  const linkScreen = 'link-edit';
+  let currentLinkScreen = null;
+  function renderLinkScreen(screen) {
+    currentLinkScreen = screen === linkScreen ? screen : null;
+    els.editDialog.classList.toggle('show', currentLinkScreen === linkScreen);
+    els.editDialog.setAttribute('aria-hidden', currentLinkScreen === linkScreen ? 'false' : 'true');
+  }
+  function linkScreenFromLocation() {
+    return new URLSearchParams(location.hash.replace(/^#/, '')).get('screen') === linkScreen ? linkScreen : null;
+  }
+  function navigateLinkScreen(screen, { replace = false } = {}) {
+    const url = new URL(location.href);
+    url.hash = screen === linkScreen ? 'screen=' + linkScreen : '';
+    const state = { ...(history.state || {}), linkScreen: screen === linkScreen ? linkScreen : null };
+    if (replace) history.replaceState(state, '', url);
+    else history.pushState(state, '', url);
+    renderLinkScreen(screen);
+  }
+  function openLinkScreen() { if (currentLinkScreen !== linkScreen) navigateLinkScreen(linkScreen); }
+  function closeLinkScreen() {
+    if (currentLinkScreen !== linkScreen) return;
+    if (history.state && history.state.linkScreen === linkScreen) history.back();
+    else navigateLinkScreen(null, { replace: true });
+  }
+  function syncLinkScreen() { renderLinkScreen(linkScreenFromLocation()); }
+  window.addEventListener('popstate', syncLinkScreen);
+  window.addEventListener('hashchange', syncLinkScreen);
+  renderLinkScreen(linkScreenFromLocation());
   const THEME_KEY = 'mangaReaderTheme';
   function applyTheme(theme) {
     const selected = theme === 'light' ? 'light' : 'dark';
@@ -653,12 +720,12 @@
     els.noteInput.value = data.note || '';
     els.tagsInput.value = normalizeTags(data.tags).join(', ');
     els.formError.textContent = '';
-    els.editDialog.showModal();
+    openLinkScreen();
     window.setTimeout(() => (els.urlInput.value ? els.titleInput : els.urlInput).focus(), 0);
   }
 
   function closeEditor() {
-    els.editDialog.close();
+    closeLinkScreen();
     els.editForm.reset();
     els.formError.textContent = '';
   }
@@ -778,7 +845,7 @@
   els.themeBtn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'));
   els.cancelBtn.addEventListener('click', () => { closeEditor(); clearCaptureQuery(); });
   els.editForm.addEventListener('submit', submitEditor);
-  els.editDialog.addEventListener('cancel', () => { clearCaptureQuery(); });
+  els.editDialog.addEventListener('cancel', (event) => { event.preventDefault(); closeEditor(); clearCaptureQuery(); });
   els.searchInput.addEventListener('input', render);
   els.clearSearchBtn.addEventListener('click', () => { els.searchInput.value = ''; render(); els.searchInput.focus(); });
   els.filters.forEach((button) => button.addEventListener('click', () => {

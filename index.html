@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#2563eb">
   <title>漫画リーダー</title>
-  <link rel="icon" type="image/png" href="icon-bookshelf.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="icon-bookshelf.png">
+  <link rel="icon" type="image/png" href="icon-152.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
   <style>
     :root { --bg:#f5f7fb; --surface:#fff; --text:#1e293b; --sub:#64748b; --line:#dbe3ee; --accent:#2563eb; --accent-dark:#1d4ed8; --radius:14px; }
     * { box-sizing:border-box; } body { margin:0; min-height:100vh; color:var(--text); background:linear-gradient(150deg,#edf4ff 0%,var(--bg) 45%,#f8fafc 100%); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
@@ -14,6 +14,42 @@
     .intro { color:var(--sub); font-size:14px; line-height:1.7; margin:0 0 24px; }.card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:0 14px 36px rgba(15,23,42,.08); padding:24px; }
     label { display:block; font-size:13px; font-weight:700; margin:15px 0 6px; } input { width:100%; padding:12px; border:1px solid var(--line); border-radius:9px; color:var(--text); background:#fbfdff; font:inherit; } input:focus { outline:3px solid rgba(37,99,235,.16); border-color:var(--accent); }
     button { width:100%; appearance:none; border:0; border-radius:9px; padding:12px 14px; font:inherit; font-weight:700; cursor:pointer; } button:disabled { opacity:.55; cursor:wait; }.primary { margin-top:20px; background:var(--accent); color:#fff; }.primary:hover { background:var(--accent-dark); }.switch { margin:18px 0 0; color:var(--sub); font-size:14px; text-align:center; }.link-button { width:auto; color:var(--accent); background:transparent; padding:0; font-size:inherit; font-weight:700; }.status { min-height:1.5em; color:var(--sub); line-height:1.6; font-size:13px; margin:14px 0 0; }[hidden] { display:none !important; } @media (max-width:520px) { main { width:min(100% - 24px,440px); padding-top:48px; }.card { padding:18px; } }
+    /* Liquid Glass: keep the form readable while giving the app chrome a
+       translucent, depth-aware material. */
+    body {
+      background:
+        radial-gradient(90% 55% at 0% 0%, rgba(122,162,255,.28), transparent 68%),
+        radial-gradient(80% 55% at 100% 100%, rgba(37,99,235,.12), transparent 70%),
+        linear-gradient(145deg, #e9f1ff 0%, var(--bg) 48%, #f8fafc 100%);
+    }
+    /* Content surface stays stable; Liquid Glass belongs to the controls and
+       navigation layer, not to the form's reading surface. */
+    .card {
+      background: rgba(255,255,255,.88);
+      border-color: rgba(203,213,225,.78);
+      box-shadow: 0 24px 60px rgba(30,64,125,.14), inset 0 1px 0 rgba(255,255,255,.96);
+    }
+    input {
+      background: rgba(255,255,255,.52);
+      border-color: rgba(148,163,184,.42);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.68);
+    }
+    button:not(.link-button) {
+      border: 1px solid rgba(255,255,255,.72);
+      background: linear-gradient(145deg, rgba(255,255,255,.68), rgba(255,255,255,.34));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.86), inset 0 -1px 0 rgba(70,90,125,.10), 0 6px 16px rgba(30,64,125,.08);
+      -webkit-backdrop-filter: blur(16px) saturate(145%);
+      backdrop-filter: blur(16px) saturate(145%);
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+    }
+    button:not(.link-button):hover { transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 9px 20px rgba(30,64,125,.13); }
+    button:not(.link-button):active { transform: scale(.98); }
+    .primary { background: linear-gradient(145deg, rgba(37,99,235,.96), rgba(37,99,235,.72)); color: #fff; border-color: rgba(255,255,255,.58); box-shadow: inset 0 1px 0 rgba(255,255,255,.42), 0 8px 20px rgba(37,99,235,.24); }
+    .primary:hover { background: linear-gradient(145deg, rgba(29,78,216,.98), rgba(37,99,235,.78)); }
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .card { background: rgba(255,255,255,.96); }
+      button:not(.link-button), input { background: rgba(255,255,255,.98); }
+    }
   </style>
 </head>
 <body>
@@ -31,7 +67,10 @@
           <button class="primary" type="submit">ログイン</button>
         </form>
         <p class="switch">アカウントをお持ちでないですか？ <button id="showSignup" class="link-button" type="button">アカウントを作成</button></p>
+        <p class="switch"><button id="showReset" class="link-button" type="button">ログインパスワードを忘れた</button></p>
       </div>
+      <div id="resetView" hidden><h2>ログインパスワードをリセット</h2><p class="intro">保管庫パスフレーズや復旧キーとは別のものです。</p><form id="resetForm"><label for="resetEmail">メールアドレス</label><input id="resetEmail" type="email" autocomplete="email" required><button class="primary" type="submit">リセットメールを送る</button></form><p class="switch"><button id="resetBack" class="link-button" type="button">ログインへ戻る</button></p></div>
+      <div id="completeResetView" hidden><h2>新しいログインパスワード</h2><p class="intro">保管庫パスフレーズや復旧キーは変更されません。</p><form id="completeResetForm"><label for="newPassword">新しいパスワード</label><input id="newPassword" type="password" autocomplete="new-password" minlength="8" required><button class="primary" type="submit">パスワードを更新</button></form></div>
       <div id="signupView" hidden>
         <h2>アカウント作成</h2>
         <form id="signupForm">
@@ -53,19 +92,23 @@
     const SESSION_KEY = 'mangaReaderSupabaseSession';
     const config = window.MANGA_READER_SUPABASE || {};
     const $ = (id) => document.getElementById(id);
-    const ui = { loginView:$('loginView'), signupView:$('signupView'), loginForm:$('loginForm'), loginEmail:$('loginEmail'), loginPassword:$('loginPassword'), signupForm:$('signupForm'), signupEmail:$('signupEmail'), signupPassword:$('signupPassword'), showSignup:$('showSignup'), showLogin:$('showLogin'), status:$('status') };
+    const ui = { loginView:$('loginView'), signupView:$('signupView'), resetView:$('resetView'), completeResetView:$('completeResetView'), loginForm:$('loginForm'), loginEmail:$('loginEmail'), loginPassword:$('loginPassword'), signupForm:$('signupForm'), signupEmail:$('signupEmail'), signupPassword:$('signupPassword'), resetForm:$('resetForm'), resetEmail:$('resetEmail'), completeResetForm:$('completeResetForm'), newPassword:$('newPassword'), showSignup:$('showSignup'), showLogin:$('showLogin'), showReset:$('showReset'), resetBack:$('resetBack'), status:$('status') };
     function setStatus(text) { ui.status.textContent = text || ''; }
     function loadSession() { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (_) { return null; } }
     function saveSession(session) { if (session) localStorage.setItem(SESSION_KEY,JSON.stringify(session)); else localStorage.removeItem(SESSION_KEY); }
     function assertConfig() { if (!config.url || !config.publishableKey) throw new Error('Supabase の設定が見つかりません。'); }
     async function api(path, options = {}) { assertConfig(); const headers=Object.assign({apikey:config.publishableKey},options.headers || {}); if (options.token) headers.Authorization='Bearer '+options.token; if (options.body) headers['Content-Type']='application/json'; const response=await fetch(config.url+path,Object.assign({},options,{headers})); if (!response.ok) { const detail=await response.text().catch(()=>''); throw new Error('通信に失敗しました ('+response.status+')'+(detail ? '。'+detail.slice(0,140) : '')); } return response.status===204 ? null : response.json(); }
-    function showLogin(message) { ui.loginView.hidden=false; ui.signupView.hidden=true; ui.loginPassword.value=''; setStatus(message); }
-    function showSignup() { ui.loginView.hidden=true; ui.signupView.hidden=false; ui.signupPassword.value=''; setStatus(''); ui.signupEmail.focus(); }
+    function showLogin(message) { ui.loginView.hidden=false; ui.signupView.hidden=true; ui.resetView.hidden=true; ui.completeResetView.hidden=true; ui.loginPassword.value=''; setStatus(message); }
+    function showSignup() { ui.loginView.hidden=true; ui.signupView.hidden=false; ui.resetView.hidden=true; ui.completeResetView.hidden=true; ui.signupPassword.value=''; setStatus(''); ui.signupEmail.focus(); }
+    function showReset() { ui.loginView.hidden=true; ui.signupView.hidden=true; ui.resetView.hidden=false; setStatus(''); ui.resetEmail.value=ui.loginEmail.value; ui.resetEmail.focus(); }
     function goReader() { window.location.replace('reader.html'); }
     async function refreshSavedSession() { const session=loadSession(); if (!session || !session.refresh_token) return; try { const next=await api('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:JSON.stringify({refresh_token:session.refresh_token})}); saveSession(next); goReader(); } catch (_) { saveSession(null); } }
     async function login(event) { event.preventDefault(); const email=ui.loginEmail.value.trim(),password=ui.loginPassword.value,button=ui.loginForm.querySelector('button'); if (!email || !password) return; button.disabled=true; try { saveSession(await api('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email,password})})); goReader(); } catch (error) { setStatus(error.message || 'ログインできませんでした。'); } finally { button.disabled=false; } }
     async function signup(event) { event.preventDefault(); const email=ui.signupEmail.value.trim(),password=ui.signupPassword.value,button=ui.signupForm.querySelector('button'); if (!email || password.length<8) { setStatus('メールアドレスと8文字以上のパスワードを入力してください。'); return; } button.disabled=true; try { const result=await api('/auth/v1/signup',{method:'POST',body:JSON.stringify({email,password})}); if (result.session) { saveSession(result.session); goReader(); return; } ui.loginEmail.value=email; showLogin('確認メールを送りました。メール内のリンクを開いた後、ログインしてください。'); } catch (error) { setStatus(error.message || 'アカウントを作成できませんでした。'); } finally { button.disabled=false; } }
-    ui.showSignup.addEventListener('click',showSignup); ui.showLogin.addEventListener('click',() => showLogin('')); ui.loginForm.addEventListener('submit',login); ui.signupForm.addEventListener('submit',signup); refreshSavedSession();
+    async function resetPassword(event) { event.preventDefault(); const email=ui.resetEmail.value.trim(); if(!email)return; const button=ui.resetForm.querySelector('button'); button.disabled=true; try { await api('/auth/v1/recover',{method:'POST',body:JSON.stringify({email,redirect_to:location.origin+location.pathname})}); showLogin('パスワード再設定メールを送信しました。ログインパスワードを変更しても、保管庫パスフレーズや復旧キーは変更されません。'); } catch(error) { setStatus(error.message||'再設定メールを送信できませんでした。'); } finally { button.disabled=false; } }
+    async function completeReset(event) { event.preventDefault(); const hash=new URLSearchParams(location.hash.replace(/^#/,'').replace(/;/g,'&')); const token=hash.get('access_token'); const password=ui.newPassword.value; if(!token||password.length<8){setStatus('8文字以上の新しいパスワードを入力してください。');return;} const button=ui.completeResetForm.querySelector('button');button.disabled=true;try{await api('/auth/v1/user',{method:'PUT',token,body:JSON.stringify({password})});history.replaceState(null,'',location.pathname);showLogin('ログインパスワードを更新しました。保管庫パスフレーズは別途必要です。');}catch(error){setStatus(error.message||'パスワードを更新できませんでした。');}finally{button.disabled=false;}}
+    function showCompleteReset(){ui.loginView.hidden=true;ui.signupView.hidden=true;ui.resetView.hidden=true;ui.completeResetView.hidden=false;ui.newPassword.focus();setStatus('');}
+    ui.showSignup.addEventListener('click',showSignup); ui.showLogin.addEventListener('click',() => showLogin('')); ui.showReset.addEventListener('click',showReset); ui.resetBack.addEventListener('click',() => showLogin('')); ui.loginForm.addEventListener('submit',login); ui.signupForm.addEventListener('submit',signup); ui.resetForm.addEventListener('submit',resetPassword); ui.completeResetForm.addEventListener('submit',completeReset); if(new URLSearchParams(location.hash.replace(/^#/,'')).get('type')==='recovery') showCompleteReset(); else refreshSavedSession();
   })();
   </script>
 </body>

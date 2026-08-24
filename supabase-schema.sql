@@ -1,8 +1,22 @@
 create table if not exists public.manga_reader_vaults (
   user_id uuid primary key references auth.users(id) on delete cascade,
   payload jsonb not null,
+  revision bigint not null default 1,
   updated_at timestamptz not null default now()
 );
+
+alter table public.manga_reader_vaults add column if not exists revision bigint not null default 1;
+
+create or replace function public.update_manga_reader_vault(expected_revision bigint, new_payload jsonb)
+returns table(revision bigint, updated_at timestamptz)
+language sql security invoker
+set search_path = public
+as $$
+  update public.manga_reader_vaults
+  set payload = new_payload, revision = manga_reader_vaults.revision + 1, updated_at = now()
+  where user_id = (select auth.uid()) and manga_reader_vaults.revision = expected_revision
+  returning manga_reader_vaults.revision, manga_reader_vaults.updated_at;
+$$;
 
 alter table public.manga_reader_vaults enable row level security;
 

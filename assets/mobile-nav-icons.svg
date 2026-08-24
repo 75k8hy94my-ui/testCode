@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="navigation icons">
+  <g fill="none" stroke="#000" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <!-- manga: open book -->
+    <path d="M24 58c36-20 72-16 100 8v108c-25-20-62-24-100-8z"/>
+    <path d="M176 58c-36-20-72-16-100 8v108c25-20 62-24 100-8z"/>
+    <path d="M100 66v108"/>
+    <!-- video: rounded screen and play outline -->
+    <rect x="226" y="48" width="142" height="106" rx="22"/>
+    <path d="m284 78 42 23-42 23z"/>
+    <!-- author: simple profile -->
+    <circle cx="100" cy="282" r="30"/>
+    <path d="M46 356c8-34 31-51 54-51s46 17 54 51"/>
+  </g>
+  <!-- more: three solid dots -->
+  <g fill="#000">
+    <circle cx="252" cy="286" r="9"/>
+    <circle cx="300" cy="286" r="9"/>
+    <circle cx="348" cy="286" r="9"/>
+  </g>
+</svg>

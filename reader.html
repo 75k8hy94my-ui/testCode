@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f5f5f7">
 <title>漫画リーダー</title>
-<link rel="icon" type="image/png" href="icon-bookshelf.png">
+<link rel="icon" type="image/png" href="icon-152.png">
 <!-- Home screen (Add to Home Screen) icon and label for iOS Safari -->
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
 <link rel="apple-touch-icon" sizes="152x152" href="icon-152.png">
@@ -224,6 +224,8 @@
     display: none; overflow: auto; z-index: 50;
   }
   .modalOverlay.show { display: block; }
+  dialog.modalOverlay::backdrop { background: var(--bg); }
+  dialog.modalOverlay { margin: 0; width: 100vw; height: 100dvh; max-width: none; max-height: none; border: 0; padding: 0; color: inherit; overflow-x: hidden; overflow-y: auto; }
   .modalPanel {
     background: var(--bg); border-radius: 0; width: 100%; min-height: 100dvh;
     display: flex; flex-direction: column; padding: 28px max(24px, env(safe-area-inset-right)) 32px max(24px, env(safe-area-inset-left));
@@ -283,6 +285,9 @@
   #listToolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
   #listFolderTitle { flex: 1; font-size: 14px; font-weight: 700; }
   #listNewFolderRow { display: none; gap: 8px; margin-bottom: 10px; }
+  #listNewFolderRow input { min-width: 0; }
+  .dashboard-row, .author-dashboard-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 7px; }
+  #mobileBottomNav { display: none; }
   #listNewFolderRow input {
     flex: 1; padding: 9px 11px; border-radius: var(--radius-sm); border: 1px solid var(--border);
     background: var(--bg-soft); color: var(--text); font-size: 16px;
@@ -290,6 +295,8 @@
   }
   #listNewFolderRow input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); outline: none; }
   #savedListItems { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 7px; background: var(--bg); }
+  #savedListItems.bookshelf { touch-action: pan-y; }
+  #savedListItems.bookshelf .bookshelf-pagination { grid-column: 1 / -1; order: -1; }
   .saved-item {
     display: flex; align-items: center; gap: 8px;
     background: var(--bg-soft); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 11px;
@@ -424,7 +431,9 @@
   .smartListLabel { color: var(--sub); font-size: 12px; font-weight: 700; margin-right: 2px; }
   .smartListBtn {
     min-height: 34px; padding: 0 11px; border: 1px solid var(--border); border-radius: 999px;
-    background: var(--panel-2); color: var(--text); font: inherit; font-size: 12px; cursor: pointer;
+    background: linear-gradient(145deg, rgba(255,255,255,.18), rgba(255,255,255,.06)); color: var(--text); font: inherit; font-size: 12px; cursor: pointer;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.24), 0 3px 10px rgba(0,0,0,.12);
+    backdrop-filter: blur(12px) saturate(150%); -webkit-backdrop-filter: blur(12px) saturate(150%);
   }
   .smartListBtn:hover { border-color: var(--accent); color: var(--accent); }
 
@@ -436,12 +445,15 @@
     margin: 0 -18px 12px; padding: 0 18px;
   }
   .listTab {
-    background: none; border: none; border-bottom: 2px solid transparent;
+    background: linear-gradient(145deg, rgba(255,255,255,.12), rgba(255,255,255,.035)); border: 1px solid transparent; border-bottom: 2px solid transparent;
     color: var(--sub); cursor: pointer; font-size: 13.5px; font-weight: 500;
-    padding: 8px 16px; margin-bottom: -1px;
-    transition: color 0.15s, border-color 0.15s;
+    padding: 8px 16px; margin: 4px 3px 3px; border-radius: 999px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 2px 8px rgba(0,0,0,.08);
+    backdrop-filter: blur(12px) saturate(150%); -webkit-backdrop-filter: blur(12px) saturate(150%);
+    transition: color 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
   }
-  .listTab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  #listTabRow[hidden] { display: none; }
+  .listTab.active { color: var(--accent); border-color: rgba(255,255,255,.34); border-bottom-color: var(--accent); background: radial-gradient(120% 180% at 10% 0%, rgba(255,255,255,.28), transparent 48%), var(--accent-dim); box-shadow: inset 0 1px 0 rgba(255,255,255,.34), 0 4px 12px rgba(0,0,0,.12); }
   /* Manga section / video section both fill the flex column and scroll */
   #mangaListSection { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
   #videoListSection { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
@@ -522,16 +534,20 @@
   .book-reading.unread { color: var(--accent); font-weight: 700; }
   .book-card .book-author, .book-card .book-tags, .book-card .book-reading:not(.unread) { display: none !important; }
   html, body { background: var(--bg); }
-  #app { background: var(--bg); height: 100dvh; }
+  #app { background: radial-gradient(120% 80% at 50% -18%, rgba(255,255,255,.12), transparent 46%), var(--bg); height: 100dvh; }
   #topbar, #controls {
-    border-color: rgba(255,255,255,.12);
-    background: rgba(25,25,27,.72);
-    -webkit-backdrop-filter: blur(22px) saturate(180%);
-    backdrop-filter: blur(22px) saturate(180%);
+    border-color: rgba(255,255,255,.25);
+    background: radial-gradient(120% 220% at 5% 0%, rgba(255,255,255,.22), transparent 42%), radial-gradient(100% 180% at 96% 100%, rgba(70,217,194,.08), transparent 52%), linear-gradient(180deg, rgba(25,25,27,.70), rgba(12,14,20,.56));
+    -webkit-backdrop-filter: blur(28px) saturate(190%) contrast(106%);
+    backdrop-filter: blur(28px) saturate(190%) contrast(106%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.26), inset 0 -1px 0 rgba(0,0,0,.24), 0 8px 25px rgba(0,0,0,.18);
+  }
+  #topbar, #controls {
+    background: radial-gradient(110% 240% at var(--glass-light-x, 5%) var(--glass-light-y, 0%), rgba(255,255,255,.16), transparent 42%), radial-gradient(100% 180% at 96% 100%, rgba(70,217,194,.06), transparent 52%), linear-gradient(180deg, rgba(25,25,27,.70), rgba(12,14,20,.56));
   }
   #topbar { padding-top: max(9px, env(safe-area-inset-top)); }
   #controls { padding-bottom: max(9px, env(safe-area-inset-bottom)); }
-  #topbar .ctrlBtn, #controls .ctrlBtn { background: rgba(255,255,255,.13); color: #fff; border-color: rgba(255,255,255,.1); }
+  #topbar .ctrlBtn, #controls .ctrlBtn { background: rgba(255,255,255,.11); color: #fff; border-color: rgba(255,255,255,.18); box-shadow: inset 0 1px 0 rgba(255,255,255,.26), inset 0 -1px 0 rgba(0,0,0,.12), 0 3px 10px rgba(0,0,0,.10); backdrop-filter: blur(14px) saturate(155%); -webkit-backdrop-filter: blur(14px) saturate(155%); }
   #topbar #enhanceBtn.active {
     background: rgba(52,199,89,.18);
     border-color: rgba(52,199,89,.42);
@@ -539,16 +555,16 @@
   }
   #status, #pageLabel { color: rgba(255,255,255,.7); }
   #currentTitle { color: #fff; }
-  .primaryBtn { background: var(--accent); color: #fff; box-shadow: none; }
-  .ctrlBtn { background: var(--panel-2); }
+  .primaryBtn { background: radial-gradient(120% 180% at 12% 0%, rgba(255,255,255,.34), transparent 46%), linear-gradient(145deg, #ff795b, var(--accent)); color: #fff; border-color: rgba(255,255,255,.34); box-shadow: inset 0 1px 0 rgba(255,255,255,.46), 0 6px 18px rgba(255,107,74,.26); }
+  .ctrlBtn { background: linear-gradient(145deg, rgba(255,255,255,.16), rgba(255,255,255,.05)); }
   .ctrlBtn, .primaryBtn { min-height: 38px; border-radius: 10px; font-weight: 600; }
   .logoutBtn { background: #dc2626 !important; border-color: #dc2626 !important; color: #fff !important; }
   .logoutBtn:hover { background: #b91c1c !important; border-color: #b91c1c !important; }
   .logoutBtn:disabled { opacity: .6; cursor: wait; }
   .dangerBtn { background: #dc2626 !important; border-color: #dc2626 !important; color: #fff !important; }
   .dangerBtn:hover { background: #b91c1c !important; border-color: #b91c1c !important; }
-  .modalOverlay { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
-  .modalPanel { width: 100%; min-height: 100dvh; max-height: none; border: 0; padding: 28px max(24px, env(safe-area-inset-right)) 32px max(24px, env(safe-area-inset-left)); }
+  .modalOverlay { background: rgba(10,12,17,.42); -webkit-backdrop-filter: blur(22px) saturate(145%); backdrop-filter: blur(22px) saturate(145%); }
+  .modalPanel { width: 100%; min-height: 100dvh; max-height: none; border: 1px solid rgba(255,255,255,.18); padding: 28px max(24px, env(safe-area-inset-right)) 32px max(24px, env(safe-area-inset-left)); background: linear-gradient(145deg, rgba(30,34,46,.82), rgba(15,18,26,.76)); box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 18px 55px rgba(0,0,0,.28); }
   .panel-header { font-size: 17px; border-bottom: 0; padding-bottom: 2px; }
   #savedListPanel { height: auto; }
   #exportImportRow, #listToolbar, #videoListToolbar {
@@ -599,7 +615,9 @@
   .book-favBtn { color: #8e8e93; font-size: 20px; font-family: Arial, sans-serif; }
   .book-favBtn.is-favorite { color: #ff3b30; }
   .book-delBtn:active, .book-favBtn:active { transform: scale(.9); }
-  input, select, textarea { border-color: var(--border) !important; background: #fff !important; color: var(--text) !important; }
+  input, select, textarea { border-color: var(--border) !important; background: var(--panel-2) !important; color: var(--text) !important; }
+  html[data-theme="dark"] select { color-scheme: dark; }
+  html[data-theme="light"] input, html[data-theme="light"] select, html[data-theme="light"] textarea { background: #fff !important; color-scheme: light; }
 
   @media (max-width: 600px) {
     /* Keep the reader controls inside the viewport on narrow phones.
@@ -637,13 +655,14 @@
     #nextVolumeText { font-size: 12px; }
     #nextVolumeBanner .ctrlBtn, #nextVolumeBanner .primaryBtn { padding: 6px 8px; font-size: 11px; }
     .modalPanel { width: 100%; min-height: 100dvh; max-width: none; max-height: none; border-radius: 0; padding: 18px 14px max(18px, env(safe-area-inset-bottom)); }
+    #authorCardPanel { padding-bottom: calc(96px + max(18px, env(safe-area-inset-bottom))); }
     #savedListPanel { height: auto; }
     #listTabRow { margin-left: -14px; margin-right: -14px; padding-left: 14px; }
     #exportImportRow { margin: 0 -2px 8px; padding: 6px 2px 10px; gap: 6px; }
     #exportImportRow .ctrlBtn, #listToolbar .ctrlBtn { padding: 7px 9px; font-size: 11.5px; min-height: 36px; }
     #smartListRow { gap: 6px; padding-bottom: 10px; }
     .smartListBtn { min-height: 32px; font-size: 11.5px; }
-    #savedListItems.bookshelf { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px 8px; }
+    #savedListItems.bookshelf { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px 8px; padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
     .book-cover { border-radius: 9px; }
     .book-delBtn, .book-favBtn { width: 28px; height: 28px; min-width: 28px; min-height: 28px; }
     .book-delBtn { top: 4px; right: 4px; }
@@ -651,24 +670,240 @@
     .book-title { font-size: 10.5px; }
     .book-series { font-size: 8px; }
     .book-reading { font-size: 8px; }
-    .dialog-actions { position: sticky; bottom: 0; padding-top: 10px; background: linear-gradient(transparent, var(--panel) 25%); }
+     .dialog-actions { position: sticky; bottom: 0; padding-top: 10px; background: linear-gradient(transparent, var(--panel) 25%); }
+    #mobileBottomNav {
+      display: flex; position: fixed; left: 50%; bottom: 0; transform: translateX(-50%) translateZ(0); width: min(100vw, 430px); z-index: 100; gap: 7px; margin: 0; padding: 9px 14px max(9px, env(safe-area-inset-bottom)); will-change: transform;
+      overflow: hidden; isolation: isolate;
+      background:
+        radial-gradient(120% 180% at 8% 0%, rgba(255,255,255,.34), transparent 44%),
+        radial-gradient(90% 150% at 96% 12%, rgba(255,112,86,.22), transparent 54%),
+        radial-gradient(80% 130% at 48% 120%, rgba(91,137,255,.16), transparent 58%),
+        linear-gradient(180deg, rgba(255,255,255,.20), rgba(255,255,255,.07) 46%, rgba(9,12,20,.48));
+      border: 1px solid rgba(255,255,255,.30); border-bottom: 0; border-radius: 24px 24px 0 0;
+      box-shadow: 0 -18px 42px rgba(0,0,0,.28), 0 -3px 12px rgba(255,255,255,.05), inset 0 1px 0 rgba(255,255,255,.62), inset 0 -1px 0 rgba(0,0,0,.28), inset 1px 0 0 rgba(255,255,255,.16), inset -1px 0 0 rgba(255,255,255,.12);
+      backdrop-filter: blur(30px) saturate(190%) contrast(108%); -webkit-backdrop-filter: blur(30px) saturate(190%) contrast(108%);
+    }
+    #mobileBottomNav::before {
+      content: ""; position: absolute; z-index: -1; inset: 0; pointer-events: none;
+      background: linear-gradient(112deg, rgba(255,255,255,.30), transparent 21%, transparent 68%, rgba(255,255,255,.12));
+      opacity: .72; transform: translateX(-18%); animation: glassSurfaceDrift 12s ease-in-out infinite alternate;
+    }
+    #mobileBottomNav::after {
+      content: ""; position: absolute; z-index: -1; left: 7%; right: 7%; top: 0; height: 1px; pointer-events: none;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.92) 18%, rgba(255,255,255,.58) 50%, rgba(255,255,255,.82) 82%, transparent);
+      box-shadow: 0 0 12px rgba(255,255,255,.35);
+    }
+    .mobileBottomNavBtn { flex: 1 1 0; min-width: 0; min-height: 40px; padding: 7px 4px; position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,.22); border-radius: 15px; background: linear-gradient(145deg, rgba(255,255,255,.20), rgba(255,255,255,.055)); color: rgba(255,255,255,.88); font: inherit; font-size: 11px; font-weight: 700; text-shadow: 0 1px 5px rgba(0,0,0,.42); box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -1px 0 rgba(0,0,0,.16), 0 5px 15px rgba(0,0,0,.16); backdrop-filter: blur(16px) saturate(165%); -webkit-backdrop-filter: blur(16px) saturate(165%); transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease; }
+    .mobileBottomNavBtn::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(115deg, rgba(255,255,255,.26), transparent 32%, transparent 66%, rgba(255,255,255,.10)); opacity: .72; }
+    .mobileBottomNavBtn::after { content: ""; position: absolute; top: -30%; bottom: -30%; left: -42%; width: 24%; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(255,255,255,.48), transparent); filter: blur(5px); transform: skewX(-18deg); opacity: 0; }
+    .mobileBottomNavBtn:active { transform: scale(.96); }
+    .mobileBottomNavBtn:active::after, .mobileBottomNavBtn:focus-visible::after { opacity: .72; animation: glassButtonSheen .8s ease-out both; }
+    .mobileBottomNavBtn:focus-visible { outline: 2px solid rgba(255,255,255,.92); outline-offset: 2px; box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 0 0 4px rgba(255,132,103,.22), 0 5px 18px rgba(0,0,0,.18); }
+    .mobileBottomNavBtn.active { color: #fff; border-color: rgba(255,255,255,.66); background: radial-gradient(120% 170% at 15% 0%, rgba(255,255,255,.42), transparent 48%), linear-gradient(145deg, rgba(255,132,103,.84), rgba(255,107,74,.42)); box-shadow: inset 0 1px 0 rgba(255,255,255,.72), inset 0 -1px 0 rgba(130,35,24,.22), 0 5px 18px rgba(255,107,74,.28), 0 0 1px rgba(255,255,255,.9); }
+    html[data-theme="light"] #mobileBottomNav { background: radial-gradient(100% 160% at 4% 0%, rgba(255,255,255,.92), transparent 44%), radial-gradient(90% 140% at 96% 10%, rgba(255,180,160,.32), transparent 54%), linear-gradient(180deg, rgba(255,255,255,.78), rgba(241,244,250,.48)); border-color: rgba(255,255,255,.92); box-shadow: 0 -18px 42px rgba(60,60,67,.16), 0 -2px 10px rgba(255,255,255,.48), inset 0 1px 0 rgba(255,255,255,.98), inset 0 -1px 0 rgba(100,106,120,.14); }
+    html[data-theme="light"] .mobileBottomNavBtn { background: linear-gradient(145deg, rgba(255,255,255,.66), rgba(255,255,255,.26)); border-color: rgba(255,255,255,.76); color: #343944; text-shadow: 0 1px 2px rgba(255,255,255,.9); box-shadow: inset 0 1px 0 rgba(255,255,255,.96), inset 0 -1px 0 rgba(115,120,130,.10), 0 5px 15px rgba(60,60,67,.10); }
+    html[data-theme="light"] .mobileBottomNavBtn.active { color: #fff; border-color: rgba(255,255,255,.95); background: radial-gradient(120% 170% at 15% 0%, rgba(255,255,255,.58), transparent 48%), linear-gradient(145deg, rgba(255,122,93,.94), rgba(255,107,74,.68)); box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 5px 18px rgba(255,107,74,.28); text-shadow: 0 1px 4px rgba(130,35,24,.32); }
+  }
+  @media (max-width: 390px) {
+    /* On narrow phones, bookshelf actions wrap instead of hiding their right edge. */
+    #exportImportRow, #listToolbar { flex-wrap: wrap; overflow: visible; }
+    #exportImportRow .ctrlBtn { flex: 1 1 auto; }
+    #listToolbar { align-items: stretch; }
+    #shelfSearchInput { flex: 1 1 100% !important; width: 100%; min-width: 0 !important; }
+    #listFolderTitle { flex: 1 1 100%; }
+    #listToolbar .ctrlBtn { flex: 0 1 auto; }
+    #listNewFolderRow { width: 100%; }
+    .dashboard-row .ctrlBtn, .author-dashboard-row .ctrlBtn { white-space: normal; text-align: left; max-width: 100%; }
+    #exportImportRow .ctrlBtn { flex: 1 1 calc(50% - 6px); min-width: 0; text-align: center; }
+    #smartListRow .smartListBtn { flex: 1 1 auto; min-width: 0; }
+    #savedListItems.bookshelf { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 12px; }
+    .dashboard-row .ctrlBtn, .author-dashboard-row .ctrlBtn { flex: 1 1 calc(50% - 7px); }
+    #shelfSortSelect { flex: 1 1 100%; min-width: 0; }
+    #mobileBottomNav { padding-left: 12px; padding-right: 12px; }
+  }
+  @media (max-width: 600px) {
+    /* Apple-like functional layer: one floating Liquid Glass capsule, with
+       only primary destinations in the tab bar. Actions live in the menu. */
+    #mobileBottomNav {
+      bottom: max(10px, env(safe-area-inset-bottom)); width: min(430px, calc(100vw - 20px));
+      gap: 5px; padding: 7px; border: 1px solid rgba(255,255,255,.34); border-radius: 30px;
+      background: radial-gradient(120% 210% at var(--glass-light-x, 12%) var(--glass-light-y, 0%), rgba(255,255,255,.17), transparent 44%), rgba(25,28,36,.58);
+      box-shadow: 0 12px 34px rgba(0,0,0,.24), 0 1px 2px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.42), inset 0 -1px 0 rgba(0,0,0,.18);
+      backdrop-filter: blur(38px) saturate(180%) contrast(106%); -webkit-backdrop-filter: blur(38px) saturate(180%) contrast(106%);
+    }
+    #mobileBottomNav::before { background: linear-gradient(112deg, rgba(255,255,255,.16), transparent 24%, transparent 76%, rgba(255,255,255,.05)); opacity: .55; transform: none; animation: none; }
+    #mobileBottomNav::after { inset: 1px; left: 1px; right: 1px; top: 1px; bottom: 1px; width: auto; height: auto; border: 1px solid rgba(255,255,255,.16); border-radius: 29px; background: none; box-shadow: none; }
+    .mobileBottomNavBtn { min-height: 42px; padding: 5px 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 1px solid transparent; border-radius: 999px; background: transparent; color: rgba(255,255,255,.72); font-size: 10px; font-weight: 600; line-height: 1.1; text-shadow: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+    .mobileNavGlyph { width: 19px; height: 19px; display: block; flex: 0 0 auto; overflow: visible; color: currentColor; }
+    .mobileNavGlyph path, .mobileNavGlyph rect { fill: none; stroke: currentColor; stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; }
+    .mobileNavGlyph circle { fill: none; stroke: currentColor; stroke-width: 10; }
+    .mobileNavGlyphMore circle { fill: currentColor; stroke: none; }
+    .mobileBottomNavBtn::before { background: linear-gradient(115deg, rgba(255,255,255,.24), transparent 32%, transparent 66%, rgba(255,255,255,.08)); opacity: 0; transition: opacity .18s ease; }
+    .mobileBottomNavBtn::after { display: none; }
+    .mobileBottomNavBtn:hover::before, .mobileBottomNavBtn:focus-visible::before { opacity: .72; }
+    .mobileBottomNavBtn:focus-visible { outline: 2px solid rgba(255,255,255,.92); outline-offset: 2px; box-shadow: none; }
+    .mobileBottomNavBtn.active { color: #fff; border-color: rgba(255,255,255,.22); background: rgba(255,255,255,.14); box-shadow: inset 0 1px 0 rgba(255,255,255,.42), inset 0 -1px 0 rgba(0,0,0,.10), 0 2px 8px rgba(0,0,0,.10); }
+    #mobileUtilityMenu { position: fixed; right: max(10px, calc((100vw - 430px) / 2 + 10px)); bottom: calc(78px + max(10px, env(safe-area-inset-bottom))); z-index: 101; display: flex; flex-direction: column; gap: 4px; min-width: 178px; padding: 7px; border: 1px solid rgba(255,255,255,.24); border-radius: 20px; background: radial-gradient(140% 170% at 8% 0%, rgba(255,255,255,.15), transparent 44%), rgba(25,28,36,.62); box-shadow: 0 14px 34px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.38), inset 0 -1px 0 rgba(0,0,0,.14); backdrop-filter: blur(34px) saturate(170%) contrast(104%); -webkit-backdrop-filter: blur(34px) saturate(170%) contrast(104%); }
+    #mobileUtilityMenu[hidden] { display: none; }
+    #mobileUtilityMenu button { min-height: 40px; padding: 8px 12px; border: 1px solid transparent; border-radius: 13px; background: transparent; color: rgba(255,255,255,.9); font: inherit; font-size: 12px; font-weight: 650; text-align: left; cursor: pointer; }
+    #mobileUtilityMenu button:hover, #mobileUtilityMenu button:focus-visible { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.18); outline: none; }
+    html[data-theme="light"] #mobileBottomNav { background: radial-gradient(120% 210% at var(--glass-light-x, 12%) var(--glass-light-y, 0%), rgba(255,255,255,.64), transparent 44%), rgba(245,246,249,.72); border-color: rgba(255,255,255,.84); box-shadow: 0 12px 34px rgba(60,60,67,.14), 0 1px 2px rgba(60,60,67,.10), inset 0 1px 0 rgba(255,255,255,.94), inset 0 -1px 0 rgba(90,95,105,.10); }
+    html[data-theme="light"] .mobileBottomNavBtn { color: rgba(35,39,42,.68); text-shadow: none; }
+    html[data-theme="light"] .mobileNavGlyph { filter: none; }
+    html[data-theme="light"] .mobileBottomNavBtn.active { color: #23272a; border-color: rgba(255,255,255,.84); background: rgba(255,255,255,.48); box-shadow: inset 0 1px 0 rgba(255,255,255,.94), inset 0 -1px 0 rgba(90,95,105,.08), 0 2px 8px rgba(60,60,67,.08); }
+    html[data-theme="light"] #mobileUtilityMenu { background: radial-gradient(140% 170% at 8% 0%, rgba(255,255,255,.66), transparent 44%), rgba(245,246,249,.78); border-color: rgba(255,255,255,.84); box-shadow: 0 14px 34px rgba(60,60,67,.14), inset 0 1px 0 rgba(255,255,255,.94), inset 0 -1px 0 rgba(90,95,105,.08); }
+    html[data-theme="light"] #mobileUtilityMenu button { color: #23272a; }
+    html[data-theme="light"] #mobileUtilityMenu button:hover, html[data-theme="light"] #mobileUtilityMenu button:focus-visible { background: rgba(255,255,255,.46); border-color: rgba(255,255,255,.78); }
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    @media (max-width: 600px) {
+      #mobileBottomNav { background: rgba(24,28,38,.94); }
+      #mobileUtilityMenu { background: rgba(24,28,38,.96); }
+      .mobileBottomNavBtn.active { background: rgba(255,255,255,.22); }
+      html[data-theme="light"] #mobileBottomNav { background: rgba(245,245,247,.96); }
+      html[data-theme="light"] #mobileUtilityMenu { background: rgba(245,245,247,.98); }
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #mobileBottomNav::before, #mobileBottomNav::after, .mobileBottomNavBtn::after { animation: none !important; }
+    .mobileBottomNavBtn, .mobileBottomNavBtn::after { transition: none !important; }
+  }
+
+  /* Final material pass: Liquid Glass should read as one quiet, refractive
+     surface. Keep the light source in the edge and let the reader content
+     provide the colour instead of stacking opaque decorative gradients. */
+  #app {
+    background:
+      radial-gradient(70% 45% at 8% 0%, rgba(70, 217, 194, .10), transparent 72%),
+      radial-gradient(65% 42% at 92% 100%, rgba(255, 107, 74, .08), transparent 72%),
+      radial-gradient(90% 65% at 50% 50%, rgba(74, 107, 168, .06), transparent 76%),
+      var(--bg);
+  }
+  #topbar, #controls {
+    background: rgba(18, 21, 28, .52);
+    border-color: rgba(255,255,255,.20);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.30),
+      inset 0 -1px 0 rgba(0,0,0,.20),
+      0 8px 28px rgba(0,0,0,.16);
+    -webkit-backdrop-filter: blur(38px) saturate(175%) contrast(106%);
+    backdrop-filter: blur(38px) saturate(175%) contrast(106%);
+  }
+  #topbar::before, #controls::before {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    inset: 0;
+    background: radial-gradient(70% 180% at var(--glass-light-x, 8%) var(--glass-light-y, 0%), rgba(255,255,255,.14), transparent 62%);
+    opacity: .72;
+  }
+  #topbar::after, #controls::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    left: 7%; right: 7%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.58), transparent);
+    opacity: .72;
+  }
+  #topbar::after { bottom: 0; }
+  #controls::after { top: 0; }
+  #topbar > *, #controls > * { position: relative; z-index: 1; }
+  #topbar .ctrlBtn, #controls .ctrlBtn {
+    background: rgba(255,255,255,.08);
+    border-color: rgba(255,255,255,.16);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.24), 0 2px 8px rgba(0,0,0,.08);
+  }
+  #topbar .ctrlBtn:hover, #controls .ctrlBtn:hover { background: rgba(255,255,255,.14); }
+  .primaryBtn {
+    background: rgba(255, 107, 74, .78);
+    border-color: rgba(255,255,255,.38);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.42), 0 5px 16px rgba(255,107,74,.20);
+  }
+  @media (max-width: 600px) {
+    #smartListRow { padding-bottom: 4px; margin-bottom: 4px; }
+    #listToolbar { margin-bottom: 0; }
+    #savedListItems.bookshelf { padding-top: 0; }
+    #savedListItems.bookshelf .bookshelf-pagination { margin-top: 0 !important; margin-bottom: 0 !important; }
+    body.reader-mobile-mode #controls { display: none !important; }
+    #mobileBottomNav.reader-mode .mobileNavGlyph { display: none; }
+    #mobileBottomNav.reader-mode .mobileBottomNavBtn { font-size: 11px; }
+    #mobileBottomNav.reader-mode { transition: transform .3s var(--ease), opacity .3s var(--ease); }
+    #mobileBottomNav.reader-mode.reader-bars-hidden { transform: translateX(-50%) translateY(calc(100% + 24px)); opacity: 0; pointer-events: none; }
+    #mobileBottomNav {
+      background:
+        radial-gradient(120% 180% at var(--glass-light-x, 12%) var(--glass-light-y, 0%), rgba(255,255,255,.16), transparent 58%),
+        rgba(28, 31, 39, .54);
+      border-color: rgba(255,255,255,.28);
+      box-shadow:
+        0 12px 34px rgba(0,0,0,.22),
+        inset 0 1px 0 rgba(255,255,255,.42),
+        inset 0 -1px 0 rgba(0,0,0,.16);
+      -webkit-backdrop-filter: blur(42px) saturate(180%) contrast(106%);
+      backdrop-filter: blur(42px) saturate(180%) contrast(106%);
+    }
+    #mobileBottomNav::before {
+      background: radial-gradient(90% 220% at 8% 0%, rgba(70,217,194,.10), transparent 72%);
+      opacity: .8;
+      animation: none;
+    }
+    #mobileBottomNav::after {
+      left: 12%; right: 12%; top: 1px; bottom: auto;
+      height: 1px; border: 0; border-radius: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.72), transparent);
+      opacity: .72;
+    }
+    .mobileBottomNavBtn {
+      color: rgba(255,255,255,.70);
+      border-color: transparent;
+      background: transparent;
+      transition: background .18s ease, color .18s ease, transform .18s ease;
+    }
+    .mobileBottomNavBtn:hover, .mobileBottomNavBtn:focus-visible { background: rgba(255,255,255,.08); }
+    .mobileBottomNavBtn.active {
+      color: #fff;
+      border-color: rgba(255,255,255,.30);
+      background: rgba(255,255,255,.16);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.38), 0 2px 8px rgba(0,0,0,.10);
+    }
+    .mobileBottomNavBtn.active .mobileNavGlyph { color: var(--accent); }
+    #mobileUtilityMenu {
+      background: rgba(28,31,39,.58);
+      border-color: rgba(255,255,255,.24);
+      box-shadow: 0 14px 34px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.34);
+      -webkit-backdrop-filter: blur(38px) saturate(175%) contrast(106%);
+      backdrop-filter: blur(38px) saturate(175%) contrast(106%);
+    }
+    #mobileUtilityMenu button:hover, #mobileUtilityMenu button:focus-visible { background: rgba(255,255,255,.10); }
+    html[data-theme="light"] #mobileBottomNav {
+      background: rgba(247,248,251,.58);
+      border-color: rgba(255,255,255,.86);
+      box-shadow: 0 12px 34px rgba(60,60,67,.13), inset 0 1px 0 rgba(255,255,255,.94), inset 0 -1px 0 rgba(90,95,105,.08);
+    }
+    html[data-theme="light"] #mobileBottomNav::before { background: radial-gradient(90% 220% at 8% 0%, rgba(0,122,255,.08), transparent 72%); }
+    html[data-theme="light"] .mobileBottomNavBtn { color: rgba(35,39,42,.66); }
+    html[data-theme="light"] .mobileBottomNavBtn.active { color: #23272a; background: rgba(255,255,255,.50); border-color: rgba(255,255,255,.86); box-shadow: inset 0 1px 0 rgba(255,255,255,.94), 0 2px 8px rgba(60,60,67,.08); }
+    html[data-theme="light"] #mobileUtilityMenu { background: rgba(247,248,251,.64); }
   }
   html[data-theme="light"] {
     --bg: #f5f5f7; --bg-soft: #ffffff; --panel: #ffffff; --panel-2: #e3e5e8;
     --border: #c9ccd1; --text: #23272a; --sub: #5b626b;
   }
-  html[data-theme="light"] #app { background: #f5f5f7; }
+  html[data-theme="light"] #app { background: radial-gradient(120% 80% at 50% -18%, rgba(255,255,255,.92), transparent 48%), #f5f5f7; }
   html[data-theme="light"] #viewer { background: #e7e9ec; }
   html[data-theme="light"] #topbar, html[data-theme="light"] #controls {
-    background: rgba(255,255,255,.88); border-color: #d1d5da;
-    -webkit-backdrop-filter: blur(18px) saturate(130%); backdrop-filter: blur(18px) saturate(130%);
+    background: radial-gradient(120% 220% at 5% 0%, rgba(255,255,255,.94), transparent 44%), radial-gradient(100% 180% at 96% 100%, rgba(0,122,255,.08), transparent 52%), linear-gradient(180deg, rgba(255,255,255,.76), rgba(232,235,242,.58)); border-color: rgba(255,255,255,.92);
+    -webkit-backdrop-filter: blur(28px) saturate(165%) contrast(104%); backdrop-filter: blur(28px) saturate(165%) contrast(104%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.98), inset 0 -1px 0 rgba(90,95,105,.12), 0 8px 25px rgba(60,60,67,.12);
   }
   html[data-theme="light"] #topbar .ctrlBtn, html[data-theme="light"] #controls .ctrlBtn {
-    background: #fff; color: #23272a; border-color: #c9ccd1;
+    background: linear-gradient(145deg, rgba(255,255,255,.76), rgba(255,255,255,.30)); color: #23272a; border-color: rgba(255,255,255,.88); box-shadow: inset 0 1px 0 rgba(255,255,255,.98), inset 0 -1px 0 rgba(90,95,105,.10), 0 4px 12px rgba(60,60,67,.10);
   }
   html[data-theme="light"] #status, html[data-theme="light"] #pageLabel { color: #5b626b; }
   html[data-theme="light"] #currentTitle { color: #23272a; }
-  html[data-theme="light"] .modalOverlay, html[data-theme="light"] .modalPanel { background: #f5f5f7; }
+  html[data-theme="light"] .modalOverlay { background: rgba(245,245,247,.42); -webkit-backdrop-filter: blur(22px) saturate(140%); backdrop-filter: blur(22px) saturate(140%); }
+  html[data-theme="light"] .modalPanel { background: linear-gradient(145deg, rgba(255,255,255,.78), rgba(238,241,247,.68)); border-color: rgba(255,255,255,.86); box-shadow: inset 0 1px 0 rgba(255,255,255,.98), 0 18px 55px rgba(60,60,67,.14); }
+  html[data-theme="light"] .saved-item, html[data-theme="light"] .toc-item, html[data-theme="light"] .videoItem { background: #fff; border-color: #c9ccd1; box-shadow: none; }
   html[data-theme="dark"] {
     --bg: #0a0c11; --bg-soft: #0f1218; --panel: #161a23; --panel-2: #1d2230;
     --border: #262b38; --accent: #ff6b4a; --accent-2: #46d9c2;
@@ -735,8 +970,16 @@
   .author-group-count { color: var(--sub); font-size: 10px; margin-top: 3px; }
   .filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
   .filter-row input { flex: 1 1 130px; min-width: 100px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-soft); color: var(--text); }
-  .bookshelf-pagination { display: flex; justify-content: center; align-items: center; gap: 10px; padding: 14px 0 4px; }
-  .bookshelf-pagination span { min-width: 74px; color: var(--sub); font-size: 12px; text-align: center; }
+  .bookshelf-pagination { display: flex; justify-content: center; align-items: center; gap: 10px; width: min(100% - 28px, 680px); margin: 18px auto 8px; padding: 8px 10px max(8px, env(safe-area-inset-bottom)); border: 1px solid rgba(255,255,255,.34); border-radius: 16px; background: linear-gradient(145deg, rgba(29,35,49,.96), rgba(13,17,25,.94)); box-shadow: 0 8px 24px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.34); -webkit-backdrop-filter: blur(24px) saturate(165%); backdrop-filter: blur(24px) saturate(165%); }
+  .bookshelf-pagination span { min-width: 74px; color: var(--text); font-size: 13px; font-weight: 700; text-align: center; }
+  .bookshelfPagerButton { min-width: 64px; }
+  .bookshelf-pagination .ctrlBtn { border-color: rgba(255,255,255,.30); background: rgba(255,255,255,.14); color: var(--text); }
+  html[data-theme="light"] .bookshelf-pagination { border-color: rgba(35,39,42,.20); background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(236,240,247,.96)); box-shadow: 0 -8px 24px rgba(60,60,67,.16), inset 0 1px 0 rgba(255,255,255,.98); }
+  html[data-theme="light"] .bookshelf-pagination .ctrlBtn { border-color: rgba(35,39,42,.18); background: rgba(35,39,42,.08); color: #23272a; }
+  @media (max-width: 600px) {
+    .bookshelf-pagination { width: min(100% - 20px, 430px); border-radius: 16px; padding-bottom: 8px; }
+    .bookshelfPagerButton { display: none; }
+  }
   html[data-theme="dark"] #authorCardPanel input { background: #1d2230 !important; color: #f1f2f6 !important; border-color: #4a5263 !important; }
   html[data-theme="dark"] #authorCardPanel input::placeholder { color: #969dad !important; opacity: 1; }
   html[data-theme="dark"] #saveDialogPanel input::placeholder,
@@ -771,30 +1014,188 @@
   #savedListOverlay[data-theme="light"] .smartListBtn,
   #savedListOverlay[data-theme="light"] .listTab,
   #savedListOverlay[data-theme="light"] .ctrlBtn { color: #23272a; }
+
+  /* Liquid Glass alignment pass (kept last so theme and mobile rules above
+     cannot accidentally turn the material into a painted card). Apple’s
+     material is a functional layer: translucent, content-infused, and
+     reserved for navigation and controls. */
+  #topbar, #controls {
+    background: rgba(22, 25, 32, .48) !important;
+    border-color: rgba(255,255,255,.22) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.34), inset 0 -1px 0 rgba(0,0,0,.18), 0 7px 24px rgba(0,0,0,.15) !important;
+    -webkit-backdrop-filter: blur(34px) saturate(180%) contrast(106%);
+    backdrop-filter: blur(34px) saturate(180%) contrast(106%);
+  }
+  #topbar::before, #controls::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(75% 200% at var(--glass-light-x, 8%) var(--glass-light-y, 0%), rgba(255,255,255,.13), transparent 64%);
+    opacity: .78;
+  }
+  #topbar::after, #controls::after {
+    content: ""; position: absolute; left: 9%; right: 9%; height: 1px; pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.64), transparent); opacity: .72;
+  }
+  #topbar::after { bottom: 0; }
+  #controls::after { top: 0; }
+  #topbar > *, #controls > * { position: relative; z-index: 1; }
+  #topbar .ctrlBtn, #controls .ctrlBtn {
+    background: rgba(255,255,255,.075) !important;
+    border-color: rgba(255,255,255,.16) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 2px 7px rgba(0,0,0,.08) !important;
+  }
+  #topbar .ctrlBtn:hover, #controls .ctrlBtn:hover { background: rgba(255,255,255,.13) !important; }
+  .primaryBtn {
+    background: rgba(255,107,74,.78) !important;
+    border-color: rgba(255,255,255,.40) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.46), 0 5px 15px rgba(255,107,74,.20) !important;
+  }
+  @media (max-width: 600px) {
+    #mobileBottomNav {
+      bottom: max(10px, env(safe-area-inset-bottom));
+      width: min(360px, calc(100vw - 32px));
+      padding: 7px;
+      gap: 5px;
+      background: rgba(28,31,39,.50) !important;
+      border: 1px solid rgba(255,255,255,.29) !important;
+      border-radius: 30px;
+      box-shadow: 0 12px 34px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.44), inset 0 -1px 0 rgba(0,0,0,.16) !important;
+      -webkit-backdrop-filter: blur(40px) saturate(180%) contrast(106%);
+      backdrop-filter: blur(40px) saturate(180%) contrast(106%);
+    }
+    #mobileBottomNav::before {
+      background: radial-gradient(90% 220% at var(--glass-light-x, 10%) var(--glass-light-y, 0%), rgba(255,255,255,.15), transparent 66%) !important;
+      opacity: .76 !important;
+      animation: none !important;
+    }
+    #mobileBottomNav.glass-pressed::before {
+      background: radial-gradient(34% 130% at var(--glass-light-x, 50%) var(--glass-light-y, 50%), rgba(255,255,255,.30), transparent 72%) !important;
+      opacity: .92 !important;
+    }
+    #mobileBottomNav::after {
+      left: 13%; right: 13%; top: 1px; bottom: auto; width: auto; height: 1px;
+      border: 0 !important; border-radius: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.72), transparent);
+      box-shadow: none; opacity: .75;
+    }
+    .mobileBottomNavBtn {
+      min-height: 42px; border: 1px solid transparent !important; border-radius: 999px;
+      background: transparent !important; color: rgba(255,255,255,.70);
+      box-shadow: none !important; text-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+    }
+    .mobileBottomNavBtn:hover, .mobileBottomNavBtn:focus-visible { background: rgba(255,255,255,.075) !important; }
+    .mobileBottomNavBtn.active {
+      color: #fff; background: rgba(255,255,255,.16) !important;
+      border-color: rgba(255,255,255,.31) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.40), 0 2px 8px rgba(0,0,0,.10) !important;
+    }
+    .mobileBottomNavBtn.active .mobileNavGlyph { color: var(--accent); }
+    #mobileUtilityMenu {
+      background: rgba(28,31,39,.56) !important;
+      border-color: rgba(255,255,255,.25) !important;
+      box-shadow: 0 14px 34px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.36) !important;
+      -webkit-backdrop-filter: blur(36px) saturate(175%) contrast(106%);
+      backdrop-filter: blur(36px) saturate(175%) contrast(106%);
+    }
+    html[data-theme="light"] #mobileBottomNav {
+      background: rgba(247,248,251,.58) !important;
+      border-color: rgba(255,255,255,.88) !important;
+      box-shadow: 0 12px 34px rgba(60,60,67,.13), inset 0 1px 0 rgba(255,255,255,.96), inset 0 -1px 0 rgba(90,95,105,.08) !important;
+    }
+    html[data-theme="light"] .mobileBottomNavBtn { color: rgba(35,39,42,.66); }
+    html[data-theme="light"] .mobileBottomNavBtn.active { color: #007aff; background: rgba(255,255,255,.50) !important; border-color: rgba(255,255,255,.88) !important; }
+  html[data-theme="light"] #mobileUtilityMenu { background: rgba(247,248,251,.64) !important; }
+  }
+  /* Chromium-only optical enhancement. WebKit/iOS intentionally keeps the
+     cross-browser frosted material above; the filter is a progressive
+     enhancement and never the only source of contrast. */
+  @supports (backdrop-filter: url(#liquidRefraction)) {
+    #topbar, #controls, #mobileBottomNav, #mobileUtilityMenu {
+      -webkit-backdrop-filter: blur(18px) saturate(180%) url(#liquidRefraction);
+      backdrop-filter: blur(18px) saturate(180%) url(#liquidRefraction);
+    }
+  }
+  @media (max-width: 600px) {
+    #newBtn, #addCustomBtn, #bulkDetectBtn { display: none !important; }
+    /* The bottom bar is the mobile navigation. A second close affordance in
+       the author-card header is redundant and visually competes with it. */
+    #closeAuthorCardBtn { display: none !important; }
+    #authorCardPanel {
+      padding-bottom: calc(128px + max(18px, env(safe-area-inset-bottom))) !important;
+    }
+    #authorCardPanel > .dialog-actions:last-child { margin-bottom: 8px !important; }
+  }
+  /* Navigable screens are ordinary full-viewport views. They are not modal
+     dialogs: the History API owns entering and leaving them. */
+  .screenView {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    width: 100%;
+    height: 100dvh;
+    margin: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: var(--bg);
+    color: var(--text);
+    border: 0;
+  }
+  .screenView.show { display: block; }
+  .screenView > .modalPanel {
+    min-height: 100%;
+    max-height: none;
+    border-radius: 0;
+  }
+  .settingsPanel { width: min(680px, 100%); margin: 0 auto; }
+  .settingsSection { max-width: 560px; width: 100%; margin: 12px auto 0; }
+  .settingsSection h2 { margin: 0; font-size: 18px; }
+  .settingsHint { margin: 8px 0 14px; color: var(--sub); font-size: 13px; }
+  .settingsToggle { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-2); color: var(--text); cursor: pointer; }
+  .settingsToggle + .settingsToggle { margin-top: 8px; }
+  .settingsToggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .backupActions { display: flex; flex-wrap: wrap; gap: 10px; }
+  .screenView:focus { outline: none; }
 </style>
 </head>
 <body>
+<svg aria-hidden="true" width="0" height="0" style="position:absolute;pointer-events:none">
+  <filter id="liquidRefraction" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.008 0.012" numOctaves="2" seed="7" result="liquidNoise" />
+    <feGaussianBlur in="liquidNoise" stdDeviation="1.5" result="softNoise" />
+    <feDisplacementMap in="SourceGraphic" in2="softNoise" scale="10" xChannelSelector="R" yChannelSelector="G" />
+  </filter>
+</svg>
 <script src="supabase-config.js"></script>
 <script src="vault-session.js?v=20260813-vault-state"></script>
+<script src="browser-storage.js"></script>
+<script src="vault-payload.js"></script>
+<script src="backup-format.js?v=20260822-backup-scope-fix"></script>
+<script src="status-message.js"></script>
+<script src="shelf-search.js"></script>
+<script src="author-summary.js"></script>
+<script src="feature-flags.js"></script>
 <script>
 (() => {
   const sessionKey = 'mangaReaderSupabaseSession';
   const loginUrl = 'index.html';
   const vaultUrl = 'sync.html';
+  const AUTH_REFRESH_TIMEOUT_MS = 5000;
   const showLogin = () => window.location.replace(loginUrl);
   try {
     const session = JSON.parse(localStorage.getItem(sessionKey) || 'null');
     const config = window.MANGA_READER_SUPABASE || {};
     if (!session || !session.refresh_token || !config.url || !config.publishableKey) { showLogin(); return; }
     if (!window.MangaVault || !MangaVault.loadActive()) { window.location.replace(vaultUrl); return; }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), AUTH_REFRESH_TIMEOUT_MS);
     fetch(config.url + '/auth/v1/token?grant_type=refresh_token', {
       method: 'POST', headers: { apikey: config.publishableKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: session.refresh_token })
+      body: JSON.stringify({ refresh_token: session.refresh_token }),
+      signal: controller.signal
     }).then(async (response) => {
       if (!response.ok) throw new Error('session expired');
       localStorage.setItem(sessionKey, JSON.stringify(await response.json()));
       document.documentElement.classList.remove('auth-pending');
-    }).catch(() => { localStorage.removeItem(sessionKey); showLogin(); });
+    }).catch(() => { localStorage.removeItem(sessionKey); showLogin(); }).finally(() => clearTimeout(timer));
   } catch (_) { localStorage.removeItem(sessionKey); showLogin(); }
 })();
 </script>
@@ -855,7 +1256,7 @@
 <div id="metadataSuggestions" role="listbox" aria-label="入力候補"></div>
 
 <!-- Save dialog -->
-<div id="saveDialogOverlay" class="modalOverlay">
+<section id="saveDialogOverlay" class="screenView modalOverlay" role="region" aria-labelledby="saveDialogPanel">
   <div id="saveDialogPanel" class="modalPanel">
     <div class="panel-header"><span>URLを保存</span></div>
     <label class="field-label" for="saveTitleInput">タイトル</label>
@@ -896,10 +1297,10 @@
       <button class="primaryBtn" id="confirmSaveBtn">保存</button>
     </div>
   </div>
-</div>
+</section>
 
 <!-- Custom (explicit page-list) manga add dialog -->
-<div id="customAddOverlay" class="modalOverlay">
+<section id="customAddOverlay" class="screenView modalOverlay" role="region" aria-labelledby="customAddPanel">
   <div id="customAddPanel" class="modalPanel">
     <div class="panel-header"><span>個別追加</span></div>
     <label class="field-label" for="customTitleInput">タイトル</label>
@@ -944,11 +1345,11 @@ https://cdn.example.org/c/003.webp"></textarea>
       <button class="primaryBtn" id="confirmCustomAddBtn">追加</button>
     </div>
   </div>
-</div>
+</section>
 
 <!-- Edit saved item dialog (works for both normal 連番URL items and custom
      explicit page-list items) -->
-<div id="editItemOverlay" class="modalOverlay">
+<section id="editItemOverlay" class="screenView modalOverlay" role="region" aria-labelledby="editItemPanel">
   <div id="editItemPanel" class="modalPanel">
     <div class="panel-header"><span>編集</span></div>
     <label class="field-label" for="editTitleInput">タイトル</label>
@@ -992,15 +1393,14 @@ https://cdn.example.org/c/003.webp"></textarea>
       <button class="primaryBtn" id="confirmEditItemBtn">保存</button>
     </div>
   </div>
-</div>
+</section>
 
 <!-- Table of contents (目次) list dialog -->
 <!-- Author cards -->
-<div id="authorCardOverlay" class="modalOverlay">
+<section id="authorCardOverlay" class="screenView modalOverlay" role="region" aria-labelledby="authorCardPanel">
   <div id="authorCardPanel" class="modalPanel">
     <div class="panel-header"><span>作者カード</span><button class="ctrlBtn" id="closeAuthorCardBtn" type="button">閉じる</button></div>
-    <div id="authorCardList" class="author-card-list"></div>
-    <div id="authorCardEmpty" style="display:none;color:var(--sub);font-size:13px;padding:14px 0;">作者カードはまだありません</div>
+    <div class="dialog-actions" id="authorCardCreateActions" style="margin-top:8px;"><button class="primaryBtn" id="newAuthorCardBtn" type="button">作者カードを作成</button></div>
     <div id="authorCardEditor" style="display:none;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
       <div class="panel-header" style="font-size:15px;padding-bottom:8px;"><span id="authorCardEditorTitle">作者カードを作成</span></div>
       <label class="field-label" for="authorCardNameInput">作者名</label>
@@ -1012,11 +1412,12 @@ https://cdn.example.org/c/003.webp"></textarea>
       <button class="ctrlBtn" id="addAuthorLinkBtn" type="button" style="margin-top:9px;">リンクを追加</button>
       <div class="dialog-actions" style="margin-top:14px;"><button class="ctrlBtn" id="cancelAuthorCardBtn" type="button">キャンセル</button><button class="primaryBtn" id="saveAuthorCardBtn" type="button">保存</button></div>
     </div>
-    <div class="dialog-actions" style="margin-top:16px;"><button class="primaryBtn" id="newAuthorCardBtn" type="button">作者カードを作成</button></div>
+    <div id="authorCardList" class="author-card-list"></div>
+    <div id="authorCardEmpty" style="display:none;color:var(--sub);font-size:13px;padding:14px 0;">作者カードはまだありません</div>
   </div>
-</div>
+</section>
 
-<div id="tocOverlay" class="modalOverlay">
+<section id="tocOverlay" class="screenView modalOverlay" role="region" aria-labelledby="tocPanel">
   <div id="tocPanel" class="modalPanel">
     <div class="panel-header">
       <span>目次</span>
@@ -1025,10 +1426,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     <div id="tocListItems"></div>
     <div id="tocListEmpty" style="display:none;">目次はまだ追加されていません</div>
   </div>
-</div>
+</section>
 
 <!-- Saved list -->
-<div id="savedListOverlay" class="modalOverlay">
+<section id="savedListOverlay" class="screenView modalOverlay" role="region" aria-labelledby="savedListPanel">
   <div id="savedListPanel" class="modalPanel">
     <div class="panel-header">
       <span id="listPanelTitle">保存したURL</span>
@@ -1039,9 +1440,6 @@ https://cdn.example.org/c/003.webp"></textarea>
       </div>
     </div>
     <div id="listTabRow">
-      <button class="listTab active" id="listTabManga" type="button">漫画</button>
-      <button class="listTab" id="listTabVideo" type="button">動画</button>
-      <button class="listTab" id="listTabLinks" type="button" onclick="window.location.href='links.html'">リンク管理</button>
       <button class="listTab" id="localReaderBtn" type="button">ローカル漫画</button>
     </div>
     <div id="mangaListSection">
@@ -1049,19 +1447,15 @@ https://cdn.example.org/c/003.webp"></textarea>
         <button class="primaryBtn" id="newBtn">新規</button>
         <button class="ctrlBtn" id="addCustomBtn">個別追加</button>
         <button class="ctrlBtn" id="bulkDetectBtn">一括読み込み</button>
-        <button class="ctrlBtn" id="authorCardsBtn" type="button">作者カード</button>
-        <button class="ctrlBtn" id="backupExportBtn" type="button">バックアップ保存</button>
-        <button class="ctrlBtn" id="backupImportBtn" type="button">バックアップ読込</button>
-        <input id="backupFileInput" type="file" accept="application/json,.json" style="display:none;">
       </div>
       <div id="smartListRow">
         <button class="smartListBtn" id="historyListBtn" type="button">履歴</button>
         <button class="smartListBtn" id="unreadListBtn" type="button">読んでいない順</button>
         <button class="smartListBtn" id="syncedListBtn" type="button">同期済み</button>
         <button class="smartListBtn" id="transferBudgetBtn" type="button">通信量</button>
-        <button class="smartListBtn" id="groupAuthorBtn" type="button">作者でまとめる</button>
       </div>
       <div id="listToolbar">
+        <input id="shelfSearchInput" type="search" placeholder="タイトル・作者・タグ・フォルダ・動画を検索" aria-label="本棚検索" style="min-width:180px;flex:1;">
         <button class="ctrlBtn" id="listBackBtn" style="display:none;">← 戻る</button>
         <span id="listFolderTitle"></span>
         <button class="ctrlBtn" id="listNewFolderBtn">+ 新しいフォルダ</button>
@@ -1074,7 +1468,9 @@ https://cdn.example.org/c/003.webp"></textarea>
           <option value="title-asc">タイトル順</option>
           <option value="synced-first">同期済みを上</option>
         </select>
+        <button class="smartListBtn" id="groupAuthorBtn" type="button">作者でまとめる</button>
       </div>
+      <div id="dashboard" hidden style="display:grid;gap:10px;margin:12px 0;"></div>
       <div id="filterRow" style="display:none;" class="filter-row">
         <input id="filterSeriesInput" type="text" placeholder="シリーズ">
         <input id="filterAuthorInput" type="text" placeholder="作者">
@@ -1087,13 +1483,14 @@ https://cdn.example.org/c/003.webp"></textarea>
         <input id="listNewFolderInput" type="text" placeholder="新しいフォルダ名">
         <button class="ctrlBtn" id="listNewFolderConfirmBtn">追加</button>
       </div>
-      <div id="savedListItems"></div>
-      <div id="savedListEmpty" style="display:none;">保存されたURLはまだありません</div>
-      <div id="bookshelfPagination" style="display:none;" class="bookshelf-pagination">
-        <button class="ctrlBtn" id="bookshelfPrevBtn" type="button">前へ</button>
-        <span id="bookshelfPageLabel"></span>
-        <button class="ctrlBtn" id="bookshelfNextBtn" type="button">次へ</button>
+      <div id="savedListItems">
+        <div id="bookshelfPagination" style="display:none;" class="bookshelf-pagination">
+          <button class="ctrlBtn bookshelfPagerButton" id="bookshelfPrevBtn" type="button">前へ</button>
+          <span id="bookshelfPageLabel"></span>
+          <button class="ctrlBtn bookshelfPagerButton" id="bookshelfNextBtn" type="button">次へ</button>
+        </div>
       </div>
+      <div id="savedListEmpty" style="display:none;">保存されたURLはまだありません</div>
     </div>
     <div id="videoListSection" style="display:none;">
       <div id="videoListToolbar">
@@ -1103,9 +1500,30 @@ https://cdn.example.org/c/003.webp"></textarea>
       <div id="videoListEmpty" style="display:none;">動画はまだ追加されていません</div>
     </div>
   </div>
+</section>
+
+<nav id="mobileBottomNav" aria-label="よく使うメニュー">
+  <button class="mobileBottomNavBtn active" id="mobileNavManga" type="button" aria-label="漫画">
+    <svg class="mobileNavGlyph mobileNavGlyphManga" viewBox="0 0 200 200" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" d="M24 58c36-20 72-16 100 8v108c-25-20-62-24-100-8z"></path><path fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" d="M176 58c-36-20-72-16-100 8v108c25-20 62-24 100-8z"></path><path fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" d="M100 66v108"></path></svg>
+    <span>漫画</span>
+  </button>
+  <button class="mobileBottomNavBtn" id="mobileNavVideo" type="button" aria-label="動画">
+    <svg class="mobileNavGlyph mobileNavGlyphVideo" viewBox="0 0 200 200" aria-hidden="true" focusable="false"><rect fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" x="26" y="48" width="148" height="106" rx="22"></rect><path fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" d="m84 78 42 23-42 23z"></path></svg>
+    <span>動画</span>
+  </button>
+  <button class="mobileBottomNavBtn" id="mobileNavMore" type="button" aria-label="その他" aria-haspopup="menu" aria-expanded="false">
+    <svg class="mobileNavGlyph mobileNavGlyphMore" viewBox="0 0 200 200" aria-hidden="true" focusable="false"><circle fill="currentColor" cx="55" cy="100" r="9"></circle><circle fill="currentColor" cx="100" cy="100" r="9"></circle><circle fill="currentColor" cx="145" cy="100" r="9"></circle></svg>
+    <span>その他</span>
+  </button>
+</nav>
+<div id="mobileUtilityMenu" role="menu" aria-label="その他の操作" hidden>
+  <button id="mobileNavLinks" type="button" role="menuitem">リンク管理</button>
+  <button id="mobileNavAuthor" type="button" role="menuitem">作者カード</button>
+  <button id="mobileNavBackup" type="button" role="menuitem">バックアップ</button>
+  <button id="mobileNavSettings" type="button" role="menuitem">設定</button>
 </div>
 
-<div id="bulkEditOverlay" class="modalOverlay">
+<section id="bulkEditOverlay" class="screenView modalOverlay" role="region" aria-labelledby="bulkEditPanel">
   <div id="bulkEditPanel" class="modalPanel">
     <div class="panel-header"><span>一括編集</span><button class="ctrlBtn" id="closeBulkEditBtn" type="button">閉じる</button></div>
     <p id="bulkEditSelectionText" style="color:var(--sub);font-size:13px;">選択した作品を編集します。空欄・「変更しない」はその項目を変更しません。</p>
@@ -1119,10 +1537,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     <label class="field-label">見開き分割</label><select id="bulkSplitSelect"><option value="">変更しない</option><option value="1">有効</option><option value="0">無効</option></select>
     <div class="dialog-actions"><button class="ctrlBtn" id="cancelBulkEditBtn" type="button">キャンセル</button><button class="primaryBtn" id="applyBulkEditBtn" type="button">適用</button></div>
   </div>
-</div>
+</section>
 
 <!-- Bulk page-count detection -->
-<div id="bulkDetectOverlay" class="modalOverlay">
+<section id="bulkDetectOverlay" class="screenView modalOverlay" role="region" aria-labelledby="bulkDetectPanel">
   <div id="bulkDetectPanel" class="modalPanel">
     <div class="panel-header"><span>一括読み込み</span><button class="ctrlBtn" id="closeBulkDetectBtn">閉じる</button></div>
     <p id="bulkDetectSummary" style="font-size:13px;color:var(--sub);line-height:1.6;margin:0 0 14px;"></p>
@@ -1134,10 +1552,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     </div>
     <p style="font-size:12px;color:var(--sub);line-height:1.6;margin:18px 0 0;">タイムアウトした作品は、次回は確認済みの続きのページから再試行します。</p>
   </div>
-</div>
+</section>
 
 <!-- Video add dialog -->
-<div id="videoAddOverlay" class="modalOverlay">
+<section id="videoAddOverlay" class="screenView modalOverlay" role="region" aria-labelledby="videoAddPanel">
   <div id="videoAddPanel" class="modalPanel">
     <div class="panel-header">
       <span>動画を追加</span>
@@ -1156,10 +1574,10 @@ https://cdn.example.org/c/003.webp"></textarea>
       <button class="primaryBtn" id="confirmVideoAddBtn" type="button">追加</button>
     </div>
   </div>
-</div>
+</section>
 
 <!-- Video player overlay -->
-<div id="videoPlayerOverlay" class="modalOverlay">
+<section id="videoPlayerOverlay" class="screenView modalOverlay" role="region" aria-labelledby="videoPlayerPanel">
   <div id="videoPlayerPanel">
     <div id="videoPlayerHeader">
       <span id="videoPlayerTitle"></span>
@@ -1171,13 +1589,44 @@ https://cdn.example.org/c/003.webp"></textarea>
       </iframe>
     </div>
   </div>
-</div>
+</section>
+
+<section id="settingsOverlay" class="screenView" role="region" aria-labelledby="settingsPanel">
+  <div id="settingsPanel" class="modalPanel settingsPanel">
+    <div class="panel-header"><span>設定</span><button class="ctrlBtn" id="closeSettingsBtn" type="button">戻る</button></div>
+    <div class="settingsSection">
+      <h2>本棚の表示</h2>
+      <p class="settingsHint">本棚に表示する補助セクションを選択できます。</p>
+      <label class="settingsToggle"><input type="checkbox" data-dashboard-setting="continue" checked><span>続きから読む</span></label>
+      <label class="settingsToggle"><input type="checkbox" data-dashboard-setting="recent-added" checked><span>最近追加</span></label>
+      <label class="settingsToggle"><input type="checkbox" data-dashboard-setting="recent-read" checked><span>最近読んだ</span></label>
+      <label class="settingsToggle"><input type="checkbox" data-dashboard-setting="unread" checked><span>未読</span></label>
+      <label class="settingsToggle"><input type="checkbox" data-dashboard-setting="random" checked><span>ランダム</span></label>
+      <label class="settingsToggle"><input type="checkbox" data-dashboard-setting="favorites" checked><span>お気に入り</span></label>
+    </div>
+  </div>
+</section>
+
+<section id="backupOverlay" class="screenView" role="region" aria-labelledby="backupPanel">
+  <div id="backupPanel" class="modalPanel settingsPanel">
+    <div class="panel-header"><span>バックアップ</span><button class="ctrlBtn" id="closeBackupBtn" type="button">戻る</button></div>
+    <div class="settingsSection">
+      <p class="settingsHint">保存したデータをファイルに書き出したり、以前のバックアップを読み込んだりできます。</p>
+      <div class="backupActions">
+        <button class="primaryBtn" id="backupExportBtn" type="button">バックアップ保存</button>
+        <button class="ctrlBtn" id="backupImportBtn" type="button">バックアップ読込</button>
+        <input id="backupFileInput" type="file" accept="application/json,.json" style="display:none;">
+      </div>
+    </div>
+  </div>
+</section>
 
 <script>
 (function () {
   const EXT_CANDIDATES = ['jpg', 'jpeg', 'png', 'webp'];
   const MAX_PAGES_SAFETY = 2000;
-  const LOAD_TIMEOUT_MS = 8000;
+  const LOAD_TIMEOUT_MS = 60000;
+  const IMAGE_PROBE_BUDGET_MS = 60000;
   // ページ検出を何件ずつ並列で確認するか。6はブラウザがオリジン毎に張る同時
   // 接続数の目安に合わせた値で、これより増やしてもキューで待たされるだけなので
   // 大きくしすぎない。
@@ -1199,6 +1648,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   const ICON_SUN = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23f1f2f6%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%224%22%2F%3E%3Cpath%20d%3D%22M12%202v2M12%2020v2M4.93%204.93l1.42%201.42M17.65%2017.65l1.42%201.42M2%2012h2M20%2012h2M4.93%2019.07l1.42-1.42M17.65%206.35l1.42-1.42%22%2F%3E%3C%2Fsvg%3E";
   const ICON_MOON = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%231d2230%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M20.5%2015.2A8.5%208.5%200%200%201%208.8%203.5%208.6%208.6%200%201%200%2020.5%2015.2z%22%2F%3E%3C%2Fsvg%3E";
   const coverSourceCache = new Map();
+  const coverFailedCache = new Set();
   function setThemeButtonIcon(button, selected) {
     if (!button) return;
     button.replaceChildren();
@@ -1263,6 +1713,16 @@ https://cdn.example.org/c/003.webp"></textarea>
   const READING_SESSION_MS = 30 * 60 * 1000;
   const THEME_KEY = 'mangaReaderTheme';
   const GROUP_AUTHOR_KEY = 'mangaReaderGroupByAuthor';
+  const DASHBOARD_VISIBILITY_KEY = 'mangaReaderDashboardVisibility';
+  const DASHBOARD_DEVICE_PROFILE = window.matchMedia && window.matchMedia('(max-width: 600px)').matches ? 'mobile' : 'desktop';
+  const DEFAULT_DASHBOARD_VISIBILITY = Object.freeze({
+    continue: false,
+    'recent-added': false,
+    'recent-read': false,
+    unread: false,
+    random: false,
+    favorites: false,
+  });
   const BOOKSHELF_PAGE_SIZE = 25;
 
   const els = {
@@ -1276,6 +1736,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     moreBtn: document.getElementById('moreBtn'),
     mobileMoreMenu: document.getElementById('mobileMoreMenu'),
     listThemeBtn: document.getElementById('listThemeBtn'),
+    settingsOverlay: document.getElementById('settingsOverlay'),
+    closeSettingsBtn: document.getElementById('closeSettingsBtn'),
+    backupOverlay: document.getElementById('backupOverlay'),
+    closeBackupBtn: document.getElementById('closeBackupBtn'),
     status: document.getElementById('status'),
     currentTitle: document.getElementById('currentTitle'),
     favToggleBtn: document.getElementById('favToggleBtn'),
@@ -1375,7 +1839,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     closeBulkEditBtn: document.getElementById('closeBulkEditBtn'),
     cancelBulkEditBtn: document.getElementById('cancelBulkEditBtn'),
     applyBulkEditBtn: document.getElementById('applyBulkEditBtn'),
-    authorCardsBtn: document.getElementById('authorCardsBtn'),
     backupExportBtn: document.getElementById('backupExportBtn'),
     backupImportBtn: document.getElementById('backupImportBtn'),
     backupFileInput: document.getElementById('backupFileInput'),
@@ -1403,6 +1866,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     transferBudgetBtn: document.getElementById('transferBudgetBtn'),
     groupAuthorBtn: document.getElementById('groupAuthorBtn'),
     shelfSortSelect: document.getElementById('shelfSortSelect'),
+    shelfSearchInput: document.getElementById('shelfSearchInput'),
+    dashboard: document.getElementById('dashboard'),
 
     bulkDetectOverlay: document.getElementById('bulkDetectOverlay'),
     closeBulkDetectBtn: document.getElementById('closeBulkDetectBtn'),
@@ -1465,6 +1930,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
 
     listPanelTitle: document.getElementById('listPanelTitle'),
+    listTabRow: document.getElementById('listTabRow'),
     listTabManga: document.getElementById('listTabManga'),
     listTabVideo: document.getElementById('listTabVideo'),
     mangaListSection: document.getElementById('mangaListSection'),
@@ -1472,6 +1938,15 @@ https://cdn.example.org/c/003.webp"></textarea>
     addVideoBtn: document.getElementById('addVideoBtn'),
     videoListItems: document.getElementById('videoListItems'),
     videoListEmpty: document.getElementById('videoListEmpty'),
+    mobileBottomNav: document.getElementById('mobileBottomNav'),
+    mobileNavManga: document.getElementById('mobileNavManga'),
+    mobileNavVideo: document.getElementById('mobileNavVideo'),
+    mobileNavLinks: document.getElementById('mobileNavLinks'),
+    mobileNavAuthor: document.getElementById('mobileNavAuthor'),
+    mobileNavMore: document.getElementById('mobileNavMore'),
+    mobileNavBackup: document.getElementById('mobileNavBackup'),
+    mobileNavSettings: document.getElementById('mobileNavSettings'),
+    mobileUtilityMenu: document.getElementById('mobileUtilityMenu'),
 
     videoAddOverlay: document.getElementById('videoAddOverlay'),
     videoUrlInput: document.getElementById('videoUrlInput'),
@@ -1488,6 +1963,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     closeVideoPlayerBtn: document.getElementById('closeVideoPlayerBtn'),
   };
 
+  if (!window.MangaReaderFeatures.transferBudget) els.transferBudgetBtn.hidden = true;
+
   let savedVideos = [];    // { id, a, b, title, addedAt }
   let activeListTab = 'manga'; // 'manga' | 'video'
   let baseUrl = '';
@@ -1500,12 +1977,15 @@ https://cdn.example.org/c/003.webp"></textarea>
   let localSyncSigning = new Map();
   let imageCacheDbPromise = null;
   const IMAGE_CACHE_DB = 'mangaReaderImageCache';
+  const IMAGE_CACHE_LIMIT = 500 * 1024 * 1024;
+  function imageCacheUserId() { try { const session = JSON.parse(localStorage.getItem('mangaReaderSupabaseSession') || 'null'); return session && session.user && session.user.id ? session.user.id : 'anonymous'; } catch (_) { return 'anonymous'; } }
+  function imageCacheKey(path) { return imageCacheUserId() + ':' + path; }
 
   function imageCacheDb() {
     if (imageCacheDbPromise) return imageCacheDbPromise;
     imageCacheDbPromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open(IMAGE_CACHE_DB, 1);
-      request.onupgradeneeded = () => request.result.createObjectStore('images', { keyPath: 'path' });
+      const request = indexedDB.open(IMAGE_CACHE_DB, 2);
+      request.onupgradeneeded = () => { if (request.result.objectStoreNames.contains('images')) request.result.deleteObjectStore('images'); request.result.createObjectStore('images', { keyPath: 'key' }); };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -1514,15 +1994,18 @@ https://cdn.example.org/c/003.webp"></textarea>
   async function readImageCache(path) {
     try {
       const db = await imageCacheDb();
-      return await new Promise((resolve, reject) => { const tx = db.transaction('images', 'readonly'); const req = tx.objectStore('images').get(path); req.onsuccess = () => resolve(req.result || null); req.onerror = () => reject(req.error); });
+      return await new Promise((resolve, reject) => { const tx = db.transaction('images', 'readwrite'); const store = tx.objectStore('images'); const req = store.get(imageCacheKey(path)); req.onsuccess = () => { const value = req.result || null; if (value) { value.lastAccessedAt = Date.now(); store.put(value); } resolve(value); }; req.onerror = () => reject(req.error); });
     } catch (_) { return null; }
   }
   async function writeImageCache(path, blob) {
     try {
       const db = await imageCacheDb();
-      await new Promise((resolve, reject) => { const tx = db.transaction('images', 'readwrite'); tx.objectStore('images').put({ path, blob, size: blob.size || 0, cachedAt: Date.now() }); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
+      await new Promise((resolve, reject) => { const tx = db.transaction('images', 'readwrite'); tx.objectStore('images').put({ key: imageCacheKey(path), path, userId: imageCacheUserId(), blob, size: blob.size || 0, lastAccessedAt: Date.now() }); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
+      await pruneImageCache();
     } catch (_) {}
   }
+  async function pruneImageCache() { try { const db = await imageCacheDb(); const rows = await new Promise((resolve, reject) => { const tx = db.transaction('images', 'readonly'); const req = tx.objectStore('images').getAll(); req.onsuccess = () => resolve(req.result || []); req.onerror = () => reject(req.error); }); let total = rows.reduce((sum, row) => sum + (row.size || 0), 0); rows.sort((a, b) => (a.lastAccessedAt || 0) - (b.lastAccessedAt || 0)); if (total <= IMAGE_CACHE_LIMIT) return; await new Promise((resolve, reject) => { const tx = db.transaction('images', 'readwrite'); const store = tx.objectStore('images'); rows.some((row) => { if (total <= IMAGE_CACHE_LIMIT) return true; store.delete(row.key); total -= row.size || 0; return false; }); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); }); } catch (_) {} }
+  async function clearImageCacheForCurrentUser() { try { const db = await imageCacheDb(); const userId = imageCacheUserId(); await new Promise((resolve, reject) => { const tx = db.transaction('images', 'readwrite'); const store = tx.objectStore('images'); const req = store.openCursor(); req.onsuccess = () => { const cursor = req.result; if (!cursor) return; if (cursor.value.userId === userId) cursor.delete(); cursor.continue(); }; tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); }); } catch (_) {} }
   let splitSpreads = false;
   let preferredExt = 0;    // index into EXT_CANDIDATES
   let pageNumberWidth = 1; // filename zero-padding width: 1 -> 1.jpg, 2 -> 01.jpg
@@ -1676,6 +2159,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   const bulkSelectedIds = new Set();
   let bulkEditUndoSnapshot = null;
   let shelfFilters = { series: '', author: '', tags: '', source: '' };
+  let shelfSearchQuery = '';
   let shelfSort = 'added-desc';
   const TRANSFER_LIMIT_KEY = 'mangaReaderStorageTransferLimitDaily';
   const TRANSFER_USAGE_KEY = 'mangaReaderStorageTransferUsageDaily';
@@ -1695,21 +2179,22 @@ https://cdn.example.org/c/003.webp"></textarea>
   function recordTransferEstimate(bytes) {
     const amount = Math.max(0, Number(bytes) || 0);
     if (transferUsageBytes() + amount > transferLimitBytes()) return false;
-    localStorage.setItem(TRANSFER_USAGE_KEY, JSON.stringify({ day: transferDayKey(), bytes: transferUsageBytes() + amount }));
-    return true;
+    return MangaReaderStorage.safeWriteJson(TRANSFER_USAGE_KEY, { day: transferDayKey(), bytes: transferUsageBytes() + amount });
   }
   function formatTransferBytes(bytes) {
     const value = Number(bytes) || 0;
     if (value >= 1024 * 1024 * 1024) return (value / 1024 / 1024 / 1024).toFixed(2) + 'GB';
     return Math.round(value / 1024 / 1024) + 'MB';
   }
-  function configureTransferBudget() {
+  async function configureTransferBudget() {
     const current = transferLimitBytes() / 1024 / 1024;
-    const input = prompt('1日の画像通信量上限をMBで設定してください。\n今日の使用量: ' + formatTransferBytes(transferUsageBytes()) + ' / ' + formatTransferBytes(transferLimitBytes()), String(Math.round(current)));
+    let storageLine = '';
+    if (navigator.storage && navigator.storage.estimate) { try { const estimate = await navigator.storage.estimate(); storageLine = '\n端末保存: ' + formatTransferBytes(estimate.usage || 0) + ' / ' + formatTransferBytes(estimate.quota || 0); } catch (_) {} }
+    const input = prompt('1日の画像通信量上限をMBで設定してください。\n今日の使用量: ' + formatTransferBytes(transferUsageBytes()) + ' / ' + formatTransferBytes(transferLimitBytes()) + storageLine, String(Math.round(current)));
     if (input === null) return;
     const mb = Number(input);
     if (!Number.isFinite(mb) || mb <= 0) { flashStatus('正しい通信量上限を入力してください'); return; }
-    localStorage.setItem(TRANSFER_LIMIT_KEY, String(Math.round(mb * 1024 * 1024)));
+    if (!MangaReaderStorage.safeSet(TRANSFER_LIMIT_KEY, String(Math.round(mb * 1024 * 1024)))) { flashStatus('端末保存容量が不足しています'); return; }
     flashStatus('1日の通信量上限を ' + Math.round(mb) + 'MB に設定しました');
   }
   let bookshelfPage = 1;
@@ -1981,9 +2466,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     });
   }
 
-  function persistFolders() { try { localStorage.setItem(SAVED_FOLDERS_KEY, JSON.stringify(savedFolders)); } catch (e) {} scheduleCloudSync(); }
-  function persistItems() { try { localStorage.setItem(SAVED_ITEMS_KEY, JSON.stringify(savedItems)); } catch (e) {} scheduleCloudSync(); }
-  function persistAuthorCards() { try { localStorage.setItem(AUTHOR_CARDS_KEY, JSON.stringify(authorCards)); } catch (e) {} scheduleCloudSync(); }
+  function persistFolders() { MangaReaderStorage.safeWriteJson(SAVED_FOLDERS_KEY, savedFolders); scheduleCloudSync(); }
+  function persistItems() { MangaReaderStorage.safeWriteJson(SAVED_ITEMS_KEY, savedItems); scheduleCloudSync(); }
+  function persistAuthorCards() { MangaReaderStorage.safeWriteJson(AUTHOR_CARDS_KEY, authorCards); scheduleCloudSync(); }
   function persistAll() {
     persistFolders();
     persistItems();
@@ -1997,7 +2482,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   function scheduleCloudSync() {
     if (!window.MangaVault || !MangaVault.loadActive()) return;
     clearTimeout(cloudSyncTimer);
-    cloudSyncTimer = setTimeout(runCloudSync, 800);
+    cloudSyncTimer = setTimeout(runCloudSync, 5000);
   }
   async function runCloudSync() {
     if (cloudSyncRunning) { cloudSyncDirty = true; return; }
@@ -2005,7 +2490,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     try {
       await MangaVault.savePayload(buildSyncPayload());
     } catch (error) {
-      flashStatus(error && error.message ? error.message : 'クラウド同期に失敗しました');
+      flashStatus(error && error.message ? error.message : 'クラウド同期に失敗しました', 'cloud-sync-error');
     } finally {
       cloudSyncRunning = false;
       if (cloudSyncDirty) { cloudSyncDirty = false; scheduleCloudSync(); }
@@ -2330,10 +2815,10 @@ https://cdn.example.org/c/003.webp"></textarea>
   function openTocList() {
     if (!currentToc.length) { flashStatus('目次はまだ追加されていません'); return; }
     renderTocList();
-    els.tocOverlay.classList.add('show');
+    openReaderScreen('toc');
   }
-  function closeTocList() { els.tocOverlay.classList.remove('show'); }
-  function isTocListOpen() { return els.tocOverlay.classList.contains('show'); }
+  function closeTocList() { closeReaderScreen('toc'); }
+  function isTocListOpen() { return currentReaderScreen === 'toc'; }
 
   // ---------- series / next-volume (シリーズ・次の巻) ----------
   // Resolves the series/volume of whatever manga is currently open. Prefers
@@ -2456,8 +2941,13 @@ https://cdn.example.org/c/003.webp"></textarea>
   // folders/items/videos に加えて per-manga info cache（拡張子・既知ページ数）も同梱する。
   // 書き出し/読み込みとクラウド同期の両方で使う共通ペイロード組み立て。
   function buildSyncPayload() {
-    return { folders: savedFolders, items: savedItems, videos: savedVideos, authorCards: authorCards, mangaInfo: loadMangaInfoCache(), toc: loadTocMap(), lastPages: (() => { try { return JSON.parse(localStorage.getItem(LAST_PAGE_KEY) || '{}'); } catch (e) { return {}; } })(), theme: document.documentElement.dataset.theme === 'light' ? 'light' : 'dark' };
+    const payload = window.MangaVaultPayload.buildFromLocalStorage();
+    payload.folders = savedFolders; payload.items = savedItems; payload.videos = savedVideos; payload.authorCards = authorCards;
+    payload.mangaInfo = loadMangaInfoCache(); payload.toc = loadTocMap(); payload.theme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'; payload.dashboardVisibility = dashboardVisibilityProfiles;
+    return payload;
   }
+  window.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && cloudSyncTimer) { clearTimeout(cloudSyncTimer); cloudSyncTimer = null; runCloudSync(); } });
+  window.addEventListener('pagehide', () => { if (cloudSyncTimer) { clearTimeout(cloudSyncTimer); cloudSyncTimer = null; runCloudSync(); } });
 
   // remoteInfo の各エントリでローカルの mangaInfoCache を上書きマージする
   // （ローカルにしかないエントリは消さない）。setCachedMangaInfo と同じ要領で
@@ -2478,7 +2968,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   function exportData() {
     const data = buildSyncPayload();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(window.MangaReaderBackup.createBackup(data), null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -2502,13 +2992,14 @@ https://cdn.example.org/c/003.webp"></textarea>
     savedItems = data.items;
     if (Array.isArray(data.authorCards)) authorCards = data.authorCards;
     if (Array.isArray(data.videos)) savedVideos = data.videos;
+    applyDashboardVisibilityProfiles(data.dashboardVisibility);
     removeHistoryFolderRecord();
     persistFolders();
     persistItems();
     persistAuthorCards();
     persistSavedVideos();
-    if (data.toc && typeof data.toc === 'object') localStorage.setItem(TOC_KEY, JSON.stringify(data.toc));
-    if (data.lastPages && typeof data.lastPages === 'object') localStorage.setItem(LAST_PAGE_KEY, JSON.stringify(data.lastPages));
+    if (data.toc && typeof data.toc === 'object') persistTocMap(data.toc);
+    if (data.lastPages && typeof data.lastPages === 'object') MangaReaderStorage.safeWriteJson(LAST_PAGE_KEY, data.lastPages);
     // ページ数キャッシュは「置き換え」ではなくマージ：他端末で既に読んで
     // ページ数が分かっている作品の情報を取り込みつつ、ローカルにしかない
     // キャッシュは消さない。
@@ -2523,7 +3014,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   function importDataFromFile(file) {
     file.text().then((text) => {
       let data;
-      try { data = JSON.parse(text); } catch (e) { flashStatus('ファイル形式が正しくありません'); return; }
+      try { data = window.MangaReaderBackup.migrateBackup(JSON.parse(text)); } catch (e) { flashStatus(e.message || 'ファイル形式が正しくありません'); return; }
       if (applyImportedData(data)) flashStatus('読み込みました');
     }).catch(() => flashStatus('読み込みに失敗しました'));
   }
@@ -2681,6 +3172,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     let v = (input || '').trim();
     if (!v) return null;
     if (!/^https?:\/\//i.test(v)) v = 'https://' + v;
+    let parsedUrl;
+    try { parsedUrl = new URL(v); } catch (_) { return null; }
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') return null;
     let hintExt = null;
     const m = v.match(/^(.*\/)([^\/]*?)(\d+)([^\/]*)\.([A-Za-z0-9]+)(?:[?#].*)?$/);
     if (m) {
@@ -2708,29 +3202,44 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
     return { baseUrl: v, hintExt: hintExt, numberWidth: numberWidth, pattern: pattern };
   }
+  window.addEventListener('manga-storage-quota', () => flashStatus('端末保存容量が不足しています。不要なデータを削除してください。'));
+
+  function showFirstPageLoadError(kind, baseUrl, numberWidth) {
+    els.placeholder.replaceChildren();
+    const message = document.createElement('div');
+    message.textContent = kind === 'timeout' ? '1ページ目の読み込みがタイムアウトしました。時間をおいて再試行してください。' : '1ページ目が見つかりませんでした。';
+    const label = document.createElement('div'); label.textContent = '試したURL:';
+    const urls = document.createElement('div');
+    EXT_CANDIDATES.forEach((ext, index) => { if (index) urls.append(document.createTextNode(' / ')); const code = document.createElement('code'); code.textContent = baseUrl + formatPageNumber(1, numberWidth) + '.' + ext; urls.append(code); });
+    const help = document.createElement('div'); help.textContent = 'URLや拡張子を確認してください。';
+    els.placeholder.append(message, label, urls, help);
+  }
 
   // ---------- image loading / detection ----------
-  function loadImageResult(url) {
+  function loadImageResult(url, timeoutMs = LOAD_TIMEOUT_MS) {
     return new Promise((resolve) => {
       const img = new Image();
       let done = false;
       const timer = setTimeout(() => {
         if (!done) { done = true; img.src = ''; resolve('timeout'); }
-      }, LOAD_TIMEOUT_MS);
+      }, timeoutMs);
       img.onload = () => { if (!done) { done = true; clearTimeout(timer); resolve('loaded'); } };
       img.onerror = () => { if (!done) { done = true; clearTimeout(timer); resolve('missing'); } };
       img.src = url;
     });
   }
-  async function loadImage(url) { return (await loadImageResult(url)) === 'loaded'; }
+  async function loadImage(url, timeoutMs) { return (await loadImageResult(url, timeoutMs)) === 'loaded'; }
 
   async function findPageResult(pageNum) {
     const order = [preferredExt, ...EXT_CANDIDATES.map((_, i) => i).filter((i) => i !== preferredExt)];
     let timedOut = false;
+    const deadline = Date.now() + IMAGE_PROBE_BUDGET_MS;
     for (const idx of order) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) { timedOut = true; break; }
       const ext = EXT_CANDIDATES[idx];
       const url = pageUrlFor(baseUrl, pageNum, idx, pageNumberWidth, pagePattern);
-      const result = await loadImageResult(url);
+      const result = await loadImageResult(url, Math.min(LOAD_TIMEOUT_MS, remaining));
       if (result === 'loaded') { preferredExt = idx; return { kind: 'found', url: url }; }
       if (result === 'timeout') timedOut = true;
     }
@@ -2752,18 +3261,20 @@ https://cdn.example.org/c/003.webp"></textarea>
     const cached = getCachedMangaInfo(key);
     const pattern = savedPattern || (parsed && parsed.pattern) || (cached && cached.pattern) || null;
     const numberWidth = Math.max(1, Number((parsed && parsed.numberWidth) || savedNumberWidth || (cached && cached.numberWidth)) || 1);
+    const deadline = Date.now() + IMAGE_PROBE_BUDGET_MS;
     if (cached) {
       // Known from a previous visit — try that extension first instead of
       // blindly cascading through all of them again. Still a real
       // loadImage() check (not a blind guess), so a stale/changed manga
       // falls straight through to the normal cascade below.
       const url = pageUrlFor(key, 1, cached.ext, numberWidth, pattern);
-      const ok = await loadImage(url);
+      const ok = await loadImage(url, Math.min(LOAD_TIMEOUT_MS, Math.max(1, deadline - Date.now())));
       if (ok) return url;
     }
     for (const ext of EXT_CANDIDATES) {
+      if (Date.now() >= deadline) break;
       const url = pageUrlFor(key, 1, EXT_CANDIDATES.indexOf(ext), numberWidth, pattern);
-      const ok = await loadImage(url);
+      const ok = await loadImage(url, Math.min(LOAD_TIMEOUT_MS, Math.max(1, deadline - Date.now())));
       if (ok) return url;
     }
     return null;
@@ -2780,6 +3291,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   async function startReading(url, addToHistoryFlag, switchDirection) {
     const parsed = parseInputUrl(url);
     if (!parsed) return;
+    setMobileReaderMode(true);
     // Before we move on to the next manga, give the one we were just reading
     // a chance to finish its page count in the background if detectMorePages
     // hadn't gotten there yet (see handOffIncompleteDetection's comment).
@@ -2865,10 +3377,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       els.spinner.style.display = 'none';
       els.imgWrap.style.display = 'none';
       els.placeholder.style.display = 'block';
-      els.placeholder.innerHTML =
-        (firstResult.kind === 'timeout' ? '1ページ目の読み込みがタイムアウトしました。時間をおいて再試行してください。<br>' : '1ページ目が見つかりませんでした。<br>') +
-        '試したURL: ' + EXT_CANDIDATES.map((e) => '<code>' + baseUrl + formatPageNumber(1, pageNumberWidth) + '.' + e + '</code>').join(' / ') + '<br>' +
-        'URLや拡張子を確認してください。';
+      showFirstPageLoadError(firstResult.kind, baseUrl, pageNumberWidth);
       els.status.textContent = '';
       detecting = false;
       updateCloseButtonVisibility();
@@ -2957,10 +3466,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         detecting = false;
         els.imgWrap.style.display = 'none';
         els.placeholder.style.display = 'block';
-        els.placeholder.innerHTML =
-          '1ページ目の読み込みがタイムアウトしました。時間をおいて再試行してください。<br>' +
-          '試したURL: ' + EXT_CANDIDATES.map((e) => '<code>' + baseUrl + formatPageNumber(1, pageNumberWidth) + '.' + e + '</code>').join(' / ') + '<br>' +
-          'URLや拡張子を確認してください。';
+        showFirstPageLoadError('timeout', baseUrl, pageNumberWidth);
         els.status.textContent = '';
         updateCloseButtonVisibility();
         return;
@@ -3109,6 +3615,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   async function startReadingCustom(item, switchDirection) {
+    setMobileReaderMode(true);
     handOffIncompleteDetection(); // 直前の漫画の検出未完了分を引き継ぐ（generationを進める前に）
     readingGeneration++; // invalidate any still-running sequential detection loop
     baseUrl = '';
@@ -3199,6 +3706,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // 閉じた漫画が復元されないよう LAST_URL_KEY も消す。何も開いていない状態に
   // なるので、リスト（保存したURL）を自動的に開く。
   function closeManga() {
+    setMobileReaderMode(false);
     const returnView = readerReturnView;
     const closingItem = getCurrentItem();
     recentlyClosedItemId = closingItem ? closingItem.id : null;
@@ -3258,9 +3766,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
   }
 
-  function flashStatus(msg) {
+  function flashStatus(msg, kind) {
     els.status.textContent = msg;
-    setTimeout(updateStatus, 1500);
+    setTimeout(updateStatus, window.MangaReaderStatus.statusMessageDuration(kind));
   }
 
   // ---------- page rendering / navigation ----------
@@ -3358,11 +3866,29 @@ https://cdn.example.org/c/003.webp"></textarea>
     return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   }
 
-  async function waitForImageReady(img) {
+  async function waitForImageReady(img, timeoutMs = LOAD_TIMEOUT_MS) {
     if (!img.complete) {
       await new Promise((resolve, reject) => {
-        img.addEventListener('load', resolve, { once: true });
-        img.addEventListener('error', reject, { once: true });
+        let settled = false;
+        const cleanup = () => {
+          clearTimeout(timer);
+          img.removeEventListener('load', onLoad);
+          img.removeEventListener('error', onError);
+        };
+        const finish = (handler) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          handler();
+        };
+        const onLoad = () => finish(resolve);
+        const onError = () => finish(reject);
+        const timer = setTimeout(() => {
+          img.src = '';
+          finish(() => reject(new Error('画像の読み込みがタイムアウトしました')));
+        }, timeoutMs);
+        img.addEventListener('load', onLoad);
+        img.addEventListener('error', onError);
       });
     }
     if (!img.naturalWidth) throw new Error('画像を読み込めませんでした');
@@ -3489,18 +4015,27 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.pageLabel.textContent = currentPage + ' / ' + totalLabel;
     const progress = count > 1 ? ((currentPage - 1) / (count - 1)) * 100 : 0;
     els.readProgressBar.style.width = Math.max(0, Math.min(100, Math.round(progress))) + '%';
+    updateMobileReaderPageLabel();
   }
 
   const preloadedPageUrls = new Set(); // URLs that have actually finished downloading — never re-fetch these
   const inFlightPreloads = new Map(); // url -> Image still in flight, so a stale one can be aborted (see pruneStalePreloads)
+  const failedPreloadUrls = new Set();
   function preload(pageNum) {
     if (pageNum >= 1 && pageNum <= displayedPageCount()) {
       const url = sourceUrlForPage(pageNum);
-      if (preloadedPageUrls.has(url) || inFlightPreloads.has(url)) return;
+      if (preloadedPageUrls.has(url) || inFlightPreloads.has(url) || failedPreloadUrls.has(url)) return;
       const img = new Image();
       img.fetchPriority = 'low'; // de-prioritize vs. the actually-visible page's own load (see makeImgFromUrl)
       inFlightPreloads.set(url, img);
+      const timer = setTimeout(() => {
+        if (!inFlightPreloads.has(url)) return;
+        failedPreloadUrls.add(url);
+        inFlightPreloads.delete(url);
+        img.src = '';
+      }, LOAD_TIMEOUT_MS);
       img.addEventListener('load', async () => {
+        clearTimeout(timer);
         if (typeof img.decode === 'function') {
           try { await img.decode(); } catch (e) {}
         }
@@ -3508,7 +4043,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         inFlightPreloads.delete(url);
         preloadedPageUrls.add(url);
       });
-      img.addEventListener('error', () => { inFlightPreloads.delete(url); }); // allow a later retry instead of giving up forever
+      img.addEventListener('error', () => { clearTimeout(timer); inFlightPreloads.delete(url); failedPreloadUrls.add(url); });
       img.src = url;
     }
   }
@@ -3615,11 +4150,13 @@ https://cdn.example.org/c/003.webp"></textarea>
   function toggleBars() {
     els.topbar.classList.toggle('hidden');
     els.controls.classList.toggle('hidden');
+    syncMobileReaderBarsVisibility();
   }
 
   function hideBars() {
     els.topbar.classList.add('hidden');
     els.controls.classList.add('hidden');
+    syncMobileReaderBarsVisibility();
   }
 
   function toggleAnim() {
@@ -4256,14 +4793,14 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.saveVolumeInput.value = '';
     updateSeriesForm(els.saveSeriesInput, els.saveNewSeriesRow, els.saveNewSeriesInput, els.saveVolumeInput, els.saveTitleInput);
     updateSeriesAuthorForm(els.saveSeriesInput, els.saveNewSeriesInput, els.saveSeriesAuthorRow, els.saveNewSeriesAuthorInput, els.saveSeriesNoAuthorInput, els.saveAuthorInput);
-    els.saveDialogOverlay.classList.add('show');
+    openReaderScreen('save-item');
     els.saveTitleInput.focus();
   }
   function closeSaveDialog() {
-    els.saveDialogOverlay.classList.remove('show');
+    closeReaderScreen('save-item');
     pendingSaveUrl = null;
   }
-  function isSaveDialogOpen() { return els.saveDialogOverlay.classList.contains('show'); }
+  function isSaveDialogOpen() { return currentReaderScreen === 'save-item'; }
 
   function confirmSave() {
     if (!pendingSaveUrl) { closeSaveDialog(); return; }
@@ -4345,12 +4882,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   // so any change is reflected — once the dialog is closed.
   function reopenSavedList() {
     renderSavedList();
-    els.savedListOverlay.classList.add('show');
+    openReaderScreen('saved-list');
   }
 
   function openCustomAddDialog() {
     customAddReturnToList = isSavedListOpen();
-    if (customAddReturnToList) closeSavedList();
     els.customTitleInput.value = '';
     els.customAuthorInput.value = '';
     els.customAuthorInput.dataset.manualAuthor = '';
@@ -4374,17 +4910,17 @@ https://cdn.example.org/c/003.webp"></textarea>
     updateSeriesForm(els.customSeriesInput, els.customNewSeriesRow, els.customNewSeriesInput, els.customVolumeInput, els.customTitleInput);
     updateSeriesAuthorForm(els.customSeriesInput, els.customNewSeriesInput, els.customSeriesAuthorRow, els.customNewSeriesAuthorInput, els.customSeriesNoAuthorInput, els.customAuthorInput);
     els.customPagesTextarea.value = '';
-    els.customAddOverlay.classList.add('show');
+    openReaderScreen('custom-add');
     els.customTitleInput.focus();
   }
   function closeCustomAddDialog() {
-    els.customAddOverlay.classList.remove('show');
+    closeReaderScreen('custom-add');
     if (customAddReturnToList) {
       customAddReturnToList = false;
-      reopenSavedList();
+      renderSavedList();
     }
   }
-  function isCustomAddDialogOpen() { return els.customAddOverlay.classList.contains('show'); }
+  function isCustomAddDialogOpen() { return currentReaderScreen === 'custom-add'; }
 
   function confirmCustomAdd() {
     const pageUrls = els.customPagesTextarea.value
@@ -4427,7 +4963,6 @@ https://cdn.example.org/c/003.webp"></textarea>
   function openEditItemDialog(item) {
     editingItemId = item.id;
     editReturnToList = isSavedListOpen();
-    if (editReturnToList) closeSavedList();
 
     els.editTitleInput.value = itemDisplayTitle(item);
     els.editAuthorInput.value = item.author || '';
@@ -4453,19 +4988,19 @@ https://cdn.example.org/c/003.webp"></textarea>
     updateSeriesForm(els.editSeriesInput, els.editNewSeriesRow, els.editNewSeriesInput, els.editVolumeInput, els.editTitleInput);
     updateSeriesAuthorForm(els.editSeriesInput, els.editNewSeriesInput, els.editSeriesAuthorRow, els.editNewSeriesAuthorInput, els.editSeriesNoAuthorInput, els.editAuthorInput);
 
-    els.editItemOverlay.classList.add('show');
+    openReaderScreen('edit-item');
     els.editTitleInput.focus();
   }
 
   function closeEditItemDialog() {
-    els.editItemOverlay.classList.remove('show');
+    closeReaderScreen('edit-item');
     editingItemId = null;
     if (editReturnToList) {
       editReturnToList = false;
-      reopenSavedList();
+      renderSavedList();
     }
   }
-  function isEditItemDialogOpen() { return els.editItemOverlay.classList.contains('show'); }
+  function isEditItemDialogOpen() { return currentReaderScreen === 'edit-item'; }
 
   function confirmEditItem() {
     const item = savedItems.find((it) => it.id === editingItemId);
@@ -4550,7 +5085,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       const storageBytes = files.map((entry) => entry.bytes);
       const paths = names.map((name) => session.user.id + '/' + folderId + '/' + name);
       const old = existingByFolder.get(folderId);
-      const item = old ? Object.assign({}, old, { pages: paths.map((path) => config.url + '/storage/v1/object/public/local-manga/' + path.split('/').map((part) => encodeURIComponent(part)).join('/')), storagePaths: paths, storageBytes }) : { id: 'local-item-' + folderId, title: folderId, folderId, pages: paths.map((path) => config.url + '/storage/v1/object/public/local-manga/' + path.split('/').map((part) => encodeURIComponent(part)).join('/')), storagePaths: paths, storageBytes, pageMeta: [], favoriteOnly: false, addedAt: Date.now(), localSync: true };
+      const item = old ? Object.assign({}, old, { storagePaths: paths, storageBytes }) : { id: 'local-item-' + folderId, title: folderId, folderId, storagePaths: paths, storageBytes, pageMeta: [], favoriteOnly: false, addedAt: Date.now(), localSync: true };
       storageItems.push(item);
     }
     const nonLocalItems = savedItems.filter((item) => !item.localSync);
@@ -4558,8 +5093,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     const storageFolderIds = new Set(storageItems.map((item) => item.folderId));
     savedFolders = savedFolders.filter((folder) => !String(folder.id || '').startsWith('local-') || storageFolderIds.has(folder.id));
     storageItems.forEach((item) => { if (!savedFolders.some((folder) => folder.id === item.folderId)) savedFolders.push({ id: item.folderId, name: item.title, addedAt: item.addedAt }); });
-    localStorage.setItem(SAVED_ITEMS_KEY, JSON.stringify(savedItems));
-    localStorage.setItem(SAVED_FOLDERS_KEY, JSON.stringify(savedFolders));
+    if (!MangaReaderStorage.safeWriteJson(SAVED_ITEMS_KEY, savedItems) || !MangaReaderStorage.safeWriteJson(SAVED_FOLDERS_KEY, savedFolders)) throw new Error('端末保存容量が不足しています。');
     try { await MangaVault.savePayload(buildSyncPayload()); } catch (_) {}
     return storageItems.length;
   }
@@ -4633,7 +5167,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   function buildFolderCard(folder, folderList, organizeMode) {
     const card = document.createElement('div');
     card.className = 'book-card folder-card' + (folder.id === recentlyClosedFolderId ? ' just-closed' : '');
-    const folderItems = savedItems.filter((item) => item.folderId === folder.id);
+    const folderItems = shelfVisibleItems().filter((item) => item.folderId === folder.id);
 
     const cover = document.createElement('div');
     cover.className = 'book-cover folder-cover';
@@ -4709,7 +5243,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     const cover = document.createElement('div');
     cover.className = 'book-cover folder-cover';
-    appendFolderPreview(cover, savedItems.filter((it) => it.favorite), ICON_HEART_FILLED, '空のお気に入り', 'お気に入り');
+    appendFolderPreview(cover, shelfVisibleItems().filter((it) => it.favorite), ICON_HEART_FILLED, '空のお気に入り', 'お気に入り');
 
     const title = document.createElement('div');
     title.className = 'book-title';
@@ -4735,7 +5269,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     const cover = document.createElement('div');
     cover.className = 'book-cover folder-cover';
-    appendFolderPreview(cover, savedItems.filter((it) => it.series), ICON_BOOKS, '空のシリーズ', 'シリーズ');
+    appendFolderPreview(cover, shelfVisibleItems().filter((it) => it.series), ICON_BOOKS, '空のシリーズ', 'シリーズ');
 
     const title = document.createElement('div');
     title.className = 'book-title';
@@ -5083,12 +5617,12 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
   function openAuthorCards() {
     authorCardReturnToList = isSavedListOpen();
-    closeSavedList(); closeAuthorCardEditor(); renderAuthorCards(); els.authorCardOverlay.classList.add('show');
+    closeAuthorCardEditor(); renderAuthorCards(); openReaderScreen('author-cards');
   }
   function closeAuthorCards() {
     closeAuthorCardEditor();
-    els.authorCardOverlay.classList.remove('show');
-    if (authorCardReturnToList) { authorCardReturnToList = false; openSavedList(false, true); }
+    closeReaderScreen('author-cards');
+    if (authorCardReturnToList) { authorCardReturnToList = false; renderSavedList(); }
   }
   function openAuthorWorks(card) {
     currentFolderView = null;
@@ -5141,9 +5675,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.bulkAuthorInput.value = ''; els.bulkTagsInput.value = ''; els.bulkSourceInput.value = ''; els.bulkSeriesInput.value = ''; els.bulkVolumeInput.value = '';
     els.bulkFavoriteSelect.value = ''; els.bulkSplitSelect.value = '';
     els.bulkEditSelectionText.textContent = bulkSelectedIds.size + '作品を一括編集します。空欄・「変更しない」は変更されません。';
-    els.bulkEditOverlay.classList.add('show');
+    openReaderScreen('bulk-edit');
   }
-  function closeBulkEditDialog() { els.bulkEditOverlay.classList.remove('show'); }
+  function closeBulkEditDialog() { closeReaderScreen('bulk-edit'); }
   function applyBulkEdit() {
     const targets = savedItems.filter((item) => bulkSelectedIds.has(item.id));
     if (!targets.length) return closeBulkEditDialog();
@@ -5176,6 +5710,121 @@ https://cdn.example.org/c/003.webp"></textarea>
     bulkEditUndoSnapshot = null; persistAll(); updateBulkEditButton(); renderSavedList(); flashStatus('一括編集をもとに戻しました');
   }
 
+  function normalizeDashboardVisibility(value) {
+    const result = { ...DEFAULT_DASHBOARD_VISIBILITY };
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return result;
+    Object.keys(result).forEach((key) => {
+      if (typeof value[key] === 'boolean') result[key] = value[key];
+    });
+    return result;
+  }
+  function loadDashboardVisibilityProfiles() {
+    const result = {
+      mobile: { ...DEFAULT_DASHBOARD_VISIBILITY },
+      desktop: { ...DEFAULT_DASHBOARD_VISIBILITY },
+    };
+    try {
+      const stored = JSON.parse(localStorage.getItem(DASHBOARD_VISIBILITY_KEY) || '{}');
+      if (stored && stored.mobile && stored.desktop) {
+        result.mobile = normalizeDashboardVisibility(stored.mobile);
+        result.desktop = normalizeDashboardVisibility(stored.desktop);
+      } else {
+        result[DASHBOARD_DEVICE_PROFILE] = normalizeDashboardVisibility(stored);
+      }
+    } catch (e) {}
+    return result;
+  }
+  const dashboardVisibilityProfiles = loadDashboardVisibilityProfiles();
+  const dashboardVisibility = dashboardVisibilityProfiles[DASHBOARD_DEVICE_PROFILE];
+  function saveDashboardVisibility() {
+    try { localStorage.setItem(DASHBOARD_VISIBILITY_KEY, JSON.stringify(dashboardVisibilityProfiles)); } catch (e) {}
+  }
+  function applyDashboardVisibilityProfiles(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || !value.mobile || !value.desktop) return;
+    dashboardVisibilityProfiles.mobile = normalizeDashboardVisibility(value.mobile);
+    dashboardVisibilityProfiles.desktop = normalizeDashboardVisibility(value.desktop);
+    Object.assign(dashboardVisibility, dashboardVisibilityProfiles[DASHBOARD_DEVICE_PROFILE]);
+    saveDashboardVisibility();
+  }
+  saveDashboardVisibility();
+  function renderDashboardSettings() {
+    document.querySelectorAll('[data-dashboard-setting]').forEach((input) => {
+      input.checked = dashboardVisibility[input.dataset.dashboardSetting] === true;
+    });
+  }
+  function openSettingsScreen() {
+    renderDashboardSettings();
+    openReaderScreen('settings');
+  }
+
+  function renderDashboard(show) {
+    if (!els.dashboard) return;
+    els.dashboard.hidden = !show;
+    if (!show) { els.dashboard.replaceChildren(); return; }
+    const visibleItems = shelfVisibleItems();
+    const sections = [
+      ['continue', '続きから読む', visibleItems.filter((item) => item.lastReadAt).sort((a, b) => (b.lastReadAt || 0) - (a.lastReadAt || 0)).slice(0, 4)],
+      ['recent-added', '最近追加', visibleItems.slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0)).slice(0, 4)],
+      ['recent-read', '最近読んだ', visibleItems.filter((item) => item.lastReadAt).sort((a, b) => (b.lastReadAt || 0) - (a.lastReadAt || 0)).slice(0, 4)],
+      ['unread', '未読', unreadOrderItems().filter((item) => visibleItems.includes(item)).slice(0, 4)],
+      ['favorites', 'お気に入り', visibleItems.filter((item) => item.favorite).slice(0, 4)],
+      ['random', 'ランダム', visibleItems.length ? [visibleItems[Math.floor(Math.random() * visibleItems.length)]] : []]
+    ];
+    els.dashboard.replaceChildren();
+    sections.forEach(([key, title, items]) => {
+      if (!dashboardVisibility[key]) return;
+      if (!items.length) return;
+      const section = document.createElement('section'); section.style.cssText = 'border:1px solid var(--border);border-radius:10px;padding:10px;';
+      const heading = document.createElement('strong'); heading.textContent = title; section.append(heading);
+      const row = document.createElement('div'); row.className = 'dashboard-row';
+      items.forEach((item) => { const button = document.createElement('button'); button.type = 'button'; button.className = 'ctrlBtn'; button.textContent = itemDisplayTitle(item); button.title = item.author || ''; button.addEventListener('click', () => openItem(item, false)); row.append(button); });
+      section.append(row); els.dashboard.append(section);
+    });
+  }
+  function renderAuthorDashboard(show) {
+    if (!els.dashboard || !show) return;
+    const card = authorCards.find((entry) => entry.name === currentAuthorView || entry.circleName === currentAuthorView);
+    if (!card) return;
+    const summary = window.MangaReaderAuthorSummary.buildAuthorSummary(card, savedItems, savedVideos);
+    els.dashboard.hidden = false; els.dashboard.replaceChildren();
+    const box = document.createElement('section'); box.style.cssText = 'border:1px solid var(--border);border-radius:10px;padding:10px;';
+    const title = document.createElement('strong'); title.textContent = [card.name, card.circleName].filter(Boolean).join(' / '); box.append(title);
+    const links = document.createElement('div'); links.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;';
+    (card.links || []).forEach((link) => { const anchor = document.createElement('a'); anchor.href = link.url; anchor.target = '_blank'; anchor.rel = 'noopener noreferrer'; anchor.textContent = link.label || link.url; links.append(anchor); });
+    if (links.childElementCount) box.append(links);
+    const addTextSection = (headingText, values) => {
+      if (!values.length) return;
+      const section = document.createElement('section'); section.style.cssText = 'margin-top:10px;';
+      const heading = document.createElement('strong'); heading.textContent = headingText; section.append(heading);
+      const text = document.createElement('div'); text.textContent = values.join(' / '); text.style.cssText = 'color:var(--sub);margin-top:5px;'; section.append(text); box.append(section);
+    };
+    const addItemSection = (headingText, items) => {
+      if (!items.length) return;
+      const section = document.createElement('section'); section.style.cssText = 'margin-top:10px;';
+      const heading = document.createElement('strong'); heading.textContent = headingText; section.append(heading);
+      const row = document.createElement('div'); row.className = 'author-dashboard-row'; row.style.marginTop = '5px';
+      items.slice(0, 8).forEach((item) => { const button = document.createElement('button'); button.type = 'button'; button.className = 'ctrlBtn'; button.textContent = itemDisplayTitle(item); button.addEventListener('click', () => openItem(item, false)); row.append(button); });
+      section.append(row); box.append(section);
+    };
+    addItemSection('関連作品', summary.relatedItems);
+    addTextSection('シリーズ', summary.series);
+    addTextSection('タグ', summary.tags);
+    addItemSection('最近読んだ作品', summary.recentItems.filter((item) => item.lastReadAt));
+    if (summary.videos.length) {
+      const section = document.createElement('section'); section.style.cssText = 'margin-top:10px;';
+      const heading = document.createElement('strong'); heading.textContent = '動画'; section.append(heading);
+      const row = document.createElement('div'); row.className = 'author-dashboard-row'; row.style.marginTop = '5px';
+      summary.videos.slice(0, 8).forEach((video) => { const button = document.createElement('button'); button.type = 'button'; button.className = 'ctrlBtn'; button.textContent = video.title; button.addEventListener('click', () => openVideoPlayer(video)); row.append(button); });
+      section.append(row); box.append(section);
+    }
+    els.dashboard.append(box);
+  }
+
+  function shelfVisibleItems() {
+    const localReaderEnabled = !!(window.MangaReaderFeatures && window.MangaReaderFeatures.localReader);
+    return localReaderEnabled ? savedItems.slice() : savedItems.filter((item) => !item.localSync);
+  }
+
   function renderSavedList() {
     clearLocalCoverObjectUrls();
     const inSeriesGroup = currentFolderView === SERIES_FOLDER_ID && !!currentSeriesView;
@@ -5183,6 +5832,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     const inAuthorView = !!currentAuthorView;
 
     const atRoot = !currentFolderView && !inAuthorView;
+    renderDashboard(atRoot && !shelfSearchQuery);
+    renderAuthorDashboard(inAuthorView);
     const isRealFolder = !!currentFolderView && currentFolderView !== FAVORITES_FOLDER_ID &&
       currentFolderView !== UNREAD_FOLDER_ID && currentFolderView !== SYNCED_FOLDER_ID && currentFolderView !== HISTORY_FOLDER_ID &&
       currentFolderView !== SERIES_FOLDER_ID;
@@ -5220,8 +5871,10 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     els.savedListItems.innerHTML = '';
     els.savedListItems.classList.add('bookshelf'); // bookshelf grid at every level now
+    els.savedListItems.appendChild(els.bookshelfPagination);
 
     let itemsList = []; // flat item list for the current view; doubles as swipe context
+    const visibleShelfItems = shelfVisibleItems();
     let folderCards = [];
     let seriesGroupCards = []; // [{name, items}], only populated at the シリーズ root (list of series names)
     let authorGroupCards = [];
@@ -5231,29 +5884,29 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (inAuthorView) {
       const authorCard = authorCards.find((card) => card.name === currentAuthorView || card.circleName === currentAuthorView);
       const names = authorCard ? [authorCard.name, authorCard.circleName].filter(Boolean) : [currentAuthorView];
-      itemsList = savedItems.filter((it) => names.includes(String(it.author || '').trim()));
+      itemsList = visibleShelfItems.filter((it) => names.includes(String(it.author || '').trim()));
     } else if (!currentFolderView) {
       // Series-tagged works belong to the virtual シリーズ shelf at the
       // root. Do not also render them as individual cards beside that shelf;
       // works with the same series name are grouped there automatically.
-      itemsList = savedItems.filter((it) => (!it.folderId || it.localSync) && !it.series);
+      itemsList = visibleShelfItems.filter((it) => !it.folderId && !it.series);
       folderCards = savedFolders.filter((folder) => folder.id !== HISTORY_FOLDER_ID && !String(folder.id || '').startsWith('local-'));
       showFavoritesCard = true;
       showSeriesCard = true;
     } else if (currentFolderView === FAVORITES_FOLDER_ID) {
       // Virtual view: aggregates favorited items regardless of which real
       // folder they actually live in, instead of filtering by folderId.
-      itemsList = savedItems.filter((it) => it.favorite);
+      itemsList = visibleShelfItems.filter((it) => it.favorite);
     } else if (currentFolderView === UNREAD_FOLDER_ID) {
-      itemsList = unreadOrderItems();
+      itemsList = unreadOrderItems().filter((item) => visibleShelfItems.includes(item));
     } else if (currentFolderView === SYNCED_FOLDER_ID) {
-      itemsList = savedItems.filter((it) => it.localSync);
+      itemsList = visibleShelfItems.filter((it) => it.localSync);
     } else if (inSeriesRoot) {
       // Virtual view: groups every series-tagged item by series name
       // regardless of which real folder it lives in. Each group's items are
       // pre-sorted by volume so drilling in shows volume 1, 2, 3... in order.
       const groups = new Map();
-      savedItems.forEach((it) => {
+      visibleShelfItems.forEach((it) => {
         if (!it.series) return;
         if (!groups.has(it.series)) groups.set(it.series, []);
         groups.get(it.series).push(it);
@@ -5262,10 +5915,10 @@ https://cdn.example.org/c/003.webp"></textarea>
         .map(([name, items]) => ({ name, items: items.slice().sort((a, b) => (a.volume || 0) - (b.volume || 0)) }))
         .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
     } else if (inSeriesGroup) {
-      itemsList = savedItems.filter((it) => it.series === currentSeriesView)
+      itemsList = visibleShelfItems.filter((it) => it.series === currentSeriesView)
         .sort((a, b) => (a.volume || 0) - (b.volume || 0));
     } else {
-      itemsList = savedItems.filter((it) => it.folderId === currentFolderView);
+      itemsList = visibleShelfItems.filter((it) => it.folderId === currentFolderView);
     }
 
     if (groupByAuthorEnabled && !bulkEditMode && !inAuthorView && !inSeriesRoot && itemsList.length) {
@@ -5281,10 +5934,12 @@ https://cdn.example.org/c/003.webp"></textarea>
     const normalizedFilter = (value) => String(value || '').trim().toLocaleLowerCase('ja');
     itemsList = itemsList.filter((item) => {
       const tags = Array.isArray(item.tags) ? item.tags.join(' ') : '';
+      const haystack = window.MangaReaderShelfSearch.buildSearchText(item, savedFolders, savedVideos, authorCards);
       return (!shelfFilters.series || normalizedFilter(item.series).includes(normalizedFilter(shelfFilters.series))) &&
         (!shelfFilters.author || normalizedFilter(item.author).includes(normalizedFilter(shelfFilters.author))) &&
         (!shelfFilters.tags || normalizedFilter(tags).includes(normalizedFilter(shelfFilters.tags))) &&
-        (!shelfFilters.source || normalizedFilter(item.sourceWork).includes(normalizedFilter(shelfFilters.source)));
+        (!shelfFilters.source || normalizedFilter(item.sourceWork).includes(normalizedFilter(shelfFilters.source))) &&
+        (!shelfSearchQuery || normalizedFilter(haystack).includes(normalizedFilter(shelfSearchQuery)));
     });
     if (shelfSort === 'title-asc') {
       itemsList.sort((a, b) => itemDisplayTitle(a).localeCompare(itemDisplayTitle(b), 'ja'));
@@ -5302,15 +5957,18 @@ https://cdn.example.org/c/003.webp"></textarea>
       authorGroupCards = Array.from(groups.entries()).map(([name, items]) => ({ name, items }));
     }
     const ungroupedItems = itemsList.filter((item) => !String(item.author || '').trim());
-    const pagedEntries = groupByAuthorEnabled && !bulkEditMode && !inAuthorView && !inSeriesRoot
+    const folderEntries = folderCards.map((folder) => ({ type: 'folder', folder }));
+    const contentEntries = groupByAuthorEnabled && !bulkEditMode && !inAuthorView && !inSeriesRoot
       ? authorGroupCards.concat(ungroupedItems)
       : itemsList;
+    const pagedEntries = folderEntries.concat(contentEntries);
     const totalShelfPages = Math.max(1, Math.ceil(pagedEntries.length / BOOKSHELF_PAGE_SIZE));
     bookshelfPage = Math.min(Math.max(1, bookshelfPage), totalShelfPages);
     const pageStart = (bookshelfPage - 1) * BOOKSHELF_PAGE_SIZE;
     const visibleEntries = pagedEntries.slice(pageStart, pageStart + BOOKSHELF_PAGE_SIZE);
-    const visibleAuthorGroups = visibleEntries.filter((entry) => entry && Array.isArray(entry.items));
-    const visibleItems = visibleEntries.filter((entry) => !Array.isArray(entry.items));
+    const visibleFolderEntries = visibleEntries.filter((entry) => entry && entry.type === 'folder');
+    const visibleAuthorGroups = visibleEntries.filter((entry) => entry && entry.type !== 'folder' && Array.isArray(entry.items));
+    const visibleItems = visibleEntries.filter((entry) => entry && entry.type !== 'folder' && !Array.isArray(entry.items));
     els.bookshelfPagination.style.display = totalShelfPages > 1 ? 'flex' : 'none';
     els.bookshelfPrevBtn.disabled = bookshelfPage <= 1;
     els.bookshelfNextBtn.disabled = bookshelfPage >= totalShelfPages;
@@ -5337,7 +5995,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       const frag = document.createDocumentFragment();
       if (showFavoritesCard) frag.appendChild(buildFavoritesFolderCard());
       if (showSeriesCard) frag.appendChild(buildSeriesFolderCard());
-      folderCards.forEach((f) => frag.appendChild(buildFolderCard(f, folderCards, showOrganizeControls)));
+      visibleFolderEntries.forEach((entry) => frag.appendChild(buildFolderCard(entry.folder, folderCards, showOrganizeControls)));
       seriesGroupCards.forEach((g) => frag.appendChild(buildSeriesGroupCard(g)));
       if (groupByAuthorEnabled && !bulkEditMode && authorGroupCards.length) {
         visibleAuthorGroups.forEach((group) => frag.appendChild(buildAuthorGroupCard(group)));
@@ -5372,8 +6030,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       reorderMode = false;
     }
     renderSavedList();
-    els.savedListOverlay.classList.add('show');
-    els.closeListBtn.style.display = hideCloseBtn ? 'none' : '';
+    openReaderScreen('saved-list');
+    els.closeListBtn.style.display = 'none';
   }
   function rememberReaderReturnView() {
     readerReturnView = { folderId: currentFolderView, seriesName: currentSeriesView, authorName: currentAuthorView };
@@ -5381,9 +6039,9 @@ https://cdn.example.org/c/003.webp"></textarea>
   function closeSavedList() {
     const isRealFolder = currentFolderView && currentFolderView !== FAVORITES_FOLDER_ID && currentFolderView !== UNREAD_FOLDER_ID && currentFolderView !== SYNCED_FOLDER_ID && currentFolderView !== HISTORY_FOLDER_ID && currentFolderView !== SERIES_FOLDER_ID;
     if (isRealFolder) recentlyClosedFolderId = currentFolderView;
-    els.savedListOverlay.classList.remove('show');
+    closeReaderScreen(currentReaderScreen === 'video-list' ? 'video-list' : 'saved-list');
   }
-  function isSavedListOpen() { return els.savedListOverlay.classList.contains('show'); }
+  function isSavedListOpen() { return currentReaderScreen === 'saved-list' || currentReaderScreen === 'video-list'; }
 
   // A saved item only stores the manga's base URL, not which file extension
   // its pages use, so the cover image is found the same cascading way page
@@ -5401,17 +6059,40 @@ https://cdn.example.org/c/003.webp"></textarea>
       imgEl.src = cachedSource;
       return;
     }
+    if (coverFailedCache.has(cacheKey)) return;
     let idx = 0;
+    let finished = false;
+    let timer = null;
     function tryNext() {
-      if (idx >= EXT_CANDIDATES.length) return;
+      if (finished || idx >= EXT_CANDIDATES.length) {
+        coverFailedCache.add(cacheKey);
+        return;
+      }
       imgEl.src = pageUrlFor(folderUrl, 1, idx, resolvedWidth, pattern);
       idx++;
     }
     imgEl.addEventListener('load', () => {
+      finished = true;
+      clearTimeout(timer);
       coverSourceCache.set(cacheKey, imgEl.currentSrc || imgEl.src);
     }, { once: true });
-    imgEl.addEventListener('error', tryNext);
+    imgEl.addEventListener('error', () => {
+      clearTimeout(timer);
+      if (finished) return;
+      if (idx >= EXT_CANDIDATES.length) {
+        finished = true;
+        coverFailedCache.add(cacheKey);
+        return;
+      }
+      tryNext();
+    });
     tryNext();
+    timer = setTimeout(() => {
+      if (finished) return;
+      finished = true;
+      coverFailedCache.add(cacheKey);
+      imgEl.src = '';
+    }, LOAD_TIMEOUT_MS);
   }
 
   let bulkDetectRunning = false;
@@ -5441,12 +6122,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   function openBulkDetect() {
-    closeSavedList();
     bulkDetectCancelRequested = false;
     els.bulkDetectProgress.textContent = '';
     els.bulkCancelBtn.textContent = '閉じる';
     refreshBulkDetectSummary();
-    els.bulkDetectOverlay.classList.add('show');
+    openReaderScreen('bulk-detect');
   }
 
   function closeBulkDetect() {
@@ -5456,8 +6136,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       els.bulkCancelBtn.textContent = '中止中…';
       return;
     }
-    els.bulkDetectOverlay.classList.remove('show');
-    reopenSavedList();
+    closeReaderScreen('bulk-detect');
+    renderSavedList();
   }
 
   async function runBulkDetect(mode) {
@@ -5500,7 +6180,76 @@ https://cdn.example.org/c/003.webp"></textarea>
     scheduleCloudSync();
   }
 
-  function anyModalOpen() { return isSaveDialogOpen() || isSavedListOpen() || isCustomAddDialogOpen() || isEditItemDialogOpen() || isTocListOpen() || els.bulkDetectOverlay.classList.contains('show'); }
+  const readerScreenElements = {
+    'saved-list': els.savedListOverlay,
+    'video-list': els.savedListOverlay,
+    'save-item': els.saveDialogOverlay,
+    'custom-add': els.customAddOverlay,
+    'edit-item': els.editItemOverlay,
+    'author-cards': els.authorCardOverlay,
+    'toc': els.tocOverlay,
+    'bulk-edit': els.bulkEditOverlay,
+    'bulk-detect': els.bulkDetectOverlay,
+    'video-add': els.videoAddOverlay,
+    'video-player': els.videoPlayerOverlay,
+    settings: els.settingsOverlay,
+    backup: els.backupOverlay,
+  };
+  let currentReaderScreen = null;
+
+  function getReaderScreenFromLocation() {
+    const key = new URLSearchParams(location.hash.replace(/^#/, '')).get('screen');
+    return Object.prototype.hasOwnProperty.call(readerScreenElements, key) ? key : null;
+  }
+
+  function renderReaderScreen(screen) {
+    currentReaderScreen = Object.prototype.hasOwnProperty.call(readerScreenElements, screen) ? screen : null;
+    Object.entries(readerScreenElements).forEach(([key, element]) => {
+      const visible = !!currentReaderScreen && element === readerScreenElements[currentReaderScreen];
+      element.classList.toggle('show', visible);
+      element.setAttribute('aria-hidden', visible ? 'false' : 'true');
+    });
+    if (currentReaderScreen === 'video-list') switchListTab('video');
+    else if (currentReaderScreen === 'saved-list') switchListTab('manga');
+    if (!currentReaderScreen) setMobileUtilityMenu(false);
+  }
+
+  function navigateReaderScreen(screen, { replace = false } = {}) {
+    const target = Object.prototype.hasOwnProperty.call(readerScreenElements, screen) ? screen : null;
+    const url = new URL(location.href);
+    if (target) url.hash = 'screen=' + encodeURIComponent(target);
+    else url.hash = '';
+    const state = { ...(history.state || {}), readerScreen: target };
+    if (replace) history.replaceState(state, '', url);
+    else history.pushState(state, '', url);
+    renderReaderScreen(target);
+  }
+
+  function openReaderScreen(screen) {
+    if (currentReaderScreen === screen) return;
+    navigateReaderScreen(screen);
+  }
+
+  function closeReaderScreen(screen) {
+    if (currentReaderScreen !== screen) return;
+    if (history.state && history.state.readerScreen === screen) {
+      history.back();
+      return;
+    }
+    navigateReaderScreen(null, { replace: true });
+  }
+
+  function handleReaderHistoryChange() {
+    renderReaderScreen(getReaderScreenFromLocation());
+  }
+  window.addEventListener('popstate', handleReaderHistoryChange);
+  window.addEventListener('hashchange', handleReaderHistoryChange);
+  renderReaderScreen(getReaderScreenFromLocation());
+
+  function anyModalOpen() { return currentReaderScreen !== null; }
+  [els.saveDialogOverlay, els.customAddOverlay, els.editItemOverlay, els.authorCardOverlay, els.tocOverlay, els.savedListOverlay, els.bulkEditOverlay, els.bulkDetectOverlay, els.videoAddOverlay, els.videoPlayerOverlay].forEach((dialog) => {
+    if (dialog && typeof dialog.addEventListener === 'function') dialog.addEventListener('close', () => dialog.classList.remove('show'));
+  });
 
   // ---------- events ----------
   function bindSeriesControls(selectEl, newRow, newInput, volumeInput, titleInput) {
@@ -5560,7 +6309,13 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
   function handleNewManga() { promptForMangaUrl(); }
   els.newBtn.addEventListener('click', handleNewManga);
-  els.localReaderBtn.addEventListener('click', () => { window.location.href = 'local-reader.html?v=f9b418b'; });
+  if (window.MangaReaderFeatures.localReader) {
+    els.listTabRow.hidden = false;
+    els.localReaderBtn.addEventListener('click', () => { window.location.href = 'local-reader.html?v=f9b418b'; });
+  } else {
+    els.localReaderBtn.hidden = true;
+    els.listTabRow.hidden = true;
+  }
   els.closeBtn.addEventListener('click', () => {
     if (hasUnsavedCurrentUrl() && !confirm('未保存ですが戻りますか？')) return;
     closeManga();
@@ -5618,6 +6373,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         'mangaReaderGithubSync', MangaVault.META_KEY
       ];
       MangaVault.clearActive();
+      await clearImageCacheForCurrentUser();
       MangaVault.saveSession(null);
       deviceKeys.forEach((key) => localStorage.removeItem(key));
       window.location.replace('index.html');
@@ -5626,7 +6382,6 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.listLogoutBtn.addEventListener('click', logoutFromReader);
   els.cancelCustomAddBtn.addEventListener('click', closeCustomAddDialog);
   els.confirmCustomAddBtn.addEventListener('click', confirmCustomAdd);
-  els.authorCardsBtn.addEventListener('click', openAuthorCards);
   els.backupExportBtn.addEventListener('click', exportData);
   els.backupImportBtn.addEventListener('click', () => els.backupFileInput.click());
   els.backupFileInput.addEventListener('change', (event) => {
@@ -5749,14 +6504,38 @@ https://cdn.example.org/c/003.webp"></textarea>
     bookshelfPage = 1;
     renderSavedList();
   });
+  els.shelfSearchInput.addEventListener('input', () => { shelfSearchQuery = els.shelfSearchInput.value.trim(); bookshelfPage = 1; renderSavedList(); });
   els.groupAuthorBtn.addEventListener('click', () => {
     groupByAuthorEnabled = !groupByAuthorEnabled;
     bookshelfPage = 1;
     try { localStorage.setItem(GROUP_AUTHOR_KEY, groupByAuthorEnabled ? '1' : '0'); } catch (e) {}
     renderSavedList();
   });
-  els.bookshelfPrevBtn.addEventListener('click', () => { if (bookshelfPage > 1) { bookshelfPage--; renderSavedList(); } });
-  els.bookshelfNextBtn.addEventListener('click', () => { bookshelfPage++; renderSavedList(); });
+  function changeBookshelfPage(delta) {
+    const next = bookshelfPage + delta;
+    if (next < 1) return;
+    bookshelfPage = next;
+    renderSavedList();
+    els.savedListItems.scrollTop = 0;
+  }
+  els.bookshelfPrevBtn.addEventListener('click', () => changeBookshelfPage(-1));
+  els.bookshelfNextBtn.addEventListener('click', () => changeBookshelfPage(1));
+  let shelfTouchStartX = 0;
+  let shelfTouchStartY = 0;
+  els.savedListItems.addEventListener('touchstart', (event) => {
+    if (activeListTab !== 'manga' || event.touches.length !== 1) return;
+    shelfTouchStartX = event.touches[0].clientX;
+    shelfTouchStartY = event.touches[0].clientY;
+  }, { passive: true });
+  els.savedListItems.addEventListener('touchend', (event) => {
+    if (activeListTab !== 'manga' || event.changedTouches.length !== 1) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - shelfTouchStartX;
+    const dy = touch.clientY - shelfTouchStartY;
+    if (Math.abs(dx) < 60 || Math.abs(dx) <= Math.abs(dy) * 1.25) return;
+    event.preventDefault();
+    changeBookshelfPage(dx < 0 ? 1 : -1);
+  }, { passive: false });
   els.savedListOverlay.addEventListener('click', (e) => { if (e.target === els.savedListOverlay) closeSavedList(); });
   els.listBackBtn.addEventListener('click', () => {
     // From inside a specific シリーズ, 戻る goes back to the series-name list
@@ -5867,7 +6646,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         e.target === els.saveNewSeriesInput || e.target === els.saveNewSeriesAuthorInput ||
         e.target === els.customNewSeriesInput || e.target === els.customNewSeriesAuthorInput ||
         e.target === els.editNewSeriesInput || e.target === els.editNewSeriesAuthorInput ||
-        e.target === els.githubRepoInput || e.target === els.githubPathInput || e.target === els.githubTokenInput) {
+        false) {
       if (e.key === 'Escape') { closeSaveDialog(); closeSavedList(); closeCustomAddDialog(); closeEditItemDialog(); closeTocList(); closeBulkDetect(); }
       return;
     }
@@ -5963,12 +6742,12 @@ https://cdn.example.org/c/003.webp"></textarea>
   function openVideoPlayer(video) {
     els.videoPlayerTitle.textContent = video.title || (video.a + ' / ' + video.b);
     els.videoPlayerIframe.src = videoEmbedUrl(video.a, video.b);
-    els.videoPlayerOverlay.classList.add('show');
+    openReaderScreen('video-player');
   }
 
   function closeVideoPlayer() {
     els.videoPlayerIframe.src = ''; // stop playback
-    els.videoPlayerOverlay.classList.remove('show');
+    closeReaderScreen('video-player');
   }
 
   // https://www.[A].com/v/[B]/... → { a: 'example', b: '0000' }
@@ -6002,12 +6781,12 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.videoBInput.value = '';
     els.videoPreviewUrl.textContent = '';
     els.videoPreviewUrl.style.color = '';
-    els.videoAddOverlay.classList.add('show');
+    openReaderScreen('video-add');
     els.videoUrlInput.focus();
   }
 
   function closeAddVideoDialog() {
-    els.videoAddOverlay.classList.remove('show');
+    closeReaderScreen('video-add');
   }
 
   function confirmVideoAdd() {
@@ -6031,26 +6810,127 @@ https://cdn.example.org/c/003.webp"></textarea>
     closeAddVideoDialog();
   }
 
+  function setMobileNavActive(button) {
+    [els.mobileNavManga, els.mobileNavVideo, els.mobileNavAuthor, els.mobileNavMore].forEach((navButton) => {
+      navButton.classList.toggle('active', navButton === button);
+    });
+  }
+
+  let mobileReaderMode = false;
+  function syncMobileReaderBarsVisibility() {
+    if (!mobileReaderMode) return;
+    const hidden = els.topbar.classList.contains('hidden') && els.controls.classList.contains('hidden');
+    els.mobileBottomNav.classList.toggle('reader-bars-hidden', hidden);
+  }
+
+  function setMobileReaderMode(active) {
+    mobileReaderMode = !!active;
+    document.body.classList.toggle('reader-mobile-mode', mobileReaderMode);
+    els.mobileBottomNav.classList.toggle('reader-mode', mobileReaderMode);
+    els.mobileBottomNav.classList.remove('reader-bars-hidden');
+    els.mobileNavManga.querySelector('span').textContent = mobileReaderMode ? '前へ' : '漫画';
+    els.mobileNavVideo.querySelector('span').textContent = mobileReaderMode ? (currentPage + ' / ' + Math.max(1, displayedPageCount())) : '動画';
+    els.mobileNavMore.querySelector('span').textContent = mobileReaderMode ? '次へ' : 'その他';
+    els.mobileNavManga.setAttribute('aria-label', mobileReaderMode ? '前のページ' : '漫画');
+    els.mobileNavVideo.setAttribute('aria-label', mobileReaderMode ? '現在のページ' : '動画');
+    els.mobileNavMore.setAttribute('aria-label', mobileReaderMode ? '次のページ' : 'その他');
+    setMobileNavActive(mobileReaderMode ? els.mobileNavVideo : els.mobileNavManga);
+  }
+
+  function updateMobileReaderPageLabel() {
+    if (!mobileReaderMode) return;
+    els.mobileNavVideo.querySelector('span').textContent = currentPage + ' / ' + Math.max(1, displayedPageCount());
+  }
+
+  function updateGlassLight(element, event) {
+    const rect = element.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const x = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
+    const y = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100));
+    element.style.setProperty('--glass-light-x', `${x}%`);
+    element.style.setProperty('--glass-light-y', `${y}%`);
+  }
+
+  function resetGlassLight(element) {
+    element.style.removeProperty('--glass-light-x');
+    element.style.removeProperty('--glass-light-y');
+  }
+
+  [els.mobileBottomNav, els.topbar, els.controls].forEach((element) => {
+    if (!element) return;
+    element.addEventListener('pointermove', (event) => updateGlassLight(element, event), { passive: true });
+    element.addEventListener('pointerdown', (event) => {
+      updateGlassLight(element, event);
+      element.classList.add('glass-pressed');
+    }, { passive: true });
+    const releaseGlass = () => element.classList.remove('glass-pressed');
+    element.addEventListener('pointerup', releaseGlass, { passive: true });
+    element.addEventListener('pointercancel', releaseGlass, { passive: true });
+    element.addEventListener('pointerleave', () => {
+      resetGlassLight(element);
+      releaseGlass();
+    }, { passive: true });
+  });
+
+  function setMobileUtilityMenu(open) {
+    els.mobileUtilityMenu.hidden = !open;
+    els.mobileNavMore.setAttribute('aria-expanded', open ? 'true' : 'false');
+    els.mobileNavMore.classList.toggle('active', open);
+  }
+
   function switchListTab(tab) {
     activeListTab = tab;
     if (tab === 'manga') {
-      els.listTabManga.classList.add('active');
-      els.listTabVideo.classList.remove('active');
+      if (els.listTabManga) els.listTabManga.classList.add('active');
+      if (els.listTabVideo) els.listTabVideo.classList.remove('active');
+      setMobileNavActive(els.mobileNavManga);
       els.mangaListSection.style.display = '';
       els.videoListSection.style.display = 'none';
       els.listPanelTitle.textContent = '保存したURL';
+      els.closeListBtn.style.display = 'none';
     } else {
-      els.listTabVideo.classList.add('active');
-      els.listTabManga.classList.remove('active');
+      if (els.listTabVideo) els.listTabVideo.classList.add('active');
+      if (els.listTabManga) els.listTabManga.classList.remove('active');
+      setMobileNavActive(els.mobileNavVideo);
       els.videoListSection.style.display = '';
       els.mangaListSection.style.display = 'none';
       els.listPanelTitle.textContent = '動画';
+      els.closeListBtn.style.display = 'none';
       renderVideoList();
     }
   }
 
-  els.listTabManga.addEventListener('click', () => switchListTab('manga'));
-  els.listTabVideo.addEventListener('click', () => switchListTab('video'));
+  els.mobileNavManga.addEventListener('click', () => {
+    if (mobileReaderMode) { els.prevBtn.click(); return; }
+    openSavedList(false, false); switchListTab('manga');
+  });
+  els.mobileNavVideo.addEventListener('click', () => {
+    if (mobileReaderMode) { toggleBars(); return; }
+    openReaderScreen('video-list');
+  });
+  els.mobileNavAuthor.addEventListener('click', () => {
+    setMobileUtilityMenu(false);
+    openAuthorCards();
+  });
+  els.mobileNavLinks.addEventListener('click', () => { setMobileUtilityMenu(false); window.location.href = 'links.html'; });
+  els.mobileNavSettings.addEventListener('click', () => { setMobileUtilityMenu(false); openSettingsScreen(); });
+  els.closeSettingsBtn.addEventListener('click', () => closeReaderScreen('settings'));
+  els.mobileNavBackup.addEventListener('click', () => { setMobileUtilityMenu(false); openReaderScreen('backup'); });
+  els.closeBackupBtn.addEventListener('click', () => closeReaderScreen('backup'));
+  document.querySelectorAll('[data-dashboard-setting]').forEach((input) => {
+    input.addEventListener('change', () => {
+      dashboardVisibility[input.dataset.dashboardSetting] = input.checked;
+      saveDashboardVisibility();
+      if (currentReaderScreen === 'settings') renderSavedList();
+    });
+  });
+  els.mobileNavMore.addEventListener('click', () => {
+    if (mobileReaderMode) { els.nextBtn.click(); return; }
+    setMobileUtilityMenu(els.mobileUtilityMenu.hidden);
+  });
+  document.addEventListener('click', (event) => {
+    if (!els.mobileUtilityMenu.hidden && !els.mobileUtilityMenu.contains(event.target) && !els.mobileNavMore.contains(event.target)) setMobileUtilityMenu(false);
+  });
   els.addVideoBtn.addEventListener('click', openAddVideoDialog);
   els.cancelVideoAddBtn.addEventListener('click', closeAddVideoDialog);
   els.confirmVideoAddBtn.addEventListener('click', confirmVideoAdd);
