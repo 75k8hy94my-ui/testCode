@@ -1,8 +1,49 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import vm from 'node:vm';
 
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
+
+function loadRecommendationPicker() {
+  const context = { window: {} };
+  vm.runInNewContext(read('recommendations.js'), context);
+  return context.window.MangaReaderRecommendations;
+}
+
+test('recommendation picker rotates fallback works and excludes disabled local manga', () => {
+  const picker = loadRecommendationPicker();
+  const items = [
+    { id: 'current', title: '読了作品', lastReadAt: '2026-08-25T10:00:00Z' },
+    { id: 'first', title: 'いつもの作品', favorite: true, updatedAt: 30 },
+    { id: 'local', title: '無効なローカル漫画', localSync: true, updatedAt: 40 },
+    { id: 'second', title: '別の作品', updatedAt: 20 },
+  ];
+  const options = { currentId: 'current', history: ['first'], localReaderEnabled: false };
+  assert.equal(picker.chooseFallback(items, options).id, 'second');
+  assert.equal(picker.chooseFallback(items, { ...options, history: ['first', 'second'] }).id, 'first');
+  assert.equal(picker.chooseFallback(items, { ...options, history: [] }).id, 'first');
+});
+
+test('reader prioritizes fast visible image loading over background detection', () => {
+  const source = read('reader.html');
+  assert.match(source, /const FIRST_PAGE_PROBE_BUDGET_MS\s*=\s*15000/);
+  assert.match(source, /findPageResult\(1, FIRST_PAGE_PROBE_BUDGET_MS\)/);
+  assert.match(source, /const LOAD_TIMEOUT_MS\s*=\s*60000/);
+});
+
+test('directly entered URLs keep the save action visible until explicitly saved', () => {
+  const source = read('reader.html');
+  const body = source.slice(source.indexOf('function hasUnsavedCurrentUrl'), source.indexOf('function updateSaveButtonVisibility'));
+  assert.match(body, /if \(!currentItem\) return !!baseUrl && !currentlyCustom/);
+});
+
+test('bookshelf cover cache separates filename patterns and can recover stale sources', () => {
+  const source = read('reader.html');
+  const body = source.slice(source.indexOf('function setupFeedImage'), source.indexOf('let bulkDetectRunning'));
+  assert.match(body, /const cacheKey = \[folderUrl, String\(resolvedWidth\), JSON\.stringify\(pattern \|\| null\)/);
+  assert.match(body, /coverSourceCache\.delete\(cacheKey\)/);
+});
 
 test('local reader routes committed bookshelf writes through storage boundary', () => {
   const source = read('local-reader.html');

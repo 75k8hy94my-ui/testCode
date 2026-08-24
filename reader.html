@@ -1173,6 +1173,7 @@
 <script src="shelf-search.js"></script>
 <script src="author-summary.js"></script>
 <script src="feature-flags.js"></script>
+<script src="recommendations.js"></script>
 <script>
 (() => {
   const sessionKey = 'mangaReaderSupabaseSession';
@@ -1626,6 +1627,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   const EXT_CANDIDATES = ['jpg', 'jpeg', 'png', 'webp'];
   const MAX_PAGES_SAFETY = 2000;
   const LOAD_TIMEOUT_MS = 60000;
+  // The image currently needed to put something on screen must not inherit
+  // the long background-probe timeout. A broken source should fail fast while
+  // page-count detection can still keep its longer retry budget.
+  const FIRST_PAGE_PROBE_BUDGET_MS = 15000;
+  const VISIBLE_PAGE_LOAD_TIMEOUT_MS = 15000;
   const IMAGE_PROBE_BUDGET_MS = 60000;
   // ページ検出を何件ずつ並列で確認するか。6はブラウザがオリジン毎に張る同時
   // 接続数の目安に合わせた値で、これより増やしてもキューで待たされるだけなので
@@ -2869,6 +2875,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   // 履歴は読書記録であって、本棚への保存先ではない。履歴しかない作品には
   // 「URLを保存」を出し、いずれかの本棚／フォルダに保存済みなら隠す。
   function hasUnsavedCurrentUrl() {
+    // A URL entered through 新規 is intentionally not associated with a
+    // bookshelf item. getCurrentItem() may still find its 履歴 entry by URL,
+    // so use the explicit open source here instead of treating that history
+    // match as proof that the URL was already saved.
+    if (!currentItem) return !!baseUrl && !currentlyCustom;
     const savedToBookshelf = !!baseUrl && savedItems.some((item) =>
       item.folderId !== HISTORY_FOLDER_ID && !Array.isArray(item.pages) && item.url &&
       baseUrlKey(item.url) === baseUrlKey(baseUrl)
@@ -2891,9 +2902,22 @@ https://cdn.example.org/c/003.webp"></textarea>
   function findNextVolumeItem(seriesInfo) {
     if (!seriesInfo) return null;
     const currentVolume = Number(seriesInfo.volume);
-    return savedItems
+    return shelfVisibleItems()
       .filter((item) => item.series === seriesInfo.series && Number(item.volume) > currentVolume)
       .sort((a, b) => Number(a.volume) - Number(b.volume))[0] || null;
+  }
+
+  const RECOMMENDATION_HISTORY_KEY = 'mangaReaderRecommendationHistory';
+  const RECOMMENDATION_HISTORY_LIMIT = 12;
+  function recommendationHistory() {
+    const history = MangaReaderStorage.safeReadJson(RECOMMENDATION_HISTORY_KEY, []);
+    return Array.isArray(history) ? history.filter((id) => typeof id === 'string') : [];
+  }
+  function rememberRecommendation(item) {
+    if (!item || !item.id) return;
+    const history = recommendationHistory().filter((id) => id !== item.id);
+    history.push(item.id);
+    MangaReaderStorage.safeWriteJson(RECOMMENDATION_HISTORY_KEY, history.slice(-RECOMMENDATION_HISTORY_LIMIT));
   }
 
   // Shows/hides the "次の巻" banner based on whether we're truly sitting on
@@ -2914,10 +2938,15 @@ https://cdn.example.org/c/003.webp"></textarea>
     const nextItem = findNextVolumeItem(getCurrentSeriesInfo());
     if (!nextItem) {
       const currentId = getCurrentItem() && getCurrentItem().id;
-      const recommendation = savedItems.filter((item) => item.id !== currentId && !Array.isArray(item.pages))
-        .sort((a, b) => Number(!a.lastReadAt) - Number(!b.lastReadAt) || Number(!!b.favorite) - Number(!!a.favorite) || Number(b.updatedAt || b.addedAt) - Number(a.updatedAt || a.addedAt))[0];
+      const localReaderEnabled = !!(window.MangaReaderFeatures && window.MangaReaderFeatures.localReader);
+      const recommendation = MangaReaderRecommendations.chooseFallback(shelfVisibleItems(), {
+        currentId,
+        history: recommendationHistory(),
+        localReaderEnabled,
+      });
       if (recommendation) {
         pendingNextVolumeItem = recommendation;
+        rememberRecommendation(recommendation);
         setNextVolumeCover(recommendation);
         els.nextVolumeText.textContent = 'おすすめ: ' + itemDisplayTitle(recommendation);
         els.nextVolumeBtn.textContent = '読む';
@@ -3230,10 +3259,10 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
   async function loadImage(url, timeoutMs) { return (await loadImageResult(url, timeoutMs)) === 'loaded'; }
 
-  async function findPageResult(pageNum) {
+  async function findPageResult(pageNum, probeBudgetMs = IMAGE_PROBE_BUDGET_MS) {
     const order = [preferredExt, ...EXT_CANDIDATES.map((_, i) => i).filter((i) => i !== preferredExt)];
     let timedOut = false;
-    const deadline = Date.now() + IMAGE_PROBE_BUDGET_MS;
+    const deadline = Date.now() + probeBudgetMs;
     for (const idx of order) {
       const remaining = deadline - Date.now();
       if (remaining <= 0) { timedOut = true; break; }
@@ -3361,7 +3390,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
     els.status.textContent = '1ページ目を確認中...';
 
-    const firstResult = await findPageResult(1);
+    const firstResult = await findPageResult(1, FIRST_PAGE_PROBE_BUDGET_MS);
     const firstUrl = firstResult.url;
     if (myGeneration !== readingGeneration) return; // superseded while we were checking page 1
     if (!firstUrl) {
@@ -3866,7 +3895,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   }
 
-  async function waitForImageReady(img, timeoutMs = LOAD_TIMEOUT_MS) {
+  async function waitForImageReady(img, timeoutMs = VISIBLE_PAGE_LOAD_TIMEOUT_MS) {
     if (!img.complete) {
       await new Promise((resolve, reject) => {
         let settled = false;
@@ -6053,9 +6082,17 @@ https://cdn.example.org/c/003.webp"></textarea>
     const cached = getCachedMangaInfo(folderUrl);
     const pattern = itemPattern || (parsed && parsed.pattern) || (cached && cached.pattern) || null;
     const resolvedWidth = numberWidth || (cached && cached.numberWidth) || 1;
-    const cacheKey = baseUrlForItem + '|' + String(numberWidth || 1);
+    const cacheKey = [folderUrl, String(resolvedWidth), JSON.stringify(pattern || null), String(cached && cached.ext != null ? cached.ext : '')].join('|');
     const cachedSource = coverSourceCache.get(cacheKey);
     if (cachedSource) {
+      // A previously cached cover can become stale when a newly saved item
+      // supplies a more precise filename pattern or when the source changes.
+      // Re-enter the normal extension cascade if the cached URL is rejected.
+      imgEl.addEventListener('error', () => {
+        coverSourceCache.delete(cacheKey);
+        coverFailedCache.delete(cacheKey);
+        setupFeedImage(imgEl, baseUrlForItem, numberWidth, itemPattern);
+      }, { once: true });
       imgEl.src = cachedSource;
       return;
     }
