@@ -45,6 +45,13 @@ test('bookshelf cover cache separates filename patterns and can recover stale so
   assert.match(body, /coverSourceCache\.delete\(cacheKey\)/);
 });
 
+test('manga cards restore the manga screen route before opening a work', () => {
+  const source = read('reader.html');
+  const body = source.slice(source.indexOf('if (!reorderMode && !bulkEditMode)'), source.indexOf('function normalizeAuthorLinks'));
+  assert.match(body, /if \(currentReaderScreen === 'video-list'\) navigateReaderScreen\('saved-list', \{ replace: true \}\);/);
+  assert.match(body, /switchListTab\('manga'\);[\s\S]*closeSavedList\(\);[\s\S]*openItem\(item, false\)/);
+});
+
 test('local reader routes committed bookshelf writes through storage boundary', () => {
   const source = read('local-reader.html');
   assert.match(source, /MangaReaderStorage\.safeWriteJson\('mangaReaderSavedFolders'/);

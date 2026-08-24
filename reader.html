@@ -5556,6 +5556,12 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!reorderMode && !bulkEditMode) {
       card.addEventListener('click', () => {
         rememberReaderReturnView();
+        // The manga and video lists share one surface. If the browser history
+        // still says video-list while the manga grid is visible, normalize the
+        // route before closing it so the video screen cannot remain underneath
+        // the reader after a manga card is opened.
+        if (currentReaderScreen === 'video-list') navigateReaderScreen('saved-list', { replace: true });
+        switchListTab('manga');
         closeSavedList();
         setReadingListContext(list, list.indexOf(item));
         flashStatus('読み込み中…');
