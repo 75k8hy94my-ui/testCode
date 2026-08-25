@@ -6,6 +6,10 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
 
+const allowedStudyUserIds = new Set([
+  'c402d28a-b2fa-45b8-9731-bd2031955b84'
+]);
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -36,6 +40,7 @@ Deno.serve(async (req: Request) => {
 
   const user = await authenticatedUser(req);
   if (!user) return json({ error: 'unauthorized' }, 401);
+  if (!allowedStudyUserIds.has(user.id)) return json({ error: 'forbidden' }, 403);
 
   const apiKey = Deno.env.get('OPENAI_API_KEY');
   if (!apiKey) return json({ error: 'server_not_configured' }, 500);
