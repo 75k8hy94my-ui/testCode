@@ -53,3 +53,11 @@ test('edge function requires an Authorization header', () => {
   assert.match(source, /req\.headers\.get\('Authorization'\)/);
   assert.match(source, /unauthorized/);
 });
+
+test('edge function verifies the bearer token belongs to a real Supabase user', () => {
+  const source = fs.readFileSync(new URL('../supabase/functions/study-ai/index.ts', import.meta.url), 'utf8');
+  assert.match(source, /SUPABASE_URL/);
+  assert.match(source, /SUPABASE_ANON_KEY/);
+  assert.match(source, /auth\/v1\/user/);
+  assert.match(source, /user\.id/);
+});
