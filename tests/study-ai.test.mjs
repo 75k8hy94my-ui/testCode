@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import StudyAI from '../study-ai.js';
 
-test('gradeAnswer calls authenticated Supabase Edge Function without provider key', async () => {
+test('gradeAnswer calls authenticated browser-safe Supabase Edge Function without provider key', async () => {
   const calls = [];
   const vault = { withSession: async (work) => work('access-token', { id: 'u1' }) };
   const fetchImpl = async (url, options) => {
@@ -25,7 +25,7 @@ test('gradeAnswer calls authenticated Supabase Edge Function without provider ke
   });
   assert.equal(result.result, 'correct');
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, 'https://example.supabase.co/functions/v1/study-ai');
+  assert.equal(calls[0].url, 'https://example.supabase.co/functions/v1/study-ai-browser');
   assert.equal(calls[0].options.headers.Authorization, 'Bearer access-token');
   assert.equal(calls[0].options.headers.apikey, 'anon-key');
   const body = JSON.parse(calls[0].options.body);
