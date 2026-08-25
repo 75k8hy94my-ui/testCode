@@ -44,7 +44,7 @@ test('edge source keeps provider secret server-side and uses structured Response
   assert.match(source, /OPENAI_STUDY_MODEL/);
   assert.match(source, /api\.openai\.com\/v1\/responses/);
   assert.match(source, /store:\s*false/);
-  assert.match(source, /type:'json_schema'/);
+  assert.match(source, /type:\s*['"]json_schema['"]/);
   assert.doesNotMatch(source, /console\.(?:log|info|debug)\(/);
 });
 
