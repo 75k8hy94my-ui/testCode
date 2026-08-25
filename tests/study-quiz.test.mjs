@@ -89,7 +89,53 @@ test('weakness-targeted stage two question uses cloze form', () => {
   const question = StudyQuiz.buildQuestion(definition, progress, 1);
   assert.equal(question.kind, 'cloze');
   assert.deepEqual(question.targetUnitIds, ['d1-legal']);
-  assert.match(question.prompt, /【　】/);
+  assert.match(question.prompt, /【1】/);
+  assert.equal(question.clozeItems.length, 1);
+});
+
+test('multi-term cloze exposes one numbered answer slot per blank', () => {
+  const definition = {
+    id: 'hearsay', subjectId: 'criminal-procedure', genreId: 'evidence', title: '伝聞証拠', contentRevision: 1,
+    modelText: '公判外の供述を内容とする供述または書面で、当該公判外供述の内容の真実性を証明するために用いられるもの',
+    memoryUnits: [{
+      id: 'hearsay-core',
+      text: '公判外の供述を内容とする供述または書面',
+      required: true,
+      importantTerms: ['公判外の供述', '供述または書面'],
+      acceptedVariants: []
+    }],
+    clozeCandidates: [{ unitId: 'hearsay-core', terms: ['公判外の供述', '供述または書面'] }]
+  };
+  const progress = StudyQuiz.createInitialProgress(definition, 0);
+  progress.stage = 2;
+  const question = StudyQuiz.buildQuestion(definition, progress, 1);
+  assert.equal(question.kind, 'cloze');
+  assert.equal(question.clozeItems.length, 2);
+  assert.deepEqual(question.clozeItems.map((item) => item.answer), ['公判外の供述', '供述または書面']);
+  assert.match(question.prompt, /【1】/);
+  assert.match(question.prompt, /【2】/);
+});
+
+test('cloze grading distinguishes correct, partial, and wrong answers per blank', () => {
+  const question = {
+    kind: 'cloze',
+    targetUnitIds: ['hearsay-core'],
+    clozeItems: [
+      { index: 0, answer: '公判外の供述' },
+      { index: 1, answer: '供述または書面' }
+    ]
+  };
+  const correct = StudyQuiz.gradeClozeAnswers(question, ['公判外の供述', '供述または書面']);
+  assert.equal(correct.result, 'correct');
+  assert.deepEqual(correct.items.map((item) => item.correct), [true, true]);
+  const partial = StudyQuiz.gradeClozeAnswers(question, ['公判外の供述', '口頭供述']);
+  assert.equal(partial.result, 'almost');
+  assert.equal(partial.correctCount, 1);
+  assert.equal(partial.totalCount, 2);
+  assert.deepEqual(partial.items.map((item) => item.correct), [true, false]);
+  const wrong = StudyQuiz.gradeClozeAnswers(question, ['判決書', '証拠物']);
+  assert.equal(wrong.result, 'wrong');
+  assert.equal(wrong.correctCount, 0);
 });
 
 test('checkpoint reports capability changes without accuracy fields', () => {
