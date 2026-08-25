@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const pages = ['index.html', 'sync.html', 'reader.html', 'local-reader.html', 'links.html'];
+const pages = ['index.html', 'sync.html', 'reader.html', 'local-reader.html', 'links.html', 'study.html'];
 const standalone = ['author-summary.js', 'backup-format.js', 'browser-storage.js', 'feature-flags.js', 'shelf-search.js', 'status-message.js', 'supabase-config.js', 'url-parser.js', 'vault-payload.js', 'vault-session.js'];
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
