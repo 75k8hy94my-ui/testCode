@@ -1,0 +1,23 @@
+name: temp recognition check
+on:
+  push:
+    branches:
+      - fix/recognition-question
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tests
+        run: node --test tests/study-quiz.test.mjs tests/study-page.test.mjs
+      - name: Syntax
+        run: |
+          node --check study-quiz.js
+          node scripts/check-static.mjs
+      - name: Whitespace
+        run: git diff --check origin/main...HEAD
