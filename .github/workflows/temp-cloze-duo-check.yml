@@ -1,0 +1,21 @@
+name: temp cloze duo check
+on:
+  push:
+    branches:
+      - fix/cloze-grading-duolingo-theme
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tests
+        run: node --test tests/study-quiz.test.mjs tests/study-page.test.mjs
+      - name: Syntax
+        run: node --check study-quiz.js
+      - name: Whitespace
+        run: git diff --check origin/main...HEAD
