@@ -107,3 +107,43 @@ test('checkpoint reports capability changes without accuracy fields', () => {
   assert.equal('accuracy' in checkpoint, false);
   assert.equal('correctCount' in checkpoint, false);
 });
+
+test('keyboard viewport mode uses the visible mobile viewport and keeps quiz input compact', () => {
+  const oldWindow = globalThis.window;
+  const oldDocument = globalThis.document;
+  const properties = new Map();
+  const classes = new Set();
+  const input = { matches: (selector) => selector.includes('#quizInputArea textarea') };
+  const visualViewport = { height: 430, offsetTop: 12, addEventListener() {} };
+  const documentElement = { clientHeight: 800, style: { setProperty: (name, value) => properties.set(name, value) } };
+  const body = { classList: { toggle: (name, enabled) => enabled ? classes.add(name) : classes.delete(name) } };
+  const documentFake = {
+    documentElement,
+    body,
+    head: { appendChild() {} },
+    activeElement: input,
+    getElementById: () => null,
+    createElement: () => ({ id: '', textContent: '' }),
+    addEventListener() {}
+  };
+  const windowFake = {
+    visualViewport,
+    innerHeight: 800,
+    navigator: { maxTouchPoints: 1 },
+    matchMedia: () => ({ matches: true }),
+    addEventListener() {},
+    requestAnimationFrame: (fn) => fn(),
+    setTimeout: (fn) => fn()
+  };
+  try {
+    globalThis.window = windowFake;
+    globalThis.document = documentFake;
+    assert.equal(StudyQuiz.installKeyboardViewport(), true);
+    assert.equal(properties.get('--quiz-visual-height'), '430px');
+    assert.equal(properties.get('--quiz-visual-offset-top'), '12px');
+    assert.equal(classes.has('keyboard-active'), true);
+  } finally {
+    if (oldWindow === undefined) delete globalThis.window; else globalThis.window = oldWindow;
+    if (oldDocument === undefined) delete globalThis.document; else globalThis.document = oldDocument;
+  }
+});
