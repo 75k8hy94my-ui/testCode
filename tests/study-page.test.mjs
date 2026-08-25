@@ -49,9 +49,11 @@ test('judicial exam study page reuses the reader authentication guard', () => {
   assert.match(source, /window\.location\.replace\(['"]index\.html['"]\)/);
 });
 
-test('reader exposes the judicial exam study area through its loaded chrome helper', () => {
+test('reader exposes the judicial exam study area on mobile and desktop chrome', () => {
   const source = read('feature-flags.js');
   assert.match(source, /id\s*=\s*['"]mobileNavStudy['"]/);
+  assert.match(source, /id\s*=\s*['"]desktopStudyBtn['"]/);
+  assert.match(source, /listTabRow/);
   assert.match(source, /司法試験学習/);
   assert.match(source, /window\.location\.href\s*=\s*['"]study\.html['"]/);
 });
