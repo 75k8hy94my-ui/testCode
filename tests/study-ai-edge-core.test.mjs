@@ -48,6 +48,14 @@ test('edge source keeps provider secret server-side and uses structured Response
   assert.doesNotMatch(source, /console\.(?:log|info|debug)\(/);
 });
 
+test('edge preflight supports browser and Supabase headers with origin-safe CORS', () => {
+  const source = fs.readFileSync(new URL('../supabase/functions/study-ai/index.ts', import.meta.url), 'utf8');
+  assert.match(source, /x-client-info/i);
+  assert.match(source, /x-supabase-api-version/i);
+  assert.match(source, /Access-Control-Max-Age/i);
+  assert.match(source, /req\.headers\.get\(['"]Origin['"]\)/);
+});
+
 test('edge function requires an Authorization header', () => {
   const source = fs.readFileSync(new URL('../supabase/functions/study-ai/index.ts', import.meta.url), 'utf8');
   assert.match(source, /req\.headers\.get\('Authorization'\)/);

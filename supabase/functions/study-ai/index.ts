@@ -1,19 +1,23 @@
 import { ANALYZE_SCHEMA, GRADE_SCHEMA, buildAnalyzePrompt, buildGradePrompt, parseStructuredResponse } from './core.mjs';
 
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS'
-};
+function corsHeaders(req: Request) {
+  return {
+    'Access-Control-Allow-Origin': req.headers.get('Origin') || '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-api-version',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin'
+  };
+}
 
 const allowedStudyUserIds = new Set([
   'c402d28a-b2fa-45b8-9731-bd2031955b84'
 ]);
 
-function json(data: unknown, status = 200) {
+function json(req: Request, data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...cors, 'Content-Type': 'application/json' }
+    headers: { ...corsHeaders(req), 'Content-Type': 'application/json' }
   });
 }
 
@@ -35,25 +39,25 @@ async function authenticatedUser(req: Request) {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-  if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(req) });
+  if (req.method !== 'POST') return json(req, { error: 'method_not_allowed' }, 405);
 
   const user = await authenticatedUser(req);
-  if (!user) return json({ error: 'unauthorized' }, 401);
-  if (!allowedStudyUserIds.has(user.id)) return json({ error: 'forbidden' }, 403);
+  if (!user) return json(req, { error: 'unauthorized' }, 401);
+  if (!allowedStudyUserIds.has(user.id)) return json(req, { error: 'forbidden' }, 403);
 
   const apiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!apiKey) return json({ error: 'server_not_configured' }, 500);
+  if (!apiKey) return json(req, { error: 'server_not_configured' }, 500);
 
   let body: { action?: string; input?: Record<string, unknown> };
   try {
     body = await req.json();
   } catch (_) {
-    return json({ error: 'invalid_json' }, 400);
+    return json(req, { error: 'invalid_json' }, 400);
   }
 
   const action = body && body.action;
-  if (action !== 'analyze' && action !== 'grade') return json({ error: 'invalid_action' }, 400);
+  if (action !== 'analyze' && action !== 'grade') return json(req, { error: 'invalid_action' }, 400);
 
   const input = body.input && typeof body.input === 'object' ? body.input : {};
   const schema = action === 'analyze' ? ANALYZE_SCHEMA : GRADE_SCHEMA;
@@ -80,13 +84,13 @@ Deno.serve(async (req: Request) => {
       })
     });
   } catch (_) {
-    return json({ error: 'provider_unreachable' }, 502);
+    return json(req, { error: 'provider_unreachable' }, 502);
   }
 
-  if (!provider.ok) return json({ error: 'provider_error', status: provider.status }, 502);
+  if (!provider.ok) return json(req, { error: 'provider_error', status: provider.status }, 502);
   try {
-    return json(parseStructuredResponse(await provider.json()));
+    return json(req, parseStructuredResponse(await provider.json()));
   } catch (_) {
-    return json({ error: 'provider_invalid_output' }, 502);
+    return json(req, { error: 'provider_invalid_output' }, 502);
   }
 });
