@@ -4,7 +4,7 @@
 
 **Goal:** Build a mobile-first adaptive legal-definition quiz inside `study.html` that tracks exact weak phrases, grades free recall through AI, works offline without blocking, syncs through the existing encrypted vault, and reads saved hiragana pronunciations through browser speech synthesis.
 
-**Architecture:** Keep the static HTML/CSS/JavaScript application and extend the existing encrypted vault payload with one normalized `study` field. Put deterministic learning behavior in small browser modules; use a Supabase Edge Function only for definition analysis and free-answer grading. All quiz interaction writes locally first, queues sync/grading work, and keeps the current CAS conflict semantics.
+**Architecture:** Keep the application static HTML/CSS/JavaScript. Add one normalized `study` field to local/vault/backup payloads, keep deterministic learning logic in focused browser modules, and use a Supabase Edge Function only for definition analysis and free-answer grading. Every answer is saved locally first; finalized attempt operations can be replayed onto the newest remote study state after a safe CAS conflict rebase.
 
 **Tech Stack:** Static HTML/CSS/JavaScript, Node `node:test`, Supabase REST/Edge Functions, Deno Edge runtime, OpenAI Responses API Structured Outputs, Web Speech API.
 
@@ -12,18 +12,19 @@
 
 ## Global Constraints
 
-- Keep the frontend static HTML/CSS/JavaScript with no production build step.
-- The registered model definition is authoritative; AI must never invent the legal definition at quiz time.
-- AI may identify missing/wrong units, but deterministic browser code decides stage, queue position, review timing, XP, and streaks.
-- Do not expose the OpenAI API key in browser code; AI requests go through a Supabase Edge Function.
-- Normal quiz UI must not display internal labels such as `Lv.2`, `弱点穴埋め`, or `完全再現`.
-- Normal quiz UI must not explain scheduling logic such as `次回はこの2箇所を狙った穴埋めで再登場します`.
-- Checkpoints must not show answer accuracy such as `8 / 10` or percentages.
-- `思い出せない` must reveal the model answer and let the learner move on without a retry wall.
-- Browser audio uses saved hiragana pronunciation text and must never block quiz use when unsupported.
-- A legacy vault without `study` must normalize successfully.
-- Existing manga payload fields and revision-based CAS behavior must remain backward compatible.
-- Finalized recent-attempt retention is capped at 2,000; pending grading and unsynced operations are never dropped by retention.
+- No production build step or frontend production dependency.
+- The registered model definition is authoritative; AI never invents the legal definition at quiz time.
+- AI reports grading facts only. Browser code decides stage, retry spacing, review interval, XP, and streak.
+- OpenAI provider secrets never appear in browser code or committed files.
+- Normal quiz UI never displays `Lv.2`, `弱点穴埋め`, `完全再現`, or other internal stage names.
+- Normal quiz UI never explains future scheduling logic.
+- Checkpoints never display answer accuracy, percentages, or `8 / 10`-style score ratios.
+- `思い出せない` reveals the model answer and permits immediate continuation.
+- Browser audio uses saved pronunciation strings; lack of speech support never blocks study.
+- Legacy vaults/backups with no `study` field remain readable.
+- Existing manga fields and CAS behavior remain backward compatible.
+- Keep at most 2,000 finalized recent attempts; never prune pending grading or unsynced operations.
+- Study sync may auto-rebase after CAS conflict only when non-study local data is unchanged from its recorded baseline.
 
 ---
 
@@ -31,14 +32,14 @@
 
 ### Create
 
-- `study-data.js` — study schema, normalization, local read/write helpers, retention, UUID/time helpers.
-- `study-sync.js` — operation log, operation application, CAS save, safe conflict rebase, sync status.
-- `study-quiz.js` — scope filtering, question construction, stage/review updates, retry spacing, checkpoint capability messages, XP/streak updates.
-- `study-audio.js` — Web Speech API support and pronunciation playback.
-- `study-ai.js` — authenticated browser client for Edge Function analysis/grading with timeout semantics.
-- `study-offline.js` — pending AI grading queue and online retry orchestration.
-- `supabase/functions/study-ai/core.mjs` — pure schemas, prompt/input builders, OpenAI response extraction/validation.
-- `supabase/functions/study-ai/index.ts` — authenticated Edge Function endpoint and OpenAI Responses API call.
+- `study-data.js` — schema/defaults, local read/write, definitions/attempt normalization, retention.
+- `study-sync.js` — operation queue, idempotent replay, safe CAS conflict rebase.
+- `study-quiz.js` — adaptive question engine, final-attempt reducer, review schedule, XP/streak, checkpoint messages.
+- `study-audio.js` — saved-pronunciation speech playback.
+- `study-ai.js` — authenticated browser Edge Function client.
+- `study-offline.js` — pending AI grading retry/finalization.
+- `supabase/functions/study-ai/core.mjs` — pure AI schemas/prompt builders/response parser.
+- `supabase/functions/study-ai/index.ts` — Edge Function handler.
 - `tests/study-data.test.mjs`
 - `tests/study-sync.test.mjs`
 - `tests/study-quiz.test.mjs`
@@ -49,71 +50,129 @@
 
 ### Modify
 
-- `vault-payload.js` — add `mangaReaderStudy` to the encrypted/local payload lifecycle.
-- `vault-session.js` — expose a safe `reloadPayload()` helper using the already-unlocked vault key.
-- `study.html` — routes, definition editor/library, launcher/session/checkpoint UI, script wiring, minimal settings.
-- `tests/vault-payload.test.mjs` — legacy/new study payload coverage.
-- `tests/study-page.test.mjs` — replace Phase-1 no-persistence assertion with quiz/editor/audio/route assertions.
-- `scripts/check-static.mjs` — include new browser JavaScript files and Edge core parse check where applicable.
-- `AGENTS.md` — record the study payload, Edge Function env names, and manual deployment/verification commands.
+- `vault-payload.js`
+- `vault-session.js`
+- `backup-format.js`
+- `study.html`
+- `tests/vault-payload.test.mjs`
+- `tests/backup-format.test.mjs`
+- `tests/study-page.test.mjs`
+- `scripts/check-static.mjs`
+- `AGENTS.md`
 
 ---
 
-### Task 1: Add the normalized study payload and vault field
+### Task 1: Add study schema to local storage, encrypted vault payload, and backup format
 
 **Files:**
 - Create: `study-data.js`
 - Create: `tests/study-data.test.mjs`
 - Modify: `vault-payload.js`
+- Modify: `backup-format.js`
 - Modify: `tests/vault-payload.test.mjs`
+- Modify: `tests/backup-format.test.mjs`
 
 **Interfaces:**
-- Produces `StudyData.STUDY_SCHEMA_VERSION: 1`.
-- Produces `StudyData.MAX_FINALIZED_ATTEMPTS: 2000`.
-- Produces `StudyData.createEmptyStudy(): StudyState`.
-- Produces `StudyData.normalizeStudy(value): StudyState`.
-- Produces `StudyData.load(storage = localStorage): StudyState`.
-- Produces `StudyData.save(study, storage = localStorage): StudyState`.
-- Produces `StudyData.pruneRecentAttempts(study, max = 2000): StudyState`.
-- `vault-payload.js` adds `DATA_KEYS.study === 'mangaReaderStudy'` and includes a `study` object in every normalized payload.
 
-- [ ] **Step 1: Write failing schema/retention tests**
+```js
+StudyData.STUDY_KEY === 'mangaReaderStudy'
+StudyData.STUDY_SCHEMA_VERSION === 1
+StudyData.MAX_FINALIZED_ATTEMPTS === 2000
+StudyData.createEmptyStudy()
+StudyData.normalizeStudy(value)
+StudyData.load(storage = localStorage)
+StudyData.save(study, storage = localStorage)
+StudyData.pruneRecentAttempts(study, max = 2000)
+StudyData.createId()
+```
 
-Create `tests/study-data.test.mjs` with concrete tests:
+`StudyState` v1:
+
+```js
+{
+  schemaVersion: 1,
+  subjects: [
+    { id: 'constitutional-law', name: '憲法' },
+    { id: 'administrative-law', name: '行政法' },
+    { id: 'civil-law', name: '民法' },
+    { id: 'commercial-law', name: '商法' },
+    { id: 'civil-procedure', name: '民事訴訟法' },
+    { id: 'criminal-law', name: '刑法' },
+    { id: 'criminal-procedure', name: '刑事訴訟法' },
+    { id: 'labor-law', name: '労働法' }
+  ],
+  genres: [],
+  definitions: [],
+  recentAttempts: [],
+  progress: {},
+  pendingGradings: [],
+  pendingSyncOps: [],
+  appliedOperationIds: [],
+  gamification: { xp: 0, streak: 0, lastStudyDate: null },
+  preferences: { autoSpeak: false }
+}
+```
+
+- [ ] **Step 1: Write failing `study-data` tests**
+
+Create `tests/study-data.test.mjs`:
 
 ```js
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import StudyData from '../study-data.js';
 
-const finalAttempt = (id) => ({
-  id,
-  definitionId: 'd1',
-  definitionRevision: 1,
-  occurredAt: `2026-08-26T00:00:${String(Number(id.slice(1)) % 60).padStart(2, '0')}Z`,
-  deviceId: 'device-a',
-  questionKind: 'full',
-  stageAtAttempt: 4,
-  answerText: 'answer',
-  grading: { status: 'final', result: 'correct', recalledUnitIds: [], missingUnitIds: [], wrongUnitIds: [], confusionUnitIds: [], source: 'ai' }
+function finalAttempt(id, second) {
+  return {
+    id,
+    definitionId: 'd1',
+    definitionRevision: 1,
+    occurredAt: `2026-08-26T00:00:${String(second).padStart(2, '0')}Z`,
+    deviceId: 'device-a',
+    questionKind: 'full',
+    stageAtAttempt: 4,
+    answerText: 'answer',
+    gradingContext: null,
+    grading: {
+      status: 'final', result: 'correct', recalledUnitIds: [], missingUnitIds: [],
+      wrongUnitIds: [], confusions: [], feedback: '', confidence: 'high', source: 'ai'
+    }
+  };
+}
+
+test('empty study contains eight legal subjects and default preferences', () => {
+  const study = StudyData.createEmptyStudy();
+  assert.equal(study.subjects.length, 8);
+  assert.equal(study.preferences.autoSpeak, false);
+  assert.deepEqual(study.appliedOperationIds, []);
 });
 
-test('normalizes missing study state to schema version 1', () => {
+test('legacy missing study normalizes to v1', () => {
   assert.deepEqual(StudyData.normalizeStudy(null), StudyData.createEmptyStudy());
 });
 
-test('keeps pending grading and unsynced operations while pruning finalized attempts', () => {
+test('pruning keeps newest 2000 finalized attempts plus every pending attempt', () => {
   const study = StudyData.createEmptyStudy();
-  study.recentAttempts = Array.from({ length: 2005 }, (_, i) => finalAttempt(`a${i}`));
-  study.recentAttempts.push({ ...finalAttempt('pending'), grading: { ...finalAttempt('pending').grading, status: 'pending', result: null, source: 'pending' } });
+  study.recentAttempts = Array.from({ length: 2005 }, (_, i) => ({
+    ...finalAttempt(`a${i}`, i % 60),
+    occurredAt: new Date(Date.UTC(2026, 7, 26, 0, 0, 0) + i * 1000).toISOString()
+  }));
+  const pending = {
+    ...finalAttempt('pending', 59),
+    gradingContext: { modelText: '模範', memoryUnits: [] },
+    grading: { ...finalAttempt('pending', 59).grading, status: 'pending', result: null, source: 'pending' }
+  };
+  study.recentAttempts.push(pending);
+  study.pendingGradings.push('pending');
   study.pendingSyncOps.push({ id: 'op1', type: 'preference.changed', payload: { autoSpeak: true }, occurredAt: '2026-08-26T00:00:00Z' });
-  const pruned = StudyData.pruneRecentAttempts(study);
-  assert.equal(pruned.recentAttempts.filter((x) => x.grading.status === 'final').length, 2000);
-  assert.equal(pruned.recentAttempts.some((x) => x.id === 'pending'), true);
-  assert.equal(pruned.pendingSyncOps.length, 1);
+  const result = StudyData.pruneRecentAttempts(study);
+  assert.equal(result.recentAttempts.filter((a) => a.grading.status === 'final').length, 2000);
+  assert.equal(result.recentAttempts.some((a) => a.id === 'pending'), true);
+  assert.deepEqual(result.pendingGradings, ['pending']);
+  assert.equal(result.pendingSyncOps.length, 1);
 });
 
-test('load and save use the mangaReaderStudy local key', () => {
+test('load and save use mangaReaderStudy', () => {
   const storage = new Map();
   const study = StudyData.createEmptyStudy();
   study.preferences.autoSpeak = true;
@@ -123,9 +182,7 @@ test('load and save use the mangaReaderStudy local key', () => {
 });
 ```
 
-- [ ] **Step 2: Run the new test to verify it fails**
-
-Run:
+- [ ] **Step 2: Verify failure**
 
 ```bash
 node --test tests/study-data.test.mjs
@@ -135,86 +192,41 @@ Expected: FAIL because `study-data.js` does not exist.
 
 - [ ] **Step 3: Implement `study-data.js`**
 
-Use this public shape and defaults:
+Use the exact v1 shape above. Normalize arrays/objects without trusting input types. `pruneRecentAttempts()` sorts finalized attempts by `occurredAt`, retains the newest `max`, and retains every pending attempt. When an attempt becomes final, remove `gradingContext` before long-term retention.
+
+Support both Web Storage and `Map`:
 
 ```js
-const STUDY_KEY = 'mangaReaderStudy';
-const STUDY_SCHEMA_VERSION = 1;
-const MAX_FINALIZED_ATTEMPTS = 2000;
-
-function createEmptyStudy() {
-  return {
-    schemaVersion: STUDY_SCHEMA_VERSION,
-    subjects: [],
-    genres: [],
-    definitions: [],
-    recentAttempts: [],
-    progress: {},
-    pendingGradings: [],
-    pendingSyncOps: [],
-    gamification: { xp: 0, streak: 0, lastStudyDate: null },
-    preferences: { autoSpeak: false }
-  };
+function getRaw(storage, key) {
+  return storage.getItem ? storage.getItem(key) : (storage.get(key) ?? null);
 }
-
-function normalizeStudy(value) {
-  const x = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  const base = createEmptyStudy();
-  return {
-    ...base,
-    schemaVersion: STUDY_SCHEMA_VERSION,
-    subjects: Array.isArray(x.subjects) ? x.subjects : [],
-    genres: Array.isArray(x.genres) ? x.genres : [],
-    definitions: Array.isArray(x.definitions) ? x.definitions : [],
-    recentAttempts: Array.isArray(x.recentAttempts) ? x.recentAttempts : [],
-    progress: x.progress && typeof x.progress === 'object' && !Array.isArray(x.progress) ? x.progress : {},
-    pendingGradings: Array.isArray(x.pendingGradings) ? x.pendingGradings : [],
-    pendingSyncOps: Array.isArray(x.pendingSyncOps) ? x.pendingSyncOps : [],
-    gamification: { ...base.gamification, ...(x.gamification || {}) },
-    preferences: { ...base.preferences, ...(x.preferences || {}) }
-  };
+function setRaw(storage, key, value) {
+  if (storage.setItem) storage.setItem(key, value);
+  else storage.set(key, value);
 }
 ```
 
-Implement `load()` and `save()` for both `localStorage`-like objects and `Map` exactly as existing vault tests do. `pruneRecentAttempts()` must sort finalized attempts by `occurredAt`, keep the newest 2,000 finalized records, and keep every pending attempt.
-
-Export via both:
+Export:
 
 ```js
+const api = { STUDY_KEY, STUDY_SCHEMA_VERSION, MAX_FINALIZED_ATTEMPTS, createEmptyStudy, normalizeStudy, load, save, pruneRecentAttempts, createId };
 if (typeof window !== 'undefined') window.StudyData = api;
 if (typeof module !== 'undefined') module.exports = api;
 ```
 
-- [ ] **Step 4: Extend vault payload tests before production code**
+- [ ] **Step 4: Extend vault payload tests before implementation**
 
-Update `tests/vault-payload.test.mjs` so the legacy normalization expectation includes:
-
-```js
-study: {
-  schemaVersion: 1,
-  subjects: [], genres: [], definitions: [], recentAttempts: [], progress: {},
-  pendingGradings: [], pendingSyncOps: [],
-  gamification: { xp: 0, streak: 0, lastStudyDate: null },
-  preferences: { autoSpeak: false }
-}
-```
-
-Extend the build/apply test with a real study object and assert:
+Update `tests/vault-payload.test.mjs` so legacy normalization includes an empty `study`, and add:
 
 ```js
 assert.equal(DATA_KEYS.study, 'mangaReaderStudy');
-assert.equal(buildFromStorage(storage).study.preferences.autoSpeak, true);
+const input = payload.normalize({ study: { preferences: { autoSpeak: true } } });
+assert.equal(input.study.preferences.autoSpeak, true);
 ```
 
-- [ ] **Step 5: Run vault tests and verify they fail**
+Also test `clearDeviceData()` removes `mangaReaderStudy`.
 
-```bash
-node --test tests/vault-payload.test.mjs
-```
-
-Expected: FAIL because `vault-payload.js` does not expose/persist `study`.
-
-- [ ] **Step 6: Add `study` to `vault-payload.js`**
+- [ ] **Step 5: Update `vault-payload.js`**
 
 Add:
 
@@ -222,27 +234,47 @@ Add:
 study: 'mangaReaderStudy'
 ```
 
-to `DATA_KEYS`, add a local `emptyStudy()`/`normalizeStudyForVault()` matching the Task 1 schema, include `study` in `defaults`, `normalize()`, and `buildFromStorage()`. Do not make `vault-payload.js` depend on script load order or `window.StudyData`.
+and a local `normalizeStudyForVault()` matching the v1 shape. Include `study` in `defaults`, `normalize()`, `buildFromStorage()`, `applyToStorage()`, and clearing through `DATA_KEYS`.
 
-- [ ] **Step 7: Run focused and full tests**
+Do not depend on `window.StudyData`; reader pages may load `vault-payload.js` without study scripts.
+
+- [ ] **Step 6: Extend backup tests before implementation**
+
+In `tests/backup-format.test.mjs`, add:
+
+```js
+test('backup v2 preserves study and legacy v2 without study gets an empty study', () => {
+  const backup = api.createBackup({ study: { preferences: { autoSpeak: true } } }, '2026-08-26T00:00:00Z');
+  assert.equal(backup.data.study.preferences.autoSpeak, true);
+  const legacy = api.migrateBackup({ format: 'manga-reader-backup', version: 2, exportedAt: '2026-08-25T00:00:00Z', data: {} });
+  assert.equal(legacy.study.schemaVersion, 1);
+  assert.equal(legacy.study.definitions.length, 0);
+});
+```
+
+- [ ] **Step 7: Update `backup-format.js`**
+
+Keep backup format version `2`. Adding an optional field is backward compatible. Add `study: normalizeBackupStudy(x.study)` to `normalizeData()` and use the same v1 defaults as Task 1.
+
+- [ ] **Step 8: Run focused/full tests**
 
 ```bash
-node --test tests/study-data.test.mjs tests/vault-payload.test.mjs
+node --test tests/study-data.test.mjs tests/vault-payload.test.mjs tests/backup-format.test.mjs
 npm test
 ```
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add study-data.js vault-payload.js tests/study-data.test.mjs tests/vault-payload.test.mjs
-git commit -m "feat: add study data to encrypted vault"
+git add study-data.js vault-payload.js backup-format.js tests/study-data.test.mjs tests/vault-payload.test.mjs tests/backup-format.test.mjs
+git commit -m "feat: add study data to vault and backups"
 ```
 
 ---
 
-### Task 2: Add safe encrypted-vault reload and study operation sync
+### Task 2: Add safe encrypted-vault reload and idempotent study operation replay
 
 **Files:**
 - Create: `study-sync.js`
@@ -250,15 +282,27 @@ git commit -m "feat: add study data to encrypted vault"
 - Modify: `vault-session.js`
 
 **Interfaces:**
-- Adds `MangaVault.reloadPayload(): Promise<{ payload, revision, updatedAt } | null>`.
-- Produces `StudySync.createOperation(type, payload, options?): SyncOperation`.
-- Produces `StudySync.applyOperation(study, operation): StudyState`.
-- Produces `StudySync.queueOperation(study, operation): StudyState`.
-- Produces `StudySync.rebaseStudy(remoteStudy, pendingOps): StudyState`.
-- Produces `StudySync.fingerprintNonStudy(vaultPayload): string`.
-- Produces `StudySync.createController({ vault, payloadApi, storage }): { syncNow, getStatus, markBase }`.
 
-- [ ] **Step 1: Write failing operation/idempotence/rebase tests**
+```js
+MangaVault.reloadPayload()
+StudySync.createOperation(type, payload, options = {})
+StudySync.applyOperation(study, operation, options = {})
+StudySync.queueOperation(study, operation)
+StudySync.rebaseStudy(remoteStudy, pendingOps, options = {})
+StudySync.fingerprintNonStudy(vaultPayload)
+StudySync.createController({ vault, payloadApi, storage, reduceFinalAttempt })
+```
+
+Supported v1 operation types:
+
+```text
+definition.upserted
+definition.deleted
+attempt.upserted
+preference.changed
+```
+
+- [ ] **Step 1: Write failing operation tests**
 
 Create `tests/study-sync.test.mjs`:
 
@@ -268,23 +312,37 @@ import assert from 'node:assert/strict';
 import StudyData from '../study-data.js';
 import StudySync from '../study-sync.js';
 
-test('replaying the same operation ID is idempotent', () => {
+test('operation replay is idempotent by operation ID', () => {
   const study = StudyData.createEmptyStudy();
   const op = { id: 'op1', type: 'preference.changed', payload: { autoSpeak: true }, occurredAt: '2026-08-26T00:00:00Z' };
   const once = StudySync.applyOperation(study, op);
   const twice = StudySync.applyOperation(once, op);
   assert.equal(twice.preferences.autoSpeak, true);
-  assert.equal(twice._appliedOperationIds.filter((id) => id === 'op1').length, 1);
+  assert.deepEqual(twice.appliedOperationIds, ['op1']);
 });
 
-test('remote study is rebased by pending local definition edit', () => {
-  const remote = StudyData.createEmptyStudy();
-  remote.definitions.push({ id: 'd1', title: 'old', updatedAt: '2026-08-25T00:00:00Z', contentRevision: 1 });
-  const op = { id: 'op2', type: 'definition.upserted', payload: { definition: { id: 'd1', title: 'new', updatedAt: '2026-08-26T00:00:00Z', contentRevision: 2 } }, occurredAt: '2026-08-26T00:00:00Z' };
-  assert.equal(StudySync.rebaseStudy(remote, [op]).definitions[0].title, 'new');
+test('queueOperation queues once without applying twice', () => {
+  const study = StudyData.createEmptyStudy();
+  const op = { id: 'op1', type: 'preference.changed', payload: { autoSpeak: true }, occurredAt: '2026-08-26T00:00:00Z' };
+  const applied = StudySync.applyOperation(study, op);
+  const queued = StudySync.queueOperation(applied, op);
+  assert.equal(queued.pendingSyncOps.length, 1);
+  assert.equal(queued.preferences.autoSpeak, true);
 });
 
-test('non-study fingerprint ignores study changes but detects manga-field changes', () => {
+test('final attempt replaces pending copy and invokes reducer once', () => {
+  const study = StudyData.createEmptyStudy();
+  const pending = { id: 'a1', grading: { status: 'pending', result: null } };
+  const final = { id: 'a1', grading: { status: 'final', result: 'correct' } };
+  study.recentAttempts.push(pending);
+  let calls = 0;
+  const op = { id: 'op-final', type: 'attempt.upserted', payload: { attempt: final }, occurredAt: '2026-08-26T00:00:00Z' };
+  const result = StudySync.applyOperation(study, op, { reduceFinalAttempt(s) { calls += 1; return s; } });
+  assert.equal(result.recentAttempts.find((a) => a.id === 'a1').grading.status, 'final');
+  assert.equal(calls, 1);
+});
+
+test('non-study fingerprint ignores study only and detects manga changes', () => {
   const a = { folders: [], items: [], study: { x: 1 } };
   const b = { folders: [], items: [], study: { x: 2 } };
   const c = { folders: [{ id: 'f1' }], items: [], study: { x: 2 } };
@@ -293,27 +351,17 @@ test('non-study fingerprint ignores study changes but detects manga-field change
 });
 ```
 
-`applyOperation()` must support these exact operation types in v1:
-
-```text
-definition.upserted
-definition.deleted
-attempt.upserted
-gamification.activity
-preference.changed
-```
-
-- [ ] **Step 2: Run tests to verify failure**
+- [ ] **Step 2: Verify failure**
 
 ```bash
 node --test tests/study-sync.test.mjs
 ```
 
-Expected: FAIL because `study-sync.js` does not exist.
+Expected: FAIL.
 
-- [ ] **Step 3: Add `reloadPayload()` to `vault-session.js`**
+- [ ] **Step 3: Add `MangaVault.reloadPayload()`**
 
-Add beside `savePayload()`:
+Add beside `savePayload()` in `vault-session.js`:
 
 ```js
 async function reloadPayload() {
@@ -330,39 +378,72 @@ async function reloadPayload() {
 }
 ```
 
-Add `reloadPayload` to `window.MangaVault` export. Do not expose raw decryption primitives.
+Add `reloadPayload` to `window.MangaVault`. Do not expose `decryptPayload` itself.
 
-- [ ] **Step 4: Implement `study-sync.js` pure operation helpers**
+- [ ] **Step 4: Implement canonical fingerprinting**
 
-Store applied operation IDs in an internal normalized array `_appliedOperationIds`, capped at 4,000, so replay is idempotent. Definition delete wins by operation order; later `definition.upserted` may recreate it only if it is a later queued operation.
+`fingerprintNonStudy()` removes only `study`, recursively sorts object keys, then `JSON.stringify()`s the canonical object. Arrays retain order.
 
-For `attempt.upserted`, merge by attempt ID. A final grading replaces a pending grading for the same attempt; two different final gradings for the same attempt throw `Error('conflicting final grading')`.
+```js
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
+}
+```
 
-- [ ] **Step 5: Implement the controller and conservative conflict rebase**
+- [ ] **Step 5: Implement operation replay rules**
 
-`createController()` captures a baseline non-study fingerprint with `markBase()`.
+`definition.upserted`: replace by definition ID, or append.
 
-`syncNow()` algorithm:
+`definition.deleted`: remove definition and its `progress` entry.
+
+`preference.changed`: merge only supplied preference fields.
+
+`attempt.upserted`:
+
+```text
+new pending -> store pending, no reducer
+new final -> store final, invoke reduceFinalAttempt once
+existing pending + incoming final -> replace, invoke reducer once
+existing final + identical final -> no-op
+existing final + different final -> throw Error('conflicting final grading')
+```
+
+After a successful operation, append its ID to `appliedOperationIds`; keep newest 4,000.
+
+- [ ] **Step 6: Implement queue/rebase/controller**
+
+`queueOperation()` only appends to `pendingSyncOps` if that operation ID is not already queued; it never reapplies the operation.
+
+`rebaseStudy(remoteStudy, pendingOps, { reduceFinalAttempt })` sorts pending operations by `occurredAt` then input order and replays them.
+
+Controller `markBase()` stores `fingerprintNonStudy(payloadApi.buildFromLocalStorage(storage))`.
+
+`syncNow()`:
 
 ```js
 const currentPayload = payloadApi.buildFromLocalStorage(storage);
 const pending = currentPayload.study.pendingSyncOps.slice();
 if (!pending.length) return { status: 'idle' };
+
 try {
-  await vault.savePayload({ ...currentPayload, study: withoutQueuedOps(currentPayload.study, pending) });
-  // clear only operations included in this save
-  // persist the cleared study object locally
+  const savedStudy = { ...currentPayload.study, pendingSyncOps: currentPayload.study.pendingSyncOps.filter((op) => !pending.some((p) => p.id === op.id)) };
+  const payloadToSave = { ...currentPayload, study: savedStudy };
+  await vault.savePayload(payloadToSave);
+  payloadApi.applyToLocalStorage(payloadToSave, storage);
   markBase();
   return { status: 'synced' };
 } catch (error) {
-  if (!String(error.message).includes('別の端末で更新されています')) throw error;
+  if (!String(error.message || '').includes('別の端末で更新されています')) throw error;
   if (fingerprintNonStudy(currentPayload) !== baselineNonStudyFingerprint) {
     return { status: 'conflict', reason: 'non-study-local-change' };
   }
   const remote = await vault.reloadPayload();
   if (!remote) return { status: 'conflict', reason: 'remote-missing' };
-  const rebasedStudy = rebaseStudy(remote.payload.study, pending);
-  const rebasedPayload = { ...remote.payload, study: withoutQueuedOps(rebasedStudy, pending) };
+  const rebasedStudy = rebaseStudy(remote.payload.study, pending, { reduceFinalAttempt });
+  rebasedStudy.pendingSyncOps = rebasedStudy.pendingSyncOps.filter((op) => !pending.some((p) => p.id === op.id));
+  const rebasedPayload = { ...remote.payload, study: rebasedStudy };
   await vault.savePayload(rebasedPayload);
   payloadApi.applyToLocalStorage(rebasedPayload, storage);
   markBase();
@@ -370,22 +451,22 @@ try {
 }
 ```
 
-Do not auto-rebase when non-study local data changed since the baseline; preserve local data and pending ops.
+- [ ] **Step 7: Add conflict-path tests**
 
-- [ ] **Step 6: Add a controller conflict test with fake vault**
+Test A: first save throws the exact CAS conflict message; remote reload succeeds; second save contains remote manga fields plus local pending study operation.
 
-Add a test where first `savePayload()` throws the exact CAS conflict message, `reloadPayload()` returns a remote payload, and the second save contains the remote manga fields plus replayed local study operation. Add a second test where local `folders` changed after baseline and assert the controller returns `conflict` without calling `reloadPayload()`.
+Test B: mutate local `folders` after `markBase()`; CAS conflict returns `{ status: 'conflict', reason: 'non-study-local-change' }`; `reloadPayload()` is not called; local `pendingSyncOps` remain.
 
-- [ ] **Step 7: Run tests**
+- [ ] **Step 8: Run tests**
 
 ```bash
-node --test tests/study-sync.test.mjs tests/vault-payload.test.mjs
+node --test tests/study-sync.test.mjs
 npm test
 ```
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add study-sync.js vault-session.js tests/study-sync.test.mjs
@@ -394,166 +475,208 @@ git commit -m "feat: sync study operations through vault CAS"
 
 ---
 
-### Task 3: Implement the adaptive quiz engine
+### Task 3: Implement adaptive quiz/review reducer
 
 **Files:**
 - Create: `study-quiz.js`
 - Create: `tests/study-quiz.test.mjs`
 
 **Interfaces:**
-- Produces `StudyQuiz.createInitialProgress(definition, now): DefinitionProgress` with `stage: 4` so a new definition gets a full-recall baseline probe first.
-- Produces `StudyQuiz.createSession(study, scope, now, rng = Math.random): QuizSession`.
-- Produces `StudyQuiz.nextQuestion(study, session, now, rng): { session, question }`.
-- Produces `StudyQuiz.applyOutcome(study, session, attempt, grading, now, rng): { study, session }`.
-- Produces `StudyQuiz.buildCheckpoint(study, sessionStartSnapshot): CheckpointModel`.
-- Produces `StudyQuiz.filterDefinitions(study, scope): Definition[]`.
 
-**Deterministic constants:**
+```js
+StudyQuiz.createInitialProgress(definition, now)
+StudyQuiz.filterDefinitions(study, scope)
+StudyQuiz.createSession(study, scope, now, rng = Math.random)
+StudyQuiz.nextQuestion(study, session, now, rng = Math.random)
+StudyQuiz.reduceFinalAttempt(study, attempt)
+StudyQuiz.applyOutcome(study, session, attempt, now, rng = Math.random)
+StudyQuiz.buildCheckpoint(study, session)
+```
+
+Constants:
 
 ```js
 const REVIEW_INTERVALS_MS = [
-  24 * 60 * 60 * 1000,
-  3 * 24 * 60 * 60 * 1000,
-  7 * 24 * 60 * 60 * 1000,
-  14 * 24 * 60 * 60 * 1000,
-  30 * 24 * 60 * 60 * 1000,
-  60 * 24 * 60 * 60 * 1000
+  86400000,
+  259200000,
+  604800000,
+  1209600000,
+  2592000000,
+  5184000000
 ];
 const RETRY_GAVE_UP = [3, 6];
 const RETRY_MAJOR = [5, 8];
 const RETRY_PARTIAL = [7, 12];
 ```
 
-- [ ] **Step 1: Write failing behavior tests**
-
-Create `tests/study-quiz.test.mjs` covering:
+Progress shape per definition:
 
 ```js
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import StudyData from '../study-data.js';
-import StudyQuiz from '../study-quiz.js';
+{
+  stage: 4,
+  stageSuccesses: 0,
+  lastStageSuccessSequence: null,
+  masteryIndex: 0,
+  nextReviewAt: 0,
+  lastCompleteRecallAt: null,
+  completeRecallSuccesses: 0,
+  almostCount: 0,
+  wrongCount: 0,
+  gaveUpCount: 0,
+  weakUnits: {
+    unitId: { successes: 0, misses: 0, wrongs: 0, lastFailureAt: null }
+  }
+}
+```
 
-const fixedRng = () => 0;
-const makeDefinition = (id, subjectId = 'civil-law', genreId = 'contracts') => ({
-  id, subjectId, genreId, title: id, modelText: '模範定義', pronunciation: { title: id, modelText: 'もはんていぎ' },
-  memoryUnits: [{ id: 'u1', text: '重要語', required: true, importantTerms: ['重要語'], acceptedVariants: [] }],
-  clozeCandidates: [{ unitId: 'u1', terms: ['重要語'] }], contentRevision: 1,
-  createdAt: '2026-08-26T00:00:00Z', updatedAt: '2026-08-26T00:00:00Z'
+- [ ] **Step 1: Write failing engine tests**
+
+Create `tests/study-quiz.test.mjs` with helpers and these assertions:
+
+```js
+test('new definition starts with full recall probe', () => {
+  assert.equal(StudyQuiz.createInitialProgress(makeDefinition('d1'), 0).stage, 4);
 });
 
-test('new definitions begin with a full recall probe', () => {
-  const p = StudyQuiz.createInitialProgress(makeDefinition('d1'), Date.parse('2026-08-26T00:00:00Z'));
-  assert.equal(p.stage, 4);
-});
-
-test('gave up on full recall schedules an easier retry at least 3 questions later', () => {
-  const study = StudyData.createEmptyStudy();
-  study.definitions = [makeDefinition('d1'), makeDefinition('d2'), makeDefinition('d3'), makeDefinition('d4')];
-  const session = StudyQuiz.createSession(study, { mode: 'all' }, Date.now(), fixedRng);
-  const result = StudyQuiz.applyOutcome(study, session, { definitionId: 'd1', stageAtAttempt: 4 }, { result: 'gave-up', missingUnitIds: ['u1'] }, Date.now(), fixedRng);
+test('gave-up schedules an easier retry 3 to 6 answered questions later', () => {
+  const { study, session } = fixtureWithFourDefinitions();
+  const attempt = finalAttempt('d1', 4, 'gave-up', ['u1']);
+  const result = StudyQuiz.applyOutcome(study, session, attempt, 0, () => 0);
   const retry = result.session.scheduledRetries.find((x) => x.definitionId === 'd1');
   assert.equal(retry.targetStage <= 2, true);
-  assert.equal(retry.afterQuestion >= 3, true);
+  assert.equal(retry.afterQuestion >= 3 && retry.afterQuestion <= 6, true);
 });
 
-test('subject and genre scope filters candidate pool', () => {
+test('scope filters by subject and genre', () => {
   const study = StudyData.createEmptyStudy();
-  study.definitions = [makeDefinition('civil', 'civil-law', 'contracts'), makeDefinition('criminal', 'criminal-law', 'complicity')];
-  assert.deepEqual(StudyQuiz.filterDefinitions(study, { mode: 'scope', subjectId: 'criminal-law', genreIds: ['complicity'] }).map((x) => x.id), ['criminal']);
+  study.definitions = [makeDefinition('a', 'civil-law', 'contracts'), makeDefinition('b', 'criminal-law', 'complicity')];
+  assert.deepEqual(StudyQuiz.filterDefinitions(study, { mode: 'scope', subjectId: 'criminal-law', genreIds: ['complicity'] }).map((d) => d.id), ['b']);
 });
 
-test('checkpoint reports capability changes and never an accuracy field', () => {
-  const study = StudyData.createEmptyStudy();
-  study.progress.d1 = { stage: 4, masteryIndex: 1, weakUnits: { u1: { misses: 0 } } };
-  const checkpoint = StudyQuiz.buildCheckpoint(study, { progress: { d1: { stage: 2, masteryIndex: 0, weakUnits: { u1: { misses: 2 } } } } });
-  assert.equal(checkpoint.capabilities.some((x) => x.definitionId === 'd1'), true);
-  assert.equal('accuracy' in checkpoint, false);
-  assert.equal('correctCount' in checkpoint, false);
+test('low-confidence wrong answer cannot cause harsh demotion', () => {
+  const study = withProgressAtStage(4);
+  const attempt = finalAttempt('d1', 4, 'wrong', ['u1'], 'low');
+  const result = StudyQuiz.reduceFinalAttempt(study, attempt);
+  assert.equal(result.progress.d1.stage >= 3, true);
+});
+
+test('checkpoint exposes capability changes but no accuracy fields', () => {
+  const { study, session } = progressedSessionFixture();
+  const model = StudyQuiz.buildCheckpoint(study, session);
+  assert.equal(Array.isArray(model.capabilities), true);
+  assert.equal('accuracy' in model, false);
+  assert.equal('correctCount' in model, false);
 });
 ```
 
-Also add a test that `nextQuestion()` never selects the immediately previous definition when another eligible definition exists.
+Also test `nextQuestion()` does not repeat the same definition consecutively when another eligible definition exists.
 
-- [ ] **Step 2: Run to verify failure**
+- [ ] **Step 2: Verify failure**
 
 ```bash
 node --test tests/study-quiz.test.mjs
 ```
 
-Expected: FAIL because `study-quiz.js` does not exist.
+Expected: FAIL.
 
-- [ ] **Step 3: Implement question construction**
+- [ ] **Step 3: Implement question kinds**
 
-Question objects use exactly:
+Question shape:
 
 ```js
 {
-  id: 'session-question-uuid',
-  definitionId: 'uuid',
-  definitionRevision: 1,
+  id,
+  definitionId,
+  definitionRevision,
   kind: 'full' | 'hinted' | 'cloze' | 'choice' | 'order',
-  prompt: '...',
+  prompt,
   targetUnitIds: [],
   options: [],
   stage: 1 | 2 | 3 | 4
 }
 ```
 
-Stage mapping:
+Mapping:
 
 ```text
-4 -> full
-3 -> hinted
-2 -> cloze
-1 -> choice or order (alternate deterministically from attempt count)
+Stage 4 -> full
+Stage 3 -> hinted
+Stage 2 -> cloze, targeting highest misses+wrongs unit
+Stage 1 -> choice/order, alternating by prior attempt count
 ```
 
-For Stage 2, target the memory unit with the highest `misses + wrongs`; fall back to the first cloze candidate.
+- [ ] **Step 4: Implement `reduceFinalAttempt()`**
 
-- [ ] **Step 4: Implement outcome state changes**
+Only finalized attempts modify progress/gamification.
 
 Rules:
 
 ```text
-Stage 1 correct twice on separated appearances -> Stage 2
-Stage 2 correct twice on separated appearances -> Stage 3
-Stage 3 correct with every required unit recalled -> Stage 4
-Stage 4 correct -> increment masteryIndex; nextReviewAt from REVIEW_INTERVALS_MS
-almost -> record weak units; keep/step down one stage conservatively; retry partial range
-wrong -> record weak/wrong units; target Stage 2; retry major range
-gave-up -> increment gaveUp; target Stage 1 or 2; retry gave-up range
-pending -> do not promote/demote; no immediate adaptive judgment
+Stage 1: two correct separated appearances -> Stage 2
+Stage 2: two correct separated appearances -> Stage 3
+Stage 3 correct with all required units -> Stage 4
+Stage 4 correct -> masteryIndex +1, spaced nextReviewAt, complete recall count +1
+almost -> record missing/wrong units; normally step down at most one stage
+wrong high/medium confidence -> target Stage 2
+wrong low confidence -> step down at most one stage, never directly to Stage 2 from Stage 4
+gave-up -> increment gaveUpCount; target Stage 1/2
 ```
 
-A “separated appearance” is valid only when at least one different definition was answered between successes.
+A separated success requires `attempt.sequence - lastStageSuccessSequence >= 2`.
 
-- [ ] **Step 5: Implement XP/streak and checkpoint capability messages**
-
-XP:
+XP/streak inside reducer:
 
 ```text
-+10 every answered question, including gave-up
-+5 additional for final correct
-+5 additional when a unit that had prior misses is successfully recalled
++10 every finalized attempt including gave-up
++5 for correct
++5 when a previously weak unit is successfully recalled
 ```
 
-Streak uses device-local `YYYY-MM-DD`. First meaningful question of a new local day increments the streak only if the previous study date was yesterday; otherwise reset to 1.
+Use the attempt's `localStudyDate` (`YYYY-MM-DD`) for streak calculation.
 
-Checkpoint model:
+- [ ] **Step 5: Implement session retry scheduling**
+
+`applyOutcome()` first calls `reduceFinalAttempt()` for a final attempt, then schedules retries:
+
+```text
+gave-up -> RETRY_GAVE_UP
+wrong high/medium -> RETRY_MAJOR
+almost or wrong low-confidence -> RETRY_PARTIAL
+correct -> no same-session retry unless an already scheduled retry exists
+pending -> no adaptive retry yet
+```
+
+- [ ] **Step 6: Implement checkpoint model**
+
+Session stores:
+
+```js
+{
+  id,
+  scope,
+  answeredCount: 0,
+  checkpointStartProgress,
+  checkpointStartXp,
+  lastDefinitionId: null,
+  scheduledRetries: [],
+  recentDefinitionIds: []
+}
+```
+
+`buildCheckpoint()` returns:
 
 ```js
 {
   capabilities: [{ definitionId, title, message: 'この問題が答えられるようになっています' }],
   improvements: [{ definitionId, terms: ['法律上'], message: '前より思い出せています' }],
-  xpGained: 120,
-  streak: 6
+  xpGained,
+  streak
 }
 ```
 
-Do not include accuracy counts.
+No accuracy/count fields.
 
-- [ ] **Step 6: Run focused/full tests**
+- [ ] **Step 7: Run tests**
 
 ```bash
 node --test tests/study-quiz.test.mjs
@@ -562,7 +685,7 @@ npm test
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add study-quiz.js tests/study-quiz.test.mjs
@@ -571,26 +694,29 @@ git commit -m "feat: add adaptive definition quiz engine"
 
 ---
 
-### Task 4: Add pronunciation playback with Web Speech API
+### Task 4: Add saved-pronunciation speech playback
 
 **Files:**
 - Create: `study-audio.js`
 - Create: `tests/study-audio.test.mjs`
 
 **Interfaces:**
-- Produces `StudyAudio.isSupported(env = globalThis): boolean`.
-- Produces `StudyAudio.speak(text, options?): boolean`.
-- Produces `StudyAudio.speakDefinition(definition, target, options?): boolean`, target is `'title' | 'modelText'`.
-- Produces `StudyAudio.stop(options?): void`.
 
-- [ ] **Step 1: Write failing audio tests**
+```js
+StudyAudio.isSupported(env = globalThis)
+StudyAudio.speak(text, options = {})
+StudyAudio.speakDefinition(definition, target, options = {})
+StudyAudio.stop(options = {})
+```
+
+- [ ] **Step 1: Write failing tests**
 
 ```js
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import StudyAudio from '../study-audio.js';
 
-test('uses saved hiragana pronunciation instead of visible kanji', () => {
+test('uses saved hiragana instead of visible kanji', () => {
   const spoken = [];
   const synth = { cancel() {}, speak(u) { spoken.push(u.text); } };
   class Utterance { constructor(text) { this.text = text; } }
@@ -599,7 +725,7 @@ test('uses saved hiragana pronunciation instead of visible kanji', () => {
   assert.deepEqual(spoken, ['かしある いしひょうじ']);
 });
 
-test('returns false rather than throwing when synthesis is unavailable', () => {
+test('unsupported speech returns false without throwing', () => {
   assert.equal(StudyAudio.speak('てすと', { synth: null, Utterance: null }), false);
 });
 ```
@@ -610,31 +736,22 @@ test('returns false rather than throwing when synthesis is unavailable', () => {
 node --test tests/study-audio.test.mjs
 ```
 
-Expected: FAIL because `study-audio.js` does not exist.
+- [ ] **Step 3: Implement module**
 
-- [ ] **Step 3: Implement audio module**
+`speak()` cancels prior speech, creates `SpeechSynthesisUtterance`, sets `lang = 'ja-JP'` and `rate = 1`, then speaks. `speakDefinition()` prefers `definition.pronunciation[target]` and falls back to visible text only if reading is empty.
 
-`speak()` must cancel prior speech, create one utterance, set `lang = 'ja-JP'`, `rate = 1`, then call `synth.speak(utterance)`. `speakDefinition()` must prefer the saved pronunciation and fall back to visible text only when pronunciation is missing.
-
-- [ ] **Step 4: Run tests**
+- [ ] **Step 4: Run and commit**
 
 ```bash
 node --test tests/study-audio.test.mjs
 npm test
-```
-
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
 git add study-audio.js tests/study-audio.test.mjs
 git commit -m "feat: add definition speech playback"
 ```
 
 ---
 
-### Task 5: Build the AI contracts and Supabase Edge Function
+### Task 5: Build AI structured-output contracts and Edge Function
 
 **Files:**
 - Create: `supabase/functions/study-ai/core.mjs`
@@ -642,42 +759,58 @@ git commit -m "feat: add definition speech playback"
 - Create: `tests/study-ai-edge-core.test.mjs`
 
 **Interfaces:**
-- Edge request body: `{ action: 'analyze', input: AnalyzeInput } | { action: 'grade', input: GradeInput }`.
-- `core.mjs` exports `ANALYZE_SCHEMA`, `GRADE_SCHEMA`, `buildAnalyzePrompt`, `buildGradePrompt`, `parseStructuredResponse`.
-- Edge environment variables: `OPENAI_API_KEY` required; `OPENAI_STUDY_MODEL` optional, default `gpt-5-mini`.
-- OpenAI endpoint: `POST https://api.openai.com/v1/responses`.
+
+```text
+POST /functions/v1/study-ai
+{ action: 'analyze', input: AnalyzeInput }
+{ action: 'grade', input: GradeInput }
+```
+
+Environment:
+
+```text
+OPENAI_API_KEY required
+OPENAI_STUDY_MODEL optional, default gpt-5-mini
+```
 
 - [ ] **Step 1: Write failing pure-contract tests**
-
-Create `tests/study-ai-edge-core.test.mjs`:
 
 ```js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ANALYZE_SCHEMA, GRADE_SCHEMA, buildAnalyzePrompt, buildGradePrompt, parseStructuredResponse } from '../supabase/functions/study-ai/core.mjs';
+import fs from 'node:fs';
+import { ANALYZE_SCHEMA, GRADE_SCHEMA, buildGradePrompt, parseStructuredResponse } from '../supabase/functions/study-ai/core.mjs';
 
-test('analyze schema requires hiragana pronunciations and memory units', () => {
+test('analysis schema includes memory units and two pronunciations', () => {
+  assert.equal(ANALYZE_SCHEMA.required.includes('memory_units'), true);
   assert.equal(ANALYZE_SCHEMA.required.includes('title_pronunciation'), true);
   assert.equal(ANALYZE_SCHEMA.required.includes('model_text_pronunciation'), true);
-  assert.equal(ANALYZE_SCHEMA.required.includes('memory_units'), true);
 });
 
-test('grade prompt names the registered model as authoritative', () => {
-  const prompt = buildGradePrompt({ modelText: 'MODEL', answerText: 'ANSWER', memoryUnits: [] });
-  assert.match(prompt, /MODEL/);
-  assert.match(prompt, /authoritative/i);
-  assert.match(prompt, /ANSWER/);
+test('grade schema contains no scheduler outputs', () => {
+  assert.equal('next_stage' in GRADE_SCHEMA.properties, false);
+  assert.equal('next_review_at' in GRADE_SCHEMA.properties, false);
+  assert.equal('xp' in GRADE_SCHEMA.properties, false);
 });
 
-test('extracts structured JSON from a Responses API output_text item', () => {
+test('grade prompt treats registered model as authoritative', () => {
+  const text = buildGradePrompt({ modelText: 'MODEL', answerText: 'ANSWER', memoryUnits: [] });
+  assert.match(text, /authoritative/i);
+  assert.match(text, /MODEL/);
+  assert.match(text, /ANSWER/);
+});
+
+test('parses Responses API output_text JSON', () => {
   const response = { output: [{ type: 'message', content: [{ type: 'output_text', text: '{"grade":"correct","recalled_unit_ids":[],"missing_unit_ids":[],"wrong_unit_ids":[],"confusions":[],"feedback":"","confidence":"high"}' }] }] };
   assert.equal(parseStructuredResponse(response).grade, 'correct');
 });
 
-test('grade schema forbids scheduler fields', () => {
-  assert.equal('next_stage' in GRADE_SCHEMA.properties, false);
-  assert.equal('next_review_at' in GRADE_SCHEMA.properties, false);
-  assert.equal('xp' in GRADE_SCHEMA.properties, false);
+test('edge source uses secret env and Responses endpoint', () => {
+  const source = fs.readFileSync(new URL('../supabase/functions/study-ai/index.ts', import.meta.url), 'utf8');
+  assert.match(source, /OPENAI_API_KEY/);
+  assert.match(source, /OPENAI_STUDY_MODEL/);
+  assert.match(source, /api\.openai\.com\/v1\/responses/);
+  assert.match(source, /store:\s*false/);
 });
 ```
 
@@ -687,11 +820,9 @@ test('grade schema forbids scheduler fields', () => {
 node --test tests/study-ai-edge-core.test.mjs
 ```
 
-Expected: FAIL because Edge core does not exist.
+- [ ] **Step 3: Implement schemas/prompts in `core.mjs`**
 
-- [ ] **Step 3: Implement strict JSON schemas and prompts in `core.mjs`**
-
-`ANALYZE_SCHEMA` requires:
+Analysis response fields:
 
 ```text
 genre_suggestions: string[]
@@ -701,7 +832,7 @@ title_pronunciation: string
 model_text_pronunciation: string
 ```
 
-`GRADE_SCHEMA` requires exactly:
+Grade response fields:
 
 ```text
 grade: correct | almost | wrong
@@ -713,86 +844,65 @@ feedback: string
 confidence: high | medium | low
 ```
 
-Both schemas set `additionalProperties: false` at every object level.
+Set `additionalProperties: false` for every object schema.
 
-`buildGradePrompt()` must explicitly say:
+- [ ] **Step 4: Implement `index.ts` with `Deno.serve`**
 
-```text
-The registered model definition is authoritative.
-Do not rewrite or replace the legal definition.
-Judge strict memorization: missing required qualifiers can prevent "correct" even if the general meaning is similar.
-Return only the schema-constrained result.
-```
-
-- [ ] **Step 4: Implement `index.ts`**
-
-The handler must:
+Use local import:
 
 ```ts
-serve(async (req) => {
-  if (req.method === 'OPTIONS') return corsResponse();
-  if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
-  if (!req.headers.get('Authorization')) return json({ error: 'unauthorized' }, 401);
+import { ANALYZE_SCHEMA, GRADE_SCHEMA, buildAnalyzePrompt, buildGradePrompt, parseStructuredResponse } from './core.mjs';
+```
+
+Handler skeleton:
+
+```ts
+const cors = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
+};
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, cors);
+  if (!req.headers.get('Authorization')) return json({ error: 'unauthorized' }, 401, cors);
   const apiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!apiKey) return json({ error: 'server_not_configured' }, 500);
+  if (!apiKey) return json({ error: 'server_not_configured' }, 500, cors);
   const { action, input } = await req.json();
   const schema = action === 'analyze' ? ANALYZE_SCHEMA : action === 'grade' ? GRADE_SCHEMA : null;
-  if (!schema) return json({ error: 'invalid_action' }, 400);
-  // build prompt and call OpenAI Responses API with Structured Outputs
+  if (!schema) return json({ error: 'invalid_action' }, 400, cors);
+  const prompt = action === 'analyze' ? buildAnalyzePrompt(input) : buildGradePrompt(input);
+  const response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: Deno.env.get('OPENAI_STUDY_MODEL') || 'gpt-5-mini',
+      instructions: 'You are a strict Japanese legal-definition study grader and formatter.',
+      input: prompt,
+      store: false,
+      text: { format: { type: 'json_schema', name: action === 'analyze' ? 'study_definition_analysis' : 'study_definition_grade', strict: true, schema } }
+    })
+  });
+  if (!response.ok) return json({ error: 'provider_error' }, 502, cors);
+  return json(parseStructuredResponse(await response.json()), 200, cors);
 });
 ```
 
-Send OpenAI:
+The Supabase deployment must keep default JWT verification enabled; do not deploy with `--no-verify-jwt`.
 
-```js
-{
-  model: Deno.env.get('OPENAI_STUDY_MODEL') || 'gpt-5-mini',
-  instructions: 'You are a strict Japanese legal-definition study grader and formatter.',
-  input: prompt,
-  text: {
-    format: {
-      type: 'json_schema',
-      name: action === 'analyze' ? 'study_definition_analysis' : 'study_definition_grade',
-      strict: true,
-      schema
-    }
-  }
-}
-```
-
-Parse the returned output through `parseStructuredResponse()` and return that JSON. Set `store: false`. Never log the model definition, learner answer, or API key.
-
-- [ ] **Step 5: Add static source assertions for Edge security**
-
-Extend `tests/study-ai-edge-core.test.mjs` to read `index.ts` and assert:
-
-```js
-assert.match(source, /OPENAI_API_KEY/);
-assert.match(source, /OPENAI_STUDY_MODEL/);
-assert.match(source, /api\.openai\.com\/v1\/responses/);
-assert.match(source, /store:\s*false/);
-assert.doesNotMatch(source, /console\.log\([^)]*(answer|modelText|apiKey)/i);
-```
-
-- [ ] **Step 6: Run tests**
+- [ ] **Step 5: Run and commit**
 
 ```bash
 node --test tests/study-ai-edge-core.test.mjs
 npm test
-```
-
-Expected: PASS.
-
-- [ ] **Step 7: Commit**
-
-```bash
 git add supabase/functions/study-ai/core.mjs supabase/functions/study-ai/index.ts tests/study-ai-edge-core.test.mjs
 git commit -m "feat: add study AI edge function"
 ```
 
 ---
 
-### Task 6: Add the authenticated AI browser client and deferred grading queue
+### Task 6: Add authenticated browser AI client and deferred grading finalization
 
 **Files:**
 - Create: `study-ai.js`
@@ -801,20 +911,22 @@ git commit -m "feat: add study AI edge function"
 - Create: `tests/study-offline.test.mjs`
 
 **Interfaces:**
-- `StudyAI.analyzeDefinition(input, options?): Promise<AnalyzeResult>`.
-- `StudyAI.gradeAnswer(input, options?): Promise<GradeResult>`.
-- `options` accepts `{ vault, fetchImpl, timeoutMs }`; default timeout `8000` ms.
-- `StudyOffline.enqueuePending(study, attemptId): StudyState`.
-- `StudyOffline.flushPending(study, { gradeAttempt }): Promise<{ study, finalizedAttemptIds }>`.
-
-- [ ] **Step 1: Write failing authenticated-client tests**
-
-Create `tests/study-ai.test.mjs` with a fake vault:
 
 ```js
-const vault = {
-  withSession: async (work) => work('access-token', { id: 'u1' })
-};
+StudyAI.analyzeDefinition(input, { vault, fetchImpl, timeoutMs, supabaseUrl } = {})
+StudyAI.gradeAnswer(input, { vault, fetchImpl, timeoutMs, supabaseUrl } = {})
+StudyOffline.enqueuePending(study, attemptId)
+StudyOffline.flushPending(study, { gradeAttempt, finalizeAttempt })
+```
+
+Default timeout: `8000` ms.
+
+- [ ] **Step 1: Write failing browser client tests**
+
+Use fake vault/fetch:
+
+```js
+const vault = { withSession: async (work) => work('access-token', { id: 'u1' }) };
 const calls = [];
 const fetchImpl = async (url, options) => {
   calls.push({ url, options });
@@ -822,118 +934,118 @@ const fetchImpl = async (url, options) => {
 };
 ```
 
-Assert the request URL is `${supabaseUrl}/functions/v1/study-ai`, `Authorization` is `Bearer access-token`, action is `grade`, and no OpenAI key is present in request data.
+Call:
+
+```js
+await StudyAI.gradeAnswer({ definition: sampleDefinition, answerText: 'answer' }, { vault, fetchImpl, supabaseUrl: 'https://example.supabase.co' });
+```
+
+Assert endpoint, `Bearer access-token`, action `grade`, and absence of any OpenAI key in body.
 
 - [ ] **Step 2: Implement `study-ai.js`**
 
-Use `window.MANGA_READER_SUPABASE.url` and `MangaVault.withSession()`; do not read or accept an OpenAI key. Timeout with `AbortController`; throw an error with `code = 'timeout'` for abort and `code = 'network'` for other fetch failures.
+Use `MangaVault.withSession()` so 401 refresh behavior remains centralized. Convert server snake_case grade fields to browser camelCase. On abort, throw an `Error` with `error.code = 'timeout'`; on network failure use `error.code = 'network'`.
 
-Map server snake_case to browser camelCase:
-
-```js
-{
-  result: json.grade,
-  recalledUnitIds: json.recalled_unit_ids,
-  missingUnitIds: json.missing_unit_ids,
-  wrongUnitIds: json.wrong_unit_ids,
-  confusions: json.confusions,
-  feedback: json.feedback,
-  confidence: json.confidence
-}
-```
-
-- [ ] **Step 3: Write failing offline queue tests**
-
-Create `tests/study-offline.test.mjs`:
+- [ ] **Step 3: Write failing offline tests**
 
 ```js
-test('flush finalizes pending attempts in queue order', async () => {
+test('flush grades pending attempts in order and invokes final reducer', async () => {
   const study = StudyData.createEmptyStudy();
   study.recentAttempts = [pendingAttempt('a1'), pendingAttempt('a2')];
   study.pendingGradings = ['a1', 'a2'];
   const seen = [];
   const result = await StudyOffline.flushPending(study, {
-    gradeAttempt: async (attempt) => { seen.push(attempt.id); return { result: 'correct', recalledUnitIds: [], missingUnitIds: [], wrongUnitIds: [], confusions: [], feedback: '', confidence: 'high' }; }
+    gradeAttempt: async (attempt) => ({ result: 'correct', recalledUnitIds: [], missingUnitIds: [], wrongUnitIds: [], confusions: [], feedback: '', confidence: 'high' }),
+    finalizeAttempt: (nextStudy, attempt) => { seen.push(attempt.id); return nextStudy; }
   });
   assert.deepEqual(seen, ['a1', 'a2']);
   assert.deepEqual(result.study.pendingGradings, []);
-  assert.equal(result.study.recentAttempts.every((a) => a.grading.status === 'final'), true);
 });
 ```
 
-Add a test that a grading failure on `a1` leaves `a1` and all later IDs queued and does not mutate the immutable answer text.
+Also test first grading failure stops processing and preserves all remaining queue IDs and original `answerText`.
 
 - [ ] **Step 4: Implement `study-offline.js`**
 
-`flushPending()` processes in order and stops on the first failure. It changes only `attempt.grading`, removes successfully finalized IDs from `pendingGradings`, and creates `attempt.upserted` sync operations for finalized attempts.
+Pending attempt stores `gradingContext` snapshot:
 
-- [ ] **Step 5: Run tests**
+```js
+{
+  modelText,
+  memoryUnits,
+  importantTerms,
+  acceptedVariants
+}
+```
+
+This allows later grading even if the definition is edited before connectivity returns.
+
+On successful grading:
+
+```text
+replace only attempt.grading
+set grading.status=final
+remove gradingContext
+call finalizeAttempt(study, finalAttempt)
+remove attempt ID from pendingGradings
+queue attempt.upserted operation containing finalAttempt
+continue to next pending ID
+```
+
+Stop on the first failure.
+
+- [ ] **Step 5: Run and commit**
 
 ```bash
 node --test tests/study-ai.test.mjs tests/study-offline.test.mjs
 npm test
-```
-
-Expected: PASS.
-
-- [ ] **Step 6: Commit**
-
-```bash
 git add study-ai.js study-offline.js tests/study-ai.test.mjs tests/study-offline.test.mjs
 git commit -m "feat: add AI grading client and offline queue"
 ```
 
 ---
 
-### Task 7: Add definition library/editor with AI-prepared structure and editable readings
+### Task 7: Add definition library/editor and AI-generated editable readings
 
 **Files:**
 - Modify: `study.html`
 - Modify: `tests/study-page.test.mjs`
 
 **Interfaces:**
-- Adds routes `definitions`, `definition-editor`, `quiz`, `quiz-session` to existing route set.
-- Editor create URL: `study.html?view=definition-editor`.
-- Editor edit URL: `study.html?view=definition-editor&definitionId=<uuid>`.
-- Saving a definition writes local study state first and queues `definition.upserted`.
-- Delete queues `definition.deleted`.
 
-- [ ] **Step 1: Replace Phase-1 persistence guard with failing feature assertions**
-
-In `tests/study-page.test.mjs`, remove:
-
-```js
-test('study phase one does not add study-data persistence', ...)
+```text
+study.html?view=definitions
+study.html?view=definition-editor
+study.html?view=definition-editor&definitionId=<id>
+study.html?view=quiz
+study.html?view=quiz-session
 ```
 
-Add assertions that `study.html` contains all four new route keys and script references:
+- [ ] **Step 1: Replace Phase-1 no-persistence test with failing feature assertions**
+
+In `tests/study-page.test.mjs`, remove the old `study phase one does not add study-data persistence` test and add:
 
 ```js
 for (const view of ['definitions', 'definition-editor', 'quiz', 'quiz-session']) {
   assert.match(source, new RegExp(`['\\"]${view}['\\"]`));
 }
-for (const script of ['study-data.js', 'study-sync.js', 'study-quiz.js', 'study-audio.js', 'study-ai.js', 'study-offline.js']) {
-  assert.match(source, new RegExp(script.replace('.', '\\.')));
+for (const file of ['study-data.js', 'study-sync.js', 'study-quiz.js', 'study-audio.js', 'study-ai.js', 'study-offline.js']) {
+  assert.match(source, new RegExp(file.replace('.', '\\.')));
 }
-assert.match(source, /id=['"]definitionTitle['"]/);
-assert.match(source, /id=['"]definitionModelText['"]/);
-assert.match(source, /id=['"]definitionTitlePronunciation['"]/);
-assert.match(source, /id=['"]definitionModelPronunciation['"]/);
-assert.match(source, /id=['"]analyzeDefinitionBtn['"]/);
-assert.match(source, /id=['"]saveDefinitionBtn['"]/);
+for (const id of ['definitionSubject', 'definitionGenre', 'definitionTitle', 'definitionModelText', 'definitionTitlePronunciation', 'definitionModelPronunciation', 'analyzeDefinitionBtn', 'saveDefinitionBtn']) {
+  assert.match(source, new RegExp(`id=['\\"]${id}['\\"]`));
+}
 ```
 
-- [ ] **Step 2: Run study page tests and verify failure**
+- [ ] **Step 2: Verify failure**
 
 ```bash
 node --test tests/study-page.test.mjs
 ```
 
-Expected: FAIL on missing routes/scripts/editor controls.
+- [ ] **Step 3: Wire modules and local-first initialization**
 
-- [ ] **Step 3: Wire the browser modules before adding UI behavior**
-
-Load in this order after existing vault scripts:
+Load scripts after existing vault scripts:
 
 ```html
 <script src="study-data.js"></script>
@@ -944,102 +1056,86 @@ Load in this order after existing vault scripts:
 <script src="study-offline.js"></script>
 ```
 
-On app initialization:
+Initialize:
 
 ```js
 let studyState = StudyData.load();
-const studySync = StudySync.createController({ vault: MangaVault, payloadApi: MangaVaultPayload, storage: localStorage });
+const studySync = StudySync.createController({
+  vault: MangaVault,
+  payloadApi: MangaVaultPayload,
+  storage: localStorage,
+  reduceFinalAttempt: StudyQuiz.reduceFinalAttempt
+});
 studySync.markBase();
 ```
 
-Do not block initial rendering on a network sync.
+Do not block initial rendering on network.
 
-- [ ] **Step 4: Add definition library UI**
+- [ ] **Step 4: Add definition library**
 
-The library view contains:
+Include `＋ 追加`, subject filter, genre filter, search, definition cards, and edit action. Do not show a mastery percentage.
 
-```text
-定義
-[＋ 追加]
-科目 filter
-ジャンル filter
-search field
-cards: title / subject / genre / edit
-```
+- [ ] **Step 5: Add editor input/analysis flow**
 
-No fabricated mastery percentage. Cards may show compact capability text only when real progress exists.
-
-- [ ] **Step 5: Add definition editor UI**
-
-Before AI analysis, inputs are:
+Before analysis:
 
 ```text
-科目 (required)
-ジャンル (optional before analysis, required before final save)
-定義名 (required)
-模範定義 (required)
-[AIで整理]
+科目 required
+ジャンル optional until analysis, required before save
+定義名 required
+模範定義 required
+AIで整理
 ```
 
-After analysis, show editable:
+After analysis, editable:
 
 ```text
 ジャンル候補
-記憶単位 rows: text / required toggle / important terms / accepted variants
+記憶単位 text / required / important terms / accepted variants
 穴埋め候補
 定義名の読み
 本文の読み
 ```
 
-Do not overwrite manually edited pronunciation on later visible-text edits. Add an explicit `読みを再生成` button that reruns analysis only after user action.
+If AI suggests a genre name not already stored for the subject, save it as `{ id: StudyData.createId(), subjectId, name }`.
 
-- [ ] **Step 6: Implement save/delete flow**
+- [ ] **Step 6: Preserve manual pronunciation**
 
-On save:
+Normal title/model edits never auto-regenerate reading. `読みを再生成` calls `StudyAI.analyzeDefinition()` but applies only returned `titlePronunciation` and `modelTextPronunciation`; it must not overwrite current memory units/genre/cloze structure.
+
+- [ ] **Step 7: Implement save/delete local-first operations**
+
+On save, increment `contentRevision` by one for every edit of an existing definition; new definition starts at 1.
 
 ```js
-const operation = StudySync.createOperation('definition.upserted', { definition });
-studyState = StudySync.queueOperation(StudySync.applyOperation(studyState, operation), operation);
+const op = StudySync.createOperation('definition.upserted', { definition });
+studyState = StudySync.applyOperation(studyState, op);
+studyState = StudySync.queueOperation(studyState, op);
 StudyData.save(studyState);
 studySync.syncNow().catch(showCompactSyncStatus);
 ```
 
-On delete use `definition.deleted` with `{ definitionId }`. Never await cloud save before returning control to the user.
+Delete uses `definition.deleted` with `{ definitionId }`.
 
-- [ ] **Step 7: Run tests and static verification**
+- [ ] **Step 8: Run and commit**
 
 ```bash
 node --test tests/study-page.test.mjs
 npm run verify:static
 npm test
-```
-
-Expected: PASS.
-
-- [ ] **Step 8: Commit**
-
-```bash
 git add study.html tests/study-page.test.mjs
 git commit -m "feat: add definition library and editor"
 ```
 
 ---
 
-### Task 8: Add the open-ended quiz launcher/session/checkpoint UI
+### Task 8: Add open-ended adaptive quiz UI, audio, offline continuation, and checkpoint sync
 
 **Files:**
 - Modify: `study.html`
 - Modify: `tests/study-page.test.mjs`
 
-**Interfaces:**
-- Primary launcher: `おまかせで始める`.
-- Secondary launcher: `範囲を指定する`.
-- Scope object is `{ mode: 'all' }` or `{ mode: 'scope', subjectId, genreIds }`.
-- Active session uses `StudyQuiz` only; no AI decides question sequence.
-
-- [ ] **Step 1: Add failing UI assertions**
-
-Add to `tests/study-page.test.mjs`:
+- [ ] **Step 1: Add failing UI-copy/structure assertions**
 
 ```js
 assert.match(source, /おまかせで始める/);
@@ -1055,123 +1151,167 @@ assert.doesNotMatch(source, /次回はこの.*穴埋め.*再登場/);
 assert.doesNotMatch(source, /復習期限と弱点から/);
 ```
 
-Also assert the checkpoint markup contains no answer-ratio element or `%` label.
+- [ ] **Step 2: Add launcher/range selector**
 
-- [ ] **Step 2: Run and verify failure**
+`おまかせで始める` uses `{ mode: 'all' }`.
 
-```bash
-node --test tests/study-page.test.mjs
-```
+`範囲を指定する` selects subject and optionally one or more genres from actual saved definitions. No selected genre means whole subject.
 
-Expected: FAIL on quiz controls.
-
-- [ ] **Step 3: Add launcher and range picker**
-
-`おまかせで始める` starts with `{ mode: 'all' }`.
-
-`範囲を指定する` shows subject first, then genre checkboxes populated only from saved definitions for that subject. Genre selection is optional; no selected genres means the whole subject.
-
-If the selected scope has no definitions, show only `この範囲には定義がありません` plus a return action.
-
-- [ ] **Step 4: Add sparse active-session layout**
-
-During `quiz-session`:
+- [ ] **Step 3: Add sparse session layout**
 
 ```text
-[10-question checkpoint progress bar only; no answer score]
-[definition title] [speaker]
-[question body / answer control]
-[思い出せない] [判定する]
-[compact feedback]
+checkpoint progress bar only
+question title + speaker
+answer control
+思い出せない / 判定する
+compact result panel
 ```
 
-Hide `#studyBottomNav` while this route is active.
+Hide `#studyBottomNav` while `quiz-session` is active.
 
-- [ ] **Step 5: Wire local question formats**
+- [ ] **Step 4: Finalize local question formats**
 
-Choice/order/cloze are graded locally and immediately produce a final attempt. Full/hinted answers call `StudyAI.gradeAnswer()`.
+Choice/order/cloze produce a finalized local attempt immediately. Full/hinted answers call `StudyAI.gradeAnswer()`.
 
-For `思い出せない`:
+Every attempt contains:
 
 ```js
-const grading = { result: 'gave-up', recalledUnitIds: [], missingUnitIds: question.targetUnitIds, wrongUnitIds: [], confusions: [], source: 'local' };
-showModelAnswer(definition);
-finalizeAndAdvance(grading);
+{
+  id,
+  definitionId,
+  definitionRevision,
+  occurredAt,
+  localStudyDate,
+  sequence,
+  deviceId,
+  questionKind,
+  stageAtAttempt,
+  answerText,
+  gradingContext,
+  grading
+}
 ```
 
-No retry input is required before advancing.
+After a final grade:
 
-- [ ] **Step 6: Wire AI timeout/offline behavior**
+```js
+studyState = StudyQuiz.reduceFinalAttempt(studyState, attempt);
+const op = StudySync.createOperation('attempt.upserted', { attempt });
+studyState = StudySync.queueOperation(studyState, op);
+StudyData.save(studyState);
+```
 
-If `StudyAI.gradeAnswer()` throws `timeout`/`network`:
+Do not locally reapply `StudySync.applyOperation()` for that final attempt because `StudyQuiz.reduceFinalAttempt()` has already applied its learning effects; operation replay is for remote/rebase use.
+
+- [ ] **Step 5: Implement `思い出せない`**
+
+Create final local grading:
+
+```js
+{
+  status: 'final',
+  result: 'gave-up',
+  recalledUnitIds: [],
+  missingUnitIds: requiredTargetIds,
+  wrongUnitIds: [],
+  confusions: [],
+  feedback: '',
+  confidence: 'high',
+  source: 'local'
+}
+```
+
+Reveal saved model answer and allow immediate next action. No forced retry field.
+
+- [ ] **Step 6: Implement compact feedback**
+
+For `almost`/`wrong`, show only useful items such as:
 
 ```text
-save attempt with grading.status=pending
-queue attempt ID in pendingGradings
-show stored model answer
-show small 採点待ち indicator
+惜しい
+抜けた: 直接 / 法律上
+[模範定義]
+```
+
+No explanation of when/how the definition will return.
+
+- [ ] **Step 7: Implement offline/timeout continuation**
+
+On `timeout` or `network` from AI:
+
+```text
+save pending attempt with gradingContext snapshot
+append attempt ID to pendingGradings
+queue attempt.upserted operation for the pending attempt
+show model answer
+show small 採点待ち
 continue immediately
 ```
 
-On `window.online`, call `StudyOffline.flushPending()` and then `studySync.syncNow()`; do not interrupt an active answer.
+On `window.online`, call `StudyOffline.flushPending()` with:
 
-- [ ] **Step 7: Wire audio and preference**
+```js
+{
+  gradeAttempt: (attempt) => StudyAI.gradeAnswer({ gradingContext: attempt.gradingContext, answerText: attempt.answerText }),
+  finalizeAttempt: (state, finalAttempt) => StudyQuiz.reduceFinalAttempt(state, finalAttempt)
+}
+```
 
-Speaker button calls:
+Then save locally and call `studySync.syncNow()`.
+
+- [ ] **Step 8: Wire speaker and `autoSpeak` preference**
+
+Speaker:
 
 ```js
 StudyAudio.speakDefinition(definition, answerRevealed ? 'modelText' : 'title');
 ```
 
-If `studyState.preferences.autoSpeak === true`, speak title when a question appears and model text when an answer is revealed. Default remains false.
+Auto-speak defaults false. Toggling it creates/applies/queues `preference.changed` and saves locally.
 
-- [ ] **Step 8: Add 10-question capability checkpoint**
+- [ ] **Step 9: Add 10-question checkpoint**
 
-After every 10 answered questions, call `StudyQuiz.buildCheckpoint()`. Render only real items from `capabilities`/`improvements`, XP gained, and streak.
+Every 10 answered questions call `StudyQuiz.buildCheckpoint()` and render only real capability/improvement items, XP gained, streak, `続ける`, `ここで終わる`.
 
-Required copy when applicable:
+Do not render correct count/accuracy/percentage.
+
+After checkpoint render, call `studySync.syncNow()` without blocking `続ける`.
+
+- [ ] **Step 10: Add sync triggers outside checkpoint**
+
+Call best-effort `studySync.syncNow()`:
 
 ```text
-この問題が答えられるようになっています
-前より思い出せています
-続ける
-ここで終わる
+when quiz starts after pending-grade flush
+when user chooses ここで終わる
+when document.visibilityState becomes hidden
+when window.online fires
+immediately after definition save/edit/delete
 ```
 
-Do not render answer accuracy, correct count, or percentage.
+All data is already local before these calls.
 
-- [ ] **Step 9: Run all relevant tests**
+- [ ] **Step 11: Run and commit**
 
 ```bash
 node --test tests/study-page.test.mjs tests/study-quiz.test.mjs tests/study-audio.test.mjs tests/study-ai.test.mjs tests/study-offline.test.mjs
 npm run verify:static
 npm test
-```
-
-Expected: PASS.
-
-- [ ] **Step 10: Commit**
-
-```bash
 git add study.html tests/study-page.test.mjs
 git commit -m "feat: add adaptive definition quiz UI"
 ```
 
 ---
 
-### Task 9: Register new scripts with static verification and document Edge deployment
+### Task 9: Register static verification and deployment runbook
 
 **Files:**
 - Modify: `scripts/check-static.mjs`
 - Modify: `AGENTS.md`
 
-**Interfaces:**
-- `npm run verify:static` parses all six new browser modules.
-- Deployment configuration documents only secret/env names, never values.
+- [ ] **Step 1: Add browser modules to static verifier**
 
-- [ ] **Step 1: Extend static verifier input list**
-
-Add these exact files to the JS parse list:
+Add exact paths:
 
 ```js
 'study-data.js',
@@ -1182,46 +1322,30 @@ Add these exact files to the JS parse list:
 'study-offline.js'
 ```
 
-Do not feed `index.ts` to the Node JavaScript parser. `core.mjs` is already executed by `tests/study-ai-edge-core.test.mjs`.
+Do not pass `index.ts` to the Node JavaScript parser. `core.mjs` is executed by its test.
 
-- [ ] **Step 2: Run static verification**
+- [ ] **Step 2: Update `AGENTS.md`**
 
-```bash
-npm run verify:static
-```
-
-Expected: PASS with `study.html` and all new browser JS included.
-
-- [ ] **Step 3: Update `AGENTS.md` with deployment/runbook facts**
-
-Append a concise section:
+Append:
 
 ```markdown
 ## Definition quiz AI
 
 - Edge Function source: `supabase/functions/study-ai/`.
 - Required Edge secret: `OPENAI_API_KEY`.
-- Optional model setting: `OPENAI_STUDY_MODEL`; default is `gpt-5-mini`.
-- Browser code never stores the provider key.
-- Deploy with `supabase functions deploy study-ai` after linking the project.
-- Set secrets with `supabase secrets set OPENAI_API_KEY=... OPENAI_STUDY_MODEL=gpt-5-mini`.
-- Definition quiz data is inside encrypted vault field `study` / local key `mangaReaderStudy`.
+- Optional model setting: `OPENAI_STUDY_MODEL`; default `gpt-5-mini`.
+- Keep Supabase Edge JWT verification enabled; do not deploy this function with `--no-verify-jwt`.
+- Browser code never stores the provider API key.
+- Deploy: `supabase functions deploy study-ai`.
+- Set secrets from already-populated local shell environment: `supabase secrets set OPENAI_API_KEY="$OPENAI_API_KEY" OPENAI_STUDY_MODEL="gpt-5-mini"`.
+- Study local key: `mangaReaderStudy`; encrypted vault/backup field: `study`.
 ```
 
-Do not commit any `.env` file or actual secret.
-
-- [ ] **Step 4: Run full test suite**
+- [ ] **Step 3: Run and commit**
 
 ```bash
-npm test
 npm run verify:static
-```
-
-Expected: all tests PASS and static verification PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
+npm test
 git add scripts/check-static.mjs AGENTS.md
 git commit -m "docs: register definition quiz verification and deploy steps"
 ```
@@ -1231,12 +1355,9 @@ git commit -m "docs: register definition quiz verification and deploy steps"
 ### Task 10: End-to-end verification before PR/merge
 
 **Files:**
-- Test only; no production changes unless a failure is found.
+- Verification only unless a defect is found.
 
-**Interfaces:**
-- Verifies the complete feature against the approved spec.
-
-- [ ] **Step 1: Run all automated checks from a clean checkout/worktree**
+- [ ] **Step 1: Automated clean verification**
 
 ```bash
 npm test
@@ -1244,19 +1365,17 @@ npm run verify:static
 git diff --check main...HEAD
 ```
 
-Expected: all PASS; `git diff --check` prints nothing.
+Expected: tests PASS, static verifier PASS, `git diff --check` prints nothing.
 
-- [ ] **Step 2: Verify legacy vault compatibility in tests**
-
-Run specifically:
+- [ ] **Step 2: Focused persistence/sync verification**
 
 ```bash
-node --test tests/vault-payload.test.mjs tests/study-data.test.mjs tests/study-sync.test.mjs
+node --test tests/study-data.test.mjs tests/vault-payload.test.mjs tests/backup-format.test.mjs tests/study-sync.test.mjs
 ```
 
-Expected: legacy payload without `study` normalizes; study round-trip passes; CAS rebase tests pass.
+Expected: legacy vault/backup compatibility, study round trip, operation idempotence, safe CAS rebase all PASS.
 
-- [ ] **Step 3: Verify AI contract tests**
+- [ ] **Step 3: Focused AI/offline verification**
 
 ```bash
 node --test tests/study-ai-edge-core.test.mjs tests/study-ai.test.mjs tests/study-offline.test.mjs
@@ -1264,51 +1383,49 @@ node --test tests/study-ai-edge-core.test.mjs tests/study-ai.test.mjs tests/stud
 
 Expected: schema/security/auth/deferred grading tests PASS.
 
-- [ ] **Step 4: Manual mobile browser checklist at ~375 px width**
+- [ ] **Step 4: Mobile browser checklist at about 375 px**
 
-Verify all of these in Safari-compatible responsive mode or an iPhone:
+Verify:
 
 ```text
 1. Open study.html and enter 定義クイズ.
-2. Add a definition with subject/title/model text and no genre.
-3. Run AI analysis; confirm genre, memory units, important terms, cloze terms, and two hiragana readings are editable.
-4. Manually correct a pronunciation; edit the visible model text; confirm the corrected reading is not silently replaced.
-5. Start おまかせ.
-6. Confirm a new definition first appears as free recall with no Lv label.
-7. Tap 思い出せない; confirm model answer appears and the session can immediately continue.
-8. Continue until the same item returns in an easier format after other questions.
-9. Confirm speaker playback uses the saved pronunciation.
-10. Complete 10 questions; confirm checkpoint contains capability/progress messages but no 8/10, percentage, or correct-count score.
-11. Toggle offline, answer a free-recall item, confirm 採点待ち and immediate continuation.
-12. Restore network and confirm deferred grading finishes without interrupting the current question.
-13. Confirm browser Back exits quiz-session through History API and ordinary bottom dock returns.
+2. Add subject/title/model text with genre blank.
+3. Run AI analysis and receive editable genre, memory units, important terms, cloze candidates, title reading, model reading.
+4. Correct a reading manually; edit visible text; confirm reading is not silently replaced.
+5. Use 読みを再生成 and confirm only reading fields change.
+6. Start おまかせ; new definition first probes free recall and shows no internal stage label.
+7. Tap 思い出せない; model answer appears and next question is immediately available.
+8. Continue until the item returns later in an easier format after other questions.
+9. Confirm speaker uses saved pronunciation.
+10. Finish 10 questions; checkpoint shows capability messages but no 8/10, percentage, or correct-count score.
+11. Go offline; submit free recall; confirm 採点待ち and immediate continuation.
+12. Return online; pending grading finalizes without interrupting current answer.
+13. Browser Back exits quiz-session through History API and restores normal dock.
 ```
 
-- [ ] **Step 5: Manual cross-device/CAS checklist**
-
-Use two authenticated browser contexts with the same vault:
+- [ ] **Step 5: Two-context CAS checklist**
 
 ```text
-1. Context A edits a definition and syncs.
-2. Context B, still on an older revision, answers questions and creates pending study operations.
-3. Context B syncs; force the CAS conflict path.
-4. Confirm study operations rebase onto the newest remote payload when non-study local data is unchanged.
-5. Repeat with a local non-study change on Context B; confirm auto-rebase stops, local data remains, and pending study operations remain queued.
+1. Context A changes/syncs study data.
+2. Context B stays on old vault revision and creates local study operations.
+3. Context B syncs and hits CAS conflict.
+4. With non-study local fields unchanged, confirm remote reload + operation replay + retry succeeds.
+5. Repeat after changing a non-study local field in Context B; confirm automatic rebase stops and local/pending data remain.
 ```
 
-- [ ] **Step 6: Verify Edge Function in Supabase after secret configuration**
+- [ ] **Step 6: Live Edge Function verification after deployment**
 
-After the function is deployed and secrets are set, send one authenticated `analyze` request and one authenticated `grade` request through the browser UI. Confirm both return schema-valid JSON and no API key appears in DevTools request payloads or repository files.
+Using the browser UI with a logged-in session, run one `analyze` and one `grade`. Confirm both return schema-valid data, provider key is absent from DevTools requests, and no definition/answer content is logged by Edge source.
 
-- [ ] **Step 7: Inspect final diff scope**
+- [ ] **Step 7: Final diff scope**
 
 ```bash
 git diff --stat main...HEAD
 git status --short
 ```
 
-Expected: only definition-quiz files, approved study/vault integrations, tests, and deployment notes; no generated artifacts, local env files, or unrelated refactors.
+Expected: only feature files/tests/docs; no secret files, generated artifacts, or unrelated refactors.
 
-- [ ] **Step 8: Final verification commit only if verification required fixes**
+- [ ] **Step 8: Commit verification fixes only when needed**
 
-If verification found and fixed defects, commit those specific fixes with a focused message. If no fixes were needed, do not create an empty commit.
+If a defect was fixed, commit only those fixes with a focused message and rerun Steps 1–3. Do not create an empty verification commit.
