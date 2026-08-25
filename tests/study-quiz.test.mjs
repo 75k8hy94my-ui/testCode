@@ -56,6 +56,14 @@ test('gave-up schedules an easier retry three to six answered questions later', 
   assert.equal(retry.afterQuestion >= 3 && retry.afterQuestion <= 6, true);
 });
 
+test('gave-up records the failure without awarding xp', () => {
+  const study = StudyData.createEmptyStudy();
+  study.definitions = [makeDefinition('d1')];
+  const result = StudyQuiz.reduceFinalAttempt(study, finalAttempt('d1', 4, 'gave-up', ['d1-actor', 'd1-direct', 'd1-legal']));
+  assert.equal(result.progress.d1.gaveUpCount, 1);
+  assert.equal(result.gamification.xp, 0);
+});
+
 test('low-confidence wrong answer cannot harshly demote stage four to stage two', () => {
   const study = StudyData.createEmptyStudy();
   study.definitions = [makeDefinition('d1')];
