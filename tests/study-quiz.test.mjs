@@ -167,3 +167,26 @@ test('submission state keeps answering, grading, and feedback controls mutually 
   assert.equal(elements.submit.disabled, false);
   assert.equal(elements.submit.textContent, '判定する');
 });
+
+test('submission state does not rewrite hidden attributes when state already matches', () => {
+  let actionWrites = 0;
+  let nextWrites = 0;
+  const actions = {
+    _hidden: true,
+    get hidden() { return this._hidden; },
+    set hidden(value) { actionWrites++; this._hidden = value; }
+  };
+  const next = {
+    _hidden: false,
+    get hidden() { return this._hidden; },
+    set hidden(value) { nextWrites++; this._hidden = value; }
+  };
+  StudyQuiz.applySubmissionState({
+    actions,
+    submit: { disabled: false, textContent: '判定する' },
+    giveUp: { disabled: false },
+    next
+  }, 'feedback');
+  assert.equal(actionWrites, 0);
+  assert.equal(nextWrites, 0);
+});
