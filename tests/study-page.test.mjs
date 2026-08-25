@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import vm from 'node:vm';
 
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 
@@ -59,4 +60,17 @@ test('study page provides Liquid Glass and a no-backdrop fallback', () => {
   const source = read('study.html');
   assert.match(source, /backdrop-filter/);
   assert.match(source, /@supports not \(\(backdrop-filter: blur\(1px\)\)/);
+});
+
+test('study page inline JavaScript parses and is covered by the static verifier', () => {
+  const source = read('study.html');
+  for (const match of source.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)) {
+    new vm.Script(match[1], { filename: 'study.html:inline' });
+  }
+  assert.match(read('scripts/check-static.mjs'), /['"]study\.html['"]/);
+});
+
+test('study phase one does not add study-data persistence', () => {
+  const source = read('study.html');
+  assert.doesNotMatch(source, /indexedDB|mangaReaderStudy|MangaVaultPayload|savePayload\(/);
 });
