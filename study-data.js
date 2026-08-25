@@ -1,3 +1,4 @@
+(()=>{
 const STUDY_KEY = 'mangaReaderStudy';
 const STUDY_SCHEMA_VERSION = 1;
 const MAX_FINALIZED_ATTEMPTS = 2000;
@@ -96,3 +97,4 @@ function createId() {
 const api = { STUDY_KEY, STUDY_SCHEMA_VERSION, MAX_FINALIZED_ATTEMPTS, DEFAULT_SUBJECTS, createEmptyStudy, normalizeStudy, load, save, pruneRecentAttempts, createId };
 if (typeof window !== 'undefined') window.StudyData = api;
 if (typeof module !== 'undefined') module.exports = api;
+})();
