@@ -61,3 +61,11 @@ test('edge function verifies the bearer token belongs to a real Supabase user', 
   assert.match(source, /auth\/v1\/user/);
   assert.match(source, /user\.id/);
 });
+
+test('edge function allows only the designated user id and does not embed an email address', () => {
+  const source = fs.readFileSync(new URL('../supabase/functions/study-ai/index.ts', import.meta.url), 'utf8');
+  assert.match(source, /c402d28a-b2fa-45b8-9731-bd2031955b84/);
+  assert.match(source, /forbidden/);
+  assert.match(source, /allowedStudyUserIds|ALLOWED_STUDY_USER_IDS/);
+  assert.doesNotMatch(source, /@icloud\.com/i);
+});
