@@ -53,17 +53,18 @@ function installKeyboardViewport(){
   syncViewport();
   return true;
 }
+const setHidden=(element,hidden)=>{if(element.hidden!==hidden)element.hidden=hidden};
 function applySubmissionState(elements,state='answering'){
   if(!elements)return false;
   const{actions,submit,giveUp,next}=elements;
   if(!actions||!submit||!giveUp||!next)return false;
   if(state==='grading'){
-    actions.hidden=false;next.hidden=true;submit.disabled=true;giveUp.disabled=true;submit.textContent='採点中…';return true;
+    setHidden(actions,false);setHidden(next,true);submit.disabled=true;giveUp.disabled=true;submit.textContent='採点中…';return true;
   }
   if(state==='feedback'){
-    actions.hidden=true;next.hidden=false;submit.disabled=false;giveUp.disabled=false;submit.textContent='判定する';return true;
+    setHidden(actions,true);setHidden(next,false);submit.disabled=false;giveUp.disabled=false;submit.textContent='判定する';return true;
   }
-  actions.hidden=false;next.hidden=true;submit.disabled=false;giveUp.disabled=false;submit.textContent='判定する';return true;
+  setHidden(actions,false);setHidden(next,true);submit.disabled=false;giveUp.disabled=false;submit.textContent='判定する';return true;
 }
 function installSubmissionUi(){
   if(submissionUiInstalled||typeof document==='undefined')return false;
