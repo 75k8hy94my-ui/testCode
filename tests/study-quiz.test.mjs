@@ -147,3 +147,23 @@ test('keyboard viewport mode uses the visible mobile viewport and keeps quiz inp
     if (oldDocument === undefined) delete globalThis.document; else globalThis.document = oldDocument;
   }
 });
+
+test('submission state keeps answering, grading, and feedback controls mutually exclusive', () => {
+  const elements = {
+    actions: { hidden: false },
+    submit: { disabled: false, textContent: '判定する' },
+    giveUp: { disabled: false },
+    next: { hidden: true }
+  };
+  StudyQuiz.applySubmissionState(elements, 'grading');
+  assert.equal(elements.actions.hidden, false);
+  assert.equal(elements.next.hidden, true);
+  assert.equal(elements.submit.disabled, true);
+  assert.equal(elements.giveUp.disabled, true);
+  assert.equal(elements.submit.textContent, '採点中…');
+  StudyQuiz.applySubmissionState(elements, 'feedback');
+  assert.equal(elements.actions.hidden, true);
+  assert.equal(elements.next.hidden, false);
+  assert.equal(elements.submit.disabled, false);
+  assert.equal(elements.submit.textContent, '判定する');
+});

@@ -8,6 +8,7 @@ const RETRY_GAVE_UP = [3, 6];
 const RETRY_MAJOR = [5, 8];
 const RETRY_PARTIAL = [7, 12];
 const QUIZ_KEYBOARD_STYLE = `
+[hidden]{display:none!important}
 body.quiz-active .quizShell{min-height:calc(var(--quiz-visual-height,100dvh) - max(18px,env(safe-area-inset-top)) - 12px)}
 body.keyboard-active #studyApp{padding-top:max(8px,calc(env(safe-area-inset-top) + var(--quiz-visual-offset-top,0px)))}
 body.keyboard-active .quizShell{height:calc(var(--quiz-visual-height,100dvh) - max(8px,env(safe-area-inset-top)) - 4px);min-height:0;overflow:hidden}
@@ -23,6 +24,7 @@ body.keyboard-active .lessonFooter .btn{min-height:48px}
 @media(max-height:520px){body.keyboard-active .lessonPromptLabel{display:none}body.keyboard-active .lessonHero.lessonQuestion{padding:11px 12px;gap:7px}body.keyboard-active .quizTitle{font-size:26px}body.keyboard-active .quizPrompt{max-height:18vh}body.keyboard-active .quizAnswer{min-height:80px!important;max-height:20vh}}
 `;
 let keyboardViewportInstalled = false;
+let submissionUiInstalled = false;
 const clone = (value) => (typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)));
 const makeId = () => StudyDataRef && StudyDataRef.createId ? StudyDataRef.createId() : `quiz-${Date.now()}-${Math.random()}`;
 function installKeyboardViewport(){
@@ -51,6 +53,41 @@ function installKeyboardViewport(){
   syncViewport();
   return true;
 }
+function applySubmissionState(elements,state='answering'){
+  if(!elements)return false;
+  const{actions,submit,giveUp,next}=elements;
+  if(!actions||!submit||!giveUp||!next)return false;
+  if(state==='grading'){
+    actions.hidden=false;next.hidden=true;submit.disabled=true;giveUp.disabled=true;submit.textContent='採点中…';return true;
+  }
+  if(state==='feedback'){
+    actions.hidden=true;next.hidden=false;submit.disabled=false;giveUp.disabled=false;submit.textContent='判定する';return true;
+  }
+  actions.hidden=false;next.hidden=true;submit.disabled=false;giveUp.disabled=false;submit.textContent='判定する';return true;
+}
+function installSubmissionUi(){
+  if(submissionUiInstalled||typeof document==='undefined')return false;
+  const doc=document,actions=doc.getElementById('quizActions'),submit=doc.getElementById('submitQuizBtn'),giveUp=doc.getElementById('giveUpBtn'),next=doc.getElementById('nextQuizBtn'),feedback=doc.getElementById('quizFeedback');
+  if(!actions||!submit||!giveUp||!next||!feedback)return false;
+  submissionUiInstalled=true;
+  const elements={actions,submit,giveUp,next};
+  const sync=()=>applySubmissionState(elements,(!next.hidden||!feedback.hidden)?'feedback':'answering');
+  doc.addEventListener('click',event=>{
+    const target=event.target&&event.target.closest?event.target.closest('#submitQuizBtn'):null;
+    if(!target)return;
+    const answer=doc.getElementById('quizTextAnswer');
+    if(answer&&!String(answer.value||'').trim())return;
+    if(!next.hidden||!feedback.hidden){applySubmissionState(elements,'feedback');return}
+    applySubmissionState(elements,'grading');
+  });
+  if(typeof MutationObserver!=='undefined'){
+    const observer=new MutationObserver(sync);
+    observer.observe(next,{attributes:true,attributeFilter:['hidden']});
+    observer.observe(feedback,{attributes:true,attributeFilter:['hidden']});
+  }
+  sync();
+  return true;
+}
 function weakUnitDefaults(){return{successes:0,misses:0,wrongs:0,lastFailureAt:null}}
 function createInitialProgress(definition,now=Date.now()){const weakUnits={};for(const unit of Array.isArray(definition&&definition.memoryUnits)?definition.memoryUnits:[])weakUnits[unit.id]=weakUnitDefaults();return{stage:4,stageSuccesses:0,lastStageSuccessSequence:null,masteryIndex:0,nextReviewAt:Number(now)||0,lastCompleteRecallAt:null,completeRecallSuccesses:0,almostCount:0,wrongCount:0,gaveUpCount:0,weakUnits}}
 function ensureProgress(study,definition,now){const current=study.progress&&study.progress[definition.id],base=createInitialProgress(definition,now);if(!current)return base;const merged={...base,...clone(current),weakUnits:{...base.weakUnits}};for(const[id,value]of Object.entries(current.weakUnits||{}))merged.weakUnits[id]={...weakUnitDefaults(),...value};return merged}
@@ -65,11 +102,12 @@ function randomOffset(range,rng){return range[0]+Math.floor(Math.max(0,Math.min(
 function applyOutcome(study,session,attempt,now=Date.now(),rng=Math.random){const nextStudy=attempt&&attempt.grading&&attempt.grading.status==='final'?reduceFinalAttempt(study,attempt):clone(study),nextSession=clone(session),g=attempt&&attempt.grading;if(g&&g.status==='final'){let range=null,targetStage=null;if(g.result==='gave-up'){range=RETRY_GAVE_UP;targetStage=2}else if(g.result==='wrong'&&g.confidence!=='low'){range=RETRY_MAJOR;targetStage=2}else if(g.result==='almost'||g.result==='wrong'&&g.confidence==='low'){range=RETRY_PARTIAL;targetStage=Math.max(2,(attempt.stageAtAttempt||4)-1)}if(range){nextSession.scheduledRetries=nextSession.scheduledRetries.filter(x=>x.definitionId!==attempt.definitionId);nextSession.scheduledRetries.push({definitionId:attempt.definitionId,targetStage,afterQuestion:nextSession.answeredCount+randomOffset(range,rng)})}}nextSession.answeredCount++;nextSession.lastDefinitionId=attempt.definitionId;nextSession.recentDefinitionIds.push(attempt.definitionId);nextSession.recentDefinitionIds=nextSession.recentDefinitionIds.slice(-12);return{study:nextStudy,session:nextSession}}
 function nextQuestion(study,session,now=Date.now(),rng=Math.random){const definitions=filterDefinitions(study,session.scope);if(!definitions.length)return null;const retry=(session.scheduledRetries||[]).find(x=>x.afterQuestion<=session.answeredCount&&definitions.some(d=>d.id===x.definitionId));if(retry){const d=definitions.find(x=>x.id===retry.definitionId);return buildQuestion(d,ensureProgress(study,d,now),session.answeredCount+1,retry.targetStage)}const prepared=definitions.map(d=>({definition:d,progress:ensureProgress(study,d,now)}));let candidates=prepared.filter(x=>x.definition.id!==session.lastDefinitionId);if(!candidates.length)candidates=prepared;candidates.sort((a,b)=>{const da=Number(a.progress.nextReviewAt||0)<=Number(now)?1:0,db=Number(b.progress.nextReviewAt||0)<=Number(now)?1:0;if(da!==db)return db-da;const wa=Object.values(a.progress.weakUnits||{}).reduce((s,x)=>s+(x.misses||0)*2+(x.wrongs||0)*3,0),wb=Object.values(b.progress.weakUnits||{}).reduce((s,x)=>s+(x.misses||0)*2+(x.wrongs||0)*3,0);return wb-wa});const top=candidates.slice(0,Math.min(3,candidates.length)),idx=Math.floor(Math.max(0,Math.min(.999999,Number(rng())||0))*top.length),chosen=top[idx];return buildQuestion(chosen.definition,chosen.progress,session.answeredCount+1)}
 function buildCheckpoint(study,session){const capabilities=[],improvements=[];for(const d of study.definitions||[]){const before=session.checkpointStartProgress&&session.checkpointStartProgress[d.id],after=study.progress&&study.progress[d.id];if(before&&after&&Number(after.stage||0)>Number(before.stage||0))capabilities.push({definitionId:d.id,title:d.title,message:'この問題が答えられるようになっています'});if(before&&after){const terms=[];for(const u of d.memoryUnits||[]){const o=before.weakUnits&&before.weakUnits[u.id]||weakUnitDefaults(),n=after.weakUnits&&after.weakUnits[u.id]||weakUnitDefaults();if((n.successes||0)>(o.successes||0)&&(o.misses||0)+(o.wrongs||0)>0)terms.push(...(u.importantTerms||[u.text]))}if(terms.length)improvements.push({definitionId:d.id,terms:[...new Set(terms)],message:'前より思い出せています'})}}return{capabilities,improvements,xpGained:Math.max(0,Number(study.gamification&&study.gamification.xp||0)-Number(session.checkpointStartXp||0)),streak:Number(study.gamification&&study.gamification.streak||0)}}
-const api={REVIEW_INTERVALS_MS,RETRY_GAVE_UP,RETRY_MAJOR,RETRY_PARTIAL,createInitialProgress,filterDefinitions,createSession,buildQuestion,nextQuestion,reduceFinalAttempt,applyOutcome,buildCheckpoint,installKeyboardViewport};
+const api={REVIEW_INTERVALS_MS,RETRY_GAVE_UP,RETRY_MAJOR,RETRY_PARTIAL,createInitialProgress,filterDefinitions,createSession,buildQuestion,nextQuestion,reduceFinalAttempt,applyOutcome,buildCheckpoint,installKeyboardViewport,applySubmissionState,installSubmissionUi};
 if(typeof window!=='undefined'){
   window.StudyQuiz=api;
   if(typeof document!=='undefined'){
-    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installKeyboardViewport,{once:true});else installKeyboardViewport();
+    const installUi=()=>{installKeyboardViewport();installSubmissionUi()};
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installUi,{once:true});else installUi();
   }
 }
 if(typeof module!=='undefined')module.exports=api;
