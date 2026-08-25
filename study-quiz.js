@@ -51,144 +51,14 @@ const clone = (value) => (typeof structuredClone === 'function' ? structuredClon
 const makeId = () => StudyDataRef && StudyDataRef.createId ? StudyDataRef.createId() : `quiz-${Date.now()}-${Math.random()}`;
 const rememberQuestion=(question)=>{activeQuestion=question;if(!question||question.kind!=='cloze')lastClozeGrade=null;return question};
 const canonicalAnswer=(value)=>String(value??'').normalize('NFKC').replace(/\s+/g,'').trim();
-function parseClozeAnswers(raw){
-  if(Array.isArray(raw))return raw;
-  const text=String(raw??'');
-  if(!text)return[];
-  try{const parsed=JSON.parse(text);if(Array.isArray(parsed))return parsed}catch(_){/* legacy newline format */}
-  return text.split('\n');
-}
-function gradeClozeAnswers(question,answers){
-  const values=parseClozeAnswers(answers),source=Array.isArray(question&&question.clozeItems)?question.clozeItems:[];
-  const items=source.map((item,index)=>{
-    const given=String(values[index]??'').trim(),expected=String(item&&item.answer??'').trim(),accepted=[expected,...(Array.isArray(item&&item.acceptedAnswers)?item.acceptedAnswers:[])].filter(Boolean);
-    const correct=accepted.some(value=>canonicalAnswer(value)===canonicalAnswer(given));
-    return{index:Number.isInteger(item&&item.index)?item.index:index,answer:given,expected,correct};
-  });
-  const totalCount=items.length,correctCount=items.filter(item=>item.correct).length,result=totalCount>0&&correctCount===totalCount?'correct':correctCount>0?'almost':'wrong';
-  return{result,correctCount,totalCount,items};
-}
-function applyClozeGradeToAttempt(attempt,question=activeQuestion){
-  if(!attempt||attempt.questionKind!=='cloze'||!question||question.kind!=='cloze'||attempt.definitionId!==question.definitionId)return attempt;
-  const grade=gradeClozeAnswers(question,attempt.answerText),targets=Array.isArray(question.targetUnitIds)?question.targetUnitIds.slice():[];
-  attempt.grading={...(attempt.grading||{}),status:'final',result:grade.result,recalledUnitIds:grade.result==='correct'?targets:[],missingUnitIds:grade.result==='almost'?targets:[],wrongUnitIds:grade.result==='wrong'?targets:[],confusions:[],feedback:'',confidence:'high',source:'local',clozeResults:grade.items};
-  lastClozeGrade={questionId:question.id,...grade};
-  return attempt;
-}
-function installKeyboardViewport(){
-  if(keyboardViewportInstalled||typeof window==='undefined'||typeof document==='undefined')return false;
-  keyboardViewportInstalled=true;
-  const win=window,doc=document,root=doc.documentElement,body=doc.body,visualViewport=win.visualViewport;
-  if(!doc.getElementById('studyQuizKeyboardViewportStyles')){
-    const style=doc.createElement('style');style.id='studyQuizKeyboardViewportStyles';style.textContent=QUIZ_KEYBOARD_STYLE;doc.head.appendChild(style);
-  }
-  const isQuizTextInput=el=>!!(el&&el.matches&&el.matches('#quizInputArea textarea,#quizInputArea input'));
-  const coarsePointer=()=>{
-    try{return Number(win.navigator&&win.navigator.maxTouchPoints||0)>0||!!(win.matchMedia&&win.matchMedia('(pointer: coarse)').matches)}catch(_){return false}
-  };
-  const syncViewport=()=>{
-    const height=Math.max(1,Number(visualViewport&&visualViewport.height)||Number(win.innerHeight)||Number(root.clientHeight)||1);
-    const offsetTop=Math.max(0,Number(visualViewport&&visualViewport.offsetTop)||0);
-    root.style.setProperty('--quiz-visual-height',`${Math.round(height)}px`);
-    root.style.setProperty('--quiz-visual-offset-top',`${Math.round(offsetTop)}px`);
-    const active=isQuizTextInput(doc.activeElement),layoutHeight=Math.max(Number(win.innerHeight)||0,Number(root.clientHeight)||0),visuallyShrunk=!!visualViewport&&layoutHeight-Number(visualViewport.height||0)>80;
-    body.classList.toggle('keyboard-active',active&&(coarsePointer()||visuallyShrunk));
-  };
-  doc.addEventListener('focusin',event=>{if(!isQuizTextInput(event.target))return;syncViewport();if(typeof win.requestAnimationFrame==='function')win.requestAnimationFrame(syncViewport);win.setTimeout(syncViewport,120)});
-  doc.addEventListener('focusout',()=>win.setTimeout(syncViewport,0));
-  if(visualViewport){visualViewport.addEventListener('resize',syncViewport);visualViewport.addEventListener('scroll',syncViewport)}
-  win.addEventListener('resize',syncViewport);
-  syncViewport();
-  return true;
-}
+function parseClozeAnswers(raw){if(Array.isArray(raw))return raw;const text=String(raw??'');if(!text)return[];try{const parsed=JSON.parse(text);if(Array.isArray(parsed))return parsed}catch(_){/* legacy newline format */}return text.split('\n')}
+function gradeClozeAnswers(question,answers){const values=parseClozeAnswers(answers),source=Array.isArray(question&&question.clozeItems)?question.clozeItems:[];const items=source.map((item,index)=>{const given=String(values[index]??'').trim(),expected=String((item&&item.answer)??'').trim(),accepted=[expected,...(Array.isArray(item&&item.acceptedAnswers)?item.acceptedAnswers:[])].filter(Boolean),correct=accepted.some(value=>canonicalAnswer(value)===canonicalAnswer(given));return{index:Number.isInteger(item&&item.index)?item.index:index,answer:given,expected,correct}});const totalCount=items.length,correctCount=items.filter(item=>item.correct).length,result=totalCount>0&&correctCount===totalCount?'correct':correctCount>0?'almost':'wrong';return{result,correctCount,totalCount,items}}
+function applyClozeGradeToAttempt(attempt,question=activeQuestion){if(!attempt||attempt.questionKind!=='cloze'||!question||question.kind!=='cloze'||attempt.definitionId!==question.definitionId)return attempt;const grade=gradeClozeAnswers(question,attempt.answerText),targets=Array.isArray(question.targetUnitIds)?question.targetUnitIds.slice():[];attempt.grading={...(attempt.grading||{}),status:'final',result:grade.result,recalledUnitIds:grade.result==='correct'?targets:[],missingUnitIds:grade.result==='almost'?targets:[],wrongUnitIds:grade.result==='wrong'?targets:[],confusions:[],feedback:'',confidence:'high',source:'local',clozeResults:grade.items};lastClozeGrade={questionId:question.id,...grade};return attempt}
+function installKeyboardViewport(){if(keyboardViewportInstalled||typeof window==='undefined'||typeof document==='undefined')return false;keyboardViewportInstalled=true;const win=window,doc=document,root=doc.documentElement,body=doc.body,visualViewport=win.visualViewport;if(!doc.getElementById('studyQuizKeyboardViewportStyles')){const style=doc.createElement('style');style.id='studyQuizKeyboardViewportStyles';style.textContent=QUIZ_KEYBOARD_STYLE;doc.head.appendChild(style)}const isQuizTextInput=el=>!!(el&&el.matches&&el.matches('#quizInputArea textarea,#quizInputArea input'));const coarsePointer=()=>{try{return Number(win.navigator&&win.navigator.maxTouchPoints||0)>0||!!(win.matchMedia&&win.matchMedia('(pointer: coarse)').matches)}catch(_){return false}};const syncViewport=()=>{const height=Math.max(1,Number(visualViewport&&visualViewport.height)||Number(win.innerHeight)||Number(root.clientHeight)||1),offsetTop=Math.max(0,Number(visualViewport&&visualViewport.offsetTop)||0);root.style.setProperty('--quiz-visual-height',`${Math.round(height)}px`);root.style.setProperty('--quiz-visual-offset-top',`${Math.round(offsetTop)}px`);const active=isQuizTextInput(doc.activeElement),layoutHeight=Math.max(Number(win.innerHeight)||0,Number(root.clientHeight)||0),visuallyShrunk=!!visualViewport&&layoutHeight-Number(visualViewport.height||0)>80;body.classList.toggle('keyboard-active',active&&(coarsePointer()||visuallyShrunk))};doc.addEventListener('focusin',event=>{if(!isQuizTextInput(event.target))return;syncViewport();if(typeof win.requestAnimationFrame==='function')win.requestAnimationFrame(syncViewport);win.setTimeout(syncViewport,120)});doc.addEventListener('focusout',()=>win.setTimeout(syncViewport,0));if(visualViewport){visualViewport.addEventListener('resize',syncViewport);visualViewport.addEventListener('scroll',syncViewport)}win.addEventListener('resize',syncViewport);syncViewport();return true}
 const setHidden=(element,hidden)=>{if(element.hidden!==hidden)element.hidden=hidden};
-function applySubmissionState(elements,state='answering'){
-  if(!elements)return false;
-  const{actions,submit,giveUp,next}=elements;
-  if(!actions||!submit||!giveUp||!next)return false;
-  if(state==='grading'){
-    setHidden(actions,false);setHidden(next,true);submit.disabled=true;giveUp.disabled=true;submit.textContent='採点中…';return true;
-  }
-  if(state==='feedback'){
-    setHidden(actions,true);setHidden(next,false);submit.disabled=false;giveUp.disabled=false;submit.textContent='判定する';return true;
-  }
-  setHidden(actions,false);setHidden(next,true);submit.disabled=false;giveUp.disabled=false;submit.textContent='判定する';return true;
-}
-function installSubmissionUi(){
-  if(submissionUiInstalled||typeof document==='undefined')return false;
-  const doc=document,actions=doc.getElementById('quizActions'),submit=doc.getElementById('submitQuizBtn'),giveUp=doc.getElementById('giveUpBtn'),next=doc.getElementById('nextQuizBtn'),feedback=doc.getElementById('quizFeedback');
-  if(!actions||!submit||!giveUp||!next||!feedback)return false;
-  submissionUiInstalled=true;
-  const elements={actions,submit,giveUp,next};
-  const sync=()=>applySubmissionState(elements,(!next.hidden||!feedback.hidden)?'feedback':'answering');
-  doc.addEventListener('click',event=>{
-    const target=event.target&&event.target.closest?event.target.closest('#submitQuizBtn'):null;
-    if(!target)return;
-    const answer=doc.getElementById('quizTextAnswer');
-    if(answer&&!String(answer.value||'').trim())return;
-    if(!next.hidden||!feedback.hidden){applySubmissionState(elements,'feedback');return}
-    applySubmissionState(elements,'grading');
-  });
-  if(typeof MutationObserver!=='undefined'){
-    const observer=new MutationObserver(sync);
-    observer.observe(next,{attributes:true,attributeFilter:['hidden']});
-    observer.observe(feedback,{attributes:true,attributeFilter:['hidden']});
-  }
-  sync();
-  return true;
-}
-function installClozeUi(){
-  if(clozeUiInstalled||typeof document==='undefined')return false;
-  const doc=document,root=doc.getElementById('quizInputArea'),feedback=doc.getElementById('quizFeedback');
-  if(!root||!feedback)return false;
-  clozeUiInstalled=true;
-  const enhanceInput=()=>{
-    const question=activeQuestion;
-    if(!question||question.kind!=='cloze'||!Array.isArray(question.clozeItems)||!question.clozeItems.length)return;
-    if(root.dataset.clozeQuestionId===question.id)return;
-    const hidden=doc.getElementById('quizTextAnswer');
-    if(!hidden)return;
-    root.dataset.clozeQuestionId=question.id;
-    hidden.classList.add('clozeHiddenAnswer');hidden.setAttribute('aria-hidden','true');hidden.tabIndex=-1;
-    const grid=doc.createElement('div');grid.className='clozeAnswerGrid';
-    const inputs=[];
-    const sync=()=>{const values=inputs.map(input=>input.value);hidden.value=values.some(value=>String(value).trim())?JSON.stringify(values):''};
-    question.clozeItems.forEach((item,index)=>{
-      const field=doc.createElement('label');field.className='clozeBlankField';
-      const caption=doc.createElement('span');caption.className='clozeBlankLabel';caption.textContent=`空欄 ${index+1}`;
-      const input=doc.createElement('input');input.type='text';input.className='clozeBlankInput';input.autocomplete='off';input.spellcheck=false;input.dataset.clozeIndex=String(index);input.setAttribute('aria-label',`空欄 ${index+1}`);input.addEventListener('input',sync);
-      inputs.push(input);field.append(caption,input);grid.appendChild(field);
-    });
-    root.appendChild(grid);sync();
-  };
-  const enhanceFeedback=()=>{
-    const question=activeQuestion,grade=lastClozeGrade;
-    if(feedback.hidden||!question||question.kind!=='cloze'||!grade||grade.questionId!==question.id||feedback.dataset.clozeQuestionId===question.id)return;
-    feedback.dataset.clozeQuestionId=question.id;
-    feedback.classList.remove('feedbackCorrect','feedbackAlmost','feedbackWrong');
-    feedback.classList.add(grade.result==='correct'?'feedbackCorrect':grade.result==='almost'?'feedbackAlmost':'feedbackWrong');
-    const title=feedback.querySelector('strong');if(title)title.textContent=grade.result==='correct'?'できました！':grade.result==='almost'?'惜しい！':'もう一度確認';
-    const oldTerms=feedback.querySelector('.feedbackTerms');if(oldTerms)oldTerms.remove();
-    const modelLabel=feedback.querySelector('.feedbackModelLabel');
-    const score=doc.createElement('div');score.className='clozeScore';score.textContent=`${grade.correctCount} / ${grade.totalCount} 正解`;
-    const list=doc.createElement('div');list.className='clozeResultList';
-    grade.items.forEach((item,index)=>{
-      const row=doc.createElement('div');row.className=`clozeResultRow ${item.correct?'isCorrect':'isWrong'}`;
-      const mark=doc.createElement('span');mark.className='clozeResultMark';mark.textContent=item.correct?'✓':'✕';
-      const answer=doc.createElement('span');answer.textContent=`空欄 ${index+1}: ${item.answer||'（未回答）'}`;
-      row.append(mark,answer);
-      if(!item.correct){const correct=doc.createElement('span');correct.className='clozeCorrectAnswer';correct.textContent=`正解：${item.expected}`;row.appendChild(correct)}
-      list.appendChild(row);
-    });
-    if(modelLabel){feedback.insertBefore(score,modelLabel);feedback.insertBefore(list,modelLabel)}else{feedback.append(score,list)}
-  };
-  if(typeof MutationObserver!=='undefined'){
-    const inputObserver=new MutationObserver(enhanceInput);inputObserver.observe(root,{childList:true});
-    const feedbackObserver=new MutationObserver(enhanceFeedback);feedbackObserver.observe(feedback,{childList:true,attributes:true,attributeFilter:['hidden']});
-  }
-  enhanceInput();enhanceFeedback();
-  return true;
-}
+function applySubmissionState(elements,state='answering'){if(!elements)return false;const{actions,submit,giveUp,next}=elements;if(!actions||!submit||!giveUp||!next)return false;if(state==='grading'){setHidden(actions,false);setHidden(next,true);submit.disabled=true;giveUp.disabled=true;submit.textContent='採点中…';return true}if(state==='feedback'){setHidden(actions,true);setHidden(next,false);submit.disabled=false;giveUp.disabled=false;submit.textContent='判定する';return true}setHidden(actions,false);setHidden(next,true);submit.disabled=false;giveUp.disabled=false;submit.textContent='判定する';return true}
+function installSubmissionUi(){if(submissionUiInstalled||typeof document==='undefined')return false;const doc=document,actions=doc.getElementById('quizActions'),submit=doc.getElementById('submitQuizBtn'),giveUp=doc.getElementById('giveUpBtn'),next=doc.getElementById('nextQuizBtn'),feedback=doc.getElementById('quizFeedback');if(!actions||!submit||!giveUp||!next||!feedback)return false;submissionUiInstalled=true;const elements={actions,submit,giveUp,next},sync=()=>applySubmissionState(elements,(!next.hidden||!feedback.hidden)?'feedback':'answering');doc.addEventListener('click',event=>{const target=event.target&&event.target.closest?event.target.closest('#submitQuizBtn'):null;if(!target)return;const answer=doc.getElementById('quizTextAnswer');if(answer&&!String(answer.value||'').trim())return;if(!next.hidden||!feedback.hidden){applySubmissionState(elements,'feedback');return}applySubmissionState(elements,'grading')});if(typeof MutationObserver!=='undefined'){const observer=new MutationObserver(sync);observer.observe(next,{attributes:true,attributeFilter:['hidden']});observer.observe(feedback,{attributes:true,attributeFilter:['hidden']})}sync();return true}
+function installClozeUi(){if(clozeUiInstalled||typeof document==='undefined')return false;const doc=document,root=doc.getElementById('quizInputArea'),feedback=doc.getElementById('quizFeedback');if(!root||!feedback)return false;clozeUiInstalled=true;const enhanceInput=()=>{const question=activeQuestion;if(!question||question.kind!=='cloze'||!Array.isArray(question.clozeItems)||!question.clozeItems.length)return;if(root.dataset.clozeQuestionId===question.id)return;const hidden=doc.getElementById('quizTextAnswer');if(!hidden)return;root.dataset.clozeQuestionId=question.id;hidden.classList.add('clozeHiddenAnswer');hidden.setAttribute('aria-hidden','true');hidden.tabIndex=-1;const grid=doc.createElement('div');grid.className='clozeAnswerGrid';const inputs=[],sync=()=>{const values=inputs.map(input=>input.value);hidden.value=values.some(value=>String(value).trim())?JSON.stringify(values):''};question.clozeItems.forEach((item,index)=>{const field=doc.createElement('label');field.className='clozeBlankField';const caption=doc.createElement('span');caption.className='clozeBlankLabel';caption.textContent=`空欄 ${index+1}`;const input=doc.createElement('input');input.type='text';input.className='clozeBlankInput';input.autocomplete='off';input.spellcheck=false;input.dataset.clozeIndex=String(index);input.setAttribute('aria-label',`空欄 ${index+1}`);input.addEventListener('input',sync);inputs.push(input);field.append(caption,input);grid.appendChild(field)});root.appendChild(grid);sync()};const enhanceFeedback=()=>{const question=activeQuestion,grade=lastClozeGrade;if(feedback.hidden||!question||question.kind!=='cloze'||!grade||grade.questionId!==question.id||feedback.dataset.clozeQuestionId===question.id)return;feedback.dataset.clozeQuestionId=question.id;feedback.classList.remove('feedbackCorrect','feedbackAlmost','feedbackWrong');feedback.classList.add(grade.result==='correct'?'feedbackCorrect':grade.result==='almost'?'feedbackAlmost':'feedbackWrong');const title=feedback.querySelector('strong');if(title)title.textContent=grade.result==='correct'?'できました！':grade.result==='almost'?'惜しい！':'もう一度確認';const oldTerms=feedback.querySelector('.feedbackTerms');if(oldTerms)oldTerms.remove();const modelLabel=feedback.querySelector('.feedbackModelLabel'),score=doc.createElement('div');score.className='clozeScore';score.textContent=`${grade.correctCount} / ${grade.totalCount} 正解`;const list=doc.createElement('div');list.className='clozeResultList';grade.items.forEach((item,index)=>{const row=doc.createElement('div');row.className=`clozeResultRow ${item.correct?'isCorrect':'isWrong'}`;const mark=doc.createElement('span');mark.className='clozeResultMark';mark.textContent=item.correct?'✓':'✕';const answer=doc.createElement('span');answer.textContent=`空欄 ${index+1}: ${item.answer||'（未回答）'}`;row.append(mark,answer);if(!item.correct){const correct=doc.createElement('span');correct.className='clozeCorrectAnswer';correct.textContent=`正解：${item.expected}`;row.appendChild(correct)}list.appendChild(row)});if(modelLabel){feedback.insertBefore(score,modelLabel);feedback.insertBefore(list,modelLabel)}else{feedback.append(score,list)}};if(typeof MutationObserver!=='undefined'){const inputObserver=new MutationObserver(enhanceInput);inputObserver.observe(root,{childList:true});const feedbackObserver=new MutationObserver(enhanceFeedback);feedbackObserver.observe(feedback,{childList:true,attributes:true,attributeFilter:['hidden']})}enhanceInput();enhanceFeedback();return true}
 function weakUnitDefaults(){return{successes:0,misses:0,wrongs:0,lastFailureAt:null}}
 function createInitialProgress(definition,now=Date.now()){const weakUnits={};for(const unit of Array.isArray(definition&&definition.memoryUnits)?definition.memoryUnits:[])weakUnits[unit.id]=weakUnitDefaults();return{stage:4,stageSuccesses:0,lastStageSuccessSequence:null,masteryIndex:0,nextReviewAt:Number(now)||0,lastCompleteRecallAt:null,completeRecallSuccesses:0,almostCount:0,wrongCount:0,gaveUpCount:0,weakUnits}}
 function ensureProgress(study,definition,now){const current=study.progress&&study.progress[definition.id],base=createInitialProgress(definition,now);if(!current)return base;const merged={...base,...clone(current),weakUnits:{...base.weakUnits}};for(const[id,value]of Object.entries(current.weakUnits||{}))merged.weakUnits[id]={...weakUnitDefaults(),...value};return merged}
@@ -196,37 +66,14 @@ function filterDefinitions(study,scope={mode:'all'}){const definitions=Array.isA
 function createSession(study,scope={mode:'all'},now=Date.now()){return{id:makeId(),scope:clone(scope),startedAt:Number(now)||Date.now(),answeredCount:0,checkpointStartProgress:clone(study.progress||{}),checkpointStartXp:Number(study.gamification&&study.gamification.xp)||0,lastDefinitionId:null,scheduledRetries:[],recentDefinitionIds:[]}}
 function weakScore(progress,unitId){const u=progress.weakUnits&&progress.weakUnits[unitId]||weakUnitDefaults();return(u.misses||0)*2+(u.wrongs||0)*3-(u.successes||0)}
 function chooseWeakestUnit(definition,progress){return(Array.isArray(definition.memoryUnits)?definition.memoryUnits:[]).slice().sort((a,b)=>weakScore(progress,b.id)-weakScore(progress,a.id))[0]||null}
-function buildQuestion(definition,progress,sequence=1,stageOverride=null){
-  const stage=Math.max(1,Math.min(4,stageOverride||progress.stage||4)),base={id:makeId(),definitionId:definition.id,definitionRevision:definition.contentRevision||1,prompt:definition.title||'',targetUnitIds:[],options:[],stage};
-  if(stage===4)return rememberQuestion({...base,kind:'full'});
-  if(stage===3){const first=(definition.memoryUnits||[])[0];return rememberQuestion({...base,kind:'hinted',prompt:first&&first.text?`${definition.title} — ${first.text.slice(0,Math.min(12,first.text.length))}…`:definition.title})}
-  const target=chooseWeakestUnit(definition,progress);
-  if(stage===2){
-    let prompt=definition.modelText||definition.title||'',candidate=(definition.clozeCandidates||[]).find(item=>target&&item.unitId===target.id),terms=(candidate&&Array.isArray(candidate.terms)?candidate.terms:target&&Array.isArray(target.importantTerms)?target.importantTerms:[]).filter(term=>typeof term==='string'&&term.trim()),clozeItems=[];
-    for(const term of terms){if(!prompt.includes(term))continue;const index=clozeItems.length;prompt=prompt.replace(term,`【${index+1}】`);clozeItems.push({index,answer:term,acceptedAnswers:[term]})}
-    return rememberQuestion({...base,kind:'cloze',prompt,targetUnitIds:target?[target.id]:[],options:terms.slice(),clozeItems});
-  }
-  const units=(definition.memoryUnits||[]).filter(u=>u&&u.text),order=Number(sequence)%2===0;
-  return rememberQuestion({...base,kind:order?'order':'choice',targetUnitIds:target?[target.id]:[],options:units.map(u=>u.text)});
-}
+function buildQuestion(definition,progress,sequence=1,stageOverride=null){const stage=Math.max(1,Math.min(4,stageOverride||progress.stage||4)),base={id:makeId(),definitionId:definition.id,definitionRevision:definition.contentRevision||1,prompt:definition.title||'',targetUnitIds:[],options:[],stage};if(stage===4)return rememberQuestion({...base,kind:'full'});if(stage===3){const first=(definition.memoryUnits||[])[0];return rememberQuestion({...base,kind:'hinted',prompt:first&&first.text?`${definition.title} — ${first.text.slice(0,Math.min(12,first.text.length))}…`:definition.title})}const target=chooseWeakestUnit(definition,progress);if(stage===2){let prompt=definition.modelText||definition.title||'',candidate=(definition.clozeCandidates||[]).find(item=>target&&item.unitId===target.id),terms=(candidate&&Array.isArray(candidate.terms)?candidate.terms:target&&Array.isArray(target.importantTerms)?target.importantTerms:[]).filter(term=>typeof term==='string'&&term.trim()),clozeItems=[];for(const term of terms){if(!prompt.includes(term))continue;const index=clozeItems.length;prompt=prompt.replace(term,`【${index+1}】`);clozeItems.push({index,answer:term,acceptedAnswers:[term]})}return rememberQuestion({...base,kind:'cloze',prompt,targetUnitIds:target?[target.id]:[],options:terms.slice(),clozeItems})}const units=(definition.memoryUnits||[]).filter(u=>u&&u.text),order=Number(sequence)%2===0;return rememberQuestion({...base,kind:order?'order':'choice',targetUnitIds:target?[target.id]:[],options:units.map(u=>u.text)})}
 function updateStreak(gamification,date){const next={xp:0,streak:0,lastStudyDate:null,...(gamification||{})};if(!date||next.lastStudyDate===date)return next;if(next.lastStudyDate){const prev=Date.parse(`${next.lastStudyDate}T00:00:00Z`),cur=Date.parse(`${date}T00:00:00Z`);next.streak=Number.isFinite(prev)&&Number.isFinite(cur)&&cur-prev===86400000?(next.streak||0)+1:1}else next.streak=1;next.lastStudyDate=date;return next}
 function reduceFinalAttempt(study,attempt){if(!attempt||!attempt.grading||attempt.grading.status!=='final')return clone(study);const next=StudyDataRef&&StudyDataRef.normalizeStudy?StudyDataRef.normalizeStudy(clone(study)):clone(study),definition=(next.definitions||[]).find(x=>x.id===attempt.definitionId);if(!definition)return next;const progress=ensureProgress(next,definition,Date.parse(attempt.occurredAt)||Date.now()),g=attempt.grading,result=g.result,oldWeak=clone(progress.weakUnits),recalled=new Set(g.recalledUnitIds||[]),missing=new Set(g.missingUnitIds||[]),wrong=new Set(g.wrongUnitIds||[]);for(const unit of definition.memoryUnits||[]){const s={...weakUnitDefaults(),...(progress.weakUnits[unit.id]||{})};if(recalled.has(unit.id))s.successes++;if(missing.has(unit.id)){s.misses++;s.lastFailureAt=attempt.occurredAt||new Date().toISOString()}if(wrong.has(unit.id)){s.wrongs++;s.lastFailureAt=attempt.occurredAt||new Date().toISOString()}progress.weakUnits[unit.id]=s}if(result==='correct'){const separated=progress.lastStageSuccessSequence==null||Number(attempt.sequence||0)-Number(progress.lastStageSuccessSequence)>=2;if(separated){progress.stageSuccesses=(progress.stageSuccesses||0)+1;progress.lastStageSuccessSequence=Number(attempt.sequence||0)}if(attempt.stageAtAttempt===1&&progress.stageSuccesses>=2){progress.stage=2;progress.stageSuccesses=0;progress.lastStageSuccessSequence=null}else if(attempt.stageAtAttempt===2&&progress.stageSuccesses>=2){progress.stage=3;progress.stageSuccesses=0;progress.lastStageSuccessSequence=null}else if(attempt.stageAtAttempt===3){const required=(definition.memoryUnits||[]).filter(u=>u.required!==false).map(u=>u.id);if(required.every(id=>recalled.has(id))){progress.stage=4;progress.stageSuccesses=0;progress.lastStageSuccessSequence=null}}else if(attempt.stageAtAttempt===4){progress.stage=4;progress.completeRecallSuccesses=(progress.completeRecallSuccesses||0)+1;progress.lastCompleteRecallAt=attempt.occurredAt||new Date().toISOString();progress.masteryIndex=Math.min(REVIEW_INTERVALS_MS.length-1,(progress.masteryIndex||0)+1);const at=Date.parse(attempt.occurredAt)||Date.now();progress.nextReviewAt=at+REVIEW_INTERVALS_MS[Math.min(progress.masteryIndex,REVIEW_INTERVALS_MS.length-1)]}}else if(result==='almost'){progress.almostCount=(progress.almostCount||0)+1;progress.stageSuccesses=0;progress.lastStageSuccessSequence=null;progress.stage=Math.max(1,Math.min(progress.stage||attempt.stageAtAttempt||4,(attempt.stageAtAttempt||4)-1))}else if(result==='wrong'){progress.wrongCount=(progress.wrongCount||0)+1;progress.stageSuccesses=0;progress.lastStageSuccessSequence=null;progress.stage=g.confidence==='low'?Math.max(3,(attempt.stageAtAttempt||4)-1):2}else if(result==='gave-up'){progress.gaveUpCount=(progress.gaveUpCount||0)+1;progress.stageSuccesses=0;progress.lastStageSuccessSequence=null;progress.stage=Math.min(2,progress.stage||attempt.stageAtAttempt||4)}next.progress[definition.id]=progress;let game=updateStreak(next.gamification,attempt.localStudyDate);if(result!=='gave-up')game.xp=(game.xp||0)+10;if(result==='correct')game.xp+=5;if(result==='correct'&&[...recalled].some(id=>{const p=oldWeak[id]||weakUnitDefaults();return(p.misses||0)+(p.wrongs||0)>(p.successes||0)}))game.xp+=5;next.gamification=game;return next}
 function randomOffset(range,rng){return range[0]+Math.floor(Math.max(0,Math.min(.999999,Number(rng())||0))*(range[1]-range[0]+1))}
-function applyOutcome(study,session,attempt,now=Date.now(),rng=Math.random){
-  applyClozeGradeToAttempt(attempt);
-  const nextStudy=attempt&&attempt.grading&&attempt.grading.status==='final'?reduceFinalAttempt(study,attempt):clone(study),nextSession=clone(session),g=attempt&&attempt.grading;
-  if(g&&g.status==='final'){let range=null,targetStage=null;if(g.result==='gave-up'){range=RETRY_GAVE_UP;targetStage=2}else if(g.result==='wrong'&&g.confidence!=='low'){range=RETRY_MAJOR;targetStage=2}else if(g.result==='almost'||g.result==='wrong'&&g.confidence==='low'){range=RETRY_PARTIAL;targetStage=Math.max(2,(attempt.stageAtAttempt||4)-1)}if(range){nextSession.scheduledRetries=nextSession.scheduledRetries.filter(x=>x.definitionId!==attempt.definitionId);nextSession.scheduledRetries.push({definitionId:attempt.definitionId,targetStage,afterQuestion:nextSession.answeredCount+randomOffset(range,rng)})}}
-  nextSession.answeredCount++;nextSession.lastDefinitionId=attempt.definitionId;nextSession.recentDefinitionIds.push(attempt.definitionId);nextSession.recentDefinitionIds=nextSession.recentDefinitionIds.slice(-12);return{study:nextStudy,session:nextSession}
-}
+function applyOutcome(study,session,attempt,now=Date.now(),rng=Math.random){applyClozeGradeToAttempt(attempt);const nextStudy=attempt&&attempt.grading&&attempt.grading.status==='final'?reduceFinalAttempt(study,attempt):clone(study),nextSession=clone(session),g=attempt&&attempt.grading;if(g&&g.status==='final'){let range=null,targetStage=null;if(g.result==='gave-up'){range=RETRY_GAVE_UP;targetStage=2}else if(g.result==='wrong'&&g.confidence!=='low'){range=RETRY_MAJOR;targetStage=2}else if(g.result==='almost'||g.result==='wrong'&&g.confidence==='low'){range=RETRY_PARTIAL;targetStage=Math.max(2,(attempt.stageAtAttempt||4)-1)}if(range){nextSession.scheduledRetries=nextSession.scheduledRetries.filter(x=>x.definitionId!==attempt.definitionId);nextSession.scheduledRetries.push({definitionId:attempt.definitionId,targetStage,afterQuestion:nextSession.answeredCount+randomOffset(range,rng)})}}nextSession.answeredCount++;nextSession.lastDefinitionId=attempt.definitionId;nextSession.recentDefinitionIds.push(attempt.definitionId);nextSession.recentDefinitionIds=nextSession.recentDefinitionIds.slice(-12);return{study:nextStudy,session:nextSession}}
 function nextQuestion(study,session,now=Date.now(),rng=Math.random){const definitions=filterDefinitions(study,session.scope);if(!definitions.length)return null;const retry=(session.scheduledRetries||[]).find(x=>x.afterQuestion<=session.answeredCount&&definitions.some(d=>d.id===x.definitionId));if(retry){const d=definitions.find(x=>x.id===retry.definitionId);return buildQuestion(d,ensureProgress(study,d,now),session.answeredCount+1,retry.targetStage)}const prepared=definitions.map(d=>({definition:d,progress:ensureProgress(study,d,now)}));let candidates=prepared.filter(x=>x.definition.id!==session.lastDefinitionId);if(!candidates.length)candidates=prepared;candidates.sort((a,b)=>{const da=Number(a.progress.nextReviewAt||0)<=Number(now)?1:0,db=Number(b.progress.nextReviewAt||0)<=Number(now)?1:0;if(da!==db)return db-da;const wa=Object.values(a.progress.weakUnits||{}).reduce((s,x)=>s+(x.misses||0)*2+(x.wrongs||0)*3,0),wb=Object.values(b.progress.weakUnits||{}).reduce((s,x)=>s+(x.misses||0)*2+(x.wrongs||0)*3,0);return wb-wa});const top=candidates.slice(0,Math.min(3,candidates.length)),idx=Math.floor(Math.max(0,Math.min(.999999,Number(rng())||0))*top.length),chosen=top[idx];return buildQuestion(chosen.definition,chosen.progress,session.answeredCount+1)}
 function buildCheckpoint(study,session){const capabilities=[],improvements=[];for(const d of study.definitions||[]){const before=session.checkpointStartProgress&&session.checkpointStartProgress[d.id],after=study.progress&&study.progress[d.id];if(before&&after&&Number(after.stage||0)>Number(before.stage||0))capabilities.push({definitionId:d.id,title:d.title,message:'この問題が答えられるようになっています'});if(before&&after){const terms=[];for(const u of d.memoryUnits||[]){const o=before.weakUnits&&before.weakUnits[u.id]||weakUnitDefaults(),n=after.weakUnits&&after.weakUnits[u.id]||weakUnitDefaults();if((n.successes||0)>(o.successes||0)&&(o.misses||0)+(o.wrongs||0)>0)terms.push(...(u.importantTerms||[u.text]))}if(terms.length)improvements.push({definitionId:d.id,terms:[...new Set(terms)],message:'前より思い出せています'})}}return{capabilities,improvements,xpGained:Math.max(0,Number(study.gamification&&study.gamification.xp||0)-Number(session.checkpointStartXp||0)),streak:Number(study.gamification&&study.gamification.streak||0)}}
 const api={REVIEW_INTERVALS_MS,RETRY_GAVE_UP,RETRY_MAJOR,RETRY_PARTIAL,createInitialProgress,filterDefinitions,createSession,buildQuestion,nextQuestion,gradeClozeAnswers,applyClozeGradeToAttempt,reduceFinalAttempt,applyOutcome,buildCheckpoint,installKeyboardViewport,applySubmissionState,installSubmissionUi,installClozeUi};
-if(typeof window!=='undefined'){
-  window.StudyQuiz=api;
-  if(typeof document!=='undefined'){
-    const installUi=()=>{installKeyboardViewport();installSubmissionUi();installClozeUi()};
-    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installUi,{once:true});else installUi();
-  }
-}
+if(typeof window!=='undefined'){window.StudyQuiz=api;if(typeof document!=='undefined'){const installUi=()=>{installKeyboardViewport();installSubmissionUi();installClozeUi()};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installUi,{once:true});else installUi()}}
 if(typeof module!=='undefined')module.exports=api;
 })();
