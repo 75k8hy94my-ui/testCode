@@ -93,6 +93,50 @@ test('weakness-targeted stage two question uses cloze form', () => {
   assert.equal(question.clozeItems.length, 1);
 });
 
+test('stage one recognition asks a real blank and never exposes the model answer as an option', () => {
+  const modelText = '公判外の供述を内容とする供述または書面で、当該公判外供述の内容の真実性を証明するために用いられるもの';
+  const definition = {
+    id: 'hearsay-choice', subjectId: 'criminal-procedure', genreId: 'evidence', title: '伝聞証拠', contentRevision: 1,
+    modelText,
+    memoryUnits: [
+      { id: 'hc-core', text: '公判外の供述を内容とする供述または書面で、', required: true, importantTerms: ['公判外の供述', '供述または書面'], acceptedVariants: [] },
+      { id: 'hc-purpose', text: '当該公判外供述の内容の真実性を証明するために用いられるもの', required: true, importantTerms: ['真実性', '証明'], acceptedVariants: [] },
+      { id: 'hc-whole', text: modelText, required: true, importantTerms: [], acceptedVariants: [] }
+    ],
+    clozeCandidates: [
+      { unitId: 'hc-core', terms: ['公判外の供述'] },
+      { unitId: 'hc-purpose', terms: ['真実性', '証明'] }
+    ]
+  };
+  const progress = StudyQuiz.createInitialProgress(definition, 0);
+  progress.stage = 1;
+  progress.weakUnits['hc-core'].misses = 4;
+  const question = StudyQuiz.buildQuestion(definition, progress, 1);
+  assert.equal(question.kind, 'choice');
+  assert.match(question.prompt, /【　】/);
+  assert.equal(question.prompt.includes(modelText), false);
+  assert.equal(question.options.includes(modelText), false);
+  assert.equal(question.options.includes(definition.memoryUnits[0].text), false);
+  assert.equal(question.options[question.correctOptionIndex], '公判外の供述');
+  assert.equal(question.options.length >= 3, true);
+});
+
+test('stage one falls back to typed cloze when safe distractors are unavailable', () => {
+  const definition = {
+    id: 'single-term', subjectId: 'civil-law', genreId: 'general', title: '単語定義', contentRevision: 1,
+    modelText: '法律上の効果を生じさせる意思表示',
+    memoryUnits: [{ id: 'single-core', text: '意思表示', required: true, importantTerms: ['意思表示'], acceptedVariants: [] }],
+    clozeCandidates: [{ unitId: 'single-core', terms: ['意思表示'] }]
+  };
+  const progress = StudyQuiz.createInitialProgress(definition, 0);
+  progress.stage = 1;
+  const question = StudyQuiz.buildQuestion(definition, progress, 1);
+  assert.equal(question.kind, 'cloze');
+  assert.match(question.prompt, /【1】/);
+  assert.deepEqual(question.options, []);
+  assert.equal(question.clozeItems[0].answer, '意思表示');
+});
+
 test('multi-term cloze exposes one numbered answer slot per blank', () => {
   const definition = {
     id: 'hearsay', subjectId: 'criminal-procedure', genreId: 'evidence', title: '伝聞証拠', contentRevision: 1,
