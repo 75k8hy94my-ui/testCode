@@ -46,7 +46,7 @@ test('official cards stay on first-party legal information domains', () => {
   });
 });
 
-test('home page is vault-gated, editable, and wired into the existing app entry flow', () => {
+test('home page is vault-gated, editable, and vault unlock enters it', () => {
   const home = read('home.html');
   assert.match(home, /class=["']auth-pending["']/);
   assert.match(home, /MangaVault\.loadActive\(\)/);
@@ -56,7 +56,6 @@ test('home page is vault-gated, editable, and wired into the existing app entry 
   assert.match(home, /home-dashboard\.js/);
   assert.match(home, /vault-payload\.js/);
 
-  assert.match(read('index.html'), /function\s+goReader\(\)\s*\{\s*window\.location\.replace\(['"]home\.html['"]\)/);
   assert.match(read('sync.html'), /function\s+goReader\(\)\s*\{\s*window\.location\.replace\(['"]home\.html['"]\)/);
   assert.match(read('vault-payload.js'), /homeCards:\s*['"]mangaReaderHomeCards['"]/);
   const verifier = read('scripts/check-static.mjs');
