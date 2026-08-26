@@ -61,8 +61,29 @@
     const original = backup.migrateBackup.bind(backup);
     const wrapped = function (input) {
       const data = original(input);
-      if (data && Array.isArray(data.videoFolders)) localStorage.setItem('mangaReaderVideoFolders', JSON.stringify(data.videoFolders));
-      if (data && data.videoMeta && typeof data.videoMeta === 'object' && !Array.isArray(data.videoMeta)) localStorage.setItem('mangaReaderVideoMeta', JSON.stringify(data.videoMeta));
+      const originalConfirm = root.confirm;
+      if (typeof originalConfirm !== 'function') return data;
+
+      const confirmOnce = function (...args) {
+        // applyImportedData() asks for confirmation immediately after
+        // migrateBackup() returns. Restore the native function before calling
+        // it so every later confirmation behaves normally.
+        if (root.confirm === confirmOnce) root.confirm = originalConfirm;
+        const accepted = originalConfirm.apply(root, args);
+        if (accepted) {
+          if (data && Array.isArray(data.videoFolders)) localStorage.setItem('mangaReaderVideoFolders', JSON.stringify(data.videoFolders));
+          if (data && data.videoMeta && typeof data.videoMeta === 'object' && !Array.isArray(data.videoMeta)) localStorage.setItem('mangaReaderVideoMeta', JSON.stringify(data.videoMeta));
+        }
+        return accepted;
+      };
+
+      root.confirm = confirmOnce;
+      // If the migration result is used by some future code path that does
+      // not immediately ask for confirmation, do not leave the interceptor
+      // installed beyond this JavaScript turn.
+      setTimeout(() => {
+        if (root.confirm === confirmOnce) root.confirm = originalConfirm;
+      }, 0);
       return data;
     };
     wrapped.__videoLibraryWrapped = true;
