@@ -370,3 +370,21 @@ test('sync unlock uses shared vault gate and continues to Home',()=>{
 test('sync contains no obsolete goReader reference',()=>{
   assert.doesNotMatch(read('sync.html'),/\bgoReader\b/);
 });
+
+
+test('authenticated app routing uses Home and direct Continue targets',()=>{
+  const index=read('index.html'),reader=read('reader.html'),study=read('study.html');
+  assert.ok(!index.includes('function goReader('));
+  assert.ok(index.includes("function goHome() { window.location.replace('home.html'); }"));
+  assert.ok(reader.includes("const vaultUrl = 'home.html';"));
+  assert.ok(study.includes("window.location.replace('home.html')"));
+  assert.ok(reader.includes('id="homeBtn"'));
+  assert.ok(reader.includes('id="mobileNavHome"'));
+  assert.ok(reader.includes("window.location.href='home.html'"));
+  assert.ok(study.includes('id="studyNavAppHome"'));
+  assert.ok(study.includes("window.location.href='home.html'"));
+  assert.ok(reader.includes("new URL(location.href).searchParams.get('item')"));
+  assert.ok(reader.includes('savedItems.find((item) => item.id === requestedItemId)'));
+  assert.ok(reader.includes('openItem(requestedItem, false)'));
+  assert.ok(reader.includes('resumedOnLoad ? null : localStorage.getItem(LAST_URL_KEY)'));
+});

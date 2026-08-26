@@ -1179,7 +1179,7 @@
 (() => {
   const sessionKey = 'mangaReaderSupabaseSession';
   const loginUrl = 'index.html';
-  const vaultUrl = 'sync.html';
+  const vaultUrl = 'home.html';
   const AUTH_REFRESH_TIMEOUT_MS = 5000;
   const showLogin = () => window.location.replace(loginUrl);
   try {
@@ -1204,6 +1204,7 @@
 <div id="app">
   <div id="readProgressBar"></div>
   <div id="topbar">
+    <button class="ctrlBtn" id="homeBtn" type="button" title="Homeへ戻る">Home</button>
     <button class="ctrlBtn" id="themeBtn" type="button" title="テーマ切替" aria-label="テーマ切替"></button>
     <button class="ctrlBtn" id="closeBtn" title="閉じる" aria-label="リーダーを閉じる" style="display:none;">×</button>
     <button class="ctrlBtn" id="saveBtn" title="今のURLを保存" style="display:none;">URLを保存</button>
@@ -1519,6 +1520,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   </button>
 </nav>
 <div id="mobileUtilityMenu" role="menu" aria-label="その他の操作" hidden>
+  <button id="mobileNavHome" type="button" role="menuitem">Home</button>
   <button id="mobileNavLinks" type="button" role="menuitem">リンク管理</button>
   <button id="mobileNavAuthor" type="button" role="menuitem">作者カード</button>
   <button id="mobileNavBackup" type="button" role="menuitem">バックアップ</button>
@@ -6485,6 +6487,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.editNewFolderRow.style.display = 'none';
   });
 
+  document.getElementById('homeBtn').addEventListener('click', () => { window.location.href='home.html'; });
+  document.getElementById('mobileNavHome').addEventListener('click', () => { window.location.href='home.html'; });
   els.safeModeBtn.addEventListener('click', toggleSafeMode);
   els.enhanceBtn.addEventListener('click', toggleImageEnhance);
   els.themeBtn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light', true));
@@ -6998,8 +7002,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   // {kind:'item',itemId}) so a custom (explicit page list) manga can be
   // resumed too; older saved data was a plain URL string, handled below.
   let resumedOnLoad = false;
+  const requestedItemId = new URL(location.href).searchParams.get('item');
+  const requestedItem = requestedItemId && savedItems.find((item) => item.id === requestedItemId);
+  if (requestedItem) { openItem(requestedItem, false); resumedOnLoad = true; }
   try {
-    const raw = localStorage.getItem(LAST_URL_KEY);
+    const raw = resumedOnLoad ? null : localStorage.getItem(LAST_URL_KEY);
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
