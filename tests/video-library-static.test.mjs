@@ -26,13 +26,16 @@ test('video library provides search filters sorting view modes folders and edito
   assert.match(source, /history\.pushState/);
 });
 
-test('video routing bridge opens enhanced cards through the legacy History API player path', () => {
+test('video routing bridge plays enhanced cards inline without opening the legacy player screen', () => {
   const source = read('video-routing-fix.js');
   assert.match(source, /\.vl-open/);
-  assert.match(source, /videoItem/);
-  assert.match(source, /node\.click\(\)/);
+  assert.match(source, /vl-inline-player/);
+  assert.match(source, /createElement\(['"]iframe['"]\)/);
+  assert.match(source, /stopImmediatePropagation/);
+  assert.match(source, /recordOpen/);
   assert.match(source, /addEventListener\(['"]click['"],[\s\S]*true\)/);
-  assert.match(source, /mangaReaderVideoMeta/);
+  assert.doesNotMatch(source, /node\.click\(\)/);
+  assert.doesNotMatch(source, /screen=video-player/);
   assert.match(source, /MangaVaultPayload\.buildFromLocalStorage/);
   assert.match(source, /MangaVault\.savePayload/);
 });
