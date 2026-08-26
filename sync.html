@@ -140,7 +140,7 @@
       const input=validateUnlockInput();
       if (!input || input.recovery) return;
       if (opening) return; opening=true; setStatus('保管庫を作成しています…');
-      try { const result=await vaultGate.create(input.passphrase); ui.passphrase.value=''; ui.unlock.hidden=true; ui.recoveryCode.textContent=result.recoveryCode; ui.recoveryBox.hidden=false; setStatus('保管庫を作成しました。復旧キーを保存してください。'); setTimeout(goReader,5500); }
+      try { const result=await vaultGate.create(input.passphrase); ui.passphrase.value=''; ui.unlock.hidden=true; ui.recoveryCode.textContent=result.recoveryCode; ui.recoveryBox.hidden=false; setStatus('保管庫を作成しました。復旧キーを保存してください。'); setTimeout(goHome,5500); }
       catch (error) { setStatus(error.message || '保管庫を作成できませんでした。'); }
       finally { opening=false; }
     }

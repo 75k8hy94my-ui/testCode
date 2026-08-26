@@ -365,3 +365,8 @@ test('sync unlock uses shared vault gate and continues to Home',()=>{
   assert.doesNotMatch(source,/MangaVault\.initializeWithPasskey\s*\(/);
   assert.doesNotMatch(source,/MangaVault\.registerPasskey\s*\(/);
 });
+
+
+test('sync contains no obsolete goReader reference',()=>{
+  assert.doesNotMatch(read('sync.html'),/\bgoReader\b/);
+});
