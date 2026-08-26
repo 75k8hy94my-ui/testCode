@@ -2,9 +2,6 @@
   'use strict';
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
-  const MOBILE_QUERY = '(max-width: 600px)';
-  const LIST_SCREENS = new Set(['saved-list', 'video-list']);
-
   function currentScreen() {
     return new URLSearchParams(window.location.hash.replace(/^#/, '')).get('screen') || '';
   }
@@ -129,35 +126,14 @@
     }
   }
 
-  function updateListCloseVisibility() {
-    const closeListBtn = document.getElementById('closeListBtn');
-    if (!closeListBtn) return;
-    const visible = LIST_SCREENS.has(currentScreen());
-    const mobile = window.matchMedia(MOBILE_QUERY).matches;
-    const desired = visible && !mobile ? '' : 'none';
-    if (closeListBtn.style.display !== desired) closeListBtn.style.display = visible && !mobile ? '' : 'none';
-  }
-
   function syncDesktopNavigation() {
     buildDesktopNavigation();
     updateDesktopReaderNavState();
-    updateListCloseVisibility();
   }
 
-  function installCloseVisibilityGuard() {
-    const closeListBtn = document.getElementById('closeListBtn');
-    if (!closeListBtn || typeof MutationObserver === 'undefined') return;
-    const observer = new MutationObserver(() => updateListCloseVisibility());
-    observer.observe(closeListBtn, { attributes: true, attributeFilter: ['style'] });
-  }
-
-  const media = window.matchMedia(MOBILE_QUERY);
-  if (typeof media.addEventListener === 'function') media.addEventListener('change', syncDesktopNavigation);
-  else if (typeof media.addListener === 'function') media.addListener(syncDesktopNavigation);
   window.addEventListener('popstate', syncDesktopNavigation);
   window.addEventListener('hashchange', syncDesktopNavigation);
 
   normalizeInboundLocalReaderRoute();
   syncDesktopNavigation();
-  installCloseVisibilityGuard();
 })();

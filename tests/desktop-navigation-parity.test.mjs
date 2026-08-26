@@ -38,11 +38,11 @@ test('desktop navigation stays off mobile and keeps the Liquid Glass bar mobile-
   assert.doesNotMatch(desktop, /position:\s*fixed/);
 });
 
-test('desktop list exit is restored after reader code hides it', () => {
+test('saved URL and video screens rely on desktop navigation instead of a redundant close button', () => {
+  const reader = read('reader.html');
   const desktop = read('desktop-navigation.js');
-  assert.match(desktop, /function\s+updateListCloseVisibility\s*\(/);
-  assert.match(desktop, /matchMedia\(MOBILE_QUERY\)/);
-  assert.match(desktop, /closeListBtn\.style\.display\s*=\s*visible\s*&&\s*!mobile\s*\?\s*['"]['"]\s*:\s*['"]none['"]/);
+  assert.doesNotMatch(desktop, /closeListBtn|updateListCloseVisibility|MutationObserver/);
+  assert.ok((reader.match(/els\.closeListBtn\.style\.display = 'none';/g) || []).length >= 2);
   assert.match(desktop, /addEventListener\(['"]popstate['"]/);
   assert.match(desktop, /addEventListener\(['"]hashchange['"]/);
 });
