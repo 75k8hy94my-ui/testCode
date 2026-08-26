@@ -2,31 +2,43 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const library = fs.readFileSync(new URL('../video-library.js', import.meta.url), 'utf8');
-const routing = fs.readFileSync(new URL('../video-routing-fix.js', import.meta.url), 'utf8');
+const featureUrl = new URL('../video-thumbnail-time.js', import.meta.url);
+
+test('thumbnail timestamp feature module exists', () => {
+  assert.equal(fs.existsSync(featureUrl), true);
+});
 
 test('video editor exposes thumbnail preview, slider, and mm:ss timestamp input', () => {
-  assert.match(library, /videoLibraryThumbnailPreview/);
-  assert.match(library, /videoLibraryThumbnailRange/);
-  assert.match(library, /videoLibraryThumbnailTime/);
-  assert.match(library, /type=\"range\"/);
+  assert.equal(fs.existsSync(featureUrl), true);
+  const source = fs.readFileSync(featureUrl, 'utf8');
+  assert.match(source, /videoLibraryThumbnailPreview/);
+  assert.match(source, /videoLibraryThumbnailRange/);
+  assert.match(source, /videoLibraryThumbnailTime/);
+  assert.match(source, /type = 'range'/);
 });
 
 test('video editor restores and saves thumbnailTimeSeconds', () => {
-  assert.match(library, /thumbnailTimeSeconds/);
-  assert.match(library, /dom\.thumbnailTime/);
-  assert.match(library, /dom\.thumbnailRange/);
+  assert.equal(fs.existsSync(featureUrl), true);
+  const source = fs.readFileSync(featureUrl, 'utf8');
+  assert.match(source, /thumbnailTimeSeconds/);
+  assert.match(source, /localStorage\.setItem\(META_KEY/);
+  assert.match(source, /scheduleVaultSync/);
 });
 
 test('thumbnail preview synchronizes slider, timestamp text, and media currentTime', () => {
-  assert.match(library, /thumbnailPreview\.currentTime/);
-  assert.match(library, /thumbnailRange\.addEventListener\('input'/);
-  assert.match(library, /thumbnailTime\.addEventListener\('change'/);
-  assert.match(library, /formatMediaTime/);
-  assert.match(library, /parseMediaTime/);
+  assert.equal(fs.existsSync(featureUrl), true);
+  const source = fs.readFileSync(featureUrl, 'utf8');
+  assert.match(source, /thumbnailPreview\.currentTime/);
+  assert.match(source, /thumbnailRange\.addEventListener\('input'/);
+  assert.match(source, /thumbnailTime\.addEventListener\('change'/);
+  assert.match(source, /Data\.formatMediaTime/);
+  assert.match(source, /Data\.parseMediaTime/);
 });
 
 test('direct card thumbnail seeks to the saved thumbnail timestamp', () => {
-  assert.match(routing, /effective\.thumbnailTimeSeconds/);
-  assert.match(routing, /preview\.currentTime/);
+  assert.equal(fs.existsSync(featureUrl), true);
+  const source = fs.readFileSync(featureUrl, 'utf8');
+  assert.match(source, /vl-thumb-direct-video/);
+  assert.match(source, /thumbnailTimeSeconds/);
+  assert.match(source, /preview\.currentTime/);
 });
