@@ -10,6 +10,7 @@
   let syncTimer = null;
   let activeVideoId = '';
   let activePlayer = null;
+  let activePlayback = null;
   let editorObserver = null;
 
   function readJson(key, fallback) {
@@ -69,12 +70,43 @@
     return meta[base.id];
   }
 
+  function persistPlaybackProgress(base, video, options) {
+    if (!base || !video) return;
+    const config = options || {};
+    const now = Date.now();
+    if (!config.force && activePlayback && now - activePlayback.lastLocalSaveAt < 5000) return;
+
+    const position = Number(video.currentTime);
+    if (!Number.isFinite(position) || position < 0) return;
+    const duration = Number(video.duration);
+    const rawMeta = readJson(META_KEY, {});
+    const meta = rawMeta && typeof rawMeta === 'object' && !Array.isArray(rawMeta) ? rawMeta : {};
+    const current = meta[base.id] && typeof meta[base.id] === 'object' ? meta[base.id] : {};
+    const next = {
+      ...current,
+      progressSeconds: Math.max(0, Math.round(position)),
+      updatedAt: now,
+    };
+    if (Number.isFinite(duration) && duration > 0) next.durationSeconds = Math.round(duration);
+    meta[base.id] = next;
+    localStorage.setItem(META_KEY, JSON.stringify(meta));
+    if (activePlayback) activePlayback.lastLocalSaveAt = now;
+    if (config.sync) scheduleVaultSync();
+  }
+
+  function persistActivePlayback(sync) {
+    if (!activePlayback) return;
+    persistPlaybackProgress(activePlayback.base, activePlayback.video, { force: true, sync: sync !== false });
+  }
+
   function closeActivePlayer() {
+    persistActivePlayback(true);
     if (activePlayer && activePlayer.isConnected) {
       const card = activePlayer.closest('.vl-card');
       activePlayer.remove();
       if (card) card.classList.remove('vl-inline-playing');
     }
+    activePlayback = null;
     activePlayer = null;
     activeVideoId = '';
   }
@@ -110,6 +142,19 @@
       video.autoplay = true;
       video.playsInline = true;
       video.preload = 'metadata';
+      activePlayback = { base, video, lastLocalSaveAt: 0 };
+
+      video.addEventListener('loadedmetadata', () => {
+        const duration = Number(video.duration);
+        const savedProgress = Number(meta && meta.progressSeconds != null ? meta.progressSeconds : base.progressSeconds);
+        if (Number.isFinite(savedProgress) && savedProgress > 0 && Number.isFinite(duration) && duration > 0 && savedProgress < duration - 1) {
+          try { video.currentTime = Math.min(savedProgress, Math.max(0, duration - 0.25)); } catch (_) {}
+        }
+        persistPlaybackProgress(base, video, { force: true, sync: false });
+      });
+      video.addEventListener('timeupdate', () => persistPlaybackProgress(base, video, { sync: false }));
+      video.addEventListener('pause', () => persistPlaybackProgress(base, video, { force: true, sync: true }));
+      video.addEventListener('ended', () => persistPlaybackProgress(base, video, { force: true, sync: true }));
       player.append(video);
     } else if (text(base.a) && text(base.b) && text(base.a) !== 'url') {
       const iframe = document.createElement('iframe');
@@ -215,5 +260,9 @@
   }
 
   document.addEventListener('click', handleEnhancedOpen, true);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') persistActivePlayback(true);
+  });
+  window.addEventListener('pagehide', () => persistActivePlayback(false));
   setTimeout(ensureUrlOnlyEditor, 0);
 })();
