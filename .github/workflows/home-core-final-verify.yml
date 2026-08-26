@@ -1,0 +1,32 @@
+name: Home core final verification
+
+on:
+  push:
+    branches:
+      - feature/home-dashboard
+    paths:
+      - scripts/home-core-final-verify.mjs
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/home-dashboard
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify Home core requirements
+        run: node scripts/home-core-final-verify.mjs
+      - name: Run complete test suite
+        run: npm test
+      - name: Run static verification
+        run: npm run verify:static
+      - name: Check whitespace errors
+        run: git diff --check origin/main...HEAD
