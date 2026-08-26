@@ -32,6 +32,48 @@
     return service && id ? `https://www.${service}.com/v/${encodeURIComponent(id)}` : '';
   }
 
+  function parseLegacyUrl(value) {
+    const url = asText(value);
+    try {
+      const parsed = new URL(url);
+      if (!/^https?:$/.test(parsed.protocol)) return null;
+      const hostParts = parsed.hostname.split('.');
+      if (hostParts[0] === 'www') hostParts.shift();
+      const a = asText(hostParts[0]);
+      const match = parsed.pathname.match(/\/v\/(\d+)(?:\/|$)/);
+      const b = match ? asText(match[1]) : '';
+      if (!a || !/^[a-zA-Z0-9]+$/.test(a) || !b) return null;
+      return { a, b };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function isDirectVideoUrl(value) {
+    const url = asText(value);
+    try {
+      const parsed = new URL(url);
+      if (!/^https?:$/.test(parsed.protocol)) return false;
+      return /\.(?:mp4|webm|ogg|ogv|m4v|mov)$/i.test(parsed.pathname);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function classifyVideoUrl(value) {
+    const url = asText(value);
+    try {
+      const parsed = new URL(url);
+      if (!/^https?:$/.test(parsed.protocol)) return { kind: 'invalid', url, a: '', b: '' };
+    } catch (_) {
+      return { kind: 'invalid', url, a: '', b: '' };
+    }
+    if (isDirectVideoUrl(url)) return { kind: 'direct', url, a: '', b: '' };
+    const legacy = parseLegacyUrl(url);
+    if (legacy) return { kind: 'legacy', url, a: legacy.a, b: legacy.b };
+    return { kind: 'link', url, a: '', b: '' };
+  }
+
   function normalizeVideo(value, now = Date.now()) {
     const x = value && typeof value === 'object' ? value : {};
     const a = asText(x.a);
@@ -136,5 +178,5 @@
     };
   }
 
-  return { WATCH_STATUSES, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl };
+  return { WATCH_STATUSES, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl };
 }));
