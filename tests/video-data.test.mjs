@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import data from '../video-data.js';
 
-const { normalizeVideo, normalizeFolders, parseTags, filterVideos, sortVideos, removeFolder, deriveService } = data;
+const { normalizeVideo, normalizeFolders, parseTags, filterVideos, sortVideos, removeFolder, deriveService, parseMediaTime, formatMediaTime } = data;
 
 test('normalizes legacy video records without losing legacy playback fields', () => {
   const video = normalizeVideo({ id:'v1', a:'example', b:'123', title:'Legacy', addedAt:100 });
@@ -17,6 +17,21 @@ test('normalizes legacy video records without losing legacy playback fields', ()
   assert.equal(video.watchStatus, '');
   assert.equal(video.openCount, 0);
   assert.equal(video.addedAt, 100);
+});
+
+test('normalizes and preserves the selected thumbnail timestamp', () => {
+  assert.equal(normalizeVideo({ id:'v1', thumbnailTimeSeconds:42.5 }).thumbnailTimeSeconds, 42.5);
+  assert.equal(normalizeVideo({ id:'v2' }).thumbnailTimeSeconds, null);
+  assert.equal(normalizeVideo({ id:'v3', thumbnailTimeSeconds:-2 }).thumbnailTimeSeconds, 0);
+});
+
+test('parses and formats thumbnail timestamps for editor input', () => {
+  assert.equal(parseMediaTime('90'), 90);
+  assert.equal(parseMediaTime('1:30'), 90);
+  assert.equal(parseMediaTime('1:02:03'), 3723);
+  assert.equal(parseMediaTime('bad'), null);
+  assert.equal(formatMediaTime(90), '1:30');
+  assert.equal(formatMediaTime(3723), '1:02:03');
 });
 
 test('parseTags trims, de-duplicates, and accepts comma or Japanese comma separators', () => {
