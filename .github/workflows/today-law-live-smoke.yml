@@ -1,0 +1,24 @@
+name: Today's Law live API smoke
+
+on:
+  push:
+    branches:
+      - feature/home-dashboard
+    paths:
+      - scripts/today-law-live-smoke.mjs
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/home-dashboard
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/today-law-live-smoke.mjs
