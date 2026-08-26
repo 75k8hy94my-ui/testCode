@@ -353,3 +353,15 @@ test('Home layout loads before vault payload on existing protected pages', () =>
     assert.ok(source.indexOf('home-layout.js') < source.indexOf('vault-payload.js'), page + ' must load Home layout first');
   }
 });
+
+
+test('sync unlock uses shared vault gate and continues to Home',()=>{
+  const source=read('sync.html');
+  assert.match(source,/vault-gate\.js/);
+  assert.match(source,/MangaVaultGate\.createController/);
+  assert.match(source,/window\.location\.replace\(['"]home\.html['"]\)/);
+  assert.doesNotMatch(source,/function\s+goReader\s*\(/);
+  assert.doesNotMatch(source,/MangaVault\.initialize\s*\(/);
+  assert.doesNotMatch(source,/MangaVault\.initializeWithPasskey\s*\(/);
+  assert.doesNotMatch(source,/MangaVault\.registerPasskey\s*\(/);
+});

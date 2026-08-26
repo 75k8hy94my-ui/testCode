@@ -68,7 +68,7 @@
         <strong>復旧キー（今だけ表示）</strong>
         <code id="recoveryCode"></code>
         <button id="copyRecoveryBtn" type="button">復旧キーをコピー</button>
-        <div style="margin-top:8px;">安全な場所に保管してください。数秒後に漫画リーダーを開きます。</div>
+        <div style="margin-top:8px;">安全な場所に保管してください。数秒後にホームを開きます。</div>
       </div>
     </section>
   </main>
@@ -76,15 +76,17 @@
   <script src="vault-session.js?v=20260813-vault-state"></script>
   <script src="home-layout.js"></script>
 <script src="vault-payload.js"></script>
+  <script src="vault-gate.js"></script>
   <script>
   (() => {
     'use strict';
-    const { DATA_KEYS, buildFromLocalStorage: buildPayload, applyToLocalStorage: applyPayload } = window.MangaVaultPayload;
+    const { DATA_KEYS } = window.MangaVaultPayload;
+    const vaultGate = MangaVaultGate.createController({ vaultApi: MangaVault, payloadApi: MangaVaultPayload });
     const DEVICE_DATA_KEYS = [...Object.values(DATA_KEYS),'mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
     const $ = (id) => document.getElementById(id);
     const ui = { email:$('accountEmail'), passphrase:$('vaultPassphrase'), recovery:$('recoveryKey'), status:$('status'), unlock:$('unlockView'), recoveryBox:$('recoveryBox'), recoveryCode:$('recoveryCode'), copy:$('copyRecoveryBtn'), logout:$('logoutBtn'), passphraseUnlock:$('passphraseUnlockBtn'), passkeyUnlock:$('passkeyUnlockBtn'), createVault:$('createVaultBtn'), passkeyRegister:$('passkeyRegisterBtn') };
     function setStatus(text) { ui.status.textContent=text || ''; }
-    function goReader() { window.location.replace('reader.html'); }
+    function goHome() { window.location.replace('home.html'); }
     const session = MangaVault.loadSession();
     if (!session || !session.user || !session.user.email) { window.location.replace('index.html'); return; }
     ui.email.textContent=session.user.email;
@@ -109,12 +111,12 @@
       if (opening) return;
       opening=true; setStatus('保管庫を確認しています…');
       try {
-        const result=await MangaVault.initialize(passphrase,recovery,buildPayload,applyPayload);
+        const result=await vaultGate.unlock({passphrase,recovery});
         ui.passphrase.value=''; ui.recovery.value='';
         if (result.created) {
           ui.unlock.hidden=true; ui.recoveryCode.textContent=result.recoveryCode; ui.recoveryBox.hidden=false; setStatus('');
-          setTimeout(goReader, 5500);
-        } else { goReader(); }
+          setTimeout(goHome, 5500);
+        } else { goHome(); }
       } catch (error) { setStatus(error.message || '保管庫を開けませんでした。'); }
       finally { opening=false; }
     }
@@ -125,7 +127,7 @@
     }
     async function passkeyUnlock() {
       if (opening) return; opening=true; setStatus('パスキーを確認しています…');
-      try { await MangaVault.initializeWithPasskey(applyPayload); goReader(); }
+      try { await vaultGate.unlockWithPasskey(); goHome(); }
       catch (error) { setStatus(error.message || 'パスキーで保管庫を開けませんでした。'); }
       finally { opening=false; }
     }
@@ -138,7 +140,7 @@
       const input=validateUnlockInput();
       if (!input || input.recovery) return;
       if (opening) return; opening=true; setStatus('保管庫を作成しています…');
-      try { const result=await MangaVault.initialize(input.passphrase,'',buildPayload,applyPayload); ui.passphrase.value=''; ui.unlock.hidden=true; ui.recoveryCode.textContent=result.recoveryCode; ui.recoveryBox.hidden=false; setStatus('保管庫を作成しました。復旧キーを保存してください。'); setTimeout(goReader,5500); }
+      try { const result=await vaultGate.create(input.passphrase); ui.passphrase.value=''; ui.unlock.hidden=true; ui.recoveryCode.textContent=result.recoveryCode; ui.recoveryBox.hidden=false; setStatus('保管庫を作成しました。復旧キーを保存してください。'); setTimeout(goReader,5500); }
       catch (error) { setStatus(error.message || '保管庫を作成できませんでした。'); }
       finally { opening=false; }
     }
@@ -147,7 +149,7 @@
       if (!input || input.recovery) { setStatus('パスキー登録には12文字以上のパスフレーズを入力してください。'); return; }
       if (opening) return; opening=true; setStatus('パスキーを登録しています…');
       try {
-        await MangaVault.registerPasskey(input.passphrase);
+        await vaultGate.registerPasskey(input.passphrase);
         ui.passphrase.value='';
         setStatus('パスキーを登録しました。次回からパスキーで開けます。');
       }
