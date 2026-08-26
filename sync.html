@@ -68,7 +68,7 @@
         <strong>復旧キー（今だけ表示）</strong>
         <code id="recoveryCode"></code>
         <button id="copyRecoveryBtn" type="button">復旧キーをコピー</button>
-        <div style="margin-top:8px;">安全な場所に保管してください。数秒後に漫画リーダーを開きます。</div>
+        <div style="margin-top:8px;">安全な場所に保管してください。数秒後にホームを開きます。</div>
       </div>
     </section>
   </main>
@@ -83,7 +83,7 @@
     const $ = (id) => document.getElementById(id);
     const ui = { email:$('accountEmail'), passphrase:$('vaultPassphrase'), recovery:$('recoveryKey'), status:$('status'), unlock:$('unlockView'), recoveryBox:$('recoveryBox'), recoveryCode:$('recoveryCode'), copy:$('copyRecoveryBtn'), logout:$('logoutBtn'), passphraseUnlock:$('passphraseUnlockBtn'), passkeyUnlock:$('passkeyUnlockBtn'), createVault:$('createVaultBtn'), passkeyRegister:$('passkeyRegisterBtn') };
     function setStatus(text) { ui.status.textContent=text || ''; }
-    function goReader() { window.location.replace('reader.html'); }
+    function goReader() { window.location.replace('home.html'); }
     const session = MangaVault.loadSession();
     if (!session || !session.user || !session.user.email) { window.location.replace('index.html'); return; }
     ui.email.textContent=session.user.email;
