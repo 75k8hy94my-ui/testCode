@@ -37,10 +37,12 @@ test('video routing bridge opens enhanced cards through the legacy History API p
   assert.match(source, /MangaVault\.savePayload/);
 });
 
-test('browser bootstrap restores encrypted sidecars when legacy reader imports a backup', () => {
+test('browser backup hook commits encrypted video sidecars only after import confirmation', () => {
   const source = read('recommendations.js');
   assert.match(source, /MangaReaderBackup\.migrateBackup/);
-  assert.match(source, /mangaReaderVideoFolders/);
-  assert.match(source, /mangaReaderVideoMeta/);
   assert.match(source, /installVideoBackupRestoreHook/);
+  assert.match(source, /root\.confirm/);
+  assert.match(source, /accepted[\s\S]*mangaReaderVideoFolders/);
+  assert.match(source, /accepted[\s\S]*mangaReaderVideoMeta/);
+  assert.match(source, /setTimeout[\s\S]*root\.confirm/);
 });
