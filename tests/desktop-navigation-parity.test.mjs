@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
+// Contract: every mobile-only reader destination needs a desktop-reachable counterpart.
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 
 test('desktop navigation provides a counterpart for every mobile reader destination', () => {
