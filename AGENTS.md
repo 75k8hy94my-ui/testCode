@@ -1,8 +1,9 @@
 # Current implementation notes
 
 - The application remains static HTML/CSS/JavaScript with no build step or production dependencies.
-- Vault payload keys are defined in `vault-payload.js`; `authorCards` and `study` are included in sync and logout clearing.
-- Backups use `manga-reader-backup` version 2 and accept legacy raw payloads; missing `study` normalizes to an empty study state.
+- Vault payload keys are defined in `vault-payload.js`; `authorCards`, `study`, `videoFolders`, and `videoMeta` are included in sync and logout clearing.
+- Video bookmark enhancements preserve the legacy `mangaReaderVideos` base records and store folders/extended metadata in `mangaReaderVideoFolders` / `mangaReaderVideoMeta`; both sidecars are included in encrypted vault sync and version-2 backups.
+- Backups use `manga-reader-backup` version 2 and accept legacy raw payloads; missing `study` normalizes to an empty study state and missing video sidecars normalize to empty values.
 - `mangaReaderSavedVaultPassphrase:<userId>` is a legacy key only; passphrases are not persisted by current UI and the legacy key is removed on logout.
 - Supabase vault rows use `revision` and `update_manga_reader_vault(expected_revision, new_payload)` for atomic conflict detection.
 - Study sync keeps local `pendingSyncOps` and may rebase them onto the newest remote study state after a CAS conflict only when non-study local data has not changed from the recorded baseline.
