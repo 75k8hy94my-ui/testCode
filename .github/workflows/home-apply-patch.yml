@@ -1,0 +1,38 @@
+name: Home apply patch
+
+on:
+  push:
+    branches:
+      - feature/home-dashboard
+    paths:
+      - scripts/home-patch-request.mjs
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/home-dashboard
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/home-patch-request.mjs
+      - run: npm test
+      - run: npm run verify:static
+      - name: Commit generated implementation changes
+        run: |
+          if git diff --quiet; then
+            echo "No generated changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "bot: apply home implementation task"
+          git push origin HEAD:feature/home-dashboard
