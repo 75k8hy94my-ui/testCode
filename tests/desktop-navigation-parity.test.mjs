@@ -51,6 +51,7 @@ test('cross-document return routes point to real destinations', () => {
   const links = read('links.html');
   const desktop = read('desktop-navigation.js');
   assert.match(links, /href=["']home\.html["']/);
+  // The implementation uses a RegExp literal, so do not couple this assertion to slash escaping.
   assert.match(desktop, /local-reader/);
   assert.match(desktop, /referrer\.pathname/);
   assert.match(desktop, /url\.hash\s*=\s*['"]screen=saved-list['"]/);
