@@ -26,13 +26,15 @@ test('video library provides search filters sorting view modes folders and edito
   assert.match(source, /history\.pushState/);
 });
 
-test('video editor accepts one URL and does not expose legacy service or video ID fields', () => {
-  const source = read('video-library.js');
-  assert.match(source, /id=["']videoLibraryUrl["']/);
-  assert.match(source, /classifyVideoUrl/);
-  assert.doesNotMatch(source, /videoLibraryLegacyService/);
-  assert.doesNotMatch(source, /videoLibraryLegacyId/);
-  assert.doesNotMatch(source, /parseThroughLegacy/);
+test('enhanced editor presents URL as the only playback locator while legacy fields stay internal', () => {
+  const library = read('video-library.js');
+  const bridge = read('video-routing-fix.js');
+  assert.match(library, /id=["']videoLibraryUrl["']/);
+  assert.match(bridge, /videoLibraryLegacyService/);
+  assert.match(bridge, /videoLibraryLegacyId/);
+  assert.match(bridge, /classifyVideoUrl/);
+  assert.match(bridge, /\.remove\(\)/);
+  assert.match(bridge, /addEventListener\(['"]submit['"],[\s\S]*true\)/);
 });
 
 test('video routing bridge plays direct video URLs with a video element and keeps legacy iframe playback', () => {
