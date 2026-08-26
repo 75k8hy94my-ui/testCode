@@ -55,8 +55,23 @@
     });
   }
 
+  function installVideoBackupRestoreHook() {
+    const backup = root.MangaReaderBackup;
+    if (!backup || typeof backup.migrateBackup !== 'function' || backup.migrateBackup.__videoLibraryWrapped) return;
+    const original = backup.migrateBackup.bind(backup);
+    const wrapped = function (input) {
+      const data = original(input);
+      if (data && Array.isArray(data.videoFolders)) localStorage.setItem('mangaReaderVideoFolders', JSON.stringify(data.videoFolders));
+      if (data && data.videoMeta && typeof data.videoMeta === 'object' && !Array.isArray(data.videoMeta)) localStorage.setItem('mangaReaderVideoMeta', JSON.stringify(data.videoMeta));
+      return data;
+    };
+    wrapped.__videoLibraryWrapped = true;
+    root.MangaReaderBackup.migrateBackup = wrapped;
+  }
+
   function bootstrapVideoLibrary() {
     if (typeof document === 'undefined') return;
+    installVideoBackupRestoreHook();
     loadBrowserScript('video-data.js')
       .then(() => loadBrowserScript('video-library.js'))
       .catch((error) => console.warn('動画ライブラリの読み込みに失敗しました', error));
