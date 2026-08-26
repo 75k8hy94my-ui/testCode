@@ -1,0 +1,39 @@
+name: Today's Law task 2
+
+on:
+  push:
+    branches:
+      - feature/home-dashboard
+    paths:
+      - scripts/today-law-task2.mjs
+
+permissions:
+  contents: write
+
+jobs:
+  author-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/home-dashboard
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/today-law-task2.mjs
+      - run: node scripts/verify-today-laws.mjs --file data/today-laws.json --subject constitutional-law --expected 30
+      - run: node scripts/verify-today-laws.mjs --file data/today-laws.json --subject administrative-law --expected 40
+      - run: node scripts/verify-today-laws.mjs --file data/today-laws.json --subject constitutional-law --expected 30 --live
+      - run: node scripts/verify-today-laws.mjs --file data/today-laws.json --subject administrative-law --expected 40 --live
+      - run: npm test
+      - run: npm run verify:static
+      - name: Commit verified data
+        run: |
+          if [ -z "$(git status --porcelain -- data/today-laws.json tests/today-law-validation.test.mjs docs/superpowers/plans/2026-08-26-today-law-implementation.md)" ]; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/today-laws.json tests/today-law-validation.test.mjs docs/superpowers/plans/2026-08-26-today-law-implementation.md
+          git commit -m "data: add constitutional and administrative daily laws"
+          git push origin HEAD:feature/home-dashboard
