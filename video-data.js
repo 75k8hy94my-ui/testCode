@@ -36,6 +36,25 @@
     return `${minutes}:${String(seconds).padStart(2, '0')}`;
   }
 
+  function mergeVideoMetaPreservingThumbnailTime(existingValue, incomingValue) {
+    const existing = existingValue && typeof existingValue === 'object' && !Array.isArray(existingValue) ? existingValue : {};
+    const incoming = incomingValue && typeof incomingValue === 'object' && !Array.isArray(incomingValue) ? incomingValue : {};
+    const merged = {};
+    Object.entries(incoming).forEach(([id, raw]) => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        merged[id] = raw;
+        return;
+      }
+      const next = { ...raw };
+      const previous = existing[id] && typeof existing[id] === 'object' && !Array.isArray(existing[id]) ? existing[id] : null;
+      if (!Object.prototype.hasOwnProperty.call(next, 'thumbnailTimeSeconds') && previous && Object.prototype.hasOwnProperty.call(previous, 'thumbnailTimeSeconds')) {
+        next.thumbnailTimeSeconds = previous.thumbnailTimeSeconds;
+      }
+      merged[id] = next;
+    });
+    return merged;
+  }
+
   function parseTags(value) {
     const source = Array.isArray(value) ? value : asText(value).split(/[,、]/);
     const seen = new Set();
@@ -220,5 +239,5 @@
     };
   }
 
-  return { WATCH_STATUSES, parseMediaTime, formatMediaTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, storageFieldsForVideoUrl };
+  return { WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, storageFieldsForVideoUrl };
 }));
