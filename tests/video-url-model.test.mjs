@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import data from '../video-data.js';
 
-const { classifyVideoUrl, parseLegacyUrl, isDirectVideoUrl } = data;
+const { classifyVideoUrl, parseLegacyUrl, isDirectVideoUrl, storageFieldsForVideoUrl } = data;
 
 test('legacy service URLs are parsed internally from the URL', () => {
   assert.deepEqual(parseLegacyUrl('https://www.example.com/v/12345/anything'), { a: 'example', b: '12345' });
@@ -34,4 +34,16 @@ test('URL classification keeps legacy support but treats arbitrary pages as URL 
     b: '',
   });
   assert.equal(classifyVideoUrl('not a url').kind, 'invalid');
+});
+
+test('URL-only records receive stable internal compatibility fields without exposing them', () => {
+  assert.deepEqual(storageFieldsForVideoUrl('https://www.example.com/v/321'), { a: 'example', b: '321' });
+  const first = storageFieldsForVideoUrl('https://cdn.example.com/movie.mp4?token=a');
+  const again = storageFieldsForVideoUrl('https://cdn.example.com/movie.mp4?token=a');
+  const other = storageFieldsForVideoUrl('https://cdn.example.com/movie.mp4?token=b');
+  assert.equal(first.a, 'url');
+  assert.match(first.b, /^\d+$/);
+  assert.deepEqual(again, first);
+  assert.notEqual(other.b, first.b);
+  assert.equal(storageFieldsForVideoUrl('not a url'), null);
 });
