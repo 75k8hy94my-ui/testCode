@@ -51,7 +51,8 @@ test('cross-document return routes point to real destinations', () => {
   const links = read('links.html');
   const desktop = read('desktop-navigation.js');
   assert.match(links, /href=["']home\.html["']/);
-  assert.match(desktop, /local-reader\.html/);
+  assert.match(desktop, /local-reader/);
+  assert.match(desktop, /referrer\.pathname/);
   assert.match(desktop, /url\.hash\s*=\s*['"]screen=saved-list['"]/);
   assert.match(desktop, /readerScreen:\s*['"]saved-list['"]/);
   assert.match(desktop, /dispatchEvent\(new Event\(['"]hashchange['"]\)\)/);
