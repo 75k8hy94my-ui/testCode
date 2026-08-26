@@ -344,3 +344,12 @@ test('screen navigation does not rely on native dialog overlays', () => {
     assert.doesNotMatch(source, /<dialog\b|showModal\(\)/);
   }
 });
+
+
+test('Home layout loads before vault payload on existing protected pages', () => {
+  for (const page of ['sync.html', 'reader.html', 'study.html']) {
+    const source = read(page);
+    assert.ok(source.indexOf('home-layout.js') >= 0, page + ' should load home-layout.js');
+    assert.ok(source.indexOf('home-layout.js') < source.indexOf('vault-payload.js'), page + ' must load Home layout first');
+  }
+});

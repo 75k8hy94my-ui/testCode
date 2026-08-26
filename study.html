@@ -11,7 +11,8 @@ html.auth-pending body{visibility:hidden}:root{color-scheme:light;--bg:#f5f5f7;-
 <script>(()=>{try{document.documentElement.dataset.theme=localStorage.getItem('mangaReaderTheme')==='light'?'light':'dark'}catch(_){document.documentElement.dataset.theme='dark'}})()</script>
 </head>
 <body>
-<script src="supabase-config.js"></script><script src="vault-session.js?v=20260813-vault-state"></script><script src="vault-payload.js"></script><script src="study-data.js"></script><script src="study-sync.js"></script><script src="study-quiz.js"></script><script src="study-audio.js"></script><script src="study-ai.js"></script><script src="study-offline.js"></script>
+<script src="supabase-config.js"></script><script src="vault-session.js?v=20260813-vault-state"></script><script src="home-layout.js"></script>
+<script src="vault-payload.js"></script><script src="study-data.js"></script><script src="study-sync.js"></script><script src="study-quiz.js"></script><script src="study-audio.js"></script><script src="study-ai.js"></script><script src="study-offline.js"></script>
 <script>(()=>{'use strict';const sessionKey='mangaReaderSupabaseSession',showLogin=()=>window.location.replace('index.html');try{const session=JSON.parse(localStorage.getItem(sessionKey)||'null'),config=window.MANGA_READER_SUPABASE||{};if(!session||!session.refresh_token||!config.url||!config.publishableKey){showLogin();return}if(!window.MangaVault||!MangaVault.loadActive()){window.location.replace('sync.html');return}document.documentElement.classList.remove('auth-pending')}catch(_){showLogin()}})()</script>
 <header id="studyContextNav" aria-label="ページナビゲーション" hidden><button id="contextBackBtn" class="contextBackBtn" type="button" aria-label="戻る"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg><span>戻る</span></button><div id="contextNavTitle"></div><div class="contextNavSpacer" aria-hidden="true"></div></header>
 <main id="studyApp">

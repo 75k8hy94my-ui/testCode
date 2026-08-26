@@ -1,3 +1,5 @@
+const BackupHomeLayoutRef=typeof module!=='undefined'&&module.exports?require('./home-layout.js'):(typeof window!=='undefined'?window.MangaHomeLayout:null);
+if(!BackupHomeLayoutRef)throw new Error('Home layout module is required before backup-format.js');
 const FORMAT = 'manga-reader-backup';
 const VERSION = 2;
 const DEFAULT_DASHBOARD_VISIBILITY = { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false };
@@ -44,7 +46,7 @@ function normalizeBackupStudy(value) {
 }
 function normalizeData(data) {
   const x = data && typeof data === 'object' ? data : {};
-  return { folders: Array.isArray(x.folders) ? x.folders : [], items: Array.isArray(x.items) ? x.items : [], videos: Array.isArray(x.videos) ? x.videos : [], authorCards: Array.isArray(x.authorCards) ? x.authorCards : [], mangaInfo: x.mangaInfo && typeof x.mangaInfo === 'object' && !Array.isArray(x.mangaInfo) ? x.mangaInfo : {}, toc: x.toc && typeof x.toc === 'object' && !Array.isArray(x.toc) ? x.toc : {}, lastPages: x.lastPages && typeof x.lastPages === 'object' && !Array.isArray(x.lastPages) ? x.lastPages : {}, theme: x.theme === 'light' ? 'light' : 'dark', dashboardVisibility: normalizeBackupDashboardVisibility(x.dashboardVisibility), study: normalizeBackupStudy(x.study) };
+  return { folders: Array.isArray(x.folders) ? x.folders : [], items: Array.isArray(x.items) ? x.items : [], videos: Array.isArray(x.videos) ? x.videos : [], authorCards: Array.isArray(x.authorCards) ? x.authorCards : [], mangaInfo: x.mangaInfo && typeof x.mangaInfo === 'object' && !Array.isArray(x.mangaInfo) ? x.mangaInfo : {}, toc: x.toc && typeof x.toc === 'object' && !Array.isArray(x.toc) ? x.toc : {}, lastPages: x.lastPages && typeof x.lastPages === 'object' && !Array.isArray(x.lastPages) ? x.lastPages : {}, theme: x.theme === 'light' ? 'light' : 'dark', dashboardVisibility: normalizeBackupDashboardVisibility(x.dashboardVisibility), study: normalizeBackupStudy(x.study), home: BackupHomeLayoutRef.normalizeHome(x.home) };
 }
 function createBackup(data, exportedAt = new Date().toISOString()) { return { format: FORMAT, version: VERSION, exportedAt, data: normalizeData(data) }; }
 function migrateBackup(input) {
