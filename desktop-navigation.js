@@ -9,6 +9,18 @@
     return new URLSearchParams(window.location.hash.replace(/^#/, '')).get('screen') || '';
   }
 
+  function normalizeInboundLocalReaderRoute() {
+    if (currentScreen() || !document.referrer) return false;
+    let referrer;
+    try { referrer = new URL(document.referrer, window.location.href); } catch (_) { return false; }
+    if (referrer.origin !== window.location.origin || !/\/local-reader\.html$/.test(referrer.pathname)) return false;
+    const url = new URL(window.location.href);
+    url.hash = 'screen=saved-list';
+    window.history.replaceState({ ...(window.history.state || {}), readerScreen: 'saved-list' }, '', url);
+    window.dispatchEvent(new Event('hashchange'));
+    return true;
+  }
+
   function createStyles() {
     if (document.getElementById('desktopReaderNavStyles')) return;
     const style = document.createElement('style');
@@ -145,6 +157,7 @@
   window.addEventListener('popstate', syncDesktopNavigation);
   window.addEventListener('hashchange', syncDesktopNavigation);
 
+  normalizeInboundLocalReaderRoute();
   syncDesktopNavigation();
   installCloseVisibilityGuard();
 })();
