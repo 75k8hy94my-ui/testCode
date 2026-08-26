@@ -48,10 +48,12 @@ test('desktop list exit is restored after reader code hides it', () => {
 
 test('cross-document return routes point to real destinations', () => {
   const links = read('links.html');
-  const localReader = read('local-reader.html');
+  const desktop = read('desktop-navigation.js');
   assert.match(links, /href=["']home\.html["']/);
-  assert.match(localReader, /reader\.html#screen=saved-list/);
-  assert.doesNotMatch(localReader, /window\.location\.href\s*=\s*['"]reader\.html['"]/);
+  assert.match(desktop, /local-reader\.html/);
+  assert.match(desktop, /url\.hash\s*=\s*['"]screen=saved-list['"]/);
+  assert.match(desktop, /readerScreen:\s*['"]saved-list['"]/);
+  assert.match(desktop, /dispatchEvent\(new Event\(['"]hashchange['"]\)\)/);
 });
 
 test('desktop navigation enhancement is bootstrapped after the reader code', () => {
