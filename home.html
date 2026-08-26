@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja" class="auth-pending">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f5f5f7">
+<title>ホーム</title>
+<link rel="icon" type="image/png" href="icon-152.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<style>
+html.auth-pending body{visibility:hidden}:root{color-scheme:light;--bg:#f5f5f7;--surface:rgba(255,255,255,.80);--surface-strong:#fff;--text:#1d1d1f;--sub:#6e6e73;--line:rgba(60,60,67,.16);--accent:#2563eb;--glass:rgba(248,249,252,.72);--glass-border:rgba(255,255,255,.78);--glass-shadow:rgba(38,42,50,.15);--official:#0f766e}html[data-theme="dark"]{color-scheme:dark;--bg:#0a0c11;--surface:rgba(21,25,35,.78);--surface-strong:#151923;--text:#f1f2f6;--sub:#959cab;--line:rgba(255,255,255,.13);--accent:#7aa2ff;--glass:rgba(25,28,35,.76);--glass-border:rgba(255,255,255,.20);--glass-shadow:rgba(0,0,0,.42);--official:#5eead4}*{box-sizing:border-box}html,body{margin:0;min-height:100%}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic",sans-serif;color:var(--text);background:radial-gradient(80% 55% at 0 0,color-mix(in srgb,var(--accent) 14%,transparent),transparent 70%),var(--bg);-webkit-font-smoothing:antialiased}button,a{font:inherit}.homeShell{width:min(100% - 24px,1080px);margin:0 auto;padding:max(24px,env(safe-area-inset-top)) 0 max(42px,env(safe-area-inset-bottom))}.homeHeader{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin:0 2px 24px}.eyebrow{font-size:11px;font-weight:850;letter-spacing:.14em;color:var(--accent)}h1{margin:6px 0 5px;font-size:clamp(34px,7vw,54px);letter-spacing:-.05em}.lead{margin:0;color:var(--sub);font-size:14px;line-height:1.6}.headerActions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.glassBtn{min-height:44px;border:1px solid var(--glass-border);border-radius:16px;padding:0 14px;background:var(--glass);color:var(--text);font-weight:750;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 8px 22px var(--glass-shadow);-webkit-backdrop-filter:blur(22px) saturate(150%);backdrop-filter:blur(22px) saturate(150%);cursor:pointer}.glassBtn:active{transform:scale(.98)}.syncStatus{min-height:20px;margin:-10px 2px 12px;color:var(--sub);font-size:12px;text-align:right}.homeGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:13px}.homeCard{position:relative;min-height:160px;border:1px solid var(--line);border-radius:24px;background:linear-gradient(145deg,color-mix(in srgb,var(--surface) 94%,transparent),color-mix(in srgb,var(--surface) 75%,transparent));box-shadow:0 14px 34px color-mix(in srgb,var(--glass-shadow) 55%,transparent),inset 0 1px 0 rgba(255,255,255,.26);overflow:hidden}.homeCardLink{height:100%;min-height:160px;padding:20px;color:inherit;text-decoration:none;display:flex;flex-direction:column}.cardTop{display:flex;justify-content:space-between;align-items:center;gap:12px}.cardMark{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 12%,var(--surface-strong));border:1px solid color-mix(in srgb,var(--accent) 20%,var(--line));font-weight:900;color:var(--accent)}.cardBadge{font-size:10px;font-weight:850;letter-spacing:.08em;color:var(--sub);border:1px solid var(--line);border-radius:999px;padding:5px 8px}.homeCard[data-kind="official"] .cardBadge{color:var(--official)}.homeCard h2{margin:18px 0 5px;font-size:21px;letter-spacing:-.025em}.homeCard p{margin:0;color:var(--sub);font-size:13px;line-height:1.6}.openHint{margin-top:auto;padding-top:16px;color:var(--accent);font-size:12px;font-weight:800}.editCardBody{min-height:160px;padding:20px 20px 70px}.editCardBody h2{margin:16px 0 5px}.cardEditControls{position:absolute;left:12px;right:12px;bottom:12px;display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:6px}.cardEditControls button,.addCardButton{min-height:40px;border:1px solid var(--line);border-radius:12px;background:var(--surface-strong);color:var(--text);font-weight:750;cursor:pointer}.cardEditControls button:disabled{opacity:.35;cursor:default}.cardEditControls .remove{color:#dc2626}.addPanel{margin-top:18px;padding:18px;border:1px solid var(--glass-border);border-radius:24px;background:var(--glass);box-shadow:0 12px 30px var(--glass-shadow),inset 0 1px 0 rgba(255,255,255,.28);-webkit-backdrop-filter:blur(24px) saturate(150%);backdrop-filter:blur(24px) saturate(150%)}.addPanel h2{margin:0;font-size:18px}.addPanel p{margin:6px 0 14px;color:var(--sub);font-size:13px}.addCardList{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}.addCardButton{text-align:left;padding:12px}.addCardButton strong{display:block}.addCardButton span{display:block;color:var(--sub);font-size:11px;margin-top:4px}.emptyState{padding:38px 18px;border:1px dashed var(--line);border-radius:24px;text-align:center;color:var(--sub)}.emptyState strong{display:block;color:var(--text);font-size:19px;margin-bottom:7px}.emptyState .glassBtn{margin-top:16px}.homeCardLink:focus-visible,.glassBtn:focus-visible,.cardEditControls button:focus-visible,.addCardButton:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 65%,transparent);outline-offset:2px}@media(max-width:640px){.homeHeader{display:block}.headerActions{justify-content:flex-start;margin-top:18px}.headerActions>*{flex:1}.syncStatus{text-align:left;margin-top:0}.homeGrid{grid-template-columns:1fr}.homeCard,.homeCardLink,.editCardBody{min-height:145px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}.glassBtn:active{transform:none}}@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.glassBtn,.addPanel{background:var(--surface-strong)}.homeCard{background:var(--surface-strong)}}[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main class="homeShell" id="homeApp">
+  <header class="homeHeader">
+    <div><span class="eyebrow">HOME</span><h1>ホーム</h1><p class="lead">よく使う機能と公式情報を、好きな順番に置けます。</p></div>
+    <div class="headerActions"><a class="glassBtn" href="sync.html">保管庫</a><button class="glassBtn" id="editHomeBtn" type="button">カードを編集</button></div>
+  </header>
+  <p id="homeSyncStatus" class="syncStatus" aria-live="polite"></p>
+  <section id="homeGrid" class="homeGrid" aria-label="ホームカード"></section>
+  <section id="homeEmpty" class="emptyState" hidden><strong>ホームにカードがありません</strong><span>必要なカードだけ追加できます。</span><button id="emptyEditBtn" class="glassBtn" type="button">カードを追加</button></section>
+  <section id="addCardPanel" class="addPanel" hidden><h2>カードを追加</h2><p>非表示にしたカードはいつでも戻せます。</p><div id="addCardList" class="addCardList"></div></section>
+</main>
+<script src="supabase-config.js"></script>
+<script src="vault-session.js?v=20260813-vault-state"></script>
+<script src="vault-payload.js"></script>
+<script src="home-dashboard.js"></script>
+<script>
+(()=>{
+'use strict';
+const config=window.MANGA_READER_SUPABASE||{};
+const showLogin=()=>window.location.replace('index.html');
+const showVault=()=>window.location.replace('sync.html');
+const session=window.MangaVault&&MangaVault.loadSession();
+if(!session||!session.refresh_token||!config.url||!config.publishableKey){showLogin();return;}
+if(!MangaVault.loadActive()){showVault();return;}
+MangaVault.refreshSession().then(()=>document.documentElement.classList.remove('auth-pending')).catch(()=>{MangaVault.saveSession(null);showLogin();});
+
+const Home=window.MangaReaderHome;
+const $=(id)=>document.getElementById(id);
+const ui={grid:$('homeGrid'),empty:$('homeEmpty'),edit:$('editHomeBtn'),emptyEdit:$('emptyEditBtn'),addPanel:$('addCardPanel'),addList:$('addCardList'),sync:$('homeSyncStatus')};
+const marks={bookshelf:'本',study:'学',quiz:'Q',links:'↗',egov:'法',courts:'判','moj-exam':'司'};
+let layout=Home.loadLayout();
+let editing=false;
+let syncRunning=false;
+let syncDirty=false;
+let syncClearTimer=null;
+
+function setSyncStatus(text){clearTimeout(syncClearTimer);ui.sync.textContent=text||'';if(text&&text!=='同期中…')syncClearTimer=setTimeout(()=>{ui.sync.textContent='';},3500);}
+async function runHomeSync(){
+  if(syncRunning){syncDirty=true;return;}
+  syncRunning=true;setSyncStatus('同期中…');
+  try{await MangaVault.savePayload(MangaVaultPayload.buildFromLocalStorage());setSyncStatus('ホームの並びを保存しました');}
+  catch(error){setSyncStatus('端末には保存済みです。クラウド同期: '+(error&&error.message?error.message:'失敗'));}
+  finally{syncRunning=false;if(syncDirty){syncDirty=false;runHomeSync();}}
+}
+function commitLayout(next){layout=Home.saveLayout(next);render();runHomeSync();}
+function cardTop(card){const top=document.createElement('div');top.className='cardTop';const mark=document.createElement('span');mark.className='cardMark';mark.textContent=marks[card.id]||'・';const badge=document.createElement('span');badge.className='cardBadge';badge.textContent=card.badge||'';top.append(mark,badge);return top;}
+function addCardText(root,card){root.append(cardTop(card));const title=document.createElement('h2');title.textContent=card.title;const text=document.createElement('p');text.textContent=card.subtitle;root.append(title,text);}
+function buildCard(id,index){
+  const card=Home.CARD_CATALOG[id];if(!card)return null;
+  const article=document.createElement('article');article.className='homeCard';article.dataset.kind=card.kind;
+  if(!editing){const link=document.createElement('a');link.className='homeCardLink';link.href=card.href;if(card.kind==='official'){link.target='_blank';link.rel='noopener noreferrer';}addCardText(link,card);const hint=document.createElement('span');hint.className='openHint';hint.textContent=card.kind==='official'?'公式サイトを開く ↗':'開く →';link.append(hint);article.append(link);return article;}
+  const body=document.createElement('div');body.className='editCardBody';addCardText(body,card);article.append(body);
+  const controls=document.createElement('div');controls.className='cardEditControls';
+  const up=document.createElement('button');up.type='button';up.textContent='↑';up.setAttribute('aria-label',card.title+'を上へ');up.disabled=index===0;up.addEventListener('click',()=>commitLayout(Home.moveCard(layout,id,-1)));
+  const down=document.createElement('button');down.type='button';down.textContent='↓';down.setAttribute('aria-label',card.title+'を下へ');down.disabled=index===layout.length-1;down.addEventListener('click',()=>commitLayout(Home.moveCard(layout,id,1)));
+  const remove=document.createElement('button');remove.type='button';remove.className='remove';remove.textContent='削除';remove.addEventListener('click',()=>commitLayout(Home.removeCard(layout,id)));
+  controls.append(up,down,remove);article.append(controls);return article;
+}
+function renderAddPanel(){ui.addList.replaceChildren();Home.hiddenCardIds(layout).forEach((id)=>{const card=Home.CARD_CATALOG[id];const button=document.createElement('button');button.className='addCardButton';button.type='button';const title=document.createElement('strong');title.textContent='+ '+card.title;const detail=document.createElement('span');detail.textContent=card.subtitle;button.append(title,detail);button.addEventListener('click',()=>commitLayout(Home.addCard(layout,id)));ui.addList.append(button);});if(!ui.addList.childElementCount){const done=document.createElement('span');done.textContent='追加できるカードはすべて表示されています。';done.style.color='var(--sub)';ui.addList.append(done);}}
+function render(){ui.grid.replaceChildren();layout.forEach((id,index)=>{const node=buildCard(id,index);if(node)ui.grid.append(node);});ui.empty.hidden=layout.length>0;ui.addPanel.hidden=!editing;ui.edit.textContent=editing?'編集完了':'カードを編集';if(editing)renderAddPanel();}
+function setEditing(value){editing=!!value;render();}
+ui.edit.addEventListener('click',()=>setEditing(!editing));ui.emptyEdit.addEventListener('click',()=>setEditing(true));
+try{const theme=localStorage.getItem('mangaReaderTheme');document.documentElement.dataset.theme=theme==='light'?'light':'dark';}catch(_){document.documentElement.dataset.theme='dark';}
+render();
+})();
+</script>
+</body>
+</html>
