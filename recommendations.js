@@ -74,6 +74,7 @@
     installVideoBackupRestoreHook();
     loadBrowserScript('video-data.js')
       .then(() => loadBrowserScript('video-library.js'))
+      .then(() => loadBrowserScript('video-routing-fix.js'))
       .catch((error) => console.warn('動画ライブラリの読み込みに失敗しました', error));
   }
 
