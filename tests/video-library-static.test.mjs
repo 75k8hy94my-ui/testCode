@@ -30,3 +30,11 @@ test('video library preserves legacy player/add/delete hooks instead of replacin
   assert.match(source, /videoDeleteBtn/);
   assert.match(source, /history\.pushState/);
 });
+
+test('browser bootstrap restores encrypted sidecars when legacy reader imports a backup', () => {
+  const source = read('recommendations.js');
+  assert.match(source, /MangaReaderBackup\.migrateBackup/);
+  assert.match(source, /mangaReaderVideoFolders/);
+  assert.match(source, /mangaReaderVideoMeta/);
+  assert.match(source, /installVideoBackupRestoreHook/);
+});
