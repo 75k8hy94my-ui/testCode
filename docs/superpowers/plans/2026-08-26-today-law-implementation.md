@@ -62,7 +62,7 @@
   article: '94',
   paragraph: '2',
   elm: 'MainProvision-Article_94-Paragraph_2',
-  text: '前項の意思表示の無効は、善意の第三者に対抗することができない。',
+  text: '前項の規定による意思表示の無効は、善意の第三者に対抗することができない。',
   story: '虚偽の外観を作った当事者より、その外観を信頼した第三者を保護する入口になる条文。94条2項類推の理解にもつながる。',
   examPoint: '第三者保護と94条2項類推の基礎。第三者該当性・善意の要否を論点と結び付ける。',
   tags: ['意思表示', '第三者保護', '権利外観法理'],
@@ -107,7 +107,7 @@ import {
 const good = {
   id: 'civil-code-94-2', subject: 'civil-law', lawName: '民法', lawId: '129AC0000000089',
   article: '94', paragraph: '2', elm: 'MainProvision-Article_94-Paragraph_2',
-  text: '前項の意思表示の無効は、善意の第三者に対抗することができない。',
+  text: '前項の規定による意思表示の無効は、善意の第三者に対抗することができない。',
   story: '第三者保護の入口になる。', examPoint: '94条2項類推と接続する。', tags: ['意思表示'],
   sourceUrl: 'https://laws.e-gov.go.jp/law/129AC0000000089', verifiedOn: '2026-08-26'
 };
