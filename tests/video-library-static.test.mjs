@@ -25,7 +25,9 @@ test('video library provides search filters sorting view modes folders and edito
 test('video library preserves legacy player/add/delete hooks instead of replacing reader routing', () => {
   const source = read('video-library.js');
   assert.match(source, /videoPlayerIframe/);
-  assert.match(source, /screen=video-player/);
+  assert.match(source, /invokeLegacyOpen/);
+  assert.match(source, /node\.click\(\)/);
+  assert.doesNotMatch(source, /location\.hash\s*=\s*['"]screen=video-player/);
   assert.match(source, /confirmVideoAddBtn/);
   assert.match(source, /videoDeleteBtn/);
   assert.match(source, /history\.pushState/);
