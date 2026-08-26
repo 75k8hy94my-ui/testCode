@@ -29,6 +29,26 @@
     }
   }
 
+  function installMetaPreservationBridge() {
+    const proto = window.Storage && window.Storage.prototype;
+    if (!proto || typeof proto.setItem !== 'function' || proto.setItem.__videoThumbnailTimeWrapped) return;
+    const original = proto.setItem;
+    const wrapped = function (key, value) {
+      if (this === window.localStorage && String(key) === META_KEY && typeof Data.mergeVideoMetaPreservingThumbnailTime === 'function') {
+        try {
+          const existing = JSON.parse(this.getItem(META_KEY) || '{}');
+          const incoming = JSON.parse(String(value));
+          value = JSON.stringify(Data.mergeVideoMetaPreservingThumbnailTime(existing, incoming));
+        } catch (_) {
+          // Preserve the original write if the value is not JSON-shaped video metadata.
+        }
+      }
+      return original.call(this, key, value);
+    };
+    wrapped.__videoThumbnailTimeWrapped = true;
+    proto.setItem = wrapped;
+  }
+
   function videos() {
     const raw = readJson(VIDEO_KEY, []);
     return Array.isArray(raw) ? raw : [];
@@ -95,7 +115,7 @@
       .vl-thumbnail-time-preview video{display:block;width:100%;height:100%;object-fit:contain;background:#000}
       .vl-thumbnail-time-controls{display:grid;grid-template-columns:minmax(0,1fr) 82px auto;gap:8px;align-items:center}
       .vl-thumbnail-time-controls input[type="range"]{width:100%;min-width:0}
-      .vl-thumbnail-time-controls input[type="text"]{width:82px;text-align:center;padding:8px 7px}
+      .vl-thumbnail-time-controls input[type="text"]{width:82px;text-align:center;padding:8px 7px;border:1px solid var(--border);border-radius:10px;background:var(--bg-soft);color:var(--text);font-size:14px}
       .vl-thumbnail-time-duration{color:var(--sub);font-size:11px;white-space:nowrap}
       .vl-thumbnail-time-note{margin:0;color:var(--sub);font-size:10px;line-height:1.45}
       @media(max-width:480px){.vl-thumbnail-time-controls{grid-template-columns:minmax(0,1fr) 72px}.vl-thumbnail-time-duration{grid-column:1/-1}.vl-thumbnail-time-controls input[type="text"]{width:72px}}
@@ -195,7 +215,7 @@
     const current = meta[targetId] && typeof meta[targetId] === 'object' ? meta[targetId] : {};
     meta[targetId] = {
       ...current,
-      thumbnailTimeSeconds: Math.max(0, Number(selectedValue) || 0),
+      thumbnailTimeSeconds: clampThumbnailTime(selectedValue, previewDuration),
       updatedAt: Date.now(),
     };
     localStorage.setItem(META_KEY, JSON.stringify(meta));
@@ -286,6 +306,7 @@
     });
 
     editorInstalled = true;
+    setTimeout(refreshEditorPreview, 0);
     return true;
   }
 
@@ -344,6 +365,7 @@
   }
 
   function ensureFeature() {
+    installMetaPreservationBridge();
     installEditor();
     scanCardPreviews(document);
     if (observer || typeof MutationObserver === 'undefined') return;
