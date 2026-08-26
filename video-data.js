@@ -74,6 +74,23 @@
     return { kind: 'link', url, a: '', b: '' };
   }
 
+  function stableUrlToken(value) {
+    const url = asText(value);
+    let hash = 2166136261;
+    for (let i = 0; i < url.length; i += 1) {
+      hash ^= url.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return String(hash >>> 0 || 1) + String(url.length).padStart(6, '0');
+  }
+
+  function storageFieldsForVideoUrl(value) {
+    const classified = classifyVideoUrl(value);
+    if (classified.kind === 'invalid') return null;
+    if (classified.kind === 'legacy') return { a: classified.a, b: classified.b };
+    return { a: 'url', b: stableUrlToken(classified.url) };
+  }
+
   function normalizeVideo(value, now = Date.now()) {
     const x = value && typeof value === 'object' ? value : {};
     const a = asText(x.a);
@@ -178,5 +195,5 @@
     };
   }
 
-  return { WATCH_STATUSES, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl };
+  return { WATCH_STATUSES, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, storageFieldsForVideoUrl };
 }));
