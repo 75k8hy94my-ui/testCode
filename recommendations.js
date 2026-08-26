@@ -36,4 +36,34 @@
   }
 
   root.MangaReaderRecommendations = { chooseFallback };
+
+  function loadBrowserScript(src) {
+    if (typeof document === 'undefined') return Promise.resolve();
+    const existing = document.querySelector('script[data-video-library-src="' + src + '"]');
+    if (existing) return existing.dataset.loaded === '1' ? Promise.resolve() : new Promise((resolve, reject) => {
+      existing.addEventListener('load', resolve, { once: true });
+      existing.addEventListener('error', reject, { once: true });
+    });
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = false;
+      script.dataset.videoLibrarySrc = src;
+      script.addEventListener('load', () => { script.dataset.loaded = '1'; resolve(); }, { once: true });
+      script.addEventListener('error', reject, { once: true });
+      document.head.appendChild(script);
+    });
+  }
+
+  function bootstrapVideoLibrary() {
+    if (typeof document === 'undefined') return;
+    loadBrowserScript('video-data.js')
+      .then(() => loadBrowserScript('video-library.js'))
+      .catch((error) => console.warn('動画ライブラリの読み込みに失敗しました', error));
+  }
+
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootstrapVideoLibrary, { once: true });
+    else setTimeout(bootstrapVideoLibrary, 0);
+  }
 }(typeof window !== 'undefined' ? window : globalThis));
