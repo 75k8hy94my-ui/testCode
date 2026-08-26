@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import payload from '../vault-payload.js';
 const { DATA_KEYS, normalize, buildFromLocalStorage: buildFromStorage, applyToLocalStorage: applyToStorage } = payload;
 
+const defaultHomeCards = ['bookshelf', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 const emptyStudy = {
   schemaVersion: 1,
   subjects: [
@@ -19,26 +20,28 @@ const emptyStudy = {
   gamification: { xp: 0, streak: 0, lastStudyDate: null }, preferences: { autoSpeak: false }
 };
 
-test('normalizes legacy payload with empty study state', () => {
+test('normalizes legacy payload with empty study state and default home cards', () => {
   const value = normalize({ folders: [{ id: 'f1' }], items: [{ id: 'i1' }] });
-  assert.deepEqual(value, { folders: [{ id: 'f1' }], items: [{ id: 'i1' }], videos: [], authorCards: [], mangaInfo: {}, toc: {}, lastPages: {}, theme: 'dark', dashboardVisibility: { mobile: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false } }, study: emptyStudy });
+  assert.deepEqual(value, { folders: [{ id: 'f1' }], items: [{ id: 'i1' }], videos: [], authorCards: [], mangaInfo: {}, toc: {}, lastPages: {}, theme: 'dark', dashboardVisibility: { mobile: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false } }, homeCards: defaultHomeCards, study: emptyStudy });
 });
 
-test('build and apply preserve every vault field including study', () => {
+test('build and apply preserve every vault field including home cards and study', () => {
   const study = structuredClone(emptyStudy);
   study.preferences.autoSpeak = true;
-  const input = { folders: [{ id: 'f1' }], items: [{ id: 'i1' }], videos: [{ id: 'v1' }], authorCards: [{ id: 'a1', name: '作者' }], mangaInfo: { a: { count: 10 } }, toc: { a: [{ page: 1 }] }, lastPages: { a: { page: 3 } }, theme: 'light', dashboardVisibility: { mobile: { continue: true, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: true, favorites: false } }, study };
+  const input = { folders: [{ id: 'f1' }], items: [{ id: 'i1' }], videos: [{ id: 'v1' }], authorCards: [{ id: 'a1', name: '作者' }], mangaInfo: { a: { count: 10 } }, toc: { a: [{ page: 1 }] }, lastPages: { a: { page: 3 } }, theme: 'light', dashboardVisibility: { mobile: { continue: true, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: true, favorites: false } }, homeCards: ['study', 'bookshelf'], study };
   const storage = new Map();
   applyToStorage(input, storage);
   assert.deepEqual(buildFromStorage(storage), input);
   assert.equal(DATA_KEYS.authorCards, 'mangaReaderAuthorCards');
   assert.equal(DATA_KEYS.dashboardVisibility, 'mangaReaderDashboardVisibility');
+  assert.equal(DATA_KEYS.homeCards, 'mangaReaderHomeCards');
   assert.equal(DATA_KEYS.study, 'mangaReaderStudy');
 });
 
-test('clearDeviceData removes study data', () => {
-  const storage = new Map([['mangaReaderStudy', JSON.stringify(emptyStudy)], ['mangaReaderSavedFolders', '[]']]);
+test('clearDeviceData removes home and study data', () => {
+  const storage = new Map([['mangaReaderHomeCards', JSON.stringify(defaultHomeCards)], ['mangaReaderStudy', JSON.stringify(emptyStudy)], ['mangaReaderSavedFolders', '[]']]);
   payload.clearDeviceData(storage);
+  assert.equal(storage.has('mangaReaderHomeCards'), false);
   assert.equal(storage.has('mangaReaderStudy'), false);
   assert.equal(storage.has('mangaReaderSavedFolders'), false);
 });
