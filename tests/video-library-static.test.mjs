@@ -26,10 +26,23 @@ test('video library provides search filters sorting view modes folders and edito
   assert.match(source, /history\.pushState/);
 });
 
-test('video routing bridge plays enhanced cards inline without opening the legacy player screen', () => {
+test('video editor accepts one URL and does not expose legacy service or video ID fields', () => {
+  const source = read('video-library.js');
+  assert.match(source, /id=["']videoLibraryUrl["']/);
+  assert.match(source, /classifyVideoUrl/);
+  assert.doesNotMatch(source, /videoLibraryLegacyService/);
+  assert.doesNotMatch(source, /videoLibraryLegacyId/);
+  assert.doesNotMatch(source, /parseThroughLegacy/);
+});
+
+test('video routing bridge plays direct video URLs with a video element and keeps legacy iframe playback', () => {
   const source = read('video-routing-fix.js');
   assert.match(source, /\.vl-open/);
   assert.match(source, /vl-inline-player/);
+  assert.match(source, /classifyVideoUrl/);
+  assert.match(source, /createElement\(['"]video['"]\)/);
+  assert.match(source, /\.controls\s*=\s*true/);
+  assert.match(source, /\.playsInline\s*=\s*true/);
   assert.match(source, /createElement\(['"]iframe['"]\)/);
   assert.match(source, /stopImmediatePropagation/);
   assert.match(source, /recordOpen/);
