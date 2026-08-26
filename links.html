@@ -333,7 +333,7 @@
 <body>
 <main>
   <div class="topline">
-    <a class="back" href="index.html" aria-label="ホームへ戻る">← ホーム</a>
+    <a class="back" href="home.html" aria-label="ホームへ戻る">← ホーム</a>
     <div style="display:flex;gap:8px;align-items:center;"><button class="secondary" id="themeBtn" type="button" aria-label="テーマ切替"></button><button class="primary" id="addBtn" type="button">＋ 追加</button></div>
   </div>
 
@@ -459,7 +459,7 @@
     document.documentElement.dataset.theme = selected;
     els.themeBtn.innerHTML = selected === 'light'
       ? '<svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 15.2A8.5 8.5 0 0 1 8.8 3.5a8.6 8.6 0 1 0 11.7 11.7z"></path></svg>'
-      : '<svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path></svg>';
+      : '<svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path></svg>';
     try { localStorage.setItem(THEME_KEY, selected); } catch (_) {}
   }
   applyTheme(localStorage.getItem(THEME_KEY));

@@ -93,6 +93,8 @@
   function bootstrapVideoLibrary() {
     if (typeof document === 'undefined') return;
     installVideoBackupRestoreHook();
+    loadBrowserScript('desktop-navigation.js')
+      .catch((error) => console.warn('デスクトップナビの読み込みに失敗しました', error));
     loadBrowserScript('video-data.js')
       .then(() => loadBrowserScript('video-library.js'))
       .then(() => loadBrowserScript('video-routing-fix.js'))

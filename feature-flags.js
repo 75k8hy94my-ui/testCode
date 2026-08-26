@@ -24,18 +24,17 @@
         else menu.appendChild(studyButton);
       }
 
-      const listTabRow = document.getElementById('listTabRow');
-      const localReaderButton = document.getElementById('localReaderBtn');
-      if (listTabRow && !document.getElementById('desktopStudyBtn')) {
-        const desktopStudyButton = document.createElement('button');
-        desktopStudyButton.id = 'desktopStudyBtn';
-        desktopStudyButton.type = 'button';
-        desktopStudyButton.className = 'listTab';
-        desktopStudyButton.textContent = '司法試験学習';
-        desktopStudyButton.addEventListener('click', goStudy);
-        if (localReaderButton && localReaderButton.parentNode === listTabRow) localReaderButton.insertAdjacentElement('afterend', desktopStudyButton);
-        else listTabRow.appendChild(desktopStudyButton);
-      }
+      const syncDesktopLocalReader = () => {
+        const desktopLocalReader = document.getElementById('desktopNavLocalReader');
+        if (!desktopLocalReader) return;
+        desktopLocalReader.hidden = !root.MangaReaderFeatures.localReader;
+        if (root.MangaReaderFeatures.localReader && desktopLocalReader.dataset.featureWired !== '1') {
+          desktopLocalReader.dataset.featureWired = '1';
+          desktopLocalReader.addEventListener('click', () => { window.location.href = 'local-reader.html'; });
+        }
+      };
+      syncDesktopLocalReader();
+      document.addEventListener('manga-reader-desktop-nav-ready', syncDesktopLocalReader);
     });
   }
 })(typeof window !== 'undefined' ? window : globalThis);
