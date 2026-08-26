@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add the post-login Home shell, shared vault gate, three independently synced device layouts, edit mode, and the local Continue/Apps/Today's Study cards.
+**Goal:** Add the post-login Home shell, reusable vault gate, three independently synced device layouts, edit mode, and the local Continue/Apps/Today's Study cards.
 
-**Architecture:** Keep the existing static HTML/CSS/JavaScript architecture and existing `MangaVault` encryption/CAS path. Introduce small pure modules for Home state/layout and card registration, extract reusable vault-unlock orchestration from `sync.html`, and make `home.html` the authenticated landing page. Public feeds, weather, and Today's Law are intentionally added by the later plans.
+**Architecture:** Keep the existing static HTML/CSS/JavaScript architecture and existing `MangaVault` encryption/CAS path. Add small pure modules for Home layout/state and card registration, extract vault-unlock orchestration from `sync.html`, and make `home.html` the canonical authenticated landing page. Today's Law, legal public feeds, and Weather are added by the two follow-on plans.
 
 **Tech Stack:** Static HTML/CSS/JavaScript, Node built-in test runner, Supabase Auth/REST through existing `vault-session.js`, localStorage/sessionStorage, existing GitHub Pages deployment.
 
@@ -15,30 +15,31 @@
 - No frontend framework or build step.
 - Preserve the existing encrypted-vault envelope and keep the passphrase out of persistent storage.
 - Home layout state is encrypted/synced through the existing vault payload and CAS path.
-- Device layout profiles are exactly `mobile`, `tablet`, and `desktop`; displayed cards, order, and size are independent per profile.
+- Device layout profiles are exactly `mobile`, `tablet`, and `desktop`; displayed cards, order, size, and card settings are independent per profile.
 - The per-browser device-profile override is local-only and must not enter the encrypted vault.
 - Home content cards are code-registered; no user-supplied API/card execution.
 - One card failure must not stop the Home shell or other cards.
 - Existing bookmarks to `sync.html` remain valid.
+- Existing `reader.html`, `study.html`, and `sync.html` must load `home-layout.js` before `vault-payload.js` once `vault-payload.js` depends on `MangaHomeLayout` in the browser.
 - Run `npm test` and `npm run verify:static` before merge.
 
 ---
 
 ## File Structure
 
-- Create `home-layout.js` — pure Home schema, defaults, profile selection, and immutable layout-edit operations.
-- Create `home-cards.js` — code-defined card registry and isolated render lifecycle.
+- Create `home-layout.js` — Home schema/defaults, profile selection, immutable layout-edit operations.
+- Create `home-cards.js` — code-defined card registry, render isolation, optional settings renderer.
 - Create `home-local-cards.js` — Continue, Apps, and Today's Study card definitions.
 - Create `vault-gate.js` — reusable vault-unlock/create/passkey orchestration without page-specific navigation.
-- Create `home.js` — Home boot, session/vault gate, rendering, edit mode, save/sync scheduling.
-- Create `home.html` — Home shell and responsive card-grid UI.
+- Create `home.js` — Home boot, vault gate, layout rendering/editing, local save and cloud-save debounce.
+- Create `home.html` — Home shell and responsive card grid.
 - Modify `vault-payload.js` — add `home` to encrypted/local payload state.
 - Modify `backup-format.js` — preserve/migrate `home` in backup data.
 - Modify `index.html` — successful account auth goes to Home.
-- Modify `sync.html` — use shared vault gate and continue to Home.
-- Modify `reader.html` — locked authenticated session redirects to Home; add Home navigation and direct `?item=` continuation target.
-- Modify `study.html` — locked authenticated session redirects to Home and add Home navigation.
-- Modify `scripts/check-static.mjs` — include Home files/pages in static verification.
+- Modify `sync.html` — load Home layout dependency, use shared vault gate, continue to Home.
+- Modify `reader.html` — load Home layout dependency, locked session redirects to Home, add Home navigation, consume direct `?item=` continuation target.
+- Modify `study.html` — load Home layout dependency, locked session redirects to Home, add Home navigation.
+- Modify `scripts/check-static.mjs` — include Home files/page in static verification.
 - Create/modify focused tests under `tests/` as listed below.
 
 ---
@@ -50,12 +51,17 @@
 - Create: `tests/home-layout.test.mjs`
 - Modify: `vault-payload.js`
 - Modify: `backup-format.js`
+- Modify: `tests/vault-payload.test.mjs`
 - Modify: `tests/backup-format.test.mjs`
+- Modify: `sync.html`
+- Modify: `reader.html`
+- Modify: `study.html`
+- Modify: `tests/static-regression.test.mjs`
 
 **Interfaces:**
-- Produces `window.MangaHomeLayout` / CommonJS export with:
-  - `PROFILE_NAMES: ['mobile','tablet','desktop']`
-  - `PROFILE_OVERRIDE_KEY: 'mangaReaderHomeDeviceProfileOverride'`
+- `window.MangaHomeLayout` / CommonJS export:
+  - `PROFILE_NAMES = ['mobile','tablet','desktop']`
+  - `PROFILE_OVERRIDE_KEY = 'mangaReaderHomeDeviceProfileOverride'`
   - `createDefaultHome(): HomeState`
   - `normalizeHome(value): HomeState`
   - `selectProfile({ width, maxTouchPoints }): 'mobile'|'tablet'|'desktop'`
@@ -64,25 +70,26 @@
   - `removeCard(home, profile, id): HomeState`
   - `moveCard(home, profile, id, toIndex): HomeState`
   - `resizeCard(home, profile, id, size): HomeState`
+  - `updateCardSettings(home, profile, id, settings): HomeState`
   - `resetProfile(home, profile): HomeState`
 - `vault-payload.js` adds `DATA_KEYS.home = 'mangaReaderHome'` and normalizes/builds/applies `home`.
-- `backup-format.js` carries `home` without bumping backup format version 2; legacy v2/raw payloads receive defaults.
+- `backup-format.js` carries `home` while retaining backup format version 2; legacy v2/raw payloads receive Home defaults.
 
-- [ ] **Step 1: Write failing Home layout tests**
+- [ ] **Step 1: Write failing Home-layout tests**
 
-Create `tests/home-layout.test.mjs` with assertions for defaults, profile isolation, mutation immutability, device selection, and override precedence:
+Create `tests/home-layout.test.mjs`:
 
 ```js
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import HomeLayout from '../home-layout.js';
 
-const baseTypes = (home, profile) => home.layouts[profile].cards.map((card) => card.type);
+const types = (home, profile) => home.layouts[profile].cards.map((card) => card.type);
 
 test('home defaults create independent mobile tablet and desktop profiles', () => {
   const home = HomeLayout.createDefaultHome();
   assert.deepEqual(Object.keys(home.layouts), ['mobile', 'tablet', 'desktop']);
-  assert.deepEqual(baseTypes(home, 'mobile'), ['continue', 'today-study', 'apps']);
+  assert.deepEqual(types(home, 'mobile'), ['continue', 'today-study', 'apps']);
   assert.notEqual(home.layouts.mobile.cards, home.layouts.tablet.cards);
 });
 
@@ -94,6 +101,17 @@ test('editing one profile does not mutate the other profiles or input', () => {
   assert.deepEqual(before, HomeLayout.createDefaultHome());
 });
 
+test('settings and size are profile-local', () => {
+  const before = HomeLayout.createDefaultHome();
+  const changed = HomeLayout.updateCardSettings(
+    HomeLayout.resizeCard(before, 'tablet', 'continue', 'large'),
+    'tablet', 'continue', { sample: true }
+  );
+  assert.equal(changed.layouts.tablet.cards.find((x) => x.id === 'continue').size, 'large');
+  assert.deepEqual(changed.layouts.tablet.cards.find((x) => x.id === 'continue').settings, { sample: true });
+  assert.deepEqual(changed.layouts.mobile, before.layouts.mobile);
+});
+
 test('profile override wins over automatic classification', () => {
   assert.equal(HomeLayout.resolveProfile({ width: 390, maxTouchPoints: 5, override: 'desktop' }), 'desktop');
   assert.equal(HomeLayout.resolveProfile({ width: 390, maxTouchPoints: 5, override: null }), 'mobile');
@@ -102,7 +120,7 @@ test('profile override wins over automatic classification', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify red**
+- [ ] **Step 2: Run the Home-layout test and verify red**
 
 Run: `node --test tests/home-layout.test.mjs`
 
@@ -110,7 +128,7 @@ Expected: FAIL because `../home-layout.js` does not exist.
 
 - [ ] **Step 3: Implement the pure Home model**
 
-Create `home-layout.js` as a browser/CommonJS module. Use semantic sizes only:
+Create `home-layout.js` as a browser/CommonJS module. Start with the three core cards; later plans extend only the default templates for new/reset profiles.
 
 ```js
 const PROFILE_NAMES = ['mobile', 'tablet', 'desktop'];
@@ -135,9 +153,9 @@ const DEFAULT_CARDS = {
 };
 ```
 
-Implement `normalizeHome` as schema version 1, clone all returned arrays/objects, drop malformed card records, reject invalid profile names/sizes, and restore a profile default only when that profile is absent or has no valid `cards` array. Keep unknown `type` strings during normalization so a temporarily unavailable future registered card is not deleted from synced state.
+`normalizeHome` returns `{ version: 1, layouts: { mobile, tablet, desktop } }`, clones arrays/settings objects, drops malformed card records, normalizes invalid sizes to `medium`, and keeps unknown `type` strings so temporarily unavailable/future card types are not deleted from sync. A missing profile gets that profile's default; an explicitly present `cards: []` remains empty because the user is allowed to remove every content card.
 
-Use this deterministic auto-classifier:
+Use this exact classifier:
 
 ```js
 function selectProfile({ width, maxTouchPoints }) {
@@ -149,9 +167,9 @@ function selectProfile({ width, maxTouchPoints }) {
 }
 ```
 
-Each edit helper must return a new normalized Home object and alter only the selected profile.
+`resolveProfile` accepts only `mobile|tablet|desktop` as override; every other value uses `selectProfile`. Every edit helper returns a new normalized Home object and changes only the selected profile.
 
-- [ ] **Step 4: Run Home layout tests and verify green**
+- [ ] **Step 4: Run Home-layout tests and verify green**
 
 Run: `node --test tests/home-layout.test.mjs`
 
@@ -159,39 +177,76 @@ Expected: PASS.
 
 - [ ] **Step 5: Add failing vault/backup tests for `home`**
 
-Extend the existing payload/backup tests so a saved Home edit survives normalize/build/apply and backup round-trip, while legacy payloads get `createDefaultHome()`.
-
-Add assertions equivalent to:
+In `tests/vault-payload.test.mjs` and `tests/backup-format.test.mjs`, import `home-layout.js` and assert:
 
 ```js
 const customHome = HomeLayout.moveCard(HomeLayout.createDefaultHome(), 'mobile', 'apps', 0);
 const roundTrip = migrateBackup(createBackup({ home: customHome }));
 assert.deepEqual(roundTrip.home, customHome);
-assert.deepEqual(migrateBackup({ format: 'manga-reader-backup', version: 2, data: {} }).home, HomeLayout.createDefaultHome());
+assert.deepEqual(
+  migrateBackup({ format: 'manga-reader-backup', version: 2, data: {} }).home,
+  HomeLayout.createDefaultHome()
+);
 ```
 
-- [ ] **Step 6: Run focused payload/backup tests and verify red**
+Also add `DATA_KEYS.home === 'mangaReaderHome'`, build/apply preservation, and `clearDeviceData` removal assertions.
+
+- [ ] **Step 6: Run payload/backup tests and verify red**
 
 Run: `node --test tests/backup-format.test.mjs tests/vault-payload.test.mjs`
 
-Expected: at least the new `home` assertions FAIL because the payload does not yet contain `home`.
+Expected: FAIL on the new Home assertions because the payload does not yet contain `home`.
 
 - [ ] **Step 7: Wire Home into `vault-payload.js` and `backup-format.js`**
 
-Load the pure helper in Node via `require('./home-layout.js')` and in the browser from `window.MangaHomeLayout`. Add `home: 'mangaReaderHome'` to `DATA_KEYS`, include normalized `home` in defaults, `normalize`, `buildFromStorage`, and `applyToStorage`, and include the same normalized field in `backup-format.js`.
+At module startup resolve the helper exactly as:
+
+```js
+const HomeLayoutRef = typeof module !== 'undefined' && module.exports
+  ? require('./home-layout.js')
+  : (typeof window !== 'undefined' ? window.MangaHomeLayout : null);
+```
+
+Throw a clear initialization error if `HomeLayoutRef` is missing rather than silently creating a different schema. Add `home: 'mangaReaderHome'` to `DATA_KEYS`; include `HomeLayoutRef.createDefaultHome()`/`normalizeHome(...)` in defaults, `normalize`, `buildFromStorage`, and `applyToStorage`. Add the equivalent normalization in `backup-format.js` using the same helper.
 
 Do not put `PROFILE_OVERRIDE_KEY` into `DATA_KEYS`; it is explicitly device-local.
 
-- [ ] **Step 8: Re-run focused tests and verify green**
+- [ ] **Step 8: Update browser script order before committing the new dependency**
 
-Run: `node --test tests/home-layout.test.mjs tests/backup-format.test.mjs tests/vault-payload.test.mjs`
+In all three existing pages that load `vault-payload.js`, insert:
+
+```html
+<script src="home-layout.js"></script>
+<script src="vault-payload.js"></script>
+```
+
+in that order. Concretely update `sync.html`, `reader.html`, and `study.html`. Preserve all other existing script ordering.
+
+- [ ] **Step 9: Add a script-order regression assertion**
+
+In `tests/static-regression.test.mjs`:
+
+```js
+for (const page of ['sync.html', 'reader.html', 'study.html']) {
+  const source = read(page);
+  assert.ok(source.indexOf('home-layout.js') < source.indexOf('vault-payload.js'), `${page} must load Home layout first`);
+}
+```
+
+- [ ] **Step 10: Re-run focused tests and static regression**
+
+Run:
+
+```bash
+node --test tests/home-layout.test.mjs tests/backup-format.test.mjs tests/vault-payload.test.mjs tests/static-regression.test.mjs
+```
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit the state-contract slice**
+- [ ] **Step 11: Commit the state-contract slice**
 
 ```bash
-git add home-layout.js vault-payload.js backup-format.js tests/home-layout.test.mjs tests/backup-format.test.mjs tests/vault-payload.test.mjs
+git add home-layout.js vault-payload.js backup-format.js sync.html reader.html study.html tests/home-layout.test.mjs tests/backup-format.test.mjs tests/vault-payload.test.mjs tests/static-regression.test.mjs
 git commit -m "feat: add synced home layout state"
 ```
 
@@ -203,32 +258,36 @@ git commit -m "feat: add synced home layout state"
 - Create: `vault-gate.js`
 - Create: `tests/vault-gate.test.mjs`
 - Modify: `sync.html`
+- Modify: `tests/static-regression.test.mjs`
 
 **Interfaces:**
-- Produces `window.MangaVaultGate` / CommonJS export:
-  - `createController({ vaultApi, payloadApi, schedule }): VaultGateController`
-- Controller methods:
+- `window.MangaVaultGate` / CommonJS export:
+  - `createController({ vaultApi, payloadApi }): VaultGateController`
+- Controller:
   - `unlock({ passphrase, recovery }): Promise<{ created:boolean, recoveryCode?:string }>`
   - `unlockWithPasskey(): Promise<{ created:false }>`
   - `create(passphrase): Promise<{ created:true, recoveryCode:string }>`
   - `registerPasskey(passphrase): Promise<void>`
-- UI code owns DOM/status/navigation; controller owns only vault operations.
+- DOM/status/recovery-display/navigation stays page-owned; the controller never reads `location`.
 
-- [ ] **Step 1: Write controller tests with fake vault API**
+- [ ] **Step 1: Write controller tests with a fake vault API**
 
-Use fake methods that record calls, proving unlock applies the payload and never navigates by itself:
+Create `tests/vault-gate.test.mjs` using:
 
 ```js
 const calls = [];
 const vaultApi = {
   initialize: async (...args) => { calls.push(['initialize', ...args.slice(0, 2)]); return { created: false }; },
-  initializeWithPasskey: async (apply) => { calls.push(['passkey']); apply({}); return { created: false }; },
+  initializeWithPasskey: async (apply) => { calls.push(['passkey']); apply({ folders: [] }); return { created: false }; },
   registerPasskey: async (value) => { calls.push(['register', value]); }
 };
-const payloadApi = { buildFromLocalStorage: () => ({ home: {} }), applyToLocalStorage: (x) => calls.push(['apply', x]) };
+const payloadApi = {
+  buildFromLocalStorage: () => ({ home: {} }),
+  applyToLocalStorage: (value) => calls.push(['apply', value])
+};
 ```
 
-Assert passphrase validation stays in UI, not controller, and no `location` dependency exists in this module.
+Assert unlock delegates `buildFromLocalStorage`/`applyToLocalStorage`, passkey unlock applies decrypted payload, registration delegates once, and `vault-gate.js` contains no `location` reference.
 
 - [ ] **Step 2: Run and verify red**
 
@@ -236,9 +295,9 @@ Run: `node --test tests/vault-gate.test.mjs`
 
 Expected: FAIL because `vault-gate.js` does not exist.
 
-- [ ] **Step 3: Implement controller**
+- [ ] **Step 3: Implement the controller**
 
-Implement the thin controller using the existing `MangaVault.initialize`, `initializeWithPasskey`, and `registerPasskey` calls. `create(passphrase)` must call `initialize(passphrase, '', build, apply)` and assert `result.created === true`; if an existing vault is unexpectedly returned, surface an error instead of overwriting anything.
+`unlock` calls `vaultApi.initialize(passphrase, recovery, payloadApi.buildFromLocalStorage, payloadApi.applyToLocalStorage)`. `unlockWithPasskey` calls `vaultApi.initializeWithPasskey(payloadApi.applyToLocalStorage)`. `create(passphrase)` calls `initialize(passphrase, '', ...)` and throws `保管庫は既に存在します。` if `created !== true`; it never overwrites an existing vault. `registerPasskey` delegates directly.
 
 - [ ] **Step 4: Run and verify green**
 
@@ -248,7 +307,7 @@ Expected: PASS.
 
 - [ ] **Step 5: Convert `sync.html` to the shared controller**
 
-Load scripts in this order:
+Load scripts in this exact order:
 
 ```html
 <script src="supabase-config.js"></script>
@@ -258,11 +317,11 @@ Load scripts in this order:
 <script src="vault-gate.js"></script>
 ```
 
-Replace direct `MangaVault.initialize(...)`/`initializeWithPasskey(...)`/`registerPasskey(...)` calls with controller calls. Rename `goReader()` to `goHome()` and make it `window.location.replace('home.html')`. Preserve the 5.5-second one-time recovery-key display for vault creation.
+Instantiate one controller with `MangaVault` and `MangaVaultPayload`. Replace direct `MangaVault.initialize(...)`, `initializeWithPasskey(...)`, and `registerPasskey(...)` calls with controller methods. Rename `goReader()` to `goHome()` and make it `window.location.replace('home.html')`. Preserve the 5.5-second one-time recovery-key display after creating a vault.
 
-- [ ] **Step 6: Add static regression assertions for sync destination**
+- [ ] **Step 6: Add sync-routing static assertions**
 
-In `tests/static-regression.test.mjs`, assert `sync.html` loads `vault-gate.js`, contains `home.html`, and no unlock success path uses `reader.html`.
+Assert `sync.html` loads `vault-gate.js`, contains `window.location.replace('home.html')`, and the unlock/create/passkey success functions contain no `reader.html` destination.
 
 - [ ] **Step 7: Run the shared-vault/static tests**
 
@@ -279,7 +338,7 @@ git commit -m "refactor: share vault gate orchestration"
 
 ---
 
-### Task 3: Add a code-defined card registry and pure local-card selectors
+### Task 3: Add the code-defined card registry and local card models
 
 **Files:**
 - Create: `home-cards.js`
@@ -293,26 +352,27 @@ git commit -m "refactor: share vault gate orchestration"
   - `get(type)`
   - `list()`
   - `render({ instance, host, context }): Promise<void>`
-- Registered definition requires `type`, `title`, `allowedSizes`, and `render`.
-- Registry `render` catches card-local exceptions and renders a contained error state by setting `host.textContent` to a Japanese unavailable message; it rethrows nothing.
+  - `renderSettings({ instance, host, context, updateSettings }): Promise<void>`
+- Definition requires `type`, `title`, `allowedSizes`, `render`; optional `renderSettings` is part of the interface from the first implementation.
+- Registry `render`/`renderSettings` catches card-local exceptions, renders a contained Japanese error state, and does not rethrow into the Home shell.
 - `MangaHomeLocalCards` exports:
-  - `getContinueModel({ items, study }): { book:null|object, study:null|object }`
+  - `getContinueModel({ items, study, localReaderEnabled }): { book:null|object, study:null|object }`
   - `getTodayStudyModel(study, now): { dueCount, streak, xp, lastStudyDate }`
   - `registerLocalCards(registry)`
 
-- [ ] **Step 1: Write registry failure-isolation tests**
+- [ ] **Step 1: Write registry isolation/settings tests**
 
-Test duplicate registration rejection, deterministic listing, and that one failing renderer only changes its host and does not throw.
+Test duplicate type registration rejection, deterministic `list()`, missing card type fallback, failing renderer isolation, and that an optional `renderSettings` receives `updateSettings` exactly once when invoked by the test renderer.
 
 - [ ] **Step 2: Run registry test and verify red**
 
 Run: `node --test tests/home-cards.test.mjs`
 
-Expected: FAIL because module is missing.
+Expected: FAIL because `home-cards.js` does not exist.
 
-- [ ] **Step 3: Implement the minimal registry**
+- [ ] **Step 3: Implement the registry**
 
-Use an internal `Map`. Validate definitions at registration. In `render`, resolve the card by `instance.type`; if missing, render `このカードは現在利用できません`. Invoke the card's renderer with `{ host, instance, context }` inside `try/catch`.
+Use an internal `Map`. Validate `type`, nonempty `title`, nonempty `allowedSizes`, and `render` function at registration. `render` resolves by `instance.type`; missing types paint `このカードは現在利用できません`. `renderSettings` paints `このカードに設定項目はありません` when no hook exists. Wrap both card callbacks in `try/catch`.
 
 - [ ] **Step 4: Run registry test and verify green**
 
@@ -320,19 +380,40 @@ Run: `node --test tests/home-cards.test.mjs`
 
 Expected: PASS.
 
-- [ ] **Step 5: Write local-card selector tests**
+- [ ] **Step 5: Write exact local-card model tests**
 
-Use saved items with numeric `lastReadAt` and study state with `progress`, `gamification`, and attempts. For Continue, select the most recently read non-history, non-disabled-local item. For Today's Study, count definition progress entries whose `nextDueAt` or equivalent scheduled-review timestamp is at/before `now`; if the current study schema uses the scheduler helper instead of a direct field, import that existing helper rather than reimplement scheduling rules.
+Use saved items whose `lastReadAt` values are numeric milliseconds. The Continue model selects the highest `lastReadAt`, excluding history-folder records and, when `localReaderEnabled === false`, records with `localSync === true`.
 
-- [ ] **Step 6: Run local selector tests and verify red**
+For Today's Study use the existing scheduler field exactly: `nextReviewAt`. A definition is due when it has no progress entry or `Number(progress.nextReviewAt || 0) <= Number(now)`. Test this exact model:
+
+```js
+const study = {
+  definitions: [{ id: 'due' }, { id: 'later' }, { id: 'new' }],
+  progress: {
+    due: { nextReviewAt: 1000 },
+    later: { nextReviewAt: 5000 }
+  },
+  gamification: { xp: 120, streak: 4, lastStudyDate: '2026-08-26' }
+};
+assert.deepEqual(LocalCards.getTodayStudyModel(study, 3000), {
+  dueCount: 2,
+  streak: 4,
+  xp: 120,
+  lastStudyDate: '2026-08-26'
+});
+```
+
+The missing `new` progress entry counts as due, matching `StudyQuiz.createInitialProgress`, which initializes `nextReviewAt` to the current time.
+
+- [ ] **Step 6: Run local-card tests and verify red**
 
 Run: `node --test tests/home-local-cards.test.mjs`
 
-Expected: FAIL because module is missing.
+Expected: FAIL because `home-local-cards.js` does not exist.
 
 - [ ] **Step 7: Implement selectors and three card definitions**
 
-Apps renders plain anchors/buttons for:
+Apps renders these destinations:
 
 ```js
 [
@@ -342,11 +423,9 @@ Apps renders plain anchors/buttons for:
 ]
 ```
 
-Continue renders the latest book plus recent-study summary. The book button targets `reader.html?item=<encoded id>`; Task 5 adds consumption of that query. If no recent book exists, show `最近読んだ本はありません` and keep the study target usable.
+Continue renders the most recently read book plus recent-study/gamification context. Its book link is `reader.html?item=<encoded id>`; Task 5 adds query consumption. If no recent book exists, show `最近読んだ本はありません` while retaining the Study destination.
 
-Today's Study shows due count, streak, XP, and links to `study.html`; do not duplicate or mutate the study scheduler.
-
-All external/user-derived title text must be assigned via `textContent`.
+Today's Study shows due count, streak, XP, last-study date, and links to `study.html`. It reads but never mutates scheduling state. User-derived book/title text is assigned with `textContent`.
 
 - [ ] **Step 8: Run local-card tests and verify green**
 
@@ -372,26 +451,27 @@ git commit -m "feat: add home card registry and local cards"
 - Modify: `scripts/check-static.mjs`
 
 **Interfaces:**
-- `home.js` consumes `MangaVault`, `MangaVaultPayload`, `MangaVaultGate`, `MangaHomeLayout`, `MangaHomeCards`, `MangaHomeLocalCards`, and existing `StudyData`.
-- Home uses local override key `mangaReaderHomeDeviceProfileOverride`.
-- Home save path writes the edited state under `mangaReaderHome`, then calls `MangaVault.savePayload(MangaVaultPayload.buildFromLocalStorage())` with debounce.
+- `home.js` consumes `MangaVault`, `MangaVaultPayload`, `MangaVaultGate`, `MangaHomeLayout`, `MangaHomeCards`, `MangaHomeLocalCards`, `StudyData`, and `MangaReaderFeatures` when present.
+- Local override key: `mangaReaderHomeDeviceProfileOverride`.
+- Edited Home state is persisted under `mangaReaderHome`, then encrypted/saved by `MangaVault.savePayload(MangaVaultPayload.buildFromLocalStorage())` after a 750 ms debounce.
+- Card context exposes `profile`, `study`, `items`, `features`, `navigate(href)`, and `requestRender()`; later plans add public-feed/weather dependencies without changing the registry contract.
 
-- [ ] **Step 1: Write static Home page tests**
+- [ ] **Step 1: Write failing Home page/static tests**
 
-Create `tests/home-page.test.mjs` asserting the page contains:
+Create `tests/home-page.test.mjs` and assert:
 
 ```js
-assert.match(source, /id="homeGrid"/);
-assert.match(source, /id="homeEditBtn"/);
-assert.match(source, /id="vaultGateHost"/);
-assert.match(source, /home-layout\.js/);
-assert.match(source, /home-cards\.js/);
-assert.match(source, /home-local-cards\.js/);
-assert.match(source, /vault-gate\.js/);
-assert.match(source, /@supports not \(\(backdrop-filter: blur\(1px\)\)/);
+assert.match(homeHtml, /id="homeGrid"/);
+assert.match(homeHtml, /id="homeEditBtn"/);
+assert.match(homeHtml, /id="vaultGateHost"/);
+assert.match(homeHtml, /home-layout\.js/);
+assert.match(homeHtml, /home-cards\.js/);
+assert.match(homeHtml, /home-local-cards\.js/);
+assert.match(homeHtml, /vault-gate\.js/);
+assert.match(homeHtml, /@supports not \(\(backdrop-filter: blur\(1px\)\)/);
+assert.match(homeJs, /MangaVault\.loadActive\(\)/);
+assert.match(homeJs, /MangaVault\.savePayload\(/);
 ```
-
-Also assert `home.js` uses `MangaVault.loadActive()` and `MangaVault.savePayload(...)`.
 
 - [ ] **Step 2: Run and verify red**
 
@@ -401,21 +481,23 @@ Expected: FAIL because Home files do not exist.
 
 - [ ] **Step 3: Create the Home shell**
 
-`home.html` must contain only minimal shell chrome plus card grid. Use a responsive CSS grid:
+`home.html` contains minimal fixed shell actions (`ホームを編集`, account/vault access, edit-mode exit/status) and the content card grid; there is no content hero/header card forced above the grid.
+
+Use this grid baseline:
 
 ```css
 #homeGrid { display:grid; gap:14px; grid-template-columns:1fr; }
 @media (min-width:700px) { #homeGrid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (min-width:1100px) { #homeGrid { grid-template-columns:repeat(4,minmax(0,1fr)); } }
-.homeCard[data-size="medium"] { grid-column:span 1; }
+.homeCard[data-size="small"], .homeCard[data-size="medium"] { grid-column:span 1; }
 @media (min-width:700px) { .homeCard[data-size="large"] { grid-column:span 2; } }
 ```
 
-Give each rendered card a heading and controls usable by keyboard. Include Liquid Glass plus no-backdrop fallback consistent with the repository's current UI treatment.
+On mobile, size affects vertical/detail density through CSS classes but all cards remain one column. Include Liquid Glass and the repository-standard no-backdrop fallback.
 
-- [ ] **Step 4: Implement Home boot and vault gate**
+- [ ] **Step 4: Implement Home boot and in-place vault gate**
 
-Boot sequence:
+Boot exactly:
 
 ```js
 const session = MangaVault.loadSession();
@@ -424,29 +506,37 @@ else if (!MangaVault.loadActive()) showVaultGate();
 else showDashboard();
 ```
 
-`showVaultGate()` uses `MangaVaultGate.createController(...)`. After successful passphrase/recovery/passkey unlock, hide the gate and call `showDashboard()` in place. On vault creation, show the recovery code before revealing Home, preserving the one-time warning.
+`showVaultGate()` renders passphrase, recovery, passkey, create-vault, and passkey-registration controls backed by `MangaVaultGate.createController`. After passphrase/recovery/passkey unlock, hide the gate and invoke `showDashboard()` without navigating to `reader.html`. On vault creation, display the recovery code and require an explicit `復旧キーを保存した` continue button before revealing Home; do not rely solely on a timer for the new Home flow.
 
-- [ ] **Step 5: Implement render/edit operations**
+- [ ] **Step 5: Implement rendering and edit operations**
 
-Read `mangaReaderHome`, normalize it, resolve active profile from viewport/touch plus local override, render the selected profile's cards in order, and keep an `editing` boolean.
+Read `mangaReaderHome`, normalize it, resolve the active profile from `innerWidth`, `navigator.maxTouchPoints`, and the local override. Render cards in stored order.
 
-Edit mode must provide:
-- add from registered card types not currently present
-- remove current card
-- move up/down buttons in addition to pointer drag
-- allowed size selector
-- reset current profile only
-- profile override selector (`auto`, `mobile`, `tablet`, `desktop`)
+Edit mode provides:
+- add registered card types not present in the current single-instance profile;
+- remove a card;
+- drag reorder using HTML drag events on pointer-capable layouts;
+- always-available `上へ`/`下へ` controls for keyboard/touch accessibility;
+- allowed size selector;
+- optional card settings through `registry.renderSettings(...)`;
+- reset only the current profile;
+- local profile selector `auto|mobile|tablet|desktop`.
 
-Every edit writes local storage immediately and schedules one vault save. Do not auto-save the local-only override.
+Every synced edit calls the corresponding `MangaHomeLayout` helper, writes `mangaReaderHome` immediately, re-renders, and schedules one 750 ms cloud save. Changing the local override only writes `PROFILE_OVERRIDE_KEY` and re-renders; it never schedules a vault save.
 
-- [ ] **Step 6: Add sync-conflict preservation behavior**
+- [ ] **Step 6: Preserve local edits on CAS/save conflict**
 
-On `MangaVault.savePayload` rejection, keep the edited local storage untouched and render the existing error message in Home status. Do not reload/re-normalize from cloud automatically. The next explicit account/sync action can resolve conflict.
+If `MangaVault.savePayload` rejects, leave `mangaReaderHome` unchanged, stop that save attempt, and show the thrown conflict/error message in `#homeStatus`. Do not auto-fetch or replace the local layout.
 
-- [ ] **Step 7: Add Home files to static verification**
+- [ ] **Step 7: Add Home to static verification**
 
-Add `home.html` to `pages`, and add `home-layout.js`, `home-cards.js`, `home-local-cards.js`, `home.js`, `vault-gate.js` to `standalone` where appropriate. `home.js` may stay page-only if it requires real browser globals; in that case its syntax is already checked as an external referenced file by an explicit `new vm.Script(read('home.js'))` entry.
+In `scripts/check-static.mjs` add `home.html` to `pages` and these files to `standalone`:
+
+```js
+'home-layout.js', 'home-cards.js', 'home-local-cards.js', 'home.js', 'vault-gate.js'
+```
+
+The standalone syntax check is valid because parsing with `vm.Script` does not execute browser globals.
 
 - [ ] **Step 8: Run focused tests and static verification**
 
@@ -477,23 +567,23 @@ git commit -m "feat: add customizable home shell"
 - Modify: `tests/static-regression.test.mjs`
 
 **Interfaces:**
-- Login/signup/saved-session destination becomes `home.html`.
-- Reader/study locked-vault destination becomes `home.html`.
-- Reader accepts optional `?item=<savedItemId>` after local saved data is loaded.
+- Login/signup/saved-session destination: `home.html`.
+- Reader/study locked-vault destination: `home.html`.
+- Reader optional continuation input: `?item=<savedItemId>` after local saved data is loaded.
 
 - [ ] **Step 1: Write routing regression assertions first**
 
-Add assertions that:
+Add:
 
 ```js
 assert.doesNotMatch(read('index.html'), /function goReader\(/);
 assert.match(read('index.html'), /location\.replace\('home\.html'\)/);
 assert.match(read('reader.html'), /vaultUrl = 'home\.html'/);
 assert.match(read('reader.html'), /new URL\(location\.href\)\.searchParams\.get\('item'\)/);
-assert.match(read('study.html'), /home\.html/);
+assert.match(read('study.html'), /window\.location\.replace\('home\.html'\)/);
 ```
 
-Also assert visible Home links exist on reader/study.
+Also assert visible anchors/buttons with `home.html` exist in reader and Study navigation.
 
 - [ ] **Step 2: Run static regression and verify red**
 
@@ -503,15 +593,15 @@ Expected: FAIL on the new routing assertions.
 
 - [ ] **Step 3: Change `index.html` routing**
 
-Rename `goReader()` to `goHome()` and make every authenticated result call `window.location.replace('home.html')`: saved-session refresh, login, signup-with-session.
+Rename `goReader()` to `goHome()` and make saved-session refresh, password login, and signup-with-session call `window.location.replace('home.html')`.
 
 - [ ] **Step 4: Change protected-page lock routing and add Home actions**
 
-In `reader.html`, change `vaultUrl` from `sync.html` to `home.html`. In `study.html`, mirror the same protected-page rule if it currently routes elsewhere. Add a Home button/link to each page's top-level navigation without removing existing browser-history navigation.
+In `reader.html`, change `const vaultUrl = 'sync.html'` to `const vaultUrl = 'home.html'`. In the compact `study.html` auth guard, change the locked-vault `window.location.replace('sync.html')` to `window.location.replace('home.html')`. Add a visible Home action to the reader's top-level app navigation and to Study's top-level navigation without removing existing browser-history behavior.
 
 - [ ] **Step 5: Add direct recent-book continuation**
 
-After `savedItems` has been loaded and the reader's normal boot is ready, consume:
+After `savedItems` has been loaded and normal reader boot has reached the point where `openItem` is safe, run once:
 
 ```js
 const requestedItemId = new URL(location.href).searchParams.get('item');
@@ -519,9 +609,9 @@ const requestedItem = requestedItemId && savedItems.find((item) => item.id === r
 if (requestedItem) openItem(requestedItem, false);
 ```
 
-Do not delete or mutate the saved item. If the ID is missing or unknown, open the normal reader/shelf state without an error loop.
+Do not mutate/delete the saved record. Missing/unknown IDs fall back to normal reader state without retries or error loops.
 
-- [ ] **Step 6: Run regression tests**
+- [ ] **Step 6: Run routing/static gates**
 
 Run:
 
@@ -544,7 +634,7 @@ git commit -m "feat: route authenticated sessions through home"
 ### Task 6: Full core verification
 
 **Files:**
-- No product-code changes expected; fix only concrete failures found by the commands below.
+- No product-code changes expected; change only concrete failures found by the commands/checks below.
 
 - [ ] **Step 1: Run the complete test suite**
 
@@ -558,24 +648,25 @@ Run: `npm run verify:static`
 
 Expected: `static verification passed` and exit 0.
 
-- [ ] **Step 3: Manual smoke test in a real browser**
+- [ ] **Step 3: Manual authenticated browser smoke test**
 
-Verify all of these in one authenticated account:
-
+Verify:
 1. Login lands on Home.
-2. Locked Home shows vault unlock instead of redirecting to Bookshelf.
-3. Passphrase and passkey unlock reveal Home without loading `reader.html`.
-4. Mobile/tablet/desktop edits do not alter one another.
-5. A browser-local profile override survives reload but is absent from `mangaReaderHome` and the encrypted Home object.
-6. Continue opens the latest saved book when one exists.
-7. Reader and Study both have a usable Home route.
-8. A simulated vault save conflict leaves the local Home edit visible and reports the conflict.
+2. Locked Home shows the vault gate instead of redirecting to Bookshelf.
+3. Passphrase/recovery/passkey unlock reveals Home without loading `reader.html`.
+4. Vault creation shows the recovery code until explicit confirmation.
+5. Mobile/tablet/desktop edits do not alter one another.
+6. Browser-local profile override survives reload but is absent from `mangaReaderHome` and the encrypted Home object.
+7. Continue opens the latest saved book when one exists.
+8. Reader and Study both have a usable Home route.
+9. A simulated vault-save conflict leaves the local Home edit visible and reports the conflict.
+10. Removing all content cards still leaves `ホームを編集` reachable through shell chrome.
 
-- [ ] **Step 4: Commit any verification-only fixes separately**
+- [ ] **Step 4: Commit verification fixes only when needed**
 
 ```bash
 git add -A
 git commit -m "fix: complete home core verification"
 ```
 
-Skip this commit if verification required no changes.
+Skip this commit when verification required no changes.
