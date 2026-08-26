@@ -4,9 +4,9 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const pages = ['index.html', 'sync.html', 'reader.html', 'local-reader.html', 'links.html', 'study.html'];
+const pages = ['index.html', 'sync.html', 'reader.html', 'local-reader.html', 'links.html', 'study.html', 'home.html'];
 const standalone = [
-  'author-summary.js', 'backup-format.js', 'home-cards.js', 'home-local-cards.js', 'browser-storage.js', 'feature-flags.js', 'shelf-search.js',
+  'author-summary.js', 'backup-format.js', 'home-layout.js', 'home-cards.js', 'home-local-cards.js', 'home.js', 'browser-storage.js', 'feature-flags.js', 'shelf-search.js',
   'status-message.js', 'vault-gate.js', 'study-data.js', 'study-sync.js', 'study-quiz.js', 'study-audio.js', 'study-ai.js',
   'study-offline.js', 'supabase-config.js', 'url-parser.js', 'vault-payload.js', 'vault-session.js'
 ];
