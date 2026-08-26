@@ -26,10 +26,25 @@ test('video library provides search filters sorting view modes folders and edito
   assert.match(source, /history\.pushState/);
 });
 
-test('video routing bridge plays enhanced cards inline without opening the legacy player screen', () => {
+test('enhanced editor presents URL as the only playback locator while legacy fields stay internal', () => {
+  const library = read('video-library.js');
+  const bridge = read('video-routing-fix.js');
+  assert.match(library, /id=["']videoLibraryUrl["']/);
+  assert.match(bridge, /videoLibraryLegacyService/);
+  assert.match(bridge, /videoLibraryLegacyId/);
+  assert.match(bridge, /classifyVideoUrl/);
+  assert.match(bridge, /\.remove\(\)/);
+  assert.match(bridge, /addEventListener\(['"]submit['"],[\s\S]*true\)/);
+});
+
+test('video routing bridge plays direct video URLs with a video element and keeps legacy iframe playback', () => {
   const source = read('video-routing-fix.js');
   assert.match(source, /\.vl-open/);
   assert.match(source, /vl-inline-player/);
+  assert.match(source, /classifyVideoUrl/);
+  assert.match(source, /createElement\(['"]video['"]\)/);
+  assert.match(source, /\.controls\s*=\s*true/);
+  assert.match(source, /\.playsInline\s*=\s*true/);
   assert.match(source, /createElement\(['"]iframe['"]\)/);
   assert.match(source, /stopImmediatePropagation/);
   assert.match(source, /recordOpen/);
