@@ -8,6 +8,7 @@ test('recommendations bootstrap loads the video enhancement after existing reade
   const source = read('recommendations.js');
   assert.match(source, /video-data\.js/);
   assert.match(source, /video-library\.js/);
+  assert.match(source, /video-routing-fix\.js/);
   assert.match(source, /DOMContentLoaded/);
 });
 
@@ -20,17 +21,20 @@ test('video library provides search filters sorting view modes folders and edito
   assert.match(source, /mangaReaderVideoFolders/);
   assert.match(source, /MangaVaultPayload\.buildFromLocalStorage/);
   assert.match(source, /MangaVault\.savePayload/);
-});
-
-test('video library preserves legacy player/add/delete hooks instead of replacing reader routing', () => {
-  const source = read('video-library.js');
-  assert.match(source, /videoPlayerIframe/);
-  assert.match(source, /invokeLegacyOpen/);
-  assert.match(source, /node\.click\(\)/);
-  assert.doesNotMatch(source, /location\.hash\s*=\s*['"]screen=video-player/);
   assert.match(source, /confirmVideoAddBtn/);
   assert.match(source, /videoDeleteBtn/);
   assert.match(source, /history\.pushState/);
+});
+
+test('video routing bridge opens enhanced cards through the legacy History API player path', () => {
+  const source = read('video-routing-fix.js');
+  assert.match(source, /\.vl-open/);
+  assert.match(source, /videoItem/);
+  assert.match(source, /node\.click\(\)/);
+  assert.match(source, /addEventListener\(['"]click['"],[\s\S]*true\)/);
+  assert.match(source, /mangaReaderVideoMeta/);
+  assert.match(source, /MangaVaultPayload\.buildFromLocalStorage/);
+  assert.match(source, /MangaVault\.savePayload/);
 });
 
 test('browser bootstrap restores encrypted sidecars when legacy reader imports a backup', () => {
