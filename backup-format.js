@@ -1,6 +1,7 @@
 const FORMAT = 'manga-reader-backup';
 const VERSION = 2;
 const DEFAULT_DASHBOARD_VISIBILITY = { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false };
+const DEFAULT_HOME_CARDS = ['bookshelf', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 const DEFAULT_STUDY_SUBJECTS = [
   { id: 'constitutional-law', name: '憲法' }, { id: 'administrative-law', name: '行政法' },
   { id: 'civil-law', name: '民法' }, { id: 'commercial-law', name: '商法' },
@@ -44,7 +45,7 @@ function normalizeBackupStudy(value) {
 }
 function normalizeData(data) {
   const x = data && typeof data === 'object' ? data : {};
-  return { folders: Array.isArray(x.folders) ? x.folders : [], items: Array.isArray(x.items) ? x.items : [], videos: Array.isArray(x.videos) ? x.videos : [], authorCards: Array.isArray(x.authorCards) ? x.authorCards : [], mangaInfo: x.mangaInfo && typeof x.mangaInfo === 'object' && !Array.isArray(x.mangaInfo) ? x.mangaInfo : {}, toc: x.toc && typeof x.toc === 'object' && !Array.isArray(x.toc) ? x.toc : {}, lastPages: x.lastPages && typeof x.lastPages === 'object' && !Array.isArray(x.lastPages) ? x.lastPages : {}, theme: x.theme === 'light' ? 'light' : 'dark', dashboardVisibility: normalizeBackupDashboardVisibility(x.dashboardVisibility), study: normalizeBackupStudy(x.study) };
+  return { folders: Array.isArray(x.folders) ? x.folders : [], items: Array.isArray(x.items) ? x.items : [], videos: Array.isArray(x.videos) ? x.videos : [], authorCards: Array.isArray(x.authorCards) ? x.authorCards : [], mangaInfo: x.mangaInfo && typeof x.mangaInfo === 'object' && !Array.isArray(x.mangaInfo) ? x.mangaInfo : {}, toc: x.toc && typeof x.toc === 'object' && !Array.isArray(x.toc) ? x.toc : {}, lastPages: x.lastPages && typeof x.lastPages === 'object' && !Array.isArray(x.lastPages) ? x.lastPages : {}, theme: x.theme === 'light' ? 'light' : 'dark', dashboardVisibility: normalizeBackupDashboardVisibility(x.dashboardVisibility), homeCards: Array.isArray(x.homeCards) ? x.homeCards.map((id) => String(id || '')).filter(Boolean) : DEFAULT_HOME_CARDS.slice(), study: normalizeBackupStudy(x.study) };
 }
 function createBackup(data, exportedAt = new Date().toISOString()) { return { format: FORMAT, version: VERSION, exportedAt, data: normalizeData(data) }; }
 function migrateBackup(input) {
