@@ -12,6 +12,7 @@
   let activePlayer = null;
   let activePlayback = null;
   let editorObserver = null;
+  let thumbnailObserver = null;
 
   function readJson(key, fallback) {
     try {
@@ -35,6 +36,7 @@
       #videoLibraryResults .vl-card.vl-inline-playing .vl-thumb{display:none}
       #videoLibraryResults .vl-inline-player{position:relative;aspect-ratio:16/9;width:100%;background:#000;border-radius:15px 15px 0 0;overflow:hidden;z-index:2}
       #videoLibraryResults .vl-inline-player iframe,#videoLibraryResults .vl-inline-player video{display:block;width:100%;height:100%;border:0;background:#000;object-fit:contain}
+      #videoLibraryResults .vl-thumb .vl-thumb-direct-video{display:block;width:100%;height:100%;border:0;background:#000;object-fit:cover}
       #videoLibraryResults .vl-inline-close{position:absolute;top:8px;left:8px;z-index:5;width:36px;height:36px;border:1px solid rgba(255,255,255,.3);border-radius:50%;display:grid;place-items:center;background:rgba(10,12,17,.78);color:#fff;font-size:22px;line-height:1;cursor:pointer;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
       #videoLibraryResults .vl-inline-fallback{height:100%;display:grid;place-items:center;align-content:center;gap:10px;padding:24px;text-align:center;color:#fff}
       #videoLibraryResults .vl-inline-fallback a{color:#fff;text-decoration:underline}
@@ -145,6 +147,11 @@
       activePlayback = { base, video, lastLocalSaveAt: 0 };
 
       video.addEventListener('loadedmetadata', () => {
+        const width = Number(video.videoWidth);
+        const height = Number(video.videoHeight);
+        if (Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0) {
+          player.style.aspectRatio = width + ' / ' + height;
+        }
         const duration = Number(video.duration);
         const savedProgress = Number(meta && meta.progressSeconds != null ? meta.progressSeconds : base.progressSeconds);
         if (Number.isFinite(savedProgress) && savedProgress > 0 && Number.isFinite(duration) && duration > 0 && savedProgress < duration - 1) {
@@ -180,6 +187,99 @@
     });
     player.append(close);
     return player;
+  }
+
+  function directThumbnailRecord(base, meta) {
+    return Data.normalizeVideo({
+      ...base,
+      ...meta,
+      id: base.id,
+      a: base.a,
+      b: base.b,
+      addedAt: base.addedAt,
+    });
+  }
+
+  function attachDirectVideoThumbnail(card, base, meta) {
+    const thumb = card && card.querySelector('.vl-thumb');
+    if (!thumb || thumb.querySelector('.vl-thumb-direct-video')) return;
+
+    const effective = directThumbnailRecord(base, meta);
+    if (text(effective.thumbnailUrl) && thumb.querySelector('img')) return;
+    const classified = Data.classifyVideoUrl(effective.url);
+    if (classified.kind !== 'direct') return;
+
+    const fallback = thumb.querySelector('.vl-thumb-fallback');
+    const preview = document.createElement('video');
+    preview.className = 'vl-thumb-direct-video';
+    preview.muted = true;
+    preview.defaultMuted = true;
+    preview.playsInline = true;
+    preview.preload = 'metadata';
+    preview.setAttribute('aria-hidden', 'true');
+    preview.tabIndex = -1;
+
+    preview.addEventListener('loadedmetadata', () => {
+      const width = Number(preview.videoWidth);
+      const height = Number(preview.videoHeight);
+      if (Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0) {
+        thumb.style.aspectRatio = width + ' / ' + height;
+      }
+      const duration = Number(preview.duration);
+      if (Number.isFinite(duration) && duration > 0) {
+        const seekTo = Math.min(0.1, Math.max(0, duration - 0.05));
+        if (seekTo > 0) {
+          try { preview.currentTime = seekTo; } catch (_) {}
+        }
+      }
+    });
+    preview.addEventListener('loadeddata', () => {
+      if (fallback) fallback.hidden = true;
+    });
+    preview.addEventListener('error', () => {
+      preview.remove();
+      if (fallback) fallback.hidden = false;
+    });
+    preview.src = classified.url;
+    thumb.append(preview);
+  }
+
+  function scanDirectVideoThumbnails() {
+    const results = document.getElementById('videoLibraryResults');
+    if (!results) return false;
+    const rawVideos = readJson(VIDEO_KEY, []);
+    const videos = Array.isArray(rawVideos) ? rawVideos : [];
+    const rawMeta = readJson(META_KEY, {});
+    const meta = rawMeta && typeof rawMeta === 'object' && !Array.isArray(rawMeta) ? rawMeta : {};
+    const byId = new Map(videos.map((video) => [text(video && video.id), video]));
+    results.querySelectorAll('.vl-card').forEach((card) => {
+      const base = byId.get(text(card.dataset.id));
+      if (!base) return;
+      const current = meta[base.id] && typeof meta[base.id] === 'object' ? meta[base.id] : {};
+      attachDirectVideoThumbnail(card, base, current);
+    });
+    return true;
+  }
+
+  function ensureDirectVideoThumbnails() {
+    ensureStyles();
+    const results = document.getElementById('videoLibraryResults');
+    if (!results) {
+      if (thumbnailObserver || typeof MutationObserver === 'undefined') return;
+      thumbnailObserver = new MutationObserver(() => {
+        if (!document.getElementById('videoLibraryResults')) return;
+        thumbnailObserver.disconnect();
+        thumbnailObserver = null;
+        ensureDirectVideoThumbnails();
+      });
+      thumbnailObserver.observe(document.documentElement, { childList: true, subtree: true });
+      return;
+    }
+    scanDirectVideoThumbnails();
+    if (thumbnailObserver) thumbnailObserver.disconnect();
+    if (typeof MutationObserver === 'undefined') return;
+    thumbnailObserver = new MutationObserver(() => scanDirectVideoThumbnails());
+    thumbnailObserver.observe(results, { childList: true, subtree: true });
   }
 
   function syncUrlCompatibilityFields(urlInput, serviceInput, idInput) {
@@ -264,5 +364,8 @@
     if (document.visibilityState === 'hidden') persistActivePlayback(true);
   });
   window.addEventListener('pagehide', () => persistActivePlayback(false));
-  setTimeout(ensureUrlOnlyEditor, 0);
+  setTimeout(() => {
+    ensureDirectVideoThumbnails();
+    ensureUrlOnlyEditor();
+  }, 0);
 })();
