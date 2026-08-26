@@ -98,6 +98,7 @@
     loadBrowserScript('video-data.js')
       .then(() => loadBrowserScript('video-library.js'))
       .then(() => loadBrowserScript('video-routing-fix.js'))
+      .then(() => loadBrowserScript('video-thumbnail-time.js'))
       .catch((error) => console.warn('動画ライブラリの読み込みに失敗しました', error));
   }
 

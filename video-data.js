@@ -12,6 +12,49 @@
     return Number.isFinite(n) && n >= 0 ? n : fallback;
   };
 
+  function parseMediaTime(value) {
+    const raw = asText(value);
+    if (!raw) return null;
+    if (/^\d+(?:\.\d+)?$/.test(raw)) return Number(raw);
+    const parts = raw.split(':');
+    if (parts.length < 2 || parts.length > 3 || parts.some((part) => !/^\d+$/.test(part))) return null;
+    const nums = parts.map(Number);
+    if (parts.length === 2) {
+      if (nums[1] >= 60) return null;
+      return nums[0] * 60 + nums[1];
+    }
+    if (nums[1] >= 60 || nums[2] >= 60) return null;
+    return nums[0] * 3600 + nums[1] * 60 + nums[2];
+  }
+
+  function formatMediaTime(value) {
+    const total = Math.max(0, Math.floor(asTime(value, 0)));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+    if (hours) return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  function mergeVideoMetaPreservingThumbnailTime(existingValue, incomingValue) {
+    const existing = existingValue && typeof existingValue === 'object' && !Array.isArray(existingValue) ? existingValue : {};
+    const incoming = incomingValue && typeof incomingValue === 'object' && !Array.isArray(incomingValue) ? incomingValue : {};
+    const merged = {};
+    Object.entries(incoming).forEach(([id, raw]) => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        merged[id] = raw;
+        return;
+      }
+      const next = { ...raw };
+      const previous = existing[id] && typeof existing[id] === 'object' && !Array.isArray(existing[id]) ? existing[id] : null;
+      if (!Object.prototype.hasOwnProperty.call(next, 'thumbnailTimeSeconds') && previous && Object.prototype.hasOwnProperty.call(previous, 'thumbnailTimeSeconds')) {
+        next.thumbnailTimeSeconds = previous.thumbnailTimeSeconds;
+      }
+      merged[id] = next;
+    });
+    return merged;
+  }
+
   function parseTags(value) {
     const source = Array.isArray(value) ? value : asText(value).split(/[,、]/);
     const seen = new Set();
@@ -109,6 +152,7 @@
       favorite: x.favorite === true,
       memo: asText(x.memo),
       thumbnailUrl: asText(x.thumbnailUrl),
+      thumbnailTimeSeconds: x.thumbnailTimeSeconds == null ? null : asTime(x.thumbnailTimeSeconds, 0),
       watchStatus,
       progressSeconds: x.progressSeconds == null ? null : asTime(x.progressSeconds, 0),
       durationSeconds: x.durationSeconds == null ? null : asTime(x.durationSeconds, 0),
@@ -195,5 +239,5 @@
     };
   }
 
-  return { WATCH_STATUSES, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, storageFieldsForVideoUrl };
+  return { WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, storageFieldsForVideoUrl };
 }));
