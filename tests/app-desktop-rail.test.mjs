@@ -39,7 +39,6 @@ test('shared rail provides global destinations and page-aware active state', () 
     ['desktopNavAuthor','reader.html#screen=author-cards'],
     ['desktopNavBackup','reader.html#screen=backup'],
     ['desktopNavSettings','reader.html#screen=settings'],
-    ['desktopNavVault','sync.html'],
     ['desktopNavLocalReader','local-reader.html']
   ];
   for (const [id, href] of destinations) {
@@ -51,6 +50,8 @@ test('shared rail provides global destinations and page-aware active state', () 
   assert.match(rail, /screen === 'backup'/);
   assert.match(rail, /screen === 'settings'/);
   assert.match(rail, /aria-current/);
+  assert.doesNotMatch(rail, /desktopNavVault/);
+  assert.doesNotMatch(rail, /label: '保管庫'/);
 });
 
 test('shared rail reserves desktop content space, caps width, and disappears below desktop width', () => {
