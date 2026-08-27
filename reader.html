@@ -1153,6 +1153,22 @@
   .settingsToggle + .settingsToggle { margin-top: 8px; }
   .settingsToggle input { width: 18px; height: 18px; accent-color: var(--accent); }
   .backupActions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+  /* Desktop saved shelf: keep the content in a restrained, centered column
+     (closer to X / note) instead of stretching it across the whole space
+     beside the Liquid Glass rail. The screen itself still owns the full
+     remaining viewport so navigation/background behavior is unchanged. */
+  @media (min-width: 900px) {
+    html.app-desktop-rail-page #savedListOverlay > #savedListPanel {
+      width: min(920px, calc(100% - 40px)) !important;
+      max-width: 920px !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+      padding-left: 28px;
+      padding-right: 28px;
+    }
+  }
+
   .screenView:focus { outline: none; }
 </style>
 </head>
