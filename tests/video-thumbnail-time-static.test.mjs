@@ -35,10 +35,11 @@ test('thumbnail preview synchronizes slider, timestamp text, and media currentTi
   assert.match(source, /Data\.parseMediaTime/);
 });
 
-test('direct card thumbnail seeks to the saved thumbnail timestamp', () => {
+test('direct card thumbnail feature reapplies the saved thumbnail timestamp after edits', () => {
   assert.equal(fs.existsSync(featureUrl), true);
   const source = fs.readFileSync(featureUrl, 'utf8');
   assert.match(source, /vl-thumb-direct-video/);
   assert.match(source, /thumbnailTimeSeconds/);
   assert.match(source, /preview\.currentTime/);
+  assert.match(source, /applySavedThumbnailTimeToCards/);
 });

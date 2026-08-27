@@ -8,7 +8,10 @@ test('direct video cards generate an automatic video-frame thumbnail when no man
   assert.match(source, /vl-thumb-direct-video/);
   assert.match(source, /thumbnailUrl/);
   assert.match(source, /muted\s*=\s*true/);
-  assert.match(source, /preload\s*=\s*'metadata'/);
+  assert.match(source, /preload\s*=\s*'auto'/);
+  assert.match(source, /position:absolute;inset:0/);
+  assert.match(source, /data-frame-ready/);
+  assert.match(source, /addEventListener\('seeked'/);
 });
 
 test('direct video thumbnail adopts the media native aspect ratio', () => {
@@ -22,4 +25,11 @@ test('direct inline player adopts the media native aspect ratio after metadata l
   assert.match(source, /loadedmetadata/);
   assert.match(source, /video\.videoWidth/);
   assert.match(source, /video\.videoHeight/);
+});
+
+test('direct card thumbnail seeks to the persisted thumbnail timestamp before reveal', () => {
+  assert.match(source, /effective\.thumbnailTimeSeconds/);
+  assert.match(source, /requestedThumbnailTime/);
+  assert.match(source, /preview\.currentTime = targetThumbnailTime/);
+  assert.match(source, /fallback\.hidden = true/);
 });
