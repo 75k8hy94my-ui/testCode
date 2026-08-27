@@ -43,6 +43,21 @@ function remove(argumentId,storage=globalThis.localStorage){
   delete all[key];
   return writeAll(all,storage);
 }
+function clearAll(storage=globalThis.localStorage){
+  if(!storage)return false;
+  try{
+    if(typeof storage.removeItem==='function')storage.removeItem(STORAGE_KEY);
+    else if(typeof storage.delete==='function')storage.delete(STORAGE_KEY);
+    else return false;
+    return true;
+  }catch(_){return false}
+}
+function fromStudy(study,argumentId){
+  const records=study&&study.argumentDrafts&&typeof study.argumentDrafts==='object'?study.argumentDrafts:{};
+  const record=records[storageKey(argumentId)];
+  if(!record||record.deleted)return null;
+  return normalizeDraft(record);
+}
 function shouldRestore(draft,argument){
   if(!draft)return false;
   if(!argument)return true;
@@ -65,7 +80,7 @@ function signature(draft){
   });
 }
 
-const api={STORAGE_KEY,AUTOSAVE_INTERVAL_MS,storageKey,readAll,normalizeDraft,load,save,remove,shouldRestore,signature};
+const api={STORAGE_KEY,AUTOSAVE_INTERVAL_MS,storageKey,readAll,normalizeDraft,load,save,remove,clearAll,fromStudy,shouldRestore,signature};
 if(typeof window!=='undefined')window.StudyArgumentDrafts=api;
 if(typeof module!=='undefined')module.exports=api;
 })();
