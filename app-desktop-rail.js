@@ -175,6 +175,7 @@
           cursor: pointer;
           transition: transform .14s ease, background .18s ease, color .18s ease, box-shadow .18s ease;
         }
+        .appDesktopRailItem[hidden] { display: none !important; }
         .appDesktopRailItem svg {
           width: 21px;
           height: 21px;
