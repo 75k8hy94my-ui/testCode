@@ -34,13 +34,13 @@ test('direct card thumbnail seeks to the persisted thumbnail timestamp before re
   assert.match(source, /fallback\.hidden = true/);
 });
 
-test('blocked or failed video embeds provide an external-playback fallback', () => {
+test('blocked or failed video embeds keep external playback only in the fallback UI', () => {
   assert.match(source, /function externalOpenLink/);
   assert.match(source, /rel = 'noopener noreferrer'/);
-  assert.match(source, /appendExternalOpenShortcut\(player, classified\.url\)/);
-  assert.match(source, /appendExternalOpenShortcut\(player, url\)/);
   assert.match(source, /video\.addEventListener\('error'/);
   assert.match(source, /appendFallback\(player, classified\.url/);
+  assert.doesNotMatch(source, /appendExternalOpenShortcut/);
+  assert.doesNotMatch(source, /vl-inline-external/);
 });
 
 test('embed restrictions fall back to a normal site iframe or external page', () => {
@@ -57,9 +57,19 @@ test('legacy video embeds can retry by embedding the ordinary site page', () => 
   assert.match(source, /appendSiteEmbedToggle\(player, iframe, url, videoEmbedUrl\)/);
 });
 
-test('ordinary video page URLs are tried as site iframes before external fallback', () => {
+test('ordinary video page URLs are tried as site iframes without overlaying an external button', () => {
   assert.match(source, /classified\.kind === 'link'/);
   assert.match(source, /configureSiteIframe/);
   assert.match(source, /iframe\.dataset\.siteEmbed = '1'/);
-  assert.match(source, /appendExternalOpenShortcut\(player, classified\.url\)/);
+  assert.doesNotMatch(source, /appendExternalOpenShortcut\(player, classified\.url\)/);
+});
+
+test('inline playback does not overlay custom close or external-open controls on the provider player', () => {
+  assert.doesNotMatch(source, /vl-inline-close/);
+  assert.doesNotMatch(source, /className = 'vl-inline-external'/);
+  assert.doesNotMatch(source, /aria-label', '再生を閉じる'/);
+});
+
+test('clicking the active card body again closes inline playback without an overlay button', () => {
+  assert.match(source, /activeVideoId === videoId[\s\S]*closeActivePlayer\(\);[\s\S]*return;/);
 });
