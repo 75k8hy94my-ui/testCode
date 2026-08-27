@@ -16,7 +16,7 @@ const emptyStudy = {
     { id: 'criminal-procedure', name: '刑事訴訟法' },
     { id: 'labor-law', name: '労働法' }
   ],
-  genres: [], definitions: [], arguments: [], argumentProgress: {}, recentAttempts: [], progress: {}, pendingGradings: [], pendingSyncOps: [], appliedOperationIds: [],
+  genres: [], definitions: [], arguments: [], argumentDrafts: {}, argumentProgress: {}, recentAttempts: [], progress: {}, pendingGradings: [], pendingSyncOps: [], appliedOperationIds: [],
   gamification: { xp: 0, streak: 0, lastStudyDate: null }, preferences: { autoSpeak: false }
 };
 
@@ -28,6 +28,7 @@ test('normalizes legacy payload with empty video library metadata, study state a
 test('build and apply preserve every vault field including video library metadata, home cards and study', () => {
   const study = structuredClone(emptyStudy);
   study.preferences.autoSpeak = true;
+  study.argumentDrafts['new'] = { argumentId: null, title: '途中', body: '下書き本文', savedAt: '2026-08-28T00:00:00.000Z' };
   const input = { folders: [{ id: 'f1' }], items: [{ id: 'i1' }], videos: [{ id: 'v1' }], videoFolders: [{ id: 'vf1', name: '動画' }], videoMeta: { v1: { favorite: true, tags: ['x'], memo: 'note' } }, authorCards: [{ id: 'a1', name: '作者' }], mangaInfo: { a: { count: 10 } }, toc: { a: [{ page: 1 }] }, lastPages: { a: { page: 3 } }, theme: 'light', dashboardVisibility: { mobile: { continue: true, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: true, favorites: false } }, homeCards: ['study', 'bookshelf'], study };
   const storage = new Map();
   applyToStorage(input, storage);
