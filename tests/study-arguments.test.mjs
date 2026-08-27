@@ -137,3 +137,36 @@ test('bold composes with marker and underline without replacing either', () => {
   assert.match(html, /argument-underline-black/);
   assert.match(html, /argument-bold/);
 });
+
+test('toggleStyle removes only bold when the selected range is already bold', () => {
+  const annotations = [
+    { start: 0, end: 8, style: 'marker-yellow-full' },
+    { start: 1, end: 7, style: 'underline-red' },
+    { start: 2, end: 6, style: 'bold' }
+  ];
+  const result = StudyArguments.toggleStyle(annotations, 2, 6, 'bold', 8);
+  assert.deepEqual(result, [
+    { start: 0, end: 8, style: 'marker-yellow-full' },
+    { start: 1, end: 7, style: 'underline-red' }
+  ]);
+});
+
+test('toggleStyle applies missing formatting and replaces only its formatting group', () => {
+  const annotations = [
+    { start: 0, end: 8, style: 'marker-green-full' },
+    { start: 1, end: 7, style: 'underline-red' }
+  ];
+  const result = StudyArguments.toggleStyle(annotations, 2, 6, 'underline-black', 8);
+  assert.deepEqual(result, [
+    { start: 0, end: 8, style: 'marker-green-full' },
+    { start: 1, end: 2, style: 'underline-red' },
+    { start: 2, end: 6, style: 'underline-black' },
+    { start: 6, end: 7, style: 'underline-red' }
+  ]);
+});
+
+test('styleCoversRange requires the entire selected range to already have the style', () => {
+  const annotations = [{ start: 2, end: 5, style: 'bold' }];
+  assert.equal(StudyArguments.styleCoversRange(annotations, 2, 5, 'bold', 8), true);
+  assert.equal(StudyArguments.styleCoversRange(annotations, 1, 5, 'bold', 8), false);
+});

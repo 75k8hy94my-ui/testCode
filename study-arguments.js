@@ -106,6 +106,34 @@ function applyStyle(annotations,start,end,style,textLength){
   out.push({start:a,end:b,style});
   return mergeAnnotations(out);
 }
+function styleCoversRange(annotations,start,end,style,textLength){
+  if(!VALID_ARGUMENT_STYLES.has(style))return false;
+  const max=Math.max(0,Number.isFinite(textLength)?Math.floor(textLength):Number.MAX_SAFE_INTEGER);
+  const a=Math.max(0,Math.min(max,Math.floor(Number(start))));
+  const b=Math.max(0,Math.min(max,Math.floor(Number(end))));
+  if(!(b>a))return false;
+  const matches=normalizeAnnotations(annotations,max).filter((item)=>item.style===style&&item.end>a&&item.start<b);
+  let cursor=a;
+  for(const item of matches){
+    if(item.start>cursor)return false;
+    if(item.end>cursor)cursor=item.end;
+    if(cursor>=b)return true;
+  }
+  return false;
+}
+function toggleStyle(annotations,start,end,style,textLength){
+  const max=Math.max(0,Number.isFinite(textLength)?Math.floor(textLength):Number.MAX_SAFE_INTEGER);
+  const a=Math.max(0,Math.min(max,Math.floor(Number(start))));
+  const b=Math.max(0,Math.min(max,Math.floor(Number(end))));
+  if(!(b>a)||!VALID_ARGUMENT_STYLES.has(style))return normalizeAnnotations(annotations,max);
+  if(!styleCoversRange(annotations,a,b,style,max))return applyStyle(annotations,a,b,style,max);
+  const out=[];
+  for(const item of normalizeAnnotations(annotations,max)){
+    if(item.style===style)out.push(...subtractRange(item,a,b));
+    else out.push(item);
+  }
+  return mergeAnnotations(out);
+}
 function clearStyles(annotations,start,end,textLength){
   const max=Math.max(0,Number.isFinite(textLength)?Math.floor(textLength):Number.MAX_SAFE_INTEGER);
   const a=Math.max(0,Math.min(max,Math.floor(Number(start))));
@@ -148,7 +176,7 @@ function renderAnnotatedHtml(text,annotations){
   return html;
 }
 
-const api={DAY_MS,RANK_ORDER,MARKER_COLORS,MARKER_MODES,VALID_ARGUMENT_STYLES,normalizeRank,normalizeProgress,progressFor,markProgress,isDue,filterArguments,summarize,styleGroup,normalizeAnnotations,applyStyle,clearStyles,transformAnnotationsForTextChange,renderAnnotatedHtml};
+const api={DAY_MS,RANK_ORDER,MARKER_COLORS,MARKER_MODES,VALID_ARGUMENT_STYLES,normalizeRank,normalizeProgress,progressFor,markProgress,isDue,filterArguments,summarize,styleGroup,normalizeAnnotations,applyStyle,styleCoversRange,toggleStyle,clearStyles,transformAnnotationsForTextChange,renderAnnotatedHtml};
 if(typeof window!=='undefined')window.StudyArguments=api;
 if(typeof module!=='undefined')module.exports=api;
 })();
