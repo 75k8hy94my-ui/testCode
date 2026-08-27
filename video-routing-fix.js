@@ -38,10 +38,8 @@
       #videoLibraryResults .vl-inline-player iframe,#videoLibraryResults .vl-inline-player video{display:block;width:100%;height:100%;border:0;background:#000;object-fit:contain}
       #videoLibraryResults .vl-thumb .vl-thumb-direct-video{position:absolute;inset:0;display:block;width:100%;height:100%;border:0;background:#000;object-fit:cover;opacity:0;pointer-events:none}
       #videoLibraryResults .vl-thumb .vl-thumb-direct-video[data-frame-ready="1"]{opacity:1}
-      #videoLibraryResults .vl-inline-close{position:absolute;top:8px;left:8px;z-index:5;width:36px;height:36px;border:1px solid rgba(255,255,255,.3);border-radius:50%;display:grid;place-items:center;background:rgba(10,12,17,.78);color:#fff;font-size:22px;line-height:1;cursor:pointer;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
       #videoLibraryResults .vl-inline-fallback{height:100%;display:grid;place-items:center;align-content:center;gap:10px;padding:24px;text-align:center;color:#fff}
       #videoLibraryResults .vl-inline-fallback a{color:#fff;text-decoration:underline}
-      #videoLibraryResults .vl-inline-external{position:absolute;right:8px;bottom:8px;z-index:5;display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:0 11px;border:1px solid rgba(255,255,255,.28);border-radius:999px;background:rgba(10,12,17,.78);color:#fff;text-decoration:none;font-size:12px;font-weight:750;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
       #videoLibraryResults .vl-inline-site-toggle{position:absolute;left:8px;bottom:8px;z-index:5;min-height:34px;padding:0 11px;border:1px solid rgba(255,255,255,.28);border-radius:999px;background:rgba(10,12,17,.78);color:#fff;font-size:12px;font-weight:750;cursor:pointer;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
       #videoLibraryResults .vl-grid.compact .vl-card.vl-inline-playing{display:block;min-height:0}
       #videoLibraryResults .vl-grid.compact .vl-card.vl-inline-playing .vl-open{display:block}
@@ -137,13 +135,6 @@
     player.append(fallback);
   }
 
-  function appendExternalOpenShortcut(player, url) {
-    const link = externalOpenLink(url, '外部で開く');
-    if (!link) return;
-    link.className = 'vl-inline-external';
-    player.append(link);
-  }
-
   function configureSiteIframe(iframe, url, title) {
     iframe.title = title || '動画ページ';
     iframe.src = url;
@@ -211,7 +202,6 @@
         }
       }, { once: true });
       player.append(video);
-      appendExternalOpenShortcut(player, classified.url);
     } else if (text(base.a) && text(base.b) && text(base.a) !== 'url') {
       const iframe = document.createElement('iframe');
       const title = text(meta && meta.title) || text(base.title) || (text(base.a) + ' / ' + text(base.b));
@@ -228,7 +218,6 @@
       // X-Frame-Options/frame-ancestors failures to the parent page, so offer
       // an explicit in-place retry using the original site URL.
       appendSiteEmbedToggle(player, iframe, url, videoEmbedUrl);
-      appendExternalOpenShortcut(player, url);
     } else if (classified.kind === 'link') {
       const iframe = configureSiteIframe(
         document.createElement('iframe'),
@@ -236,22 +225,10 @@
         text(meta && meta.title) || text(base.title) || '動画ページ'
       );
       player.append(iframe);
-      appendExternalOpenShortcut(player, classified.url);
     } else {
       appendFallback(player, classified.kind === 'invalid' ? url : classified.url);
     }
 
-    const close = document.createElement('button');
-    close.type = 'button';
-    close.className = 'vl-inline-close';
-    close.textContent = '×';
-    close.setAttribute('aria-label', '再生を閉じる');
-    close.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      closeActivePlayer();
-    });
-    player.append(close);
     return player;
   }
 
@@ -432,7 +409,10 @@
     event.preventDefault();
     event.stopImmediatePropagation();
 
-    if (activeVideoId === videoId && activePlayer && activePlayer.isConnected) return;
+    if (activeVideoId === videoId && activePlayer && activePlayer.isConnected) {
+      closeActivePlayer();
+      return;
+    }
     closeActivePlayer();
     ensureStyles();
 
