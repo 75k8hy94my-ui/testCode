@@ -74,22 +74,11 @@
           <input id="loginPassword" type="password" autocomplete="current-password" required>
           <button class="primary" type="submit">ログイン</button>
         </form>
-        <p class="switch">アカウントをお持ちでないですか？ <button id="showSignup" class="link-button" type="button">アカウントを作成</button></p>
+        <p class="switch">現在、新規アカウントの作成は停止しています。</p>
         <p class="switch"><button id="showReset" class="link-button" type="button">ログインパスワードを忘れた</button></p>
       </div>
       <div id="resetView" hidden><h2>ログインパスワードをリセット</h2><p class="intro">保管庫パスフレーズや復旧キーとは別のものです。</p><form id="resetForm"><label for="resetEmail">メールアドレス</label><input id="resetEmail" type="email" autocomplete="email" required><button class="primary" type="submit">リセットメールを送る</button></form><p class="switch"><button id="resetBack" class="link-button" type="button">ログインへ戻る</button></p></div>
       <div id="completeResetView" hidden><h2>新しいログインパスワード</h2><p class="intro">保管庫パスフレーズや復旧キーは変更されません。</p><form id="completeResetForm"><label for="newPassword">新しいパスワード</label><input id="newPassword" type="password" autocomplete="new-password" minlength="8" required><button class="primary" type="submit">パスワードを更新</button></form></div>
-      <div id="signupView" hidden>
-        <h2>アカウント作成</h2>
-        <form id="signupForm">
-          <label for="signupEmail">メールアドレス</label>
-          <input id="signupEmail" type="email" autocomplete="email" required>
-          <label for="signupPassword">パスワード</label>
-          <input id="signupPassword" type="password" autocomplete="new-password" minlength="8" required>
-          <button class="primary" type="submit">確認メールを送る</button>
-        </form>
-        <p class="switch">すでにアカウントをお持ちですか？ <button id="showLogin" class="link-button" type="button">ログインへ戻る</button></p>
-      </div>
       <p id="status" class="status" aria-live="polite"></p>
     </section>
   </main>
@@ -100,23 +89,21 @@
     const SESSION_KEY = 'mangaReaderSupabaseSession';
     const config = window.MANGA_READER_SUPABASE || {};
     const $ = (id) => document.getElementById(id);
-    const ui = { loginView:$('loginView'), signupView:$('signupView'), resetView:$('resetView'), completeResetView:$('completeResetView'), loginForm:$('loginForm'), loginEmail:$('loginEmail'), loginPassword:$('loginPassword'), signupForm:$('signupForm'), signupEmail:$('signupEmail'), signupPassword:$('signupPassword'), resetForm:$('resetForm'), resetEmail:$('resetEmail'), completeResetForm:$('completeResetForm'), newPassword:$('newPassword'), showSignup:$('showSignup'), showLogin:$('showLogin'), showReset:$('showReset'), resetBack:$('resetBack'), status:$('status') };
+    const ui = { loginView:$('loginView'), resetView:$('resetView'), completeResetView:$('completeResetView'), loginForm:$('loginForm'), loginEmail:$('loginEmail'), loginPassword:$('loginPassword'), resetForm:$('resetForm'), resetEmail:$('resetEmail'), completeResetForm:$('completeResetForm'), newPassword:$('newPassword'), showReset:$('showReset'), resetBack:$('resetBack'), status:$('status') };
     function setStatus(text) { ui.status.textContent = text || ''; }
     function loadSession() { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (_) { return null; } }
     function saveSession(session) { if (session) localStorage.setItem(SESSION_KEY,JSON.stringify(session)); else localStorage.removeItem(SESSION_KEY); }
     function assertConfig() { if (!config.url || !config.publishableKey) throw new Error('Supabase の設定が見つかりません。'); }
     async function api(path, options = {}) { assertConfig(); const headers=Object.assign({apikey:config.publishableKey},options.headers || {}); if (options.token) headers.Authorization='Bearer '+options.token; if (options.body) headers['Content-Type']='application/json'; const response=await fetch(config.url+path,Object.assign({},options,{headers})); if (!response.ok) { const detail=await response.text().catch(()=>''); throw new Error('通信に失敗しました ('+response.status+')'+(detail ? '。'+detail.slice(0,140) : '')); } return response.status===204 ? null : response.json(); }
-    function showLogin(message) { ui.loginView.hidden=false; ui.signupView.hidden=true; ui.resetView.hidden=true; ui.completeResetView.hidden=true; ui.loginPassword.value=''; setStatus(message); }
-    function showSignup() { ui.loginView.hidden=true; ui.signupView.hidden=false; ui.resetView.hidden=true; ui.completeResetView.hidden=true; ui.signupPassword.value=''; setStatus(''); ui.signupEmail.focus(); }
-    function showReset() { ui.loginView.hidden=true; ui.signupView.hidden=true; ui.resetView.hidden=false; setStatus(''); ui.resetEmail.value=ui.loginEmail.value; ui.resetEmail.focus(); }
+    function showLogin(message) { ui.loginView.hidden=false; ui.resetView.hidden=true; ui.completeResetView.hidden=true; ui.loginPassword.value=''; setStatus(message); }
+    function showReset() { ui.loginView.hidden=true; ui.resetView.hidden=false; ui.completeResetView.hidden=true; setStatus(''); ui.resetEmail.value=ui.loginEmail.value; ui.resetEmail.focus(); }
     function goReader() { window.location.replace('reader.html'); }
     async function refreshSavedSession() { const session=loadSession(); if (!session || !session.refresh_token) return; try { const next=await api('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:JSON.stringify({refresh_token:session.refresh_token})}); saveSession(next); goReader(); } catch (_) { saveSession(null); } }
     async function login(event) { event.preventDefault(); const email=ui.loginEmail.value.trim(),password=ui.loginPassword.value,button=ui.loginForm.querySelector('button'); if (!email || !password) return; button.disabled=true; try { saveSession(await api('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email,password})})); goReader(); } catch (error) { setStatus(error.message || 'ログインできませんでした。'); } finally { button.disabled=false; } }
-    async function signup(event) { event.preventDefault(); const email=ui.signupEmail.value.trim(),password=ui.signupPassword.value,button=ui.signupForm.querySelector('button'); if (!email || password.length<8) { setStatus('メールアドレスと8文字以上のパスワードを入力してください。'); return; } button.disabled=true; try { const result=await api('/auth/v1/signup',{method:'POST',body:JSON.stringify({email,password})}); if (result.session) { saveSession(result.session); goReader(); return; } ui.loginEmail.value=email; showLogin('確認メールを送りました。メール内のリンクを開いた後、ログインしてください。'); } catch (error) { setStatus(error.message || 'アカウントを作成できませんでした。'); } finally { button.disabled=false; } }
     async function resetPassword(event) { event.preventDefault(); const email=ui.resetEmail.value.trim(); if(!email)return; const button=ui.resetForm.querySelector('button'); button.disabled=true; try { await api('/auth/v1/recover',{method:'POST',body:JSON.stringify({email,redirect_to:location.origin+location.pathname})}); showLogin('パスワード再設定メールを送信しました。ログインパスワードを変更しても、保管庫パスフレーズや復旧キーは変更されません。'); } catch(error) { setStatus(error.message||'再設定メールを送信できませんでした。'); } finally { button.disabled=false; } }
     async function completeReset(event) { event.preventDefault(); const hash=new URLSearchParams(location.hash.replace(/^#/,'').replace(/;/g,'&')); const token=hash.get('access_token'); const password=ui.newPassword.value; if(!token||password.length<8){setStatus('8文字以上の新しいパスワードを入力してください。');return;} const button=ui.completeResetForm.querySelector('button');button.disabled=true;try{await api('/auth/v1/user',{method:'PUT',token,body:JSON.stringify({password})});history.replaceState(null,'',location.pathname);showLogin('ログインパスワードを更新しました。保管庫パスフレーズは別途必要です。');}catch(error){setStatus(error.message||'パスワードを更新できませんでした。');}finally{button.disabled=false;}}
-    function showCompleteReset(){ui.loginView.hidden=true;ui.signupView.hidden=true;ui.resetView.hidden=true;ui.completeResetView.hidden=false;ui.newPassword.focus();setStatus('');}
-    ui.showSignup.addEventListener('click',showSignup); ui.showLogin.addEventListener('click',() => showLogin('')); ui.showReset.addEventListener('click',showReset); ui.resetBack.addEventListener('click',() => showLogin('')); ui.loginForm.addEventListener('submit',login); ui.signupForm.addEventListener('submit',signup); ui.resetForm.addEventListener('submit',resetPassword); ui.completeResetForm.addEventListener('submit',completeReset); if(new URLSearchParams(location.hash.replace(/^#/,'')).get('type')==='recovery') showCompleteReset(); else refreshSavedSession();
+    function showCompleteReset(){ui.loginView.hidden=true;ui.resetView.hidden=true;ui.completeResetView.hidden=false;ui.newPassword.focus();setStatus('');}
+    ui.showReset.addEventListener('click',showReset); ui.resetBack.addEventListener('click',() => showLogin('')); ui.loginForm.addEventListener('submit',login); ui.resetForm.addEventListener('submit',resetPassword); ui.completeResetForm.addEventListener('submit',completeReset); if(new URLSearchParams(location.hash.replace(/^#/,'')).get('type')==='recovery') showCompleteReset(); else refreshSavedSession();
   })();
   </script>
 </body>
