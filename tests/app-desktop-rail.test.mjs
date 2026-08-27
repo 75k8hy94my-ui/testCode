@@ -53,9 +53,14 @@ test('shared rail provides global destinations and page-aware active state', () 
   assert.match(rail, /aria-current/);
 });
 
-test('shared rail reserves desktop content space and disappears below desktop width', () => {
+test('shared rail reserves desktop content space, caps width, and disappears below desktop width', () => {
   const rail = read('app-desktop-rail.js');
-  assert.match(rail, /html\.app-desktop-rail-page body\s*\{\s*padding-left:\s*144px\s*!important/);
+  assert.match(rail, /--app-desktop-content-max:\s*1180px/);
+  assert.match(rail, /--app-desktop-rail-offset:\s*144px/);
+  assert.match(rail, /padding-left:\s*var\(--app-desktop-rail-offset\)\s*!important/);
+  assert.match(rail, /body > main,[\s\S]*body > #app[\s\S]*max-width:\s*var\(--app-desktop-content-max\)\s*!important/);
+  assert.match(rail, /\.screenView\s*\{[\s\S]*left:\s*var\(--app-desktop-rail-offset\)\s*!important[\s\S]*width:\s*auto\s*!important/);
+  assert.match(rail, /\.screenView > \.modalPanel[\s\S]*max-width:\s*var\(--app-desktop-content-max\)\s*!important/);
   assert.match(rail, /@media \(max-width: 899px\)/);
   assert.match(rail, /\.appDesktopRailItem\[hidden\]\s*\{\s*display:\s*none\s*!important/);
 });

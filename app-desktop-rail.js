@@ -99,8 +99,30 @@
         }
       }
       @media (min-width: 900px) {
+        html.app-desktop-rail-page {
+          --app-desktop-content-max: 1180px;
+          --app-desktop-rail-offset: 144px;
+        }
         html.app-desktop-rail-page body {
-          padding-left: 144px !important;
+          padding-left: var(--app-desktop-rail-offset) !important;
+        }
+        html.app-desktop-rail-page body > main,
+        html.app-desktop-rail-page body > #app {
+          width: min(100%, var(--app-desktop-content-max)) !important;
+          max-width: var(--app-desktop-content-max) !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
+        }
+        html.app-desktop-rail-page .screenView {
+          left: var(--app-desktop-rail-offset) !important;
+          right: 0 !important;
+          width: auto !important;
+        }
+        html.app-desktop-rail-page .screenView > .modalPanel {
+          width: min(100%, var(--app-desktop-content-max)) !important;
+          max-width: var(--app-desktop-content-max) !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
         }
         #appDesktopRail,
         #desktopReaderNav {
