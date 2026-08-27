@@ -199,11 +199,11 @@ test('author card creation remains reachable above the fixed bottom navigation',
   assert.match(source, /#authorCardPanel \{ padding-bottom: calc\(96px \+ max\(18px, env\(safe-area-inset-bottom\)\)\); \}/);
 });
 
-test('mobile author cards use the bottom navigation instead of a close button', () => {
+test('author cards use navigation instead of a redundant close button', () => {
   const source = read('reader.html');
-  assert.match(source, /#closeAuthorCardBtn\s*\{\s*display:\s*none !important;/);
+  assert.doesNotMatch(source, /id=["']closeAuthorCardBtn["']/);
+  assert.doesNotMatch(source, /els\.closeAuthorCardBtn/);
   assert.match(source, /mobileNavAuthor\.addEventListener\('click', \(\) => \{[\s\S]*openAuthorCards\(\)/);
-  assert.doesNotMatch(source, /currentReaderScreen === 'author-cards'[\s\S]*closeAuthorCards\(\)/);
   assert.match(source, /#authorCardPanel\s*\{[^}]*padding-bottom: calc\(128px \+ max\(18px, env\(safe-area-inset-bottom\)\)\)/);
 });
 
@@ -227,7 +227,7 @@ test('saved list does not duplicate manga and video navigation in its header', (
 test('video list has its own history-backed screen route', () => {
   const source = read('reader.html');
   assert.match(source, /'video-list': els\.savedListOverlay/);
-  assert.match(source, /currentReaderScreen === 'video-list'\) switchListTab\('video'\)/);
+  assert.match(source, /currentReaderScreen === 'video-list'\)\s*\{\s*switchListTab\('video'\);/);
   assert.match(source, /openReaderScreen\('video-list'\)/);
   assert.match(source, /closeReaderScreen\(currentReaderScreen === 'video-list' \? 'video-list' : 'saved-list'\)/);
 });
