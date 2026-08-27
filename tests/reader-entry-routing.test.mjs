@@ -20,5 +20,22 @@ test('reader startup honors an explicit screen route before resume and default-l
 test('reader location parser recognizes the video-list route', () => {
   const reader = read('reader.html');
   assert.match(reader, /'video-list': els\.savedListOverlay/);
-  assert.match(reader, /if \(currentReaderScreen === 'video-list'\) switchListTab\('video'\)/);
+  assert.match(reader, /if \(currentReaderScreen === 'video-list'\)\s*\{\s*switchListTab\('video'\);/);
+});
+
+test('direct saved-list routes hydrate the bookshelf before showing the manga tab', () => {
+  const reader = read('reader.html');
+  assert.match(reader, /else if \(currentReaderScreen === 'saved-list'\)\s*\{\s*renderSavedList\(\);\s*switchListTab\('manga'\);/);
+});
+
+test('direct author-card routes hydrate author cards and derived authors', () => {
+  const reader = read('reader.html');
+  assert.match(reader, /else if \(currentReaderScreen === 'author-cards'\)\s*\{[\s\S]*syncAuthorCardsFromSavedItems\(\);[\s\S]*renderAuthorCards\(\);/);
+});
+
+test('author cards no longer expose a redundant close button', () => {
+  const reader = read('reader.html');
+  assert.doesNotMatch(reader, /id=['"]closeAuthorCardBtn['"]/);
+  assert.doesNotMatch(reader, /closeAuthorCardBtn:/);
+  assert.doesNotMatch(reader, /els\.closeAuthorCardBtn\.addEventListener/);
 });
