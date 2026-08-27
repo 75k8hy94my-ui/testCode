@@ -11,7 +11,6 @@
     author: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg>',
     backup: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7.5h14v12H5z"/><path d="M8 4h8v3.5H8zM9 12h6M9 16h4"/></svg>',
     settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.1M12 19.1v2.1M21.2 12h-2.1M4.9 12H2.8M18.5 5.5 17 7M7 17l-1.5 1.5M18.5 18.5 17 17M7 7 5.5 5.5"/></svg>',
-    vault: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="12" cy="12" r="3"/><path d="M12 9V7M15 12h2M12 15v2M9 12H7"/></svg>',
     local: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h6l2 2h8v10H4z"/><path d="M8 13h8"/></svg>'
   };
 
@@ -24,7 +23,6 @@
     { id: 'desktopNavAuthor', key: 'author', label: '作者', href: 'reader.html#screen=author-cards' },
     { id: 'desktopNavBackup', key: 'backup', label: 'バックアップ', href: 'reader.html#screen=backup' },
     { id: 'desktopNavSettings', key: 'settings', label: '設定', href: 'reader.html#screen=settings' },
-    { id: 'desktopNavVault', key: 'vault', label: '保管庫', href: 'sync.html' },
     { id: 'desktopNavLocalReader', key: 'local', label: 'ローカル', href: 'local-reader.html', optional: true }
   ];
 
@@ -42,7 +40,6 @@
     if (page === 'home.html') return 'home';
     if (page === 'study.html') return 'study';
     if (page === 'links.html') return 'links';
-    if (page === 'sync.html') return 'vault';
     if (page === 'local-reader.html') return 'local';
     if (page !== 'reader.html') return '';
     const screen = currentReaderScreen();
