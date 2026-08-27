@@ -43,8 +43,9 @@ test('blocked or failed video embeds provide an external-playback fallback', () 
   assert.match(source, /appendFallback\(player, classified\.url/);
 });
 
-test('embed restrictions are not bypassed and provider pages remain reachable', () => {
-  assert.match(source, /X-Frame-Options \/ frame-ancestors failures are intentionally not/);
+test('embed restrictions fall back to a normal site iframe or external page', () => {
+  assert.match(source, /X-Frame-Options\/frame-ancestors failures/);
+  assert.match(source, /explicit in-place retry using the original site URL/);
   assert.match(source, /外部で開く/);
 });
 
