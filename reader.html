@@ -7013,26 +7013,29 @@ https://cdn.example.org/c/003.webp"></textarea>
   // LAST_URL_KEY is now a JSON envelope ({kind:'url',value} or
   // {kind:'item',itemId}) so a custom (explicit page list) manga can be
   // resumed too; older saved data was a plain URL string, handled below.
+  const requestedScreenOnLoad = getReaderScreenFromLocation();
   let resumedOnLoad = false;
-  try {
-    const raw = localStorage.getItem(LAST_URL_KEY);
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.kind === 'url' && parsed.value) {
-          startReading(parsed.value, false);
-          resumedOnLoad = true;
-        } else if (parsed && parsed.kind === 'item' && parsed.itemId) {
-          const it = savedItems.find((x) => x.id === parsed.itemId);
-          if (it) { openItem(it, false); resumedOnLoad = true; }
-        }
-      } catch (e) { /* not JSON: legacy plain-string URL from before this change */ }
-      if (!resumedOnLoad && /^https?:\/\//i.test(raw)) { startReading(raw, false); resumedOnLoad = true; }
-    }
-  } catch (e) {}
-  // 何も復元されなかった場合（初回起動、または閉じる操作の直後など）は、
-  // 空のplaceholderの代わりにリスト（保存したURL）を表示する。
-  if (!resumedOnLoad) openSavedList(true);
+  if (!requestedScreenOnLoad) {
+    try {
+      const raw = localStorage.getItem(LAST_URL_KEY);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.kind === 'url' && parsed.value) {
+            startReading(parsed.value, false);
+            resumedOnLoad = true;
+          } else if (parsed && parsed.kind === 'item' && parsed.itemId) {
+            const it = savedItems.find((x) => x.id === parsed.itemId);
+            if (it) { openItem(it, false); resumedOnLoad = true; }
+          }
+        } catch (e) { /* not JSON: legacy plain-string URL from before this change */ }
+        if (!resumedOnLoad && /^https?:\/\//i.test(raw)) { startReading(raw, false); resumedOnLoad = true; }
+      }
+    } catch (e) {}
+  }
+  // 明示された #screen=... は外部ナビゲーションの意図なので最優先する。
+  // ルート指定も前回の漫画もない場合だけ、保存一覧を既定画面として開く。
+  if (!requestedScreenOnLoad && !resumedOnLoad) openSavedList(true);
 })();
 </script>
 </body>
