@@ -41,6 +41,7 @@
       #videoLibraryResults .vl-inline-close{position:absolute;top:8px;left:8px;z-index:5;width:36px;height:36px;border:1px solid rgba(255,255,255,.3);border-radius:50%;display:grid;place-items:center;background:rgba(10,12,17,.78);color:#fff;font-size:22px;line-height:1;cursor:pointer;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
       #videoLibraryResults .vl-inline-fallback{height:100%;display:grid;place-items:center;align-content:center;gap:10px;padding:24px;text-align:center;color:#fff}
       #videoLibraryResults .vl-inline-fallback a{color:#fff;text-decoration:underline}
+      #videoLibraryResults .vl-inline-external{position:absolute;right:8px;bottom:8px;z-index:5;display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:0 11px;border:1px solid rgba(255,255,255,.28);border-radius:999px;background:rgba(10,12,17,.78);color:#fff;text-decoration:none;font-size:12px;font-weight:750;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
       #videoLibraryResults .vl-grid.compact .vl-card.vl-inline-playing{display:block;min-height:0}
       #videoLibraryResults .vl-grid.compact .vl-card.vl-inline-playing .vl-open{display:block}
       #videoLibraryResults .vl-grid.compact .vl-card.vl-inline-playing .vl-body{padding:10px 70px 10px 12px}
@@ -114,21 +115,32 @@
     activeVideoId = '';
   }
 
-  function appendFallback(player, url) {
+  function externalOpenLink(url, label) {
+    if (!url) return null;
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = label || '外部で開く';
+    return link;
+  }
+
+  function appendFallback(player, url, messageText) {
     const fallback = document.createElement('div');
     fallback.className = 'vl-inline-fallback';
     const message = document.createElement('strong');
-    message.textContent = 'このURLは埋め込み再生できません';
+    message.textContent = messageText || 'このURLはサイト内で再生できません';
     fallback.append(message);
-    if (url) {
-      const link = document.createElement('a');
-      link.href = url;
-      link.target = '_blank';
-      link.rel = 'noopener';
-      link.textContent = '元ページを開く';
-      fallback.append(link);
-    }
+    const link = externalOpenLink(url, '外部で開く');
+    if (link) fallback.append(link);
     player.append(fallback);
+  }
+
+  function appendExternalOpenShortcut(player, url) {
+    const link = externalOpenLink(url, '外部で開く');
+    if (!link) return;
+    link.className = 'vl-inline-external';
+    player.append(link);
   }
 
   function createInlinePlayer(base, meta) {
@@ -163,7 +175,15 @@
       video.addEventListener('timeupdate', () => persistPlaybackProgress(base, video, { sync: false }));
       video.addEventListener('pause', () => persistPlaybackProgress(base, video, { force: true, sync: true }));
       video.addEventListener('ended', () => persistPlaybackProgress(base, video, { force: true, sync: true }));
+      video.addEventListener('error', () => {
+        if (activePlayback && activePlayback.video === video) activePlayback = null;
+        video.remove();
+        if (!player.querySelector('.vl-inline-fallback')) {
+          appendFallback(player, classified.url, 'この動画はサイト内再生を許可していないか、ブラウザで直接再生できません');
+        }
+      }, { once: true });
       player.append(video);
+      appendExternalOpenShortcut(player, classified.url);
     } else if (text(base.a) && text(base.b) && text(base.a) !== 'url') {
       const iframe = document.createElement('iframe');
       iframe.title = text(meta && meta.title) || text(base.title) || (text(base.a) + ' / ' + text(base.b));
@@ -172,6 +192,10 @@
       iframe.allowFullscreen = true;
       iframe.referrerPolicy = 'strict-origin-when-cross-origin';
       player.append(iframe);
+      // X-Frame-Options / frame-ancestors failures are intentionally not
+      // bypassed. The top-level destination remains available so users can
+      // continue playback on the provider's own page.
+      appendExternalOpenShortcut(player, url);
     } else {
       appendFallback(player, classified.kind === 'invalid' ? url : classified.url);
     }
