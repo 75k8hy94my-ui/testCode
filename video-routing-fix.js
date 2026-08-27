@@ -36,7 +36,8 @@
       #videoLibraryResults .vl-card.vl-inline-playing .vl-thumb{display:none}
       #videoLibraryResults .vl-inline-player{position:relative;aspect-ratio:16/9;width:100%;background:#000;border-radius:15px 15px 0 0;overflow:hidden;z-index:2}
       #videoLibraryResults .vl-inline-player iframe,#videoLibraryResults .vl-inline-player video{display:block;width:100%;height:100%;border:0;background:#000;object-fit:contain}
-      #videoLibraryResults .vl-thumb .vl-thumb-direct-video{display:block;width:100%;height:100%;border:0;background:#000;object-fit:cover}
+      #videoLibraryResults .vl-thumb .vl-thumb-direct-video{position:absolute;inset:0;display:block;width:100%;height:100%;border:0;background:#000;object-fit:cover;opacity:0;pointer-events:none}
+      #videoLibraryResults .vl-thumb .vl-thumb-direct-video[data-frame-ready="1"]{opacity:1}
       #videoLibraryResults .vl-inline-close{position:absolute;top:8px;left:8px;z-index:5;width:36px;height:36px;border:1px solid rgba(255,255,255,.3);border-radius:50%;display:grid;place-items:center;background:rgba(10,12,17,.78);color:#fff;font-size:22px;line-height:1;cursor:pointer;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
       #videoLibraryResults .vl-inline-fallback{height:100%;display:grid;place-items:center;align-content:center;gap:10px;padding:24px;text-align:center;color:#fff}
       #videoLibraryResults .vl-inline-fallback a{color:#fff;text-decoration:underline}
@@ -211,13 +212,29 @@
 
     const fallback = thumb.querySelector('.vl-thumb-fallback');
     const preview = document.createElement('video');
+    const savedThumbnailTime = Number(effective.thumbnailTimeSeconds);
+    const requestedThumbnailTime = Number.isFinite(savedThumbnailTime) && savedThumbnailTime >= 0 ? savedThumbnailTime : 0.1;
+    let targetThumbnailTime = requestedThumbnailTime;
     preview.className = 'vl-thumb-direct-video';
     preview.muted = true;
     preview.defaultMuted = true;
     preview.playsInline = true;
-    preview.preload = 'metadata';
+    // metadata-only preload is not enough on several browsers to decode and
+    // paint the frame reached by currentTime. Request media data for this tiny
+    // muted preview so the selected frame can actually become visible.
+    preview.preload = 'auto';
     preview.setAttribute('aria-hidden', 'true');
     preview.tabIndex = -1;
+
+    const revealFrame = () => {
+      preview.dataset.frameReady = '1';
+      if (fallback) fallback.hidden = true;
+    };
+    const revealIfAtTarget = () => {
+      const current = Number(preview.currentTime);
+      if (!Number.isFinite(current)) return;
+      if (targetThumbnailTime <= 0.05 || Math.abs(current - targetThumbnailTime) <= 0.35) revealFrame();
+    };
 
     preview.addEventListener('loadedmetadata', () => {
       const width = Number(preview.videoWidth);
@@ -226,16 +243,19 @@
         thumb.style.aspectRatio = width + ' / ' + height;
       }
       const duration = Number(preview.duration);
-      if (Number.isFinite(duration) && duration > 0) {
-        const seekTo = Math.min(0.1, Math.max(0, duration - 0.05));
-        if (seekTo > 0) {
-          try { preview.currentTime = seekTo; } catch (_) {}
-        }
-      }
+      targetThumbnailTime = Number.isFinite(duration) && duration > 0
+        ? Math.min(requestedThumbnailTime, Math.max(0, duration - 0.05))
+        : Math.max(0, requestedThumbnailTime);
+      preview.dataset.thumbnailTarget = String(targetThumbnailTime);
+      try { preview.currentTime = targetThumbnailTime; } catch (_) {}
+      revealIfAtTarget();
     });
-    preview.addEventListener('loadeddata', () => {
-      if (fallback) fallback.hidden = true;
-    });
+    // seeked is the reliable signal that the browser has decoded the
+    // requested frame. loadeddata/canplay cover time 0 and browsers that
+    // do not emit seeked when the target is effectively the current position.
+    preview.addEventListener('seeked', revealFrame);
+    preview.addEventListener('loadeddata', revealIfAtTarget);
+    preview.addEventListener('canplay', revealIfAtTarget);
     preview.addEventListener('error', () => {
       preview.remove();
       if (fallback) fallback.hidden = false;
