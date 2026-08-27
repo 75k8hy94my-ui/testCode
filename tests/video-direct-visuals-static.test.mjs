@@ -33,3 +33,17 @@ test('direct card thumbnail seeks to the persisted thumbnail timestamp before re
   assert.match(source, /preview\.currentTime = targetThumbnailTime/);
   assert.match(source, /fallback\.hidden = true/);
 });
+
+test('blocked or failed video embeds provide an external-playback fallback', () => {
+  assert.match(source, /function externalOpenLink/);
+  assert.match(source, /rel = 'noopener noreferrer'/);
+  assert.match(source, /appendExternalOpenShortcut\(player, classified\.url\)/);
+  assert.match(source, /appendExternalOpenShortcut\(player, url\)/);
+  assert.match(source, /video\.addEventListener\('error'/);
+  assert.match(source, /appendFallback\(player, classified\.url/);
+});
+
+test('embed restrictions are not bypassed and provider pages remain reachable', () => {
+  assert.match(source, /X-Frame-Options \/ frame-ancestors failures are intentionally not/);
+  assert.match(source, /外部で開く/);
+});
