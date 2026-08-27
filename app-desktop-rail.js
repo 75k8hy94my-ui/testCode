@@ -97,7 +97,7 @@
       }
       @media (min-width: 900px) {
         html.app-desktop-rail-page {
-          --app-desktop-content-max: 1180px;
+          --app-desktop-content-max: 920px;
           --app-desktop-rail-offset: 144px;
         }
         html.app-desktop-rail-page body {

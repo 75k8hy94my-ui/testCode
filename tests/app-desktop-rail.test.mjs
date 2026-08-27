@@ -56,7 +56,7 @@ test('shared rail provides global destinations and page-aware active state', () 
 
 test('shared rail reserves desktop content space, caps width, and disappears below desktop width', () => {
   const rail = read('app-desktop-rail.js');
-  assert.match(rail, /--app-desktop-content-max:\s*1180px/);
+  assert.match(rail, /--app-desktop-content-max:\s*920px/);
   assert.match(rail, /--app-desktop-rail-offset:\s*144px/);
   assert.match(rail, /padding-left:\s*var\(--app-desktop-rail-offset\)\s*!important/);
   assert.match(rail, /body > main,[\s\S]*body > #app[\s\S]*max-width:\s*var\(--app-desktop-content-max\)\s*!important/);
