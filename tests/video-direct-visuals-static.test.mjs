@@ -43,7 +43,23 @@ test('blocked or failed video embeds provide an external-playback fallback', () 
   assert.match(source, /appendFallback\(player, classified\.url/);
 });
 
-test('embed restrictions are not bypassed and provider pages remain reachable', () => {
-  assert.match(source, /X-Frame-Options \/ frame-ancestors failures are intentionally not/);
+test('embed restrictions fall back to a normal site iframe or external page', () => {
+  assert.match(source, /X-Frame-Options\/frame-ancestors failures/);
+  assert.match(source, /explicit in-place retry using the original site URL/);
   assert.match(source, /外部で開く/);
+});
+
+test('legacy video embeds can retry by embedding the ordinary site page', () => {
+  assert.match(source, /function appendSiteEmbedToggle/);
+  assert.match(source, /サイト表示を試す/);
+  assert.match(source, /動画埋め込みに戻す/);
+  assert.match(source, /iframe\.src = showingSite \? videoEmbedUrl : siteUrl/);
+  assert.match(source, /appendSiteEmbedToggle\(player, iframe, url, videoEmbedUrl\)/);
+});
+
+test('ordinary video page URLs are tried as site iframes before external fallback', () => {
+  assert.match(source, /classified\.kind === 'link'/);
+  assert.match(source, /configureSiteIframe/);
+  assert.match(source, /iframe\.dataset\.siteEmbed = '1'/);
+  assert.match(source, /appendExternalOpenShortcut\(player, classified\.url\)/);
 });

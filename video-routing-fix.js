@@ -42,6 +42,7 @@
       #videoLibraryResults .vl-inline-fallback{height:100%;display:grid;place-items:center;align-content:center;gap:10px;padding:24px;text-align:center;color:#fff}
       #videoLibraryResults .vl-inline-fallback a{color:#fff;text-decoration:underline}
       #videoLibraryResults .vl-inline-external{position:absolute;right:8px;bottom:8px;z-index:5;display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:0 11px;border:1px solid rgba(255,255,255,.28);border-radius:999px;background:rgba(10,12,17,.78);color:#fff;text-decoration:none;font-size:12px;font-weight:750;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+      #videoLibraryResults .vl-inline-site-toggle{position:absolute;left:8px;bottom:8px;z-index:5;min-height:34px;padding:0 11px;border:1px solid rgba(255,255,255,.28);border-radius:999px;background:rgba(10,12,17,.78);color:#fff;font-size:12px;font-weight:750;cursor:pointer;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
       #videoLibraryResults .vl-grid.compact .vl-card.vl-inline-playing{display:block;min-height:0}
       #videoLibraryResults .vl-grid.compact .vl-card.vl-inline-playing .vl-open{display:block}
       #videoLibraryResults .vl-grid.compact .vl-card.vl-inline-playing .vl-body{padding:10px 70px 10px 12px}
@@ -143,6 +144,33 @@
     player.append(link);
   }
 
+  function configureSiteIframe(iframe, url, title) {
+    iframe.title = title || '動画ページ';
+    iframe.src = url;
+    iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+    iframe.allowFullscreen = true;
+    iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+    iframe.dataset.siteEmbed = '1';
+    return iframe;
+  }
+
+  function appendSiteEmbedToggle(player, iframe, siteUrl, videoEmbedUrl) {
+    if (!siteUrl || !iframe) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'vl-inline-site-toggle';
+    button.textContent = 'サイト表示を試す';
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const showingSite = iframe.dataset.siteEmbed === '1';
+      iframe.dataset.siteEmbed = showingSite ? '0' : '1';
+      iframe.src = showingSite ? videoEmbedUrl : siteUrl;
+      button.textContent = showingSite ? 'サイト表示を試す' : '動画埋め込みに戻す';
+    });
+    player.append(button);
+  }
+
   function createInlinePlayer(base, meta) {
     const player = document.createElement('div');
     player.className = 'vl-inline-player';
@@ -186,16 +214,29 @@
       appendExternalOpenShortcut(player, classified.url);
     } else if (text(base.a) && text(base.b) && text(base.a) !== 'url') {
       const iframe = document.createElement('iframe');
-      iframe.title = text(meta && meta.title) || text(base.title) || (text(base.a) + ' / ' + text(base.b));
-      iframe.src = 'https://www.' + text(base.a) + '.com/embed/' + encodeURIComponent(text(base.b));
+      const title = text(meta && meta.title) || text(base.title) || (text(base.a) + ' / ' + text(base.b));
+      const videoEmbedUrl = 'https://www.' + text(base.a) + '.com/embed/' + encodeURIComponent(text(base.b));
+      iframe.title = title;
+      iframe.src = videoEmbedUrl;
       iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
       iframe.allowFullscreen = true;
       iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+      iframe.dataset.siteEmbed = '0';
       player.append(iframe);
-      // X-Frame-Options / frame-ancestors failures are intentionally not
-      // bypassed. The top-level destination remains available so users can
-      // continue playback on the provider's own page.
+      // When the dedicated video embed is rejected, the provider's ordinary
+      // page may still allow framing. Browsers do not reliably expose
+      // X-Frame-Options/frame-ancestors failures to the parent page, so offer
+      // an explicit in-place retry using the original site URL.
+      appendSiteEmbedToggle(player, iframe, url, videoEmbedUrl);
       appendExternalOpenShortcut(player, url);
+    } else if (classified.kind === 'link') {
+      const iframe = configureSiteIframe(
+        document.createElement('iframe'),
+        classified.url,
+        text(meta && meta.title) || text(base.title) || '動画ページ'
+      );
+      player.append(iframe);
+      appendExternalOpenShortcut(player, classified.url);
     } else {
       appendFallback(player, classified.kind === 'invalid' ? url : classified.url);
     }
