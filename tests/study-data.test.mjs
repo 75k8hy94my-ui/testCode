@@ -25,6 +25,8 @@ test('empty study contains eight legal subjects and defaults', () => {
   assert.equal(study.schemaVersion, 1);
   assert.deepEqual(study.subjects.map((x) => x.name), ['憲法', '行政法', '民法', '商法', '民事訴訟法', '刑法', '刑事訴訟法', '労働法']);
   assert.equal(study.preferences.autoSpeak, false);
+  assert.deepEqual(study.arguments, []);
+  assert.deepEqual(study.argumentProgress, {});
   assert.deepEqual(study.appliedOperationIds, []);
 });
 
@@ -37,12 +39,16 @@ test('normalization preserves valid user data but repairs invalid containers', (
     subjects: 'bad',
     genres: [{ id: 'g1', subjectId: 'civil-law', name: '債権' }],
     definitions: [{ id: 'd1', title: '定義' }],
+    arguments: [{ id: 'a1', title: '論証' }],
+    argumentProgress: { a1: { status: 'memorized' } },
     progress: null,
     preferences: { autoSpeak: true }
   });
   assert.equal(study.subjects.length, 8);
   assert.equal(study.genres.length, 1);
   assert.equal(study.definitions.length, 1);
+  assert.equal(study.arguments.length, 1);
+  assert.equal(study.argumentProgress.a1.status, 'memorized');
   assert.deepEqual(study.progress, {});
   assert.equal(study.preferences.autoSpeak, true);
 });
