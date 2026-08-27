@@ -43,3 +43,22 @@ test('draft signature ignores save timestamp but tracks editable content and ann
 test('argument draft autosave cadence is three seconds',()=>{
   assert.equal(Drafts.AUTOSAVE_INTERVAL_MS,3000);
 });
+
+test('fromStudy reads synced drafts and hides deletion tombstones',()=>{
+  const study={
+    argumentDrafts:{
+      'argument:a1':{argumentId:'a1',title:'同期下書き',body:'本文',rank:'B',savedAt:'2026-08-28T00:00:00.000Z'},
+      new:{deleted:true,savedAt:'2026-08-28T00:01:00.000Z'}
+    }
+  };
+  assert.equal(Drafts.fromStudy(study,'a1').title,'同期下書き');
+  assert.equal(Drafts.fromStudy(study,null),null);
+});
+
+test('clearAll removes legacy local-only draft storage after migration',()=>{
+  const store=storage();
+  Drafts.save(null,{title:'旧下書き',body:'本文'},store,Date.UTC(2026,7,27,14,0,0));
+  assert.equal(Drafts.readAll(store).new.title,'旧下書き');
+  assert.equal(Drafts.clearAll(store),true);
+  assert.deepEqual(Drafts.readAll(store),{});
+});
