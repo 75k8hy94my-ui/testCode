@@ -9,7 +9,8 @@ test('desktop navigation provides a counterpart for every mobile reader destinat
   const reader = read('reader.html');
   const flags = read('feature-flags.js');
   const desktop = read('desktop-navigation.js');
-  const source = reader + '\n' + flags + '\n' + desktop;
+  const rail = read('app-desktop-rail.js');
+  const source = reader + '\n' + flags + '\n' + desktop + '\n' + rail;
   const parity = [
     ['mobileNavManga', 'desktopNavManga'],
     ['mobileNavVideo', 'desktopNavVideo'],
@@ -21,21 +22,25 @@ test('desktop navigation provides a counterpart for every mobile reader destinat
   ];
   for (const [mobileId, desktopId] of parity) {
     assert.match(source, new RegExp(mobileId));
-    assert.match(desktop, new RegExp(desktopId));
+    assert.match(source, new RegExp(desktopId));
   }
-  assert.match(desktop, /desktopReaderNav/);
-  assert.match(desktop, /デスクトップナビ/);
-  assert.match(desktop, /desktopNavHome/);
-  assert.match(desktop, /desktopNavLocalReader/);
+  assert.match(source, /desktopReaderNav/);
+  assert.match(rail, /デスクトップナビ/);
+  assert.match(source, /desktopNavHome/);
+  assert.match(source, /desktopNavLocalReader/);
 });
 
-test('desktop navigation stays off mobile and keeps the Liquid Glass bar mobile-only', () => {
+test('desktop navigation uses the shared fixed Liquid Glass rail and stays off narrow screens', () => {
   const reader = read('reader.html');
-  const desktop = read('desktop-navigation.js');
+  const rail = read('app-desktop-rail.js');
   assert.match(reader, /#mobileBottomNav\s*\{\s*display:\s*none/);
-  assert.match(desktop, /@media\s*\(max-width:\s*600px\)/);
-  assert.match(desktop, /#desktopReaderNav\s*\{\s*display:\s*none\s*!important/);
-  assert.doesNotMatch(desktop, /position:\s*fixed/);
+  assert.match(rail, /@media\s*\(min-width:\s*900px\)/);
+  assert.match(rail, /@media\s*\(max-width:\s*899px\)/);
+  assert.match(rail, /position:\s*fixed/);
+  assert.match(rail, /left:\s*18px/);
+  assert.match(rail, /backdrop-filter:\s*blur\(28px\)\s+saturate\(150%\)/);
+  assert.match(rail, /border-radius:\s*30px/);
+  assert.match(rail, /appDesktopRailItem\.active/);
 });
 
 test('saved URL and video screens rely on desktop navigation instead of a redundant close button', () => {
