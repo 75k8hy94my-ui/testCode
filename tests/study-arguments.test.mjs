@@ -2,9 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import StudyArguments from '../study-arguments.js';
 
-test('argument ranks normalize to A B C with B fallback', () => {
-  assert.equal(StudyArguments.normalizeRank('a'), 'A');
-  assert.equal(StudyArguments.normalizeRank('C'), 'C');
+test('argument ranks follow the seven-level importance order', () => {
+  assert.deepEqual(StudyArguments.RANK_ORDER, ['A+','A','B+','B(+)','B','B-','B(-)']);
+  assert.equal(StudyArguments.normalizeRank('a+'), 'A+');
+  assert.equal(StudyArguments.normalizeRank('b(+)'), 'B(+)');
+  assert.equal(StudyArguments.normalizeRank('b-'), 'B-');
+  assert.equal(StudyArguments.normalizeRank('C'), 'B(-)');
   assert.equal(StudyArguments.normalizeRank('x'), 'B');
 });
 
@@ -43,7 +46,7 @@ test('argument filters combine subject genre rank status and due state', () => {
 });
 
 
-test('argument formatting exposes five marker colors in full and lower-third modes plus two underlines', () => {
+test('argument formatting exposes five marker colors, two underlines, and bold', () => {
   const styles = StudyArguments.VALID_ARGUMENT_STYLES;
   for (const color of ['pink','green','orange','yellow','blue']) {
     assert.equal(styles.has(`marker-${color}-full`), true);
@@ -51,7 +54,8 @@ test('argument formatting exposes five marker colors in full and lower-third mod
   }
   assert.equal(styles.has('underline-red'), true);
   assert.equal(styles.has('underline-black'), true);
-  assert.equal(styles.size, 12);
+  assert.equal(styles.has('bold'), true);
+  assert.equal(styles.size, 13);
 });
 
 test('applying a marker replaces an overlapping marker but preserves underline', () => {
@@ -102,4 +106,34 @@ test('annotated rendering escapes user text and composes marker with underline',
   assert.match(html, /argument-underline-red/);
   assert.match(html, /<br>/);
   assert.doesNotMatch(html, /<規範>/);
+});
+
+test('rank sorting follows importance order', () => {
+  const study = {
+    arguments: [
+      { id: 'r1', rank: 'B(-)', title: '7' },
+      { id: 'r2', rank: 'A', title: '2' },
+      { id: 'r3', rank: 'B(+)', title: '4' },
+      { id: 'r4', rank: 'A+', title: '1' },
+      { id: 'r5', rank: 'B-', title: '6' },
+      { id: 'r6', rank: 'B', title: '5' },
+      { id: 'r7', rank: 'B+', title: '3' }
+    ],
+    argumentProgress: {}
+  };
+  assert.deepEqual(
+    StudyArguments.filterArguments(study, {}).map((item) => item.rank),
+    ['A+','A','B+','B(+)','B','B-','B(-)']
+  );
+});
+
+test('bold composes with marker and underline without replacing either', () => {
+  let annotations = [];
+  annotations = StudyArguments.applyStyle(annotations, 0, 6, 'marker-blue-low', 8);
+  annotations = StudyArguments.applyStyle(annotations, 1, 5, 'underline-black', 8);
+  annotations = StudyArguments.applyStyle(annotations, 2, 4, 'bold', 8);
+  const html = StudyArguments.renderAnnotatedHtml('abcdefgh', annotations);
+  assert.match(html, /argument-marker-blue-low/);
+  assert.match(html, /argument-underline-black/);
+  assert.match(html, /argument-bold/);
 });
