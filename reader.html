@@ -1115,9 +1115,6 @@
   }
   @media (max-width: 600px) {
     #newBtn, #addCustomBtn, #bulkDetectBtn { display: none !important; }
-    /* The bottom bar is the mobile navigation. A second close affordance in
-       the author-card header is redundant and visually competes with it. */
-    #closeAuthorCardBtn { display: none !important; }
     #authorCardPanel {
       padding-bottom: calc(128px + max(18px, env(safe-area-inset-bottom))) !important;
     }
@@ -1417,7 +1414,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 <!-- Author cards -->
 <section id="authorCardOverlay" class="screenView modalOverlay" role="region" aria-labelledby="authorCardPanel">
   <div id="authorCardPanel" class="modalPanel">
-    <div class="panel-header"><span>作者カード</span><button class="ctrlBtn" id="closeAuthorCardBtn" type="button">閉じる</button></div>
+    <div class="panel-header"><span>作者カード</span></div>
     <div class="dialog-actions" id="authorCardCreateActions" style="margin-top:8px;"><button class="primaryBtn" id="newAuthorCardBtn" type="button">作者カードを作成</button></div>
     <div id="authorCardEditor" style="display:none;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
       <div class="panel-header" style="font-size:15px;padding-bottom:8px;"><span id="authorCardEditorTitle">作者カードを作成</span></div>
@@ -1877,7 +1874,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     newAuthorCardBtn: document.getElementById('newAuthorCardBtn'),
     cancelAuthorCardBtn: document.getElementById('cancelAuthorCardBtn'),
     saveAuthorCardBtn: document.getElementById('saveAuthorCardBtn'),
-    closeAuthorCardBtn: document.getElementById('closeAuthorCardBtn'),
 
     addCustomBtn: document.getElementById('addCustomBtn'),
     bulkDetectBtn: document.getElementById('bulkDetectBtn'),
@@ -6269,8 +6265,16 @@ https://cdn.example.org/c/003.webp"></textarea>
       element.classList.toggle('show', visible);
       element.setAttribute('aria-hidden', visible ? 'false' : 'true');
     });
-    if (currentReaderScreen === 'video-list') switchListTab('video');
-    else if (currentReaderScreen === 'saved-list') switchListTab('manga');
+    if (currentReaderScreen === 'video-list') {
+      switchListTab('video');
+    } else if (currentReaderScreen === 'saved-list') {
+      renderSavedList();
+      switchListTab('manga');
+    } else if (currentReaderScreen === 'author-cards') {
+      closeAuthorCardEditor();
+      syncAuthorCardsFromSavedItems();
+      renderAuthorCards();
+    }
     if (!currentReaderScreen) setMobileUtilityMenu(false);
   }
 
@@ -6449,7 +6453,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (file) importDataFromFile(file);
     event.target.value = '';
   });
-  els.closeAuthorCardBtn.addEventListener('click', closeAuthorCards);
   els.authorCardOverlay.addEventListener('click', (e) => { if (e.target === els.authorCardOverlay) closeAuthorCards(); });
   els.newAuthorCardBtn.addEventListener('click', () => openAuthorCardEditor(null));
   els.addAuthorLinkBtn.addEventListener('click', () => addAuthorLinkRow());
