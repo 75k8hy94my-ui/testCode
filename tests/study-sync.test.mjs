@@ -32,6 +32,18 @@ test('definition operations upsert and delete without touching other definitions
   assert.equal('d1' in study.progress, false);
 });
 
+test('argument operations upsert progress and delete independently', () => {
+  let study = StudyData.createEmptyStudy();
+  study.arguments = [{ id: 'keep', title: 'keep' }];
+  study = StudySync.applyOperation(study, { id: 'a-upsert', type: 'argument.upserted', payload: { argument: { id: 'a1', subjectId: 'civil-law', title: '解除', body: '論証' } }, occurredAt: '2026-08-26T00:00:00Z' });
+  assert.deepEqual(study.arguments.map((a) => a.id), ['keep', 'a1']);
+  study = StudySync.applyOperation(study, { id: 'a-progress', type: 'argument.progress.changed', payload: { argumentId: 'a1', progress: { status: 'memorized', nextReviewAt: '2026-09-02T00:00:00Z' } }, occurredAt: '2026-08-26T00:01:00Z' });
+  assert.equal(study.argumentProgress.a1.status, 'memorized');
+  study = StudySync.applyOperation(study, { id: 'a-delete', type: 'argument.deleted', payload: { argumentId: 'a1' }, occurredAt: '2026-08-26T00:02:00Z' });
+  assert.deepEqual(study.arguments.map((a) => a.id), ['keep']);
+  assert.equal('a1' in study.argumentProgress, false);
+});
+
 test('queueOperation queues once without applying twice', () => {
   const study = StudyData.createEmptyStudy();
   const op = { id: 'op1', type: 'preference.changed', payload: { autoSpeak: true }, occurredAt: '2026-08-26T00:00:00Z' };
