@@ -87,6 +87,7 @@ test('annotations after a text edit shift while formatting intersecting the edit
   const result = StudyArguments.transformAnnotationsForTextChange('abcdefghij', 'abXYZcdefghij', annotations);
   assert.deepEqual(result, [
     { start: 0, end: 2, style: 'marker-yellow-full' },
+    { start: 5, end: 7, style: 'marker-yellow-full' },
     { start: 9, end: 13, style: 'underline-red' }
   ]);
 });
