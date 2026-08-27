@@ -15,7 +15,7 @@ const defaultStudySubjects = [
 const createEmptyStudy = () => ({
   schemaVersion: 1,
   subjects: defaultStudySubjects.map((item) => ({ ...item })),
-  genres: [], definitions: [], recentAttempts: [], progress: {}, pendingGradings: [], pendingSyncOps: [], appliedOperationIds: [],
+  genres: [], definitions: [], arguments: [], argumentProgress: {}, recentAttempts: [], progress: {}, pendingGradings: [], pendingSyncOps: [], appliedOperationIds: [],
   gamification: { xp: 0, streak: 0, lastStudyDate: null }, preferences: { autoSpeak: false }
 });
 const defaults = { folders: [], items: [], videos: [], videoFolders: [], videoMeta: {}, authorCards: [], mangaInfo: {}, toc: {}, lastPages: {}, theme: 'dark', dashboardVisibility: { mobile: { ...defaultDashboardVisibility }, desktop: { ...defaultDashboardVisibility } }, homeCards: defaultHomeCards.slice(), study: createEmptyStudy() };
@@ -40,6 +40,8 @@ function normalizeStudyForVault(value) {
     subjects: Array.isArray(x.subjects) && x.subjects.length ? x.subjects : base.subjects,
     genres: Array.isArray(x.genres) ? x.genres : [],
     definitions: Array.isArray(x.definitions) ? x.definitions : [],
+    arguments: Array.isArray(x.arguments) ? x.arguments : [],
+    argumentProgress: isObject(x.argumentProgress),
     recentAttempts: Array.isArray(x.recentAttempts) ? x.recentAttempts : [],
     progress: isObject(x.progress),
     pendingGradings: Array.isArray(x.pendingGradings) ? x.pendingGradings : [],

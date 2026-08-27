@@ -16,7 +16,7 @@ const emptyStudy = {
     { id: 'criminal-procedure', name: '刑事訴訟法' },
     { id: 'labor-law', name: '労働法' }
   ],
-  genres: [], definitions: [], recentAttempts: [], progress: {}, pendingGradings: [], pendingSyncOps: [], appliedOperationIds: [],
+  genres: [], definitions: [], arguments: [], argumentProgress: {}, recentAttempts: [], progress: {}, pendingGradings: [], pendingSyncOps: [], appliedOperationIds: [],
   gamification: { xp: 0, streak: 0, lastStudyDate: null }, preferences: { autoSpeak: false }
 };
 
