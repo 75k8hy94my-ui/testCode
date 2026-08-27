@@ -44,6 +44,51 @@ test('argument operations upsert progress and delete independently', () => {
   assert.equal('a1' in study.argumentProgress, false);
 });
 
+test('argument draft operations sync with last-write-wins timestamps and tombstones', () => {
+  let study = StudyData.createEmptyStudy();
+  study = StudySync.applyOperation(study, {
+    id: 'draft-newer',
+    type: 'argument.draft.upserted',
+    payload: { draftKey: 'argument:a1', draft: { argumentId: 'a1', title: 'newer', body: 'body', savedAt: '2026-08-28T00:00:10.000Z' } },
+    occurredAt: '2026-08-28T00:00:10.000Z'
+  });
+  study = StudySync.applyOperation(study, {
+    id: 'draft-older',
+    type: 'argument.draft.upserted',
+    payload: { draftKey: 'argument:a1', draft: { argumentId: 'a1', title: 'older', body: 'old', savedAt: '2026-08-28T00:00:05.000Z' } },
+    occurredAt: '2026-08-28T00:00:05.000Z'
+  });
+  assert.equal(study.argumentDrafts['argument:a1'].title, 'newer');
+  study = StudySync.applyOperation(study, {
+    id: 'delete-old',
+    type: 'argument.draft.deleted',
+    payload: { draftKey: 'argument:a1', deletedAt: '2026-08-28T00:00:08.000Z' },
+    occurredAt: '2026-08-28T00:00:08.000Z'
+  });
+  assert.equal(study.argumentDrafts['argument:a1'].title, 'newer');
+  study = StudySync.applyOperation(study, {
+    id: 'delete-new',
+    type: 'argument.draft.deleted',
+    payload: { draftKey: 'argument:a1', deletedAt: '2026-08-28T00:00:12.000Z' },
+    occurredAt: '2026-08-28T00:00:12.000Z'
+  });
+  assert.deepEqual(study.argumentDrafts['argument:a1'], { deleted: true, savedAt: '2026-08-28T00:00:12.000Z' });
+  study = StudySync.applyOperation(study, {
+    id: 'stale-resurrection',
+    type: 'argument.draft.upserted',
+    payload: { draftKey: 'argument:a1', draft: { argumentId: 'a1', title: 'stale', body: 'old', savedAt: '2026-08-28T00:00:11.000Z' } },
+    occurredAt: '2026-08-28T00:00:11.000Z'
+  });
+  assert.equal(study.argumentDrafts['argument:a1'].deleted, true);
+  study = StudySync.applyOperation(study, {
+    id: 'fresh-after-delete',
+    type: 'argument.draft.upserted',
+    payload: { draftKey: 'argument:a1', draft: { argumentId: 'a1', title: 'fresh', body: 'new', savedAt: '2026-08-28T00:00:13.000Z' } },
+    occurredAt: '2026-08-28T00:00:13.000Z'
+  });
+  assert.equal(study.argumentDrafts['argument:a1'].title, 'fresh');
+});
+
 test('queueOperation queues once without applying twice', () => {
   const study = StudyData.createEmptyStudy();
   const op = { id: 'op1', type: 'preference.changed', payload: { autoSpeak: true }, occurredAt: '2026-08-26T00:00:00Z' };
