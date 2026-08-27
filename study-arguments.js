@@ -1,15 +1,22 @@
 (()=>{
 const DAY_MS = 24 * 60 * 60 * 1000;
-const VALID_RANKS = new Set(['A','B','C']);
+const RANK_ORDER = ['A+','A','B+','B(+)','B','B-','B(-)'];
+const VALID_RANKS = new Set(RANK_ORDER);
 const VALID_STATUSES = new Set(['new','learning','memorized','review']);
 const MARKER_COLORS = ['pink','green','orange','yellow','blue'];
 const MARKER_MODES = ['full','low'];
 const VALID_ARGUMENT_STYLES = new Set([
   ...MARKER_COLORS.flatMap((color)=>MARKER_MODES.map((mode)=>`marker-${color}-${mode}`)),
-  'underline-red','underline-black'
+  'underline-red','underline-black','bold'
 ]);
 
-function normalizeRank(value){const rank=String(value||'').toUpperCase();return VALID_RANKS.has(rank)?rank:'B'}
+function normalizeRank(value){
+  const raw=String(value||'').trim();
+  const compact=raw.replace(/\s+/g,'').toUpperCase();
+  if(compact==='C')return'B(-)';
+  const aliases={'A+':'A+','A':'A','B+':'B+','B(+)':'B(+)','B':'B','B-':'B-','B(-)':'B(-)'};
+  return aliases[compact]||'B';
+}
 function normalizeProgress(value){
   const x=value&&typeof value==='object'?value:{};
   const status=VALID_STATUSES.has(x.status)?x.status:'new';
@@ -33,7 +40,7 @@ function isDue(progress,now=Date.now()){
 function filterArguments(study,filters={},now=Date.now()){
   const list=Array.isArray(study&&study.arguments)?study.arguments:[];
   const progress=study&&study.argumentProgress&&typeof study.argumentProgress==='object'?study.argumentProgress:{};
-  const rankOrder={A:0,B:1,C:2};
+  const rankOrder=Object.fromEntries(RANK_ORDER.map((rank,index)=>[rank,index]));
   return list.filter((argument)=>{
     const p=normalizeProgress(progress[argument.id]);
     if(filters.subjectId&&argument.subjectId!==filters.subjectId)return false;
@@ -54,6 +61,7 @@ function summarize(study,now=Date.now()){
 function styleGroup(style){
   if(String(style).startsWith('marker-'))return'marker';
   if(String(style).startsWith('underline-'))return'underline';
+  if(style==='bold')return'weight';
   return'';
 }
 function normalizeAnnotations(value,textLength=Number.MAX_SAFE_INTEGER){
@@ -140,7 +148,7 @@ function renderAnnotatedHtml(text,annotations){
   return html;
 }
 
-const api={DAY_MS,MARKER_COLORS,MARKER_MODES,VALID_ARGUMENT_STYLES,normalizeRank,normalizeProgress,progressFor,markProgress,isDue,filterArguments,summarize,styleGroup,normalizeAnnotations,applyStyle,clearStyles,transformAnnotationsForTextChange,renderAnnotatedHtml};
+const api={DAY_MS,RANK_ORDER,MARKER_COLORS,MARKER_MODES,VALID_ARGUMENT_STYLES,normalizeRank,normalizeProgress,progressFor,markProgress,isDue,filterArguments,summarize,styleGroup,normalizeAnnotations,applyStyle,clearStyles,transformAnnotationsForTextChange,renderAnnotatedHtml};
 if(typeof window!=='undefined')window.StudyArguments=api;
 if(typeof module!=='undefined')module.exports=api;
 })();
