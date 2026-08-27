@@ -49,6 +49,14 @@
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
       .card { background: rgba(255,255,255,.96); }
       button:not(.link-button), input { background: rgba(255,255,255,.98); }
+      button.primary {
+        background: var(--accent);
+        color: #fff;
+        -webkit-text-fill-color: #fff;
+        border-color: var(--accent-dark);
+        box-shadow: 0 6px 16px rgba(37,99,235,.24);
+      }
+      button.primary:hover { background: var(--accent-dark); }
     }
   </style>
 </head>
