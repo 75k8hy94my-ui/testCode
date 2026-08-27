@@ -160,7 +160,8 @@ test('toggleStyle applies missing formatting and replaces only its formatting gr
   assert.deepEqual(result, [
     { start: 0, end: 8, style: 'marker-green-full' },
     { start: 1, end: 2, style: 'underline-red' },
-    { start: 2, end: 6, style: 'underline-black' }
+    { start: 2, end: 6, style: 'underline-black' },
+    { start: 6, end: 7, style: 'underline-red' }
   ]);
 });
 
