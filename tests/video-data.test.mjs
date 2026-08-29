@@ -25,6 +25,14 @@ test('normalizes and preserves the selected thumbnail timestamp', () => {
   assert.equal(normalizeVideo({ id:'v3', thumbnailTimeSeconds:-2 }).thumbnailTimeSeconds, 0);
 });
 
+test('normalizes the timed left-rotation interval', () => {
+  const video = normalizeVideo({ id:'v1', rotateLeftStartSeconds:12.5, rotateLeftEndSeconds:28 });
+  assert.equal(video.rotateLeftStartSeconds, 12.5);
+  assert.equal(video.rotateLeftEndSeconds, 28);
+  assert.equal(normalizeVideo({ id:'v2' }).rotateLeftStartSeconds, null);
+  assert.equal(normalizeVideo({ id:'v2' }).rotateLeftEndSeconds, null);
+});
+
 test('parses and formats thumbnail timestamps for editor input', () => {
   assert.equal(parseMediaTime('90'), 90);
   assert.equal(parseMediaTime('1:30'), 90);
@@ -37,7 +45,7 @@ test('parses and formats thumbnail timestamps for editor input', () => {
 test('preserves thumbnail timestamps when older in-memory video meta is written back', () => {
   assert.equal(typeof mergeVideoMetaPreservingThumbnailTime, 'function');
   const existing = {
-    keep: { thumbnailTimeSeconds: 42, memo: 'old' },
+    keep: { thumbnailTimeSeconds: 42, rotateLeftStartSeconds: 12, rotateLeftEndSeconds: 28, memo: 'old' },
     removed: { thumbnailTimeSeconds: 9 },
     override: { thumbnailTimeSeconds: 12 },
   };
@@ -46,7 +54,7 @@ test('preserves thumbnail timestamps when older in-memory video meta is written 
     override: { thumbnailTimeSeconds: 30 },
   };
   const merged = mergeVideoMetaPreservingThumbnailTime(existing, incoming);
-  assert.deepEqual(merged.keep, { memo: 'new', thumbnailTimeSeconds: 42 });
+  assert.deepEqual(merged.keep, { memo: 'new', thumbnailTimeSeconds: 42, rotateLeftStartSeconds: 12, rotateLeftEndSeconds: 28 });
   assert.equal(merged.override.thumbnailTimeSeconds, 30);
   assert.equal(Object.hasOwn(merged, 'removed'), false);
 });
