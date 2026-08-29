@@ -24,3 +24,13 @@ test('closing or leaving flushes the active direct video progress', () => {
   assert.match(source, /visibilitychange/);
   assert.match(source, /scheduleVaultSync/);
 });
+
+
+test('direct playback applies timed left rotation and rechecks after seeking', () => {
+  assert.match(source, /rotateLeftStartSeconds/);
+  assert.match(source, /rotateLeftEndSeconds/);
+  assert.match(source, /vl-rotate-left/);
+  assert.match(source, /rotate\(-90deg\)/);
+  assert.match(source, /seeking/);
+  assert.match(source, /seeked/);
+});
