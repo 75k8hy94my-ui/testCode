@@ -36,6 +36,7 @@
       #videoLibraryResults .vl-card.vl-inline-playing .vl-thumb{display:none}
       #videoLibraryResults .vl-inline-player{position:relative;aspect-ratio:16/9;width:100%;background:#000;border-radius:15px 15px 0 0;overflow:hidden;z-index:2}
       #videoLibraryResults .vl-inline-player iframe,#videoLibraryResults .vl-inline-player video{display:block;width:100%;height:100%;border:0;background:#000;object-fit:contain}
+      #videoLibraryResults .vl-inline-player video.vl-rotate-left{position:absolute;left:50%;top:50%;max-width:none;max-height:none;transform:translate(-50%,-50%) rotate(-90deg);transform-origin:center center}
       #videoLibraryResults .vl-thumb .vl-thumb-direct-video{position:absolute;inset:0;display:block;width:100%;height:100%;border:0;background:#000;object-fit:cover;opacity:0;pointer-events:none}
       #videoLibraryResults .vl-thumb .vl-thumb-direct-video[data-frame-ready="1"]{opacity:1}
       #videoLibraryResults .vl-inline-fallback{height:100%;display:grid;place-items:center;align-content:center;gap:10px;padding:24px;text-align:center;color:#fff}
@@ -102,8 +103,80 @@
     persistPlaybackProgress(activePlayback.base, activePlayback.video, { force: true, sync: sync !== false });
   }
 
+  function validRotationRange(base, meta) {
+    const start = Number(meta && meta.rotateLeftStartSeconds != null ? meta.rotateLeftStartSeconds : base && base.rotateLeftStartSeconds);
+    const end = Number(meta && meta.rotateLeftEndSeconds != null ? meta.rotateLeftEndSeconds : base && base.rotateLeftEndSeconds);
+    if (!Number.isFinite(start) || start < 0 || !Number.isFinite(end) || end <= start) return null;
+    return { start, end };
+  }
+
+  function installTimedLeftRotation(player, video, base, meta) {
+    const range = validRotationRange(base, meta);
+    if (!range) return () => {};
+    let sourceWidth = 0;
+    let sourceHeight = 0;
+    let rotated = false;
+    let resizeObserver = null;
+
+    const sizeRotatedVideo = () => {
+      if (!rotated || !player.isConnected) return;
+      const width = player.clientWidth;
+      const height = player.clientHeight;
+      if (width > 0 && height > 0) {
+        video.style.width = height + 'px';
+        video.style.height = width + 'px';
+      }
+    };
+
+    const apply = () => {
+      const current = Number(video.currentTime);
+      const shouldRotate = Number.isFinite(current) && current >= range.start && current < range.end;
+      if (shouldRotate === rotated) {
+        if (rotated) sizeRotatedVideo();
+        return;
+      }
+      rotated = shouldRotate;
+      video.classList.toggle('vl-rotate-left', rotated);
+      if (sourceWidth > 0 && sourceHeight > 0) {
+        player.style.aspectRatio = rotated ? (sourceHeight + ' / ' + sourceWidth) : (sourceWidth + ' / ' + sourceHeight);
+      }
+      if (rotated) requestAnimationFrame(sizeRotatedVideo);
+      else {
+        video.style.width = '100%';
+        video.style.height = '100%';
+      }
+    };
+
+    const onMetadata = () => {
+      sourceWidth = Number(video.videoWidth) || 0;
+      sourceHeight = Number(video.videoHeight) || 0;
+      apply();
+    };
+    video.addEventListener('loadedmetadata', onMetadata);
+    video.addEventListener('timeupdate', apply);
+    video.addEventListener('seeking', apply);
+    video.addEventListener('seeked', apply);
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        if (rotated) sizeRotatedVideo();
+      });
+      resizeObserver.observe(player);
+    }
+    return () => {
+      video.removeEventListener('loadedmetadata', onMetadata);
+      video.removeEventListener('timeupdate', apply);
+      video.removeEventListener('seeking', apply);
+      video.removeEventListener('seeked', apply);
+      if (resizeObserver) resizeObserver.disconnect();
+      video.classList.remove('vl-rotate-left');
+      video.style.width = '';
+      video.style.height = '';
+    };
+  }
+
   function closeActivePlayer() {
     persistActivePlayback(true);
+    if (activePlayback && typeof activePlayback.cleanup === 'function') activePlayback.cleanup();
     if (activePlayer && activePlayer.isConnected) {
       const card = activePlayer.closest('.vl-card');
       activePlayer.remove();
@@ -176,7 +249,8 @@
       video.autoplay = true;
       video.playsInline = true;
       video.preload = 'metadata';
-      activePlayback = { base, video, lastLocalSaveAt: 0 };
+      const cleanupRotation = installTimedLeftRotation(player, video, base, meta);
+      activePlayback = { base, video, lastLocalSaveAt: 0, cleanup: cleanupRotation };
 
       video.addEventListener('loadedmetadata', () => {
         const width = Number(video.videoWidth);
@@ -195,7 +269,10 @@
       video.addEventListener('pause', () => persistPlaybackProgress(base, video, { force: true, sync: true }));
       video.addEventListener('ended', () => persistPlaybackProgress(base, video, { force: true, sync: true }));
       video.addEventListener('error', () => {
-        if (activePlayback && activePlayback.video === video) activePlayback = null;
+        if (activePlayback && activePlayback.video === video) {
+          if (typeof activePlayback.cleanup === 'function') activePlayback.cleanup();
+          activePlayback = null;
+        }
         video.remove();
         if (!player.querySelector('.vl-inline-fallback')) {
           appendFallback(player, classified.url, 'この動画はサイト内再生を許可していないか、ブラウザで直接再生できません');
