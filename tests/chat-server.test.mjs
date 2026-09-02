@@ -88,3 +88,17 @@ test('chat server streams only fixed Ollama chat endpoint after full validation'
     assert.deepEqual(JSON.parse(call.options.body),{model:'dolphin-mistral:7b',messages:body.messages,stream:true});
   });
 });
+
+
+test('chat server rejects an invalid Supabase token before Ollama',async()=>{
+  const calls=[];
+  await withServer(mockFetch(calls,{validToken:false}),async(base)=>{
+    const response=await fetch(base+'/v1/models',{headers:authHeaders()});
+    assert.equal(response.status,401);
+    assert.equal(calls.filter(c=>c.url.includes('127.0.0.1:11434')).length,0);
+  });
+});
+
+test('chat server refuses wildcard CORS configuration',()=>{
+  assert.throws(()=>createServer({config:{...baseConfig,allowedOrigins:new Set(['*'])},fetchImpl:mockFetch([]),logger:{info(){},error(){}}}),/wildcard|origin/i);
+});
