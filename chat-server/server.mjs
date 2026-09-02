@@ -12,6 +12,7 @@ export function configFromEnv(env=process.env){
   };
 }
 export function validateConfig(config){
+  if(config.host!=='127.0.0.1')throw new Error('CHAT_HOST must be 127.0.0.1');
   if(!(config.allowedOrigins instanceof Set)||config.allowedOrigins.size===0)throw new Error('CHAT_ALLOWED_ORIGINS is required');
   if(config.allowedOrigins.has('*'))throw new Error('Wildcard origin is not allowed');
   if(!/^[0-9a-f]{64}$/.test(config.apiKeySha256))throw new Error('CHAT_API_KEY_SHA256 must be a SHA-256 hex digest');
