@@ -108,4 +108,5 @@ as $$
 $$;
 
 revoke all on function public.update_chat_vault(bigint, jsonb) from public;
+revoke all on function public.update_chat_vault(bigint, jsonb) from anon;
 grant execute on function public.update_chat_vault(bigint, jsonb) to authenticated;
