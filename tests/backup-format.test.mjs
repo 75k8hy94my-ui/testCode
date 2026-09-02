@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import backup from '../backup-format.js';
 const { createBackup, migrateBackup } = backup;
 
-const defaultHomeCards = ['bookshelf', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
+const defaultHomeCards = ['bookshelf', 'study', 'chat', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 const emptyStudy = {
   schemaVersion: 1,
   subjects: [
