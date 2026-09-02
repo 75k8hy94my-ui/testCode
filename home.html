@@ -41,7 +41,7 @@ MangaVault.refreshSession().then(()=>document.documentElement.classList.remove('
 const Home=window.MangaReaderHome;
 const $=(id)=>document.getElementById(id);
 const ui={grid:$('homeGrid'),empty:$('homeEmpty'),edit:$('editHomeBtn'),emptyEdit:$('emptyEditBtn'),addPanel:$('addCardPanel'),addList:$('addCardList'),sync:$('homeSyncStatus')};
-const marks={bookshelf:'本',study:'学',quiz:'Q',links:'↗',egov:'法',courts:'判','moj-exam':'司'};
+const marks={bookshelf:'本',study:'学',chat:'AI',quiz:'Q',links:'↗',egov:'法',courts:'判','moj-exam':'司'};
 let layout=Home.loadLayout();
 let editing=false;
 let syncRunning=false;
