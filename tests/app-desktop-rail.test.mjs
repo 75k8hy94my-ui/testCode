@@ -5,7 +5,7 @@ import fs from 'node:fs';
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 
 test('every authenticated top-level page gets a desktop Liquid Glass rail', () => {
-  for (const page of ['home.html','reader.html','links.html','sync.html','local-reader.html']) {
+  for (const page of ['home.html','reader.html','links.html','sync.html','local-reader.html','chat.html']) {
     assert.match(read(page), /app-desktop-rail\.js/, `${page} should load the shared rail`);
   }
   assert.doesNotMatch(read('index.html'), /app-desktop-rail\.js/);
@@ -34,7 +34,7 @@ test('shared rail provides global destinations and page-aware active state', () 
     ['desktopNavHome','home.html'],
     ['desktopNavManga','reader.html#screen=saved-list'],
     ['desktopNavVideo','reader.html#screen=video-list'],
-    ['desktopNavStudy','study.html'],
+    ['desktopNavStudy','study.html'],\n    ['desktopNavChat','chat.html'],
     ['desktopNavLinks','links.html'],
     ['desktopNavAuthor','reader.html#screen=author-cards'],
     ['desktopNavBackup','reader.html#screen=backup'],
