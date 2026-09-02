@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import payload from '../vault-payload.js';
 const { DATA_KEYS, normalize, buildFromLocalStorage: buildFromStorage, applyToLocalStorage: applyToStorage } = payload;
 
-const defaultHomeCards = ['bookshelf', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
+const defaultHomeCards = ['bookshelf', 'study', 'chat', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 const emptyStudy = {
   schemaVersion: 1,
   subjects: [
