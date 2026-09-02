@@ -70,6 +70,7 @@ create table if not exists public.chat_vaults (
 alter table public.chat_vaults enable row level security;
 
 revoke all on table public.chat_vaults from anon;
+revoke all on table public.chat_vaults from authenticated;
 grant select, insert, update on table public.chat_vaults to authenticated;
 
 drop policy if exists "Users can read their own encrypted chat vault" on public.chat_vaults;
