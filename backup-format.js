@@ -1,7 +1,7 @@
 const FORMAT = 'manga-reader-backup';
 const VERSION = 2;
 const DEFAULT_DASHBOARD_VISIBILITY = { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false };
-const DEFAULT_HOME_CARDS = ['bookshelf', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
+const DEFAULT_HOME_CARDS = ['bookshelf', 'study', 'chat', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 const DEFAULT_STUDY_SUBJECTS = [
   { id: 'constitutional-law', name: '憲法' }, { id: 'administrative-law', name: '行政法' },
   { id: 'civil-law', name: '民法' }, { id: 'commercial-law', name: '商法' },
