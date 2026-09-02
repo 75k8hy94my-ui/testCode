@@ -5,7 +5,7 @@ const DATA_KEYS = {
   homeCards: 'mangaReaderHomeCards', study: 'mangaReaderStudy'
 };
 const defaultDashboardVisibility = { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false };
-const defaultHomeCards = ['bookshelf', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
+const defaultHomeCards = ['bookshelf', 'study', 'chat', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 const defaultStudySubjects = [
   { id: 'constitutional-law', name: '憲法' }, { id: 'administrative-law', name: '行政法' },
   { id: 'civil-law', name: '民法' }, { id: 'commercial-law', name: '商法' },
