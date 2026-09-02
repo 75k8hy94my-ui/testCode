@@ -102,3 +102,8 @@ test('chat server rejects an invalid Supabase token before Ollama',async()=>{
 test('chat server refuses wildcard CORS configuration',()=>{
   assert.throws(()=>createServer({config:{...baseConfig,allowedOrigins:new Set(['*'])},fetchImpl:mockFetch([]),logger:{info(){},error(){}}}),/wildcard|origin/i);
 });
+
+
+test('chat server refuses non-loopback bind configuration',()=>{
+  assert.throws(()=>createServer({config:{...baseConfig,host:'0.0.0.0'},fetchImpl:mockFetch([]),logger:{info(){},error(){}}}),/127\.0\.0\.1|loopback|host/i);
+});
