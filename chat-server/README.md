@@ -4,7 +4,7 @@ Windows 上の Ollama を testCode の通常チャットから利用するため
 
 ## セキュリティ境界
 
-- 既定で `127.0.0.1:3100` のみに bind します。
+- `127.0.0.1` のみに bind します。`0.0.0.0` などの非ループバック設定は起動時に拒否します。
 - ブラウザから Ollama を直接公開しません。
 - `CHAT_ALLOWED_ORIGINS` は testCode の HTTPS Origin を完全一致で指定します。ワイルドカードは使えません。
 - `/v1/models` と `/v1/chat` は、有効な Supabase Bearer token と Chat API key の両方を要求します。
