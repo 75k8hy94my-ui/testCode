@@ -6,6 +6,7 @@ const root = new URL('../', import.meta.url);
 const read = (name) => fs.existsSync(new URL(name, root)) ? fs.readFileSync(new URL(name, root), 'utf8') : '';
 const html = read('index-search.html');
 const pageJs = read('index-search-page.js');
+const syncHtml = read('sync.html');
 
 test('legal index search page is authenticated and vault-gated', () => {
   assert.ok(html, 'index-search.html should exist');
@@ -48,6 +49,16 @@ test('page search is local-first and imports persist only encrypted chunk payloa
   assert.match(pageJs, /EncryptedChunkCrypto\.decryptChunk\(/);
   assert.match(pageJs, /EncryptedChunkCache\.put\(/);
   assert.doesNotMatch(pageJs, /localStorage\.setItem\([^\n]*(?:matterEntries|caseEntries|statuteEntries)/);
+});
+
+test('logout clears the persistent encrypted index cache before redirecting', () => {
+  assert.match(syncHtml, /<script[^>]+src=["'][^"']*encrypted-chunk-cache\.js[^"']*["']/i);
+  const logoutBody = syncHtml.match(/async function logout\(\)\s*\{([\s\S]*?)\n\s*\}/)?.[1] || '';
+  assert.match(logoutBody, /await\s+EncryptedChunkCache\.clear\(\)/);
+  assert.ok(
+    logoutBody.indexOf('await EncryptedChunkCache.clear()') < logoutBody.indexOf("window.location.replace('index.html')"),
+    'encrypted chunk cache should be cleared before redirect'
+  );
 });
 
 test('static verifier covers the new protected page and standalone modules', () => {
