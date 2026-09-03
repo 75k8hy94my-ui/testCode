@@ -47,6 +47,11 @@ test('restore replaces old corpus with revisioned tombstones and retains rollbac
   assert.match(source, /IndexSearchPage\.sync\(\)/);
 });
 
+test('successful complete restore reloads the page so restored search settings are re-read from local storage', () => {
+  const source = read('index-search-backup.js');
+  assert.match(source, /if\s*\(result\s*&&\s*!result\.cancelled\)[\s\S]*?window\.location\.reload\(\)/);
+});
+
 test('backup bridge is syntactically valid classic JavaScript', () => {
   new vm.Script(read('index-search-backup.js'), { filename: 'index-search-backup.js' });
 });
