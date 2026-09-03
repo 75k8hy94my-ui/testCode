@@ -5,6 +5,7 @@ const FORMAT = 'manga-reader-backup';
 const VERSION = 3;
 const DEFAULT_DASHBOARD_VISIBILITY = { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false };
 const DEFAULT_HOME_CARDS = ['bookshelf', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
+const DEFAULT_INDEX_SEARCH_SETTINGS = { matchModes: { exact: true, partial: true, and: true, fuzzy: true }, activeKind: 'all', selectedSubjects: [], selectedBookIds: [] };
 const DEFAULT_STUDY_SUBJECTS = [
   { id: 'constitutional-law', name: '憲法' }, { id: 'administrative-law', name: '行政法' },
   { id: 'civil-law', name: '民法' }, { id: 'commercial-law', name: '商法' },
@@ -24,6 +25,25 @@ function normalizeBackupDashboardVisibility(value) {
   return source.mobile && source.desktop
     ? { mobile: normalizeBackupDashboardProfile(source.mobile), desktop: normalizeBackupDashboardProfile(source.desktop) }
     : { mobile: normalizeBackupDashboardProfile(), desktop: normalizeBackupDashboardProfile() };
+}
+function normalizeBackupStringArray(value) {
+  return Array.isArray(value) ? value.map(text).filter(Boolean) : [];
+}
+function normalizeBackupIndexSearchSettings(value) {
+  const source = isBackupObject(value) ? value : {};
+  const modes = isBackupObject(source.matchModes) ? source.matchModes : {};
+  const allowedKinds = new Set(['all', 'matter', 'case', 'statute']);
+  return {
+    matchModes: {
+      exact: modes.exact === undefined ? true : Boolean(modes.exact),
+      partial: modes.partial === undefined ? true : Boolean(modes.partial),
+      and: modes.and === undefined ? true : Boolean(modes.and),
+      fuzzy: modes.fuzzy === undefined ? true : Boolean(modes.fuzzy)
+    },
+    activeKind: allowedKinds.has(source.activeKind) ? source.activeKind : 'all',
+    selectedSubjects: normalizeBackupStringArray(source.selectedSubjects),
+    selectedBookIds: normalizeBackupStringArray(source.selectedBookIds)
+  };
 }
 function emptyBackupStudy() {
   return {
@@ -57,7 +77,9 @@ function normalizeData(data) {
     videoFolders: Array.isArray(x.videoFolders) ? x.videoFolders : [], videoMeta: isBackupObject(x.videoMeta) ? x.videoMeta : {}, authorCards: Array.isArray(x.authorCards) ? x.authorCards : [],
     mangaInfo: isBackupObject(x.mangaInfo) ? x.mangaInfo : {}, toc: isBackupObject(x.toc) ? x.toc : {}, lastPages: isBackupObject(x.lastPages) ? x.lastPages : {},
     theme: x.theme === 'light' ? 'light' : 'dark', dashboardVisibility: normalizeBackupDashboardVisibility(x.dashboardVisibility),
-    homeCards: Array.isArray(x.homeCards) ? x.homeCards.map((id) => text(id)).filter(Boolean) : DEFAULT_HOME_CARDS.slice(), study: normalizeBackupStudy(x.study)
+    homeCards: Array.isArray(x.homeCards) ? x.homeCards.map((id) => text(id)).filter(Boolean) : DEFAULT_HOME_CARDS.slice(),
+    study: normalizeBackupStudy(x.study),
+    indexSearchSettings: normalizeBackupIndexSearchSettings(x.indexSearchSettings)
   };
 }
 
