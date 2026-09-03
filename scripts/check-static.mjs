@@ -9,7 +9,7 @@ const standalone = [
   'app-desktop-rail.js', 'author-summary.js', 'backup-format.js', 'browser-storage.js', 'desktop-navigation.js', 'feature-flags.js', 'home-dashboard.js', 'shelf-search.js',
   'status-message.js', 'study-data.js', 'study-arguments.js', 'study-sync.js', 'study-quiz.js', 'study-audio.js', 'study-ai.js',
   'study-offline.js', 'supabase-config.js', 'url-parser.js', 'vault-payload.js', 'vault-session.js', 'video-thumbnail-time.js',
-  'legal-index-schema.js', 'legal-index-search.js', 'encrypted-chunk-crypto.js', 'encrypted-chunk-cache.js', 'encrypted-chunk-sync.js', 'index-search-page.js'
+  'legal-index-schema.js', 'legal-index-search.js', 'encrypted-chunk-crypto.js', 'encrypted-chunk-cache.js', 'encrypted-chunk-sync.js', 'legal-index-backup.js', 'index-search-page.js'
 ];
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
