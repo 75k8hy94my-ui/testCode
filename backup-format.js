@@ -10,14 +10,14 @@ const DEFAULT_STUDY_SUBJECTS = [
 ];
 
 const text = (value) => String(value ?? '').trim();
-const isObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+const isBackupObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 
 function normalizeBackupDashboardProfile(value) {
-  const source = isObject(value) ? value : {};
+  const source = isBackupObject(value) ? value : {};
   return Object.fromEntries(Object.keys(DEFAULT_DASHBOARD_VISIBILITY).map((key) => [key, typeof source[key] === 'boolean' ? source[key] : DEFAULT_DASHBOARD_VISIBILITY[key]]));
 }
 function normalizeBackupDashboardVisibility(value) {
-  const source = isObject(value) ? value : {};
+  const source = isBackupObject(value) ? value : {};
   return source.mobile && source.desktop
     ? { mobile: normalizeBackupDashboardProfile(source.mobile), desktop: normalizeBackupDashboardProfile(source.desktop) }
     : { mobile: normalizeBackupDashboardProfile(), desktop: normalizeBackupDashboardProfile() };
@@ -31,7 +31,7 @@ function emptyBackupStudy() {
   };
 }
 function normalizeBackupStudy(value) {
-  const source = isObject(value) ? value : {};
+  const source = isBackupObject(value) ? value : {};
   const base = emptyBackupStudy();
   return {
     schemaVersion: 1,
@@ -39,20 +39,20 @@ function normalizeBackupStudy(value) {
     genres: Array.isArray(source.genres) ? source.genres : [],
     definitions: Array.isArray(source.definitions) ? source.definitions : [],
     recentAttempts: Array.isArray(source.recentAttempts) ? source.recentAttempts : [],
-    progress: isObject(source.progress) ? source.progress : {},
+    progress: isBackupObject(source.progress) ? source.progress : {},
     pendingGradings: Array.isArray(source.pendingGradings) ? source.pendingGradings : [],
     pendingSyncOps: Array.isArray(source.pendingSyncOps) ? source.pendingSyncOps : [],
     appliedOperationIds: Array.isArray(source.appliedOperationIds) ? source.appliedOperationIds : [],
-    gamification: { ...base.gamification, ...(isObject(source.gamification) ? source.gamification : {}) },
-    preferences: { ...base.preferences, ...(isObject(source.preferences) ? source.preferences : {}) }
+    gamification: { ...base.gamification, ...(isBackupObject(source.gamification) ? source.gamification : {}) },
+    preferences: { ...base.preferences, ...(isBackupObject(source.preferences) ? source.preferences : {}) }
   };
 }
 function normalizeData(data) {
-  const x = isObject(data) ? data : {};
+  const x = isBackupObject(data) ? data : {};
   return {
     folders: Array.isArray(x.folders) ? x.folders : [], items: Array.isArray(x.items) ? x.items : [], videos: Array.isArray(x.videos) ? x.videos : [],
-    videoFolders: Array.isArray(x.videoFolders) ? x.videoFolders : [], videoMeta: isObject(x.videoMeta) ? x.videoMeta : {}, authorCards: Array.isArray(x.authorCards) ? x.authorCards : [],
-    mangaInfo: isObject(x.mangaInfo) ? x.mangaInfo : {}, toc: isObject(x.toc) ? x.toc : {}, lastPages: isObject(x.lastPages) ? x.lastPages : {},
+    videoFolders: Array.isArray(x.videoFolders) ? x.videoFolders : [], videoMeta: isBackupObject(x.videoMeta) ? x.videoMeta : {}, authorCards: Array.isArray(x.authorCards) ? x.authorCards : [],
+    mangaInfo: isBackupObject(x.mangaInfo) ? x.mangaInfo : {}, toc: isBackupObject(x.toc) ? x.toc : {}, lastPages: isBackupObject(x.lastPages) ? x.lastPages : {},
     theme: x.theme === 'light' ? 'light' : 'dark', dashboardVisibility: normalizeBackupDashboardVisibility(x.dashboardVisibility),
     homeCards: Array.isArray(x.homeCards) ? x.homeCards.map((id) => text(id)).filter(Boolean) : DEFAULT_HOME_CARDS.slice(), study: normalizeBackupStudy(x.study)
   };
@@ -68,13 +68,13 @@ function normalizePages(value, field) {
   return normalizeStringArray(value, field, { allowEmpty: false });
 }
 function normalizeMatterEntry(entry, index) {
-  if (!isObject(entry)) throw new Error(`index book matterEntries[${index}] is invalid`);
+  if (!isBackupObject(entry)) throw new Error(`index book matterEntries[${index}] is invalid`);
   const term = text(entry.term);
   if (!term) throw new Error(`index book matterEntries[${index}].term is required`);
   return { term, pages: normalizePages(entry.pages, `matterEntries[${index}].pages`) };
 }
 function normalizeCaseEntry(entry, index) {
-  if (!isObject(entry)) throw new Error(`index book caseEntries[${index}] is invalid`);
+  if (!isBackupObject(entry)) throw new Error(`index book caseEntries[${index}] is invalid`);
   const result = {
     court: text(entry.court), date: text(entry.date), reporter: text(entry.reporter), volume: text(entry.volume), issue: text(entry.issue), reportPage: text(entry.reportPage),
     citationText: text(entry.citationText), pages: normalizePages(entry.pages, `caseEntries[${index}].pages`)
@@ -85,7 +85,7 @@ function normalizeCaseEntry(entry, index) {
   return result;
 }
 function normalizeStatuteEntry(entry, index) {
-  if (!isObject(entry)) throw new Error(`index book statuteEntries[${index}] is invalid`);
+  if (!isBackupObject(entry)) throw new Error(`index book statuteEntries[${index}] is invalid`);
   const result = {
     statute: text(entry.statute), article: text(entry.article), paragraph: text(entry.paragraph), item: text(entry.item), citationText: text(entry.citationText),
     pages: normalizePages(entry.pages, `statuteEntries[${index}].pages`)
@@ -95,9 +95,9 @@ function normalizeStatuteEntry(entry, index) {
   return result;
 }
 function normalizePortableIndexBook(value) {
-  if (!isObject(value)) throw new Error('index book is invalid');
+  if (!isBackupObject(value)) throw new Error('index book is invalid');
   if (Number(value.schemaVersion) !== 1) throw new Error('index book schemaVersion is unsupported');
-  if (!isObject(value.book)) throw new Error('index book book is required');
+  if (!isBackupObject(value.book)) throw new Error('index book book is required');
   const title = text(value.book.title);
   if (!title) throw new Error('index book book.title is required');
   const authors = value.book.authors == null ? [] : normalizeStringArray(value.book.authors, 'book.authors');
