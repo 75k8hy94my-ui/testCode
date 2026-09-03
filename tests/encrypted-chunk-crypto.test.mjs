@@ -40,8 +40,8 @@ test('tampering with ciphertext fails authentication', async () => {
   requireApi('encryptChunk');
   requireApi('decryptChunk');
   const envelope = await ChunkCrypto.encryptChunk(master, chunkA, value);
-  const last = envelope.ciphertext.endsWith('A') ? 'B' : 'A';
-  const tampered = { ...envelope, ciphertext: envelope.ciphertext.slice(0, -1) + last };
+  const first = envelope.ciphertext[0];
+  const tampered = { ...envelope, ciphertext: (first === 'A' ? 'B' : 'A') + envelope.ciphertext.slice(1) };
   await assert.rejects(() => ChunkCrypto.decryptChunk(master, chunkA, tampered));
 });
 
