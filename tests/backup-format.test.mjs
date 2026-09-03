@@ -15,7 +15,7 @@ const emptyStudy = {
     { id: 'civil-procedure', name: '民事訴訟法' }, { id: 'criminal-law', name: '刑法' },
     { id: 'criminal-procedure', name: '刑事訴訟法' }, { id: 'labor-law', name: '労働法' }
   ],
-  genres: [], definitions: [], recentAttempts: [], progress: {}, pendingGradings: [], pendingSyncOps: [], appliedOperationIds: [],
+  genres: [], definitions: [], arguments: [], argumentDrafts: {}, argumentProgress: {}, recentAttempts: [], progress: {}, pendingGradings: [], pendingSyncOps: [], appliedOperationIds: [],
   gamification: { xp: 0, streak: 0, lastStudyDate: null }, preferences: { autoSpeak: false }
 };
 
@@ -37,6 +37,20 @@ test('versioned backup round-trips author cards and supplies video library, home
   assert.deepEqual(migrateBackup(result), { folders: data.folders, items: [], videos: [], videoFolders: [], videoMeta: {}, authorCards: data.authorCards, mangaInfo: {}, toc: {}, lastPages: {}, theme: 'light', dashboardVisibility: { mobile: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false } }, homeCards: defaultHomeCards, study: emptyStudy, indexSearchSettings: defaultIndexSearchSettings });
 });
 
+test('backup v3 preserves current study arguments, drafts and argument progress', () => {
+  const study = {
+    ...emptyStudy,
+    arguments: [{ id: 'arg-1', title: '債権者代位権', body: '論証本文' }],
+    argumentDrafts: { 'arg-1': { body: '下書き' } },
+    argumentProgress: { 'arg-1': { rank: 'A', updatedAt: '2026-09-04T00:00:00Z' } }
+  };
+  const result = createBackup({ folders: [], items: [], study }, '2026-09-04T00:00:00Z');
+  assert.deepEqual(result.data.study.arguments, study.arguments);
+  assert.deepEqual(result.data.study.argumentDrafts, study.argumentDrafts);
+  assert.deepEqual(result.data.study.argumentProgress, study.argumentProgress);
+  assert.deepEqual(migrateBackupPackage(result).data.study, study);
+});
+
 test('backup v3 preserves portable index books but strips device and sync identities', () => {
   const result = createBackup({ folders: [], items: [] }, '2026-09-04T00:00:00Z', [indexBook]);
   assert.equal(result.version, 3);
@@ -56,11 +70,18 @@ test('backup v3 preserves portable index books but strips device and sync identi
   assert.deepEqual(migrated.data.folders, []);
 });
 
-test('backup v3 preserves synchronized index-search preferences', () => {
+test('backup v3 preserves portable index-search preferences but clears selected book identities', () => {
   const preferences = { matchModes: { exact: true, partial: false, and: true, fuzzy: false }, activeKind: 'case', selectedSubjects: ['民法', '民訴'], selectedBookIds: ['book-a'] };
+  const expected = { ...preferences, selectedBookIds: [] };
   const result = createBackup({ folders: [], items: [], indexSearchSettings: preferences }, '2026-09-04T00:00:00Z');
-  assert.deepEqual(result.data.indexSearchSettings, preferences);
-  assert.deepEqual(migrateBackupPackage(result).data.indexSearchSettings, preferences);
+  assert.deepEqual(result.data.indexSearchSettings, expected);
+  assert.deepEqual(migrateBackupPackage(result).data.indexSearchSettings, expected);
+});
+
+test('reader-only migration refuses to silently discard index books from a v3 complete backup', () => {
+  const result = createBackup({ folders: [], items: [] }, '2026-09-04T00:00:00Z', [indexBook]);
+  assert.throws(() => migrateBackup(result), /索引検索/);
+  assert.equal(migrateBackupPackage(result).indexBooks.length, 1);
 });
 
 test('backup v2 remains importable and migrates with no index books', () => {
