@@ -26,6 +26,15 @@ async function exportBooks(masterKeyBytes, overrides = {}) {
   }
   return result;
 }
+async function markExistingForReplacement(cache) {
+  const rows = await cache.list();
+  const now = new Date().toISOString();
+  for (const row of rows) {
+    if (!row || row.deletedAt) continue;
+    if (row.pendingAction === 'insert' && Number(row.revision || 0) === 0) await cache.remove(row.chunkId);
+    else await cache.put({ ...row, deletedAt: now, pendingAction: 'delete', baseRevision: Number(row.baseRevision ?? row.revision) });
+  }
+}
 async function restoreBooks(masterKeyBytes, books, overrides = {}) {
   const { cache, chunkCrypto, schema, sync, idFactory } = deps(overrides);
   if (!cache || !chunkCrypto || !schema) throw new Error('索引バックアップ機能を読み込めませんでした。');
@@ -37,6 +46,7 @@ async function restoreBooks(masterKeyBytes, books, overrides = {}) {
     if (!checked.ok) failures.push({ index, error: checked.error });
     else valid.push({ index, book: checked.book });
   });
+  if (overrides.replaceExisting === true) await markExistingForReplacement(cache);
   for (const entry of valid) {
     try {
       const bookId = idFactory(), chunkId = idFactory();
@@ -46,7 +56,7 @@ async function restoreBooks(masterKeyBytes, books, overrides = {}) {
     } catch (error) { failures.push({ index: entry.index, error: error?.message || String(error) }); }
   }
   const restored = valid.length - failures.filter((failure) => valid.some((entry) => entry.index === failure.index)).length;
-  if (overrides.syncAfter !== false && sync && navigator.onLine) {
+  if (overrides.syncAfter !== false && sync && typeof navigator !== 'undefined' && navigator.onLine) {
     try { await sync.sync(cache, { upload: true }); } catch (_) {}
   }
   return { restored, failures };
