@@ -3,7 +3,13 @@ import assert from 'node:assert/strict';
 import payload from '../vault-payload.js';
 const { DATA_KEYS, normalize, buildFromLocalStorage: buildFromStorage, applyToLocalStorage: applyToStorage } = payload;
 
-const defaultHomeCards = ['bookshelf', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
+const defaultHomeCards = ['bookshelf', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
+const defaultIndexSearchSettings = {
+  matchModes: { exact: true, partial: true, and: true, fuzzy: true },
+  activeKind: 'all',
+  selectedSubjects: [],
+  selectedBookIds: []
+};
 const emptyStudy = {
   schemaVersion: 1,
   subjects: [
@@ -20,16 +26,17 @@ const emptyStudy = {
   gamification: { xp: 0, streak: 0, lastStudyDate: null }, preferences: { autoSpeak: false }
 };
 
-test('normalizes legacy payload with empty video library metadata, study state and default home cards', () => {
+test('normalizes legacy payload with empty video library metadata, study state, index settings and default home cards', () => {
   const value = normalize({ folders: [{ id: 'f1' }], items: [{ id: 'i1' }] });
-  assert.deepEqual(value, { folders: [{ id: 'f1' }], items: [{ id: 'i1' }], videos: [], videoFolders: [], videoMeta: {}, authorCards: [], mangaInfo: {}, toc: {}, lastPages: {}, theme: 'dark', dashboardVisibility: { mobile: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false } }, homeCards: defaultHomeCards, study: emptyStudy });
+  assert.deepEqual(value, { folders: [{ id: 'f1' }], items: [{ id: 'i1' }], videos: [], videoFolders: [], videoMeta: {}, authorCards: [], mangaInfo: {}, toc: {}, lastPages: {}, theme: 'dark', dashboardVisibility: { mobile: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false } }, homeCards: defaultHomeCards, study: emptyStudy, indexSearchSettings: defaultIndexSearchSettings });
 });
 
-test('build and apply preserve every vault field including video library metadata, home cards and study', () => {
+test('build and apply preserve every vault field including video library metadata, home cards, study and index settings', () => {
   const study = structuredClone(emptyStudy);
   study.preferences.autoSpeak = true;
   study.argumentDrafts['new'] = { argumentId: null, title: '途中', body: '下書き本文', savedAt: '2026-08-28T00:00:00.000Z' };
-  const input = { folders: [{ id: 'f1' }], items: [{ id: 'i1' }], videos: [{ id: 'v1' }], videoFolders: [{ id: 'vf1', name: '動画' }], videoMeta: { v1: { favorite: true, tags: ['x'], memo: 'note' } }, authorCards: [{ id: 'a1', name: '作者' }], mangaInfo: { a: { count: 10 } }, toc: { a: [{ page: 1 }] }, lastPages: { a: { page: 3 } }, theme: 'light', dashboardVisibility: { mobile: { continue: true, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: true, favorites: false } }, homeCards: ['study', 'bookshelf'], study };
+  const indexSearchSettings = { matchModes: { exact: true, partial: false, and: true, fuzzy: false }, activeKind: 'case', selectedSubjects: ['民法'], selectedBookIds: ['book-1'] };
+  const input = { folders: [{ id: 'f1' }], items: [{ id: 'i1' }], videos: [{ id: 'v1' }], videoFolders: [{ id: 'vf1', name: '動画' }], videoMeta: { v1: { favorite: true, tags: ['x'], memo: 'note' } }, authorCards: [{ id: 'a1', name: '作者' }], mangaInfo: { a: { count: 10 } }, toc: { a: [{ page: 1 }] }, lastPages: { a: { page: 3 } }, theme: 'light', dashboardVisibility: { mobile: { continue: true, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: true, favorites: false } }, homeCards: ['study', 'bookshelf'], study, indexSearchSettings };
   const storage = new Map();
   applyToStorage(input, storage);
   assert.deepEqual(buildFromStorage(storage), input);
@@ -39,15 +46,26 @@ test('build and apply preserve every vault field including video library metadat
   assert.equal(DATA_KEYS.dashboardVisibility, 'mangaReaderDashboardVisibility');
   assert.equal(DATA_KEYS.homeCards, 'mangaReaderHomeCards');
   assert.equal(DATA_KEYS.study, 'mangaReaderStudy');
+  assert.equal(DATA_KEYS.indexSearchSettings, 'mangaReaderIndexSearchSettings');
 });
 
-test('clearDeviceData removes video library metadata, home and study data', () => {
-  const storage = new Map([['mangaReaderVideoFolders', JSON.stringify([{ id: 'vf1', name: '動画' }])], ['mangaReaderVideoMeta', JSON.stringify({ v1: { favorite: true } })], ['mangaReaderHomeCards', JSON.stringify(defaultHomeCards)], ['mangaReaderStudy', JSON.stringify(emptyStudy)], ['mangaReaderSavedFolders', '[]']]);
+test('index search settings normalize mode flags, kind and selection arrays', () => {
+  assert.deepEqual(normalize({ indexSearchSettings: { matchModes: { exact: false }, activeKind: 'invalid', selectedSubjects: ['民法', '', 3], selectedBookIds: ['a', null] } }).indexSearchSettings, {
+    matchModes: { exact: false, partial: true, and: true, fuzzy: true },
+    activeKind: 'all',
+    selectedSubjects: ['民法', '3'],
+    selectedBookIds: ['a']
+  });
+});
+
+test('clearDeviceData removes video library metadata, home, study and index settings data', () => {
+  const storage = new Map([['mangaReaderVideoFolders', JSON.stringify([{ id: 'vf1', name: '動画' }])], ['mangaReaderVideoMeta', JSON.stringify({ v1: { favorite: true } })], ['mangaReaderHomeCards', JSON.stringify(defaultHomeCards)], ['mangaReaderStudy', JSON.stringify(emptyStudy)], ['mangaReaderIndexSearchSettings', JSON.stringify(defaultIndexSearchSettings)], ['mangaReaderSavedFolders', '[]']]);
   payload.clearDeviceData(storage);
   assert.equal(storage.has('mangaReaderVideoFolders'), false);
   assert.equal(storage.has('mangaReaderVideoMeta'), false);
   assert.equal(storage.has('mangaReaderHomeCards'), false);
   assert.equal(storage.has('mangaReaderStudy'), false);
+  assert.equal(storage.has('mangaReaderIndexSearchSettings'), false);
   assert.equal(storage.has('mangaReaderSavedFolders'), false);
 });
 
