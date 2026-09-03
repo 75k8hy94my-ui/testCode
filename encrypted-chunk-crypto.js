@@ -65,7 +65,7 @@ async function deriveChunkKey(masterKey, chunkId, usages = ['encrypt', 'decrypt'
     },
     root,
     { name: 'AES-GCM', length: 256 },
-    true,
+    false,
     usages
   );
 }
