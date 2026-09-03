@@ -97,30 +97,31 @@ using ((select auth.uid()) = user_id)
 with check ((select auth.uid()) = user_id);
 
 create or replace function public.update_manga_reader_encrypted_chunk(
-  p_chunk_id uuid,
-  p_expected_revision bigint,
-  p_new_payload jsonb
+  expected_chunk_id uuid,
+  expected_revision bigint,
+  new_payload jsonb
 )
 returns table(revision bigint, updated_at timestamptz, deleted_at timestamptz)
 language sql security invoker
 set search_path = public
 as $$
   update public.manga_reader_encrypted_chunks
-  set payload = p_new_payload,
+  set payload = new_payload,
       revision = manga_reader_encrypted_chunks.revision + 1,
       deleted_at = null,
       updated_at = now()
   where user_id = (select auth.uid())
-    and chunk_id = p_chunk_id
-    and manga_reader_encrypted_chunks.revision = p_expected_revision
+    and chunk_id = expected_chunk_id
+    and manga_reader_encrypted_chunks.revision = expected_revision
+    and manga_reader_encrypted_chunks.deleted_at is null
   returning manga_reader_encrypted_chunks.revision,
             manga_reader_encrypted_chunks.updated_at,
             manga_reader_encrypted_chunks.deleted_at;
 $$;
 
 create or replace function public.delete_manga_reader_encrypted_chunk(
-  p_chunk_id uuid,
-  p_expected_revision bigint
+  expected_chunk_id uuid,
+  expected_revision bigint
 )
 returns table(revision bigint, updated_at timestamptz, deleted_at timestamptz)
 language sql security invoker
@@ -131,8 +132,9 @@ as $$
       deleted_at = now(),
       updated_at = now()
   where user_id = (select auth.uid())
-    and chunk_id = p_chunk_id
-    and manga_reader_encrypted_chunks.revision = p_expected_revision
+    and chunk_id = expected_chunk_id
+    and manga_reader_encrypted_chunks.revision = expected_revision
+    and manga_reader_encrypted_chunks.deleted_at is null
   returning manga_reader_encrypted_chunks.revision,
             manga_reader_encrypted_chunks.updated_at,
             manga_reader_encrypted_chunks.deleted_at;
