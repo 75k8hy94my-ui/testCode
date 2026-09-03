@@ -76,7 +76,7 @@ async function replaceChunk({ chunkId, expectedRevision, payload }) {
   return V.withSession(async (token) => {
     const rows = await V.api(`/rest/v1/rpc/${UPDATE_RPC}`, {
       method: 'POST', token,
-      body: JSON.stringify({ p_chunk_id: chunkId, p_expected_revision: Number(expectedRevision), p_new_payload: payload })
+      body: JSON.stringify({ expected_chunk_id: chunkId, expected_revision: Number(expectedRevision), new_payload: payload })
     });
     if (!Array.isArray(rows) || !rows.length) throw new Error('別の端末で同じ書籍が更新されています。');
     return { chunkId, payload, ...normalizeRow(rows[0]) };
@@ -88,7 +88,7 @@ async function deleteChunk({ chunkId, expectedRevision }) {
   return V.withSession(async (token) => {
     const rows = await V.api(`/rest/v1/rpc/${DELETE_RPC}`, {
       method: 'POST', token,
-      body: JSON.stringify({ p_chunk_id: chunkId, p_expected_revision: Number(expectedRevision) })
+      body: JSON.stringify({ expected_chunk_id: chunkId, expected_revision: Number(expectedRevision) })
     });
     if (!Array.isArray(rows) || !rows.length) throw new Error('別の端末で同じ書籍が更新されています。');
     return { chunkId, ...normalizeRow(rows[0]) };
