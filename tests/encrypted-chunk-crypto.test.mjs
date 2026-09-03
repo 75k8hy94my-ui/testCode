@@ -37,12 +37,18 @@ test('fresh AES-GCM IV makes repeated encryption produce different ciphertext', 
   assert.notEqual(a.ciphertext, b.ciphertext);
 });
 
-test('HKDF derives separate keys for separate chunk ids', async () => {
+test('HKDF derives separate non-extractable keys for separate chunk ids', async () => {
   const a = await deriveChunkKey(masterKey, chunkA, ['encrypt']);
   const b = await deriveChunkKey(masterKey, chunkB, ['encrypt']);
-  const rawA = new Uint8Array(await crypto.subtle.exportKey('raw', a));
-  const rawB = new Uint8Array(await crypto.subtle.exportKey('raw', b));
-  assert.notDeepEqual(rawA, rawB);
+  assert.equal(a.extractable, false);
+  assert.equal(b.extractable, false);
+  await assert.rejects(() => crypto.subtle.exportKey('raw', a));
+
+  const iv = new Uint8Array(12);
+  const data = new TextEncoder().encode('same plaintext');
+  const encryptedA = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, a, data));
+  const encryptedB = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, b, data));
+  assert.notDeepEqual(encryptedA, encryptedB);
 });
 
 test('ciphertext is bound to its chunk id by key derivation and authenticated data', async () => {
