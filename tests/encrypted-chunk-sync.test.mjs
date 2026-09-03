@@ -9,11 +9,11 @@ const envelope = (label) => ({
 function memoryCache(initial = []) {
   const map = new Map(initial.map((row) => [row.chunkId, structuredClone(row)]));
   return {
-    async list() { return [...map.values()].map(structuredClone); },
+    async list() { return [...map.values()].map((row) => structuredClone(row)); },
     async get(id) { return map.has(id) ? structuredClone(map.get(id)) : null; },
     async put(row) { map.set(row.chunkId, structuredClone(row)); return structuredClone(row); },
     async remove(id) { map.delete(id); },
-    snapshot() { return [...map.values()].map(structuredClone); }
+    snapshot() { return [...map.values()].map((row) => structuredClone(row)); }
   };
 }
 
