@@ -2,10 +2,16 @@ const DATA_KEYS = {
   folders: 'mangaReaderSavedFolders', items: 'mangaReaderSavedItems', videos: 'mangaReaderVideos', videoFolders: 'mangaReaderVideoFolders', videoMeta: 'mangaReaderVideoMeta',
   authorCards: 'mangaReaderAuthorCards', mangaInfo: 'mangaReaderInfoCache', toc: 'mangaReaderToc',
   lastPages: 'mangaReaderLastPage', theme: 'mangaReaderTheme', dashboardVisibility: 'mangaReaderDashboardVisibility',
-  homeCards: 'mangaReaderHomeCards', study: 'mangaReaderStudy'
+  homeCards: 'mangaReaderHomeCards', study: 'mangaReaderStudy', indexSearchSettings: 'mangaReaderIndexSearchSettings'
 };
 const defaultDashboardVisibility = { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false };
-const defaultHomeCards = ['bookshelf', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
+const defaultHomeCards = ['bookshelf', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
+const defaultIndexSearchSettings = {
+  matchModes: { exact: true, partial: true, and: true, fuzzy: true },
+  activeKind: 'all',
+  selectedSubjects: [],
+  selectedBookIds: []
+};
 const defaultStudySubjects = [
   { id: 'constitutional-law', name: '憲法' }, { id: 'administrative-law', name: '行政法' },
   { id: 'civil-law', name: '民法' }, { id: 'commercial-law', name: '商法' },
@@ -18,8 +24,9 @@ const createEmptyStudy = () => ({
   genres: [], definitions: [], arguments: [], argumentDrafts: {}, argumentProgress: {}, recentAttempts: [], progress: {}, pendingGradings: [], pendingSyncOps: [], appliedOperationIds: [],
   gamification: { xp: 0, streak: 0, lastStudyDate: null }, preferences: { autoSpeak: false }
 });
-const defaults = { folders: [], items: [], videos: [], videoFolders: [], videoMeta: {}, authorCards: [], mangaInfo: {}, toc: {}, lastPages: {}, theme: 'dark', dashboardVisibility: { mobile: { ...defaultDashboardVisibility }, desktop: { ...defaultDashboardVisibility } }, homeCards: defaultHomeCards.slice(), study: createEmptyStudy() };
+const defaults = { folders: [], items: [], videos: [], videoFolders: [], videoMeta: {}, authorCards: [], mangaInfo: {}, toc: {}, lastPages: {}, theme: 'dark', dashboardVisibility: { mobile: { ...defaultDashboardVisibility }, desktop: { ...defaultDashboardVisibility } }, homeCards: defaultHomeCards.slice(), study: createEmptyStudy(), indexSearchSettings: structuredCloneSafe(defaultIndexSearchSettings) };
 const isObject = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+function structuredCloneSafe(value) { return JSON.parse(JSON.stringify(value)); }
 const normalizeDashboardProfile = (value) => {
   const result = { ...defaultDashboardVisibility };
   const source = isObject(value);
@@ -32,6 +39,34 @@ const normalizeDashboardVisibility = (value) => {
   return { mobile: normalizeDashboardProfile(), desktop: normalizeDashboardProfile() };
 };
 const normalizeHomeCards = (value) => Array.isArray(value) ? value.map((id) => String(id || '')).filter(Boolean) : defaultHomeCards.slice();
+const normalizeStringList = (value) => {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const out = [];
+  value.forEach((item) => {
+    const text = String(item ?? '').trim();
+    if (!text || seen.has(text)) return;
+    seen.add(text);
+    out.push(text);
+  });
+  return out;
+};
+function normalizeIndexSearchSettings(value) {
+  const x = isObject(value);
+  const modes = isObject(x.matchModes);
+  const allowedKinds = new Set(['all', 'matter', 'case', 'statute']);
+  return {
+    matchModes: {
+      exact: typeof modes.exact === 'boolean' ? modes.exact : true,
+      partial: typeof modes.partial === 'boolean' ? modes.partial : true,
+      and: typeof modes.and === 'boolean' ? modes.and : true,
+      fuzzy: typeof modes.fuzzy === 'boolean' ? modes.fuzzy : true
+    },
+    activeKind: allowedKinds.has(x.activeKind) ? x.activeKind : 'all',
+    selectedSubjects: normalizeStringList(x.selectedSubjects),
+    selectedBookIds: normalizeStringList(x.selectedBookIds)
+  };
+}
 function normalizeStudyForVault(value) {
   const x = isObject(value);
   const base = createEmptyStudy();
@@ -54,7 +89,7 @@ function normalizeStudyForVault(value) {
 }
 function normalize(value) {
   const x = value && typeof value === 'object' ? value : {};
-  return { folders: Array.isArray(x.folders) ? x.folders : [], items: Array.isArray(x.items) ? x.items : [], videos: Array.isArray(x.videos) ? x.videos : [], videoFolders: Array.isArray(x.videoFolders) ? x.videoFolders : [], videoMeta: isObject(x.videoMeta), authorCards: Array.isArray(x.authorCards) ? x.authorCards : [], mangaInfo: isObject(x.mangaInfo), toc: isObject(x.toc), lastPages: isObject(x.lastPages), theme: x.theme === 'light' ? 'light' : 'dark', dashboardVisibility: normalizeDashboardVisibility(x.dashboardVisibility), homeCards: normalizeHomeCards(x.homeCards), study: normalizeStudyForVault(x.study) };
+  return { folders: Array.isArray(x.folders) ? x.folders : [], items: Array.isArray(x.items) ? x.items : [], videos: Array.isArray(x.videos) ? x.videos : [], videoFolders: Array.isArray(x.videoFolders) ? x.videoFolders : [], videoMeta: isObject(x.videoMeta), authorCards: Array.isArray(x.authorCards) ? x.authorCards : [], mangaInfo: isObject(x.mangaInfo), toc: isObject(x.toc), lastPages: isObject(x.lastPages), theme: x.theme === 'light' ? 'light' : 'dark', dashboardVisibility: normalizeDashboardVisibility(x.dashboardVisibility), homeCards: normalizeHomeCards(x.homeCards), study: normalizeStudyForVault(x.study), indexSearchSettings: normalizeIndexSearchSettings(x.indexSearchSettings) };
 }
 function read(storage, key, fallback) {
   try { const raw = storage.getItem ? storage.getItem(key) : storage.get(key); return raw == null ? fallback : JSON.parse(raw); } catch (_) { return fallback; }
@@ -64,7 +99,7 @@ function setRaw(storage, key, value) { if (storage.setItem) storage.setItem(key,
 function removeRaw(storage, key) { if (storage.removeItem) storage.removeItem(key); else storage.delete(key); }
 function write(storage, key, value) { setRaw(storage, key, JSON.stringify(value)); }
 function buildFromStorage(storage = globalThis.localStorage) {
-  return normalize({ folders: read(storage, DATA_KEYS.folders, []), items: read(storage, DATA_KEYS.items, []), videos: read(storage, DATA_KEYS.videos, []), videoFolders: read(storage, DATA_KEYS.videoFolders, []), videoMeta: read(storage, DATA_KEYS.videoMeta, {}), authorCards: read(storage, DATA_KEYS.authorCards, []), mangaInfo: read(storage, DATA_KEYS.mangaInfo, {}), toc: read(storage, DATA_KEYS.toc, {}), lastPages: read(storage, DATA_KEYS.lastPages, {}), theme: storage.getItem ? storage.getItem(DATA_KEYS.theme) : (storage.get(DATA_KEYS.theme) === '"light"' ? 'light' : 'dark'), dashboardVisibility: read(storage, DATA_KEYS.dashboardVisibility, {}), homeCards: read(storage, DATA_KEYS.homeCards, defaultHomeCards), study: read(storage, DATA_KEYS.study, {}) });
+  return normalize({ folders: read(storage, DATA_KEYS.folders, []), items: read(storage, DATA_KEYS.items, []), videos: read(storage, DATA_KEYS.videos, []), videoFolders: read(storage, DATA_KEYS.videoFolders, []), videoMeta: read(storage, DATA_KEYS.videoMeta, {}), authorCards: read(storage, DATA_KEYS.authorCards, []), mangaInfo: read(storage, DATA_KEYS.mangaInfo, {}), toc: read(storage, DATA_KEYS.toc, {}), lastPages: read(storage, DATA_KEYS.lastPages, {}), theme: storage.getItem ? storage.getItem(DATA_KEYS.theme) : (storage.get(DATA_KEYS.theme) === '"light"' ? 'light' : 'dark'), dashboardVisibility: read(storage, DATA_KEYS.dashboardVisibility, {}), homeCards: read(storage, DATA_KEYS.homeCards, defaultHomeCards), study: read(storage, DATA_KEYS.study, {}), indexSearchSettings: read(storage, DATA_KEYS.indexSearchSettings, defaultIndexSearchSettings) });
 }
 function applyToStorage(payload, storage = globalThis.localStorage) {
   const data = normalize(payload);
