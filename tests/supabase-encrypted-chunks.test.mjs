@@ -20,8 +20,9 @@ test('encrypted chunk table is RLS protected and only authenticated owners may r
   assert.match(schema, /on\s+public\.manga_reader_encrypted_chunks\s+for\s+select\s+to\s+authenticated\s+using\s*\(\s*\(select\s+auth\.uid\(\)\)\s*=\s*user_id\s*\)/i);
   assert.match(schema, /on\s+public\.manga_reader_encrypted_chunks\s+for\s+insert\s+to\s+authenticated\s+with\s+check\s*\(\s*\(select\s+auth\.uid\(\)\)\s*=\s*user_id\s*\)/i);
   assert.match(schema, /on\s+public\.manga_reader_encrypted_chunks\s+for\s+update\s+to\s+authenticated[\s\S]*?using\s*\(\s*\(select\s+auth\.uid\(\)\)\s*=\s*user_id\s*\)[\s\S]*?with\s+check\s*\(\s*\(select\s+auth\.uid\(\)\)\s*=\s*user_id\s*\)/i);
-  assert.match(schema, /revoke\s+all\s+on\s+table\s+public\.manga_reader_encrypted_chunks\s+from\s+anon/i);
+  assert.match(schema, /revoke\s+all\s+on\s+table\s+public\.manga_reader_encrypted_chunks\s+from\s+anon\s*,\s*authenticated/i);
   assert.match(schema, /grant\s+select\s*,\s*insert\s*,\s*update\s+on\s+table\s+public\.manga_reader_encrypted_chunks\s+to\s+authenticated/i);
+  assert.doesNotMatch(schema, /grant\s+[^;]*\b(?:delete|truncate|trigger|references)\b[^;]*on\s+table\s+public\.manga_reader_encrypted_chunks\s+to\s+authenticated/i);
 });
 
 test('chunk CAS and tombstone RPCs use security invoker and owner/revision guards', () => {
