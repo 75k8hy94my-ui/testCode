@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const schema = fs.readFileSync(new URL('../supabase-schema.sql', import.meta.url), 'utf8');
+const syncSource = fs.readFileSync(new URL('../encrypted-chunk-sync.js', import.meta.url), 'utf8');
 let Sync = {};
 try { Sync = (await import('../encrypted-chunk-sync.js')).default || {}; } catch (_) {}
 
@@ -31,12 +32,22 @@ test('chunk CAS and tombstone RPCs use security invoker and owner/revision guard
     const match = schema.match(pattern);
     assert.ok(match, `${name} should be security invoker`);
     assert.match(match[1], /user_id\s*=\s*\(select\s+auth\.uid\(\)\)/i);
-    assert.match(match[1], /chunk_id\s*=\s*p_chunk_id/i);
-    assert.match(match[1], /revision\s*=\s*p_expected_revision/i);
+    assert.match(match[1], /chunk_id\s*=\s*expected_chunk_id/i);
+    assert.match(match[1], /revision\s*=\s*expected_revision/i);
   }
+  assert.match(schema, /update_manga_reader_encrypted_chunk\(\s*expected_chunk_id\s+uuid\s*,\s*expected_revision\s+bigint\s*,\s*new_payload\s+jsonb/i);
+  assert.match(schema, /delete_manga_reader_encrypted_chunk\(\s*expected_chunk_id\s+uuid\s*,\s*expected_revision\s+bigint/i);
+  assert.match(schema, /manga_reader_encrypted_chunks\.deleted_at\s+is\s+null/i);
   assert.doesNotMatch(schema, /create\s+or\s+replace\s+function\s+public\.(?:update|delete)_manga_reader_encrypted_chunk\([\s\S]*?security\s+definer/i);
   assert.match(schema, /revoke\s+execute\s+on\s+function\s+public\.update_manga_reader_encrypted_chunk\([^;]+\)\s+from\s+public\s*,\s*anon/i);
   assert.match(schema, /grant\s+execute\s+on\s+function\s+public\.update_manga_reader_encrypted_chunk\([^;]+\)\s+to\s+authenticated/i);
+});
+
+test('sync client uses the deployed RPC parameter names', () => {
+  assert.match(syncSource, /expected_chunk_id\s*:\s*chunkId/);
+  assert.match(syncSource, /expected_revision\s*:\s*Number\(expectedRevision\)/);
+  assert.match(syncSource, /new_payload\s*:\s*payload/);
+  assert.doesNotMatch(syncSource, /p_chunk_id|p_expected_revision|p_new_payload/);
 });
 
 test('sync module exposes incremental metadata, payload, write and reconciliation operations', () => {
