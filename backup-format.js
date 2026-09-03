@@ -1,3 +1,6 @@
+(()=>{
+'use strict';
+
 const FORMAT = 'manga-reader-backup';
 const VERSION = 3;
 const DEFAULT_DASHBOARD_VISIBILITY = { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false };
@@ -136,3 +139,4 @@ function migrateBackup(input) {
 const backupApi = { FORMAT, VERSION, normalizeData, normalizePortableIndexBook, normalizeIndexBooks, createBackup, migrateBackupPackage, migrateBackup };
 if (typeof window !== 'undefined') window.MangaReaderBackup = backupApi;
 if (typeof module !== 'undefined') module.exports = backupApi;
+})();
