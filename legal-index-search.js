@@ -54,6 +54,7 @@ function normalizeLegalText(value) {
   out = out.replace(/第(?=\s*\d+\s*(?:条|項|号))/g, '');
   out = out.replace(/[\u3000\t\r\n]+/g, ' ');
   out = out.replace(/\s+/g, ' ').trim();
+  out = out.replace(/\s+(?=\d+\s*(?:条|項|号))/g, '');
   return out;
 }
 
