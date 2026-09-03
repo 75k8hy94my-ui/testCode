@@ -5,6 +5,10 @@ import vm from 'node:vm';
 
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 
+function assertDependencyBinding(page, localName, globalName) {
+  assert.match(page, new RegExp(`const\\s+${localName}\\s*=\\s*window\\.${globalName}\\s*;`));
+}
+
 test('index search page is authenticated, vault-gated and loads focused encrypted-index modules', () => {
   const html = read('index-search.html');
   assert.match(html, /<html[^>]+class=["']auth-pending["']/i);
@@ -16,8 +20,9 @@ test('index search page is authenticated, vault-gated and loads focused encrypte
     assert.match(html, new RegExp(script.replace('.', '\\.')));
   }
   const page = read('index-search-page.js');
-  assert.match(page, /MangaVault\.loadSession\(\)/);
-  assert.match(page, /MangaVault\.loadActive\(\)/);
+  assertDependencyBinding(page, 'Vault', 'MangaVault');
+  assert.match(page, /Vault\.loadSession\(\)/);
+  assert.match(page, /Vault\.loadActive\(\)/);
   assert.match(page, /window\.location\.replace\(['"]index\.html['"]\)/);
   assert.match(page, /window\.location\.replace\(['"]sync\.html['"]\)/);
 });
@@ -29,9 +34,10 @@ test('search surface exposes live query, kind tabs, book/subject filters and con
   }
   for (const kind of ['all', 'matter', 'case', 'statute']) assert.match(html, new RegExp(`data-kind=["']${kind}["']`));
   const page = read('index-search-page.js');
+  assertDependencyBinding(page, 'Search', 'LegalIndexSearch');
   assert.match(page, /addEventListener\(['"]input['"]/);
-  assert.match(page, /LegalIndexSearch\.search/);
-  assert.match(page, /setTimeout\([^,]+,\s*\d+\)/);
+  assert.match(page, /Search\.search/);
+  assert.match(page, /setTimeout\([^,]+,\s*(?:\d+|[A-Z_]+)\)/);
 });
 
 test('batch import accepts multiple JSON files, validates each and supports new or explicit replacement', () => {
@@ -40,8 +46,9 @@ test('batch import accepts multiple JSON files, validates each and supports new 
   assert.match(html, /accept=["'][^"']*\.json/i);
   assert.match(html, /id=["']importPreview["']/);
   const page = read('index-search-page.js');
+  assertDependencyBinding(page, 'Schema', 'LegalIndexSchema');
   assert.match(page, /const\s+MAX_IMPORT_CONCURRENCY\s*=\s*4/);
-  assert.match(page, /LegalIndexSchema\.validateBookFile/);
+  assert.match(page, /Schema\.validateBookFile/);
   assert.match(page, /new-book/);
   assert.match(page, /replace-book/);
   assert.match(page, /existingBookId/);
@@ -50,10 +57,13 @@ test('batch import accepts multiple JSON files, validates each and supports new 
 
 test('book corpus is encrypted before persistent cache and search settings alone use the monolithic vault', () => {
   const page = read('index-search-page.js');
-  assert.match(page, /EncryptedChunkCrypto\.encryptChunk/);
+  assertDependencyBinding(page, 'ChunkCrypto', 'EncryptedChunkCrypto');
+  assertDependencyBinding(page, 'VaultPayload', 'MangaVaultPayload');
+  assertDependencyBinding(page, 'Vault', 'MangaVault');
+  assert.match(page, /ChunkCrypto\.encryptChunk/);
   assert.match(page, /cache\.put/);
-  assert.match(page, /MangaVaultPayload\.buildFromLocalStorage/);
-  assert.match(page, /MangaVault\.savePayload/);
+  assert.match(page, /VaultPayload\.buildFromLocalStorage/);
+  assert.match(page, /Vault\.savePayload/);
   assert.doesNotMatch(page, /localStorage\.setItem\([^\n]*(indexBooks|matterEntries|caseEntries|statuteEntries)/i);
   assert.match(page, /rawKey/);
 });
