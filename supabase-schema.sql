@@ -73,7 +73,7 @@ create table if not exists public.manga_reader_encrypted_chunks (
 
 alter table public.manga_reader_encrypted_chunks enable row level security;
 
-revoke all on table public.manga_reader_encrypted_chunks from anon;
+revoke all on table public.manga_reader_encrypted_chunks from anon, authenticated;
 grant select, insert, update on table public.manga_reader_encrypted_chunks to authenticated;
 
 drop policy if exists "Users can read their own encrypted chunks" on public.manga_reader_encrypted_chunks;
