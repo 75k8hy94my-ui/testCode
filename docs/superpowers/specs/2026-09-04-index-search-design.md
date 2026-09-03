@@ -157,7 +157,7 @@ Display text remains the imported/original form; normalization affects matching 
 
 For AND matching, whitespace in the user query defines tokens before compact normalization. Every token must match the normalized searchable text.
 
-Fuzzy matching runs last and must have a conservative threshold to avoid flooding legal searches with unrelated terms.
+Fuzzy matching runs last and uses normalized Damerau-Levenshtein distance. It is disabled for query tokens shorter than 3 normalized characters. For length 3-7, allow distance at most 1; for length 8 or more, allow distance at most 2. Fuzzy results sort by normalized edit ratio first, then deterministic lexical order. This conservative rule is fixed for v1 and may become configurable later.
 
 ## Result grouping
 
@@ -200,7 +200,7 @@ Imported plaintext is held only while the vault is unlocked and while the page/s
 
 The persistent browser cache uses IndexedDB and stores encrypted records, not plaintext index entries.
 
-Suggested stores:
+Stores:
 
 - `chunks`: encrypted chunk envelopes keyed by `chunkId`, plus revision/update metadata.
 - `syncMeta`: last-seen remote revision/deletion metadata.
@@ -220,7 +220,7 @@ Keep the existing `manga_reader_vaults` table and its current clients unchanged 
 
 Add one generic encrypted-chunk table for independently synchronized large data. It is not exposed as plaintext application data.
 
-Suggested schema:
+Schema:
 
 ```sql
 create table public.manga_reader_encrypted_chunks (
@@ -245,9 +245,9 @@ A `security invoker` CAS RPC updates one `(user_id, chunk_id)` only when the exp
 The cloud and persistent offline cache retain the current client-side confidentiality model: Supabase receives ciphertext only.
 
 - Reuse the already-unlocked 32-byte vault master key as root key material.
-- Derive a per-chunk AES-256 key with HKDF-SHA-256 using `chunkId` and a fixed domain-separation context such as `manga-reader/encrypted-chunk/v1`.
+- Derive a per-chunk AES-256 key with HKDF-SHA-256 using `chunkId` and fixed domain-separation info `manga-reader/encrypted-chunk/v1`.
 - Encrypt each chunk independently with AES-256-GCM and a fresh random 96-bit IV for every encryption.
-- Authenticate immutable envelope context (version and chunk ID) as AES-GCM additional authenticated data where practical.
+- AES-GCM additional authenticated data is mandatory and contains the envelope version plus chunk ID, so ciphertext cannot be transparently moved between chunk identities.
 - The plaintext chunk contains `type: "index-book"`, internal `bookId`, book metadata, and all entries.
 - The server cannot infer book names or subjects from the table schema; it can still observe unavoidable metadata such as user ownership, ciphertext size, row count, revisions, and timestamps.
 
@@ -266,7 +266,7 @@ The feature is offline-first.
 
 Do not download every book on every page load. A new device with no cache necessarily performs a full initial download once.
 
-Batch import/upload uses bounded concurrency (target 3-5 simultaneous writes) to avoid unnecessary request and database bursts.
+Batch import/upload uses bounded concurrency of at most 4 simultaneous writes to avoid unnecessary request and database bursts.
 
 ## Deletion and tombstones
 
@@ -275,11 +275,11 @@ Deleting a book must synchronize safely to devices that were offline.
 - Deletion increments the chunk revision and sets `deleted_at` rather than immediately removing the row.
 - Other devices receiving the tombstone remove the local searchable/decrypted representation and mark the local encrypted cache deleted.
 - A stale offline copy must not recreate the deleted book unless the user explicitly imports it again as a new book.
-- Tombstones may be physically purged later under a separate retention policy; physical purge is not required for v1.
+- Tombstones are not physically purged in v1.
 
 ## Search settings in the existing vault
 
-Small synchronized preferences remain in the existing `manga_reader_vaults` payload, for example:
+Small synchronized preferences remain in the existing `manga_reader_vaults` payload:
 
 ```json
 {
@@ -303,14 +303,14 @@ These settings must be added to vault normalization, application, clearing, and 
 
 The existing backup format currently covers the monolithic vault only, so index books must not be silently omitted.
 
-Introduce a new backup version that can contain both:
+Backup format version 3 is a single user-downloaded JSON object that contains:
 
 - existing normalized vault data, and
-- encrypted-index book plaintext export data while the vault is unlocked (or an equivalent portable encrypted representation that is restorable with documented key handling).
+- `indexBooks`, an array of normalized plaintext book objects produced only while the vault is unlocked.
 
-The preferred v1 implementation is a single user-initiated backup file containing the existing normalized data plus normalized index books, then protected by the existing backup/export security flow if one is present. Restore validates all books before committing and preserves per-book boundaries.
+This follows the existing backup format's local-export semantics: the backup file itself is sensitive user data and is not uploaded by the index feature. Restore parses and validates the complete v3 file first, then restores existing data and index books while preserving per-book boundaries. Index books are re-encrypted into fresh chunk envelopes on restore.
 
-Legacy v2 backups remain importable and simply contain zero index books.
+Legacy version-2 backups remain importable and normalize to `indexBooks: []`.
 
 ## Home-layout compatibility
 
