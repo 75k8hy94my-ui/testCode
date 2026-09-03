@@ -25,16 +25,16 @@ const createEmptyStudy = () => ({
   gamification: { xp: 0, streak: 0, lastStudyDate: null }, preferences: { autoSpeak: false }
 });
 const defaults = { folders: [], items: [], videos: [], videoFolders: [], videoMeta: {}, authorCards: [], mangaInfo: {}, toc: {}, lastPages: {}, theme: 'dark', dashboardVisibility: { mobile: { ...defaultDashboardVisibility }, desktop: { ...defaultDashboardVisibility } }, homeCards: defaultHomeCards.slice(), study: createEmptyStudy(), indexSearchSettings: structuredCloneSafe(defaultIndexSearchSettings) };
-const isObject = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+const vaultObject = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 function structuredCloneSafe(value) { return JSON.parse(JSON.stringify(value)); }
 const normalizeDashboardProfile = (value) => {
   const result = { ...defaultDashboardVisibility };
-  const source = isObject(value);
+  const source = vaultObject(value);
   Object.keys(result).forEach((key) => { if (typeof source[key] === 'boolean') result[key] = source[key]; });
   return result;
 };
 const normalizeDashboardVisibility = (value) => {
-  const source = isObject(value);
+  const source = vaultObject(value);
   if (source.mobile && source.desktop) return { mobile: normalizeDashboardProfile(source.mobile), desktop: normalizeDashboardProfile(source.desktop) };
   return { mobile: normalizeDashboardProfile(), desktop: normalizeDashboardProfile() };
 };
@@ -52,8 +52,8 @@ const normalizeStringList = (value) => {
   return out;
 };
 function normalizeIndexSearchSettings(value) {
-  const x = isObject(value);
-  const modes = isObject(x.matchModes);
+  const x = vaultObject(value);
+  const modes = vaultObject(x.matchModes);
   const allowedKinds = new Set(['all', 'matter', 'case', 'statute']);
   return {
     matchModes: {
@@ -68,7 +68,7 @@ function normalizeIndexSearchSettings(value) {
   };
 }
 function normalizeStudyForVault(value) {
-  const x = isObject(value);
+  const x = vaultObject(value);
   const base = createEmptyStudy();
   return {
     schemaVersion: 1,
@@ -76,20 +76,20 @@ function normalizeStudyForVault(value) {
     genres: Array.isArray(x.genres) ? x.genres : [],
     definitions: Array.isArray(x.definitions) ? x.definitions : [],
     arguments: Array.isArray(x.arguments) ? x.arguments : [],
-    argumentDrafts: isObject(x.argumentDrafts),
-    argumentProgress: isObject(x.argumentProgress),
+    argumentDrafts: vaultObject(x.argumentDrafts),
+    argumentProgress: vaultObject(x.argumentProgress),
     recentAttempts: Array.isArray(x.recentAttempts) ? x.recentAttempts : [],
-    progress: isObject(x.progress),
+    progress: vaultObject(x.progress),
     pendingGradings: Array.isArray(x.pendingGradings) ? x.pendingGradings : [],
     pendingSyncOps: Array.isArray(x.pendingSyncOps) ? x.pendingSyncOps : [],
     appliedOperationIds: Array.isArray(x.appliedOperationIds) ? x.appliedOperationIds : [],
-    gamification: { ...base.gamification, ...isObject(x.gamification) },
-    preferences: { ...base.preferences, ...isObject(x.preferences) }
+    gamification: { ...base.gamification, ...vaultObject(x.gamification) },
+    preferences: { ...base.preferences, ...vaultObject(x.preferences) }
   };
 }
 function normalize(value) {
   const x = value && typeof value === 'object' ? value : {};
-  return { folders: Array.isArray(x.folders) ? x.folders : [], items: Array.isArray(x.items) ? x.items : [], videos: Array.isArray(x.videos) ? x.videos : [], videoFolders: Array.isArray(x.videoFolders) ? x.videoFolders : [], videoMeta: isObject(x.videoMeta), authorCards: Array.isArray(x.authorCards) ? x.authorCards : [], mangaInfo: isObject(x.mangaInfo), toc: isObject(x.toc), lastPages: isObject(x.lastPages), theme: x.theme === 'light' ? 'light' : 'dark', dashboardVisibility: normalizeDashboardVisibility(x.dashboardVisibility), homeCards: normalizeHomeCards(x.homeCards), study: normalizeStudyForVault(x.study), indexSearchSettings: normalizeIndexSearchSettings(x.indexSearchSettings) };
+  return { folders: Array.isArray(x.folders) ? x.folders : [], items: Array.isArray(x.items) ? x.items : [], videos: Array.isArray(x.videos) ? x.videos : [], videoFolders: Array.isArray(x.videoFolders) ? x.videoFolders : [], videoMeta: vaultObject(x.videoMeta), authorCards: Array.isArray(x.authorCards) ? x.authorCards : [], mangaInfo: vaultObject(x.mangaInfo), toc: vaultObject(x.toc), lastPages: vaultObject(x.lastPages), theme: x.theme === 'light' ? 'light' : 'dark', dashboardVisibility: normalizeDashboardVisibility(x.dashboardVisibility), homeCards: normalizeHomeCards(x.homeCards), study: normalizeStudyForVault(x.study), indexSearchSettings: normalizeIndexSearchSettings(x.indexSearchSettings) };
 }
 function read(storage, key, fallback) {
   try { const raw = storage.getItem ? storage.getItem(key) : storage.get(key); return raw == null ? fallback : JSON.parse(raw); } catch (_) { return fallback; }
