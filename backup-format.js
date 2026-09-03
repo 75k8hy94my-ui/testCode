@@ -42,14 +42,14 @@ function normalizeBackupIndexSearchSettings(value) {
     },
     activeKind: allowedKinds.has(source.activeKind) ? source.activeKind : 'all',
     selectedSubjects: normalizeBackupStringArray(source.selectedSubjects),
-    selectedBookIds: normalizeBackupStringArray(source.selectedBookIds)
+    selectedBookIds: []
   };
 }
 function emptyBackupStudy() {
   return {
     schemaVersion: 1,
     subjects: DEFAULT_STUDY_SUBJECTS.map((item) => ({ ...item })),
-    genres: [], definitions: [], recentAttempts: [], progress: {}, pendingGradings: [], pendingSyncOps: [], appliedOperationIds: [],
+    genres: [], definitions: [], arguments: [], argumentDrafts: {}, argumentProgress: {}, recentAttempts: [], progress: {}, pendingGradings: [], pendingSyncOps: [], appliedOperationIds: [],
     gamification: { xp: 0, streak: 0, lastStudyDate: null }, preferences: { autoSpeak: false }
   };
 }
@@ -61,6 +61,9 @@ function normalizeBackupStudy(value) {
     subjects: Array.isArray(source.subjects) && source.subjects.length ? source.subjects : base.subjects,
     genres: Array.isArray(source.genres) ? source.genres : [],
     definitions: Array.isArray(source.definitions) ? source.definitions : [],
+    arguments: Array.isArray(source.arguments) ? source.arguments : [],
+    argumentDrafts: isBackupObject(source.argumentDrafts) ? source.argumentDrafts : {},
+    argumentProgress: isBackupObject(source.argumentProgress) ? source.argumentProgress : {},
     recentAttempts: Array.isArray(source.recentAttempts) ? source.recentAttempts : [],
     progress: isBackupObject(source.progress) ? source.progress : {},
     pendingGradings: Array.isArray(source.pendingGradings) ? source.pendingGradings : [],
@@ -156,7 +159,9 @@ function migrateBackupPackage(input) {
   return { data: normalizeData(input), indexBooks: [] };
 }
 function migrateBackup(input) {
-  return migrateBackupPackage(input).data;
+  const packageData = migrateBackupPackage(input);
+  if (packageData.indexBooks.length) throw new Error('索引を含むバックアップは「索引検索」画面から復元してください。');
+  return packageData.data;
 }
 const backupApi = { FORMAT, VERSION, normalizeData, normalizePortableIndexBook, normalizeIndexBooks, createBackup, migrateBackupPackage, migrateBackup };
 if (typeof window !== 'undefined') window.MangaReaderBackup = backupApi;
