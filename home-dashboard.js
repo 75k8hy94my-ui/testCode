@@ -1,9 +1,10 @@
 (()=>{
 'use strict';
 const HOME_LAYOUT_KEY = 'mangaReaderHomeCards';
-const DEFAULT_CARD_IDS = ['bookshelf', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
+const DEFAULT_CARD_IDS = ['bookshelf', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 const CARD_CATALOG = Object.freeze({
   bookshelf: Object.freeze({ id: 'bookshelf', title: '本棚', subtitle: '保存した漫画・資料を開く', kind: 'internal', href: 'reader.html#screen=saved-list', badge: 'APP' }),
+  'index-search': Object.freeze({ id: 'index-search', title: '索引検索', subtitle: '教科書の事項・判例・条文索引を横断検索', kind: 'internal', href: 'index-search.html', badge: 'INDEX' }),
   study: Object.freeze({ id: 'study', title: '司法試験学習', subtitle: '科目・論証・過去問・復習', kind: 'internal', href: 'study.html', badge: 'STUDY' }),
   quiz: Object.freeze({ id: 'quiz', title: '定義クイズ', subtitle: '定義を思い出す練習を始める', kind: 'internal', href: 'study.html?view=quiz', badge: 'QUIZ' }),
   links: Object.freeze({ id: 'links', title: 'リンク管理', subtitle: '学習・資料リンクをまとめて開く', kind: 'internal', href: 'links.html', badge: 'APP' }),

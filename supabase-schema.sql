@@ -58,3 +58,89 @@ on public.manga_reader_vaults for update
 to authenticated
 using ((select auth.uid()) = user_id)
 with check ((select auth.uid()) = user_id);
+
+-- 大容量のクライアント側暗号化データを独立同期する汎用チャンク。
+-- 書名・科目・索引語などの平文メタデータは列として保持しない。
+create table if not exists public.manga_reader_encrypted_chunks (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  chunk_id uuid not null,
+  revision bigint not null default 1,
+  payload jsonb not null,
+  deleted_at timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, chunk_id)
+);
+
+alter table public.manga_reader_encrypted_chunks enable row level security;
+
+revoke all on table public.manga_reader_encrypted_chunks from anon, authenticated;
+grant select, insert, update on table public.manga_reader_encrypted_chunks to authenticated;
+
+drop policy if exists "Users can read their own encrypted chunks" on public.manga_reader_encrypted_chunks;
+drop policy if exists "Users can create their own encrypted chunks" on public.manga_reader_encrypted_chunks;
+drop policy if exists "Users can update their own encrypted chunks" on public.manga_reader_encrypted_chunks;
+
+create policy "Users can read their own encrypted chunks"
+on public.manga_reader_encrypted_chunks for select
+to authenticated
+using ((select auth.uid()) = user_id);
+
+create policy "Users can create their own encrypted chunks"
+on public.manga_reader_encrypted_chunks for insert
+to authenticated
+with check ((select auth.uid()) = user_id);
+
+create policy "Users can update their own encrypted chunks"
+on public.manga_reader_encrypted_chunks for update
+to authenticated
+using ((select auth.uid()) = user_id)
+with check ((select auth.uid()) = user_id);
+
+create or replace function public.update_manga_reader_encrypted_chunk(
+  expected_chunk_id uuid,
+  expected_revision bigint,
+  new_payload jsonb
+)
+returns table(revision bigint, updated_at timestamptz, deleted_at timestamptz)
+language sql security invoker
+set search_path = public
+as $$
+  update public.manga_reader_encrypted_chunks
+  set payload = new_payload,
+      revision = manga_reader_encrypted_chunks.revision + 1,
+      deleted_at = null,
+      updated_at = now()
+  where user_id = (select auth.uid())
+    and chunk_id = expected_chunk_id
+    and manga_reader_encrypted_chunks.revision = expected_revision
+    and manga_reader_encrypted_chunks.deleted_at is null
+  returning manga_reader_encrypted_chunks.revision,
+            manga_reader_encrypted_chunks.updated_at,
+            manga_reader_encrypted_chunks.deleted_at;
+$$;
+
+create or replace function public.delete_manga_reader_encrypted_chunk(
+  expected_chunk_id uuid,
+  expected_revision bigint
+)
+returns table(revision bigint, updated_at timestamptz, deleted_at timestamptz)
+language sql security invoker
+set search_path = public
+as $$
+  update public.manga_reader_encrypted_chunks
+  set revision = manga_reader_encrypted_chunks.revision + 1,
+      deleted_at = now(),
+      updated_at = now()
+  where user_id = (select auth.uid())
+    and chunk_id = expected_chunk_id
+    and manga_reader_encrypted_chunks.revision = expected_revision
+    and manga_reader_encrypted_chunks.deleted_at is null
+  returning manga_reader_encrypted_chunks.revision,
+            manga_reader_encrypted_chunks.updated_at,
+            manga_reader_encrypted_chunks.deleted_at;
+$$;
+
+revoke execute on function public.update_manga_reader_encrypted_chunk(uuid, bigint, jsonb) from public, anon;
+revoke execute on function public.delete_manga_reader_encrypted_chunk(uuid, bigint) from public, anon;
+grant execute on function public.update_manga_reader_encrypted_chunk(uuid, bigint, jsonb) to authenticated;
+grant execute on function public.delete_manga_reader_encrypted_chunk(uuid, bigint) to authenticated;

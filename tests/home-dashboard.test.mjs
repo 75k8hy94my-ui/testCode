@@ -5,11 +5,12 @@ import dashboard from '../home-dashboard.js';
 
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 
-const DEFAULT_IDS = ['bookshelf', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
+const DEFAULT_IDS = ['bookshelf', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 
 test('home dashboard starts with useful app and official-law cards', () => {
   assert.deepEqual(dashboard.DEFAULT_CARD_IDS, DEFAULT_IDS);
   for (const id of DEFAULT_IDS) assert.ok(dashboard.CARD_CATALOG[id], `${id} should exist in the card catalog`);
+  assert.equal(dashboard.CARD_CATALOG['index-search'].href, 'index-search.html');
 });
 
 test('home layout normalization keeps order, removes duplicates, and preserves an intentional empty home', () => {
@@ -17,6 +18,12 @@ test('home layout normalization keeps order, removes duplicates, and preserves a
   assert.deepEqual(dashboard.normalizeLayout(['study', 'study', 'unknown', 'bookshelf']), ['study', 'bookshelf']);
   assert.deepEqual(dashboard.normalizeLayout([]), []);
   assert.deepEqual(dashboard.normalizeLayout(['removed-card']), DEFAULT_IDS);
+});
+
+test('existing saved home layouts do not receive the new index card automatically', () => {
+  const storage = new Map([['mangaReaderHomeCards', JSON.stringify(['bookshelf', 'study'])]]);
+  assert.deepEqual(dashboard.loadLayout(storage), ['bookshelf', 'study']);
+  assert.equal(dashboard.hiddenCardIds(['bookshelf', 'study']).includes('index-search'), true);
 });
 
 test('home cards can be added, removed, and reordered without mutating the source layout', () => {
