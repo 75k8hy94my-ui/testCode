@@ -157,7 +157,10 @@ function installBackupActions() {
     restoreButton.disabled = true;
     try {
       const result = await restoreCompleteBackup(file);
-      if (result && !result.cancelled) alert(`バックアップを復元しました。索引 ${result.restoredBooks}冊を再暗号化して同期しました。`);
+      if (result && !result.cancelled) {
+        alert(`バックアップを復元しました。索引 ${result.restoredBooks}冊を再暗号化しました。画面を再読込します。`);
+        window.location.reload();
+      }
     } catch (error) {
       alert(error && error.message ? error.message : 'バックアップを復元できませんでした。');
     } finally {
