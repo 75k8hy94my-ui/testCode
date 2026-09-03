@@ -106,3 +106,79 @@ function migrateBackup(input) {
 const backupApi = { FORMAT, VERSION, normalizeData, normalizeIndexBooks, createBackup, migrateBackup };
 if (typeof window !== 'undefined') window.MangaReaderBackup = backupApi;
 if (typeof module !== 'undefined') module.exports = backupApi;
+
+// reader.html already loads this file. Intercept its existing backup controls in
+// capture phase so v3 can include independently encrypted index chunks without
+// coupling the large reader file to the new index subsystem.
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  let toolsPromise = null;
+  const toolScripts = [
+    ['legal-index-schema.js', 'LegalIndexSchema'],
+    ['encrypted-chunk-crypto.js', 'EncryptedChunkCrypto'],
+    ['encrypted-chunk-cache.js', 'EncryptedChunkCache'],
+    ['encrypted-chunk-sync.js', 'EncryptedChunkSync'],
+    ['legal-index-backup.js', 'LegalIndexBackup']
+  ];
+  function bridgeStatus(message) {
+    const status = document.getElementById('status');
+    if (status) status.textContent = message || '';
+  }
+  function ensureScript(src, globalName) {
+    if (window[globalName]) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script'); script.src = src;
+      script.onload = () => window[globalName] ? resolve() : reject(new Error(`${src} を読み込めませんでした。`));
+      script.onerror = () => reject(new Error(`${src} を読み込めませんでした。`));
+      document.head.append(script);
+    });
+  }
+  function ensureIndexTools() {
+    if (!toolsPromise) toolsPromise = toolScripts.reduce((promise, [src, globalName]) => promise.then(() => ensureScript(src, globalName)), Promise.resolve()).catch((error) => { toolsPromise = null; throw error; });
+    return toolsPromise;
+  }
+  function downloadBackup(value) {
+    const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob); const link = document.createElement('a');
+    link.href = url; link.download = 'manga_reader_backup.json'; document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  async function enhancedExport() {
+    const active = window.MangaVault && window.MangaVault.loadActive();
+    if (!active || !active.rawKey) throw new Error('保管庫を開いてください。');
+    await ensureIndexTools();
+    bridgeStatus('索引を含むバックアップを作成しています…');
+    const books = await window.LegalIndexBackup.exportBooks(active.rawKey);
+    const data = window.MangaVaultPayload.buildFromLocalStorage();
+    downloadBackup(createBackup(data, new Date().toISOString(), books));
+    bridgeStatus(`バックアップを保存しました（索引 ${books.length}冊）。`);
+  }
+  async function enhancedImport(file) {
+    const parsed = migrateBackup(JSON.parse(await file.text()));
+    const active = window.MangaVault && window.MangaVault.loadActive();
+    if (!active || !active.rawKey) throw new Error('保管庫を開いてください。');
+    if (!confirm('読み込んだバックアップで端末の保存内容と索引を置き換えます。よろしいですか？')) return;
+    await ensureIndexTools();
+    const indexBooks = parsed.indexBooks || [];
+    const vaultData = { ...parsed }; delete vaultData.indexBooks;
+    window.MangaVaultPayload.applyToLocalStorage(vaultData);
+    const restored = await window.LegalIndexBackup.restoreBooks(active.rawKey, indexBooks, { replaceExisting: true, syncAfter: typeof navigator !== 'undefined' && navigator.onLine });
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      try { await window.MangaVault.savePayload(window.MangaVaultPayload.buildFromLocalStorage()); } catch (_) {}
+    }
+    bridgeStatus(`バックアップを読み込みました（索引 ${restored.restored}冊）。`);
+    setTimeout(() => location.reload(), 500);
+  }
+  document.addEventListener('click', (event) => {
+    const target = event.target && event.target.closest && event.target.closest('#backupExportBtn');
+    if (!target) return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    enhancedExport().catch((error) => bridgeStatus(error?.message || 'バックアップ保存に失敗しました。'));
+  }, true);
+  document.addEventListener('change', (event) => {
+    const target = event.target;
+    if (!target || target.id !== 'backupFileInput') return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    const file = target.files && target.files[0]; target.value = '';
+    if (file) enhancedImport(file).catch((error) => bridgeStatus(error?.message || 'バックアップ読込に失敗しました。'));
+  }, true);
+}
