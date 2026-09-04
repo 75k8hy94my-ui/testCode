@@ -1,20 +1,4 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-const html = fs.readFileSync(new URL('../roppo.html', import.meta.url), 'utf8');
-
-test('loads statutes from repository JSON rather than e-Gov API', () => {
-  assert.match(html, /data\/roppo\/\$\{encodeURIComponent\(meta\.id\)\}\.json/);
-  assert.doesNotMatch(html, /laws\.e-gov\.go\.jp\/api\/1\/lawdata/);
-});
-
-test('renders paragraph memos', () => {
-  assert.match(html, /paragraphStorageKey/);
-  assert.match(html, /paragraphs\.forEach/);
-  assert.match(html, /項のメモ/);
-});
-
-test('article list uses formal caption instead of body preview', () => {
-  assert.match(html, /article\.caption/);
-  assert.doesNotMatch(html, /bodyText\.slice/);
-});
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';const html=fs.readFileSync(new URL('../roppo.html',import.meta.url),'utf8');
+test('loads statutes from repository JSON rather than e-Gov API',()=>{assert.match(html,/data\/roppo\/\$\{encodeURIComponent\(meta\.id\)\}\.json/);assert.doesNotMatch(html,/laws\.e-gov\.go\.jp\/api\/1\/lawdata/)});
+test('renders structured paragraph memos',()=>{assert.match(html,/paragraphStorageKey/);assert.match(html,/paragraphs\.forEach/);assert.match(html,/MEMO_LABELS/);assert.match(html,/requirements:'要件'/);assert.match(html,/effects:'効果'/);assert.match(html,/definitions:'定義'/);assert.match(html,/purpose:'趣旨'/);assert.doesNotMatch(html,/項のメモ/)});
+test('article list uses formal caption instead of body preview',()=>{assert.match(html,/article\.caption/);assert.doesNotMatch(html,/bodyText\.slice/)});
