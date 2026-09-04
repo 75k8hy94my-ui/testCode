@@ -67,3 +67,12 @@ test('shared rail reserves desktop content space, caps width, and disappears bel
   assert.match(rail, /@media \(max-width: 899px\)/);
   assert.match(rail, /\.appDesktopRailItem\[hidden\]\s*\{\s*display:\s*none\s*!important/);
 });
+
+test('desktop screen-view margins are inert instead of triggering backdrop-close handlers', () => {
+  const rail = read('app-desktop-rail.js');
+  assert.match(rail, /function blockDesktopScreenMarginClick\(event\)/);
+  assert.match(rail, /matchMedia\('\(min-width: 900px\)'\)\.matches/);
+  assert.match(rail, /target\.classList\.contains\('screenView'\)/);
+  assert.match(rail, /event\.stopImmediatePropagation\(\)/);
+  assert.match(rail, /document\.addEventListener\('click', blockDesktopScreenMarginClick, true\)/);
+});
