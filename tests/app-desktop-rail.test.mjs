@@ -4,11 +4,13 @@ import fs from 'node:fs';
 
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 
-test('every authenticated top-level page gets a desktop Liquid Glass rail', () => {
-  for (const page of ['home.html','reader.html','links.html','sync.html','local-reader.html']) {
+test('desktop Liquid Glass rail appears only after the vault is unlocked', () => {
+  for (const page of ['home.html','reader.html','links.html','local-reader.html']) {
     assert.match(read(page), /app-desktop-rail\.js/, `${page} should load the shared rail`);
   }
-  assert.doesNotMatch(read('index.html'), /app-desktop-rail\.js/);
+  for (const page of ['index.html','sync.html']) {
+    assert.doesNotMatch(read(page), /app-desktop-rail\.js/, `${page} should not load the shared rail before vault unlock`);
+  }
   assert.doesNotMatch(read('study.html'), /app-desktop-rail\.js/);
   assert.match(read('study.html'), /@media\(min-width:900px\)[\s\S]*#studyBottomNav\{[^}]*left:18px/);
 });
