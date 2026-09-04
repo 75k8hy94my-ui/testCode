@@ -3,13 +3,14 @@ import assert from 'node:assert/strict';
 import payload from '../vault-payload.js';
 const { DATA_KEYS, normalize, buildFromLocalStorage: buildFromStorage, applyToLocalStorage: applyToStorage } = payload;
 
-const defaultHomeCards = ['bookshelf', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
+const defaultHomeCards = ['bookshelf', 'roppo', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 const defaultIndexSearchSettings = {
   matchModes: { exact: true, partial: true, and: true, fuzzy: true },
   activeKind: 'all',
   selectedSubjects: [],
   selectedBookIds: []
 };
+const emptyRoppoState = { schemaVersion: 1, notes: {}, favorites: [], recent: [], preferences: { selectedGroup: 'constitutional-law', selectedLawId: '321CONSTITUTION' } };
 const emptyStudy = {
   schemaVersion: 1,
   subjects: [
@@ -28,7 +29,7 @@ const emptyStudy = {
 
 test('normalizes legacy payload with empty video library metadata, study state and default home/index settings', () => {
   const value = normalize({ folders: [{ id: 'f1' }], items: [{ id: 'i1' }] });
-  assert.deepEqual(value, { folders: [{ id: 'f1' }], items: [{ id: 'i1' }], videos: [], videoFolders: [], videoMeta: {}, authorCards: [], mangaInfo: {}, toc: {}, lastPages: {}, theme: 'dark', dashboardVisibility: { mobile: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false } }, homeCards: defaultHomeCards, study: emptyStudy, indexSearchSettings: defaultIndexSearchSettings });
+  assert.deepEqual(value, { folders: [{ id: 'f1' }], items: [{ id: 'i1' }], videos: [], videoFolders: [], videoMeta: {}, authorCards: [], mangaInfo: {}, toc: {}, lastPages: {}, theme: 'dark', dashboardVisibility: { mobile: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false } }, homeCards: defaultHomeCards, study: emptyStudy, indexSearchSettings: defaultIndexSearchSettings, roppoState: emptyRoppoState });
 });
 
 test('build and apply preserve every vault field including index search settings', () => {
@@ -41,7 +42,7 @@ test('build and apply preserve every vault field including index search settings
     selectedSubjects: ['民法', '民事訴訟法'],
     selectedBookIds: ['book-1']
   };
-  const input = { folders: [{ id: 'f1' }], items: [{ id: 'i1' }], videos: [{ id: 'v1' }], videoFolders: [{ id: 'vf1', name: '動画' }], videoMeta: { v1: { favorite: true, tags: ['x'], memo: 'note' } }, authorCards: [{ id: 'a1', name: '作者' }], mangaInfo: { a: { count: 10 } }, toc: { a: [{ page: 1 }] }, lastPages: { a: { page: 3 } }, theme: 'light', dashboardVisibility: { mobile: { continue: true, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: true, favorites: false } }, homeCards: ['study', 'bookshelf'], study, indexSearchSettings };
+  const input = { folders: [{ id: 'f1' }], items: [{ id: 'i1' }], videos: [{ id: 'v1' }], videoFolders: [{ id: 'vf1', name: '動画' }], videoMeta: { v1: { favorite: true, tags: ['x'], memo: 'note' } }, authorCards: [{ id: 'a1', name: '作者' }], mangaInfo: { a: { count: 10 } }, toc: { a: [{ page: 1 }] }, lastPages: { a: { page: 3 } }, theme: 'light', dashboardVisibility: { mobile: { continue: true, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: true, favorites: false } }, homeCards: ['study', 'bookshelf'], study, indexSearchSettings, roppoState: emptyRoppoState };
   const storage = new Map();
   applyToStorage(input, storage);
   assert.deepEqual(buildFromStorage(storage), input);
@@ -52,6 +53,7 @@ test('build and apply preserve every vault field including index search settings
   assert.equal(DATA_KEYS.homeCards, 'mangaReaderHomeCards');
   assert.equal(DATA_KEYS.study, 'mangaReaderStudy');
   assert.equal(DATA_KEYS.indexSearchSettings, 'mangaReaderIndexSearchSettings');
+  assert.equal(DATA_KEYS.roppoState, 'mangaReaderRoppoState');
 });
 
 test('index search settings sanitize modes, kind and selection arrays', () => {
@@ -69,14 +71,15 @@ test('index search settings sanitize modes, kind and selection arrays', () => {
   });
 });
 
-test('clearDeviceData removes video library metadata, home, study and index search preferences', () => {
-  const storage = new Map([['mangaReaderVideoFolders', JSON.stringify([{ id: 'vf1', name: '動画' }])], ['mangaReaderVideoMeta', JSON.stringify({ v1: { favorite: true } })], ['mangaReaderHomeCards', JSON.stringify(defaultHomeCards)], ['mangaReaderStudy', JSON.stringify(emptyStudy)], ['mangaReaderIndexSearchSettings', JSON.stringify(defaultIndexSearchSettings)], ['mangaReaderSavedFolders', '[]']]);
+test('clearDeviceData removes video library metadata, home, study, index search, and roppo preferences', () => {
+  const storage = new Map([['mangaReaderVideoFolders', JSON.stringify([{ id: 'vf1', name: '動画' }])], ['mangaReaderVideoMeta', JSON.stringify({ v1: { favorite: true } })], ['mangaReaderHomeCards', JSON.stringify(defaultHomeCards)], ['mangaReaderStudy', JSON.stringify(emptyStudy)], ['mangaReaderIndexSearchSettings', JSON.stringify(defaultIndexSearchSettings)], ['mangaReaderRoppoState', JSON.stringify(emptyRoppoState)], ['mangaReaderSavedFolders', '[]']]);
   payload.clearDeviceData(storage);
   assert.equal(storage.has('mangaReaderVideoFolders'), false);
   assert.equal(storage.has('mangaReaderVideoMeta'), false);
   assert.equal(storage.has('mangaReaderHomeCards'), false);
   assert.equal(storage.has('mangaReaderStudy'), false);
   assert.equal(storage.has('mangaReaderIndexSearchSettings'), false);
+  assert.equal(storage.has('mangaReaderRoppoState'), false);
   assert.equal(storage.has('mangaReaderSavedFolders'), false);
 });
 
