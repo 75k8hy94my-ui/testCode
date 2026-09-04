@@ -13,9 +13,12 @@ test('cleanup RPC is owner-scoped, security invoker, and cannot use retention be
   assert.match(sql, /deleted_at\s*<\s*now\(\)\s*-\s*make_interval\s*\(\s*days\s*=>\s*effective_days\s*\)/i);
 });
 
-test('authenticated DELETE is allowed only through owner RLS and cleanup execute is not public/anon', () => {
+test('authenticated DELETE is owner-scoped and cannot directly delete active or recent chunks', () => {
   assert.match(sql, /grant delete on table public\.manga_reader_encrypted_chunks to authenticated/i);
-  assert.match(sql, /create policy "Users can delete their own encrypted chunks"[\s\S]*for delete[\s\S]*using\s*\(\(select auth\.uid\(\)\)\s*=\s*user_id\)/i);
+  const policy = sql.match(/create policy "Users can delete their own encrypted chunks"[\s\S]*?using\s*\(([\s\S]*?)\);/i)?.[1] || '';
+  assert.match(policy, /\(select auth\.uid\(\)\)\s*=\s*user_id/i);
+  assert.match(policy, /deleted_at\s+is\s+not\s+null/i);
+  assert.match(policy, /deleted_at\s*<\s*now\(\)\s*-\s*interval\s+'90 days'/i);
   assert.match(sql, /revoke execute on function public\.cleanup_manga_reader_encrypted_chunk_tombstones\(integer\) from public\s*,\s*anon/i);
   assert.match(sql, /grant execute on function public\.cleanup_manga_reader_encrypted_chunk_tombstones\(integer\) to authenticated/i);
 });
