@@ -55,8 +55,7 @@ test('roppo page is vault gated, reads repository JSON, and syncs private paragr
   assert.match(source, /項のメモ/);
   assert.match(source, /id=["']roppoSearch["']/);
   assert.match(source, /id=["']favoriteBtn["']/);
-  assert.match(source, /法令データ更新推奨/);
-  assert.match(source, /isLawDataStale/);
+  assert.match(source, /lastSyncedAt/);
 });
 
 test('roppo refresh action is manual-only and keeps the one-month check inside the sync script', () => {
