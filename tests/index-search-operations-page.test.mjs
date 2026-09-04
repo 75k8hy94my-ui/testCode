@@ -37,6 +37,12 @@ test('manual sync, retry controller, prompt copy fallback, and weekly cleanup ar
   assert.match(page, /cleanupRemoteTombstones/);
 });
 
+test('global transport errors stay visible in aggregate sync status', () => {
+  const page = read('index-search-page.js');
+  assert.match(page, /const\s+globalError\s*=\s*\(result\.errors\s*\|\|\s*\[\]\)\.find/);
+  assert.match(page, /errorMap\.set\(['"]__global__['"]\s*,\s*globalError\.error\)/);
+});
+
 test('decrypted user-controlled text is still rendered with textContent rather than dynamic HTML', () => {
   const page = read('index-search-page.js');
   assert.match(page, /textContent\s*=/);
