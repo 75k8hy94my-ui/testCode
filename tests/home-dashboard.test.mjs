@@ -31,8 +31,16 @@ test('home cards can be added, removed, and reordered without mutating the sourc
   assert.deepEqual(source, ['bookshelf', 'study', 'quiz']);
 });
 
-test('saved home layouts remain authoritative and can add index search manually', () => {
-  const storage = new Map([['mangaReaderHomeCards', JSON.stringify(['bookshelf', 'study'])]]);
+test('existing homes receive the statutes card once without re-adding it after user removal', () => {
+  const storage = new Map([['mangaReaderHomeCards', JSON.stringify(['bookshelf', 'index-search', 'study'])]]);
+  assert.deepEqual(dashboard.loadLayout(storage), ['bookshelf', 'index-search', 'statutes', 'study']);
+  assert.equal(storage.get(dashboard.HOME_LAYOUT_STATUTES_MIGRATION_KEY), '1');
+  dashboard.saveLayout(['bookshelf', 'study'], storage);
+  assert.deepEqual(dashboard.loadLayout(storage), ['bookshelf', 'study']);
+});
+
+test('saved migrated home layouts remain authoritative and can add index search manually', () => {
+  const storage = new Map([['mangaReaderHomeCards', JSON.stringify(['bookshelf', 'study'])], [dashboard.HOME_LAYOUT_STATUTES_MIGRATION_KEY, '1']]);
   assert.deepEqual(dashboard.loadLayout(storage), ['bookshelf', 'study']);
   assert.equal(dashboard.hiddenCardIds(['bookshelf', 'study']).includes('index-search'), true);
   assert.deepEqual(dashboard.addCard(['bookshelf', 'study'], 'index-search'), ['bookshelf', 'study', 'index-search']);
