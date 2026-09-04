@@ -5,97 +5,49 @@ const { DATA_KEYS, normalize, buildFromLocalStorage: buildFromStorage, applyToLo
 
 const defaultHomeCards = ['bookshelf', 'roppo', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 const defaultIndexSearchSettings = {
-  matchModes: { exact: true, partial: true, and: true, fuzzy: true },
-  activeKind: 'all',
-  selectedSubjects: [],
-  selectedBookIds: []
+  matchModes: { exact: true, partial: true, and: true, fuzzy: true }, activeKind: 'all', selectedSubjects: [], selectedBookIds: []
 };
-const emptyRoppoState = { schemaVersion: 1, notes: {}, favorites: [], recent: [], preferences: { selectedGroup: 'constitutional-law', selectedLawId: '321CONSTITUTION' } };
+const emptyRoppoState = { schemaVersion: 2, notes: {}, favorites: [], recent: [], preferences: { selectedGroup: 'constitutional-law', selectedLawId: '321CONSTITUTION' } };
 const emptyStudy = {
   schemaVersion: 1,
   subjects: [
-    { id: 'constitutional-law', name: '憲法' },
-    { id: 'administrative-law', name: '行政法' },
-    { id: 'civil-law', name: '民法' },
-    { id: 'commercial-law', name: '商法' },
-    { id: 'civil-procedure', name: '民事訴訟法' },
-    { id: 'criminal-law', name: '刑法' },
-    { id: 'criminal-procedure', name: '刑事訴訟法' },
-    { id: 'labor-law', name: '労働法' }
-  ],
-  genres: [], definitions: [], arguments: [], argumentDrafts: {}, argumentProgress: {}, recentAttempts: [], progress: {}, pendingGradings: [], pendingSyncOps: [], appliedOperationIds: [],
-  gamification: { xp: 0, streak: 0, lastStudyDate: null }, preferences: { autoSpeak: false }
+    { id: 'constitutional-law', name: '憲法' }, { id: 'administrative-law', name: '行政法' }, { id: 'civil-law', name: '民法' }, { id: 'commercial-law', name: '商法' },
+    { id: 'civil-procedure', name: '民事訴訟法' }, { id: 'criminal-law', name: '刑法' }, { id: 'criminal-procedure', name: '刑事訴訟法' }, { id: 'labor-law', name: '労働法' }
+  ], genres: [], definitions: [], arguments: [], argumentDrafts: {}, argumentProgress: {}, recentAttempts: [], progress: {}, pendingGradings: [], pendingSyncOps: [], appliedOperationIds: [], gamification: { xp: 0, streak: 0, lastStudyDate: null }, preferences: { autoSpeak: false }
 };
 
 test('normalizes legacy payload with empty video library metadata, study state and default home/index settings', () => {
   const value = normalize({ folders: [{ id: 'f1' }], items: [{ id: 'i1' }] });
   assert.equal(value.statuteNotes && typeof value.statuteNotes, 'object');
+  assert.equal(value.roppoState.schemaVersion, 2);
+});
+
+test('legacy article-level roppo memo migrates to paragraph 1 inside encrypted payload', () => {
+  const value = normalize({ roppoState: { schemaVersion: 1, notes: { '129AC0000000089|Article_95': { text: '旧メモ', updatedAt: '' } }, favorites: [], recent: [], preferences: {} } });
+  assert.equal(value.roppoState.schemaVersion, 2);
+  assert.equal(value.roppoState.notes['129AC0000000089|Article_95|1'].text, '旧メモ');
 });
 
 test('build and apply preserve every vault field including index search settings', () => {
-  const study = structuredClone(emptyStudy);
-  study.preferences.autoSpeak = true;
-  study.argumentDrafts['new'] = { argumentId: null, title: '途中', body: '下書き本文', savedAt: '2026-08-28T00:00:00.000Z' };
-  const indexSearchSettings = {
-    matchModes: { exact: true, partial: false, and: true, fuzzy: false },
-    activeKind: 'case',
-    selectedSubjects: ['民法', '民事訴訟法'],
-    selectedBookIds: ['book-1']
-  };
+  const study = structuredClone(emptyStudy); study.preferences.autoSpeak = true; study.argumentDrafts['new'] = { argumentId: null, title: '途中', body: '下書き本文', savedAt: '2026-08-28T00:00:00.000Z' };
+  const indexSearchSettings = { matchModes: { exact: true, partial: false, and: true, fuzzy: false }, activeKind: 'case', selectedSubjects: ['民法', '民事訴訟法'], selectedBookIds: ['book-1'] };
   const input = { folders: [{ id: 'f1' }], items: [{ id: 'i1' }], videos: [{ id: 'v1' }], videoFolders: [{ id: 'vf1', name: '動画' }], videoMeta: { v1: { favorite: true, tags: ['x'], memo: 'note' } }, authorCards: [{ id: 'a1', name: '作者' }], mangaInfo: { a: { count: 10 } }, toc: { a: [{ page: 1 }] }, lastPages: { a: { page: 3 } }, theme: 'light', dashboardVisibility: { mobile: { continue: true, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: true, favorites: false } }, homeCards: ['study', 'bookshelf'], study, indexSearchSettings, roppoState: emptyRoppoState, statuteNotes: {} };
-  const storage = new Map();
-  applyToStorage(input, storage);
-  assert.deepEqual(buildFromStorage(storage), input);
-  assert.equal(DATA_KEYS.videoFolders, 'mangaReaderVideoFolders');
-  assert.equal(DATA_KEYS.videoMeta, 'mangaReaderVideoMeta');
-  assert.equal(DATA_KEYS.authorCards, 'mangaReaderAuthorCards');
-  assert.equal(DATA_KEYS.dashboardVisibility, 'mangaReaderDashboardVisibility');
-  assert.equal(DATA_KEYS.homeCards, 'mangaReaderHomeCards');
-  assert.equal(DATA_KEYS.study, 'mangaReaderStudy');
-  assert.equal(DATA_KEYS.indexSearchSettings, 'mangaReaderIndexSearchSettings');
-  assert.equal(DATA_KEYS.roppoState, 'mangaReaderRoppoState');
-  assert.equal(DATA_KEYS.statuteNotes, 'mangaReaderStatuteNotes');
+  const storage = new Map(); applyToStorage(input, storage); assert.deepEqual(buildFromStorage(storage), input);
+  assert.equal(DATA_KEYS.videoFolders, 'mangaReaderVideoFolders'); assert.equal(DATA_KEYS.videoMeta, 'mangaReaderVideoMeta'); assert.equal(DATA_KEYS.authorCards, 'mangaReaderAuthorCards'); assert.equal(DATA_KEYS.dashboardVisibility, 'mangaReaderDashboardVisibility'); assert.equal(DATA_KEYS.homeCards, 'mangaReaderHomeCards'); assert.equal(DATA_KEYS.study, 'mangaReaderStudy'); assert.equal(DATA_KEYS.indexSearchSettings, 'mangaReaderIndexSearchSettings'); assert.equal(DATA_KEYS.roppoState, 'mangaReaderRoppoState'); assert.equal(DATA_KEYS.statuteNotes, 'mangaReaderStatuteNotes');
 });
 
 test('index search settings sanitize modes, kind and selection arrays', () => {
-  const normalized = normalize({ indexSearchSettings: {
-    matchModes: { exact: false, partial: true, and: 'yes', fuzzy: 1 },
-    activeKind: 'unknown',
-    selectedSubjects: ['民法', '', 123],
-    selectedBookIds: ['book-1', null]
-  } }).indexSearchSettings;
-  assert.deepEqual(normalized, {
-    matchModes: { exact: false, partial: true, and: true, fuzzy: true },
-    activeKind: 'all',
-    selectedSubjects: ['民法', '123'],
-    selectedBookIds: ['book-1']
-  });
+  const normalized = normalize({ indexSearchSettings: { matchModes: { exact: false, partial: true, and: 'yes', fuzzy: 1 }, activeKind: 'unknown', selectedSubjects: ['民法', '', 123], selectedBookIds: ['book-1', null] } }).indexSearchSettings;
+  assert.deepEqual(normalized, { matchModes: { exact: false, partial: true, and: true, fuzzy: true }, activeKind: 'all', selectedSubjects: ['民法', '123'], selectedBookIds: ['book-1'] });
 });
 
 test('clearDeviceData removes video library metadata, home, study, index search, and roppo preferences', () => {
   const storage = new Map([['mangaReaderVideoFolders', JSON.stringify([{ id: 'vf1', name: '動画' }])], ['mangaReaderVideoMeta', JSON.stringify({ v1: { favorite: true } })], ['mangaReaderHomeCards', JSON.stringify(defaultHomeCards)], ['mangaReaderStudy', JSON.stringify(emptyStudy)], ['mangaReaderIndexSearchSettings', JSON.stringify(defaultIndexSearchSettings)], ['mangaReaderRoppoState', JSON.stringify(emptyRoppoState)], ['mangaReaderSavedFolders', '[]']]);
-  payload.clearDeviceData(storage);
-  assert.equal(storage.has('mangaReaderVideoFolders'), false);
-  assert.equal(storage.has('mangaReaderVideoMeta'), false);
-  assert.equal(storage.has('mangaReaderHomeCards'), false);
-  assert.equal(storage.has('mangaReaderStudy'), false);
-  assert.equal(storage.has('mangaReaderIndexSearchSettings'), false);
-  assert.equal(storage.has('mangaReaderRoppoState'), false);
-  assert.equal(storage.has('mangaReaderSavedFolders'), false);
+  payload.clearDeviceData(storage); ['mangaReaderVideoFolders','mangaReaderVideoMeta','mangaReaderHomeCards','mangaReaderStudy','mangaReaderIndexSearchSettings','mangaReaderRoppoState','mangaReaderSavedFolders'].forEach(key=>assert.equal(storage.has(key),false));
 });
 
 test('apply rolls back all device keys when storage fails partway through', () => {
-  const values = new Map([
-    ['mangaReaderSavedFolders', JSON.stringify([{ id: 'old-folder' }])],
-    ['mangaReaderSavedItems', JSON.stringify([{ id: 'old-item' }])],
-  ]);
-  let writes = 0;
-  const storage = {
-    getItem(key) { return values.get(key) ?? null; },
-    setItem(key, value) { writes += 1; if (writes === 2) throw new Error('quota'); values.set(key, value); },
-    removeItem(key) { values.delete(key); },
-  };
-  assert.throws(() => payload.applyToLocalStorage({ folders: [{ id: 'new-folder' }], items: [{ id: 'new-item' }] }, storage), /quota/);
-  assert.deepEqual(JSON.parse(values.get('mangaReaderSavedFolders')), [{ id: 'old-folder' }]);
-  assert.deepEqual(JSON.parse(values.get('mangaReaderSavedItems')), [{ id: 'old-item' }]);
+  const values = new Map([['mangaReaderSavedFolders', JSON.stringify([{ id: 'old-folder' }])], ['mangaReaderSavedItems', JSON.stringify([{ id: 'old-item' }])]]); let writes = 0;
+  const storage = { getItem(key) { return values.get(key) ?? null; }, setItem(key, value) { writes += 1; if (writes === 2) throw new Error('quota'); values.set(key, value); }, removeItem(key) { values.delete(key); } };
+  assert.throws(() => payload.applyToLocalStorage({ folders: [{ id: 'new-folder' }], items: [{ id: 'new-item' }] }, storage), /quota/); assert.deepEqual(JSON.parse(values.get('mangaReaderSavedFolders')), [{ id: 'old-folder' }]); assert.deepEqual(JSON.parse(values.get('mangaReaderSavedItems')), [{ id: 'old-item' }]);
 });
