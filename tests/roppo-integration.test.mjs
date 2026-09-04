@@ -58,6 +58,14 @@ test('roppo page is vault gated, reads repository JSON, and syncs private paragr
   assert.match(source, /lastSyncedAt/);
 });
 
+test('clearing roppo search keeps the article selected from search results', () => {
+  const source = read('roppo.html');
+  assert.match(source, /currentArticleKey/);
+  assert.match(source, /currentArticleKey=article\.key/);
+  assert.match(source, /const selectedKey=currentArticleKey/);
+  assert.match(source, /visibleArticles\.findIndex\([^)]*\.key===selectedKey\)/);
+});
+
 test('roppo refresh action is manual-only and keeps the one-month check inside the sync script', () => {
   const source = read('.github/workflows/roppo-sync.yml');
   assert.match(source, /workflow_dispatch/);
