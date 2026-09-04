@@ -7,123 +7,26 @@ const DATA_KEYS = {
 const defaultDashboardVisibility = { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false };
 const defaultHomeCards = ['bookshelf', 'roppo', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 const defaultIndexSearchSettings = { matchModes: { exact: true, partial: true, and: true, fuzzy: true }, activeKind: 'all', selectedSubjects: [], selectedBookIds: [] };
-const defaultRoppoState = { schemaVersion: 1, notes: {}, favorites: [], recent: [], preferences: { selectedGroup: 'constitutional-law', selectedLawId: '321CONSTITUTION' } };
-const roppoGroups = {
-  'constitutional-law': ['321CONSTITUTION'], 'civil-law': ['129AC0000000089'], 'criminal-law': ['140AC0000000045'],
-  'civil-procedure': ['408AC0000000109'], 'criminal-procedure': ['323AC0000000131'],
-  'administrative-law': ['405AC0000000088', '337AC0000000139', '426AC0000000068', '322AC0000000125'], 'company-law': ['417AC0000000086']
-};
+const defaultRoppoState = { schemaVersion: 2, notes: {}, favorites: [], recent: [], preferences: { selectedGroup: 'constitutional-law', selectedLawId: '321CONSTITUTION' } };
+const roppoGroups = {'constitutional-law':['321CONSTITUTION'],'civil-law':['129AC0000000089'],'criminal-law':['140AC0000000045'],'civil-procedure':['408AC0000000109'],'criminal-procedure':['323AC0000000131'],'administrative-law':['405AC0000000088','337AC0000000139','426AC0000000068','322AC0000000125'],'company-law':['417AC0000000086']};
 const roppoLawIds = new Set(Object.values(roppoGroups).flat());
-const defaultStudySubjects = [
-  { id: 'constitutional-law', name: '憲法' }, { id: 'administrative-law', name: '行政法' },
-  { id: 'civil-law', name: '民法' }, { id: 'commercial-law', name: '商法' },
-  { id: 'civil-procedure', name: '民事訴訟法' }, { id: 'criminal-law', name: '刑法' },
-  { id: 'criminal-procedure', name: '刑事訴訟法' }, { id: 'labor-law', name: '労働法' }
-];
-const createEmptyStudy = () => ({
-  schemaVersion: 1,
-  subjects: defaultStudySubjects.map((item) => ({ ...item })),
-  genres: [], definitions: [], arguments: [], argumentDrafts: {}, argumentProgress: {}, recentAttempts: [], progress: {}, pendingGradings: [], pendingSyncOps: [], appliedOperationIds: [],
-  gamification: { xp: 0, streak: 0, lastStudyDate: null }, preferences: { autoSpeak: false }
-});
-const cloneIndexSearchSettings = () => ({ matchModes: { ...defaultIndexSearchSettings.matchModes }, activeKind: 'all', selectedSubjects: [], selectedBookIds: [] });
-const cloneRoppoState = () => ({ schemaVersion: 1, notes: {}, favorites: [], recent: [], preferences: { ...defaultRoppoState.preferences } });
-const defaults = { folders: [], items: [], videos: [], videoFolders: [], videoMeta: {}, authorCards: [], mangaInfo: {}, toc: {}, lastPages: {}, theme: 'dark', dashboardVisibility: { mobile: { ...defaultDashboardVisibility }, desktop: { ...defaultDashboardVisibility } }, homeCards: defaultHomeCards.slice(), study: createEmptyStudy(), indexSearchSettings: cloneIndexSearchSettings(), roppoState: cloneRoppoState(), statuteNotes: {} };
-const isObject = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-const normalizeDashboardProfile = (value) => {
-  const result = { ...defaultDashboardVisibility };
-  const source = isObject(value);
-  Object.keys(result).forEach((key) => { if (typeof source[key] === 'boolean') result[key] = source[key]; });
-  return result;
-};
-const normalizeDashboardVisibility = (value) => {
-  const source = isObject(value);
-  if (source.mobile && source.desktop) return { mobile: normalizeDashboardProfile(source.mobile), desktop: normalizeDashboardProfile(source.desktop) };
-  return { mobile: normalizeDashboardProfile(), desktop: normalizeDashboardProfile() };
-};
-const normalizeHomeCards = (value) => Array.isArray(value) ? value.map((id) => String(id || '')).filter(Boolean) : defaultHomeCards.slice();
-const normalizeStringArray = (value) => Array.isArray(value) ? value.map((item) => String(item ?? '').trim()).filter(Boolean) : [];
-function normalizeIndexSearchSettings(value) {
-  const source = isObject(value);
-  const modes = isObject(source.matchModes);
-  const allowedKinds = new Set(['all', 'matter', 'case', 'statute']);
-  return {
-    matchModes: {
-      exact: modes.exact === undefined ? true : Boolean(modes.exact), partial: modes.partial === undefined ? true : Boolean(modes.partial),
-      and: modes.and === undefined ? true : Boolean(modes.and), fuzzy: modes.fuzzy === undefined ? true : Boolean(modes.fuzzy)
-    },
-    activeKind: allowedKinds.has(source.activeKind) ? source.activeKind : 'all',
-    selectedSubjects: normalizeStringArray(source.selectedSubjects), selectedBookIds: normalizeStringArray(source.selectedBookIds)
-  };
-}
-function normalizeRoppoState(value) {
-  const source = isObject(value);
-  const notes = {};
-  Object.entries(isObject(source.notes)).forEach(([key, note]) => {
-    const n = isObject(note);
-    if (!key.includes('|') || typeof n.text !== 'string' || !n.text.trim()) return;
-    notes[key] = { text: n.text, updatedAt: typeof n.updatedAt === 'string' ? n.updatedAt : '' };
-  });
-  const seenFavorites = new Set();
-  const favorites = [];
-  (Array.isArray(source.favorites) ? source.favorites : []).forEach((key) => {
-    if (typeof key !== 'string' || !key.includes('|') || seenFavorites.has(key)) return;
-    seenFavorites.add(key); favorites.push(key);
-  });
-  const recent = [];
-  const seenRecent = new Set();
-  (Array.isArray(source.recent) ? source.recent : []).forEach((entry) => {
-    const item = isObject(entry); const lawId = String(item.lawId || '').trim(); const articleKey = String(item.articleKey || '').trim();
-    const key = `${lawId}|${articleKey}`;
-    if (!roppoLawIds.has(lawId) || !articleKey || seenRecent.has(key)) return;
-    seenRecent.add(key); recent.push({ lawId, articleKey, viewedAt: typeof item.viewedAt === 'string' ? item.viewedAt : '' });
-  });
-  const prefs = isObject(source.preferences);
-  const selectedGroup = roppoGroups[prefs.selectedGroup] ? prefs.selectedGroup : defaultRoppoState.preferences.selectedGroup;
-  const selectedLawId = roppoGroups[selectedGroup].includes(prefs.selectedLawId) ? prefs.selectedLawId : roppoGroups[selectedGroup][0];
-  return { schemaVersion: 1, notes, favorites, recent: recent.slice(0, 50), preferences: { selectedGroup, selectedLawId } };
-}
-function normalizeStatuteNotes(value) {
-  const result = {};
-  Object.entries(isObject(value)).forEach(([key, note]) => {
-    if (!note || typeof note !== 'object' || Array.isArray(note)) return;
-    const text = String(note.text ?? '').trim(); if (!text) return;
-    result[String(key).trim()] = { text, updatedAt: Number(note.updatedAt) > 0 ? Number(note.updatedAt) : Date.now(), tags: normalizeStringArray(note.tags) };
-  });
-  return result;
-}
-function normalizeStudyForVault(value) {
-  const x = isObject(value); const base = createEmptyStudy();
-  return {
-    schemaVersion: 1, subjects: Array.isArray(x.subjects) && x.subjects.length ? x.subjects : base.subjects, genres: Array.isArray(x.genres) ? x.genres : [],
-    definitions: Array.isArray(x.definitions) ? x.definitions : [], arguments: Array.isArray(x.arguments) ? x.arguments : [], argumentDrafts: isObject(x.argumentDrafts),
-    argumentProgress: isObject(x.argumentProgress), recentAttempts: Array.isArray(x.recentAttempts) ? x.recentAttempts : [], progress: isObject(x.progress),
-    pendingGradings: Array.isArray(x.pendingGradings) ? x.pendingGradings : [], pendingSyncOps: Array.isArray(x.pendingSyncOps) ? x.pendingSyncOps : [], appliedOperationIds: Array.isArray(x.appliedOperationIds) ? x.appliedOperationIds : [],
-    gamification: { ...base.gamification, ...isObject(x.gamification) }, preferences: { ...base.preferences, ...isObject(x.preferences) }
-  };
-}
-function normalize(value) {
-  const x = value && typeof value === 'object' ? value : {};
-  return { folders: Array.isArray(x.folders) ? x.folders : [], items: Array.isArray(x.items) ? x.items : [], videos: Array.isArray(x.videos) ? x.videos : [], videoFolders: Array.isArray(x.videoFolders) ? x.videoFolders : [], videoMeta: isObject(x.videoMeta), authorCards: Array.isArray(x.authorCards) ? x.authorCards : [], mangaInfo: isObject(x.mangaInfo), toc: isObject(x.toc), lastPages: isObject(x.lastPages), theme: x.theme === 'light' ? 'light' : 'dark', dashboardVisibility: normalizeDashboardVisibility(x.dashboardVisibility), homeCards: normalizeHomeCards(x.homeCards), study: normalizeStudyForVault(x.study), indexSearchSettings: normalizeIndexSearchSettings(x.indexSearchSettings), roppoState: normalizeRoppoState(x.roppoState), statuteNotes: normalizeStatuteNotes(x.statuteNotes) };
-}
-function read(storage, key, fallback) { try { const raw = storage.getItem ? storage.getItem(key) : storage.get(key); return raw == null ? fallback : JSON.parse(raw); } catch (_) { return fallback; } }
-function rawValue(storage, key) { return storage.getItem ? storage.getItem(key) : (storage.get(key) ?? null); }
-function setRaw(storage, key, value) { if (storage.setItem) storage.setItem(key, value); else storage.set(key, value); }
-function removeRaw(storage, key) { if (storage.removeItem) storage.removeItem(key); else storage.delete(key); }
-function write(storage, key, value) { setRaw(storage, key, JSON.stringify(value)); }
-function readTheme(storage) {
-  const raw = rawValue(storage, DATA_KEYS.theme);
-  return String(raw ?? '').replace(/^"|"$/g, '').trim() === 'light' ? 'light' : 'dark';
-}
-function buildFromStorage(storage = globalThis.localStorage) {
-  return normalize({ folders: read(storage, DATA_KEYS.folders, []), items: read(storage, DATA_KEYS.items, []), videos: read(storage, DATA_KEYS.videos, []), videoFolders: read(storage, DATA_KEYS.videoFolders, []), videoMeta: read(storage, DATA_KEYS.videoMeta, {}), authorCards: read(storage, DATA_KEYS.authorCards, []), mangaInfo: read(storage, DATA_KEYS.mangaInfo, {}), toc: read(storage, DATA_KEYS.toc, {}), lastPages: read(storage, DATA_KEYS.lastPages, {}), theme: readTheme(storage), dashboardVisibility: read(storage, DATA_KEYS.dashboardVisibility, {}), homeCards: read(storage, DATA_KEYS.homeCards, defaultHomeCards), study: read(storage, DATA_KEYS.study, {}), indexSearchSettings: read(storage, DATA_KEYS.indexSearchSettings, defaultIndexSearchSettings), roppoState: read(storage, DATA_KEYS.roppoState, defaultRoppoState), statuteNotes: read(storage, DATA_KEYS.statuteNotes, {}) });
-}
-function applyToStorage(payload, storage = globalThis.localStorage) {
-  const data = normalize(payload); const snapshot = new Map(Object.values(DATA_KEYS).map((key) => [key, rawValue(storage, key)]));
-  try { Object.entries(DATA_KEYS).forEach(([name, key]) => write(storage, key, data[name])); return data; }
-  catch (error) { snapshot.forEach((value, key) => { try { if (value == null) removeRaw(storage, key); else setRaw(storage, key, value); } catch (_) {} }); throw error; }
-}
-function clearDeviceData(storage = globalThis.localStorage) { Object.values(DATA_KEYS).forEach((key) => { if (storage.removeItem) storage.removeItem(key); else storage.delete(key); }); }
-const api = { DATA_KEYS, defaults, normalize, buildFromLocalStorage: buildFromStorage, applyToLocalStorage: applyToStorage, clearDeviceData, normalizeIndexSearchSettings, normalizeRoppoState, normalizeStatuteNotes };
-if (typeof window !== 'undefined') window.MangaVaultPayload = api;
-if (typeof module !== 'undefined') module.exports = api;
+const defaultStudySubjects = [{id:'constitutional-law',name:'憲法'},{id:'administrative-law',name:'行政法'},{id:'civil-law',name:'民法'},{id:'commercial-law',name:'商法'},{id:'civil-procedure',name:'民事訴訟法'},{id:'criminal-law',name:'刑法'},{id:'criminal-procedure',name:'刑事訴訟法'},{id:'labor-law',name:'労働法'}];
+const createEmptyStudy=()=>({schemaVersion:1,subjects:defaultStudySubjects.map(item=>({...item})),genres:[],definitions:[],arguments:[],argumentDrafts:{},argumentProgress:{},recentAttempts:[],progress:{},pendingGradings:[],pendingSyncOps:[],appliedOperationIds:[],gamification:{xp:0,streak:0,lastStudyDate:null},preferences:{autoSpeak:false}});
+const cloneIndexSearchSettings=()=>({matchModes:{...defaultIndexSearchSettings.matchModes},activeKind:'all',selectedSubjects:[],selectedBookIds:[]});
+const cloneRoppoState=()=>({schemaVersion:2,notes:{},favorites:[],recent:[],preferences:{...defaultRoppoState.preferences}});
+const defaults={folders:[],items:[],videos:[],videoFolders:[],videoMeta:{},authorCards:[],mangaInfo:{},toc:{},lastPages:{},theme:'dark',dashboardVisibility:{mobile:{...defaultDashboardVisibility},desktop:{...defaultDashboardVisibility}},homeCards:defaultHomeCards.slice(),study:createEmptyStudy(),indexSearchSettings:cloneIndexSearchSettings(),roppoState:cloneRoppoState(),statuteNotes:{}};
+const isObject=value=>value&&typeof value==='object'&&!Array.isArray(value)?value:{};
+const normalizeDashboardProfile=value=>{const result={...defaultDashboardVisibility},source=isObject(value);Object.keys(result).forEach(key=>{if(typeof source[key]==='boolean')result[key]=source[key];});return result;};
+const normalizeDashboardVisibility=value=>{const source=isObject(value);return source.mobile&&source.desktop?{mobile:normalizeDashboardProfile(source.mobile),desktop:normalizeDashboardProfile(source.desktop)}:{mobile:normalizeDashboardProfile(),desktop:normalizeDashboardProfile()};};
+const normalizeHomeCards=value=>Array.isArray(value)?value.map(id=>String(id||'')).filter(Boolean):defaultHomeCards.slice();
+const normalizeStringArray=value=>Array.isArray(value)?value.map(item=>String(item??'').trim()).filter(Boolean):[];
+function normalizeIndexSearchSettings(value){const source=isObject(value),modes=isObject(source.matchModes),allowedKinds=new Set(['all','matter','case','statute']);return{matchModes:{exact:modes.exact===undefined?true:Boolean(modes.exact),partial:modes.partial===undefined?true:Boolean(modes.partial),and:modes.and===undefined?true:Boolean(modes.and),fuzzy:modes.fuzzy===undefined?true:Boolean(modes.fuzzy)},activeKind:allowedKinds.has(source.activeKind)?source.activeKind:'all',selectedSubjects:normalizeStringArray(source.selectedSubjects),selectedBookIds:normalizeStringArray(source.selectedBookIds)};}
+function normalizeRoppoState(value){const source=isObject(value),sourceVersion=Number(source.schemaVersion)||1,notes={};Object.entries(isObject(source.notes)).forEach(([rawKey,note])=>{const n=isObject(note);if(typeof n.text!=='string'||!n.text.trim())return;const parts=rawKey.split('|');let key=rawKey;if(sourceVersion<2&&parts.length===2)key=`${rawKey}|1`;if(key.split('|').length!==3)return;notes[key]={text:n.text,updatedAt:typeof n.updatedAt==='string'?n.updatedAt:''};});const seenFavorites=new Set(),favorites=[];(Array.isArray(source.favorites)?source.favorites:[]).forEach(key=>{if(typeof key!=='string'||key.split('|').length!==2||seenFavorites.has(key))return;seenFavorites.add(key);favorites.push(key);});const recent=[],seenRecent=new Set();(Array.isArray(source.recent)?source.recent:[]).forEach(entry=>{const item=isObject(entry),lawId=String(item.lawId||'').trim(),articleKey=String(item.articleKey||'').trim(),key=`${lawId}|${articleKey}`;if(!roppoLawIds.has(lawId)||!articleKey||seenRecent.has(key))return;seenRecent.add(key);recent.push({lawId,articleKey,viewedAt:typeof item.viewedAt==='string'?item.viewedAt:''});});const prefs=isObject(source.preferences),selectedGroup=roppoGroups[prefs.selectedGroup]?prefs.selectedGroup:defaultRoppoState.preferences.selectedGroup,selectedLawId=roppoGroups[selectedGroup].includes(prefs.selectedLawId)?prefs.selectedLawId:roppoGroups[selectedGroup][0];return{schemaVersion:2,notes,favorites,recent:recent.slice(0,50),preferences:{selectedGroup,selectedLawId}};}
+function normalizeStatuteNotes(value){const result={};Object.entries(isObject(value)).forEach(([key,note])=>{if(!note||typeof note!=='object'||Array.isArray(note))return;const text=String(note.text??'').trim();if(!text)return;result[String(key).trim()]={text,updatedAt:Number(note.updatedAt)>0?Number(note.updatedAt):Date.now(),tags:normalizeStringArray(note.tags)};});return result;}
+function normalizeStudyForVault(value){const x=isObject(value),base=createEmptyStudy();return{schemaVersion:1,subjects:Array.isArray(x.subjects)&&x.subjects.length?x.subjects:base.subjects,genres:Array.isArray(x.genres)?x.genres:[],definitions:Array.isArray(x.definitions)?x.definitions:[],arguments:Array.isArray(x.arguments)?x.arguments:[],argumentDrafts:isObject(x.argumentDrafts),argumentProgress:isObject(x.argumentProgress),recentAttempts:Array.isArray(x.recentAttempts)?x.recentAttempts:[],progress:isObject(x.progress),pendingGradings:Array.isArray(x.pendingGradings)?x.pendingGradings:[],pendingSyncOps:Array.isArray(x.pendingSyncOps)?x.pendingSyncOps:[],appliedOperationIds:Array.isArray(x.appliedOperationIds)?x.appliedOperationIds:[],gamification:{...base.gamification,...isObject(x.gamification)},preferences:{...base.preferences,...isObject(x.preferences)}};}
+function normalize(value){const x=value&&typeof value==='object'?value:{};return{folders:Array.isArray(x.folders)?x.folders:[],items:Array.isArray(x.items)?x.items:[],videos:Array.isArray(x.videos)?x.videos:[],videoFolders:Array.isArray(x.videoFolders)?x.videoFolders:[],videoMeta:isObject(x.videoMeta),authorCards:Array.isArray(x.authorCards)?x.authorCards:[],mangaInfo:isObject(x.mangaInfo),toc:isObject(x.toc),lastPages:isObject(x.lastPages),theme:x.theme==='light'?'light':'dark',dashboardVisibility:normalizeDashboardVisibility(x.dashboardVisibility),homeCards:normalizeHomeCards(x.homeCards),study:normalizeStudyForVault(x.study),indexSearchSettings:normalizeIndexSearchSettings(x.indexSearchSettings),roppoState:normalizeRoppoState(x.roppoState),statuteNotes:normalizeStatuteNotes(x.statuteNotes)};}
+function read(storage,key,fallback){try{const raw=storage.getItem?storage.getItem(key):storage.get(key);return raw==null?fallback:JSON.parse(raw);}catch(_){return fallback;}}function rawValue(storage,key){return storage.getItem?storage.getItem(key):(storage.get(key)??null);}function setRaw(storage,key,value){if(storage.setItem)storage.setItem(key,value);else storage.set(key,value);}function removeRaw(storage,key){if(storage.removeItem)storage.removeItem(key);else storage.delete(key);}function write(storage,key,value){setRaw(storage,key,JSON.stringify(value));}function readTheme(storage){const raw=rawValue(storage,DATA_KEYS.theme);return String(raw??'').replace(/^"|"$/g,'').trim()==='light'?'light':'dark';}
+function buildFromStorage(storage=globalThis.localStorage){return normalize({folders:read(storage,DATA_KEYS.folders,[]),items:read(storage,DATA_KEYS.items,[]),videos:read(storage,DATA_KEYS.videos,[]),videoFolders:read(storage,DATA_KEYS.videoFolders,[]),videoMeta:read(storage,DATA_KEYS.videoMeta,{}),authorCards:read(storage,DATA_KEYS.authorCards,[]),mangaInfo:read(storage,DATA_KEYS.mangaInfo,{}),toc:read(storage,DATA_KEYS.toc,{}),lastPages:read(storage,DATA_KEYS.lastPages,{}),theme:readTheme(storage),dashboardVisibility:read(storage,DATA_KEYS.dashboardVisibility,{}),homeCards:read(storage,DATA_KEYS.homeCards,defaultHomeCards),study:read(storage,DATA_KEYS.study,{}),indexSearchSettings:read(storage,DATA_KEYS.indexSearchSettings,defaultIndexSearchSettings),roppoState:read(storage,DATA_KEYS.roppoState,defaultRoppoState),statuteNotes:read(storage,DATA_KEYS.statuteNotes,{})});}
+function applyToStorage(payload,storage=globalThis.localStorage){const data=normalize(payload),snapshot=new Map(Object.values(DATA_KEYS).map(key=>[key,rawValue(storage,key)]));try{Object.entries(DATA_KEYS).forEach(([name,key])=>write(storage,key,data[name]));return data;}catch(error){snapshot.forEach((value,key)=>{try{if(value==null)removeRaw(storage,key);else setRaw(storage,key,value);}catch(_){}});throw error;}}
+function clearDeviceData(storage=globalThis.localStorage){Object.values(DATA_KEYS).forEach(key=>{if(storage.removeItem)storage.removeItem(key);else storage.delete(key);});}
+const api={DATA_KEYS,defaults,normalize,buildFromLocalStorage:buildFromStorage,applyToLocalStorage:applyToStorage,clearDeviceData,normalizeIndexSearchSettings,normalizeRoppoState,normalizeStatuteNotes};if(typeof window!=='undefined')window.MangaVaultPayload=api;if(typeof module!=='undefined')module.exports=api;
