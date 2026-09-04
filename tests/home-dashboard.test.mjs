@@ -5,12 +5,13 @@ import dashboard from '../home-dashboard.js';
 
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 
-const DEFAULT_IDS = ['bookshelf', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
+const DEFAULT_IDS = ['bookshelf', 'index-search', 'statutes', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 
 test('home dashboard starts with useful app and official-law cards', () => {
   assert.deepEqual(dashboard.DEFAULT_CARD_IDS, DEFAULT_IDS);
   for (const id of DEFAULT_IDS) assert.ok(dashboard.CARD_CATALOG[id], `${id} should exist in the card catalog`);
   assert.equal(dashboard.CARD_CATALOG['index-search'].href, 'index-search.html');
+  assert.equal(dashboard.CARD_CATALOG.statutes.href, 'statutes.html');
 });
 
 test('home layout normalization keeps order, removes duplicates, and preserves an intentional empty home', () => {
