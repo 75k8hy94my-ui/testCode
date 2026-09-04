@@ -96,3 +96,8 @@ test('worker runtime imports the same Hyakusen catalog before legal search', asy
   const searchPos = source.indexOf("importScripts('legal-index-search.js')");
   assert.ok(catalogPos >= 0 && searchPos > catalogPos);
 });
+
+test('browser search integration avoids duplicate links when hyakusen link is already present', async () => {
+  const source = await readFile(new URL('../legal-index-search.js', import.meta.url), 'utf8');
+  assert.match(source, /document\.querySelector\(['"]a\[href=["']hyakusen\.html["']\]['"]\)/);
+});

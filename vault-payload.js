@@ -2,10 +2,11 @@ const DATA_KEYS = {
   folders: 'mangaReaderSavedFolders', items: 'mangaReaderSavedItems', videos: 'mangaReaderVideos', videoFolders: 'mangaReaderVideoFolders', videoMeta: 'mangaReaderVideoMeta',
   authorCards: 'mangaReaderAuthorCards', mangaInfo: 'mangaReaderInfoCache', toc: 'mangaReaderToc',
   lastPages: 'mangaReaderLastPage', theme: 'mangaReaderTheme', dashboardVisibility: 'mangaReaderDashboardVisibility',
-  homeCards: 'mangaReaderHomeCards', study: 'mangaReaderStudy', indexSearchSettings: 'mangaReaderIndexSearchSettings'
+  homeCards: 'mangaReaderHomeCards', study: 'mangaReaderStudy', indexSearchSettings: 'mangaReaderIndexSearchSettings',
+  statuteNotes: 'mangaReaderStatuteNotes'
 };
 const defaultDashboardVisibility = { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false };
-const defaultHomeCards = ['bookshelf', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
+const defaultHomeCards = ['bookshelf', 'index-search', 'statutes', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 const defaultIndexSearchSettings = { matchModes: { exact: true, partial: true, and: true, fuzzy: true }, activeKind: 'all', selectedSubjects: [], selectedBookIds: [] };
 const defaultStudySubjects = [
   { id: 'constitutional-law', name: '憲法' }, { id: 'administrative-law', name: '行政法' },
@@ -20,7 +21,7 @@ const createEmptyStudy = () => ({
   gamification: { xp: 0, streak: 0, lastStudyDate: null }, preferences: { autoSpeak: false }
 });
 const cloneIndexSearchSettings = () => ({ matchModes: { ...defaultIndexSearchSettings.matchModes }, activeKind: 'all', selectedSubjects: [], selectedBookIds: [] });
-const defaults = { folders: [], items: [], videos: [], videoFolders: [], videoMeta: {}, authorCards: [], mangaInfo: {}, toc: {}, lastPages: {}, theme: 'dark', dashboardVisibility: { mobile: { ...defaultDashboardVisibility }, desktop: { ...defaultDashboardVisibility } }, homeCards: defaultHomeCards.slice(), study: createEmptyStudy(), indexSearchSettings: cloneIndexSearchSettings() };
+const defaults = { folders: [], items: [], videos: [], videoFolders: [], videoMeta: {}, authorCards: [], mangaInfo: {}, toc: {}, lastPages: {}, theme: 'dark', dashboardVisibility: { mobile: { ...defaultDashboardVisibility }, desktop: { ...defaultDashboardVisibility } }, homeCards: defaultHomeCards.slice(), study: createEmptyStudy(), indexSearchSettings: cloneIndexSearchSettings(), statuteNotes: {} };
 const isObject = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 const normalizeDashboardProfile = (value) => {
   const result = { ...defaultDashboardVisibility };
@@ -71,9 +72,23 @@ function normalizeStudyForVault(value) {
     preferences: { ...base.preferences, ...isObject(x.preferences) }
   };
 }
+
+function normalizeStatuteNotes(value) {
+  const source = isObject(value);
+  const result = {};
+  Object.entries(source).forEach(([k, v]) => {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return;
+    const noteText = String(v.text ?? '').trim();
+    if (!noteText) return;
+    const updatedAt = Number(v.updatedAt) > 0 ? Number(v.updatedAt) : Date.now();
+    const tags = normalizeStringArray(v.tags);
+    result[String(k).trim()] = { text: noteText, updatedAt, tags };
+  });
+  return result;
+}
 function normalize(value) {
   const x = value && typeof value === 'object' ? value : {};
-  return { folders: Array.isArray(x.folders) ? x.folders : [], items: Array.isArray(x.items) ? x.items : [], videos: Array.isArray(x.videos) ? x.videos : [], videoFolders: Array.isArray(x.videoFolders) ? x.videoFolders : [], videoMeta: isObject(x.videoMeta), authorCards: Array.isArray(x.authorCards) ? x.authorCards : [], mangaInfo: isObject(x.mangaInfo), toc: isObject(x.toc), lastPages: isObject(x.lastPages), theme: x.theme === 'light' ? 'light' : 'dark', dashboardVisibility: normalizeDashboardVisibility(x.dashboardVisibility), homeCards: normalizeHomeCards(x.homeCards), study: normalizeStudyForVault(x.study), indexSearchSettings: normalizeIndexSearchSettings(x.indexSearchSettings) };
+  return { folders: Array.isArray(x.folders) ? x.folders : [], items: Array.isArray(x.items) ? x.items : [], videos: Array.isArray(x.videos) ? x.videos : [], videoFolders: Array.isArray(x.videoFolders) ? x.videoFolders : [], videoMeta: isObject(x.videoMeta), authorCards: Array.isArray(x.authorCards) ? x.authorCards : [], mangaInfo: isObject(x.mangaInfo), toc: isObject(x.toc), lastPages: isObject(x.lastPages), theme: x.theme === 'light' ? 'light' : 'dark', dashboardVisibility: normalizeDashboardVisibility(x.dashboardVisibility), homeCards: normalizeHomeCards(x.homeCards), study: normalizeStudyForVault(x.study), indexSearchSettings: normalizeIndexSearchSettings(x.indexSearchSettings), statuteNotes: normalizeStatuteNotes(x.statuteNotes) };
 }
 function read(storage, key, fallback) {
   try { const raw = storage.getItem ? storage.getItem(key) : storage.get(key); return raw == null ? fallback : JSON.parse(raw); } catch (_) { return fallback; }
@@ -82,14 +97,23 @@ function rawValue(storage, key) { return storage.getItem ? storage.getItem(key) 
 function setRaw(storage, key, value) { if (storage.setItem) storage.setItem(key, value); else storage.set(key, value); }
 function removeRaw(storage, key) { if (storage.removeItem) storage.removeItem(key); else storage.delete(key); }
 function write(storage, key, value) { setRaw(storage, key, JSON.stringify(value)); }
+function readTheme(storage) {
+  const raw = rawValue(storage, DATA_KEYS.theme);
+  if (raw == null) return 'dark';
+  const cleaned = String(raw).replace(/^"|"$/g, '').trim();
+  return cleaned === 'light' ? 'light' : 'dark';
+}
 function buildFromStorage(storage = globalThis.localStorage) {
-  return normalize({ folders: read(storage, DATA_KEYS.folders, []), items: read(storage, DATA_KEYS.items, []), videos: read(storage, DATA_KEYS.videos, []), videoFolders: read(storage, DATA_KEYS.videoFolders, []), videoMeta: read(storage, DATA_KEYS.videoMeta, {}), authorCards: read(storage, DATA_KEYS.authorCards, []), mangaInfo: read(storage, DATA_KEYS.mangaInfo, {}), toc: read(storage, DATA_KEYS.toc, {}), lastPages: read(storage, DATA_KEYS.lastPages, {}), theme: storage.getItem ? storage.getItem(DATA_KEYS.theme) : (storage.get(DATA_KEYS.theme) === '"light"' ? 'light' : 'dark'), dashboardVisibility: read(storage, DATA_KEYS.dashboardVisibility, {}), homeCards: read(storage, DATA_KEYS.homeCards, defaultHomeCards), study: read(storage, DATA_KEYS.study, {}), indexSearchSettings: read(storage, DATA_KEYS.indexSearchSettings, defaultIndexSearchSettings) });
+  return normalize({ folders: read(storage, DATA_KEYS.folders, []), items: read(storage, DATA_KEYS.items, []), videos: read(storage, DATA_KEYS.videos, []), videoFolders: read(storage, DATA_KEYS.videoFolders, []), videoMeta: read(storage, DATA_KEYS.videoMeta, {}), authorCards: read(storage, DATA_KEYS.authorCards, []), mangaInfo: read(storage, DATA_KEYS.mangaInfo, {}), toc: read(storage, DATA_KEYS.toc, {}), lastPages: read(storage, DATA_KEYS.lastPages, {}), theme: readTheme(storage), dashboardVisibility: read(storage, DATA_KEYS.dashboardVisibility, {}), homeCards: read(storage, DATA_KEYS.homeCards, defaultHomeCards), study: read(storage, DATA_KEYS.study, {}), indexSearchSettings: read(storage, DATA_KEYS.indexSearchSettings, defaultIndexSearchSettings), statuteNotes: read(storage, DATA_KEYS.statuteNotes, {}) });
 }
 function applyToStorage(payload, storage = globalThis.localStorage) {
   const data = normalize(payload);
   const snapshot = new Map(Object.values(DATA_KEYS).map((key) => [key, rawValue(storage, key)]));
   try {
-    Object.entries(DATA_KEYS).forEach(([name, key]) => write(storage, key, data[name]));
+    Object.entries(DATA_KEYS).forEach(([name, key]) => {
+      if (key === DATA_KEYS.theme) setRaw(storage, key, data.theme);
+      else write(storage, key, data[name]);
+    });
     return data;
   } catch (error) {
     snapshot.forEach((value, key) => { try { if (value == null) removeRaw(storage, key); else setRaw(storage, key, value); } catch (_) {} });
@@ -97,6 +121,6 @@ function applyToStorage(payload, storage = globalThis.localStorage) {
   }
 }
 function clearDeviceData(storage = globalThis.localStorage) { Object.values(DATA_KEYS).forEach((key) => { if (storage.removeItem) storage.removeItem(key); else storage.delete(key); }); }
-const api = { DATA_KEYS, defaults, normalize, buildFromLocalStorage: buildFromStorage, applyToLocalStorage: applyToStorage, clearDeviceData, normalizeIndexSearchSettings };
+const api = { DATA_KEYS, defaults, normalize, buildFromLocalStorage: buildFromStorage, applyToLocalStorage: applyToStorage, clearDeviceData, normalizeIndexSearchSettings, normalizeStatuteNotes };
 if (typeof window !== 'undefined') window.MangaVaultPayload = api;
 if (typeof module !== 'undefined') module.exports = api;

@@ -34,7 +34,7 @@ test('versioned backup round-trips author cards and supplies video library, home
   const result = createBackup(data, '2026-08-22T00:00:00.000Z');
   assert.equal(VERSION, 3);
   assert.deepEqual(result.indexBooks, []);
-  assert.deepEqual(migrateBackup(result), { folders: data.folders, items: [], videos: [], videoFolders: [], videoMeta: {}, authorCards: data.authorCards, mangaInfo: {}, toc: {}, lastPages: {}, theme: 'light', dashboardVisibility: { mobile: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false } }, homeCards: defaultHomeCards, study: emptyStudy, indexSearchSettings: defaultIndexSearchSettings });
+  assert.deepEqual(migrateBackup(result), { folders: data.folders, items: [], videos: [], videoFolders: [], videoMeta: {}, authorCards: data.authorCards, mangaInfo: {}, toc: {}, lastPages: {}, theme: 'light', dashboardVisibility: { mobile: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false } }, homeCards: defaultHomeCards, study: emptyStudy, indexSearchSettings: defaultIndexSearchSettings, statuteNotes: {} });
 });
 
 test('backup v3 preserves current study arguments, drafts and argument progress', () => {
@@ -91,6 +91,7 @@ test('backup v2 remains importable and migrates with no index books', () => {
   assert.deepEqual(legacy.data.homeCards, ['study', 'bookshelf']);
   assert.deepEqual(legacy.data.study, emptyStudy);
   assert.deepEqual(legacy.data.indexSearchSettings, defaultIndexSearchSettings);
+  assert.deepEqual(legacy.data.statuteNotes, {});
 });
 
 test('legacy raw payload migrates with no index books and future versions are rejected', () => {
@@ -102,8 +103,19 @@ test('legacy raw payload migrates with no index books and future versions are re
   assert.deepEqual(legacy.data.homeCards, defaultHomeCards);
   assert.deepEqual(legacy.data.study, emptyStudy);
   assert.deepEqual(legacy.data.indexSearchSettings, defaultIndexSearchSettings);
+  assert.deepEqual(legacy.data.statuteNotes, {});
   assert.throws(() => migrateBackupPackage({ format: 'manga-reader-backup', version: 99, data: {} }));
   assert.throws(() => migrateBackup({ format: 'manga-reader-backup', version: 99, data: {} }));
+});
+
+test('backup v3 preserves statuteNotes with tags and update timestamps', () => {
+  const statuteNotes = {
+    'kenpo:13': { text: '個人の尊重、幸福追求権', updatedAt: 1725400000000, tags: ['憲法', '人権'] }
+  };
+  const result = createBackup({ folders: [], items: [], statuteNotes }, '2026-09-04T00:00:00Z');
+  assert.deepEqual(result.data.statuteNotes, statuteNotes);
+  const migrated = migrateBackupPackage(result);
+  assert.deepEqual(migrated.data.statuteNotes, statuteNotes);
 });
 
 test('malformed v3 indexBooks are rejected at package boundary', () => {

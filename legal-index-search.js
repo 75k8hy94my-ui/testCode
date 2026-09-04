@@ -332,7 +332,7 @@ function installHyakusenBrowserIntegration() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
   const installLink = () => {
-    if (document.getElementById('openHyakusenBtn')) return;
+    if (document.getElementById('openHyakusenBtn') || document.querySelector('a[href="hyakusen.html"]')) return;
     const actions = document.querySelector('.topbar .actions');
     if (!actions) return;
     const link = document.createElement('a');

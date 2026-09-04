@@ -82,8 +82,23 @@ function normalizeData(data) {
     theme: x.theme === 'light' ? 'light' : 'dark', dashboardVisibility: normalizeBackupDashboardVisibility(x.dashboardVisibility),
     homeCards: Array.isArray(x.homeCards) ? x.homeCards.map((id) => text(id)).filter(Boolean) : DEFAULT_HOME_CARDS.slice(),
     study: normalizeBackupStudy(x.study),
-    indexSearchSettings: normalizeBackupIndexSearchSettings(x.indexSearchSettings)
+    indexSearchSettings: normalizeBackupIndexSearchSettings(x.indexSearchSettings),
+    statuteNotes: normalizeBackupStatuteNotes(x.statuteNotes)
   };
+}
+
+function normalizeBackupStatuteNotes(value) {
+  const source = isBackupObject(value) ? value : {};
+  const result = {};
+  Object.entries(source).forEach(([k, v]) => {
+    if (!isBackupObject(v)) return;
+    const noteText = text(v.text);
+    if (!noteText) return;
+    const updatedAt = Number(v.updatedAt) > 0 ? Number(v.updatedAt) : Date.now();
+    const tags = Array.isArray(v.tags) ? v.tags.map(text).filter(Boolean) : [];
+    result[text(k)] = { text: noteText, updatedAt, tags };
+  });
+  return result;
 }
 
 function normalizeStringArray(value, field, { allowEmpty = true } = {}) {
