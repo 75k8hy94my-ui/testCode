@@ -99,6 +99,7 @@ test('token controller keeps access token only in memory and uses the readonly s
   const token = await controller.requestAccessToken();
   assert.equal(config.client_id, 'client-id.apps.googleusercontent.com');
   assert.equal(config.scope, DRIVE_METADATA_SCOPE);
+  assert.equal(config.include_granted_scopes, false);
   assert.equal(token, 'temporary-token');
   assert.equal(controller.getAccessToken(), 'temporary-token');
   assert.equal(override.prompt, '');
