@@ -55,6 +55,18 @@ test('roppo page is vault gated, reads repository JSON, and syncs private paragr
   assert.match(source, /項のメモ/);
   assert.match(source, /id=["']roppoSearch["']/);
   assert.match(source, /id=["']favoriteBtn["']/);
+  assert.match(source, /lastSyncedAt/);
+});
+
+test('roppo refresh action is manual-only and keeps the one-month check inside the sync script', () => {
+  const source = read('.github/workflows/roppo-sync.yml');
+  assert.match(source, /workflow_dispatch/);
+  assert.doesNotMatch(source, /schedule\s*:/);
+  assert.doesNotMatch(source, /\n\s*push\s*:/);
+  assert.match(source, /scripts\/sync_roppo\.py/);
+  const script = read('scripts/sync_roppo.py');
+  assert.match(script, /is_stale/);
+  assert.match(script, /if not force and not is_stale/);
 });
 
 test('static verifier includes roppo page and module', () => {

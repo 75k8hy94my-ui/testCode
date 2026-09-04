@@ -51,3 +51,10 @@ test('article search matches article number, caption, and paragraph text', () =>
   assert.deepEqual(roppo.searchArticles(articles, '公序良俗').map((item) => item.key), ['Article_90']);
   assert.deepEqual(roppo.searchArticles(articles, '意思表示').map((item) => item.key), ['Article_95']);
 });
+
+test('law data becomes stale exactly one calendar month after the recorded sync', () => {
+  const metadata = { lastSyncedAt: '2026-08-04T12:00:00.000Z' };
+  assert.equal(roppo.isLawDataStale(metadata, new Date('2026-09-04T11:59:59.000Z')), false);
+  assert.equal(roppo.isLawDataStale(metadata, new Date('2026-09-04T12:00:00.000Z')), true);
+  assert.equal(roppo.isLawDataStale({}, new Date('2026-09-04T12:00:00.000Z')), true);
+});
