@@ -52,6 +52,17 @@ test('article search matches article number, caption, and paragraph text', () =>
   assert.deepEqual(roppo.searchArticles(articles, '意思表示').map((item) => item.key), ['Article_95']);
 });
 
+test('statutory paragraph formatting trims source indentation and preserves semantic line breaks', () => {
+  assert.equal(
+    roppo.formatParagraphText('未成年者が法律行為をするには、その法定代理人の同意を得なければならない。\n                        ただし、単に権利を得、又は義務を免れる法律行為については、この限りでない。'),
+    '未成年者が法律行為をするには、その法定代理人の同意を得なければならない。\nただし、単に権利を得、又は義務を免れる法律行為については、この限りでない。'
+  );
+  assert.equal(
+    roppo.formatParagraphText('被保佐人が次に掲げる行為をするには、その保佐人の同意を得なければならない。\n一\n                        \n                          元本を領収し、又は利用すること。'),
+    '被保佐人が次に掲げる行為をするには、その保佐人の同意を得なければならない。\n一　元本を領収し、又は利用すること。'
+  );
+});
+
 test('law data becomes stale exactly one calendar month after the recorded sync', () => {
   const metadata = { lastSyncedAt: '2026-08-04T12:00:00.000Z' };
   assert.equal(roppo.isLawDataStale(metadata, new Date('2026-09-04T11:59:59.000Z')), false);
