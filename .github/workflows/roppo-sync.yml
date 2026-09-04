@@ -29,7 +29,7 @@ jobs:
       - name: Commit refreshed statutes
         shell: bash
         run: |
-          if git diff --quiet -- data/roppo; then
+          if [ -z "$(git status --porcelain -- data/roppo)" ]; then
             echo 'No statute refresh needed.'
             exit 0
           fi
