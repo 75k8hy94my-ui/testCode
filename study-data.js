@@ -15,6 +15,22 @@ const DEFAULT_SUBJECTS = [
 const isObject = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 const cloneSubjects = () => DEFAULT_SUBJECTS.map((item) => ({ ...item }));
 
+function installDesktopLayoutStyles(doc = globalThis.document) {
+  if (!doc || !doc.head || doc.getElementById('studyDesktopLayoutStyles')) return;
+  const style = doc.createElement('style');
+  style.id = 'studyDesktopLayoutStyles';
+  style.textContent = `
+@media (min-width: 900px) {
+  body.top-level-nav { padding-left: 144px; }
+  body.top-level-nav #studyApp { width: min(100%, 920px); margin-left: auto; margin-right: auto; }
+  .lessonLauncher,
+  .quizShell { width: 100%; max-width: 920px; }
+}
+`;
+  doc.head.appendChild(style);
+}
+installDesktopLayoutStyles();
+
 function createEmptyStudy() {
   return {
     schemaVersion: STUDY_SCHEMA_VERSION,
