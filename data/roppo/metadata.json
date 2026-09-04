@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "lastSyncedAt": "2026-09-04T11:28:10.656Z",
+  "laws": {
+    "321CONSTITUTION": {
+      "syncedAt": "2026-09-04T11:28:10.656Z",
+      "articleCount": 103
+    },
+    "129AC0000000089": {
+      "syncedAt": "2026-09-04T11:28:10.656Z",
+      "articleCount": 1374
+    },
+    "140AC0000000045": {
+      "syncedAt": "2026-09-04T11:28:10.656Z",
+      "articleCount": 357
+    },
+    "408AC0000000109": {
+      "syncedAt": "2026-09-04T11:28:10.656Z",
+      "articleCount": 588
+    },
+    "323AC0000000131": {
+      "syncedAt": "2026-09-04T11:28:10.656Z",
+      "articleCount": 834
+    },
+    "405AC0000000088": {
+      "syncedAt": "2026-09-04T11:28:10.656Z",
+      "articleCount": 74
+    },
+    "337AC0000000139": {
+      "syncedAt": "2026-09-04T11:28:10.656Z",
+      "articleCount": 128
+    },
+    "426AC0000000068": {
+      "syncedAt": "2026-09-04T11:28:10.656Z",
+      "articleCount": 108
+    },
+    "322AC0000000125": {
+      "syncedAt": "2026-09-04T11:28:10.656Z",
+      "articleCount": 6
+    },
+    "417AC0000000086": {
+      "syncedAt": "2026-09-04T11:28:10.656Z",
+      "articleCount": 1158
+    }
+  }
+}
