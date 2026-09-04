@@ -52,10 +52,19 @@ function setRaw(storage,key,value){if(storage.setItem)storage.setItem(key,value)
 function loadState(storage=globalThis.localStorage){try{const raw=getRaw(storage,STORAGE_KEY);return raw==null?normalizeState({}):normalizeState(JSON.parse(raw));}catch(_){return normalizeState({});}}
 function saveState(value,storage=globalThis.localStorage){const normalized=normalizeState(value);setRaw(storage,STORAGE_KEY,JSON.stringify(normalized));return normalized;}
 function normalizeSearchText(value){return String(value??'').normalize('NFKC').toLowerCase().replace(/[\s　]+/g,'').replace(/[（）()「」『』【】\[\]・,，.。]/g,'');}
+function formatParagraphText(value){
+ const lines=String(value??'').replace(/\r\n?/g,'\n').split('\n').map((line)=>line.trim());const output=[];
+ for(let i=0;i<lines.length;i++){
+  const line=lines[i];if(!line)continue;
+  if(/^[一二三四五六七八九十百千]+$/.test(line)&&i+1<lines.length){let next=i+1;while(next<lines.length&&!lines[next])next++;if(next<lines.length){output.push(`${line}　${lines[next]}`);i=next;continue;}}
+  output.push(line);
+ }
+ return output.join('\n');
+}
 function articleBodyText(article){return Array.isArray(article?.paragraphs)?article.paragraphs.map((p)=>p.text||'').join('\n'):String(article?.bodyText||'');}
 function searchArticles(articles,query){const needle=normalizeSearchText(query);if(!needle)return Array.isArray(articles)?articles.slice():[];if(!Array.isArray(articles))return[];return articles.filter((article)=>normalizeSearchText([article.key,article.number,article.caption,articleBodyText(article)].filter(Boolean).join(' ')).includes(needle));}
 function addCalendarMonth(date){const result=new Date(date.getTime()),day=result.getUTCDate();result.setUTCDate(1);result.setUTCMonth(result.getUTCMonth()+1);const lastDay=new Date(Date.UTC(result.getUTCFullYear(),result.getUTCMonth()+1,0)).getUTCDate();result.setUTCDate(Math.min(day,lastDay));return result;}
 function isLawDataStale(metadata,now=new Date()){const raw=metadata&&metadata.lastSyncedAt,last=raw?new Date(raw):null;if(!last||Number.isNaN(last.getTime()))return true;const current=now instanceof Date?now:new Date(now);return current.getTime()>=addCalendarMonth(last).getTime();}
-const api={STORAGE_KEY,MAX_RECENT,LAW_CATALOG,LAW_GROUPS,DEFAULT_STATE,normalizeState,loadState,saveState,articleStorageKey,paragraphStorageKey,normalizeSearchText,articleBodyText,searchArticles,isLawDataStale};
+const api={STORAGE_KEY,MAX_RECENT,LAW_CATALOG,LAW_GROUPS,DEFAULT_STATE,normalizeState,loadState,saveState,articleStorageKey,paragraphStorageKey,normalizeSearchText,formatParagraphText,articleBodyText,searchArticles,isLawDataStale};
 if(typeof window!=='undefined')window.MangaRoppo=api;if(typeof module!=='undefined')module.exports=api;
 })();
