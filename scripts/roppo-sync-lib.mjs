@@ -51,7 +51,11 @@ function walk(node, callback) {
   callback(node);
   node.children.forEach((child) => { if (isNode(child)) walk(child, callback); });
 }
-function cleanCaption(value) { return normalizeLegalReferences(String(value ?? '').trim()).replace(/^（|）$/g, '').trim(); }
+function cleanCaption(value) {
+  return normalizeLegalReferences(String(value ?? '').trim())
+    .replace(/^[（(]\s*|\s*[）)]$/g, '')
+    .trim();
+}
 function paragraphText(node) {
   const pieces = node.children
     .filter((child) => !(isNode(child) && (child.tag === 'ParagraphNum' || child.tag === 'ParagraphCaption')))
