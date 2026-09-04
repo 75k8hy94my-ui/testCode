@@ -63,6 +63,18 @@ test('statutory paragraph formatting trims source indentation and preserves sema
   );
 });
 
+test('roppo header helper hides the descriptive line and visible update date', () => {
+  const sub = { hidden: false };
+  const dataStatus = { hidden: false };
+  const doc = {
+    querySelector: (selector) => selector === '.header .sub' ? sub : null,
+    getElementById: (id) => id === 'dataStatus' ? dataStatus : null
+  };
+  roppo.hideHeaderMeta(doc);
+  assert.equal(sub.hidden, true);
+  assert.equal(dataStatus.hidden, true);
+});
+
 test('law data becomes stale exactly one calendar month after the recorded sync', () => {
   const metadata = { lastSyncedAt: '2026-08-04T12:00:00.000Z' };
   assert.equal(roppo.isLawDataStale(metadata, new Date('2026-09-04T11:59:59.000Z')), false);
