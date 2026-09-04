@@ -82,6 +82,15 @@ test('mobile roppo search prioritizes the results list and returns to the select
   assert.match(source, /scrollIntoView\(\{behavior:['"]smooth['"],block:['"]start['"]\}\)/);
 });
 
+test('mobile roppo normal article list is taller and shows readable two-line captions', () => {
+  const source = read('roppo.html');
+  assert.match(source, /@media\(max-width:800px\)[\s\S]*?\.articleList\{max-height:55vh/);
+  assert.match(source, /@media\(max-width:800px\)[\s\S]*?\.articleItem\{padding:13px 14px/);
+  assert.match(source, /@media\(max-width:800px\)[\s\S]*?\.articleItem strong\{font-size:15px/);
+  assert.match(source, /@media\(max-width:800px\)[\s\S]*?\.articleItem span\{font-size:12px;line-height:1\.45;display:-webkit-box;-webkit-line-clamp:2/);
+  assert.match(source, /@media\(max-width:800px\)[\s\S]*?\.articleItem\.active\{box-shadow:/);
+});
+
 test('roppo refresh action is manual-only and keeps the one-month check inside the sync script', () => {
   const source = read('.github/workflows/roppo-sync.yml');
   assert.match(source, /workflow_dispatch/);
