@@ -11,7 +11,7 @@ const standalone = [
   'hyakusen-catalog.js', 'hyakusen-drive.js', 'hyakusen-page.js',
   'index-conversion-prompt.js', 'index-search-backup.js', 'index-search-conflicts.js', 'index-search-page.js', 'index-search-sync-status.js',
   'index-search-worker-client.js', 'legal-index-schema.js', 'legal-index-search.js', 'legal-index-search-worker.js', 'shelf-search.js',
-  'status-message.js', 'statute-data.js', 'study-data.js', 'study-arguments.js', 'study-sync.js', 'study-quiz.js', 'study-audio.js', 'study-ai.js',
+  'status-message.js', 'statute-data.js', 'statutes-page.js', 'study-data.js', 'study-arguments.js', 'study-sync.js', 'study-quiz.js', 'study-audio.js', 'study-ai.js',
   'study-offline.js', 'supabase-config.js', 'url-parser.js', 'vault-payload.js', 'vault-session.js', 'video-thumbnail-time.js'
 ];
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
