@@ -66,6 +66,13 @@ test('clearing roppo search keeps the article selected from search results', () 
   assert.match(source, /visibleArticles\.findIndex\([^)]*\.key===selectedKey\)/);
 });
 
+test('clearing roppo search scrolls the retained article into view in the article list', () => {
+  const source = read('roppo.html');
+  assert.match(source, /scrollSelectedArticleIntoView/);
+  assert.match(source, /querySelector\(['"]\.articleItem\.active['"]\)/);
+  assert.match(source, /scrollIntoView\(\{block:['"]center['"],inline:['"]nearest['"]\}\)/);
+});
+
 test('roppo refresh action is manual-only and keeps the one-month check inside the sync script', () => {
   const source = read('.github/workflows/roppo-sync.yml');
   assert.match(source, /workflow_dispatch/);
