@@ -27,7 +27,7 @@ const LAW_GROUPS = Object.freeze([
 ]);
 
 const DEFAULT_STATE = Object.freeze({
-  schemaVersion: 1,
+  schemaVersion: 2,
   notes: Object.freeze({}),
   favorites: Object.freeze([]),
   recent: Object.freeze([]),
@@ -36,23 +36,26 @@ const DEFAULT_STATE = Object.freeze({
 
 const isObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const text = (value) => String(value ?? '').trim();
-const validPrivateKey = (value) => typeof value === 'string' && value.includes('|') && !value.startsWith('|') && !value.endsWith('|');
+const articleKeyIsValid = (value) => typeof value === 'string' && value.split('|').length === 2 && !value.startsWith('|') && !value.endsWith('|');
+const paragraphKeyIsValid = (value) => typeof value === 'string' && value.split('|').length === 3 && !value.split('|').some((part) => !part);
 
 function normalizeState(value) {
   const source = isObject(value) ? value : {};
+  const sourceVersion = Number(source.schemaVersion) || 1;
   const notes = {};
   if (isObject(source.notes)) {
-    Object.entries(source.notes).forEach(([key, note]) => {
-      if (!validPrivateKey(key) || !isObject(note) || typeof note.text !== 'string') return;
-      const noteText = note.text.trim();
-      if (!noteText) return;
+    Object.entries(source.notes).forEach(([rawKey, note]) => {
+      if (!isObject(note) || typeof note.text !== 'string' || !note.text.trim()) return;
+      let key = rawKey;
+      if (sourceVersion < 2 && articleKeyIsValid(rawKey)) key = `${rawKey}|1`;
+      if (!paragraphKeyIsValid(key)) return;
       notes[key] = { text: note.text, updatedAt: typeof note.updatedAt === 'string' ? note.updatedAt : '' };
     });
   }
   const favorites = [];
   const seenFavorites = new Set();
   if (Array.isArray(source.favorites)) source.favorites.forEach((value) => {
-    if (!validPrivateKey(value) || seenFavorites.has(value)) return;
+    if (!articleKeyIsValid(value) || seenFavorites.has(value)) return;
     seenFavorites.add(value); favorites.push(value);
   });
   const recent = [];
@@ -70,7 +73,7 @@ function normalizeState(value) {
   const selectedGroup = LAW_GROUPS.some((group) => group.id === prefs.selectedGroup) ? prefs.selectedGroup : DEFAULT_STATE.preferences.selectedGroup;
   const group = LAW_GROUPS.find((item) => item.id === selectedGroup);
   const selectedLawId = group && group.lawIds.includes(prefs.selectedLawId) ? prefs.selectedLawId : group.lawIds[0];
-  return { schemaVersion: 1, notes, favorites, recent: recent.slice(0, MAX_RECENT), preferences: { selectedGroup, selectedLawId } };
+  return { schemaVersion: 2, notes, favorites, recent: recent.slice(0, MAX_RECENT), preferences: { selectedGroup, selectedLawId } };
 }
 
 function getRaw(storage, key) { return storage.getItem ? storage.getItem(key) : (storage.get(key) ?? null); }
@@ -83,6 +86,7 @@ function saveState(value, storage = globalThis.localStorage) {
   const normalized = normalizeState(value); setRaw(storage, STORAGE_KEY, JSON.stringify(normalized)); return normalized;
 }
 function articleStorageKey(lawId, articleKey) { return `${text(lawId)}|${text(articleKey)}`; }
+function paragraphStorageKey(lawId, articleKey, paragraphNum) { return `${text(lawId)}|${text(articleKey)}|${text(paragraphNum) || '1'}`; }
 
 function normalizeSearchText(value) {
   return String(value ?? '')
@@ -96,33 +100,34 @@ function searchArticles(articles, query) {
   if (!needle) return Array.isArray(articles) ? articles.slice() : [];
   if (!Array.isArray(articles)) return [];
   return articles.filter((article) => normalizeSearchText([
-    article.key, article.number, article.caption, article.bodyText
+    article.key, article.number, article.caption, article.bodyText,
+    ...(Array.isArray(article.paragraphs) ? article.paragraphs.map((paragraph) => paragraph.text) : [])
   ].filter(Boolean).join(' ')).includes(needle));
 }
 
-function directChildText(node, tagName) {
-  if (!node || !node.children) return '';
-  const child = Array.from(node.children).find((item) => item.tagName === tagName);
-  return child ? child.textContent.trim() : '';
+function addCalendarMonth(date) {
+  const result = new Date(date.getTime());
+  const originalDay = result.getUTCDate();
+  result.setUTCDate(1);
+  result.setUTCMonth(result.getUTCMonth() + 1);
+  const lastDay = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate();
+  result.setUTCDate(Math.min(originalDay, lastDay));
+  return result;
 }
-function parseLawXml(xmlText, lawMeta = {}) {
-  if (typeof DOMParser === 'undefined') throw new Error('DOMParser is not available');
-  const doc = new DOMParser().parseFromString(String(xmlText || ''), 'application/xml');
-  if (doc.querySelector('parsererror')) throw new Error('e-Gov response XML could not be parsed');
-  const articles = Array.from(doc.querySelectorAll('Article')).map((node, index) => {
-    const articleTitle = directChildText(node, 'ArticleTitle') || node.getAttribute('Num') || String(index + 1);
-    const caption = directChildText(node, 'ArticleCaption');
-    const paragraphs = Array.from(node.children || []).filter((item) => item.tagName === 'Paragraph');
-    const bodyText = paragraphs.length ? paragraphs.map((item) => item.textContent.trim()).filter(Boolean).join('\n') : node.textContent.trim();
-    const num = node.getAttribute('Num') || articleTitle || String(index + 1);
-    return { key: `Article_${num}`, number: articleTitle, caption, bodyText, index };
-  }).filter((article) => article.bodyText);
-  const lawName = doc.querySelector('LawTitle')?.textContent?.trim() || lawMeta.name || '';
-  const lawNumber = doc.querySelector('LawNum')?.textContent?.trim() || lawMeta.lawNumber || '';
-  return { lawName, lawNumber, articles };
+function isLawDataStale(metadata, now = new Date()) {
+  const raw = metadata && metadata.lastSyncedAt;
+  const last = raw ? new Date(raw) : null;
+  if (!last || Number.isNaN(last.getTime())) return true;
+  const current = now instanceof Date ? now : new Date(now);
+  return current.getTime() >= addCalendarMonth(last).getTime();
+}
+function validateStaticLawData(value, expectedLawId = '') {
+  if (!isObject(value) || value.schemaVersion !== 1 || !Array.isArray(value.articles) || !value.articles.length) return false;
+  if (expectedLawId && value.lawId !== expectedLawId) return false;
+  return value.articles.every((article) => isObject(article) && text(article.key) && text(article.number) && Array.isArray(article.paragraphs) && article.paragraphs.length && article.paragraphs.every((paragraph) => isObject(paragraph) && text(paragraph.num) && typeof paragraph.text === 'string'));
 }
 
-const api = { STORAGE_KEY, MAX_RECENT, LAW_CATALOG, LAW_GROUPS, DEFAULT_STATE, normalizeState, loadState, saveState, articleStorageKey, normalizeSearchText, searchArticles, parseLawXml };
+const api = { STORAGE_KEY, MAX_RECENT, LAW_CATALOG, LAW_GROUPS, DEFAULT_STATE, normalizeState, loadState, saveState, articleStorageKey, paragraphStorageKey, normalizeSearchText, searchArticles, isLawDataStale, validateStaticLawData };
 if (typeof window !== 'undefined') window.MangaRoppo = api;
 if (typeof module !== 'undefined') module.exports = api;
 })();
