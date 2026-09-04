@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "lastSyncedAt": "2026-09-04T11:23:00.383122Z",
+  "source": "e-Gov 法令API v1",
+  "laws": [
+    {
+      "lawId": "321CONSTITUTION",
+      "lawName": "日本国憲法",
+      "articles": 103
+    },
+    {
+      "lawId": "129AC0000000089",
+      "lawName": "民法",
+      "articles": 1374
+    },
+    {
+      "lawId": "140AC0000000045",
+      "lawName": "刑法",
+      "articles": 357
+    },
+    {
+      "lawId": "408AC0000000109",
+      "lawName": "民事訴訟法",
+      "articles": 588
+    },
+    {
+      "lawId": "323AC0000000131",
+      "lawName": "刑事訴訟法",
+      "articles": 834
+    },
+    {
+      "lawId": "405AC0000000088",
+      "lawName": "行政手続法",
+      "articles": 74
+    },
+    {
+      "lawId": "337AC0000000139",
+      "lawName": "行政事件訴訟法",
+      "articles": 128
+    },
+    {
+      "lawId": "426AC0000000068",
+      "lawName": "行政不服審査法",
+      "articles": 108
+    },
+    {
+      "lawId": "322AC0000000125",
+      "lawName": "国家賠償法",
+      "articles": 6
+    },
+    {
+      "lawId": "417AC0000000086",
+      "lawName": "会社法",
+      "articles": 1158
+    }
+  ]
+}
