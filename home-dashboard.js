@@ -1,6 +1,7 @@
 (()=>{
 'use strict';
 const HOME_LAYOUT_KEY = 'mangaReaderHomeCards';
+const LEGACY_DEFAULT_CARD_IDS = ['bookshelf', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 const DEFAULT_CARD_IDS = ['bookshelf', 'roppo', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 const CARD_CATALOG = Object.freeze({
   bookshelf: Object.freeze({ id: 'bookshelf', title: '本棚', subtitle: '保存した漫画・資料を開く', kind: 'internal', href: 'reader.html#screen=saved-list', badge: 'APP' }),
@@ -21,6 +22,7 @@ function normalizeLayout(value) {
   if (value.length && !normalized.length) return DEFAULT_CARD_IDS.slice();
   return normalized;
 }
+function isLegacyDefaultLayout(layout) { return layout.length === LEGACY_DEFAULT_CARD_IDS.length && layout.every((id, index) => id === LEGACY_DEFAULT_CARD_IDS[index]); }
 function addCard(layout, id) { const normalized = normalizeLayout(layout); if (!isKnownCard(id) || normalized.includes(id)) return normalized; return normalized.concat(id); }
 function removeCard(layout, id) { return normalizeLayout(layout).filter((cardId) => cardId !== id); }
 function moveCard(layout, id, direction) {
@@ -31,9 +33,17 @@ function moveCard(layout, id, direction) {
 function hiddenCardIds(layout) { const visible = new Set(normalizeLayout(layout)); return Object.keys(CARD_CATALOG).filter((id) => !visible.has(id)); }
 function getRaw(storage, key) { return storage.getItem ? storage.getItem(key) : (storage.get(key) ?? null); }
 function setRaw(storage, key, value) { if (storage.setItem) storage.setItem(key, value); else storage.set(key, value); }
-function loadLayout(storage = globalThis.localStorage) { try { const raw = getRaw(storage, HOME_LAYOUT_KEY); return raw == null ? DEFAULT_CARD_IDS.slice() : normalizeLayout(JSON.parse(raw)); } catch (_) { return DEFAULT_CARD_IDS.slice(); } }
+function loadLayout(storage = globalThis.localStorage) {
+  try {
+    const raw = getRaw(storage, HOME_LAYOUT_KEY);
+    if (raw == null) return DEFAULT_CARD_IDS.slice();
+    const normalized = normalizeLayout(JSON.parse(raw));
+    if (!isLegacyDefaultLayout(normalized)) return normalized;
+    const migrated = DEFAULT_CARD_IDS.slice(); setRaw(storage, HOME_LAYOUT_KEY, JSON.stringify(migrated)); return migrated;
+  } catch (_) { return DEFAULT_CARD_IDS.slice(); }
+}
 function saveLayout(layout, storage = globalThis.localStorage) { const normalized = normalizeLayout(layout); setRaw(storage, HOME_LAYOUT_KEY, JSON.stringify(normalized)); return normalized; }
-const api = { HOME_LAYOUT_KEY, DEFAULT_CARD_IDS, CARD_CATALOG, normalizeLayout, addCard, removeCard, moveCard, hiddenCardIds, loadLayout, saveLayout };
+const api = { HOME_LAYOUT_KEY, LEGACY_DEFAULT_CARD_IDS, DEFAULT_CARD_IDS, CARD_CATALOG, normalizeLayout, addCard, removeCard, moveCard, hiddenCardIds, loadLayout, saveLayout };
 if (typeof window !== 'undefined') window.MangaReaderHome = api;
 if (typeof module !== 'undefined') module.exports = api;
 })();
