@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ja" class="auth-pending">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f5f5f7">
+<title>六法</title>
+<link rel="icon" type="image/png" href="icon-152.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<link rel="stylesheet" href="liquid-glass.css">
+<style>
+html.auth-pending body{visibility:hidden}:root{color-scheme:light;--bg:#f5f5f7;--surface:rgba(255,255,255,.82);--surface-strong:#fff;--text:#1d1d1f;--sub:#6e6e73;--line:rgba(60,60,67,.16);--accent:#2563eb;--danger:#dc2626;--glass:rgba(248,249,252,.72);--glass-border:rgba(255,255,255,.78);--glass-shadow:rgba(38,42,50,.15)}html[data-theme="dark"]{color-scheme:dark;--bg:#0a0c11;--surface:rgba(21,25,35,.82);--surface-strong:#151923;--text:#f1f2f6;--sub:#959cab;--line:rgba(255,255,255,.13);--accent:#7aa2ff;--danger:#fb7185;--glass:rgba(25,28,35,.76);--glass-border:rgba(255,255,255,.20);--glass-shadow:rgba(0,0,0,.42)}*{box-sizing:border-box}html,body{margin:0;min-height:100%}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic",sans-serif;color:var(--text);background:radial-gradient(80% 55% at 0 0,color-mix(in srgb,var(--accent) 14%,transparent),transparent 70%),var(--bg);-webkit-font-smoothing:antialiased}button,input,select,textarea,a{font:inherit}.shell{width:min(100% - 24px,1180px);margin:0 auto;padding:max(22px,env(safe-area-inset-top)) 0 max(42px,env(safe-area-inset-bottom))}.header{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:18px}.eyebrow{font-size:11px;font-weight:850;letter-spacing:.14em;color:var(--accent)}h1{margin:6px 0 3px;font-size:clamp(32px,6vw,50px);letter-spacing:-.05em}.sub{margin:0;color:var(--sub);font-size:13px}.topActions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.glassBtn{min-height:42px;border:1px solid var(--glass-border);border-radius:15px;padding:0 13px;background:var(--glass);color:var(--text);font-weight:750;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 8px 22px var(--glass-shadow);-webkit-backdrop-filter:blur(22px) saturate(150%);backdrop-filter:blur(22px) saturate(150%);cursor:pointer}.glassBtn.current{color:var(--accent);cursor:default}.layout{display:grid;grid-template-columns:minmax(260px,340px) minmax(0,1fr);gap:14px;align-items:start}.panel{border:1px solid var(--line);border-radius:24px;background:linear-gradient(145deg,color-mix(in srgb,var(--surface) 95%,transparent),color-mix(in srgb,var(--surface) 76%,transparent));box-shadow:0 14px 34px color-mix(in srgb,var(--glass-shadow) 55%,transparent),inset 0 1px 0 rgba(255,255,255,.25);overflow:hidden}.controls{padding:16px;position:sticky;top:12px}.label{display:block;font-size:11px;font-weight:850;color:var(--sub);margin:0 0 6px}.field{width:100%;min-height:44px;border:1px solid var(--line);border-radius:14px;background:var(--surface-strong);color:var(--text);padding:0 12px;outline:none}.field:focus{border-color:color-mix(in srgb,var(--accent) 52%,var(--line));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent)}.field+ .label,.controlBlock+.controlBlock{margin-top:12px}.resultsMeta{margin:12px 2px 7px;color:var(--sub);font-size:11px}.articleList{display:grid;gap:6px;max-height:58vh;overflow:auto;padding-right:2px}.articleItem{width:100%;border:1px solid var(--line);border-radius:13px;background:color-mix(in srgb,var(--surface-strong) 92%,transparent);color:var(--text);padding:10px 11px;text-align:left;cursor:pointer}.articleItem strong{display:block;font-size:13px}.articleItem span{display:block;color:var(--sub);font-size:11px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.articleItem.active{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));background:color-mix(in srgb,var(--accent) 8%,var(--surface-strong))}.detail{min-height:520px;padding:21px}.detailHead{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding-bottom:14px;border-bottom:1px solid var(--line)}.lawName{margin:0;color:var(--sub);font-size:12px}.articleTitle{margin:5px 0 0;font-size:26px;letter-spacing:-.035em}.caption{display:block;color:var(--sub);font-size:13px;margin-top:4px}.favBtn{min-width:46px}.favBtn.on{color:#f59e0b}.articleBody{white-space:pre-wrap;line-height:1.9;font-size:15px;padding:18px 2px}.memoWrap{border-top:1px solid var(--line);padding-top:16px}.memoHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}.memoHead strong{font-size:14px}.saveStatus{color:var(--sub);font-size:11px}.memo{width:100%;min-height:150px;resize:vertical;border:1px solid var(--line);border-radius:16px;background:var(--surface-strong);color:var(--text);padding:12px;line-height:1.65;outline:none}.memo:focus{border-color:color-mix(in srgb,var(--accent) 50%,var(--line));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent)}.navRow{display:flex;justify-content:space-between;gap:8px;margin-top:14px}.state{padding:48px 20px;text-align:center;color:var(--sub)}.state strong{display:block;color:var(--text);font-size:18px;margin-bottom:8px}.errorLink{margin-top:14px}.syncLine{min-height:19px;margin:0 2px 9px;text-align:right;color:var(--sub);font-size:11px}[hidden]{display:none!important}@media(max-width:800px){.header{display:block}.topActions{justify-content:flex-start;margin-top:15px}.layout{grid-template-columns:1fr}.controls{position:static}.articleList{max-height:36vh}.detail{min-height:400px}.syncLine{text-align:left}}@media(max-width:520px){.topActions>*{flex:1}.detail{padding:16px}.articleTitle{font-size:23px}.articleBody{font-size:14px}}
+</style>
+</head>
+<body>
+<main class="shell">
+  <header class="header">
+    <div><span class="eyebrow">LAW</span><h1>六法</h1><p class="sub">e-Govの現行法令を閲覧し、条文ごとのメモを暗号化同期します。</p></div>
+    <nav class="topActions" aria-label="主要ページ">
+      <a class="glassBtn" href="home.html">ホーム</a><span class="glassBtn current" aria-current="page">六法</span><a class="glassBtn" href="index-search.html">索引検索</a><a class="glassBtn" href="hyakusen.html">判例百選</a><a class="glassBtn" href="sync.html">保管庫</a>
+    </nav>
+  </header>
+  <p id="roppoSyncStatus" class="syncLine" aria-live="polite"></p>
+  <div class="layout">
+    <aside class="panel controls">
+      <div class="controlBlock"><label class="label" for="groupSelect">分野</label><select id="groupSelect" class="field"></select></div>
+      <div class="controlBlock"><label class="label" for="lawSelect">法令</label><select id="lawSelect" class="field"></select></div>
+      <div class="controlBlock"><label class="label" for="roppoSearch">条番号・キーワード検索</label><input id="roppoSearch" class="field" type="search" inputmode="search" autocomplete="off" placeholder="例: 90 / 錯誤 / 公序良俗"></div>
+      <div id="resultsMeta" class="resultsMeta"></div>
+      <div id="articleList" class="articleList" aria-label="条文一覧"></div>
+    </aside>
+    <section class="panel detail" aria-live="polite">
+      <div id="loadingState" class="state"><strong>法令を読み込み中</strong><span>e-Gov 法令APIから現行条文を取得しています。</span></div>
+      <div id="errorState" class="state" hidden><strong>法令を取得できませんでした</strong><span id="errorText"></span><div><a id="officialLawLink" class="glassBtn errorLink" target="_blank" rel="noopener noreferrer">e-Govで開く ↗</a></div></div>
+      <div id="emptyState" class="state" hidden><strong>該当する条文がありません</strong><span>検索語を変えてください。</span></div>
+      <div id="articleDetail" hidden>
+        <div class="detailHead"><div><p id="lawName" class="lawName"></p><h2 id="articleTitle" class="articleTitle"></h2><span id="articleCaption" class="caption"></span></div><button id="favoriteBtn" class="glassBtn favBtn" type="button" aria-label="お気に入り">☆</button></div>
+        <div id="articleBody" class="articleBody"></div>
+        <div class="memoWrap"><div class="memoHead"><strong>この条文のメモ</strong><span id="memoStatus" class="saveStatus"></span></div><textarea id="articleMemo" class="memo" placeholder="要件、趣旨、判例、論証との関係など"></textarea></div>
+        <div class="navRow"><button id="prevArticle" class="glassBtn" type="button">← 前の条文</button><button id="nextArticle" class="glassBtn" type="button">次の条文 →</button></div>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="app-desktop-rail.js"></script>
+<script src="supabase-config.js"></script>
+<script src="vault-session.js?v=20260813-vault-state"></script>
+<script src="vault-payload.js"></script>
+<script src="roppo-data.js"></script>
+<script>
+(()=>{
+'use strict';
+const config=window.MANGA_READER_SUPABASE||{};
+const showLogin=()=>window.location.replace('index.html');
+const showVault=()=>window.location.replace('sync.html');
+const session=window.MangaVault&&MangaVault.loadSession();
+if(!session||!session.refresh_token||!config.url||!config.publishableKey){showLogin();return;}
+if(!MangaVault.loadActive()){showVault();return;}
+MangaVault.refreshSession().then(()=>document.documentElement.classList.remove('auth-pending')).catch(()=>{MangaVault.saveSession(null);showLogin();});
+
+const R=window.MangaRoppo;
+const $=(id)=>document.getElementById(id);
+const ui={group:$('groupSelect'),law:$('lawSelect'),search:$('roppoSearch'),list:$('articleList'),meta:$('resultsMeta'),loading:$('loadingState'),error:$('errorState'),errorText:$('errorText'),official:$('officialLawLink'),empty:$('emptyState'),detail:$('articleDetail'),lawName:$('lawName'),title:$('articleTitle'),caption:$('articleCaption'),body:$('articleBody'),memo:$('articleMemo'),memoStatus:$('memoStatus'),fav:$('favoriteBtn'),prev:$('prevArticle'),next:$('nextArticle'),sync:$('roppoSyncStatus')};
+let state=R.loadState();
+let articles=[];
+let visibleArticles=[];
+let currentIndex=-1;
+let loadToken=0;
+let memoTimer=null;
+let syncTimer=null;
+let syncing=false;
+let syncQueued=false;
+
+try{const theme=localStorage.getItem('mangaReaderTheme');document.documentElement.dataset.theme=theme==='light'?'light':'dark';}catch(_){document.documentElement.dataset.theme='dark';}
+
+function lawMeta(){return R.LAW_CATALOG[state.preferences.selectedLawId];}
+function setView(name){ui.loading.hidden=name!=='loading';ui.error.hidden=name!=='error';ui.empty.hidden=name!=='empty';ui.detail.hidden=name!=='detail';}
+function setSync(text){ui.sync.textContent=text||'';}
+function persistLocal(){state=R.saveState(state);}
+async function syncVault(){
+  if(syncing){syncQueued=true;return;}
+  syncing=true;setSync('同期中…');
+  try{await MangaVault.savePayload(MangaVaultPayload.buildFromLocalStorage());setSync('同期済み');setTimeout(()=>{if(ui.sync.textContent==='同期済み')setSync('');},1800);}
+  catch(error){setSync('端末保存済み・同期失敗: '+(error&&error.message?error.message:'エラー'));}
+  finally{syncing=false;if(syncQueued){syncQueued=false;syncVault();}}
+}
+function scheduleSync(){clearTimeout(syncTimer);syncTimer=setTimeout(syncVault,500);}
+function commitState(){persistLocal();scheduleSync();}
+function populateGroups(){ui.group.replaceChildren();R.LAW_GROUPS.forEach((group)=>{const option=document.createElement('option');option.value=group.id;option.textContent=group.name;ui.group.append(option);});ui.group.value=state.preferences.selectedGroup;populateLaws();}
+function populateLaws(){const group=R.LAW_GROUPS.find((item)=>item.id===state.preferences.selectedGroup)||R.LAW_GROUPS[0];ui.law.replaceChildren();group.lawIds.forEach((id)=>{const law=R.LAW_CATALOG[id];const option=document.createElement('option');option.value=id;option.textContent=law.name;ui.law.append(option);});if(!group.lawIds.includes(state.preferences.selectedLawId))state.preferences.selectedLawId=group.lawIds[0];ui.law.value=state.preferences.selectedLawId;}
+function officialUrl(){return `https://laws.e-gov.go.jp/law/${encodeURIComponent(state.preferences.selectedLawId)}`;}
+async function loadLaw(preferredKey){
+  const token=++loadToken;setView('loading');articles=[];visibleArticles=[];currentIndex=-1;ui.list.replaceChildren();ui.meta.textContent='';ui.official.href=officialUrl();
+  const meta=lawMeta();
+  try{
+    const response=await fetch(`https://laws.e-gov.go.jp/api/1/lawdata/${encodeURIComponent(meta.id)}`);
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    const xml=await response.text();if(token!==loadToken)return;
+    const parsed=R.parseLawXml(xml,meta);articles=parsed.articles;ui.search.value='';renderResults();
+    const target=preferredKey||state.recent.find((entry)=>entry.lawId===meta.id)?.articleKey;
+    let index=target?visibleArticles.findIndex((item)=>item.key===target):-1;if(index<0)index=0;
+    if(visibleArticles.length)selectVisible(index);else setView('empty');
+  }catch(error){if(token!==loadToken)return;ui.errorText.textContent=(error&&error.message?error.message:'不明なエラー')+'。ネットワーク状態を確認するか、公式ページを開いてください。';setView('error');}
+}
+function renderResults(){
+  visibleArticles=R.searchArticles(articles,ui.search.value);ui.list.replaceChildren();ui.meta.textContent=`${visibleArticles.length} 条文`;
+  visibleArticles.forEach((article,index)=>{const button=document.createElement('button');button.type='button';button.className='articleItem';button.dataset.key=article.key;const strong=document.createElement('strong');strong.textContent=article.number||article.key;const span=document.createElement('span');span.textContent=article.caption||article.bodyText.slice(0,45);button.append(strong,span);button.addEventListener('click',()=>selectVisible(index));ui.list.append(button);});
+  if(!visibleArticles.length){setView('empty');currentIndex=-1;return;}
+  const currentKey=currentIndex>=0&&articles[currentIndex]?articles[currentIndex].key:null;const match=currentKey?visibleArticles.findIndex((item)=>item.key===currentKey):-1;if(match>=0)selectVisible(match);else selectVisible(0);
+}
+function pushRecent(article){const meta=lawMeta();state.recent=[{lawId:meta.id,articleKey:article.key,viewedAt:new Date().toISOString()},...state.recent.filter((entry)=>!(entry.lawId===meta.id&&entry.articleKey===article.key))].slice(0,R.MAX_RECENT);}
+function selectVisible(visibleIndex){
+  const article=visibleArticles[visibleIndex];if(!article)return;currentIndex=articles.findIndex((item)=>item.key===article.key);setView('detail');
+  const meta=lawMeta();ui.lawName.textContent=`${meta.name}（${meta.lawNumber}）`;ui.title.textContent=article.number||article.key;ui.caption.textContent=article.caption||'';ui.body.textContent=article.bodyText;
+  const key=R.articleStorageKey(meta.id,article.key);ui.memo.value=state.notes[key]?.text||'';ui.memoStatus.textContent='';const on=state.favorites.includes(key);ui.fav.classList.toggle('on',on);ui.fav.textContent=on?'★':'☆';ui.fav.setAttribute('aria-pressed',String(on));
+  ui.prev.disabled=currentIndex<=0;ui.next.disabled=currentIndex<0||currentIndex>=articles.length-1;
+  Array.from(ui.list.children).forEach((node)=>node.classList.toggle('active',node.dataset.key===article.key));
+  pushRecent(article);persistLocal();
+}
+function selectedArticle(){return currentIndex>=0?articles[currentIndex]:null;}
+function saveMemo(){
+  const article=selectedArticle();if(!article)return;const key=R.articleStorageKey(state.preferences.selectedLawId,article.key);const value=ui.memo.value;
+  if(value.trim())state.notes[key]={text:value,updatedAt:new Date().toISOString()};else delete state.notes[key];
+  persistLocal();ui.memoStatus.textContent='端末に保存済み';scheduleSync();setTimeout(()=>{if(ui.memoStatus.textContent==='端末に保存済み')ui.memoStatus.textContent='';},1600);
+}
+ui.memo.addEventListener('input',()=>{clearTimeout(memoTimer);ui.memoStatus.textContent='保存中…';memoTimer=setTimeout(saveMemo,350);});
+ui.fav.addEventListener('click',()=>{const article=selectedArticle();if(!article)return;const key=R.articleStorageKey(state.preferences.selectedLawId,article.key);state.favorites=state.favorites.includes(key)?state.favorites.filter((item)=>item!==key):[...state.favorites,key];commitState();selectVisible(visibleArticles.findIndex((item)=>item.key===article.key));});
+ui.prev.addEventListener('click',()=>{if(currentIndex>0){const key=articles[currentIndex-1].key;const i=visibleArticles.findIndex((item)=>item.key===key);if(i>=0)selectVisible(i);else{ui.search.value='';renderResults();selectVisible(articles.findIndex((item)=>item.key===key));}}});
+ui.next.addEventListener('click',()=>{if(currentIndex<articles.length-1){const key=articles[currentIndex+1].key;const i=visibleArticles.findIndex((item)=>item.key===key);if(i>=0)selectVisible(i);else{ui.search.value='';renderResults();selectVisible(articles.findIndex((item)=>item.key===key));}}});
+ui.search.addEventListener('input',renderResults);
+ui.group.addEventListener('change',()=>{state.preferences.selectedGroup=ui.group.value;const group=R.LAW_GROUPS.find((item)=>item.id===ui.group.value);state.preferences.selectedLawId=group.lawIds[0];populateLaws();commitState();loadLaw();});
+ui.law.addEventListener('change',()=>{state.preferences.selectedLawId=ui.law.value;commitState();loadLaw();});
+populateGroups();loadLaw();
+})();
+</script>
+</body>
+</html>
