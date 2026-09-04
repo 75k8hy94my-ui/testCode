@@ -81,10 +81,15 @@ to authenticated
 using ((select auth.uid()) = user_id)
 with check ((select auth.uid()) = user_id);
 
+-- 物理DELETEは本人の90日超tombstoneだけ。通常の削除は必ずtombstone RPCを使う。
 create policy "Users can delete their own encrypted chunks"
 on public.manga_reader_encrypted_chunks for delete
 to authenticated
-using ((select auth.uid()) = user_id);
+using (
+  (select auth.uid()) = user_id
+  and deleted_at is not null
+  and deleted_at < now() - interval '90 days'
+);
 
 -- 1 chunk だけを revision CAS で更新する。tombstone 済みの行は通常更新では復活させない。
 create or replace function public.update_manga_reader_encrypted_chunk(
