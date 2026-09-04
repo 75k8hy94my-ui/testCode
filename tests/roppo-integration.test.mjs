@@ -16,46 +16,60 @@ test('home dashboard exposes roppo as a default internal card', () => {
 test('vault payload round-trips encrypted roppo private state through local storage', () => {
   const storage = new Map();
   storage.set('mangaReaderRoppoState', JSON.stringify({
-    schemaVersion: 1,
-    notes: { '129AC0000000089|Article_90': { text: '公序良俗メモ', updatedAt: '2026-09-04T09:00:00.000Z' } },
+    schemaVersion: 2,
+    notes: { '129AC0000000089|Article_90|1': { text: '公序良俗メモ', updatedAt: '2026-09-04T09:00:00.000Z' } },
     favorites: ['129AC0000000089|Article_90'],
     recent: [],
     preferences: { selectedGroup: 'civil-law', selectedLawId: '129AC0000000089' }
   }));
   assert.equal(payload.DATA_KEYS.roppoState, 'mangaReaderRoppoState');
   const built = payload.buildFromLocalStorage(storage);
-  assert.equal(built.roppoState.notes['129AC0000000089|Article_90'].text, '公序良俗メモ');
+  assert.equal(built.roppoState.notes['129AC0000000089|Article_90|1'].text, '公序良俗メモ');
   const target = new Map();
   payload.applyToLocalStorage(built, target);
   assert.equal(JSON.parse(target.get('mangaReaderRoppoState')).favorites[0], '129AC0000000089|Article_90');
 });
 
-test('portable backup preserves normalized roppo state', () => {
+test('portable backup preserves paragraph-scoped roppo state', () => {
   const normalized = backup.normalizeData({
     roppoState: {
-      schemaVersion: 1,
-      notes: { '417AC0000000086|Article_1': { text: '会社法メモ', updatedAt: '2026-09-04T09:00:00.000Z' } },
+      schemaVersion: 2,
+      notes: { '417AC0000000086|Article_1|1': { text: '会社法メモ', updatedAt: '2026-09-04T09:00:00.000Z' } },
       favorites: ['417AC0000000086|Article_1'], recent: [], preferences: {}
     }
   });
-  assert.equal(normalized.roppoState.notes['417AC0000000086|Article_1'].text, '会社法メモ');
+  assert.equal(normalized.roppoState.notes['417AC0000000086|Article_1|1'].text, '会社法メモ');
 });
 
-test('roppo page is vault gated and wired to e-Gov with private-state sync', () => {
+test('roppo page is vault gated, reads repository JSON, and supports paragraph memos', () => {
   const source = read('roppo.html');
   assert.match(source, /class=["']auth-pending["']/);
   assert.match(source, /MangaVault\.loadActive\(\)/);
   assert.match(source, /roppo-data\.js/);
   assert.match(source, /vault-payload\.js/);
-  assert.match(source, /laws\.e-gov\.go\.jp\/api\/1\/lawdata\//);
+  assert.match(source, /data\/roppo\/metadata\.json/);
+  assert.match(source, /data\/roppo\/\$\{encodeURIComponent\(meta\.id\)\}\.json/);
+  assert.doesNotMatch(source, /laws\.e-gov\.go\.jp\/api\/(?:1|2)\//);
+  assert.match(source, /paragraphStorageKey/);
+  assert.match(source, /paragraphBlock/);
   assert.match(source, /MangaVault\.savePayload/);
   assert.match(source, /id=["']roppoSearch["']/);
-  assert.match(source, /id=["']articleMemo["']/);
   assert.match(source, /id=["']favoriteBtn["']/);
+  assert.match(source, /法令データ更新推奨/);
 });
 
-test('static verifier includes roppo page and module', () => {
+test('manual roppo sync workflow has no schedule trigger', () => {
+  const source = read('.github/workflows/sync-roppo.yml');
+  assert.match(source, /workflow_dispatch/);
+  assert.doesNotMatch(source, /schedule\s*:/);
+  assert.match(source, /scripts\/sync-roppo-data\.mjs/);
+});
+
+test('static verifier includes roppo page, module, metadata, and sync assets', () => {
   const source = read('scripts/check-static.mjs');
   assert.match(source, /['"]roppo\.html['"]/);
   assert.match(source, /['"]roppo-data\.js['"]/);
+  assert.match(source, /data\/roppo\/metadata\.json/);
+  assert.match(source, /scripts\/sync-roppo-data\.mjs/);
+  assert.match(source, /\.github\/workflows\/sync-roppo\.yml/);
 });
