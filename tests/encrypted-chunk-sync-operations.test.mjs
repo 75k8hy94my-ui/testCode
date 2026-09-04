@@ -12,6 +12,7 @@ const envelope = (label) => ({
 function memoryCache(initial = []) {
   const rows = new Map(initial.map((row) => [row.chunkId, structuredClone(row)]));
   return {
+    async list() { return [...rows.values()].map((row) => structuredClone(row)); },
     async get(id) { return rows.has(id) ? structuredClone(rows.get(id)) : null; },
     async put(row) { rows.set(row.chunkId, structuredClone(row)); return structuredClone(row); },
     async remove(id) { rows.delete(id); }
@@ -75,4 +76,15 @@ test('cleanupRemoteTombstones clamps retention to 90 days and returns count', as
   const call = vault.calls.find((item) => item.path === '/rest/v1/rpc/cleanup_manga_reader_encrypted_chunk_tombstones');
   assert.ok(call);
   assert.deepEqual(JSON.parse(call.options.body), { retention_days: 90 });
+});
+
+test('syncCache labels metadata/transport failures as the global sync error', async () => {
+  const vault = {
+    async withSession(work) { return work('token', { id: 'user' }); },
+    async api() { throw new Error('network unavailable'); }
+  };
+  const result = await syncApi.syncCache({ vault, cache: memoryCache() });
+  assert.equal(result.errors.length, 1);
+  assert.equal(result.errors[0].chunkId, '__global__');
+  assert.match(result.errors[0].error.message, /network unavailable/);
 });
