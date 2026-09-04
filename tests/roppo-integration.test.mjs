@@ -41,16 +41,19 @@ test('portable backup preserves normalized roppo state', () => {
   assert.equal(normalized.roppoState.notes['417AC0000000086|Article_1'].text, '会社法メモ');
 });
 
-test('roppo page is vault gated and wired to e-Gov with private-state sync', () => {
+test('roppo page is vault gated, reads repository JSON, and syncs private paragraph notes', () => {
   const source = read('roppo.html');
   assert.match(source, /class=["']auth-pending["']/);
   assert.match(source, /MangaVault\.loadActive\(\)/);
   assert.match(source, /roppo-data\.js/);
   assert.match(source, /vault-payload\.js/);
-  assert.match(source, /laws\.e-gov\.go\.jp\/api\/1\/lawdata\//);
+  assert.match(source, /data\/roppo\/metadata\.json/);
+  assert.match(source, /data\/roppo\/\$\{encodeURIComponent\(meta\.id\)\}\.json/);
+  assert.doesNotMatch(source, /laws\.e-gov\.go\.jp\/api\/1\/lawdata\//);
   assert.match(source, /MangaVault\.savePayload/);
+  assert.match(source, /paragraphStorageKey/);
+  assert.match(source, /項のメモ/);
   assert.match(source, /id=["']roppoSearch["']/);
-  assert.match(source, /id=["']articleMemo["']/);
   assert.match(source, /id=["']favoriteBtn["']/);
 });
 
