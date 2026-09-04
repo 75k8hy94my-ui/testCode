@@ -54,6 +54,15 @@
     return pageName() === 'local-reader.html' || Boolean(window.MangaReaderFeatures && window.MangaReaderFeatures.localReader);
   }
 
+  function blockDesktopScreenMarginClick(event) {
+    if (!window.matchMedia || !window.matchMedia('(min-width: 900px)').matches) return;
+    if (!document.documentElement.classList.contains('app-desktop-rail-page')) return;
+    const target = event.target;
+    if (!target || !target.classList || !target.classList.contains('screenView')) return;
+    event.stopImmediatePropagation();
+  }
+  document.addEventListener('click', blockDesktopScreenMarginClick, true);
+
   function ensureStyles() {
     if (document.getElementById('appDesktopRailStyles')) return;
     const style = document.createElement('style');
