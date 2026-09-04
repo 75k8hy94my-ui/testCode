@@ -77,6 +77,7 @@ function createTokenController({ clientId, googleApi, now = Date.now } = {}) {
   const tokenClient = oauth2.initTokenClient({
     client_id: id,
     scope: DRIVE_METADATA_SCOPE,
+    include_granted_scopes: false,
     callback(response) {
       if (!pending) return;
       const current = pending;
