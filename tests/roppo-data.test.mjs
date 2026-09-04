@@ -27,7 +27,7 @@ test('roppo state keeps structured paragraph notes, discards legacy text notes, 
     },
     favorites: ['129AC0000000089|Article_1', '129AC0000000089|Article_1', '', null],
     recent,
-    preferences: { selectedGroup: 'civil-law', selectedLawId: '129AC0000000089', memoVisibility: { requirements: true, effects: false, definitions: true, purpose: false } }
+    preferences: { selectedGroup: 'civil-law', selectedLawId: '129AC0000000089', memoMode: 'edit', memoVisibility: { requirements: true, effects: false, definitions: true, purpose: false } }
   });
   assert.equal(state.schemaVersion, 3);
   assert.equal(state.notes['129AC0000000089|Article_1|P_1'], undefined);
@@ -35,7 +35,7 @@ test('roppo state keeps structured paragraph notes, discards legacy text notes, 
   assert.equal(state.notes['129AC0000000089|Article_3|P_1'], undefined);
   assert.deepEqual(state.favorites, ['129AC0000000089|Article_1']);
   assert.equal(state.recent.length, 50);
-  assert.deepEqual(state.preferences, { selectedGroup: 'civil-law', selectedLawId: '129AC0000000089', memoVisibility: { requirements: true, effects: false, definitions: true, purpose: false } });
+  assert.deepEqual(state.preferences, { selectedGroup: 'civil-law', selectedLawId: '129AC0000000089', memoMode: 'edit', memoVisibility: { requirements: true, effects: false, definitions: true, purpose: false } });
 });
 
 test('memo visibility defaults every category to visible and survives save/load', () => {
@@ -45,6 +45,12 @@ test('memo visibility defaults every category to visible and survives save/load'
   const saved = roppo.saveState(state, storage);
   assert.deepEqual(roppo.loadState(storage).preferences.memoVisibility, saved.preferences.memoVisibility);
   assert.deepEqual(roppo.normalizeState({}).preferences.memoVisibility, ALL_MEMOS_VISIBLE);
+});
+
+test('memo mode defaults to view, accepts edit, and rejects unknown values', () => {
+  assert.equal(roppo.normalizeState({}).preferences.memoMode, 'view');
+  assert.equal(roppo.normalizeState({ preferences: { memoMode: 'edit' } }).preferences.memoMode, 'edit');
+  assert.equal(roppo.normalizeState({ preferences: { memoMode: 'weird' } }).preferences.memoMode, 'view');
 });
 
 test('article and paragraph storage keys are stable', () => {
