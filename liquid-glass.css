@@ -1,0 +1,283 @@
+/* Shared Liquid Glass optical treatment.
+   Page structure and content surfaces stay intact; this file only refines
+   translucent controls/panels that already opt in to glass-like styling. */
+
+/* Hyakusen is dark-first. */
+.shell {
+  --glass-base: var(--panel, rgba(24, 28, 34, .72));
+  --glass-highlight: rgba(255, 255, 255, .34);
+  --glass-edge: rgba(0, 0, 0, .26);
+  --glass-shadow-deep: rgba(0, 0, 0, .36);
+  --glass-shadow-soft: rgba(0, 0, 0, .20);
+  --glass-refraction: rgba(255, 255, 255, .075);
+  --glass-refraction-tail: rgba(255, 255, 255, .012);
+  --glass-border-optical: color-mix(in srgb, var(--line) 72%, rgba(255, 255, 255, .22));
+}
+
+html[data-theme="light"] .shell {
+  --glass-highlight: rgba(255, 255, 255, .88);
+  --glass-edge: rgba(54, 67, 88, .13);
+  --glass-shadow-deep: rgba(44, 54, 70, .24);
+  --glass-shadow-soft: rgba(44, 54, 70, .12);
+  --glass-refraction: rgba(255, 255, 255, .38);
+  --glass-refraction-tail: rgba(255, 255, 255, .08);
+  --glass-border-optical: color-mix(in srgb, var(--line) 56%, rgba(255, 255, 255, .76));
+}
+
+/* Home and Index Search are light-first. */
+.homeShell,
+.indexShell {
+  --glass-base: var(--glass, rgba(248, 249, 252, .74));
+  --glass-highlight: rgba(255, 255, 255, .92);
+  --glass-edge: rgba(62, 72, 88, .14);
+  --glass-shadow-deep: rgba(38, 48, 67, .22);
+  --glass-shadow-soft: rgba(38, 48, 67, .10);
+  --glass-refraction: rgba(255, 255, 255, .40);
+  --glass-refraction-tail: rgba(255, 255, 255, .09);
+  --glass-border-optical: color-mix(in srgb, var(--glass-border, var(--line)) 72%, rgba(255, 255, 255, .84));
+}
+
+html[data-theme="dark"] .homeShell,
+html[data-theme="dark"] .indexShell {
+  --glass-highlight: rgba(255, 255, 255, .24);
+  --glass-edge: rgba(0, 0, 0, .34);
+  --glass-shadow-deep: rgba(0, 0, 0, .48);
+  --glass-shadow-soft: rgba(0, 0, 0, .24);
+  --glass-refraction: rgba(255, 255, 255, .085);
+  --glass-refraction-tail: rgba(255, 255, 255, .016);
+  --glass-border-optical: color-mix(in srgb, var(--glass-border, var(--line)) 78%, rgba(255, 255, 255, .18));
+}
+
+/* --- Hyakusen --------------------------------------------------------- */
+.shell .glass,
+.shell .glassBtn,
+.shell .hyakusenRow {
+  border-color: var(--glass-border-optical);
+  background:
+    radial-gradient(145% 185% at 8% -48%, color-mix(in srgb, var(--glass-highlight) 64%, transparent) 0%, transparent 46%),
+    linear-gradient(135deg, var(--glass-refraction) 0%, color-mix(in srgb, var(--glass-refraction) 42%, transparent) 38%, var(--glass-refraction-tail) 66%, color-mix(in srgb, var(--glass-edge) 10%, transparent) 100%),
+    var(--glass-base);
+  box-shadow:
+    inset 0 1px 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 var(--glass-edge),
+    0 24px 54px -18px var(--glass-shadow-deep),
+    0 8px 22px -12px var(--glass-shadow-soft);
+  -webkit-backdrop-filter: blur(28px) saturate(170%) contrast(108%);
+  backdrop-filter: blur(28px) saturate(170%) contrast(108%);
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.shell .glassBtn {
+  box-shadow:
+    inset 0 1px 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 var(--glass-edge),
+    0 15px 34px -16px var(--glass-shadow-deep),
+    0 5px 14px -8px var(--glass-shadow-soft);
+}
+
+.shell .hyakusenRow[data-drive-state="missing"],
+.shell .hyakusenRow[data-drive-state="unverified"] {
+  box-shadow: none;
+}
+
+.shell .hyakusenRow[data-drive-state="available"] {
+  border-color: color-mix(in srgb, var(--ok) 42%, var(--glass-border-optical));
+}
+
+/* --- Home ------------------------------------------------------------- */
+.homeShell .glassBtn {
+  border-color: var(--glass-border-optical);
+  background:
+    radial-gradient(145% 180% at 8% -46%, color-mix(in srgb, var(--glass-highlight) 62%, transparent) 0%, transparent 46%),
+    linear-gradient(135deg, var(--glass-refraction) 0%, color-mix(in srgb, var(--glass-refraction) 40%, transparent) 40%, var(--glass-refraction-tail) 68%, color-mix(in srgb, var(--glass-edge) 8%, transparent) 100%),
+    var(--glass-base);
+  box-shadow:
+    inset 0 1px 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 var(--glass-edge),
+    0 17px 38px -17px var(--glass-shadow-deep),
+    0 6px 16px -9px var(--glass-shadow-soft);
+  -webkit-backdrop-filter: blur(25px) saturate(168%) contrast(107%);
+  backdrop-filter: blur(25px) saturate(168%) contrast(107%);
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.homeShell .addPanel,
+.homeShell .homeCard {
+  border-color: var(--glass-border-optical);
+  background:
+    radial-gradient(150% 175% at 7% -42%, color-mix(in srgb, var(--glass-highlight) 54%, transparent) 0%, transparent 47%),
+    linear-gradient(135deg, color-mix(in srgb, var(--glass-refraction) 82%, transparent) 0%, color-mix(in srgb, var(--glass-refraction) 32%, transparent) 43%, var(--glass-refraction-tail) 70%, color-mix(in srgb, var(--glass-edge) 7%, transparent) 100%),
+    var(--glass-base);
+  box-shadow:
+    inset 0 1px 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 var(--glass-edge),
+    0 26px 58px -22px var(--glass-shadow-deep),
+    0 9px 24px -14px var(--glass-shadow-soft);
+  -webkit-backdrop-filter: blur(27px) saturate(165%) contrast(106%);
+  backdrop-filter: blur(27px) saturate(165%) contrast(106%);
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+/* --- Index Search ----------------------------------------------------- */
+.indexShell .glassBtn,
+.indexShell .tabBtn {
+  border-color: var(--glass-border-optical);
+  background:
+    radial-gradient(145% 180% at 8% -46%, color-mix(in srgb, var(--glass-highlight) 62%, transparent) 0%, transparent 46%),
+    linear-gradient(135deg, var(--glass-refraction) 0%, color-mix(in srgb, var(--glass-refraction) 40%, transparent) 40%, var(--glass-refraction-tail) 68%, color-mix(in srgb, var(--glass-edge) 8%, transparent) 100%),
+    var(--glass-base);
+  box-shadow:
+    inset 0 1px 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 var(--glass-edge),
+    0 17px 38px -17px var(--glass-shadow-deep),
+    0 6px 16px -9px var(--glass-shadow-soft);
+  -webkit-backdrop-filter: blur(24px) saturate(168%) contrast(107%);
+  backdrop-filter: blur(24px) saturate(168%) contrast(107%);
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.indexShell .tabBtn {
+  box-shadow:
+    inset 0 1px 1px 0 color-mix(in srgb, var(--glass-highlight) 78%, transparent),
+    inset 0 -1px 0 var(--glass-edge),
+    0 8px 18px -13px var(--glass-shadow-soft);
+}
+
+.indexShell .tabBtn.active,
+.indexShell .glassBtn.primary {
+  background:
+    radial-gradient(145% 180% at 8% -46%, color-mix(in srgb, var(--glass-highlight) 68%, transparent) 0%, transparent 44%),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 21%, var(--glass-refraction)) 0%, color-mix(in srgb, var(--accent) 10%, var(--glass-refraction-tail)) 66%, color-mix(in srgb, var(--glass-edge) 8%, transparent) 100%),
+    var(--glass-base);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--glass-border-optical));
+}
+
+.indexShell .searchCard {
+  border-color: var(--glass-border-optical);
+  background:
+    radial-gradient(150% 180% at 7% -44%, color-mix(in srgb, var(--glass-highlight) 58%, transparent) 0%, transparent 48%),
+    linear-gradient(135deg, color-mix(in srgb, var(--glass-refraction) 88%, transparent) 0%, color-mix(in srgb, var(--glass-refraction) 34%, transparent) 42%, var(--glass-refraction-tail) 70%, color-mix(in srgb, var(--glass-edge) 8%, transparent) 100%),
+    var(--glass-base);
+  box-shadow:
+    inset 0 1px 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 var(--glass-edge),
+    0 28px 62px -23px var(--glass-shadow-deep),
+    0 10px 26px -15px var(--glass-shadow-soft);
+  -webkit-backdrop-filter: blur(30px) saturate(172%) contrast(108%);
+  backdrop-filter: blur(30px) saturate(172%) contrast(108%);
+}
+
+.indexShell .filterMenu {
+  border-color: var(--glass-border-optical);
+  background:
+    radial-gradient(150% 180% at 7% -44%, color-mix(in srgb, var(--glass-highlight) 60%, transparent) 0%, transparent 47%),
+    linear-gradient(135deg, color-mix(in srgb, var(--glass-refraction) 90%, transparent) 0%, color-mix(in srgb, var(--glass-refraction) 34%, transparent) 44%, var(--glass-refraction-tail) 72%, color-mix(in srgb, var(--glass-edge) 8%, transparent) 100%),
+    var(--glass-base);
+  box-shadow:
+    inset 0 1px 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 var(--glass-edge),
+    0 30px 68px -20px var(--glass-shadow-deep),
+    0 10px 26px -12px var(--glass-shadow-soft);
+  -webkit-backdrop-filter: blur(32px) saturate(174%) contrast(108%);
+  backdrop-filter: blur(32px) saturate(174%) contrast(108%);
+}
+
+.indexShell .toolPanel,
+.indexShell .resultCard,
+.indexShell .emptyCard,
+.indexShell .syncStrip {
+  border-color: var(--glass-border-optical);
+  background:
+    radial-gradient(155% 180% at 7% -46%, color-mix(in srgb, var(--glass-highlight) 48%, transparent) 0%, transparent 49%),
+    linear-gradient(135deg, color-mix(in srgb, var(--glass-refraction) 74%, transparent) 0%, color-mix(in srgb, var(--glass-refraction) 28%, transparent) 45%, var(--glass-refraction-tail) 72%, color-mix(in srgb, var(--glass-edge) 6%, transparent) 100%),
+    color-mix(in srgb, var(--surface, var(--glass-base)) 86%, var(--glass-base));
+  box-shadow:
+    inset 0 1px 1px 0 color-mix(in srgb, var(--glass-highlight) 84%, transparent),
+    inset 0 -1px 0 var(--glass-edge),
+    0 22px 48px -22px var(--glass-shadow-deep),
+    0 8px 20px -14px var(--glass-shadow-soft);
+}
+
+@media (hover: hover) {
+  .shell .glassBtn:hover,
+  .shell button.hyakusenRow[data-drive-state="available"]:hover,
+  .homeShell .glassBtn:hover,
+  .indexShell .glassBtn:hover,
+  .indexShell .tabBtn:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--glass-border-optical) 72%, var(--glass-highlight));
+    box-shadow:
+      inset 0 1px 1px 0 var(--glass-highlight),
+      inset 0 -1px 0 var(--glass-edge),
+      0 23px 46px -18px var(--glass-shadow-deep),
+      0 8px 18px -10px var(--glass-shadow-soft);
+  }
+
+  .homeShell .homeCard:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 1px 1px 0 var(--glass-highlight),
+      inset 0 -1px 0 var(--glass-edge),
+      0 30px 64px -22px var(--glass-shadow-deep),
+      0 12px 28px -14px var(--glass-shadow-soft);
+  }
+}
+
+.shell .glassBtn:active,
+.shell button.hyakusenRow[data-drive-state="available"]:active,
+.homeShell .glassBtn:active,
+.indexShell .glassBtn:active,
+.indexShell .tabBtn:active {
+  transform: translateY(0) scale(.98);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .shell .glass,
+  .shell .glassBtn,
+  .shell .hyakusenRow {
+    background: var(--panel-strong, var(--glass-base));
+  }
+
+  .homeShell .glassBtn,
+  .homeShell .addPanel,
+  .homeShell .homeCard,
+  .indexShell .glassBtn,
+  .indexShell .tabBtn,
+  .indexShell .searchCard,
+  .indexShell .filterMenu,
+  .indexShell .toolPanel,
+  .indexShell .resultCard,
+  .indexShell .emptyCard,
+  .indexShell .syncStrip {
+    background: var(--surface-strong, var(--glass-base));
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .shell .glass,
+  .shell .glassBtn,
+  .shell .hyakusenRow,
+  .homeShell .glassBtn,
+  .homeShell .addPanel,
+  .homeShell .homeCard,
+  .indexShell .glassBtn,
+  .indexShell .tabBtn,
+  .indexShell .searchCard,
+  .indexShell .filterMenu {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell .glass,
+  .shell .glassBtn,
+  .shell .hyakusenRow,
+  .homeShell .glassBtn,
+  .homeShell .addPanel,
+  .homeShell .homeCard,
+  .indexShell .glassBtn,
+  .indexShell .tabBtn {
+    transition: none;
+  }
+}
