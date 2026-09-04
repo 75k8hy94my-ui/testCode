@@ -5,12 +5,14 @@ import fs from 'node:fs';
 const cssUrl = new URL('../liquid-glass.css', import.meta.url);
 const cssExists = fs.existsSync(cssUrl);
 const css = cssExists ? fs.readFileSync(cssUrl, 'utf8') : '';
-const rail = fs.readFileSync(new URL('../app-desktop-rail.js', import.meta.url), 'utf8');
+const targetPages = ['hyakusen.html', 'home.html', 'index-search.html'];
+const pages = Object.fromEntries(targetPages.map((name) => [name, fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8')]));
 
-test('shared Liquid Glass stylesheet exists and is loaded by the common desktop bootstrap', () => {
+test('shared Liquid Glass stylesheet exists and is linked by every target page', () => {
   assert.equal(cssExists, true, 'liquid-glass.css should exist');
-  assert.match(rail, /liquid-glass\.css/);
-  assert.match(rail, /appLiquidGlassStyles/);
+  for (const [name, html] of Object.entries(pages)) {
+    assert.match(html, /<link\s+rel="stylesheet"\s+href="liquid-glass\.css">/, `${name} should load liquid-glass.css`);
+  }
 });
 
 test('shared optical tokens are theme-aware for Hyakusen, Home and Index Search', () => {
