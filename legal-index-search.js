@@ -278,6 +278,24 @@ function classify(group, rawQuery, modes) {
   return null;
 }
 
+function hyakusenCatalog() {
+  if (typeof globalThis !== 'undefined' && globalThis.HyakusenCatalog) return globalThis.HyakusenCatalog;
+  if (typeof require === 'function') {
+    try { return require('./hyakusen-catalog.js'); } catch (_) {}
+  }
+  return null;
+}
+
+function annotateCaseDisplay(identityKey, display, entries) {
+  if (!text(identityKey).startsWith('case|')) return text(display);
+  const catalog = hyakusenCatalog();
+  if (!catalog || typeof catalog.primaryListingsForIdentity !== 'function' || typeof catalog.labelForEntry !== 'function') return text(display);
+  const listings = catalog.primaryListingsForIdentity(identityKey, entries);
+  if (!listings.length) return text(display);
+  const labels = listings.map((entry) => catalog.labelForEntry(entry));
+  return `${text(display)}　${labels.map((label) => `［${label}］`).join('')}`;
+}
+
 function search(index, query, options = {}) {
   const kind = ['all', 'matter', 'case', 'statute'].includes(options.kind) ? options.kind : 'all';
   const modes = normalizeMatchModes(options.matchModes);
@@ -304,7 +322,43 @@ function search(index, query, options = {}) {
     if (b.score !== a.score) return b.score - a.score;
     return normalizeLegalText(a.display).localeCompare(normalizeLegalText(b.display), 'ja');
   });
+  for (const result of results) {
+    if (result.kind === 'case') result.display = annotateCaseDisplay(result.identityKey, result.display, options.hyakusenEntries);
+  }
   return results;
+}
+
+function installHyakusenBrowserIntegration() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+  const installLink = () => {
+    if (document.getElementById('openHyakusenBtn')) return;
+    const actions = document.querySelector('.topbar .actions');
+    if (!actions) return;
+    const link = document.createElement('a');
+    link.id = 'openHyakusenBtn';
+    link.href = 'hyakusen.html';
+    link.className = 'glassBtn';
+    link.textContent = '判例百選';
+    link.style.display = 'inline-flex';
+    link.style.alignItems = 'center';
+    link.style.textDecoration = 'none';
+    actions.append(link);
+  };
+
+  if (!window.HyakusenCatalog && !document.querySelector('script[data-hyakusen-catalog]')) {
+    const script = document.createElement('script');
+    script.src = 'hyakusen-catalog.js';
+    script.dataset.hyakusenCatalog = 'true';
+    script.addEventListener('load', () => {
+      const query = document.getElementById('indexQuery');
+      if (query && query.value.trim()) query.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    document.head.append(script);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installLink, { once: true });
+  else installLink();
 }
 
 const api = {
@@ -315,8 +369,12 @@ const api = {
   statuteIdentityKey,
   buildIndex,
   search,
+  annotateCaseDisplay,
   damerauLevenshtein
 };
-if (typeof window !== 'undefined') window.LegalIndexSearch = api;
+if (typeof window !== 'undefined') {
+  window.LegalIndexSearch = api;
+  installHyakusenBrowserIntegration();
+}
 if (typeof module !== 'undefined') module.exports = api;
 })();

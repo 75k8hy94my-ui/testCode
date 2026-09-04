@@ -40,6 +40,7 @@ if (typeof window !== 'undefined') window.LegalIndexSearchWorker = api;
 
 if (typeof self !== 'undefined' && typeof self.postMessage === 'function' && typeof importScripts === 'function') {
   try {
+    if (!self.HyakusenCatalog) importScripts('hyakusen-catalog.js');
     if (!self.LegalIndexSearch) importScripts('legal-index-search.js');
     const handler = createWorkerHandler(self.LegalIndexSearch, self.postMessage.bind(self));
     self.onmessage = (event) => handler(event.data);

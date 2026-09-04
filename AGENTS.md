@@ -28,6 +28,21 @@
 - AI conversion support only generates/copies the static schema instructions. It must not send registered book content or provider credentials to an external AI service.
 - Run `npm test` and `npm run verify:static` before merging legal-index changes.
 
+## 判例百選 / Google Drive
+
+- `hyakusen.html` is authenticated and requires an unlocked Vault, just like `index-search.html`.
+- `hyakusen-catalog.js` is the single authoritative mapping from a case identity to Hyakusen collection/edition/number. `DEFAULT_ENTRIES` intentionally remains empty until the user supplies an authoritative contents list; never infer or fabricate Hyakusen contents.
+- A Hyakusen case match requires all six structured case identity fields: court, decision date, reporter, volume, issue, and reporter page. Never attach a Hyakusen label from the decision date alone or from the `case-text|...` fallback identity.
+- When the same case appears in multiple editions of one Hyakusen collection, the latest edition is the default listing. Latest labels omit the edition (`民法Ⅱ14`); old-edition-only fallback labels include it (`民法Ⅱ8版37`).
+- `legal-index-search.js` adds Hyakusen labels only after ordinary search ranking is complete, so Hyakusen metadata must not change search scoring/order. Worker search imports the same catalog before `legal-index-search.js`.
+- Drive integration uses Google Identity Services token model and only the scope `https://www.googleapis.com/auth/drive.metadata.readonly`.
+- Drive availability is based only on exact filename equality with an expected catalog filename, `mimeType === 'application/pdf'`, and `trashed === false`. Similar filenames do not count.
+- Never download or inspect Drive PDF bodies for availability checking. Only metadata fields `id`, `name`, `mimeType`, `trashed`, and `webViewLink` are requested.
+- The Google OAuth Client ID may be stored in localStorage because it is public configuration. The Google access token is held only in page memory and must never be written to localStorage, sessionStorage, IndexedDB, the Vault, Supabase, or backups. Do not introduce a client secret into browser code or the repository.
+- To configure Google Cloud: enable Google Drive API; create an OAuth 2.0 **Web application** client; add `https://75k8hy94my-ui.github.io` as an Authorized JavaScript origin; then paste that client ID into the Hyakusen page. No client secret is used by testCode.
+- Google Identity Services does not automatically refresh access tokens. When a token expires or authorization is lost, the user reconnects from the Hyakusen page.
+- Run `npm test` and `npm run verify:static` before merging Hyakusen or Drive changes.
+
 ## Manual CAS verification
 
 Open the same account in two authenticated browser contexts, unlock the same vault revision, change data in both, and save both. Exactly one save must succeed; the other must show a conflict while retaining its local data. Apply `supabase-schema.sql` in the Supabase SQL editor before testing.
