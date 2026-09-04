@@ -5,8 +5,9 @@ import vm from 'node:vm';
 import backup from '../backup-format.js';
 const { VERSION, createBackup, migrateBackup, migrateBackupPackage } = backup;
 
-const defaultHomeCards = ['bookshelf', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
+const defaultHomeCards = ['bookshelf', 'roppo', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 const defaultIndexSearchSettings = { matchModes: { exact: true, partial: true, and: true, fuzzy: true }, activeKind: 'all', selectedSubjects: [], selectedBookIds: [] };
+const emptyRoppoState = { schemaVersion: 1, notes: {}, favorites: [], recent: [], preferences: { selectedGroup: 'constitutional-law', selectedLawId: '321CONSTITUTION' } };
 const emptyStudy = {
   schemaVersion: 1,
   subjects: [
@@ -29,12 +30,12 @@ const indexBook = {
   statuteEntries: [{ statute: '民法', article: '423', paragraph: '', item: '', citationText: '民法423条', pages: ['205'] }]
 };
 
-test('versioned backup round-trips author cards and supplies video library, home, study and index-search defaults', () => {
+test('versioned backup round-trips author cards and supplies video library, home, study, index-search and roppo defaults', () => {
   const data = { folders: [{ id: 'f' }], items: [], authorCards: [{ id: 'a', name: '作者' }], theme: 'light' };
   const result = createBackup(data, '2026-08-22T00:00:00.000Z');
   assert.equal(VERSION, 3);
   assert.deepEqual(result.indexBooks, []);
-  assert.deepEqual(migrateBackup(result), { folders: data.folders, items: [], videos: [], videoFolders: [], videoMeta: {}, authorCards: data.authorCards, mangaInfo: {}, toc: {}, lastPages: {}, theme: 'light', dashboardVisibility: { mobile: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false } }, homeCards: defaultHomeCards, study: emptyStudy, indexSearchSettings: defaultIndexSearchSettings });
+  assert.deepEqual(migrateBackup(result), { folders: data.folders, items: [], videos: [], videoFolders: [], videoMeta: {}, authorCards: data.authorCards, mangaInfo: {}, toc: {}, lastPages: {}, theme: 'light', dashboardVisibility: { mobile: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false } }, homeCards: defaultHomeCards, study: emptyStudy, indexSearchSettings: defaultIndexSearchSettings, roppoState: emptyRoppoState });
 });
 
 test('backup v3 preserves current study arguments, drafts and argument progress', () => {
@@ -91,6 +92,7 @@ test('backup v2 remains importable and migrates with no index books', () => {
   assert.deepEqual(legacy.data.homeCards, ['study', 'bookshelf']);
   assert.deepEqual(legacy.data.study, emptyStudy);
   assert.deepEqual(legacy.data.indexSearchSettings, defaultIndexSearchSettings);
+  assert.deepEqual(legacy.data.roppoState, emptyRoppoState);
 });
 
 test('legacy raw payload migrates with no index books and future versions are rejected', () => {
@@ -102,6 +104,7 @@ test('legacy raw payload migrates with no index books and future versions are re
   assert.deepEqual(legacy.data.homeCards, defaultHomeCards);
   assert.deepEqual(legacy.data.study, emptyStudy);
   assert.deepEqual(legacy.data.indexSearchSettings, defaultIndexSearchSettings);
+  assert.deepEqual(legacy.data.roppoState, emptyRoppoState);
   assert.throws(() => migrateBackupPackage({ format: 'manga-reader-backup', version: 99, data: {} }));
   assert.throws(() => migrateBackup({ format: 'manga-reader-backup', version: 99, data: {} }));
 });
