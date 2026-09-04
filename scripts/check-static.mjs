@@ -14,6 +14,7 @@ const standalone = [
   'status-message.js', 'study-data.js', 'study-arguments.js', 'study-sync.js', 'study-quiz.js', 'study-audio.js', 'study-ai.js',
   'study-offline.js', 'supabase-config.js', 'url-parser.js', 'vault-payload.js', 'vault-session.js', 'video-thumbnail-time.js'
 ];
+const requiredAssets = ['data/roppo/metadata.json', 'scripts/roppo-sync-lib.mjs', 'scripts/sync-roppo-data.mjs', '.github/workflows/sync-roppo.yml'];
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 for (const file of standalone) new vm.Script(read(file), { filename: file });
@@ -26,6 +27,13 @@ for (const file of pages) {
     if (!fs.existsSync(path.join(root, ref))) throw new Error(`${file} references missing ${ref}`);
   }
 }
+for (const file of requiredAssets) if (!fs.existsSync(path.join(root, file))) throw new Error(`missing required roppo asset ${file}`);
+const metadata = JSON.parse(read('data/roppo/metadata.json'));
+if (!metadata.lastSyncedAt || !metadata.laws) throw new Error('invalid roppo metadata');
+const roppoPage = read('roppo.html');
+if (/laws\.e-gov\.go\.jp\/api\/(?:1|2)\//.test(roppoPage)) throw new Error('roppo page must not fetch e-Gov API at runtime');
+const syncWorkflow = read('.github/workflows/sync-roppo.yml');
+if (/schedule\s*:/.test(syncWorkflow) || !/workflow_dispatch/.test(syncWorkflow)) throw new Error('roppo sync must be manual-only');
 const allSource = pages.concat(standalone).map(read).join('\n');
 if (/service_role|BEGIN (?:RSA|OPENSSH)|sk-[A-Za-z0-9]/i.test(allSource)) throw new Error('potential secret material found');
 console.log(`static verification passed: ${pages.length} HTML pages, ${standalone.length} JS files`);
