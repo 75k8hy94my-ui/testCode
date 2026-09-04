@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, calendar, json, re, urllib.request
+import argparse, calendar, json, re, time, urllib.error, urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 import xml.etree.ElementTree as ET
@@ -104,11 +104,26 @@ def is_stale(last_synced_at: str | None, now: datetime | None = None) -> bool:
         last = last.replace(tzinfo=timezone.utc)
     return now >= add_one_month(last)
 
-def fetch_xml(law_id: str) -> str:
+def fetch_xml(law_id: str, attempts: int = 4) -> str:
     url = f'https://laws.e-gov.go.jp/api/1/lawdata/{law_id}'
-    req = urllib.request.Request(url, headers={'User-Agent': 'testCode-roppo-sync/1.0'})
-    with urllib.request.urlopen(req, timeout=45) as response:
-        return response.read().decode('utf-8')
+    last_error = None
+    for attempt in range(1, attempts + 1):
+        req = urllib.request.Request(url, headers={'User-Agent': 'testCode-roppo-sync/1.0', 'Accept': 'application/xml,text/xml,*/*'})
+        try:
+            with urllib.request.urlopen(req, timeout=45) as response:
+                return response.read().decode('utf-8')
+        except urllib.error.HTTPError as error:
+            last_error = error
+            if error.code not in {404, 408, 429, 500, 502, 503, 504} or attempt == attempts:
+                raise
+        except urllib.error.URLError as error:
+            last_error = error
+            if attempt == attempts:
+                raise
+        delay = attempt * 2
+        print(f'Retrying {law_id} after {last_error} ({attempt}/{attempts}) in {delay}s...')
+        time.sleep(delay)
+    raise last_error
 
 def load_metadata(path: Path):
     try:
