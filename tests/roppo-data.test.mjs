@@ -15,34 +15,55 @@ test('administrative-law group contains the core administrative statutes', () =>
   assert.deepEqual(admin.lawIds, ['405AC0000000088', '337AC0000000139', '426AC0000000068', '322AC0000000125']);
 });
 
-test('roppo state normalization removes malformed private data, deduplicates favorites, and caps recent items', () => {
-  const recent = Array.from({ length: 60 }, (_, index) => ({ lawId: '129AC0000000089', articleKey: String(index + 1), viewedAt: `2026-09-04T00:${String(index).padStart(2, '0')}:00.000Z` }));
+test('schema v1 article notes migrate to paragraph 1 while malformed data is discarded', () => {
   const state = roppo.normalizeState({
-    schemaVersion: 99,
+    schemaVersion: 1,
     notes: {
-      '129AC0000000089|1': { text: '基本原則', updatedAt: '2026-09-04T09:00:00.000Z' },
-      'bad': { text: 42 },
-      'empty': { text: '   ', updatedAt: 'x' }
+      '129AC0000000089|Article_95': { text: '錯誤のメモ', updatedAt: '2026-09-04T09:00:00.000Z' },
+      'bad': { text: 42 }
     },
-    favorites: ['129AC0000000089|1', '129AC0000000089|1', '', null],
+    favorites: ['129AC0000000089|Article_95', '129AC0000000089|Article_95'],
+    recent: [{ lawId: '129AC0000000089', articleKey: 'Article_95', viewedAt: '2026-09-04T09:00:00.000Z' }],
+    preferences: { selectedGroup: 'civil-law', selectedLawId: '129AC0000000089' }
+  });
+  assert.equal(state.schemaVersion, 2);
+  assert.deepEqual(state.notes, {
+    '129AC0000000089|Article_95|1': { text: '錯誤のメモ', updatedAt: '2026-09-04T09:00:00.000Z' }
+  });
+  assert.deepEqual(state.favorites, ['129AC0000000089|Article_95']);
+});
+
+test('schema v2 paragraph notes remain paragraph scoped and recent items are capped', () => {
+  const recent = Array.from({ length: 60 }, (_, index) => ({ lawId: '129AC0000000089', articleKey: `Article_${index + 1}`, viewedAt: `2026-09-04T00:${String(index).padStart(2, '0')}:00.000Z` }));
+  const state = roppo.normalizeState({
+    schemaVersion: 2,
+    notes: {
+      '129AC0000000089|Article_95|1': { text: '1項', updatedAt: '' },
+      '129AC0000000089|Article_95|2': { text: '2項', updatedAt: '' }
+    },
     recent,
     preferences: { selectedGroup: 'civil-law', selectedLawId: '129AC0000000089' }
   });
-  assert.equal(state.schemaVersion, 1);
-  assert.deepEqual(Object.keys(state.notes), ['129AC0000000089|1']);
-  assert.deepEqual(state.favorites, ['129AC0000000089|1']);
+  assert.equal(state.schemaVersion, 2);
+  assert.deepEqual(Object.keys(state.notes), ['129AC0000000089|Article_95|1', '129AC0000000089|Article_95|2']);
   assert.equal(state.recent.length, 50);
-  assert.deepEqual(state.preferences, { selectedGroup: 'civil-law', selectedLawId: '129AC0000000089' });
 });
 
-test('article storage keys are stable per law and article', () => {
-  assert.equal(roppo.articleStorageKey('129AC0000000089', 'Article_90'), '129AC0000000089|Article_90');
+test('paragraph storage keys are stable per law article and paragraph', () => {
+  assert.equal(roppo.paragraphStorageKey('129AC0000000089', 'Article_95', 2), '129AC0000000089|Article_95|2');
 });
 
-test('article search matches article number, caption, and body text', () => {
+test('law data becomes stale one calendar month after last sync', () => {
+  const metadata = { lastSyncedAt: '2026-08-04T12:00:00.000Z' };
+  assert.equal(roppo.isLawDataStale(metadata, new Date('2026-09-04T11:59:59.000Z')), false);
+  assert.equal(roppo.isLawDataStale(metadata, new Date('2026-09-04T12:00:00.000Z')), true);
+  assert.equal(roppo.isLawDataStale({}, new Date('2026-09-04T12:00:00.000Z')), true);
+});
+
+test('article search matches normalized article number, official caption, and paragraph text', () => {
   const articles = [
-    { key: 'Article_90', number: '第九十条', caption: '公序良俗', bodyText: '公の秩序又は善良の風俗に反する法律行為は、無効とする。' },
-    { key: 'Article_95', number: '第九十五条', caption: '錯誤', bodyText: '意思表示は、錯誤に基づくものであって…' }
+    { key: 'Article_90', number: '第90条', caption: '公序良俗', paragraphs: [{ num: '1', text: '公の秩序又は善良の風俗に反する法律行為は、無効とする。' }], bodyText: '公の秩序又は善良の風俗に反する法律行為は、無効とする。' },
+    { key: 'Article_95', number: '第95条', caption: '錯誤', paragraphs: [{ num: '1', text: '意思表示は、錯誤に基づくものであって…' }], bodyText: '意思表示は、錯誤に基づくものであって…' }
   ];
   assert.deepEqual(roppo.searchArticles(articles, '90').map((item) => item.key), ['Article_90']);
   assert.deepEqual(roppo.searchArticles(articles, '公序良俗').map((item) => item.key), ['Article_90']);
