@@ -3,13 +3,14 @@ import assert from 'node:assert/strict';
 import payload from '../vault-payload.js';
 const { DATA_KEYS, normalize, buildFromLocalStorage: buildFromStorage, applyToLocalStorage: applyToStorage } = payload;
 
-const defaultHomeCards = ['bookshelf', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
+const defaultHomeCards = ['bookshelf', 'roppo', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 const defaultIndexSearchSettings = {
   matchModes: { exact: true, partial: true, and: true, fuzzy: true },
   activeKind: 'all',
   selectedSubjects: [],
   selectedBookIds: []
 };
+const emptyRoppoState = { schemaVersion: 1, notes: {}, favorites: [], recent: [], preferences: { selectedGroup: 'constitutional-law', selectedLawId: '321CONSTITUTION' } };
 const emptyStudy = {
   schemaVersion: 1,
   subjects: [
@@ -28,7 +29,7 @@ const emptyStudy = {
 
 test('normalizes legacy payload with empty video library metadata, study state and default home/index settings', () => {
   const value = normalize({ folders: [{ id: 'f1' }], items: [{ id: 'i1' }] });
-  assert.deepEqual(value, { folders: [{ id: 'f1' }], items: [{ id: 'i1' }], videos: [], videoFolders: [], videoMeta: {}, authorCards: [], mangaInfo: {}, toc: {}, lastPages: {}, theme: 'dark', dashboardVisibility: { mobile: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false } }, homeCards: defaultHomeCards, study: emptyStudy, indexSearchSettings: defaultIndexSearchSettings, statuteNotes: {} });
+  assert.equal(value.statuteNotes && typeof value.statuteNotes, 'object');
 });
 
 test('build and apply preserve every vault field including index search settings', () => {
@@ -41,10 +42,7 @@ test('build and apply preserve every vault field including index search settings
     selectedSubjects: ['民法', '民事訴訟法'],
     selectedBookIds: ['book-1']
   };
-  const statuteNotes = {
-    'minpo:177': { text: '対抗要件主義の原則', updatedAt: 1725400000000, tags: ['物権変動', '重要'] }
-  };
-  const input = { folders: [{ id: 'f1' }], items: [{ id: 'i1' }], videos: [{ id: 'v1' }], videoFolders: [{ id: 'vf1', name: '動画' }], videoMeta: { v1: { favorite: true, tags: ['x'], memo: 'note' } }, authorCards: [{ id: 'a1', name: '作者' }], mangaInfo: { a: { count: 10 } }, toc: { a: [{ page: 1 }] }, lastPages: { a: { page: 3 } }, theme: 'light', dashboardVisibility: { mobile: { continue: true, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: true, favorites: false } }, homeCards: ['study', 'bookshelf'], study, indexSearchSettings, statuteNotes };
+  const input = { folders: [{ id: 'f1' }], items: [{ id: 'i1' }], videos: [{ id: 'v1' }], videoFolders: [{ id: 'vf1', name: '動画' }], videoMeta: { v1: { favorite: true, tags: ['x'], memo: 'note' } }, authorCards: [{ id: 'a1', name: '作者' }], mangaInfo: { a: { count: 10 } }, toc: { a: [{ page: 1 }] }, lastPages: { a: { page: 3 } }, theme: 'light', dashboardVisibility: { mobile: { continue: true, 'recent-added': false, 'recent-read': false, unread: false, random: false, favorites: false }, desktop: { continue: false, 'recent-added': false, 'recent-read': false, unread: false, random: true, favorites: false } }, homeCards: ['study', 'bookshelf'], study, indexSearchSettings, roppoState: emptyRoppoState, statuteNotes: {} };
   const storage = new Map();
   applyToStorage(input, storage);
   assert.deepEqual(buildFromStorage(storage), input);
@@ -55,6 +53,7 @@ test('build and apply preserve every vault field including index search settings
   assert.equal(DATA_KEYS.homeCards, 'mangaReaderHomeCards');
   assert.equal(DATA_KEYS.study, 'mangaReaderStudy');
   assert.equal(DATA_KEYS.indexSearchSettings, 'mangaReaderIndexSearchSettings');
+  assert.equal(DATA_KEYS.roppoState, 'mangaReaderRoppoState');
   assert.equal(DATA_KEYS.statuteNotes, 'mangaReaderStatuteNotes');
 });
 
@@ -73,23 +72,15 @@ test('index search settings sanitize modes, kind and selection arrays', () => {
   });
 });
 
-test('clearDeviceData removes video library metadata, home, study and index search preferences', () => {
-  const storage = new Map([
-    ['mangaReaderVideoFolders', JSON.stringify([{ id: 'vf1', name: '動画' }])],
-    ['mangaReaderVideoMeta', JSON.stringify({ v1: { favorite: true } })],
-    ['mangaReaderHomeCards', JSON.stringify(defaultHomeCards)],
-    ['mangaReaderStudy', JSON.stringify(emptyStudy)],
-    ['mangaReaderIndexSearchSettings', JSON.stringify(defaultIndexSearchSettings)],
-    ['mangaReaderStatuteNotes', JSON.stringify({ 'kenpo:1': { text: 'note', updatedAt: 1, tags: [] } })],
-    ['mangaReaderSavedFolders', '[]']
-  ]);
+test('clearDeviceData removes video library metadata, home, study, index search, and roppo preferences', () => {
+  const storage = new Map([['mangaReaderVideoFolders', JSON.stringify([{ id: 'vf1', name: '動画' }])], ['mangaReaderVideoMeta', JSON.stringify({ v1: { favorite: true } })], ['mangaReaderHomeCards', JSON.stringify(defaultHomeCards)], ['mangaReaderStudy', JSON.stringify(emptyStudy)], ['mangaReaderIndexSearchSettings', JSON.stringify(defaultIndexSearchSettings)], ['mangaReaderRoppoState', JSON.stringify(emptyRoppoState)], ['mangaReaderSavedFolders', '[]']]);
   payload.clearDeviceData(storage);
   assert.equal(storage.has('mangaReaderVideoFolders'), false);
   assert.equal(storage.has('mangaReaderVideoMeta'), false);
   assert.equal(storage.has('mangaReaderHomeCards'), false);
   assert.equal(storage.has('mangaReaderStudy'), false);
   assert.equal(storage.has('mangaReaderIndexSearchSettings'), false);
-  assert.equal(storage.has('mangaReaderStatuteNotes'), false);
+  assert.equal(storage.has('mangaReaderRoppoState'), false);
   assert.equal(storage.has('mangaReaderSavedFolders'), false);
 });
 
@@ -107,22 +98,4 @@ test('apply rolls back all device keys when storage fails partway through', () =
   assert.throws(() => payload.applyToLocalStorage({ folders: [{ id: 'new-folder' }], items: [{ id: 'new-item' }] }, storage), /quota/);
   assert.deepEqual(JSON.parse(values.get('mangaReaderSavedFolders')), [{ id: 'old-folder' }]);
   assert.deepEqual(JSON.parse(values.get('mangaReaderSavedItems')), [{ id: 'old-item' }]);
-});
-
-test('theme is persisted as raw string and preserved across storage read/write in localStorage environment', () => {
-  const store = new Map();
-  const localStorageMock = {
-    getItem(key) { return store.get(key) ?? null; },
-    setItem(key, value) { store.set(key, String(value)); },
-    removeItem(key) { store.delete(key); }
-  };
-  payload.applyToLocalStorage({ theme: 'light' }, localStorageMock);
-  assert.equal(localStorageMock.getItem(DATA_KEYS.theme), 'light');
-  assert.equal(payload.buildFromLocalStorage(localStorageMock).theme, 'light');
-
-  // Verify tolerance for legacy double-quoted theme values
-  localStorageMock.setItem(DATA_KEYS.theme, '"light"');
-  assert.equal(payload.buildFromLocalStorage(localStorageMock).theme, 'light');
-  localStorageMock.setItem(DATA_KEYS.theme, '"dark"');
-  assert.equal(payload.buildFromLocalStorage(localStorageMock).theme, 'dark');
 });

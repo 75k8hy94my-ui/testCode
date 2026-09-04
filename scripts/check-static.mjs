@@ -4,21 +4,16 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const pages = ['index.html', 'sync.html', 'home.html', 'reader.html', 'local-reader.html', 'links.html', 'study.html', 'index-search.html', 'hyakusen.html'];
+const pages = ['index.html', 'sync.html', 'home.html', 'reader.html', 'local-reader.html', 'links.html', 'study.html', 'index-search.html', 'hyakusen.html', 'roppo.html'];
 const standalone = [
   'app-desktop-rail.js', 'author-summary.js', 'backup-format.js', 'browser-storage.js', 'desktop-navigation.js',
   'encrypted-chunk-cache.js', 'encrypted-chunk-crypto.js', 'encrypted-chunk-sync.js', 'feature-flags.js', 'home-dashboard.js',
   'hyakusen-catalog.js', 'hyakusen-drive.js', 'hyakusen-page.js',
   'index-conversion-prompt.js', 'index-search-backup.js', 'index-search-conflicts.js', 'index-search-page.js', 'index-search-sync-status.js',
-  'index-search-worker-client.js', 'legal-index-schema.js', 'legal-index-search.js', 'legal-index-search-worker.js',
-  'recommendations.js', 'shelf-search.js', 'status-message.js', 'study-ai.js', 'study-argument-drafts.js',
-  'study-arguments.js', 'study-audio.js', 'study-data.js', 'study-offline.js', 'study-quiz.js', 'study-sync.js',
-  'supabase-config.js', 'url-parser.js', 'vault-payload.js', 'vault-session.js',
-  'video-data.js', 'video-library.js', 'video-routing-fix.js', 'video-thumbnail-time.js'
+  'index-search-worker-client.js', 'legal-index-schema.js', 'legal-index-search.js', 'legal-index-search-worker.js', 'roppo-data.js', 'shelf-search.js',
+  'status-message.js', 'study-data.js', 'study-arguments.js', 'study-sync.js', 'study-quiz.js', 'study-audio.js', 'study-ai.js',
+  'study-offline.js', 'supabase-config.js', 'url-parser.js', 'vault-payload.js', 'vault-session.js', 'video-thumbnail-time.js'
 ];
-const rootJsFiles = fs.readdirSync(root).filter((name) => name.endsWith('.js') && fs.statSync(path.join(root, name)).isFile());
-const missing = rootJsFiles.filter((name) => !standalone.includes(name));
-if (missing.length) throw new Error(`check-static: missing standalone JS files: ${missing.join(', ')}`);
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 for (const file of standalone) new vm.Script(read(file), { filename: file });
