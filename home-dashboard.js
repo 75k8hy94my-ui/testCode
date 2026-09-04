@@ -1,6 +1,7 @@
 (()=>{
 'use strict';
 const HOME_LAYOUT_KEY = 'mangaReaderHomeCards';
+const HOME_LAYOUT_STATUTES_MIGRATION_KEY = 'mangaReaderHomeCardsStatutesV1';
 const DEFAULT_CARD_IDS = ['bookshelf', 'index-search', 'statutes', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
 const CARD_CATALOG = Object.freeze({
   bookshelf: Object.freeze({ id: 'bookshelf', title: '本棚', subtitle: '保存した漫画・資料を開く', kind: 'internal', href: 'reader.html#screen=saved-list', badge: 'APP' }),
@@ -32,6 +33,14 @@ function addCard(layout, id) {
   if (!isKnownCard(id) || normalized.includes(id)) return normalized;
   return normalized.concat(id);
 }
+function insertStatutes(layout) {
+  const normalized = normalizeLayout(layout);
+  if (normalized.includes('statutes')) return normalized;
+  const index = normalized.indexOf('index-search');
+  const result = normalized.slice();
+  result.splice(index >= 0 ? index + 1 : Math.min(1, result.length), 0, 'statutes');
+  return result;
+}
 function removeCard(layout, id) {
   return normalizeLayout(layout).filter((cardId) => cardId !== id);
 }
@@ -59,7 +68,14 @@ function setRaw(storage, key, value) {
 function loadLayout(storage = globalThis.localStorage) {
   try {
     const raw = getRaw(storage, HOME_LAYOUT_KEY);
-    return raw == null ? DEFAULT_CARD_IDS.slice() : normalizeLayout(JSON.parse(raw));
+    if (raw == null) return DEFAULT_CARD_IDS.slice();
+    let layout = normalizeLayout(JSON.parse(raw));
+    if (getRaw(storage, HOME_LAYOUT_STATUTES_MIGRATION_KEY) !== '1') {
+      layout = insertStatutes(layout);
+      setRaw(storage, HOME_LAYOUT_KEY, JSON.stringify(layout));
+      setRaw(storage, HOME_LAYOUT_STATUTES_MIGRATION_KEY, '1');
+    }
+    return layout;
   } catch (_) {
     return DEFAULT_CARD_IDS.slice();
   }
@@ -67,9 +83,10 @@ function loadLayout(storage = globalThis.localStorage) {
 function saveLayout(layout, storage = globalThis.localStorage) {
   const normalized = normalizeLayout(layout);
   setRaw(storage, HOME_LAYOUT_KEY, JSON.stringify(normalized));
+  setRaw(storage, HOME_LAYOUT_STATUTES_MIGRATION_KEY, '1');
   return normalized;
 }
-const api = { HOME_LAYOUT_KEY, DEFAULT_CARD_IDS, CARD_CATALOG, normalizeLayout, addCard, removeCard, moveCard, hiddenCardIds, loadLayout, saveLayout };
+const api = { HOME_LAYOUT_KEY, HOME_LAYOUT_STATUTES_MIGRATION_KEY, DEFAULT_CARD_IDS, CARD_CATALOG, normalizeLayout, addCard, insertStatutes, removeCard, moveCard, hiddenCardIds, loadLayout, saveLayout };
 if (typeof window !== 'undefined') window.MangaReaderHome = api;
 if (typeof module !== 'undefined') module.exports = api;
 })();
