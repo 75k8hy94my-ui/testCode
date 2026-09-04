@@ -5,7 +5,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   test:
@@ -17,24 +17,3 @@ jobs:
           node-version: 22
       - run: npm test
       - run: npm run verify:static
-
-  bootstrap-roppo-data:
-    if: github.ref == 'refs/heads/feat/roppo-static-sync'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: node scripts/sync-roppo-data.mjs
-      - name: Commit generated law data
-        shell: bash
-        run: |
-          if git diff --quiet -- data/roppo; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/roppo
-          git commit -m "data: seed roppo law data [skip ci]"
-          git push
