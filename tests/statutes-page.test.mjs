@@ -20,7 +20,8 @@ test('statutes page exposes search, refresh, article navigation and memo control
   for (const id of ['lawTabs', 'articleSearch', 'refreshLawBtn', 'articleList', 'articleDetail', 'prevArticleBtn', 'nextArticleBtn', 'statuteMemo', 'memoCloseBtn', 'syncStatus']) {
     assert.match(page, new RegExp(`id=["']${id}["']`));
   }
-  assert.match(page, /MangaStatutes\.ensureLaw/);
+  assert.match(page, /window\.MangaStatutes/);
+  assert.match(page, /Statutes\.ensureLaw/);
   assert.match(page, /MangaVault\.savePayload\(MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
   assert.match(page, /mangaReaderStatuteNotes/);
 });
