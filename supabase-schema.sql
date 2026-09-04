@@ -58,10 +58,12 @@ alter table public.manga_reader_encrypted_chunks enable row level security;
 revoke all on table public.manga_reader_encrypted_chunks from public;
 revoke all on table public.manga_reader_encrypted_chunks from anon;
 grant select, insert, update on table public.manga_reader_encrypted_chunks to authenticated;
+grant delete on table public.manga_reader_encrypted_chunks to authenticated;
 
 drop policy if exists "Users can read their own encrypted chunks" on public.manga_reader_encrypted_chunks;
 drop policy if exists "Users can create their own encrypted chunks" on public.manga_reader_encrypted_chunks;
 drop policy if exists "Users can update their own encrypted chunks" on public.manga_reader_encrypted_chunks;
+drop policy if exists "Users can delete their own encrypted chunks" on public.manga_reader_encrypted_chunks;
 
 create policy "Users can read their own encrypted chunks"
 on public.manga_reader_encrypted_chunks for select
@@ -78,6 +80,16 @@ on public.manga_reader_encrypted_chunks for update
 to authenticated
 using ((select auth.uid()) = user_id)
 with check ((select auth.uid()) = user_id);
+
+-- 物理DELETEは本人の90日超tombstoneだけ。通常の削除は必ずtombstone RPCを使う。
+create policy "Users can delete their own encrypted chunks"
+on public.manga_reader_encrypted_chunks for delete
+to authenticated
+using (
+  (select auth.uid()) = user_id
+  and deleted_at is not null
+  and deleted_at < now() - interval '90 days'
+);
 
 -- 1 chunk だけを revision CAS で更新する。tombstone 済みの行は通常更新では復活させない。
 create or replace function public.update_manga_reader_encrypted_chunk(
@@ -125,10 +137,33 @@ as $$
             manga_reader_encrypted_chunks.deleted_at;
 $$;
 
+-- 90日以上経過した本人の tombstone だけを物理削除する。
+create or replace function public.cleanup_manga_reader_encrypted_chunk_tombstones(retention_days integer default 90)
+returns table(deleted_count bigint)
+language plpgsql security invoker
+set search_path = public
+as $$
+declare
+  effective_days integer := greatest(90, coalesce(retention_days, 90));
+begin
+  return query
+  with deleted as (
+    delete from public.manga_reader_encrypted_chunks
+    where user_id = (select auth.uid())
+      and deleted_at is not null
+      and deleted_at < now() - make_interval(days => effective_days)
+    returning 1
+  )
+  select count(*)::bigint from deleted;
+end;
+$$;
+
 revoke execute on function public.update_manga_reader_encrypted_chunk(uuid, bigint, jsonb) from public, anon;
 grant execute on function public.update_manga_reader_encrypted_chunk(uuid, bigint, jsonb) to authenticated;
 revoke execute on function public.tombstone_manga_reader_encrypted_chunk(uuid, bigint) from public, anon;
 grant execute on function public.tombstone_manga_reader_encrypted_chunk(uuid, bigint) to authenticated;
+revoke execute on function public.cleanup_manga_reader_encrypted_chunk_tombstones(integer) from public, anon;
+grant execute on function public.cleanup_manga_reader_encrypted_chunk_tombstones(integer) to authenticated;
 
 -- ローカル漫画の同期用。画像本体はvaultのJSONに入れず、Storageへ1枚ずつ保存する。
 insert into storage.buckets (id, name, public)

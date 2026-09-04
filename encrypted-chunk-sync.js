@@ -5,6 +5,7 @@ const TABLE = 'manga_reader_encrypted_chunks';
 const METADATA_SELECT = 'chunk_id,revision,deleted_at,updated_at';
 const PAYLOAD_SELECT = 'chunk_id,payload,revision,deleted_at,updated_at';
 const DEFAULT_PAYLOAD_BATCH_SIZE = 50;
+const GLOBAL_ERROR_ID = '__global__';
 
 const text = (value) => String(value ?? '').trim();
 const number = (value) => Number(value ?? 0);
@@ -63,6 +64,36 @@ async function fetchRemotePayloads(vault, chunkIds, batchSize = DEFAULT_PAYLOAD_
       results.push(...(rows || []).map(remoteRow));
     }
     return results;
+  });
+}
+
+async function fetchRemoteChunk(vault, chunkId) {
+  const id = text(chunkId);
+  if (!id) throw new Error('chunkId is required');
+  return vault.withSession(async (token) => {
+    const rows = await vault.api(`/rest/v1/${TABLE}?select=${PAYLOAD_SELECT}&chunk_id=eq.${encodeURIComponent(id)}&limit=1`, { token });
+    return rows && rows[0] ? remoteRow(rows[0]) : null;
+  });
+}
+
+async function adoptRemoteChunk(cache, row) {
+  if (!cache || typeof cache.put !== 'function') throw new Error('encrypted chunk cache is required');
+  if (!row) return null;
+  const safe = { ...remoteRow(row), pendingAction: null };
+  await cache.put(safe);
+  return safe;
+}
+
+async function cleanupRemoteTombstones(vault, retentionDays = 90) {
+  const days = Math.max(90, Math.floor(Number(retentionDays) || 90));
+  return vault.withSession(async (token) => {
+    const rows = await vault.api('/rest/v1/rpc/cleanup_manga_reader_encrypted_chunk_tombstones', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ retention_days: days })
+    });
+    const first = rows && rows[0];
+    return Number(first && (first.deleted_count ?? first.cleanup_manga_reader_encrypted_chunk_tombstones) || 0);
   });
 }
 
@@ -197,7 +228,7 @@ async function syncCache({ vault, cache, payloadBatchSize = DEFAULT_PAYLOAD_BATC
   try {
     metadata = await fetchRemoteMetadata(vault);
   } catch (error) {
-    return { records: await cache.list(), conflicts, errors: [{ chunkId: null, error }] };
+    return { records: await cache.list(), conflicts, errors: [{ chunkId: GLOBAL_ERROR_ID, error }] };
   }
   let remoteMap = new Map(metadata.map((row) => [row.chunkId, row]));
 
@@ -211,7 +242,7 @@ async function syncCache({ vault, cache, payloadBatchSize = DEFAULT_PAYLOAD_BATC
     metadata = await fetchRemoteMetadata(vault);
     remoteMap = new Map(metadata.map((row) => [row.chunkId, row]));
   } catch (error) {
-    errors.push({ chunkId: null, error });
+    errors.push({ chunkId: GLOBAL_ERROR_ID, error });
     return { records: await cache.list(), conflicts, errors };
   }
 
@@ -237,7 +268,7 @@ async function syncCache({ vault, cache, payloadBatchSize = DEFAULT_PAYLOAD_BATC
     const downloaded = await fetchRemotePayloads(vault, downloadIds, payloadBatchSize);
     for (const row of downloaded) await cache.put(row);
   } catch (error) {
-    errors.push({ chunkId: null, error });
+    errors.push({ chunkId: GLOBAL_ERROR_ID, error });
   }
 
   return { records: await cache.list(), conflicts, errors };
@@ -246,8 +277,12 @@ async function syncCache({ vault, cache, payloadBatchSize = DEFAULT_PAYLOAD_BATC
 const api = {
   TABLE,
   DEFAULT_PAYLOAD_BATCH_SIZE,
+  GLOBAL_ERROR_ID,
   fetchRemoteMetadata,
   fetchRemotePayloads,
+  fetchRemoteChunk,
+  adoptRemoteChunk,
+  cleanupRemoteTombstones,
   insertRemoteChunk,
   updateRemoteChunk,
   tombstoneRemoteChunk,

@@ -21,6 +21,11 @@
 - Search settings remain in the existing encrypted monolithic Vault. The large index corpus does not: it syncs in separate encrypted chunks and is cached per signed-in user for offline search.
 - A full backup downloaded by the user intentionally contains normalized plaintext `indexBooks`; treat the downloaded JSON as sensitive. Restore validates the complete package, creates fresh book/chunk IDs, and re-encrypts each book before persistent cache storage.
 - Logging out clears that user's encrypted index IndexedDB cache before active Vault material and session state are cleared.
+- Same-book sync conflicts are never automatically merged. Conflict comparison decrypts both versions only in memory while the Vault is unlocked; the user must explicitly adopt the cloud version, save the local version as a separate freshly encrypted book, or explicitly discard a stale remote-missing copy.
+- Worker-backed search may hold decrypted index data only ephemerally while the protected page is open. Worker failure must fall back to the same `legal-index-search.js` semantics on the main thread; neither route persists plaintext search indexes.
+- Old encrypted-chunk tombstones may be physically removed only for the authenticated owner after at least 90 days, through an owner-scoped `security invoker` RPC. The client attempts cleanup at most once every seven days and only after an ordinary sync succeeds.
+- If a tombstone has already been physically removed, a stale nonzero-revision local copy remains a `remote-missing` conflict and must never be auto-inserted/resurrected.
+- AI conversion support only generates/copies the static schema instructions. It must not send registered book content or provider credentials to an external AI service.
 - Run `npm test` and `npm run verify:static` before merging legal-index changes.
 
 ## Manual CAS verification
