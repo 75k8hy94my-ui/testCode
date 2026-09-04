@@ -73,6 +73,15 @@ test('clearing roppo search scrolls the retained article into view in the articl
   assert.match(source, /scrollIntoView\(\{block:['"]center['"],inline:['"]nearest['"]\}\)/);
 });
 
+test('mobile roppo search prioritizes the results list and returns to the selected statute on tap', () => {
+  const source = read('roppo.html');
+  assert.match(source, /mobile-searching/);
+  assert.match(source, /body\.mobile-searching/);
+  assert.match(source, /classList\.toggle\(['"]mobile-searching['"]/);
+  assert.match(source, /classList\.remove\(['"]mobile-searching['"]\)/);
+  assert.match(source, /scrollIntoView\(\{behavior:['"]smooth['"],block:['"]start['"]\}\)/);
+});
+
 test('roppo refresh action is manual-only and keeps the one-month check inside the sync script', () => {
   const source = read('.github/workflows/roppo-sync.yml');
   assert.match(source, /workflow_dispatch/);
