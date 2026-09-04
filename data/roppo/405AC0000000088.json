@@ -4,13 +4,13 @@
   "lawName": "行政手続法",
   "lawNumber": "平成五年法律第八十八号",
   "source": "e-Gov 法令API v2",
-  "syncedAt": "2026-09-04T11:31:05.851Z",
+  "syncedAt": "2026-09-04T11:36:04.348Z",
   "articles": [
     {
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(目的等)",
+      "caption": "目的等",
       "paragraphs": [
         {
           "num": "1",
@@ -27,7 +27,7 @@
       "key": "Article_2",
       "num": "2",
       "number": "第2条",
-      "caption": "(定義)",
+      "caption": "定義",
       "paragraphs": [
         {
           "num": "1",
@@ -40,7 +40,7 @@
       "key": "Article_3",
       "num": "3",
       "number": "第3条",
-      "caption": "(適用除外)",
+      "caption": "適用除外",
       "paragraphs": [
         {
           "num": "1",
@@ -61,7 +61,7 @@
       "key": "Article_4",
       "num": "4",
       "number": "第4条",
-      "caption": "(国の機関等に対する処分等の適用除外)",
+      "caption": "国の機関等に対する処分等の適用除外",
       "paragraphs": [
         {
           "num": "1",
@@ -86,7 +86,7 @@
       "key": "Article_5",
       "num": "5",
       "number": "第5条",
-      "caption": "(審査基準)",
+      "caption": "審査基準",
       "paragraphs": [
         {
           "num": "1",
@@ -107,7 +107,7 @@
       "key": "Article_6",
       "num": "6",
       "number": "第6条",
-      "caption": "(標準処理期間)",
+      "caption": "標準処理期間",
       "paragraphs": [
         {
           "num": "1",
@@ -120,7 +120,7 @@
       "key": "Article_7",
       "num": "7",
       "number": "第7条",
-      "caption": "(申請に対する審査、応答)",
+      "caption": "申請に対する審査、応答",
       "paragraphs": [
         {
           "num": "1",
@@ -133,7 +133,7 @@
       "key": "Article_8",
       "num": "8",
       "number": "第8条",
-      "caption": "(理由の提示)",
+      "caption": "理由の提示",
       "paragraphs": [
         {
           "num": "1",
@@ -150,7 +150,7 @@
       "key": "Article_9",
       "num": "9",
       "number": "第9条",
-      "caption": "(情報の提供)",
+      "caption": "情報の提供",
       "paragraphs": [
         {
           "num": "1",
@@ -167,7 +167,7 @@
       "key": "Article_10",
       "num": "10",
       "number": "第10条",
-      "caption": "(公聴会の開催等)",
+      "caption": "公聴会の開催等",
       "paragraphs": [
         {
           "num": "1",
@@ -180,7 +180,7 @@
       "key": "Article_11",
       "num": "11",
       "number": "第11条",
-      "caption": "(複数の行政庁が関与する処分)",
+      "caption": "複数の行政庁が関与する処分",
       "paragraphs": [
         {
           "num": "1",
@@ -197,7 +197,7 @@
       "key": "Article_12",
       "num": "12",
       "number": "第12条",
-      "caption": "(処分の基準)",
+      "caption": "処分の基準",
       "paragraphs": [
         {
           "num": "1",
@@ -214,7 +214,7 @@
       "key": "Article_13",
       "num": "13",
       "number": "第13条",
-      "caption": "(不利益処分をしようとする場合の手続)",
+      "caption": "不利益処分をしようとする場合の手続",
       "paragraphs": [
         {
           "num": "1",
@@ -231,7 +231,7 @@
       "key": "Article_14",
       "num": "14",
       "number": "第14条",
-      "caption": "(不利益処分の理由の提示)",
+      "caption": "不利益処分の理由の提示",
       "paragraphs": [
         {
           "num": "1",
@@ -252,7 +252,7 @@
       "key": "Article_15",
       "num": "15",
       "number": "第15条",
-      "caption": "(聴聞の通知の方式)",
+      "caption": "聴聞の通知の方式",
       "paragraphs": [
         {
           "num": "1",
@@ -277,7 +277,7 @@
       "key": "Article_16",
       "num": "16",
       "number": "第16条",
-      "caption": "(代理人)",
+      "caption": "代理人",
       "paragraphs": [
         {
           "num": "1",
@@ -302,7 +302,7 @@
       "key": "Article_17",
       "num": "17",
       "number": "第17条",
-      "caption": "(参加人)",
+      "caption": "参加人",
       "paragraphs": [
         {
           "num": "1",
@@ -323,7 +323,7 @@
       "key": "Article_18",
       "num": "18",
       "number": "第18条",
-      "caption": "(文書等の閲覧)",
+      "caption": "文書等の閲覧",
       "paragraphs": [
         {
           "num": "1",
@@ -344,7 +344,7 @@
       "key": "Article_19",
       "num": "19",
       "number": "第19条",
-      "caption": "(聴聞の主宰)",
+      "caption": "聴聞の主宰",
       "paragraphs": [
         {
           "num": "1",
@@ -361,7 +361,7 @@
       "key": "Article_20",
       "num": "20",
       "number": "第20条",
-      "caption": "(聴聞の期日における審理の方式)",
+      "caption": "聴聞の期日における審理の方式",
       "paragraphs": [
         {
           "num": "1",
@@ -394,7 +394,7 @@
       "key": "Article_21",
       "num": "21",
       "number": "第21条",
-      "caption": "(陳述書等の提出)",
+      "caption": "陳述書等の提出",
       "paragraphs": [
         {
           "num": "1",
@@ -411,7 +411,7 @@
       "key": "Article_22",
       "num": "22",
       "number": "第22条",
-      "caption": "(続行期日の指定)",
+      "caption": "続行期日の指定",
       "paragraphs": [
         {
           "num": "1",
@@ -432,7 +432,7 @@
       "key": "Article_23",
       "num": "23",
       "number": "第23条",
-      "caption": "(当事者の不出頭等の場合における聴聞の終結)",
+      "caption": "当事者の不出頭等の場合における聴聞の終結",
       "paragraphs": [
         {
           "num": "1",
@@ -449,7 +449,7 @@
       "key": "Article_24",
       "num": "24",
       "number": "第24条",
-      "caption": "(聴聞調書及び報告書)",
+      "caption": "聴聞調書及び報告書",
       "paragraphs": [
         {
           "num": "1",
@@ -474,7 +474,7 @@
       "key": "Article_25",
       "num": "25",
       "number": "第25条",
-      "caption": "(聴聞の再開)",
+      "caption": "聴聞の再開",
       "paragraphs": [
         {
           "num": "1",
@@ -487,7 +487,7 @@
       "key": "Article_26",
       "num": "26",
       "number": "第26条",
-      "caption": "(聴聞を経てされる不利益処分の決定)",
+      "caption": "聴聞を経てされる不利益処分の決定",
       "paragraphs": [
         {
           "num": "1",
@@ -500,7 +500,7 @@
       "key": "Article_27",
       "num": "27",
       "number": "第27条",
-      "caption": "(審査請求の制限)",
+      "caption": "審査請求の制限",
       "paragraphs": [
         {
           "num": "1",
@@ -513,7 +513,7 @@
       "key": "Article_28",
       "num": "28",
       "number": "第28条",
-      "caption": "(役員等の解任等を命ずる不利益処分をしようとする場合の聴聞等の特例)",
+      "caption": "役員等の解任等を命ずる不利益処分をしようとする場合の聴聞等の特例",
       "paragraphs": [
         {
           "num": "1",
@@ -530,7 +530,7 @@
       "key": "Article_29",
       "num": "29",
       "number": "第29条",
-      "caption": "(弁明の機会の付与の方式)",
+      "caption": "弁明の機会の付与の方式",
       "paragraphs": [
         {
           "num": "1",
@@ -547,7 +547,7 @@
       "key": "Article_30",
       "num": "30",
       "number": "第30条",
-      "caption": "(弁明の機会の付与の通知の方式)",
+      "caption": "弁明の機会の付与の通知の方式",
       "paragraphs": [
         {
           "num": "1",
@@ -560,7 +560,7 @@
       "key": "Article_31",
       "num": "31",
       "number": "第31条",
-      "caption": "(聴聞に関する手続の準用)",
+      "caption": "聴聞に関する手続の準用",
       "paragraphs": [
         {
           "num": "1",
@@ -573,7 +573,7 @@
       "key": "Article_32",
       "num": "32",
       "number": "第32条",
-      "caption": "(行政指導の一般原則)",
+      "caption": "行政指導の一般原則",
       "paragraphs": [
         {
           "num": "1",
@@ -590,7 +590,7 @@
       "key": "Article_33",
       "num": "33",
       "number": "第33条",
-      "caption": "(申請に関連する行政指導)",
+      "caption": "申請に関連する行政指導",
       "paragraphs": [
         {
           "num": "1",
@@ -603,7 +603,7 @@
       "key": "Article_34",
       "num": "34",
       "number": "第34条",
-      "caption": "(許認可等の権限に関連する行政指導)",
+      "caption": "許認可等の権限に関連する行政指導",
       "paragraphs": [
         {
           "num": "1",
@@ -616,7 +616,7 @@
       "key": "Article_35",
       "num": "35",
       "number": "第35条",
-      "caption": "(行政指導の方式)",
+      "caption": "行政指導の方式",
       "paragraphs": [
         {
           "num": "1",
@@ -641,7 +641,7 @@
       "key": "Article_36",
       "num": "36",
       "number": "第36条",
-      "caption": "(複数の者を対象とする行政指導)",
+      "caption": "複数の者を対象とする行政指導",
       "paragraphs": [
         {
           "num": "1",
@@ -654,7 +654,7 @@
       "key": "Article_36_2",
       "num": "36_2",
       "number": "第36条の2",
-      "caption": "(行政指導の中止等の求め)",
+      "caption": "行政指導の中止等の求め",
       "paragraphs": [
         {
           "num": "1",
@@ -696,7 +696,7 @@
       "key": "Article_37",
       "num": "37",
       "number": "第37条",
-      "caption": "(届出)",
+      "caption": "届出",
       "paragraphs": [
         {
           "num": "1",
@@ -709,7 +709,7 @@
       "key": "Article_38",
       "num": "38",
       "number": "第38条",
-      "caption": "(命令等を定める場合の一般原則)",
+      "caption": "命令等を定める場合の一般原則",
       "paragraphs": [
         {
           "num": "1",
@@ -726,7 +726,7 @@
       "key": "Article_39",
       "num": "39",
       "number": "第39条",
-      "caption": "(意見公募手続)",
+      "caption": "意見公募手続",
       "paragraphs": [
         {
           "num": "1",
@@ -751,7 +751,7 @@
       "key": "Article_40",
       "num": "40",
       "number": "第40条",
-      "caption": "(意見公募手続の特例)",
+      "caption": "意見公募手続の特例",
       "paragraphs": [
         {
           "num": "1",
@@ -768,7 +768,7 @@
       "key": "Article_41",
       "num": "41",
       "number": "第41条",
-      "caption": "(意見公募手続の周知等)",
+      "caption": "意見公募手続の周知等",
       "paragraphs": [
         {
           "num": "1",
@@ -781,7 +781,7 @@
       "key": "Article_42",
       "num": "42",
       "number": "第42条",
-      "caption": "(提出意見の考慮)",
+      "caption": "提出意見の考慮",
       "paragraphs": [
         {
           "num": "1",
@@ -794,7 +794,7 @@
       "key": "Article_43",
       "num": "43",
       "number": "第43条",
-      "caption": "(結果の公示等)",
+      "caption": "結果の公示等",
       "paragraphs": [
         {
           "num": "1",
@@ -823,7 +823,7 @@
       "key": "Article_44",
       "num": "44",
       "number": "第44条",
-      "caption": "(準用)",
+      "caption": "準用",
       "paragraphs": [
         {
           "num": "1",
@@ -836,7 +836,7 @@
       "key": "Article_45",
       "num": "45",
       "number": "第45条",
-      "caption": "(公示の方法)",
+      "caption": "公示の方法",
       "paragraphs": [
         {
           "num": "1",
@@ -853,7 +853,7 @@
       "key": "Article_46",
       "num": "46",
       "number": "第46条",
-      "caption": "(地方公共団体の措置)",
+      "caption": "地方公共団体の措置",
       "paragraphs": [
         {
           "num": "1",
@@ -866,7 +866,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -879,7 +879,7 @@
       "key": "Article_3",
       "num": "3",
       "number": "第3条",
-      "caption": "(経過措置)",
+      "caption": "経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -892,7 +892,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -905,7 +905,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -918,7 +918,7 @@
       "key": "Article_5",
       "num": "5",
       "number": "第5条",
-      "caption": "(その他の経過措置の政令への委任)",
+      "caption": "その他の経過措置の政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -931,7 +931,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -944,7 +944,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -957,7 +957,7 @@
       "key": "Article_2",
       "num": "2",
       "number": "第2条",
-      "caption": "(経過措置)",
+      "caption": "経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -974,7 +974,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -987,7 +987,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1000,7 +1000,7 @@
       "key": "Article_5",
       "num": "5",
       "number": "第5条",
-      "caption": "(経過措置の原則)",
+      "caption": "経過措置の原則",
       "paragraphs": [
         {
           "num": "1",
@@ -1013,7 +1013,7 @@
       "key": "Article_6",
       "num": "6",
       "number": "第6条",
-      "caption": "(訴訟に関する経過措置)",
+      "caption": "訴訟に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1034,7 +1034,7 @@
       "key": "Article_10",
       "num": "10",
       "number": "第10条",
-      "caption": "(その他の経過措置の政令への委任)",
+      "caption": "その他の経過措置の政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -1047,7 +1047,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1060,7 +1060,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1073,7 +1073,7 @@
       "key": "Article_141",
       "num": "141",
       "number": "第141条",
-      "caption": "(政令への委任)",
+      "caption": "政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -1086,7 +1086,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1099,7 +1099,7 @@
       "key": "Article_38",
       "num": "38",
       "number": "第38条",
-      "caption": "(政令への委任)",
+      "caption": "政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -1112,7 +1112,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1125,7 +1125,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1138,7 +1138,7 @@
       "key": "Article_2",
       "num": "2",
       "number": "第2条",
-      "caption": "(公示送達等の方法に関する経過措置)",
+      "caption": "公示送達等の方法に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1151,7 +1151,7 @@
       "key": "Article_7",
       "num": "7",
       "number": "第7条",
-      "caption": "(政令への委任)",
+      "caption": "政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -1164,7 +1164,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1177,7 +1177,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1190,7 +1190,7 @@
       "key": "Article_5",
       "num": "5",
       "number": "第5条",
-      "caption": "(政令への委任)",
+      "caption": "政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -1203,7 +1203,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",

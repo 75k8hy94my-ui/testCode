@@ -4,13 +4,13 @@
   "lawName": "行政事件訴訟法",
   "lawNumber": "昭和三十七年法律第百三十九号",
   "source": "e-Gov 法令API v2",
-  "syncedAt": "2026-09-04T11:31:05.851Z",
+  "syncedAt": "2026-09-04T11:36:04.348Z",
   "articles": [
     {
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(この法律の趣旨)",
+      "caption": "この法律の趣旨",
       "paragraphs": [
         {
           "num": "1",
@@ -23,7 +23,7 @@
       "key": "Article_2",
       "num": "2",
       "number": "第2条",
-      "caption": "(行政事件訴訟)",
+      "caption": "行政事件訴訟",
       "paragraphs": [
         {
           "num": "1",
@@ -36,7 +36,7 @@
       "key": "Article_3",
       "num": "3",
       "number": "第3条",
-      "caption": "(抗告訴訟)",
+      "caption": "抗告訴訟",
       "paragraphs": [
         {
           "num": "1",
@@ -73,7 +73,7 @@
       "key": "Article_4",
       "num": "4",
       "number": "第4条",
-      "caption": "(当事者訴訟)",
+      "caption": "当事者訴訟",
       "paragraphs": [
         {
           "num": "1",
@@ -86,7 +86,7 @@
       "key": "Article_5",
       "num": "5",
       "number": "第5条",
-      "caption": "(民衆訴訟)",
+      "caption": "民衆訴訟",
       "paragraphs": [
         {
           "num": "1",
@@ -99,7 +99,7 @@
       "key": "Article_6",
       "num": "6",
       "number": "第6条",
-      "caption": "(機関訴訟)",
+      "caption": "機関訴訟",
       "paragraphs": [
         {
           "num": "1",
@@ -112,7 +112,7 @@
       "key": "Article_7",
       "num": "7",
       "number": "第7条",
-      "caption": "(この法律に定めがない事項)",
+      "caption": "この法律に定めがない事項",
       "paragraphs": [
         {
           "num": "1",
@@ -125,7 +125,7 @@
       "key": "Article_8",
       "num": "8",
       "number": "第8条",
-      "caption": "(処分の取消しの訴えと審査請求との関係)",
+      "caption": "処分の取消しの訴えと審査請求との関係",
       "paragraphs": [
         {
           "num": "1",
@@ -146,7 +146,7 @@
       "key": "Article_9",
       "num": "9",
       "number": "第9条",
-      "caption": "(原告適格)",
+      "caption": "原告適格",
       "paragraphs": [
         {
           "num": "1",
@@ -163,7 +163,7 @@
       "key": "Article_10",
       "num": "10",
       "number": "第10条",
-      "caption": "(取消しの理由の制限)",
+      "caption": "取消しの理由の制限",
       "paragraphs": [
         {
           "num": "1",
@@ -180,7 +180,7 @@
       "key": "Article_11",
       "num": "11",
       "number": "第11条",
-      "caption": "(被告適格等)",
+      "caption": "被告適格等",
       "paragraphs": [
         {
           "num": "1",
@@ -213,7 +213,7 @@
       "key": "Article_12",
       "num": "12",
       "number": "第12条",
-      "caption": "(管轄)",
+      "caption": "管轄",
       "paragraphs": [
         {
           "num": "1",
@@ -242,7 +242,7 @@
       "key": "Article_13",
       "num": "13",
       "number": "第13条",
-      "caption": "(関連請求に係る訴訟の移送)",
+      "caption": "関連請求に係る訴訟の移送",
       "paragraphs": [
         {
           "num": "1",
@@ -255,7 +255,7 @@
       "key": "Article_14",
       "num": "14",
       "number": "第14条",
-      "caption": "(出訴期間)",
+      "caption": "出訴期間",
       "paragraphs": [
         {
           "num": "1",
@@ -276,7 +276,7 @@
       "key": "Article_15",
       "num": "15",
       "number": "第15条",
-      "caption": "(被告を誤つた訴えの救済)",
+      "caption": "被告を誤つた訴えの救済",
       "paragraphs": [
         {
           "num": "1",
@@ -313,7 +313,7 @@
       "key": "Article_16",
       "num": "16",
       "number": "第16条",
-      "caption": "(請求の客観的併合)",
+      "caption": "請求の客観的併合",
       "paragraphs": [
         {
           "num": "1",
@@ -330,7 +330,7 @@
       "key": "Article_17",
       "num": "17",
       "number": "第17条",
-      "caption": "(共同訴訟)",
+      "caption": "共同訴訟",
       "paragraphs": [
         {
           "num": "1",
@@ -347,7 +347,7 @@
       "key": "Article_18",
       "num": "18",
       "number": "第18条",
-      "caption": "(第三者による請求の追加的併合)",
+      "caption": "第三者による請求の追加的併合",
       "paragraphs": [
         {
           "num": "1",
@@ -360,7 +360,7 @@
       "key": "Article_19",
       "num": "19",
       "number": "第19条",
-      "caption": "(原告による請求の追加的併合)",
+      "caption": "原告による請求の追加的併合",
       "paragraphs": [
         {
           "num": "1",
@@ -390,7 +390,7 @@
       "key": "Article_21",
       "num": "21",
       "number": "第21条",
-      "caption": "(国又は公共団体に対する請求への訴えの変更)",
+      "caption": "国又は公共団体に対する請求への訴えの変更",
       "paragraphs": [
         {
           "num": "1",
@@ -419,7 +419,7 @@
       "key": "Article_22",
       "num": "22",
       "number": "第22条",
-      "caption": "(第三者の訴訟参加)",
+      "caption": "第三者の訴訟参加",
       "paragraphs": [
         {
           "num": "1",
@@ -448,7 +448,7 @@
       "key": "Article_23",
       "num": "23",
       "number": "第23条",
-      "caption": "(行政庁の訴訟参加)",
+      "caption": "行政庁の訴訟参加",
       "paragraphs": [
         {
           "num": "1",
@@ -469,7 +469,7 @@
       "key": "Article_23_2",
       "num": "23_2",
       "number": "第23条の2",
-      "caption": "(釈明処分の特則)",
+      "caption": "釈明処分の特則",
       "paragraphs": [
         {
           "num": "1",
@@ -486,7 +486,7 @@
       "key": "Article_24",
       "num": "24",
       "number": "第24条",
-      "caption": "(職権証拠調べ)",
+      "caption": "職権証拠調べ",
       "paragraphs": [
         {
           "num": "1",
@@ -499,7 +499,7 @@
       "key": "Article_25",
       "num": "25",
       "number": "第25条",
-      "caption": "(執行停止)",
+      "caption": "執行停止",
       "paragraphs": [
         {
           "num": "1",
@@ -540,7 +540,7 @@
       "key": "Article_26",
       "num": "26",
       "number": "第26条",
-      "caption": "(事情変更による執行停止の取消し)",
+      "caption": "事情変更による執行停止の取消し",
       "paragraphs": [
         {
           "num": "1",
@@ -557,7 +557,7 @@
       "key": "Article_27",
       "num": "27",
       "number": "第27条",
-      "caption": "(内閣総理大臣の異議)",
+      "caption": "内閣総理大臣の異議",
       "paragraphs": [
         {
           "num": "1",
@@ -590,7 +590,7 @@
       "key": "Article_28",
       "num": "28",
       "number": "第28条",
-      "caption": "(執行停止等の管轄裁判所)",
+      "caption": "執行停止等の管轄裁判所",
       "paragraphs": [
         {
           "num": "1",
@@ -603,7 +603,7 @@
       "key": "Article_29",
       "num": "29",
       "number": "第29条",
-      "caption": "(執行停止に関する規定の準用)",
+      "caption": "執行停止に関する規定の準用",
       "paragraphs": [
         {
           "num": "1",
@@ -616,7 +616,7 @@
       "key": "Article_30",
       "num": "30",
       "number": "第30条",
-      "caption": "(裁量処分の取消し)",
+      "caption": "裁量処分の取消し",
       "paragraphs": [
         {
           "num": "1",
@@ -629,7 +629,7 @@
       "key": "Article_31",
       "num": "31",
       "number": "第31条",
-      "caption": "(特別の事情による請求の棄却)",
+      "caption": "特別の事情による請求の棄却",
       "paragraphs": [
         {
           "num": "1",
@@ -650,7 +650,7 @@
       "key": "Article_32",
       "num": "32",
       "number": "第32条",
-      "caption": "(取消判決等の効力)",
+      "caption": "取消判決等の効力",
       "paragraphs": [
         {
           "num": "1",
@@ -692,7 +692,7 @@
       "key": "Article_34",
       "num": "34",
       "number": "第34条",
-      "caption": "(第三者の再審の訴え)",
+      "caption": "第三者の再審の訴え",
       "paragraphs": [
         {
           "num": "1",
@@ -717,7 +717,7 @@
       "key": "Article_35",
       "num": "35",
       "number": "第35条",
-      "caption": "(訴訟費用の裁判の効力)",
+      "caption": "訴訟費用の裁判の効力",
       "paragraphs": [
         {
           "num": "1",
@@ -730,7 +730,7 @@
       "key": "Article_36",
       "num": "36",
       "number": "第36条",
-      "caption": "(無効等確認の訴えの原告適格)",
+      "caption": "無効等確認の訴えの原告適格",
       "paragraphs": [
         {
           "num": "1",
@@ -743,7 +743,7 @@
       "key": "Article_37",
       "num": "37",
       "number": "第37条",
-      "caption": "(不作為の違法確認の訴えの原告適格)",
+      "caption": "不作為の違法確認の訴えの原告適格",
       "paragraphs": [
         {
           "num": "1",
@@ -756,7 +756,7 @@
       "key": "Article_37_2",
       "num": "37_2",
       "number": "第37条の2",
-      "caption": "(義務付けの訴えの要件等)",
+      "caption": "義務付けの訴えの要件等",
       "paragraphs": [
         {
           "num": "1",
@@ -822,7 +822,7 @@
       "key": "Article_37_4",
       "num": "37_4",
       "number": "第37条の4",
-      "caption": "(差止めの訴えの要件)",
+      "caption": "差止めの訴えの要件",
       "paragraphs": [
         {
           "num": "1",
@@ -851,7 +851,7 @@
       "key": "Article_37_5",
       "num": "37_5",
       "number": "第37条の5",
-      "caption": "(仮の義務付け及び仮の差止め)",
+      "caption": "仮の義務付け及び仮の差止め",
       "paragraphs": [
         {
           "num": "1",
@@ -880,7 +880,7 @@
       "key": "Article_38",
       "num": "38",
       "number": "第38条",
-      "caption": "(取消訴訟に関する規定の準用)",
+      "caption": "取消訴訟に関する規定の準用",
       "paragraphs": [
         {
           "num": "1",
@@ -905,7 +905,7 @@
       "key": "Article_39",
       "num": "39",
       "number": "第39条",
-      "caption": "(出訴の通知)",
+      "caption": "出訴の通知",
       "paragraphs": [
         {
           "num": "1",
@@ -918,7 +918,7 @@
       "key": "Article_40",
       "num": "40",
       "number": "第40条",
-      "caption": "(出訴期間の定めがある当事者訴訟)",
+      "caption": "出訴期間の定めがある当事者訴訟",
       "paragraphs": [
         {
           "num": "1",
@@ -935,7 +935,7 @@
       "key": "Article_41",
       "num": "41",
       "number": "第41条",
-      "caption": "(抗告訴訟に関する規定の準用)",
+      "caption": "抗告訴訟に関する規定の準用",
       "paragraphs": [
         {
           "num": "1",
@@ -952,7 +952,7 @@
       "key": "Article_42",
       "num": "42",
       "number": "第42条",
-      "caption": "(訴えの提起)",
+      "caption": "訴えの提起",
       "paragraphs": [
         {
           "num": "1",
@@ -965,7 +965,7 @@
       "key": "Article_43",
       "num": "43",
       "number": "第43条",
-      "caption": "(抗告訴訟又は当事者訴訟に関する規定の準用)",
+      "caption": "抗告訴訟又は当事者訴訟に関する規定の準用",
       "paragraphs": [
         {
           "num": "1",
@@ -986,7 +986,7 @@
       "key": "Article_44",
       "num": "44",
       "number": "第44条",
-      "caption": "(仮処分の排除)",
+      "caption": "仮処分の排除",
       "paragraphs": [
         {
           "num": "1",
@@ -999,7 +999,7 @@
       "key": "Article_45",
       "num": "45",
       "number": "第45条",
-      "caption": "(処分の効力等を争点とする訴訟)",
+      "caption": "処分の効力等を争点とする訴訟",
       "paragraphs": [
         {
           "num": "1",
@@ -1024,7 +1024,7 @@
       "key": "Article_46",
       "num": "46",
       "number": "第46条",
-      "caption": "(取消訴訟等の提起に関する事項の教示)",
+      "caption": "取消訴訟等の提起に関する事項の教示",
       "paragraphs": [
         {
           "num": "1",
@@ -1045,7 +1045,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1058,7 +1058,7 @@
       "key": "Article_2",
       "num": "2",
       "number": "第2条",
-      "caption": "(行政事件訴訟特例法の廃止)",
+      "caption": "行政事件訴訟特例法の廃止",
       "paragraphs": [
         {
           "num": "1",
@@ -1071,7 +1071,7 @@
       "key": "Article_3",
       "num": "3",
       "number": "第3条",
-      "caption": "(経過措置に関する原則)",
+      "caption": "経過措置に関する原則",
       "paragraphs": [
         {
           "num": "1",
@@ -1084,7 +1084,7 @@
       "key": "Article_4",
       "num": "4",
       "number": "第4条",
-      "caption": "(訴願前置に関する経過措置)",
+      "caption": "訴願前置に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1097,7 +1097,7 @@
       "key": "Article_5",
       "num": "5",
       "number": "第5条",
-      "caption": "(取消しの理由の制限に関する経過措置)",
+      "caption": "取消しの理由の制限に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1110,7 +1110,7 @@
       "key": "Article_6",
       "num": "6",
       "number": "第6条",
-      "caption": "(被告適格に関する経過措置)",
+      "caption": "被告適格に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1123,7 +1123,7 @@
       "key": "Article_7",
       "num": "7",
       "number": "第7条",
-      "caption": "(出訴期間に関する経過措置)",
+      "caption": "出訴期間に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1144,7 +1144,7 @@
       "key": "Article_8",
       "num": "8",
       "number": "第8条",
-      "caption": "(取消訴訟以外の抗告訴訟に関する経過措置)",
+      "caption": "取消訴訟以外の抗告訴訟に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1161,7 +1161,7 @@
       "key": "Article_9",
       "num": "9",
       "number": "第9条",
-      "caption": "(当事者訴訟に関する経過措置)",
+      "caption": "当事者訴訟に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1174,7 +1174,7 @@
       "key": "Article_10",
       "num": "10",
       "number": "第10条",
-      "caption": "(民衆訴訟及び機関訴訟に関する経過措置)",
+      "caption": "民衆訴訟及び機関訴訟に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1187,7 +1187,7 @@
       "key": "Article_11",
       "num": "11",
       "number": "第11条",
-      "caption": "(処分の効力等を争点とする訴訟に関する経過措置)",
+      "caption": "処分の効力等を争点とする訴訟に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1200,7 +1200,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1213,7 +1213,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1226,7 +1226,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1239,7 +1239,7 @@
       "key": "Article_2",
       "num": "2",
       "number": "第2条",
-      "caption": "(経過措置に関する原則)",
+      "caption": "経過措置に関する原則",
       "paragraphs": [
         {
           "num": "1",
@@ -1252,7 +1252,7 @@
       "key": "Article_3",
       "num": "3",
       "number": "第3条",
-      "caption": "(被告適格に関する経過措置)",
+      "caption": "被告適格に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1265,7 +1265,7 @@
       "key": "Article_4",
       "num": "4",
       "number": "第4条",
-      "caption": "(出訴期間に関する経過措置)",
+      "caption": "出訴期間に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1278,7 +1278,7 @@
       "key": "Article_5",
       "num": "5",
       "number": "第5条",
-      "caption": "(取消訴訟等の提起に関する事項の教示に関する経過措置)",
+      "caption": "取消訴訟等の提起に関する事項の教示に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1291,7 +1291,7 @@
       "key": "Article_50",
       "num": "50",
       "number": "第50条",
-      "caption": "(検討)",
+      "caption": "検討",
       "paragraphs": [
         {
           "num": "1",
@@ -1304,7 +1304,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1317,7 +1317,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1330,7 +1330,7 @@
       "key": "Article_39",
       "num": "39",
       "number": "第39条",
-      "caption": "(政令への委任)",
+      "caption": "政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -1343,7 +1343,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1356,7 +1356,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1369,7 +1369,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1382,7 +1382,7 @@
       "key": "Article_61",
       "num": "61",
       "number": "第61条",
-      "caption": "(行政事件訴訟法の一部改正に伴う経過措置)",
+      "caption": "行政事件訴訟法の一部改正に伴う経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1395,7 +1395,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1408,7 +1408,7 @@
       "key": "Article_9",
       "num": "9",
       "number": "第9条",
-      "caption": "(第2条の規定による改正に伴う関係法律の一部改正に伴う経過措置)",
+      "caption": "第2条の規定による改正に伴う関係法律の一部改正に伴う経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1421,7 +1421,7 @@
       "key": "Article_19",
       "num": "19",
       "number": "第19条",
-      "caption": "(政令への委任)",
+      "caption": "政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -1434,7 +1434,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1447,7 +1447,7 @@
       "key": "Article_9",
       "num": "9",
       "number": "第9条",
-      "caption": "(政令への委任)",
+      "caption": "政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -1460,7 +1460,7 @@
       "key": "Article_10",
       "num": "10",
       "number": "第10条",
-      "caption": "(調整規定)",
+      "caption": "調整規定",
       "paragraphs": [
         {
           "num": "1",
@@ -1473,7 +1473,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1486,7 +1486,7 @@
       "key": "Article_39",
       "num": "39",
       "number": "第39条",
-      "caption": "(行政事件訴訟法の一部改正に伴う経過措置)",
+      "caption": "行政事件訴訟法の一部改正に伴う経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1499,7 +1499,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1512,7 +1512,7 @@
       "key": "Article_67",
       "num": "67",
       "number": "第67条",
-      "caption": "(行政事件訴訟法の一部改正に伴う経過措置)",
+      "caption": "行政事件訴訟法の一部改正に伴う経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1525,7 +1525,7 @@
       "key": "Article_100",
       "num": "100",
       "number": "第100条",
-      "caption": "(処分等に関する経過措置)",
+      "caption": "処分等に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1538,7 +1538,7 @@
       "key": "Article_102",
       "num": "102",
       "number": "第102条",
-      "caption": "(その他の経過措置の政令への委任)",
+      "caption": "その他の経過措置の政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -1551,7 +1551,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1564,7 +1564,7 @@
       "key": "Article_16",
       "num": "16",
       "number": "第16条",
-      "caption": "(行政事件訴訟法の一部改正に伴う経過措置)",
+      "caption": "行政事件訴訟法の一部改正に伴う経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1577,7 +1577,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1590,7 +1590,7 @@
       "key": "Article_22",
       "num": "22",
       "number": "第22条",
-      "caption": "(第2条の規定による改正に伴う行政事件訴訟法等の一部改正に伴う経過措置)",
+      "caption": "第2条の規定による改正に伴う行政事件訴訟法等の一部改正に伴う経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1603,7 +1603,7 @@
       "key": "Article_26",
       "num": "26",
       "number": "第26条",
-      "caption": "(第4条の規定による改正に伴う行政事件訴訟法等の一部改正に伴う経過措置)",
+      "caption": "第4条の規定による改正に伴う行政事件訴訟法等の一部改正に伴う経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1616,7 +1616,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1629,7 +1629,7 @@
       "key": "Article_43",
       "num": "43",
       "number": "第43条",
-      "caption": "(行政事件訴訟法の一部改正に伴う経過措置)",
+      "caption": "行政事件訴訟法の一部改正に伴う経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1642,7 +1642,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1655,7 +1655,7 @@
       "key": "Article_34",
       "num": "34",
       "number": "第34条",
-      "caption": "(国立国会図書館法等の一部改正に伴う経過措置)",
+      "caption": "国立国会図書館法等の一部改正に伴う経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1681,7 +1681,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1694,7 +1694,7 @@
       "key": "Article_75",
       "num": "75",
       "number": "第75条",
-      "caption": "(政令への委任)",
+      "caption": "政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -1707,7 +1707,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1720,7 +1720,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1733,7 +1733,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1746,7 +1746,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1759,7 +1759,7 @@
       "key": "Article_50",
       "num": "50",
       "number": "第50条",
-      "caption": "(株式会社日本政策金融公庫法等の改正に伴う経過措置)",
+      "caption": "株式会社日本政策金融公庫法等の改正に伴う経過措置",
       "paragraphs": [
         {
           "num": "2",
@@ -1772,7 +1772,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1785,7 +1785,7 @@
       "key": "Article_28",
       "num": "28",
       "number": "第28条",
-      "caption": "(行政事件訴訟法の一部改正に伴う経過措置)",
+      "caption": "行政事件訴訟法の一部改正に伴う経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1798,7 +1798,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1811,7 +1811,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1824,7 +1824,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1837,7 +1837,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1850,7 +1850,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1863,7 +1863,7 @@
       "key": "Article_5",
       "num": "5",
       "number": "第5条",
-      "caption": "(経過措置の原則)",
+      "caption": "経過措置の原則",
       "paragraphs": [
         {
           "num": "1",
@@ -1876,7 +1876,7 @@
       "key": "Article_6",
       "num": "6",
       "number": "第6条",
-      "caption": "(訴訟に関する経過措置)",
+      "caption": "訴訟に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1897,7 +1897,7 @@
       "key": "Article_10",
       "num": "10",
       "number": "第10条",
-      "caption": "(その他の経過措置の政令への委任)",
+      "caption": "その他の経過措置の政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -1910,7 +1910,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1923,7 +1923,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1936,7 +1936,7 @@
       "key": "Article_26",
       "num": "26",
       "number": "第26条",
-      "caption": "(政令への委任)",
+      "caption": "政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -1949,7 +1949,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -1962,7 +1962,7 @@
       "key": "Article_59",
       "num": "59",
       "number": "第59条",
-      "caption": "(行政事件訴訟法の一部改正に伴う経過措置)",
+      "caption": "行政事件訴訟法の一部改正に伴う経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -1975,7 +1975,7 @@
       "key": "Article_125",
       "num": "125",
       "number": "第125条",
-      "caption": "(政令への委任)",
+      "caption": "政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -1988,7 +1988,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -2001,7 +2001,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -2014,7 +2014,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -2027,7 +2027,7 @@
       "key": "Article_5",
       "num": "5",
       "number": "第5条",
-      "caption": "(政令への委任)",
+      "caption": "政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -2040,7 +2040,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -2053,7 +2053,7 @@
       "key": "Article_68",
       "num": "68",
       "number": "第68条",
-      "caption": "(政令への委任)",
+      "caption": "政令への委任",
       "paragraphs": [
         {
           "num": "1",

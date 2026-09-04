@@ -4,13 +4,13 @@
   "lawName": "民事訴訟法",
   "lawNumber": "平成八年法律第百九号",
   "source": "e-Gov 法令API v2",
-  "syncedAt": "2026-09-04T11:31:05.851Z",
+  "syncedAt": "2026-09-04T11:36:04.348Z",
   "articles": [
     {
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(趣旨)",
+      "caption": "趣旨",
       "paragraphs": [
         {
           "num": "1",
@@ -23,7 +23,7 @@
       "key": "Article_2",
       "num": "2",
       "number": "第2条",
-      "caption": "(裁判所及び当事者の責務)",
+      "caption": "裁判所及び当事者の責務",
       "paragraphs": [
         {
           "num": "1",
@@ -36,7 +36,7 @@
       "key": "Article_3",
       "num": "3",
       "number": "第3条",
-      "caption": "(最高裁判所規則)",
+      "caption": "最高裁判所規則",
       "paragraphs": [
         {
           "num": "1",
@@ -49,7 +49,7 @@
       "key": "Article_3_2",
       "num": "3_2",
       "number": "第3条の2",
-      "caption": "(被告の住所等による管轄権)",
+      "caption": "被告の住所等による管轄権",
       "paragraphs": [
         {
           "num": "1",
@@ -70,7 +70,7 @@
       "key": "Article_3_3",
       "num": "3_3",
       "number": "第3条の3",
-      "caption": "(契約上の債務に関する訴え等の管轄権)",
+      "caption": "契約上の債務に関する訴え等の管轄権",
       "paragraphs": [
         {
           "num": "1",
@@ -83,7 +83,7 @@
       "key": "Article_3_4",
       "num": "3_4",
       "number": "第3条の4",
-      "caption": "(消費者契約及び労働関係に関する訴えの管轄権)",
+      "caption": "消費者契約及び労働関係に関する訴えの管轄権",
       "paragraphs": [
         {
           "num": "1",
@@ -104,7 +104,7 @@
       "key": "Article_3_5",
       "num": "3_5",
       "number": "第3条の5",
-      "caption": "(管轄権の専属)",
+      "caption": "管轄権の専属",
       "paragraphs": [
         {
           "num": "1",
@@ -125,7 +125,7 @@
       "key": "Article_3_6",
       "num": "3_6",
       "number": "第3条の6",
-      "caption": "(併合請求における管轄権)",
+      "caption": "併合請求における管轄権",
       "paragraphs": [
         {
           "num": "1",
@@ -138,7 +138,7 @@
       "key": "Article_3_7",
       "num": "3_7",
       "number": "第3条の7",
-      "caption": "(管轄権に関する合意)",
+      "caption": "管轄権に関する合意",
       "paragraphs": [
         {
           "num": "1",
@@ -171,7 +171,7 @@
       "key": "Article_3_8",
       "num": "3_8",
       "number": "第3条の8",
-      "caption": "(応訴による管轄権)",
+      "caption": "応訴による管轄権",
       "paragraphs": [
         {
           "num": "1",
@@ -184,7 +184,7 @@
       "key": "Article_3_9",
       "num": "3_9",
       "number": "第3条の9",
-      "caption": "(特別の事情による訴えの却下)",
+      "caption": "特別の事情による訴えの却下",
       "paragraphs": [
         {
           "num": "1",
@@ -197,7 +197,7 @@
       "key": "Article_3_10",
       "num": "3_10",
       "number": "第3条の10",
-      "caption": "(管轄権が専属する場合の適用除外)",
+      "caption": "管轄権が専属する場合の適用除外",
       "paragraphs": [
         {
           "num": "1",
@@ -210,7 +210,7 @@
       "key": "Article_3_11",
       "num": "3_11",
       "number": "第3条の11",
-      "caption": "(職権証拠調べ)",
+      "caption": "職権証拠調べ",
       "paragraphs": [
         {
           "num": "1",
@@ -223,7 +223,7 @@
       "key": "Article_3_12",
       "num": "3_12",
       "number": "第3条の12",
-      "caption": "(管轄権の標準時)",
+      "caption": "管轄権の標準時",
       "paragraphs": [
         {
           "num": "1",
@@ -236,7 +236,7 @@
       "key": "Article_4",
       "num": "4",
       "number": "第4条",
-      "caption": "(普通裁判籍による管轄)",
+      "caption": "普通裁判籍による管轄",
       "paragraphs": [
         {
           "num": "1",
@@ -269,7 +269,7 @@
       "key": "Article_5",
       "num": "5",
       "number": "第5条",
-      "caption": "(財産権上の訴え等についての管轄)",
+      "caption": "財産権上の訴え等についての管轄",
       "paragraphs": [
         {
           "num": "1",
@@ -282,7 +282,7 @@
       "key": "Article_6",
       "num": "6",
       "number": "第6条",
-      "caption": "(特許権等に関する訴え等の管轄)",
+      "caption": "特許権等に関する訴え等の管轄",
       "paragraphs": [
         {
           "num": "1",
@@ -303,7 +303,7 @@
       "key": "Article_6_2",
       "num": "6_2",
       "number": "第6条の2",
-      "caption": "(意匠権等に関する訴えの管轄)",
+      "caption": "意匠権等に関する訴えの管轄",
       "paragraphs": [
         {
           "num": "1",
@@ -316,7 +316,7 @@
       "key": "Article_7",
       "num": "7",
       "number": "第7条",
-      "caption": "(併合請求における管轄)",
+      "caption": "併合請求における管轄",
       "paragraphs": [
         {
           "num": "1",
@@ -329,7 +329,7 @@
       "key": "Article_8",
       "num": "8",
       "number": "第8条",
-      "caption": "(訴訟の目的の価額の算定)",
+      "caption": "訴訟の目的の価額の算定",
       "paragraphs": [
         {
           "num": "1",
@@ -346,7 +346,7 @@
       "key": "Article_9",
       "num": "9",
       "number": "第9条",
-      "caption": "(併合請求の場合の価額の算定)",
+      "caption": "併合請求の場合の価額の算定",
       "paragraphs": [
         {
           "num": "1",
@@ -363,7 +363,7 @@
       "key": "Article_10",
       "num": "10",
       "number": "第10条",
-      "caption": "(管轄裁判所の指定)",
+      "caption": "管轄裁判所の指定",
       "paragraphs": [
         {
           "num": "1",
@@ -384,7 +384,7 @@
       "key": "Article_10_2",
       "num": "10_2",
       "number": "第10条の2",
-      "caption": "(管轄裁判所の特例)",
+      "caption": "管轄裁判所の特例",
       "paragraphs": [
         {
           "num": "1",
@@ -397,7 +397,7 @@
       "key": "Article_11",
       "num": "11",
       "number": "第11条",
-      "caption": "(管轄の合意)",
+      "caption": "管轄の合意",
       "paragraphs": [
         {
           "num": "1",
@@ -418,7 +418,7 @@
       "key": "Article_12",
       "num": "12",
       "number": "第12条",
-      "caption": "(応訴管轄)",
+      "caption": "応訴管轄",
       "paragraphs": [
         {
           "num": "1",
@@ -431,7 +431,7 @@
       "key": "Article_13",
       "num": "13",
       "number": "第13条",
-      "caption": "(専属管轄の場合の適用除外等)",
+      "caption": "専属管轄の場合の適用除外等",
       "paragraphs": [
         {
           "num": "1",
@@ -448,7 +448,7 @@
       "key": "Article_14",
       "num": "14",
       "number": "第14条",
-      "caption": "(職権証拠調べ)",
+      "caption": "職権証拠調べ",
       "paragraphs": [
         {
           "num": "1",
@@ -461,7 +461,7 @@
       "key": "Article_15",
       "num": "15",
       "number": "第15条",
-      "caption": "(管轄の標準時)",
+      "caption": "管轄の標準時",
       "paragraphs": [
         {
           "num": "1",
@@ -474,7 +474,7 @@
       "key": "Article_16",
       "num": "16",
       "number": "第16条",
-      "caption": "(管轄違いの場合の取扱い)",
+      "caption": "管轄違いの場合の取扱い",
       "paragraphs": [
         {
           "num": "1",
@@ -491,7 +491,7 @@
       "key": "Article_17",
       "num": "17",
       "number": "第17条",
-      "caption": "(遅滞を避ける等のための移送)",
+      "caption": "遅滞を避ける等のための移送",
       "paragraphs": [
         {
           "num": "1",
@@ -504,7 +504,7 @@
       "key": "Article_18",
       "num": "18",
       "number": "第18条",
-      "caption": "(簡易裁判所の裁量移送)",
+      "caption": "簡易裁判所の裁量移送",
       "paragraphs": [
         {
           "num": "1",
@@ -517,7 +517,7 @@
       "key": "Article_19",
       "num": "19",
       "number": "第19条",
-      "caption": "(必要的移送)",
+      "caption": "必要的移送",
       "paragraphs": [
         {
           "num": "1",
@@ -534,7 +534,7 @@
       "key": "Article_20",
       "num": "20",
       "number": "第20条",
-      "caption": "(専属管轄の場合の移送の制限)",
+      "caption": "専属管轄の場合の移送の制限",
       "paragraphs": [
         {
           "num": "1",
@@ -551,7 +551,7 @@
       "key": "Article_20_2",
       "num": "20_2",
       "number": "第20条の2",
-      "caption": "(特許権等に関する訴え等に係る訴訟の移送)",
+      "caption": "特許権等に関する訴え等に係る訴訟の移送",
       "paragraphs": [
         {
           "num": "1",
@@ -568,7 +568,7 @@
       "key": "Article_21",
       "num": "21",
       "number": "第21条",
-      "caption": "(即時抗告)",
+      "caption": "即時抗告",
       "paragraphs": [
         {
           "num": "1",
@@ -581,7 +581,7 @@
       "key": "Article_22",
       "num": "22",
       "number": "第22条",
-      "caption": "(移送の裁判の拘束力等)",
+      "caption": "移送の裁判の拘束力等",
       "paragraphs": [
         {
           "num": "1",
@@ -602,7 +602,7 @@
       "key": "Article_23",
       "num": "23",
       "number": "第23条",
-      "caption": "(裁判官の除斥)",
+      "caption": "裁判官の除斥",
       "paragraphs": [
         {
           "num": "1",
@@ -619,7 +619,7 @@
       "key": "Article_24",
       "num": "24",
       "number": "第24条",
-      "caption": "(裁判官の忌避)",
+      "caption": "裁判官の忌避",
       "paragraphs": [
         {
           "num": "1",
@@ -636,7 +636,7 @@
       "key": "Article_25",
       "num": "25",
       "number": "第25条",
-      "caption": "(除斥又は忌避の裁判)",
+      "caption": "除斥又は忌避の裁判",
       "paragraphs": [
         {
           "num": "1",
@@ -665,7 +665,7 @@
       "key": "Article_26",
       "num": "26",
       "number": "第26条",
-      "caption": "(訴訟手続の停止)",
+      "caption": "訴訟手続の停止",
       "paragraphs": [
         {
           "num": "1",
@@ -678,7 +678,7 @@
       "key": "Article_27",
       "num": "27",
       "number": "第27条",
-      "caption": "(裁判所書記官への準用)",
+      "caption": "裁判所書記官への準用",
       "paragraphs": [
         {
           "num": "1",
@@ -691,7 +691,7 @@
       "key": "Article_28",
       "num": "28",
       "number": "第28条",
-      "caption": "(原則)",
+      "caption": "原則",
       "paragraphs": [
         {
           "num": "1",
@@ -704,7 +704,7 @@
       "key": "Article_29",
       "num": "29",
       "number": "第29条",
-      "caption": "(法人でない社団等の当事者能力)",
+      "caption": "法人でない社団等の当事者能力",
       "paragraphs": [
         {
           "num": "1",
@@ -717,7 +717,7 @@
       "key": "Article_30",
       "num": "30",
       "number": "第30条",
-      "caption": "(選定当事者)",
+      "caption": "選定当事者",
       "paragraphs": [
         {
           "num": "1",
@@ -746,7 +746,7 @@
       "key": "Article_31",
       "num": "31",
       "number": "第31条",
-      "caption": "(未成年者及び成年被後見人の訴訟能力)",
+      "caption": "未成年者及び成年被後見人の訴訟能力",
       "paragraphs": [
         {
           "num": "1",
@@ -759,7 +759,7 @@
       "key": "Article_32",
       "num": "32",
       "number": "第32条",
-      "caption": "(被保佐人、被補助人及び法定代理人の訴訟行為の特則)",
+      "caption": "被保佐人、被補助人及び法定代理人の訴訟行為の特則",
       "paragraphs": [
         {
           "num": "1",
@@ -776,7 +776,7 @@
       "key": "Article_33",
       "num": "33",
       "number": "第33条",
-      "caption": "(外国人の訴訟能力の特則)",
+      "caption": "外国人の訴訟能力の特則",
       "paragraphs": [
         {
           "num": "1",
@@ -789,7 +789,7 @@
       "key": "Article_34",
       "num": "34",
       "number": "第34条",
-      "caption": "(訴訟能力等を欠く場合の措置等)",
+      "caption": "訴訟能力等を欠く場合の措置等",
       "paragraphs": [
         {
           "num": "1",
@@ -810,7 +810,7 @@
       "key": "Article_35",
       "num": "35",
       "number": "第35条",
-      "caption": "(特別代理人)",
+      "caption": "特別代理人",
       "paragraphs": [
         {
           "num": "1",
@@ -831,7 +831,7 @@
       "key": "Article_36",
       "num": "36",
       "number": "第36条",
-      "caption": "(法定代理権の消滅の通知)",
+      "caption": "法定代理権の消滅の通知",
       "paragraphs": [
         {
           "num": "1",
@@ -848,7 +848,7 @@
       "key": "Article_37",
       "num": "37",
       "number": "第37条",
-      "caption": "(法人の代表者等への準用)",
+      "caption": "法人の代表者等への準用",
       "paragraphs": [
         {
           "num": "1",
@@ -861,7 +861,7 @@
       "key": "Article_38",
       "num": "38",
       "number": "第38条",
-      "caption": "(共同訴訟の要件)",
+      "caption": "共同訴訟の要件",
       "paragraphs": [
         {
           "num": "1",
@@ -874,7 +874,7 @@
       "key": "Article_39",
       "num": "39",
       "number": "第39条",
-      "caption": "(共同訴訟人の地位)",
+      "caption": "共同訴訟人の地位",
       "paragraphs": [
         {
           "num": "1",
@@ -887,7 +887,7 @@
       "key": "Article_40",
       "num": "40",
       "number": "第40条",
-      "caption": "(必要的共同訴訟)",
+      "caption": "必要的共同訴訟",
       "paragraphs": [
         {
           "num": "1",
@@ -912,7 +912,7 @@
       "key": "Article_41",
       "num": "41",
       "number": "第41条",
-      "caption": "(同時審判の申出がある共同訴訟)",
+      "caption": "同時審判の申出がある共同訴訟",
       "paragraphs": [
         {
           "num": "1",
@@ -933,7 +933,7 @@
       "key": "Article_42",
       "num": "42",
       "number": "第42条",
-      "caption": "(補助参加)",
+      "caption": "補助参加",
       "paragraphs": [
         {
           "num": "1",
@@ -946,7 +946,7 @@
       "key": "Article_43",
       "num": "43",
       "number": "第43条",
-      "caption": "(補助参加の申出)",
+      "caption": "補助参加の申出",
       "paragraphs": [
         {
           "num": "1",
@@ -963,7 +963,7 @@
       "key": "Article_44",
       "num": "44",
       "number": "第44条",
-      "caption": "(補助参加についての異議等)",
+      "caption": "補助参加についての異議等",
       "paragraphs": [
         {
           "num": "1",
@@ -984,7 +984,7 @@
       "key": "Article_45",
       "num": "45",
       "number": "第45条",
-      "caption": "(補助参加人の訴訟行為等)",
+      "caption": "補助参加人の訴訟行為等",
       "paragraphs": [
         {
           "num": "1",
@@ -1013,7 +1013,7 @@
       "key": "Article_46",
       "num": "46",
       "number": "第46条",
-      "caption": "(補助参加人に対する裁判の効力)",
+      "caption": "補助参加人に対する裁判の効力",
       "paragraphs": [
         {
           "num": "1",
@@ -1026,7 +1026,7 @@
       "key": "Article_47",
       "num": "47",
       "number": "第47条",
-      "caption": "(独立当事者参加)",
+      "caption": "独立当事者参加",
       "paragraphs": [
         {
           "num": "1",
@@ -1051,7 +1051,7 @@
       "key": "Article_48",
       "num": "48",
       "number": "第48条",
-      "caption": "(訴訟脱退)",
+      "caption": "訴訟脱退",
       "paragraphs": [
         {
           "num": "1",
@@ -1064,7 +1064,7 @@
       "key": "Article_49",
       "num": "49",
       "number": "第49条",
-      "caption": "(権利承継人の訴訟参加の場合における時効の完成猶予等)",
+      "caption": "権利承継人の訴訟参加の場合における時効の完成猶予等",
       "paragraphs": [
         {
           "num": "1",
@@ -1081,7 +1081,7 @@
       "key": "Article_50",
       "num": "50",
       "number": "第50条",
-      "caption": "(義務承継人の訴訟引受け)",
+      "caption": "義務承継人の訴訟引受け",
       "paragraphs": [
         {
           "num": "1",
@@ -1102,7 +1102,7 @@
       "key": "Article_51",
       "num": "51",
       "number": "第51条",
-      "caption": "(義務承継人の訴訟参加及び権利承継人の訴訟引受け)",
+      "caption": "義務承継人の訴訟参加及び権利承継人の訴訟引受け",
       "paragraphs": [
         {
           "num": "1",
@@ -1115,7 +1115,7 @@
       "key": "Article_52",
       "num": "52",
       "number": "第52条",
-      "caption": "(共同訴訟参加)",
+      "caption": "共同訴訟参加",
       "paragraphs": [
         {
           "num": "1",
@@ -1132,7 +1132,7 @@
       "key": "Article_53",
       "num": "53",
       "number": "第53条",
-      "caption": "(訴訟告知)",
+      "caption": "訴訟告知",
       "paragraphs": [
         {
           "num": "1",
@@ -1157,7 +1157,7 @@
       "key": "Article_54",
       "num": "54",
       "number": "第54条",
-      "caption": "(訴訟代理人の資格)",
+      "caption": "訴訟代理人の資格",
       "paragraphs": [
         {
           "num": "1",
@@ -1174,7 +1174,7 @@
       "key": "Article_55",
       "num": "55",
       "number": "第55条",
-      "caption": "(訴訟代理権の範囲)",
+      "caption": "訴訟代理権の範囲",
       "paragraphs": [
         {
           "num": "1",
@@ -1199,7 +1199,7 @@
       "key": "Article_56",
       "num": "56",
       "number": "第56条",
-      "caption": "(個別代理)",
+      "caption": "個別代理",
       "paragraphs": [
         {
           "num": "1",
@@ -1216,7 +1216,7 @@
       "key": "Article_57",
       "num": "57",
       "number": "第57条",
-      "caption": "(当事者による更正)",
+      "caption": "当事者による更正",
       "paragraphs": [
         {
           "num": "1",
@@ -1229,7 +1229,7 @@
       "key": "Article_58",
       "num": "58",
       "number": "第58条",
-      "caption": "(訴訟代理権の不消滅)",
+      "caption": "訴訟代理権の不消滅",
       "paragraphs": [
         {
           "num": "1",
@@ -1250,7 +1250,7 @@
       "key": "Article_59",
       "num": "59",
       "number": "第59条",
-      "caption": "(法定代理の規定の準用)",
+      "caption": "法定代理の規定の準用",
       "paragraphs": [
         {
           "num": "1",
@@ -1263,7 +1263,7 @@
       "key": "Article_60",
       "num": "60",
       "number": "第60条",
-      "caption": "(補佐人)",
+      "caption": "補佐人",
       "paragraphs": [
         {
           "num": "1",
@@ -1284,7 +1284,7 @@
       "key": "Article_61",
       "num": "61",
       "number": "第61条",
-      "caption": "(訴訟費用の負担の原則)",
+      "caption": "訴訟費用の負担の原則",
       "paragraphs": [
         {
           "num": "1",
@@ -1297,7 +1297,7 @@
       "key": "Article_62",
       "num": "62",
       "number": "第62条",
-      "caption": "(不必要な行為があった場合等の負担)",
+      "caption": "不必要な行為があった場合等の負担",
       "paragraphs": [
         {
           "num": "1",
@@ -1310,7 +1310,7 @@
       "key": "Article_63",
       "num": "63",
       "number": "第63条",
-      "caption": "(訴訟を遅滞させた場合の負担)",
+      "caption": "訴訟を遅滞させた場合の負担",
       "paragraphs": [
         {
           "num": "1",
@@ -1323,7 +1323,7 @@
       "key": "Article_64",
       "num": "64",
       "number": "第64条",
-      "caption": "(一部敗訴の場合の負担)",
+      "caption": "一部敗訴の場合の負担",
       "paragraphs": [
         {
           "num": "1",
@@ -1336,7 +1336,7 @@
       "key": "Article_65",
       "num": "65",
       "number": "第65条",
-      "caption": "(共同訴訟の場合の負担)",
+      "caption": "共同訴訟の場合の負担",
       "paragraphs": [
         {
           "num": "1",
@@ -1353,7 +1353,7 @@
       "key": "Article_66",
       "num": "66",
       "number": "第66条",
-      "caption": "(補助参加の場合の負担)",
+      "caption": "補助参加の場合の負担",
       "paragraphs": [
         {
           "num": "1",
@@ -1366,7 +1366,7 @@
       "key": "Article_67",
       "num": "67",
       "number": "第67条",
-      "caption": "(訴訟費用の負担の裁判)",
+      "caption": "訴訟費用の負担の裁判",
       "paragraphs": [
         {
           "num": "1",
@@ -1383,7 +1383,7 @@
       "key": "Article_68",
       "num": "68",
       "number": "第68条",
-      "caption": "(和解の場合の負担)",
+      "caption": "和解の場合の負担",
       "paragraphs": [
         {
           "num": "1",
@@ -1396,7 +1396,7 @@
       "key": "Article_69",
       "num": "69",
       "number": "第69条",
-      "caption": "(法定代理人等の費用償還)",
+      "caption": "法定代理人等の費用償還",
       "paragraphs": [
         {
           "num": "1",
@@ -1417,7 +1417,7 @@
       "key": "Article_70",
       "num": "70",
       "number": "第70条",
-      "caption": "(無権代理人の費用負担)",
+      "caption": "無権代理人の費用負担",
       "paragraphs": [
         {
           "num": "1",
@@ -1430,7 +1430,7 @@
       "key": "Article_71",
       "num": "71",
       "number": "第71条",
-      "caption": "(訴訟費用額の確定手続)",
+      "caption": "訴訟費用額の確定手続",
       "paragraphs": [
         {
           "num": "1",
@@ -1471,7 +1471,7 @@
       "key": "Article_72",
       "num": "72",
       "number": "第72条",
-      "caption": "(和解の場合の費用額の確定手続)",
+      "caption": "和解の場合の費用額の確定手続",
       "paragraphs": [
         {
           "num": "1",
@@ -1484,7 +1484,7 @@
       "key": "Article_73",
       "num": "73",
       "number": "第73条",
-      "caption": "(訴訟が裁判及び和解によらないで完結した場合等の取扱い)",
+      "caption": "訴訟が裁判及び和解によらないで完結した場合等の取扱い",
       "paragraphs": [
         {
           "num": "1",
@@ -1501,7 +1501,7 @@
       "key": "Article_74",
       "num": "74",
       "number": "第74条",
-      "caption": "(費用額の確定処分の更正)",
+      "caption": "費用額の確定処分の更正",
       "paragraphs": [
         {
           "num": "1",
@@ -1522,7 +1522,7 @@
       "key": "Article_75",
       "num": "75",
       "number": "第75条",
-      "caption": "(担保提供命令)",
+      "caption": "担保提供命令",
       "paragraphs": [
         {
           "num": "1",
@@ -1559,7 +1559,7 @@
       "key": "Article_76",
       "num": "76",
       "number": "第76条",
-      "caption": "(担保提供の方法)",
+      "caption": "担保提供の方法",
       "paragraphs": [
         {
           "num": "1",
@@ -1572,7 +1572,7 @@
       "key": "Article_77",
       "num": "77",
       "number": "第77条",
-      "caption": "(担保物に対する被告の権利)",
+      "caption": "担保物に対する被告の権利",
       "paragraphs": [
         {
           "num": "1",
@@ -1585,7 +1585,7 @@
       "key": "Article_78",
       "num": "78",
       "number": "第78条",
-      "caption": "(担保不提供の効果)",
+      "caption": "担保不提供の効果",
       "paragraphs": [
         {
           "num": "1",
@@ -1598,7 +1598,7 @@
       "key": "Article_79",
       "num": "79",
       "number": "第79条",
-      "caption": "(担保の取消し)",
+      "caption": "担保の取消し",
       "paragraphs": [
         {
           "num": "1",
@@ -1623,7 +1623,7 @@
       "key": "Article_80",
       "num": "80",
       "number": "第80条",
-      "caption": "(担保の変換)",
+      "caption": "担保の変換",
       "paragraphs": [
         {
           "num": "1",
@@ -1636,7 +1636,7 @@
       "key": "Article_81",
       "num": "81",
       "number": "第81条",
-      "caption": "(他の法令による担保への準用)",
+      "caption": "他の法令による担保への準用",
       "paragraphs": [
         {
           "num": "1",
@@ -1649,7 +1649,7 @@
       "key": "Article_82",
       "num": "82",
       "number": "第82条",
-      "caption": "(救助の付与)",
+      "caption": "救助の付与",
       "paragraphs": [
         {
           "num": "1",
@@ -1666,7 +1666,7 @@
       "key": "Article_83",
       "num": "83",
       "number": "第83条",
-      "caption": "(救助の効力等)",
+      "caption": "救助の効力等",
       "paragraphs": [
         {
           "num": "1",
@@ -1687,7 +1687,7 @@
       "key": "Article_84",
       "num": "84",
       "number": "第84条",
-      "caption": "(救助の決定の取消し)",
+      "caption": "救助の決定の取消し",
       "paragraphs": [
         {
           "num": "1",
@@ -1700,7 +1700,7 @@
       "key": "Article_85",
       "num": "85",
       "number": "第85条",
-      "caption": "(猶予された費用等の取立方法)",
+      "caption": "猶予された費用等の取立方法",
       "paragraphs": [
         {
           "num": "1",
@@ -1713,7 +1713,7 @@
       "key": "Article_86",
       "num": "86",
       "number": "第86条",
-      "caption": "(即時抗告)",
+      "caption": "即時抗告",
       "paragraphs": [
         {
           "num": "1",
@@ -1726,7 +1726,7 @@
       "key": "Article_87",
       "num": "87",
       "number": "第87条",
-      "caption": "(口頭弁論の必要性)",
+      "caption": "口頭弁論の必要性",
       "paragraphs": [
         {
           "num": "1",
@@ -1747,7 +1747,7 @@
       "key": "Article_87_2",
       "num": "87_2",
       "number": "第87条の2",
-      "caption": "(映像と音声の送受信による通話の方法による口頭弁論等)",
+      "caption": "映像と音声の送受信による通話の方法による口頭弁論等",
       "paragraphs": [
         {
           "num": "1",
@@ -1768,7 +1768,7 @@
       "key": "Article_88",
       "num": "88",
       "number": "第88条",
-      "caption": "(受命裁判官による審尋)",
+      "caption": "受命裁判官による審尋",
       "paragraphs": [
         {
           "num": "1",
@@ -1781,7 +1781,7 @@
       "key": "Article_89",
       "num": "89",
       "number": "第89条",
-      "caption": "(和解の試み等)",
+      "caption": "和解の試み等",
       "paragraphs": [
         {
           "num": "1",
@@ -1810,7 +1810,7 @@
       "key": "Article_90",
       "num": "90",
       "number": "第90条",
-      "caption": "(訴訟手続に関する異議権の喪失)",
+      "caption": "訴訟手続に関する異議権の喪失",
       "paragraphs": [
         {
           "num": "1",
@@ -1823,7 +1823,7 @@
       "key": "Article_91",
       "num": "91",
       "number": "第91条",
-      "caption": "(非電磁的訴訟記録の閲覧等)",
+      "caption": "非電磁的訴訟記録の閲覧等",
       "paragraphs": [
         {
           "num": "1",
@@ -1852,7 +1852,7 @@
       "key": "Article_91_2",
       "num": "91_2",
       "number": "第91条の2",
-      "caption": "(電磁的訴訟記録の閲覧等)",
+      "caption": "電磁的訴訟記録の閲覧等",
       "paragraphs": [
         {
           "num": "1",
@@ -1877,7 +1877,7 @@
       "key": "Article_91_3",
       "num": "91_3",
       "number": "第91条の3",
-      "caption": "(訴訟に関する事項の証明)",
+      "caption": "訴訟に関する事項の証明",
       "paragraphs": [
         {
           "num": "1",
@@ -1890,7 +1890,7 @@
       "key": "Article_92",
       "num": "92",
       "number": "第92条",
-      "caption": "(秘密保護のための閲覧等の制限)",
+      "caption": "秘密保護のための閲覧等の制限",
       "paragraphs": [
         {
           "num": "1",
@@ -1939,7 +1939,7 @@
       "key": "Article_92_2",
       "num": "92_2",
       "number": "第92条の2",
-      "caption": "(専門委員の関与)",
+      "caption": "専門委員の関与",
       "paragraphs": [
         {
           "num": "1",
@@ -1964,7 +1964,7 @@
       "key": "Article_92_3",
       "num": "92_3",
       "number": "第92条の3",
-      "caption": "(音声の送受信による通話の方法による専門委員の関与)",
+      "caption": "音声の送受信による通話の方法による専門委員の関与",
       "paragraphs": [
         {
           "num": "1",
@@ -1977,7 +1977,7 @@
       "key": "Article_92_4",
       "num": "92_4",
       "number": "第92条の4",
-      "caption": "(専門委員の関与の決定の取消し)",
+      "caption": "専門委員の関与の決定の取消し",
       "paragraphs": [
         {
           "num": "1",
@@ -1990,7 +1990,7 @@
       "key": "Article_92_5",
       "num": "92_5",
       "number": "第92条の5",
-      "caption": "(専門委員の指定及び任免等)",
+      "caption": "専門委員の指定及び任免等",
       "paragraphs": [
         {
           "num": "1",
@@ -2015,7 +2015,7 @@
       "key": "Article_92_6",
       "num": "92_6",
       "number": "第92条の6",
-      "caption": "(専門委員の除斥及び忌避)",
+      "caption": "専門委員の除斥及び忌避",
       "paragraphs": [
         {
           "num": "1",
@@ -2032,7 +2032,7 @@
       "key": "Article_92_7",
       "num": "92_7",
       "number": "第92条の7",
-      "caption": "(受命裁判官等の権限)",
+      "caption": "受命裁判官等の権限",
       "paragraphs": [
         {
           "num": "1",
@@ -2045,7 +2045,7 @@
       "key": "Article_92_8",
       "num": "92_8",
       "number": "第92条の8",
-      "caption": "(知的財産に関する事件における裁判所調査官の事務)",
+      "caption": "知的財産に関する事件における裁判所調査官の事務",
       "paragraphs": [
         {
           "num": "1",
@@ -2058,7 +2058,7 @@
       "key": "Article_92_9",
       "num": "92_9",
       "number": "第92条の9",
-      "caption": "(知的財産に関する事件における裁判所調査官の除斥及び忌避)",
+      "caption": "知的財産に関する事件における裁判所調査官の除斥及び忌避",
       "paragraphs": [
         {
           "num": "1",
@@ -2075,7 +2075,7 @@
       "key": "Article_93",
       "num": "93",
       "number": "第93条",
-      "caption": "(期日の指定及び変更)",
+      "caption": "期日の指定及び変更",
       "paragraphs": [
         {
           "num": "1",
@@ -2100,7 +2100,7 @@
       "key": "Article_94",
       "num": "94",
       "number": "第94条",
-      "caption": "(期日の呼出し)",
+      "caption": "期日の呼出し",
       "paragraphs": [
         {
           "num": "1",
@@ -2121,7 +2121,7 @@
       "key": "Article_95",
       "num": "95",
       "number": "第95条",
-      "caption": "(期間の計算)",
+      "caption": "期間の計算",
       "paragraphs": [
         {
           "num": "1",
@@ -2142,7 +2142,7 @@
       "key": "Article_96",
       "num": "96",
       "number": "第96条",
-      "caption": "(期間の伸縮及び付加期間)",
+      "caption": "期間の伸縮及び付加期間",
       "paragraphs": [
         {
           "num": "1",
@@ -2159,7 +2159,7 @@
       "key": "Article_97",
       "num": "97",
       "number": "第97条",
-      "caption": "(訴訟行為の追完)",
+      "caption": "訴訟行為の追完",
       "paragraphs": [
         {
           "num": "1",
@@ -2176,7 +2176,7 @@
       "key": "Article_98",
       "num": "98",
       "number": "第98条",
-      "caption": "(職権送達の原則等)",
+      "caption": "職権送達の原則等",
       "paragraphs": [
         {
           "num": "1",
@@ -2193,7 +2193,7 @@
       "key": "Article_99",
       "num": "99",
       "number": "第99条",
-      "caption": "(訴訟無能力者等に対する送達)",
+      "caption": "訴訟無能力者等に対する送達",
       "paragraphs": [
         {
           "num": "1",
@@ -2214,7 +2214,7 @@
       "key": "Article_100",
       "num": "100",
       "number": "第100条",
-      "caption": "(送達報告書)",
+      "caption": "送達報告書",
       "paragraphs": [
         {
           "num": "1",
@@ -2231,7 +2231,7 @@
       "key": "Article_101",
       "num": "101",
       "number": "第101条",
-      "caption": "(送達実施機関)",
+      "caption": "送達実施機関",
       "paragraphs": [
         {
           "num": "1",
@@ -2248,7 +2248,7 @@
       "key": "Article_102",
       "num": "102",
       "number": "第102条",
-      "caption": "(裁判所書記官による送達)",
+      "caption": "裁判所書記官による送達",
       "paragraphs": [
         {
           "num": "1",
@@ -2261,7 +2261,7 @@
       "key": "Article_102_2",
       "num": "102_2",
       "number": "第102条の2",
-      "caption": "(交付送達の原則)",
+      "caption": "交付送達の原則",
       "paragraphs": [
         {
           "num": "1",
@@ -2274,7 +2274,7 @@
       "key": "Article_103",
       "num": "103",
       "number": "第103条",
-      "caption": "(送達場所)",
+      "caption": "送達場所",
       "paragraphs": [
         {
           "num": "1",
@@ -2291,7 +2291,7 @@
       "key": "Article_104",
       "num": "104",
       "number": "第104条",
-      "caption": "(送達場所等の届出)",
+      "caption": "送達場所等の届出",
       "paragraphs": [
         {
           "num": "1",
@@ -2312,7 +2312,7 @@
       "key": "Article_105",
       "num": "105",
       "number": "第105条",
-      "caption": "(出会送達)",
+      "caption": "出会送達",
       "paragraphs": [
         {
           "num": "1",
@@ -2325,7 +2325,7 @@
       "key": "Article_106",
       "num": "106",
       "number": "第106条",
-      "caption": "(補充送達及び差置送達)",
+      "caption": "補充送達及び差置送達",
       "paragraphs": [
         {
           "num": "1",
@@ -2346,7 +2346,7 @@
       "key": "Article_107",
       "num": "107",
       "number": "第107条",
-      "caption": "(書留郵便等に付する送達)",
+      "caption": "書留郵便等に付する送達",
       "paragraphs": [
         {
           "num": "1",
@@ -2367,7 +2367,7 @@
       "key": "Article_108",
       "num": "108",
       "number": "第108条",
-      "caption": "(外国における送達)",
+      "caption": "外国における送達",
       "paragraphs": [
         {
           "num": "1",
@@ -2380,7 +2380,7 @@
       "key": "Article_109",
       "num": "109",
       "number": "第109条",
-      "caption": "(電磁的記録に記録された事項を出力した書面による送達)",
+      "caption": "電磁的記録に記録された事項を出力した書面による送達",
       "paragraphs": [
         {
           "num": "1",
@@ -2393,7 +2393,7 @@
       "key": "Article_109_2",
       "num": "109_2",
       "number": "第109条の2",
-      "caption": "(電子情報処理組織による送達)",
+      "caption": "電子情報処理組織による送達",
       "paragraphs": [
         {
           "num": "1",
@@ -2414,7 +2414,7 @@
       "key": "Article_109_3",
       "num": "109_3",
       "number": "第109条の3",
-      "caption": "(電子情報処理組織による送達の効力発生の時期)",
+      "caption": "電子情報処理組織による送達の効力発生の時期",
       "paragraphs": [
         {
           "num": "1",
@@ -2431,7 +2431,7 @@
       "key": "Article_109_4",
       "num": "109_4",
       "number": "第109条の4",
-      "caption": "(電子情報処理組織による送達を受ける旨の届出をしなければならない者に関する特例)",
+      "caption": "電子情報処理組織による送達を受ける旨の届出をしなければならない者に関する特例",
       "paragraphs": [
         {
           "num": "1",
@@ -2448,7 +2448,7 @@
       "key": "Article_110",
       "num": "110",
       "number": "第110条",
-      "caption": "(公示送達の要件)",
+      "caption": "公示送達の要件",
       "paragraphs": [
         {
           "num": "1",
@@ -2469,7 +2469,7 @@
       "key": "Article_111",
       "num": "111",
       "number": "第111条",
-      "caption": "(公示送達の方法)",
+      "caption": "公示送達の方法",
       "paragraphs": [
         {
           "num": "1",
@@ -2482,7 +2482,7 @@
       "key": "Article_112",
       "num": "112",
       "number": "第112条",
-      "caption": "(公示送達の効力発生の時期)",
+      "caption": "公示送達の効力発生の時期",
       "paragraphs": [
         {
           "num": "1",
@@ -2503,7 +2503,7 @@
       "key": "Article_113",
       "num": "113",
       "number": "第113条",
-      "caption": "(公示送達による意思表示の到達)",
+      "caption": "公示送達による意思表示の到達",
       "paragraphs": [
         {
           "num": "1",
@@ -2516,7 +2516,7 @@
       "key": "Article_114",
       "num": "114",
       "number": "第114条",
-      "caption": "(既判力の範囲)",
+      "caption": "既判力の範囲",
       "paragraphs": [
         {
           "num": "1",
@@ -2533,7 +2533,7 @@
       "key": "Article_115",
       "num": "115",
       "number": "第115条",
-      "caption": "(確定判決等の効力が及ぶ者の範囲)",
+      "caption": "確定判決等の効力が及ぶ者の範囲",
       "paragraphs": [
         {
           "num": "1",
@@ -2550,7 +2550,7 @@
       "key": "Article_116",
       "num": "116",
       "number": "第116条",
-      "caption": "(判決の確定時期)",
+      "caption": "判決の確定時期",
       "paragraphs": [
         {
           "num": "1",
@@ -2567,7 +2567,7 @@
       "key": "Article_117",
       "num": "117",
       "number": "第117条",
-      "caption": "(定期金による賠償を命じた確定判決の変更を求める訴え)",
+      "caption": "定期金による賠償を命じた確定判決の変更を求める訴え",
       "paragraphs": [
         {
           "num": "1",
@@ -2584,7 +2584,7 @@
       "key": "Article_118",
       "num": "118",
       "number": "第118条",
-      "caption": "(外国裁判所の確定判決の効力)",
+      "caption": "外国裁判所の確定判決の効力",
       "paragraphs": [
         {
           "num": "1",
@@ -2597,7 +2597,7 @@
       "key": "Article_119",
       "num": "119",
       "number": "第119条",
-      "caption": "(決定及び命令の告知)",
+      "caption": "決定及び命令の告知",
       "paragraphs": [
         {
           "num": "1",
@@ -2610,7 +2610,7 @@
       "key": "Article_120",
       "num": "120",
       "number": "第120条",
-      "caption": "(訴訟指揮に関する裁判の取消し)",
+      "caption": "訴訟指揮に関する裁判の取消し",
       "paragraphs": [
         {
           "num": "1",
@@ -2623,7 +2623,7 @@
       "key": "Article_121",
       "num": "121",
       "number": "第121条",
-      "caption": "(裁判所書記官の処分に対する異議)",
+      "caption": "裁判所書記官の処分に対する異議",
       "paragraphs": [
         {
           "num": "1",
@@ -2636,7 +2636,7 @@
       "key": "Article_122",
       "num": "122",
       "number": "第122条",
-      "caption": "(判決に関する規定の準用)",
+      "caption": "判決に関する規定の準用",
       "paragraphs": [
         {
           "num": "1",
@@ -2649,7 +2649,7 @@
       "key": "Article_123",
       "num": "123",
       "number": "第123条",
-      "caption": "(判事補の権限)",
+      "caption": "判事補の権限",
       "paragraphs": [
         {
           "num": "1",
@@ -2662,7 +2662,7 @@
       "key": "Article_124",
       "num": "124",
       "number": "第124条",
-      "caption": "(訴訟手続の中断及び受継)",
+      "caption": "訴訟手続の中断及び受継",
       "paragraphs": [
         {
           "num": "1",
@@ -2712,7 +2712,7 @@
       "key": "Article_126",
       "num": "126",
       "number": "第126条",
-      "caption": "(相手方による受継の申立て)",
+      "caption": "相手方による受継の申立て",
       "paragraphs": [
         {
           "num": "1",
@@ -2725,7 +2725,7 @@
       "key": "Article_127",
       "num": "127",
       "number": "第127条",
-      "caption": "(受継の通知)",
+      "caption": "受継の通知",
       "paragraphs": [
         {
           "num": "1",
@@ -2738,7 +2738,7 @@
       "key": "Article_128",
       "num": "128",
       "number": "第128条",
-      "caption": "(受継についての裁判)",
+      "caption": "受継についての裁判",
       "paragraphs": [
         {
           "num": "1",
@@ -2755,7 +2755,7 @@
       "key": "Article_129",
       "num": "129",
       "number": "第129条",
-      "caption": "(職権による続行命令)",
+      "caption": "職権による続行命令",
       "paragraphs": [
         {
           "num": "1",
@@ -2768,7 +2768,7 @@
       "key": "Article_130",
       "num": "130",
       "number": "第130条",
-      "caption": "(裁判所の職務執行不能による中止)",
+      "caption": "裁判所の職務執行不能による中止",
       "paragraphs": [
         {
           "num": "1",
@@ -2781,7 +2781,7 @@
       "key": "Article_131",
       "num": "131",
       "number": "第131条",
-      "caption": "(当事者の故障による中止)",
+      "caption": "当事者の故障による中止",
       "paragraphs": [
         {
           "num": "1",
@@ -2798,7 +2798,7 @@
       "key": "Article_132",
       "num": "132",
       "number": "第132条",
-      "caption": "(中断及び中止の効果)",
+      "caption": "中断及び中止の効果",
       "paragraphs": [
         {
           "num": "1",
@@ -2815,7 +2815,7 @@
       "key": "Article_132_2",
       "num": "132_2",
       "number": "第132条の2",
-      "caption": "(訴えの提起前における照会)",
+      "caption": "訴えの提起前における照会",
       "paragraphs": [
         {
           "num": "1",
@@ -2873,7 +2873,7 @@
       "key": "Article_132_4",
       "num": "132_4",
       "number": "第132条の4",
-      "caption": "(訴えの提起前における証拠収集の処分)",
+      "caption": "訴えの提起前における証拠収集の処分",
       "paragraphs": [
         {
           "num": "1",
@@ -2898,7 +2898,7 @@
       "key": "Article_132_5",
       "num": "132_5",
       "number": "第132条の5",
-      "caption": "(証拠収集の処分の管轄裁判所等)",
+      "caption": "証拠収集の処分の管轄裁判所等",
       "paragraphs": [
         {
           "num": "1",
@@ -2915,7 +2915,7 @@
       "key": "Article_132_6",
       "num": "132_6",
       "number": "第132条の6",
-      "caption": "(証拠収集の処分の手続等)",
+      "caption": "証拠収集の処分の手続等",
       "paragraphs": [
         {
           "num": "1",
@@ -2948,7 +2948,7 @@
       "key": "Article_132_7",
       "num": "132_7",
       "number": "第132条の7",
-      "caption": "(事件の記録の閲覧等)",
+      "caption": "事件の記録の閲覧等",
       "paragraphs": [
         {
           "num": "1",
@@ -2961,7 +2961,7 @@
       "key": "Article_132_8",
       "num": "132_8",
       "number": "第132条の8",
-      "caption": "(不服申立ての不許)",
+      "caption": "不服申立ての不許",
       "paragraphs": [
         {
           "num": "1",
@@ -2974,7 +2974,7 @@
       "key": "Article_132_9",
       "num": "132_9",
       "number": "第132条の9",
-      "caption": "(証拠収集の処分に係る裁判に関する費用の負担)",
+      "caption": "証拠収集の処分に係る裁判に関する費用の負担",
       "paragraphs": [
         {
           "num": "1",
@@ -2987,7 +2987,7 @@
       "key": "Article_132_10",
       "num": "132_10",
       "number": "第132条の10",
-      "caption": "(電子情報処理組織による申立て等)",
+      "caption": "電子情報処理組織による申立て等",
       "paragraphs": [
         {
           "num": "1",
@@ -3020,7 +3020,7 @@
       "key": "Article_132_11",
       "num": "132_11",
       "number": "第132条の11",
-      "caption": "(電子情報処理組織による申立て等の特例)",
+      "caption": "電子情報処理組織による申立て等の特例",
       "paragraphs": [
         {
           "num": "1",
@@ -3041,7 +3041,7 @@
       "key": "Article_132_12",
       "num": "132_12",
       "number": "第132条の12",
-      "caption": "(書面等による申立て等)",
+      "caption": "書面等による申立て等",
       "paragraphs": [
         {
           "num": "1",
@@ -3062,7 +3062,7 @@
       "key": "Article_132_13",
       "num": "132_13",
       "number": "第132条の13",
-      "caption": "(書面等に記録された事項のファイルへの記録等)",
+      "caption": "書面等に記録された事項のファイルへの記録等",
       "paragraphs": [
         {
           "num": "1",
@@ -3075,7 +3075,7 @@
       "key": "Article_133",
       "num": "133",
       "number": "第133条",
-      "caption": "(申立人の住所、氏名等の秘匿)",
+      "caption": "申立人の住所、氏名等の秘匿",
       "paragraphs": [
         {
           "num": "1",
@@ -3104,7 +3104,7 @@
       "key": "Article_133_2",
       "num": "133_2",
       "number": "第133条の2",
-      "caption": "(秘匿決定があった場合における閲覧等の制限の特則)",
+      "caption": "秘匿決定があった場合における閲覧等の制限の特則",
       "paragraphs": [
         {
           "num": "1",
@@ -3137,7 +3137,7 @@
       "key": "Article_133_3",
       "num": "133_3",
       "number": "第133条の3",
-      "caption": "(送達をすべき場所等の調査嘱託があった場合における閲覧等の制限の特則)",
+      "caption": "送達をすべき場所等の調査嘱託があった場合における閲覧等の制限の特則",
       "paragraphs": [
         {
           "num": "1",
@@ -3154,7 +3154,7 @@
       "key": "Article_133_4",
       "num": "133_4",
       "number": "第133条の4",
-      "caption": "(秘匿決定の取消し等)",
+      "caption": "秘匿決定の取消し等",
       "paragraphs": [
         {
           "num": "1",
@@ -3191,7 +3191,7 @@
       "key": "Article_134",
       "num": "134",
       "number": "第134条",
-      "caption": "(訴え提起の方式)",
+      "caption": "訴え提起の方式",
       "paragraphs": [
         {
           "num": "1",
@@ -3208,7 +3208,7 @@
       "key": "Article_134_2",
       "num": "134_2",
       "number": "第134条の2",
-      "caption": "(証書真否確認の訴え)",
+      "caption": "証書真否確認の訴え",
       "paragraphs": [
         {
           "num": "1",
@@ -3221,7 +3221,7 @@
       "key": "Article_135",
       "num": "135",
       "number": "第135条",
-      "caption": "(将来の給付の訴え)",
+      "caption": "将来の給付の訴え",
       "paragraphs": [
         {
           "num": "1",
@@ -3234,7 +3234,7 @@
       "key": "Article_136",
       "num": "136",
       "number": "第136条",
-      "caption": "(請求の併合)",
+      "caption": "請求の併合",
       "paragraphs": [
         {
           "num": "1",
@@ -3247,7 +3247,7 @@
       "key": "Article_137",
       "num": "137",
       "number": "第137条",
-      "caption": "(裁判長の訴状審査権)",
+      "caption": "裁判長の訴状審査権",
       "paragraphs": [
         {
           "num": "1",
@@ -3268,7 +3268,7 @@
       "key": "Article_137_2",
       "num": "137_2",
       "number": "第137条の2",
-      "caption": "(訴えの提起の手数料の納付がない場合の訴状却下)",
+      "caption": "訴えの提起の手数料の納付がない場合の訴状却下",
       "paragraphs": [
         {
           "num": "1",
@@ -3313,7 +3313,7 @@
       "key": "Article_138",
       "num": "138",
       "number": "第138条",
-      "caption": "(訴状の送達)",
+      "caption": "訴状の送達",
       "paragraphs": [
         {
           "num": "1",
@@ -3330,7 +3330,7 @@
       "key": "Article_139",
       "num": "139",
       "number": "第139条",
-      "caption": "(口頭弁論期日の指定)",
+      "caption": "口頭弁論期日の指定",
       "paragraphs": [
         {
           "num": "1",
@@ -3343,7 +3343,7 @@
       "key": "Article_140",
       "num": "140",
       "number": "第140条",
-      "caption": "(口頭弁論を経ない訴えの却下)",
+      "caption": "口頭弁論を経ない訴えの却下",
       "paragraphs": [
         {
           "num": "1",
@@ -3356,7 +3356,7 @@
       "key": "Article_141",
       "num": "141",
       "number": "第141条",
-      "caption": "(呼出費用の予納がない場合の訴えの却下)",
+      "caption": "呼出費用の予納がない場合の訴えの却下",
       "paragraphs": [
         {
           "num": "1",
@@ -3373,7 +3373,7 @@
       "key": "Article_142",
       "num": "142",
       "number": "第142条",
-      "caption": "(重複する訴えの提起の禁止)",
+      "caption": "重複する訴えの提起の禁止",
       "paragraphs": [
         {
           "num": "1",
@@ -3386,7 +3386,7 @@
       "key": "Article_143",
       "num": "143",
       "number": "第143条",
-      "caption": "(訴えの変更)",
+      "caption": "訴えの変更",
       "paragraphs": [
         {
           "num": "1",
@@ -3411,7 +3411,7 @@
       "key": "Article_144",
       "num": "144",
       "number": "第144条",
-      "caption": "(選定者に係る請求の追加)",
+      "caption": "選定者に係る請求の追加",
       "paragraphs": [
         {
           "num": "1",
@@ -3432,7 +3432,7 @@
       "key": "Article_145",
       "num": "145",
       "number": "第145条",
-      "caption": "(中間確認の訴え)",
+      "caption": "中間確認の訴え",
       "paragraphs": [
         {
           "num": "1",
@@ -3457,7 +3457,7 @@
       "key": "Article_146",
       "num": "146",
       "number": "第146条",
-      "caption": "(反訴)",
+      "caption": "反訴",
       "paragraphs": [
         {
           "num": "1",
@@ -3482,7 +3482,7 @@
       "key": "Article_147",
       "num": "147",
       "number": "第147条",
-      "caption": "(裁判上の請求による時効の完成猶予等)",
+      "caption": "裁判上の請求による時効の完成猶予等",
       "paragraphs": [
         {
           "num": "1",
@@ -3495,7 +3495,7 @@
       "key": "Article_147_2",
       "num": "147_2",
       "number": "第147条の2",
-      "caption": "(訴訟手続の計画的進行)",
+      "caption": "訴訟手続の計画的進行",
       "paragraphs": [
         {
           "num": "1",
@@ -3508,7 +3508,7 @@
       "key": "Article_147_3",
       "num": "147_3",
       "number": "第147条の3",
-      "caption": "(審理の計画)",
+      "caption": "審理の計画",
       "paragraphs": [
         {
           "num": "1",
@@ -3533,7 +3533,7 @@
       "key": "Article_148",
       "num": "148",
       "number": "第148条",
-      "caption": "(裁判長の訴訟指揮権)",
+      "caption": "裁判長の訴訟指揮権",
       "paragraphs": [
         {
           "num": "1",
@@ -3550,7 +3550,7 @@
       "key": "Article_149",
       "num": "149",
       "number": "第149条",
-      "caption": "(釈明権等)",
+      "caption": "釈明権等",
       "paragraphs": [
         {
           "num": "1",
@@ -3575,7 +3575,7 @@
       "key": "Article_150",
       "num": "150",
       "number": "第150条",
-      "caption": "(訴訟指揮等に対する異議)",
+      "caption": "訴訟指揮等に対する異議",
       "paragraphs": [
         {
           "num": "1",
@@ -3588,7 +3588,7 @@
       "key": "Article_151",
       "num": "151",
       "number": "第151条",
-      "caption": "(釈明処分)",
+      "caption": "釈明処分",
       "paragraphs": [
         {
           "num": "1",
@@ -3613,7 +3613,7 @@
       "key": "Article_152",
       "num": "152",
       "number": "第152条",
-      "caption": "(口頭弁論の併合等)",
+      "caption": "口頭弁論の併合等",
       "paragraphs": [
         {
           "num": "1",
@@ -3630,7 +3630,7 @@
       "key": "Article_153",
       "num": "153",
       "number": "第153条",
-      "caption": "(口頭弁論の再開)",
+      "caption": "口頭弁論の再開",
       "paragraphs": [
         {
           "num": "1",
@@ -3643,7 +3643,7 @@
       "key": "Article_154",
       "num": "154",
       "number": "第154条",
-      "caption": "(通訳人の立会い等)",
+      "caption": "通訳人の立会い等",
       "paragraphs": [
         {
           "num": "1",
@@ -3664,7 +3664,7 @@
       "key": "Article_155",
       "num": "155",
       "number": "第155条",
-      "caption": "(弁論能力を欠く者に対する措置)",
+      "caption": "弁論能力を欠く者に対する措置",
       "paragraphs": [
         {
           "num": "1",
@@ -3681,7 +3681,7 @@
       "key": "Article_156",
       "num": "156",
       "number": "第156条",
-      "caption": "(攻撃防御方法の提出時期)",
+      "caption": "攻撃防御方法の提出時期",
       "paragraphs": [
         {
           "num": "1",
@@ -3694,7 +3694,7 @@
       "key": "Article_156_2",
       "num": "156_2",
       "number": "第156条の2",
-      "caption": "(審理の計画が定められている場合の攻撃防御方法の提出期間)",
+      "caption": "審理の計画が定められている場合の攻撃防御方法の提出期間",
       "paragraphs": [
         {
           "num": "1",
@@ -3707,7 +3707,7 @@
       "key": "Article_157",
       "num": "157",
       "number": "第157条",
-      "caption": "(時機に後れた攻撃防御方法の却下等)",
+      "caption": "時機に後れた攻撃防御方法の却下等",
       "paragraphs": [
         {
           "num": "1",
@@ -3724,7 +3724,7 @@
       "key": "Article_157_2",
       "num": "157_2",
       "number": "第157条の2",
-      "caption": "(審理の計画が定められている場合の攻撃防御方法の却下)",
+      "caption": "審理の計画が定められている場合の攻撃防御方法の却下",
       "paragraphs": [
         {
           "num": "1",
@@ -3737,7 +3737,7 @@
       "key": "Article_158",
       "num": "158",
       "number": "第158条",
-      "caption": "(訴状等の陳述の擬制)",
+      "caption": "訴状等の陳述の擬制",
       "paragraphs": [
         {
           "num": "1",
@@ -3750,7 +3750,7 @@
       "key": "Article_159",
       "num": "159",
       "number": "第159条",
-      "caption": "(自白の擬制)",
+      "caption": "自白の擬制",
       "paragraphs": [
         {
           "num": "1",
@@ -3771,7 +3771,7 @@
       "key": "Article_160",
       "num": "160",
       "number": "第160条",
-      "caption": "(口頭弁論に係る電子調書の作成等)",
+      "caption": "口頭弁論に係る電子調書の作成等",
       "paragraphs": [
         {
           "num": "1",
@@ -3796,7 +3796,7 @@
       "key": "Article_160_2",
       "num": "160_2",
       "number": "第160条の2",
-      "caption": "(口頭弁論に係る電子調書の更正)",
+      "caption": "口頭弁論に係る電子調書の更正",
       "paragraphs": [
         {
           "num": "1",
@@ -3817,7 +3817,7 @@
       "key": "Article_161",
       "num": "161",
       "number": "第161条",
-      "caption": "(準備書面)",
+      "caption": "準備書面",
       "paragraphs": [
         {
           "num": "1",
@@ -3838,7 +3838,7 @@
       "key": "Article_162",
       "num": "162",
       "number": "第162条",
-      "caption": "(準備書面等の提出期間)",
+      "caption": "準備書面等の提出期間",
       "paragraphs": [
         {
           "num": "1",
@@ -3855,7 +3855,7 @@
       "key": "Article_163",
       "num": "163",
       "number": "第163条",
-      "caption": "(当事者照会)",
+      "caption": "当事者照会",
       "paragraphs": [
         {
           "num": "1",
@@ -3876,7 +3876,7 @@
       "key": "Article_164",
       "num": "164",
       "number": "第164条",
-      "caption": "(準備的口頭弁論の開始)",
+      "caption": "準備的口頭弁論の開始",
       "paragraphs": [
         {
           "num": "1",
@@ -3889,7 +3889,7 @@
       "key": "Article_165",
       "num": "165",
       "number": "第165条",
-      "caption": "(証明すべき事実の確認等)",
+      "caption": "証明すべき事実の確認等",
       "paragraphs": [
         {
           "num": "1",
@@ -3906,7 +3906,7 @@
       "key": "Article_166",
       "num": "166",
       "number": "第166条",
-      "caption": "(当事者の不出頭等による終了)",
+      "caption": "当事者の不出頭等による終了",
       "paragraphs": [
         {
           "num": "1",
@@ -3919,7 +3919,7 @@
       "key": "Article_167",
       "num": "167",
       "number": "第167条",
-      "caption": "(準備的口頭弁論終了後の攻撃防御方法の提出)",
+      "caption": "準備的口頭弁論終了後の攻撃防御方法の提出",
       "paragraphs": [
         {
           "num": "1",
@@ -3932,7 +3932,7 @@
       "key": "Article_168",
       "num": "168",
       "number": "第168条",
-      "caption": "(弁論準備手続の開始)",
+      "caption": "弁論準備手続の開始",
       "paragraphs": [
         {
           "num": "1",
@@ -3945,7 +3945,7 @@
       "key": "Article_169",
       "num": "169",
       "number": "第169条",
-      "caption": "(弁論準備手続の期日)",
+      "caption": "弁論準備手続の期日",
       "paragraphs": [
         {
           "num": "1",
@@ -3962,7 +3962,7 @@
       "key": "Article_170",
       "num": "170",
       "number": "第170条",
-      "caption": "(弁論準備手続における訴訟行為等)",
+      "caption": "弁論準備手続における訴訟行為等",
       "paragraphs": [
         {
           "num": "1",
@@ -3991,7 +3991,7 @@
       "key": "Article_171",
       "num": "171",
       "number": "第171条",
-      "caption": "(受命裁判官による弁論準備手続)",
+      "caption": "受命裁判官による弁論準備手続",
       "paragraphs": [
         {
           "num": "1",
@@ -4012,7 +4012,7 @@
       "key": "Article_172",
       "num": "172",
       "number": "第172条",
-      "caption": "(弁論準備手続に付する裁判の取消し)",
+      "caption": "弁論準備手続に付する裁判の取消し",
       "paragraphs": [
         {
           "num": "1",
@@ -4025,7 +4025,7 @@
       "key": "Article_173",
       "num": "173",
       "number": "第173条",
-      "caption": "(弁論準備手続の結果の陳述)",
+      "caption": "弁論準備手続の結果の陳述",
       "paragraphs": [
         {
           "num": "1",
@@ -4038,7 +4038,7 @@
       "key": "Article_174",
       "num": "174",
       "number": "第174条",
-      "caption": "(弁論準備手続終結後の攻撃防御方法の提出)",
+      "caption": "弁論準備手続終結後の攻撃防御方法の提出",
       "paragraphs": [
         {
           "num": "1",
@@ -4051,7 +4051,7 @@
       "key": "Article_175",
       "num": "175",
       "number": "第175条",
-      "caption": "(書面による準備手続の開始)",
+      "caption": "書面による準備手続の開始",
       "paragraphs": [
         {
           "num": "1",
@@ -4064,7 +4064,7 @@
       "key": "Article_176",
       "num": "176",
       "number": "第176条",
-      "caption": "(書面による準備手続の方法等)",
+      "caption": "書面による準備手続の方法等",
       "paragraphs": [
         {
           "num": "1",
@@ -4085,7 +4085,7 @@
       "key": "Article_176_2",
       "num": "176_2",
       "number": "第176条の2",
-      "caption": "(受命裁判官による書面による準備手続)",
+      "caption": "受命裁判官による書面による準備手続",
       "paragraphs": [
         {
           "num": "1",
@@ -4102,7 +4102,7 @@
       "key": "Article_177",
       "num": "177",
       "number": "第177条",
-      "caption": "(証明すべき事実の確認)",
+      "caption": "証明すべき事実の確認",
       "paragraphs": [
         {
           "num": "1",
@@ -4115,7 +4115,7 @@
       "key": "Article_178",
       "num": "178",
       "number": "第178条",
-      "caption": "(書面による準備手続終結後の攻撃防御方法の提出)",
+      "caption": "書面による準備手続終結後の攻撃防御方法の提出",
       "paragraphs": [
         {
           "num": "1",
@@ -4128,7 +4128,7 @@
       "key": "Article_179",
       "num": "179",
       "number": "第179条",
-      "caption": "(証明することを要しない事実)",
+      "caption": "証明することを要しない事実",
       "paragraphs": [
         {
           "num": "1",
@@ -4141,7 +4141,7 @@
       "key": "Article_180",
       "num": "180",
       "number": "第180条",
-      "caption": "(証拠の申出)",
+      "caption": "証拠の申出",
       "paragraphs": [
         {
           "num": "1",
@@ -4158,7 +4158,7 @@
       "key": "Article_181",
       "num": "181",
       "number": "第181条",
-      "caption": "(証拠調べを要しない場合)",
+      "caption": "証拠調べを要しない場合",
       "paragraphs": [
         {
           "num": "1",
@@ -4175,7 +4175,7 @@
       "key": "Article_182",
       "num": "182",
       "number": "第182条",
-      "caption": "(集中証拠調べ)",
+      "caption": "集中証拠調べ",
       "paragraphs": [
         {
           "num": "1",
@@ -4188,7 +4188,7 @@
       "key": "Article_183",
       "num": "183",
       "number": "第183条",
-      "caption": "(当事者の不出頭の場合の取扱い)",
+      "caption": "当事者の不出頭の場合の取扱い",
       "paragraphs": [
         {
           "num": "1",
@@ -4201,7 +4201,7 @@
       "key": "Article_184",
       "num": "184",
       "number": "第184条",
-      "caption": "(外国における証拠調べ)",
+      "caption": "外国における証拠調べ",
       "paragraphs": [
         {
           "num": "1",
@@ -4218,7 +4218,7 @@
       "key": "Article_185",
       "num": "185",
       "number": "第185条",
-      "caption": "(裁判所外における証拠調べ)",
+      "caption": "裁判所外における証拠調べ",
       "paragraphs": [
         {
           "num": "1",
@@ -4239,7 +4239,7 @@
       "key": "Article_186",
       "num": "186",
       "number": "第186条",
-      "caption": "(調査の嘱託)",
+      "caption": "調査の嘱託",
       "paragraphs": [
         {
           "num": "1",
@@ -4256,7 +4256,7 @@
       "key": "Article_187",
       "num": "187",
       "number": "第187条",
-      "caption": "(参考人等の審尋)",
+      "caption": "参考人等の審尋",
       "paragraphs": [
         {
           "num": "1",
@@ -4281,7 +4281,7 @@
       "key": "Article_188",
       "num": "188",
       "number": "第188条",
-      "caption": "(疎明)",
+      "caption": "疎明",
       "paragraphs": [
         {
           "num": "1",
@@ -4294,7 +4294,7 @@
       "key": "Article_189",
       "num": "189",
       "number": "第189条",
-      "caption": "(過料の裁判の執行)",
+      "caption": "過料の裁判の執行",
       "paragraphs": [
         {
           "num": "1",
@@ -4319,7 +4319,7 @@
       "key": "Article_190",
       "num": "190",
       "number": "第190条",
-      "caption": "(証人義務)",
+      "caption": "証人義務",
       "paragraphs": [
         {
           "num": "1",
@@ -4332,7 +4332,7 @@
       "key": "Article_191",
       "num": "191",
       "number": "第191条",
-      "caption": "(公務員の尋問)",
+      "caption": "公務員の尋問",
       "paragraphs": [
         {
           "num": "1",
@@ -4349,7 +4349,7 @@
       "key": "Article_192",
       "num": "192",
       "number": "第192条",
-      "caption": "(不出頭に対する過料等)",
+      "caption": "不出頭に対する過料等",
       "paragraphs": [
         {
           "num": "1",
@@ -4366,7 +4366,7 @@
       "key": "Article_193",
       "num": "193",
       "number": "第193条",
-      "caption": "(不出頭に対する罰金等)",
+      "caption": "不出頭に対する罰金等",
       "paragraphs": [
         {
           "num": "1",
@@ -4383,7 +4383,7 @@
       "key": "Article_194",
       "num": "194",
       "number": "第194条",
-      "caption": "(勾引)",
+      "caption": "勾引",
       "paragraphs": [
         {
           "num": "1",
@@ -4400,7 +4400,7 @@
       "key": "Article_195",
       "num": "195",
       "number": "第195条",
-      "caption": "(受命裁判官等による証人尋問)",
+      "caption": "受命裁判官等による証人尋問",
       "paragraphs": [
         {
           "num": "1",
@@ -4413,7 +4413,7 @@
       "key": "Article_196",
       "num": "196",
       "number": "第196条",
-      "caption": "(証言拒絶権)",
+      "caption": "証言拒絶権",
       "paragraphs": [
         {
           "num": "1",
@@ -4443,7 +4443,7 @@
       "key": "Article_198",
       "num": "198",
       "number": "第198条",
-      "caption": "(証言拒絶の理由の疎明)",
+      "caption": "証言拒絶の理由の疎明",
       "paragraphs": [
         {
           "num": "1",
@@ -4456,7 +4456,7 @@
       "key": "Article_199",
       "num": "199",
       "number": "第199条",
-      "caption": "(証言拒絶についての裁判)",
+      "caption": "証言拒絶についての裁判",
       "paragraphs": [
         {
           "num": "1",
@@ -4473,7 +4473,7 @@
       "key": "Article_200",
       "num": "200",
       "number": "第200条",
-      "caption": "(証言拒絶に対する制裁)",
+      "caption": "証言拒絶に対する制裁",
       "paragraphs": [
         {
           "num": "1",
@@ -4486,7 +4486,7 @@
       "key": "Article_201",
       "num": "201",
       "number": "第201条",
-      "caption": "(宣誓)",
+      "caption": "宣誓",
       "paragraphs": [
         {
           "num": "1",
@@ -4515,7 +4515,7 @@
       "key": "Article_202",
       "num": "202",
       "number": "第202条",
-      "caption": "(尋問の順序)",
+      "caption": "尋問の順序",
       "paragraphs": [
         {
           "num": "1",
@@ -4536,7 +4536,7 @@
       "key": "Article_203",
       "num": "203",
       "number": "第203条",
-      "caption": "(書類等に基づく陳述の禁止)",
+      "caption": "書類等に基づく陳述の禁止",
       "paragraphs": [
         {
           "num": "1",
@@ -4549,7 +4549,7 @@
       "key": "Article_203_2",
       "num": "203_2",
       "number": "第203条の2",
-      "caption": "(付添い)",
+      "caption": "付添い",
       "paragraphs": [
         {
           "num": "1",
@@ -4570,7 +4570,7 @@
       "key": "Article_203_3",
       "num": "203_3",
       "number": "第203条の3",
-      "caption": "(遮へいの措置)",
+      "caption": "遮へいの措置",
       "paragraphs": [
         {
           "num": "1",
@@ -4591,7 +4591,7 @@
       "key": "Article_204",
       "num": "204",
       "number": "第204条",
-      "caption": "(映像等の送受信による通話の方法による尋問)",
+      "caption": "映像等の送受信による通話の方法による尋問",
       "paragraphs": [
         {
           "num": "1",
@@ -4604,7 +4604,7 @@
       "key": "Article_205",
       "num": "205",
       "number": "第205条",
-      "caption": "(尋問に代わる書面の提出)",
+      "caption": "尋問に代わる書面の提出",
       "paragraphs": [
         {
           "num": "1",
@@ -4625,7 +4625,7 @@
       "key": "Article_206",
       "num": "206",
       "number": "第206条",
-      "caption": "(受命裁判官等の権限)",
+      "caption": "受命裁判官等の権限",
       "paragraphs": [
         {
           "num": "1",
@@ -4638,7 +4638,7 @@
       "key": "Article_207",
       "num": "207",
       "number": "第207条",
-      "caption": "(当事者本人の尋問)",
+      "caption": "当事者本人の尋問",
       "paragraphs": [
         {
           "num": "1",
@@ -4655,7 +4655,7 @@
       "key": "Article_208",
       "num": "208",
       "number": "第208条",
-      "caption": "(不出頭等の効果)",
+      "caption": "不出頭等の効果",
       "paragraphs": [
         {
           "num": "1",
@@ -4668,7 +4668,7 @@
       "key": "Article_209",
       "num": "209",
       "number": "第209条",
-      "caption": "(虚偽の陳述に対する過料)",
+      "caption": "虚偽の陳述に対する過料",
       "paragraphs": [
         {
           "num": "1",
@@ -4689,7 +4689,7 @@
       "key": "Article_210",
       "num": "210",
       "number": "第210条",
-      "caption": "(証人尋問の規定の準用)",
+      "caption": "証人尋問の規定の準用",
       "paragraphs": [
         {
           "num": "1",
@@ -4702,7 +4702,7 @@
       "key": "Article_211",
       "num": "211",
       "number": "第211条",
-      "caption": "(法定代理人の尋問)",
+      "caption": "法定代理人の尋問",
       "paragraphs": [
         {
           "num": "1",
@@ -4715,7 +4715,7 @@
       "key": "Article_212",
       "num": "212",
       "number": "第212条",
-      "caption": "(鑑定義務)",
+      "caption": "鑑定義務",
       "paragraphs": [
         {
           "num": "1",
@@ -4732,7 +4732,7 @@
       "key": "Article_213",
       "num": "213",
       "number": "第213条",
-      "caption": "(鑑定人の指定)",
+      "caption": "鑑定人の指定",
       "paragraphs": [
         {
           "num": "1",
@@ -4745,7 +4745,7 @@
       "key": "Article_214",
       "num": "214",
       "number": "第214条",
-      "caption": "(忌避)",
+      "caption": "忌避",
       "paragraphs": [
         {
           "num": "1",
@@ -4770,7 +4770,7 @@
       "key": "Article_215",
       "num": "215",
       "number": "第215条",
-      "caption": "(鑑定人の陳述の方式等)",
+      "caption": "鑑定人の陳述の方式等",
       "paragraphs": [
         {
           "num": "1",
@@ -4795,7 +4795,7 @@
       "key": "Article_215_2",
       "num": "215_2",
       "number": "第215条の2",
-      "caption": "(鑑定人質問)",
+      "caption": "鑑定人質問",
       "paragraphs": [
         {
           "num": "1",
@@ -4820,7 +4820,7 @@
       "key": "Article_215_3",
       "num": "215_3",
       "number": "第215条の3",
-      "caption": "(映像等の送受信による通話の方法による陳述)",
+      "caption": "映像等の送受信による通話の方法による陳述",
       "paragraphs": [
         {
           "num": "1",
@@ -4833,7 +4833,7 @@
       "key": "Article_215_4",
       "num": "215_4",
       "number": "第215条の4",
-      "caption": "(受命裁判官等の権限)",
+      "caption": "受命裁判官等の権限",
       "paragraphs": [
         {
           "num": "1",
@@ -4846,7 +4846,7 @@
       "key": "Article_216",
       "num": "216",
       "number": "第216条",
-      "caption": "(証人尋問の規定の準用)",
+      "caption": "証人尋問の規定の準用",
       "paragraphs": [
         {
           "num": "1",
@@ -4859,7 +4859,7 @@
       "key": "Article_217",
       "num": "217",
       "number": "第217条",
-      "caption": "(鑑定証人)",
+      "caption": "鑑定証人",
       "paragraphs": [
         {
           "num": "1",
@@ -4872,7 +4872,7 @@
       "key": "Article_218",
       "num": "218",
       "number": "第218条",
-      "caption": "(鑑定の嘱託)",
+      "caption": "鑑定の嘱託",
       "paragraphs": [
         {
           "num": "1",
@@ -4893,7 +4893,7 @@
       "key": "Article_219",
       "num": "219",
       "number": "第219条",
-      "caption": "(書証の申出)",
+      "caption": "書証の申出",
       "paragraphs": [
         {
           "num": "1",
@@ -4906,7 +4906,7 @@
       "key": "Article_220",
       "num": "220",
       "number": "第220条",
-      "caption": "(文書提出義務)",
+      "caption": "文書提出義務",
       "paragraphs": [
         {
           "num": "1",
@@ -4919,7 +4919,7 @@
       "key": "Article_221",
       "num": "221",
       "number": "第221条",
-      "caption": "(文書提出命令の申立て)",
+      "caption": "文書提出命令の申立て",
       "paragraphs": [
         {
           "num": "1",
@@ -4936,7 +4936,7 @@
       "key": "Article_222",
       "num": "222",
       "number": "第222条",
-      "caption": "(文書の特定のための手続)",
+      "caption": "文書の特定のための手続",
       "paragraphs": [
         {
           "num": "1",
@@ -4953,7 +4953,7 @@
       "key": "Article_223",
       "num": "223",
       "number": "第223条",
-      "caption": "(文書提出命令等)",
+      "caption": "文書提出命令等",
       "paragraphs": [
         {
           "num": "1",
@@ -4990,7 +4990,7 @@
       "key": "Article_224",
       "num": "224",
       "number": "第224条",
-      "caption": "(当事者が文書提出命令に従わない場合等の効果)",
+      "caption": "当事者が文書提出命令に従わない場合等の効果",
       "paragraphs": [
         {
           "num": "1",
@@ -5011,7 +5011,7 @@
       "key": "Article_225",
       "num": "225",
       "number": "第225条",
-      "caption": "(第三者が文書提出命令に従わない場合の過料)",
+      "caption": "第三者が文書提出命令に従わない場合の過料",
       "paragraphs": [
         {
           "num": "1",
@@ -5028,7 +5028,7 @@
       "key": "Article_226",
       "num": "226",
       "number": "第226条",
-      "caption": "(文書送付の嘱託)",
+      "caption": "文書送付の嘱託",
       "paragraphs": [
         {
           "num": "1",
@@ -5041,7 +5041,7 @@
       "key": "Article_227",
       "num": "227",
       "number": "第227条",
-      "caption": "(文書の留置等)",
+      "caption": "文書の留置等",
       "paragraphs": [
         {
           "num": "1",
@@ -5058,7 +5058,7 @@
       "key": "Article_228",
       "num": "228",
       "number": "第228条",
-      "caption": "(文書の成立)",
+      "caption": "文書の成立",
       "paragraphs": [
         {
           "num": "1",
@@ -5087,7 +5087,7 @@
       "key": "Article_229",
       "num": "229",
       "number": "第229条",
-      "caption": "(筆跡等の対照による証明)",
+      "caption": "筆跡等の対照による証明",
       "paragraphs": [
         {
           "num": "1",
@@ -5120,7 +5120,7 @@
       "key": "Article_230",
       "num": "230",
       "number": "第230条",
-      "caption": "(文書の成立の真正を争った者に対する過料)",
+      "caption": "文書の成立の真正を争った者に対する過料",
       "paragraphs": [
         {
           "num": "1",
@@ -5141,7 +5141,7 @@
       "key": "Article_231",
       "num": "231",
       "number": "第231条",
-      "caption": "(文書に準ずる物件への準用)",
+      "caption": "文書に準ずる物件への準用",
       "paragraphs": [
         {
           "num": "1",
@@ -5154,7 +5154,7 @@
       "key": "Article_231_2",
       "num": "231_2",
       "number": "第231条の2",
-      "caption": "(電磁的記録に記録された情報の内容に係る証拠調べの申出)",
+      "caption": "電磁的記録に記録された情報の内容に係る証拠調べの申出",
       "paragraphs": [
         {
           "num": "1",
@@ -5171,7 +5171,7 @@
       "key": "Article_231_3",
       "num": "231_3",
       "number": "第231条の3",
-      "caption": "(書証の規定の準用等)",
+      "caption": "書証の規定の準用等",
       "paragraphs": [
         {
           "num": "1",
@@ -5188,7 +5188,7 @@
       "key": "Article_232",
       "num": "232",
       "number": "第232条",
-      "caption": "(検証の目的の提示等)",
+      "caption": "検証の目的の提示等",
       "paragraphs": [
         {
           "num": "1",
@@ -5209,7 +5209,7 @@
       "key": "Article_232_2",
       "num": "232_2",
       "number": "第232条の2",
-      "caption": "(映像等の送受信による方法による検証)",
+      "caption": "映像等の送受信による方法による検証",
       "paragraphs": [
         {
           "num": "1",
@@ -5222,7 +5222,7 @@
       "key": "Article_233",
       "num": "233",
       "number": "第233条",
-      "caption": "(検証の際の鑑定)",
+      "caption": "検証の際の鑑定",
       "paragraphs": [
         {
           "num": "1",
@@ -5235,7 +5235,7 @@
       "key": "Article_234",
       "num": "234",
       "number": "第234条",
-      "caption": "(証拠保全)",
+      "caption": "証拠保全",
       "paragraphs": [
         {
           "num": "1",
@@ -5248,7 +5248,7 @@
       "key": "Article_235",
       "num": "235",
       "number": "第235条",
-      "caption": "(管轄裁判所等)",
+      "caption": "管轄裁判所等",
       "paragraphs": [
         {
           "num": "1",
@@ -5269,7 +5269,7 @@
       "key": "Article_236",
       "num": "236",
       "number": "第236条",
-      "caption": "(相手方の指定ができない場合の取扱い)",
+      "caption": "相手方の指定ができない場合の取扱い",
       "paragraphs": [
         {
           "num": "1",
@@ -5282,7 +5282,7 @@
       "key": "Article_237",
       "num": "237",
       "number": "第237条",
-      "caption": "(職権による証拠保全)",
+      "caption": "職権による証拠保全",
       "paragraphs": [
         {
           "num": "1",
@@ -5295,7 +5295,7 @@
       "key": "Article_238",
       "num": "238",
       "number": "第238条",
-      "caption": "(不服申立ての不許)",
+      "caption": "不服申立ての不許",
       "paragraphs": [
         {
           "num": "1",
@@ -5308,7 +5308,7 @@
       "key": "Article_239",
       "num": "239",
       "number": "第239条",
-      "caption": "(受命裁判官による証拠調べ)",
+      "caption": "受命裁判官による証拠調べ",
       "paragraphs": [
         {
           "num": "1",
@@ -5321,7 +5321,7 @@
       "key": "Article_240",
       "num": "240",
       "number": "第240条",
-      "caption": "(期日の呼出し)",
+      "caption": "期日の呼出し",
       "paragraphs": [
         {
           "num": "1",
@@ -5334,7 +5334,7 @@
       "key": "Article_241",
       "num": "241",
       "number": "第241条",
-      "caption": "(証拠保全の費用)",
+      "caption": "証拠保全の費用",
       "paragraphs": [
         {
           "num": "1",
@@ -5347,7 +5347,7 @@
       "key": "Article_242",
       "num": "242",
       "number": "第242条",
-      "caption": "(口頭弁論における再尋問)",
+      "caption": "口頭弁論における再尋問",
       "paragraphs": [
         {
           "num": "1",
@@ -5360,7 +5360,7 @@
       "key": "Article_243",
       "num": "243",
       "number": "第243条",
-      "caption": "(終局判決)",
+      "caption": "終局判決",
       "paragraphs": [
         {
           "num": "1",
@@ -5394,7 +5394,7 @@
       "key": "Article_245",
       "num": "245",
       "number": "第245条",
-      "caption": "(中間判決)",
+      "caption": "中間判決",
       "paragraphs": [
         {
           "num": "1",
@@ -5407,7 +5407,7 @@
       "key": "Article_246",
       "num": "246",
       "number": "第246条",
-      "caption": "(判決事項)",
+      "caption": "判決事項",
       "paragraphs": [
         {
           "num": "1",
@@ -5420,7 +5420,7 @@
       "key": "Article_247",
       "num": "247",
       "number": "第247条",
-      "caption": "(自由心証主義)",
+      "caption": "自由心証主義",
       "paragraphs": [
         {
           "num": "1",
@@ -5433,7 +5433,7 @@
       "key": "Article_248",
       "num": "248",
       "number": "第248条",
-      "caption": "(損害額の認定)",
+      "caption": "損害額の認定",
       "paragraphs": [
         {
           "num": "1",
@@ -5446,7 +5446,7 @@
       "key": "Article_249",
       "num": "249",
       "number": "第249条",
-      "caption": "(直接主義)",
+      "caption": "直接主義",
       "paragraphs": [
         {
           "num": "1",
@@ -5467,7 +5467,7 @@
       "key": "Article_250",
       "num": "250",
       "number": "第250条",
-      "caption": "(判決の発効)",
+      "caption": "判決の発効",
       "paragraphs": [
         {
           "num": "1",
@@ -5480,7 +5480,7 @@
       "key": "Article_251",
       "num": "251",
       "number": "第251条",
-      "caption": "(言渡期日)",
+      "caption": "言渡期日",
       "paragraphs": [
         {
           "num": "1",
@@ -5497,7 +5497,7 @@
       "key": "Article_252",
       "num": "252",
       "number": "第252条",
-      "caption": "(電子判決書)",
+      "caption": "電子判決書",
       "paragraphs": [
         {
           "num": "1",
@@ -5514,7 +5514,7 @@
       "key": "Article_253",
       "num": "253",
       "number": "第253条",
-      "caption": "(言渡しの方式)",
+      "caption": "言渡しの方式",
       "paragraphs": [
         {
           "num": "1",
@@ -5531,7 +5531,7 @@
       "key": "Article_254",
       "num": "254",
       "number": "第254条",
-      "caption": "(言渡しの方式の特則)",
+      "caption": "言渡しの方式の特則",
       "paragraphs": [
         {
           "num": "1",
@@ -5548,7 +5548,7 @@
       "key": "Article_255",
       "num": "255",
       "number": "第255条",
-      "caption": "(電子判決書等の送達)",
+      "caption": "電子判決書等の送達",
       "paragraphs": [
         {
           "num": "1",
@@ -5565,7 +5565,7 @@
       "key": "Article_256",
       "num": "256",
       "number": "第256条",
-      "caption": "(変更の判決)",
+      "caption": "変更の判決",
       "paragraphs": [
         {
           "num": "1",
@@ -5586,7 +5586,7 @@
       "key": "Article_257",
       "num": "257",
       "number": "第257条",
-      "caption": "(判決の更正決定)",
+      "caption": "判決の更正決定",
       "paragraphs": [
         {
           "num": "1",
@@ -5607,7 +5607,7 @@
       "key": "Article_258",
       "num": "258",
       "number": "第258条",
-      "caption": "(裁判の脱漏)",
+      "caption": "裁判の脱漏",
       "paragraphs": [
         {
           "num": "1",
@@ -5632,7 +5632,7 @@
       "key": "Article_259",
       "num": "259",
       "number": "第259条",
-      "caption": "(仮執行の宣言)",
+      "caption": "仮執行の宣言",
       "paragraphs": [
         {
           "num": "1",
@@ -5665,7 +5665,7 @@
       "key": "Article_260",
       "num": "260",
       "number": "第260条",
-      "caption": "(仮執行の宣言の失効及び原状回復等)",
+      "caption": "仮執行の宣言の失効及び原状回復等",
       "paragraphs": [
         {
           "num": "1",
@@ -5686,7 +5686,7 @@
       "key": "Article_261",
       "num": "261",
       "number": "第261条",
-      "caption": "(訴えの取下げ)",
+      "caption": "訴えの取下げ",
       "paragraphs": [
         {
           "num": "1",
@@ -5719,7 +5719,7 @@
       "key": "Article_262",
       "num": "262",
       "number": "第262条",
-      "caption": "(訴えの取下げの効果)",
+      "caption": "訴えの取下げの効果",
       "paragraphs": [
         {
           "num": "1",
@@ -5736,7 +5736,7 @@
       "key": "Article_263",
       "num": "263",
       "number": "第263条",
-      "caption": "(訴えの取下げの擬制)",
+      "caption": "訴えの取下げの擬制",
       "paragraphs": [
         {
           "num": "1",
@@ -5749,7 +5749,7 @@
       "key": "Article_264",
       "num": "264",
       "number": "第264条",
-      "caption": "(和解条項案の書面による受諾)",
+      "caption": "和解条項案の書面による受諾",
       "paragraphs": [
         {
           "num": "1",
@@ -5766,7 +5766,7 @@
       "key": "Article_265",
       "num": "265",
       "number": "第265条",
-      "caption": "(裁判所等が定める和解条項)",
+      "caption": "裁判所等が定める和解条項",
       "paragraphs": [
         {
           "num": "1",
@@ -5795,7 +5795,7 @@
       "key": "Article_266",
       "num": "266",
       "number": "第266条",
-      "caption": "(請求の放棄又は認諾)",
+      "caption": "請求の放棄又は認諾",
       "paragraphs": [
         {
           "num": "1",
@@ -5812,7 +5812,7 @@
       "key": "Article_267",
       "num": "267",
       "number": "第267条",
-      "caption": "(和解等に係る電子調書の効力)",
+      "caption": "和解等に係る電子調書の効力",
       "paragraphs": [
         {
           "num": "1",
@@ -5829,7 +5829,7 @@
       "key": "Article_267_2",
       "num": "267_2",
       "number": "第267条の2",
-      "caption": "(和解等に係る電子調書の更正決定)",
+      "caption": "和解等に係る電子調書の更正決定",
       "paragraphs": [
         {
           "num": "1",
@@ -5850,7 +5850,7 @@
       "key": "Article_268",
       "num": "268",
       "number": "第268条",
-      "caption": "(大規模訴訟に係る事件における受命裁判官による証人等の尋問)",
+      "caption": "大規模訴訟に係る事件における受命裁判官による証人等の尋問",
       "paragraphs": [
         {
           "num": "1",
@@ -5863,7 +5863,7 @@
       "key": "Article_269",
       "num": "269",
       "number": "第269条",
-      "caption": "(大規模訴訟に係る事件における合議体の構成)",
+      "caption": "大規模訴訟に係る事件における合議体の構成",
       "paragraphs": [
         {
           "num": "1",
@@ -5880,7 +5880,7 @@
       "key": "Article_269_2",
       "num": "269_2",
       "number": "第269条の2",
-      "caption": "(特許権等に関する訴えに係る事件における合議体の構成)",
+      "caption": "特許権等に関する訴えに係る事件における合議体の構成",
       "paragraphs": [
         {
           "num": "1",
@@ -5897,7 +5897,7 @@
       "key": "Article_270",
       "num": "270",
       "number": "第270条",
-      "caption": "(手続の特色)",
+      "caption": "手続の特色",
       "paragraphs": [
         {
           "num": "1",
@@ -5910,7 +5910,7 @@
       "key": "Article_271",
       "num": "271",
       "number": "第271条",
-      "caption": "(口頭による訴えの提起)",
+      "caption": "口頭による訴えの提起",
       "paragraphs": [
         {
           "num": "1",
@@ -5923,7 +5923,7 @@
       "key": "Article_272",
       "num": "272",
       "number": "第272条",
-      "caption": "(訴えの提起において明らかにすべき事項)",
+      "caption": "訴えの提起において明らかにすべき事項",
       "paragraphs": [
         {
           "num": "1",
@@ -5936,7 +5936,7 @@
       "key": "Article_273",
       "num": "273",
       "number": "第273条",
-      "caption": "(任意の出頭による訴えの提起等)",
+      "caption": "任意の出頭による訴えの提起等",
       "paragraphs": [
         {
           "num": "1",
@@ -5949,7 +5949,7 @@
       "key": "Article_274",
       "num": "274",
       "number": "第274条",
-      "caption": "(反訴の提起に基づく移送)",
+      "caption": "反訴の提起に基づく移送",
       "paragraphs": [
         {
           "num": "1",
@@ -5966,7 +5966,7 @@
       "key": "Article_275",
       "num": "275",
       "number": "第275条",
-      "caption": "(訴え提起前の和解)",
+      "caption": "訴え提起前の和解",
       "paragraphs": [
         {
           "num": "1",
@@ -5991,7 +5991,7 @@
       "key": "Article_275_2",
       "num": "275_2",
       "number": "第275条の2",
-      "caption": "(和解に代わる決定)",
+      "caption": "和解に代わる決定",
       "paragraphs": [
         {
           "num": "1",
@@ -6020,7 +6020,7 @@
       "key": "Article_276",
       "num": "276",
       "number": "第276条",
-      "caption": "(準備書面の省略等)",
+      "caption": "準備書面の省略等",
       "paragraphs": [
         {
           "num": "1",
@@ -6041,7 +6041,7 @@
       "key": "Article_277",
       "num": "277",
       "number": "第277条",
-      "caption": "(続行期日における陳述の擬制)",
+      "caption": "続行期日における陳述の擬制",
       "paragraphs": [
         {
           "num": "1",
@@ -6054,7 +6054,7 @@
       "key": "Article_277_2",
       "num": "277_2",
       "number": "第277条の2",
-      "caption": "(映像等の送受信による通話の方法による尋問)",
+      "caption": "映像等の送受信による通話の方法による尋問",
       "paragraphs": [
         {
           "num": "1",
@@ -6067,7 +6067,7 @@
       "key": "Article_278",
       "num": "278",
       "number": "第278条",
-      "caption": "(尋問等に代わる書面の提出)",
+      "caption": "尋問等に代わる書面の提出",
       "paragraphs": [
         {
           "num": "1",
@@ -6084,7 +6084,7 @@
       "key": "Article_279",
       "num": "279",
       "number": "第279条",
-      "caption": "(司法委員)",
+      "caption": "司法委員",
       "paragraphs": [
         {
           "num": "1",
@@ -6113,7 +6113,7 @@
       "key": "Article_280",
       "num": "280",
       "number": "第280条",
-      "caption": "(電子判決書の記録事項)",
+      "caption": "電子判決書の記録事項",
       "paragraphs": [
         {
           "num": "1",
@@ -6126,7 +6126,7 @@
       "key": "Article_281",
       "num": "281",
       "number": "第281条",
-      "caption": "(控訴をすることができる判決等)",
+      "caption": "控訴をすることができる判決等",
       "paragraphs": [
         {
           "num": "1",
@@ -6143,7 +6143,7 @@
       "key": "Article_282",
       "num": "282",
       "number": "第282条",
-      "caption": "(訴訟費用の負担の裁判に対する控訴の制限)",
+      "caption": "訴訟費用の負担の裁判に対する控訴の制限",
       "paragraphs": [
         {
           "num": "1",
@@ -6156,7 +6156,7 @@
       "key": "Article_283",
       "num": "283",
       "number": "第283条",
-      "caption": "(控訴裁判所の判断を受ける裁判)",
+      "caption": "控訴裁判所の判断を受ける裁判",
       "paragraphs": [
         {
           "num": "1",
@@ -6169,7 +6169,7 @@
       "key": "Article_284",
       "num": "284",
       "number": "第284条",
-      "caption": "(控訴権の放棄)",
+      "caption": "控訴権の放棄",
       "paragraphs": [
         {
           "num": "1",
@@ -6182,7 +6182,7 @@
       "key": "Article_285",
       "num": "285",
       "number": "第285条",
-      "caption": "(控訴期間)",
+      "caption": "控訴期間",
       "paragraphs": [
         {
           "num": "1",
@@ -6195,7 +6195,7 @@
       "key": "Article_286",
       "num": "286",
       "number": "第286条",
-      "caption": "(控訴提起の方式)",
+      "caption": "控訴提起の方式",
       "paragraphs": [
         {
           "num": "1",
@@ -6212,7 +6212,7 @@
       "key": "Article_287",
       "num": "287",
       "number": "第287条",
-      "caption": "(第一審裁判所による控訴の却下)",
+      "caption": "第一審裁判所による控訴の却下",
       "paragraphs": [
         {
           "num": "1",
@@ -6229,7 +6229,7 @@
       "key": "Article_288",
       "num": "288",
       "number": "第288条",
-      "caption": "(裁判長の控訴状審査権等)",
+      "caption": "裁判長の控訴状審査権等",
       "paragraphs": [
         {
           "num": "1",
@@ -6242,7 +6242,7 @@
       "key": "Article_289",
       "num": "289",
       "number": "第289条",
-      "caption": "(控訴状の送達)",
+      "caption": "控訴状の送達",
       "paragraphs": [
         {
           "num": "1",
@@ -6259,7 +6259,7 @@
       "key": "Article_290",
       "num": "290",
       "number": "第290条",
-      "caption": "(口頭弁論を経ない控訴の却下)",
+      "caption": "口頭弁論を経ない控訴の却下",
       "paragraphs": [
         {
           "num": "1",
@@ -6272,7 +6272,7 @@
       "key": "Article_291",
       "num": "291",
       "number": "第291条",
-      "caption": "(呼出費用の予納がない場合の控訴の却下)",
+      "caption": "呼出費用の予納がない場合の控訴の却下",
       "paragraphs": [
         {
           "num": "1",
@@ -6289,7 +6289,7 @@
       "key": "Article_292",
       "num": "292",
       "number": "第292条",
-      "caption": "(控訴の取下げ)",
+      "caption": "控訴の取下げ",
       "paragraphs": [
         {
           "num": "1",
@@ -6306,7 +6306,7 @@
       "key": "Article_293",
       "num": "293",
       "number": "第293条",
-      "caption": "(附帯控訴)",
+      "caption": "附帯控訴",
       "paragraphs": [
         {
           "num": "1",
@@ -6327,7 +6327,7 @@
       "key": "Article_294",
       "num": "294",
       "number": "第294条",
-      "caption": "(第一審判決についての仮執行の宣言)",
+      "caption": "第一審判決についての仮執行の宣言",
       "paragraphs": [
         {
           "num": "1",
@@ -6340,7 +6340,7 @@
       "key": "Article_295",
       "num": "295",
       "number": "第295条",
-      "caption": "(仮執行に関する裁判に対する不服申立て)",
+      "caption": "仮執行に関する裁判に対する不服申立て",
       "paragraphs": [
         {
           "num": "1",
@@ -6353,7 +6353,7 @@
       "key": "Article_296",
       "num": "296",
       "number": "第296条",
-      "caption": "(口頭弁論の範囲等)",
+      "caption": "口頭弁論の範囲等",
       "paragraphs": [
         {
           "num": "1",
@@ -6370,7 +6370,7 @@
       "key": "Article_297",
       "num": "297",
       "number": "第297条",
-      "caption": "(第一審の訴訟手続の規定の準用)",
+      "caption": "第一審の訴訟手続の規定の準用",
       "paragraphs": [
         {
           "num": "1",
@@ -6383,7 +6383,7 @@
       "key": "Article_298",
       "num": "298",
       "number": "第298条",
-      "caption": "(第一審の訴訟行為の効力等)",
+      "caption": "第一審の訴訟行為の効力等",
       "paragraphs": [
         {
           "num": "1",
@@ -6400,7 +6400,7 @@
       "key": "Article_299",
       "num": "299",
       "number": "第299条",
-      "caption": "(第一審の管轄違いの主張の制限)",
+      "caption": "第一審の管轄違いの主張の制限",
       "paragraphs": [
         {
           "num": "1",
@@ -6417,7 +6417,7 @@
       "key": "Article_300",
       "num": "300",
       "number": "第300条",
-      "caption": "(反訴の提起等)",
+      "caption": "反訴の提起等",
       "paragraphs": [
         {
           "num": "1",
@@ -6438,7 +6438,7 @@
       "key": "Article_301",
       "num": "301",
       "number": "第301条",
-      "caption": "(攻撃防御方法の提出等の期間)",
+      "caption": "攻撃防御方法の提出等の期間",
       "paragraphs": [
         {
           "num": "1",
@@ -6455,7 +6455,7 @@
       "key": "Article_302",
       "num": "302",
       "number": "第302条",
-      "caption": "(控訴棄却)",
+      "caption": "控訴棄却",
       "paragraphs": [
         {
           "num": "1",
@@ -6472,7 +6472,7 @@
       "key": "Article_303",
       "num": "303",
       "number": "第303条",
-      "caption": "(控訴権の濫用に対する制裁)",
+      "caption": "控訴権の濫用に対する制裁",
       "paragraphs": [
         {
           "num": "1",
@@ -6501,7 +6501,7 @@
       "key": "Article_304",
       "num": "304",
       "number": "第304条",
-      "caption": "(第一審判決の取消し及び変更の範囲)",
+      "caption": "第一審判決の取消し及び変更の範囲",
       "paragraphs": [
         {
           "num": "1",
@@ -6514,7 +6514,7 @@
       "key": "Article_305",
       "num": "305",
       "number": "第305条",
-      "caption": "(第一審判決が不当な場合の取消し)",
+      "caption": "第一審判決が不当な場合の取消し",
       "paragraphs": [
         {
           "num": "1",
@@ -6527,7 +6527,7 @@
       "key": "Article_306",
       "num": "306",
       "number": "第306条",
-      "caption": "(第一審の判決の手続が違法な場合の取消し)",
+      "caption": "第一審の判決の手続が違法な場合の取消し",
       "paragraphs": [
         {
           "num": "1",
@@ -6540,7 +6540,7 @@
       "key": "Article_307",
       "num": "307",
       "number": "第307条",
-      "caption": "(事件の差戻し)",
+      "caption": "事件の差戻し",
       "paragraphs": [
         {
           "num": "1",
@@ -6570,7 +6570,7 @@
       "key": "Article_309",
       "num": "309",
       "number": "第309条",
-      "caption": "(第一審の管轄違いを理由とする移送)",
+      "caption": "第一審の管轄違いを理由とする移送",
       "paragraphs": [
         {
           "num": "1",
@@ -6583,7 +6583,7 @@
       "key": "Article_310",
       "num": "310",
       "number": "第310条",
-      "caption": "(控訴審の判決における仮執行の宣言)",
+      "caption": "控訴審の判決における仮執行の宣言",
       "paragraphs": [
         {
           "num": "1",
@@ -6596,7 +6596,7 @@
       "key": "Article_310_2",
       "num": "310_2",
       "number": "第310条の2",
-      "caption": "(特許権等に関する訴えに係る控訴事件における合議体の構成)",
+      "caption": "特許権等に関する訴えに係る控訴事件における合議体の構成",
       "paragraphs": [
         {
           "num": "1",
@@ -6609,7 +6609,7 @@
       "key": "Article_311",
       "num": "311",
       "number": "第311条",
-      "caption": "(上告裁判所)",
+      "caption": "上告裁判所",
       "paragraphs": [
         {
           "num": "1",
@@ -6626,7 +6626,7 @@
       "key": "Article_312",
       "num": "312",
       "number": "第312条",
-      "caption": "(上告の理由)",
+      "caption": "上告の理由",
       "paragraphs": [
         {
           "num": "1",
@@ -6647,7 +6647,7 @@
       "key": "Article_313",
       "num": "313",
       "number": "第313条",
-      "caption": "(控訴の規定の準用)",
+      "caption": "控訴の規定の準用",
       "paragraphs": [
         {
           "num": "1",
@@ -6660,7 +6660,7 @@
       "key": "Article_314",
       "num": "314",
       "number": "第314条",
-      "caption": "(上告提起の方式等)",
+      "caption": "上告提起の方式等",
       "paragraphs": [
         {
           "num": "1",
@@ -6677,7 +6677,7 @@
       "key": "Article_315",
       "num": "315",
       "number": "第315条",
-      "caption": "(上告の理由の記載)",
+      "caption": "上告の理由の記載",
       "paragraphs": [
         {
           "num": "1",
@@ -6694,7 +6694,7 @@
       "key": "Article_316",
       "num": "316",
       "number": "第316条",
-      "caption": "(原裁判所による上告の却下)",
+      "caption": "原裁判所による上告の却下",
       "paragraphs": [
         {
           "num": "1",
@@ -6711,7 +6711,7 @@
       "key": "Article_317",
       "num": "317",
       "number": "第317条",
-      "caption": "(上告裁判所による上告の却下等)",
+      "caption": "上告裁判所による上告の却下等",
       "paragraphs": [
         {
           "num": "1",
@@ -6728,7 +6728,7 @@
       "key": "Article_318",
       "num": "318",
       "number": "第318条",
-      "caption": "(上告受理の申立て)",
+      "caption": "上告受理の申立て",
       "paragraphs": [
         {
           "num": "1",
@@ -6757,7 +6757,7 @@
       "key": "Article_319",
       "num": "319",
       "number": "第319条",
-      "caption": "(口頭弁論を経ない上告の棄却)",
+      "caption": "口頭弁論を経ない上告の棄却",
       "paragraphs": [
         {
           "num": "1",
@@ -6770,7 +6770,7 @@
       "key": "Article_320",
       "num": "320",
       "number": "第320条",
-      "caption": "(調査の範囲)",
+      "caption": "調査の範囲",
       "paragraphs": [
         {
           "num": "1",
@@ -6783,7 +6783,7 @@
       "key": "Article_321",
       "num": "321",
       "number": "第321条",
-      "caption": "(原判決の確定した事実の拘束)",
+      "caption": "原判決の確定した事実の拘束",
       "paragraphs": [
         {
           "num": "1",
@@ -6800,7 +6800,7 @@
       "key": "Article_322",
       "num": "322",
       "number": "第322条",
-      "caption": "(職権調査事項についての適用除外)",
+      "caption": "職権調査事項についての適用除外",
       "paragraphs": [
         {
           "num": "1",
@@ -6813,7 +6813,7 @@
       "key": "Article_323",
       "num": "323",
       "number": "第323条",
-      "caption": "(仮執行の宣言)",
+      "caption": "仮執行の宣言",
       "paragraphs": [
         {
           "num": "1",
@@ -6826,7 +6826,7 @@
       "key": "Article_324",
       "num": "324",
       "number": "第324条",
-      "caption": "(最高裁判所への移送)",
+      "caption": "最高裁判所への移送",
       "paragraphs": [
         {
           "num": "1",
@@ -6839,7 +6839,7 @@
       "key": "Article_325",
       "num": "325",
       "number": "第325条",
-      "caption": "(破棄差戻し等)",
+      "caption": "破棄差戻し等",
       "paragraphs": [
         {
           "num": "1",
@@ -6864,7 +6864,7 @@
       "key": "Article_326",
       "num": "326",
       "number": "第326条",
-      "caption": "(破棄自判)",
+      "caption": "破棄自判",
       "paragraphs": [
         {
           "num": "1",
@@ -6877,7 +6877,7 @@
       "key": "Article_327",
       "num": "327",
       "number": "第327条",
-      "caption": "(特別上告)",
+      "caption": "特別上告",
       "paragraphs": [
         {
           "num": "1",
@@ -6894,7 +6894,7 @@
       "key": "Article_328",
       "num": "328",
       "number": "第328条",
-      "caption": "(抗告をすることができる裁判)",
+      "caption": "抗告をすることができる裁判",
       "paragraphs": [
         {
           "num": "1",
@@ -6911,7 +6911,7 @@
       "key": "Article_329",
       "num": "329",
       "number": "第329条",
-      "caption": "(受命裁判官等の裁判に対する不服申立て)",
+      "caption": "受命裁判官等の裁判に対する不服申立て",
       "paragraphs": [
         {
           "num": "1",
@@ -6932,7 +6932,7 @@
       "key": "Article_330",
       "num": "330",
       "number": "第330条",
-      "caption": "(再抗告)",
+      "caption": "再抗告",
       "paragraphs": [
         {
           "num": "1",
@@ -6945,7 +6945,7 @@
       "key": "Article_331",
       "num": "331",
       "number": "第331条",
-      "caption": "(控訴又は上告の規定の準用)",
+      "caption": "控訴又は上告の規定の準用",
       "paragraphs": [
         {
           "num": "1",
@@ -6958,7 +6958,7 @@
       "key": "Article_332",
       "num": "332",
       "number": "第332条",
-      "caption": "(即時抗告期間)",
+      "caption": "即時抗告期間",
       "paragraphs": [
         {
           "num": "1",
@@ -6971,7 +6971,7 @@
       "key": "Article_333",
       "num": "333",
       "number": "第333条",
-      "caption": "(原裁判所等による更正)",
+      "caption": "原裁判所等による更正",
       "paragraphs": [
         {
           "num": "1",
@@ -6984,7 +6984,7 @@
       "key": "Article_334",
       "num": "334",
       "number": "第334条",
-      "caption": "(原裁判の執行停止)",
+      "caption": "原裁判の執行停止",
       "paragraphs": [
         {
           "num": "1",
@@ -7001,7 +7001,7 @@
       "key": "Article_335",
       "num": "335",
       "number": "第335条",
-      "caption": "(口頭弁論に代わる審尋)",
+      "caption": "口頭弁論に代わる審尋",
       "paragraphs": [
         {
           "num": "1",
@@ -7014,7 +7014,7 @@
       "key": "Article_336",
       "num": "336",
       "number": "第336条",
-      "caption": "(特別抗告)",
+      "caption": "特別抗告",
       "paragraphs": [
         {
           "num": "1",
@@ -7035,7 +7035,7 @@
       "key": "Article_337",
       "num": "337",
       "number": "第337条",
-      "caption": "(許可抗告)",
+      "caption": "許可抗告",
       "paragraphs": [
         {
           "num": "1",
@@ -7068,7 +7068,7 @@
       "key": "Article_338",
       "num": "338",
       "number": "第338条",
-      "caption": "(再審の事由)",
+      "caption": "再審の事由",
       "paragraphs": [
         {
           "num": "1",
@@ -7102,7 +7102,7 @@
       "key": "Article_340",
       "num": "340",
       "number": "第340条",
-      "caption": "(管轄裁判所)",
+      "caption": "管轄裁判所",
       "paragraphs": [
         {
           "num": "1",
@@ -7119,7 +7119,7 @@
       "key": "Article_341",
       "num": "341",
       "number": "第341条",
-      "caption": "(再審の訴訟手続)",
+      "caption": "再審の訴訟手続",
       "paragraphs": [
         {
           "num": "1",
@@ -7132,7 +7132,7 @@
       "key": "Article_342",
       "num": "342",
       "number": "第342条",
-      "caption": "(再審期間)",
+      "caption": "再審期間",
       "paragraphs": [
         {
           "num": "1",
@@ -7153,7 +7153,7 @@
       "key": "Article_343",
       "num": "343",
       "number": "第343条",
-      "caption": "(再審の訴状の記載事項)",
+      "caption": "再審の訴状の記載事項",
       "paragraphs": [
         {
           "num": "1",
@@ -7166,7 +7166,7 @@
       "key": "Article_344",
       "num": "344",
       "number": "第344条",
-      "caption": "(不服の理由の変更)",
+      "caption": "不服の理由の変更",
       "paragraphs": [
         {
           "num": "1",
@@ -7179,7 +7179,7 @@
       "key": "Article_345",
       "num": "345",
       "number": "第345条",
-      "caption": "(再審の訴えの却下等)",
+      "caption": "再審の訴えの却下等",
       "paragraphs": [
         {
           "num": "1",
@@ -7200,7 +7200,7 @@
       "key": "Article_346",
       "num": "346",
       "number": "第346条",
-      "caption": "(再審開始の決定)",
+      "caption": "再審開始の決定",
       "paragraphs": [
         {
           "num": "1",
@@ -7217,7 +7217,7 @@
       "key": "Article_347",
       "num": "347",
       "number": "第347条",
-      "caption": "(即時抗告)",
+      "caption": "即時抗告",
       "paragraphs": [
         {
           "num": "1",
@@ -7230,7 +7230,7 @@
       "key": "Article_348",
       "num": "348",
       "number": "第348条",
-      "caption": "(本案の審理及び裁判)",
+      "caption": "本案の審理及び裁判",
       "paragraphs": [
         {
           "num": "1",
@@ -7251,7 +7251,7 @@
       "key": "Article_349",
       "num": "349",
       "number": "第349条",
-      "caption": "(決定又は命令に対する再審)",
+      "caption": "決定又は命令に対する再審",
       "paragraphs": [
         {
           "num": "1",
@@ -7268,7 +7268,7 @@
       "key": "Article_350",
       "num": "350",
       "number": "第350条",
-      "caption": "(手形訴訟の要件)",
+      "caption": "手形訴訟の要件",
       "paragraphs": [
         {
           "num": "1",
@@ -7285,7 +7285,7 @@
       "key": "Article_351",
       "num": "351",
       "number": "第351条",
-      "caption": "(反訴の禁止)",
+      "caption": "反訴の禁止",
       "paragraphs": [
         {
           "num": "1",
@@ -7298,7 +7298,7 @@
       "key": "Article_352",
       "num": "352",
       "number": "第352条",
-      "caption": "(証拠調べの制限)",
+      "caption": "証拠調べの制限",
       "paragraphs": [
         {
           "num": "1",
@@ -7327,7 +7327,7 @@
       "key": "Article_353",
       "num": "353",
       "number": "第353条",
-      "caption": "(通常の手続への移行)",
+      "caption": "通常の手続への移行",
       "paragraphs": [
         {
           "num": "1",
@@ -7352,7 +7352,7 @@
       "key": "Article_354",
       "num": "354",
       "number": "第354条",
-      "caption": "(口頭弁論の終結)",
+      "caption": "口頭弁論の終結",
       "paragraphs": [
         {
           "num": "1",
@@ -7365,7 +7365,7 @@
       "key": "Article_355",
       "num": "355",
       "number": "第355条",
-      "caption": "(口頭弁論を経ない訴えの却下)",
+      "caption": "口頭弁論を経ない訴えの却下",
       "paragraphs": [
         {
           "num": "1",
@@ -7382,7 +7382,7 @@
       "key": "Article_356",
       "num": "356",
       "number": "第356条",
-      "caption": "(控訴の禁止)",
+      "caption": "控訴の禁止",
       "paragraphs": [
         {
           "num": "1",
@@ -7395,7 +7395,7 @@
       "key": "Article_357",
       "num": "357",
       "number": "第357条",
-      "caption": "(異議の申立て)",
+      "caption": "異議の申立て",
       "paragraphs": [
         {
           "num": "1",
@@ -7408,7 +7408,7 @@
       "key": "Article_358",
       "num": "358",
       "number": "第358条",
-      "caption": "(異議申立権の放棄)",
+      "caption": "異議申立権の放棄",
       "paragraphs": [
         {
           "num": "1",
@@ -7421,7 +7421,7 @@
       "key": "Article_359",
       "num": "359",
       "number": "第359条",
-      "caption": "(口頭弁論を経ない異議の却下)",
+      "caption": "口頭弁論を経ない異議の却下",
       "paragraphs": [
         {
           "num": "1",
@@ -7434,7 +7434,7 @@
       "key": "Article_360",
       "num": "360",
       "number": "第360条",
-      "caption": "(異議の取下げ)",
+      "caption": "異議の取下げ",
       "paragraphs": [
         {
           "num": "1",
@@ -7455,7 +7455,7 @@
       "key": "Article_361",
       "num": "361",
       "number": "第361条",
-      "caption": "(異議後の手続)",
+      "caption": "異議後の手続",
       "paragraphs": [
         {
           "num": "1",
@@ -7468,7 +7468,7 @@
       "key": "Article_362",
       "num": "362",
       "number": "第362条",
-      "caption": "(異議後の判決)",
+      "caption": "異議後の判決",
       "paragraphs": [
         {
           "num": "1",
@@ -7485,7 +7485,7 @@
       "key": "Article_363",
       "num": "363",
       "number": "第363条",
-      "caption": "(異議後の判決における訴訟費用)",
+      "caption": "異議後の判決における訴訟費用",
       "paragraphs": [
         {
           "num": "1",
@@ -7502,7 +7502,7 @@
       "key": "Article_364",
       "num": "364",
       "number": "第364条",
-      "caption": "(事件の差戻し)",
+      "caption": "事件の差戻し",
       "paragraphs": [
         {
           "num": "1",
@@ -7515,7 +7515,7 @@
       "key": "Article_365",
       "num": "365",
       "number": "第365条",
-      "caption": "(訴え提起前の和解の手続から手形訴訟への移行)",
+      "caption": "訴え提起前の和解の手続から手形訴訟への移行",
       "paragraphs": [
         {
           "num": "1",
@@ -7528,7 +7528,7 @@
       "key": "Article_366",
       "num": "366",
       "number": "第366条",
-      "caption": "(督促手続から手形訴訟への移行)",
+      "caption": "督促手続から手形訴訟への移行",
       "paragraphs": [
         {
           "num": "1",
@@ -7545,7 +7545,7 @@
       "key": "Article_367",
       "num": "367",
       "number": "第367条",
-      "caption": "(小切手訴訟)",
+      "caption": "小切手訴訟",
       "paragraphs": [
         {
           "num": "1",
@@ -7562,7 +7562,7 @@
       "key": "Article_368",
       "num": "368",
       "number": "第368条",
-      "caption": "(少額訴訟の要件等)",
+      "caption": "少額訴訟の要件等",
       "paragraphs": [
         {
           "num": "1",
@@ -7583,7 +7583,7 @@
       "key": "Article_369",
       "num": "369",
       "number": "第369条",
-      "caption": "(反訴の禁止)",
+      "caption": "反訴の禁止",
       "paragraphs": [
         {
           "num": "1",
@@ -7596,7 +7596,7 @@
       "key": "Article_370",
       "num": "370",
       "number": "第370条",
-      "caption": "(一期日審理の原則)",
+      "caption": "一期日審理の原則",
       "paragraphs": [
         {
           "num": "1",
@@ -7613,7 +7613,7 @@
       "key": "Article_371",
       "num": "371",
       "number": "第371条",
-      "caption": "(証拠調べの制限)",
+      "caption": "証拠調べの制限",
       "paragraphs": [
         {
           "num": "1",
@@ -7626,7 +7626,7 @@
       "key": "Article_372",
       "num": "372",
       "number": "第372条",
-      "caption": "(証人等の尋問)",
+      "caption": "証人等の尋問",
       "paragraphs": [
         {
           "num": "1",
@@ -7647,7 +7647,7 @@
       "key": "Article_373",
       "num": "373",
       "number": "第373条",
-      "caption": "(通常の手続への移行)",
+      "caption": "通常の手続への移行",
       "paragraphs": [
         {
           "num": "1",
@@ -7676,7 +7676,7 @@
       "key": "Article_374",
       "num": "374",
       "number": "第374条",
-      "caption": "(判決の言渡し)",
+      "caption": "判決の言渡し",
       "paragraphs": [
         {
           "num": "1",
@@ -7693,7 +7693,7 @@
       "key": "Article_375",
       "num": "375",
       "number": "第375条",
-      "caption": "(判決による支払の猶予)",
+      "caption": "判決による支払の猶予",
       "paragraphs": [
         {
           "num": "1",
@@ -7714,7 +7714,7 @@
       "key": "Article_376",
       "num": "376",
       "number": "第376条",
-      "caption": "(仮執行の宣言)",
+      "caption": "仮執行の宣言",
       "paragraphs": [
         {
           "num": "1",
@@ -7731,7 +7731,7 @@
       "key": "Article_377",
       "num": "377",
       "number": "第377条",
-      "caption": "(控訴の禁止)",
+      "caption": "控訴の禁止",
       "paragraphs": [
         {
           "num": "1",
@@ -7744,7 +7744,7 @@
       "key": "Article_378",
       "num": "378",
       "number": "第378条",
-      "caption": "(異議)",
+      "caption": "異議",
       "paragraphs": [
         {
           "num": "1",
@@ -7761,7 +7761,7 @@
       "key": "Article_379",
       "num": "379",
       "number": "第379条",
-      "caption": "(異議後の審理及び裁判)",
+      "caption": "異議後の審理及び裁判",
       "paragraphs": [
         {
           "num": "1",
@@ -7778,7 +7778,7 @@
       "key": "Article_380",
       "num": "380",
       "number": "第380条",
-      "caption": "(異議後の判決に対する不服申立て)",
+      "caption": "異議後の判決に対する不服申立て",
       "paragraphs": [
         {
           "num": "1",
@@ -7795,7 +7795,7 @@
       "key": "Article_381",
       "num": "381",
       "number": "第381条",
-      "caption": "(過料)",
+      "caption": "過料",
       "paragraphs": [
         {
           "num": "1",
@@ -7816,7 +7816,7 @@
       "key": "Article_381_2",
       "num": "381_2",
       "number": "第381条の2",
-      "caption": "(法定審理期間訴訟手続の要件)",
+      "caption": "法定審理期間訴訟手続の要件",
       "paragraphs": [
         {
           "num": "1",
@@ -7841,7 +7841,7 @@
       "key": "Article_381_3",
       "num": "381_3",
       "number": "第381条の3",
-      "caption": "(法定審理期間訴訟手続の審理)",
+      "caption": "法定審理期間訴訟手続の審理",
       "paragraphs": [
         {
           "num": "1",
@@ -7874,7 +7874,7 @@
       "key": "Article_381_4",
       "num": "381_4",
       "number": "第381条の4",
-      "caption": "(通常の手続への移行)",
+      "caption": "通常の手続への移行",
       "paragraphs": [
         {
           "num": "1",
@@ -7895,7 +7895,7 @@
       "key": "Article_381_5",
       "num": "381_5",
       "number": "第381条の5",
-      "caption": "(法定審理期間訴訟手続の電子判決書)",
+      "caption": "法定審理期間訴訟手続の電子判決書",
       "paragraphs": [
         {
           "num": "1",
@@ -7908,7 +7908,7 @@
       "key": "Article_381_6",
       "num": "381_6",
       "number": "第381条の6",
-      "caption": "(控訴の禁止)",
+      "caption": "控訴の禁止",
       "paragraphs": [
         {
           "num": "1",
@@ -7921,7 +7921,7 @@
       "key": "Article_381_7",
       "num": "381_7",
       "number": "第381条の7",
-      "caption": "(異議)",
+      "caption": "異議",
       "paragraphs": [
         {
           "num": "1",
@@ -7938,7 +7938,7 @@
       "key": "Article_381_8",
       "num": "381_8",
       "number": "第381条の8",
-      "caption": "(異議後の審理及び裁判)",
+      "caption": "異議後の審理及び裁判",
       "paragraphs": [
         {
           "num": "1",
@@ -7963,7 +7963,7 @@
       "key": "Article_382",
       "num": "382",
       "number": "第382条",
-      "caption": "(支払督促の要件)",
+      "caption": "支払督促の要件",
       "paragraphs": [
         {
           "num": "1",
@@ -7976,7 +7976,7 @@
       "key": "Article_383",
       "num": "383",
       "number": "第383条",
-      "caption": "(支払督促の申立て)",
+      "caption": "支払督促の申立て",
       "paragraphs": [
         {
           "num": "1",
@@ -7993,7 +7993,7 @@
       "key": "Article_384",
       "num": "384",
       "number": "第384条",
-      "caption": "(訴えに関する規定の準用)",
+      "caption": "訴えに関する規定の準用",
       "paragraphs": [
         {
           "num": "1",
@@ -8006,7 +8006,7 @@
       "key": "Article_385",
       "num": "385",
       "number": "第385条",
-      "caption": "(申立ての却下)",
+      "caption": "申立ての却下",
       "paragraphs": [
         {
           "num": "1",
@@ -8031,7 +8031,7 @@
       "key": "Article_386",
       "num": "386",
       "number": "第386条",
-      "caption": "(支払督促の発付等)",
+      "caption": "支払督促の発付等",
       "paragraphs": [
         {
           "num": "1",
@@ -8048,7 +8048,7 @@
       "key": "Article_387",
       "num": "387",
       "number": "第387条",
-      "caption": "(電子支払督促の記録事項)",
+      "caption": "電子支払督促の記録事項",
       "paragraphs": [
         {
           "num": "1",
@@ -8065,7 +8065,7 @@
       "key": "Article_388",
       "num": "388",
       "number": "第388条",
-      "caption": "(電子支払督促の送達)",
+      "caption": "電子支払督促の送達",
       "paragraphs": [
         {
           "num": "1",
@@ -8086,7 +8086,7 @@
       "key": "Article_389",
       "num": "389",
       "number": "第389条",
-      "caption": "(支払督促の更正)",
+      "caption": "支払督促の更正",
       "paragraphs": [
         {
           "num": "1",
@@ -8103,7 +8103,7 @@
       "key": "Article_390",
       "num": "390",
       "number": "第390条",
-      "caption": "(仮執行の宣言前の督促異議)",
+      "caption": "仮執行の宣言前の督促異議",
       "paragraphs": [
         {
           "num": "1",
@@ -8116,7 +8116,7 @@
       "key": "Article_391",
       "num": "391",
       "number": "第391条",
-      "caption": "(仮執行の宣言)",
+      "caption": "仮執行の宣言",
       "paragraphs": [
         {
           "num": "1",
@@ -8145,7 +8145,7 @@
       "key": "Article_392",
       "num": "392",
       "number": "第392条",
-      "caption": "(期間の徒過による支払督促の失効)",
+      "caption": "期間の徒過による支払督促の失効",
       "paragraphs": [
         {
           "num": "1",
@@ -8158,7 +8158,7 @@
       "key": "Article_393",
       "num": "393",
       "number": "第393条",
-      "caption": "(仮執行の宣言後の督促異議)",
+      "caption": "仮執行の宣言後の督促異議",
       "paragraphs": [
         {
           "num": "1",
@@ -8171,7 +8171,7 @@
       "key": "Article_394",
       "num": "394",
       "number": "第394条",
-      "caption": "(督促異議の却下)",
+      "caption": "督促異議の却下",
       "paragraphs": [
         {
           "num": "1",
@@ -8188,7 +8188,7 @@
       "key": "Article_395",
       "num": "395",
       "number": "第395条",
-      "caption": "(督促異議の申立てによる訴訟への移行)",
+      "caption": "督促異議の申立てによる訴訟への移行",
       "paragraphs": [
         {
           "num": "1",
@@ -8201,7 +8201,7 @@
       "key": "Article_396",
       "num": "396",
       "number": "第396条",
-      "caption": "(支払督促の効力)",
+      "caption": "支払督促の効力",
       "paragraphs": [
         {
           "num": "1",
@@ -8214,7 +8214,7 @@
       "key": "Article_397",
       "num": "397",
       "number": "第397条",
-      "caption": "(電子情報処理組織による支払督促の申立て)",
+      "caption": "電子情報処理組織による支払督促の申立て",
       "paragraphs": [
         {
           "num": "1",
@@ -8248,7 +8248,7 @@
       "key": "Article_399",
       "num": "399",
       "number": "第399条",
-      "caption": "(電子情報処理組織による送達の効力発生の時期)",
+      "caption": "電子情報処理組織による送達の効力発生の時期",
       "paragraphs": [
         {
           "num": "1",
@@ -8274,7 +8274,7 @@
       "key": "Article_403",
       "num": "403",
       "number": "第403条",
-      "caption": "(執行停止の裁判)",
+      "caption": "執行停止の裁判",
       "paragraphs": [
         {
           "num": "1",
@@ -8291,7 +8291,7 @@
       "key": "Article_404",
       "num": "404",
       "number": "第404条",
-      "caption": "(原裁判所による裁判)",
+      "caption": "原裁判所による裁判",
       "paragraphs": [
         {
           "num": "1",
@@ -8308,7 +8308,7 @@
       "key": "Article_405",
       "num": "405",
       "number": "第405条",
-      "caption": "(担保の提供)",
+      "caption": "担保の提供",
       "paragraphs": [
         {
           "num": "1",
@@ -8325,7 +8325,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -8338,7 +8338,7 @@
       "key": "Article_3",
       "num": "3",
       "number": "第3条",
-      "caption": "(経過措置の原則)",
+      "caption": "経過措置の原則",
       "paragraphs": [
         {
           "num": "1",
@@ -8351,7 +8351,7 @@
       "key": "Article_4",
       "num": "4",
       "number": "第4条",
-      "caption": "(管轄等に関する経過措置)",
+      "caption": "管轄等に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8368,7 +8368,7 @@
       "key": "Article_5",
       "num": "5",
       "number": "第5条",
-      "caption": "(訴訟費用に関する経過措置)",
+      "caption": "訴訟費用に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8385,7 +8385,7 @@
       "key": "Article_6",
       "num": "6",
       "number": "第6条",
-      "caption": "(期日の呼出しに関する経過措置)",
+      "caption": "期日の呼出しに関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8398,7 +8398,7 @@
       "key": "Article_7",
       "num": "7",
       "number": "第7条",
-      "caption": "(送達に関する経過措置)",
+      "caption": "送達に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8423,7 +8423,7 @@
       "key": "Article_8",
       "num": "8",
       "number": "第8条",
-      "caption": "(定期金による賠償を命じた確定判決の変更を求める訴えに関する経過措置)",
+      "caption": "定期金による賠償を命じた確定判決の変更を求める訴えに関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8436,7 +8436,7 @@
       "key": "Article_9",
       "num": "9",
       "number": "第9条",
-      "caption": "(訴えに関する経過措置)",
+      "caption": "訴えに関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8453,7 +8453,7 @@
       "key": "Article_10",
       "num": "10",
       "number": "第10条",
-      "caption": "(当事者を異にする事件の併合に関する経過措置)",
+      "caption": "当事者を異にする事件の併合に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8466,7 +8466,7 @@
       "key": "Article_11",
       "num": "11",
       "number": "第11条",
-      "caption": "(攻撃防御方法の提出時期に関する経過措置)",
+      "caption": "攻撃防御方法の提出時期に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8479,7 +8479,7 @@
       "key": "Article_12",
       "num": "12",
       "number": "第12条",
-      "caption": "(準備書面に関する経過措置)",
+      "caption": "準備書面に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8492,7 +8492,7 @@
       "key": "Article_13",
       "num": "13",
       "number": "第13条",
-      "caption": "(準備手続に関する経過措置)",
+      "caption": "準備手続に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8505,7 +8505,7 @@
       "key": "Article_14",
       "num": "14",
       "number": "第14条",
-      "caption": "(疎明に代わる保証金の供託等に関する経過措置)",
+      "caption": "疎明に代わる保証金の供託等に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8518,7 +8518,7 @@
       "key": "Article_15",
       "num": "15",
       "number": "第15条",
-      "caption": "(当事者が文書提出命令に従わない場合等の効果に関する経過措置)",
+      "caption": "当事者が文書提出命令に従わない場合等の効果に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8531,7 +8531,7 @@
       "key": "Article_16",
       "num": "16",
       "number": "第16条",
-      "caption": "(損害額の認定に関する経過措置)",
+      "caption": "損害額の認定に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8544,7 +8544,7 @@
       "key": "Article_17",
       "num": "17",
       "number": "第17条",
-      "caption": "(訴えの取下げ等につき相手方の同意を擬制するための期間に関する経過措置)",
+      "caption": "訴えの取下げ等につき相手方の同意を擬制するための期間に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8557,7 +8557,7 @@
       "key": "Article_18",
       "num": "18",
       "number": "第18条",
-      "caption": "(訴えの取下げ等の擬制に関する経過措置)",
+      "caption": "訴えの取下げ等の擬制に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8574,7 +8574,7 @@
       "key": "Article_19",
       "num": "19",
       "number": "第19条",
-      "caption": "(控訴に関する経過措置)",
+      "caption": "控訴に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8599,7 +8599,7 @@
       "key": "Article_20",
       "num": "20",
       "number": "第20条",
-      "caption": "(最高裁判所にする上告に関する経過措置)",
+      "caption": "最高裁判所にする上告に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8612,7 +8612,7 @@
       "key": "Article_21",
       "num": "21",
       "number": "第21条",
-      "caption": "(抗告に関する経過措置)",
+      "caption": "抗告に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8633,7 +8633,7 @@
       "key": "Article_22",
       "num": "22",
       "number": "第22条",
-      "caption": "(再審に関する経過措置)",
+      "caption": "再審に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8646,7 +8646,7 @@
       "key": "Article_23",
       "num": "23",
       "number": "第23条",
-      "caption": "(督促手続に関する経過措置)",
+      "caption": "督促手続に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8659,7 +8659,7 @@
       "key": "Article_24",
       "num": "24",
       "number": "第24条",
-      "caption": "(執行停止に関する経過措置)",
+      "caption": "執行停止に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8672,7 +8672,7 @@
       "key": "Article_25",
       "num": "25",
       "number": "第25条",
-      "caption": "(罰則の適用に関する経過措置)",
+      "caption": "罰則の適用に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8685,7 +8685,7 @@
       "key": "Article_26",
       "num": "26",
       "number": "第26条",
-      "caption": "(最高裁判所規則への委任)",
+      "caption": "最高裁判所規則への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -8698,7 +8698,7 @@
       "key": "Article_27",
       "num": "27",
       "number": "第27条",
-      "caption": "(検討)",
+      "caption": "検討",
       "paragraphs": [
         {
           "num": "1",
@@ -8715,7 +8715,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -8728,7 +8728,7 @@
       "key": "Article_3",
       "num": "3",
       "number": "第3条",
-      "caption": "(経過措置)",
+      "caption": "経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8754,7 +8754,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -8767,7 +8767,7 @@
       "key": "Article_42",
       "num": "42",
       "number": "第42条",
-      "caption": "(処分、手続等に関する経過措置)",
+      "caption": "処分、手続等に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8780,7 +8780,7 @@
       "key": "Article_43",
       "num": "43",
       "number": "第43条",
-      "caption": "(罰則に関する経過措置)",
+      "caption": "罰則に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8793,7 +8793,7 @@
       "key": "Article_44",
       "num": "44",
       "number": "第44条",
-      "caption": "(経過措置の政令への委任)",
+      "caption": "経過措置の政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -8806,7 +8806,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -8819,7 +8819,7 @@
       "key": "Article_85",
       "num": "85",
       "number": "第85条",
-      "caption": "(その他の経過措置の政令への委任)",
+      "caption": "その他の経過措置の政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -8832,7 +8832,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -8845,7 +8845,7 @@
       "key": "Article_2",
       "num": "2",
       "number": "第2条",
-      "caption": "(罰則に関する経過措置)",
+      "caption": "罰則に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8858,7 +8858,7 @@
       "key": "Article_3",
       "num": "3",
       "number": "第3条",
-      "caption": "(その他の経過措置の政令への委任)",
+      "caption": "その他の経過措置の政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -8871,7 +8871,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -8884,7 +8884,7 @@
       "key": "Article_2",
       "num": "2",
       "number": "第2条",
-      "caption": "(民事訴訟法の一部改正に伴う経過措置)",
+      "caption": "民事訴訟法の一部改正に伴う経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8897,7 +8897,7 @@
       "key": "Article_3",
       "num": "3",
       "number": "第3条",
-      "caption": "(特許権等に関する訴え及び意匠権等に関する訴えに係る訴訟の管轄等に関する経過措置)",
+      "caption": "特許権等に関する訴え及び意匠権等に関する訴えに係る訴訟の管轄等に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8922,7 +8922,7 @@
       "key": "Article_4",
       "num": "4",
       "number": "第4条",
-      "caption": "(少額訴訟に関する経過措置)",
+      "caption": "少額訴訟に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8935,7 +8935,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -8948,7 +8948,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -8961,7 +8961,7 @@
       "key": "Article_11",
       "num": "11",
       "number": "第11条",
-      "caption": "(民事訴訟法の一部改正に伴う経過措置)",
+      "caption": "民事訴訟法の一部改正に伴う経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8974,7 +8974,7 @@
       "key": "Article_12",
       "num": "12",
       "number": "第12条",
-      "caption": "(罰則の適用等に関する経過措置)",
+      "caption": "罰則の適用等に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -8987,7 +8987,7 @@
       "key": "Article_14",
       "num": "14",
       "number": "第14条",
-      "caption": "(政令への委任)",
+      "caption": "政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -9000,7 +9000,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9013,7 +9013,7 @@
       "key": "Article_135",
       "num": "135",
       "number": "第135条",
-      "caption": "(罰則の適用に関する経過措置)",
+      "caption": "罰則の適用に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9026,7 +9026,7 @@
       "key": "Article_136",
       "num": "136",
       "number": "第136条",
-      "caption": "(その他の経過措置の政令への委任)",
+      "caption": "その他の経過措置の政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -9039,7 +9039,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9052,7 +9052,7 @@
       "key": "Article_2",
       "num": "2",
       "number": "第2条",
-      "caption": "(経過措置の原則)",
+      "caption": "経過措置の原則",
       "paragraphs": [
         {
           "num": "1",
@@ -9065,7 +9065,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9078,7 +9078,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9091,7 +9091,7 @@
       "key": "Article_2",
       "num": "2",
       "number": "第2条",
-      "caption": "(公示催告手続ニ関スル法律の廃止)",
+      "caption": "公示催告手続ニ関スル法律の廃止",
       "paragraphs": [
         {
           "num": "1",
@@ -9104,7 +9104,7 @@
       "key": "Article_3",
       "num": "3",
       "number": "第3条",
-      "caption": "(経過措置の原則)",
+      "caption": "経過措置の原則",
       "paragraphs": [
         {
           "num": "1",
@@ -9117,7 +9117,7 @@
       "key": "Article_4",
       "num": "4",
       "number": "第4条",
-      "caption": "(電磁的記録による管轄の合意等に関する経過措置)",
+      "caption": "電磁的記録による管轄の合意等に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9130,7 +9130,7 @@
       "key": "Article_5",
       "num": "5",
       "number": "第5条",
-      "caption": "(電子情報処理組織を用いて取り扱う督促手続の特則に関する経過措置)",
+      "caption": "電子情報処理組織を用いて取り扱う督促手続の特則に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9143,7 +9143,7 @@
       "key": "Article_7",
       "num": "7",
       "number": "第7条",
-      "caption": "(過料事件に関する経過措置)",
+      "caption": "過料事件に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9156,7 +9156,7 @@
       "key": "Article_39",
       "num": "39",
       "number": "第39条",
-      "caption": "(罰則の適用に関する経過措置)",
+      "caption": "罰則の適用に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9169,7 +9169,7 @@
       "key": "Article_40",
       "num": "40",
       "number": "第40条",
-      "caption": "(政令への委任)",
+      "caption": "政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -9182,7 +9182,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9195,7 +9195,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9208,7 +9208,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9221,7 +9221,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9234,7 +9234,7 @@
       "key": "Article_104",
       "num": "104",
       "number": "第104条",
-      "caption": "(民事訴訟法の一部改正に伴う経過措置)",
+      "caption": "民事訴訟法の一部改正に伴う経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9251,7 +9251,7 @@
       "key": "Article_117",
       "num": "117",
       "number": "第117条",
-      "caption": "(罰則に関する経過措置)",
+      "caption": "罰則に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9264,7 +9264,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9277,7 +9277,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9290,7 +9290,7 @@
       "key": "Article_9",
       "num": "9",
       "number": "第9条",
-      "caption": "(検討等)",
+      "caption": "検討等",
       "paragraphs": [
         {
           "num": "1",
@@ -9303,7 +9303,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9316,7 +9316,7 @@
       "key": "Article_2",
       "num": "2",
       "number": "第2条",
-      "caption": "(経過措置)",
+      "caption": "経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9333,7 +9333,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9346,7 +9346,7 @@
       "key": "Article_35",
       "num": "35",
       "number": "第35条",
-      "caption": "(民事訴訟法の一部改正に伴う経過措置)",
+      "caption": "民事訴訟法の一部改正に伴う経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9359,7 +9359,7 @@
       "key": "Article_46",
       "num": "46",
       "number": "第46条",
-      "caption": "(罰則に関する経過措置)",
+      "caption": "罰則に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9372,7 +9372,7 @@
       "key": "Article_47",
       "num": "47",
       "number": "第47条",
-      "caption": "(その他の経過措置の政令への委任)",
+      "caption": "その他の経過措置の政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -9385,7 +9385,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9398,7 +9398,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9411,7 +9411,7 @@
       "key": "Article_34",
       "num": "34",
       "number": "第34条",
-      "caption": "(その他の経過措置の政令等への委任)",
+      "caption": "その他の経過措置の政令等への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -9424,7 +9424,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9437,7 +9437,7 @@
       "key": "Article_2",
       "num": "2",
       "number": "第2条",
-      "caption": "(訴訟費用額の確定手続に関する経過措置)",
+      "caption": "訴訟費用額の確定手続に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9450,7 +9450,7 @@
       "key": "Article_3",
       "num": "3",
       "number": "第3条",
-      "caption": "(担保権利者に対する権利を行使すべき旨の催告に関する経過措置)",
+      "caption": "担保権利者に対する権利を行使すべき旨の催告に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9463,7 +9463,7 @@
       "key": "Article_4",
       "num": "4",
       "number": "第4条",
-      "caption": "(人事訴訟等に関する手続における映像と音声の送受信による通話の方法による口頭弁論等に関する経過措置)",
+      "caption": "人事訴訟等に関する手続における映像と音声の送受信による通話の方法による口頭弁論等に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9476,7 +9476,7 @@
       "key": "Article_5",
       "num": "5",
       "number": "第5条",
-      "caption": "(訴訟に関する事項の証明に関する経過措置)",
+      "caption": "訴訟に関する事項の証明に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9489,7 +9489,7 @@
       "key": "Article_6",
       "num": "6",
       "number": "第6条",
-      "caption": "(期日の呼出しに関する経過措置)",
+      "caption": "期日の呼出しに関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9502,7 +9502,7 @@
       "key": "Article_7",
       "num": "7",
       "number": "第7条",
-      "caption": "(送達報告書に関する経過措置)",
+      "caption": "送達報告書に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9515,7 +9515,7 @@
       "key": "Article_8",
       "num": "8",
       "number": "第8条",
-      "caption": "(公示送達の方法に関する経過措置)",
+      "caption": "公示送達の方法に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9528,7 +9528,7 @@
       "key": "Article_9",
       "num": "9",
       "number": "第9条",
-      "caption": "(受継についての裁判に関する経過措置)",
+      "caption": "受継についての裁判に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9541,7 +9541,7 @@
       "key": "Article_10",
       "num": "10",
       "number": "第10条",
-      "caption": "(訴えの提起前における証拠収集の処分の手続に関する経過措置)",
+      "caption": "訴えの提起前における証拠収集の処分の手続に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9554,7 +9554,7 @@
       "key": "Article_11",
       "num": "11",
       "number": "第11条",
-      "caption": "(電子情報処理組織による申立て等に関する経過措置)",
+      "caption": "電子情報処理組織による申立て等に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9567,7 +9567,7 @@
       "key": "Article_12",
       "num": "12",
       "number": "第12条",
-      "caption": "(訴えの提起の手数料の納付等がない場合に関する経過措置)",
+      "caption": "訴えの提起の手数料の納付等がない場合に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9580,7 +9580,7 @@
       "key": "Article_13",
       "num": "13",
       "number": "第13条",
-      "caption": "(釈明処分による電磁的記録の提出に関する経過措置)",
+      "caption": "釈明処分による電磁的記録の提出に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9593,7 +9593,7 @@
       "key": "Article_14",
       "num": "14",
       "number": "第14条",
-      "caption": "(口頭弁論調書に関する経過措置)",
+      "caption": "口頭弁論調書に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9610,7 +9610,7 @@
       "key": "Article_15",
       "num": "15",
       "number": "第15条",
-      "caption": "(尋問に代わる書面の提出等に関する経過措置)",
+      "caption": "尋問に代わる書面の提出等に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9623,7 +9623,7 @@
       "key": "Article_16",
       "num": "16",
       "number": "第16条",
-      "caption": "(電磁的記録に記録された情報の内容に係る証拠調べに関する経過措置)",
+      "caption": "電磁的記録に記録された情報の内容に係る証拠調べに関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9636,7 +9636,7 @@
       "key": "Article_17",
       "num": "17",
       "number": "第17条",
-      "caption": "(判決の言渡しの方式等に関する経過措置)",
+      "caption": "判決の言渡しの方式等に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9653,7 +9653,7 @@
       "key": "Article_18",
       "num": "18",
       "number": "第18条",
-      "caption": "(訴え又は控訴の取下げが口頭でされたときに関する経過措置)",
+      "caption": "訴え又は控訴の取下げが口頭でされたときに関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9666,7 +9666,7 @@
       "key": "Article_19",
       "num": "19",
       "number": "第19条",
-      "caption": "(和解調書等の効力に関する経過措置)",
+      "caption": "和解調書等の効力に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9687,7 +9687,7 @@
       "key": "Article_20",
       "num": "20",
       "number": "第20条",
-      "caption": "(控訴期間等に関する経過措置)",
+      "caption": "控訴期間等に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9700,7 +9700,7 @@
       "key": "Article_21",
       "num": "21",
       "number": "第21条",
-      "caption": "(手形訴訟及び小切手訴訟における口頭弁論を経ない却下又は異議の申立てに関する経過措置)",
+      "caption": "手形訴訟及び小切手訴訟における口頭弁論を経ない却下又は異議の申立てに関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9713,7 +9713,7 @@
       "key": "Article_22",
       "num": "22",
       "number": "第22条",
-      "caption": "(少額訴訟の判決の言渡し等に関する経過措置)",
+      "caption": "少額訴訟の判決の言渡し等に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9726,7 +9726,7 @@
       "key": "Article_23",
       "num": "23",
       "number": "第23条",
-      "caption": "(法定審理期間訴訟手続に関する経過措置)",
+      "caption": "法定審理期間訴訟手続に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9739,7 +9739,7 @@
       "key": "Article_24",
       "num": "24",
       "number": "第24条",
-      "caption": "(督促手続に関する経過措置)",
+      "caption": "督促手続に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9756,7 +9756,7 @@
       "key": "Article_124",
       "num": "124",
       "number": "第124条",
-      "caption": "(罰則に関する経過措置)",
+      "caption": "罰則に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9769,7 +9769,7 @@
       "key": "Article_125",
       "num": "125",
       "number": "第125条",
-      "caption": "(政令への委任)",
+      "caption": "政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -9782,7 +9782,7 @@
       "key": "Article_126",
       "num": "126",
       "number": "第126条",
-      "caption": "(検討)",
+      "caption": "検討",
       "paragraphs": [
         {
           "num": "1",
@@ -9795,7 +9795,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9808,7 +9808,7 @@
       "key": "Article_40",
       "num": "40",
       "number": "第40条",
-      "caption": "(罰則に関する経過措置)",
+      "caption": "罰則に関する経過措置",
       "paragraphs": [
         {
           "num": "1",
@@ -9821,7 +9821,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9834,7 +9834,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9847,7 +9847,7 @@
       "key": "Article_39",
       "num": "39",
       "number": "第39条",
-      "caption": "(政令への委任)",
+      "caption": "政令への委任",
       "paragraphs": [
         {
           "num": "1",
@@ -9860,7 +9860,7 @@
       "key": "Article_1",
       "num": "1",
       "number": "第1条",
-      "caption": "(施行期日)",
+      "caption": "施行期日",
       "paragraphs": [
         {
           "num": "1",
@@ -9873,7 +9873,7 @@
       "key": "Article_5",
       "num": "5",
       "number": "第5条",
-      "caption": "(政令への委任)",
+      "caption": "政令への委任",
       "paragraphs": [
         {
           "num": "1",
