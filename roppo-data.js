@@ -61,10 +61,11 @@ function formatParagraphText(value){
  }
  return output.join('\n');
 }
+function hideHeaderMeta(doc=globalThis.document){if(!doc)return;const sub=doc.querySelector?.('.header .sub');const dataStatus=doc.getElementById?.('dataStatus');if(sub)sub.hidden=true;if(dataStatus)dataStatus.hidden=true;}
 function articleBodyText(article){return Array.isArray(article?.paragraphs)?article.paragraphs.map((p)=>p.text||'').join('\n'):String(article?.bodyText||'');}
 function searchArticles(articles,query){const needle=normalizeSearchText(query);if(!needle)return Array.isArray(articles)?articles.slice():[];if(!Array.isArray(articles))return[];return articles.filter((article)=>normalizeSearchText([article.key,article.number,article.caption,articleBodyText(article)].filter(Boolean).join(' ')).includes(needle));}
 function addCalendarMonth(date){const result=new Date(date.getTime()),day=result.getUTCDate();result.setUTCDate(1);result.setUTCMonth(result.getUTCMonth()+1);const lastDay=new Date(Date.UTC(result.getUTCFullYear(),result.getUTCMonth()+1,0)).getUTCDate();result.setUTCDate(Math.min(day,lastDay));return result;}
 function isLawDataStale(metadata,now=new Date()){const raw=metadata&&metadata.lastSyncedAt,last=raw?new Date(raw):null;if(!last||Number.isNaN(last.getTime()))return true;const current=now instanceof Date?now:new Date(now);return current.getTime()>=addCalendarMonth(last).getTime();}
-const api={STORAGE_KEY,MAX_RECENT,LAW_CATALOG,LAW_GROUPS,DEFAULT_STATE,normalizeState,loadState,saveState,articleStorageKey,paragraphStorageKey,normalizeSearchText,formatParagraphText,articleBodyText,searchArticles,isLawDataStale};
-if(typeof window!=='undefined')window.MangaRoppo=api;if(typeof module!=='undefined')module.exports=api;
+const api={STORAGE_KEY,MAX_RECENT,LAW_CATALOG,LAW_GROUPS,DEFAULT_STATE,normalizeState,loadState,saveState,articleStorageKey,paragraphStorageKey,normalizeSearchText,formatParagraphText,hideHeaderMeta,articleBodyText,searchArticles,isLawDataStale};
+if(typeof window!=='undefined'){window.MangaRoppo=api;hideHeaderMeta();}if(typeof module!=='undefined')module.exports=api;
 })();
