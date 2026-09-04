@@ -69,3 +69,28 @@ test('desktop navigation enhancement is bootstrapped after the reader code', () 
   assert.match(source, /desktop-navigation\.js/);
   assert.match(source, /loadBrowserScript\('desktop-navigation\.js'\)/);
 });
+
+test('major pages expose the same primary destinations and mark the current page', () => {
+  const pages = [
+    ['home.html', 'ホーム', 'home.html'],
+    ['index-search.html', '索引検索', 'index-search.html'],
+    ['hyakusen.html', '判例百選', 'hyakusen.html'],
+  ];
+  const destinations = [
+    ['ホーム', 'home.html'],
+    ['索引検索', 'index-search.html'],
+    ['判例百選', 'hyakusen.html'],
+  ];
+
+  for (const [file, currentLabel, currentHref] of pages) {
+    const source = read(file);
+    assert.match(source, /<nav[^>]+class=["'][^"']*\btopActions\b[^"']*["'][^>]*>/);
+    assert.doesNotMatch(source, /へ戻る/);
+    assert.match(source, new RegExp(`<span[^>]*class=["'][^"']*glassBtn[^"']*topActionCurrent[^"']*["'][^>]*aria-current=["']page["'][^>]*>${currentLabel}<\\/span>`));
+
+    for (const [label, href] of destinations) {
+      if (href === currentHref) continue;
+      assert.match(source, new RegExp(`<a[^>]*class=["'][^"']*glassBtn[^"']*["'][^>]*href=["']${href.replace('.', '\\.') }["'][^>]*>${label}<\\/a>`));
+    }
+  }
+});
