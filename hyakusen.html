@@ -21,6 +21,7 @@
     button,input,select{font:inherit;color:inherit}
     .shell{width:min(920px,100%);margin:0 auto}
     .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}
+    .topbarActions{display:grid;gap:8px;justify-items:end}.topActions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.topActionCurrent{cursor:default;color:var(--accent);border-color:color-mix(in srgb,var(--accent) 34%,var(--line))}.shell .topActionCurrent:hover{transform:none}.topActionCurrent:active{transform:none}
     .titleBlock h1{font-size:clamp(26px,4vw,38px);letter-spacing:-.035em;margin:0}.titleBlock p{margin:7px 0 0;color:var(--muted);font-size:14px}
     .glass,.glassBtn,.hyakusenRow{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);backdrop-filter:blur(22px) saturate(135%);-webkit-backdrop-filter:blur(22px) saturate(135%)}
     .glass{border-radius:var(--radius);padding:18px;margin-bottom:16px}
@@ -41,7 +42,7 @@
     .hyakusenRow[data-drive-state="available"]{border-color:color-mix(in srgb,var(--ok) 38%,var(--line))}.hyakusenRow[data-drive-state="available"] .hyakusenFile{color:var(--ok)}
     .empty{padding:34px 20px;text-align:center;border:1px dashed var(--line);border-radius:18px;color:var(--muted);line-height:1.7}
     @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.glass,.glassBtn,.hyakusenRow{background:var(--panel-strong)}}
-    @media(max-width:700px){body{padding:18px 12px 50px}.topbar{align-items:flex-start;flex-direction:column}.controls,.driveRow{grid-template-columns:1fr}.hyakusenRow{grid-template-columns:48px minmax(0,1fr);padding:13px}.hyakusenFile{grid-column:2;text-align:left}}
+    @media(max-width:700px){body{padding:18px 12px 50px}.topbar{align-items:flex-start;flex-direction:column}.topbarActions{width:100%;justify-items:stretch}.topActions{justify-content:flex-start}.topActions .glassBtn{flex:1}.controls,.driveRow{grid-template-columns:1fr}.hyakusenRow{grid-template-columns:48px minmax(0,1fr);padding:13px}.hyakusenFile{grid-column:2;text-align:left}}
   </style>
 </head>
 <body>
@@ -51,7 +52,13 @@
         <h1>判例百選</h1>
         <p>収録判例と、Google Driveに保存した注釈PDFを対応表示します。</p>
       </div>
-      <a class="glassBtn" href="index-search.html">索引検索へ戻る</a>
+      <div class="topbarActions">
+        <nav class="topActions" aria-label="主要ページ">
+          <a class="glassBtn" href="home.html">ホーム</a>
+          <a class="glassBtn" href="index-search.html">索引検索</a>
+          <span class="glassBtn topActionCurrent" aria-current="page">判例百選</span>
+        </nav>
+      </div>
     </header>
 
     <section class="glass" aria-label="判例百選の選択">
