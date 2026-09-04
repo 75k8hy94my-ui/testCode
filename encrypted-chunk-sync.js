@@ -5,6 +5,7 @@ const TABLE = 'manga_reader_encrypted_chunks';
 const METADATA_SELECT = 'chunk_id,revision,deleted_at,updated_at';
 const PAYLOAD_SELECT = 'chunk_id,payload,revision,deleted_at,updated_at';
 const DEFAULT_PAYLOAD_BATCH_SIZE = 50;
+const GLOBAL_ERROR_ID = '__global__';
 
 const text = (value) => String(value ?? '').trim();
 const number = (value) => Number(value ?? 0);
@@ -227,7 +228,7 @@ async function syncCache({ vault, cache, payloadBatchSize = DEFAULT_PAYLOAD_BATC
   try {
     metadata = await fetchRemoteMetadata(vault);
   } catch (error) {
-    return { records: await cache.list(), conflicts, errors: [{ chunkId: null, error }] };
+    return { records: await cache.list(), conflicts, errors: [{ chunkId: GLOBAL_ERROR_ID, error }] };
   }
   let remoteMap = new Map(metadata.map((row) => [row.chunkId, row]));
 
@@ -241,7 +242,7 @@ async function syncCache({ vault, cache, payloadBatchSize = DEFAULT_PAYLOAD_BATC
     metadata = await fetchRemoteMetadata(vault);
     remoteMap = new Map(metadata.map((row) => [row.chunkId, row]));
   } catch (error) {
-    errors.push({ chunkId: null, error });
+    errors.push({ chunkId: GLOBAL_ERROR_ID, error });
     return { records: await cache.list(), conflicts, errors };
   }
 
@@ -267,7 +268,7 @@ async function syncCache({ vault, cache, payloadBatchSize = DEFAULT_PAYLOAD_BATC
     const downloaded = await fetchRemotePayloads(vault, downloadIds, payloadBatchSize);
     for (const row of downloaded) await cache.put(row);
   } catch (error) {
-    errors.push({ chunkId: null, error });
+    errors.push({ chunkId: GLOBAL_ERROR_ID, error });
   }
 
   return { records: await cache.list(), conflicts, errors };
@@ -276,6 +277,7 @@ async function syncCache({ vault, cache, payloadBatchSize = DEFAULT_PAYLOAD_BATC
 const api = {
   TABLE,
   DEFAULT_PAYLOAD_BATCH_SIZE,
+  GLOBAL_ERROR_ID,
   fetchRemoteMetadata,
   fetchRemotePayloads,
   fetchRemoteChunk,
