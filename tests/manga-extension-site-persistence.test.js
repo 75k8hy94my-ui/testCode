@@ -7,19 +7,8 @@ const toolbar=fs.readFileSync('extension/content/site-toolbar.js','utf8');
 const extractor=fs.readFileSync('extension/content/extractor.js','utf8');
 const manifest=JSON.parse(fs.readFileSync('extension/manifest.json','utf8'));
 
-test('registered origins are restored as persistent dynamic content scripts',()=>{
-  assert.match(background,/registerContentScripts/);
-  assert.match(background,/getRegisteredContentScripts/);
-  assert.match(background,/onStartup/);
-  assert.match(background,/onInstalled/);
-});
-
-test('dynamic script refresh registers replacements before removing stale scripts',()=>{
-  const registerAt=background.indexOf('await chromeApi.scripting.registerContentScripts(desired)');
-  const unregisterAt=background.indexOf('await chromeApi.scripting.unregisterContentScripts');
-  assert.ok(registerAt>=0&&unregisterAt>=0&&registerAt<unregisterAt,'replacement scripts must be registered before stale scripts are removed');
-});
-
+test('registered origins are restored as persistent dynamic content scripts',()=>{assert.match(background,/registerContentScripts/);assert.match(background,/getRegisteredContentScripts/);assert.match(background,/onStartup/);assert.match(background,/onInstalled/)});
+test('dynamic script sync only unregisters changed or stale registrations',()=>{assert.match(background,/changedIds/);assert.match(background,/staleIds/);assert.match(background,/toRegister/);assert.doesNotMatch(background,/managed\.map\(x=>x\.id\)/)});
 test('toolbar marks its host so element picker ignores extension UI',()=>{assert.match(toolbar,/testcodeMangaExtensionHost/)});
 test('new mappings default to site-wide rules',()=>{assert.match(toolbar,/function defaultPattern\(\)\{return ['"]\/\*['"]\}/)});
 test('image extraction supports common lazy loading attributes and srcset',()=>{for(const token of ['data-src','data-original','data-lazy-src','srcset'])assert.match(extractor,new RegExp(token))});
