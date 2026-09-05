@@ -78,3 +78,17 @@ test('home page is vault-gated, editable, and vault unlock enters it', () => {
   assert.match(verifier, /['"]home\.html['"]/);
   assert.match(verifier, /['"]home-dashboard\.js['"]/);
 });
+
+test('logout is exposed only at the bottom of home', () => {
+  const home = read('home.html');
+  const sync = read('sync.html');
+  const featureFlags = read('feature-flags.js');
+
+  assert.match(home, /id=["']homeLogoutBtn["']/);
+  assert.match(home, /class=["'][^"']*homeLogoutArea[^"']*["']/);
+  assert.match(home, /EncryptedChunkCache\.clearAll/);
+  assert.match(home, /MangaVault\.saveSession\(null\)/);
+  assert.doesNotMatch(sync, /id=["']logoutBtn["']/);
+  assert.match(featureFlags, /getElementById\(['"]listLogoutBtn['"]\)/);
+  assert.match(featureFlags, /readerLogout\.hidden\s*=\s*true/);
+});

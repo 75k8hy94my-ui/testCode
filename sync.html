@@ -46,7 +46,7 @@
 </head>
 <body>
   <main>
-    <header><h1>漫画リーダー</h1><button id="logoutBtn" class="danger" type="button">ログアウト</button></header>
+    <header><h1>漫画リーダー</h1></header>
     <section class="card">
       <div class="account"><div><div class="description" style="margin:0 0 3px;">ログイン中</div><div id="accountEmail"></div></div></div>
       <div id="unlockView" style="margin-top:24px;">
@@ -75,14 +75,12 @@
   <script src="supabase-config.js"></script>
   <script src="vault-session.js?v=20260813-vault-state"></script>
   <script src="vault-payload.js"></script>
-  <script src="encrypted-chunk-cache.js"></script>
   <script>
   (() => {
     'use strict';
-    const { DATA_KEYS, buildFromLocalStorage: buildPayload, applyToLocalStorage: applyPayload } = window.MangaVaultPayload;
-    const DEVICE_DATA_KEYS = [...Object.values(DATA_KEYS),'mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
+    const { buildFromLocalStorage: buildPayload, applyToLocalStorage: applyPayload } = window.MangaVaultPayload;
     const $ = (id) => document.getElementById(id);
-    const ui = { email:$('accountEmail'), passphrase:$('vaultPassphrase'), recovery:$('recoveryKey'), status:$('status'), unlock:$('unlockView'), recoveryBox:$('recoveryBox'), recoveryCode:$('recoveryCode'), copy:$('copyRecoveryBtn'), logout:$('logoutBtn'), passphraseUnlock:$('passphraseUnlockBtn'), passkeyUnlock:$('passkeyUnlockBtn'), createVault:$('createVaultBtn'), passkeyRegister:$('passkeyRegisterBtn') };
+    const ui = { email:$('accountEmail'), passphrase:$('vaultPassphrase'), recovery:$('recoveryKey'), status:$('status'), unlock:$('unlockView'), recoveryBox:$('recoveryBox'), recoveryCode:$('recoveryCode'), copy:$('copyRecoveryBtn'), passphraseUnlock:$('passphraseUnlockBtn'), passkeyUnlock:$('passkeyUnlockBtn'), createVault:$('createVaultBtn'), passkeyRegister:$('passkeyRegisterBtn') };
     function setStatus(text) { ui.status.textContent=text || ''; }
     function goReader() { window.location.replace('home.html'); }
     const session = MangaVault.loadSession();
@@ -118,12 +116,6 @@
       } catch (error) { setStatus(error.message || '保管庫を開けませんでした。'); }
       finally { opening=false; }
     }
-    async function logout() {
-      if (!confirm('ログアウトしますか？')) return;
-      try { await MangaVault.withSession((token) => MangaVault.api('/auth/v1/logout',{method:'POST',token})); } catch (_) {}
-      try { await EncryptedChunkCache.clearAll({ dbName: `${EncryptedChunkCache.DB_NAME}:${session.user.id}` }); } catch (_) {}
-      MangaVault.clearActive(); MangaVault.saveSession(null); localStorage.removeItem(MangaVault.META_KEY); DEVICE_DATA_KEYS.forEach((key)=>localStorage.removeItem(key)); Object.keys(localStorage).filter((key) => key.startsWith('mangaReaderSavedVaultPassphrase:')).forEach((key) => localStorage.removeItem(key)); window.location.replace('index.html');
-    }
     async function passkeyUnlock() {
       if (opening) return; opening=true; setStatus('パスキーを確認しています…');
       try { await MangaVault.initializeWithPasskey(applyPayload); goReader(); }
@@ -155,7 +147,7 @@
       catch (error) { setStatus(error.message || 'パスキーを登録できませんでした。'); }
       finally { opening=false; }
     }
-    ui.passphraseUnlock.addEventListener('click',passphraseUnlock); ui.passkeyUnlock.addEventListener('click',passkeyUnlock); ui.createVault.addEventListener('click',createVault); ui.passkeyRegister.addEventListener('click',passkeyRegister); ui.copy.addEventListener('click',async () => { try { await navigator.clipboard.writeText(ui.recoveryCode.textContent); } catch (_) {} }); ui.logout.addEventListener('click',logout);
+    ui.passphraseUnlock.addEventListener('click',passphraseUnlock); ui.passkeyUnlock.addEventListener('click',passkeyUnlock); ui.createVault.addEventListener('click',createVault); ui.passkeyRegister.addEventListener('click',passkeyRegister); ui.copy.addEventListener('click',async () => { try { await navigator.clipboard.writeText(ui.recoveryCode.textContent); } catch (_) {} });
     refreshVaultState();
   })();
   </script>
