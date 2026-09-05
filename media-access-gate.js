@@ -157,6 +157,15 @@
     }
   }
 
+  async function genericVpnVerdict(ip, signal) {
+    try {
+      const payload = await fetchJson(CHECK_URL + '?q=' + encodeURIComponent(ip), signal);
+      return isVpnVerdict(payload);
+    } catch (_) {
+      return false;
+    }
+  }
+
   async function checkVpn() {
     status = 'checking';
     const controller = typeof root.AbortController === 'function' ? new root.AbortController() : null;
@@ -166,9 +175,9 @@
       const ipPayload = await fetchJson(IP_URL, controller ? controller.signal : undefined);
       const ip = String(ipPayload && ipPayload.ip || '').trim();
       if (!ip) throw new Error('public IP unavailable');
-      const payload = await fetchJson(CHECK_URL + '?q=' + encodeURIComponent(ip), controller ? controller.signal : undefined);
-      let allowed = isVpnVerdict(payload);
-      if (!allowed) allowed = await isKnownProtonExitIp(ip, controller ? controller.signal : undefined);
+      const signal = controller ? controller.signal : undefined;
+      let allowed = await genericVpnVerdict(ip, signal);
+      if (!allowed) allowed = await isKnownProtonExitIp(ip, signal);
       status = allowed ? 'allowed' : 'blocked';
       if (status === 'allowed') {
         removeNotice();
