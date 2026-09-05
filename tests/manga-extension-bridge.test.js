@@ -33,6 +33,23 @@ test('importDraft reports locked without mutating', async () => {
   assert.equal(items.length, 0);
 });
 
+test('importDraft waits for cross-tab vault handoff before reporting locked', async () => {
+  const items = [];
+  let ready = false;
+  let waits = 0;
+  const result = await bridge.importDraft({version:1,title:'A',url:'https://x/1.jpg'}, {
+    getSavedItems:()=>items,
+    persistItems:()=>{},
+    genId:()=> 'i_1',
+    now:()=>9,
+    isVaultReady:()=>ready,
+    awaitVaultReady:async () => { waits += 1; ready = true; return true; }
+  });
+  assert.equal(waits, 1);
+  assert.equal(result.status, 'added');
+  assert.equal(items.length, 1);
+});
+
 test('importDraft adds through supplied persistence path', async () => {
   const items = []; let persisted = 0;
   const result = await bridge.importDraft({version:1,title:'A',url:'https://x/1.jpg'}, {
