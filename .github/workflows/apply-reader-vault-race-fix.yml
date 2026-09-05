@@ -20,47 +20,49 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
           vault_path = Path('vault-session.js')
           vault = vault_path.read_text(encoding='utf-8')
           anchor = "  setupVaultChannel();\n  function getMeta(userId) { return readJSON(META_KEY, {})[userId] || null; }\n"
-          wait_code = """  setupVaultChannel();
-  async function waitForActive(timeoutMs = 2500) {
-    const existing = loadActive();
-    if (existing) return existing;
-    if (!vaultChannel) setupVaultChannel();
-    return new Promise((resolve) => {
-      let settled = false;
-      let timer = null;
-      let interval = null;
-      const cleanup = () => {
-        if (timer !== null) clearTimeout(timer);
-        if (interval !== null) clearInterval(interval);
-        window.removeEventListener('manga-vault-active', onActive);
-      };
-      const finish = (value) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        resolve(value || null);
-      };
-      const check = () => {
-        const active = loadActive();
-        if (active) { finish(active); return true; }
-        return false;
-      };
-      const request = () => {
-        if (!check()) channelPost({ type: 'vault-request' });
-      };
-      const onActive = () => { check(); };
-      window.addEventListener('manga-vault-active', onActive);
-      request();
-      interval = setInterval(request, 200);
-      timer = setTimeout(() => finish(loadActive()), Math.max(0, Number(timeoutMs) || 2500));
-    });
-  }
-  function getMeta(userId) { return readJSON(META_KEY, {})[userId] || null; }
-"""
+          wait_lines = [
+              "  setupVaultChannel();",
+              "  async function waitForActive(timeoutMs = 2500) {",
+              "    const existing = loadActive();",
+              "    if (existing) return existing;",
+              "    if (!vaultChannel) setupVaultChannel();",
+              "    return new Promise((resolve) => {",
+              "      let settled = false;",
+              "      let timer = null;",
+              "      let interval = null;",
+              "      const cleanup = () => {",
+              "        if (timer !== null) clearTimeout(timer);",
+              "        if (interval !== null) clearInterval(interval);",
+              "        window.removeEventListener('manga-vault-active', onActive);",
+              "      };",
+              "      const finish = (value) => {",
+              "        if (settled) return;",
+              "        settled = true;",
+              "        cleanup();",
+              "        resolve(value || null);",
+              "      };",
+              "      const check = () => {",
+              "        const active = loadActive();",
+              "        if (active) { finish(active); return true; }",
+              "        return false;",
+              "      };",
+              "      const request = () => {",
+              "        if (!check()) channelPost({ type: 'vault-request' });",
+              "      };",
+              "      const onActive = () => { check(); };",
+              "      window.addEventListener('manga-vault-active', onActive);",
+              "      request();",
+              "      interval = setInterval(request, 200);",
+              "      timer = setTimeout(() => finish(loadActive()), Math.max(0, Number(timeoutMs) || 2500));",
+              "    });",
+              "  }",
+              "  function getMeta(userId) { return readJSON(META_KEY, {})[userId] || null; }",
+              "",
+          ]
+          wait_code = "\n".join(wait_lines)
           if 'async function waitForActive(' not in vault:
               if anchor not in vault:
                   raise SystemExit('vault insertion anchor not found')
@@ -72,11 +74,15 @@ jobs:
           elif export_new not in vault:
               raise SystemExit('vault export anchor not found')
           vault_path.write_text(vault, encoding='utf-8')
-
           reader_path = Path('reader.html')
           reader = reader_path.read_text(encoding='utf-8')
           old_guard = "    if (!window.MangaVault || !MangaVault.loadActive()) { window.location.replace(vaultUrl); return; }"
-          new_guard = "    if (!window.MangaVault) { window.location.replace(vaultUrl); return; }\n    let activeVault = MangaVault.loadActive();\n    if (!activeVault && typeof MangaVault.waitForActive === 'function') activeVault = await MangaVault.waitForActive(2500);\n    if (!activeVault) { window.location.replace(vaultUrl); return; }"
+          new_guard = "\n".join([
+              "    if (!window.MangaVault) { window.location.replace(vaultUrl); return; }",
+              "    let activeVault = MangaVault.loadActive();",
+              "    if (!activeVault && typeof MangaVault.waitForActive === 'function') activeVault = await MangaVault.waitForActive(2500);",
+              "    if (!activeVault) { window.location.replace(vaultUrl); return; }",
+          ])
           if 'await MangaVault.waitForActive(' not in reader:
               if old_guard not in reader:
                   raise SystemExit('reader auth guard anchor not found')
