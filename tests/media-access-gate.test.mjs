@@ -5,8 +5,8 @@ import vm from 'node:vm';
 
 const source = fs.readFileSync(new URL('../media-access-gate.js', import.meta.url), 'utf8');
 
-function loadGate() {
-  const window = {};
+function loadGate(overrides = {}) {
+  const window = { ...overrides };
   const context = vm.createContext({ window, globalThis: window, URL, setTimeout, clearTimeout, console });
   vm.runInContext(source, context);
   return window.MangaReaderMediaAccess;
@@ -37,6 +37,19 @@ test('blocked state never returns an external media URL for assignment', () => {
   assert.equal(Gate.mediaUrl('/testCode/icon-152.png', 'https://75k8hy94my-ui.github.io/testCode/reader.html'), '/testCode/icon-152.png');
   Gate.setAllowedForTesting(true);
   assert.equal(Gate.mediaUrl('https://example.com/page.jpg', 'https://75k8hy94my-ui.github.io/testCode/reader.html'), 'https://example.com/page.jpg');
+});
+
+test('VPN check discovers the current public IP before querying the VPN verdict API', async () => {
+  const calls = [];
+  const fetch = async (url) => {
+    calls.push(String(url));
+    if (calls.length === 1) return { ok: true, json: async () => ({ ip: '203.0.113.9' }) };
+    return { ok: true, json: async () => ({ is_vpn: true, is_proxy: false }) };
+  };
+  const Gate = loadGate({ fetch, setTimeout, clearTimeout });
+  assert.equal(await Gate.checkVpn(), true);
+  assert.match(calls[0], /api\.ipify\.org/);
+  assert.match(calls[1], /ip-api\.dev\/api\?q=203\.0\.113\.9/);
 });
 
 test('reader bootstrap loads the VPN gate before reader media and the gate covers image/video/iframe src', () => {
