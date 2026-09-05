@@ -1,8 +1,9 @@
 (function (root, factory) {
-  const api = factory(root.MangaExtensionRuleLocator);
+  const locator = root.MangaExtensionRuleLocator || (typeof require === 'function' ? require('./rule-locator.js') : null);
+  const api = factory(locator);
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.MangaExtensionExtractor = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (RuleLocator) {
   'use strict';
 
   function normalizeText(value) {
@@ -69,5 +70,46 @@
     return { selector, count: urls.length, urls };
   }
 
-  return { normalizeText, normalizeHttpUrl, extractImageUrl, dedupeUrls, extractAllPageUrls, inferImageCollection };
+  function resolveField(rootNode, field) {
+    if (!field) return null;
+    if (field.candidates && RuleLocator && typeof RuleLocator.resolveLocator === 'function') return RuleLocator.resolveLocator(rootNode, field.candidates);
+    if (field.selector && rootNode && typeof rootNode.querySelector === 'function') {
+      try { return rootNode.querySelector(field.selector); } catch (_) { return null; }
+    }
+    return null;
+  }
+
+  function extractDraft(rule, rootNode, pageUrl) {
+    if (!rule || !rootNode) throw new Error('抽出ルールがありません。');
+    const fields = rule.fields || {};
+    const draft = { version: 1, sourcePageUrl: String(pageUrl || '') };
+    for (const key of ['title', 'author', 'series', 'volume', 'source']) {
+      const element = resolveField(rootNode, fields[key]);
+      const value = element ? normalizeText(element.textContent) : '';
+      if (value) draft[key] = value;
+    }
+    const tagElement = resolveField(rootNode, fields.tags);
+    if (tagElement) {
+      const text = normalizeText(tagElement.textContent);
+      const tags = text.split(/[、,|\/]+/).map(normalizeText).filter(Boolean);
+      if (tags.length) draft.tags = Array.from(new Set(tags));
+    }
+    if (fields.allPageImages && fields.allPageImages.selector) {
+      const pages = extractAllPageUrls(rootNode, fields.allPageImages, pageUrl);
+      if (pages.length >= 2) draft.pages = pages;
+      else if (pages.length === 1) draft.url = pages[0];
+    }
+    if (!draft.pages && !draft.url && fields.firstPageImage) {
+      const imageElement = resolveField(rootNode, fields.firstPageImage);
+      const url = extractImageUrl(imageElement, pageUrl);
+      if (url) draft.url = url;
+    }
+    if (!draft.pages && !draft.url) throw new Error('漫画画像を取得できませんでした。画像要素を登録してください。');
+    if (!draft.source) {
+      try { draft.source = new URL(pageUrl).hostname; } catch (_) {}
+    }
+    return draft;
+  }
+
+  return { normalizeText, normalizeHttpUrl, extractImageUrl, dedupeUrls, extractAllPageUrls, inferImageCollection, extractDraft };
 });
