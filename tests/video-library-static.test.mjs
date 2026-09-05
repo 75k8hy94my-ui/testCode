@@ -45,6 +45,15 @@ test('video editor locks URL until the explicit edit button and exposes one-clic
   assert.match(library, /suggestedTag\.addEventListener\(['"]click['"]/);
 });
 
+test('video library supports hiding videos and restoring them from the hidden list', () => {
+  const library = read('video-library.js');
+  assert.match(library, /videoLibraryHidden/);
+  assert.match(library, /動画を非表示/);
+  assert.match(library, /非表示/);
+  assert.match(library, /表示に戻す/);
+  assert.match(library, /hidden/);
+});
+
 test('video routing bridge plays direct video URLs with a video element and keeps legacy iframe playback', () => {
   const source = read('video-routing-fix.js');
   assert.match(source, /\.vl-open/);

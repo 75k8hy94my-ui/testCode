@@ -153,6 +153,7 @@
       folderId: asText(x.folderId) || null,
       tags: parseTags(x.tags),
       favorite: x.favorite === true,
+      hidden: x.hidden === true,
       memo: asText(x.memo),
       thumbnailUrl: asText(x.thumbnailUrl),
       thumbnailTimeSeconds: x.thumbnailTimeSeconds == null ? null : asTime(x.thumbnailTimeSeconds, 0),
