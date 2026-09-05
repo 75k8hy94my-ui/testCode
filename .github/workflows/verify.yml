@@ -18,6 +18,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: npm test
+      - name: Run npm test
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee node-test-output.txt
+      - name: Upload node test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-test-output
+          path: node-test-output.txt
       - run: PYTHONPATH=. python3 -m unittest discover -s tests -p 'test_*.py'
       - run: npm run verify:static
