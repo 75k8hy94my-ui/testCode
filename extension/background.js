@@ -46,15 +46,7 @@
     chromeApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (!message || !message.type) { sendResponse({ok:false}); return false; }
       if (message.type === 'QUEUE_DRAFT') {
-        (async()=>{
-          const diagnostics=[diag('queue-write-start')];
-          const id=await queue.enqueue(message.draft);
-          diagnostics.push(diag('queue-write-success'));
-          diagnostics.push(diag('flush-start'));
-          const deliveryPending = serialFlush('delivery');
-          deliveryPending.catch(()=>{});
-          return {ok:true,id,delivered:false,deliveryPending:true,deliveryState:'waiting',lastResult:null,diagnostics};
-        })().then(sendResponse).catch(error=>sendResponse({ok:false,error:String(error&&error.message||error),diagnostics:[diag('queue-write-failed',false,error&&error.message||error)]}));
+        (async()=>{ const diagnostics=[diag('queue-write-start')]; const id=await queue.enqueue(message.draft); diagnostics.push(diag('queue-write-success')); return {ok:true,id,delivered:false,deliveryState:'waiting',lastResult:null,diagnostics}; })().then(sendResponse).catch(error=>sendResponse({ok:false,error:String(error&&error.message||error),diagnostics:[diag('queue-write-failed',false,error&&error.message||error)]}));
         return true;
       }
       (async () => {
@@ -62,7 +54,7 @@
         if (message.type === 'REGISTER_SITE') { const origin=message.origin; const granted=await chromeApi.permissions.contains({origins:[origin+'/*']}); if(!granted)return{ok:false,error:'permission-not-granted'}; const origins=await registeredOrigins(store); if(!origins.includes(origin)){origins.push(origin);await store.set(KEYS.origins,origins);} if(message.tabId)await injectSite(chromeApi,message.tabId); return{ok:true}; }
         if (message.type === 'GET_RULES') return { ok:true, rules:await rules(store) };
         if (message.type === 'SAVE_RULE') { const all=await rules(store); const next=Object.assign({},message.rule,{updatedAt:Date.now()}); const index=all.findIndex((rule)=>rule.id===next.id); if(index>=0)all[index]=next;else all.push(next); await store.set(KEYS.rules,all); return{ok:true,rule:next}; }
-        if (message.type === 'TESTCODE_READY' || message.type === 'FLUSH_PENDING') return Object.assign({ok:true},await serialFlush('delivery'));
+        if (message.type === 'TESTCODE_READY' || message.type === 'FLUSH_PENDING') { const result=await serialFlush('delivery'); return Object.assign({ok:true,deliveryState:deliveryStateFromResult(result.lastResult)},result); }
         return { ok:false,error:'unknown-message' };
       })().then(sendResponse).catch((error)=>sendResponse({ok:false,error:String(error&&error.message||error),diagnostics:[diag('background-error',false,error&&error.message||error)]})); return true;
     });
