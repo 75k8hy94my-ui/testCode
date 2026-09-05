@@ -39,12 +39,13 @@ test('blocked state never returns an external media URL for assignment', () => {
   assert.equal(Gate.mediaUrl('https://example.com/page.jpg', 'https://75k8hy94my-ui.github.io/testCode/reader.html'), 'https://example.com/page.jpg');
 });
 
-test('reader and video integration route external media through the VPN gate', () => {
-  const reader = fs.readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
-  const library = fs.readFileSync(new URL('../video-library.js', import.meta.url), 'utf8');
-  const routing = fs.readFileSync(new URL('../video-routing-fix.js', import.meta.url), 'utf8');
-  assert.match(reader, /media-access-gate\.js/);
-  assert.match(reader, /MangaReaderMediaAccess\.mediaUrl/);
-  assert.match(library, /MangaReaderMediaAccess\.mediaUrl/);
-  assert.match(routing, /MangaReaderMediaAccess\.canLoadExternalMedia/);
+test('reader bootstrap loads the VPN gate before reader media and the gate covers image/video/iframe src', () => {
+  const recommendations = fs.readFileSync(new URL('../recommendations.js', import.meta.url), 'utf8');
+  assert.match(recommendations, /document\.write\([\s\S]*media-access-gate\.js/);
+  assert.match(source, /patchSrcProperty\(root\.HTMLImageElement\)/);
+  assert.match(source, /patchSrcProperty\(root\.HTMLMediaElement\)/);
+  assert.match(source, /patchSrcProperty\(root\.HTMLIFrameElement\)/);
+  assert.match(source, /data-vpn-blocked-src/);
+  assert.match(source, /\.vl-open/);
+  assert.match(source, /checkVpn/);
 });
