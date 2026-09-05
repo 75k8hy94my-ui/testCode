@@ -85,3 +85,26 @@ test('importDraft adds through supplied persistence path', async () => {
   assert.equal(items[0].id, 'i_1');
   assert.equal(persisted, 1);
 });
+
+test('makePageDeps rolls back local bookshelf when cloud save fails', async () => {
+  const original = JSON.stringify([{ id:'old', title:'Existing', url:'https://x/old.jpg' }]);
+  const storage = new Map([['mangaReaderSavedItems', original]]);
+  const localStorage = {
+    getItem: (key) => storage.has(key) ? storage.get(key) : null,
+    setItem: (key, value) => storage.set(key, String(value)),
+    removeItem: (key) => storage.delete(key)
+  };
+  const target = {
+    localStorage,
+    MangaVault: {
+      loadActive: () => ({ rawKey:new Uint8Array(32), keyWraps:{} }),
+      savePayload: async () => { throw new Error('network down'); }
+    },
+    MangaVaultPayload: { buildFromLocalStorage: () => ({ items: JSON.parse(localStorage.getItem('mangaReaderSavedItems')) }) },
+    setTimeout
+  };
+  const deps = bridge.makePageDeps(target);
+  deps.getSavedItems().unshift({ id:'new', title:'New', url:'https://x/new.jpg' });
+  await assert.rejects(() => deps.persistItems(), /network down/);
+  assert.equal(localStorage.getItem('mangaReaderSavedItems'), original);
+});
