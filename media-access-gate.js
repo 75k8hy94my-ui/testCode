@@ -329,6 +329,7 @@
       }
       status = allowed ? 'allowed' : 'blocked';
       updateStatusButtons(status);
+      if (status === 'allowed') diagnostics.error = null;
       diagnostics.final = status;
       diagnostics.checkedAt = new Date().toISOString();
       renderDiagnostics();

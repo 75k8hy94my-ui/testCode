@@ -67,6 +67,7 @@ test('VPN check falls back to Proton exit IP list when generic detection returns
   const Gate = loadGate({ fetch, setTimeout, clearTimeout });
   assert.equal(await Gate.checkVpn(), true);
   assert.match(calls[2], /ProtonVPN-IPs/);
+  assert.equal(Gate.getDiagnostics().error, null);
 });
 
 test('VPN check still uses Proton exit IP list when generic detection API errors', async () => {
