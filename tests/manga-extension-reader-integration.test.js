@@ -1,8 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const path = require('node:path');
 
-const bridgeSource = fs.readFileSync(new URL('../manga-extension-bridge.js', import.meta.url), 'utf8');
+const bridgeSource = fs.readFileSync(path.join(__dirname, '..', 'manga-extension-bridge.js'), 'utf8');
 const bridge = require('../manga-extension-bridge.js');
 
 test('bridge no longer depends on reader IIFE locals', () => {
@@ -10,7 +11,7 @@ test('bridge no longer depends on reader IIFE locals', () => {
   assert.doesNotMatch(bridgeSource, /getSavedItems:\s*\(\)\s*=>\s*savedItems/);
 });
 
-test('storage-backed page deps persist added items and schedule cloud save', () => {
+test('storage-backed page deps persist added items and schedule cloud save', async () => {
   const data = new Map([['mangaReaderSavedItems', JSON.stringify([{ id:'old', url:'https://x/old.jpg' }])]]);
   const storage = {
     getItem: (key) => data.has(key) ? data.get(key) : null,
@@ -28,7 +29,7 @@ test('storage-backed page deps persist added items and schedule cloud save', () 
   const deps = bridge.makePageDeps(root);
   const items = deps.getSavedItems();
   items.unshift({ id:'new', url:'https://x/new.jpg' });
-  deps.persistItems();
+  await deps.persistItems();
   deps.afterAdded();
   assert.equal(JSON.parse(data.get('mangaReaderSavedItems'))[0].id, 'new');
   assert.equal(cloudSaves, 1);
