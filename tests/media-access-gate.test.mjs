@@ -83,6 +83,25 @@ test('VPN check still uses Proton exit IP list when generic detection API errors
   assert.match(calls[2], /ProtonVPN-IPs/);
 });
 
+test('diagnostics expose IP, generic lookup result, Proton match, and final decision', async () => {
+  const currentIp = '198.51.100.88';
+  let call = 0;
+  const fetch = async () => {
+    call += 1;
+    if (call === 1) return { ok: true, json: async () => ({ ip: currentIp }) };
+    if (call === 2) return { ok: false, status: 429, json: async () => ({}) };
+    return { ok: true, json: async () => ([currentIp]) };
+  };
+  const Gate = loadGate({ fetch, setTimeout, clearTimeout });
+  assert.equal(await Gate.checkVpn(), true);
+  const d = Gate.getDiagnostics();
+  assert.equal(d.ip, currentIp);
+  assert.equal(d.generic.status, 'error');
+  assert.equal(d.generic.httpStatus, 429);
+  assert.equal(d.protonExitMatch, true);
+  assert.equal(d.final, 'allowed');
+});
+
 test('reader bootstrap loads the VPN gate before reader media and the gate covers image/video/iframe src', () => {
   const recommendations = fs.readFileSync(new URL('../recommendations.js', import.meta.url), 'utf8');
   assert.match(recommendations, /document\.write\([\s\S]*media-access-gate\.js/);
@@ -91,5 +110,7 @@ test('reader bootstrap loads the VPN gate before reader media and the gate cover
   assert.match(source, /patchSrcProperty\(root\.HTMLIFrameElement\)/);
   assert.match(source, /data-vpn-blocked-src/);
   assert.match(source, /\.vl-open/);
+  assert.match(source, /VPN診断/);
+  assert.match(source, /getDiagnostics/);
   assert.match(source, /checkVpn/);
 });
