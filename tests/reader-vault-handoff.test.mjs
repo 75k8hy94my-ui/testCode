@@ -13,8 +13,8 @@ test('vault session exposes an async wait for cross-tab active vault', () => {
 });
 
 test('reader waits for cross-tab vault handoff before redirecting to sync', () => {
-  assert.match(reader, /await\s+MangaVault\.waitForActive\(/);
-  const waitIndex = reader.indexOf('await MangaVault.waitForActive(');
-  const redirectIndex = reader.indexOf('window.location.replace(vaultUrl)');
-  assert.ok(waitIndex >= 0 && redirectIndex > waitIndex, 'reader must wait before deciding the vault is locked');
+  const waitIndex = reader.indexOf('await MangaVault.waitForActive(2500)');
+  const lockedRedirectIndex = reader.indexOf('if (!activeVault) { window.location.replace(vaultUrl); return; }');
+  assert.ok(waitIndex >= 0, 'reader must await cross-tab vault handoff');
+  assert.ok(lockedRedirectIndex > waitIndex, 'reader must wait before deciding the vault is locked');
 });
