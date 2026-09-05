@@ -51,23 +51,38 @@
   }
 
   function extractAllPageUrls(rootNode, collectionRule, baseUrl) {
-    if (!rootNode || typeof rootNode.querySelectorAll !== 'function' || !collectionRule || !collectionRule.selector) return [];
+    if (!rootNode || !collectionRule || !collectionRule.selector) return [];
+    let scope = rootNode;
+    if (collectionRule.containerCandidates && RuleLocator && typeof RuleLocator.resolveLocator === 'function') {
+      scope = RuleLocator.resolveLocator(rootNode, collectionRule.containerCandidates) || rootNode;
+    }
+    if (!scope || typeof scope.querySelectorAll !== 'function') return [];
     let nodes = [];
-    try { nodes = Array.from(rootNode.querySelectorAll(collectionRule.selector)); } catch (_) { return []; }
+    try { nodes = Array.from(scope.querySelectorAll(collectionRule.selector)); } catch (_) { return []; }
     return dedupeUrls(nodes.map((node) => extractImageUrl(node, baseUrl)).filter(Boolean));
   }
 
   function inferImageCollection(selectedElement) {
-    if (!selectedElement) return { selector: '', count: 0, urls: [] };
+    if (!selectedElement) return { selector: '', count: 0, urls: [], containerCandidates: [] };
     const tag = String(selectedElement.tagName || 'img').toLowerCase();
     const classes = Array.from(selectedElement.classList || []).filter(Boolean).slice(0, 2);
     const selector = tag + classes.map((name) => '.' + String(name).replace(/([^a-zA-Z0-9_-])/g, '\\$1')).join('');
-    const rootNode = selectedElement.parentElement || (selectedElement.ownerDocument || null);
-    let nodes = [];
-    try { nodes = rootNode && rootNode.querySelectorAll ? Array.from(rootNode.querySelectorAll(selector)) : [selectedElement]; } catch (_) { nodes = [selectedElement]; }
     const baseUrl = selectedElement.ownerDocument && selectedElement.ownerDocument.location ? selectedElement.ownerDocument.location.href : (typeof location !== 'undefined' ? location.href : 'https://invalid.example/');
-    const urls = dedupeUrls(nodes.map((node) => extractImageUrl(node, baseUrl)).filter(Boolean));
-    return { selector, count: urls.length, urls };
+    let bestScope = selectedElement.parentElement || selectedElement.ownerDocument || null;
+    let bestNodes = [selectedElement];
+    let scope = bestScope;
+    for (let depth = 0; scope && depth < 6; depth += 1, scope = scope.parentElement) {
+      if (typeof scope.querySelectorAll !== 'function') continue;
+      let nodes = [];
+      try { nodes = Array.from(scope.querySelectorAll(selector)); } catch (_) { continue; }
+      const valid = nodes.filter((node) => extractImageUrl(node, baseUrl));
+      if (valid.length > bestNodes.length) { bestNodes = valid; bestScope = scope; }
+      if (valid.length >= 200) break;
+    }
+    const urls = dedupeUrls(bestNodes.map((node) => extractImageUrl(node, baseUrl)).filter(Boolean));
+    const containerCandidates = bestScope && bestScope !== selectedElement.ownerDocument && RuleLocator && typeof RuleLocator.generateLocatorCandidates === 'function'
+      ? RuleLocator.generateLocatorCandidates(bestScope) : [];
+    return { selector, count: urls.length, urls, containerCandidates };
   }
 
   function resolveField(rootNode, field) {
