@@ -1,6 +1,13 @@
 (function (root) {
   'use strict';
 
+  // This file is loaded synchronously by reader.html before the large inline
+  // reader script. Load the media gate at parse time as well so external
+  // image/video URLs cannot begin loading before the VPN verdict is known.
+  if (typeof document !== 'undefined' && !root.MangaReaderMediaAccess && document.readyState === 'loading') {
+    document.write('<script src="media-access-gate.js"><\/script>');
+  }
+
   function activityTime(item) {
     return Number(item.updatedAt || item.addedAt || 0) || 0;
   }
