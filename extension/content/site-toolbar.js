@@ -68,15 +68,17 @@
     const rule = current && current.origin === location.origin ? JSON.parse(JSON.stringify(current)) : { id: ruleId(location.origin, pattern), origin: location.origin, urlPattern: pattern, fields:{} };
     if (rule.urlPattern !== pattern) { rule.urlPattern = pattern; rule.id = ruleId(location.origin, pattern); }
     rule.fields = rule.fields || {};
-    if (field === 'allPageImages') rule.fields[field] = { selector: collection.selector };
+    if (field === 'allPageImages') rule.fields[field] = { selector: collection.selector, containerCandidates: collection.containerCandidates || [] };
     else rule.fields[field] = { candidates: RuleLocator.generateLocatorCandidates(selected) };
     const response = await chrome.runtime.sendMessage({ type:'SAVE_RULE', rule });
     if (!response || !response.ok) throw new Error('ルール保存に失敗しました。');
     panel.classList.remove('show'); status(fieldLabels[field].replace('を登録','') + 'を登録しました');
   }
 
-  function showMapping(selected) {
-    const currentPattern = defaultPattern();
+  async function showMapping(selected) {
+    const all = await getRules().catch(() => []);
+    const matched = RuleLocator.selectBestRule(all, location.href);
+    const currentPattern = matched ? matched.urlPattern : defaultPattern();
     panel.innerHTML = `<div class="heading">この要素を何として登録しますか？</div><label>URLパターン</label><input id="patternInput" class="pattern" value="${currentPattern.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}"><div id="fieldButtons"></div>`;
     const buttons = panel.querySelector('#fieldButtons');
     Object.entries(fieldLabels).forEach(([field, label]) => {
