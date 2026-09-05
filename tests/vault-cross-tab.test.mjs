@@ -13,6 +13,7 @@ test('vault session supports same-origin cross-tab handoff without localStorage 
 });
 
 test('saving and clearing active vault announces state to peer tabs', () => {
-  assert.match(source, /function saveActive\([\s\S]*postMessage/);
-  assert.match(source, /function clearActive\([\s\S]*postMessage/);
+  assert.match(source, /function channelPost\([\s\S]*postMessage/);
+  assert.match(source, /function saveActive\([^)]*\)[^{]*\{[^}]*channelPost\(\{ type: 'vault-response'/);
+  assert.match(source, /function clearActive\([^)]*\)[^{]*\{[^}]*channelPost\(\{ type: 'vault-cleared'/);
 });
