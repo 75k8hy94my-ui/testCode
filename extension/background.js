@@ -60,8 +60,8 @@
     if (!tabId) return;
     try {
       await chromeApi.scripting.executeScript({ target: { tabId }, files: [
-        'extension/content/rule-locator.js', 'extension/content/extractor.js',
-        'extension/content/element-picker.js', 'extension/content/site-toolbar.js'
+        'content/rule-locator.js', 'content/extractor.js',
+        'content/element-picker.js', 'content/site-toolbar.js'
       ] });
     } catch (_) {}
   }
