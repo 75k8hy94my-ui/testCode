@@ -81,6 +81,13 @@
     return PROTON_OWNED_IPV4_CIDRS.some((cidr) => ipv4InCidr(ip, cidr));
   }
 
+  function ipv424(ip) {
+    const parts = String(ip || '').trim().split('.');
+    return parts.length === 4 && parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) >= 0 && Number(part) <= 255)
+      ? parts.slice(0, 3).join('.')
+      : '';
+  }
+
   function isVpnVerdict(value) {
     if (!value || typeof value !== 'object') return false;
     const privacy = value.privacy && typeof value.privacy === 'object' ? value.privacy : {};
@@ -271,7 +278,10 @@
   async function isKnownProtonExitIp(ip, signal) {
     try {
       const list = await fetchJson(PROTON_EXIT_IPS_URL, signal);
-      return Array.isArray(list) && list.includes(ip);
+      if (!Array.isArray(list)) return false;
+      if (list.includes(ip)) return true;
+      const block = ipv424(ip);
+      return !!block && list.some((candidate) => ipv424(candidate) === block);
     } catch (_) {
       return false;
     }

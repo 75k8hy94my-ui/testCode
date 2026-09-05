@@ -83,6 +83,21 @@ test('VPN check still uses Proton exit IP list when generic detection API errors
   assert.match(calls[2], /ProtonVPN-IPs/);
 });
 
+test('VPN check accepts an IP in a Proton-listed /24 exit block', async () => {
+  const currentIp = '37.19.205.204';
+  const Gate = loadGate({
+    fetch: async (url) => {
+      if (url === Gate.IP_URL) return { ok: true, json: async () => ({ ip: currentIp }) };
+      if (url.startsWith(Gate.CHECK_URL)) return { ok: false, status: 503, json: async () => ({}) };
+      return { ok: true, json: async () => ['37.19.205.223'] };
+    },
+    setTimeout,
+    clearTimeout,
+  });
+  assert.equal(await Gate.checkVpn(), true);
+  assert.equal(Gate.getDiagnostics().protonExitMatch, true);
+});
+
 test('diagnostics expose IP, generic lookup result, Proton match, and final decision', async () => {
   const currentIp = '198.51.100.88';
   let call = 0;
