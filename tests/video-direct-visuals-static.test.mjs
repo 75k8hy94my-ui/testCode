@@ -27,10 +27,14 @@ test('direct inline player adopts the media native aspect ratio after metadata l
   assert.match(source, /video\.videoHeight/);
 });
 
-test('direct inline player provides a large-display toggle and blocks context-menu saving', () => {
+test('inline player exposes large-display action through the three-dot menu and blocks context-menu saving', () => {
   assert.match(source, /大きく表示/);
   assert.match(source, /vl-large-player/);
   assert.match(source, /contextmenu/);
+  assert.match(source, /vl-player-menu/);
+  assert.match(source, /三点/);
+  assert.match(source, /vl-player-menu-item/);
+  assert.doesNotMatch(source, /button\.type = 'button'; button\.className = 'vl-portrait-toggle'/);
 });
 
 test('direct card thumbnail seeks to the persisted thumbnail timestamp before reveal', () => {
