@@ -102,8 +102,8 @@
         }
         if (message.type === 'REGISTER_SITE') {
           const origin = message.origin;
-          const granted = await chromeApi.permissions.request({ origins: [origin + '/*'] });
-          if (!granted) return { ok: false, error: 'permission-denied' };
+          const granted = await chromeApi.permissions.contains({ origins: [origin + '/*'] });
+          if (!granted) return { ok: false, error: 'permission-not-granted' };
           const origins = await registeredOrigins(store);
           if (!origins.includes(origin)) { origins.push(origin); await store.set(KEYS.origins, origins); }
           if (message.tabId) await injectSite(chromeApi, message.tabId);
@@ -120,12 +120,11 @@
         }
         if (message.type === 'QUEUE_DRAFT') {
           const id = await queue.enqueue(message.draft);
-          const result = await serialFlush('global');
+          const result = await serialFlush('delivery');
           return { ok: true, id, delivered: result.delivered > 0 };
         }
         if (message.type === 'TESTCODE_READY' || message.type === 'FLUSH_PENDING') {
-          const tabId = sender && sender.tab && sender.tab.id;
-          return Object.assign({ ok: true }, await serialFlush(typeof tabId === 'number' ? tabId : 'global'));
+          return Object.assign({ ok: true }, await serialFlush('delivery'));
         }
         return { ok: false, error: 'unknown-message' };
       })().then(sendResponse).catch((error) => sendResponse({ ok: false, error: String(error && error.message || error) }));
