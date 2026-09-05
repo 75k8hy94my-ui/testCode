@@ -8,7 +8,15 @@
   const IP_URL = 'https://api.ipify.org?format=json';
   const CHECK_URL = 'https://ip-api.dev/api';
   const PROTON_EXIT_IPS_URL = 'https://raw.githubusercontent.com/tn3w/ProtonVPN-IPs/master/protonvpn_ips.json';
-  const PROTON_ASNS = new Set([209103, 62371]);
+  const PROTON_ASNS = new Set([209103, 62371, 208172]);
+  const PROTON_OWNED_IPV4_CIDRS = [
+    '159.26.96.0/20',
+    '159.26.116.0/22',
+    '134.82.68.0/22',
+    '72.251.208.0/21',
+    '205.147.17.0/24',
+    '205.147.22.0/24',
+  ];
   const NOTICE_ID = 'vpnMediaNotice';
   const DIAGNOSTICS_BUTTON_ID = 'vpnDiagnosticsButton';
   const DIAGNOSTICS_PANEL_ID = 'vpnDiagnosticsPanel';
@@ -20,6 +28,7 @@
     return {
       ip: '',
       generic: { status: 'pending', httpStatus: null, verdict: null },
+      protonOwnedNetworkMatch: null,
       protonExitMatch: null,
       final: 'pending',
       checkedAt: null,
@@ -31,6 +40,7 @@
     return {
       ip: diagnostics.ip,
       generic: { ...diagnostics.generic },
+      protonOwnedNetworkMatch: diagnostics.protonOwnedNetworkMatch,
       protonExitMatch: diagnostics.protonExitMatch,
       final: diagnostics.final,
       checkedAt: diagnostics.checkedAt,
@@ -40,6 +50,34 @@
 
   function currentBase() {
     return root.location && root.location.href ? root.location.href : 'https://75k8hy94my-ui.github.io/testCode/reader.html';
+  }
+
+  function ipv4ToInt(ip) {
+    const parts = String(ip || '').trim().split('.');
+    if (parts.length !== 4) return null;
+    let value = 0;
+    for (const part of parts) {
+      if (!/^\d{1,3}$/.test(part)) return null;
+      const octet = Number(part);
+      if (octet < 0 || octet > 255) return null;
+      value = (value * 256) + octet;
+    }
+    return value >>> 0;
+  }
+
+  function ipv4InCidr(ip, cidr) {
+    const [networkText, prefixText] = String(cidr || '').split('/');
+    const ipInt = ipv4ToInt(ip);
+    const networkInt = ipv4ToInt(networkText);
+    const prefix = Number(prefixText);
+    if (ipInt == null || networkInt == null || !Number.isInteger(prefix) || prefix < 0 || prefix > 32) return false;
+    if (prefix === 0) return true;
+    const mask = (0xffffffff << (32 - prefix)) >>> 0;
+    return (ipInt & mask) === (networkInt & mask);
+  }
+
+  function isKnownProtonOwnedIp(ip) {
+    return PROTON_OWNED_IPV4_CIDRS.some((cidr) => ipv4InCidr(ip, cidr));
   }
 
   function isVpnVerdict(value) {
@@ -118,10 +156,12 @@
       : d.generic.status === 'error'
         ? 'エラー' + (d.generic.httpStatus ? ' (HTTP ' + d.generic.httpStatus + ')' : '')
         : d.generic.status === 'checking' ? '確認中' : '未確認';
+    const owned = d.protonOwnedNetworkMatch === true ? '一致' : d.protonOwnedNetworkMatch === false ? '不一致' : '未確認';
     const proton = d.protonExitMatch === true ? '一致' : d.protonExitMatch === false ? '不一致' : '未確認';
     const final = d.final === 'allowed' ? '許可' : d.final === 'blocked' ? 'ブロック' : d.final === 'checking' ? '確認中' : '未判定';
     return [
       '現在IP: ' + (d.ip || '取得前'),
+      'Proton保有ネットワーク: ' + owned,
       '一般VPN判定: ' + generic,
       'Proton出口IP: ' + proton,
       '最終判定: ' + final,
@@ -279,9 +319,11 @@
       const ip = String(ipPayload && ipPayload.ip || '').trim();
       if (!ip) throw new Error('public IP unavailable');
       diagnostics.ip = ip;
+      diagnostics.protonOwnedNetworkMatch = isKnownProtonOwnedIp(ip);
       renderDiagnostics();
       const signal = controller ? controller.signal : undefined;
-      let allowed = await genericVpnVerdict(ip, signal);
+      let allowed = diagnostics.protonOwnedNetworkMatch;
+      if (!allowed) allowed = await genericVpnVerdict(ip, signal);
       if (!allowed) {
         diagnostics.protonExitMatch = await isKnownProtonExitIp(ip, signal);
         allowed = diagnostics.protonExitMatch;
@@ -324,5 +366,5 @@
     else if (root.setTimeout) root.setTimeout(checkVpn, 0);
   }
 
-  return { IP_URL, CHECK_URL, PROTON_EXIT_IPS_URL, isVpnVerdict, isProtectedMediaUrl, canLoadExternalMedia, mediaUrl, checkVpn, getDiagnostics, setAllowedForTesting, installGuards, installDiagnosticsUi };
+  return { IP_URL, CHECK_URL, PROTON_EXIT_IPS_URL, PROTON_OWNED_IPV4_CIDRS, isVpnVerdict, isKnownProtonOwnedIp, isProtectedMediaUrl, canLoadExternalMedia, mediaUrl, checkVpn, getDiagnostics, setAllowedForTesting, installGuards, installDiagnosticsUi };
 }));
