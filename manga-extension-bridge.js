@@ -9,6 +9,7 @@
   const RESULT_TYPE = 'testcode:manga-extension:result';
   const READY_TYPE = 'testcode:manga-extension:bridge-ready';
   const SAVED_ITEMS_KEY = 'mangaReaderSavedItems';
+  const VAULT_CHANNEL_NAME = 'mangaReaderVaultSession';
 
   function normalizeUrl(value) {
     const raw = String(value || '').trim();
@@ -100,7 +101,12 @@
   async function importDraft(input, deps) {
     const draft = validateDraft(input);
     if (!deps || typeof deps.getSavedItems !== 'function' || typeof deps.persistItems !== 'function') return { status:'invalid', message:'testCode側の受信準備ができていません。' };
-    if (typeof deps.isVaultReady === 'function' && !deps.isVaultReady()) return { status:'locked', message:'保管庫がロックされています。' };
+    if (typeof deps.isVaultReady === 'function' && !deps.isVaultReady()) {
+      if (typeof deps.awaitVaultReady === 'function') {
+        try { await deps.awaitVaultReady(); } catch (_) {}
+      }
+      if (!deps.isVaultReady()) return { status:'locked', message:'保管庫がロックされています。' };
+    }
     const items = deps.getSavedItems();
     if (!Array.isArray(items)) return { status:'invalid', message:'本棚データを取得できません。' };
     if (findDuplicate(items, draft)) return { status:'duplicate', message:'すでに追加されています' };
@@ -136,9 +142,62 @@
       if (ready && !wasReady) target.postMessage({ type: READY_TYPE }, target.location ? target.location.origin : '*');
       wasReady = ready;
     };
+    const onActive = () => check();
+    if (typeof target.addEventListener === 'function') target.addEventListener('manga-vault-active', onActive);
     check();
     const timer = setInterval(check, intervalMs);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      if (typeof target.removeEventListener === 'function') target.removeEventListener('manga-vault-active', onActive);
+    };
+  }
+
+  function waitForVaultReady(target, isVaultReady, timeoutMs = 3000, requestEveryMs = 200) {
+    if (!target || typeof isVaultReady !== 'function') return Promise.resolve(false);
+    try { if (isVaultReady()) return Promise.resolve(true); } catch (_) {}
+
+    const setTimer = typeof target.setTimeout === 'function' ? target.setTimeout.bind(target) : setTimeout;
+    const clearTimer = typeof target.clearTimeout === 'function' ? target.clearTimeout.bind(target) : clearTimeout;
+    const setRepeater = typeof target.setInterval === 'function' ? target.setInterval.bind(target) : setInterval;
+    const clearRepeater = typeof target.clearInterval === 'function' ? target.clearInterval.bind(target) : clearInterval;
+    let channel = null;
+    try {
+      const Channel = target.BroadcastChannel || (typeof BroadcastChannel === 'function' ? BroadcastChannel : null);
+      if (Channel) channel = new Channel(VAULT_CHANNEL_NAME);
+    } catch (_) { channel = null; }
+
+    return new Promise((resolve) => {
+      let done = false;
+      let interval = null;
+      let timeout = null;
+      const cleanup = () => {
+        if (interval !== null) clearRepeater(interval);
+        if (timeout !== null) clearTimer(timeout);
+        if (typeof target.removeEventListener === 'function') target.removeEventListener('manga-vault-active', onActive);
+        try { if (channel) channel.close(); } catch (_) {}
+      };
+      const finish = (ready) => {
+        if (done) return;
+        done = true;
+        cleanup();
+        resolve(!!ready);
+      };
+      const check = () => {
+        try {
+          if (isVaultReady()) { finish(true); return true; }
+        } catch (_) {}
+        return false;
+      };
+      const request = () => {
+        if (check()) return;
+        try { if (channel) channel.postMessage({ type: 'vault-request' }); } catch (_) {}
+      };
+      const onActive = () => { if (!check()) request(); };
+      if (typeof target.addEventListener === 'function') target.addEventListener('manga-vault-active', onActive);
+      request();
+      interval = setRepeater(request, Math.max(50, Number(requestEveryMs) || 200));
+      timeout = setTimer(() => finish(check()), Math.max(0, Number(timeoutMs) || 3000));
+    });
   }
 
   function makePageDeps(target) {
@@ -160,6 +219,7 @@
       genId: (prefix) => String(prefix || 'i') + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
       now: () => Date.now(),
       isVaultReady,
+      awaitVaultReady: () => waitForVaultReady(target, isVaultReady),
       afterAdded: () => {
         const schedule = typeof target.setTimeout === 'function' ? target.setTimeout.bind(target) : setTimeout;
         schedule(() => { if (target.location && typeof target.location.reload === 'function') target.location.reload(); }, 50);
@@ -187,5 +247,5 @@
     }
   }
 
-  return { REQUEST_TYPE, RESULT_TYPE, READY_TYPE, normalizeUrl, validateDraft, findDuplicate, buildSavedItem, importDraft, install, watchVaultReady, makePageDeps, autoInstall };
+  return { REQUEST_TYPE, RESULT_TYPE, READY_TYPE, normalizeUrl, validateDraft, findDuplicate, buildSavedItem, importDraft, install, watchVaultReady, waitForVaultReady, makePageDeps, autoInstall };
 });
