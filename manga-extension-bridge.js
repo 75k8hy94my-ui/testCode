@@ -80,15 +80,9 @@
     const genIdFn = typeof deps.genId === 'function' ? deps.genId : (() => 'i_' + Math.random().toString(36).slice(2));
     const now = typeof deps.now === 'function' ? deps.now : Date.now;
     const item = {
-      id: genIdFn('i'),
-      title: draft.title || '無題',
-      author: draft.author || '',
-      tags: Array.isArray(draft.tags) ? draft.tags : [],
-      folderId: null,
-      favorite: false,
-      splitSpreads: false,
-      addedAt: now(),
-      sourcePageUrl: draft.sourcePageUrl || null
+      id: genIdFn('i'), title: draft.title || '無題', author: draft.author || '',
+      tags: Array.isArray(draft.tags) ? draft.tags : [], folderId: null, favorite: false,
+      splitSpreads: false, addedAt: now(), sourcePageUrl: draft.sourcePageUrl || null
     };
     if (draft.series) item.series = draft.series;
     if (draft.volume) item.volume = draft.volume;
@@ -102,9 +96,7 @@
     const draft = validateDraft(input);
     if (!deps || typeof deps.getSavedItems !== 'function' || typeof deps.persistItems !== 'function') return { status:'invalid', message:'testCode側の受信準備ができていません。' };
     if (typeof deps.isVaultReady === 'function' && !deps.isVaultReady()) {
-      if (typeof deps.awaitVaultReady === 'function') {
-        try { await deps.awaitVaultReady(); } catch (_) {}
-      }
+      if (typeof deps.awaitVaultReady === 'function') { try { await deps.awaitVaultReady(); } catch (_) {} }
       if (!deps.isVaultReady()) return { status:'locked', message:'保管庫がロックされています。' };
     }
     const items = deps.getSavedItems();
@@ -112,7 +104,13 @@
     if (findDuplicate(items, draft)) return { status:'duplicate', message:'すでに追加されています' };
     const item = buildSavedItem(draft, deps);
     items.unshift(item);
-    await deps.persistItems();
+    try {
+      await deps.persistItems();
+    } catch (error) {
+      const index = items.indexOf(item);
+      if (index >= 0) items.splice(index, 1);
+      throw error;
+    }
     if (typeof deps.renderSavedList === 'function') deps.renderSavedList();
     if (typeof deps.afterAdded === 'function') deps.afterAdded(item);
     return { status:'added', message:'追加しました', itemId:item.id };
@@ -155,43 +153,23 @@
   function waitForVaultReady(target, isVaultReady, timeoutMs = 3000, requestEveryMs = 200) {
     if (!target || typeof isVaultReady !== 'function') return Promise.resolve(false);
     try { if (isVaultReady()) return Promise.resolve(true); } catch (_) {}
-
     const setTimer = typeof target.setTimeout === 'function' ? target.setTimeout.bind(target) : setTimeout;
     const clearTimer = typeof target.clearTimeout === 'function' ? target.clearTimeout.bind(target) : clearTimeout;
     const setRepeater = typeof target.setInterval === 'function' ? target.setInterval.bind(target) : setInterval;
     const clearRepeater = typeof target.clearInterval === 'function' ? target.clearInterval.bind(target) : clearInterval;
     let channel = null;
-    try {
-      const Channel = target.BroadcastChannel || (typeof BroadcastChannel === 'function' ? BroadcastChannel : null);
-      if (Channel) channel = new Channel(VAULT_CHANNEL_NAME);
-    } catch (_) { channel = null; }
-
+    try { const Channel = target.BroadcastChannel || (typeof BroadcastChannel === 'function' ? BroadcastChannel : null); if (Channel) channel = new Channel(VAULT_CHANNEL_NAME); } catch (_) { channel = null; }
     return new Promise((resolve) => {
-      let done = false;
-      let interval = null;
-      let timeout = null;
+      let done = false, interval = null, timeout = null;
       const cleanup = () => {
         if (interval !== null) clearRepeater(interval);
         if (timeout !== null) clearTimer(timeout);
         if (typeof target.removeEventListener === 'function') target.removeEventListener('manga-vault-active', onActive);
         try { if (channel) channel.close(); } catch (_) {}
       };
-      const finish = (ready) => {
-        if (done) return;
-        done = true;
-        cleanup();
-        resolve(!!ready);
-      };
-      const check = () => {
-        try {
-          if (isVaultReady()) { finish(true); return true; }
-        } catch (_) {}
-        return false;
-      };
-      const request = () => {
-        if (check()) return;
-        try { if (channel) channel.postMessage({ type: 'vault-request' }); } catch (_) {}
-      };
+      const finish = (ready) => { if (done) return; done = true; cleanup(); resolve(!!ready); };
+      const check = () => { try { if (isVaultReady()) { finish(true); return true; } } catch (_) {} return false; };
+      const request = () => { if (check()) return; try { if (channel) channel.postMessage({ type:'vault-request' }); } catch (_) {} };
       const onActive = () => { if (!check()) request(); };
       if (typeof target.addEventListener === 'function') target.addEventListener('manga-vault-active', onActive);
       request();
@@ -203,17 +181,25 @@
   function makePageDeps(target) {
     if (!target || !target.localStorage) return null;
     let items;
-    try {
-      const parsed = JSON.parse(target.localStorage.getItem(SAVED_ITEMS_KEY) || '[]');
-      items = Array.isArray(parsed) ? parsed : [];
-    } catch (_) { items = []; }
+    try { const parsed = JSON.parse(target.localStorage.getItem(SAVED_ITEMS_KEY) || '[]'); items = Array.isArray(parsed) ? parsed : []; }
+    catch (_) { items = []; }
     const isVaultReady = () => !!(target.MangaVault && typeof target.MangaVault.loadActive === 'function' && target.MangaVault.loadActive());
     return {
       getSavedItems: () => items,
       persistItems: async () => {
-        target.localStorage.setItem(SAVED_ITEMS_KEY, JSON.stringify(items));
-        if (isVaultReady() && target.MangaVault && typeof target.MangaVault.savePayload === 'function' && target.MangaVaultPayload && typeof target.MangaVaultPayload.buildFromLocalStorage === 'function') {
-          await target.MangaVault.savePayload(target.MangaVaultPayload.buildFromLocalStorage());
+        const previous = target.localStorage.getItem(SAVED_ITEMS_KEY);
+        const next = JSON.stringify(items);
+        target.localStorage.setItem(SAVED_ITEMS_KEY, next);
+        try {
+          if (isVaultReady() && target.MangaVault && typeof target.MangaVault.savePayload === 'function' && target.MangaVaultPayload && typeof target.MangaVaultPayload.buildFromLocalStorage === 'function') {
+            await target.MangaVault.savePayload(target.MangaVaultPayload.buildFromLocalStorage());
+          }
+        } catch (error) {
+          if (target.localStorage.getItem(SAVED_ITEMS_KEY) === next) {
+            if (previous === null) target.localStorage.removeItem(SAVED_ITEMS_KEY);
+            else target.localStorage.setItem(SAVED_ITEMS_KEY, previous);
+          }
+          throw error;
         }
       },
       genId: (prefix) => String(prefix || 'i') + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
