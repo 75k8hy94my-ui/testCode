@@ -6,6 +6,7 @@
   const REQUEST_TYPE = 'testcode:manga-extension:import';
   const RESULT_TYPE = 'testcode:manga-extension:result';
   const READY_TYPE = 'testcode:manga-extension:bridge-ready';
+  const DELIVERY_TIMEOUT_MS = 30000;
   const pending = new Map();
   let bridgeReady = false;
 
@@ -25,8 +26,8 @@
       const id = requestId();
       const timer = setTimeout(() => {
         pending.delete(id);
-        resolve({ status: bridgeReady ? 'invalid' : 'locked', message: bridgeReady ? 'testCodeから応答がありません。' : 'testCodeの保管庫を開いてください。' });
-      }, 4000);
+        resolve({ status: bridgeReady ? 'invalid' : 'locked', message: bridgeReady ? 'testCodeの同期処理がタイムアウトしました。追加待ちに残します。' : 'testCodeの保管庫を開いてください。' });
+      }, DELIVERY_TIMEOUT_MS);
       pending.set(id, { resolve, timer });
       window.postMessage({ type: REQUEST_TYPE, requestId: id, draft }, location.origin);
     });
