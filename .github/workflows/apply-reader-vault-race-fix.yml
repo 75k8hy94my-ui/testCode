@@ -2,30 +2,29 @@ name: Apply reader vault race fix
 
 on:
   push:
-    branches: [fix/reader-vault-handoff-race]
+    branches:
+      - fix/reader-vault-handoff-race
 
 permissions:
   contents: write
 
 jobs:
   patch:
-    if: github.actor != 'github-actions[bot]'
+    if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: fix/reader-vault-handoff-race
       - name: Patch vault wait and reader guard
-        shell: python
         run: |
+          python3 - <<'PY'
           from pathlib import Path
 
           vault_path = Path('vault-session.js')
           vault = vault_path.read_text(encoding='utf-8')
-          anchor = """  setupVaultChannel();
-  function getMeta(userId) { return readJSON(META_KEY, {})[userId] || null; }
-"""
-          replacement = """  setupVaultChannel();
+          anchor = "  setupVaultChannel();\n  function getMeta(userId) { return readJSON(META_KEY, {})[userId] || null; }\n"
+          wait_code = """  setupVaultChannel();
   async function waitForActive(timeoutMs = 2500) {
     const existing = loadActive();
     if (existing) return existing;
@@ -65,7 +64,7 @@ jobs:
           if 'async function waitForActive(' not in vault:
               if anchor not in vault:
                   raise SystemExit('vault insertion anchor not found')
-              vault = vault.replace(anchor, replacement, 1)
+              vault = vault.replace(anchor, wait_code, 1)
           export_old = "window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, loadActive, refreshSession, api, withSession, fetchRecordForUi, initialize, initializeWithPasskey, registerPasskey, savePayload };"
           export_new = "window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, loadActive, waitForActive, refreshSession, api, withSession, fetchRecordForUi, initialize, initializeWithPasskey, registerPasskey, savePayload };"
           if export_old in vault:
@@ -76,38 +75,19 @@ jobs:
 
           reader_path = Path('reader.html')
           reader = reader_path.read_text(encoding='utf-8')
-          old = """(() => {
-  const sessionKey = 'mangaReaderSupabaseSession';
-  const loginUrl = 'index.html';
-  const vaultUrl = 'sync.html';
-  const AUTH_REFRESH_TIMEOUT_MS = 5000;
-  const showLogin = () => window.location.replace(loginUrl);
-  try {
-    const session = JSON.parse(localStorage.getItem(sessionKey) || 'null');
-    const config = window.MANGA_READER_SUPABASE || {};
-    if (!session || !session.refresh_token || !config.url || !config.publishableKey) { showLogin(); return; }
-    if (!window.MangaVault || !MangaVault.loadActive()) { window.location.replace(vaultUrl); return; }
-"""
-          new = """(async () => {
-  const sessionKey = 'mangaReaderSupabaseSession';
-  const loginUrl = 'index.html';
-  const vaultUrl = 'sync.html';
-  const AUTH_REFRESH_TIMEOUT_MS = 5000;
-  const showLogin = () => window.location.replace(loginUrl);
-  try {
-    const session = JSON.parse(localStorage.getItem(sessionKey) || 'null');
-    const config = window.MANGA_READER_SUPABASE || {};
-    if (!session || !session.refresh_token || !config.url || !config.publishableKey) { showLogin(); return; }
-    if (!window.MangaVault) { window.location.replace(vaultUrl); return; }
-    let activeVault = MangaVault.loadActive();
-    if (!activeVault && typeof MangaVault.waitForActive === 'function') activeVault = await MangaVault.waitForActive(2500);
-    if (!activeVault) { window.location.replace(vaultUrl); return; }
-"""
+          old_guard = "    if (!window.MangaVault || !MangaVault.loadActive()) { window.location.replace(vaultUrl); return; }"
+          new_guard = "    if (!window.MangaVault) { window.location.replace(vaultUrl); return; }\n    let activeVault = MangaVault.loadActive();\n    if (!activeVault && typeof MangaVault.waitForActive === 'function') activeVault = await MangaVault.waitForActive(2500);\n    if (!activeVault) { window.location.replace(vaultUrl); return; }"
           if 'await MangaVault.waitForActive(' not in reader:
-              if old not in reader:
+              if old_guard not in reader:
                   raise SystemExit('reader auth guard anchor not found')
-              reader = reader.replace(old, new, 1)
+              auth_start = "(() => {\n  const sessionKey = 'mangaReaderSupabaseSession';"
+              async_start = "(async () => {\n  const sessionKey = 'mangaReaderSupabaseSession';"
+              if auth_start not in reader:
+                  raise SystemExit('reader auth IIFE anchor not found')
+              reader = reader.replace(auth_start, async_start, 1)
+              reader = reader.replace(old_guard, new_guard, 1)
           reader_path.write_text(reader, encoding='utf-8')
+          PY
       - name: Commit patch
         run: |
           if git diff --quiet; then exit 0; fi
