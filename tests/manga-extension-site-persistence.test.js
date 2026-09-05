@@ -8,7 +8,7 @@ const extractor=fs.readFileSync('extension/content/extractor.js','utf8');
 const manifest=JSON.parse(fs.readFileSync('extension/manifest.json','utf8'));
 
 test('registered origins are restored as persistent dynamic content scripts',()=>{assert.match(background,/registerContentScripts/);assert.match(background,/getRegisteredContentScripts/);assert.match(background,/onStartup/);assert.match(background,/onInstalled/)});
-test('dynamic script sync only unregisters changed or stale registrations',()=>{assert.match(background,/changedIds/);assert.match(background,/staleIds/);assert.match(background,/toRegister/);assert.doesNotMatch(background,/managed\.map\(x=>x\.id\)/)});
+test('dynamic script sync updates changed registrations in place',()=>{assert.match(background,/updateContentScripts/);assert.match(background,/staleIds/);assert.match(background,/toRegister/);assert.doesNotMatch(background,/changedIds/)});
 test('toolbar injection guard is set only after dependencies are available',()=>{const deps=toolbar.indexOf('if(!RuleLocator||!Extractor||!PickerApi');const guard=toolbar.indexOf('window.__testcodeMangaToolbarMounted=true');assert.ok(deps>=0&&guard>deps,'mount guard must be set after dependency validation')});
 test('toolbar marks its host so element picker ignores extension UI',()=>{assert.match(toolbar,/testcodeMangaExtensionHost/)});
 test('new mappings default to site-wide rules',()=>{assert.match(toolbar,/function defaultPattern\(\)\{return ['"]\/\*['"]\}/)});
