@@ -24,6 +24,32 @@ test('validateDraft rejects non-http page URLs', () => {
   assert.throws(() => bridge.validateDraft({ version:1, pages:['javascript:alert(1)','https://x/2.jpg'] }), /URL/);
 });
 
+test('waitForVaultReady retries cross-tab requests until the vault arrives', async () => {
+  let ready = false;
+  let requests = 0;
+  class FakeBroadcastChannel {
+    postMessage(message) {
+      if (message && message.type === 'vault-request') {
+        requests += 1;
+        if (requests >= 2) ready = true;
+      }
+    }
+    close() {}
+  }
+  const target = {
+    BroadcastChannel: FakeBroadcastChannel,
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
+    addEventListener() {},
+    removeEventListener() {}
+  };
+  const result = await bridge.waitForVaultReady(target, () => ready, 100, 5);
+  assert.equal(result, true);
+  assert.ok(requests >= 2);
+});
+
 test('importDraft reports locked without mutating', async () => {
   const items = [];
   const result = await bridge.importDraft({version:1,url:'https://x/1.jpg'}, {
