@@ -1,12 +1,13 @@
 (function (root, factory) {
-  const api = factory();
+  const api = factory(root);
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.MangaExtensionBridge = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (root) {
   'use strict';
 
   const REQUEST_TYPE = 'testcode:manga-extension:import';
   const RESULT_TYPE = 'testcode:manga-extension:result';
+  const READY_TYPE = 'testcode:manga-extension:bridge-ready';
 
   function normalizeUrl(value) {
     const raw = String(value || '').trim();
@@ -109,7 +110,8 @@
     return { status:'added', message:'追加しました', itemId:item.id };
   }
 
-  function install(deps, target = root) {
+  function install(deps, target) {
+    target = target || (typeof window !== 'undefined' ? window : null);
     if (!target || typeof target.addEventListener !== 'function' || typeof target.postMessage !== 'function') return () => {};
     const handler = async (event) => {
       if (event.source !== target || !event.data || event.data.type !== REQUEST_TYPE) return;
@@ -123,20 +125,36 @@
     return () => target.removeEventListener('message', handler);
   }
 
+  function watchVaultReady(isVaultReady, target, intervalMs = 1000) {
+    if (!target || typeof target.postMessage !== 'function' || typeof setInterval !== 'function') return () => {};
+    let wasReady = false;
+    const check = () => {
+      let ready = false;
+      try { ready = !!isVaultReady(); } catch (_) {}
+      if (ready && !wasReady) target.postMessage({ type: READY_TYPE }, target.location ? target.location.origin : '*');
+      wasReady = ready;
+    };
+    check();
+    const timer = setInterval(check, intervalMs);
+    return () => clearInterval(timer);
+  }
+
   function autoInstall() {
     if (typeof window === 'undefined' || window.__mangaExtensionBridgeInstalled) return false;
     try {
       if (typeof savedItems === 'undefined' || typeof persistItems !== 'function' || typeof genId !== 'function') return false;
+      const isVaultReady = () => !!(window.MangaVault && typeof MangaVault.loadActive === 'function' && MangaVault.loadActive());
       install({
         getSavedItems: () => savedItems,
         persistItems: () => persistItems(),
         renderSavedList: () => { if (typeof renderSavedList === 'function') renderSavedList(); },
         genId: (prefix) => genId(prefix),
         now: () => Date.now(),
-        isVaultReady: () => !!(window.MangaVault && typeof MangaVault.loadActive === 'function' && MangaVault.loadActive())
+        isVaultReady
       }, window);
+      watchVaultReady(isVaultReady, window);
       window.__mangaExtensionBridgeInstalled = true;
-      window.postMessage({ type:'testcode:manga-extension:bridge-ready' }, location.origin);
+      window.postMessage({ type: READY_TYPE }, location.origin);
       return true;
     } catch (_) { return false; }
   }
@@ -148,5 +166,5 @@
     }
   }
 
-  return { REQUEST_TYPE, RESULT_TYPE, normalizeUrl, validateDraft, findDuplicate, buildSavedItem, importDraft, install, autoInstall };
+  return { REQUEST_TYPE, RESULT_TYPE, READY_TYPE, normalizeUrl, validateDraft, findDuplicate, buildSavedItem, importDraft, install, watchVaultReady, autoInstall };
 });
