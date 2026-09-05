@@ -152,13 +152,13 @@
       <div class="vl-sheet-panel" role="dialog" aria-modal="true" aria-labelledby="videoLibrarySheetTitle">
         <div class="vl-sheet-head"><h2 id="videoLibrarySheetTitle">動画</h2><button id="videoLibrarySheetClose" class="vl-close" type="button" aria-label="閉じる">×</button></div>
         <form id="videoLibraryForm" class="vl-form">
-          <div class="vl-field"><label for="videoLibraryUrl">動画URL</label><input id="videoLibraryUrl" type="url" autocomplete="off" placeholder="https://..."></div>
+          <div class="vl-url-row"><div class="vl-field"><label for="videoLibraryUrl">動画URL</label><input id="videoLibraryUrl" type="url" autocomplete="off" placeholder="https://..."></div><button id="videoLibraryUrlEdit" class="vl-url-edit" type="button">編集</button></div>
           <div class="vl-field"><label for="videoLibraryTitle">タイトル</label><input id="videoLibraryTitle" type="text" autocomplete="off"></div>
           <div class="vl-two">
             <div class="vl-field"><label for="videoLibraryEditFolder">フォルダ</label><select id="videoLibraryEditFolder"></select></div>
             <div class="vl-field"><label for="videoLibraryStatusSelect">状態（任意）</label><select id="videoLibraryStatusSelect"><option value="">未設定</option><option value="later">あとで見る</option><option value="watching">視聴中</option><option value="watched">視聴済み</option></select></div>
           </div>
-          <div class="vl-field"><label for="videoLibraryTags">タグ（カンマ区切り）</label><input id="videoLibraryTags" type="text" autocomplete="off"></div>
+          <div class="vl-field"><label for="videoLibraryTags">タグ（カンマ区切り）</label><input id="videoLibraryTags" type="text" autocomplete="off"></div><div id="videoLibrarySuggestedTags" class="vl-suggested-tags" aria-label="既存のタグ"></div>
           <div class="vl-field"><label for="videoLibraryMemo">メモ</label><textarea id="videoLibraryMemo"></textarea></div>
           <label class="vl-check"><input id="videoLibraryFavorite" type="checkbox"> お気に入り</label>
           <details class="vl-advanced"><summary>再生情報・サムネイル</summary>
@@ -189,7 +189,7 @@
       sort: document.getElementById('videoLibrarySort'), view: document.getElementById('videoLibraryView'), foldersBtn: document.getElementById('videoLibraryFolders'),
       add: document.getElementById('videoLibraryAdd'), count: document.getElementById('videoLibraryCount'), status: document.getElementById('videoLibraryStatus'), results: document.getElementById('videoLibraryResults'),
       sheet, sheetTitle: document.getElementById('videoLibrarySheetTitle'), sheetClose: document.getElementById('videoLibrarySheetClose'), form: document.getElementById('videoLibraryForm'),
-      formError: document.getElementById('videoLibraryFormError'), url: document.getElementById('videoLibraryUrl'), title: document.getElementById('videoLibraryTitle'), editFolder: document.getElementById('videoLibraryEditFolder'),
+      formError: document.getElementById('videoLibraryFormError'), url: document.getElementById('videoLibraryUrl'), urlEdit: document.getElementById('videoLibraryUrlEdit'), suggestedTags: document.getElementById('videoLibrarySuggestedTags'), title: document.getElementById('videoLibraryTitle'), editFolder: document.getElementById('videoLibraryEditFolder'),
       statusSelect: document.getElementById('videoLibraryStatusSelect'), tags: document.getElementById('videoLibraryTags'), memo: document.getElementById('videoLibraryMemo'), favorite: document.getElementById('videoLibraryFavorite'),
       legacyService: document.getElementById('videoLibraryLegacyService'), legacyId: document.getElementById('videoLibraryLegacyId'), thumbnail: document.getElementById('videoLibraryThumbnail'),
       rotateLeftStart: document.getElementById('videoLibraryRotateLeftStart'), rotateLeftEnd: document.getElementById('videoLibraryRotateLeftEnd'),
@@ -350,6 +350,30 @@
     fillSelect(dom.editFolder, state.folders.map((folder) => ({ value: folder.id, label: folder.name })), selected || '', '未分類');
   }
 
+  function renderSuggestedTags(selectedTags) {
+    if (!dom.suggestedTags) return;
+    dom.suggestedTags.replaceChildren();
+    const current = new Set(Data.parseTags(selectedTags || ''));
+    const tags = [...new Set(effectiveVideos().flatMap((video) => video.tags))].sort((a, b) => a.localeCompare(b, 'ja'));
+    tags.forEach((tag) => {
+      const suggestedTag = document.createElement('button');
+      suggestedTag.type = 'button'; suggestedTag.className = 'vl-suggested-tag'; suggestedTag.textContent = '#' + tag;
+      suggestedTag.setAttribute('aria-label', 'タグ「' + tag + '」を追加');
+      suggestedTag.addEventListener('click', () => {
+        if (current.has(tag)) return;
+        current.add(tag); dom.tags.value = [...current].join(', ');
+      });
+      dom.suggestedTags.append(suggestedTag);
+    });
+  }
+
+  function setUrlEditing(enabled) {
+    if (!dom.url || !dom.urlEdit) return;
+    dom.url.readOnly = !enabled;
+    dom.urlEdit.textContent = enabled ? '編集中' : '編集';
+    dom.urlEdit.disabled = enabled;
+  }
+
   function setSheetVisible(visible) {
     dom.sheet.hidden = !visible; dom.sheet.setAttribute('aria-hidden', visible ? 'false' : 'true');
     if (!visible) { state.editorId = null; state.sheetMode = null; dom.formError.textContent = ''; }
@@ -368,10 +392,12 @@
     const video = videoId ? effectiveFieldsForEditor(videoId) : Data.normalizeVideo({ id: 'draft', addedAt: Date.now() });
     const base = videoId ? baseById(videoId) : null;
     dom.url.value = videoId ? video.url : '';
+    setUrlEditing(!videoId);
     dom.title.value = videoId ? video.title : '';
     fillEditorFolders(videoId ? video.folderId : '');
     dom.statusSelect.value = videoId ? video.watchStatus : '';
     dom.tags.value = videoId ? video.tags.join(', ') : '';
+    renderSuggestedTags(dom.tags.value);
     dom.memo.value = videoId ? video.memo : '';
     dom.favorite.checked = videoId ? video.favorite : false;
     dom.legacyService.value = base ? text(base.a) : '';
@@ -477,6 +503,7 @@
     dom.view.addEventListener('click', () => { state.view = state.view === 'card' ? 'compact' : 'card'; savePrefs(); render(); });
     dom.add.addEventListener('click', () => openEditor(null)); dom.foldersBtn.addEventListener('click', openFolderManager);
     dom.sheetClose.addEventListener('click', closeSheet); dom.cancel.addEventListener('click', closeSheet); dom.form.addEventListener('submit', saveEditor); dom.deleteBtn.addEventListener('click', () => state.editorId && deleteVideoFromLibrary(state.editorId));
+    dom.urlEdit.addEventListener('click', () => setUrlEditing(true));
     dom.createFolder.addEventListener('click', createFolder); dom.newFolder.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); createFolder(); } });
     dom.url.addEventListener('input', () => { const parsed = parseThroughLegacy(text(dom.url.value)); if (parsed) { dom.legacyService.value = parsed.a; dom.legacyId.value = parsed.b; } });
     dom.sheet.addEventListener('click', (event) => { if (event.target === dom.sheet) closeSheet(); });
