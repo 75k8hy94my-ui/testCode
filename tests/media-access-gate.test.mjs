@@ -69,6 +69,20 @@ test('VPN check falls back to Proton exit IP list when generic detection returns
   assert.match(calls[2], /ProtonVPN-IPs/);
 });
 
+test('VPN check still uses Proton exit IP list when generic detection API errors', async () => {
+  const calls = [];
+  const currentIp = '198.51.100.77';
+  const fetch = async (url) => {
+    calls.push(String(url));
+    if (calls.length === 1) return { ok: true, json: async () => ({ ip: currentIp }) };
+    if (calls.length === 2) return { ok: false, status: 429, json: async () => ({ error: 'Rate limit exceeded' }) };
+    return { ok: true, json: async () => ([currentIp]) };
+  };
+  const Gate = loadGate({ fetch, setTimeout, clearTimeout });
+  assert.equal(await Gate.checkVpn(), true);
+  assert.match(calls[2], /ProtonVPN-IPs/);
+});
+
 test('reader bootstrap loads the VPN gate before reader media and the gate covers image/video/iframe src', () => {
   const recommendations = fs.readFileSync(new URL('../recommendations.js', import.meta.url), 'utf8');
   assert.match(recommendations, /document\.write\([\s\S]*media-access-gate\.js/);
