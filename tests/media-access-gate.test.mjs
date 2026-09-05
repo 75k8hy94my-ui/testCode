@@ -12,11 +12,14 @@ function loadGate(overrides = {}) {
   return window.MangaReaderMediaAccess;
 }
 
-test('VPN verdict accepts vpn/proxy signals and blocks ordinary connections', () => {
+test('VPN verdict accepts vpn/proxy signals and Proton-owned networks while blocking ordinary connections', () => {
   const Gate = loadGate();
   assert.equal(Gate.isVpnVerdict({ is_vpn: true }), true);
   assert.equal(Gate.isVpnVerdict({ is_proxy: true }), true);
-  assert.equal(Gate.isVpnVerdict({ is_vpn: false, is_proxy: false }), false);
+  assert.equal(Gate.isVpnVerdict({ is_vpn: false, is_proxy: false, asn: { number: 209103, name: 'Proton AG' } }), true);
+  assert.equal(Gate.isVpnVerdict({ is_vpn: false, is_proxy: false, asn: { number: 62371, name: 'Proton AG' } }), true);
+  assert.equal(Gate.isVpnVerdict({ is_vpn: false, is_proxy: false, organization: { name: 'Proton AG' } }), true);
+  assert.equal(Gate.isVpnVerdict({ is_vpn: false, is_proxy: false, asn: { number: 64500, name: 'Example ISP' } }), false);
   assert.equal(Gate.isVpnVerdict(null), false);
 });
 
@@ -50,6 +53,20 @@ test('VPN check discovers the current public IP before querying the VPN verdict 
   assert.equal(await Gate.checkVpn(), true);
   assert.match(calls[0], /api\.ipify\.org/);
   assert.match(calls[1], /ip-api\.dev\/api\?q=203\.0\.113\.9/);
+});
+
+test('VPN check falls back to Proton exit IP list when generic detection returns false', async () => {
+  const calls = [];
+  const currentIp = '198.51.100.44';
+  const fetch = async (url) => {
+    calls.push(String(url));
+    if (calls.length === 1) return { ok: true, json: async () => ({ ip: currentIp }) };
+    if (calls.length === 2) return { ok: true, json: async () => ({ is_vpn: false, is_proxy: false, asn: { number: 64500, name: 'Hosting Example' } }) };
+    return { ok: true, json: async () => ([currentIp, '203.0.113.25']) };
+  };
+  const Gate = loadGate({ fetch, setTimeout, clearTimeout });
+  assert.equal(await Gate.checkVpn(), true);
+  assert.match(calls[2], /ProtonVPN-IPs/);
 });
 
 test('reader bootstrap loads the VPN gate before reader media and the gate covers image/video/iframe src', () => {
