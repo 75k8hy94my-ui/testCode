@@ -1,64 +1,31 @@
-(function (root, factory) {
-  const api = factory();
-  if (typeof module === 'object' && module.exports) module.exports = api;
-  root.MangaExtensionBackground = api;
-  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.storage) api.installChromeHandlers(chrome);
-})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
-  'use strict';
-  const KEYS = { rules: 'mangaSiteRulesV1', origins: 'mangaRegisteredOriginsV1', pending: 'mangaPendingDraftsV1' };
-  const diag = (stage, ok = true, detail = '') => ({ stage, ok, detail: String(detail || '').slice(0, 300) });
-  function makeMemoryStore(initial = {}) { const data = Object.assign({}, initial); return { async get(key) { return data[key]; }, async set(key, value) { data[key] = value; } }; }
-  function chromeStore(chromeApi) { return { async get(key) { const result = await chromeApi.storage.local.get(key); return result[key]; }, async set(key, value) { await chromeApi.storage.local.set({ [key]: value }); } }; }
-  function uid() { return 'q_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10); }
-  function summarizeRuleFields(rule, total) { return { configured: rule && rule.fields ? Object.keys(rule.fields).filter((key) => rule.fields[key]).length : 0, total: Number(total) || 0 }; }
-  function deliveryStateFromResult(result) { if (!result) return 'waiting'; if (result.status === 'added') return 'synced'; if (result.status === 'duplicate') return 'duplicate'; if (result.status === 'locked') return 'locked'; return 'waiting'; }
-  function makeQueue(store) { return { async list() { const value = await store.get(KEYS.pending); return Array.isArray(value) ? value : []; }, async enqueue(draft) { const items = await this.list(); const id = uid(); items.push({ id, draft, queuedAt: Date.now() }); await store.set(KEYS.pending, items); return id; }, async ack(id) { const items = await this.list(); await store.set(KEYS.pending, items.filter((item) => item.id !== id)); } }; }
-  function makeSerializedFlusher(work) { const inFlight = new Map(); return function run(key) { const normalizedKey = String(key || 'global'); if (inFlight.has(normalizedKey)) return inFlight.get(normalizedKey); let promise; try { promise = Promise.resolve(work(key)); } catch (error) { promise = Promise.reject(error); } promise = promise.finally(() => { if (inFlight.get(normalizedKey) === promise) inFlight.delete(normalizedKey); }); inFlight.set(normalizedKey, promise); return promise; }; }
-  async function registeredOrigins(store) { const value = await store.get(KEYS.origins); return Array.isArray(value) ? value : []; }
-  async function rules(store) { const value = await store.get(KEYS.rules); return Array.isArray(value) ? value : []; }
-  async function injectSite(chromeApi, tabId) { if (!tabId) return; try { await chromeApi.scripting.executeScript({ target:{ tabId }, files:['content/rule-locator.js','content/extractor.js','content/element-picker.js','content/site-toolbar.js'] }); } catch (_) {} }
-  async function findTestCodeTabs(chromeApi) { return chromeApi.tabs.query({ url:'https://75k8hy94my-ui.github.io/testCode/reader.html*' }); }
-  async function flushPending(chromeApi, queue, tabId) {
-    const diagnostics = [];
-    const tabs = typeof tabId === 'number' ? [{ id:tabId }] : await findTestCodeTabs(chromeApi);
-    diagnostics.push(diag('reader-detected', tabs.length > 0, tabs.length ? tabs.length + ' tab(s)' : 'reader.html が開かれていません'));
-    if (!tabs.length) return { delivered:0, lastResult:null, diagnostics };
-    let delivered = 0, lastResult = null;
-    for (const item of await queue.list()) {
-      let terminal = false;
-      for (const tab of tabs) {
-        try {
-          diagnostics.push(diag('relay-send', true, 'tab ' + tab.id));
-          const response = await chromeApi.tabs.sendMessage(tab.id, { type:'DELIVER_DRAFT', item });
-          if (response) { lastResult = response; if (Array.isArray(response.diagnostics)) diagnostics.push(...response.diagnostics); }
-          diagnostics.push(diag('relay-result', !!response, response ? response.status : '応答なし'));
-          if (response && (response.status === 'added' || response.status === 'duplicate')) { terminal = true; break; }
-          if (response && response.status === 'locked') break;
-        } catch (error) { diagnostics.push(diag('relay-error', false, error && error.message || error)); }
-      }
-      if (terminal) { await queue.ack(item.id); delivered += 1; diagnostics.push(diag('queue-acked')); }
-      else diagnostics.push(diag('queue-retained', true, '再送待ち'));
-    }
-    return { delivered, lastResult, diagnostics };
-  }
-  function installChromeHandlers(chromeApi) {
-    const store = chromeStore(chromeApi); const queue = makeQueue(store); const serialFlush = makeSerializedFlusher((tabId) => flushPending(chromeApi, queue, tabId));
-    chromeApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      if (!message || !message.type) { sendResponse({ok:false}); return false; }
-      if (message.type === 'QUEUE_DRAFT') {
-        (async()=>{ const diagnostics=[diag('queue-write-start')]; const id=await queue.enqueue(message.draft); diagnostics.push(diag('queue-write-success')); return {ok:true,id,delivered:false,deliveryState:'waiting',lastResult:null,diagnostics}; })().then(sendResponse).catch(error=>sendResponse({ok:false,error:String(error&&error.message||error),diagnostics:[diag('queue-write-failed',false,error&&error.message||error)]}));
-        return true;
-      }
-      (async () => {
-        if (message.type === 'GET_SITE_STATUS') { const origin=message.origin; return { ok:true, registered:(await registeredOrigins(store)).includes(origin), rules:(await rules(store)).filter((rule)=>rule.origin===origin) }; }
-        if (message.type === 'REGISTER_SITE') { const origin=message.origin; const granted=await chromeApi.permissions.contains({origins:[origin+'/*']}); if(!granted)return{ok:false,error:'permission-not-granted'}; const origins=await registeredOrigins(store); if(!origins.includes(origin)){origins.push(origin);await store.set(KEYS.origins,origins);} if(message.tabId)await injectSite(chromeApi,message.tabId); return{ok:true}; }
-        if (message.type === 'GET_RULES') return { ok:true, rules:await rules(store) };
-        if (message.type === 'SAVE_RULE') { const all=await rules(store); const next=Object.assign({},message.rule,{updatedAt:Date.now()}); const index=all.findIndex((rule)=>rule.id===next.id); if(index>=0)all[index]=next;else all.push(next); await store.set(KEYS.rules,all); return{ok:true,rule:next}; }
-        if (message.type === 'TESTCODE_READY' || message.type === 'FLUSH_PENDING') { const result=await serialFlush('delivery'); return Object.assign({ok:true,deliveryState:deliveryStateFromResult(result.lastResult)},result); }
-        return { ok:false,error:'unknown-message' };
-      })().then(sendResponse).catch((error)=>sendResponse({ok:false,error:String(error&&error.message||error),diagnostics:[diag('background-error',false,error&&error.message||error)]})); return true;
-    });
-    if (chromeApi.tabs && chromeApi.tabs.onUpdated) chromeApi.tabs.onUpdated.addListener(async(tabId,changeInfo,tab)=>{ if(changeInfo.status!=='complete'||!tab.url)return; try{const origin=new URL(tab.url).origin;if((await registeredOrigins(store)).includes(origin))await injectSite(chromeApi,tabId);}catch(_){} });
-  }
-  return { KEYS, makeMemoryStore, makeQueue, makeSerializedFlusher, summarizeRuleFields, deliveryStateFromResult, installChromeHandlers, flushPending };
-});
+(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;root.MangaExtensionBackground=api;if(typeof chrome!=='undefined'&&chrome.runtime&&chrome.storage)api.installChromeHandlers(chrome);})(typeof globalThis!=='undefined'?globalThis:this,function(){'use strict';
+const KEYS={rules:'mangaSiteRulesV1',origins:'mangaRegisteredOriginsV1',pending:'mangaPendingDraftsV1',exportDrafts:'mangaExportDraftsV1'};
+function makeMemoryStore(initial={}){const data={...initial};return{async get(k){return data[k]},async set(k,v){data[k]=v}}}function chromeStore(c){return{async get(k){return(await c.storage.local.get(k))[k]},async set(k,v){await c.storage.local.set({[k]:v})}}}
+function makeQueue(store,key=KEYS.pending){return{async list(){const v=await store.get(key);return Array.isArray(v)?v:[]},async enqueue(draft){const a=await this.list();const id='q_'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);a.push({id,draft,queuedAt:Date.now()});await store.set(key,a);return id},async ack(id){await store.set(key,(await this.list()).filter(x=>x.id!==id))}}}
+function makeSerializedFlusher(work){const m=new Map();return function(k){if(m.has(k))return m.get(k);const p=Promise.resolve().then(()=>work(k)).finally(()=>m.delete(k));m.set(k,p);return p}}
+function summarizeRuleFields(rule,total){return{configured:rule&&rule.fields?Object.keys(rule.fields).filter(k=>rule.fields[k]).length:0,total:Number(total)||0}}function deliveryStateFromResult(r){return r&&r.status==='added'?'synced':r&&r.status==='duplicate'?'duplicate':r&&r.status==='locked'?'locked':'waiting'}
+async function flushPending(){return{delivered:0,lastResult:null,diagnostics:[]}}
+async function importBatchMain(batch){
+  const normalize=v=>{try{const u=new URL(String(v||'').trim());if(!/^https?:$/.test(u.protocol))return null;u.hash='';return u.href}catch(_){return null}};
+  if(!batch||batch.version!==1||!Array.isArray(batch.items))throw new Error('JSON形式が正しくありません。');
+  const key='mangaReaderSavedItems',previous=localStorage.getItem(key);let items;try{items=JSON.parse(previous||'[]');if(!Array.isArray(items))items=[]}catch(_){items=[]}
+  let added=0,duplicates=0;
+  for(const raw of batch.items){if(!raw||typeof raw!=='object')throw new Error('漫画データが不正です。');const pages=Array.isArray(raw.pages)?raw.pages.map(normalize).filter(Boolean):[],url=normalize(raw.url),sourcePageUrl=normalize(raw.sourcePageUrl),primary=pages[0]||url;if(!primary)throw new Error('画像URLがありません。');const duplicate=items.some(x=>{const xp=Array.isArray(x.pages)&&x.pages.length?normalize(x.pages[0]):normalize(x.url);return(primary&&xp===primary)||(sourcePageUrl&&normalize(x.sourcePageUrl)===sourcePageUrl)});if(duplicate){duplicates++;continue;}const item={id:'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),title:String(raw.title||'無題').slice(0,1000),author:String(raw.author||'').slice(0,1000),tags:Array.isArray(raw.tags)?raw.tags.map(String).slice(0,100):[],folderId:null,favorite:false,splitSpreads:false,addedAt:Date.now(),sourcePageUrl:sourcePageUrl||null};if(raw.series)item.series=String(raw.series).slice(0,1000);if(raw.volume!=null){const m=String(raw.volume).match(/\d+(?:\.\d+)?/);if(m)item.volume=Number(m[0])}if(raw.source)item.source=String(raw.source).slice(0,1000);if(pages.length>=2)item.pages=pages;else item.url=pages[0]||url;items.unshift(item);added++;}
+  if(!added)return{added:0,duplicates};
+  const next=JSON.stringify(items);localStorage.setItem(key,next);
+  try{if(!globalThis.MangaVault||typeof MangaVault.savePayload!=='function'||!globalThis.MangaVaultPayload||typeof MangaVaultPayload.buildFromLocalStorage!=='function')throw new Error('暗号化同期の準備ができていません。');await MangaVault.savePayload(MangaVaultPayload.buildFromLocalStorage());}catch(e){if(previous===null)localStorage.removeItem(key);else localStorage.setItem(key,previous);throw e;}
+  return{added,duplicates};
+}
+function installChromeHandlers(chromeApi){const store=chromeStore(chromeApi),exportQueue=makeQueue(store,KEYS.exportDrafts);chromeApi.runtime.onMessage.addListener((message,sender,sendResponse)=>{if(!message||!message.type){sendResponse({ok:false});return false}(async()=>{
+  if(message.type==='GET_RULES'){const v=await store.get(KEYS.rules);return{ok:true,rules:Array.isArray(v)?v:[]}}
+  if(message.type==='SAVE_RULE'){const all=Array.isArray(await store.get(KEYS.rules))?await store.get(KEYS.rules):[],next={...message.rule,updatedAt:Date.now()},i=all.findIndex(r=>r.id===next.id);if(i>=0)all[i]=next;else all.push(next);await store.set(KEYS.rules,all);return{ok:true,rule:next}}
+  if(message.type==='QUEUE_DRAFT'){const id=await exportQueue.enqueue(message.draft);return{ok:true,id,count:(await exportQueue.list()).length,deliveryState:'waiting',diagnostics:[]}}
+  if(message.type==='GET_EXPORT_STATUS')return{ok:true,count:(await exportQueue.list()).length};
+  if(message.type==='EXPORT_DRAFTS_JSON'){const rows=await exportQueue.list();if(!rows.length)return{ok:false,error:'書き出し待ちの漫画がありません。'};const payload={version:1,exportedAt:new Date().toISOString(),items:rows.map(x=>x.draft)};const text=JSON.stringify(payload,null,2),url='data:application/json;charset=utf-8,'+encodeURIComponent(text),stamp=new Date().toISOString().replace(/[:.]/g,'-');await chromeApi.downloads.download({url,filename:`testcode-manga-${stamp}.json`,saveAs:true});await store.set(KEYS.exportDrafts,[]);return{ok:true,count:rows.length};}
+  if(message.type==='IMPORT_JSON_BATCH'){if(!sender.tab||typeof sender.tab.id!=='number')return{ok:false,error:'readerタブを特定できません。'};const result=await chromeApi.scripting.executeScript({target:{tabId:sender.tab.id},world:'MAIN',func:importBatchMain,args:[message.batch]});const value=result&&result[0]&&result[0].result;if(!value)return{ok:false,error:'取り込み処理の結果を取得できません。'};return{ok:true,...value};}
+  if(message.type==='GET_SITE_STATUS'){const origins=await store.get(KEYS.origins),rules=await store.get(KEYS.rules);return{ok:true,registered:Array.isArray(origins)&&origins.includes(message.origin),rules:(Array.isArray(rules)?rules:[]).filter(r=>r.origin===message.origin)}}
+  if(message.type==='REGISTER_SITE'){const origin=message.origin,granted=await chromeApi.permissions.contains({origins:[origin+'/*']});if(!granted)return{ok:false,error:'permission-not-granted'};const origins=Array.isArray(await store.get(KEYS.origins))?await store.get(KEYS.origins):[];if(!origins.includes(origin)){origins.push(origin);await store.set(KEYS.origins,origins)}if(message.tabId)try{await chromeApi.scripting.executeScript({target:{tabId:message.tabId},files:['content/rule-locator.js','content/extractor.js','content/element-picker.js','content/site-toolbar.js']})}catch(_){}return{ok:true}}
+  if(message.type==='TESTCODE_READY'||message.type==='FLUSH_PENDING')return{ok:true,deliveryState:'waiting',delivered:0,lastResult:null,diagnostics:[]};
+  return{ok:false,error:'unknown-message'};
+})().then(sendResponse).catch(e=>sendResponse({ok:false,error:String(e&&e.message||e)}));return true});}
+return{KEYS,makeMemoryStore,makeQueue,makeSerializedFlusher,summarizeRuleFields,deliveryStateFromResult,installChromeHandlers,flushPending,importBatchMain};});
