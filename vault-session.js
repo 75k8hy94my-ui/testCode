@@ -115,6 +115,40 @@
     } catch (_) { vaultChannel = null; }
   }
   setupVaultChannel();
+  async function waitForActive(timeoutMs = 2500) {
+    const existing = loadActive();
+    if (existing) return existing;
+    if (!vaultChannel) setupVaultChannel();
+    return new Promise((resolve) => {
+      let settled = false;
+      let timer = null;
+      let interval = null;
+      const cleanup = () => {
+        if (timer !== null) clearTimeout(timer);
+        if (interval !== null) clearInterval(interval);
+        window.removeEventListener('manga-vault-active', onActive);
+      };
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(value || null);
+      };
+      const check = () => {
+        const active = loadActive();
+        if (active) { finish(active); return true; }
+        return false;
+      };
+      const request = () => {
+        if (!check()) channelPost({ type: 'vault-request' });
+      };
+      const onActive = () => { check(); };
+      window.addEventListener('manga-vault-active', onActive);
+      request();
+      interval = setInterval(request, 200);
+      timer = setTimeout(() => finish(loadActive()), Math.max(0, Number(timeoutMs) || 2500));
+    });
+  }
   function getMeta(userId) { return readJSON(META_KEY, {})[userId] || null; }
   function setMeta(userId, value) { const meta = readJSON(META_KEY, {}); meta[userId] = value || null; localStorage.setItem(META_KEY, JSON.stringify(meta)); }
   function assertConfig() { if (!config.url || !config.publishableKey) throw new Error('Supabase の設定が見つかりません。'); }
@@ -188,5 +222,5 @@
       if (!passkeys || !passkeys.length) throw new Error('このアカウントには保管庫パスキーが登録されていません。'); const rawKey = await unlockByPasskey(passkeys); const vault = { rawKey, keyWraps: record.payload.keyWraps }; saveActive(vault); await applyPayload(await decryptPayload(record.payload)); setMeta(user.id, { revision: record.revision || 1, updatedAt: record.updated_at }); return { created: false };
     });
   }
-  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, loadActive, refreshSession, api, withSession, fetchRecordForUi, initialize, initializeWithPasskey, registerPasskey, savePayload };
+  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, loadActive, waitForActive, refreshSession, api, withSession, fetchRecordForUi, initialize, initializeWithPasskey, registerPasskey, savePayload };
 })();
