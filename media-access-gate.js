@@ -22,6 +22,7 @@
   const DIAGNOSTICS_PANEL_ID = 'vpnDiagnosticsPanel';
   let status = 'pending';
   let installed = false;
+  let diagnosticsUiInstalled = false;
   let diagnostics = freshDiagnostics();
 
   function freshDiagnostics() {
@@ -166,7 +167,8 @@
   function installDiagnosticsUi() {
     if (!root.document) return;
     const mount = () => {
-      if (!root.document.body || root.document.getElementById(DIAGNOSTICS_PANEL_ID)) return;
+      if (!root.document.body || diagnosticsUiInstalled) return;
+      diagnosticsUiInstalled = true;
 
       const panel = root.document.createElement('div');
       panel.id = DIAGNOSTICS_PANEL_ID;
@@ -183,12 +185,17 @@
       recheck.style.cssText = 'border:1px solid rgba(255,255,255,.18);border-radius:9px;background:#262c38;color:#fff;padding:6px 9px;font:inherit;cursor:pointer';
       recheck.addEventListener('click', () => checkVpn());
       panel.append(title, pre, recheck);
-      root.document.querySelectorAll('[data-vpn-diagnostics-button]').forEach((button) => button.addEventListener('click', () => {
-        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-        renderDiagnostics();
-      }));
-      root.document.querySelectorAll('[data-vpn-status-button]').forEach((button) => button.addEventListener('click', () => checkVpn()));
       root.document.body.append(panel);
+      root.document.addEventListener('click', (event) => {
+        const diagnosticsButton = event.target && event.target.closest ? event.target.closest('[data-vpn-diagnostics-button]') : null;
+        if (diagnosticsButton) {
+          panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+          renderDiagnostics();
+          return;
+        }
+        const statusButton = event.target && event.target.closest ? event.target.closest('[data-vpn-status-button]') : null;
+        if (statusButton) checkVpn();
+      });
       renderDiagnostics();
     };
     if (root.document.body) mount();
@@ -294,7 +301,7 @@
     diagnostics.final = 'checking';
     renderDiagnostics();
     const controller = typeof root.AbortController === 'function' ? new root.AbortController() : null;
-    const timer = root.setTimeout && controller ? root.setTimeout(() => controller.abort(), 5000) : null;
+    const timer = root.setTimeout && controller ? root.setTimeout(() => controller.abort(), 15000) : null;
     try {
       if (typeof root.fetch !== 'function') throw new Error('fetch unavailable');
       const ipPayload = await fetchJson(IP_URL, controller ? controller.signal : undefined);

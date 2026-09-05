@@ -116,8 +116,9 @@ test('reader bootstrap loads the VPN gate before reader media and the gate cover
   assert.match(source, /data-vpn-blocked-src/);
   assert.match(source, /\.vl-open/);
   assert.match(source, /VPN診断/);
-  assert.match(source, /querySelectorAll\('\[data-vpn-diagnostics-button\]'\)/);
   assert.doesNotMatch(source, /button\.id = DIAGNOSTICS_BUTTON_ID/);
+  assert.match(source, /closest\('\[data-vpn-diagnostics-button\]'\)/);
+  assert.match(source, /abort\(\), 15000/);
   assert.match(source, /getDiagnostics/);
   assert.match(source, /checkVpn/);
 });
