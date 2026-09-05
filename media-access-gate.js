@@ -5,7 +5,8 @@
 }(typeof window !== 'undefined' ? window : globalThis, function (root) {
   'use strict';
 
-  const CHECK_URL = 'https://ip-api.dev/api/';
+  const IP_URL = 'https://api.ipify.org?format=json';
+  const CHECK_URL = 'https://ip-api.dev/api';
   const NOTICE_ID = 'vpnMediaNotice';
   let status = 'pending';
   let installed = false;
@@ -127,20 +128,27 @@
     }
   }
 
+  async function fetchJson(url, signal) {
+    const response = await root.fetch(url, {
+      cache: 'no-store',
+      credentials: 'omit',
+      referrerPolicy: 'no-referrer',
+      signal,
+    });
+    if (!response.ok) throw new Error('VPN check failed');
+    return response.json();
+  }
+
   async function checkVpn() {
     status = 'checking';
     const controller = typeof root.AbortController === 'function' ? new root.AbortController() : null;
     const timer = root.setTimeout && controller ? root.setTimeout(() => controller.abort(), 5000) : null;
     try {
       if (typeof root.fetch !== 'function') throw new Error('fetch unavailable');
-      const response = await root.fetch(CHECK_URL, {
-        cache: 'no-store',
-        credentials: 'omit',
-        referrerPolicy: 'no-referrer',
-        signal: controller ? controller.signal : undefined,
-      });
-      if (!response.ok) throw new Error('VPN check failed');
-      const payload = await response.json();
+      const ipPayload = await fetchJson(IP_URL, controller ? controller.signal : undefined);
+      const ip = String(ipPayload && ipPayload.ip || '').trim();
+      if (!ip) throw new Error('public IP unavailable');
+      const payload = await fetchJson(CHECK_URL + '?q=' + encodeURIComponent(ip), controller ? controller.signal : undefined);
       status = isVpnVerdict(payload) ? 'allowed' : 'blocked';
       if (status === 'allowed') {
         removeNotice();
@@ -169,5 +177,5 @@
     else if (root.setTimeout) root.setTimeout(checkVpn, 0);
   }
 
-  return { CHECK_URL, isVpnVerdict, isProtectedMediaUrl, canLoadExternalMedia, mediaUrl, checkVpn, setAllowedForTesting, installGuards };
+  return { IP_URL, CHECK_URL, isVpnVerdict, isProtectedMediaUrl, canLoadExternalMedia, mediaUrl, checkVpn, setAllowedForTesting, installGuards };
 }));
