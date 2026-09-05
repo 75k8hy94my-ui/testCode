@@ -1189,7 +1189,7 @@
 <script src="feature-flags.js"></script>
 <script src="recommendations.js"></script>
 <script>
-(() => {
+(async () => {
   const sessionKey = 'mangaReaderSupabaseSession';
   const loginUrl = 'index.html';
   const vaultUrl = 'sync.html';
@@ -1199,7 +1199,10 @@
     const session = JSON.parse(localStorage.getItem(sessionKey) || 'null');
     const config = window.MANGA_READER_SUPABASE || {};
     if (!session || !session.refresh_token || !config.url || !config.publishableKey) { showLogin(); return; }
-    if (!window.MangaVault || !MangaVault.loadActive()) { window.location.replace(vaultUrl); return; }
+    if (!window.MangaVault) { window.location.replace(vaultUrl); return; }
+    let activeVault = MangaVault.loadActive();
+    if (!activeVault && typeof MangaVault.waitForActive === 'function') activeVault = await MangaVault.waitForActive(2500);
+    if (!activeVault) { window.location.replace(vaultUrl); return; }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), AUTH_REFRESH_TIMEOUT_MS);
     fetch(config.url + '/auth/v1/token?grant_type=refresh_token', {
