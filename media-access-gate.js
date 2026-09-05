@@ -7,6 +7,8 @@
 
   const IP_URL = 'https://api.ipify.org?format=json';
   const CHECK_URL = 'https://ip-api.dev/api';
+  const PROTON_EXIT_IPS_URL = 'https://raw.githubusercontent.com/tn3w/ProtonVPN-IPs/master/protonvpn_ips.json';
+  const PROTON_ASNS = new Set([209103, 62371]);
   const NOTICE_ID = 'vpnMediaNotice';
   let status = 'pending';
   let installed = false;
@@ -18,7 +20,14 @@
   function isVpnVerdict(value) {
     if (!value || typeof value !== 'object') return false;
     const privacy = value.privacy && typeof value.privacy === 'object' ? value.privacy : {};
-    return value.is_vpn === true || value.is_proxy === true || privacy.vpn === true || privacy.proxy === true || privacy.is_vpn === true || privacy.is_proxy === true;
+    const asn = value.asn && typeof value.asn === 'object' ? value.asn : {};
+    const organization = value.organization && typeof value.organization === 'object' ? value.organization : {};
+    const asnNumber = Number(asn.number || value.asn_number || 0);
+    const providerText = [asn.name, organization.name, value.org, value.isp]
+      .filter(Boolean)
+      .join(' ')
+      .toLocaleLowerCase('en-US');
+    return value.is_vpn === true || value.is_proxy === true || privacy.vpn === true || privacy.proxy === true || privacy.is_vpn === true || privacy.is_proxy === true || PROTON_ASNS.has(asnNumber) || providerText.includes('proton ag') || providerText.includes('protonvpn') || providerText.includes('proton vpn');
   }
 
   function isProtectedMediaUrl(value, baseUrl) {
@@ -139,6 +148,15 @@
     return response.json();
   }
 
+  async function isKnownProtonExitIp(ip, signal) {
+    try {
+      const list = await fetchJson(PROTON_EXIT_IPS_URL, signal);
+      return Array.isArray(list) && list.includes(ip);
+    } catch (_) {
+      return false;
+    }
+  }
+
   async function checkVpn() {
     status = 'checking';
     const controller = typeof root.AbortController === 'function' ? new root.AbortController() : null;
@@ -149,7 +167,9 @@
       const ip = String(ipPayload && ipPayload.ip || '').trim();
       if (!ip) throw new Error('public IP unavailable');
       const payload = await fetchJson(CHECK_URL + '?q=' + encodeURIComponent(ip), controller ? controller.signal : undefined);
-      status = isVpnVerdict(payload) ? 'allowed' : 'blocked';
+      let allowed = isVpnVerdict(payload);
+      if (!allowed) allowed = await isKnownProtonExitIp(ip, controller ? controller.signal : undefined);
+      status = allowed ? 'allowed' : 'blocked';
       if (status === 'allowed') {
         removeNotice();
         restoreBlockedElements();
@@ -177,5 +197,5 @@
     else if (root.setTimeout) root.setTimeout(checkVpn, 0);
   }
 
-  return { IP_URL, CHECK_URL, isVpnVerdict, isProtectedMediaUrl, canLoadExternalMedia, mediaUrl, checkVpn, setAllowedForTesting, installGuards };
+  return { IP_URL, CHECK_URL, PROTON_EXIT_IPS_URL, isVpnVerdict, isProtectedMediaUrl, canLoadExternalMedia, mediaUrl, checkVpn, setAllowedForTesting, installGuards };
 }));
