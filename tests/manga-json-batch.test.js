@@ -9,15 +9,17 @@ test('extension queues multiple drafts and exports one JSON batch',()=>{
   assert.match(toolbar,/書き出し待ち/);
   assert.match(background,/mangaExportDraftsV1/);
   assert.match(background,/version:\s*1[\s\S]*items/);
-  assert.match(background,/chromeApi\.downloads\.download|downloads\.download/);
+  assert.match(background,/downloads\.download/);
 });
 
-test('reader provides JSON batch import using existing encrypted persistence',()=>{
-  const reader=fs.readFileSync('reader.html','utf8');
-  assert.match(reader,/mangaJsonImportInput/);
-  assert.match(reader,/JSONから追加/);
-  assert.match(reader,/MangaJsonBatch/);
-  assert.match(reader,/MangaVault\.savePayload|saveMangaBookshelfCloud/);
+test('reader gets a JSON batch import control and uses encrypted persistence',()=>{
+  const relay=fs.readFileSync('extension/content/testcode-content.js','utf8');
+  const background=fs.readFileSync('extension/background.js','utf8');
+  assert.match(relay,/mangaJsonImportInput/);
+  assert.match(relay,/JSONから追加/);
+  assert.match(relay,/IMPORT_JSON_BATCH/);
+  assert.match(background,/MangaVault\.savePayload/);
+  assert.match(background,/MangaVaultPayload\.buildFromLocalStorage/);
 });
 
 test('batch helper validates all drafts and skips duplicates',()=>{
