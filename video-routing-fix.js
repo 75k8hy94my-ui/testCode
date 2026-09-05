@@ -35,7 +35,10 @@
       #videoLibraryResults .vl-card.vl-inline-playing{overflow:hidden}
       #videoLibraryResults .vl-card.vl-inline-playing .vl-thumb{display:none}
       #videoLibraryResults .vl-inline-player{position:relative;aspect-ratio:16/9;width:100%;background:#000;border-radius:15px 15px 0 0;overflow:hidden;z-index:2}
+      #videoLibraryResults .vl-inline-player.vl-large-player{position:fixed;inset:8vh 5vw;z-index:210;width:90vw;height:84vh;max-width:none;aspect-ratio:auto;border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.65)}
       #videoLibraryResults .vl-inline-player iframe,#videoLibraryResults .vl-inline-player video{display:block;width:100%;height:100%;border:0;background:#000;object-fit:contain}
+      #videoLibraryResults .vl-inline-player.vl-large-player video,#videoLibraryResults .vl-inline-player.vl-large-player iframe{object-fit:contain}
+      #videoLibraryResults .vl-portrait-toggle{position:absolute;right:8px;top:8px;z-index:5;min-height:34px;padding:0 11px;border:1px solid rgba(255,255,255,.28);border-radius:999px;background:rgba(10,12,17,.78);color:#fff;font-size:12px;font-weight:750;cursor:pointer}
       #videoLibraryResults .vl-inline-player video.vl-rotate-left{position:absolute;left:50%;top:50%;max-width:none;max-height:none;transform:translate(-50%,-50%) rotate(-90deg);transform-origin:center center}
       #videoLibraryResults .vl-thumb .vl-thumb-direct-video{position:absolute;inset:0;display:block;width:100%;height:100%;border:0;background:#000;object-fit:cover;opacity:0;pointer-events:none}
       #videoLibraryResults .vl-thumb .vl-thumb-direct-video[data-frame-ready="1"]{opacity:1}
@@ -235,6 +238,17 @@
     player.append(button);
   }
 
+  function appendLargeDisplayToggle(player) {
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'vl-portrait-toggle'; button.textContent = '大きく表示';
+    button.addEventListener('click', (event) => {
+      event.preventDefault(); event.stopPropagation();
+      const enabled = player.classList.toggle('vl-large-player');
+      button.textContent = enabled ? '通常表示' : '大きく表示';
+    });
+    player.append(button);
+  }
+
   function createInlinePlayer(base, meta) {
     const player = document.createElement('div');
     player.className = 'vl-inline-player';
@@ -279,6 +293,8 @@
         }
       }, { once: true });
       player.append(video);
+      video.addEventListener('contextmenu', (event) => event.preventDefault());
+      appendLargeDisplayToggle(player);
     } else if (text(base.a) && text(base.b) && text(base.a) !== 'url') {
       const iframe = document.createElement('iframe');
       const title = text(meta && meta.title) || text(base.title) || (text(base.a) + ' / ' + text(base.b));
