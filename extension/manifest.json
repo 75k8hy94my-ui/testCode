@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "testCode Manga Add",
-  "version": "0.1.0",
-  "description": "Register manga extraction rules and add manga to testCode.",
-  "permissions": ["storage", "scripting", "activeTab", "tabs"],
+  "version": "0.2.0",
+  "description": "Register manga extraction rules and export manga batches for testCode.",
+  "permissions": ["storage", "scripting", "activeTab", "tabs", "downloads"],
   "optional_host_permissions": ["https://*/*", "http://*/*"],
   "host_permissions": ["https://75k8hy94my-ui.github.io/testCode/*"],
   "background": { "service_worker": "background.js" },
