@@ -22,3 +22,17 @@ test('extractImageUrl falls back to anchor href then background image', () => {
 test('dedupeUrls preserves DOM order and rejects non-http URLs', () => {
   assert.deepEqual(extractor.dedupeUrls(['https://x/1.jpg','data:image/png;base64,x','https://x/2.jpg','https://x/1.jpg']), ['https://x/1.jpg','https://x/2.jpg']);
 });
+
+test('inferImageCollection climbs to a common ancestor with repeated images', () => {
+  const img1 = { tagName:'IMG', classList:['page'], currentSrc:'https://x/1.jpg' };
+  const img2 = { tagName:'IMG', classList:['page'], currentSrc:'https://x/2.jpg' };
+  const img3 = { tagName:'IMG', classList:['page'], currentSrc:'https://x/3.jpg' };
+  const local = { parentElement:null, querySelectorAll() { return [img1]; }, attributes:[], classList:[], tagName:'DIV' };
+  const common = { parentElement:null, querySelectorAll(selector) { return selector === 'img.page' ? [img1,img2,img3] : []; }, attributes:[], classList:[], tagName:'DIV' };
+  local.parentElement = common;
+  img1.parentElement = local;
+  img1.ownerDocument = { location:{ href:'https://example.com/viewer' } };
+  const inferred = extractor.inferImageCollection(img1);
+  assert.equal(inferred.count, 3);
+  assert.deepEqual(inferred.urls, ['https://x/1.jpg','https://x/2.jpg','https://x/3.jpg']);
+});
