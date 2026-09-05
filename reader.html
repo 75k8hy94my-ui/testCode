@@ -508,6 +508,8 @@
   }
   .vpnHeaderControls { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
   .vpnHeaderControls .ctrlBtn { padding: 7px 10px; font-size: 12px; }
+  .listHeaderControls { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+  .listHeaderControls .ctrlBtn { padding: 7px 10px; font-size: 12px; }
   .vpnMediaHeader { display: flex; align-items: center; gap: 10px; padding: 12px 14px 8px; flex-shrink: 0; }
   .vpnMediaHeader > strong { font-size: 16px; }
   #videoPlayerHeader .vpnHeaderControls { margin-left: auto; margin-right: 8px; }
@@ -1244,10 +1246,6 @@
     <button class="ctrlBtn active" id="animBtn" title="ページ送りアニメーションの切替">アニメ</button>
     <button class="ctrlBtn" id="redetectBtn" title="保存されたページ数情報を消して、最初から再検出します">再検出</button>
     <button class="ctrlBtn" id="tocAddBtn" title="今のページを目次として追加">目次追加</button>
-    <div class="vpnHeaderControls" data-vpn-header="manga" aria-label="VPN状態">
-      <button class="ctrlBtn vpnStatusButton" type="button" data-vpn-status-button>VPN確認中</button>
-      <button class="ctrlBtn" type="button" data-vpn-diagnostics-button>VPN診断</button>
-    </div>
     <button class="ctrlBtn" id="moreBtn" type="button" aria-label="その他の操作">⋯</button>
     <span id="readerMeta"><span id="currentTitle"></span><span id="status"></span></span>
     <div id="mobileMoreMenu" role="menu">
@@ -1466,9 +1464,13 @@ https://cdn.example.org/c/003.webp"></textarea>
 
 <!-- Saved list -->
 <section id="savedListOverlay" class="screenView modalOverlay" role="region" aria-labelledby="savedListPanel">
-  <div id="savedListPanel" class="modalPanel">
+    <div id="savedListPanel" class="modalPanel">
     <div class="panel-header">
       <span id="listPanelTitle">保存したURL</span>
+      <div class="listHeaderControls" data-vpn-header="saved-list" aria-label="VPN状態">
+        <button class="ctrlBtn vpnStatusButton" type="button" data-vpn-status-button>VPN確認中</button>
+        <button class="ctrlBtn" type="button" data-vpn-diagnostics-button>VPN診断</button>
+      </div>
       <div style="display:flex;gap:8px;align-items:center;">
         <button class="ctrlBtn" id="listThemeBtn" type="button" title="テーマ切替" aria-label="テーマ切替"></button>
         <button class="ctrlBtn logoutBtn" id="listLogoutBtn" title="ログアウトして端末内の保存データを消去">ログアウト</button>
@@ -1529,13 +1531,6 @@ https://cdn.example.org/c/003.webp"></textarea>
       <div id="savedListEmpty" style="display:none;">保存されたURLはまだありません</div>
     </div>
     <div id="videoListSection" style="display:none;">
-      <header class="vpnMediaHeader" data-vpn-header="video">
-        <strong>動画</strong>
-        <div class="vpnHeaderControls" aria-label="VPN状態">
-          <button class="ctrlBtn vpnStatusButton" type="button" data-vpn-status-button>VPN確認中</button>
-          <button class="ctrlBtn" type="button" data-vpn-diagnostics-button>VPN診断</button>
-        </div>
-      </header>
       <div id="videoListToolbar">
         <button class="ctrlBtn" id="addVideoBtn" type="button">+ 動画を追加</button>
       </div>

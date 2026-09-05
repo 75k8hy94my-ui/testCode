@@ -106,8 +106,7 @@ test('reader bootstrap loads the VPN gate before reader media and the gate cover
   const recommendations = fs.readFileSync(new URL('../recommendations.js', import.meta.url), 'utf8');
   const reader = fs.readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
   assert.match(recommendations, /document\.write\([\s\S]*media-access-gate\.js/);
-  assert.match(reader, /data-vpn-header="manga"/);
-  assert.match(reader, /data-vpn-header="video"/);
+  assert.match(reader, /data-vpn-header="saved-list"/);
   assert.match(reader, /data-vpn-header="video-player"/);
   assert.match(reader, /data-vpn-status-button/);
   assert.match(reader, /data-vpn-diagnostics-button/);
