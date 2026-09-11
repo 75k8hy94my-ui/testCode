@@ -8,6 +8,7 @@
   const IP_URL = 'https://api.ipify.org?format=json';
   const CHECK_URL = 'https://ip-api.dev/api';
   const PROTON_EXIT_IPS_URL = 'https://raw.githubusercontent.com/tn3w/ProtonVPN-IPs/master/protonvpn_ips.json';
+  const OVERRIDE_STORAGE_KEY = 'testCode.vpnIpOverrides.v1';
   const PROTON_ASNS = new Set([209103, 62371, 208172]);
   const PROTON_OWNED_IPV4_CIDRS = [
     '159.26.96.0/20',
@@ -31,6 +32,7 @@
       generic: { status: 'pending', httpStatus: null, verdict: null },
       protonOwnedNetworkMatch: null,
       protonExitMatch: null,
+      manualOverride: null,
       final: 'pending',
       checkedAt: null,
       error: null,
@@ -43,6 +45,7 @@
       generic: { ...diagnostics.generic },
       protonOwnedNetworkMatch: diagnostics.protonOwnedNetworkMatch,
       protonExitMatch: diagnostics.protonExitMatch,
+      manualOverride: diagnostics.manualOverride,
       final: diagnostics.final,
       checkedAt: diagnostics.checkedAt,
       error: diagnostics.error,
@@ -86,6 +89,61 @@
     return parts.length === 4 && parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) >= 0 && Number(part) <= 255)
       ? parts.slice(0, 3).join('.')
       : '';
+  }
+
+  function normalizeOverrideIp(ip) {
+    return String(ip || '').trim();
+  }
+
+  function readOverrides() {
+    const fallback = { vpn: [], nonVpn: [] };
+    if (!root.localStorage || typeof root.localStorage.getItem !== 'function') return fallback;
+    try {
+      const parsed = JSON.parse(root.localStorage.getItem(OVERRIDE_STORAGE_KEY) || '{}');
+      return {
+        vpn: Array.isArray(parsed.vpn) ? parsed.vpn.map(normalizeOverrideIp).filter(Boolean) : [],
+        nonVpn: Array.isArray(parsed.nonVpn) ? parsed.nonVpn.map(normalizeOverrideIp).filter(Boolean) : [],
+      };
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function writeOverrides(value) {
+    if (!root.localStorage || typeof root.localStorage.setItem !== 'function') return false;
+    try {
+      root.localStorage.setItem(OVERRIDE_STORAGE_KEY, JSON.stringify(value));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function getIpOverride(ip) {
+    const normalized = normalizeOverrideIp(ip);
+    if (!normalized) return null;
+    const overrides = readOverrides();
+    if (overrides.nonVpn.includes(normalized)) return 'non-vpn';
+    if (overrides.vpn.includes(normalized)) return 'vpn';
+    return null;
+  }
+
+  function saveVpnOverride(ip) {
+    const normalized = normalizeOverrideIp(ip);
+    if (!normalized) return false;
+    const overrides = readOverrides();
+    if (overrides.nonVpn.includes(normalized)) return false;
+    if (!overrides.vpn.includes(normalized)) overrides.vpn.push(normalized);
+    return writeOverrides(overrides);
+  }
+
+  function saveNonVpnOverride(ip) {
+    const normalized = normalizeOverrideIp(ip);
+    if (!normalized) return false;
+    const overrides = readOverrides();
+    overrides.vpn = overrides.vpn.filter((candidate) => candidate !== normalized);
+    if (!overrides.nonVpn.includes(normalized)) overrides.nonVpn.push(normalized);
+    return writeOverrides(overrides);
   }
 
   function isVpnVerdict(value) {
@@ -151,9 +209,11 @@
         : d.generic.status === 'checking' ? '確認中' : '未確認';
     const owned = d.protonOwnedNetworkMatch === true ? '一致' : d.protonOwnedNetworkMatch === false ? '不一致' : '未確認';
     const proton = d.protonExitMatch === true ? '一致' : d.protonExitMatch === false ? '不一致' : '未確認';
+    const manual = d.manualOverride === 'vpn' ? 'VPNとして例外指定' : d.manualOverride === 'non-vpn' ? '非VPNとして固定' : 'なし';
     const final = d.final === 'allowed' ? '許可' : d.final === 'blocked' ? 'ブロック' : d.final === 'checking' ? '確認中' : '未判定';
     return [
       '現在IP: ' + (d.ip || '取得前'),
+      '手動指定: ' + manual,
       'Proton保有ネットワーク: ' + owned,
       '一般VPN判定: ' + generic,
       'Proton出口IP: ' + proton,
@@ -169,6 +229,20 @@
     if (!panel) return;
     const pre = panel.querySelector('[data-vpn-diagnostics-text]');
     if (pre) pre.textContent = diagnosticText();
+    const vpnButton = panel.querySelector('[data-vpn-mark-vpn]');
+    const nonVpnButton = panel.querySelector('[data-vpn-mark-non-vpn]');
+    const locked = panel.querySelector('[data-vpn-non-vpn-locked]');
+    const hasIp = !!diagnostics.ip;
+    const isLocked = diagnostics.manualOverride === 'non-vpn';
+    if (vpnButton) {
+      vpnButton.disabled = !hasIp || isLocked;
+      vpnButton.style.display = isLocked ? 'none' : '';
+    }
+    if (nonVpnButton) {
+      nonVpnButton.disabled = !hasIp || isLocked;
+      nonVpnButton.style.display = isLocked ? 'none' : '';
+    }
+    if (locked) locked.style.display = isLocked ? 'block' : 'none';
   }
 
   function installDiagnosticsUi() {
@@ -186,12 +260,37 @@
       const pre = root.document.createElement('pre');
       pre.dataset.vpnDiagnosticsText = '1';
       pre.style.cssText = 'white-space:pre-wrap;word-break:break-all;margin:0 0 10px;font:inherit;color:inherit';
+      const controls = root.document.createElement('div');
+      controls.style.cssText = 'display:flex;gap:7px;flex-wrap:wrap';
       const recheck = root.document.createElement('button');
       recheck.type = 'button';
       recheck.textContent = '再確認';
       recheck.style.cssText = 'border:1px solid rgba(255,255,255,.18);border-radius:9px;background:#262c38;color:#fff;padding:6px 9px;font:inherit;cursor:pointer';
       recheck.addEventListener('click', () => checkVpn());
-      panel.append(title, pre, recheck);
+      const markVpn = root.document.createElement('button');
+      markVpn.type = 'button';
+      markVpn.dataset.vpnMarkVpn = '1';
+      markVpn.textContent = 'このIPはVPN';
+      markVpn.style.cssText = recheck.style.cssText;
+      markVpn.addEventListener('click', () => {
+        if (!diagnostics.ip || !saveVpnOverride(diagnostics.ip)) return;
+        checkVpn();
+      });
+      const markNonVpn = root.document.createElement('button');
+      markNonVpn.type = 'button';
+      markNonVpn.dataset.vpnMarkNonVpn = '1';
+      markNonVpn.textContent = 'このIPはVPNではない';
+      markNonVpn.style.cssText = recheck.style.cssText;
+      markNonVpn.addEventListener('click', () => {
+        if (!diagnostics.ip || !saveNonVpnOverride(diagnostics.ip)) return;
+        checkVpn();
+      });
+      const locked = root.document.createElement('div');
+      locked.dataset.vpnNonVpnLocked = '1';
+      locked.textContent = 'このIPは「VPNではない」として固定されています。';
+      locked.style.cssText = 'display:none;margin-top:8px;color:#c7cbd4';
+      controls.append(recheck, markVpn, markNonVpn);
+      panel.append(title, pre, controls, locked);
       root.document.body.append(panel);
       root.document.addEventListener('click', (event) => {
         const diagnosticsButton = event.target && event.target.closest ? event.target.closest('[data-vpn-diagnostics-button]') : null;
@@ -318,6 +417,32 @@
       const ip = String(ipPayload && ipPayload.ip || '').trim();
       if (!ip) throw new Error('public IP unavailable');
       diagnostics.ip = ip;
+      diagnostics.manualOverride = getIpOverride(ip);
+      renderDiagnostics();
+
+      if (diagnostics.manualOverride === 'non-vpn') {
+        status = 'blocked';
+        diagnostics.final = status;
+        diagnostics.checkedAt = new Date().toISOString();
+        diagnostics.error = null;
+        updateStatusButtons(status);
+        renderDiagnostics();
+        showNotice('このIPは「VPNではない」として固定されています。');
+        return false;
+      }
+
+      if (diagnostics.manualOverride === 'vpn') {
+        status = 'allowed';
+        diagnostics.final = status;
+        diagnostics.checkedAt = new Date().toISOString();
+        diagnostics.error = null;
+        updateStatusButtons(status);
+        renderDiagnostics();
+        removeNotice();
+        restoreBlockedElements();
+        return true;
+      }
+
       diagnostics.protonOwnedNetworkMatch = isKnownProtonOwnedIp(ip);
       renderDiagnostics();
       const signal = controller ? controller.signal : undefined;
@@ -379,5 +504,5 @@
     else if (root.setTimeout) root.setTimeout(checkVpn, 0);
   }
 
-  return { IP_URL, CHECK_URL, PROTON_EXIT_IPS_URL, PROTON_OWNED_IPV4_CIDRS, isVpnVerdict, isKnownProtonOwnedIp, isProtectedMediaUrl, canLoadExternalMedia, mediaUrl, checkVpn, getDiagnostics, setAllowedForTesting, installGuards, installDiagnosticsUi };
+  return { IP_URL, CHECK_URL, PROTON_EXIT_IPS_URL, PROTON_OWNED_IPV4_CIDRS, OVERRIDE_STORAGE_KEY, isVpnVerdict, isKnownProtonOwnedIp, isProtectedMediaUrl, canLoadExternalMedia, mediaUrl, checkVpn, getDiagnostics, getIpOverride, saveVpnOverride, saveNonVpnOverride, setAllowedForTesting, installGuards, installDiagnosticsUi };
 }));
