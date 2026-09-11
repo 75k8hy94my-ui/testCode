@@ -8,15 +8,20 @@
   <link rel="icon" type="image/png" href="icon-152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
   <style>
-    :root { --bg:#fff; --text:#1f2937; --line:#9ca3af; --focus:#2563eb; --danger:#dc2626; }
+    :root { --bg:#fff; --text:#1f2937; --line:#9ca3af; --focus:#2563eb; --danger:#dc2626; --menu-line:#e5e7eb; --menu-shadow:0 12px 30px rgba(15,23,42,.14); }
     * { box-sizing:border-box; }
     html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; }
     body { height:100dvh; color:var(--text); background:var(--bg); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic",sans-serif; }
     main { position:relative; width:100%; height:100dvh; overflow:hidden; padding-top:env(safe-area-inset-top); padding-right:env(safe-area-inset-right); padding-bottom:env(safe-area-inset-bottom); padding-left:env(safe-area-inset-left); }
-    header { position:absolute; top:max(22px, calc(env(safe-area-inset-top) + 14px)); left:max(28px, calc(env(safe-area-inset-left) + 18px)); right:max(28px, calc(env(safe-area-inset-right) + 18px)); display:flex; align-items:center; justify-content:space-between; gap:24px; min-width:0; }
+    header { position:absolute; z-index:5; top:max(22px, calc(env(safe-area-inset-top) + 14px)); left:max(28px, calc(env(safe-area-inset-left) + 18px)); right:max(28px, calc(env(safe-area-inset-right) + 18px)); display:flex; align-items:flex-start; justify-content:space-between; gap:24px; min-width:0; }
     h1 { margin:0; font-size:clamp(24px,3vw,42px); line-height:1.1; font-weight:500; letter-spacing:.04em; white-space:nowrap; }
-    #accountLogout { appearance:none; border:0; background:transparent; padding:8px 0; margin:0; color:var(--text); font:inherit; font-size:clamp(13px,1.4vw,18px); cursor:pointer; min-width:0; max-width:55%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    #accountLogout:hover { text-decoration:underline; text-underline-offset:4px; }
+    #accountControl { position:relative; min-width:0; max-width:55%; }
+    #accountMenuButton { appearance:none; border:0; background:transparent; padding:8px 0; margin:0; color:var(--text); font:inherit; font-size:clamp(13px,1.4vw,18px); cursor:pointer; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; }
+    #accountMenuButton:hover { text-decoration:underline; text-underline-offset:4px; }
+    #accountMenu { position:absolute; top:calc(100% + 6px); right:0; width:max-content; min-width:170px; overflow:hidden; border:1px solid var(--menu-line); border-radius:10px; background:#fff; box-shadow:var(--menu-shadow); }
+    #accountMenu button { appearance:none; display:block; width:100%; border:0; border-bottom:1px solid var(--menu-line); background:#fff; color:var(--text); padding:11px 14px; font:inherit; font-size:14px; text-align:left; cursor:pointer; white-space:nowrap; }
+    #accountMenu button:last-child { border-bottom:0; }
+    #accountMenu button:hover, #accountMenu button:focus-visible { background:#f3f4f6; outline:none; }
     #unlockView { position:absolute; inset:0; pointer-events:none; }
     #unlockForm { position:absolute; left:50%; top:44%; transform:translate(-50%,-50%); width:min(62vw,720px); pointer-events:auto; }
     #vaultCredential { display:block; width:100%; height:clamp(54px,6vw,78px); border:1.5px solid var(--line); border-radius:3px; background:#fff; color:var(--text); padding:0 18px; font:inherit; font-size:clamp(18px,2vw,26px); box-shadow:none; outline:none; }
@@ -30,7 +35,10 @@
     @media (max-width:640px) {
       header { top:max(18px, calc(env(safe-area-inset-top) + 10px)); left:max(18px, calc(env(safe-area-inset-left) + 12px)); right:max(18px, calc(env(safe-area-inset-right) + 12px)); gap:12px; }
       h1 { font-size:25px; }
-      #accountLogout { max-width:58%; font-size:12px; }
+      #accountControl { max-width:58%; }
+      #accountMenuButton { font-size:12px; }
+      #accountMenu { min-width:158px; }
+      #accountMenu button { padding:10px 12px; font-size:13px; }
       #unlockForm { top:42%; width:calc(100vw - 44px - env(safe-area-inset-left) - env(safe-area-inset-right)); }
       #vaultCredential { height:58px; padding:0 14px; font-size:20px; }
     }
@@ -43,7 +51,14 @@
   <main>
     <header>
       <h1>同期コード</h1>
-      <button id="accountLogout" type="button"><span id="accountEmail"></span> でログイン中</button>
+      <div id="accountControl">
+        <button id="accountMenuButton" type="button" aria-haspopup="menu" aria-expanded="false"><span id="accountEmail"></span> でログイン中</button>
+        <div id="accountMenu" role="menu" hidden>
+          <button id="vaultLogoutBtn" type="button" role="menuitem">ログアウト</button>
+          <button id="passkeyRegisterBtn" type="button" role="menuitem">パスキー登録</button>
+          <button id="passkeyUseBtn" type="button" role="menuitem">パスキーを使う</button>
+        </div>
+      </div>
     </header>
     <div id="unlockView">
       <form id="unlockForm" novalidate>
@@ -70,7 +85,11 @@
     const $ = (id) => document.getElementById(id);
     const ui = {
       email:$('accountEmail'),
-      accountLogout:$('accountLogout'),
+      accountMenuButton:$('accountMenuButton'),
+      accountMenu:$('accountMenu'),
+      vaultLogout:$('vaultLogoutBtn'),
+      passkeyRegisterBtn:$('passkeyRegisterBtn'),
+      passkeyUseBtn:$('passkeyUseBtn'),
       unlock:$('unlockView'),
       unlockForm:$('unlockForm'),
       credential:$('vaultCredential'),
@@ -86,9 +105,23 @@
     ui.email.textContent=session.user.email;
     const DEVICE_DATA_KEYS=[...Object.values(MangaVaultPayload.DATA_KEYS||{}),'mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
     let opening=false;
+    let passkeyOpening=false;
+
+    function closeAccountMenu() {
+      ui.accountMenu.hidden=true;
+      ui.accountMenuButton.setAttribute('aria-expanded','false');
+    }
+
+    function toggleAccountMenu() {
+      const nextOpen=ui.accountMenu.hidden;
+      ui.accountMenu.hidden=!nextOpen;
+      ui.accountMenuButton.setAttribute('aria-expanded',nextOpen ? 'true' : 'false');
+    }
 
     async function logout() {
-      ui.accountLogout.disabled=true;
+      if (!confirm('ログアウトしてよろしいですか？')) return;
+      closeAccountMenu();
+      ui.vaultLogout.disabled=true;
       try { await MangaVault.withSession((token)=>MangaVault.api('/auth/v1/logout',{method:'POST',token})); } catch (_) {}
       try { if (session.user&&session.user.id) await EncryptedChunkCache.clearAll({dbName:`${EncryptedChunkCache.DB_NAME}:${session.user.id}`}); } catch (_) {}
       MangaVault.clearActive();
@@ -108,8 +141,8 @@
       event.preventDefault();
       const credential=ui.credential.value;
       const isRecovery=credential.trim().startsWith('mrk1_');
-      if (!credential.trim() || (!isRecovery && credential.length < 12) || opening) {
-        if (!opening) markError('入力内容を確認してください。');
+      if (!credential.trim() || (!isRecovery && credential.length < 12) || opening || passkeyOpening) {
+        if (!opening && !passkeyOpening) markError('入力内容を確認してください。');
         return;
       }
       opening=true;
@@ -134,10 +167,73 @@
       }
     }
 
+    async function usePasskey(options={}) {
+      closeAccountMenu();
+      if (opening || passkeyOpening) return false;
+      passkeyOpening=true;
+      ui.credential.classList.remove('error');
+      setStatus('');
+      try {
+        await MangaVault.initializeWithPasskey(applyPayload);
+        goReader();
+        return true;
+      } catch (error) {
+        if (!options.silentFailure) {
+          markError(error && error.message ? error.message : '入力内容を確認してください。');
+          ui.credential.focus();
+        }
+        return false;
+      } finally {
+        passkeyOpening=false;
+      }
+    }
+
+    async function registerPasskey() {
+      closeAccountMenu();
+      if (opening || passkeyOpening) return;
+      const credential=ui.credential.value;
+      if (!credential || credential.trim().startsWith('mrk1_') || credential.length < 12) {
+        markError('入力内容を確認してください。');
+        ui.credential.focus();
+        return;
+      }
+      passkeyOpening=true;
+      ui.credential.classList.remove('error');
+      setStatus('');
+      try {
+        await MangaVault.registerPasskey(credential);
+        ui.credential.value='';
+        goReader();
+      } catch (error) {
+        markError(error && error.message ? error.message : '入力内容を確認してください。');
+        ui.credential.focus();
+      } finally {
+        passkeyOpening=false;
+      }
+    }
+
+    async function autoUsePasskey() {
+      if (opening || passkeyOpening) return;
+      try {
+        const record=await MangaVault.withSession((token,user)=>MangaVault.fetchRecordForUi(token,user));
+        const keyWraps=record && record.payload && record.payload.keyWraps;
+        const passkeys=keyWraps && (Array.isArray(keyWraps.passkeys) ? keyWraps.passkeys : (keyWraps.passkey ? [keyWraps.passkey] : []));
+        if (!passkeys || !passkeys.length) return;
+        await usePasskey({ silentFailure:true });
+      } catch (_) {}
+    }
+
     ui.credential.addEventListener('input',()=>{ ui.credential.classList.remove('error'); setStatus(''); });
     ui.unlockForm.addEventListener('submit',unlockFromCredential);
-    ui.accountLogout.addEventListener('click',logout);
+    ui.accountMenuButton.addEventListener('click',(event)=>{ event.stopPropagation(); toggleAccountMenu(); });
+    ui.accountMenu.addEventListener('click',(event)=>event.stopPropagation());
+    ui.vaultLogout.addEventListener('click',logout);
+    ui.passkeyRegisterBtn.addEventListener('click',registerPasskey);
+    ui.passkeyUseBtn.addEventListener('click',usePasskey);
+    document.addEventListener('click',closeAccountMenu);
+    document.addEventListener('keydown',(event)=>{ if (event.key === 'Escape') closeAccountMenu(); });
     ui.copy.addEventListener('click',async()=>{ try { await navigator.clipboard.writeText(ui.recoveryCode.textContent); } catch (_) {} });
+    autoUsePasskey();
   })();
   </script>
 </body>
