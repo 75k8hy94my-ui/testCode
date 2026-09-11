@@ -20,13 +20,13 @@
     const trigger = nav.querySelector('#desktopNavHome');
     if (!trigger || trigger.dataset.profileMenuInstalled === '1') return;
     trigger.dataset.profileMenuInstalled = '1'; trigger.removeAttribute('href'); trigger.removeAttribute('aria-current'); trigger.classList.remove('active'); trigger.setAttribute('role','button'); trigger.setAttribute('aria-haspopup','menu'); trigger.setAttribute('aria-expanded','false'); trigger.setAttribute('aria-label','アカウント');
-    const menu = document.createElement('div'); menu.id='desktopProfileMenu'; menu.hidden=true; menu.setAttribute('role','menu'); menu.innerHTML='<a href="profile.html" role="menuitem">プロフィール設定</a><button type="button" role="menuitem">ログアウト</button>'; document.body.appendChild(menu);
+    const menu = document.createElement('div'); menu.id='desktopProfileMenu'; menu.hidden=true; menu.setAttribute('role','menu'); menu.innerHTML='<button type="button" role="menuitem" data-profile-route>プロフィール設定</button><button type="button" role="menuitem" data-logout>ログアウト</button>'; document.body.appendChild(menu);
     const style=document.createElement('style'); style.textContent='@media(min-width:900px){#desktopProfileMenu{position:fixed;z-index:1200;left:66px;top:62px;width:170px;padding:4px;background:#fff;border:1px solid #dfe3e8;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.14)}#desktopProfileMenu a,#desktopProfileMenu button{width:100%;min-height:38px;padding:0 10px;border:0;border-radius:4px;background:transparent;color:#202124;display:flex;align-items:center;text-align:left;text-decoration:none;font:inherit;font-size:13px;cursor:pointer}#desktopProfileMenu a:hover,#desktopProfileMenu button:hover{background:#f1f3f5}}@media(max-width:899px){#desktopProfileMenu{display:none!important}}'; document.head.appendChild(style);
     const close=()=>{menu.hidden=true;trigger.setAttribute('aria-expanded','false');};
     trigger.addEventListener('click',(event)=>{event.preventDefault();event.stopPropagation();menu.hidden=!menu.hidden;trigger.setAttribute('aria-expanded',menu.hidden?'false':'true');});
     menu.addEventListener('click',(event)=>event.stopPropagation());
-    menu.querySelector('a').addEventListener('click',(event)=>{if(window.HomeProfileSPA){event.preventDefault();close();HomeProfileSPA.navigate('profile.html');}});
-    menu.querySelector('button').addEventListener('click',()=>logout(menu.querySelector('button')));
+    menu.querySelector('[data-profile-route]').addEventListener('click',()=>{close();if(window.HomeProfileSPA)window.HomeProfileSPA.navigate('profile.html');});
+    menu.querySelector('[data-logout]').addEventListener('click',()=>logout(menu.querySelector('[data-logout]')));
     document.addEventListener('click',close); document.addEventListener('keydown',(event)=>{if(event.key==='Escape')close();});
     document.addEventListener('home-profile-routechange',close);
   }
