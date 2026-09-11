@@ -20,6 +20,8 @@
   const NOTICE_ID = 'vpnMediaNotice';
   const DIAGNOSTICS_BUTTON_ID = 'vpnDiagnosticsButton';
   const DIAGNOSTICS_PANEL_ID = 'vpnDiagnosticsPanel';
+  const MANUAL_VPN_IPS_KEY = 'testCode.manualVpnIps';
+  const MANUAL_NON_VPN_IPS_KEY = 'testCode.manualNonVpnIps';
   let status = 'pending';
   let installed = false;
   let diagnosticsUiInstalled = false;
@@ -31,6 +33,7 @@
       generic: { status: 'pending', httpStatus: null, verdict: null },
       protonOwnedNetworkMatch: null,
       protonExitMatch: null,
+      manualDesignation: null,
       final: 'pending',
       checkedAt: null,
       error: null,
@@ -43,6 +46,7 @@
       generic: { ...diagnostics.generic },
       protonOwnedNetworkMatch: diagnostics.protonOwnedNetworkMatch,
       protonExitMatch: diagnostics.protonExitMatch,
+      manualDesignation: diagnostics.manualDesignation,
       final: diagnostics.final,
       checkedAt: diagnostics.checkedAt,
       error: diagnostics.error,
@@ -51,6 +55,64 @@
 
   function currentBase() {
     return root.location && root.location.href ? root.location.href : 'https://75k8hy94my-ui.github.io/testCode/reader.html';
+  }
+
+  function storage() {
+    try {
+      return root.localStorage || null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function readIpSet(key) {
+    const store = storage();
+    if (!store) return new Set();
+    try {
+      const parsed = JSON.parse(store.getItem(key) || '[]');
+      return new Set(Array.isArray(parsed) ? parsed.map((value) => String(value || '').trim()).filter(Boolean) : []);
+    } catch (_) {
+      return new Set();
+    }
+  }
+
+  function writeIpSet(key, values) {
+    const store = storage();
+    if (!store) return false;
+    try {
+      store.setItem(key, JSON.stringify(Array.from(values)));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function getManualIpDesignation(ip) {
+    const value = String(ip || '').trim();
+    if (!value) return null;
+    if (readIpSet(MANUAL_NON_VPN_IPS_KEY).has(value)) return 'non-vpn';
+    if (readIpSet(MANUAL_VPN_IPS_KEY).has(value)) return 'vpn';
+    return null;
+  }
+
+  function setManualIpDesignation(ip, designation) {
+    const value = String(ip || '').trim();
+    if (!value || (designation !== 'vpn' && designation !== 'non-vpn')) return false;
+
+    const nonVpnIps = readIpSet(MANUAL_NON_VPN_IPS_KEY);
+    const vpnIps = readIpSet(MANUAL_VPN_IPS_KEY);
+
+    // A non-VPN designation is intentionally irreversible from this UI.
+    if (nonVpnIps.has(value)) return designation === 'non-vpn';
+
+    if (designation === 'non-vpn') {
+      vpnIps.delete(value);
+      nonVpnIps.add(value);
+      return writeIpSet(MANUAL_VPN_IPS_KEY, vpnIps) && writeIpSet(MANUAL_NON_VPN_IPS_KEY, nonVpnIps);
+    }
+
+    vpnIps.add(value);
+    return writeIpSet(MANUAL_VPN_IPS_KEY, vpnIps);
   }
 
   function ipv4ToInt(ip) {
@@ -151,9 +213,11 @@
         : d.generic.status === 'checking' ? '確認中' : '未確認';
     const owned = d.protonOwnedNetworkMatch === true ? '一致' : d.protonOwnedNetworkMatch === false ? '不一致' : '未確認';
     const proton = d.protonExitMatch === true ? '一致' : d.protonExitMatch === false ? '不一致' : '未確認';
+    const manual = d.manualDesignation === 'vpn' ? 'VPNとして手動指定' : d.manualDesignation === 'non-vpn' ? 'VPNではないと固定' : 'なし';
     const final = d.final === 'allowed' ? '許可' : d.final === 'blocked' ? 'ブロック' : d.final === 'checking' ? '確認中' : '未判定';
     return [
       '現在IP: ' + (d.ip || '取得前'),
+      '手動指定: ' + manual,
       'Proton保有ネットワーク: ' + owned,
       '一般VPN判定: ' + generic,
       'Proton出口IP: ' + proton,
@@ -163,10 +227,37 @@
     ].filter(Boolean).join('\n');
   }
 
+  function renderManualControls() {
+    if (!root.document) return;
+    const panel = root.document.getElementById(DIAGNOSTICS_PANEL_ID);
+    if (!panel) return;
+    const vpnButton = panel.querySelector('[data-vpn-mark-vpn]');
+    const nonVpnButton = panel.querySelector('[data-vpn-mark-non-vpn]');
+    if (!vpnButton || !nonVpnButton) return;
+
+    const ip = diagnostics.ip;
+    const designation = ip ? getManualIpDesignation(ip) : null;
+    diagnostics.manualDesignation = designation;
+
+    vpnButton.disabled = !ip || designation === 'vpn' || designation === 'non-vpn';
+    nonVpnButton.disabled = !ip || designation === 'non-vpn';
+    vpnButton.textContent = designation === 'vpn'
+      ? 'VPN例外指定済み'
+      : designation === 'non-vpn'
+        ? 'VPN例外指定不可'
+        : 'このIPはVPN';
+    nonVpnButton.textContent = designation === 'non-vpn'
+      ? 'VPNではないと固定済み'
+      : 'このIPはVPNではない';
+    vpnButton.title = designation === 'non-vpn' ? 'このIPは「VPNではない」と固定済みのため変更できません。' : '';
+    nonVpnButton.title = designation === 'non-vpn' ? 'この指定はこの画面から解除できません。' : '';
+  }
+
   function renderDiagnostics() {
     if (!root.document) return;
     const panel = root.document.getElementById(DIAGNOSTICS_PANEL_ID);
     if (!panel) return;
+    renderManualControls();
     const pre = panel.querySelector('[data-vpn-diagnostics-text]');
     if (pre) pre.textContent = diagnosticText();
   }
@@ -186,12 +277,38 @@
       const pre = root.document.createElement('pre');
       pre.dataset.vpnDiagnosticsText = '1';
       pre.style.cssText = 'white-space:pre-wrap;word-break:break-all;margin:0 0 10px;font:inherit;color:inherit';
+      const controls = root.document.createElement('div');
+      controls.style.cssText = 'display:flex;flex-wrap:wrap;gap:7px';
+      const buttonStyle = 'border:1px solid rgba(255,255,255,.18);border-radius:9px;background:#262c38;color:#fff;padding:6px 9px;font:inherit;cursor:pointer';
       const recheck = root.document.createElement('button');
       recheck.type = 'button';
       recheck.textContent = '再確認';
-      recheck.style.cssText = 'border:1px solid rgba(255,255,255,.18);border-radius:9px;background:#262c38;color:#fff;padding:6px 9px;font:inherit;cursor:pointer';
+      recheck.style.cssText = buttonStyle;
       recheck.addEventListener('click', () => checkVpn());
-      panel.append(title, pre, recheck);
+      const markVpn = root.document.createElement('button');
+      markVpn.type = 'button';
+      markVpn.dataset.vpnMarkVpn = '1';
+      markVpn.textContent = 'このIPはVPN';
+      markVpn.style.cssText = buttonStyle;
+      markVpn.addEventListener('click', async () => {
+        const ip = diagnostics.ip;
+        if (!ip || getManualIpDesignation(ip) === 'non-vpn') return;
+        if (setManualIpDesignation(ip, 'vpn')) await checkVpn();
+      });
+      const markNonVpn = root.document.createElement('button');
+      markNonVpn.type = 'button';
+      markNonVpn.dataset.vpnMarkNonVpn = '1';
+      markNonVpn.textContent = 'このIPはVPNではない';
+      markNonVpn.style.cssText = buttonStyle;
+      markNonVpn.addEventListener('click', async () => {
+        const ip = diagnostics.ip;
+        if (!ip || getManualIpDesignation(ip) === 'non-vpn') return;
+        const message = 'このIPを「VPNではない」と固定します。\nこの画面からは解除できず、あとからVPN例外にも変更できません。\nよろしいですか？';
+        if (typeof root.confirm === 'function' && !root.confirm(message)) return;
+        if (setManualIpDesignation(ip, 'non-vpn')) await checkVpn();
+      });
+      controls.append(recheck, markVpn, markNonVpn);
+      panel.append(title, pre, controls);
       root.document.body.append(panel);
       root.document.addEventListener('click', (event) => {
         const diagnosticsButton = event.target && event.target.closest ? event.target.closest('[data-vpn-diagnostics-button]') : null;
@@ -304,6 +421,22 @@
     }
   }
 
+  function applyFinalStatus(allowed) {
+    status = allowed ? 'allowed' : 'blocked';
+    updateStatusButtons(status);
+    if (status === 'allowed') diagnostics.error = null;
+    diagnostics.final = status;
+    diagnostics.checkedAt = new Date().toISOString();
+    renderDiagnostics();
+    if (status === 'allowed') {
+      removeNotice();
+      restoreBlockedElements();
+    } else {
+      showNotice('VPNに接続すると漫画・動画を読み込めます。');
+    }
+    return status === 'allowed';
+  }
+
   async function checkVpn() {
     status = 'checking';
     updateStatusButtons(status);
@@ -318,6 +451,12 @@
       const ip = String(ipPayload && ipPayload.ip || '').trim();
       if (!ip) throw new Error('public IP unavailable');
       diagnostics.ip = ip;
+
+      const manualDesignation = getManualIpDesignation(ip);
+      diagnostics.manualDesignation = manualDesignation;
+      if (manualDesignation === 'non-vpn') return applyFinalStatus(false);
+      if (manualDesignation === 'vpn') return applyFinalStatus(true);
+
       diagnostics.protonOwnedNetworkMatch = isKnownProtonOwnedIp(ip);
       renderDiagnostics();
       const signal = controller ? controller.signal : undefined;
@@ -327,19 +466,7 @@
         diagnostics.protonExitMatch = await isKnownProtonExitIp(ip, signal);
         allowed = diagnostics.protonExitMatch;
       }
-      status = allowed ? 'allowed' : 'blocked';
-      updateStatusButtons(status);
-      if (status === 'allowed') diagnostics.error = null;
-      diagnostics.final = status;
-      diagnostics.checkedAt = new Date().toISOString();
-      renderDiagnostics();
-      if (status === 'allowed') {
-        removeNotice();
-        restoreBlockedElements();
-      } else {
-        showNotice('VPNに接続すると漫画・動画を読み込めます。');
-      }
-      return status === 'allowed';
+      return applyFinalStatus(allowed);
     } catch (error) {
       status = 'blocked';
       updateStatusButtons(status);
@@ -379,5 +506,24 @@
     else if (root.setTimeout) root.setTimeout(checkVpn, 0);
   }
 
-  return { IP_URL, CHECK_URL, PROTON_EXIT_IPS_URL, PROTON_OWNED_IPV4_CIDRS, isVpnVerdict, isKnownProtonOwnedIp, isProtectedMediaUrl, canLoadExternalMedia, mediaUrl, checkVpn, getDiagnostics, setAllowedForTesting, installGuards, installDiagnosticsUi };
+  return {
+    IP_URL,
+    CHECK_URL,
+    PROTON_EXIT_IPS_URL,
+    PROTON_OWNED_IPV4_CIDRS,
+    MANUAL_VPN_IPS_KEY,
+    MANUAL_NON_VPN_IPS_KEY,
+    isVpnVerdict,
+    isKnownProtonOwnedIp,
+    isProtectedMediaUrl,
+    canLoadExternalMedia,
+    mediaUrl,
+    checkVpn,
+    getDiagnostics,
+    getManualIpDesignation,
+    setManualIpDesignation,
+    setAllowedForTesting,
+    installGuards,
+    installDiagnosticsUi,
+  };
 }));
