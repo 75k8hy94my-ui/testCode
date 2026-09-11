@@ -287,6 +287,7 @@
   }
 
   function build() {
+    if (document.documentElement.classList.contains('global-shell-page')) return null;
     const page = pageName();
     if (page === 'index.html' || page === 'study.html') return null;
     const id = page === 'reader.html' ? 'desktopReaderNav' : 'appDesktopRail';

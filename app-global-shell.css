@@ -23,6 +23,20 @@
 .globalShellEyebrow { color:#1769aa; font-size:10px; font-weight:800; letter-spacing:.12em; }
 .global-shell-page .shell > .header { display:none; }
 .global-shell-page main > header:not(.globalAppHeader) { display:none; }
+.global-shell-page #appDesktopRail,
+.global-shell-page #desktopReaderNav { display:none !important; }
+.global-shell-page body { padding-left:0 !important; }
+.global-shell-page body > main,
+.global-shell-page body > #app { margin-left:auto !important; margin-right:auto !important; }
+html.global-shell-page.app-desktop-rail-page body { padding-left:0 !important; }
+html.global-shell-page.app-desktop-rail-page body > main,
+html.global-shell-page.app-desktop-rail-page body > #app { width:100% !important; max-width:none !important; margin-left:auto !important; margin-right:auto !important; }
+html.global-shell-page body.top-level-nav { padding-left:0 !important; }
+html.global-shell-page body.top-level-nav #studyApp { width:min(100% - 24px,920px) !important; margin-left:auto !important; margin-right:auto !important; }
+.global-shell-page #topbar button,
+.global-shell-page .topbar button,
+.global-shell-page #studyContextNav button,
+.global-shell-page header:not(.globalAppHeader) button { display:none !important; }
 .global-shell-page #appGlobalHeader ~ #app,
 .global-shell-page #appGlobalHeader ~ .app { margin-top:58px; height:calc(100vh - 58px); }
 .global-shell-page #appGlobalHeader ~ .shell { padding-top:76px; }

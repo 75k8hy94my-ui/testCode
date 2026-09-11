@@ -21,6 +21,7 @@
     window.location.assign('profile.html');
   }
   function install() {
+    if (document.documentElement.classList.contains('global-shell-page')) return;
     if (!window.matchMedia || !window.matchMedia('(min-width: 900px)').matches) return;
     const nav = document.getElementById('appDesktopRail') || document.getElementById('desktopReaderNav');
     if (!nav) { requestAnimationFrame(install); return; }

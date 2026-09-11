@@ -123,6 +123,9 @@
     ensureStylesheet();
     const page = currentPage();
     const currentLabel = labels[page] || document.title;
+    document.getElementById('appDesktopRail')?.remove();
+    document.getElementById('desktopReaderNav')?.remove();
+    document.getElementById('desktopProfileMenu')?.remove();
     if (page === 'study.html') setTimeout(() => document.getElementById('studyBottomNav')?.remove(), 0);
     const existing = document.querySelector('.homeHeader');
     const header = existing || document.createElement('header');
