@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pages = ['index.html', 'sync.html', 'home.html', 'reader.html', 'local-reader.html', 'links.html', 'study.html', 'index-search.html', 'hyakusen.html', 'roppo.html'];
 const standalone = [
-  'app-desktop-rail.js', 'author-summary.js', 'backup-format.js', 'browser-storage.js', 'desktop-navigation.js',
+  'app-desktop-rail.js', 'app-global-shell.js', 'author-summary.js', 'backup-format.js', 'browser-storage.js', 'desktop-navigation.js',
   'encrypted-chunk-cache.js', 'encrypted-chunk-crypto.js', 'encrypted-chunk-sync.js', 'feature-flags.js', 'home-dashboard.js',
   'hyakusen-catalog.js', 'hyakusen-drive.js', 'hyakusen-page.js',
   'index-conversion-prompt.js', 'index-search-backup.js', 'index-search-conflicts.js', 'index-search-page.js', 'index-search-sync-status.js',

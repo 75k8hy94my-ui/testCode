@@ -1,0 +1,51 @@
+#appGlobalHeader.globalAppHeader,
+.globalAppHeader {
+  position: fixed;
+  z-index: 900;
+  top: 0;
+  left: 0;
+  right: 0;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 8px 18px;
+  border-bottom: 1px solid rgba(60,60,67,.16);
+  background: rgba(248,249,252,.86);
+  color: #202124;
+  box-shadow: 0 6px 20px rgba(38,42,50,.10);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  backdrop-filter: blur(24px) saturate(150%);
+}
+.globalShellBrand { display:flex; align-items:center; gap:8px; min-width:0; }
+.globalShellBrand h1 { margin:0; font-size:18px; font-weight:700; letter-spacing:0; white-space:nowrap; }
+.globalShellEyebrow { color:#1769aa; font-size:10px; font-weight:800; letter-spacing:.12em; }
+.globalShellNav { display:flex; align-items:center; justify-content:flex-end; gap:4px; flex-wrap:wrap; }
+.globalShellLink { min-height:34px; display:inline-flex; align-items:center; justify-content:center; padding:0 9px; border:1px solid transparent; border-radius:5px; color:inherit; font-size:12px; font-weight:650; text-decoration:none; white-space:nowrap; }
+.globalShellLink:hover,.globalShellLink:focus-visible { background:rgba(23,105,170,.10); outline:none; }
+.globalShellLink.is-current { color:#1769aa; background:rgba(23,105,170,.13); border-color:rgba(23,105,170,.18); }
+.global-shell-page .shell > .header { display:none; }
+.globalShellEdit { min-height:34px; padding:0 9px; border:1px solid rgba(23,105,170,.18); border-radius:5px; background:rgba(23,105,170,.10); color:#1769aa; font:inherit; font-size:12px; font-weight:650; cursor:pointer; white-space:nowrap; }
+.global-shell-page #appGlobalHeader ~ #app,
+.global-shell-page #appGlobalHeader ~ .app { margin-top:58px; height:calc(100vh - 58px); }
+.global-shell-page #appGlobalHeader ~ .shell { padding-top:76px; }
+.global-shell-page #appGlobalHeader ~ #studyApp { padding-top:76px; }
+.global-shell-page #appGlobalHeader ~ main.homeShell #routeContent { padding-top:0; }
+.global-shell-page #appGlobalHeader ~ main:not(.homeShell) { padding-top:58px; }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  #appGlobalHeader.globalAppHeader,.globalAppHeader { background:#fff; -webkit-backdrop-filter:none; backdrop-filter:none; }
+}
+@media (max-width:899px) {
+  #appGlobalHeader.globalAppHeader,.globalAppHeader { position:sticky; min-height:0; padding:10px 12px; display:block; }
+  .globalShellBrand { justify-content:space-between; }
+  .globalShellBrand h1 { font-size:16px; }
+  .globalShellEyebrow { font-size:9px; }
+  .globalShellNav { justify-content:flex-start; overflow-x:auto; flex-wrap:nowrap; margin-top:7px; padding-bottom:1px; }
+  .globalShellLink { min-height:32px; padding:0 8px; font-size:11px; }
+  .global-shell-page #appGlobalHeader ~ #app,
+  .global-shell-page #appGlobalHeader ~ .app { margin-top:0; height:calc(100vh - 94px); }
+  .global-shell-page #appGlobalHeader ~ .shell,
+  .global-shell-page #appGlobalHeader ~ #studyApp { padding-top:18px; }
+  .global-shell-page #appGlobalHeader ~ main:not(.homeShell) { padding-top:18px; }
+}
