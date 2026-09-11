@@ -1,0 +1,468 @@
+(() => {
+  'use strict';
+
+  const STORAGE_KEY = 'linkManagerItemsV1';
+  const MAX_IMPORT_ITEMS = 5000;
+  const els = {
+    addBtn: document.getElementById('addBtn'),
+    themeBtn: document.getElementById('themeBtn'),
+    summary: document.getElementById('summary'),
+    searchInput: document.getElementById('searchInput'),
+    clearSearchBtn: document.getElementById('clearSearchBtn'),
+    filters: Array.from(document.querySelectorAll('.filter-btn')),
+    tagFilter: document.getElementById('tagFilter'),
+    linkList: document.getElementById('linkList'),
+    emptyState: document.getElementById('emptyState'),
+    exportBtn: document.getElementById('exportBtn'),
+    importBtn: document.getElementById('importBtn'),
+    importFile: document.getElementById('importFile'),
+    editDialog: document.getElementById('editDialog'),
+    editForm: document.getElementById('editForm'),
+    dialogTitle: document.getElementById('dialogTitle'),
+    itemId: document.getElementById('itemId'),
+    urlInput: document.getElementById('urlInput'),
+    titleInput: document.getElementById('titleInput'),
+    noteInput: document.getElementById('noteInput'),
+    tagsInput: document.getElementById('tagsInput'),
+    formError: document.getElementById('formError'),
+    cancelBtn: document.getElementById('cancelBtn'),
+    toast: document.getElementById('toast'),
+  };
+  const linkScreen = 'link-edit';
+  let currentLinkScreen = null;
+  function renderLinkScreen(screen) {
+    currentLinkScreen = screen === linkScreen ? screen : null;
+    els.editDialog.classList.toggle('show', currentLinkScreen === linkScreen);
+    els.editDialog.setAttribute('aria-hidden', currentLinkScreen === linkScreen ? 'false' : 'true');
+  }
+  function linkScreenFromLocation() {
+    return new URLSearchParams(location.hash.replace(/^#/, '')).get('screen') === linkScreen ? linkScreen : null;
+  }
+  function navigateLinkScreen(screen, { replace = false } = {}) {
+    const url = new URL(location.href);
+    url.hash = screen === linkScreen ? 'screen=' + linkScreen : '';
+    const state = { ...(history.state || {}), linkScreen: screen === linkScreen ? linkScreen : null };
+    if (replace) history.replaceState(state, '', url);
+    else history.pushState(state, '', url);
+    renderLinkScreen(screen);
+  }
+  function openLinkScreen() { if (currentLinkScreen !== linkScreen) navigateLinkScreen(linkScreen); }
+  function closeLinkScreen() {
+    if (currentLinkScreen !== linkScreen) return;
+    if (history.state && history.state.linkScreen === linkScreen) history.back();
+    else navigateLinkScreen(null, { replace: true });
+  }
+  function syncLinkScreen() { renderLinkScreen(linkScreenFromLocation()); }
+  window.addEventListener('popstate', syncLinkScreen);
+  window.addEventListener('hashchange', syncLinkScreen);
+  renderLinkScreen(linkScreenFromLocation());
+  const THEME_KEY = 'mangaReaderTheme';
+  function applyTheme(theme) {
+    const selected = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = selected;
+    els.themeBtn.innerHTML = selected === 'light'
+      ? '<svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 15.2A8.5 8.5 0 0 1 8.8 3.5a8.6 8.6 0 1 0 11.7 11.7z"></path></svg>'
+      : '<svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path></svg>';
+    try { localStorage.setItem(THEME_KEY, selected); } catch (_) {}
+  }
+  applyTheme(localStorage.getItem(THEME_KEY));
+
+  let items = loadItems();
+  let activeFilter = 'all';
+  let activeTag = '';
+  let toastTimer = 0;
+
+  function loadItems() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      return Array.isArray(parsed) ? parsed.map(normalizeItem).filter(Boolean) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function normalizeItem(raw) {
+    if (!raw || typeof raw !== 'object' || typeof raw.url !== 'string') return null;
+    const url = normalizeUrl(raw.url);
+    if (!url) return null;
+    const now = Date.now();
+    return {
+      id: String(raw.id || makeId()),
+      url,
+      title: String(raw.title || titleFromUrl(url)).trim(),
+      note: String(raw.note || '').trim(),
+      tags: normalizeTags(raw.tags),
+      favorite: !!raw.favorite,
+      readAt: Number(raw.readAt) || null,
+      createdAt: Number(raw.createdAt) || now,
+      updatedAt: Number(raw.updatedAt) || Number(raw.createdAt) || now,
+      source: String(raw.source || 'manual'),
+    };
+  }
+
+  function saveItems() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  }
+
+  function makeId() {
+    if (crypto && typeof crypto.randomUUID === 'function') return 'link_' + crypto.randomUUID();
+    return 'link_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+  }
+
+  function normalizeUrl(value) {
+    let input = String(value || '').trim();
+    if (!input) return '';
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(input)) input = 'https://' + input;
+    try {
+      const url = new URL(input);
+      if (!/^https?:$/.test(url.protocol)) return '';
+      url.hash = '';
+      return url.href;
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function urlKey(value) {
+    try {
+      const url = new URL(value);
+      url.hash = '';
+      if (url.pathname === '/') url.pathname = '';
+      return url.href.replace(/\/$/, '').toLowerCase();
+    } catch (e) {
+      return String(value || '').toLowerCase();
+    }
+  }
+
+  function titleFromUrl(value) {
+    try {
+      const url = new URL(value);
+      const tail = decodeURIComponent(url.pathname.split('/').filter(Boolean).pop() || '');
+      return tail || url.hostname.replace(/^www\./, '');
+    } catch (e) {
+      return value;
+    }
+  }
+
+  function normalizeTags(value) {
+    const source = Array.isArray(value) ? value : String(value || '').split(/[,、]/);
+    return Array.from(new Set(source.map((tag) => String(tag).trim()).filter(Boolean))).slice(0, 20);
+  }
+
+  function displayDomain(value) {
+    try {
+      return new URL(value).hostname.replace(/^www\./, '');
+    } catch (e) {
+      return value;
+    }
+  }
+
+  function formatDate(timestamp) {
+    if (!timestamp) return '未読';
+    return new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric' }).format(timestamp);
+  }
+
+  function escapeSearch(value) {
+    return String(value || '').normalize('NFKC').toLocaleLowerCase('ja');
+  }
+
+  function visibleItems() {
+    const query = escapeSearch(els.searchInput.value.trim());
+    return items
+      .filter((item) => {
+        if (activeFilter === 'unread' && item.readAt) return false;
+        if (activeFilter === 'favorite' && !item.favorite) return false;
+        if (activeTag && !item.tags.includes(activeTag)) return false;
+        if (!query) return true;
+        return escapeSearch([item.title, item.url, item.note, item.tags.join(' ')].join(' ')).includes(query);
+      })
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  function render() {
+    const visible = visibleItems();
+    const unread = items.filter((item) => !item.readAt).length;
+    els.summary.textContent = items.length
+      ? items.length + '件保存 ・ 未読' + unread + '件'
+      : '保存したリンクはありません';
+    els.clearSearchBtn.hidden = !els.searchInput.value;
+
+    els.tagFilter.hidden = !activeTag;
+    if (activeTag) {
+      els.tagFilter.replaceChildren(
+        document.createTextNode('タグ「' + activeTag + '」で絞り込み中'),
+        makeButton('解除', () => { activeTag = ''; render(); })
+      );
+    }
+
+    els.linkList.replaceChildren();
+    const fragment = document.createDocumentFragment();
+    visible.forEach((item) => fragment.appendChild(buildCard(item)));
+    els.linkList.appendChild(fragment);
+
+    const filtering = activeFilter !== 'all' || activeTag || els.searchInput.value.trim();
+    els.emptyState.style.display = visible.length ? 'none' : 'block';
+    els.emptyState.textContent = items.length
+      ? (filtering ? '条件に一致するリンクはありません。' : 'リンクはまだありません。')
+      : '「＋ 追加」から最初のリンクを保存できます。';
+  }
+
+  function buildCard(item) {
+    const card = document.createElement('article');
+    card.className = 'card' + (item.readAt ? '' : ' unread');
+
+    const head = document.createElement('div');
+    head.className = 'card-head';
+    const titleBox = document.createElement('div');
+    const title = document.createElement('a');
+    title.className = 'card-title';
+    title.href = item.url;
+    title.target = '_blank';
+    title.rel = 'noopener noreferrer';
+    title.textContent = item.title || item.url;
+    title.addEventListener('click', () => markRead(item));
+    const domain = document.createElement('div');
+    domain.className = 'domain';
+    domain.textContent = displayDomain(item.url);
+    titleBox.append(title, domain);
+
+    const favorite = document.createElement('button');
+    favorite.type = 'button';
+    favorite.className = 'favorite-btn' + (item.favorite ? ' active' : '');
+    favorite.innerHTML = item.favorite
+      ? '<svg class="favorite-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3z"></path></svg>'
+      : '<svg class="favorite-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3z"></path></svg>';
+    favorite.title = item.favorite ? 'お気に入りから外す' : 'お気に入りに追加';
+    favorite.setAttribute('aria-label', favorite.title);
+    favorite.addEventListener('click', () => {
+      item.favorite = !item.favorite;
+      item.updatedAt = Date.now();
+      saveItems();
+      render();
+    });
+    head.append(titleBox, favorite);
+    card.appendChild(head);
+
+    if (item.note) {
+      const note = document.createElement('p');
+      note.className = 'note';
+      note.textContent = item.note;
+      card.appendChild(note);
+    }
+
+    if (item.tags.length) {
+      const tags = document.createElement('div');
+      tags.className = 'tags';
+      item.tags.forEach((tagName) => {
+        const tag = makeButton(tagName, () => { activeTag = tagName; render(); });
+        tag.className = 'tag';
+        tags.appendChild(tag);
+      });
+      card.appendChild(tags);
+    }
+
+    const foot = document.createElement('div');
+    foot.className = 'card-foot';
+    const status = document.createElement('span');
+    status.textContent = item.readAt ? '既読 ' + formatDate(item.readAt) : '未読';
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    actions.append(
+      makeAction(item.readAt ? '未読に戻す' : '既読にする', () => toggleRead(item)),
+      makeAction('編集', () => openEditor(item)),
+      makeAction('削除', () => deleteItem(item))
+    );
+    foot.append(status, actions);
+    card.appendChild(foot);
+    return card;
+  }
+
+  function makeButton(label, action) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.addEventListener('click', action);
+    return button;
+  }
+
+  function makeAction(label, action) {
+    const button = makeButton(label, action);
+    button.className = 'icon-btn';
+    return button;
+  }
+
+  function markRead(item) {
+    if (!item.readAt) {
+      item.readAt = Date.now();
+      item.updatedAt = Date.now();
+      saveItems();
+    }
+  }
+
+  function toggleRead(item) {
+    item.readAt = item.readAt ? null : Date.now();
+    item.updatedAt = Date.now();
+    saveItems();
+    render();
+  }
+
+  function deleteItem(item) {
+    if (!confirm('「' + item.title + '」を削除しますか？')) return;
+    items = items.filter((candidate) => candidate.id !== item.id);
+    saveItems();
+    render();
+    showToast('削除しました');
+  }
+
+  function openEditor(item, preset) {
+    const data = item || preset || {};
+    els.dialogTitle.textContent = item ? 'リンクを編集' : 'リンクを追加';
+    els.itemId.value = item ? item.id : '';
+    els.urlInput.value = data.url || '';
+    els.titleInput.value = data.title || '';
+    els.noteInput.value = data.note || '';
+    els.tagsInput.value = normalizeTags(data.tags).join(', ');
+    els.formError.textContent = '';
+    openLinkScreen();
+    window.setTimeout(() => (els.urlInput.value ? els.titleInput : els.urlInput).focus(), 0);
+  }
+
+  function closeEditor() {
+    closeLinkScreen();
+    els.editForm.reset();
+    els.formError.textContent = '';
+  }
+
+  function submitEditor(event) {
+    event.preventDefault();
+    const url = normalizeUrl(els.urlInput.value);
+    if (!url) {
+      els.formError.textContent = 'http または https のURLを入力してください。';
+      return;
+    }
+    const id = els.itemId.value;
+    const duplicate = items.find((item) => urlKey(item.url) === urlKey(url) && item.id !== id);
+    if (duplicate) {
+      els.formError.textContent = 'このURLはすでに「' + duplicate.title + '」として保存されています。';
+      return;
+    }
+    const now = Date.now();
+    const existing = items.find((item) => item.id === id);
+    const values = {
+      url,
+      title: els.titleInput.value.trim() || titleFromUrl(url),
+      note: els.noteInput.value.trim(),
+      tags: normalizeTags(els.tagsInput.value),
+      updatedAt: now,
+    };
+    if (existing) {
+      Object.assign(existing, values);
+    } else {
+      items.unshift({
+        id: makeId(),
+        ...values,
+        favorite: false,
+        readAt: null,
+        createdAt: now,
+        source: new URLSearchParams(location.search).has('add') ? 'safari-shortcut' : 'manual',
+      });
+    }
+    saveItems();
+    closeEditor();
+    clearCaptureQuery();
+    render();
+    showToast(existing ? '更新しました' : '保存しました');
+  }
+
+  function showToast(message) {
+    window.clearTimeout(toastTimer);
+    els.toast.textContent = message;
+    els.toast.classList.add('show');
+    toastTimer = window.setTimeout(() => els.toast.classList.remove('show'), 1800);
+  }
+
+  function exportItems() {
+    const payload = JSON.stringify({
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      items,
+    }, null, 2);
+    const blob = new Blob([payload], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'links-' + new Date().toISOString().slice(0, 10) + '.json';
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  }
+
+  async function importItems(file) {
+    try {
+      const payload = JSON.parse(await file.text());
+      const incoming = Array.isArray(payload) ? payload : payload.items;
+      if (!Array.isArray(incoming)) throw new Error('形式が違います');
+      if (incoming.length > MAX_IMPORT_ITEMS) throw new Error('件数が多すぎます');
+
+      const byUrl = new Map(items.map((item) => [urlKey(item.url), item]));
+      let added = 0;
+      let updated = 0;
+      incoming.map(normalizeItem).filter(Boolean).forEach((item) => {
+        const key = urlKey(item.url);
+        const existing = byUrl.get(key);
+        if (!existing) {
+          items.push(item);
+          byUrl.set(key, item);
+          added++;
+        } else if (item.updatedAt > existing.updatedAt) {
+          Object.assign(existing, item, { id: existing.id });
+          updated++;
+        }
+      });
+      saveItems();
+      render();
+      showToast('追加' + added + '件・更新' + updated + '件');
+    } catch (e) {
+      alert('JSONを読み込めませんでした。リンク管理から書き出したファイルを選んでください。');
+    } finally {
+      els.importFile.value = '';
+    }
+  }
+
+  function captureFromQuery() {
+    const params = new URLSearchParams(location.search);
+    const rawUrl = params.get('url') || '';
+    if (!params.has('add') && !rawUrl) return;
+    openEditor(null, {
+      url: rawUrl,
+      title: params.get('title') || '',
+      note: params.get('note') || '',
+      tags: params.get('tags') || '',
+    });
+  }
+
+  function clearCaptureQuery() {
+    if (!location.search) return;
+    history.replaceState(null, '', location.pathname + location.hash);
+  }
+
+  els.addBtn.addEventListener('click', () => openEditor());
+  els.themeBtn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'));
+  els.cancelBtn.addEventListener('click', () => { closeEditor(); clearCaptureQuery(); });
+  els.editForm.addEventListener('submit', submitEditor);
+  els.editDialog.addEventListener('cancel', (event) => { event.preventDefault(); closeEditor(); clearCaptureQuery(); });
+  els.searchInput.addEventListener('input', render);
+  els.clearSearchBtn.addEventListener('click', () => { els.searchInput.value = ''; render(); els.searchInput.focus(); });
+  els.filters.forEach((button) => button.addEventListener('click', () => {
+    activeFilter = button.dataset.filter;
+    els.filters.forEach((candidate) => candidate.classList.toggle('active', candidate === button));
+    render();
+  }));
+  els.exportBtn.addEventListener('click', exportItems);
+  els.importBtn.addEventListener('click', () => els.importFile.click());
+  els.importFile.addEventListener('change', () => {
+    const file = els.importFile.files && els.importFile.files[0];
+    if (file) importItems(file);
+  });
+
+  render();
+  captureFromQuery();
+})();
