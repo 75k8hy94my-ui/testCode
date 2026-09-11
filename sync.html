@@ -2,96 +2,93 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex,nofollow,noarchive,nosnippet">
   <title>漫画リーダー</title>
   <link rel="icon" type="image/png" href="icon-152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
   <style>
-    :root { --bg:#f5f7fb; --surface:#fff; --text:#1e293b; --sub:#64748b; --line:#dbe3ee; --accent:#2563eb; --danger:#b91c1c; --radius:14px; }
-    * { box-sizing:border-box; } body { margin:0; min-height:100vh; color:var(--text); background:linear-gradient(150deg,#edf4ff 0%,var(--bg) 45%,#f8fafc 100%); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-    main { width:min(100% - 32px,560px); margin:0 auto; padding:42px 0 64px; } header,.account { display:flex; justify-content:space-between; align-items:center; gap:12px; } header { margin-bottom:26px; } h1 { font-size:24px; margin:0; } h2 { font-size:18px; margin:0 0 6px; }
-    .card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:0 14px 36px rgba(15,23,42,.08); padding:24px; } .description,.status { color:var(--sub); font-size:14px; line-height:1.7; margin:0 0 18px; } label { display:block; font-size:13px; font-weight:700; margin:15px 0 6px; }
-    input { width:100%; padding:12px; border:1px solid var(--line); border-radius:9px; color:var(--text); background:#fbfdff; font:inherit; } input:focus { outline:3px solid rgba(37,99,235,.16); border-color:var(--accent); } button { appearance:none; border:1px solid var(--line); border-radius:9px; padding:10px 12px; background:#fff; color:var(--text); font:inherit; font-weight:700; cursor:pointer; } .danger { color:var(--danger); border-color:#fecaca; background:#fff7f7; } .recovery { margin-top:16px; padding:14px; border:1px solid #facc15; border-radius:10px; background:#fefce8; font-size:13px; line-height:1.65; } code { display:block; margin:8px 0; padding:9px; border-radius:7px; background:#fff; overflow-wrap:anywhere; user-select:all; } [hidden] { display:none!important; } @media (max-width:520px) { main { width:min(100% - 24px,560px); padding-top:24px; }.card { padding:18px; } }
-    body { background:radial-gradient(90% 55% at 0% 0%, rgba(122,162,255,.28), transparent 68%),radial-gradient(80% 55% at 100% 100%, rgba(37,99,235,.12), transparent 70%),linear-gradient(145deg, #e9f1ff 0%, var(--bg) 48%, #f8fafc 100%); }
-    .card { background: rgba(255,255,255,.88); border-color: rgba(203,213,225,.78); box-shadow: 0 24px 60px rgba(30,64,125,.14), inset 0 1px 0 rgba(255,255,255,.96); }
-    input, code { background: rgba(255,255,255,.52); border-color: rgba(148,163,184,.42); box-shadow: inset 0 1px 0 rgba(255,255,255,.68); }
-    button { background: linear-gradient(145deg, rgba(255,255,255,.68), rgba(255,255,255,.34)); border-color: rgba(255,255,255,.72); box-shadow: inset 0 1px 0 rgba(255,255,255,.86), inset 0 -1px 0 rgba(70,90,125,.10), 0 6px 16px rgba(30,64,125,.08); -webkit-backdrop-filter: blur(16px) saturate(145%); backdrop-filter: blur(16px) saturate(145%); transition: transform .18s ease, box-shadow .18s ease, background .18s ease; }
-    button:hover { transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 9px 20px rgba(30,64,125,.13); }
-    button:active { transform: scale(.98); }
-    .danger { color: #991b1b; background: linear-gradient(145deg, rgba(255,247,247,.84), rgba(254,226,226,.44)); border-color: rgba(248,113,113,.38); }
-    .recovery { background: linear-gradient(145deg, rgba(254,252,232,.78), rgba(254,249,195,.40)); border-color: rgba(234,179,8,.48); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
-    .vaultLogout { width:100%; margin-top:18px; min-height:44px; }
-    .extensionDownload { margin-top:22px; padding-top:20px; border-top:1px solid var(--line); }
-    .extensionDownload h2 { margin-bottom:7px; }
-    .extensionDownload .description { margin-bottom:12px; }
-    .extensionSteps { margin:10px 0 14px 20px; padding:0; color:var(--sub); font-size:13px; line-height:1.7; }
-    .extensionDownload button { width:100%; min-height:44px; color:var(--accent); }
-    .extensionDownload .status { margin:10px 0 0; min-height:20px; }
-    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .card, button, input, code { background: rgba(255,255,255,.96); } }
+    :root { --bg:#fff; --text:#1f2937; --line:#9ca3af; --focus:#2563eb; --danger:#dc2626; }
+    * { box-sizing:border-box; }
+    html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; }
+    body { height:100dvh; color:var(--text); background:var(--bg); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic",sans-serif; }
+    main { position:relative; width:100%; height:100dvh; overflow:hidden; padding-top:env(safe-area-inset-top); padding-right:env(safe-area-inset-right); padding-bottom:env(safe-area-inset-bottom); padding-left:env(safe-area-inset-left); }
+    header { position:absolute; top:max(22px, calc(env(safe-area-inset-top) + 14px)); left:max(28px, calc(env(safe-area-inset-left) + 18px)); right:max(28px, calc(env(safe-area-inset-right) + 18px)); display:flex; align-items:center; justify-content:space-between; gap:24px; min-width:0; }
+    h1 { margin:0; font-size:clamp(24px,3vw,42px); line-height:1.1; font-weight:500; letter-spacing:.04em; white-space:nowrap; }
+    #accountLogout { appearance:none; border:0; background:transparent; padding:8px 0; margin:0; color:var(--text); font:inherit; font-size:clamp(13px,1.4vw,18px); cursor:pointer; min-width:0; max-width:55%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #accountLogout:hover { text-decoration:underline; text-underline-offset:4px; }
+    #unlockView { position:absolute; inset:0; pointer-events:none; }
+    #unlockForm { position:absolute; left:50%; top:44%; transform:translate(-50%,-50%); width:min(62vw,720px); pointer-events:auto; }
+    #vaultCredential { display:block; width:100%; height:clamp(54px,6vw,78px); border:1.5px solid var(--line); border-radius:3px; background:#fff; color:var(--text); padding:0 18px; font:inherit; font-size:clamp(18px,2vw,26px); box-shadow:none; outline:none; }
+    #vaultCredential:focus { border-color:var(--focus); box-shadow:0 0 0 2px rgba(37,99,235,.12); }
+    #vaultCredential.error { border-color:var(--danger); box-shadow:0 0 0 2px rgba(220,38,38,.10); }
+    .sr-only { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
+    #recoveryBox { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(88vw,680px); padding:22px; border:1px solid #d1d5db; background:#fff; }
+    #recoveryBox code { display:block; margin:12px 0; padding:12px; border:1px solid #d1d5db; overflow-wrap:anywhere; user-select:all; }
+    #recoveryBox button { width:100%; min-height:44px; }
+    [hidden] { display:none!important; }
+    @media (max-width:640px) {
+      header { top:max(18px, calc(env(safe-area-inset-top) + 10px)); left:max(18px, calc(env(safe-area-inset-left) + 12px)); right:max(18px, calc(env(safe-area-inset-right) + 12px)); gap:12px; }
+      h1 { font-size:25px; }
+      #accountLogout { max-width:58%; font-size:12px; }
+      #unlockForm { top:42%; width:calc(100vw - 44px - env(safe-area-inset-left) - env(safe-area-inset-right)); }
+      #vaultCredential { height:58px; padding:0 14px; font-size:20px; }
+    }
+    @media (max-height:520px) {
+      #unlockForm { top:54%; }
+    }
   </style>
 </head>
 <body>
   <main>
-    <header><h1>漫画リーダー</h1></header>
-    <section class="card">
-      <div class="account"><div><div class="description" style="margin:0 0 3px;">ログイン中</div><div id="accountEmail"></div></div></div>
-      <div id="unlockView" style="margin-top:24px;">
-        <h2>パスフレーズ</h2>
-        <p class="description">入力すると、暗号化された保存内容を自動で読み込みます。</p>
-        <label for="vaultPassphrase">保管庫パスフレーズ</label>
-        <input id="vaultPassphrase" name="vault-unlock-key" type="password" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" placeholder="ログイン用とは別のパスフレーズ" autofocus>
-        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
-          <button id="passphraseUnlockBtn" type="button">パスフレーズで開く</button>
-          <button id="passkeyUnlockBtn" type="button">パスキーで開く</button>
-          <button id="createVaultBtn" type="button">保管庫を作成</button>
-          <button id="passkeyRegisterBtn" type="button">パスキーを登録</button>
-        </div>
-        <label for="recoveryKey">または復旧キー</label>
-        <input id="recoveryKey" type="text" autocomplete="off" spellcheck="false" placeholder="作成時に控えた復旧キー">
-        <p id="status" class="status" aria-live="polite"></p>
-        <button id="vaultLogoutBtn" class="danger vaultLogout" type="button">ログアウト</button>
-      </div>
-      <div id="recoveryBox" class="recovery" hidden>
-        <strong>復旧キー（今だけ表示）</strong>
-        <code id="recoveryCode"></code>
-        <button id="copyRecoveryBtn" type="button">復旧キーをコピー</button>
-        <div style="margin-top:8px;">安全な場所に保管してください。数秒後にホームを開きます。</div>
-      </div>
-      <section class="extensionDownload" aria-labelledby="extensionDownloadHeading">
-        <h2 id="extensionDownloadHeading">漫画登録ブラウザ拡張機能</h2>
-        <p class="description">Chrome / Edge 用の最新版をZIPでダウンロードできます。</p>
-        <ol class="extensionSteps">
-          <li>ZIPをダウンロードして展開</li>
-          <li>拡張機能の管理画面でデベロッパーモードをオン</li>
-          <li>「パッケージ化されていない拡張機能を読み込む」で展開したフォルダを選択</li>
-        </ol>
-        <button id="extensionDownloadBtn" type="button">ブラウザ拡張機能をダウンロード</button>
-        <p id="extensionDownloadStatus" class="status" aria-live="polite"></p>
-      </section>
-    </section>
+    <header>
+      <h1>同期コード</h1>
+      <button id="accountLogout" type="button"><span id="accountEmail"></span> でログイン中</button>
+    </header>
+    <div id="unlockView">
+      <form id="unlockForm" novalidate>
+        <input id="vaultCredential" name="vault-unlock-key" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" autofocus>
+        <button type="submit" hidden aria-hidden="true"></button>
+        <p id="status" class="sr-only" aria-live="polite"></p>
+      </form>
+    </div>
+    <div id="recoveryBox" hidden>
+      <strong>復旧キー（今だけ表示）</strong>
+      <code id="recoveryCode"></code>
+      <button id="copyRecoveryBtn" type="button">復旧キーをコピー</button>
+      <div>安全な場所に保管してください。数秒後にホームを開きます。</div>
+    </div>
   </main>
   <script src="supabase-config.js"></script>
   <script src="vault-session.js?v=20260813-vault-state"></script>
   <script src="vault-payload.js"></script>
   <script src="encrypted-chunk-cache.js"></script>
-  <script src="extension-download.js"></script>
   <script>
   (() => {
     'use strict';
     const { buildFromLocalStorage: buildPayload, applyToLocalStorage: applyPayload } = window.MangaVaultPayload;
     const $ = (id) => document.getElementById(id);
-    const ui = { email:$('accountEmail'), passphrase:$('vaultPassphrase'), recovery:$('recoveryKey'), status:$('status'), unlock:$('unlockView'), recoveryBox:$('recoveryBox'), recoveryCode:$('recoveryCode'), copy:$('copyRecoveryBtn'), passphraseUnlock:$('passphraseUnlockBtn'), passkeyUnlock:$('passkeyUnlockBtn'), createVault:$('createVaultBtn'), passkeyRegister:$('passkeyRegisterBtn'), vaultLogout:$('vaultLogoutBtn') };
+    const ui = {
+      email:$('accountEmail'),
+      accountLogout:$('accountLogout'),
+      unlock:$('unlockView'),
+      unlockForm:$('unlockForm'),
+      credential:$('vaultCredential'),
+      status:$('status'),
+      recoveryBox:$('recoveryBox'),
+      recoveryCode:$('recoveryCode'),
+      copy:$('copyRecoveryBtn')
+    };
     function setStatus(text) { ui.status.textContent=text || ''; }
     function goReader() { window.location.replace('home.html'); }
     const session = MangaVault.loadSession();
     if (!session || !session.user || !session.user.email) { window.location.replace('index.html'); return; }
     ui.email.textContent=session.user.email;
     const DEVICE_DATA_KEYS=[...Object.values(MangaVaultPayload.DATA_KEYS||{}),'mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
-    let opening = false;
+    let opening=false;
+
     async function logout() {
-      if (!confirm('ログアウトしますか？')) return;
-      ui.vaultLogout.disabled=true;
+      ui.accountLogout.disabled=true;
       try { await MangaVault.withSession((token)=>MangaVault.api('/auth/v1/logout',{method:'POST',token})); } catch (_) {}
       try { if (session.user&&session.user.id) await EncryptedChunkCache.clearAll({dbName:`${EncryptedChunkCache.DB_NAME}:${session.user.id}`}); } catch (_) {}
       MangaVault.clearActive();
@@ -101,68 +98,46 @@
       Object.keys(localStorage).filter((key)=>key.startsWith('mangaReaderSavedVaultPassphrase:')).forEach((key)=>localStorage.removeItem(key));
       window.location.replace('index.html');
     }
-    async function refreshVaultState() {
-      try {
-        const record = await MangaVault.withSession((token, user) => MangaVault.fetchRecordForUi(token, user));
-        const exists = !!record;
-        ui.passphraseUnlock.hidden = !exists;
-        ui.passkeyUnlock.hidden = !exists;
-        ui.passkeyRegister.hidden = !exists;
-        ui.createVault.hidden = exists;
-        if (!exists) setStatus('保管庫はまだ作成されていません。パスフレーズを入力して作成してください。');
-      } catch (_) {}
+
+    function markError(message) {
+      ui.credential.classList.add('error');
+      setStatus(message);
     }
-    function validateUnlockInput() {
-      const passphrase=ui.passphrase.value, recovery=ui.recovery.value.trim();
-      if (!recovery && passphrase.length < 12) { setStatus('パスフレーズは12文字以上で入力してください。'); return; }
-      return { passphrase, recovery };
-    }
-    async function openAutomatically(passphrase,recovery) {
-      if (opening) return;
-      opening=true; setStatus('保管庫を確認しています…');
-      try {
-        const result=await MangaVault.initialize(passphrase,recovery,buildPayload,applyPayload);
-        ui.passphrase.value=''; ui.recovery.value='';
-        if (result.created) {
-          ui.unlock.hidden=true; ui.recoveryCode.textContent=result.recoveryCode; ui.recoveryBox.hidden=false; setStatus('');
-          setTimeout(goReader, 5500);
-        } else { goReader(); }
-      } catch (error) { setStatus(error.message || '保管庫を開けませんでした。'); }
-      finally { opening=false; }
-    }
-    async function passkeyUnlock() {
-      if (opening) return; opening=true; setStatus('パスキーを確認しています…');
-      try { await MangaVault.initializeWithPasskey(applyPayload); goReader(); }
-      catch (error) { setStatus(error.message || 'パスキーで保管庫を開けませんでした。'); }
-      finally { opening=false; }
-    }
-    async function passphraseUnlock() {
-      const input=validateUnlockInput();
-      if (!input || opening) return;
-      await openAutomatically(input.passphrase,input.recovery);
-    }
-    async function createVault() {
-      const input=validateUnlockInput();
-      if (!input || input.recovery) return;
-      if (opening) return; opening=true; setStatus('保管庫を作成しています…');
-      try { const result=await MangaVault.initialize(input.passphrase,'',buildPayload,applyPayload); ui.passphrase.value=''; ui.unlock.hidden=true; ui.recoveryCode.textContent=result.recoveryCode; ui.recoveryBox.hidden=false; setStatus('保管庫を作成しました。復旧キーを保存してください。'); setTimeout(goReader,5500); }
-      catch (error) { setStatus(error.message || '保管庫を作成できませんでした。'); }
-      finally { opening=false; }
-    }
-    async function passkeyRegister() {
-      const input=validateUnlockInput();
-      if (!input || input.recovery) { setStatus('パスキー登録には12文字以上のパスフレーズを入力してください。'); return; }
-      if (opening) return; opening=true; setStatus('パスキーを登録しています…');
-      try {
-        await MangaVault.registerPasskey(input.passphrase);
-        ui.passphrase.value='';
-        setStatus('パスキーを登録しました。次回からパスキーで開けます。');
+
+    async function unlockFromCredential(event) {
+      event.preventDefault();
+      const credential=ui.credential.value;
+      const isRecovery=credential.trim().startsWith('mrk1_');
+      if (!credential.trim() || (!isRecovery && credential.length < 12) || opening) {
+        if (!opening) markError('入力内容を確認してください。');
+        return;
       }
-      catch (error) { setStatus(error.message || 'パスキーを登録できませんでした。'); }
-      finally { opening=false; }
+      opening=true;
+      ui.credential.classList.remove('error');
+      setStatus('');
+      try {
+        const result=await MangaVault.initialize(isRecovery ? '' : credential,isRecovery ? credential.trim() : '',buildPayload,applyPayload);
+        ui.credential.value='';
+        if (result.created) {
+          ui.unlock.hidden=true;
+          ui.recoveryCode.textContent=result.recoveryCode;
+          ui.recoveryBox.hidden=false;
+          setTimeout(goReader,5500);
+        } else {
+          goReader();
+        }
+      } catch (error) {
+        markError(error && error.message ? error.message : '入力内容を確認してください。');
+        ui.credential.focus();
+      } finally {
+        opening=false;
+      }
     }
-    ui.passphraseUnlock.addEventListener('click',passphraseUnlock); ui.passkeyUnlock.addEventListener('click',passkeyUnlock); ui.createVault.addEventListener('click',createVault); ui.passkeyRegister.addEventListener('click',passkeyRegister); ui.vaultLogout.addEventListener('click',logout); ui.copy.addEventListener('click',async () => { try { await navigator.clipboard.writeText(ui.recoveryCode.textContent); } catch (_) {} });
-    refreshVaultState();
+
+    ui.credential.addEventListener('input',()=>{ ui.credential.classList.remove('error'); setStatus(''); });
+    ui.unlockForm.addEventListener('submit',unlockFromCredential);
+    ui.accountLogout.addEventListener('click',logout);
+    ui.copy.addEventListener('click',async()=>{ try { await navigator.clipboard.writeText(ui.recoveryCode.textContent); } catch (_) {} });
   })();
   </script>
 </body>
