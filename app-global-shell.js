@@ -16,34 +16,8 @@
     'roppo.html': '六法',
     'sync.html': '保管庫'
   };
-  const nav = [
-    ['home.html', 'ホーム'],
-    ['reader.html#screen=saved-list', '漫画'],
-    ['study.html', '学習'],
-    ['links.html', 'リンク'],
-    ['index-search.html', '索引'],
-    ['hyakusen.html', '判例百選'],
-    ['roppo.html', '六法'],
-    ['local-reader.html', 'ローカル漫画'],
-    ['profile.html', 'プロフィール'],
-    ['sync.html', '保管庫']
-  ];
   const routePages = new Set(Object.keys(labels));
   let navigating = false;
-
-  function active(href) {
-    return href.split('#')[0] === currentPage();
-  }
-
-  function syncActive() {
-    const current = location.pathname.split('/').pop() || 'home.html';
-    document.querySelectorAll('.globalShellLink[href]').forEach((link) => {
-      const isCurrent = new URL(link.href, location.href).pathname.split('/').pop() === current;
-      link.classList.toggle('is-current', isCurrent);
-      if (isCurrent) link.setAttribute('aria-current', 'page');
-      else link.removeAttribute('aria-current');
-    });
-  }
 
   function ensureStylesheet() {
     if (document.querySelector('link[data-global-shell-style]')) return;
@@ -142,17 +116,14 @@
   }
 
   function markup() {
-    const page = currentPage();
-    return '<div class="globalShellBrand"><span class="globalShellEyebrow">BOOKS</span><h1 id="shellTitle"></h1></div>' +
-      '<nav class="globalShellNav" aria-label="主要ページ">' +
-      nav.map(([href, label]) => '<a class="globalShellLink' + (active(href) ? ' is-current' : '') + '" href="' + href + '"' + (active(href) ? ' aria-current="page"' : '') + '>' + label + '</a>').join('') +
-      '</nav>' + (page === 'home.html' ? '<button class="globalShellEdit" id="editHomeBtn" type="button">カードを編集</button>' : '');
+    return '<div class="globalShellBrand"><span class="globalShellEyebrow">BOOKS</span><h1 id="shellTitle"></h1></div>';
   }
 
   function install() {
     ensureStylesheet();
     const page = currentPage();
     const currentLabel = labels[page] || document.title;
+    if (page === 'study.html') setTimeout(() => document.getElementById('studyBottomNav')?.remove(), 0);
     const existing = document.querySelector('.homeHeader');
     const header = existing || document.createElement('header');
     header.id = 'appGlobalHeader';
@@ -161,11 +132,8 @@
     header.querySelector('#shellTitle').textContent = currentLabel;
     if (!existing) document.body.insertBefore(header, document.body.firstChild);
     document.documentElement.classList.add('global-shell-page');
-    syncActive();
     document.removeEventListener('click', intercept);
     document.addEventListener('click', intercept);
-    document.addEventListener('home-profile-routechange', syncActive);
-    window.addEventListener('popstate', syncActive);
   }
 
   install();
