@@ -19,11 +19,7 @@
     { id: 'desktopNavManga', key: 'manga', label: '漫画', href: 'reader.html#screen=saved-list' },
     { id: 'desktopNavVideo', key: 'video', label: '動画', href: 'reader.html#screen=video-list' },
     { id: 'desktopNavStudy', key: 'study', label: '学習', href: 'study.html' },
-    { id: 'desktopNavLinks', key: 'links', label: 'リンク', href: 'links.html' },
-    { id: 'desktopNavAuthor', key: 'author', label: '作者', href: 'reader.html#screen=author-cards' },
-    { id: 'desktopNavBackup', key: 'backup', label: 'バックアップ', href: 'reader.html#screen=backup' },
     { id: 'desktopNavSettings', key: 'settings', label: '設定', href: 'reader.html#screen=settings' },
-    { id: 'desktopNavLocalReader', key: 'local', label: 'ローカル', href: 'local-reader.html', optional: true }
   ];
 
   function pageName() {
@@ -287,7 +283,6 @@
   }
 
   function build() {
-    if (document.documentElement.classList.contains('global-shell-page')) return null;
     const page = pageName();
     if (page === 'index.html' || page === 'study.html') return null;
     const id = page === 'reader.html' ? 'desktopReaderNav' : 'appDesktopRail';
