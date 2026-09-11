@@ -13,6 +13,13 @@
     Object.keys(localStorage).filter((key) => key.startsWith('mangaReaderSavedVaultPassphrase:')).forEach((key) => localStorage.removeItem(key));
     window.location.replace('index.html');
   }
+  function openProfile() {
+    if (window.HomeProfileSPA && typeof window.HomeProfileSPA.navigate === 'function') {
+      window.HomeProfileSPA.navigate('profile.html');
+      return;
+    }
+    window.location.assign('profile.html');
+  }
   function install() {
     if (!window.matchMedia || !window.matchMedia('(min-width: 900px)').matches) return;
     const nav = document.getElementById('appDesktopRail') || document.getElementById('desktopReaderNav');
@@ -25,7 +32,7 @@
     const close=()=>{menu.hidden=true;trigger.setAttribute('aria-expanded','false');};
     trigger.addEventListener('click',(event)=>{event.preventDefault();event.stopPropagation();menu.hidden=!menu.hidden;trigger.setAttribute('aria-expanded',menu.hidden?'false':'true');});
     menu.addEventListener('click',(event)=>event.stopPropagation());
-    menu.querySelector('[data-profile-route]').addEventListener('click',()=>{close();if(window.HomeProfileSPA)window.HomeProfileSPA.navigate('profile.html');});
+    menu.querySelector('[data-profile-route]').addEventListener('click',()=>{close();openProfile();});
     menu.querySelector('[data-logout]').addEventListener('click',()=>logout(menu.querySelector('[data-logout]')));
     document.addEventListener('click',close); document.addEventListener('keydown',(event)=>{if(event.key==='Escape')close();});
     document.addEventListener('home-profile-routechange',close);
