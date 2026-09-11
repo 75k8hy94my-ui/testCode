@@ -26,6 +26,7 @@
 .globalShellLink:hover,.globalShellLink:focus-visible { background:rgba(23,105,170,.10); outline:none; }
 .globalShellLink.is-current { color:#1769aa; background:rgba(23,105,170,.13); border-color:rgba(23,105,170,.18); }
 .global-shell-page .shell > .header { display:none; }
+.global-shell-page main > header:not(.globalAppHeader) { display:none; }
 .globalShellEdit { min-height:34px; padding:0 9px; border:1px solid rgba(23,105,170,.18); border-radius:5px; background:rgba(23,105,170,.10); color:#1769aa; font:inherit; font-size:12px; font-weight:650; cursor:pointer; white-space:nowrap; }
 .global-shell-page #appGlobalHeader ~ #app,
 .global-shell-page #appGlobalHeader ~ .app { margin-top:58px; height:calc(100vh - 58px); }

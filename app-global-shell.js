@@ -3,7 +3,7 @@
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
   if (location.pathname.endsWith('/index.html') || location.pathname === '/index.html') return;
 
-  const page = location.pathname.split('/').pop() || 'home.html';
+  const currentPage = () => location.pathname.split('/').pop() || 'home.html';
   const labels = {
     'home.html': 'ホーム',
     'profile.html': 'プロフィール設定',
@@ -16,7 +16,6 @@
     'roppo.html': '六法',
     'sync.html': '保管庫'
   };
-  const currentLabel = labels[page] || document.title;
   const nav = [
     ['home.html', 'ホーム'],
     ['reader.html#screen=saved-list', '漫画'],
@@ -25,13 +24,15 @@
     ['index-search.html', '索引'],
     ['hyakusen.html', '判例百選'],
     ['roppo.html', '六法'],
+    ['local-reader.html', 'ローカル漫画'],
+    ['profile.html', 'プロフィール'],
     ['sync.html', '保管庫']
   ];
   const routePages = new Set(Object.keys(labels));
   let navigating = false;
 
   function active(href) {
-    return href.split('#')[0] === page;
+    return href.split('#')[0] === currentPage();
   }
 
   function syncActive() {
@@ -141,6 +142,7 @@
   }
 
   function markup() {
+    const page = currentPage();
     return '<div class="globalShellBrand"><span class="globalShellEyebrow">BOOKS</span><h1 id="shellTitle"></h1></div>' +
       '<nav class="globalShellNav" aria-label="主要ページ">' +
       nav.map(([href, label]) => '<a class="globalShellLink' + (active(href) ? ' is-current' : '') + '" href="' + href + '"' + (active(href) ? ' aria-current="page"' : '') + '>' + label + '</a>').join('') +
@@ -149,6 +151,8 @@
 
   function install() {
     ensureStylesheet();
+    const page = currentPage();
+    const currentLabel = labels[page] || document.title;
     const existing = document.querySelector('.homeHeader');
     const header = existing || document.createElement('header');
     header.id = 'appGlobalHeader';
