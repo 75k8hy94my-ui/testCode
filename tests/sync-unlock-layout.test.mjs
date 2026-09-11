@@ -22,6 +22,14 @@ test('sync unlock view does not show copy absent from the supplied layout', () =
   assert.doesNotMatch(html, /パスフレーズで開く|パスキーで開く|保管庫を作成|パスキーを登録|ログアウト|保管庫パスフレーズ|または復旧キー|入力すると/);
 });
 
+test('sync unlock layout stays inside the viewport without page scrolling', () => {
+  assert.match(sync, /html, body \{[\s\S]*height:100%;[\s\S]*overflow:hidden;/);
+  assert.match(sync, /body \{[\s\S]*height:100dvh;/);
+  assert.match(sync, /main \{[\s\S]*height:100dvh;/);
+  assert.match(sync, /env\(safe-area-inset-top\)/);
+  assert.match(sync, /env\(safe-area-inset-bottom\)/);
+});
+
 test('single credential field accepts recovery keys through the existing unlock API', () => {
   assert.match(sync, /const credential=ui\.credential\.value/);
   assert.match(sync, /const isRecovery=credential\.trim\(\)\.startsWith\('mrk1_'\)/);
