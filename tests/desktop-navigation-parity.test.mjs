@@ -86,7 +86,7 @@ test('major pages expose the same primary destinations and mark the current page
     const source = read(file);
     assert.match(source, /<nav[^>]+class=["'][^"']*\btopActions\b[^"']*["'][^>]*>/);
     assert.doesNotMatch(source, /へ戻る/);
-    assert.match(source, new RegExp(`<span[^>]*class=["'][^"']*glassBtn[^"']*topActionCurrent[^"']*["'][^>]*aria-current=["']page["'][^>]*>${currentLabel}<\\/span>`));
+    assert.match(source, new RegExp(`<a[^>]*class=["'][^"']*glassBtn[^"']*topActionCurrent[^"']*["'][^>]*aria-current=["']page["'][^>]*href=["']${currentHref.replace('.', '\\.')}["'][^>]*>${currentLabel}<\\/a>`));
 
     for (const [label, href] of destinations) {
       if (href === currentHref) continue;

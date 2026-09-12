@@ -37,5 +37,6 @@
     document.addEventListener('click',close); document.addEventListener('keydown',(event)=>{if(event.key==='Escape')close();});
     document.addEventListener('home-profile-routechange',close);
   }
+  window.ProfileMenu = { logout, openProfile };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install); else install();
 })();

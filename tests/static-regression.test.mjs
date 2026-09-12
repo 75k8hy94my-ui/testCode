@@ -163,11 +163,14 @@ test('reader surfaces share the Liquid Glass treatment', () => {
 });
 
 test('all app pages provide Liquid Glass and a no-backdrop fallback', () => {
-  for (const page of ['index.html', 'sync.html', 'reader.html', 'links.html', 'local-reader.html']) {
+  for (const page of ['index.html', 'sync.html', 'reader.html', 'local-reader.html']) {
     const source = read(page);
     assert.match(source, /backdrop-filter/ , `${page} should define a glass surface`);
     assert.match(source, /@supports not \(\(backdrop-filter: blur\(1px\)\)/, `${page} should define a fallback`);
   }
+  const spaCss = read('home-profile-shell.css') + read('app-global-shell.css');
+  assert.match(spaCss, /backdrop-filter/);
+  assert.match(spaCss, /@supports not \(\(backdrop-filter: blur\(1px\)\)/);
 });
 
 test('mobile bottom navigation remains above reader overlays', () => {
@@ -327,7 +330,7 @@ test('navigable reader screens use history-backed screen views', () => {
 });
 
 test('link and local-reader editors use history-backed screen views', () => {
-  const links = read('links.html');
+  const links = read('home-profile-spa.js') + '\n' + read('links-page.js');
   const localReader = read('local-reader.html');
   for (const [source, key] of [[links, 'link-edit'], [localReader, 'crop-editor']]) {
     assert.match(source, /class="[^"]*\bscreenView\b[^"]*"/);
@@ -339,7 +342,7 @@ test('link and local-reader editors use history-backed screen views', () => {
 });
 
 test('screen navigation does not rely on native dialog overlays', () => {
-  for (const file of ['reader.html', 'links.html', 'local-reader.html']) {
+  for (const file of ['reader.html', 'home-profile-spa.js', 'local-reader.html']) {
     const source = read(file);
     assert.doesNotMatch(source, /<dialog\b|showModal\(\)/);
   }

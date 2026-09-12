@@ -7,12 +7,7 @@ const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), '
 test('desktop app pages use the shared 920px content width', () => {
   const rail = read('app-desktop-rail.js');
   assert.match(rail, /--app-desktop-content-max:\s*920px/);
-
-  const indexSearch = read('index-search.html');
-  assert.match(indexSearch, /\.indexShell\{width:min\(100% - 24px,920px\)/);
-
-  const hyakusen = read('hyakusen.html');
-  assert.match(hyakusen, /\.shell\{width:min\(920px,100%\)/);
+  assert.match(rail, /max-width:\s*var\(--app-desktop-content-max\)/);
 });
 
 test('study desktop views expand to the same 920px content width', () => {

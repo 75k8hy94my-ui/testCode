@@ -7,11 +7,12 @@ const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), '
 
 test('index page exposes sync, AI prompt, and conflict controls', () => {
   const html = read('index-search.html');
+  const spa = read('home-profile-spa.js');
   for (const id of ['syncNowBtn', 'syncSummary', 'copyConversionPromptBtn', 'conversionPromptPanel', 'conflictPanel', 'conflictList']) {
-    assert.match(html, new RegExp(`id=["']${id}["']`));
+    assert.match(spa, new RegExp(`id=["']${id}["']`));
   }
   for (const script of ['index-search-conflicts.js', 'index-search-sync-status.js', 'index-conversion-prompt.js', 'index-search-worker-client.js']) {
-    assert.match(html, new RegExp(script.replace('.', '\\.')));
+    assert.match(html + spa, new RegExp(script.replace('.', '\\.')));
   }
 });
 

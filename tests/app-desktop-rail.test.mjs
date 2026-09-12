@@ -11,8 +11,8 @@ test('desktop Liquid Glass rail appears only after the vault is unlocked', () =>
   for (const page of ['index.html','sync.html']) {
     assert.doesNotMatch(read(page), /app-desktop-rail\.js/, `${page} should not load the shared rail before vault unlock`);
   }
-  assert.doesNotMatch(read('study.html'), /app-desktop-rail\.js/);
-  assert.match(read('study.html'), /@media\(min-width:900px\)[\s\S]*#studyBottomNav\{[^}]*left:18px/);
+  assert.match(read('study.html'), /app-desktop-rail\.js/);
+  assert.match(read('app-desktop-rail.js'), /page === 'study\.html'/);
 });
 
 test('shared rail mirrors the study desktop Liquid Glass material', () => {

@@ -64,11 +64,13 @@ test('official cards stay on first-party legal information domains', () => {
 
 test('home page is vault-gated, editable, and vault unlock enters it', () => {
   const home = read('home.html');
+  const spa = read('home-profile-spa.js');
   assert.match(home, /class=["']auth-pending["']/);
-  assert.match(home, /MangaVault\.loadActive\(\)/);
-  assert.match(home, /window\.location\.replace\(['"]sync\.html['"]\)/);
-  assert.match(home, /window\.location\.replace\(['"]index\.html['"]\)/);
-  for (const id of ['homeGrid', 'editHomeBtn', 'addCardPanel', 'homeSyncStatus']) assert.match(home, new RegExp(`id=["']${id}["']`));
+  assert.match(spa, /MangaVault\.loadActive\(\)/);
+  assert.match(spa, /window\.location\.replace\(['"]sync\.html['"]\)/);
+  assert.match(spa, /window\.location\.replace\(['"]index\.html['"]\)/);
+  assert.match(home, /id=["']editHomeBtn["']/);
+  for (const id of ['homeGrid', 'addCardPanel', 'homeSyncStatus']) assert.match(spa, new RegExp(`id=["']${id}["']`));
   assert.match(home, /home-dashboard\.js/);
   assert.match(home, /vault-payload\.js/);
 
@@ -79,15 +81,17 @@ test('home page is vault-gated, editable, and vault unlock enters it', () => {
   assert.match(verifier, /['"]home-dashboard\.js['"]/);
 });
 
-test('logout is exposed only at the bottom of home', () => {
-  const home = read('home.html');
+test('logout lives on the profile settings route', () => {
+  const spa = read('home-profile-spa.js');
+  const menu = read('profile-menu.js');
   const sync = read('sync.html');
   const featureFlags = read('feature-flags.js');
 
-  assert.match(home, /id=["']homeLogoutBtn["']/);
-  assert.match(home, /class=["'][^"']*homeLogoutArea[^"']*["']/);
-  assert.match(home, /EncryptedChunkCache\.clearAll/);
-  assert.match(home, /MangaVault\.saveSession\(null\)/);
+  assert.match(spa, /id=["']profileLogoutBtn["']/);
+  assert.match(menu, /EncryptedChunkCache\.clearAll/);
+  assert.match(menu, /MangaVault\.saveSession\(null\)/);
+  assert.match(menu, /window\.ProfileMenu/);
+  assert.doesNotMatch(read('home.html'), /id=["']homeLogoutBtn["']/);
   assert.doesNotMatch(sync, /id=["']logoutBtn["']/);
   assert.match(featureFlags, /getElementById\(['"]listLogoutBtn['"]\)/);
   assert.match(featureFlags, /readerLogout\.hidden\s*=\s*true/);

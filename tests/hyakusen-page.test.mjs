@@ -3,13 +3,16 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const html = await readFile(new URL('../hyakusen.html', import.meta.url), 'utf8').catch(() => '');
+const spa = await readFile(new URL('../home-profile-spa.js', import.meta.url), 'utf8').catch(() => '');
+const shellCss = await readFile(new URL('../home-profile-shell.css', import.meta.url), 'utf8').catch(() => '');
 const page = await readFile(new URL('../hyakusen-page.js', import.meta.url), 'utf8').catch(() => '');
+const surface = html + '\n' + spa;
 
 test('Hyakusen page is authenticated, vault-gated, and loads only read-only Drive integration modules', () => {
   assert.match(html, /<html[^>]*class="auth-pending"/);
-  assert.match(html, /https:\/\/accounts\.google\.com\/gsi\/client/);
+  assert.match(surface, /https:\/\/accounts\.google\.com\/gsi\/client/);
   for (const script of ['supabase-config.js', 'vault-session.js', 'hyakusen-catalog.js', 'hyakusen-drive.js', 'hyakusen-page.js']) {
-    assert.match(html, new RegExp(script.replace('.', '\\.')));
+    assert.match(surface, new RegExp(script.replace('.', '\\.')));
   }
   assert.match(page, /Vault\.loadSession\(\)/);
   assert.match(page, /window\.location\.replace\('index\.html'\)/);
@@ -19,11 +22,11 @@ test('Hyakusen page is authenticated, vault-gated, and loads only read-only Driv
 
 test('Hyakusen page exposes collection, edition, OAuth client id, Drive connect, and numbered-list controls', () => {
   for (const id of ['collectionSelect', 'editionSelect', 'googleClientId', 'connectDriveBtn', 'driveStatus', 'hyakusenList']) {
-    assert.match(html, new RegExp(`id="${id}"`));
+    assert.match(spa, new RegExp(`id="${id}"`));
   }
   assert.match(html, /href="index-search\.html"/);
-  assert.match(html, /Google Driveに接続/);
-  assert.match(html, /百選データ未登録|判例百選/);
+  assert.match(spa, /Google Driveに接続/);
+  assert.match(spa, /百選データ未登録|判例百選/);
 });
 
 test('OAuth client id may persist locally but access tokens never do', () => {
@@ -37,7 +40,7 @@ test('OAuth client id may persist locally but access tokens never do', () => {
 test('Drive availability distinguishes exact matches and keeps unavailable rows dimmed and non-clickable', () => {
   assert.match(page, /Drive\.matchDriveFiles\(/);
   assert.match(page, /data-drive-state|dataset\.driveState/);
-  assert.match(html, /\[data-drive-state="(?:missing|unverified)"\][^{]*\{[^}]*opacity/s);
+  assert.match(shellCss, /\[data-drive-state="(?:missing|unverified)"\][^{]*\{[^}]*opacity/s);
   assert.match(page, /window\.open\([^,]+,[^,]+,[^)]*noopener/i);
   assert.match(page, /webViewLink/);
 });

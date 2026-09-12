@@ -8,11 +8,18 @@
 <title>プロフィール設定</title>
 <link rel="icon" type="image/png" href="icon-152.png">
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
-<link rel="stylesheet" href="home-profile-shell.css?v=20260911-links-spa">
-<link rel="stylesheet" href="app-global-shell.css?v=20260911-shell">
+<link rel="stylesheet" href="home-profile-shell.css?v=20260912-shell">
+<link rel="stylesheet" href="app-global-shell.css?v=20260912-shell">
 </head>
 <body>
 <main class="homeShell" id="homeApp">
+<header class="homeHeader">
+<div><span class="eyebrow">HOME</span><h1 id="shellTitle">プロフィール設定</h1></div>
+<div class="topbarActions">
+<nav class="topActions" aria-label="主要ページ"><a id="headerHomeLink" class="glassBtn" href="home.html">ホーム</a><a class="glassBtn" href="index-search.html">索引検索</a><a class="glassBtn" href="hyakusen.html">判例百選</a></nav>
+<div class="headerActions"><a class="glassBtn" href="sync.html">保管庫</a><button class="glassBtn" id="editHomeBtn" type="button" hidden>カードを編集</button></div>
+</div>
+</header>
 <div id="routeContent"></div>
 </main>
 <script src="app-desktop-rail.js"></script>
@@ -21,8 +28,8 @@
 <script src="vault-payload.js"></script>
 <script src="encrypted-chunk-cache.js"></script>
 <script src="home-dashboard.js"></script>
-<script src="profile-menu.js?v=20260911-links-spa"></script>
-<script src="app-global-shell.js?v=20260911-shell"></script>
-<script src="home-profile-spa.js?v=20260911-links-spa"></script>
+<script src="profile-menu.js?v=20260912-shell"></script>
+<script src="app-global-shell.js?v=20260912-shell"></script>
+<script src="home-profile-spa.js?v=20260912-shell"></script>
 </body>
 </html>

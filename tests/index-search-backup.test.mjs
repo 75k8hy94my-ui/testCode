@@ -6,10 +6,10 @@ import vm from 'node:vm';
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 
 test('index search page loads the v3 backup format and dedicated backup bridge', () => {
-  const html = read('index-search.html');
-  assert.match(html, /<script src="backup-format\.js"><\/script>/);
-  assert.match(html, /<script src="index-search-backup\.js"><\/script>/);
-  assert.ok(html.indexOf('backup-format.js') < html.indexOf('index-search-backup.js'));
+  const spa = read('home-profile-spa.js');
+  assert.match(spa, /backup-format\.js/);
+  assert.match(spa, /index-search-backup\.js/);
+  assert.ok(spa.indexOf('backup-format.js') < spa.indexOf('index-search-backup.js'));
 });
 
 test('backup bridge exports existing vault data plus portable plaintext index books only on user download', () => {

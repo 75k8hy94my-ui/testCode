@@ -11,13 +11,15 @@ function assertDependencyBinding(page, localName, globalName) {
 
 test('index search page is authenticated, vault-gated and loads focused encrypted-index modules', () => {
   const html = read('index-search.html');
+  const spa = read('home-profile-spa.js');
   assert.match(html, /<html[^>]+class=["']auth-pending["']/i);
   assert.match(html, /app-desktop-rail\.js/);
   assert.match(html, /supabase-config\.js/);
   assert.match(html, /vault-session\.js/);
   assert.match(html, /vault-payload\.js/);
+  assert.match(html, /home-profile-spa\.js/);
   for (const script of ['legal-index-schema.js', 'legal-index-search.js', 'encrypted-chunk-crypto.js', 'encrypted-chunk-cache.js', 'encrypted-chunk-sync.js', 'index-search-page.js']) {
-    assert.match(html, new RegExp(script.replace('.', '\\.')));
+    assert.match(html + spa, new RegExp(script.replace('.', '\\.')));
   }
   const page = read('index-search-page.js');
   assertDependencyBinding(page, 'Vault', 'MangaVault');
@@ -28,11 +30,11 @@ test('index search page is authenticated, vault-gated and loads focused encrypte
 });
 
 test('search surface exposes live query, kind tabs, book/subject filters and configurable match modes', () => {
-  const html = read('index-search.html');
+  const spa = read('home-profile-spa.js');
   for (const id of ['indexQuery', 'kindTabs', 'subjectFilters', 'bookFilters', 'searchResults', 'matchExact', 'matchPartial', 'matchAnd', 'matchFuzzy']) {
-    assert.match(html, new RegExp(`id=["']${id}["']`));
+    assert.match(spa, new RegExp(`id=["']${id}["']`));
   }
-  for (const kind of ['all', 'matter', 'case', 'statute']) assert.match(html, new RegExp(`data-kind=["']${kind}["']`));
+  for (const kind of ['all', 'matter', 'case', 'statute']) assert.match(spa, new RegExp(`data-kind=["']${kind}["']`));
   const page = read('index-search-page.js');
   assertDependencyBinding(page, 'Search', 'LegalIndexSearch');
   assert.match(page, /addEventListener\(['"]input['"]/);
@@ -41,10 +43,10 @@ test('search surface exposes live query, kind tabs, book/subject filters and con
 });
 
 test('batch import accepts multiple JSON files, validates each and supports new or explicit replacement', () => {
-  const html = read('index-search.html');
-  assert.match(html, /id=["']indexFiles["'][^>]+multiple/i);
-  assert.match(html, /accept=["'][^"']*\.json/i);
-  assert.match(html, /id=["']importPreview["']/);
+  const spa = read('home-profile-spa.js');
+  assert.match(spa, /id=["']indexFiles["'][^>]+multiple/i);
+  assert.match(spa, /accept=["'][^"']*\.json/i);
+  assert.match(spa, /id=["']importPreview["']/);
   const page = read('index-search-page.js');
   assertDependencyBinding(page, 'Schema', 'LegalIndexSchema');
   assert.match(page, /const\s+MAX_IMPORT_CONCURRENCY\s*=\s*4/);
