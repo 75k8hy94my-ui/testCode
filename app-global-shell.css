@@ -29,6 +29,12 @@
 .global-shell-page .topbar button,
 .global-shell-page #studyContextNav button,
 .global-shell-page header:not(.globalAppHeader) button { display:none !important; }
+.global-shell-page #topbar button[data-vpn-status-button],
+.global-shell-page #topbar button[data-vpn-diagnostics-button],
+.global-shell-page .vpnHeaderControls button[data-vpn-status-button],
+.global-shell-page .vpnHeaderControls button[data-vpn-diagnostics-button],
+.global-shell-page [data-vpn-header] button[data-vpn-status-button],
+.global-shell-page [data-vpn-header] button[data-vpn-diagnostics-button] { display:inline-flex !important; }
 .global-shell-page #appGlobalHeader ~ #app,
 .global-shell-page #appGlobalHeader ~ .app { margin-top:58px; height:calc(100vh - 58px); }
 .global-shell-page #appGlobalHeader ~ .shell { padding-top:76px; }

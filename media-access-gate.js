@@ -358,6 +358,21 @@
     Object.defineProperty(ctor.prototype, 'src', { ...descriptor, set: guardedSet });
   }
 
+  function patchSrcAttribute() {
+    const proto = root.Element && root.Element.prototype;
+    if (!proto || typeof proto.setAttribute !== 'function' || proto.setAttribute.__vpnMediaGuard) return;
+    const originalSetAttribute = proto.setAttribute;
+    const guardedSetAttribute = function (name, value) {
+      if (String(name).toLowerCase() === 'src' && this && /^(IMG|VIDEO|AUDIO|IFRAME|SOURCE)$/.test(this.tagName || '') && isProtectedMediaUrl(value, currentBase()) && !canLoadExternalMedia()) {
+        markBlocked(this, value);
+        return;
+      }
+      return originalSetAttribute.call(this, name, value);
+    };
+    guardedSetAttribute.__vpnMediaGuard = true;
+    proto.setAttribute = guardedSetAttribute;
+  }
+
   function installGuards() {
     if (installed) return;
     installed = true;
@@ -365,6 +380,7 @@
     patchSrcProperty(root.HTMLMediaElement);
     patchSrcProperty(root.HTMLIFrameElement);
     patchSrcProperty(root.HTMLSourceElement);
+    patchSrcAttribute();
     if (root.document && typeof root.document.addEventListener === 'function') {
       root.document.addEventListener('click', (event) => {
         if (canLoadExternalMedia() || !event.target || typeof event.target.closest !== 'function') return;
