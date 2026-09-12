@@ -82,7 +82,7 @@
   <script src="vault-payload.js"></script>
   <script src="encrypted-chunk-cache.js"></script>
   <script>
-  (() => {
+  (async () => {
     'use strict';
     const { buildFromLocalStorage: buildPayload, applyToLocalStorage: applyPayload } = window.MangaVaultPayload;
     const $ = (id) => document.getElementById(id);
@@ -105,6 +105,13 @@
     function goReader() { window.location.replace('home.html'); }
     const session = MangaVault.loadSession();
     if (!session || !session.user || !session.user.email) { window.location.replace('index.html'); return; }
+    try {
+      await MangaVault.refreshSession();
+    } catch (_) {
+      MangaVault.saveSession(null);
+      window.location.replace('index.html');
+      return;
+    }
     ui.email.textContent=session.user.email;
     const DEVICE_DATA_KEYS=[...Object.values(MangaVaultPayload.DATA_KEYS||{}),'mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
     let opening=false;
