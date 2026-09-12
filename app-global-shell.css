@@ -21,6 +21,8 @@
 .globalShellBrand { display:flex; align-items:center; gap:8px; min-width:0; }
 .globalShellBrand h1 { margin:0; font-size:18px; font-weight:700; letter-spacing:0; white-space:nowrap; }
 .globalShellEyebrow { color:#1769aa; font-size:10px; font-weight:800; letter-spacing:.12em; }
+.globalShellAccount { margin-left:auto; overflow:hidden; color:#202124; font-size:13px; text-overflow:ellipsis; white-space:nowrap; }
+.globalShellAccountSuffix { flex:0 0 auto; color:#6b7280; font-size:13px; }
 .global-shell-page .shell > .header { display:none; }
 .global-shell-page main > header:not(.globalAppHeader) { display:none; }
 .global-shell-page #topbar button,

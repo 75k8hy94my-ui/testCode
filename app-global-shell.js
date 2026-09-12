@@ -116,7 +116,10 @@
   }
 
   function markup() {
-    return '<div class="globalShellBrand"><span class="globalShellEyebrow">BOOKS</span><h1 id="shellTitle"></h1></div>';
+    const account = currentPage() === 'sync.html'
+      ? '<span class="globalShellAccount" id="globalShellAccountEmail"></span><span class="globalShellAccountSuffix">でログイン中</span>'
+      : '';
+    return '<div class="globalShellBrand"><span class="globalShellEyebrow">BOOKS</span><h1 id="shellTitle"></h1></div>' + account;
   }
 
   function install() {
@@ -131,6 +134,9 @@
     header.classList.add('globalAppHeader');
     header.innerHTML = markup();
     header.querySelector('#shellTitle').textContent = currentLabel;
+    const accountEmail = header.querySelector('#globalShellAccountEmail');
+    const session = window.MangaVault && MangaVault.loadSession && MangaVault.loadSession();
+    if (accountEmail) accountEmail.textContent = session && session.user ? session.user.email || '' : '';
     if (!existing) document.body.insertBefore(header, document.body.firstChild);
     document.documentElement.classList.add('global-shell-page');
     document.removeEventListener('click', intercept);
