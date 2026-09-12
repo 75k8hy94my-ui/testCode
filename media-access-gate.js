@@ -341,6 +341,19 @@
     });
   }
 
+  function blockExistingExternalMedia() {
+    if (!root.document) return;
+    root.document.querySelectorAll('img,video,audio,iframe,source').forEach((element) => {
+      const value = element.currentSrc || element.getAttribute('src') || element.src || '';
+      if (!isProtectedMediaUrl(value, currentBase())) return;
+      markBlocked(element, value);
+      element.removeAttribute('src');
+      if (element.tagName === 'VIDEO' || element.tagName === 'AUDIO') {
+        try { element.load(); } catch (_) {}
+      }
+    });
+  }
+
   function patchSrcProperty(ctor) {
     if (!ctor || !ctor.prototype) return;
     const descriptor = Object.getOwnPropertyDescriptor(ctor.prototype, 'src');
@@ -448,6 +461,7 @@
       removeNotice();
       restoreBlockedElements();
     } else {
+      blockExistingExternalMedia();
       showNotice('VPNに接続すると漫画・動画を読み込めます。');
     }
     return status === 'allowed';
@@ -471,7 +485,6 @@
       const manualDesignation = getManualIpDesignation(ip);
       diagnostics.manualDesignation = manualDesignation;
       if (manualDesignation === 'non-vpn') return applyFinalStatus(false);
-      if (manualDesignation === 'vpn') return applyFinalStatus(true);
 
       diagnostics.protonOwnedNetworkMatch = isKnownProtonOwnedIp(ip);
       renderDiagnostics();
