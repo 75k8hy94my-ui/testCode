@@ -63,9 +63,10 @@ test('VPN check honors a manually designated VPN IP', async () => {
       getItem: (key) => store.get(key) || null,
       setItem: (key, value) => store.set(key, value),
     },
+    confirm: () => true,
     fetch: async (url) => {
-      assert.equal(url, Gate.IP_URL);
-      return { ok: true, json: async () => ({ ip: currentIp }) };
+      if (url === Gate.IP_URL) return { ok: true, json: async () => ({ ip: currentIp }) };
+      return { ok: true, json: async () => ({ is_vpn: false, is_proxy: false }) };
     },
     setTimeout,
     clearTimeout,
@@ -74,6 +75,8 @@ test('VPN check honors a manually designated VPN IP', async () => {
   assert.equal(await Gate.checkVpn(), true);
   assert.equal(Gate.getDiagnostics().manualDesignation, 'vpn');
   assert.equal(Gate.getDiagnostics().final, 'allowed');
+  assert.equal(Gate.clearManualVpnDesignation(currentIp), true);
+  assert.equal(Gate.getManualIpDesignation(currentIp), null);
 });
 
 test('VPN check falls back to Proton exit IP list when generic detection returns false', async () => {
