@@ -57,4 +57,4 @@ html[data-theme="dark"] .linksContent .tag{background:#202635;color:#bdc8e3;bord
 html[data-theme="dark"] .linksContent .screenView{background:rgba(10,12,17,.98);color:#f1f2f6}
 html[data-theme="dark"] .linksContent .primary,html[data-theme="dark"] .linksContent .filter-btn.active{background:#223b5e;color:#9cc8ff;border-color:#315b88}
 @media(max-width:899px){.linksContent{margin-left:0;padding:24px 18px 40px}.linksToolbar{align-items:flex-start}.linksContent .card-foot{align-items:flex-start;flex-direction:column}.linksContent .actions{justify-content:flex-start}.linksContent .screenView{padding-top:24px}}
-.homeShell #routeContent{padding-top:0}
+.homeShell #routeContent{padding-top:0}.homeShell.reader-route #routeContent{padding-top:54px}
