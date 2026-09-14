@@ -6887,7 +6887,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
   // 明示された #screen=... は外部ナビゲーションの意図なので最優先する。
   // ルート指定も前回の漫画もない場合だけ、保存一覧を既定画面として開く。
-  if (!requestedScreenOnLoad && !resumedOnLoad && !location.pathname.endsWith('/reader.html') && location.pathname !== '/reader.html') openSavedList(true);
+  if (!requestedScreenOnLoad && !resumedOnLoad && !location.pathname.endsWith('/reader.html') && location.pathname !== '/reader.html') {
+    // Manga/video entry pages render the list as their normal document body.
+    // Do not route this initial view through the hash-based reader history.
+    renderReaderScreen(location.pathname.endsWith('/video.html') || location.pathname === '/video.html' ? 'video-list' : 'saved-list');
+  }
 })();
 </script>
 <script src="reader-shell.js?v=20260915-shell"></script>
