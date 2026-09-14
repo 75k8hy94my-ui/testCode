@@ -62,6 +62,7 @@ html.reader-entry-manga #app,html.reader-entry-video #app{height:0!important;min
 html.reader-entry-manga .homeShell #routeContent,html.reader-entry-video .homeShell #routeContent{min-height:0!important}
 html.reader-entry-manga,html.reader-entry-video,html.reader-entry-manga body,html.reader-entry-video body{height:auto!important;min-height:100%!important;overflow-y:auto!important;overflow-x:hidden!important}
 html.reader-entry-manga body,html.reader-entry-video body{background:#0a0c11!important}
+html.reader-entry-manga #mobileBottomNav,html.reader-entry-video #mobileBottomNav,html.reader-entry-manga #mobileUtilityMenu,html.reader-entry-video #mobileUtilityMenu{display:none!important}
 html.reader-entry-manga #savedListItems,html.reader-entry-video #savedListItems,html.reader-entry-manga #mangaListSection,html.reader-entry-video #videoListSection{overflow:visible!important}
 @media(min-width:900px){html.reader-entry-manga #savedListOverlay,html.reader-entry-video #savedListOverlay{padding-left:58px!important}html.reader-entry-manga #savedListPanel,html.reader-entry-video #savedListPanel{margin-left:auto!important;margin-right:auto!important}}
 html.reader-entry-manga #viewer,html.reader-entry-video #viewer,html.reader-entry-manga #topbar,html.reader-entry-video #topbar,html.reader-entry-manga #controls,html.reader-entry-video #controls,html.reader-entry-manga #readProgressBar,html.reader-entry-video #readProgressBar{display:none!important}
