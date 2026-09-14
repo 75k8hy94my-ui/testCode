@@ -75,6 +75,9 @@
       #readerShellHeader.homeHeader h1 { color: #fff !important; }
       #readerShellHeader.homeHeader .glassBtn { color: #fff !important; }
       #readerShellHeader.homeHeader .glassBtn:hover { background: rgba(255,255,255,.14) !important; }
+      @media (min-width: 900px) {
+        html.reader-shell-page #app { padding-top: 54px !important; }
+      }
       @media (max-width: 899px) {
         #readerShellHeader.homeHeader { position: static !important; height: auto !important; min-height: 0 !important; padding: 18px !important; background: #fff !important; color: #202124 !important; }
         #readerShellHeader.homeHeader h1, #readerShellHeader.homeHeader .glassBtn { color: #202124 !important; }
