@@ -68,11 +68,11 @@
       <div id="savedListEmpty" style="display:none;">保存されたURLはまだありません</div>
     </div>
     <div id="videoListSection" style="display:none;">
-      <div id="videoListToolbar">
-        <button class="ctrlBtn" id="addVideoBtn" type="button">+ 動画を追加</button>
-      </div>
-      <div id="videoListItems"></div>
-      <div id="videoListEmpty" style="display:none;">動画はまだ追加されていません</div>
+    <div id="videoListToolbar" hidden>
+      <button class="ctrlBtn" id="addVideoBtn" type="button">+ 動画を追加</button>
+    </div>
+      <div id="videoListItems" hidden></div>
+      <div id="videoListEmpty" hidden>動画はまだ追加されていません</div>
     </div>
   </div>
 </section>
