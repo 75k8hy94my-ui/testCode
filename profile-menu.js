@@ -24,7 +24,7 @@
     if (!window.matchMedia || !window.matchMedia('(min-width: 900px)').matches) return;
     const nav = document.getElementById('appDesktopRail') || document.getElementById('desktopReaderNav');
     if (!nav) { requestAnimationFrame(install); return; }
-    const trigger = nav.querySelector('#desktopNavHome');
+    const trigger = nav.querySelector('#desktopProfileButton');
     if (!trigger || trigger.dataset.profileMenuInstalled === '1') return;
     trigger.dataset.profileMenuInstalled = '1'; trigger.removeAttribute('href'); trigger.removeAttribute('aria-current'); trigger.classList.remove('active'); trigger.setAttribute('role','button'); trigger.setAttribute('aria-haspopup','menu'); trigger.setAttribute('aria-expanded','false'); trigger.setAttribute('aria-label','アカウント');
     const menu = document.createElement('div'); menu.id='desktopProfileMenu'; menu.hidden=true; menu.setAttribute('role','menu'); menu.innerHTML='<button type="button" role="menuitem" data-profile-route>プロフィール設定</button><button type="button" role="menuitem" data-logout>ログアウト</button>'; document.body.appendChild(menu);

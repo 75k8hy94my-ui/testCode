@@ -226,6 +226,9 @@
           box-shadow: 0 2px 8px color-mix(in srgb,var(--rail-shadow) 48%,transparent), inset 0 1px 0 var(--rail-highlight) !important;
         }
         .appDesktopRailItem:active { transform: scale(.96); }
+        .appDesktopProfileButton { flex:0 0 52px; min-height:52px; width:52px; margin:0 auto 3px; padding:0 !important; border-radius:50% !important; justify-content:center; background:var(--rail-selection) !important; color:var(--rail-text) !important; }
+        .appDesktopProfileButton svg { width:24px; height:24px; }
+        .appDesktopRailItem[aria-disabled="true"] { cursor:default; opacity:.62; pointer-events:none; }
         .appDesktopRailItem:focus-visible {
           outline: 3px solid color-mix(in srgb,#2563eb 70%,transparent);
           outline-offset: 2px;
@@ -272,6 +275,18 @@
     return link;
   }
 
+  function makeProfileButton() {
+    const button = document.createElement('button');
+    button.id = 'desktopProfileButton';
+    button.type = 'button';
+    button.className = 'appDesktopRailItem appDesktopProfileButton';
+    button.innerHTML = `${ICONS.author}`;
+    button.setAttribute('aria-label', 'プロフィール');
+    button.setAttribute('aria-haspopup', 'menu');
+    button.setAttribute('aria-expanded', 'false');
+    return button;
+  }
+
   function syncActive(nav = document.getElementById(pageName() === 'reader.html' ? 'desktopReaderNav' : 'appDesktopRail')) {
     if (!nav) return;
     const active = activeKey();
@@ -283,6 +298,9 @@
       element.classList.toggle('active', selected);
       if (selected) element.setAttribute('aria-current', 'page');
       else element.removeAttribute('aria-current');
+      element.toggleAttribute('aria-disabled', selected);
+      if (selected) element.setAttribute('tabindex', '-1');
+      else element.removeAttribute('tabindex');
     }
   }
 
@@ -302,6 +320,7 @@
     nav.id = id;
     nav.className = 'appDesktopRailSurface';
     nav.setAttribute('aria-label', 'デスクトップナビ');
+    nav.appendChild(makeProfileButton());
     for (const item of ITEMS) nav.appendChild(makeItem(item));
     document.body.appendChild(nav);
     document.documentElement.classList.add('app-desktop-rail-page');
