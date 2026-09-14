@@ -3562,7 +3562,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     currentItem = item || null; // remembered for series/次の巻 lookups
     if (location.pathname.endsWith('/manga.html') || location.pathname === '/manga.html') {
       if (item && item.id) localStorage.setItem(LAST_URL_KEY, JSON.stringify({ kind: 'item', itemId: item.id }));
-      location.href = 'reader.html';
+      if (window.HomeProfileSPA && typeof HomeProfileSPA.navigate === 'function') HomeProfileSPA.navigate('reader.html');
+      else location.href = 'reader.html';
       return;
     }
     if (item && Array.isArray(item.pages) && item.pages.length) {
