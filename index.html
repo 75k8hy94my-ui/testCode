@@ -45,9 +45,14 @@
       button.primary { background: var(--accent); color: #fff; -webkit-text-fill-color: #fff; }
     }
     @media (max-width:640px) {
-      #mobileTopBar { position:fixed; z-index:10; top:0; left:0; right:0; min-height:48px; display:flex; align-items:center; justify-content:space-between; padding:0 max(14px, calc(env(safe-area-inset-right) + 14px)) 0 max(14px, calc(env(safe-area-inset-left) + 14px)); background:#1769aa; color:#fff; font-size:15px; font-weight:700; box-shadow:0 1px 3px rgba(0,0,0,.14); }
+      #mobileTopBar { position:fixed; z-index:10; top:0; left:0; right:0; min-height:48px; display:flex; align-items:center; gap:10px; padding:0 max(14px, calc(env(safe-area-inset-right) + 14px)) 0 max(14px, calc(env(safe-area-inset-left) + 14px)); background:#1769aa; color:#fff; box-shadow:0 1px 3px rgba(0,0,0,.14); }
       #mobileTopBar .mobileTopBarBrand { font-size:12px; letter-spacing:.12em; opacity:.9; }
       #mobileTopBar .mobileTopBarTitle { font-size:15px; }
+      #mobileTopBar .mobileTopNav { min-width:0; flex:1; display:flex; align-items:center; gap:2px; overflow-x:auto; scrollbar-width:none; }
+      #mobileTopBar .mobileTopNav::-webkit-scrollbar { display:none; }
+      #mobileTopBar .mobileTopNav a { flex:0 0 32px; width:32px; height:36px; display:grid; place-items:center; border-radius:6px; color:#fff; text-decoration:none; }
+      #mobileTopBar .mobileTopNav a:active { background:rgba(255,255,255,.2); }
+      #mobileTopBar .mobileTopNav svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
       header { display:none; }
       h1 { font-size:25px; }
       #loginForm, #resetView, #completeResetView { top:42%; width:calc(100vw - 44px - env(safe-area-inset-left) - env(safe-area-inset-right)); }
@@ -61,7 +66,16 @@
   </style>
 </head>
 <body>
-  <div id="mobileTopBar" aria-label="ページヘッダー"><span class="mobileTopBarBrand">BOOKS</span><span class="mobileTopBarTitle">ログイン</span></div>
+  <div id="mobileTopBar" aria-label="ページヘッダー"><span class="mobileTopBarBrand">BOOKS</span><nav class="mobileTopNav" aria-label="ページメニュー">
+    <a href="home.html" aria-label="ホーム"><svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5z"/><path d="M9 20v-6h6v6"/></svg></a>
+    <a href="manga.html" aria-label="漫画"><svg viewBox="0 0 24 24"><path d="M4 5.5c3-1.5 5.5-1.2 8 .7v13c-2.2-1.7-4.8-2-8-.6z"/><path d="M20 5.5c-3-1.5-5.5-1.2-8 .7v13c2.2-1.7 4.8-2 8-.6z"/></svg></a>
+    <a href="video.html" aria-label="動画"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></svg></a>
+    <a href="study.html" aria-label="学習"><svg viewBox="0 0 24 24"><path d="M6 5h12v14H6z"/><path d="M9 9h6M9 13h6M9 17h4"/></svg></a>
+    <a href="links.html" aria-label="リンク"><svg viewBox="0 0 24 24"><path d="M10 14 14 10"/><path d="M7.5 16.5 5 19a3.5 3.5 0 0 1-5-5l3-3a3.5 3.5 0 0 1 5 0"/><path d="m16 8 3-3a3.5 3.5 0 1 1 5 5l-2.5 2.5a3.5 3.5 0 0 1-5 0"/></svg></a>
+    <a href="reader.html#screen=author-cards" aria-label="著者"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg></a>
+    <a href="reader.html#screen=backup" aria-label="バックアップ"><svg viewBox="0 0 24 24"><path d="M5 7.5h14v12H5z"/><path d="M8 4h8v3.5H8zM9 12h6M9 16h4"/></svg></a>
+    <a href="reader.html#screen=settings" aria-label="設定"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.1M12 19.1v2.1M21.2 12h-2.1M4.9 12H2.8M18.5 5.5 17 7M7 17l-1.5 1.5M18.5 18.5 17 17M7 7 5.5 5.5"/></svg></a>
+  </nav><span class="mobileTopBarTitle">ログイン</span></div>
   <main>
     <header><h1>ログイン</h1></header>
 
