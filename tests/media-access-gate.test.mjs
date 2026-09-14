@@ -120,7 +120,7 @@ test('diagnostics expose IP, generic lookup result, Proton match, and final deci
 
 test('reader bootstrap loads the VPN gate before reader media and the gate covers image/video/iframe src', () => {
   const recommendations = fs.readFileSync(new URL('../recommendations.js', import.meta.url), 'utf8');
-  const reader = ['reader.html', 'reader-saved-list-template.js', 'reader-author-list-template.js', 'reader-toc-template.js', 'reader-mobile-nav-template.js']
+  const reader = ['reader.html', 'reader-saved-list-template.js', 'reader-author-list-template.js', 'reader-toc-template.js', 'reader-mobile-nav-template.js', 'reader-feature-overlays-template.js']
     .map((name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8')).join('\n');
   assert.match(recommendations, /document\.write\([\s\S]*media-access-gate\.js/);
   assert.match(reader, /data-vpn-header="saved-list"/);

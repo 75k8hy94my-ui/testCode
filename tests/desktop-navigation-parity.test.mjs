@@ -4,7 +4,7 @@ import fs from 'node:fs';
 
 // Contract: every mobile-only reader destination needs a desktop-reachable counterpart.
 const readFile = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
-const read = (name) => name === 'reader.html' ? ['reader.html', 'reader-saved-list-template.js', 'reader-author-list-template.js', 'reader-toc-template.js', 'reader-mobile-nav-template.js'].map(readFile).join('\n') : readFile(name);
+const read = (name) => name === 'reader.html' ? ['reader.html', 'reader-saved-list-template.js', 'reader-author-list-template.js', 'reader-toc-template.js', 'reader-mobile-nav-template.js', 'reader-feature-overlays-template.js'].map(readFile).join('\n') : readFile(name);
 const readReader = () => read('reader.html');
 
 test('desktop navigation provides a counterpart for every mobile reader destination', () => {
