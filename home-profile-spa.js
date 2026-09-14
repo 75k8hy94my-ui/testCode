@@ -38,7 +38,7 @@ function getMount(){
 }
 
 function routeName(path=location.pathname){const name=path.split('/').pop();if(name==='profile.html')return'profile';if(name==='index-search.html')return'index-search';if(name==='hyakusen.html')return'hyakusen';if(name==='links.html')return'links';return'home';}
-function setTitle(route){const titles={home:'ホーム',profile:'プロフィール設定','index-search':'索引検索',hyakusen:'判例百選',links:'リンク管理'};const title=titles[route]||titles.home;document.title=title;const h1=document.getElementById('shellTitle');if(h1)h1.textContent=title;}
+function setTitle(route){const titles={home:'ホームズ',profile:'プロフィール設定','index-search':'索引検索',hyakusen:'判例百選',links:'リンク管理'};const title=titles[route]||titles.home;document.title=title;const h1=document.getElementById('shellTitle');if(h1)h1.textContent=title;}
 function setSyncStatus(text){const node=$('homeSyncStatus');if(!node)return;clearTimeout(syncClearTimer);node.textContent=text||'';if(text&&text!=='同期中…')syncClearTimer=setTimeout(()=>{if(node.isConnected)node.textContent='';},3500);}
 async function runHomeSync(okMessage){if(syncRunning){syncDirty=true;syncDirtyMessage=okMessage||syncDirtyMessage;return;}syncRunning=true;setSyncStatus('同期中…');try{await MangaVault.savePayload(MangaVaultPayload.buildFromLocalStorage());setSyncStatus(okMessage||'保存しました');}catch(error){setSyncStatus('端末には保存済みです。クラウド同期: '+(error&&error.message?error.message:'失敗'));}finally{syncRunning=false;if(syncDirty){syncDirty=false;const queued=syncDirtyMessage;syncDirtyMessage='';runHomeSync(queued);}}}
 function commitLayout(next){layout=Home.saveLayout(next);renderHome();runHomeSync('ホームの並びを保存しました');}
