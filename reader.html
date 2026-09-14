@@ -71,6 +71,17 @@
   html.reader-entry-video #videoListSection {
     overflow: visible !important;
   }
+  @media (min-width: 900px) {
+    html.reader-entry-manga #savedListOverlay,
+    html.reader-entry-video #savedListOverlay {
+      padding-left: 58px !important;
+    }
+    html.reader-entry-manga #savedListPanel,
+    html.reader-entry-video #savedListPanel {
+      margin-left: auto !important;
+      margin-right: auto !important;
+    }
+  }
   ::selection { background: var(--accent-dim); color: var(--text); }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
