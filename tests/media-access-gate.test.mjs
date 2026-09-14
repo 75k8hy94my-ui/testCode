@@ -79,6 +79,23 @@ test('VPN check honors a manually designated VPN IP', async () => {
   assert.equal(Gate.getManualIpDesignation(currentIp), null);
 });
 
+test('VPN check does not prompt or allow an unregistered non-VPN IP', async () => {
+  let prompted = false;
+  const Gate = loadGate({
+    confirm: () => { prompted = true; return true; },
+    fetch: async (url) => {
+      if (url === Gate.IP_URL) return { ok: true, json: async () => ({ ip: '198.51.100.121' }) };
+      if (url.startsWith(Gate.CHECK_URL)) return { ok: true, json: async () => ({ is_vpn: false, is_proxy: false }) };
+      return { ok: true, json: async () => [] };
+    },
+    setTimeout,
+    clearTimeout,
+  });
+  assert.equal(await Gate.checkVpn(), false);
+  assert.equal(prompted, false);
+  assert.equal(Gate.getDiagnostics().final, 'blocked');
+});
+
 test('VPN check falls back to Proton exit IP list when generic detection returns false', async () => {
   const calls = [];
   const currentIp = '198.51.100.44';

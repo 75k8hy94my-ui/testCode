@@ -487,6 +487,11 @@
     return status === 'allowed';
   }
 
+  function confirmManualVpnOverride() {
+    const message = 'Protonおよび一般VPN判定ではVPNと確認できませんでした。\n手動指定IPで接続しますがよろしいですか？';
+    return typeof root.confirm !== 'function' || root.confirm(message);
+  }
+
   async function checkVpn() {
     status = 'checking';
     updateStatusButtons(status);
@@ -516,12 +521,15 @@
         allowed = diagnostics.protonExitMatch;
       }
       if (!allowed && manualDesignation === 'vpn') {
-        const message = 'Protonおよび一般VPN判定ではVPNと確認できませんでした。\n手動指定IPで接続しますがよろしいですか？';
-        if (typeof root.confirm === 'function' && root.confirm(message)) return applyFinalStatus(true);
+        if (confirmManualVpnOverride()) return applyFinalStatus(true);
         diagnostics.error = 'VPNと確認できなかったため手動指定を適用しませんでした';
       }
       return applyFinalStatus(allowed);
     } catch (error) {
+      if (diagnostics.manualDesignation === 'vpn' || getManualIpDesignation(diagnostics.ip) === 'vpn') {
+        if (confirmManualVpnOverride()) return applyFinalStatus(true);
+        diagnostics.error = 'VPNを確認できなかったため手動指定を適用しませんでした';
+      }
       status = 'blocked';
       updateStatusButtons(status);
       diagnostics.final = 'blocked';
