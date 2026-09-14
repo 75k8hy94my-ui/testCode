@@ -16,7 +16,7 @@ test('reader startup honors an explicit screen route before resume and default-l
   const reader = readReader();
   assert.match(reader, /const requestedScreenOnLoad = getReaderScreenFromLocation\(\);/);
   assert.match(reader, /if \(!requestedScreenOnLoad\) \{[\s\S]*localStorage\.getItem\(LAST_URL_KEY\)/);
-  assert.match(reader, /if \(!requestedScreenOnLoad && !resumedOnLoad\) openSavedList\(true\);/);
+  assert.match(reader, /if \(!requestedScreenOnLoad && !resumedOnLoad && !location\.pathname\.endsWith\('\/reader\.html'\)/);
 });
 
 test('reader location parser recognizes the video-list route', () => {

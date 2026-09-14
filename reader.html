@@ -3560,6 +3560,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   async function openItem(item, addToHistoryFlag, switchDirection) {
     recentlyClosedItemId = null;
     currentItem = item || null; // remembered for series/次の巻 lookups
+    if (location.pathname.endsWith('/manga.html') || location.pathname === '/manga.html') {
+      if (item && item.id) localStorage.setItem(LAST_URL_KEY, JSON.stringify({ kind: 'item', itemId: item.id }));
+      location.href = 'reader.html';
+      return;
+    }
     if (item && Array.isArray(item.pages) && item.pages.length) {
       await startReadingCustom(item, switchDirection);
     } else {
@@ -6879,7 +6884,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
   // 明示された #screen=... は外部ナビゲーションの意図なので最優先する。
   // ルート指定も前回の漫画もない場合だけ、保存一覧を既定画面として開く。
-  if (!requestedScreenOnLoad && !resumedOnLoad) openSavedList(true);
+  if (!requestedScreenOnLoad && !resumedOnLoad && !location.pathname.endsWith('/reader.html') && location.pathname !== '/reader.html') openSavedList(true);
 })();
 </script>
 <script src="reader-shell.js?v=20260915-shell"></script>
