@@ -8,7 +8,7 @@ const showLogin=()=>window.location.replace('index.html');
 const showVault=()=>window.location.replace('sync.html');
 const session=window.MangaVault&&MangaVault.loadSession();
 const marks={bookshelf:'本',study:'学',quiz:'Q',links:'↗',egov:'法',courts:'判','moj-exam':'司'};
-const SPA_PAGES=(window.AppShell&&Array.isArray(AppShell.SPA_PAGES)?[...AppShell.SPA_PAGES]:['home.html','profile.html','index-search.html','hyakusen.html','links.html']);
+const SPA_PAGES=(window.AppShell&&Array.isArray(AppShell.SPA_PAGES)?[...AppShell.SPA_PAGES,'reader.html']:['home.html','profile.html','index-search.html','hyakusen.html','links.html','reader.html']);
 let layout=Home?Home.loadLayout():[];
 let editing=false,syncRunning=false,syncDirty=false,syncDirtyMessage='',syncClearTimer=null;
 let hyakusenView=null,hyakusenBootPromise=null,indexView=null,indexBootPromise=null,linksView=null,linksBootPromise=null;
@@ -37,7 +37,7 @@ function getMount(){
   return mount;
 }
 
-function routeName(path=location.pathname){const name=path.split('/').pop();if(name==='profile.html')return'profile';if(name==='index-search.html')return'index-search';if(name==='hyakusen.html')return'hyakusen';if(name==='links.html')return'links';return'home';}
+function routeName(path=location.pathname){const name=path.split('/').pop();if(name==='profile.html')return'profile';if(name==='index-search.html')return'index-search';if(name==='hyakusen.html')return'hyakusen';if(name==='links.html')return'links';if(name==='reader.html')return'reader';return'home';}
 function setTitle(route){const titles={home:'ホームズ',profile:'プロフィール設定','index-search':'索引検索',hyakusen:'判例百選',links:'リンク管理'};const title=titles[route]||titles.home;document.title=title;const h1=document.getElementById('shellTitle');if(h1)h1.textContent=title;}
 function setSyncStatus(text){const node=$('homeSyncStatus');if(!node)return;clearTimeout(syncClearTimer);node.textContent=text||'';if(text&&text!=='同期中…')syncClearTimer=setTimeout(()=>{if(node.isConnected)node.textContent='';},3500);}
 async function runHomeSync(okMessage){if(syncRunning){syncDirty=true;syncDirtyMessage=okMessage||syncDirtyMessage;return;}syncRunning=true;setSyncStatus('同期中…');try{await MangaVault.savePayload(MangaVaultPayload.buildFromLocalStorage());setSyncStatus(okMessage||'保存しました');}catch(error){setSyncStatus('端末には保存済みです。クラウド同期: '+(error&&error.message?error.message:'失敗'));}finally{syncRunning=false;if(syncDirty){syncDirty=false;const queued=syncDirtyMessage;syncDirtyMessage='';runHomeSync(queued);}}}
@@ -78,7 +78,8 @@ function syncHeaderRoute(){
   });
   if(window.AppDesktopRail)AppDesktopRail.syncActive();
 }
-function renderRoute(){ensureAppShell();const route=routeName();if(route==='profile')renderProfile();else if(route==='index-search')renderIndexSearch();else if(route==='hyakusen')renderHyakusen();else if(route==='links')renderLinks();else renderHome();document.dispatchEvent(new CustomEvent('home-profile-routechange',{detail:{route}}));}
+async function renderReader(){const target=getMount();if(!target)return;setTitle('reader');editing=false;const edit=$('editHomeBtn');if(edit)edit.hidden=true;target.replaceChildren();const loading=document.createElement('p');loading.className='syncStatus';loading.textContent='読み込み中…';target.append(loading);try{const response=await fetch('reader.html');if(!response.ok)throw new Error('reader load failed');const doc=new DOMParser().parseFromString(await response.text(),'text/html');const nodes=[...doc.body.children].filter((node)=>node.tagName!=='SCRIPT');target.replaceChildren(...nodes);for(const source of [...doc.querySelectorAll('script')]){const script=document.createElement('script');if(source.src)script.src=new URL(source.getAttribute('src'),location.href).href;else script.textContent=source.textContent;document.body.appendChild(script);}syncHeaderRoute();}catch(_){target.innerHTML='<section class="profileContent"><h2>漫画を読み込めませんでした</h2><p>ホームへ戻って再試行してください。</p><a class="glassBtn" href="home.html">ホームへ戻る</a></section>';}}
+function renderRoute(){ensureAppShell();const route=routeName();if(route==='profile')renderProfile();else if(route==='index-search')renderIndexSearch();else if(route==='hyakusen')renderHyakusen();else if(route==='links')renderLinks();else if(route==='reader')renderReader();else renderHome();document.dispatchEvent(new CustomEvent('home-profile-routechange',{detail:{route}}));}
 function navigate(path,{replace=false}={}){const target=new URL(path,location.href),name=target.pathname.split('/').pop();if(!SPA_PAGES.includes(name)){location.href=target.href;return;}if(replace)history.replaceState({appShellSPA:true},'',target.href);else history.pushState({appShellSPA:true},'',target.href);renderRoute();}
 function intercept(event){if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;const link=event.target.closest('a[href]');if(!link||link.target||link.hasAttribute('download'))return;const target=new URL(link.href,location.href),name=target.pathname.split('/').pop();if(target.origin===location.origin&&SPA_PAGES.includes(name)){event.preventDefault();navigate(target.href);}}
 async function start(){

@@ -35,7 +35,7 @@
   }
 
   function install() {
-    if (document.getElementById('readerShellHeader')) return;
+    if (document.getElementById('readerShellHeader') || document.querySelector('.homeHeader')) return;
     installShellStyle();
     document.body.insertAdjacentHTML('afterbegin', shellMarkup());
     document.documentElement.classList.add('reader-shell-page');
