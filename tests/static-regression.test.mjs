@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
+const readFile = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
+const read = (name) => name === 'reader.html' ? ['reader.html', 'reader-saved-list-template.js', 'reader-author-list-template.js', 'reader-toc-template.js', 'reader-mobile-nav-template.js'].map(readFile).join('\n') : readFile(name);
+const readReader = () => read('reader.html');
 
 function loadRecommendationPicker() {
   const context = { window: {} };
@@ -26,27 +28,27 @@ test('recommendation picker rotates fallback works and excludes disabled local m
 });
 
 test('reader prioritizes fast visible image loading over background detection', () => {
-  const source = read('reader.html');
+  const source = readReader();
   assert.match(source, /const FIRST_PAGE_PROBE_BUDGET_MS\s*=\s*15000/);
   assert.match(source, /findPageResult\(1, FIRST_PAGE_PROBE_BUDGET_MS\)/);
   assert.match(source, /const LOAD_TIMEOUT_MS\s*=\s*60000/);
 });
 
 test('directly entered URLs keep the save action visible until explicitly saved', () => {
-  const source = read('reader.html');
+  const source = readReader();
   const body = source.slice(source.indexOf('function hasUnsavedCurrentUrl'), source.indexOf('function updateSaveButtonVisibility'));
   assert.match(body, /if \(!currentItem\) return !!baseUrl && !currentlyCustom/);
 });
 
 test('bookshelf cover cache separates filename patterns and can recover stale sources', () => {
-  const source = read('reader.html');
+  const source = readReader();
   const body = source.slice(source.indexOf('function setupFeedImage'), source.indexOf('let bulkDetectRunning'));
   assert.match(body, /const cacheKey = \[folderUrl, String\(resolvedWidth\), JSON\.stringify\(pattern \|\| null\)/);
   assert.match(body, /coverSourceCache\.delete\(cacheKey\)/);
 });
 
 test('manga cards restore the manga screen route before opening a work', () => {
-  const source = read('reader.html');
+  const source = readReader();
   const body = source.slice(source.indexOf('if (!reorderMode && !bulkEditMode)'), source.indexOf('function normalizeAuthorLinks'));
   assert.match(body, /if \(currentReaderScreen === 'video-list'\) navigateReaderScreen\('saved-list', \{ replace: true \}\);/);
   assert.match(body, /switchListTab\('manga'\);[\s\S]*closeSavedList\(\);[\s\S]*openItem\(item, false\)/);
@@ -60,7 +62,7 @@ test('local reader routes committed bookshelf writes through storage boundary', 
 });
 
 test('reader error UI builds candidate URLs as text nodes', () => {
-  const source = read('reader.html');
+  const source = readReader();
   const functionBody = source.slice(source.indexOf('function showFirstPageLoadError'), source.indexOf('function findPageUrl'));
   assert.match(functionBody, /replaceChildren\(\)/);
   assert.match(functionBody, /code\.textContent\s*=\s*baseUrl/);
@@ -74,7 +76,7 @@ test('sync UI has no persistent passphrase control and payload includes author c
 });
 
 test('reader dashboard includes recent-read and random sections', () => {
-  const source = read('reader.html');
+  const source = readReader();
   assert.match(source, /\['recent-read', '最近読んだ'/);
   assert.match(source, /\['random', 'ランダム'/);
   assert.match(source, /mangaReaderDashboardVisibility/);
@@ -93,7 +95,7 @@ test('local reader is disabled behind a reversible feature flag', () => {
 });
 
 test('disabled local manga stays out of bookshelf views without deleting it', () => {
-  const source = read('reader.html');
+  const source = readReader();
   assert.match(source, /function shelfVisibleItems\(\)/);
   assert.match(source, /window\.MangaReaderFeatures && window\.MangaReaderFeatures\.localReader/);
   assert.match(source, /!item\.localSync/);
@@ -270,13 +272,14 @@ test('dashboard sections are user-configurable from a history-backed settings sc
 
 test('backup actions live on their own utility screen and mobile hides heavy actions', () => {
   const source = read('reader.html');
+  const readerOnly = readFile('reader.html');
   assert.match(source, /id="backupOverlay" class="screenView/);
   assert.match(source, /id="mobileNavBackup"[^>]*>バックアップ</);
   assert.match(source, /openReaderScreen\('backup'\)/);
   assert.match(source, /@media \(max-width: 600px\)[\s\S]*#newBtn[\s\S]*display: none/);
   assert.match(source, /@media \(max-width: 600px\)[\s\S]*#addCustomBtn[\s\S]*display: none/);
   assert.match(source, /@media \(max-width: 600px\)[\s\S]*#bulkDetectBtn[\s\S]*display: none/);
-  assert.doesNotMatch(source, /id="backupExportBtn"[^>]*>バックアップ保存[\s\S]*id="mangaListSection"/);
+  assert.doesNotMatch(readerOnly, /id="backupExportBtn"[^>]*>バックアップ保存[\s\S]*id="mangaListSection"/);
 });
 
 test('bookshelf pagination follows the shelf content and paginates folders with items', () => {

@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 // Contract: every mobile-only reader destination needs a desktop-reachable counterpart.
-const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
+const readFile = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
+const read = (name) => name === 'reader.html' ? ['reader.html', 'reader-saved-list-template.js', 'reader-author-list-template.js', 'reader-toc-template.js', 'reader-mobile-nav-template.js'].map(readFile).join('\n') : readFile(name);
+const readReader = () => read('reader.html');
 
 test('desktop navigation provides a counterpart for every mobile reader destination', () => {
-  const reader = read('reader.html');
+  const reader = readReader();
   const flags = read('feature-flags.js');
   const desktop = read('desktop-navigation.js');
   const rail = read('app-desktop-rail.js');
@@ -31,7 +33,7 @@ test('desktop navigation provides a counterpart for every mobile reader destinat
 });
 
 test('desktop navigation uses the shared fixed Liquid Glass rail and stays off narrow screens', () => {
-  const reader = read('reader.html');
+  const reader = readReader();
   const rail = read('app-desktop-rail.js');
   assert.match(reader, /#mobileBottomNav\s*\{\s*display:\s*none/);
   assert.match(rail, /@media\s*\(min-width:\s*900px\)/);
@@ -44,7 +46,7 @@ test('desktop navigation uses the shared fixed Liquid Glass rail and stays off n
 });
 
 test('saved URL and video screens rely on desktop navigation instead of a redundant close button', () => {
-  const reader = read('reader.html');
+  const reader = readReader();
   const desktop = read('desktop-navigation.js');
   assert.doesNotMatch(desktop, /closeListBtn|updateListCloseVisibility|MutationObserver/);
   assert.ok((reader.match(/els\.closeListBtn\.style\.display = 'none';/g) || []).length >= 2);
