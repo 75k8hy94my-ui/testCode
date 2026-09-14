@@ -55,6 +55,27 @@ test('VPN check discovers the current public IP before querying the VPN verdict 
   assert.match(calls[1], /ip-api\.dev\/api\?q=203\.0\.113\.9/);
 });
 
+test('VPN check honors a manually designated VPN IP', async () => {
+  const store = new Map();
+  const currentIp = '198.51.100.120';
+  const Gate = loadGate({
+    localStorage: {
+      getItem: (key) => store.get(key) || null,
+      setItem: (key, value) => store.set(key, value),
+    },
+    fetch: async (url) => {
+      assert.equal(url, Gate.IP_URL);
+      return { ok: true, json: async () => ({ ip: currentIp }) };
+    },
+    setTimeout,
+    clearTimeout,
+  });
+  assert.equal(Gate.setManualIpDesignation(currentIp, 'vpn'), true);
+  assert.equal(await Gate.checkVpn(), true);
+  assert.equal(Gate.getDiagnostics().manualDesignation, 'vpn');
+  assert.equal(Gate.getDiagnostics().final, 'allowed');
+});
+
 test('VPN check falls back to Proton exit IP list when generic detection returns false', async () => {
   const calls = [];
   const currentIp = '198.51.100.44';

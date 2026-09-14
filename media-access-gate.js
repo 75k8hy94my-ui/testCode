@@ -485,6 +485,7 @@
       const manualDesignation = getManualIpDesignation(ip);
       diagnostics.manualDesignation = manualDesignation;
       if (manualDesignation === 'non-vpn') return applyFinalStatus(false);
+      if (manualDesignation === 'vpn') return applyFinalStatus(true);
 
       diagnostics.protonOwnedNetworkMatch = isKnownProtonOwnedIp(ip);
       renderDiagnostics();
