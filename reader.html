@@ -3672,6 +3672,12 @@ https://cdn.example.org/c/003.webp"></textarea>
     updateTocButtonVisibility();
     try { localStorage.removeItem(LAST_URL_KEY); } catch (e) {}
 
+    if (location.pathname.endsWith('/reader.html') || location.pathname === '/reader.html') {
+      if (window.HomeProfileSPA && typeof HomeProfileSPA.navigate === 'function') HomeProfileSPA.navigate('manga.html');
+      else location.href = 'manga.html';
+      return;
+    }
+
     // 本棚から開いた作品は、閉じたときにそのフォルダ／スマートリストへ戻す。
     // 新規URLや起動時のように閲覧元がない場合は、従来どおり本棚の先頭を表示する。
     if (returnView) {
