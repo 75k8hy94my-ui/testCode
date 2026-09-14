@@ -56,6 +56,21 @@
   html.reader-entry-video .homeShell #routeContent {
     min-height: 0 !important;
   }
+  html.reader-entry-manga,
+  html.reader-entry-video,
+  html.reader-entry-manga body,
+  html.reader-entry-video body {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+  html.reader-entry-manga #savedListItems,
+  html.reader-entry-video #savedListItems,
+  html.reader-entry-manga #mangaListSection,
+  html.reader-entry-video #videoListSection {
+    overflow: visible !important;
+  }
   ::selection { background: var(--accent-dim); color: var(--text); }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
