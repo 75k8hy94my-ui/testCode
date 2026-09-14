@@ -10,6 +10,9 @@
     ['settings', '設定', '設定'],
     ['backup', '保管庫', '保管庫']
   ]);
+  window.ReaderRoutes = window.ReaderRoutes || {};
+  let mountedRoute = null;
+  const routeContainer = () => document.getElementById('app') || document.body;
 
   function getScreen() {
     const match = String(location.hash || '').match(/(?:^#|&)screen=([^&]+)/);
@@ -89,6 +92,14 @@
       if (active) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
     });
+    const route = window.ReaderRoutes[screen];
+    if (mountedRoute && mountedRoute.module.unmount) mountedRoute.module.unmount(mountedRoute.container);
+    mountedRoute = null;
+    if (route && route.mount) {
+      const container = routeContainer();
+      route.mount(container, { screen });
+      mountedRoute = { module: route, container };
+    }
   }
 
   window.ReaderShell = Object.freeze({ routes, getScreen, setScreen, syncActive });
