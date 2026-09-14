@@ -17,7 +17,7 @@
     header { position:absolute; top:max(22px, calc(env(safe-area-inset-top) + 14px)); left:max(28px, calc(env(safe-area-inset-left) + 18px)); }
     h1 { margin:0; font-size:clamp(24px,3vw,42px); line-height:1.1; font-weight:500; letter-spacing:.04em; white-space:nowrap; }
     #loginView { position:absolute; inset:0; }
-    #loginForm { position:absolute; left:50%; top:44%; transform:translate(-50%,-50%); width:min(62vw,720px); display:grid; gap:14px; }
+    #loginForm { position:absolute; left:50%; top:44%; transform:translate(-50%,-50%); width:min(62vw,720px); display:grid; gap:14px; z-index:2; }
     #loginForm input { display:block; width:100%; height:clamp(54px,6vw,78px); border:1.5px solid var(--line); border-radius:3px; background:#fff; color:var(--text); padding:0 18px; font:inherit; font-size:clamp(18px,2vw,26px); box-shadow:none; outline:none; }
     #loginForm input::placeholder { color:#9ca3af; opacity:.72; }
     #loginForm input:focus { border-color:var(--focus); box-shadow:0 0 0 2px rgba(37,99,235,.12); }
@@ -29,8 +29,8 @@
     #forgotRow { margin:14px 0 0; text-align:center; }
     .link-button { appearance:none; border:0; background:transparent; color:#2563eb; padding:4px 6px; font:inherit; font-size:14px; cursor:pointer; }
     .link-button:hover { text-decoration:underline; text-underline-offset:3px; }
-    .status { position:absolute; left:50%; top:calc(44% + 145px); transform:translateX(-50%); width:min(62vw,720px); min-height:1.5em; color:var(--sub); line-height:1.5; font-size:13px; text-align:center; margin:0; }
-    #resetView, #completeResetView { position:absolute; left:50%; top:44%; transform:translate(-50%,-50%); width:min(62vw,720px); }
+    .status { position:absolute; left:50%; top:calc(44% + 145px); transform:translateX(-50%); width:min(62vw,720px); min-height:1.5em; color:var(--sub); line-height:1.5; font-size:13px; text-align:center; margin:0; z-index:1; pointer-events:none; }
+    #resetView, #completeResetView { position:absolute; left:50%; top:44%; transform:translate(-50%,-50%); width:min(62vw,720px); z-index:2; }
     #resetView h2, #completeResetView h2 { margin:0 0 16px; font-size:22px; font-weight:500; }
     #resetView .intro, #completeResetView .intro { margin:0 0 16px; color:var(--sub); font-size:14px; line-height:1.6; }
     #resetView form, #completeResetView form { display:grid; gap:14px; }
