@@ -52,7 +52,7 @@ test('VPN check discovers the current public IP before querying the VPN verdict 
   const Gate = loadGate({ fetch, setTimeout, clearTimeout });
   assert.equal(await Gate.checkVpn(), true);
   assert.match(calls[0], /api\.ipify\.org/);
-  assert.match(calls[1], /ip-api\.dev\/api\?q=203\.0\.113\.9/);
+    assert.match(calls[1], /ip-api\.dev\/api\?q=203\.0\.113\.9&format=json/);
 });
 
 test('VPN check honors a manually designated VPN IP', async () => {

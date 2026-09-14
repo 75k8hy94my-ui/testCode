@@ -437,7 +437,7 @@
     diagnostics.generic = { status: 'checking', httpStatus: null, verdict: null };
     renderDiagnostics();
     try {
-      const payload = await fetchJson(CHECK_URL + '?q=' + encodeURIComponent(ip), signal);
+      const payload = await fetchJson(CHECK_URL + '?q=' + encodeURIComponent(ip) + '&format=json', signal);
       const verdict = isVpnVerdict(payload);
       diagnostics.generic = { status: 'success', httpStatus: 200, verdict };
       renderDiagnostics();
@@ -498,6 +498,10 @@
       }
       return applyFinalStatus(allowed);
     } catch (error) {
+      if (diagnostics.manualDesignation === 'vpn' || getManualIpDesignation(diagnostics.ip) === 'vpn') {
+        diagnostics.manualDesignation = 'vpn';
+        return applyFinalStatus(true);
+      }
       status = 'blocked';
       updateStatusButtons(status);
       diagnostics.final = 'blocked';
