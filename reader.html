@@ -74,6 +74,11 @@
   html.reader-shell-page #topbar {
     top: 54px !important;
   }
+  #videoListSection:not([data-video-library-enhanced="1"]) #videoListToolbar,
+  #videoListSection:not([data-video-library-enhanced="1"]) #videoListItems,
+  #videoListSection:not([data-video-library-enhanced="1"]) #videoListEmpty {
+    display: none !important;
+  }
   @media (min-width: 900px) {
     html.reader-entry-manga #savedListOverlay,
     html.reader-entry-video #savedListOverlay {
