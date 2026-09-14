@@ -270,6 +270,7 @@
     const link = document.createElement('a');
     link.id = item.id;
     link.href = item.href;
+    link.dataset.routeHref = item.href;
     decorateItem(link, item);
     if (item.optional) link.hidden = !shouldShowLocal();
     return link;
@@ -299,8 +300,13 @@
       if (selected) element.setAttribute('aria-current', 'page');
       else element.removeAttribute('aria-current');
       element.toggleAttribute('aria-disabled', selected);
-      if (selected) element.setAttribute('tabindex', '-1');
-      else element.removeAttribute('tabindex');
+      if (selected) {
+        element.setAttribute('tabindex', '-1');
+        element.removeAttribute('href');
+      } else {
+        element.removeAttribute('tabindex');
+        if (element.dataset.routeHref) element.setAttribute('href', element.dataset.routeHref);
+      }
     }
   }
 
