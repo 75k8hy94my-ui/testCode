@@ -33,6 +33,7 @@
 
   function install() {
     if (document.getElementById('readerShellHeader')) return;
+    installShellStyle();
     document.body.insertAdjacentHTML('afterbegin', shellMarkup());
     document.documentElement.classList.add('reader-shell-page');
     document.querySelectorAll('[data-reader-route]').forEach((link) => {
@@ -45,6 +46,38 @@
       });
     });
     syncActive();
+  }
+
+  function installShellStyle() {
+    if (document.getElementById('readerShellStyle')) return;
+    const style = document.createElement('style');
+    style.id = 'readerShellStyle';
+    style.textContent = `
+      #readerShellHeader.homeHeader {
+        position: fixed !important;
+        z-index: 1100 !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: auto !important;
+        height: 54px !important;
+        min-height: 54px !important;
+        margin: 0 !important;
+        padding: 0 18px 0 74px !important;
+        background: #1769aa !important;
+        color: #fff !important;
+        border-bottom: 1px solid rgba(0,0,0,.08) !important;
+        box-shadow: none !important;
+      }
+      #readerShellHeader.homeHeader h1 { color: #fff !important; }
+      #readerShellHeader.homeHeader .glassBtn { color: #fff !important; }
+      #readerShellHeader.homeHeader .glassBtn:hover { background: rgba(255,255,255,.14) !important; }
+      @media (max-width: 899px) {
+        #readerShellHeader.homeHeader { position: static !important; height: auto !important; min-height: 0 !important; padding: 18px !important; background: #fff !important; color: #202124 !important; }
+        #readerShellHeader.homeHeader h1, #readerShellHeader.homeHeader .glassBtn { color: #202124 !important; }
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   function syncActive() {
