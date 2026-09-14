@@ -8,7 +8,7 @@ const showLogin=()=>window.location.replace('index.html');
 const showVault=()=>window.location.replace('sync.html');
 const session=window.MangaVault&&MangaVault.loadSession();
 const marks={bookshelf:'本',study:'学',quiz:'Q',links:'↗',egov:'法',courts:'判','moj-exam':'司'};
-const SPA_PAGES=(window.AppShell&&Array.isArray(AppShell.SPA_PAGES)?[...AppShell.SPA_PAGES,'reader.html']:['home.html','profile.html','index-search.html','hyakusen.html','links.html','reader.html']);
+const SPA_PAGES=(window.AppShell&&Array.isArray(AppShell.SPA_PAGES)?[...AppShell.SPA_PAGES]:['home.html','profile.html','index-search.html','hyakusen.html','links.html']);
 let layout=Home?Home.loadLayout():[];
 let editing=false,syncRunning=false,syncDirty=false,syncDirtyMessage='',syncClearTimer=null;
 let hyakusenView=null,hyakusenBootPromise=null,indexView=null,indexBootPromise=null,linksView=null,linksBootPromise=null;

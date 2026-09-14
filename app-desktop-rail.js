@@ -16,8 +16,8 @@
 
   const ITEMS = [
     { id: 'desktopNavHome', key: 'home', label: 'ホーム', href: 'home.html' },
-    { id: 'desktopNavManga', key: 'manga', label: '漫画', href: 'reader.html#screen=saved-list' },
-    { id: 'desktopNavVideo', key: 'video', label: '動画', href: 'reader.html#screen=video-list' },
+    { id: 'desktopNavManga', key: 'manga', label: '漫画', href: 'manga.html' },
+    { id: 'desktopNavVideo', key: 'video', label: '動画', href: 'video.html' },
     { id: 'desktopNavStudy', key: 'study', label: '学習', href: 'study.html' },
     { id: 'desktopNavLinks', key: 'links', label: 'リンク', href: 'links.html' },
     { id: 'desktopNavAuthor', key: 'author', label: '著者', href: 'reader.html#screen=author-cards' },
@@ -41,6 +41,8 @@
     if (page === 'study.html') return 'study';
     if (page === 'links.html') return 'links';
     if (page === 'local-reader.html') return 'local';
+    if (page === 'manga.html') return 'manga';
+    if (page === 'video.html') return 'video';
     if (page !== 'reader.html') return '';
     const screen = currentReaderScreen();
     if (screen === 'video-list' || screen.startsWith('video-')) return 'video';
