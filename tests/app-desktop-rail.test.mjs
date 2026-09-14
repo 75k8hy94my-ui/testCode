@@ -34,8 +34,8 @@ test('shared rail provides global destinations and page-aware active state', () 
   const rail = read('app-desktop-rail.js');
   const destinations = [
     ['desktopNavHome','home.html'],
-    ['desktopNavManga','reader.html#screen=saved-list'],
-    ['desktopNavVideo','reader.html#screen=video-list'],
+    ['desktopNavManga','manga.html'],
+    ['desktopNavVideo','video.html'],
     ['desktopNavStudy','study.html'],
     ['desktopNavLinks','links.html'],
     ['desktopNavAuthor','reader.html#screen=author-cards'],

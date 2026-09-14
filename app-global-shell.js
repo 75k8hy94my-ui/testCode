@@ -10,6 +10,8 @@
     'index-search.html': '索引検索',
     'hyakusen.html': '判例百選',
     'links.html': 'リンク管理',
+    'manga.html': '漫画',
+    'video.html': '動画',
     'reader.html': '漫画',
     'local-reader.html': 'ローカル漫画',
     'study.html': '学習',
