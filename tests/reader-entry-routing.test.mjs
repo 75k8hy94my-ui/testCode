@@ -9,7 +9,7 @@ const readReader = () => read('reader.html');
 test('desktop video destination deep-links directly to the video list', () => {
   const rail = read('app-desktop-rail.js');
   assert.match(rail, /desktopNavVideo/);
-  assert.match(rail, /reader\.html#screen=video-list/);
+  assert.match(rail, /video\.html/);
 });
 
 test('reader startup honors an explicit screen route before resume and default-list logic', () => {

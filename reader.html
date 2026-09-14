@@ -6811,10 +6811,12 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   els.mobileNavManga.addEventListener('click', () => {
     if (mobileReaderMode) { els.prevBtn.click(); return; }
+    if (location.pathname.endsWith('/video.html') || location.pathname === '/video.html') { location.href = 'manga.html'; return; }
     openSavedList(false, false); switchListTab('manga');
   });
   els.mobileNavVideo.addEventListener('click', () => {
     if (mobileReaderMode) { toggleBars(); return; }
+    if (location.pathname.endsWith('/manga.html') || location.pathname === '/manga.html') { location.href = 'video.html'; return; }
     openReaderScreen('video-list');
   });
   els.mobileNavAuthor.addEventListener('click', () => {
