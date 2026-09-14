@@ -6221,11 +6221,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   function handleNewManga() { promptForMangaUrl(); }
   els.newBtn.addEventListener('click', handleNewManga);
   if (window.MangaReaderFeatures.localReader) {
-    els.listTabRow.hidden = false;
-    els.localReaderBtn.addEventListener('click', () => { window.location.href = 'local-reader.html?v=f9b418b'; });
+    if (els.listTabRow) els.listTabRow.hidden = false;
+    if (els.localReaderBtn) els.localReaderBtn.addEventListener('click', () => { window.location.href = 'local-reader.html?v=f9b418b'; });
   } else {
-    els.localReaderBtn.hidden = true;
-    els.listTabRow.hidden = true;
+    if (els.localReaderBtn) els.localReaderBtn.hidden = true;
+    if (els.listTabRow) els.listTabRow.hidden = true;
   }
   els.closeBtn.addEventListener('click', () => {
     if (hasUnsavedCurrentUrl() && !confirm('未保存ですが戻りますか？')) return;
