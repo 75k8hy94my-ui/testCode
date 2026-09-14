@@ -220,10 +220,10 @@
         }
         .appDesktopRailItem.active,
         .appDesktopRailItem[aria-current="page"] {
-          color: var(--rail-text) !important;
-          background: var(--rail-selection) !important;
-          border-color: color-mix(in srgb,var(--rail-border) 68%,transparent) !important;
-          box-shadow: 0 2px 8px color-mix(in srgb,var(--rail-shadow) 48%,transparent), inset 0 1px 0 var(--rail-highlight) !important;
+          color: #17181a !important;
+          background: transparent !important;
+          border-color: transparent !important;
+          box-shadow: none !important;
         }
         .appDesktopRailItem:active { transform: scale(.96); }
         .appDesktopProfileButton { flex:0 0 52px; min-height:52px; width:52px; margin:0 auto 3px; padding:0 !important; border-radius:50% !important; justify-content:center; background:var(--rail-selection) !important; color:var(--rail-text) !important; }
