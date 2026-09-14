@@ -28,9 +28,7 @@
   }
 
   function shellMarkup() {
-    const items = routes.map(([key, label, short]) =>
-      `<a class="readerShellNavItem" data-reader-route="${key}" href="reader.html#screen=${key}"><span>${short}</span><small>${label}</small></a>`).join('');
-    return `<header class="readerShellHeader" id="readerShellHeader"><a class="readerShellBrand" href="home.html"><span class="readerShellEyebrow">BOOKS</span><strong>漫画</strong></a><nav class="readerShellTopNav" aria-label="主要ページ"><a href="home.html">ホーム</a><a href="reader.html#screen=saved-list" data-reader-route="saved-list">本棚</a><a href="study.html">学習</a><a href="links.html">リンク</a></nav></header><nav class="readerShellBottomNav" id="readerShellNavigation" aria-label="漫画メニュー">${items}</nav>`;
+    return '<header class="homeHeader" id="readerShellHeader"><div><h1 id="readerShellTitle">漫画</h1></div><div class="topbarActions"><nav class="topActions" aria-label="主要ページ"><a class="glassBtn" href="home.html">ホーム</a><a class="glassBtn topActionCurrent" aria-current="page" href="reader.html#screen=saved-list" data-reader-route="saved-list">本棚</a><a class="glassBtn" href="study.html">学習</a><a class="glassBtn" href="links.html">リンク</a></nav><div class="headerActions"><a class="glassBtn" href="sync.html">保管庫</a><a class="glassBtn" href="reader.html#screen=settings" data-reader-route="settings">設定</a></div></div></header>';
   }
 
   function install() {
@@ -54,6 +52,7 @@
     document.querySelectorAll('[data-reader-route]').forEach((link) => {
       const active = link.dataset.readerRoute === screen;
       link.classList.toggle('active', active);
+      link.classList.toggle('topActionCurrent', active);
       if (active) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
     });
