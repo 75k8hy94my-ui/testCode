@@ -22,6 +22,9 @@
     #loginForm input::placeholder { color:#9ca3af; opacity:.72; }
     #loginForm input:focus { border-color:var(--focus); box-shadow:0 0 0 2px rgba(37,99,235,.12); }
     #loginForm button[type="submit"] { appearance:none; width:100%; min-height:48px; border:0; border-radius:3px; background:#2563eb; color:#fff; font:inherit; font-size:16px; font-weight:600; cursor:pointer; }
+    button:not(.link-button) { background: linear-gradient(145deg, rgba(255,255,255,.68), rgba(255,255,255,.34)); color: var(--text); }
+    button.primary { background: linear-gradient(145deg, rgba(37,99,235,.96), rgba(37,99,235,.72)); color:#fff; border-color:rgba(255,255,255,.58); }
+    button.primary:hover { background: linear-gradient(145deg, rgba(29,78,216,.98), rgba(37,99,235,.78)); }
     #loginForm button[type="submit"]:disabled { opacity:.55; cursor:wait; }
     #forgotRow { margin:14px 0 0; text-align:center; }
     .link-button { appearance:none; border:0; background:transparent; color:#2563eb; padding:4px 6px; font:inherit; font-size:14px; cursor:pointer; }
@@ -37,7 +40,8 @@
     #resetView .switch { text-align:center; margin:14px 0 0; }
     [hidden] { display:none!important; }
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-      #loginForm button[type="submit"], #resetView button[type="submit"], #completeResetView button[type="submit"] { background:#2563eb; }
+      button:not(.link-button), input { background: rgba(255,255,255,.98); }
+      button.primary { background: var(--accent); color: #fff; -webkit-text-fill-color: #fff; }
     }
     @media (max-width:640px) {
       header { top:max(18px, calc(env(safe-area-inset-top) + 10px)); left:max(18px, calc(env(safe-area-inset-left) + 12px)); }
@@ -60,7 +64,7 @@
       <form id="loginForm">
         <input id="loginEmail" type="email" autocomplete="email" placeholder="メールアドレス" required autofocus>
         <input id="loginPassword" type="password" autocomplete="current-password" placeholder="パスワード" required>
-        <button type="submit">ログイン</button>
+        <button class="primary" type="submit">ログイン</button>
         <p id="forgotRow"><button id="showReset" class="link-button" type="button">ログインパスワードを忘れた</button></p>
       </form>
     </div>

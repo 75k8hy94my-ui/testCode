@@ -76,11 +76,19 @@
       <button id="copyRecoveryBtn" type="button">復旧キーをコピー</button>
       <div>安全な場所に保管してください。数秒後にホームを開きます。</div>
     </div>
+    <section class="extensionDownload" aria-labelledby="extensionDownloadHeading">
+      <h2 id="extensionDownloadHeading">漫画登録ブラウザ拡張機能</h2>
+      <p>Chrome / Edge 用の最新版をZIPでダウンロードできます。</p>
+      <ol><li>ZIPをダウンロードして展開</li><li>拡張機能の管理画面でデベロッパーモードをオン</li><li>「パッケージ化されていない拡張機能を読み込む」で展開したフォルダを選択</li></ol>
+      <button id="extensionDownloadBtn" type="button">ブラウザ拡張機能をダウンロード</button>
+      <p id="extensionDownloadStatus" aria-live="polite"></p>
+    </section>
   </main>
   <script src="supabase-config.js"></script>
   <script src="vault-session.js?v=20260813-vault-state"></script>
   <script src="vault-payload.js"></script>
   <script src="encrypted-chunk-cache.js"></script>
+  <script src="extension-download.js"></script>
   <script>
   (async () => {
     'use strict';

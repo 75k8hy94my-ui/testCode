@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = path.dirname(new URL(import.meta.url).pathname).replace(/[/\\]tests$/, '');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pages = fs.readdirSync(root).filter((name) => name.endsWith('.html'));
 
 test('published site opts out of crawler indexing on every HTML entry point', () => {
