@@ -6,7 +6,7 @@
   const routes = Object.freeze([
     ['saved-list', '本棚', '本'],
     ['video-list', '動画', '動画'],
-    ['author-list', '作者', '作者'],
+    ['author-cards', '作者', '作者'],
     ['settings', '設定', '設定'],
     ['backup', '保管庫', '保管庫']
   ]);
@@ -92,7 +92,7 @@
       if (active) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
     });
-    const route = window.ReaderRoutes[screen];
+    const route = window.ReaderRoutes[screen] || window.ReaderRoutes[screen === 'author-cards' ? 'authorList' : screen === 'video-list' ? 'videoList' : screen];
     if (mountedRoute && mountedRoute.module.unmount) mountedRoute.module.unmount(mountedRoute.container);
     mountedRoute = null;
     if (route && route.mount) {
