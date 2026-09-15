@@ -491,11 +491,9 @@
   function openVideo(videoId) {
     const base = baseById(videoId); if (!base) return; const video = effectiveVideo(base);
     updateMeta(videoId, { openCount: (video.openCount || 0) + 1, lastOpenedAt: Date.now() });
-    if (base.a && base.b && dom.videoPlayerIframe && dom.videoPlayerTitle) {
-      dom.videoPlayerTitle.textContent = video.title || (base.a + ' / ' + base.b);
-      dom.videoPlayerIframe.src = 'https://www.' + base.a + '.com/embed/' + base.b;
-      location.hash = 'screen=video-player';
-    } else if (video.url) window.open(video.url, '_blank', 'noopener');
+    const target = new URL('video-player.html', location.href);
+    target.searchParams.set('id', videoId);
+    window.location.href = target.href;
   }
 
   function bindEvents() {
