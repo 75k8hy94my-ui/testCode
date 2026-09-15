@@ -198,7 +198,6 @@
       newFolder: document.getElementById('videoLibraryNewFolder'), createFolder: document.getElementById('videoLibraryCreateFolder'), folderList: document.getElementById('videoLibraryFolderList'),
       legacyItems, legacyAddBtn: document.getElementById('addVideoBtn'), legacyConfirmAdd: document.getElementById('confirmVideoAddBtn'), legacyUrlInput: document.getElementById('videoUrlInput'),
       legacyTitleInput: document.getElementById('videoTitleInput'), legacyAInput: document.getElementById('videoAInput'), legacyBInput: document.getElementById('videoBInput'),
-      videoPlayerTitle: document.getElementById('videoPlayerTitle'), videoPlayerIframe: document.getElementById('videoPlayerIframe'),
     });
     return true;
   }
@@ -512,7 +511,6 @@
     dom.url.addEventListener('input', () => { const parsed = parseThroughLegacy(text(dom.url.value)); if (parsed) { dom.legacyService.value = parsed.a; dom.legacyId.value = parsed.b; } });
     dom.sheet.addEventListener('click', (event) => { if (event.target === dom.sheet) closeSheet(); });
     window.addEventListener('popstate', () => { if (!(history.state && history.state.videoLibrarySheet)) setSheetVisible(false); });
-    window.addEventListener('hashchange', () => { if (!location.hash.includes('screen=video-player') && dom.videoPlayerIframe) dom.videoPlayerIframe.src = ''; });
   }
 
   function init() {

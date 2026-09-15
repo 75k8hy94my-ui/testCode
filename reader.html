@@ -547,19 +547,6 @@
   }
   #videoPreviewUrl { font-size: 11px; color: var(--sub); margin-top: 8px; word-break: break-all; min-height: 16px; }
   #videoAddActions { display: flex; justify-content: flex-end; margin-top: 16px; }
-  /* Video player overlay — sits above other modals */
-  #videoPlayerOverlay { z-index: 60; }
-  #videoPlayerPanel {
-    background: var(--panel); border-radius: 14px;
-    width: min(900px, 95vw); display: flex; flex-direction: column;
-    border: 1px solid var(--border); box-shadow: var(--shadow-md);
-    animation: panelRise 0.22s var(--ease); overflow: hidden;
-  }
-  #videoPlayerHeader {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 12px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
-    font-size: 14px; font-weight: 600;
-  }
   .vpnHeaderControls { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
   .vpnHeaderControls .ctrlBtn { padding: 7px 10px; font-size: 12px; }
   .listHeaderControls { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
@@ -568,18 +555,12 @@
   .textActionBtn:hover { color: var(--accent); }
   .vpnMediaHeader { display: flex; align-items: center; gap: 10px; padding: 12px 14px 8px; flex-shrink: 0; }
   .vpnMediaHeader > strong { font-size: 16px; }
-  #videoPlayerHeader .vpnHeaderControls { margin-left: auto; margin-right: 8px; }
   .vpnStatusButton[data-vpn-state="allowed"] { color: #16845f; border-color: rgba(22,132,95,.35); }
   .vpnStatusButton[data-vpn-state="blocked"] { color: #c44949; border-color: rgba(196,73,73,.35); }
   .vpnStatusButton[data-vpn-state="checking"] { color: var(--sub); }
-  /* 16:9 responsive iframe container */
-  #videoPlayerFrame { position: relative; width: 100%; padding-bottom: 56.25%; }
-  #videoPlayerIframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
   @media(max-width:650px) {
     .vpnMediaHeader { padding-left: 10px; padding-right: 10px; }
     .vpnHeaderControls .ctrlBtn { padding: 7px 8px; }
-    #videoPlayerHeader { flex-wrap: wrap; gap: 6px; }
-    #videoPlayerHeader .vpnHeaderControls { order: 3; width: 100%; margin-left: 0; margin-right: 0; }
   }
 
   /* 2026 responsive refresh: calm, native-feeling surfaces with iPhone-first density. */
@@ -1868,10 +1849,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     cancelVideoAddBtn: document.getElementById('cancelVideoAddBtn'),
     confirmVideoAddBtn: document.getElementById('confirmVideoAddBtn'),
 
-    videoPlayerOverlay: document.getElementById('videoPlayerOverlay'),
-    videoPlayerTitle: document.getElementById('videoPlayerTitle'),
-    videoPlayerIframe: document.getElementById('videoPlayerIframe'),
-    closeVideoPlayerBtn: document.getElementById('closeVideoPlayerBtn'),
   };
 
   if (!window.MangaReaderFeatures.transferBudget) els.transferBudgetBtn.hidden = true;
@@ -5766,7 +5743,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       const section = document.createElement('section'); section.style.cssText = 'margin-top:10px;';
       const heading = document.createElement('strong'); heading.textContent = '動画'; section.append(heading);
       const row = document.createElement('div'); row.className = 'author-dashboard-row'; row.style.marginTop = '5px';
-      summary.videos.slice(0, 8).forEach((video) => { const button = document.createElement('button'); button.type = 'button'; button.className = 'ctrlBtn'; button.textContent = video.title; button.addEventListener('click', () => openVideoPlayer(video)); row.append(button); });
+      summary.videos.slice(0, 8).forEach((video) => { const button = document.createElement('button'); button.type = 'button'; button.className = 'ctrlBtn'; button.textContent = video.title; button.addEventListener('click', () => openStandaloneVideo(video)); row.append(button); });
       section.append(row); box.append(section);
     }
     els.dashboard.append(box);
@@ -6151,7 +6128,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     'bulk-edit': els.bulkEditOverlay,
     'bulk-detect': els.bulkDetectOverlay,
     'video-add': els.videoAddOverlay,
-    'video-player': els.videoPlayerOverlay,
     settings: els.settingsOverlay,
     backup: els.backupOverlay,
   };
@@ -6215,7 +6191,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   renderReaderScreen(getReaderScreenFromLocation());
 
   function anyModalOpen() { return currentReaderScreen !== null; }
-  [els.saveDialogOverlay, els.customAddOverlay, els.editItemOverlay, els.authorCardOverlay, els.tocOverlay, els.savedListOverlay, els.bulkEditOverlay, els.bulkDetectOverlay, els.videoAddOverlay, els.videoPlayerOverlay].forEach((dialog) => {
+  [els.saveDialogOverlay, els.customAddOverlay, els.editItemOverlay, els.authorCardOverlay, els.tocOverlay, els.savedListOverlay, els.bulkEditOverlay, els.bulkDetectOverlay, els.videoAddOverlay].forEach((dialog) => {
     if (dialog && typeof dialog.addEventListener === 'function') dialog.addEventListener('close', () => dialog.classList.remove('show'));
   });
 
@@ -6639,6 +6615,12 @@ https://cdn.example.org/c/003.webp"></textarea>
     return 'https://www.' + a + '.com/embed/' + b;
   }
 
+  function openStandaloneVideo(video) {
+    const target = new URL('video-player.html', location.href);
+    target.searchParams.set('id', video.id);
+    window.location.href = target.href;
+  }
+
   function renderVideoList() {
     const frag = document.createDocumentFragment();
     if (!savedVideos.length) {
@@ -6688,7 +6670,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         item.appendChild(titleSpan);
         item.appendChild(idSpan);
         item.appendChild(delBtn);
-        item.addEventListener('click', () => openVideoPlayer(v));
+        item.addEventListener('click', () => openStandaloneVideo(v));
         groupDiv.appendChild(item);
       });
 
@@ -6703,17 +6685,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     savedVideos = savedVideos.filter((v) => v.id !== id);
     persistSavedVideos();
     renderVideoList();
-  }
-
-  function openVideoPlayer(video) {
-    els.videoPlayerTitle.textContent = video.title || (video.a + ' / ' + video.b);
-    els.videoPlayerIframe.src = videoEmbedUrl(video.a, video.b);
-    openReaderScreen('video-player');
-  }
-
-  function closeVideoPlayer() {
-    els.videoPlayerIframe.src = ''; // stop playback
-    closeReaderScreen('video-player');
   }
 
   // https://www.[A].com/v/[B]/... → { a: 'example', b: '0000' }
@@ -6900,9 +6871,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.addVideoBtn.addEventListener('click', openAddVideoDialog);
   els.cancelVideoAddBtn.addEventListener('click', closeAddVideoDialog);
   els.confirmVideoAddBtn.addEventListener('click', confirmVideoAdd);
-  els.closeVideoPlayerBtn.addEventListener('click', closeVideoPlayer);
   els.videoAddOverlay.addEventListener('click', (e) => { if (e.target === els.videoAddOverlay) closeAddVideoDialog(); });
-  els.videoPlayerOverlay.addEventListener('click', (e) => { if (e.target === els.videoPlayerOverlay) closeVideoPlayer(); });
   els.videoUrlInput.addEventListener('input', () => {
     const parsed = parseVideoUrl(els.videoUrlInput.value);
     if (parsed) {

@@ -22,24 +22,6 @@
   </div>
 </section>
 
-<!-- Video player overlay -->
-<section id="videoPlayerOverlay" class="screenView modalOverlay" role="region" aria-labelledby="videoPlayerPanel">
-  <div id="videoPlayerPanel">
-    <div id="videoPlayerHeader">
-      <span id="videoPlayerTitle"></span>
-      <div class="vpnHeaderControls" data-vpn-header="video-player" aria-label="VPN状態">
-        <button class="ctrlBtn vpnStatusButton" type="button" data-vpn-status-button>VPN確認中</button>
-        <button class="ctrlBtn" type="button" data-vpn-diagnostics-button>VPN診断</button>
-      </div>
-      <button class="ctrlBtn" id="closeVideoPlayerBtn" type="button">閉じる</button>
-    </div>
-    <div id="videoPlayerFrame">
-      <iframe id="videoPlayerIframe" frameborder="0" allowfullscreen
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
-      </iframe>
-    </div>
-  </div>
-</section>
 
 <section id="settingsOverlay" class="screenView" role="region" aria-labelledby="settingsPanel">
   <div id="settingsPanel" class="modalPanel settingsPanel">
