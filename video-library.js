@@ -151,7 +151,7 @@
     sheet.setAttribute('aria-hidden', 'true');
     sheet.innerHTML = `
       <div class="vl-sheet-panel" role="dialog" aria-modal="true" aria-labelledby="videoLibrarySheetTitle">
-        <div class="vl-sheet-head"><h2 id="videoLibrarySheetTitle">動画</h2><button id="videoLibrarySheetClose" class="vl-close" type="button" aria-label="閉じる">×</button></div>
+        <div class="vl-sheet-head"><h2 id="videoLibrarySheetTitle">動画</h2></div>
         <form id="videoLibraryForm" class="vl-form">
           <div class="vl-url-row"><div class="vl-field"><label for="videoLibraryUrl">動画URL</label><input id="videoLibraryUrl" type="url" autocomplete="off" placeholder="https://..."></div><button id="videoLibraryUrlEdit" class="vl-url-edit" type="button">編集</button></div>
           <div class="vl-field"><label for="videoLibraryTitle">タイトル</label><input id="videoLibraryTitle" type="text" autocomplete="off"></div>
@@ -189,15 +189,14 @@
       folder: document.getElementById('videoLibraryFolder'), tag: document.getElementById('videoLibraryTag'), service: document.getElementById('videoLibraryService'),
       sort: document.getElementById('videoLibrarySort'), view: document.getElementById('videoLibraryView'), foldersBtn: document.getElementById('videoLibraryFolders'),
       add: document.getElementById('videoLibraryAdd'), hiddenBtn: document.getElementById('videoLibraryHidden'), count: document.getElementById('videoLibraryCount'), status: document.getElementById('videoLibraryStatus'), results: document.getElementById('videoLibraryResults'),
-      sheet, sheetTitle: document.getElementById('videoLibrarySheetTitle'), sheetClose: document.getElementById('videoLibrarySheetClose'), form: document.getElementById('videoLibraryForm'),
+      sheet, sheetTitle: document.getElementById('videoLibrarySheetTitle'), form: document.getElementById('videoLibraryForm'),
       formError: document.getElementById('videoLibraryFormError'), url: document.getElementById('videoLibraryUrl'), urlEdit: document.getElementById('videoLibraryUrlEdit'), suggestedTags: document.getElementById('videoLibrarySuggestedTags'), title: document.getElementById('videoLibraryTitle'), editFolder: document.getElementById('videoLibraryEditFolder'),
       statusSelect: document.getElementById('videoLibraryStatusSelect'), tags: document.getElementById('videoLibraryTags'), memo: document.getElementById('videoLibraryMemo'), favorite: document.getElementById('videoLibraryFavorite'),
       legacyService: document.getElementById('videoLibraryLegacyService'), legacyId: document.getElementById('videoLibraryLegacyId'), thumbnail: document.getElementById('videoLibraryThumbnail'),
       rotateLeftStart: document.getElementById('videoLibraryRotateLeftStart'), rotateLeftEnd: document.getElementById('videoLibraryRotateLeftEnd'),
       deleteBtn: document.getElementById('videoLibraryDelete'), cancel: document.getElementById('videoLibraryCancel'), folderManager: document.getElementById('videoLibraryFolderManager'),
       newFolder: document.getElementById('videoLibraryNewFolder'), createFolder: document.getElementById('videoLibraryCreateFolder'), folderList: document.getElementById('videoLibraryFolderList'),
-      legacyItems, legacyAddBtn: document.getElementById('addVideoBtn'), legacyConfirmAdd: document.getElementById('confirmVideoAddBtn'), legacyUrlInput: document.getElementById('videoUrlInput'),
-      legacyTitleInput: document.getElementById('videoTitleInput'), legacyAInput: document.getElementById('videoAInput'), legacyBInput: document.getElementById('videoBInput'),
+      legacyItems,
     });
     return true;
   }
@@ -298,29 +297,17 @@
     const grid = document.createElement('div'); grid.className = 'vl-grid' + (state.view === 'compact' ? ' compact' : ''); videos.forEach((video) => grid.append(createCard(video))); dom.results.append(grid);
   }
 
-  function parseThroughLegacy(url) {
-    if (!dom.legacyUrlInput || !dom.legacyAInput || !dom.legacyBInput) return null;
-    const oldUrl = dom.legacyUrlInput.value, oldA = dom.legacyAInput.value, oldB = dom.legacyBInput.value;
-    dom.legacyUrlInput.value = url || '';
-    dom.legacyAInput.value = '';
-    dom.legacyBInput.value = '';
-    dom.legacyUrlInput.dispatchEvent(new Event('input', { bubbles: true }));
-    const result = { a: text(dom.legacyAInput.value), b: text(dom.legacyBInput.value) };
-    dom.legacyUrlInput.value = oldUrl; dom.legacyAInput.value = oldA; dom.legacyBInput.value = oldB;
-    return result.a && result.b ? result : null;
-  }
-
-  function invokeLegacyAdd({ title, a, b }) {
-    if (!dom.legacyConfirmAdd || !dom.legacyTitleInput || !dom.legacyAInput || !dom.legacyBInput) throw new Error('既存の動画追加機能を利用できません。');
-    const before = new Set((readJson(VIDEO_KEY, []) || []).map((video) => String(video.id)));
-    dom.legacyTitleInput.value = title || '';
-    dom.legacyAInput.value = a;
-    dom.legacyBInput.value = b;
-    dom.legacyConfirmAdd.click();
-    const afterRaw = readJson(VIDEO_KEY, []);
-    const after = Array.isArray(afterRaw) ? afterRaw : [];
-    const created = after.find((video) => !before.has(String(video.id)));
-    if (!created) throw new Error('動画を追加できませんでした。サービス名と動画IDを確認してください。');
+  function invokeUrlAdd({ title, url }) {
+    const fields = Data.storageFieldsForVideoUrl(url);
+    if (!fields) throw new Error('動画URLを確認してください。');
+    const videos = readJson(VIDEO_KEY, []);
+    const list = Array.isArray(videos) ? videos : [];
+    const created = Data.normalizeVideo({
+      id: id('v'), title, url, a: fields.a, b: fields.b, addedAt: Date.now(), updatedAt: Date.now(),
+    });
+    list.unshift(created);
+    writeJson(VIDEO_KEY, list);
+    scheduleVaultSync();
     return created;
   }
 
@@ -437,11 +424,11 @@
   function saveEditor(event) {
     event.preventDefault(); dom.formError.textContent = '';
     const existingBase = state.editorId ? baseById(state.editorId) : null;
-    const parsed = parseThroughLegacy(text(dom.url.value));
-    const a = text(dom.legacyService.value) || (parsed && parsed.a) || (existingBase && text(existingBase.a)) || '';
-    const b = text(dom.legacyId.value) || (parsed && parsed.b) || (existingBase && text(existingBase.b)) || '';
-    if (!a || !/^[a-zA-Z0-9]+$/.test(a)) { dom.formError.textContent = 'サービス名を英数字で入力してください。'; return; }
-    if (!b || !/^\d+$/.test(b)) { dom.formError.textContent = '動画IDを数字で入力してください。'; return; }
+    const rawUrl = text(dom.url.value);
+    const classified = Data.classifyVideoUrl(rawUrl);
+    if (classified.kind === 'invalid') { dom.formError.textContent = '有効な動画URLを入力してください。'; return; }
+    const a = text(dom.legacyService.value) || classified.a || (existingBase && text(existingBase.a)) || '';
+    const b = text(dom.legacyId.value) || classified.b || (existingBase && text(existingBase.b)) || '';
     const title = text(dom.title.value);
     const url = text(dom.url.value) || Data.legacyUrl(a, b);
     const rotationStartRaw = text(dom.rotateLeftStart.value);
@@ -468,9 +455,9 @@
     try {
       let targetId = state.editorId;
       if (!existingBase) {
-        const created = invokeLegacyAdd({ title, a, b }); targetId = created.id;
+        const created = invokeUrlAdd({ title, url }); targetId = created.id;
       } else if (text(existingBase.a) !== a || text(existingBase.b) !== b) {
-        const created = invokeLegacyAdd({ title: title || existingBase.title, a, b });
+        const created = invokeUrlAdd({ title: title || existingBase.title, url });
         if (!invokeLegacyDelete(existingBase)) { invokeLegacyDelete(created); throw new Error('元の動画を置き換えられませんでした。'); }
         delete state.meta[state.editorId]; targetId = created.id;
       }
@@ -505,11 +492,11 @@
     dom.view.addEventListener('click', () => { state.view = state.view === 'card' ? 'compact' : 'card'; savePrefs(); render(); });
     dom.hiddenBtn.addEventListener('click', () => { state.showHidden = !state.showHidden; state.query = ''; dom.search.value = ''; state.folderId = ''; state.tag = ''; state.service = ''; render(); });
     dom.add.addEventListener('click', () => openEditor(null)); dom.foldersBtn.addEventListener('click', openFolderManager);
-    dom.sheetClose.addEventListener('click', closeSheet); dom.cancel.addEventListener('click', closeSheet); dom.form.addEventListener('submit', saveEditor); dom.deleteBtn.addEventListener('click', () => state.editorId && deleteVideoFromLibrary(state.editorId));
+    dom.cancel.addEventListener('click', closeSheet); dom.form.addEventListener('submit', saveEditor); dom.deleteBtn.addEventListener('click', () => state.editorId && deleteVideoFromLibrary(state.editorId));
     dom.urlEdit.addEventListener('click', () => setUrlEditing(true));
     dom.createFolder.addEventListener('click', createFolder); dom.newFolder.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); createFolder(); } });
     dom.url.addEventListener('input', () => { const parsed = parseThroughLegacy(text(dom.url.value)); if (parsed) { dom.legacyService.value = parsed.a; dom.legacyId.value = parsed.b; } });
-    dom.sheet.addEventListener('click', (event) => { if (event.target === dom.sheet) closeSheet(); });
+    dom.sheet.addEventListener('click', (event) => { if (event.target === dom.sheet) return; });
     window.addEventListener('popstate', () => { if (!(history.state && history.state.videoLibrarySheet)) setSheetVisible(false); });
   }
 

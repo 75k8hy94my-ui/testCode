@@ -21,7 +21,6 @@ test('video library provides search filters sorting view modes folders and edito
   assert.match(source, /mangaReaderVideoFolders/);
   assert.match(source, /MangaVaultPayload\.buildFromLocalStorage/);
   assert.match(source, /MangaVault\.savePayload/);
-  assert.match(source, /confirmVideoAddBtn/);
   assert.match(source, /videoDeleteBtn/);
   assert.match(source, /history\.pushState/);
 });
@@ -43,6 +42,15 @@ test('video editor locks URL until the explicit edit button and exposes one-clic
   assert.match(library, /readOnly/);
   assert.match(library, /videoLibrarySuggestedTags/);
   assert.match(library, /suggestedTag\.addEventListener\(['"]click['"]/);
+});
+
+test('video add sheet only closes from explicit controls and accepts ordinary http URLs', () => {
+  const library = read('video-library.js');
+  assert.match(library, /dom\.sheet\.addEventListener\(['"]click['"],\s*\(event\)\s*=>\s*\{\s*if \(event\.target === dom\.sheet\) return;/);
+  assert.match(library, /Data\.classifyVideoUrl\(rawUrl\)/);
+  assert.match(library, /classified\.kind === ['"]invalid['"]/);
+  assert.doesNotMatch(library, /sheetClose.*closeSheet/);
+  assert.doesNotMatch(library, /invokeLegacyAdd|confirmVideoAddBtn|既存の動画追加機能を利用できません/);
 });
 
 test('video library supports hiding videos and restoring them from the hidden list', () => {
