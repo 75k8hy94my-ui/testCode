@@ -302,6 +302,9 @@
     if (!fields) throw new Error('動画URLを確認してください。');
     const videos = readJson(VIDEO_KEY, []);
     const list = Array.isArray(videos) ? videos : [];
+    if (list.some((item) => Data.normalizeVideo(item).url === url)) {
+      throw new Error('同じ動画URLはすでに追加されています。');
+    }
     const created = Data.normalizeVideo({
       id: id('v'), title, url, a: fields.a, b: fields.b, addedAt: Date.now(), updatedAt: Date.now(),
     });

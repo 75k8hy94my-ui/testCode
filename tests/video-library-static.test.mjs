@@ -59,6 +59,12 @@ test('reader sync payload reads the current video records after enhanced additio
   assert.match(reader, /payload\.videos\s*=\s*latestVideos/);
 });
 
+test('video URL additions reject an exact duplicate without writing another record', () => {
+  const library = read('video-library.js');
+  assert.match(library, /list\.some\(\(item\)\s*=>\s*Data\.normalizeVideo\(item\)\.url\s*===\s*url\)/);
+  assert.match(library, /同じ動画URLはすでに追加されています/);
+});
+
 test('video library supports hiding videos and restoring them from the hidden list', () => {
   const library = read('video-library.js');
   assert.match(library, /videoLibraryHidden/);
