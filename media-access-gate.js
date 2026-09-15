@@ -415,14 +415,6 @@
     patchSrcProperty(root.HTMLSourceElement);
     patchSrcAttribute();
     if (root.document && typeof root.document.addEventListener === 'function') {
-      root.document.addEventListener('click', (event) => {
-        if (canLoadExternalMedia() || !event.target || typeof event.target.closest !== 'function') return;
-        const openButton = event.target.closest('.vl-open');
-        if (!openButton) return;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        showNotice('VPNに接続してから動画を開いてください。');
-      }, true);
     }
   }
 
