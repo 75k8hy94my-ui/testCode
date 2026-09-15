@@ -53,6 +53,12 @@ test('video add sheet only closes from explicit controls and accepts ordinary ht
   assert.doesNotMatch(library, /invokeLegacyAdd|confirmVideoAddBtn|既存の動画追加機能を利用できません/);
 });
 
+test('reader sync payload reads the current video records after enhanced additions', () => {
+  const reader = read('reader.html');
+  assert.match(reader, /const storedVideos = JSON\.parse\(localStorage\.getItem\(SAVED_VIDEOS_KEY\)/);
+  assert.match(reader, /payload\.videos\s*=\s*latestVideos/);
+});
+
 test('video library supports hiding videos and restoring them from the hidden list', () => {
   const library = read('video-library.js');
   assert.match(library, /videoLibraryHidden/);

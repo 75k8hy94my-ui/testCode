@@ -2853,7 +2853,12 @@ https://cdn.example.org/c/003.webp"></textarea>
   // 書き出し/読み込みとクラウド同期の両方で使う共通ペイロード組み立て。
   function buildSyncPayload() {
     const payload = window.MangaVaultPayload.buildFromLocalStorage();
-    payload.folders = savedFolders; payload.items = savedItems; payload.videos = savedVideos; payload.authorCards = authorCards;
+    let latestVideos = savedVideos;
+    try {
+      const storedVideos = JSON.parse(localStorage.getItem(SAVED_VIDEOS_KEY) || 'null');
+      if (Array.isArray(storedVideos)) latestVideos = storedVideos;
+    } catch (_) {}
+    payload.folders = savedFolders; payload.items = savedItems; payload.videos = latestVideos; payload.authorCards = authorCards;
     payload.mangaInfo = loadMangaInfoCache(); payload.toc = loadTocMap(); payload.theme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'; payload.dashboardVisibility = dashboardVisibilityProfiles;
     return payload;
   }
