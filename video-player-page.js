@@ -14,10 +14,10 @@
   const heading = document.createElement('h2'); heading.textContent = title;
   const info = document.createElement('div'); info.className = 'videoPlayerInfo'; info.textContent = [base.a, base.b].filter(Boolean).join(' / ') || '動画';
   if (tags.length) { const tagLine = document.createElement('div'); tagLine.className = 'videoPlayerTags'; tagLine.textContent = tags.map((tag) => '#' + tag).join(' '); info.append(tagLine); }
-  const frame = document.createElement('div'); frame.className = 'videoPlayerFrame';
+  const frame = document.createElement('div'); frame.className = 'videoPlayerFrame'; frame.style.height = 'min(540px, calc(100svh - 150px))'; frame.style.minHeight = '240px';
   const sourceUrl = meta.url || base.url || '';
   const directVideo = /\.(?:mp4|webm|ogg|ogv|m4v|mov)(?:[?#].*)?$/i.test(sourceUrl);
-  if (directVideo) { const video = document.createElement('video'); video.src = sourceUrl; video.controls = true; video.playsInline = true; video.preload = 'metadata'; frame.append(video); }
+  if (directVideo) { const video = document.createElement('video'); video.src = sourceUrl; video.controls = true; video.playsInline = true; video.preload = 'metadata'; video.style.display = 'block'; video.style.width = '100%'; video.style.height = '100%'; video.style.maxWidth = '100%'; video.style.maxHeight = '100%'; video.style.objectFit = 'contain'; frame.append(video); }
   else if (base.a && base.b) { const iframe = document.createElement('iframe'); iframe.src = 'https://www.' + base.a + '.com/embed/' + base.b; iframe.title = title; iframe.allowFullscreen = true; frame.append(iframe); }
   else { const link = document.createElement('a'); link.className = 'glassBtn'; link.href = sourceUrl || '#'; link.target = '_blank'; link.rel = 'noopener'; link.textContent = '元ページを開く'; frame.append(link); }
   const back = document.createElement('a'); back.className = 'glassBtn videoBack'; back.href = 'video.html'; back.textContent = '動画一覧へ戻る';
