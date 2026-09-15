@@ -495,7 +495,6 @@
     dom.cancel.addEventListener('click', closeSheet); dom.form.addEventListener('submit', saveEditor); dom.deleteBtn.addEventListener('click', () => state.editorId && deleteVideoFromLibrary(state.editorId));
     dom.urlEdit.addEventListener('click', () => setUrlEditing(true));
     dom.createFolder.addEventListener('click', createFolder); dom.newFolder.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); createFolder(); } });
-    dom.url.addEventListener('input', () => { const parsed = parseThroughLegacy(text(dom.url.value)); if (parsed) { dom.legacyService.value = parsed.a; dom.legacyId.value = parsed.b; } });
     dom.sheet.addEventListener('click', (event) => { if (event.target === dom.sheet) return; });
     window.addEventListener('popstate', () => { if (!(history.state && history.state.videoLibrarySheet)) setSheetVisible(false); });
   }
