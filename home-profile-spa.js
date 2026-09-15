@@ -90,7 +90,7 @@ function loadReaderAsset(src){const source=document.createElement('script');sour
 async function ensureVideoEntryEnhancement(){
   await loadReaderAsset('video-data.js?v=20260916-video-data');
   await loadReaderAsset('video-library.js?v=20260917-video-library');
-  await loadReaderAsset('video-routing-fix.js?v=20260916-video-routing');
+  await loadReaderAsset('video-routing-fix.js?v=20260917-video-routing');
   await loadReaderAsset('video-thumbnail-time.js?v=20260916-video-thumbnail');
   const deadline=Date.now()+3000;
   while(!document.getElementById('videoLibraryApp')&&Date.now()<deadline) await new Promise((resolve)=>setTimeout(resolve,25));

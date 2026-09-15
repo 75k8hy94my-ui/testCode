@@ -527,23 +527,12 @@
     const base = videos.find((video) => text(video && video.id) === videoId);
     if (!base) return;
 
-    // Capture before the card's original click handler so legacy screen navigation never runs.
+    const targetUrl = new URL('video-player.html', location.href);
+    targetUrl.searchParams.set('id', videoId);
     event.preventDefault();
     event.stopImmediatePropagation();
-
-    if (activeVideoId === videoId && activePlayer && activePlayer.isConnected) {
-      closeActivePlayer();
-      return;
-    }
-    closeActivePlayer();
-    ensureStyles();
-
-    const meta = recordOpen(base);
-    const player = createInlinePlayer(base, meta);
-    card.classList.add('vl-inline-playing');
-    card.prepend(player);
-    activeVideoId = videoId;
-    activePlayer = player;
+    recordOpen(base);
+    window.location.href = targetUrl.href;
   }
 
   document.addEventListener('click', handleEnhancedOpen, true);
