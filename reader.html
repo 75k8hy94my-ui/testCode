@@ -564,6 +564,8 @@
   .vpnHeaderControls .ctrlBtn { padding: 7px 10px; font-size: 12px; }
   .listHeaderControls { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
   .listHeaderControls .ctrlBtn { padding: 7px 10px; font-size: 12px; }
+  .textActionBtn { appearance: none; padding: 7px 4px; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .textActionBtn:hover { color: var(--accent); }
   .vpnMediaHeader { display: flex; align-items: center; gap: 10px; padding: 12px 14px 8px; flex-shrink: 0; }
   .vpnMediaHeader > strong { font-size: 16px; }
   #videoPlayerHeader .vpnHeaderControls { margin-left: auto; margin-right: 8px; }
@@ -1769,7 +1771,6 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     addCustomBtn: document.getElementById('addCustomBtn'),
     bulkDetectBtn: document.getElementById('bulkDetectBtn'),
-    listLogoutBtn: document.getElementById('listLogoutBtn'),
     smartListRow: document.getElementById('smartListRow'),
     historyListBtn: document.getElementById('historyListBtn'),
     unreadListBtn: document.getElementById('unreadListBtn'),
@@ -1840,7 +1841,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     confirmEditItemBtn: document.getElementById('confirmEditItemBtn'),
 
 
-    listPanelTitle: document.getElementById('listPanelTitle'),
     listTabRow: document.getElementById('listTabRow'),
     listTabManga: document.getElementById('listTabManga'),
     listTabVideo: document.getElementById('listTabVideo'),
@@ -6347,7 +6347,6 @@ https://cdn.example.org/c/003.webp"></textarea>
       window.location.replace('index.html');
     }
   }
-  els.listLogoutBtn.addEventListener('click', logoutFromReader);
   els.cancelCustomAddBtn.addEventListener('click', closeCustomAddDialog);
   els.confirmCustomAddBtn.addEventListener('click', confirmCustomAdd);
   els.backupExportBtn.addEventListener('click', exportData);
@@ -6853,7 +6852,6 @@ https://cdn.example.org/c/003.webp"></textarea>
       setMobileNavActive(els.mobileNavManga);
       els.mangaListSection.style.display = '';
       els.videoListSection.style.display = 'none';
-      els.listPanelTitle.textContent = '保存したURL';
       els.closeListBtn.style.display = 'none';
     } else {
       if (els.listTabVideo) els.listTabVideo.classList.add('active');
@@ -6861,7 +6859,6 @@ https://cdn.example.org/c/003.webp"></textarea>
       setMobileNavActive(els.mobileNavVideo);
       els.videoListSection.style.display = '';
       els.mangaListSection.style.display = 'none';
-      els.listPanelTitle.textContent = '動画';
       els.closeListBtn.style.display = 'none';
       renderVideoList();
     }

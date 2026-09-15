@@ -3,14 +3,11 @@
   const template = String.raw`<section id="savedListOverlay" class="screenView modalOverlay" role="region" aria-labelledby="savedListPanel">
     <div id="savedListPanel" class="modalPanel">
     <div class="panel-header">
-      <span id="listPanelTitle">保存したURL</span>
       <div class="listHeaderControls" data-vpn-header="saved-list" aria-label="VPN状態">
-        <button class="ctrlBtn vpnStatusButton" type="button" data-vpn-status-button>VPN確認中</button>
-        <button class="ctrlBtn" type="button" data-vpn-diagnostics-button>VPN診断</button>
+        <button class="ctrlBtn vpnStatusButton" type="button" data-vpn-status-button data-vpn-diagnostics-button>VPN確認中</button>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
         <button class="ctrlBtn" id="listThemeBtn" type="button" title="テーマ切替" aria-label="テーマ切替"></button>
-        <button class="ctrlBtn logoutBtn" id="listLogoutBtn" title="ログアウトして端末内の保存データを消去">ログアウト</button>
         <button class="ctrlBtn" id="closeListBtn">閉じる</button>
       </div>
     </div>
@@ -19,9 +16,9 @@
     </div>
     <div id="mangaListSection">
       <div id="exportImportRow">
-        <button class="primaryBtn" id="newBtn">新規</button>
-        <button class="ctrlBtn" id="addCustomBtn">個別追加</button>
-        <button class="ctrlBtn" id="bulkDetectBtn">一括読み込み</button>
+        <button class="textActionBtn" id="newBtn">新規</button>
+        <button class="textActionBtn" id="addCustomBtn">個別追加</button>
+        <button class="textActionBtn" id="bulkDetectBtn">一括読み込み</button>
       </div>
       <div id="smartListRow">
         <button class="smartListBtn" id="historyListBtn" type="button">履歴</button>
