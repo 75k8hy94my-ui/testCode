@@ -234,8 +234,10 @@
     const d = diagnostics;
     const generic = d.generic.status === 'success'
       ? (d.generic.verdict ? 'VPN判定: YES' : 'VPN判定: NO')
-      : d.generic.status === 'error'
-        ? 'エラー' + (d.generic.httpStatus ? ' (HTTP ' + d.generic.httpStatus + ')' : '')
+      : d.generic.status === 'unavailable'
+        ? '判定不能' + (d.generic.httpStatus ? ' (HTTP ' + d.generic.httpStatus + ')' : '')
+        : d.generic.status === 'error'
+          ? 'エラー' + (d.generic.httpStatus ? ' (HTTP ' + d.generic.httpStatus + ')' : '')
         : d.generic.status === 'checking' ? '確認中' : '未確認';
     const owned = d.protonOwnedNetworkMatch === true ? '一致' : d.protonOwnedNetworkMatch === false ? '不一致' : '未確認';
     const proton = d.protonExitMatch === true ? '一致' : d.protonExitMatch === false ? '不一致' : '未確認';
@@ -473,8 +475,8 @@
       renderDiagnostics();
       return verdict;
     } catch (error) {
-      diagnostics.generic = { status: 'error', httpStatus: error && error.httpStatus || null, verdict: false };
-      diagnostics.error = '一般VPN判定APIの取得に失敗';
+      diagnostics.generic = { status: 'unavailable', httpStatus: error && error.httpStatus || null, verdict: null };
+      diagnostics.error = '一般VPN判定APIを利用できません' + (error && error.httpStatus ? ' (HTTP ' + error.httpStatus + ')' : '');
       renderDiagnostics();
       return false;
     }

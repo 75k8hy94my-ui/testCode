@@ -143,6 +143,24 @@ test('VPN check still uses Proton exit IP list when generic detection API errors
   assert.match(calls[2], /ProtonVPN-IPs/);
 });
 
+test('generic API outage is reported as unavailable rather than a VPN verdict', async () => {
+  const currentIp = '198.51.100.78';
+  const Gate = loadGate({
+    fetch: async (url) => {
+      if (url === Gate.IP_URL) return { ok: true, json: async () => ({ ip: currentIp }) };
+      if (url.startsWith(Gate.CHECK_URL)) return { ok: false, status: 429, json: async () => ({}) };
+      return { ok: true, json: async () => [] };
+    },
+    setTimeout,
+    clearTimeout,
+  });
+  assert.equal(await Gate.checkVpn(), false);
+  const diagnostics = Gate.getDiagnostics();
+  assert.equal(diagnostics.generic.status, 'unavailable');
+  assert.equal(diagnostics.generic.httpStatus, 429);
+  assert.equal(diagnostics.error, '一般VPN判定APIを利用できません (HTTP 429)');
+});
+
 test('VPN check accepts an IP in a Proton-listed /24 exit block', async () => {
   const currentIp = '37.19.205.204';
   const Gate = loadGate({
@@ -171,7 +189,7 @@ test('diagnostics expose IP, generic lookup result, Proton match, and final deci
   assert.equal(await Gate.checkVpn(), true);
   const d = Gate.getDiagnostics();
   assert.equal(d.ip, currentIp);
-  assert.equal(d.generic.status, 'error');
+  assert.equal(d.generic.status, 'unavailable');
   assert.equal(d.generic.httpStatus, 429);
   assert.equal(d.protonExitMatch, true);
   assert.equal(d.final, 'allowed');
