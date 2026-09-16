@@ -55,6 +55,24 @@ test('VPN check discovers the current public IP before querying the VPN verdict 
     assert.match(calls[1], /ip-api\.dev\/api\?q=203\.0\.113\.9&format=json/);
 });
 
+test('known public VPN IP snapshot is used before external VPN lookup', async () => {
+  const currentIp = '37.19.205.223';
+  const calls = [];
+  const Gate = loadGate({
+    fetch: async (url) => {
+      calls.push(String(url));
+      if (calls.length === 1) return { ok: true, json: async () => ({ ip: currentIp }) };
+      throw new Error('external VPN API must not be needed for a known IP');
+    },
+    setTimeout,
+    clearTimeout,
+  });
+  assert.equal(Gate.isKnownVpnIp(currentIp), true);
+  assert.equal(await Gate.checkVpn(), true);
+  assert.deepEqual(calls, [Gate.IP_URL]);
+  assert.equal(Gate.getDiagnostics().generic.status, 'skipped-known-ip');
+});
+
 test('VPN check honors a manually designated VPN IP', async () => {
   const store = new Map();
   const currentIp = '198.51.100.120';

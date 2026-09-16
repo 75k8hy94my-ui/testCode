@@ -17,6 +17,19 @@
     '205.147.17.0/24',
     '205.147.22.0/24',
   ];
+  // Snapshot of publicly listed ProtonVPN exit IPs (source: tn3w/ProtonVPN-IPs,
+  // checked 2026-09-16). Keep this local list as the first line of defense;
+  // the remote list below remains an updateable fallback.
+  const KNOWN_VPN_IPV4S = new Set([
+    '2.58.241.66', '5.253.204.162', '31.171.153.98', '37.0.12.226',
+    '37.19.199.129', '37.19.199.144', '37.19.199.149', '37.19.199.155',
+    '37.19.200.1', '37.19.200.17', '37.19.200.22', '37.19.201.129',
+    '37.19.201.130', '37.19.205.223', '37.19.221.193', '37.46.115.5',
+    '45.14.71.5', '45.14.71.6', '45.14.71.7', '45.82.64.25',
+    '72.251.222.1', '84.17.63.17', '84.20.16.29', '146.70.8.2',
+    '146.70.14.19', '146.70.14.42', '149.22.80.1', '149.22.81.1',
+    '185.28.254.2', '185.51.134.194', '185.100.233.84', '185.107.44.200',
+  ]);
   const NOTICE_ID = 'vpnMediaNotice';
   const DIAGNOSTICS_BUTTON_ID = 'vpnDiagnosticsButton';
   const DIAGNOSTICS_PANEL_ID = 'vpnDiagnosticsPanel';
@@ -149,6 +162,11 @@
 
   function isKnownProtonOwnedIp(ip) {
     return PROTON_OWNED_IPV4_CIDRS.some((cidr) => ipv4InCidr(ip, cidr));
+  }
+
+  function isKnownVpnIp(ip) {
+    const value = String(ip || '').trim();
+    return KNOWN_VPN_IPV4S.has(value) || isKnownProtonOwnedIp(value);
   }
 
   function ipv424(ip) {
@@ -506,8 +524,13 @@
       diagnostics.protonOwnedNetworkMatch = isKnownProtonOwnedIp(ip);
       renderDiagnostics();
       const signal = controller ? controller.signal : undefined;
-      let allowed = diagnostics.protonOwnedNetworkMatch;
-      if (!allowed) allowed = await genericVpnVerdict(ip, signal);
+      let allowed = isKnownVpnIp(ip);
+      if (allowed) {
+        diagnostics.generic = { status: 'skipped-known-ip', httpStatus: null, verdict: true };
+        renderDiagnostics();
+      } else {
+        allowed = await genericVpnVerdict(ip, signal);
+      }
       if (!allowed) {
         diagnostics.protonExitMatch = await isKnownProtonExitIp(ip, signal);
         allowed = diagnostics.protonExitMatch;
@@ -565,10 +588,12 @@
     CHECK_URL,
     PROTON_EXIT_IPS_URL,
     PROTON_OWNED_IPV4_CIDRS,
+    KNOWN_VPN_IPV4S,
     MANUAL_VPN_IPS_KEY,
     MANUAL_NON_VPN_IPS_KEY,
     isVpnVerdict,
     isKnownProtonOwnedIp,
+    isKnownVpnIp,
     isProtectedMediaUrl,
     canLoadExternalMedia,
     mediaUrl,
