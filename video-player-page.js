@@ -8,6 +8,7 @@
   if (!base) { page.innerHTML = '<section class="profileContent"><h2>動画が見つかりません</h2><a class="glassBtn" href="video.html">動画一覧へ戻る</a></section>'; return; }
   const meta = allMeta[id] || {};
   const title = meta.title || base.title || [base.a, base.b].filter(Boolean).join(' / ') || '動画';
+  document.title = title;
   const tags = Array.isArray(meta.tags) ? meta.tags : (Array.isArray(base.tags) ? base.tags : []);
   const words = new Set(title.toLocaleLowerCase('ja').split(/[\s/・、,._-]+/).filter((word) => word.length >= 2));
   const related = read('mangaReaderVideos', []).filter((item) => String(item.id) !== id).map((item) => { const itemMeta = allMeta[item.id] || {}; const itemTitle = itemMeta.title || item.title || [item.a, item.b].filter(Boolean).join(' / ') || '動画'; const itemTags = Array.isArray(itemMeta.tags) ? itemMeta.tags : (Array.isArray(item.tags) ? item.tags : []); const sharedTags = itemTags.filter((tag) => tags.includes(tag)).length; const sharedWords = [...words].filter((word) => itemTitle.toLocaleLowerCase('ja').includes(word)).length; return { item, itemTitle, itemTags, score: sharedTags * 100 + sharedWords }; }).sort((a, b) => b.score - a.score).slice(0, 12);
@@ -20,8 +21,15 @@
   if (directVideo) { const video = document.createElement('video'); video.src = sourceUrl; video.controls = true; video.playsInline = true; video.preload = 'metadata'; video.style.display = 'block'; video.style.width = '100%'; video.style.height = '100%'; video.style.maxWidth = '100%'; video.style.maxHeight = '100%'; video.style.objectFit = 'contain'; frame.append(video); }
   else if (base.a && base.b) { const iframe = document.createElement('iframe'); iframe.src = 'https://www.' + base.a + '.com/embed/' + base.b; iframe.title = title; iframe.allowFullscreen = true; frame.append(iframe); }
   else { const link = document.createElement('a'); link.className = 'glassBtn'; link.href = sourceUrl || '#'; link.target = '_blank'; link.rel = 'noopener'; link.textContent = '元ページを開く'; frame.append(link); }
+  const markerList = document.createElement('div'); markerList.className = 'videoPlayerMarkerList'; markerList.innerHTML = '<h3>登録した秒数</h3><div class="videoMarkerList"></div>';
+  const markerItems = markerList.querySelector('.videoMarkerList');
+  const markerStore = () => { try { const value = JSON.parse(localStorage.getItem('mangaReaderVideoMarkers') || '{}'); return Array.isArray(value[id]) ? value[id] : []; } catch (_) { return []; } };
+  const formatMarker = (seconds) => Math.floor(seconds / 60) + ':' + String(Math.floor(seconds % 60)).padStart(2, '0');
+  const renderPageMarkers = () => { markerItems.replaceChildren(); markerStore().slice().sort((a, b) => a.seconds - b.seconds).forEach((marker) => { const button = document.createElement('button'); button.type = 'button'; button.textContent = formatMarker(Number(marker.seconds) || 0) + ' ' + String(marker.label || '現在位置'); button.addEventListener('click', () => { const target = frame.querySelector('video'); if (target) { target.currentTime = marker.seconds; target.play(); } }); markerItems.append(button); }); markerList.hidden = !markerItems.children.length; };
+  renderPageMarkers();
+  window.addEventListener('manga-video-markers-changed', renderPageMarkers);
   const back = document.createElement('a'); back.className = 'glassBtn videoBack'; back.href = 'video.html'; back.textContent = '動画一覧へ戻る';
   const relatedBox = document.createElement('aside'); relatedBox.className = 'videoRelated'; const relatedHeading = document.createElement('h3'); relatedHeading.textContent = '関連動画'; relatedBox.append(relatedHeading);
   related.forEach(({ item, itemTitle, itemTags }) => { const link = document.createElement('a'); link.className = 'videoRelatedItem'; link.href = 'video-player.html?id=' + encodeURIComponent(item.id); const thumb = document.createElement('span'); thumb.className = 'videoRelatedThumb'; thumb.textContent = '▶'; const text = document.createElement('span'); text.className = 'videoRelatedText'; text.textContent = itemTitle; const tagsText = document.createElement('small'); tagsText.textContent = itemTags.slice(0, 3).map((tag) => '#' + tag).join(' '); text.append(tagsText); link.append(thumb, text); relatedBox.append(link); });
-  const main = document.createElement('section'); main.className = 'videoPlayerMain'; main.append(heading, info, frame, back); const layout = document.createElement('div'); layout.className = 'videoPlayerLayout'; layout.append(main, relatedBox); page.replaceChildren(layout);
+  const main = document.createElement('section'); main.className = 'videoPlayerMain'; main.append(heading, info, frame, markerList, back); const layout = document.createElement('div'); layout.className = 'videoPlayerLayout'; layout.append(main, relatedBox); page.replaceChildren(layout);
 })();
