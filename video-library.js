@@ -162,18 +162,13 @@
           <div class="vl-field"><label for="videoLibraryTags">タグ（カンマ区切り）</label><input id="videoLibraryTags" type="text" autocomplete="off"></div><div id="videoLibrarySuggestedTags" class="vl-suggested-tags" aria-label="既存のタグ"></div>
           <div class="vl-field"><label for="videoLibraryMemo">メモ</label><textarea id="videoLibraryMemo"></textarea></div>
           <label class="vl-check"><input id="videoLibraryFavorite" type="checkbox"> お気に入り</label>
+          <div class="vl-field"><label for="videoLibraryRotate90Direction">再生時の回転</label><select id="videoLibraryRotate90Direction"><option value="none">回転なし</option><option value="left">常に左90°回転</option><option value="right">常に右90°回転</option></select></div>
           <details class="vl-advanced"><summary>再生情報・サムネイル</summary>
             <div class="vl-two">
               <div class="vl-field"><label for="videoLibraryLegacyService">サービス名</label><input id="videoLibraryLegacyService" type="text" autocomplete="off"></div>
               <div class="vl-field"><label for="videoLibraryLegacyId">動画ID</label><input id="videoLibraryLegacyId" type="text" inputmode="numeric" autocomplete="off"></div>
             </div>
             <div class="vl-field"><label for="videoLibraryThumbnail">サムネイルURL（任意）</label><input id="videoLibraryThumbnail" type="url" autocomplete="off"></div>
-            <div class="vl-two">
-              <div class="vl-field"><label for="videoLibraryRotateLeftStart">左90°回転 開始秒</label><input id="videoLibraryRotateLeftStart" type="number" min="0" step="0.1" inputmode="decimal" placeholder="例: 12.5"></div>
-              <div class="vl-field"><label for="videoLibraryRotateLeftEnd">左90°回転 終了秒</label><input id="videoLibraryRotateLeftEnd" type="number" min="0" step="0.1" inputmode="decimal" placeholder="例: 28"></div>
-            </div>
-            <div class="vl-field"><label for="videoLibraryRotate90Direction">再生時の回転</label><select id="videoLibraryRotate90Direction"><option value="none">回転なし</option><option value="left">常に左90°回転</option><option value="right">常に右90°回転</option></select></div>
-            <div class="vl-help">開始・終了を両方指定すると、その区間だけ直接再生動画を左90°回転します。</div>
           </details>
           <div id="videoLibraryFormError" class="vl-summary" aria-live="polite"></div>
           <div class="vl-sheet-actions"><button id="videoLibraryDelete" class="danger" type="button">削除</button><button id="videoLibraryCancel" type="button">キャンセル</button><button class="save" type="submit">保存</button></div>
@@ -194,7 +189,7 @@
       formError: document.getElementById('videoLibraryFormError'), url: document.getElementById('videoLibraryUrl'), urlEdit: document.getElementById('videoLibraryUrlEdit'), suggestedTags: document.getElementById('videoLibrarySuggestedTags'), title: document.getElementById('videoLibraryTitle'), editFolder: document.getElementById('videoLibraryEditFolder'),
       statusSelect: document.getElementById('videoLibraryStatusSelect'), tags: document.getElementById('videoLibraryTags'), memo: document.getElementById('videoLibraryMemo'), favorite: document.getElementById('videoLibraryFavorite'),
       legacyService: document.getElementById('videoLibraryLegacyService'), legacyId: document.getElementById('videoLibraryLegacyId'), thumbnail: document.getElementById('videoLibraryThumbnail'),
-      rotateLeftStart: document.getElementById('videoLibraryRotateLeftStart'), rotateLeftEnd: document.getElementById('videoLibraryRotateLeftEnd'), rotate90Direction: document.getElementById('videoLibraryRotate90Direction'),
+      rotate90Direction: document.getElementById('videoLibraryRotate90Direction'),
       deleteBtn: document.getElementById('videoLibraryDelete'), cancel: document.getElementById('videoLibraryCancel'), folderManager: document.getElementById('videoLibraryFolderManager'),
       newFolder: document.getElementById('videoLibraryNewFolder'), createFolder: document.getElementById('videoLibraryCreateFolder'), folderList: document.getElementById('videoLibraryFolderList'),
       legacyItems,
@@ -398,8 +393,6 @@
     dom.legacyService.value = base ? text(base.a) : '';
     dom.legacyId.value = base ? text(base.b) : '';
     dom.thumbnail.value = videoId ? video.thumbnailUrl : '';
-    dom.rotateLeftStart.value = videoId && video.rotateLeftStartSeconds != null ? String(video.rotateLeftStartSeconds) : '';
-    dom.rotateLeftEnd.value = videoId && video.rotateLeftEndSeconds != null ? String(video.rotateLeftEndSeconds) : '';
     dom.rotate90Direction.value = videoId ? (video.rotate90Direction || (video.rotate90 ? 'left' : 'none')) : 'none';
     dom.formError.textContent = '';
     setSheetVisible(true); pushSheetState(); setTimeout(() => dom.url.focus(), 30);
@@ -436,26 +429,9 @@
     const b = text(dom.legacyId.value) || classified.b || (existingBase && text(existingBase.b)) || '';
     const title = text(dom.title.value);
     const url = text(dom.url.value) || Data.legacyUrl(a, b);
-    const rotationStartRaw = text(dom.rotateLeftStart.value);
-    const rotationEndRaw = text(dom.rotateLeftEnd.value);
-    let rotateLeftStartSeconds = null;
-    let rotateLeftEndSeconds = null;
-    if (rotationStartRaw || rotationEndRaw) {
-      if (!rotationStartRaw || !rotationEndRaw) {
-        dom.formError.textContent = '自動回転は開始秒と終了秒を両方入力してください。';
-        return;
-      }
-      rotateLeftStartSeconds = Number(rotationStartRaw);
-      rotateLeftEndSeconds = Number(rotationEndRaw);
-      if (!Number.isFinite(rotateLeftStartSeconds) || rotateLeftStartSeconds < 0 || !Number.isFinite(rotateLeftEndSeconds) || rotateLeftEndSeconds <= rotateLeftStartSeconds) {
-        dom.formError.textContent = '自動回転は「0以上の開始秒 < 終了秒」で入力してください。';
-        return;
-      }
-    }
     const patch = {
       title, url, folderId: text(dom.editFolder.value) || null, tags: Data.parseTags(dom.tags.value), memo: text(dom.memo.value), favorite: !!dom.favorite.checked,
       watchStatus: text(dom.statusSelect.value), thumbnailUrl: text(dom.thumbnail.value),
-      rotateLeftStartSeconds, rotateLeftEndSeconds,
       rotate90: dom.rotate90Direction.value !== 'none', rotate90Direction: dom.rotate90Direction.value,
     };
     try {

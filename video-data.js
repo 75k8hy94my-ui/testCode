@@ -47,7 +47,7 @@
       }
       const next = { ...raw };
       const previous = existing[id] && typeof existing[id] === 'object' && !Array.isArray(existing[id]) ? existing[id] : null;
-      const preservedFields = ['thumbnailTimeSeconds', 'rotateLeftStartSeconds', 'rotateLeftEndSeconds', 'rotate90'];
+      const preservedFields = ['thumbnailTimeSeconds', 'rotate90', 'rotate90Direction'];
       preservedFields.forEach((field) => {
         if (!Object.prototype.hasOwnProperty.call(next, field) && previous && Object.prototype.hasOwnProperty.call(previous, field)) {
           next[field] = previous[field];
@@ -160,8 +160,6 @@
       thumbnailTimeSeconds: x.thumbnailTimeSeconds == null ? null : asTime(x.thumbnailTimeSeconds, 0),
       rotate90: x.rotate90 === true,
       rotate90Direction,
-      rotateLeftStartSeconds: x.rotateLeftStartSeconds == null ? null : asTime(x.rotateLeftStartSeconds, 0),
-      rotateLeftEndSeconds: x.rotateLeftEndSeconds == null ? null : asTime(x.rotateLeftEndSeconds, 0),
       watchStatus,
       progressSeconds: x.progressSeconds == null ? null : asTime(x.progressSeconds, 0),
       durationSeconds: x.durationSeconds == null ? null : asTime(x.durationSeconds, 0),

@@ -26,13 +26,12 @@ test('closing or leaving flushes the active direct video progress', () => {
 });
 
 
-test('direct playback applies timed left rotation and rechecks after seeking', () => {
-  assert.match(source, /rotateLeftStartSeconds/);
-  assert.match(source, /rotateLeftEndSeconds/);
+test('direct playback applies persistent left or right rotation without time windows', () => {
+  assert.match(source, /rotate90Direction/);
   assert.match(source, /vl-rotate-left/);
   assert.match(source, /rotate\(-90deg\)/);
-  assert.match(source, /seeking/);
-  assert.match(source, /seeked/);
+  assert.match(source, /rotate\(90deg\)/);
+  assert.doesNotMatch(source, /rotateLeftStartSeconds|rotateLeftEndSeconds/);
 });
 
 test('direct playback applies persistent 90-degree rotation for the whole video', () => {

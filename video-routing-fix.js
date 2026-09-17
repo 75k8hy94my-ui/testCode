@@ -113,18 +113,10 @@
     persistPlaybackProgress(activePlayback.base, activePlayback.video, { force: true, sync: sync !== false });
   }
 
-  function validRotationRange(base, meta) {
-    const start = Number(meta && meta.rotateLeftStartSeconds != null ? meta.rotateLeftStartSeconds : base && base.rotateLeftStartSeconds);
-    const end = Number(meta && meta.rotateLeftEndSeconds != null ? meta.rotateLeftEndSeconds : base && base.rotateLeftEndSeconds);
-    if (!Number.isFinite(start) || start < 0 || !Number.isFinite(end) || end <= start) return null;
-    return { start, end };
-  }
-
-  function installTimedLeftRotation(player, video, base, meta) {
-    const range = validRotationRange(base, meta);
+  function installPersistentRotation(player, video, base, meta) {
     const persistentDirection = (meta && meta.rotate90Direction) || (base && base.rotate90Direction) || ((meta && meta.rotate90) || (base && base.rotate90) ? 'left' : 'none');
     const persistent = persistentDirection === 'left' || persistentDirection === 'right';
-    if (!range && !persistent) return () => {};
+    if (!persistent) return () => {};
     let sourceWidth = 0;
     let sourceHeight = 0;
     let rotated = false;
@@ -141,8 +133,7 @@
     };
 
     const apply = () => {
-      const current = Number(video.currentTime);
-      const shouldRotate = persistent || (!!range && Number.isFinite(current) && current >= range.start && current < range.end);
+      const shouldRotate = persistent;
       if (shouldRotate === rotated) {
         if (rotated) sizeRotatedVideo();
         return;
@@ -166,9 +157,6 @@
       apply();
     };
     video.addEventListener('loadedmetadata', onMetadata);
-    video.addEventListener('timeupdate', apply);
-    video.addEventListener('seeking', apply);
-    video.addEventListener('seeked', apply);
     if (typeof ResizeObserver !== 'undefined') {
       resizeObserver = new ResizeObserver(() => {
         if (rotated) sizeRotatedVideo();
@@ -177,9 +165,6 @@
     }
     return () => {
       video.removeEventListener('loadedmetadata', onMetadata);
-      video.removeEventListener('timeupdate', apply);
-      video.removeEventListener('seeking', apply);
-      video.removeEventListener('seeked', apply);
       if (resizeObserver) resizeObserver.disconnect();
       video.classList.remove('vl-rotate-left');
       video.classList.remove('vl-rotate-right');
@@ -297,7 +282,7 @@
       video.autoplay = true;
       video.playsInline = true;
       video.preload = 'metadata';
-      const cleanupRotation = installTimedLeftRotation(player, video, base, meta);
+      const cleanupRotation = installPersistentRotation(player, video, base, meta);
       activePlayback = { base, video, lastLocalSaveAt: 0, cleanup: cleanupRotation };
 
       video.addEventListener('loadedmetadata', () => {
