@@ -259,3 +259,10 @@ test('VPN diagnostics panel toggles closed and hides on SPA route changes', () =
   assert.match(source, /addEventListener\('home-profile-routechange',[\s\S]*hideDiagnosticsPanel\(\)/);
   assert.match(source, /panel\.style\.display === 'none' \? 'block' : 'none'/);
 });
+
+test('profile exposes controls to release manually fixed non-VPN IPs', () => {
+  const spa = fs.readFileSync(new URL('../home-profile-spa.js', import.meta.url), 'utf8');
+  assert.match(spa, /profileNonVpnIps/);
+  assert.match(spa, /profileClearNonVpn/);
+  assert.match(spa, /testCode\.manualNonVpnIps/);
+});
