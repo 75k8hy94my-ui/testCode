@@ -314,7 +314,7 @@
       recheck.type = 'button';
       recheck.textContent = '再確認';
       recheck.style.cssText = buttonStyle;
-      recheck.addEventListener('click', () => checkVpn());
+      recheck.addEventListener('click', () => checkVpn({ external: true }));
       const markVpn = root.document.createElement('button');
       markVpn.type = 'button';
       markVpn.dataset.vpnMarkVpn = '1';
@@ -323,7 +323,7 @@
       markVpn.addEventListener('click', async () => {
         const ip = diagnostics.ip;
         if (!ip || getManualIpDesignation(ip) === 'non-vpn') return;
-        if (setManualIpDesignation(ip, 'vpn')) await checkVpn();
+        if (setManualIpDesignation(ip, 'vpn')) await checkVpn({ external: false });
       });
       const markNonVpn = root.document.createElement('button');
       markNonVpn.type = 'button';
@@ -335,7 +335,7 @@
         if (!ip || getManualIpDesignation(ip) === 'non-vpn') return;
         const message = 'このIPを「VPNではない」と固定します。\nこの画面からは解除できず、あとからVPN例外にも変更できません。\nよろしいですか？';
         if (typeof root.confirm === 'function' && !root.confirm(message)) return;
-        if (setManualIpDesignation(ip, 'non-vpn')) await checkVpn();
+        if (setManualIpDesignation(ip, 'non-vpn')) await checkVpn({ external: false });
       });
       const clearVpn = root.document.createElement('button');
       clearVpn.type = 'button';
@@ -345,7 +345,7 @@
       clearVpn.hidden = true;
       clearVpn.addEventListener('click', async () => {
         const ip = diagnostics.ip;
-        if (clearManualVpnDesignation(ip)) await checkVpn();
+        if (clearManualVpnDesignation(ip)) await checkVpn({ external: false });
       });
       controls.append(recheck, markVpn, markNonVpn, clearVpn);
       panel.append(title, pre, controls);
@@ -358,7 +358,7 @@
           return;
         }
         const statusButton = event.target && event.target.closest ? event.target.closest('[data-vpn-status-button]') : null;
-        if (statusButton) checkVpn();
+        if (statusButton) checkVpn({ external: false });
       });
       renderDiagnostics();
     };
@@ -504,7 +504,8 @@
     return typeof root.confirm !== 'function' || root.confirm(message);
   }
 
-  async function checkVpn() {
+  async function checkVpn(options = {}) {
+    const useExternalApi = options.external !== false;
     status = 'checking';
     updateStatusButtons(status);
     diagnostics = freshDiagnostics();
@@ -529,6 +530,9 @@
       let allowed = isKnownVpnIp(ip);
       if (allowed) {
         diagnostics.generic = { status: 'skipped-known-ip', httpStatus: null, verdict: true };
+        renderDiagnostics();
+      } else if (!useExternalApi) {
+        diagnostics.generic = { status: 'skipped-manual', httpStatus: null, verdict: null };
         renderDiagnostics();
       } else {
         allowed = await genericVpnVerdict(ip, signal);
@@ -581,8 +585,8 @@
   installDiagnosticsUi();
   updateStatusButtons(status);
   if (root.document) {
-    if (root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded', checkVpn, { once: true });
-    else if (root.setTimeout) root.setTimeout(checkVpn, 0);
+    if (root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded', () => checkVpn({ external: false }), { once: true });
+    else if (root.setTimeout) root.setTimeout(() => checkVpn({ external: false }), 0);
   }
 
   return {
