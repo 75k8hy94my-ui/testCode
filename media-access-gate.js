@@ -316,6 +316,12 @@
     if (pre) pre.textContent = diagnosticText();
   }
 
+  function hideDiagnosticsPanel() {
+    if (!root.document) return;
+    const panel = root.document.getElementById(DIAGNOSTICS_PANEL_ID);
+    if (panel) panel.style.display = 'none';
+  }
+
   function installDiagnosticsUi() {
     if (!root.document) return;
     const mount = () => {
@@ -383,6 +389,9 @@
         }
         const statusButton = event.target && event.target.closest ? event.target.closest('[data-vpn-status-button]') : null;
         if (statusButton) checkVpn({ external: false });
+      });
+      root.document.addEventListener('home-profile-routechange', () => {
+        hideDiagnosticsPanel();
       });
       renderDiagnostics();
     };

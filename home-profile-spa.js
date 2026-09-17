@@ -86,7 +86,7 @@ function activateReaderEntry(route){
 }
 function installReaderHeadAssets(doc){document.querySelectorAll('[data-reader-head-asset]').forEach((node)=>node.remove());doc.head.querySelectorAll('link[rel="stylesheet"],style').forEach((source)=>{const asset=source.cloneNode(true);asset.dataset.readerHeadAsset='1';if(asset.tagName==='LINK')asset.href=new URL(source.getAttribute('href'),location.href).href;document.head.appendChild(asset);});}
 function loadReaderScript(source){return new Promise((resolve,reject)=>{if(source.src){const src=new URL(source.getAttribute('src'),location.href).href;if([...document.scripts].some((script)=>!script.dataset.readerSpaScript&&script.src===src)){resolve();return;}const script=document.createElement('script');script.dataset.readerSpaScript='1';script.src=src;script.onload=resolve;script.onerror=reject;document.body.appendChild(script);return;}const script=document.createElement('script');script.dataset.readerSpaScript='1';script.textContent=source.textContent;document.body.appendChild(script);resolve();});}
-function loadReaderAsset(src){const source=document.createElement('script');source.src=new URL(src,location.href).href;return loadReaderScript(source);}
+function loadReaderAsset(src){const source=document.createElement('script');source.src=new URL(src,location.href).href;if(src.startsWith('media-access-gate.js?'))source.src=source.src.replace('vpn-recheck-session','vpn-panel-toggle');return loadReaderScript(source);}
 async function ensureVideoEntryEnhancement(){
   await loadReaderAsset('video-data.js?v=20260918-video-data-no-window');
   await loadReaderAsset('video-library.js?v=20260918-video-library-no-window');

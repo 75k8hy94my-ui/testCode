@@ -252,3 +252,10 @@ test('reader bootstrap loads the VPN gate before reader media and the gate cover
   assert.match(source, /getDiagnostics/);
   assert.match(source, /checkVpn/);
 });
+
+test('VPN diagnostics panel toggles closed and hides on SPA route changes', () => {
+  assert.match(source, /function hideDiagnosticsPanel\(\)/);
+  assert.match(source, /home-profile-routechange/);
+  assert.match(source, /addEventListener\('home-profile-routechange',[\s\S]*hideDiagnosticsPanel\(\)/);
+  assert.match(source, /panel\.style\.display === 'none' \? 'block' : 'none'/);
+});
