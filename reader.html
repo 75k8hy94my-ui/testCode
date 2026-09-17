@@ -6895,7 +6895,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   // resumed too; older saved data was a plain URL string, handled below.
   const requestedScreenOnLoad = getReaderScreenFromLocation();
   let resumedOnLoad = false;
-  if (!requestedScreenOnLoad) {
+  const shouldResumeLastManga = location.pathname.endsWith('/reader.html') || location.pathname === '/reader.html' || location.pathname === 'reader.html';
+  if (!requestedScreenOnLoad && shouldResumeLastManga) {
     try {
       const raw = localStorage.getItem(LAST_URL_KEY);
       if (raw) {

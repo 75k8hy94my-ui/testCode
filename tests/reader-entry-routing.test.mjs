@@ -15,7 +15,8 @@ test('desktop video destination deep-links directly to the video list', () => {
 test('reader startup honors an explicit screen route before resume and default-list logic', () => {
   const reader = readReader();
   assert.match(reader, /const requestedScreenOnLoad = getReaderScreenFromLocation\(\);/);
-  assert.match(reader, /if \(!requestedScreenOnLoad\) \{[\s\S]*localStorage\.getItem\(LAST_URL_KEY\)/);
+  assert.match(reader, /if \(!requestedScreenOnLoad && shouldResumeLastManga\) \{[\s\S]*localStorage\.getItem\(LAST_URL_KEY\)/);
+  assert.match(reader, /shouldResumeLastManga = location\.pathname\.endsWith\('\/reader\.html'\)/);
   assert.match(reader, /if \(!requestedScreenOnLoad && !resumedOnLoad && !location\.pathname\.endsWith\('\/reader\.html'\)/);
 });
 
