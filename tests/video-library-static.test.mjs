@@ -76,8 +76,9 @@ test('video library supports hiding videos and restoring them from the hidden li
 
 test('video editor exposes a persistent 90-degree rotation setting', () => {
   const library = read('video-library.js');
-  assert.match(library, /videoLibraryRotate90/);
+  assert.match(library, /videoLibraryRotate90Direction/);
   assert.match(library, /rotate90/);
+  assert.match(library, /videoLibraryRotate90Direction/);
 });
 
 test('video routing bridge plays direct video URLs with a video element and keeps legacy iframe playback', () => {

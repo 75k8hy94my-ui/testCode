@@ -44,7 +44,9 @@
       #videoLibraryResults .vl-player-menu.is-open .vl-player-menu-panel{display:block}
       #videoLibraryResults .vl-player-menu-item{display:block;width:100%;padding:9px 11px;border:0;border-radius:7px;background:transparent;color:#fff;text-align:left;font-size:12px;cursor:pointer}
       #videoLibraryResults .vl-player-menu-item:hover{background:rgba(255,255,255,.14)}
-      #videoLibraryResults .vl-inline-player video.vl-rotate-left{position:absolute;left:50%;top:50%;max-width:none;max-height:none;transform:translate(-50%,-50%) rotate(-90deg);transform-origin:center center}
+      #videoLibraryResults .vl-inline-player video.vl-rotate-left,#videoLibraryResults .vl-inline-player video.vl-rotate-right{position:absolute;left:50%;top:50%;max-width:none;max-height:none;transform:translate(-50%,-50%);transform-origin:center center}
+      #videoLibraryResults .vl-inline-player video.vl-rotate-left{transform:translate(-50%,-50%) rotate(-90deg)}
+      #videoLibraryResults .vl-inline-player video.vl-rotate-right{transform:translate(-50%,-50%) rotate(90deg)}
       #videoLibraryResults .vl-thumb .vl-thumb-direct-video{position:absolute;inset:0;display:block;width:100%;height:100%;border:0;background:#000;object-fit:cover;opacity:0;pointer-events:none}
       #videoLibraryResults .vl-thumb .vl-thumb-direct-video[data-frame-ready="1"]{opacity:1}
       #videoLibraryResults .vl-inline-fallback{height:100%;display:grid;place-items:center;align-content:center;gap:10px;padding:24px;text-align:center;color:#fff}
@@ -120,7 +122,8 @@
 
   function installTimedLeftRotation(player, video, base, meta) {
     const range = validRotationRange(base, meta);
-    const persistent = !!((meta && meta.rotate90) || (base && base.rotate90));
+    const persistentDirection = (meta && meta.rotate90Direction) || (base && base.rotate90Direction) || ((meta && meta.rotate90) || (base && base.rotate90) ? 'left' : 'none');
+    const persistent = persistentDirection === 'left' || persistentDirection === 'right';
     if (!range && !persistent) return () => {};
     let sourceWidth = 0;
     let sourceHeight = 0;
@@ -145,7 +148,8 @@
         return;
       }
       rotated = shouldRotate;
-      video.classList.toggle('vl-rotate-left', rotated);
+      video.classList.toggle('vl-rotate-left', rotated && persistentDirection === 'left');
+      video.classList.toggle('vl-rotate-right', rotated && persistentDirection === 'right');
       if (sourceWidth > 0 && sourceHeight > 0) {
         player.style.aspectRatio = rotated ? (sourceHeight + ' / ' + sourceWidth) : (sourceWidth + ' / ' + sourceHeight);
       }
@@ -178,6 +182,7 @@
       video.removeEventListener('seeked', apply);
       if (resizeObserver) resizeObserver.disconnect();
       video.classList.remove('vl-rotate-left');
+      video.classList.remove('vl-rotate-right');
       video.style.width = '';
       video.style.height = '';
     };

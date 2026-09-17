@@ -144,6 +144,7 @@
     const addedAt = asTime(x.addedAt || x.createdAt, now);
     const updatedAt = asTime(x.updatedAt, addedAt);
     const watchStatus = WATCH_STATUSES.has(asText(x.watchStatus)) ? asText(x.watchStatus) : '';
+    const rotate90Direction = x.rotate90Direction === 'right' ? 'right' : (x.rotate90Direction === 'left' || x.rotate90 === true ? 'left' : 'none');
     return {
       id: asText(x.id) || `v-${Math.random().toString(36).slice(2)}-${now}`,
       title: asText(x.title),
@@ -158,6 +159,7 @@
       thumbnailUrl: asText(x.thumbnailUrl),
       thumbnailTimeSeconds: x.thumbnailTimeSeconds == null ? null : asTime(x.thumbnailTimeSeconds, 0),
       rotate90: x.rotate90 === true,
+      rotate90Direction,
       rotateLeftStartSeconds: x.rotateLeftStartSeconds == null ? null : asTime(x.rotateLeftStartSeconds, 0),
       rotateLeftEndSeconds: x.rotateLeftEndSeconds == null ? null : asTime(x.rotateLeftEndSeconds, 0),
       watchStatus,

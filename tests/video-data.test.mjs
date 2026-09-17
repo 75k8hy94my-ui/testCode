@@ -107,4 +107,6 @@ test('normalizes and preserves the persistent 90-degree rotation setting', () =>
   assert.equal(normalizeVideo({ id: 'v3', rotate90: 'yes' }).rotate90, false);
   const merged = mergeVideoMetaPreservingThumbnailTime({ v1: { rotate90: true } }, { v1: { title: '更新' } });
   assert.equal(merged.v1.rotate90, true);
+  assert.equal(normalizeVideo({ id: 'v4', rotate90Direction: 'right' }).rotate90Direction, 'right');
+  assert.equal(normalizeVideo({ id: 'v5', rotate90Direction: 'invalid' }).rotate90Direction, 'none');
 });

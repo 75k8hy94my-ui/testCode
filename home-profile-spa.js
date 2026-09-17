@@ -88,9 +88,9 @@ function installReaderHeadAssets(doc){document.querySelectorAll('[data-reader-he
 function loadReaderScript(source){return new Promise((resolve,reject)=>{if(source.src){const src=new URL(source.getAttribute('src'),location.href).href;if([...document.scripts].some((script)=>!script.dataset.readerSpaScript&&script.src===src)){resolve();return;}const script=document.createElement('script');script.dataset.readerSpaScript='1';script.src=src;script.onload=resolve;script.onerror=reject;document.body.appendChild(script);return;}const script=document.createElement('script');script.dataset.readerSpaScript='1';script.textContent=source.textContent;document.body.appendChild(script);resolve();});}
 function loadReaderAsset(src){const source=document.createElement('script');source.src=new URL(src,location.href).href;return loadReaderScript(source);}
 async function ensureVideoEntryEnhancement(){
-  await loadReaderAsset('video-data.js?v=20260918-video-data-rotate');
-  await loadReaderAsset('video-library.js?v=20260918-video-library-rotate');
-  await loadReaderAsset('video-routing-fix.js?v=20260918-video-routing-rotate');
+  await loadReaderAsset('video-data.js?v=20260918-video-data-rotate-right');
+  await loadReaderAsset('video-library.js?v=20260918-video-library-rotate-right');
+  await loadReaderAsset('video-routing-fix.js?v=20260918-video-routing-rotate-right');
   await loadReaderAsset('video-thumbnail-time.js?v=20260916-video-thumbnail');
   const deadline=Date.now()+3000;
   while(!document.getElementById('videoLibraryApp')&&Date.now()<deadline) await new Promise((resolve)=>setTimeout(resolve,25));
