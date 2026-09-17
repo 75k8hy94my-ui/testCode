@@ -120,7 +120,8 @@
 
   function installTimedLeftRotation(player, video, base, meta) {
     const range = validRotationRange(base, meta);
-    if (!range) return () => {};
+    const persistent = !!((meta && meta.rotate90) || (base && base.rotate90));
+    if (!range && !persistent) return () => {};
     let sourceWidth = 0;
     let sourceHeight = 0;
     let rotated = false;
@@ -138,7 +139,7 @@
 
     const apply = () => {
       const current = Number(video.currentTime);
-      const shouldRotate = Number.isFinite(current) && current >= range.start && current < range.end;
+      const shouldRotate = persistent || (!!range && Number.isFinite(current) && current >= range.start && current < range.end);
       if (shouldRotate === rotated) {
         if (rotated) sizeRotatedVideo();
         return;

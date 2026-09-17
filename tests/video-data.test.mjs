@@ -100,3 +100,11 @@ test('deriveService returns a stable host label for arbitrary URLs', () => {
   assert.equal(deriveService('https://sub.example.co.jp/path'), 'sub.example.co.jp');
   assert.equal(deriveService('not a url','legacy'), 'legacy');
 });
+
+test('normalizes and preserves the persistent 90-degree rotation setting', () => {
+  assert.equal(normalizeVideo({ id: 'v1', rotate90: true }).rotate90, true);
+  assert.equal(normalizeVideo({ id: 'v2', rotate90: false }).rotate90, false);
+  assert.equal(normalizeVideo({ id: 'v3', rotate90: 'yes' }).rotate90, false);
+  const merged = mergeVideoMetaPreservingThumbnailTime({ v1: { rotate90: true } }, { v1: { title: '更新' } });
+  assert.equal(merged.v1.rotate90, true);
+});

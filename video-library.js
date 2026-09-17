@@ -172,6 +172,7 @@
               <div class="vl-field"><label for="videoLibraryRotateLeftStart">左90°回転 開始秒</label><input id="videoLibraryRotateLeftStart" type="number" min="0" step="0.1" inputmode="decimal" placeholder="例: 12.5"></div>
               <div class="vl-field"><label for="videoLibraryRotateLeftEnd">左90°回転 終了秒</label><input id="videoLibraryRotateLeftEnd" type="number" min="0" step="0.1" inputmode="decimal" placeholder="例: 28"></div>
             </div>
+            <label class="vl-check"><input id="videoLibraryRotate90" type="checkbox"> この動画は常に左90°回転</label>
             <div class="vl-help">開始・終了を両方指定すると、その区間だけ直接再生動画を左90°回転します。</div>
           </details>
           <div id="videoLibraryFormError" class="vl-summary" aria-live="polite"></div>
@@ -193,7 +194,7 @@
       formError: document.getElementById('videoLibraryFormError'), url: document.getElementById('videoLibraryUrl'), urlEdit: document.getElementById('videoLibraryUrlEdit'), suggestedTags: document.getElementById('videoLibrarySuggestedTags'), title: document.getElementById('videoLibraryTitle'), editFolder: document.getElementById('videoLibraryEditFolder'),
       statusSelect: document.getElementById('videoLibraryStatusSelect'), tags: document.getElementById('videoLibraryTags'), memo: document.getElementById('videoLibraryMemo'), favorite: document.getElementById('videoLibraryFavorite'),
       legacyService: document.getElementById('videoLibraryLegacyService'), legacyId: document.getElementById('videoLibraryLegacyId'), thumbnail: document.getElementById('videoLibraryThumbnail'),
-      rotateLeftStart: document.getElementById('videoLibraryRotateLeftStart'), rotateLeftEnd: document.getElementById('videoLibraryRotateLeftEnd'),
+      rotateLeftStart: document.getElementById('videoLibraryRotateLeftStart'), rotateLeftEnd: document.getElementById('videoLibraryRotateLeftEnd'), rotate90: document.getElementById('videoLibraryRotate90'),
       deleteBtn: document.getElementById('videoLibraryDelete'), cancel: document.getElementById('videoLibraryCancel'), folderManager: document.getElementById('videoLibraryFolderManager'),
       newFolder: document.getElementById('videoLibraryNewFolder'), createFolder: document.getElementById('videoLibraryCreateFolder'), folderList: document.getElementById('videoLibraryFolderList'),
       legacyItems,
@@ -399,6 +400,7 @@
     dom.thumbnail.value = videoId ? video.thumbnailUrl : '';
     dom.rotateLeftStart.value = videoId && video.rotateLeftStartSeconds != null ? String(video.rotateLeftStartSeconds) : '';
     dom.rotateLeftEnd.value = videoId && video.rotateLeftEndSeconds != null ? String(video.rotateLeftEndSeconds) : '';
+    dom.rotate90.checked = videoId && video.rotate90 === true;
     dom.formError.textContent = '';
     setSheetVisible(true); pushSheetState(); setTimeout(() => dom.url.focus(), 30);
   }
@@ -454,6 +456,7 @@
       title, url, folderId: text(dom.editFolder.value) || null, tags: Data.parseTags(dom.tags.value), memo: text(dom.memo.value), favorite: !!dom.favorite.checked,
       watchStatus: text(dom.statusSelect.value), thumbnailUrl: text(dom.thumbnail.value),
       rotateLeftStartSeconds, rotateLeftEndSeconds,
+      rotate90: !!dom.rotate90.checked,
     };
     try {
       let targetId = state.editorId;

@@ -34,3 +34,8 @@ test('direct playback applies timed left rotation and rechecks after seeking', (
   assert.match(source, /seeking/);
   assert.match(source, /seeked/);
 });
+
+test('direct playback applies persistent 90-degree rotation for the whole video', () => {
+  assert.match(source, /rotate90/);
+  assert.match(source, /rotate90[\s\S]*vl-rotate-left/);
+});
