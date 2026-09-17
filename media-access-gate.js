@@ -35,6 +35,7 @@
   const DIAGNOSTICS_PANEL_ID = 'vpnDiagnosticsPanel';
   const MANUAL_VPN_IPS_KEY = 'testCode.manualVpnIps';
   const MANUAL_NON_VPN_IPS_KEY = 'testCode.manualNonVpnIps';
+  const MANUAL_VPN_APPROVAL_KEY = 'testCode.manualVpnSessionApproval';
   let status = 'pending';
   let installed = false;
   let diagnosticsUiInstalled = false;
@@ -128,11 +129,34 @@
     return writeIpSet(MANUAL_VPN_IPS_KEY, vpnIps);
   }
 
+  function sessionStorage() {
+    try { return root.sessionStorage || null; } catch (_) { return null; }
+  }
+
+  function hasManualVpnApproval(ip) {
+    const store = sessionStorage();
+    if (!store || !ip) return false;
+    try { return store.getItem(MANUAL_VPN_APPROVAL_KEY) === String(ip); } catch (_) { return false; }
+  }
+
+  function rememberManualVpnApproval(ip) {
+    const store = sessionStorage();
+    if (!store || !ip) return false;
+    try { store.setItem(MANUAL_VPN_APPROVAL_KEY, String(ip)); return true; } catch (_) { return false; }
+  }
+
+  function clearManualVpnApproval(ip) {
+    const store = sessionStorage();
+    if (!store) return;
+    try { if (!ip || store.getItem(MANUAL_VPN_APPROVAL_KEY) === String(ip)) store.removeItem(MANUAL_VPN_APPROVAL_KEY); } catch (_) {}
+  }
+
   function clearManualVpnDesignation(ip) {
     const value = String(ip || '').trim();
     if (!value) return false;
     const vpnIps = readIpSet(MANUAL_VPN_IPS_KEY);
     if (!vpnIps.delete(value)) return true;
+    clearManualVpnApproval(value);
     return writeIpSet(MANUAL_VPN_IPS_KEY, vpnIps);
   }
 
@@ -504,6 +528,13 @@
     return typeof root.confirm !== 'function' || root.confirm(message);
   }
 
+  function allowManualVpn(ip) {
+    if (hasManualVpnApproval(ip)) return true;
+    if (!confirmManualVpnOverride()) return false;
+    rememberManualVpnApproval(ip);
+    return true;
+  }
+
   async function checkVpn(options = {}) {
     const useExternalApi = options.external !== false;
     status = 'checking';
@@ -542,13 +573,13 @@
         allowed = diagnostics.protonExitMatch;
       }
       if (!allowed && manualDesignation === 'vpn') {
-        if (confirmManualVpnOverride()) return applyFinalStatus(true);
+        if (allowManualVpn(ip)) return applyFinalStatus(true);
         diagnostics.error = 'VPNと確認できなかったため手動指定を適用しませんでした';
       }
       return applyFinalStatus(allowed);
     } catch (error) {
       if (diagnostics.manualDesignation === 'vpn' || getManualIpDesignation(diagnostics.ip) === 'vpn') {
-        if (confirmManualVpnOverride()) return applyFinalStatus(true);
+        if (allowManualVpn(diagnostics.ip)) return applyFinalStatus(true);
         diagnostics.error = 'VPNを確認できなかったため手動指定を適用しませんでした';
       }
       status = 'blocked';

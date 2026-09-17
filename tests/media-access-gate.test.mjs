@@ -113,6 +113,28 @@ test('VPN check honors a manually designated VPN IP', async () => {
   assert.equal(Gate.getManualIpDesignation(currentIp), null);
 });
 
+test('manual VPN approval is remembered for the same IP during the browser session', async () => {
+  const store = new Map();
+  const session = new Map();
+  let prompts = 0;
+  const currentIp = '198.51.100.125';
+  const Gate = loadGate({
+    localStorage: { getItem: (key) => store.get(key) || null, setItem: (key, value) => store.set(key, value) },
+    sessionStorage: { getItem: (key) => session.get(key) || null, setItem: (key, value) => session.set(key, value), removeItem: (key) => session.delete(key) },
+    confirm: () => { prompts += 1; return true; },
+    fetch: async (url) => {
+      if (url === Gate.IP_URL) return { ok: true, json: async () => ({ ip: currentIp }) };
+      return { ok: true, json: async () => [] };
+    },
+    setTimeout,
+    clearTimeout,
+  });
+  assert.equal(Gate.setManualIpDesignation(currentIp, 'vpn'), true);
+  assert.equal(await Gate.checkVpn({ external: false }), true);
+  assert.equal(await Gate.checkVpn({ external: false }), true);
+  assert.equal(prompts, 1);
+});
+
 test('VPN check does not prompt or allow an unregistered non-VPN IP', async () => {
   let prompted = false;
   const Gate = loadGate({
