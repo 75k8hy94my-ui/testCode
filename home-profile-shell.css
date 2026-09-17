@@ -58,6 +58,8 @@ html[data-theme="dark"] .linksContent .screenView{background:rgba(10,12,17,.98);
 html[data-theme="dark"] .linksContent .primary,html[data-theme="dark"] .linksContent .filter-btn.active{background:#223b5e;color:#9cc8ff;border-color:#315b88}
 @media(max-width:899px){.linksContent{margin-left:0;padding:24px 18px 40px}.linksToolbar{align-items:flex-start}.linksContent .card-foot{align-items:flex-start;flex-direction:column}.linksContent .actions{justify-content:flex-start}.linksContent .screenView{padding-top:24px}}
 .homeShell #routeContent{padding-top:0}.homeShell.reader-route #routeContent{padding-top:54px}
+.mobileBottomNav{display:none}
+@media(max-width:899px){.mobileBottomNav{position:fixed;z-index:1200;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));display:flex;justify-content:space-around;gap:4px;padding:8px 5px;border:1px solid rgba(255,255,255,.14);border-radius:18px;background:rgba(20,24,32,.92);box-shadow:0 10px 30px rgba(0,0,0,.28);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}.mobileBottomNav a{flex:1;min-width:0;padding:7px 3px;color:#f5f7fb;text-align:center;text-decoration:none;font-size:11px;white-space:nowrap}.homeShell #routeContent{padding-bottom:82px}}
 html.reader-entry-manga #app,html.reader-entry-video #app{height:0!important;min-height:0!important;overflow:visible!important;background:transparent!important}
 html.reader-entry-manga .homeShell #routeContent,html.reader-entry-video .homeShell #routeContent{min-height:0!important}
 html.reader-entry-manga,html.reader-entry-video,html.reader-entry-manga body,html.reader-entry-video body{height:auto!important;min-height:100%!important;overflow-y:auto!important;overflow-x:hidden!important}

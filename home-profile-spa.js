@@ -28,6 +28,9 @@ function ensureAppShell(){
     content.id='routeContent';
     app.appendChild(content);
   }
+  if(!document.getElementById('mobileBottomNav')){
+    const nav=document.createElement('nav');nav.id='mobileBottomNav';nav.className='mobileBottomNav';nav.setAttribute('aria-label','モバイルメニュー');nav.innerHTML='<a href="home.html">ホーム</a><a href="manga.html">漫画</a><a href="video.html">動画</a><a href="index-search.html">索引</a><a href="profile.html">プロフィール</a>';app.append(nav);
+  }
   mount=document.getElementById('routeContent');
   return mount;
 }

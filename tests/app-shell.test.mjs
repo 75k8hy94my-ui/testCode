@@ -30,6 +30,13 @@ test('home-family pages share one History API controller', () => {
   assert.match(spa, /保管庫を開く/);
 });
 
+test('mobile home shell provides navigation to profile and other pages', () => {
+  const spa = fs.readFileSync(new URL('../home-profile-spa.js', import.meta.url), 'utf8');
+  assert.match(spa, /mobileBottomNav/);
+  assert.match(spa, /profile\.html/);
+  assert.match(spa, /index-search\.html/);
+});
+
 test('static verifier covers the shared shell and profile entry', () => {
   const verifier = read('scripts/check-static.mjs');
   for (const file of ['profile.html', 'home-profile-spa.js', 'profile-menu.js', 'video-library.js', 'media-access-gate.js']) {
