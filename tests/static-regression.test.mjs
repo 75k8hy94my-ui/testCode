@@ -96,10 +96,12 @@ test('local reader is disabled behind a reversible feature flag', () => {
 
 test('disabled local manga stays out of bookshelf views without deleting it', () => {
   const source = readReader();
+  const viewModel = read('manga-list-view-model.js');
   assert.match(source, /function shelfVisibleItems\(\)/);
   assert.match(source, /window\.MangaReaderFeatures && window\.MangaReaderFeatures\.localReader/);
   assert.match(source, /!item\.localSync/);
-  assert.match(source, /itemsList = visibleShelfItems\.filter\(\(it\) => !it\.folderId && !it\.series\)/);
+  assert.match(viewModel, /itemsList = visibleShelfItems\.filter\(\(it\) => !it\.folderId && !it\.series\)/);
+  assert.match(source, /items:\s*shelfVisibleItems\(\)/);
 });
 
 test('narrow bookshelf controls wrap instead of clipping', () => {
@@ -284,9 +286,11 @@ test('backup actions live on their own utility screen and mobile hides heavy act
 
 test('bookshelf pagination follows the shelf content and paginates folders with items', () => {
   const source = read('reader.html');
+  const viewModel = read('manga-list-view-model.js');
   assert.doesNotMatch(source, /\.bookshelf-pagination \{[^}]*position:\s*fixed/);
-  assert.match(source, /const folderEntries = folderCards\.map/);
-  assert.match(source, /const pagedEntries = folderEntries\.concat\(contentEntries\)/);
+  assert.match(viewModel, /const folderEntries = folderCards\.map/);
+  assert.match(viewModel, /const pagedEntries = folderEntries\.concat\(contentEntries\)/);
+  assert.match(source, /MangaListViewModel\.derive\([\s\S]*pageSize:\s*BOOKSHELF_PAGE_SIZE/);
   assert.match(source, /visibleFolderEntries\.forEach\(\(entry\) => frag\.appendChild\(buildFolderCard\(entry\.folder/);
   assert.match(source, /#savedListItems\.bookshelf \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);[^}]*padding-bottom: calc\(92px \+ env\(safe-area-inset-bottom\)\)/);
   assert.match(source, /savedListItems\.addEventListener\('touchstart'/);

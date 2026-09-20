@@ -4,9 +4,11 @@ import fs from 'node:fs';
 
 const reader = fs.readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
 const card = fs.readFileSync(new URL('../manga-list-card.js', import.meta.url), 'utf8');
+const viewModel = fs.readFileSync(new URL('../manga-list-view-model.js', import.meta.url), 'utf8');
 
 test('reorder mode preserves the savedItems-derived display order instead of re-sorting it', () => {
-  assert.match(reader, /if \(!reorderMode\)\s*\{\s*if \(shelfSort === 'title-asc'\)/);
+  assert.match(viewModel, /if \(!reorderMode\)\s*\{\s*if \(sort === 'title-asc'\)/);
+  assert.match(reader, /MangaListViewModel\.derive\(/);
 });
 
 test('moveItemInList swaps only adjacent saved items and persists the result', () => {

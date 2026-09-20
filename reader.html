@@ -1512,6 +1512,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="reader-feature-overlays-template.js?v=20260915-template"></script>
 
 <script src="manga-list-card.js?v=20260921-card-boundary"></script>
+<script src="manga-list-view-model.js?v=20260921-view-model"></script>
 
 <script>
 (function () {
@@ -5778,104 +5779,31 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.savedListItems.classList.add('bookshelf'); // bookshelf grid at every level now
     els.savedListItems.appendChild(els.bookshelfPagination);
 
-    let itemsList = []; // flat item list for the current view; doubles as swipe context
-    const visibleShelfItems = shelfVisibleItems();
-    let folderCards = [];
-    let seriesGroupCards = []; // [{name, items}], only populated at the シリーズ root (list of series names)
-    let authorGroupCards = [];
-    let showFavoritesCard = false;
-    let showSeriesCard = false;
-
-    if (inAuthorView) {
-      const authorCard = authorCards.find((card) => card.name === currentAuthorView || card.circleName === currentAuthorView);
-      const names = authorCard ? [authorCard.name, authorCard.circleName].filter(Boolean) : [currentAuthorView];
-      itemsList = visibleShelfItems.filter((it) => names.includes(String(it.author || '').trim()));
-    } else if (!currentFolderView) {
-      // Series-tagged works belong to the virtual シリーズ shelf at the
-      // root. Do not also render them as individual cards beside that shelf;
-      // works with the same series name are grouped there automatically.
-      itemsList = visibleShelfItems.filter((it) => !it.folderId && !it.series);
-      folderCards = savedFolders.filter((folder) => folder.id !== HISTORY_FOLDER_ID && !String(folder.id || '').startsWith('local-'));
-      showFavoritesCard = true;
-      showSeriesCard = true;
-    } else if (currentFolderView === FAVORITES_FOLDER_ID) {
-      // Virtual view: aggregates favorited items regardless of which real
-      // folder they actually live in, instead of filtering by folderId.
-      itemsList = visibleShelfItems.filter((it) => it.favorite);
-    } else if (currentFolderView === UNREAD_FOLDER_ID) {
-      itemsList = unreadOrderItems().filter((item) => visibleShelfItems.includes(item));
-    } else if (currentFolderView === SYNCED_FOLDER_ID) {
-      itemsList = visibleShelfItems.filter((it) => it.localSync);
-    } else if (inSeriesRoot) {
-      // Virtual view: groups every series-tagged item by series name
-      // regardless of which real folder it lives in. Each group's items are
-      // pre-sorted by volume so drilling in shows volume 1, 2, 3... in order.
-      const groups = new Map();
-      visibleShelfItems.forEach((it) => {
-        if (!it.series) return;
-        if (!groups.has(it.series)) groups.set(it.series, []);
-        groups.get(it.series).push(it);
-      });
-      seriesGroupCards = Array.from(groups.entries())
-        .map(([name, items]) => ({ name, items: items.slice().sort((a, b) => (a.volume || 0) - (b.volume || 0)) }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-    } else if (inSeriesGroup) {
-      itemsList = visibleShelfItems.filter((it) => it.series === currentSeriesView)
-        .sort((a, b) => (a.volume || 0) - (b.volume || 0));
-    } else {
-      itemsList = visibleShelfItems.filter((it) => it.folderId === currentFolderView);
-    }
-
-    if (groupByAuthorEnabled && !bulkEditMode && !inAuthorView && !inSeriesRoot && itemsList.length) {
-      const groups = new Map();
-      itemsList.forEach((item) => {
-        const name = String(item.author || '').trim();
-        if (!name) return;
-        if (!groups.has(name)) groups.set(name, []);
-        groups.get(name).push(item);
-      });
-      authorGroupCards = Array.from(groups.entries()).map(([name, items]) => ({ name, items }));
-    }
-    const normalizedFilter = (value) => String(value || '').trim().toLocaleLowerCase('ja');
-    itemsList = itemsList.filter((item) => {
-      const tags = Array.isArray(item.tags) ? item.tags.join(' ') : '';
-      const haystack = window.MangaReaderShelfSearch.buildSearchText(item, savedFolders, savedVideos, authorCards);
-      return (!shelfFilters.series || normalizedFilter(item.series).includes(normalizedFilter(shelfFilters.series))) &&
-        (!shelfFilters.author || normalizedFilter(item.author).includes(normalizedFilter(shelfFilters.author))) &&
-        (!shelfFilters.tags || normalizedFilter(tags).includes(normalizedFilter(shelfFilters.tags))) &&
-        (!shelfFilters.source || normalizedFilter(item.sourceWork).includes(normalizedFilter(shelfFilters.source))) &&
-        (!shelfSearchQuery || normalizedFilter(haystack).includes(normalizedFilter(shelfSearchQuery)));
+    const viewModel = MangaListViewModel.derive({
+      items: shelfVisibleItems(),
+      folders: savedFolders,
+      authorCards,
+      videos: savedVideos,
+      folderView: currentFolderView,
+      seriesView: currentSeriesView,
+      authorView: currentAuthorView,
+      filters: shelfFilters,
+      searchQuery: shelfSearchQuery,
+      sort: shelfSort,
+      reorderMode,
+      groupByAuthor: groupByAuthorEnabled,
+      bulkEditMode,
+      page: bookshelfPage,
+      pageSize: BOOKSHELF_PAGE_SIZE,
+      ids: { favorites: FAVORITES_FOLDER_ID, unread: UNREAD_FOLDER_ID, synced: SYNCED_FOLDER_ID, history: HISTORY_FOLDER_ID, series: SERIES_FOLDER_ID },
+      searchText: (item, folders, videos, cards) => window.MangaReaderShelfSearch.buildSearchText(item, folders, videos, cards),
+      title: itemDisplayTitle,
+      unreadItems: unreadOrderItems()
     });
-    if (!reorderMode) {
-      if (shelfSort === 'title-asc') {
-        itemsList.sort((a, b) => itemDisplayTitle(a).localeCompare(itemDisplayTitle(b), 'ja'));
-      } else if (shelfSort === 'synced-first') {
-        itemsList.sort((a, b) => Number(!!b.localSync) - Number(!!a.localSync) || (Number(b.addedAt) || 0) - (Number(a.addedAt) || 0));
-      } else {
-        itemsList.sort((a, b) => (Number(b.addedAt) || 0) - (Number(a.addedAt) || 0));
-      }
-    }
-    if (groupByAuthorEnabled && !bulkEditMode && !inAuthorView && !inSeriesRoot) {
-      const groups = new Map();
-      itemsList.forEach((item) => {
-        const name = String(item.author || '').trim();
-        if (name) { if (!groups.has(name)) groups.set(name, []); groups.get(name).push(item); }
-      });
-      authorGroupCards = Array.from(groups.entries()).map(([name, items]) => ({ name, items }));
-    }
-    const ungroupedItems = itemsList.filter((item) => !String(item.author || '').trim());
-    const folderEntries = folderCards.map((folder) => ({ type: 'folder', folder }));
-    const contentEntries = groupByAuthorEnabled && !bulkEditMode && !inAuthorView && !inSeriesRoot
-      ? authorGroupCards.concat(ungroupedItems)
-      : itemsList;
-    const pagedEntries = folderEntries.concat(contentEntries);
-    const totalShelfPages = Math.max(1, Math.ceil(pagedEntries.length / BOOKSHELF_PAGE_SIZE));
-    bookshelfPage = Math.min(Math.max(1, bookshelfPage), totalShelfPages);
-    const pageStart = (bookshelfPage - 1) * BOOKSHELF_PAGE_SIZE;
-    const visibleEntries = pagedEntries.slice(pageStart, pageStart + BOOKSHELF_PAGE_SIZE);
-    const visibleFolderEntries = visibleEntries.filter((entry) => entry && entry.type === 'folder');
-    const visibleAuthorGroups = visibleEntries.filter((entry) => entry && entry.type !== 'folder' && Array.isArray(entry.items));
-    const visibleItems = visibleEntries.filter((entry) => entry && entry.type !== 'folder' && !Array.isArray(entry.items));
+    const { itemsList, folderCards, seriesGroupCards, authorGroupCards, showFavoritesCard, showSeriesCard,
+      visibleEntries, visibleFolderEntries, visibleAuthorGroups, visibleItems, totalPages } = viewModel;
+    bookshelfPage = viewModel.normalizedPage;
+    const totalShelfPages = totalPages;
     els.bookshelfPagination.style.display = totalShelfPages > 1 ? 'flex' : 'none';
     els.bookshelfPrevBtn.disabled = bookshelfPage <= 1;
     els.bookshelfNextBtn.disabled = bookshelfPage >= totalShelfPages;
