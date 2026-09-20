@@ -5347,6 +5347,12 @@ https://cdn.example.org/c/003.webp"></textarea>
   // 上下移動 (move up/down) buttons, and disables tap-to-open — so taps in
   // 並べ替え mode can't accidentally open a manga while the user is busy
   // rearranging the shelf.
+  const mangaListCoverDeps = Object.freeze({
+    loadLocalCover,
+    setupFeedImage,
+    coverSourceCache
+  });
+
   function handleMangaCardOpen(item, list) {
     rememberReaderReturnView();
     // The manga and video lists share one surface. If the browser history
@@ -5384,13 +5390,13 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (Array.isArray(item.pages) && item.pages.length) {
       const source = item.pages[0];
       if (item.localSync) {
-        loadLocalCover(item, img);
+        mangaListCoverDeps.loadLocalCover(item, img);
       } else {
-        img.src = coverSourceCache.get(source) || source; // exact URL already known; no extension cascade needed
-        img.addEventListener('load', () => coverSourceCache.set(source, img.currentSrc || img.src), { once: true });
+        img.src = mangaListCoverDeps.coverSourceCache.get(source) || source; // exact URL already known; no extension cascade needed
+        img.addEventListener('load', () => mangaListCoverDeps.coverSourceCache.set(source, img.currentSrc || img.src), { once: true });
       }
     } else {
-      setupFeedImage(img, item.url, item.numberWidth, item.pagePattern);
+      mangaListCoverDeps.setupFeedImage(img, item.url, item.numberWidth, item.pagePattern);
     }
     if (reorderMode) {
       const idx = list.indexOf(item);

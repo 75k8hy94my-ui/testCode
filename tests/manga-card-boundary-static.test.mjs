@@ -55,6 +55,27 @@ test('normal manga card clicks use one reader interaction boundary in the origin
   assert.equal((build.match(/card\.addEventListener\('click'/g) || []).length, 1);
 });
 
+test('buildBookCard uses one private cover dependency boundary without changing image branches', () => {
+  assert.equal((reader.match(/const mangaListCoverDeps = Object\.freeze\(/g) || []).length, 1);
+  const start = reader.indexOf('const mangaListCoverDeps = Object.freeze(');
+  const end = reader.indexOf('\n  function handleMangaCardOpen(', start);
+  const deps = reader.slice(start, end);
+  assert.match(deps, /loadLocalCover/);
+  assert.match(deps, /setupFeedImage/);
+  assert.match(deps, /coverSourceCache/);
+  assert.doesNotMatch(deps, /checkVpn|media-access-gate|MangaVault|localStorage|new Map|new Set/);
+
+  const buildStart = reader.indexOf('function buildBookCard(');
+  const buildEnd = reader.indexOf('\n  function normalizeAuthorLinks(', buildStart);
+  const build = reader.slice(buildStart, buildEnd);
+  assert.match(build, /mangaListCoverDeps\.loadLocalCover\(item, img\)/);
+  assert.match(build, /mangaListCoverDeps\.coverSourceCache\.get\(source\)/);
+  assert.match(build, /mangaListCoverDeps\.coverSourceCache\.set\(source, img\.currentSrc \|\| img\.src\)/);
+  assert.match(build, /mangaListCoverDeps\.setupFeedImage\(img, item\.url, item\.numberWidth, item\.pagePattern\)/);
+  assert.equal((build.match(/mangaListCoverDeps\.loadLocalCover\(item, img\)/g) || []).length, 1);
+  assert.equal((build.match(/mangaListCoverDeps\.setupFeedImage\(/g) || []).length, 1);
+});
+
 test('manga card boundary preserves the required card classes and image attributes', () => {
   assert.match(card, /book-card/);
   assert.match(card, /reorder-card/);
