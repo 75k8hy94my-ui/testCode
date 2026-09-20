@@ -8,6 +8,12 @@ const spa = read('home-profile-spa.js');
 const reader = read('reader.html');
 
 const readerIds = ['mobileBottomNav', 'mobileNavManga', 'mobileNavVideo', 'mobileNavMore', 'mobileUtilityMenu'];
+const readerMobileTemplateSrc = 'reader-mobile-nav-template.js?v=20260921-mobile-utility-contract';
+
+test('reader.html uses the refreshed reader mobile navigation asset identifier once', () => {
+  assert.equal((reader.match(/reader-mobile-nav-template\.js\?v=[^"']+/g) || []).length, 1);
+  assert.match(reader, new RegExp(`<script src="${readerMobileTemplateSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"><\\/script>`));
+});
 
 test('reader mobile template replaces the generic SPA nav when reader controls are missing', () => {
   assert.match(template, /getElementById\('mobileBottomNav'\)/);
