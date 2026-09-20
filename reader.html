@@ -6772,6 +6772,16 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
   }
 
+  const mangaListController = Object.freeze({
+    init: initMangaList,
+    render: renderSavedList,
+    open: openSavedList,
+    activate() {
+      switchListTab('manga');
+    },
+    getElements: getMangaListElements,
+  });
+
   els.mobileNavManga.addEventListener('click', () => {
     if (mobileReaderMode) { els.prevBtn.click(); return; }
     if (location.pathname.endsWith('/video.html') || location.pathname === '/video.html') { if (window.HomeProfileSPA && typeof HomeProfileSPA.navigate === 'function') HomeProfileSPA.navigate('manga.html'); else location.href = 'manga.html'; return; }

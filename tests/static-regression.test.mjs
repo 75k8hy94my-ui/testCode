@@ -350,6 +350,21 @@ test('manga list initialization has one synchronous private entry point', () => 
   assert.match(source, /savedVideos = JSON\.parse/);
 });
 
+test('manga list controller exposes only existing private boundaries', () => {
+  const source = read('reader.html');
+  assert.equal((source.match(/const mangaListController = Object\.freeze\(/g) || []).length, 1);
+  const start = source.indexOf('const mangaListController = Object.freeze(');
+  const end = source.indexOf('\n  //', start);
+  const controller = source.slice(start, end);
+  assert.match(controller, /init:\s*initMangaList/);
+  assert.match(controller, /render:\s*renderSavedList/);
+  assert.match(controller, /open:\s*openSavedList/);
+  assert.match(controller, /getElements:\s*getMangaListElements/);
+  assert.match(controller, /activate\(\)\s*\{[\s\S]*switchListTab\('manga'\)/);
+  assert.doesNotMatch(controller, /savedItems|savedFolders|authorCards|localStorage|MangaVault|checkVpn|setTimeout|new Map|new Set|\[\]/);
+  assert.doesNotMatch(source, /window\.mangaListController|self\.mangaListController/);
+});
+
 test('image requests stop after a short timeout instead of retrying indefinitely', () => {
   const source = read('reader.html');
   assert.match(source, /const LOAD_TIMEOUT_MS = 60000/);
