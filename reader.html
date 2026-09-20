@@ -1513,6 +1513,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
 <script src="manga-list-card.js?v=20260921-card-boundary"></script>
 <script src="manga-list-view-model.js?v=20260921-view-model-self"></script>
+<script src="manga-list-renderer.js?v=20260921-renderer"></script>
 
 <script>
 (function () {
@@ -5804,15 +5805,9 @@ https://cdn.example.org/c/003.webp"></textarea>
       visibleEntries, visibleFolderEntries, visibleAuthorGroups, visibleItems, totalPages } = viewModel;
     bookshelfPage = viewModel.normalizedPage;
     const totalShelfPages = totalPages;
-    els.bookshelfPagination.style.display = totalShelfPages > 1 ? 'flex' : 'none';
-    els.bookshelfPrevBtn.disabled = bookshelfPage <= 1;
-    els.bookshelfNextBtn.disabled = bookshelfPage >= totalShelfPages;
-    els.bookshelfPageLabel.textContent = bookshelfPage + ' / ' + totalShelfPages;
     const isEmpty = folderCards.length === 0 && itemsList.length === 0 && seriesGroupCards.length === 0 &&
       !showFavoritesCard && !showSeriesCard;
-    if (isEmpty) {
-      els.savedListEmpty.style.display = 'block';
-      els.savedListEmpty.textContent = currentFolderView === FAVORITES_FOLDER_ID
+    const emptyText = currentFolderView === FAVORITES_FOLDER_ID
         ? 'お気に入りはまだ追加されていません'
         : currentFolderView === UNREAD_FOLDER_ID
           ? '保存された漫画はまだありません'
@@ -5821,8 +5816,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         : inSeriesRoot
           ? 'シリーズはまだ設定されていません'
           : (currentFolderView ? 'このフォルダにはまだ何もありません' : '保存されたURLはまだありません');
-    } else {
-      els.savedListEmpty.style.display = 'none';
+    if (!isEmpty) {
       // Build every card into an off-DOM fragment first and append it once —
       // appending each card straight onto the live, already-visible container
       // forces a layout/reflow per card, which adds up once a folder has a
@@ -5834,12 +5828,27 @@ https://cdn.example.org/c/003.webp"></textarea>
       seriesGroupCards.forEach((g) => frag.appendChild(buildSeriesGroupCard(g)));
       if (groupByAuthorEnabled && !bulkEditMode && authorGroupCards.length) {
         visibleAuthorGroups.forEach((group) => frag.appendChild(buildAuthorGroupCard(group)));
-        visibleItems.forEach((it) => frag.appendChild(buildBookCard(it, itemsList, showOrganizeControls)));
-      } else {
-        visibleItems.forEach((it) => frag.appendChild(buildBookCard(it, itemsList, showOrganizeControls)));
       }
       els.savedListItems.appendChild(frag);
     }
+    MangaListRenderer.render({
+      elements: {
+        savedListItems: els.savedListItems,
+        savedListEmpty: els.savedListEmpty,
+        bookshelfPagination: els.bookshelfPagination,
+        bookshelfPrevBtn: els.bookshelfPrevBtn,
+        bookshelfNextBtn: els.bookshelfNextBtn,
+        bookshelfPageLabel: els.bookshelfPageLabel
+      },
+      items: visibleItems,
+      createCard: (item, list, organizeMode) => buildBookCard(item, list, organizeMode),
+      list: itemsList,
+      reorderMode: showOrganizeControls,
+      empty: isEmpty,
+      emptyText,
+      page: bookshelfPage,
+      totalPages: totalShelfPages
+    });
 
     els.smartListRow.style.display = atRoot ? 'flex' : 'none';
     if (atRoot) {
