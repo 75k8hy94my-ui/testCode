@@ -365,6 +365,16 @@ test('manga list controller exposes only existing private boundaries', () => {
   assert.doesNotMatch(source, /window\.mangaListController|self\.mangaListController/);
 });
 
+test('manga mobile navigation routes one open call through the controller', () => {
+  const source = read('reader.html');
+  assert.equal((source.match(/mangaListController\.open\(/g) || []).length, 1);
+  assert.equal((source.match(/openSavedList\(false, false\)/g) || []).length, 0);
+  const controller = source.indexOf('const mangaListController = Object.freeze(');
+  const use = source.indexOf('mangaListController.open(false, false);');
+  assert.ok(controller < use);
+  assert.match(source.slice(use, use + 100), /mangaListController\.open\(false, false\); switchListTab\('manga'\)/);
+});
+
 test('image requests stop after a short timeout instead of retrying indefinitely', () => {
   const source = read('reader.html');
   assert.match(source, /const LOAD_TIMEOUT_MS = 60000/);

@@ -6785,7 +6785,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.mobileNavManga.addEventListener('click', () => {
     if (mobileReaderMode) { els.prevBtn.click(); return; }
     if (location.pathname.endsWith('/video.html') || location.pathname === '/video.html') { if (window.HomeProfileSPA && typeof HomeProfileSPA.navigate === 'function') HomeProfileSPA.navigate('manga.html'); else location.href = 'manga.html'; return; }
-    openSavedList(false, false); switchListTab('manga');
+    mangaListController.open(false, false); switchListTab('manga');
   });
   els.mobileNavVideo.addEventListener('click', () => {
     if (mobileReaderMode) { toggleBars(); return; }
