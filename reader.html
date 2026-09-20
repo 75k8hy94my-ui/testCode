@@ -1512,6 +1512,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="reader-feature-overlays-template.js?v=20260915-template"></script>
 
 <script src="manga-list-card.js?v=20260921-card-boundary"></script>
+<script src="manga-list-state.js?v=20260921-state-loader"></script>
 <script src="manga-list-view-model.js?v=20260921-view-model-self"></script>
 <script src="manga-list-renderer.js?v=20260921-renderer"></script>
 
@@ -3079,10 +3080,12 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   function loadSaved() {
-    try { savedFolders = JSON.parse(localStorage.getItem(SAVED_FOLDERS_KEY) || '[]'); }
-    catch (e) { savedFolders = []; }
-    try { savedItems = JSON.parse(localStorage.getItem(SAVED_ITEMS_KEY) || '[]'); }
-    catch (e) { savedItems = []; }
+    const loaded = MangaListState.load({
+      storage: localStorage,
+      keys: { savedFolders: SAVED_FOLDERS_KEY, savedItems: SAVED_ITEMS_KEY, authorCards: AUTHOR_CARDS_KEY }
+    });
+    savedFolders = loaded.savedFolders;
+    savedItems = loaded.savedItems;
 
     // migrate from the older flat URL-list format if present and nothing migrated yet
     if (savedItems.length === 0) {
@@ -3103,8 +3106,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (removeHistoryFolderRecord()) persistFolders();
     try { savedVideos = JSON.parse(localStorage.getItem(SAVED_VIDEOS_KEY) || '[]'); }
     catch (e) { savedVideos = []; }
-    try { authorCards = JSON.parse(localStorage.getItem(AUTHOR_CARDS_KEY) || '[]'); }
-    catch (e) { authorCards = []; }
+    authorCards = loaded.authorCards;
   }
   loadSaved();
   syncAuthorCardsFromSavedItems();
