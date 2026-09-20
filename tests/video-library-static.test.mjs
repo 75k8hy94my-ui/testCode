@@ -109,3 +109,23 @@ test('browser backup hook commits encrypted video sidecars only after import con
   assert.match(source, /accepted[\s\S]*mangaReaderVideoMeta/);
   assert.match(source, /setTimeout[\s\S]*root\.confirm/);
 });
+
+test('backup restore hook is reader-only while video library loading is page-specific', () => {
+  const source = read('recommendations.js');
+  assert.match(source, /const page = String\(\(root\.location && root\.location\.pathname\) \|\| ''\)\.split\('\/'\)\.pop\(\);/);
+  assert.match(source, /if \(page !== 'reader\.html'\) return;\s*installVideoBackupRestoreHook\(\);/);
+  assert.ok(source.indexOf("if (page !== 'reader.html') return;") < source.indexOf('installVideoBackupRestoreHook();'));
+  assert.ok(source.indexOf('installVideoBackupRestoreHook();') < source.indexOf("loadBrowserScript('video-data.js')"));
+});
+
+test('backup sidecar fields remain part of the existing migration and payload boundaries', () => {
+  const recommendations = read('recommendations.js');
+  const backup = read('backup-format.js');
+  const payload = read('vault-payload.js');
+  assert.match(recommendations, /mangaReaderVideoFolders/);
+  assert.match(recommendations, /mangaReaderVideoMeta/);
+  assert.match(backup, /videoFolders/);
+  assert.match(backup, /videoMeta/);
+  assert.match(payload, /videoFolders/);
+  assert.match(payload, /videoMeta/);
+});

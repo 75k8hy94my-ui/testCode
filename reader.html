@@ -1851,6 +1851,31 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   };
 
+  function getMangaListElements() {
+    return {
+      listBackBtn: els.listBackBtn,
+      listFolderTitle: els.listFolderTitle,
+      listNewFolderBtn: els.listNewFolderBtn,
+      listNewFolderRow: els.listNewFolderRow,
+      editShelfBtn: els.editShelfBtn,
+      bulkEditBtn: els.bulkEditBtn,
+      undoBulkEditBtn: els.undoBulkEditBtn,
+      savedListItems: els.savedListItems,
+      savedListEmpty: els.savedListEmpty,
+      bookshelfPagination: els.bookshelfPagination,
+      bookshelfPrevBtn: els.bookshelfPrevBtn,
+      bookshelfNextBtn: els.bookshelfNextBtn,
+      bookshelfPageLabel: els.bookshelfPageLabel,
+      smartListRow: els.smartListRow,
+      historyListBtn: els.historyListBtn,
+      unreadListBtn: els.unreadListBtn,
+      groupAuthorBtn: els.groupAuthorBtn,
+      dashboard: els.dashboard,
+    };
+  }
+
+  const mangaListEls = getMangaListElements();
+
   if (!window.MangaReaderFeatures.transferBudget) els.transferBudgetBtn.hidden = true;
 
   let savedVideos = [];    // { id, a, b, title, addedAt }
@@ -5760,6 +5785,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   function renderSavedList() {
+    const els = mangaListEls;
     clearLocalCoverObjectUrls();
     const inSeriesGroup = currentFolderView === SERIES_FOLDER_ID && !!currentSeriesView;
     const inSeriesRoot = currentFolderView === SERIES_FOLDER_ID && !currentSeriesView;

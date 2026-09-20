@@ -80,6 +80,9 @@ test('inline playback does not overlay custom close or external-open controls on
   assert.doesNotMatch(source, /aria-label', '再生を閉じる'/);
 });
 
-test('clicking the active card body again closes inline playback without an overlay button', () => {
-  assert.match(source, /activeVideoId === videoId[\s\S]*closeActivePlayer\(\);[\s\S]*return;/);
+test('clicking a video card routes to the dedicated player without an overlay close button', () => {
+  assert.match(source, /function handleEnhancedOpen\(event\)/);
+  assert.match(source, /event\.stopImmediatePropagation\(\);[\s\S]*recordOpen\(base\);[\s\S]*window\.location\.href = targetUrl\.href;/);
+  assert.match(source, /new URL\('video-player\.html', location\.href\)/);
+  assert.doesNotMatch(source, /activeVideoId === videoId[\s\S]*closeActivePlayer\(\);[\s\S]*return;/);
 });
