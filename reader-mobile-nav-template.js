@@ -11,5 +11,10 @@
   <button id="mobileNavBackup" type="button" role="menuitem">バックアップ</button>
   <button id="mobileNavSettings" type="button" role="menuitem">設定</button>
 </div>`;
-  if (document.body && !document.getElementById('mobileBottomNav')) document.body.insertAdjacentHTML('beforeend', template);
+  const existingBottomNav = document.getElementById('mobileBottomNav');
+  const hasReaderControls = document.getElementById('mobileNavMore') && document.getElementById('mobileUtilityMenu');
+  if (document.body && !hasReaderControls) {
+    if (existingBottomNav) existingBottomNav.remove();
+    document.body.insertAdjacentHTML('beforeend', template);
+  }
 })();
