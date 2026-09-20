@@ -298,6 +298,36 @@ test('bookshelf pagination follows the shelf content and paginates folders with 
   assert.match(source, /changeBookshelfPage\(dx < 0 \? 1 : -1\)/);
 });
 
+test('folder cards use one private operation dependency boundary without capturing mutable state', () => {
+  const source = read('reader.html');
+  assert.equal((source.match(/const mangaFolderCardDeps = Object\.freeze\(/g) || []).length, 1);
+  const depsStart = source.indexOf('const mangaFolderCardDeps = Object.freeze(');
+  const depsEnd = source.indexOf('\n  function buildFolderCard(', depsStart);
+  const deps = source.slice(depsStart, depsEnd);
+  assert.match(deps, /getVisibleItems: shelfVisibleItems/);
+  assert.match(deps, /openItem/);
+  assert.match(deps, /persistAll/);
+  assert.match(deps, /persistFolders/);
+  assert.match(deps, /renderSavedList/);
+  assert.match(deps, /moveFolderInList/);
+  assert.doesNotMatch(deps, /savedItems\s*[,=]|savedFolders\s*[,=]|currentFolderView\s*[,=]|currentSeriesView\s*[,=]|bookshelfPage\s*[,=]|localStorage|MangaVault|new Map|new Set|\[\]/);
+
+  const buildStart = source.indexOf('function buildFolderCard(');
+  const buildEnd = source.indexOf('\n  // お気に入り is a virtual', buildStart);
+  const build = source.slice(buildStart, buildEnd);
+  assert.match(build, /mangaFolderCardDeps\.getVisibleItems\(\)/);
+  assert.match(build, /mangaFolderCardDeps\.openItem\(folderItems\[0\], false\)/);
+  assert.match(build, /mangaFolderCardDeps\.persistAll\(\)/);
+  assert.match(build, /mangaFolderCardDeps\.renderSavedList\(\)/);
+  assert.match(build, /mangaFolderCardDeps\.moveFolderInList\(folder, folderList, -1\)/);
+  assert.match(build, /mangaFolderCardDeps\.moveFolderInList\(folder, folderList, 1\)/);
+  assert.equal((build.match(/mangaFolderCardDeps\.openItem\(/g) || []).length, 1);
+  assert.equal((build.match(/mangaFolderCardDeps\.persistAll\(/g) || []).length, 1);
+  assert.equal((build.match(/mangaFolderCardDeps\.moveFolderInList\(/g) || []).length, 2);
+  assert.match(build, /e\.stopPropagation\(\)/);
+  assert.match(build, /folder\.id === recentlyClosedFolderId/);
+});
+
 test('image requests stop after a short timeout instead of retrying indefinitely', () => {
   const source = read('reader.html');
   assert.match(source, /const LOAD_TIMEOUT_MS = 60000/);

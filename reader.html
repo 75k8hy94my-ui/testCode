@@ -5123,10 +5123,19 @@ https://cdn.example.org/c/003.webp"></textarea>
     cover.appendChild(badge);
   }
 
+  const mangaFolderCardDeps = Object.freeze({
+    getVisibleItems: shelfVisibleItems,
+    openItem,
+    persistAll,
+    persistFolders,
+    renderSavedList,
+    moveFolderInList
+  });
+
   function buildFolderCard(folder, folderList, organizeMode) {
     const card = document.createElement('div');
     card.className = 'book-card folder-card' + (folder.id === recentlyClosedFolderId ? ' just-closed' : '');
-    const folderItems = shelfVisibleItems().filter((item) => item.folderId === folder.id);
+    const folderItems = mangaFolderCardDeps.getVisibleItems().filter((item) => item.folderId === folder.id);
 
     const cover = document.createElement('div');
     cover.className = 'book-cover folder-cover';
@@ -5143,8 +5152,8 @@ https://cdn.example.org/c/003.webp"></textarea>
         if (folderItems.length && !confirm('「' + folder.name + '」フォルダと、その中のURLをすべて削除します。本当によろしいですか？')) return;
         savedItems = savedItems.filter((it) => it.folderId !== folder.id);
         savedFolders = savedFolders.filter((f) => f.id !== folder.id);
-        persistAll();
-        renderSavedList();
+        mangaFolderCardDeps.persistAll();
+        mangaFolderCardDeps.renderSavedList();
       });
       cover.appendChild(delBtn);
 
@@ -5154,7 +5163,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       upBtn.textContent = '←';
       upBtn.title = '左へ移動';
       upBtn.disabled = idx <= 0;
-      upBtn.addEventListener('click', (e) => { e.stopPropagation(); moveFolderInList(folder, folderList, -1); });
+      upBtn.addEventListener('click', (e) => { e.stopPropagation(); mangaFolderCardDeps.moveFolderInList(folder, folderList, -1); });
       cover.appendChild(upBtn);
 
       const downBtn = document.createElement('button');
@@ -5162,7 +5171,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       downBtn.textContent = '→';
       downBtn.title = '右へ移動';
       downBtn.disabled = idx >= folderList.length - 1;
-      downBtn.addEventListener('click', (e) => { e.stopPropagation(); moveFolderInList(folder, folderList, 1); });
+      downBtn.addEventListener('click', (e) => { e.stopPropagation(); mangaFolderCardDeps.moveFolderInList(folder, folderList, 1); });
       cover.appendChild(downBtn);
     }
 
@@ -5182,13 +5191,13 @@ https://cdn.example.org/c/003.webp"></textarea>
         rememberReaderReturnView();
         closeSavedList();
         setReadingListContext(folderItems, 0);
-        openItem(folderItems[0], false);
+        mangaFolderCardDeps.openItem(folderItems[0], false);
         return;
       }
       currentFolderView = folder.id;
       currentSeriesView = null;
       reorderMode = false;
-      renderSavedList();
+      mangaFolderCardDeps.renderSavedList();
     });
     return card;
   }
