@@ -27,6 +27,34 @@ test('buildBookCard delegates static DOM creation and keeps interaction logic in
   assert.match(reader, /setupFeedImage\(img, item\.url, item\.numberWidth, item\.pagePattern\)/);
 });
 
+test('normal manga card clicks use one reader interaction boundary in the original order', () => {
+  assert.equal((reader.match(/function handleMangaCardOpen\(/g) || []).length, 1);
+  const boundaryStart = reader.indexOf('function handleMangaCardOpen(');
+  const boundaryEnd = reader.indexOf('\n  function buildBookCard(', boundaryStart);
+  const boundary = reader.slice(boundaryStart, boundaryEnd);
+  const expected = [
+    'rememberReaderReturnView()',
+    "navigateReaderScreen('saved-list', { replace: true })",
+    "switchListTab('manga')",
+    'closeSavedList()',
+    'setReadingListContext(list, list.indexOf(item))',
+    "flashStatus('読み込み中…')",
+    'openItem(item, false)'
+  ];
+  let previous = -1;
+  for (const expression of expected) {
+    const index = boundary.indexOf(expression);
+    assert.ok(index > previous, expression);
+    previous = index;
+  }
+  const buildStart = reader.indexOf('function buildBookCard(');
+  const buildEnd = reader.indexOf('\n  function normalizeAuthorLinks(', buildStart);
+  const build = reader.slice(buildStart, buildEnd);
+  assert.match(build, /if \(!reorderMode && !bulkEditMode\) \{\s*card\.addEventListener\('click', \(\) => handleMangaCardOpen\(item, list\)\);/);
+  assert.equal((boundary.match(/openItem\(item, false\)/g) || []).length, 1);
+  assert.equal((build.match(/card\.addEventListener\('click'/g) || []).length, 1);
+});
+
 test('manga card boundary preserves the required card classes and image attributes', () => {
   assert.match(card, /book-card/);
   assert.match(card, /reorder-card/);

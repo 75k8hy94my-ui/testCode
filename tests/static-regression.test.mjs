@@ -49,7 +49,7 @@ test('bookshelf cover cache separates filename patterns and can recover stale so
 
 test('manga cards restore the manga screen route before opening a work', () => {
   const source = readReader();
-  const body = source.slice(source.indexOf('if (!reorderMode && !bulkEditMode)'), source.indexOf('function normalizeAuthorLinks'));
+  const body = source.slice(source.indexOf('function handleMangaCardOpen'), source.indexOf('function buildBookCard'));
   assert.match(body, /if \(currentReaderScreen === 'video-list'\) navigateReaderScreen\('saved-list', \{ replace: true \}\);/);
   assert.match(body, /switchListTab\('manga'\);[\s\S]*closeSavedList\(\);[\s\S]*openItem\(item, false\)/);
 });

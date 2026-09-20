@@ -5347,6 +5347,22 @@ https://cdn.example.org/c/003.webp"></textarea>
   // 上下移動 (move up/down) buttons, and disables tap-to-open — so taps in
   // 並べ替え mode can't accidentally open a manga while the user is busy
   // rearranging the shelf.
+  function handleMangaCardOpen(item, list) {
+    rememberReaderReturnView();
+    // The manga and video lists share one surface. If the browser history
+    // still says video-list while the manga grid is visible, normalize the
+    // route before closing it so the video screen cannot remain underneath
+    // the reader after a manga card is opened.
+    if (currentReaderScreen === 'video-list') navigateReaderScreen('saved-list', { replace: true });
+    switchListTab('manga');
+    closeSavedList();
+    setReadingListContext(list, list.indexOf(item));
+    flashStatus('読み込み中…');
+    openItem(item, false).catch((error) => {
+      flashStatus(error && error.message ? error.message : '漫画を開けませんでした');
+    });
+  }
+
   function buildBookCard(item, list, reorderMode) {
     const { card, select, cover, img, appendDetails } = MangaListCardBoundary.createStaticCard({
       documentRef: document,
@@ -5427,21 +5443,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 
     appendDetails();
     if (!reorderMode && !bulkEditMode) {
-      card.addEventListener('click', () => {
-        rememberReaderReturnView();
-        // The manga and video lists share one surface. If the browser history
-        // still says video-list while the manga grid is visible, normalize the
-        // route before closing it so the video screen cannot remain underneath
-        // the reader after a manga card is opened.
-        if (currentReaderScreen === 'video-list') navigateReaderScreen('saved-list', { replace: true });
-        switchListTab('manga');
-        closeSavedList();
-        setReadingListContext(list, list.indexOf(item));
-        flashStatus('読み込み中…');
-        openItem(item, false).catch((error) => {
-          flashStatus(error && error.message ? error.message : '漫画を開けませんでした');
-        });
-      });
+      card.addEventListener('click', () => handleMangaCardOpen(item, list));
     }
     return card;
   }
