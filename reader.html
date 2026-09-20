@@ -1511,6 +1511,8 @@ https://cdn.example.org/c/003.webp"></textarea>
 <!-- Feature overlays -->
 <script src="reader-feature-overlays-template.js?v=20260915-template"></script>
 
+<script src="manga-list-card.js?v=20260921-card-boundary"></script>
+
 <script>
 (function () {
   const EXT_CANDIDATES = ['jpg', 'jpeg', 'png', 'webp'];
@@ -5342,25 +5344,23 @@ https://cdn.example.org/c/003.webp"></textarea>
   // 並べ替え mode can't accidentally open a manga while the user is busy
   // rearranging the shelf.
   function buildBookCard(item, list, reorderMode) {
-    const card = document.createElement('div');
-    card.className = 'book-card' + (reorderMode ? ' reorder-card' : '') + (item.id === recentlyClosedItemId ? ' just-closed' : '');
-    card.title = itemSubtext(item);
-    if (bulkEditMode) {
-      const select = document.createElement('input');
-      select.type = 'checkbox'; select.className = 'bulk-select'; select.checked = bulkSelectedIds.has(item.id);
-      select.title = '一括編集の対象にする';
+    const { card, select, cover, img, appendDetails } = MangaListCardBoundary.createStaticCard({
+      documentRef: document,
+      item,
+      reorderMode,
+      bulkEditMode,
+      bulkSelected: bulkSelectedIds,
+      recentlyClosed: recentlyClosedItemId,
+      itemSubtext,
+      itemDisplayTitle,
+      readingRecordText,
+      itemPageCountText
+    });
+    if (select) {
       select.addEventListener('click', (e) => e.stopPropagation());
       select.addEventListener('change', () => { if (select.checked) bulkSelectedIds.add(item.id); else bulkSelectedIds.delete(item.id); updateBulkEditButton(); });
-      card.appendChild(select);
     }
 
-    const cover = document.createElement('div');
-    cover.className = 'book-cover';
-    const img = document.createElement('img');
-    img.alt = itemDisplayTitle(item);
-    img.loading = 'eager';
-    img.decoding = 'async';
-    img.fetchPriority = 'low';
     if (Array.isArray(item.pages) && item.pages.length) {
       const source = item.pages[0];
       if (item.localSync) {
@@ -5372,8 +5372,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     } else {
       setupFeedImage(img, item.url, item.numberWidth, item.pagePattern);
     }
-    cover.appendChild(img);
-
     if (reorderMode) {
       const idx = list.indexOf(item);
       const upBtn = document.createElement('button');
@@ -5423,60 +5421,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       cover.appendChild(favBtn);
     }
 
-    const title = document.createElement('div');
-    title.className = 'book-title';
-    title.textContent = itemDisplayTitle(item);
-
-    card.appendChild(cover);
-    card.appendChild(title);
-    if (item.series) {
-      const seriesEl = document.createElement('div');
-      seriesEl.className = 'book-series';
-      seriesEl.textContent = 'シリーズ';
-      card.appendChild(seriesEl);
-    }
-    if (item.author) {
-      const authorEl = document.createElement('div');
-      authorEl.className = 'book-author';
-      authorEl.textContent = item.author;
-      authorEl.title = item.author;
-      card.appendChild(authorEl);
-    }
-    if (item.isDoujin && item.sourceWork) {
-      const sourceWorkEl = document.createElement('div');
-      sourceWorkEl.className = 'book-author';
-      sourceWorkEl.textContent = '同人誌 ・ ' + item.sourceWork;
-      sourceWorkEl.title = '元ネタの作品名: ' + item.sourceWork;
-      card.appendChild(sourceWorkEl);
-    }
-    const tags = Array.isArray(item.tags) ? item.tags.filter(Boolean) : [];
-    if (tags.length) {
-      const tagsEl = document.createElement('div');
-      tagsEl.className = 'book-tags';
-      tagsEl.title = tags.join(', ');
-      tags.slice(0, 3).forEach((tag) => {
-        const tagEl = document.createElement('span');
-        tagEl.className = 'book-tag';
-        tagEl.textContent = tag;
-        tagsEl.appendChild(tagEl);
-      });
-      if (tags.length > 3) {
-        const moreEl = document.createElement('span');
-        moreEl.className = 'book-tag';
-        moreEl.textContent = '+' + (tags.length - 3);
-        tagsEl.appendChild(moreEl);
-      }
-      card.appendChild(tagsEl);
-    }
-    const readingEl = document.createElement('div');
-    readingEl.className = 'book-reading' + (item.lastReadAt ? '' : ' unread');
-    readingEl.textContent = readingRecordText(item) + ' ・ ' + itemPageCountText(item);
-    readingEl.title = item.lastReadAt
-      ? '最終読書: ' + new Date(Number(item.lastReadAt)).toLocaleString('ja-JP') + ' / ' + (Number(item.readCount) || 1) + '回'
-      : 'まだ読んでいません';
-    card.appendChild(readingEl);
-    if (item.lastReadAt) readingEl.remove();
-    else readingEl.textContent = '未読';
+    appendDetails();
     if (!reorderMode && !bulkEditMode) {
       card.addEventListener('click', () => {
         rememberReaderReturnView();
