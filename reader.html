@@ -6394,7 +6394,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     const next = bookshelfPage + delta;
     if (next < 1) return;
     bookshelfPage = next;
-    renderSavedList();
+    mangaListController.render();
     els.savedListItems.scrollTop = 0;
   }
   els.bookshelfPrevBtn.addEventListener('click', () => changeBookshelfPage(-1));
