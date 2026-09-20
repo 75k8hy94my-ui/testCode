@@ -328,6 +328,28 @@ test('folder cards use one private operation dependency boundary without capturi
   assert.match(build, /folder\.id === recentlyClosedFolderId/);
 });
 
+test('manga list initialization has one synchronous private entry point', () => {
+  const source = read('reader.html');
+  assert.equal((source.match(/function initMangaList\(\)/g) || []).length, 1);
+  assert.equal((source.match(/\binitMangaList\(\);/g) || []).length, 1);
+  const initStart = source.indexOf('function initMangaList()');
+  const initEnd = source.indexOf('\n  initMangaList();', initStart);
+  const init = source.slice(initStart, initEnd);
+  assert.match(init, /loadSaved\(\);\s*syncAuthorCardsFromSavedItems\(\);/);
+  assert.doesNotMatch(init, /addEventListener|async|Promise|initialized|DOMContentLoaded|renderReaderScreen|renderSavedList/);
+
+  const loadCall = source.indexOf('    loadSaved();', initStart);
+  const syncCall = source.indexOf('    syncAuthorCardsFromSavedItems();', initStart);
+  const entryCall = source.indexOf('  initMangaList();', initStart);
+  const renderCall = source.indexOf('renderReaderScreen(getReaderScreenFromLocation());');
+  assert.ok(loadCall < syncCall && syncCall < entryCall);
+  assert.ok(entryCall < renderCall);
+  assert.match(source, /function loadSaved\(\)\s*\{[\s\S]*?MangaListState\.load\(/);
+  assert.match(source, /if \(savedItems\.length === 0\)[\s\S]*?persistItems\(\);/);
+  assert.match(source, /if \(removeHistoryFolderRecord\(\)\) persistFolders\(\);/);
+  assert.match(source, /savedVideos = JSON\.parse/);
+});
+
 test('image requests stop after a short timeout instead of retrying indefinitely', () => {
   const source = read('reader.html');
   assert.match(source, /const LOAD_TIMEOUT_MS = 60000/);

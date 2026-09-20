@@ -3108,8 +3108,11 @@ https://cdn.example.org/c/003.webp"></textarea>
     catch (e) { savedVideos = []; }
     authorCards = loaded.authorCards;
   }
-  loadSaved();
-  syncAuthorCardsFromSavedItems();
+  function initMangaList() {
+    loadSaved();
+    syncAuthorCardsFromSavedItems();
+  }
+  initMangaList();
 
   // ---------- URL parsing ----------
   // Accepts either a folder URL ("https://example.com/manga/test/") or a direct
