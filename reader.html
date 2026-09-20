@@ -5846,12 +5846,14 @@ https://cdn.example.org/c/003.webp"></textarea>
         (!shelfFilters.source || normalizedFilter(item.sourceWork).includes(normalizedFilter(shelfFilters.source))) &&
         (!shelfSearchQuery || normalizedFilter(haystack).includes(normalizedFilter(shelfSearchQuery)));
     });
-    if (shelfSort === 'title-asc') {
-      itemsList.sort((a, b) => itemDisplayTitle(a).localeCompare(itemDisplayTitle(b), 'ja'));
-    } else if (shelfSort === 'synced-first') {
-      itemsList.sort((a, b) => Number(!!b.localSync) - Number(!!a.localSync) || (Number(b.addedAt) || 0) - (Number(a.addedAt) || 0));
-    } else {
-      itemsList.sort((a, b) => (Number(b.addedAt) || 0) - (Number(a.addedAt) || 0));
+    if (!reorderMode) {
+      if (shelfSort === 'title-asc') {
+        itemsList.sort((a, b) => itemDisplayTitle(a).localeCompare(itemDisplayTitle(b), 'ja'));
+      } else if (shelfSort === 'synced-first') {
+        itemsList.sort((a, b) => Number(!!b.localSync) - Number(!!a.localSync) || (Number(b.addedAt) || 0) - (Number(a.addedAt) || 0));
+      } else {
+        itemsList.sort((a, b) => (Number(b.addedAt) || 0) - (Number(a.addedAt) || 0));
+      }
     }
     if (groupByAuthorEnabled && !bulkEditMode && !inAuthorView && !inSeriesRoot) {
       const groups = new Map();
