@@ -49,7 +49,7 @@ test('view model filters folders, search, and pages without duplication', () => 
 });
 
 test('view model is pure and loaded once before the reader inline script', () => {
-  assert.equal((reader.match(/manga-list-view-model\.js\?v=[^"']+/g) || []).length, 1);
+  assert.equal((reader.match(/manga-list-view-model\.js\?v=20260921-view-model-self/g) || []).length, 1);
   assert.ok(reader.indexOf('manga-list-view-model.js') < reader.indexOf('function renderSavedList'));
   assert.doesNotMatch(source, /\b(document|window|localStorage|sessionStorage|MangaVault|Supabase|fetch|setTimeout|addEventListener)\b/);
   assert.equal((source.match(/root\.MangaListViewModel\s*=/g) || []).length, 1);
