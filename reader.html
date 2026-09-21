@@ -6754,13 +6754,34 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.mobileNavMore.classList.toggle('active', open);
   }
 
+  const mangaTabActivationDeps = Object.freeze({
+    activateMangaTab() {
+      if (els.listTabManga) els.listTabManga.classList.add('active');
+    },
+    deactivateVideoTab() {
+      if (els.listTabVideo) els.listTabVideo.classList.remove('active');
+    },
+    activateMangaMobileNav() {
+      setMobileNavActive(els.mobileNavManga);
+    },
+    showMangaSection() {
+      els.mangaListSection.style.display = '';
+    },
+    hideVideoSection() {
+      els.videoListSection.style.display = 'none';
+    },
+    hideCloseButton() {
+      els.closeListBtn.style.display = 'none';
+    },
+  });
+
   function activateMangaListTab() {
-    if (els.listTabManga) els.listTabManga.classList.add('active');
-    if (els.listTabVideo) els.listTabVideo.classList.remove('active');
-    setMobileNavActive(els.mobileNavManga);
-    els.mangaListSection.style.display = '';
-    els.videoListSection.style.display = 'none';
-    els.closeListBtn.style.display = 'none';
+    mangaTabActivationDeps.activateMangaTab();
+    mangaTabActivationDeps.deactivateVideoTab();
+    mangaTabActivationDeps.activateMangaMobileNav();
+    mangaTabActivationDeps.showMangaSection();
+    mangaTabActivationDeps.hideVideoSection();
+    mangaTabActivationDeps.hideCloseButton();
   }
 
   function switchListTab(tab) {

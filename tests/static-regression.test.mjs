@@ -360,21 +360,41 @@ test('manga list controller exposes only existing private boundaries', () => {
   assert.doesNotMatch(source, /window\.mangaListController|self\.mangaListController|globalThis\.mangaListController|export\s/);
 });
 
-test('manga tab activation uses one private adapter and preserves video branch', () => {
+test('manga tab activation uses one private dependency boundary and preserves video branch', () => {
   const source = read('reader.html');
-  const adapterStart = source.indexOf('function activateMangaListTab()');
+  const depsStart = source.indexOf('const mangaTabActivationDeps = Object.freeze({');
   const switchStart = source.indexOf('function switchListTab(tab)');
-  assert.notEqual(adapterStart, -1);
+  const adapterStart = source.indexOf('function activateMangaListTab()');
+  assert.notEqual(depsStart, -1);
+  assert.ok(depsStart < adapterStart);
   assert.ok(adapterStart < switchStart);
+  assert.equal((source.match(/const mangaTabActivationDeps = Object\.freeze\(/g) || []).length, 1);
   assert.equal((source.match(/function activateMangaListTab\(\)/g) || []).length, 1);
 
+  const depsEnd = source.indexOf('\n  function activateMangaListTab()', depsStart);
+  const deps = source.slice(depsStart, depsEnd);
+  assert.deepEqual([...deps.matchAll(/^(\s{4})([A-Za-z]+)\(\)\s*\{/gm)].map((match) => match[2]), [
+    'activateMangaTab',
+    'deactivateVideoTab',
+    'activateMangaMobileNav',
+    'showMangaSection',
+    'hideVideoSection',
+    'hideCloseButton',
+  ]);
+  assert.doesNotMatch(deps, /\b(els|document|window|self|localStorage|MangaVault|Supabase|checkVpn|setTimeout)\s*:/);
+  assert.doesNotMatch(deps, /addEventListener|new Map|new Set|\[\]/);
+
   const adapter = source.slice(adapterStart, switchStart);
-  assert.match(adapter, /if \(els\.listTabManga\) els\.listTabManga\.classList\.add\('active'\);/);
-  assert.match(adapter, /if \(els\.listTabVideo\) els\.listTabVideo\.classList\.remove\('active'\);/);
-  assert.match(adapter, /setMobileNavActive\(els\.mobileNavManga\);/);
-  assert.match(adapter, /els\.mangaListSection\.style\.display = '';\s*els\.videoListSection\.style\.display = 'none';/);
-  assert.match(adapter, /els\.closeListBtn\.style\.display = 'none';/);
-  assert.doesNotMatch(adapter, /addEventListener|localStorage|MangaVault|checkVpn|setTimeout/);
+  assert.deepEqual([...adapter.matchAll(/mangaTabActivationDeps\.([A-Za-z]+)\(\);/g)].map((match) => match[1]), [
+    'activateMangaTab',
+    'deactivateVideoTab',
+    'activateMangaMobileNav',
+    'showMangaSection',
+    'hideVideoSection',
+    'hideCloseButton',
+  ]);
+  assert.equal((adapter.match(/mangaTabActivationDeps\.[A-Za-z]+\(\);/g) || []).length, 6);
+  assert.doesNotMatch(adapter, /\bels\.[A-Za-z]+\.(classList|style)/);
 
   const switchEnd = source.indexOf('\n  const mangaListController', switchStart);
   const switchBody = source.slice(switchStart, switchEnd);
