@@ -21,6 +21,7 @@
     async function render(route, generation) {
       const target = deps.getMount();
       if (!target) return;
+      if (generation !== deps.getGeneration()) return;
       deps.cleanup();
       deps.setTitle(route);
       deps.setEditing(false);

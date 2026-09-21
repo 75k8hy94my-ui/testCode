@@ -79,8 +79,6 @@ test('reader route runtime rejects missing callbacks and stale generations witho
   const calls = [];
   const stale = factory.create(dependencies(calls, 2));
   await stale.render('manga', 1);
-  assert.deepEqual(calls.map((call) => Array.isArray(call) ? call[0] : call).slice(-3), [
-    'fetch', 'response.text', 'parse',
-  ]);
+  assert.deepEqual(calls.map((call) => Array.isArray(call) ? call[0] : call), ['mount']);
   assert.equal(calls.some((call) => Array.isArray(call) && ['script', 'prune', 'activate', 'sync'].includes(call[0])), false);
 });
