@@ -27,11 +27,8 @@ test('manga list DOM references are centralized without video or reader-view ele
   const match = reader.match(/function getMangaListElements\(\)\s*\{([\s\S]*?)\n\s*\}/);
   assert.ok(match, 'getMangaListElements must exist');
   const boundary = match[1];
-  for (const key of expectedKeys) assert.match(boundary, new RegExp(`\\b${key}:`), key);
-  for (const id of expectedIds) assert.match(boundary, new RegExp(`\\b${id}: els\\.${id}\\b`), id);
-  for (const forbidden of ['videoListItems', 'videoListEmpty', 'viewer', 'pageStage', 'settingsOverlay', 'backupOverlay', 'tocOverlay', 'authorCardOverlay']) {
-    assert.doesNotMatch(boundary, new RegExp(`\\b${forbidden}\\b`), forbidden);
-  }
+  assert.match(boundary, /return MangaListElementsFactory\.create\(els\);/);
+  assert.doesNotMatch(boundary, /videoListItems|videoListEmpty|viewer|pageStage|settingsOverlay|backupOverlay|tocOverlay|authorCardOverlay/);
 });
 
 test('renderSavedList uses the centralized manga list DOM object', () => {
@@ -47,6 +44,8 @@ test('manga list DOM boundary ids belong to the manga template and does not crea
     assert.equal((mangaListTemplate.match(idPattern) || []).length, 1, id);
   }
   assert.match(reader, /manga-list-template\.js/);
+  assert.equal((reader.match(/manga-list-elements\.js\?v=[^"']+/g) || []).length, 1);
+  assert.ok(reader.indexOf('manga-list-elements.js?v=') < reader.indexOf('function getMangaListElements()'));
   assert.match(reader, /reader-saved-list-template\.js/);
   assert.ok(reader.indexOf('manga-list-template.js') < reader.indexOf('reader-saved-list-template.js'));
   assert.equal((savedListTemplate.match(/MangaListTemplate\.createMarkup\(\)/g) || []).length, 1);

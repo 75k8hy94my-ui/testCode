@@ -1518,6 +1518,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="manga-list-renderer.js?v=20260921-renderer"></script>
 <script src="manga-list-controller.js?v=20260921-controller-factory"></script>
 <script src="manga-surface-activation.js?v=20260921-surface-activation"></script>
+<script src="manga-list-elements.js?v=20260921-elements-boundary"></script>
 
 <script>
 (function () {
@@ -1860,26 +1861,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   };
 
   function getMangaListElements() {
-    return {
-      listBackBtn: els.listBackBtn,
-      listFolderTitle: els.listFolderTitle,
-      listNewFolderBtn: els.listNewFolderBtn,
-      listNewFolderRow: els.listNewFolderRow,
-      editShelfBtn: els.editShelfBtn,
-      bulkEditBtn: els.bulkEditBtn,
-      undoBulkEditBtn: els.undoBulkEditBtn,
-      savedListItems: els.savedListItems,
-      savedListEmpty: els.savedListEmpty,
-      bookshelfPagination: els.bookshelfPagination,
-      bookshelfPrevBtn: els.bookshelfPrevBtn,
-      bookshelfNextBtn: els.bookshelfNextBtn,
-      bookshelfPageLabel: els.bookshelfPageLabel,
-      smartListRow: els.smartListRow,
-      historyListBtn: els.historyListBtn,
-      unreadListBtn: els.unreadListBtn,
-      groupAuthorBtn: els.groupAuthorBtn,
-      dashboard: els.dashboard,
-    };
+    return MangaListElementsFactory.create(els);
   }
 
   const mangaListEls = getMangaListElements();
