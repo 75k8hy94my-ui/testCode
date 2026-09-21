@@ -1525,6 +1525,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="manga-list-search-events.js?v=20260921-search-events"></script>
 <script src="manga-list-filter-events.js?v=20260921-filter-events"></script>
 <script src="manga-list-smart-list-events.js?v=20260921-smart-list-events"></script>
+<script src="manga-list-navigation-events.js?v=20260921-navigation-events"></script>
 
 <script>
 (function () {
@@ -6437,7 +6438,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     changeBookshelfPage(dx < 0 ? 1 : -1);
   }, { passive: false });
   els.savedListOverlay.addEventListener('click', (e) => { if (e.target === els.savedListOverlay) closeSavedList(); });
-  els.listBackBtn.addEventListener('click', () => {
+  function handleMangaListBack() {
     // From inside a specific シリーズ, 戻る goes back to the series-name list
     // first (not straight to the top root) — a two-level back, matching the
     // two-level drill-in.
@@ -6451,6 +6452,12 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
     reorderMode = false;
     renderSavedList();
+  }
+  const mangaListNavigationEvents = MangaListNavigationEventsFactory.create({
+    onBack: handleMangaListBack,
+  });
+  const cleanupMangaListNavigationEvents = mangaListNavigationEvents.bind({
+    backButton: els.listBackBtn,
   });
   els.listNewFolderBtn.addEventListener('click', () => {
     const showing = els.listNewFolderRow.style.display === 'flex';

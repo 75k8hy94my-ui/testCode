@@ -480,6 +480,20 @@ test('manga smart list listeners use one callback boundary for safe static butto
   assert.match(source.slice(unreadStart, source.indexOf('const mangaListSmartListEvents', unreadStart)), /currentFolderView = UNREAD_FOLDER_ID;\s*currentSeriesView = null;\s*reorderMode = false;\s*renderSavedList\(\);/);
 });
 
+test('manga list back navigation uses one private callback boundary', () => {
+  const source = read('reader.html');
+  assert.equal((source.match(/manga-list-navigation-events\.js\?v=20260921-navigation-events/g) || []).length, 1);
+  assert.equal((source.match(/MangaListNavigationEventsFactory\.create\(/g) || []).length, 1);
+  assert.match(source, /onBack: handleMangaListBack/);
+  assert.match(source, /mangaListNavigationEvents\.bind\(\{\s*backButton: els\.listBackBtn,\s*\}\)/);
+  assert.match(source, /const cleanupMangaListNavigationEvents = mangaListNavigationEvents\.bind/);
+  assert.doesNotMatch(source, /els\.listBackBtn\.addEventListener\('click'/);
+  const start = source.indexOf('function handleMangaListBack()');
+  const end = source.indexOf('const mangaListNavigationEvents', start);
+  assert.ok(start >= 0 && end > start);
+  assert.match(source.slice(start, end), /if \(currentAuthorView\) \{\s*currentAuthorView = null;\s*\} else if \(currentFolderView === SERIES_FOLDER_ID && currentSeriesView\) \{\s*currentSeriesView = null;\s*\} else \{\s*currentFolderView = null;\s*currentSeriesView = null;\s*\}\s*reorderMode = false;\s*renderSavedList\(\);/);
+});
+
 test('image requests stop after a short timeout instead of retrying indefinitely', () => {
   const source = read('reader.html');
   assert.match(source, /const LOAD_TIMEOUT_MS = 60000/);
