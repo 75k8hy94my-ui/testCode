@@ -463,6 +463,23 @@ test('manga filter listeners call named actions without changing existing order'
   assert.equal((source.match(/clearButton: els\.clearFilterBtn/g) || []).length, 1);
 });
 
+test('manga smart list listeners use one callback boundary for safe static buttons', () => {
+  const source = read('reader.html');
+  assert.equal((source.match(/manga-list-smart-list-events\.js\?v=20260921-smart-list-events/g) || []).length, 1);
+  assert.equal((source.match(/MangaListSmartListEventsFactory\.create\(/g) || []).length, 1);
+  assert.match(source, /onHistory: handleHistoryListClick/);
+  assert.match(source, /onUnread: handleUnreadListClick/);
+  assert.match(source, /mangaListSmartListEvents\.bind\(\{[\s\S]*?historyButton: els\.historyListBtn,[\s\S]*?unreadButton: els\.unreadListBtn,[\s\S]*?\}\)/);
+  assert.match(source, /const cleanupMangaListSmartListEvents = mangaListSmartListEvents\.bind/);
+  assert.doesNotMatch(source, /els\.historyListBtn\.addEventListener\('click'/);
+  assert.doesNotMatch(source, /els\.unreadListBtn\.addEventListener\('click'/);
+  const historyStart = source.indexOf('function handleHistoryListClick()');
+  const unreadStart = source.indexOf('function handleUnreadListClick()');
+  assert.ok(historyStart >= 0 && unreadStart > historyStart);
+  assert.match(source.slice(historyStart, unreadStart), /currentFolderView = HISTORY_FOLDER_ID;\s*currentSeriesView = null;\s*reorderMode = false;\s*renderSavedList\(\);/);
+  assert.match(source.slice(unreadStart, source.indexOf('const mangaListSmartListEvents', unreadStart)), /currentFolderView = UNREAD_FOLDER_ID;\s*currentSeriesView = null;\s*reorderMode = false;\s*renderSavedList\(\);/);
+});
+
 test('image requests stop after a short timeout instead of retrying indefinitely', () => {
   const source = read('reader.html');
   assert.match(source, /const LOAD_TIMEOUT_MS = 60000/);
