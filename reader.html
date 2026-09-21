@@ -1526,6 +1526,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="manga-list-filter-events.js?v=20260921-filter-events"></script>
 <script src="manga-list-smart-list-events.js?v=20260921-smart-list-events"></script>
 <script src="manga-list-navigation-events.js?v=20260921-navigation-events"></script>
+<script src="manga-list-folder-events.js?v=20260921-folder-events"></script>
 
 <script>
 (function () {
@@ -6459,12 +6460,12 @@ https://cdn.example.org/c/003.webp"></textarea>
   const cleanupMangaListNavigationEvents = mangaListNavigationEvents.bind({
     backButton: els.listBackBtn,
   });
-  els.listNewFolderBtn.addEventListener('click', () => {
+  function handleMangaFolderCreateStart() {
     const showing = els.listNewFolderRow.style.display === 'flex';
     els.listNewFolderRow.style.display = showing ? 'none' : 'flex';
     if (!showing) els.listNewFolderInput.focus();
-  });
-  els.listNewFolderConfirmBtn.addEventListener('click', () => {
+  }
+  function handleMangaFolderCreateConfirm() {
     const name = els.listNewFolderInput.value.trim();
     if (!name) return;
     savedFolders.push({ id: genId('f'), name: name });
@@ -6472,6 +6473,14 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.listNewFolderInput.value = '';
     els.listNewFolderRow.style.display = 'none';
     renderSavedList();
+  }
+  const mangaListFolderEvents = MangaListFolderEventsFactory.create({
+    onCreateStart: handleMangaFolderCreateStart,
+    onCreateConfirm: handleMangaFolderCreateConfirm,
+  });
+  const cleanupMangaListFolderEvents = mangaListFolderEvents.bind({
+    createButton: els.listNewFolderBtn,
+    confirmButton: els.listNewFolderConfirmBtn,
   });
 
   els.editShelfBtn.addEventListener('click', () => {

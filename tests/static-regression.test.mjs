@@ -494,6 +494,24 @@ test('manga list back navigation uses one private callback boundary', () => {
   assert.match(source.slice(start, end), /if \(currentAuthorView\) \{\s*currentAuthorView = null;\s*\} else if \(currentFolderView === SERIES_FOLDER_ID && currentSeriesView\) \{\s*currentSeriesView = null;\s*\} else \{\s*currentFolderView = null;\s*currentSeriesView = null;\s*\}\s*reorderMode = false;\s*renderSavedList\(\);/);
 });
 
+test('manga folder creation listeners use named actions and one private boundary', () => {
+  const source = read('reader.html');
+  assert.equal((source.match(/manga-list-folder-events\.js\?v=20260921-folder-events/g) || []).length, 1);
+  assert.equal((source.match(/MangaListFolderEventsFactory\.create\(/g) || []).length, 1);
+  assert.match(source, /onCreateStart: handleMangaFolderCreateStart/);
+  assert.match(source, /onCreateConfirm: handleMangaFolderCreateConfirm/);
+  assert.match(source, /mangaListFolderEvents\.bind\(\{[\s\S]*?createButton: els\.listNewFolderBtn,[\s\S]*?confirmButton: els\.listNewFolderConfirmBtn,[\s\S]*?\}\)/);
+  assert.match(source, /const cleanupMangaListFolderEvents = mangaListFolderEvents\.bind/);
+  assert.doesNotMatch(source, /els\.listNewFolderBtn\.addEventListener\('click'/);
+  assert.doesNotMatch(source, /els\.listNewFolderConfirmBtn\.addEventListener\('click'/);
+  const start = source.indexOf('function handleMangaFolderCreateStart()');
+  const confirm = source.indexOf('function handleMangaFolderCreateConfirm()');
+  const boundary = source.indexOf('const mangaListFolderEvents', confirm);
+  assert.ok(start >= 0 && confirm > start && boundary > confirm);
+  assert.match(source.slice(start, confirm), /const showing = els\.listNewFolderRow\.style\.display === 'flex';[\s\S]*?if \(!showing\) els\.listNewFolderInput\.focus\(\);/);
+  assert.match(source.slice(confirm, boundary), /const name = els\.listNewFolderInput\.value\.trim\(\);[\s\S]*?if \(!name\) return;[\s\S]*?savedFolders\.push\(\{ id: genId\('f'\), name: name \}\);[\s\S]*?persistAll\(\);[\s\S]*?renderSavedList\(\);/);
+});
+
 test('image requests stop after a short timeout instead of retrying indefinitely', () => {
   const source = read('reader.html');
   assert.match(source, /const LOAD_TIMEOUT_MS = 60000/);
