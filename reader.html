@@ -6754,15 +6754,20 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.mobileNavMore.classList.toggle('active', open);
   }
 
+  function activateMangaListTab() {
+    if (els.listTabManga) els.listTabManga.classList.add('active');
+    if (els.listTabVideo) els.listTabVideo.classList.remove('active');
+    setMobileNavActive(els.mobileNavManga);
+    els.mangaListSection.style.display = '';
+    els.videoListSection.style.display = 'none';
+    els.closeListBtn.style.display = 'none';
+  }
+
   function switchListTab(tab) {
     activeListTab = tab;
     if (tab === 'manga') {
-      if (els.listTabManga) els.listTabManga.classList.add('active');
-      if (els.listTabVideo) els.listTabVideo.classList.remove('active');
-      setMobileNavActive(els.mobileNavManga);
-      els.mangaListSection.style.display = '';
-      els.videoListSection.style.display = 'none';
-      els.closeListBtn.style.display = 'none';
+      activateMangaListTab();
+      return;
     } else {
       if (els.listTabVideo) els.listTabVideo.classList.add('active');
       if (els.listTabManga) els.listTabManga.classList.remove('active');
