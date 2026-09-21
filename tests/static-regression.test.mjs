@@ -434,6 +434,28 @@ test('manga search routes the existing input value and render order through one 
   assert.doesNotMatch(action, /trim\(|toLowerCase\(|toUpperCase\(/);
 });
 
+test('manga filter listeners call named actions without changing existing order', () => {
+  const source = read('reader.html');
+  const toggleStart = source.indexOf('function handleShelfFilterToggle()');
+  const applyStart = source.indexOf('function handleShelfFilterApply()');
+  const clearStart = source.indexOf('function handleShelfFilterClear()');
+  assert.ok(toggleStart >= 0);
+  assert.ok(applyStart > toggleStart);
+  assert.ok(clearStart > applyStart);
+  const toggle = source.slice(toggleStart, applyStart);
+  const apply = source.slice(applyStart, clearStart);
+  const clear = source.slice(clearStart, source.indexOf("els.zoneLeft.addEventListener('click', prevPage)", clearStart));
+  assert.match(toggle, /els\.filterRow\.style\.display = els\.filterRow\.style\.display === 'none' \? 'flex' : 'none';/);
+  assert.match(apply, /shelfFilters = \{ series: els\.filterSeriesInput\.value\.trim\(\), author: els\.filterAuthorInput\.value\.trim\(\), tags: els\.filterTagsInput\.value\.trim\(\), source: els\.filterSourceInput\.value\.trim\(\) \};\s*bookshelfPage = 1;\s*renderSavedList\(\);/);
+  assert.match(clear, /shelfFilters = \{ series: '', author: '', tags: '', source: '' \};\s*bookshelfPage = 1;\s*els\.filterSeriesInput\.value = ''; els\.filterAuthorInput\.value = ''; els\.filterTagsInput\.value = ''; els\.filterSourceInput\.value = '';\s*renderSavedList\(\);/);
+  assert.match(source, /els\.filterBtn\.addEventListener\('click', handleShelfFilterToggle\)/);
+  assert.match(source, /els\.applyFilterBtn\.addEventListener\('click', handleShelfFilterApply\)/);
+  assert.match(source, /els\.clearFilterBtn\.addEventListener\('click', handleShelfFilterClear\)/);
+  assert.equal((source.match(/els\.filterBtn\.addEventListener\('click'/g) || []).length, 1);
+  assert.equal((source.match(/els\.applyFilterBtn\.addEventListener\('click'/g) || []).length, 1);
+  assert.equal((source.match(/els\.clearFilterBtn\.addEventListener\('click'/g) || []).length, 1);
+});
+
 test('image requests stop after a short timeout instead of retrying indefinitely', () => {
   const source = read('reader.html');
   assert.match(source, /const LOAD_TIMEOUT_MS = 60000/);

@@ -6470,18 +6470,23 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.cancelBulkEditBtn.addEventListener('click', closeBulkEditDialog);
   els.applyBulkEditBtn.addEventListener('click', applyBulkEdit);
   els.bulkEditOverlay.addEventListener('click', (e) => { if (e.target === els.bulkEditOverlay) closeBulkEditDialog(); });
-  els.filterBtn.addEventListener('click', () => { els.filterRow.style.display = els.filterRow.style.display === 'none' ? 'flex' : 'none'; });
-  els.applyFilterBtn.addEventListener('click', () => {
+  function handleShelfFilterToggle() {
+    els.filterRow.style.display = els.filterRow.style.display === 'none' ? 'flex' : 'none';
+  }
+  function handleShelfFilterApply() {
     shelfFilters = { series: els.filterSeriesInput.value.trim(), author: els.filterAuthorInput.value.trim(), tags: els.filterTagsInput.value.trim(), source: els.filterSourceInput.value.trim() };
     bookshelfPage = 1;
     renderSavedList();
-  });
-  els.clearFilterBtn.addEventListener('click', () => {
+  }
+  function handleShelfFilterClear() {
     shelfFilters = { series: '', author: '', tags: '', source: '' };
     bookshelfPage = 1;
     els.filterSeriesInput.value = ''; els.filterAuthorInput.value = ''; els.filterTagsInput.value = ''; els.filterSourceInput.value = '';
     renderSavedList();
-  });
+  }
+  els.filterBtn.addEventListener('click', handleShelfFilterToggle);
+  els.applyFilterBtn.addEventListener('click', handleShelfFilterApply);
+  els.clearFilterBtn.addEventListener('click', handleShelfFilterClear);
 
   els.zoneLeft.addEventListener('click', prevPage);
   els.zoneRight.addEventListener('click', nextPage);
