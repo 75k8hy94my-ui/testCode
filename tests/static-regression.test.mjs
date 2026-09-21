@@ -569,7 +569,7 @@ test('navigable reader screens use history-backed screen views', () => {
   const source = read('reader.html');
   assert.match(source, /class="[^"]*\bscreenView\b[^"]*"/);
   assert.match(source, /history\.pushState/);
-  assert.match(source, /addEventListener\(['"]popstate['"]/);
+  assert.match(source, /(?:addEventListener\(['"]popstate['"]|bindReaderGlobal\(\s*window,\s*['"]popstate['"])/);
   for (const id of ['savedListOverlay', 'saveDialogOverlay', 'customAddOverlay', 'editItemOverlay', 'authorCardOverlay', 'tocOverlay', 'bulkEditOverlay', 'bulkDetectOverlay', 'videoAddOverlay', 'videoPlayerOverlay']) {
     assert.doesNotMatch(source, new RegExp(`<dialog[^>]+id="${id}"`));
   }

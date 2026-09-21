@@ -121,7 +121,7 @@ test('video bootstrap has one owner per page and keeps direct reader loading', (
 test('current event registration points are recorded for later comparison', () => {
   assert.match(spa, /addEventListener\('click',intercept\)/);
   assert.match(spa, /addEventListener\('popstate',renderRoute\)/);
-  assert.match(reader, /addEventListener\(['"]popstate['"]/);
+  assert.match(reader, /(?:addEventListener\(['"]popstate['"]|bindReaderGlobal\(\s*window,\s*['"]popstate['"])/);
   assert.match(videoLibrary, /addEventListener\(['"]popstate['"]/);
   assert.match(videoLibrary, /DOMContentLoaded/);
 });

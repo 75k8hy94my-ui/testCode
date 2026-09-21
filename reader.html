@@ -1534,6 +1534,17 @@ https://cdn.example.org/c/003.webp"></textarea>
 
 <script>
 (function () {
+  const readerGlobalListeners = [];
+  function bindReaderGlobal(target, type, handler, options) {
+    target.addEventListener(type, handler, options);
+    readerGlobalListeners.push(() => target.removeEventListener(type, handler, options));
+  }
+  function cleanupReaderGlobalListeners() {
+    while (readerGlobalListeners.length) readerGlobalListeners.pop()();
+    if (window.MangaReaderRuntimeCleanup === cleanupReaderGlobalListeners) window.MangaReaderRuntimeCleanup = null;
+  }
+  if (typeof window.MangaReaderRuntimeCleanup === 'function') window.MangaReaderRuntimeCleanup();
+  window.MangaReaderRuntimeCleanup = cleanupReaderGlobalListeners;
   const EXT_CANDIDATES = ['jpg', 'jpeg', 'png', 'webp'];
   const MAX_PAGES_SAFETY = 2000;
   const LOAD_TIMEOUT_MS = 60000;
@@ -3025,8 +3036,8 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   // folders/items/videos に加えて per-manga info cache（拡張子・既知ページ数）も同梱する。
   // 書き出し/読み込みとクラウド同期の両方で使う共通ペイロード組み立て。
-  window.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && cloudSyncTimer) { clearTimeout(cloudSyncTimer); cloudSyncTimer = null; runCloudSync(); } });
-  window.addEventListener('pagehide', () => { if (cloudSyncTimer) { clearTimeout(cloudSyncTimer); cloudSyncTimer = null; runCloudSync(); } });
+  bindReaderGlobal(window, 'visibilitychange', () => { if (document.visibilityState === 'hidden' && cloudSyncTimer) { clearTimeout(cloudSyncTimer); cloudSyncTimer = null; runCloudSync(); } });
+  bindReaderGlobal(window, 'pagehide', () => { if (cloudSyncTimer) { clearTimeout(cloudSyncTimer); cloudSyncTimer = null; runCloudSync(); } });
 
   // remoteInfo の各エントリでローカルの mangaInfoCache を上書きマージする
   // （ローカルにしかないエントリは消さない）。setCachedMangaInfo と同じ要領で
@@ -3285,7 +3296,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
     return { baseUrl: v, hintExt: hintExt, numberWidth: numberWidth, pattern: pattern };
   }
-  window.addEventListener('manga-storage-quota', () => flashStatus('端末保存容量が不足しています。不要なデータを削除してください。'));
+  bindReaderGlobal(window, 'manga-storage-quota', () => flashStatus('端末保存容量が不足しています。不要なデータを削除してください。'));
 
   function showFirstPageLoadError(kind, baseUrl, numberWidth) {
     els.placeholder.replaceChildren();
@@ -5902,8 +5913,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   function handleReaderHistoryChange() {
     renderReaderScreen(getReaderScreenFromLocation());
   }
-  window.addEventListener('popstate', handleReaderHistoryChange);
-  window.addEventListener('hashchange', handleReaderHistoryChange);
+  bindReaderGlobal(window, 'popstate', handleReaderHistoryChange);
+  bindReaderGlobal(window, 'hashchange', handleReaderHistoryChange);
   renderReaderScreen(getReaderScreenFromLocation());
 
   function anyModalOpen() { return currentReaderScreen !== null; }
@@ -6117,7 +6128,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
     els.mobileMoreMenu.classList.remove('show');
   });
-  document.addEventListener('click', (e) => {
+  bindReaderGlobal(document, 'click', (e) => {
     if (!els.mobileMoreMenu.contains(e.target) && e.target !== els.moreBtn) els.mobileMoreMenu.classList.remove('show');
   });
   els.closeListBtn.addEventListener('click', closeSavedList);
@@ -6357,7 +6368,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     hideNextVolumeBanner();
   });
 
-  document.addEventListener('keydown', (e) => {
+  bindReaderGlobal(document, 'keydown', (e) => {
     if (e.target === els.saveTitleInput || e.target === els.saveAuthorInput || e.target === els.saveTagsInput || e.target === els.saveNewSourceWorkInput ||
         e.target === els.newFolderInput || e.target === els.listNewFolderInput ||
         e.target === els.customTitleInput || e.target === els.customAuthorInput || e.target === els.customTagsInput || e.target === els.customNewSourceWorkInput || e.target === els.customNewFolderInput ||
@@ -6682,7 +6693,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (mobileReaderMode) { els.nextBtn.click(); return; }
     setMobileUtilityMenu(els.mobileUtilityMenu.hidden);
   });
-  document.addEventListener('click', (event) => {
+  bindReaderGlobal(document, 'click', (event) => {
     if (!els.mobileUtilityMenu.hidden && !els.mobileUtilityMenu.contains(event.target) && !els.mobileNavMore.contains(event.target)) setMobileUtilityMenu(false);
   });
   els.addVideoBtn.addEventListener('click', openAddVideoDialog);
