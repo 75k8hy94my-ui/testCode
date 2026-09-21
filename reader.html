@@ -1517,6 +1517,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="manga-list-view-model.js?v=20260921-view-model-self"></script>
 <script src="manga-list-renderer.js?v=20260921-renderer"></script>
 <script src="manga-list-runtime-context.js?v=20260922-runtime-context"></script>
+<script src="manga-list-host-runtime.js?v=20260922-host-runtime"></script>
 <script src="manga-list-runtime.js?v=20260922-shared-runtime"></script>
 <script src="manga-list-controller.js?v=20260921-controller-factory"></script>
 <script src="manga-surface-activation.js?v=20260921-surface-activation"></script>
@@ -2166,6 +2167,17 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (Object.prototype.hasOwnProperty.call(next, 'recentlyClosedFolderId')) recentlyClosedFolderId = next.recentlyClosedFolderId;
   }
 
+  const mangaListHostRuntime = MangaListHostRuntimeFactory.create({
+    safeWriteJson: (key, value) => MangaReaderStorage.safeWriteJson(key, value),
+    getState: getMangaRuntimeState,
+    scheduleCloudSync,
+    persistVideos: persistSavedVideos,
+    keys: { savedItems: SAVED_ITEMS_KEY, savedFolders: SAVED_FOLDERS_KEY, authorCards: AUTHOR_CARDS_KEY }
+  });
+  const persistItems = () => mangaListHostRuntime.persistItems();
+  const persistFolders = () => mangaListHostRuntime.persistFolders();
+  const persistAuthorCards = () => mangaListHostRuntime.persistAuthorCards();
+  const persistAll = () => mangaListHostRuntime.persistAll();
   let mangaListRuntime;
   const mangaListRuntimeContext = MangaListRuntimeContextFactory.create({
     getState: getMangaRuntimeState,
@@ -2191,10 +2203,10 @@ https://cdn.example.org/c/003.webp"></textarea>
     clearLocalCoverObjectUrls,
     confirmAction: (message) => confirm(message),
     setTimeout: (callback, delay) => window.setTimeout(callback, delay),
-    persistItems,
-    persistFolders,
-    persistAuthorCards,
-    persistAll,
+    persistItems: mangaListHostRuntime.persistItems,
+    persistFolders: mangaListHostRuntime.persistFolders,
+    persistAuthorCards: mangaListHostRuntime.persistAuthorCards,
+    persistAll: mangaListHostRuntime.persistAll,
     scheduleCloudSync,
     openReader: handleMangaCardOpen,
     accessMedia: setupFeedImage,
@@ -2490,16 +2502,6 @@ https://cdn.example.org/c/003.webp"></textarea>
       if (imageEnhanceEnabled && !safeModeEnabled) enhanceImageElement(img);
       else restoreLocalEnhancement(img);
     });
-  }
-
-  function persistFolders() { MangaReaderStorage.safeWriteJson(SAVED_FOLDERS_KEY, savedFolders); scheduleCloudSync(); }
-  function persistItems() { MangaReaderStorage.safeWriteJson(SAVED_ITEMS_KEY, savedItems); scheduleCloudSync(); }
-  function persistAuthorCards() { MangaReaderStorage.safeWriteJson(AUTHOR_CARDS_KEY, authorCards); scheduleCloudSync(); }
-  function persistAll() {
-    persistFolders();
-    persistItems();
-    persistAuthorCards();
-    persistSavedVideos();
   }
 
   let cloudSyncTimer = null;
