@@ -41,10 +41,9 @@ test('directly entered URLs keep the save action visible until explicitly saved'
 });
 
 test('bookshelf cover cache separates filename patterns and can recover stale sources', () => {
-  const source = readReader();
-  const body = source.slice(source.indexOf('function setupFeedImage'), source.indexOf('let bulkDetectRunning'));
+  const body = read('manga-list-host-runtime.js');
   assert.match(body, /const cacheKey = \[folderUrl, String\(resolvedWidth\), JSON\.stringify\(pattern \|\| null\)/);
-  assert.match(body, /coverSourceCache\.delete\(cacheKey\)/);
+  assert.match(body, /sourceCache\.delete\(cacheKey\)/);
 });
 
 test('manga cards restore the manga screen route before opening a work', () => {
@@ -534,11 +533,12 @@ test('manga bulk static listeners use a callback boundary while overlay handlers
 
 test('image requests stop after a short timeout instead of retrying indefinitely', () => {
   const source = read('reader.html');
+  const host = read('manga-list-host-runtime.js');
   assert.match(source, /const LOAD_TIMEOUT_MS = 60000/);
   assert.match(source, /const IMAGE_PROBE_BUDGET_MS = 60000/);
   assert.match(source, /const failedPreloadUrls = new Set\(\)/);
   assert.match(source, /failedPreloadUrls\.add\(url\)/);
-  assert.match(source, /coverFailedCache\.add\(cacheKey\)/);
+  assert.match(host, /failedCache\.add\(cacheKey\)/);
   assert.match(source, /画像の読み込みがタイムアウトしました/);
 });
 

@@ -2185,6 +2185,23 @@ https://cdn.example.org/c/003.webp"></textarea>
       getTheme: () => document.documentElement.dataset.theme === 'light' ? 'light' : 'dark',
       getDashboardVisibility: () => dashboardVisibilityProfiles,
       onSyncError: (message, kind) => flashStatus(message, kind),
+    },
+    images: {
+      parseInputUrl,
+      getCachedMangaInfo,
+      getCoverSourceCache: () => coverSourceCache,
+      getCoverFailedCache: () => coverFailedCache,
+      pageUrlFor,
+      extCandidates: EXT_CANDIDATES,
+      loadTimeoutMs: LOAD_TIMEOUT_MS,
+      sessionKey,
+      readStorageItem: (key) => localStorage.getItem(key),
+      getSupabaseConfig: () => window.MANGA_READER_SUPABASE || {},
+      getLocalStoragePathFromUrl: localStoragePathFromUrl,
+      loadCachedLocalImage,
+      rememberLocalCoverObjectUrl: (url) => localCoverObjectUrls.push(url),
+      setTimer: (callback, delay) => setTimeout(callback, delay),
+      clearTimer: (timer) => clearTimeout(timer),
     }
   });
   const persistItems = () => mangaListHostRuntime.persistItems();
@@ -2194,6 +2211,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   const buildSyncPayload = () => mangaListHostRuntime.buildSyncPayload();
   const runCloudSync = () => mangaListHostRuntime.runCloudSync();
   const scheduleCloudSync = () => mangaListHostRuntime.scheduleCloudSync();
+  const setupFeedImage = (...args) => mangaListHostRuntime.setupFeedImage(...args);
+  const loadLocalCover = (...args) => mangaListHostRuntime.loadLocalCover(...args);
   let mangaListRuntime;
   const mangaListRuntimeContext = MangaListRuntimeContextFactory.create({
     getState: getMangaRuntimeState,
@@ -3550,17 +3569,6 @@ https://cdn.example.org/c/003.webp"></textarea>
   function clearLocalCoverObjectUrls() {
     localCoverObjectUrls.forEach((url) => URL.revokeObjectURL(url));
     localCoverObjectUrls = [];
-  }
-
-  async function loadLocalCover(item, img) {
-    try {
-      const session = JSON.parse(localStorage.getItem('mangaReaderSupabaseSession') || 'null');
-      const config = window.MANGA_READER_SUPABASE || {};
-      const path = (Array.isArray(item.storagePaths) && item.storagePaths[0]) || localStoragePathFromUrl(item.pages && item.pages[0]);
-      if (!session || !session.access_token || !path || !config.url) return;
-      const objectUrl = await loadCachedLocalImage(config, session.access_token, path, item.storageBytes && item.storageBytes[0]);
-      if (objectUrl && img.isConnected) { localCoverObjectUrls.push(objectUrl); img.src = objectUrl; }
-    } catch (_) {}
   }
 
   async function signPrivateLocalUrl(config, token, encodedPath, signal, estimatedBytes) {
@@ -5724,62 +5732,6 @@ https://cdn.example.org/c/003.webp"></textarea>
   // its pages use, so the cover image is found the same cascading way page
   // detection works: try .jpg, then .jpeg/.png/.webp on error, in order.
   // Used by the bookshelf grid (buildBookCard) for cover thumbnails.
-  function setupFeedImage(imgEl, baseUrlForItem, numberWidth, itemPattern) {
-    const parsed = parseInputUrl(baseUrlForItem);
-    const folderUrl = parsed ? parsed.baseUrl : baseUrlForItem;
-    const cached = getCachedMangaInfo(folderUrl);
-    const pattern = itemPattern || (parsed && parsed.pattern) || (cached && cached.pattern) || null;
-    const resolvedWidth = numberWidth || (cached && cached.numberWidth) || 1;
-    const cacheKey = [folderUrl, String(resolvedWidth), JSON.stringify(pattern || null), String(cached && cached.ext != null ? cached.ext : '')].join('|');
-    const cachedSource = coverSourceCache.get(cacheKey);
-    if (cachedSource) {
-      // A previously cached cover can become stale when a newly saved item
-      // supplies a more precise filename pattern or when the source changes.
-      // Re-enter the normal extension cascade if the cached URL is rejected.
-      imgEl.addEventListener('error', () => {
-        coverSourceCache.delete(cacheKey);
-        coverFailedCache.delete(cacheKey);
-        setupFeedImage(imgEl, baseUrlForItem, numberWidth, itemPattern);
-      }, { once: true });
-      imgEl.src = cachedSource;
-      return;
-    }
-    if (coverFailedCache.has(cacheKey)) return;
-    let idx = 0;
-    let finished = false;
-    let timer = null;
-    function tryNext() {
-      if (finished || idx >= EXT_CANDIDATES.length) {
-        coverFailedCache.add(cacheKey);
-        return;
-      }
-      imgEl.src = pageUrlFor(folderUrl, 1, idx, resolvedWidth, pattern);
-      idx++;
-    }
-    imgEl.addEventListener('load', () => {
-      finished = true;
-      clearTimeout(timer);
-      coverSourceCache.set(cacheKey, imgEl.currentSrc || imgEl.src);
-    }, { once: true });
-    imgEl.addEventListener('error', () => {
-      clearTimeout(timer);
-      if (finished) return;
-      if (idx >= EXT_CANDIDATES.length) {
-        finished = true;
-        coverFailedCache.add(cacheKey);
-        return;
-      }
-      tryNext();
-    });
-    tryNext();
-    timer = setTimeout(() => {
-      if (finished) return;
-      finished = true;
-      coverFailedCache.add(cacheKey);
-      imgEl.src = '';
-    }, LOAD_TIMEOUT_MS);
-  }
-
   let bulkDetectRunning = false;
   let bulkDetectCancelRequested = false;
 
