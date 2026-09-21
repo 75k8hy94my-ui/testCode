@@ -354,15 +354,20 @@ test('manga list controller exposes only existing private boundaries', () => {
   const source = read('reader.html');
   assert.equal((source.match(/const mangaListController = Object\.freeze\(/g) || []).length, 1);
   const start = source.indexOf('const mangaListController = Object.freeze(');
-  const end = source.indexOf('\n  //', start);
+  const end = source.indexOf('\n  });', start) + '\n  });'.length;
   const controller = source.slice(start, end);
+  const keys = [...controller.matchAll(/^\s{4}([A-Za-z]+)(?::|\()/gm)].map((match) => match[1]);
+  assert.deepEqual(keys, ['init', 'render', 'open', 'activate', 'getElements']);
   assert.match(controller, /init:\s*initMangaList/);
   assert.match(controller, /render:\s*renderSavedList/);
   assert.match(controller, /open:\s*openSavedList/);
   assert.match(controller, /getElements:\s*getMangaListElements/);
-  assert.match(controller, /activate\(\)\s*\{[\s\S]*switchListTab\('manga'\)/);
-  assert.doesNotMatch(controller, /savedItems|savedFolders|authorCards|localStorage|MangaVault|checkVpn|setTimeout|new Map|new Set|\[\]/);
-  assert.doesNotMatch(source, /window\.mangaListController|self\.mangaListController/);
+  assert.match(controller, /activate\(\)\s*\{\s*switchListTab\('manga'\);\s*\}/);
+  const activateBody = controller.match(/activate\(\)\s*\{([\s\S]*?)\}/)?.[1] || '';
+  assert.doesNotMatch(activateBody, /openSavedList|renderSavedList/);
+  assert.doesNotMatch(controller, /savedItems|savedFolders|authorCards|savedVideos|activeListTab|currentFolderView|currentSeriesView|currentAuthorView|readerReturnView|recentlyClosedItemId|recentlyClosedFolderId|mangaListEls|document|window|self|localStorage|sessionStorage|MangaVault|MangaListState|Supabase|media-access-gate|VPN|setTimeout|new Map|new Set|\[\]/);
+  assert.doesNotMatch(controller, /\bthis\b|\.bind\(|\.call\(|\.apply\(|prototype|class\b/);
+  assert.doesNotMatch(source, /window\.mangaListController|self\.mangaListController|globalThis\.mangaListController|export\s/);
 });
 
 test('manga mobile navigation routes one open call through the controller', () => {
