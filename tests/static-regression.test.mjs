@@ -48,9 +48,8 @@ test('bookshelf cover cache separates filename patterns and can recover stale so
 });
 
 test('manga cards restore the manga screen route before opening a work', () => {
-  const source = readReader();
-  const body = source.slice(source.indexOf('function handleMangaCardOpen'), source.indexOf('function buildBookCard'));
-  assert.match(body, /if \(currentReaderScreen === 'video-list'\) context\.navigateReaderScreen\('saved-list', \{ replace: true \}\);/);
+  const body = read('manga-list-runtime.js');
+  assert.match(body, /if \(context\.getReaderScreen\(\) === 'video-list'\) context\.navigateReaderScreen\('saved-list', \{ replace: true \}\);/);
   assert.match(body, /switchListTab\('manga'\);[\s\S]*closeSavedList\(\);[\s\S]*openItem\(item, false\)/);
 });
 
@@ -96,12 +95,13 @@ test('local reader is disabled behind a reversible feature flag', () => {
 
 test('disabled local manga stays out of bookshelf views without deleting it', () => {
   const source = readReader();
+  const runtime = read('manga-list-runtime.js');
   const viewModel = read('manga-list-view-model.js');
   assert.match(source, /function shelfVisibleItems\(\)/);
   assert.match(source, /window\.MangaReaderFeatures && window\.MangaReaderFeatures\.localReader/);
   assert.match(source, /!item\.localSync/);
   assert.match(viewModel, /itemsList = visibleShelfItems\.filter\(\(it\) => !it\.folderId && !it\.series\)/);
-  assert.match(source, /items:\s*context\.shelfVisibleItems\(\)/);
+  assert.match(runtime, /items:\s*context\.shelfVisibleItems\(\)/);
 });
 
 test('narrow bookshelf controls wrap instead of clipping', () => {
@@ -286,12 +286,13 @@ test('backup actions live on their own utility screen and mobile hides heavy act
 
 test('bookshelf pagination follows the shelf content and paginates folders with items', () => {
   const source = read('reader.html');
+  const runtime = read('manga-list-runtime.js');
   const viewModel = read('manga-list-view-model.js');
   assert.doesNotMatch(source, /\.bookshelf-pagination \{[^}]*position:\s*fixed/);
   assert.match(viewModel, /const folderEntries = folderCards\.map/);
   assert.match(viewModel, /const pagedEntries = folderEntries\.concat\(contentEntries\)/);
-  assert.match(source, /MangaListViewModel\.derive\([\s\S]*pageSize:\s*BOOKSHELF_PAGE_SIZE/);
-  assert.match(source, /visibleFolderEntries\.forEach\(\(entry\) => frag\.appendChild\(buildFolderCard\(entry\.folder/);
+  assert.match(runtime, /context\.deriveViewModel\([\s\S]*pageSize:\s*config\.BOOKSHELF_PAGE_SIZE/);
+  assert.match(runtime, /visibleFolderEntries\.forEach\(\(entry\) => frag\.appendChild\(buildFolderCard\(entry\.folder/);
   assert.match(source, /#savedListItems\.bookshelf \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);[^}]*padding-bottom: calc\(92px \+ env\(safe-area-inset-bottom\)\)/);
   assert.match(source, /savedListItems\.addEventListener\('touchstart'/);
   assert.match(source, /savedListItems\.addEventListener\('touchend'/);
@@ -300,6 +301,7 @@ test('bookshelf pagination follows the shelf content and paginates folders with 
 
 test('folder cards use one private operation dependency boundary without capturing mutable state', () => {
   const source = read('reader.html');
+  const runtime = read('manga-list-runtime.js');
   assert.equal((source.match(/const mangaFolderCardDeps = Object\.freeze\(/g) || []).length, 1);
   const depsStart = source.indexOf('const mangaFolderCardDeps = Object.freeze(');
   const depsEnd = source.indexOf('\n  function buildFolderCard(', depsStart);
@@ -312,20 +314,20 @@ test('folder cards use one private operation dependency boundary without capturi
   assert.match(deps, /moveFolderInList/);
   assert.doesNotMatch(deps, /savedItems\s*[,=]|savedFolders\s*[,=]|currentFolderView\s*[,=]|currentSeriesView\s*[,=]|bookshelfPage\s*[,=]|localStorage|MangaVault|new Map|new Set|\[\]/);
 
-  const buildStart = source.indexOf('function buildFolderCard(');
-  const buildEnd = source.indexOf('\n  // お気に入り is a virtual', buildStart);
-  const build = source.slice(buildStart, buildEnd);
+  const buildStart = runtime.indexOf('function buildFolderCard(');
+  const buildEnd = runtime.indexOf('\n    function buildBookCard(', buildStart);
+  const build = runtime.slice(buildStart, buildEnd);
   assert.match(build, /context\.getVisibleItems\(\)/);
   assert.match(build, /context\.openItem\(folderItems\[0\], false\)/);
   assert.match(build, /context\.persistAll\(\)/);
   assert.match(build, /context\.renderList\(\)/);
   assert.match(build, /context\.moveFolderInList\(folder, folderList, -1\)/);
   assert.match(build, /context\.moveFolderInList\(folder, folderList, 1\)/);
-  assert.equal((build.match(/context\.openItem\(/g) || []).length, 1);
+  assert.equal((build.match(/context\.openItem\(folderItems\[0\], false\)/g) || []).length, 1);
   assert.equal((build.match(/context\.persistAll\(/g) || []).length, 1);
   assert.equal((build.match(/context\.moveFolderInList\(/g) || []).length, 2);
   assert.match(build, /e\.stopPropagation\(\)/);
-  assert.match(build, /folder\.id === recentlyClosedFolderId/);
+  assert.match(build, /folder\.id === state\.recentlyClosedFolderId/);
 });
 
 test('manga list initialization has one synchronous private entry point', () => {

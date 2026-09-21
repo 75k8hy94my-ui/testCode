@@ -5,6 +5,7 @@ import fs from 'node:fs';
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 const reader = read('reader.html');
 const card = fs.existsSync(new URL('../manga-list-card.js', import.meta.url)) ? read('manga-list-card.js') : '';
+const runtime = read('manga-list-runtime.js');
 
 test('reader loads the manga card boundary before its inline card consumer', () => {
   const script = 'manga-list-card.js?v=20260921-card-boundary';
@@ -19,19 +20,17 @@ test('manga card boundary exposes only stateless static card creation', () => {
 });
 
 test('buildBookCard delegates static DOM creation and keeps interaction logic in reader', () => {
-  assert.match(reader, /MangaListCardBoundary\.createStaticCard\(/);
-  assert.match(reader, /bulkSelectedIds\.add\(item\.id\)/);
-  assert.match(reader, /updateBulkEditButton\(\)/);
-  assert.match(reader, /stopPropagation\(\)/);
-  assert.match(reader, /loadLocalCover\(item, img\)/);
-  assert.match(reader, /setupFeedImage\(img, item\.url, item\.numberWidth, item\.pagePattern\)/);
+  assert.match(runtime, /context\.createStaticCard\(/);
+  assert.match(runtime, /state\.bulkSelectedIds\.add\(item\.id\)/);
+  assert.match(runtime, /context\.updateBulkEditButton\(\)/);
+  assert.match(runtime, /stopPropagation\(\)/);
+  assert.match(runtime, /context\.loadLocalCover\(item, img\)/);
+  assert.match(runtime, /context\.setupFeedImage\(img, item\.url, item\.numberWidth, item\.pagePattern\)/);
 });
 
 test('normal manga card clicks use one reader interaction boundary in the original order', () => {
   assert.equal((reader.match(/function handleMangaCardOpen\(/g) || []).length, 1);
-  const boundaryStart = reader.indexOf('function handleMangaCardOpen(');
-  const boundaryEnd = reader.indexOf('\n  function buildBookCard(', boundaryStart);
-  const boundary = reader.slice(boundaryStart, boundaryEnd);
+  const boundary = runtime;
   const expected = [
     'context.rememberReaderReturnView()',
     "context.navigateReaderScreen('saved-list', { replace: true })",
@@ -47,11 +46,13 @@ test('normal manga card clicks use one reader interaction boundary in the origin
     assert.ok(index > previous, expression);
     previous = index;
   }
-  const buildStart = reader.indexOf('function buildBookCard(');
-  const buildEnd = reader.indexOf('\n  function normalizeAuthorLinks(', buildStart);
-  const build = reader.slice(buildStart, buildEnd);
-  assert.match(build, /if \(!reorderMode && !bulkEditMode\) \{\s*card\.addEventListener\('click', \(\) => handleMangaCardOpen\(item, list\)\);/);
-  assert.equal((boundary.match(/context\.openItem\(item, false\)/g) || []).length, 1);
+  const buildStart = runtime.indexOf('function buildBookCard(');
+  const buildEnd = runtime.indexOf('\n    function renderSavedList(', buildStart);
+  const build = runtime.slice(buildStart, buildEnd);
+  assert.match(build, /if \(!reorderMode && !state\.bulkEditMode\) \{\s*card\.addEventListener\('click', \(\) => context\.openReader\(item, list\)\);/);
+  const openStart = boundary.indexOf('function handleMangaCardOpen(');
+  const openEnd = boundary.indexOf('\n    function buildFolderCard(', openStart);
+  assert.equal((boundary.slice(openStart, openEnd).match(/context\.openItem\(item, false\)/g) || []).length, 1);
   assert.equal((build.match(/card\.addEventListener\('click'/g) || []).length, 1);
 });
 
@@ -65,9 +66,7 @@ test('buildBookCard uses one private cover dependency boundary without changing 
   assert.match(deps, /coverSourceCache/);
   assert.doesNotMatch(deps, /checkVpn|media-access-gate|MangaVault|localStorage|new Map|new Set/);
 
-  const buildStart = reader.indexOf('function buildBookCard(');
-  const buildEnd = reader.indexOf('\n  function normalizeAuthorLinks(', buildStart);
-  const build = reader.slice(buildStart, buildEnd);
+  const build = runtime;
   assert.match(build, /context\.loadLocalCover\(item, img\)/);
   assert.match(build, /coverSourceCache\.get\(source\)/);
   assert.match(build, /coverSourceCache\.set\(source, img\.currentSrc \|\| img\.src\)/);

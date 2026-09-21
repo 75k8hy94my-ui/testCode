@@ -4,6 +4,7 @@ import fs from 'node:fs';
 
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 const reader = read('reader.html');
+const runtime = read('manga-list-runtime.js');
 const mangaListTemplate = read('manga-list-template.js');
 const savedListTemplate = read('reader-saved-list-template.js');
 
@@ -36,7 +37,8 @@ test('renderSavedList uses the centralized manga list DOM object', () => {
   const start = reader.indexOf('function renderSavedList()');
   assert.notEqual(start, -1, 'renderSavedList must exist');
   assert.match(reader, /const mangaListEls = getMangaListElements\(\);/);
-  assert.match(reader.slice(start, start + 16000), /mangaListEls/);
+  assert.match(runtime, /function renderSavedList\(\)/);
+  assert.match(runtime, /const elements = context\.getElements\(\)/);
 });
 
 test('manga list DOM boundary ids belong to the manga template and does not create fallback elements', () => {

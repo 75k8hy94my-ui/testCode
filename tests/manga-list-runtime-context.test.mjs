@@ -10,7 +10,8 @@ async function load(path) {
 }
 
 const names = [
-  'getState', 'setState', 'getElements',
+  'getState', 'setState', 'getElements', 'getDocument', 'getConfig', 'getReaderScreen',
+  'getSavedVideos', 'clearLocalCoverObjectUrls', 'confirmAction', 'setTimeout',
   'persistItems', 'persistFolders', 'persistAuthorCards', 'persistAll', 'scheduleCloudSync',
   'openReader', 'accessMedia', 'renderDashboard', 'renderAuthorDashboard',
   'getVisibleItems', 'appendFolderPreview', 'createStaticCard', 'loadLocalCover',
@@ -19,7 +20,9 @@ const names = [
   'setReadingListContext', 'flashStatus', 'navigateReaderScreen', 'switchListTab',
   'openItem', 'renderList', 'updateBulkEditButton', 'shelfVisibleItems',
   'unreadOrderItems', 'itemDisplayTitle', 'itemSubtext', 'readingRecordText',
-  'itemPageCountText'
+  'itemPageCountText', 'buildFavoritesFolderCard', 'buildSeriesFolderCard',
+  'buildSeriesGroupCard', 'buildAuthorGroupCard', 'buildSearchText',
+  'deriveViewModel', 'renderCards', 'createDocumentFragment'
 ];
 
 test('manga runtime context exposes only frozen callback accessors', async () => {
@@ -30,7 +33,7 @@ test('manga runtime context exposes only frozen callback accessors', async () =>
   assert.ok(Object.isFrozen(self.MangaListRuntimeContextFactory));
   assert.ok(Object.isFrozen(context));
   assert.throws(() => self.MangaListRuntimeContextFactory.create({}), TypeError);
-  assert.doesNotMatch(source, /savedVideos|localStorage|sessionStorage|document|window|MangaVault|VPN|addEventListener|setTimeout/);
+  assert.doesNotMatch(source, /savedVideos|localStorage|sessionStorage|document|window|MangaVault|VPN|addEventListener/);
 });
 
 test('manga runtime context does not retain mutable state or DOM values', async () => {

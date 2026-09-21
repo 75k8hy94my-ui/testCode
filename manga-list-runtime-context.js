@@ -2,7 +2,8 @@
   'use strict';
 
   const REQUIRED = [
-    'getState', 'setState', 'getElements',
+    'getState', 'setState', 'getElements', 'getDocument', 'getConfig', 'getReaderScreen',
+    'getSavedVideos', 'clearLocalCoverObjectUrls', 'confirmAction', 'setTimeout',
     'persistItems', 'persistFolders', 'persistAuthorCards', 'persistAll', 'scheduleCloudSync',
     'openReader', 'accessMedia', 'renderDashboard', 'renderAuthorDashboard',
     'getVisibleItems', 'appendFolderPreview', 'createStaticCard', 'loadLocalCover',
@@ -11,7 +12,9 @@
     'setReadingListContext', 'flashStatus', 'navigateReaderScreen', 'switchListTab',
     'openItem', 'renderList', 'updateBulkEditButton', 'shelfVisibleItems',
     'unreadOrderItems', 'itemDisplayTitle', 'itemSubtext', 'readingRecordText',
-    'itemPageCountText'
+    'itemPageCountText', 'buildFavoritesFolderCard', 'buildSeriesFolderCard',
+    'buildSeriesGroupCard', 'buildAuthorGroupCard', 'buildSearchText',
+    'deriveViewModel', 'renderCards', 'createDocumentFragment'
   ];
 
   function create(deps) {
@@ -27,6 +30,13 @@
       getState: deps.getState,
       setState: deps.setState,
       getElements: deps.getElements,
+      getDocument: deps.getDocument,
+      getConfig: deps.getConfig,
+      getReaderScreen: deps.getReaderScreen,
+      getSavedVideos: deps.getSavedVideos,
+      clearLocalCoverObjectUrls: deps.clearLocalCoverObjectUrls,
+      confirmAction: deps.confirmAction,
+      setTimeout: deps.setTimeout,
       persistItems: deps.persistItems,
       persistFolders: deps.persistFolders,
       persistAuthorCards: deps.persistAuthorCards,
@@ -59,7 +69,16 @@
       itemDisplayTitle: deps.itemDisplayTitle,
       itemSubtext: deps.itemSubtext,
       readingRecordText: deps.readingRecordText,
-      itemPageCountText: deps.itemPageCountText
+      itemPageCountText: deps.itemPageCountText,
+      buildFavoritesFolderCard: deps.buildFavoritesFolderCard,
+      buildSeriesFolderCard: deps.buildSeriesFolderCard,
+      buildSeriesGroupCard: deps.buildSeriesGroupCard,
+      buildAuthorGroupCard: deps.buildAuthorGroupCard,
+      buildSearchText: deps.buildSearchText,
+      deriveViewModel: deps.deriveViewModel,
+      renderCards: deps.renderCards,
+      createDocumentFragment: deps.createDocumentFragment,
+      openReader: deps.openReader
     });
   }
 

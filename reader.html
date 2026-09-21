@@ -1517,6 +1517,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="manga-list-view-model.js?v=20260921-view-model-self"></script>
 <script src="manga-list-renderer.js?v=20260921-renderer"></script>
 <script src="manga-list-runtime-context.js?v=20260922-runtime-context"></script>
+<script src="manga-list-runtime.js?v=20260922-shared-runtime"></script>
 <script src="manga-list-controller.js?v=20260921-controller-factory"></script>
 <script src="manga-surface-activation.js?v=20260921-surface-activation"></script>
 <script src="manga-list-elements.js?v=20260921-elements-boundary"></script>
@@ -2165,10 +2166,31 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (Object.prototype.hasOwnProperty.call(next, 'recentlyClosedFolderId')) recentlyClosedFolderId = next.recentlyClosedFolderId;
   }
 
+  let mangaListRuntime;
   const mangaListRuntimeContext = MangaListRuntimeContextFactory.create({
     getState: getMangaRuntimeState,
     setState: setMangaRuntimeState,
     getElements: () => mangaListEls,
+    getDocument: () => document,
+    getConfig: () => ({
+      ICON_FOLDER,
+      HISTORY_FOLDER_ID,
+      HISTORY_FOLDER_NAME,
+      FAVORITES_FOLDER_ID,
+      FAVORITES_FOLDER_NAME,
+      SERIES_FOLDER_ID,
+      SERIES_FOLDER_NAME,
+      UNREAD_FOLDER_ID,
+      UNREAD_FOLDER_NAME,
+      SYNCED_FOLDER_ID,
+      SYNCED_FOLDER_NAME,
+      BOOKSHELF_PAGE_SIZE
+    }),
+    getReaderScreen: () => currentReaderScreen,
+    getSavedVideos: () => savedVideos,
+    clearLocalCoverObjectUrls,
+    confirmAction: (message) => confirm(message),
+    setTimeout: (callback, delay) => window.setTimeout(callback, delay),
     persistItems,
     persistFolders,
     persistAuthorCards,
@@ -2201,8 +2223,18 @@ https://cdn.example.org/c/003.webp"></textarea>
     itemDisplayTitle,
     itemSubtext,
     readingRecordText,
-    itemPageCountText
+    itemPageCountText,
+    buildFavoritesFolderCard,
+    buildSeriesFolderCard,
+    buildSeriesGroupCard,
+    buildAuthorGroupCard,
+    buildSearchText: (item, folders, videos, cards) => window.MangaReaderShelfSearch.buildSearchText(item, folders, videos, cards),
+    deriveViewModel: (input) => MangaListViewModel.derive(input),
+    renderCards: (input) => MangaListRenderer.render(input),
+    createDocumentFragment: () => document.createDocumentFragment(),
+    openReader: handleMangaCardOpen
   });
+  mangaListRuntime = MangaListRuntimeFactory.create(mangaListRuntimeContext);
   let pendingSaveUrl = null;
   // Whether opening the 個別追加/編集 dialog hid an already-open 保存したURL
   // list popup behind it; if so, closing the dialog reopens (and re-renders)
@@ -5212,77 +5244,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   });
 
   function buildFolderCard(folder, folderList, organizeMode) {
-    return buildFolderCardWithContext(mangaListRuntimeContext, folder, folderList, organizeMode);
-  }
-
-  function buildFolderCardWithContext(context, folder, folderList, organizeMode) {
-    const card = document.createElement('div');
-    card.className = 'book-card folder-card' + (folder.id === recentlyClosedFolderId ? ' just-closed' : '');
-    const folderItems = context.getVisibleItems().filter((item) => item.folderId === folder.id);
-
-    const cover = document.createElement('div');
-    cover.className = 'book-cover folder-cover';
-    context.appendFolderPreview(cover, folderItems, ICON_FOLDER, '空のフォルダ', 'フォルダ');
-
-    // フォルダの削除・並び替えは常時出さず、本棚の編集モードだけで行う。
-    if (organizeMode && folder.id !== HISTORY_FOLDER_ID) {
-      const delBtn = document.createElement('button');
-      delBtn.className = 'book-delBtn';
-      delBtn.textContent = '×';
-      delBtn.title = '削除';
-      delBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (folderItems.length && !confirm('「' + folder.name + '」フォルダと、その中のURLをすべて削除します。本当によろしいですか？')) return;
-        savedItems = savedItems.filter((it) => it.folderId !== folder.id);
-        savedFolders = savedFolders.filter((f) => f.id !== folder.id);
-        context.persistAll();
-        context.renderList();
-      });
-      cover.appendChild(delBtn);
-
-      const idx = folderList.indexOf(folder);
-      const upBtn = document.createElement('button');
-      upBtn.className = 'book-moveBtn book-moveUpBtn';
-      upBtn.textContent = '←';
-      upBtn.title = '左へ移動';
-      upBtn.disabled = idx <= 0;
-      upBtn.addEventListener('click', (e) => { e.stopPropagation(); context.moveFolderInList(folder, folderList, -1); });
-      cover.appendChild(upBtn);
-
-      const downBtn = document.createElement('button');
-      downBtn.className = 'book-moveBtn book-moveDownBtn';
-      downBtn.textContent = '→';
-      downBtn.title = '右へ移動';
-      downBtn.disabled = idx >= folderList.length - 1;
-      downBtn.addEventListener('click', (e) => { e.stopPropagation(); context.moveFolderInList(folder, folderList, 1); });
-      cover.appendChild(downBtn);
-    }
-
-    const title = document.createElement('div');
-    title.className = 'book-title';
-    title.textContent = folder.name;
-
-    card.appendChild(cover);
-    card.appendChild(title);
-    if (!organizeMode) card.addEventListener('click', () => {
-      recentlyClosedFolderId = null;
-      if (folderItems.length === 1) {
-        // 1冊だけのフォルダは直接開くが、閉じた際の戻り先はこのフォルダにする。
-        currentFolderView = folder.id;
-        currentSeriesView = null;
-        reorderMode = false;
-        context.rememberReaderReturnView();
-        context.closeSavedList();
-        context.setReadingListContext(folderItems, 0);
-        context.openItem(folderItems[0], false);
-        return;
-      }
-      currentFolderView = folder.id;
-      currentSeriesView = null;
-      reorderMode = false;
-      context.renderList();
-    });
-    return card;
+    return mangaListRuntime.buildFolderCard(folder, folderList, organizeMode);
   }
 
   // お気に入り is a virtual aggregating folder (see FAVORITES_FOLDER_ID
@@ -5446,114 +5408,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   });
 
   function handleMangaCardOpen(item, list) {
-    return handleMangaCardOpenWithContext(mangaListRuntimeContext, item, list);
-  }
-
-  function handleMangaCardOpenWithContext(context, item, list) {
-    context.rememberReaderReturnView();
-    // The manga and video lists share one surface. If the browser history
-    // still says video-list while the manga grid is visible, normalize the
-    // route before closing it so the video screen cannot remain underneath
-    // the reader after a manga card is opened.
-    if (currentReaderScreen === 'video-list') context.navigateReaderScreen('saved-list', { replace: true });
-    context.switchListTab('manga');
-    context.closeSavedList();
-    context.setReadingListContext(list, list.indexOf(item));
-    context.flashStatus('読み込み中…');
-    context.openItem(item, false).catch((error) => {
-      context.flashStatus(error && error.message ? error.message : '漫画を開けませんでした');
-    });
+    return mangaListRuntime.handleMangaCardOpen(item, list);
   }
 
   function buildBookCard(item, list, reorderMode) {
-    return buildBookCardWithContext(mangaListRuntimeContext, item, list, reorderMode);
-  }
-
-  function buildBookCardWithContext(context, item, list, reorderMode) {
-    const elements = context.getElements();
-    const { card, select, cover, img, appendDetails } = context.createStaticCard({
-      documentRef: document,
-      item,
-      reorderMode,
-      bulkEditMode,
-      bulkSelected: bulkSelectedIds,
-      recentlyClosed: recentlyClosedItemId,
-      itemSubtext,
-      itemDisplayTitle,
-      readingRecordText,
-      itemPageCountText
-    });
-    if (select) {
-      select.addEventListener('click', (e) => e.stopPropagation());
-      select.addEventListener('change', () => { if (select.checked) bulkSelectedIds.add(item.id); else bulkSelectedIds.delete(item.id); updateBulkEditButton(); });
-    }
-
-    if (Array.isArray(item.pages) && item.pages.length) {
-      const source = item.pages[0];
-      if (item.localSync) {
-        context.loadLocalCover(item, img);
-      } else {
-        const coverSourceCache = context.getCoverSourceCache();
-        img.src = coverSourceCache.get(source) || source; // exact URL already known; no extension cascade needed
-        img.addEventListener('load', () => coverSourceCache.set(source, img.currentSrc || img.src), { once: true });
-      }
-    } else {
-      context.setupFeedImage(img, item.url, item.numberWidth, item.pagePattern);
-    }
-    if (reorderMode) {
-      const idx = list.indexOf(item);
-      const upBtn = document.createElement('button');
-      upBtn.className = 'book-moveBtn book-moveUpBtn';
-      upBtn.textContent = '←';
-      upBtn.title = '左へ移動';
-      upBtn.disabled = idx <= 0;
-      upBtn.addEventListener('click', (e) => { e.stopPropagation(); context.moveItemInList(item, list, -1); });
-      cover.appendChild(upBtn);
-
-      const downBtn = document.createElement('button');
-      downBtn.className = 'book-moveBtn book-moveDownBtn';
-      downBtn.textContent = '→';
-      downBtn.title = '右へ移動';
-      downBtn.disabled = idx >= list.length - 1;
-      downBtn.addEventListener('click', (e) => { e.stopPropagation(); context.moveItemInList(item, list, 1); });
-      cover.appendChild(downBtn);
-    } else {
-      const favBtn = document.createElement('button');
-      favBtn.className = 'book-favBtn';
-      const updateFavoriteButton = () => {
-        favBtn.replaceChildren(context.makeHeartIcon(!!item.favorite));
-        favBtn.classList.toggle('is-favorite', !!item.favorite);
-        favBtn.title = item.favorite ? 'お気に入りから外す' : 'お気に入りに追加';
-        favBtn.setAttribute('aria-label', favBtn.title);
-        favBtn.setAttribute('aria-pressed', item.favorite ? 'true' : 'false');
-      };
-      updateFavoriteButton();
-      favBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        item.favorite = !item.favorite;
-        context.persistAll();
-        updateFavoriteButton();
-        if (currentFolderView === FAVORITES_FOLDER_ID && !item.favorite) {
-          card.style.transition = 'opacity .16s ease, transform .16s ease';
-          card.style.opacity = '0';
-          card.style.transform = 'scale(.94)';
-          window.setTimeout(() => {
-            card.remove();
-            if (!elements.savedListItems.children.length) {
-              elements.savedListEmpty.textContent = 'お気に入りはまだ追加されていません';
-              elements.savedListEmpty.style.display = 'block';
-            }
-          }, 160);
-        }
-      });
-      cover.appendChild(favBtn);
-    }
-
-    appendDetails();
-    if (!reorderMode && !bulkEditMode) {
-      card.addEventListener('click', () => handleMangaCardOpen(item, list));
-    }
-    return card;
+    return mangaListRuntime.buildBookCard(item, list, reorderMode);
   }
 
   function normalizeAuthorLinks(links) {
@@ -5844,138 +5703,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   function renderSavedList() {
-    return renderSavedListWithContext(mangaListRuntimeContext);
-  }
-
-  function renderSavedListWithContext(context) {
-    const mangaListEls = context.getElements();
-    const els = mangaListEls;
-    clearLocalCoverObjectUrls();
-    const inSeriesGroup = currentFolderView === SERIES_FOLDER_ID && !!currentSeriesView;
-    const inSeriesRoot = currentFolderView === SERIES_FOLDER_ID && !currentSeriesView;
-    const inAuthorView = !!currentAuthorView;
-
-    const atRoot = !currentFolderView && !inAuthorView;
-    context.renderDashboard(atRoot && !shelfSearchQuery);
-    context.renderAuthorDashboard(inAuthorView);
-    const isRealFolder = !!currentFolderView && currentFolderView !== FAVORITES_FOLDER_ID &&
-      currentFolderView !== UNREAD_FOLDER_ID && currentFolderView !== SYNCED_FOLDER_ID && currentFolderView !== HISTORY_FOLDER_ID &&
-      currentFolderView !== SERIES_FOLDER_ID;
-    const canOrganize = atRoot || isRealFolder;
-    const showOrganizeControls = canOrganize && reorderMode;
-
-    els.listBackBtn.style.display = currentFolderView || inAuthorView ? '' : 'none';
-    els.listNewFolderBtn.style.display = atRoot ? '' : 'none';
-    els.editShelfBtn.style.display = canOrganize ? '' : 'none';
-    els.editShelfBtn.classList.toggle('active', showOrganizeControls);
-    els.editShelfBtn.textContent = showOrganizeControls ? '編集完了' : '編集';
-    context.updateBulkEditButton();
-    els.listNewFolderRow.style.display = 'none';
-
-    if (currentFolderView === HISTORY_FOLDER_ID) {
-      els.listFolderTitle.textContent = HISTORY_FOLDER_NAME;
-    } else if (currentFolderView === FAVORITES_FOLDER_ID) {
-      els.listFolderTitle.textContent = FAVORITES_FOLDER_NAME;
-    } else if (currentFolderView === UNREAD_FOLDER_ID) {
-      els.listFolderTitle.textContent = UNREAD_FOLDER_NAME;
-    } else if (currentFolderView === SYNCED_FOLDER_ID) {
-      els.listFolderTitle.textContent = SYNCED_FOLDER_NAME;
-    } else if (inSeriesGroup) {
-      els.listFolderTitle.textContent = currentSeriesView;
-    } else if (inSeriesRoot) {
-      els.listFolderTitle.textContent = SERIES_FOLDER_NAME;
-    } else if (inAuthorView) {
-      els.listFolderTitle.textContent = currentAuthorView;
-    } else if (currentFolderView) {
-      const folder = savedFolders.find((f) => f.id === currentFolderView);
-      els.listFolderTitle.textContent = folder ? folder.name : '';
-    } else {
-      els.listFolderTitle.textContent = '';
-    }
-
-    els.savedListItems.innerHTML = '';
-    els.savedListItems.classList.add('bookshelf'); // bookshelf grid at every level now
-    els.savedListItems.appendChild(els.bookshelfPagination);
-
-    const viewModel = MangaListViewModel.derive({
-      items: context.shelfVisibleItems(),
-      folders: savedFolders,
-      authorCards,
-      videos: savedVideos,
-      folderView: currentFolderView,
-      seriesView: currentSeriesView,
-      authorView: currentAuthorView,
-      filters: shelfFilters,
-      searchQuery: shelfSearchQuery,
-      sort: shelfSort,
-      reorderMode,
-      groupByAuthor: groupByAuthorEnabled,
-      bulkEditMode,
-      page: bookshelfPage,
-      pageSize: BOOKSHELF_PAGE_SIZE,
-      ids: { favorites: FAVORITES_FOLDER_ID, unread: UNREAD_FOLDER_ID, synced: SYNCED_FOLDER_ID, history: HISTORY_FOLDER_ID, series: SERIES_FOLDER_ID },
-      searchText: (item, folders, videos, cards) => window.MangaReaderShelfSearch.buildSearchText(item, folders, videos, cards),
-      title: context.itemDisplayTitle,
-      unreadItems: context.unreadOrderItems()
-    });
-    const { itemsList, folderCards, seriesGroupCards, authorGroupCards, showFavoritesCard, showSeriesCard,
-      visibleEntries, visibleFolderEntries, visibleAuthorGroups, visibleItems, totalPages } = viewModel;
-    bookshelfPage = viewModel.normalizedPage;
-    const totalShelfPages = totalPages;
-    const isEmpty = folderCards.length === 0 && itemsList.length === 0 && seriesGroupCards.length === 0 &&
-      !showFavoritesCard && !showSeriesCard;
-    const emptyText = currentFolderView === FAVORITES_FOLDER_ID
-        ? 'お気に入りはまだ追加されていません'
-        : currentFolderView === UNREAD_FOLDER_ID
-          ? '保存された漫画はまだありません'
-        : currentFolderView === SYNCED_FOLDER_ID
-          ? '同期済みの漫画はまだありません'
-        : inSeriesRoot
-          ? 'シリーズはまだ設定されていません'
-          : (currentFolderView ? 'このフォルダにはまだ何もありません' : '保存されたURLはまだありません');
-    if (!isEmpty) {
-      // Build every card into an off-DOM fragment first and append it once —
-      // appending each card straight onto the live, already-visible container
-      // forces a layout/reflow per card, which adds up once a folder has a
-      // few dozen items.
-      const frag = document.createDocumentFragment();
-      if (showFavoritesCard) frag.appendChild(buildFavoritesFolderCard());
-      if (showSeriesCard) frag.appendChild(buildSeriesFolderCard());
-      visibleFolderEntries.forEach((entry) => frag.appendChild(buildFolderCard(entry.folder, folderCards, showOrganizeControls)));
-      seriesGroupCards.forEach((g) => frag.appendChild(buildSeriesGroupCard(g)));
-      if (groupByAuthorEnabled && !bulkEditMode && authorGroupCards.length) {
-        visibleAuthorGroups.forEach((group) => frag.appendChild(buildAuthorGroupCard(group)));
-      }
-      els.savedListItems.appendChild(frag);
-    }
-    MangaListRenderer.render({
-      elements: {
-        savedListItems: els.savedListItems,
-        savedListEmpty: els.savedListEmpty,
-        bookshelfPagination: els.bookshelfPagination,
-        bookshelfPrevBtn: els.bookshelfPrevBtn,
-        bookshelfNextBtn: els.bookshelfNextBtn,
-        bookshelfPageLabel: els.bookshelfPageLabel
-      },
-      items: visibleItems,
-      createCard: (item, list, organizeMode) => buildBookCard(item, list, organizeMode),
-      list: itemsList,
-      reorderMode: showOrganizeControls,
-      empty: isEmpty,
-      emptyText,
-      page: bookshelfPage,
-      totalPages: totalShelfPages
-    });
-
-    els.smartListRow.style.display = atRoot ? 'flex' : 'none';
-    if (atRoot) {
-      const historyCount = savedItems.filter((item) => item.folderId === HISTORY_FOLDER_ID).length;
-      const unreadCount = context.unreadOrderItems().filter((item) => !Number(item.lastReadAt)).length;
-      els.historyListBtn.textContent = '履歴 (' + historyCount + ')';
-      els.unreadListBtn.textContent = '読んでいない順 (' + unreadCount + ')';
-      els.groupAuthorBtn.classList.toggle('active', groupByAuthorEnabled);
-      els.groupAuthorBtn.textContent = groupByAuthorEnabled ? '作者まとめを解除' : '作者でまとめる';
-    }
+    return mangaListRuntime.renderSavedList();
   }
 
   // hideCloseBtn: true when this list is being shown automatically because
