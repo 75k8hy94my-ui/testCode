@@ -9,6 +9,7 @@ const pages = {
   video: read('video.html'),
 };
 const spa = read('home-profile-spa.js');
+const readerRouteRuntime = read('reader-route-runtime.js');
 const reader = read('reader.html');
 const readerTemplates = [
   'reader-saved-list-template.js', 'reader-author-list-template.js', 'reader-toc-template.js',
@@ -43,7 +44,9 @@ test('current route dispatcher recognizes manga and video and renders through re
   assert.match(spa, /if\(name==='video\.html'\)return'video'/);
   assert.match(spa, /else if\(\['manga','video','reader'\]\.includes\(route\)\)renderReader\(route,generation\)/);
   assert.match(spa, /fetch\('reader\.html\?v=20260916-reader'/);
-  assert.match(spa, /if\(route==='manga'\|\|route==='video'\)activateReaderEntry\(route\)/);
+  assert.match(spa, /ReaderRouteRuntimeFactory\.create\(/);
+  assert.match(spa, /reader-route-runtime\.js\?v=20260922-route-runtime/);
+  assert.match(readerRouteRuntime, /if \(route === 'manga' \|\| route === 'video'\) deps\.activate\(route\)/);
   assert.match(spa, /route==='video'\?'listTabVideo':'listTabManga'/);
 });
 
@@ -53,7 +56,8 @@ test('current reader entry pruning excludes the opposite list surface', () => {
 });
 
 test('reader bootstrap reports loading failure instead of silently swallowing it', () => {
-  assert.match(spa, /catch\(_\)\{if\(generation===renderGeneration\)target\.innerHTML=/);
+  assert.match(spa, /renderError:\(mount\)=>\{mount\.innerHTML=/);
+  assert.match(readerRouteRuntime, /if \(generation === deps\.getGeneration\(\)\) deps\.renderError\(target, error\)/);
   assert.match(spa, /漫画を読み込めませんでした/);
 });
 
