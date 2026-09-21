@@ -360,47 +360,24 @@ test('manga list controller exposes only existing private boundaries', () => {
   assert.doesNotMatch(source, /window\.mangaListController|self\.mangaListController|globalThis\.mangaListController|export\s/);
 });
 
-test('manga tab activation uses one private dependency boundary and preserves video branch', () => {
+test('manga tab activation no longer keeps the combined dependency object', () => {
   const source = read('reader.html');
-  const depsStart = source.indexOf('const mangaTabActivationDeps = Object.freeze({');
-  const switchStart = source.indexOf('function switchListTab(tab)');
-  const adapterStart = source.indexOf('function activateMangaListTab()');
-  assert.notEqual(depsStart, -1);
-  assert.ok(depsStart < adapterStart);
-  assert.ok(adapterStart < switchStart);
-  assert.equal((source.match(/const mangaTabActivationDeps = Object\.freeze\(/g) || []).length, 1);
+  assert.doesNotMatch(source, /mangaTabActivationDeps/);
   assert.equal((source.match(/function activateMangaListTab\(\)/g) || []).length, 1);
+});
 
-  const depsEnd = source.indexOf('\n  function activateMangaListTab()', depsStart);
-  const deps = source.slice(depsStart, depsEnd);
-  assert.deepEqual([...deps.matchAll(/^(\s{4})([A-Za-z]+)\(\)\s*\{/gm)].map((match) => match[2]), [
-    'activateMangaTab',
-    'deactivateVideoTab',
-    'activateMangaMobileNav',
-    'showMangaSection',
-    'hideVideoSection',
-    'hideCloseButton',
-  ]);
-  assert.doesNotMatch(deps, /\b(els|document|window|self|localStorage|MangaVault|Supabase|checkVpn|setTimeout)\s*:/);
-  assert.doesNotMatch(deps, /addEventListener|new Map|new Set|\[\]/);
-
-  const adapter = source.slice(adapterStart, switchStart);
-  assert.deepEqual([...adapter.matchAll(/mangaTabActivationDeps\.([A-Za-z]+)\(\);/g)].map((match) => match[1]), [
-    'activateMangaTab',
-    'deactivateVideoTab',
-    'activateMangaMobileNav',
-    'showMangaSection',
-    'hideVideoSection',
-    'hideCloseButton',
-  ]);
-  assert.equal((adapter.match(/mangaTabActivationDeps\.[A-Za-z]+\(\);/g) || []).length, 6);
-  assert.doesNotMatch(adapter, /\bels\.[A-Za-z]+\.(classList|style)/);
-
-  const switchEnd = source.indexOf('\n  const mangaListController', switchStart);
-  const switchBody = source.slice(switchStart, switchEnd);
-  assert.match(switchBody, /activeListTab = tab;\s*if \(tab === 'manga'\) \{\s*activateMangaListTab\(\);\s*return;\s*\}/);
-  assert.equal((switchBody.match(/activateMangaListTab\(\)/g) || []).length, 1);
-  assert.match(switchBody, /else \{[\s\S]*if \(els\.listTabVideo\) els\.listTabVideo\.classList\.add\('active'\);[\s\S]*renderVideoList\(\);/);
+test('manga surface activation uses an external factory while reader chrome stays local', () => {
+  const source = read('reader.html');
+  assert.equal((source.match(/manga-surface-activation\.js\?v=[^"']+/g) || []).length, 1);
+  assert.equal((source.match(/MangaSurfaceActivationFactory\.create\(/g) || []).length, 1);
+  assert.ok(source.indexOf('manga-surface-activation.js?v=') < source.indexOf('MangaSurfaceActivationFactory.create('));
+  assert.equal((source.match(/const mangaSurfaceActivation =/g) || []).length, 1);
+  assert.equal((source.match(/const readerMangaChromeDeps = Object\.freeze\(/g) || []).length, 1);
+  assert.doesNotMatch(source, /mangaTabActivationDeps/);
+  assert.match(source, /mangaSurfaceActivation\.activateMangaTab\(\);[\s\S]*readerMangaChromeDeps\.deactivateVideoTab\(\);[\s\S]*mangaSurfaceActivation\.activateMangaMobileNav\(\);[\s\S]*mangaSurfaceActivation\.showMangaSection\(\);[\s\S]*readerMangaChromeDeps\.hideVideoSection\(\);[\s\S]*readerMangaChromeDeps\.hideCloseButton\(\);/);
+  assert.equal((source.match(/mangaSurfaceActivation\.(activateMangaTab|activateMangaMobileNav|showMangaSection)\(\);/g) || []).length, 3);
+  assert.equal((source.match(/readerMangaChromeDeps\.(deactivateVideoTab|hideVideoSection|hideCloseButton)\(\);/g) || []).length, 3);
+  assert.match(source, /const mangaListController = MangaListControllerFactory\.create\([\s\S]*activate\(\)\s*\{\s*switchListTab\('manga'\);/);
 });
 
 test('manga mobile navigation routes one open call through the controller', () => {

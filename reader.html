@@ -1517,6 +1517,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="manga-list-view-model.js?v=20260921-view-model-self"></script>
 <script src="manga-list-renderer.js?v=20260921-renderer"></script>
 <script src="manga-list-controller.js?v=20260921-controller-factory"></script>
+<script src="manga-surface-activation.js?v=20260921-surface-activation"></script>
 
 <script>
 (function () {
@@ -6754,18 +6755,21 @@ https://cdn.example.org/c/003.webp"></textarea>
     els.mobileNavMore.classList.toggle('active', open);
   }
 
-  const mangaTabActivationDeps = Object.freeze({
+  const mangaSurfaceActivation = MangaSurfaceActivationFactory.create({
     activateMangaTab() {
       if (els.listTabManga) els.listTabManga.classList.add('active');
-    },
-    deactivateVideoTab() {
-      if (els.listTabVideo) els.listTabVideo.classList.remove('active');
     },
     activateMangaMobileNav() {
       setMobileNavActive(els.mobileNavManga);
     },
     showMangaSection() {
       els.mangaListSection.style.display = '';
+    },
+  });
+
+  const readerMangaChromeDeps = Object.freeze({
+    deactivateVideoTab() {
+      if (els.listTabVideo) els.listTabVideo.classList.remove('active');
     },
     hideVideoSection() {
       els.videoListSection.style.display = 'none';
@@ -6776,12 +6780,12 @@ https://cdn.example.org/c/003.webp"></textarea>
   });
 
   function activateMangaListTab() {
-    mangaTabActivationDeps.activateMangaTab();
-    mangaTabActivationDeps.deactivateVideoTab();
-    mangaTabActivationDeps.activateMangaMobileNav();
-    mangaTabActivationDeps.showMangaSection();
-    mangaTabActivationDeps.hideVideoSection();
-    mangaTabActivationDeps.hideCloseButton();
+    mangaSurfaceActivation.activateMangaTab();
+    readerMangaChromeDeps.deactivateVideoTab();
+    mangaSurfaceActivation.activateMangaMobileNav();
+    mangaSurfaceActivation.showMangaSection();
+    readerMangaChromeDeps.hideVideoSection();
+    readerMangaChromeDeps.hideCloseButton();
   }
 
   function switchListTab(tab) {
