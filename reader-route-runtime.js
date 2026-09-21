@@ -35,11 +35,13 @@
         deps.installHeadAssets(doc);
         deps.mountBody(doc);
         await deps.loadMediaGate();
+        if (generation !== deps.getGeneration()) return;
         for (const source of deps.getScripts(doc)) {
           await deps.loadScript(source);
           if (generation !== deps.getGeneration()) return;
         }
         if (route === 'video') await deps.ensureVideoEntryEnhancement();
+        if (generation !== deps.getGeneration()) return;
         deps.prune(route);
         if (route === 'manga' || route === 'video') deps.activate(route);
         deps.sync();

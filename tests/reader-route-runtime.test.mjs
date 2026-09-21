@@ -82,3 +82,32 @@ test('reader route runtime rejects missing callbacks and stale generations witho
   assert.deepEqual(calls.map((call) => Array.isArray(call) ? call[0] : call), ['mount']);
   assert.equal(calls.some((call) => Array.isArray(call) && ['script', 'prune', 'activate', 'sync'].includes(call[0])), false);
 });
+
+test('reader route runtime stops stale work after media and video initialization awaits', async () => {
+  const factory = loadFactory();
+  let currentGeneration = 1;
+  const calls = [];
+  const mediaStale = dependencies(calls);
+  mediaStale.getGeneration = () => currentGeneration;
+  mediaStale.loadMediaGate = () => {
+    calls.push('media');
+    currentGeneration = 2;
+    return Promise.resolve();
+  };
+  await factory.create(mediaStale).render('manga', 1);
+  assert.equal(calls.includes('scripts'), false);
+  assert.equal(calls.some((call) => Array.isArray(call) && ['prune', 'activate', 'sync'].includes(call[0])), false);
+
+  calls.length = 0;
+  currentGeneration = 1;
+  const videoStale = dependencies(calls);
+  videoStale.getGeneration = () => currentGeneration;
+  videoStale.ensureVideoEntryEnhancement = () => {
+    calls.push('video-enhancement');
+    currentGeneration = 2;
+    return Promise.resolve();
+  };
+  await factory.create(videoStale).render('video', 1);
+  assert.equal(calls.filter((call) => call === 'video-enhancement').length, 1);
+  assert.equal(calls.some((call) => Array.isArray(call) && ['prune', 'activate', 'sync'].includes(call[0])), false);
+});
