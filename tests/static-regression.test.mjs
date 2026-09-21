@@ -448,12 +448,19 @@ test('manga filter listeners call named actions without changing existing order'
   assert.match(toggle, /els\.filterRow\.style\.display = els\.filterRow\.style\.display === 'none' \? 'flex' : 'none';/);
   assert.match(apply, /shelfFilters = \{ series: els\.filterSeriesInput\.value\.trim\(\), author: els\.filterAuthorInput\.value\.trim\(\), tags: els\.filterTagsInput\.value\.trim\(\), source: els\.filterSourceInput\.value\.trim\(\) \};\s*bookshelfPage = 1;\s*renderSavedList\(\);/);
   assert.match(clear, /shelfFilters = \{ series: '', author: '', tags: '', source: '' \};\s*bookshelfPage = 1;\s*els\.filterSeriesInput\.value = ''; els\.filterAuthorInput\.value = ''; els\.filterTagsInput\.value = ''; els\.filterSourceInput\.value = '';\s*renderSavedList\(\);/);
-  assert.match(source, /els\.filterBtn\.addEventListener\('click', handleShelfFilterToggle\)/);
-  assert.match(source, /els\.applyFilterBtn\.addEventListener\('click', handleShelfFilterApply\)/);
-  assert.match(source, /els\.clearFilterBtn\.addEventListener\('click', handleShelfFilterClear\)/);
-  assert.equal((source.match(/els\.filterBtn\.addEventListener\('click'/g) || []).length, 1);
-  assert.equal((source.match(/els\.applyFilterBtn\.addEventListener\('click'/g) || []).length, 1);
-  assert.equal((source.match(/els\.clearFilterBtn\.addEventListener\('click'/g) || []).length, 1);
+  assert.equal((source.match(/manga-list-filter-events\.js\?v=20260921-filter-events/g) || []).length, 1);
+  assert.equal((source.match(/MangaListFilterEventsFactory\.create\(/g) || []).length, 1);
+  assert.match(source, /onToggle: handleShelfFilterToggle/);
+  assert.match(source, /onApply: handleShelfFilterApply/);
+  assert.match(source, /onClear: handleShelfFilterClear/);
+  assert.match(source, /mangaListFilterEvents\.bind\(\{[\s\S]*?filterButton: els\.filterBtn,[\s\S]*?applyButton: els\.applyFilterBtn,[\s\S]*?clearButton: els\.clearFilterBtn,[\s\S]*?\}\)/);
+  assert.match(source, /const cleanupMangaListFilterEvents = mangaListFilterEvents\.bind/);
+  assert.doesNotMatch(source, /els\.filterBtn\.addEventListener\('click', handleShelfFilterToggle\)/);
+  assert.doesNotMatch(source, /els\.applyFilterBtn\.addEventListener\('click', handleShelfFilterApply\)/);
+  assert.doesNotMatch(source, /els\.clearFilterBtn\.addEventListener\('click', handleShelfFilterClear\)/);
+  assert.equal((source.match(/filterButton: els\.filterBtn/g) || []).length, 1);
+  assert.equal((source.match(/applyButton: els\.applyFilterBtn/g) || []).length, 1);
+  assert.equal((source.match(/clearButton: els\.clearFilterBtn/g) || []).length, 1);
 });
 
 test('image requests stop after a short timeout instead of retrying indefinitely', () => {
