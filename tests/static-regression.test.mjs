@@ -512,6 +512,24 @@ test('manga folder creation listeners use named actions and one private boundary
   assert.match(source.slice(confirm, boundary), /const name = els\.listNewFolderInput\.value\.trim\(\);[\s\S]*?if \(!name\) return;[\s\S]*?savedFolders\.push\(\{ id: genId\('f'\), name: name \}\);[\s\S]*?persistAll\(\);[\s\S]*?renderSavedList\(\);/);
 });
 
+test('manga bulk static listeners use a callback boundary while overlay handlers stay local', () => {
+  const source = read('reader.html');
+  assert.equal((source.match(/manga-list-bulk-events\.js\?v=20260921-bulk-events/g) || []).length, 1);
+  assert.equal((source.match(/MangaListBulkEventsFactory\.create\(/g) || []).length, 1);
+  assert.match(source, /onEdit: handleMangaBulkEditClick/);
+  assert.match(source, /onUndo: undoBulkEdit/);
+  assert.match(source, /mangaListBulkEvents\.bind\(\{[\s\S]*?editButton: els\.bulkEditBtn,[\s\S]*?undoButton: els\.undoBulkEditBtn,[\s\S]*?\}\)/);
+  assert.match(source, /const cleanupMangaListBulkEvents = mangaListBulkEvents\.bind/);
+  assert.doesNotMatch(source, /els\.bulkEditBtn\.addEventListener\('click'/);
+  assert.doesNotMatch(source, /els\.undoBulkEditBtn\.addEventListener\('click'/);
+  assert.match(source, /els\.closeBulkEditBtn\.addEventListener\('click', closeBulkEditDialog\)/);
+  assert.match(source, /els\.bulkEditOverlay\.addEventListener\('click'/);
+  const start = source.indexOf('function handleMangaBulkEditClick()');
+  const boundary = source.indexOf('const mangaListBulkEvents', start);
+  assert.ok(start >= 0 && boundary > start);
+  assert.match(source.slice(start, boundary), /if \(bulkEditMode\) openBulkEditDialog\(\);[\s\S]*?bulkEditMode = true; bulkSelectedIds\.clear\(\); updateBulkEditButton\(\); renderSavedList\(\);/);
+});
+
 test('image requests stop after a short timeout instead of retrying indefinitely', () => {
   const source = read('reader.html');
   assert.match(source, /const LOAD_TIMEOUT_MS = 60000/);

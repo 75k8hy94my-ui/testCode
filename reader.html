@@ -1527,6 +1527,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="manga-list-smart-list-events.js?v=20260921-smart-list-events"></script>
 <script src="manga-list-navigation-events.js?v=20260921-navigation-events"></script>
 <script src="manga-list-folder-events.js?v=20260921-folder-events"></script>
+<script src="manga-list-bulk-events.js?v=20260921-bulk-events"></script>
 
 <script>
 (function () {
@@ -6487,11 +6488,18 @@ https://cdn.example.org/c/003.webp"></textarea>
     reorderMode = !reorderMode;
     renderSavedList();
   });
-  els.bulkEditBtn.addEventListener('click', () => {
+  function handleMangaBulkEditClick() {
     if (bulkEditMode) openBulkEditDialog();
     else { bulkEditMode = true; bulkSelectedIds.clear(); updateBulkEditButton(); renderSavedList(); }
+  }
+  const mangaListBulkEvents = MangaListBulkEventsFactory.create({
+    onEdit: handleMangaBulkEditClick,
+    onUndo: undoBulkEdit,
   });
-  els.undoBulkEditBtn.addEventListener('click', undoBulkEdit);
+  const cleanupMangaListBulkEvents = mangaListBulkEvents.bind({
+    editButton: els.bulkEditBtn,
+    undoButton: els.undoBulkEditBtn,
+  });
   els.closeBulkEditBtn.addEventListener('click', closeBulkEditDialog);
   els.cancelBulkEditBtn.addEventListener('click', closeBulkEditDialog);
   els.applyBulkEditBtn.addEventListener('click', applyBulkEdit);
