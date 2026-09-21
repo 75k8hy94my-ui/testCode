@@ -21,8 +21,8 @@ test('moveItemInList swaps only adjacent saved items and persists the result', (
 });
 
 test('reorder controls and manga card boundary remain unchanged', () => {
-  assert.match(reader, /e\.stopPropagation\(\); moveItemInList\(item, list, -1\)/);
-  assert.match(reader, /e\.stopPropagation\(\); moveItemInList\(item, list, 1\)/);
+  assert.match(reader, /e\.stopPropagation\(\); context\.moveItemInList\(item, list, -1\)/);
+  assert.match(reader, /e\.stopPropagation\(\); context\.moveItemInList\(item, list, 1\)/);
   assert.match(card, /createStaticCard/);
 });
 

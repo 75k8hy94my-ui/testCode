@@ -4,7 +4,14 @@
   const REQUIRED = [
     'getState', 'setState', 'getElements',
     'persistItems', 'persistFolders', 'persistAuthorCards', 'persistAll', 'scheduleCloudSync',
-    'openReader', 'accessMedia', 'renderDashboard', 'renderAuthorDashboard'
+    'openReader', 'accessMedia', 'renderDashboard', 'renderAuthorDashboard',
+    'getVisibleItems', 'appendFolderPreview', 'createStaticCard', 'loadLocalCover',
+    'getCoverSourceCache', 'setupFeedImage', 'makeHeartIcon', 'moveItemInList',
+    'moveFolderInList', 'rememberReaderReturnView', 'closeSavedList',
+    'setReadingListContext', 'flashStatus', 'navigateReaderScreen', 'switchListTab',
+    'openItem', 'renderList', 'updateBulkEditButton', 'shelfVisibleItems',
+    'unreadOrderItems', 'itemDisplayTitle', 'itemSubtext', 'readingRecordText',
+    'itemPageCountText'
   ];
 
   function create(deps) {
@@ -28,7 +35,31 @@
       openReader: deps.openReader,
       accessMedia: deps.accessMedia,
       renderDashboard: deps.renderDashboard,
-      renderAuthorDashboard: deps.renderAuthorDashboard
+      renderAuthorDashboard: deps.renderAuthorDashboard,
+      getVisibleItems: deps.getVisibleItems,
+      appendFolderPreview: deps.appendFolderPreview,
+      createStaticCard: deps.createStaticCard,
+      loadLocalCover: deps.loadLocalCover,
+      getCoverSourceCache: deps.getCoverSourceCache,
+      setupFeedImage: deps.setupFeedImage,
+      makeHeartIcon: deps.makeHeartIcon,
+      moveItemInList: deps.moveItemInList,
+      moveFolderInList: deps.moveFolderInList,
+      rememberReaderReturnView: deps.rememberReaderReturnView,
+      closeSavedList: deps.closeSavedList,
+      setReadingListContext: deps.setReadingListContext,
+      flashStatus: deps.flashStatus,
+      navigateReaderScreen: deps.navigateReaderScreen,
+      switchListTab: deps.switchListTab,
+      openItem: deps.openItem,
+      renderList: deps.renderList,
+      updateBulkEditButton: deps.updateBulkEditButton,
+      shelfVisibleItems: deps.shelfVisibleItems,
+      unreadOrderItems: deps.unreadOrderItems,
+      itemDisplayTitle: deps.itemDisplayTitle,
+      itemSubtext: deps.itemSubtext,
+      readingRecordText: deps.readingRecordText,
+      itemPageCountText: deps.itemPageCountText
     });
   }
 

@@ -33,13 +33,13 @@ test('normal manga card clicks use one reader interaction boundary in the origin
   const boundaryEnd = reader.indexOf('\n  function buildBookCard(', boundaryStart);
   const boundary = reader.slice(boundaryStart, boundaryEnd);
   const expected = [
-    'rememberReaderReturnView()',
-    "navigateReaderScreen('saved-list', { replace: true })",
-    "switchListTab('manga')",
-    'closeSavedList()',
-    'setReadingListContext(list, list.indexOf(item))',
-    "flashStatus('読み込み中…')",
-    'openItem(item, false)'
+    'context.rememberReaderReturnView()',
+    "context.navigateReaderScreen('saved-list', { replace: true })",
+    "context.switchListTab('manga')",
+    'context.closeSavedList()',
+    'context.setReadingListContext(list, list.indexOf(item))',
+    "context.flashStatus('読み込み中…')",
+    'context.openItem(item, false)'
   ];
   let previous = -1;
   for (const expression of expected) {
@@ -51,7 +51,7 @@ test('normal manga card clicks use one reader interaction boundary in the origin
   const buildEnd = reader.indexOf('\n  function normalizeAuthorLinks(', buildStart);
   const build = reader.slice(buildStart, buildEnd);
   assert.match(build, /if \(!reorderMode && !bulkEditMode\) \{\s*card\.addEventListener\('click', \(\) => handleMangaCardOpen\(item, list\)\);/);
-  assert.equal((boundary.match(/openItem\(item, false\)/g) || []).length, 1);
+  assert.equal((boundary.match(/context\.openItem\(item, false\)/g) || []).length, 1);
   assert.equal((build.match(/card\.addEventListener\('click'/g) || []).length, 1);
 });
 
@@ -68,12 +68,12 @@ test('buildBookCard uses one private cover dependency boundary without changing 
   const buildStart = reader.indexOf('function buildBookCard(');
   const buildEnd = reader.indexOf('\n  function normalizeAuthorLinks(', buildStart);
   const build = reader.slice(buildStart, buildEnd);
-  assert.match(build, /mangaListCoverDeps\.loadLocalCover\(item, img\)/);
-  assert.match(build, /mangaListCoverDeps\.coverSourceCache\.get\(source\)/);
-  assert.match(build, /mangaListCoverDeps\.coverSourceCache\.set\(source, img\.currentSrc \|\| img\.src\)/);
-  assert.match(build, /mangaListCoverDeps\.setupFeedImage\(img, item\.url, item\.numberWidth, item\.pagePattern\)/);
-  assert.equal((build.match(/mangaListCoverDeps\.loadLocalCover\(item, img\)/g) || []).length, 1);
-  assert.equal((build.match(/mangaListCoverDeps\.setupFeedImage\(/g) || []).length, 1);
+  assert.match(build, /context\.loadLocalCover\(item, img\)/);
+  assert.match(build, /coverSourceCache\.get\(source\)/);
+  assert.match(build, /coverSourceCache\.set\(source, img\.currentSrc \|\| img\.src\)/);
+  assert.match(build, /context\.setupFeedImage\(img, item\.url, item\.numberWidth, item\.pagePattern\)/);
+  assert.equal((build.match(/context\.loadLocalCover\(item, img\)/g) || []).length, 1);
+  assert.equal((build.match(/context\.setupFeedImage\(/g) || []).length, 1);
 });
 
 test('manga card boundary preserves the required card classes and image attributes', () => {

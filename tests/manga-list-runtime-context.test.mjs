@@ -12,7 +12,14 @@ async function load(path) {
 const names = [
   'getState', 'setState', 'getElements',
   'persistItems', 'persistFolders', 'persistAuthorCards', 'persistAll', 'scheduleCloudSync',
-  'openReader', 'accessMedia', 'renderDashboard', 'renderAuthorDashboard'
+  'openReader', 'accessMedia', 'renderDashboard', 'renderAuthorDashboard',
+  'getVisibleItems', 'appendFolderPreview', 'createStaticCard', 'loadLocalCover',
+  'getCoverSourceCache', 'setupFeedImage', 'makeHeartIcon', 'moveItemInList',
+  'moveFolderInList', 'rememberReaderReturnView', 'closeSavedList',
+  'setReadingListContext', 'flashStatus', 'navigateReaderScreen', 'switchListTab',
+  'openItem', 'renderList', 'updateBulkEditButton', 'shelfVisibleItems',
+  'unreadOrderItems', 'itemDisplayTitle', 'itemSubtext', 'readingRecordText',
+  'itemPageCountText'
 ];
 
 test('manga runtime context exposes only frozen callback accessors', async () => {

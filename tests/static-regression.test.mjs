@@ -50,7 +50,7 @@ test('bookshelf cover cache separates filename patterns and can recover stale so
 test('manga cards restore the manga screen route before opening a work', () => {
   const source = readReader();
   const body = source.slice(source.indexOf('function handleMangaCardOpen'), source.indexOf('function buildBookCard'));
-  assert.match(body, /if \(currentReaderScreen === 'video-list'\) navigateReaderScreen\('saved-list', \{ replace: true \}\);/);
+  assert.match(body, /if \(currentReaderScreen === 'video-list'\) context\.navigateReaderScreen\('saved-list', \{ replace: true \}\);/);
   assert.match(body, /switchListTab\('manga'\);[\s\S]*closeSavedList\(\);[\s\S]*openItem\(item, false\)/);
 });
 
@@ -101,7 +101,7 @@ test('disabled local manga stays out of bookshelf views without deleting it', ()
   assert.match(source, /window\.MangaReaderFeatures && window\.MangaReaderFeatures\.localReader/);
   assert.match(source, /!item\.localSync/);
   assert.match(viewModel, /itemsList = visibleShelfItems\.filter\(\(it\) => !it\.folderId && !it\.series\)/);
-  assert.match(source, /items:\s*shelfVisibleItems\(\)/);
+  assert.match(source, /items:\s*context\.shelfVisibleItems\(\)/);
 });
 
 test('narrow bookshelf controls wrap instead of clipping', () => {
@@ -315,15 +315,15 @@ test('folder cards use one private operation dependency boundary without capturi
   const buildStart = source.indexOf('function buildFolderCard(');
   const buildEnd = source.indexOf('\n  // お気に入り is a virtual', buildStart);
   const build = source.slice(buildStart, buildEnd);
-  assert.match(build, /mangaFolderCardDeps\.getVisibleItems\(\)/);
-  assert.match(build, /mangaFolderCardDeps\.openItem\(folderItems\[0\], false\)/);
-  assert.match(build, /mangaFolderCardDeps\.persistAll\(\)/);
-  assert.match(build, /mangaFolderCardDeps\.renderSavedList\(\)/);
-  assert.match(build, /mangaFolderCardDeps\.moveFolderInList\(folder, folderList, -1\)/);
-  assert.match(build, /mangaFolderCardDeps\.moveFolderInList\(folder, folderList, 1\)/);
-  assert.equal((build.match(/mangaFolderCardDeps\.openItem\(/g) || []).length, 1);
-  assert.equal((build.match(/mangaFolderCardDeps\.persistAll\(/g) || []).length, 1);
-  assert.equal((build.match(/mangaFolderCardDeps\.moveFolderInList\(/g) || []).length, 2);
+  assert.match(build, /context\.getVisibleItems\(\)/);
+  assert.match(build, /context\.openItem\(folderItems\[0\], false\)/);
+  assert.match(build, /context\.persistAll\(\)/);
+  assert.match(build, /context\.renderList\(\)/);
+  assert.match(build, /context\.moveFolderInList\(folder, folderList, -1\)/);
+  assert.match(build, /context\.moveFolderInList\(folder, folderList, 1\)/);
+  assert.equal((build.match(/context\.openItem\(/g) || []).length, 1);
+  assert.equal((build.match(/context\.persistAll\(/g) || []).length, 1);
+  assert.equal((build.match(/context\.moveFolderInList\(/g) || []).length, 2);
   assert.match(build, /e\.stopPropagation\(\)/);
   assert.match(build, /folder\.id === recentlyClosedFolderId/);
 });
