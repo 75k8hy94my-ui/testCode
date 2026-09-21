@@ -1520,6 +1520,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="manga-surface-activation.js?v=20260921-surface-activation"></script>
 <script src="manga-list-elements.js?v=20260921-elements-boundary"></script>
 <script src="manga-list-dom-resolver.js?v=20260921-dom-resolver"></script>
+<script src="manga-list-pagination-events.js?v=20260921-pagination-events"></script>
 
 <script>
 (function () {
@@ -6384,8 +6385,13 @@ https://cdn.example.org/c/003.webp"></textarea>
     mangaListController.render();
     els.savedListItems.scrollTop = 0;
   }
-  els.bookshelfPrevBtn.addEventListener('click', () => changeBookshelfPage(-1));
-  els.bookshelfNextBtn.addEventListener('click', () => changeBookshelfPage(1));
+  const mangaListPaginationEvents = MangaListPaginationEventsFactory.create({
+    onPageChange: changeBookshelfPage,
+  });
+  const cleanupMangaListPaginationEvents = mangaListPaginationEvents.bind({
+    prevButton: mangaListEls.bookshelfPrevBtn,
+    nextButton: mangaListEls.bookshelfNextBtn,
+  });
   let shelfTouchStartX = 0;
   let shelfTouchStartY = 0;
   els.savedListItems.addEventListener('touchstart', (event) => {

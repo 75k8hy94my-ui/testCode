@@ -394,13 +394,17 @@ test('manga paging routes one render call through the controller', () => {
   const source = read('reader.html');
   assert.equal((source.match(/mangaListController\.render\(\);/g) || []).length, 1);
   const changeStart = source.indexOf('function changeBookshelfPage(delta)');
-  const changeEnd = source.indexOf('\n  els.bookshelfPrevBtn.addEventListener', changeStart);
+  const changeEnd = source.indexOf('\n  const mangaListPaginationEvents', changeStart);
   const change = source.slice(changeStart, changeEnd);
   assert.match(change, /bookshelfPage = next;\s*mangaListController\.render\(\);/);
   assert.doesNotMatch(change, /renderSavedList\(\);/);
   assert.match(source, /MangaListControllerFactory\.create\([\s\S]*render:\s*renderSavedList/);
-  assert.match(source, /els\.bookshelfPrevBtn\.addEventListener\('click', \(\) => changeBookshelfPage\(-1\)\)/);
-  assert.match(source, /els\.bookshelfNextBtn\.addEventListener\('click', \(\) => changeBookshelfPage\(1\)\)/);
+  assert.match(source, /manga-list-pagination-events\.js\?v=[^"']+/);
+  assert.match(source, /MangaListPaginationEventsFactory\.create\(\{\s*onPageChange:\s*changeBookshelfPage/);
+  assert.match(source, /mangaListPaginationEvents\.bind\(\{\s*prevButton:\s*mangaListEls\.bookshelfPrevBtn,\s*nextButton:\s*mangaListEls\.bookshelfNextBtn/);
+  assert.match(source, /const cleanupMangaListPaginationEvents =/);
+  assert.doesNotMatch(source, /els\.bookshelfPrevBtn\.addEventListener\('click'/);
+  assert.doesNotMatch(source, /els\.bookshelfNextBtn\.addEventListener\('click'/);
 });
 
 test('image requests stop after a short timeout instead of retrying indefinitely', () => {
