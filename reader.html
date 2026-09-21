@@ -1522,6 +1522,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="manga-list-dom-resolver.js?v=20260921-dom-resolver"></script>
 <script src="manga-list-pagination-events.js?v=20260921-pagination-events"></script>
 <script src="manga-list-sort-events.js?v=20260921-sort-events"></script>
+<script src="manga-list-search-events.js?v=20260921-search-events"></script>
 
 <script>
 (function () {
@@ -6378,7 +6379,17 @@ https://cdn.example.org/c/003.webp"></textarea>
   const cleanupMangaListSortEvents = mangaListSortEvents.bind({
     sortSelect: els.shelfSortSelect,
   });
-  els.shelfSearchInput.addEventListener('input', () => { shelfSearchQuery = els.shelfSearchInput.value.trim(); bookshelfPage = 1; renderSavedList(); });
+  function handleShelfSearchChange(value) {
+    shelfSearchQuery = value;
+    bookshelfPage = 1;
+    renderSavedList();
+  }
+  const mangaListSearchEvents = MangaListSearchEventsFactory.create({
+    onSearchChange: handleShelfSearchChange,
+  });
+  const cleanupMangaListSearchEvents = mangaListSearchEvents.bind({
+    searchInput: els.shelfSearchInput,
+  });
   els.groupAuthorBtn.addEventListener('click', () => {
     groupByAuthorEnabled = !groupByAuthorEnabled;
     bookshelfPage = 1;
