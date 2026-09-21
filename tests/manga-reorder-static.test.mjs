@@ -29,7 +29,8 @@ test('reorder controls and manga card boundary remain unchanged', () => {
 
 test('manual ordering fix does not change storage or video ownership boundaries', () => {
   assert.match(reader, /const SAVED_ITEMS_KEY\s*=\s*['"]mangaReaderSavedItems['"]/);
-  assert.match(reader, /MangaVault\.savePayload\(buildSyncPayload\(\)\)/);
+  assert.match(reader, /savePayload:\s*\(payload\) => MangaVault\.savePayload\(payload\)/);
+  assert.match(reader, /const buildSyncPayload = \(\) => mangaListHostRuntime\.buildSyncPayload\(\);/);
   assert.match(reader, /scheduleCloudSync\(\)/);
   assert.match(reader, /persistItems\(\)/);
 });

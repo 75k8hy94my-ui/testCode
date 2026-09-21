@@ -2170,14 +2170,30 @@ https://cdn.example.org/c/003.webp"></textarea>
   const mangaListHostRuntime = MangaListHostRuntimeFactory.create({
     safeWriteJson: (key, value) => MangaReaderStorage.safeWriteJson(key, value),
     getState: getMangaRuntimeState,
-    scheduleCloudSync,
     persistVideos: persistSavedVideos,
-    keys: { savedItems: SAVED_ITEMS_KEY, savedFolders: SAVED_FOLDERS_KEY, authorCards: AUTHOR_CARDS_KEY }
+    keys: { savedItems: SAVED_ITEMS_KEY, savedFolders: SAVED_FOLDERS_KEY, authorCards: AUTHOR_CARDS_KEY, savedVideos: SAVED_VIDEOS_KEY },
+    sync: {
+      hasActiveVault: () => !!(window.MangaVault && MangaVault.loadActive()),
+      clearTimer: (timer) => { clearTimeout(timer); cloudSyncTimer = null; },
+      setTimer: (callback, delay) => { cloudSyncTimer = setTimeout(callback, delay); return cloudSyncTimer; },
+      savePayload: (payload) => MangaVault.savePayload(payload),
+      buildBasePayload: () => window.MangaVaultPayload.buildFromLocalStorage(),
+      getSavedVideos: () => savedVideos,
+      readStorageItem: (key) => localStorage.getItem(key),
+      getMangaInfo: loadMangaInfoCache,
+      getToc: loadTocMap,
+      getTheme: () => document.documentElement.dataset.theme === 'light' ? 'light' : 'dark',
+      getDashboardVisibility: () => dashboardVisibilityProfiles,
+      onSyncError: (message, kind) => flashStatus(message, kind),
+    }
   });
   const persistItems = () => mangaListHostRuntime.persistItems();
   const persistFolders = () => mangaListHostRuntime.persistFolders();
   const persistAuthorCards = () => mangaListHostRuntime.persistAuthorCards();
   const persistAll = () => mangaListHostRuntime.persistAll();
+  const buildSyncPayload = () => mangaListHostRuntime.buildSyncPayload();
+  const runCloudSync = () => mangaListHostRuntime.runCloudSync();
+  const scheduleCloudSync = () => mangaListHostRuntime.scheduleCloudSync();
   let mangaListRuntime;
   const mangaListRuntimeContext = MangaListRuntimeContextFactory.create({
     getState: getMangaRuntimeState,
@@ -2505,25 +2521,6 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   let cloudSyncTimer = null;
-  let cloudSyncRunning = false;
-  let cloudSyncDirty = false;
-  function scheduleCloudSync() {
-    if (!window.MangaVault || !MangaVault.loadActive()) return;
-    clearTimeout(cloudSyncTimer);
-    cloudSyncTimer = setTimeout(runCloudSync, 5000);
-  }
-  async function runCloudSync() {
-    if (cloudSyncRunning) { cloudSyncDirty = true; return; }
-    cloudSyncRunning = true;
-    try {
-      await MangaVault.savePayload(buildSyncPayload());
-    } catch (error) {
-      flashStatus(error && error.message ? error.message : 'クラウド同期に失敗しました', 'cloud-sync-error');
-    } finally {
-      cloudSyncRunning = false;
-      if (cloudSyncDirty) { cloudSyncDirty = false; scheduleCloudSync(); }
-    }
-  }
 
   // Remembers the last page viewed per manga (keyed by baseUrl). If the last
   // viewed page was the final page (and detection had finished, so we know it
@@ -2991,17 +2988,6 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   // folders/items/videos に加えて per-manga info cache（拡張子・既知ページ数）も同梱する。
   // 書き出し/読み込みとクラウド同期の両方で使う共通ペイロード組み立て。
-  function buildSyncPayload() {
-    const payload = window.MangaVaultPayload.buildFromLocalStorage();
-    let latestVideos = savedVideos;
-    try {
-      const storedVideos = JSON.parse(localStorage.getItem(SAVED_VIDEOS_KEY) || 'null');
-      if (Array.isArray(storedVideos)) latestVideos = storedVideos;
-    } catch (_) {}
-    payload.folders = savedFolders; payload.items = savedItems; payload.videos = latestVideos; payload.authorCards = authorCards;
-    payload.mangaInfo = loadMangaInfoCache(); payload.toc = loadTocMap(); payload.theme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'; payload.dashboardVisibility = dashboardVisibilityProfiles;
-    return payload;
-  }
   window.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && cloudSyncTimer) { clearTimeout(cloudSyncTimer); cloudSyncTimer = null; runCloudSync(); } });
   window.addEventListener('pagehide', () => { if (cloudSyncTimer) { clearTimeout(cloudSyncTimer); cloudSyncTimer = null; runCloudSync(); } });
 

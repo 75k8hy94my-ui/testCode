@@ -17,9 +17,22 @@ function deps(calls) {
   return {
     safeWriteJson(key, value) { calls.push(['write', key, value]); },
     getState() { calls.push('state'); return state; },
-    scheduleCloudSync() { calls.push('sync'); },
     persistVideos() { calls.push('videos'); },
-    keys: { savedItems: 'items-key', savedFolders: 'folders-key', authorCards: 'authors-key' },
+    keys: { savedItems: 'items-key', savedFolders: 'folders-key', authorCards: 'authors-key', savedVideos: 'videos-key' },
+    sync: {
+      hasActiveVault() { calls.push('vault'); return true; },
+      clearTimer(timer) { calls.push(['clear', timer]); },
+      setTimer(callback, delay) { calls.push(['timer', delay]); return 'timer-id'; },
+      savePayload(payload) { calls.push(['save', payload]); },
+      buildBasePayload() { calls.push('base'); return {}; },
+      getSavedVideos() { calls.push('saved-videos'); return ['memory-videos']; },
+      readStorageItem(key) { calls.push(['read', key]); return '["stored-videos"]'; },
+      getMangaInfo() { calls.push('manga-info'); return { info: true }; },
+      getToc() { calls.push('toc'); return { toc: true }; },
+      getTheme() { calls.push('theme'); return 'dark'; },
+      getDashboardVisibility() { calls.push('dashboard'); return { desktop: {} }; },
+      onSyncError(message, kind) { calls.push(['error', message, kind]); },
+    },
   };
 }
 
@@ -29,24 +42,55 @@ test('host factory exposes the shared persistence callbacks and rejects missing 
   assert.ok(Object.isFrozen(factory));
   assert.throws(() => factory.create(), (error) => error.name === 'TypeError');
   const complete = deps([]);
-  for (const key of ['safeWriteJson', 'getState', 'scheduleCloudSync', 'persistVideos', 'keys']) {
+  for (const key of ['safeWriteJson', 'getState', 'persistVideos', 'keys', 'sync']) {
     const missing = { ...complete };
     delete missing[key];
     assert.throws(() => factory.create(missing), (error) => error.name === 'TypeError' && error.message.includes(key === 'keys' ? 'keys' : key));
+  }
+  for (const name of [
+    'hasActiveVault', 'clearTimer', 'setTimer', 'savePayload', 'buildBasePayload',
+    'getSavedVideos', 'readStorageItem', 'getMangaInfo', 'getToc', 'getTheme',
+    'getDashboardVisibility', 'onSyncError',
+  ]) {
+    const missing = deps([]);
+    delete missing.sync[name];
+    assert.throws(() => factory.create(missing), (error) => error.name === 'TypeError' && error.message.includes(name));
   }
 });
 
 test('host persistence preserves write and sync order', () => {
   const calls = [];
   const host = loadFactory().create(deps(calls));
-  assert.deepEqual(Object.keys(host), ['persistItems', 'persistFolders', 'persistAuthorCards', 'persistAll']);
+  assert.deepEqual(Object.keys(host), [
+    'persistItems', 'persistFolders', 'persistAuthorCards', 'persistAll',
+    'buildSyncPayload', 'runCloudSync', 'scheduleCloudSync',
+  ]);
   assert.ok(Object.isFrozen(host));
   host.persistAll();
   assert.deepEqual(calls.map((call) => Array.isArray(call) ? call[0] + ':' + call[1] : call), [
-    'state', 'write:folders-key', 'sync',
-    'state', 'write:items-key', 'sync',
-    'state', 'write:authors-key', 'sync',
+    'state', 'write:folders-key', 'vault', 'clear:null', 'timer:5000',
+    'state', 'write:items-key', 'vault', 'clear:timer-id', 'timer:5000',
+    'state', 'write:authors-key', 'vault', 'clear:timer-id', 'timer:5000',
     'videos',
+  ]);
+});
+
+test('host builds the sync payload through explicit injected dependencies', () => {
+  const calls = [];
+  const host = loadFactory().create(deps(calls));
+  assert.equal(JSON.stringify(host.buildSyncPayload()), JSON.stringify({
+    folders: ['folders'],
+    items: ['items'],
+    videos: ['stored-videos'],
+    authorCards: ['authors'],
+    mangaInfo: { info: true },
+    toc: { toc: true },
+    theme: 'dark',
+    dashboardVisibility: { desktop: {} },
+  }));
+  assert.deepEqual(calls, [
+    'base', 'saved-videos', ['read', 'videos-key'], 'state',
+    'manga-info', 'toc', 'theme', 'dashboard',
   ]);
 });
 
@@ -62,5 +106,11 @@ test('reader delegates persistence to the host boundary without duplicating impl
   assert.equal((reader.match(/function persistFolders\s*\(/g) || []).length, 0);
   assert.equal((reader.match(/function persistAuthorCards\s*\(/g) || []).length, 0);
   assert.equal((reader.match(/function persistAll\s*\(/g) || []).length, 0);
+  assert.equal((reader.match(/function scheduleCloudSync\s*\(/g) || []).length, 0);
+  assert.equal((reader.match(/function runCloudSync\s*\(/g) || []).length, 0);
+  assert.equal((reader.match(/function buildSyncPayload\s*\(/g) || []).length, 0);
   assert.match(reader, /const persistItems = \(\) => mangaListHostRuntime\.persistItems\(\);/);
+  assert.match(reader, /const scheduleCloudSync = \(\) => mangaListHostRuntime\.scheduleCloudSync\(\);/);
+  assert.match(reader, /const runCloudSync = \(\) => mangaListHostRuntime\.runCloudSync\(\);/);
+  assert.match(reader, /const buildSyncPayload = \(\) => mangaListHostRuntime\.buildSyncPayload\(\);/);
 });
