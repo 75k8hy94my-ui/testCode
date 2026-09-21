@@ -407,6 +407,19 @@ test('manga paging routes one render call through the controller', () => {
   assert.doesNotMatch(source, /els\.bookshelfNextBtn\.addEventListener\('click'/);
 });
 
+test('manga sort routes the existing state and render order through one event boundary', () => {
+  const source = read('reader.html');
+  const sortStart = source.indexOf('function handleShelfSortChange(value)');
+  const sortEnd = source.indexOf('\n  const mangaListSortEvents', sortStart);
+  const action = source.slice(sortStart, sortEnd);
+  assert.equal((source.match(/manga-list-sort-events\.js\?v=[^"']+/g) || []).length, 1);
+  assert.match(source, /MangaListSortEventsFactory\.create\(\{\s*onSortChange:\s*handleShelfSortChange/);
+  assert.match(source, /mangaListSortEvents\.bind\(\{\s*sortSelect:\s*els\.shelfSortSelect/);
+  assert.match(source, /const cleanupMangaListSortEvents =/);
+  assert.match(action, /shelfSort = value;\s*bookshelfPage = 1;\s*renderSavedList\(\);/);
+  assert.doesNotMatch(source, /els\.shelfSortSelect\.addEventListener\('change'/);
+});
+
 test('image requests stop after a short timeout instead of retrying indefinitely', () => {
   const source = read('reader.html');
   assert.match(source, /const LOAD_TIMEOUT_MS = 60000/);

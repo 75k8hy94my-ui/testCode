@@ -1521,6 +1521,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="manga-list-elements.js?v=20260921-elements-boundary"></script>
 <script src="manga-list-dom-resolver.js?v=20260921-dom-resolver"></script>
 <script src="manga-list-pagination-events.js?v=20260921-pagination-events"></script>
+<script src="manga-list-sort-events.js?v=20260921-sort-events"></script>
 
 <script>
 (function () {
@@ -6366,10 +6367,16 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
   });
   els.transferBudgetBtn.addEventListener('click', configureTransferBudget);
-  els.shelfSortSelect.addEventListener('change', () => {
-    shelfSort = els.shelfSortSelect.value;
+  function handleShelfSortChange(value) {
+    shelfSort = value;
     bookshelfPage = 1;
     renderSavedList();
+  }
+  const mangaListSortEvents = MangaListSortEventsFactory.create({
+    onSortChange: handleShelfSortChange,
+  });
+  const cleanupMangaListSortEvents = mangaListSortEvents.bind({
+    sortSelect: els.shelfSortSelect,
   });
   els.shelfSearchInput.addEventListener('input', () => { shelfSearchQuery = els.shelfSearchInput.value.trim(); bookshelfPage = 1; renderSavedList(); });
   els.groupAuthorBtn.addEventListener('click', () => {
