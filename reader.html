@@ -1515,6 +1515,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="manga-list-state.js?v=20260921-state-loader"></script>
 <script src="manga-list-view-model.js?v=20260921-view-model-self"></script>
 <script src="manga-list-renderer.js?v=20260921-renderer"></script>
+<script src="manga-list-controller.js?v=20260921-controller-factory"></script>
 
 <script>
 (function () {
@@ -6772,7 +6773,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
   }
 
-  const mangaListController = Object.freeze({
+  const mangaListController = MangaListControllerFactory.create({
     init: initMangaList,
     render: renderSavedList,
     open: openSavedList,

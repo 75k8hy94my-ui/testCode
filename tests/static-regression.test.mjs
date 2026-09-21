@@ -352,21 +352,11 @@ test('manga list initialization has one synchronous private entry point', () => 
 
 test('manga list controller exposes only existing private boundaries', () => {
   const source = read('reader.html');
-  assert.equal((source.match(/const mangaListController = Object\.freeze\(/g) || []).length, 1);
-  const start = source.indexOf('const mangaListController = Object.freeze(');
-  const end = source.indexOf('\n  });', start) + '\n  });'.length;
-  const controller = source.slice(start, end);
-  const keys = [...controller.matchAll(/^\s{4}([A-Za-z]+)(?::|\()/gm)].map((match) => match[1]);
-  assert.deepEqual(keys, ['init', 'render', 'open', 'activate', 'getElements']);
-  assert.match(controller, /init:\s*initMangaList/);
-  assert.match(controller, /render:\s*renderSavedList/);
-  assert.match(controller, /open:\s*openSavedList/);
-  assert.match(controller, /getElements:\s*getMangaListElements/);
-  assert.match(controller, /activate\(\)\s*\{\s*switchListTab\('manga'\);\s*\}/);
-  const activateBody = controller.match(/activate\(\)\s*\{([\s\S]*?)\}/)?.[1] || '';
-  assert.doesNotMatch(activateBody, /openSavedList|renderSavedList/);
-  assert.doesNotMatch(controller, /savedItems|savedFolders|authorCards|savedVideos|activeListTab|currentFolderView|currentSeriesView|currentAuthorView|readerReturnView|recentlyClosedItemId|recentlyClosedFolderId|mangaListEls|document|window|self|localStorage|sessionStorage|MangaVault|MangaListState|Supabase|media-access-gate|VPN|setTimeout|new Map|new Set|\[\]/);
-  assert.doesNotMatch(controller, /\bthis\b|\.bind\(|\.call\(|\.apply\(|prototype|class\b/);
+  assert.equal((source.match(/manga-list-controller\.js\?v=[^"']+/g) || []).length, 1);
+  assert.equal((source.match(/MangaListControllerFactory\.create\(/g) || []).length, 1);
+  assert.ok(source.indexOf('manga-list-controller.js?v=') < source.indexOf('MangaListControllerFactory.create('));
+  assert.doesNotMatch(source, /const mangaListController = Object\.freeze\(/);
+  assert.match(source, /const mangaListController = MangaListControllerFactory\.create\(\{[\s\S]*init:\s*initMangaList,[\s\S]*render:\s*renderSavedList,[\s\S]*open:\s*openSavedList,[\s\S]*activate\(\)\s*\{\s*switchListTab\('manga'\);\s*\}[\s\S]*getElements:\s*getMangaListElements/);
   assert.doesNotMatch(source, /window\.mangaListController|self\.mangaListController|globalThis\.mangaListController|export\s/);
 });
 
@@ -374,7 +364,7 @@ test('manga mobile navigation routes one open call through the controller', () =
   const source = read('reader.html');
   assert.equal((source.match(/mangaListController\.open\(/g) || []).length, 1);
   assert.equal((source.match(/openSavedList\(false, false\)/g) || []).length, 0);
-  const controller = source.indexOf('const mangaListController = Object.freeze(');
+  const controller = source.indexOf('const mangaListController = MangaListControllerFactory.create(');
   const use = source.indexOf('mangaListController.open(false, false);');
   assert.ok(controller < use);
   assert.match(source.slice(use, use + 100), /mangaListController\.open\(false, false\); switchListTab\('manga'\)/);
@@ -388,7 +378,7 @@ test('manga paging routes one render call through the controller', () => {
   const change = source.slice(changeStart, changeEnd);
   assert.match(change, /bookshelfPage = next;\s*mangaListController\.render\(\);/);
   assert.doesNotMatch(change, /renderSavedList\(\);/);
-  assert.match(source, /const mangaListController = Object\.freeze\([\s\S]*render:\s*renderSavedList/);
+  assert.match(source, /MangaListControllerFactory\.create\([\s\S]*render:\s*renderSavedList/);
   assert.match(source, /els\.bookshelfPrevBtn\.addEventListener\('click', \(\) => changeBookshelfPage\(-1\)\)/);
   assert.match(source, /els\.bookshelfNextBtn\.addEventListener\('click', \(\) => changeBookshelfPage\(1\)\)/);
 });
