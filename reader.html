@@ -1519,6 +1519,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="manga-list-controller.js?v=20260921-controller-factory"></script>
 <script src="manga-surface-activation.js?v=20260921-surface-activation"></script>
 <script src="manga-list-elements.js?v=20260921-elements-boundary"></script>
+<script src="manga-list-dom-resolver.js?v=20260921-dom-resolver"></script>
 
 <script>
 (function () {
@@ -1861,7 +1862,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   };
 
   function getMangaListElements() {
-    return MangaListElementsFactory.create(els);
+    const source = MangaListDomResolver.createSource(els.mangaListSection);
+    return MangaListElementsFactory.create(source);
   }
 
   const mangaListEls = getMangaListElements();
