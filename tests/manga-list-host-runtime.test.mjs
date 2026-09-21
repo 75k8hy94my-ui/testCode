@@ -34,6 +34,12 @@ function deps(calls) {
       onSyncError(message, kind) { calls.push(['error', message, kind]); },
     },
     images: imageDeps(calls),
+    navigation: {
+      lastUrlKey: 'last-url-key',
+      readerUrl: 'reader.html',
+      writeStorage(key, value) { calls.push(['navigation-write', key, value]); },
+      navigate(url) { calls.push(['navigate', url]); },
+    },
   };
 }
 
@@ -66,7 +72,7 @@ test('host factory exposes the shared persistence callbacks and rejects missing 
   assert.ok(Object.isFrozen(factory));
   assert.throws(() => factory.create(), (error) => error.name === 'TypeError');
   const complete = deps([]);
-  for (const key of ['safeWriteJson', 'getState', 'persistVideos', 'keys', 'sync']) {
+  for (const key of ['safeWriteJson', 'getState', 'persistVideos', 'keys', 'sync', 'navigation']) {
     const missing = { ...complete };
     delete missing[key];
     assert.throws(() => factory.create(missing), (error) => error.name === 'TypeError' && error.message.includes(key === 'keys' ? 'keys' : key));
@@ -88,6 +94,7 @@ test('host persistence preserves write and sync order', () => {
   assert.deepEqual(Object.keys(host), [
     'persistItems', 'persistFolders', 'persistAuthorCards', 'persistAll',
     'buildSyncPayload', 'runCloudSync', 'scheduleCloudSync', 'setupFeedImage', 'loadLocalCover',
+    'navigateToReader',
   ]);
   assert.ok(Object.isFrozen(host));
   host.persistAll();
@@ -130,6 +137,7 @@ test('host rejects missing image dependencies and exposes image callbacks', asyn
   const host = factory.create(deps(calls));
   assert.equal(typeof host.setupFeedImage, 'function');
   assert.equal(typeof host.loadLocalCover, 'function');
+  assert.equal(typeof host.navigateToReader, 'function');
   assert.ok(Object.isFrozen(host));
 
   const img = {
@@ -148,6 +156,21 @@ test('host rejects missing image dependencies and exposes image callbacks', asyn
     'cached-image',
     ['remember-cover', 'blob:cover'],
   ]);
+});
+
+test('host preserves manga item payload and reader navigation order', () => {
+  const calls = [];
+  const host = loadFactory().create(deps(calls));
+
+  host.navigateToReader({ id: 'item-1' });
+  assert.deepEqual(calls, [
+    ['navigation-write', 'last-url-key', JSON.stringify({ kind: 'item', itemId: 'item-1' })],
+    ['navigate', 'reader.html'],
+  ]);
+
+  calls.length = 0;
+  host.navigateToReader({});
+  assert.deepEqual(calls, [['navigate', 'reader.html']]);
 });
 
 test('host setupFeedImage preserves extension fallback and shared cover cache updates', () => {
@@ -202,4 +225,10 @@ test('reader delegates persistence to the host boundary without duplicating impl
   assert.match(reader, /const buildSyncPayload = \(\) => mangaListHostRuntime\.buildSyncPayload\(\);/);
   assert.match(reader, /const setupFeedImage = \(\.\.\.args\) => mangaListHostRuntime\.setupFeedImage\(\.\.\.args\);/);
   assert.match(reader, /const loadLocalCover = \(\.\.\.args\) => mangaListHostRuntime\.loadLocalCover\(\.\.\.args\);/);
+  const openItemMatch = reader.match(/async function openItem\(item, addToHistoryFlag, switchDirection\) \{([\s\S]*?)\n  \}/);
+  assert.ok(openItemMatch);
+  assert.match(openItemMatch[1], /mangaListHostRuntime\.navigateToReader\(item\);/);
+  assert.doesNotMatch(openItemMatch[1], /localStorage\.setItem\(LAST_URL_KEY/);
+  assert.doesNotMatch(openItemMatch[1], /HomeProfileSPA\.navigate/);
+  assert.doesNotMatch(openItemMatch[1], /location\.href\s*=\s*'reader\.html'/);
 });

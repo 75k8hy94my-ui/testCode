@@ -30,6 +30,7 @@
     'setTimer',
     'clearTimer',
   ];
+  const NAVIGATION_FUNCTION_NAMES = ['writeStorage', 'navigate'];
 
   function create(deps) {
     if (!deps || typeof deps !== 'object' || Array.isArray(deps)) {
@@ -67,6 +68,19 @@
     }
     if (!Array.isArray(deps.images.extCandidates) || typeof deps.images.loadTimeoutMs !== 'number' || typeof deps.images.sessionKey !== 'string' || !deps.images.sessionKey) {
       throw new TypeError('MangaListHostRuntimeFactory requires image constants');
+    }
+    if (!deps.navigation || typeof deps.navigation !== 'object' || Array.isArray(deps.navigation)) {
+      throw new TypeError('MangaListHostRuntimeFactory requires navigation dependency object');
+    }
+    for (const name of NAVIGATION_FUNCTION_NAMES) {
+      if (typeof deps.navigation[name] !== 'function') {
+        throw new TypeError('MangaListHostRuntimeFactory requires navigation function: ' + name);
+      }
+    }
+    for (const name of ['lastUrlKey', 'readerUrl']) {
+      if (typeof deps.navigation[name] !== 'string' || !deps.navigation[name]) {
+        throw new TypeError('MangaListHostRuntimeFactory requires navigation value: ' + name);
+      }
     }
 
     let cloudSyncTimer = null;
@@ -180,6 +194,16 @@
       }, deps.images.loadTimeoutMs);
     }
 
+    function navigateToReader(item) {
+      if (item && item.id) {
+        deps.navigation.writeStorage(
+          deps.navigation.lastUrlKey,
+          JSON.stringify({ kind: 'item', itemId: item.id }),
+        );
+      }
+      deps.navigation.navigate(deps.navigation.readerUrl);
+    }
+
     function persistFolders() {
       deps.safeWriteJson(deps.keys.savedFolders, deps.getState().savedFolders);
       scheduleCloudSync();
@@ -212,6 +236,7 @@
       scheduleCloudSync,
       setupFeedImage,
       loadLocalCover,
+      navigateToReader,
     });
   }
 

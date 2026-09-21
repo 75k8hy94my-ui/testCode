@@ -2202,7 +2202,16 @@ https://cdn.example.org/c/003.webp"></textarea>
       rememberLocalCoverObjectUrl: (url) => localCoverObjectUrls.push(url),
       setTimer: (callback, delay) => setTimeout(callback, delay),
       clearTimer: (timer) => clearTimeout(timer),
-    }
+    },
+    navigation: {
+      lastUrlKey: LAST_URL_KEY,
+      readerUrl: 'reader.html',
+      writeStorage: (key, value) => localStorage.setItem(key, value),
+      navigate: (url) => {
+        if (window.HomeProfileSPA && typeof HomeProfileSPA.navigate === 'function') HomeProfileSPA.navigate(url);
+        else location.href = url;
+      },
+    },
   });
   const persistItems = () => mangaListHostRuntime.persistItems();
   const persistFolders = () => mangaListHostRuntime.persistFolders();
@@ -3732,9 +3741,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     recentlyClosedItemId = null;
     currentItem = item || null; // remembered for series/次の巻 lookups
     if (location.pathname.endsWith('/manga.html') || location.pathname === '/manga.html') {
-      if (item && item.id) localStorage.setItem(LAST_URL_KEY, JSON.stringify({ kind: 'item', itemId: item.id }));
-      if (window.HomeProfileSPA && typeof HomeProfileSPA.navigate === 'function') HomeProfileSPA.navigate('reader.html');
-      else location.href = 'reader.html';
+      mangaListHostRuntime.navigateToReader(item);
       return;
     }
     if (item && Array.isArray(item.pages) && item.pages.length) {
