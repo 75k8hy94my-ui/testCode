@@ -1516,6 +1516,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="manga-list-state.js?v=20260921-state-loader"></script>
 <script src="manga-list-view-model.js?v=20260921-view-model-self"></script>
 <script src="manga-list-renderer.js?v=20260921-renderer"></script>
+<script src="manga-list-runtime-context.js?v=20260922-runtime-context"></script>
 <script src="manga-list-controller.js?v=20260921-controller-factory"></script>
 <script src="manga-surface-activation.js?v=20260921-surface-activation"></script>
 <script src="manga-list-elements.js?v=20260921-elements-boundary"></script>
@@ -2122,6 +2123,62 @@ https://cdn.example.org/c/003.webp"></textarea>
   let readerReturnView = null;
   let recentlyClosedItemId = null;
   let recentlyClosedFolderId = null;
+
+  function getMangaRuntimeState() {
+    return {
+      savedItems,
+      savedFolders,
+      authorCards,
+      currentFolderView,
+      currentSeriesView,
+      currentAuthorView,
+      bookshelfPage,
+      shelfSearchQuery,
+      shelfSort,
+      shelfFilters,
+      groupByAuthorEnabled,
+      bulkEditMode,
+      bulkSelectedIds,
+      reorderMode,
+      recentlyClosedItemId,
+      recentlyClosedFolderId
+    };
+  }
+
+  function setMangaRuntimeState(next) {
+    if (!next || typeof next !== 'object') throw new TypeError('manga runtime state must be an object');
+    if (Object.prototype.hasOwnProperty.call(next, 'savedItems')) savedItems = next.savedItems;
+    if (Object.prototype.hasOwnProperty.call(next, 'savedFolders')) savedFolders = next.savedFolders;
+    if (Object.prototype.hasOwnProperty.call(next, 'authorCards')) authorCards = next.authorCards;
+    if (Object.prototype.hasOwnProperty.call(next, 'currentFolderView')) currentFolderView = next.currentFolderView;
+    if (Object.prototype.hasOwnProperty.call(next, 'currentSeriesView')) currentSeriesView = next.currentSeriesView;
+    if (Object.prototype.hasOwnProperty.call(next, 'currentAuthorView')) currentAuthorView = next.currentAuthorView;
+    if (Object.prototype.hasOwnProperty.call(next, 'bookshelfPage')) bookshelfPage = next.bookshelfPage;
+    if (Object.prototype.hasOwnProperty.call(next, 'shelfSearchQuery')) shelfSearchQuery = next.shelfSearchQuery;
+    if (Object.prototype.hasOwnProperty.call(next, 'shelfSort')) shelfSort = next.shelfSort;
+    if (Object.prototype.hasOwnProperty.call(next, 'shelfFilters')) shelfFilters = next.shelfFilters;
+    if (Object.prototype.hasOwnProperty.call(next, 'groupByAuthorEnabled')) groupByAuthorEnabled = next.groupByAuthorEnabled;
+    if (Object.prototype.hasOwnProperty.call(next, 'bulkEditMode')) bulkEditMode = next.bulkEditMode;
+    if (Object.prototype.hasOwnProperty.call(next, 'bulkSelectedIds')) bulkSelectedIds = next.bulkSelectedIds;
+    if (Object.prototype.hasOwnProperty.call(next, 'reorderMode')) reorderMode = next.reorderMode;
+    if (Object.prototype.hasOwnProperty.call(next, 'recentlyClosedItemId')) recentlyClosedItemId = next.recentlyClosedItemId;
+    if (Object.prototype.hasOwnProperty.call(next, 'recentlyClosedFolderId')) recentlyClosedFolderId = next.recentlyClosedFolderId;
+  }
+
+  const mangaListRuntimeContext = MangaListRuntimeContextFactory.create({
+    getState: getMangaRuntimeState,
+    setState: setMangaRuntimeState,
+    getElements: () => mangaListEls,
+    persistItems,
+    persistFolders,
+    persistAuthorCards,
+    persistAll,
+    scheduleCloudSync,
+    openReader: handleMangaCardOpen,
+    accessMedia: setupFeedImage,
+    renderDashboard,
+    renderAuthorDashboard
+  });
   let pendingSaveUrl = null;
   // Whether opening the 個別追加/編集 dialog hid an already-open 保存したURL
   // list popup behind it; if so, closing the dialog reopens (and re-renders)
@@ -5131,6 +5188,10 @@ https://cdn.example.org/c/003.webp"></textarea>
   });
 
   function buildFolderCard(folder, folderList, organizeMode) {
+    return buildFolderCardWithContext(mangaListRuntimeContext, folder, folderList, organizeMode);
+  }
+
+  function buildFolderCardWithContext(context, folder, folderList, organizeMode) {
     const card = document.createElement('div');
     card.className = 'book-card folder-card' + (folder.id === recentlyClosedFolderId ? ' just-closed' : '');
     const folderItems = mangaFolderCardDeps.getVisibleItems().filter((item) => item.folderId === folder.id);
@@ -5361,6 +5422,10 @@ https://cdn.example.org/c/003.webp"></textarea>
   });
 
   function handleMangaCardOpen(item, list) {
+    return handleMangaCardOpenWithContext(mangaListRuntimeContext, item, list);
+  }
+
+  function handleMangaCardOpenWithContext(context, item, list) {
     rememberReaderReturnView();
     // The manga and video lists share one surface. If the browser history
     // still says video-list while the manga grid is visible, normalize the
@@ -5377,6 +5442,10 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   function buildBookCard(item, list, reorderMode) {
+    return buildBookCardWithContext(mangaListRuntimeContext, item, list, reorderMode);
+  }
+
+  function buildBookCardWithContext(context, item, list, reorderMode) {
     const { card, select, cover, img, appendDetails } = MangaListCardBoundary.createStaticCard({
       documentRef: document,
       item,
@@ -5749,6 +5818,11 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   function renderSavedList() {
+    return renderSavedListWithContext(mangaListRuntimeContext);
+  }
+
+  function renderSavedListWithContext(context) {
+    const mangaListEls = context.getElements();
     const els = mangaListEls;
     clearLocalCoverObjectUrls();
     const inSeriesGroup = currentFolderView === SERIES_FOLDER_ID && !!currentSeriesView;
