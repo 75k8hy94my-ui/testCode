@@ -10,14 +10,14 @@ async function load(path) {
 }
 
 const names = [
-  'getState', 'setState', 'getElements', 'getDocument', 'getConfig', 'getReaderScreen',
+  'getState', 'setState', 'getElements', 'getDocument', 'getConfig',
   'getSavedVideos', 'clearLocalCoverObjectUrls', 'confirmAction', 'setTimeout',
   'persistItems', 'persistFolders', 'persistAuthorCards', 'persistAll', 'scheduleCloudSync',
   'openReader', 'accessMedia', 'renderDashboard', 'renderAuthorDashboard',
   'getVisibleItems', 'appendFolderPreview', 'createStaticCard', 'loadLocalCover',
   'getCoverSourceCache', 'setupFeedImage', 'makeHeartIcon', 'moveItemInList',
   'moveFolderInList', 'rememberReaderReturnView', 'closeSavedList',
-  'setReadingListContext', 'flashStatus', 'navigateReaderScreen', 'switchListTab',
+  'setReadingListContext', 'flashStatus',
   'openItem', 'renderList', 'updateBulkEditButton', 'shelfVisibleItems',
   'unreadOrderItems', 'itemDisplayTitle', 'itemSubtext', 'readingRecordText',
   'itemPageCountText', 'buildFavoritesFolderCard', 'buildSeriesFolderCard',

@@ -2,15 +2,15 @@
   'use strict';
 
   const REQUIRED = [
-    'getState', 'setState', 'getElements', 'getDocument', 'getConfig', 'getReaderScreen',
+    'getState', 'setState', 'getElements', 'getDocument', 'getConfig',
     'getSavedVideos', 'clearLocalCoverObjectUrls', 'confirmAction', 'setTimeout',
     'persistAll', 'renderDashboard', 'renderAuthorDashboard', 'updateBulkEditButton',
     'getVisibleItems', 'appendFolderPreview', 'createStaticCard', 'loadLocalCover',
     'getCoverSourceCache', 'setupFeedImage', 'makeHeartIcon', 'moveItemInList',
     'moveFolderInList', 'rememberReaderReturnView', 'closeSavedList',
-    'setReadingListContext', 'flashStatus', 'navigateReaderScreen', 'switchListTab',
-    'openItem', 'renderList', 'buildFavoritesFolderCard', 'buildSeriesFolderCard',
-    'buildSeriesGroupCard', 'buildAuthorGroupCard', 'buildSearchText',
+    'setReadingListContext', 'openItem', 'renderList', 'buildFavoritesFolderCard',
+    'buildSeriesFolderCard', 'buildSeriesGroupCard', 'buildAuthorGroupCard',
+    'buildSearchText',
     'deriveViewModel', 'renderCards', 'createDocumentFragment', 'openReader'
   ];
 
@@ -25,16 +25,7 @@
     }
 
     function handleMangaCardOpen(item, list) {
-      context.rememberReaderReturnView();
-      const state = context.getState();
-      if (context.getReaderScreen() === 'video-list') context.navigateReaderScreen('saved-list', { replace: true });
-      context.switchListTab('manga');
-      context.closeSavedList();
-      context.setReadingListContext(list, list.indexOf(item));
-      context.flashStatus('読み込み中…');
-      context.openItem(item, false).catch((error) => {
-        context.flashStatus(error && error.message ? error.message : '漫画を開けませんでした');
-      });
+      return context.openReader(item, list);
     }
 
     function buildFolderCard(folder, folderList, organizeMode) {

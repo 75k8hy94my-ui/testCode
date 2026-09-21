@@ -35,3 +35,12 @@ test('shared runtime has no direct reader or global DOM dependency', () => {
   const source = read('manga-list-runtime.js');
   assert.doesNotMatch(source, /\b(?:window|document|mangaListEls|MangaListViewModel|MangaListRenderer|renderSavedListWithContext|buildBookCardWithContext|buildFolderCardWithContext|handleMangaCardOpenWithContext)\b/);
 });
+
+test('card opening delegates the entire reader strategy to openReader', () => {
+  const source = read('manga-list-runtime.js');
+  const start = source.indexOf('function handleMangaCardOpen(');
+  const end = source.indexOf('\n    function buildFolderCard(', start);
+  const body = source.slice(start, end);
+  assert.match(body, /return context\.openReader\(item, list\);/);
+  assert.doesNotMatch(body, /getReaderScreen|rememberReaderReturnView|navigateReaderScreen|switchListTab|closeSavedList|setReadingListContext|flashStatus|openItem/);
+});

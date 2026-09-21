@@ -2222,6 +2222,19 @@ https://cdn.example.org/c/003.webp"></textarea>
   const scheduleCloudSync = () => mangaListHostRuntime.scheduleCloudSync();
   const setupFeedImage = (...args) => mangaListHostRuntime.setupFeedImage(...args);
   const loadLocalCover = (...args) => mangaListHostRuntime.loadLocalCover(...args);
+
+  function openMangaReader(item, list) {
+    rememberReaderReturnView();
+    if (currentReaderScreen === 'video-list') navigateReaderScreen('saved-list', { replace: true });
+    switchListTab('manga');
+    closeSavedList();
+    setReadingListContext(list, list.indexOf(item));
+    flashStatus('読み込み中…');
+    openItem(item, false).catch((error) => {
+      flashStatus(error && error.message ? error.message : '漫画を開けませんでした');
+    });
+  }
+
   let mangaListRuntime;
   const mangaListRuntimeContext = MangaListRuntimeContextFactory.create({
     getState: getMangaRuntimeState,
@@ -2242,7 +2255,6 @@ https://cdn.example.org/c/003.webp"></textarea>
       SYNCED_FOLDER_NAME,
       BOOKSHELF_PAGE_SIZE
     }),
-    getReaderScreen: () => currentReaderScreen,
     getSavedVideos: () => savedVideos,
     clearLocalCoverObjectUrls,
     confirmAction: (message) => confirm(message),
@@ -2252,7 +2264,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     persistAuthorCards: mangaListHostRuntime.persistAuthorCards,
     persistAll: mangaListHostRuntime.persistAll,
     scheduleCloudSync,
-    openReader: handleMangaCardOpen,
+    openReader: openMangaReader,
     accessMedia: setupFeedImage,
     renderDashboard,
     renderAuthorDashboard,
@@ -2269,8 +2281,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     closeSavedList,
     setReadingListContext,
     flashStatus,
-    navigateReaderScreen,
-    switchListTab,
     openItem,
     renderList: renderSavedList,
     updateBulkEditButton,
@@ -2287,8 +2297,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     buildSearchText: (item, folders, videos, cards) => window.MangaReaderShelfSearch.buildSearchText(item, folders, videos, cards),
     deriveViewModel: (input) => MangaListViewModel.derive(input),
     renderCards: (input) => MangaListRenderer.render(input),
-    createDocumentFragment: () => document.createDocumentFragment(),
-    openReader: handleMangaCardOpen
+    createDocumentFragment: () => document.createDocumentFragment()
   });
   mangaListRuntime = MangaListRuntimeFactory.create(mangaListRuntimeContext);
   let pendingSaveUrl = null;

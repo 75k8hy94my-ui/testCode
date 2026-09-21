@@ -2,14 +2,14 @@
   'use strict';
 
   const REQUIRED = [
-    'getState', 'setState', 'getElements', 'getDocument', 'getConfig', 'getReaderScreen',
+    'getState', 'setState', 'getElements', 'getDocument', 'getConfig',
     'getSavedVideos', 'clearLocalCoverObjectUrls', 'confirmAction', 'setTimeout',
     'persistItems', 'persistFolders', 'persistAuthorCards', 'persistAll', 'scheduleCloudSync',
     'openReader', 'accessMedia', 'renderDashboard', 'renderAuthorDashboard',
     'getVisibleItems', 'appendFolderPreview', 'createStaticCard', 'loadLocalCover',
     'getCoverSourceCache', 'setupFeedImage', 'makeHeartIcon', 'moveItemInList',
     'moveFolderInList', 'rememberReaderReturnView', 'closeSavedList',
-    'setReadingListContext', 'flashStatus', 'navigateReaderScreen', 'switchListTab',
+    'setReadingListContext', 'flashStatus',
     'openItem', 'renderList', 'updateBulkEditButton', 'shelfVisibleItems',
     'unreadOrderItems', 'itemDisplayTitle', 'itemSubtext', 'readingRecordText',
     'itemPageCountText', 'buildFavoritesFolderCard', 'buildSeriesFolderCard',
@@ -32,7 +32,6 @@
       getElements: deps.getElements,
       getDocument: deps.getDocument,
       getConfig: deps.getConfig,
-      getReaderScreen: deps.getReaderScreen,
       getSavedVideos: deps.getSavedVideos,
       clearLocalCoverObjectUrls: deps.clearLocalCoverObjectUrls,
       confirmAction: deps.confirmAction,
@@ -59,8 +58,6 @@
       closeSavedList: deps.closeSavedList,
       setReadingListContext: deps.setReadingListContext,
       flashStatus: deps.flashStatus,
-      navigateReaderScreen: deps.navigateReaderScreen,
-      switchListTab: deps.switchListTab,
       openItem: deps.openItem,
       renderList: deps.renderList,
       updateBulkEditButton: deps.updateBulkEditButton,
@@ -77,8 +74,7 @@
       buildSearchText: deps.buildSearchText,
       deriveViewModel: deps.deriveViewModel,
       renderCards: deps.renderCards,
-      createDocumentFragment: deps.createDocumentFragment,
-      openReader: deps.openReader
+      createDocumentFragment: deps.createDocumentFragment
     });
   }
 
