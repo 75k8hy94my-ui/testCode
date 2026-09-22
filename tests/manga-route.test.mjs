@@ -28,6 +28,23 @@ test('manga route loads the shared runtime pieces without reader or video entry 
   assert.doesNotMatch(route, /reader-saved-list-template|video-data\.js|video-library\.js/);
 });
 
+test('manga route reuses the existing list event factories', () => {
+  for (const name of [
+    'manga-list-search-events.js',
+    'manga-list-sort-events.js',
+    'manga-list-filter-events.js',
+    'manga-list-folder-events.js',
+    'manga-list-smart-list-events.js',
+    'manga-list-pagination-events.js',
+    'manga-list-navigation-events.js',
+    'manga-list-bulk-events.js',
+  ]) assert.match(route, new RegExp(name.replace('.', '\\.') + '\\?v='));
+  assert.match(route, /bindFactory\(MangaListSearchEventsFactory/);
+  assert.match(route, /bindFactory\(MangaListPaginationEventsFactory/);
+  assert.match(route, /bindFactory\(MangaListNavigationEventsFactory/);
+  assert.match(route, /factory\.create\(deps\)\.bind\(factoryElements\)/);
+});
+
 test('manga shell keeps the existing shared authentication and vault bootstrap', () => {
   assert.match(manga, /supabase-config\.js/);
   assert.match(manga, /vault-session\.js/);

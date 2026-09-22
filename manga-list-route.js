@@ -3,6 +3,14 @@
 
   const SCRIPT_URLS = [
     ['manga-list-template.js?v=20260921-manga-template', 'mangaRouteTemplate'],
+    ['manga-list-search-events.js?v=20260922-search-events', 'mangaRouteSearchEvents'],
+    ['manga-list-sort-events.js?v=20260922-sort-events', 'mangaRouteSortEvents'],
+    ['manga-list-filter-events.js?v=20260922-filter-events', 'mangaRouteFilterEvents'],
+    ['manga-list-folder-events.js?v=20260922-folder-events', 'mangaRouteFolderEvents'],
+    ['manga-list-smart-list-events.js?v=20260922-smart-events', 'mangaRouteSmartEvents'],
+    ['manga-list-pagination-events.js?v=20260922-pagination-events', 'mangaRoutePaginationEvents'],
+    ['manga-list-navigation-events.js?v=20260922-navigation-events', 'mangaRouteNavigationEvents'],
+    ['manga-list-bulk-events.js?v=20260922-bulk-events', 'mangaRouteBulkEvents'],
     ['manga-list-dom-resolver.js?v=20260922-dom-resolver', 'mangaRouteResolver'],
     ['manga-list-elements.js?v=20260922-elements', 'mangaRouteElements'],
     ['manga-list-mount.js?v=20260922-mount', 'mangaRouteMount'],
@@ -200,6 +208,13 @@
       const makeHeartIcon = () => { const img = documentRef.createElement('img'); img.alt = ''; return img; };
       const moveItemInList = (item, list, direction) => { const index = list.indexOf(item); const other = list[index + direction]; if (!other) return; const items = state().savedItems; const a = items.indexOf(item); const b = items.indexOf(other); if (a < 0 || b < 0) return; [items[a], items[b]] = [items[b], items[a]]; host.persistAll(); renderList(); };
       const moveFolderInList = (folder, list, direction) => { const index = list.indexOf(folder); const other = list[index + direction]; if (!other) return; const folders = state().savedFolders; const a = folders.indexOf(folder); const b = folders.indexOf(other); if (a < 0 || b < 0) return; [folders[a], folders[b]] = [folders[b], folders[a]]; host.persistFolders(); renderList(); };
+      const updateBulkEditButton = () => {
+        if (!elements) return;
+        const current = state();
+        elements.bulkEditBtn.textContent = current.bulkEditMode ? '選択完了 (' + current.bulkSelectedIds.size + ')' : '一括編集';
+        elements.bulkEditBtn.classList.toggle('active', current.bulkEditMode);
+        elements.undoBulkEditBtn.style.display = 'none';
+      };
       const buildVirtualCard = (label, icon, items, update) => { const card = documentRef.createElement('div'); card.className = 'book-card folder-card'; const cover = documentRef.createElement('div'); cover.className = 'book-cover folder-cover'; appendFolderPreview(cover, items, icon, label, label); const text = documentRef.createElement('div'); text.className = 'book-title'; text.textContent = label; card.append(cover, text); card.addEventListener('click', () => { update(); renderList(); }); return card; };
       const buildFavoritesFolderCard = () => buildVirtualCard('お気に入り', iconFolder, visibleItems().filter((item) => item.favorite), () => setState({ currentFolderView: config.FAVORITES_FOLDER_ID, currentSeriesView: null, bookshelfPage: 1 }));
       const buildSeriesFolderCard = () => buildVirtualCard('シリーズ', iconBooks, visibleItems().filter((item) => item.series), () => setState({ currentFolderView: config.SERIES_FOLDER_ID, currentSeriesView: null, bookshelfPage: 1 }));
@@ -228,7 +243,7 @@
         renderDashboard, renderAuthorDashboard,
         getVisibleItems: visibleItems, appendFolderPreview, createStaticCard: (input) => MangaListCardBoundary.createStaticCard(input), loadLocalCover: host.loadLocalCover, getCoverSourceCache: () => coverSourceCache, setupFeedImage: host.setupFeedImage,
         makeHeartIcon, moveItemInList, moveFolderInList, renderList,
-        updateBulkEditButton: () => {}, shelfVisibleItems: visibleItems, unreadOrderItems: () => visibleItems().filter((item) => !item.lastReadAt), itemDisplayTitle: title, itemSubtext, readingRecordText, itemPageCountText: pageCount,
+        updateBulkEditButton, shelfVisibleItems: visibleItems, unreadOrderItems: () => visibleItems().filter((item) => !item.lastReadAt), itemDisplayTitle: title, itemSubtext, readingRecordText, itemPageCountText: pageCount,
         buildFavoritesFolderCard, buildSeriesFolderCard, buildSeriesGroupCard, buildAuthorGroupCard, buildSearchText,
         deriveViewModel: (input) => MangaListViewModel.derive(input), renderCards: (input) => MangaListRenderer.render(input), createDocumentFragment: () => documentRef.createDocumentFragment(),
       };
@@ -250,6 +265,10 @@
       const eventBindings = () => {
         const cleanups = [];
         const bind = (node, type, handler) => { node.addEventListener(type, handler); cleanups.push(() => node.removeEventListener(type, handler)); };
+        const bindFactory = (factory, deps, factoryElements) => {
+          const cleanup = factory.create(deps).bind(factoryElements);
+          cleanups.push(cleanup);
+        };
         const rootElement = elements.savedListItems.closest('#mangaListSection');
         const search = rootElement.querySelector('#shelfSearchInput');
         const sort = rootElement.querySelector('#shelfSortSelect');
@@ -268,28 +287,38 @@
         const back = elements.listBackBtn;
         const prev = elements.bookshelfPrevBtn;
         const next = elements.bookshelfNextBtn;
-        if (search) bind(search, 'input', () => { setState({ shelfSearchQuery: search.value, bookshelfPage: 1 }); renderList(); });
-        if (sort) bind(sort, 'change', () => { setState({ shelfSort: sort.value, bookshelfPage: 1 }); renderList(); });
-        if (filter) bind(filter, 'click', () => { rootElement.querySelector('#filterRow').style.display = ''; });
-        if (apply) bind(apply, 'click', () => { setState({ shelfFilters: { series: rootElement.querySelector('#filterSeriesInput').value, author: rootElement.querySelector('#filterAuthorInput').value, tags: rootElement.querySelector('#filterTagsInput').value, source: rootElement.querySelector('#filterSourceInput').value }, bookshelfPage: 1 }); renderList(); });
-        if (clear) bind(clear, 'click', () => { setState({ shelfFilters: { series: '', author: '', tags: '', source: '' }, bookshelfPage: 1 }); renderList(); });
-        if (newFolder) bind(newFolder, 'click', () => { newFolderRow.style.display = ''; if (newFolderInput) newFolderInput.focus(); });
-        if (newFolderConfirm) bind(newFolderConfirm, 'click', () => {
-          const name = newFolderInput && newFolderInput.value.trim();
-          if (!name) return;
-          const folders = state().savedFolders.slice();
-          folders.push({ id: 'f-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name });
-          setState({ savedFolders: folders }); host.persistFolders();
-          if (newFolderInput) newFolderInput.value = '';
-          newFolderRow.style.display = 'none'; renderList();
-        });
+        bindFactory(MangaListSearchEventsFactory, { onSearchChange: (value) => { setState({ shelfSearchQuery: value, bookshelfPage: 1 }); renderList(); } }, { searchInput: search });
+        bindFactory(MangaListSortEventsFactory, { onSortChange: (value) => { setState({ shelfSort: value, bookshelfPage: 1 }); renderList(); } }, { sortSelect: sort });
+        bindFactory(MangaListFilterEventsFactory, {
+          onToggle: () => { rootElement.querySelector('#filterRow').style.display = ''; },
+          onApply: () => { setState({ shelfFilters: { series: rootElement.querySelector('#filterSeriesInput').value, author: rootElement.querySelector('#filterAuthorInput').value, tags: rootElement.querySelector('#filterTagsInput').value, source: rootElement.querySelector('#filterSourceInput').value }, bookshelfPage: 1 }); renderList(); },
+          onClear: () => { setState({ shelfFilters: { series: '', author: '', tags: '', source: '' }, bookshelfPage: 1 }); renderList(); },
+        }, { filterButton: filter, applyButton: apply, clearButton: clear });
+        bindFactory(MangaListFolderEventsFactory, {
+          onCreateStart: () => { newFolderRow.style.display = ''; if (newFolderInput) newFolderInput.focus(); },
+          onCreateConfirm: () => {
+            const name = newFolderInput && newFolderInput.value.trim();
+            if (!name) return;
+            const folders = state().savedFolders.slice();
+            folders.push({ id: 'f-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name });
+            setState({ savedFolders: folders }); host.persistFolders();
+            if (newFolderInput) newFolderInput.value = '';
+            newFolderRow.style.display = 'none'; renderList();
+          },
+        }, { createButton: newFolder, confirmButton: newFolderConfirm });
         if (editShelf) bind(editShelf, 'click', () => { setState({ reorderMode: !state().reorderMode, bookshelfPage: 1 }); renderList(); });
         if (groupAuthor) bind(groupAuthor, 'click', () => { setState({ groupByAuthorEnabled: !state().groupByAuthorEnabled, bookshelfPage: 1 }); renderList(); });
-        if (history) bind(history, 'click', () => { setState({ currentFolderView: config.HISTORY_FOLDER_ID, currentSeriesView: null, currentAuthorView: null, bookshelfPage: 1 }); renderList(); });
-        if (unread) bind(unread, 'click', () => { setState({ currentFolderView: config.UNREAD_FOLDER_ID, currentSeriesView: null, currentAuthorView: null, bookshelfPage: 1 }); renderList(); });
+        bindFactory(MangaListSmartListEventsFactory, {
+          onHistory: () => { setState({ currentFolderView: config.HISTORY_FOLDER_ID, currentSeriesView: null, currentAuthorView: null, bookshelfPage: 1 }); renderList(); },
+          onUnread: () => { setState({ currentFolderView: config.UNREAD_FOLDER_ID, currentSeriesView: null, currentAuthorView: null, bookshelfPage: 1 }); renderList(); },
+        }, { historyButton: history, unreadButton: unread });
         if (synced) bind(synced, 'click', () => { setState({ currentFolderView: config.SYNCED_FOLDER_ID, currentSeriesView: null, currentAuthorView: null, bookshelfPage: 1 }); renderList(); });
-        bind(prev, 'click', () => { setState({ bookshelfPage: state().bookshelfPage - 1 }); renderList(); }); bind(next, 'click', () => { setState({ bookshelfPage: state().bookshelfPage + 1 }); renderList(); });
-        bind(back, 'click', () => { setState({ currentFolderView: null, currentSeriesView: null, currentAuthorView: null, bookshelfPage: 1 }); renderList(); });
+        bindFactory(MangaListPaginationEventsFactory, { onPageChange: (delta) => { setState({ bookshelfPage: state().bookshelfPage + delta }); renderList(); } }, { prevButton: prev, nextButton: next });
+        bindFactory(MangaListNavigationEventsFactory, { onBack: () => { setState({ currentFolderView: null, currentSeriesView: null, currentAuthorView: null, bookshelfPage: 1 }); renderList(); } }, { backButton: back });
+        bindFactory(MangaListBulkEventsFactory, {
+          onEdit: () => { setState({ bulkEditMode: !state().bulkEditMode, bookshelfPage: 1 }); updateBulkEditButton(); renderList(); },
+          onUndo: () => {},
+        }, { editButton: elements.bulkEditBtn, undoButton: elements.undoBulkEditBtn });
         return () => { while (cleanups.length) cleanups.pop()(); };
       };
       const entry = MangaListEntryFactory.create({
