@@ -44,3 +44,14 @@ test('video route detaches its retained DOM when leaving the route', () => {
   assert.match(spa, /function cleanupVideoRoute\(\)\{if\(videoRouteRuntime\)videoRouteRuntime\.detach\(\);\}/);
   assert.match(route, /function detach\(\)/);
 });
+
+test('video library can be reinitialized after a route interruption without rebinding events', () => {
+  const library = read('video-library.js');
+  assert.match(library, /window\.MangaReaderVideoLibrary\s*=\s*Object\.freeze\(\{ init \}\)/);
+  assert.match(library, /let eventsBound = false/);
+  assert.match(library, /if \(eventsBound\) return;/);
+  assert.match(library, /if \(section\.dataset\.videoLibraryEnhanced === '1'\) return true/);
+  assert.match(library, /if \(dom\.search\) dom\.search\.value = state\.query/);
+  assert.match(route, /MangaReaderVideoLibrary\.init\(\)/);
+  assert.match(route, /bootPromise = null/);
+});

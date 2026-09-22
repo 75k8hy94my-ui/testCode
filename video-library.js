@@ -19,6 +19,7 @@
     syncTimer: null, syncRunning: false, syncDirty: false, editorId: null, sheetMode: null, showHidden: false,
   };
   const dom = {};
+  let eventsBound = false;
 
   function readJson(key, fallback) {
     try { const value = JSON.parse(localStorage.getItem(key) || 'null'); return value == null ? fallback : value; }
@@ -109,7 +110,8 @@
 
   function setupMarkup() {
     const section = document.getElementById('videoListSection');
-    if (!section || section.dataset.videoLibraryEnhanced === '1') return false;
+    if (!section) return false;
+    if (section.dataset.videoLibraryEnhanced === '1') return true;
     section.dataset.videoLibraryEnhanced = '1';
     const legacyToolbar = document.getElementById('videoListToolbar');
     const legacyItems = document.getElementById('videoListItems');
@@ -465,6 +467,8 @@
   }
 
   function bindEvents() {
+    if (eventsBound) return;
+    eventsBound = true;
     dom.search.addEventListener('input', () => { state.query = dom.search.value; render(); });
     dom.quick.addEventListener('click', (event) => { const button = event.target.closest('[data-quick]'); if (!button) return; state.quick = button.dataset.quick; savePrefs(); render(); });
     dom.folder.addEventListener('change', () => { state.folderId = dom.folder.value; render(); });
@@ -483,9 +487,10 @@
 
   function init() {
     if (!document.getElementById('videoListSection')) return;
-    injectStyles(); loadPrefs(); loadLibraryState(); if (!setupMarkup()) return; bindEvents(); dom.search.value = state.query; render();
+    injectStyles(); loadPrefs(); loadLibraryState(); if (!setupMarkup()) return; bindEvents(); if (dom.search) dom.search.value = state.query; render();
   }
 
+  window.MangaReaderVideoLibrary = Object.freeze({ init });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(init, 0), { once: true });
   else setTimeout(init, 0);
 })();

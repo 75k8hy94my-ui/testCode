@@ -27,7 +27,10 @@
         await deps.loadScript('video-routing-fix.js?v=20260918-video-routing-no-window', 'spaVideoRouting');
         await deps.loadScript('video-thumbnail-time.js?v=20260916-video-thumbnail', 'spaVideoThumbnailTime');
         scriptsLoaded = true;
-      })();
+      })().catch((error) => {
+        bootPromise = null;
+        throw error;
+      });
       return bootPromise;
     }
 
@@ -43,6 +46,8 @@
         mountElement.append(rootElement);
       }
       await loadFeatureScripts();
+      if (!root.MangaReaderVideoLibrary || typeof root.MangaReaderVideoLibrary.init !== 'function') throw new Error('video library runtime is unavailable');
+      root.MangaReaderVideoLibrary.init();
       if (!scriptsLoaded || !documentRef.getElementById('videoLibraryApp')) {
         await new Promise((resolve) => setTimeout(resolve, 0));
       }
