@@ -32,26 +32,21 @@
   }
 
   function markup() {
-    const account = currentPage() === 'sync.html'
-      ? '<span class="globalShellAccount" id="globalShellAccountEmail"></span><span class="globalShellAccountSuffix">でログイン中</span>'
-      : '';
-    return '<div class="globalShellBrand"><span class="globalShellEyebrow">BOOKS</span><h1 id="shellTitle"></h1></div>' + account;
+    return '<div class="globalShellBrand"><h1 id="shellTitle"></h1></div><button class="headerProfileButton" type="button" data-profile-menu-trigger aria-label="アカウント" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg></button>';
   }
 
   function install() {
     ensureStylesheet();
     const page = currentPage();
     const currentLabel = labels[page] || document.title;
-    const existing = document.getElementById('appGlobalHeader') || document.querySelector('.globalAppHeader');
+    const existing = document.getElementById('appGlobalHeader') || document.querySelector('.globalAppHeader') || document.querySelector('.homeShell > .homeHeader');
     const header = existing || document.createElement('header');
     header.id = 'appGlobalHeader';
     header.classList.add('globalAppHeader');
+    header.dataset.profileOnlyHeader = '1';
     header.innerHTML = markup();
     const title = header.querySelector('#shellTitle');
     if (title) title.textContent = currentLabel;
-    const accountEmail = header.querySelector('#globalShellAccountEmail');
-    const session = window.MangaVault && MangaVault.loadSession && MangaVault.loadSession();
-    if (accountEmail) accountEmail.textContent = session && session.user ? session.user.email || '' : '';
     if (!existing) document.body.insertBefore(header, document.body.firstChild);
     document.documentElement.classList.add('global-shell-page');
   }

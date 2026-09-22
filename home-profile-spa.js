@@ -4,6 +4,23 @@ if (typeof window === 'undefined' || typeof document === 'undefined') return;
 const Home=window.MangaReaderHome;
 const config=window.MANGA_READER_SUPABASE||{};
 const marks={bookshelf:'本'};
+const PROFILE_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg>';
+function profileHeaderButtonMarkup(){return '<button class="headerProfileButton" type="button" data-profile-menu-trigger aria-label="アカウント" aria-haspopup="menu" aria-expanded="false">'+PROFILE_ICON+'</button>';}
+function ensureProfileOnlyHeader(app){
+  let header=app.querySelector('.homeHeader');
+  if(!header){
+    header=document.createElement('header');
+    header.className='homeHeader';
+    app.insertBefore(header,app.firstChild);
+  }
+  if(header.dataset.profileOnlyHeader!=='1'){
+    const currentTitle=(header.querySelector('#shellTitle')&&header.querySelector('#shellTitle').textContent)||document.title||'ホーム';
+    header.innerHTML='<div><span class="eyebrow">HOME</span><h1 id="shellTitle"></h1></div>'+profileHeaderButtonMarkup();
+    header.querySelector('#shellTitle').textContent=currentTitle;
+    header.dataset.profileOnlyHeader='1';
+  }
+  return header;
+}
 const $=(id)=>document.getElementById(id);
 const showLogin=()=>window.location.replace('index.html');
 const showVault=()=>window.location.replace('sync.html');
@@ -16,12 +33,7 @@ let mount=null,renderGeneration=0,mangaRouteRuntime=null,mangaRouteBootPromise=n
 function ensureAppShell(){
   const app=document.getElementById('homeApp')||document.querySelector('.homeShell');
   if(!app)return null;
-  if(!app.querySelector('.homeHeader')){
-    const header=document.createElement('header');
-    header.className='homeHeader';
-    header.innerHTML='<div><span class="eyebrow">HOME</span><h1 id="shellTitle">ホーム</h1></div><div class="topbarActions"><nav class="topActions" aria-label="主要ページ"><a id="headerHomeLink" class="glassBtn topActionCurrent" aria-current="page" href="home.html">ホーム</a><a class="glassBtn" href="manga.html">漫画</a><a class="glassBtn" href="video.html">動画</a></nav><div class="headerActions"><a class="glassBtn" href="sync.html">保管庫</a><button class="glassBtn" id="editHomeBtn" type="button" hidden>カードを編集</button></div></div>';
-    app.insertBefore(header, app.firstChild);
-  }
+  ensureProfileOnlyHeader(app);
   if(!document.getElementById('routeContent')){
     const content=document.createElement('div');
     content.id='routeContent';
