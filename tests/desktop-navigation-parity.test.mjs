@@ -57,19 +57,14 @@ test('desktop navigation enhancement is bootstrapped after the reader code', () 
   assert.match(source, /loadBrowserScript\('desktop-navigation\.js'\)/);
 });
 
-test('major pages expose the same primary destinations and mark the current page', () => {
-  const pages = [['home.html', 'ホーム', 'home.html']];
-  const destinations = [['ホーム', 'home.html']];
-
-  for (const [file, currentLabel, currentHref] of pages) {
+test('top chrome delegates navigation to the rail and keeps only the profile action', () => {
+  for (const file of ['home.html', 'profile.html', 'manga.html', 'video.html']) {
     const source = read(file);
-    assert.match(source, /<nav[^>]+class=["'][^"']*\btopActions\b[^"']*["'][^>]*>/);
-    assert.doesNotMatch(source, /へ戻る/);
-    assert.match(source, new RegExp(`<a[^>]*class=["'][^"']*glassBtn[^"']*topActionCurrent[^"']*["'][^>]*aria-current=["']page["'][^>]*href=["']${currentHref.replace('.', '\\.')}["'][^>]*>${currentLabel}<\\/a>`));
-
-    for (const [label, href] of destinations) {
-      if (href === currentHref) continue;
-      assert.match(source, new RegExp(`<a[^>]*class=["'][^"']*glassBtn[^"']*["'][^>]*href=["']${href.replace('.', '\\.') }["'][^>]*>${label}<\\/a>`));
-    }
+    const header = source.match(/<header class=["']homeHeader["'][\\s\\S]*?<\\/header>/)?.[0] || '';
+    assert.match(header, /data-profile-menu-trigger/);
+    assert.doesNotMatch(header, /topActions|headerActions/);
   }
+  const readerShell = read('reader-shell.js');
+  assert.match(readerShell, /data-profile-menu-trigger/);
+  assert.doesNotMatch(readerShell.match(/function shellMarkup\\(\\)[\\s\\S]*?function install\\(\\)/)?.[0] || '', /topActions|headerActions/);
 });

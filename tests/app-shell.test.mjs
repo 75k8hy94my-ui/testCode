@@ -52,3 +52,24 @@ test('mobile bottom navigation stays visible on manga and video routes', () => {
     assert.match(read(page), /home-profile-shell\.css\?v=20260922-mobile-route-nav/);
   }
 });
+
+test('authenticated top bars keep only the shared profile action', () => {
+  const iconPages = ['home.html', 'profile.html', 'manga.html', 'video.html', 'video-player.html'];
+  for (const page of iconPages) {
+    const source = read(page);
+    const header = source.match(/<header class=["']homeHeader["'][\s\S]*?<\/header>/)?.[0] || '';
+    assert.match(header, /data-profile-menu-trigger/);
+    assert.match(header, /<circle cx=["']12["'] cy=["']8["'] r=["']3\.2["']/);
+    assert.doesNotMatch(header, /topActions|headerActions|>保管庫<|>設定<|>ホーム<|>本棚</);
+  }
+  const readerShell = read('reader-shell.js');
+  assert.match(readerShell, /data-profile-menu-trigger/);
+  assert.doesNotMatch(readerShell.match(/function shellMarkup\(\)[\s\S]*?function install\(\)/)?.[0] || '', /topActions|headerActions/);
+  const globalShell = read('app-global-shell.js');
+  assert.match(globalShell, /data-profile-menu-trigger/);
+  assert.doesNotMatch(globalShell.match(/function markup\(\)[\s\S]*?function install\(\)/)?.[0] || '', /globalShellAccount|topActions|headerActions/);
+  const menu = read('profile-menu.js');
+  assert.match(menu, /\[data-profile-menu-trigger\], #desktopProfileButton/);
+  assert.doesNotMatch(menu, /matchMedia\('\(min-width: 900px\)'\)\.matches\) return/);
+  assert.match(read('sync.html'), /profile-menu\.js\?v=20260922-profile-header/);
+});
