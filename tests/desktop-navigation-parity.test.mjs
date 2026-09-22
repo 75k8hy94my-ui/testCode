@@ -60,11 +60,11 @@ test('desktop navigation enhancement is bootstrapped after the reader code', () 
 test('top chrome delegates navigation to the rail and keeps only the profile action', () => {
   for (const file of ['home.html', 'profile.html', 'manga.html', 'video.html']) {
     const source = read(file);
-    const header = source.match(/<header class=["']homeHeader["'][\\s\\S]*?<\\/header>/)?.[0] || '';
+    const header = source.match(/<header class=["']homeHeader["'][\s\S]*?<\/header>/)?.[0] || '';
     assert.match(header, /data-profile-menu-trigger/);
     assert.doesNotMatch(header, /topActions|headerActions/);
   }
   const readerShell = read('reader-shell.js');
   assert.match(readerShell, /data-profile-menu-trigger/);
-  assert.doesNotMatch(readerShell.match(/function shellMarkup\\(\\)[\\s\\S]*?function install\\(\\)/)?.[0] || '', /topActions|headerActions/);
+  assert.doesNotMatch(readerShell.match(/function shellMarkup\(\)[\s\S]*?function install\(\)/)?.[0] || '', /topActions|headerActions/);
 });
