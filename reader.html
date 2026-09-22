@@ -1635,8 +1635,6 @@ https://cdn.example.org/c/003.webp"></textarea>
   const SERIES_FOLDER_NAME = 'シリーズ';
   const UNREAD_FOLDER_ID = '__unread_order__';
   const UNREAD_FOLDER_NAME = '読んでいない順';
-  const SYNCED_FOLDER_ID = '__synced__';
-  const SYNCED_FOLDER_NAME = '同期済み';
   const READING_SESSION_MS = 30 * 60 * 1000;
   const THEME_KEY = 'mangaReaderTheme';
   const GROUP_AUTHOR_KEY = 'mangaReaderGroupByAuthor';
@@ -1654,7 +1652,6 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   const els = {
     newBtn: document.getElementById('newBtn'),
-    localReaderBtn: document.getElementById('localReaderBtn'),
     closeBtn: document.getElementById('closeBtn'),
     saveBtn: document.getElementById('saveBtn'),
     safeModeBtn: document.getElementById('safeModeBtn'),
@@ -1787,7 +1784,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     smartListRow: document.getElementById('smartListRow'),
     historyListBtn: document.getElementById('historyListBtn'),
     unreadListBtn: document.getElementById('unreadListBtn'),
-    syncedListBtn: document.getElementById('syncedListBtn'),
     transferBudgetBtn: document.getElementById('transferBudgetBtn'),
     groupAuthorBtn: document.getElementById('groupAuthorBtn'),
     shelfSortSelect: document.getElementById('shelfSortSelect'),
@@ -1865,7 +1861,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     mobileBottomNav: document.getElementById('mobileBottomNav'),
     mobileNavManga: document.getElementById('mobileNavManga'),
     mobileNavVideo: document.getElementById('mobileNavVideo'),
-    mobileNavLinks: document.getElementById('mobileNavLinks'),
     mobileNavAuthor: document.getElementById('mobileNavAuthor'),
     mobileNavMore: document.getElementById('mobileNavMore'),
     mobileNavBackup: document.getElementById('mobileNavBackup'),
@@ -2262,8 +2257,6 @@ https://cdn.example.org/c/003.webp"></textarea>
       SERIES_FOLDER_NAME,
       UNREAD_FOLDER_ID,
       UNREAD_FOLDER_NAME,
-      SYNCED_FOLDER_ID,
-      SYNCED_FOLDER_NAME,
       BOOKSHELF_PAGE_SIZE
     }),
     getSavedVideos: () => savedVideos,
@@ -3000,11 +2993,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     const nextItem = findNextVolumeItem(getCurrentSeriesInfo());
     if (!nextItem) {
       const currentId = getCurrentItem() && getCurrentItem().id;
-      const localReaderEnabled = !!(window.MangaReaderFeatures && window.MangaReaderFeatures.localReader);
       const recommendation = MangaReaderRecommendations.chooseFallback(shelfVisibleItems(), {
         currentId,
         history: recommendationHistory(),
-        localReaderEnabled,
       });
       if (recommendation) {
         pendingNextVolumeItem = recommendation;
@@ -5716,8 +5707,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   function shelfVisibleItems() {
-    const localReaderEnabled = !!(window.MangaReaderFeatures && window.MangaReaderFeatures.localReader);
-    return localReaderEnabled ? savedItems.slice() : savedItems.filter((item) => !item.localSync);
+    return savedItems.filter((item) => !item.localSync);
   }
 
   function renderSavedList() {
@@ -5744,7 +5734,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     readerReturnView = { folderId: currentFolderView, seriesName: currentSeriesView, authorName: currentAuthorView };
   }
   function closeSavedList() {
-    const isRealFolder = currentFolderView && currentFolderView !== FAVORITES_FOLDER_ID && currentFolderView !== UNREAD_FOLDER_ID && currentFolderView !== SYNCED_FOLDER_ID && currentFolderView !== HISTORY_FOLDER_ID && currentFolderView !== SERIES_FOLDER_ID;
+    const isRealFolder = currentFolderView && currentFolderView !== FAVORITES_FOLDER_ID && currentFolderView !== UNREAD_FOLDER_ID && currentFolderView !== HISTORY_FOLDER_ID && currentFolderView !== SERIES_FOLDER_ID;
     if (isRealFolder) recentlyClosedFolderId = currentFolderView;
     closeReaderScreen(currentReaderScreen === 'video-list' ? 'video-list' : 'saved-list');
   }
@@ -5975,13 +5965,6 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
   function handleNewManga() { promptForMangaUrl(); }
   els.newBtn.addEventListener('click', handleNewManga);
-  if (window.MangaReaderFeatures.localReader) {
-    if (els.listTabRow) els.listTabRow.hidden = false;
-    if (els.localReaderBtn) els.localReaderBtn.addEventListener('click', () => { window.location.href = 'local-reader.html?v=f9b418b'; });
-  } else {
-    if (els.localReaderBtn) els.localReaderBtn.hidden = true;
-    if (els.listTabRow) els.listTabRow.hidden = true;
-  }
   els.closeBtn.addEventListener('click', () => {
     if (hasUnsavedCurrentUrl() && !confirm('未保存ですが戻りますか？')) return;
     closeManga();
@@ -6146,29 +6129,6 @@ https://cdn.example.org/c/003.webp"></textarea>
   const cleanupMangaListSmartListEvents = mangaListSmartListEvents.bind({
     historyButton: els.historyListBtn,
     unreadButton: els.unreadListBtn,
-  });
-  els.syncedListBtn.addEventListener('click', async () => {
-    currentFolderView = SYNCED_FOLDER_ID;
-    currentSeriesView = null;
-    currentAuthorView = null;
-    bookshelfPage = 1;
-    reorderMode = false;
-    bulkEditMode = false;
-    bulkSelectedIds.clear();
-    updateBulkEditButton();
-    els.syncedListBtn.disabled = true;
-    els.syncedListBtn.textContent = '同期済みを確認中…';
-    try {
-      const count = await reconcileLocalSyncItemsFromStorage();
-      renderSavedList();
-      flashStatus('Storage上のフォルダを確認しました（' + count + '件）');
-    } catch (error) {
-      renderSavedList();
-      flashStatus(error.message || 'Storageの一覧を取得できませんでした');
-    } finally {
-      els.syncedListBtn.disabled = false;
-      els.syncedListBtn.textContent = '同期済み';
-    }
   });
   els.transferBudgetBtn.addEventListener('click', configureTransferBudget);
   function handleShelfSortChange(value) {
@@ -6672,7 +6632,6 @@ https://cdn.example.org/c/003.webp"></textarea>
     setMobileUtilityMenu(false);
     openAuthorCards();
   });
-  els.mobileNavLinks.addEventListener('click', () => { setMobileUtilityMenu(false); window.location.href = 'links.html'; });
   els.mobileNavSettings.addEventListener('click', () => { setMobileUtilityMenu(false); openSettingsScreen(); });
   els.closeSettingsBtn.addEventListener('click', () => closeReaderScreen('settings'));
   els.mobileNavBackup.addEventListener('click', () => { setMobileUtilityMenu(false); openReaderScreen('backup'); });

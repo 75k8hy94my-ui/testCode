@@ -6,24 +6,18 @@
     home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5z"/><path d="M9 20v-6h6v6"/></svg>',
     manga: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5c3-1.5 5.5-1.2 8 .7v13c-2.2-1.7-4.8-2-8-.6z"/><path d="M20 5.5c-3-1.5-5.5-1.2-8 .7v13c2.2-1.7 4.8-2 8-.6z"/></svg>',
     video: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></svg>',
-    study: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h12v14H6z"/><path d="M9 9h6M9 13h6M9 17h4"/></svg>',
-    links: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14 14 10"/><path d="M7.5 16.5 5 19a3.5 3.5 0 0 1-5-5l3-3a3.5 3.5 0 0 1 5 0"/><path d="m16 8 3-3a3.5 3.5 0 1 1 5 5l-2.5 2.5a3.5 3.5 0 0 1-5 0"/></svg>',
     author: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg>',
     backup: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7.5h14v12H5z"/><path d="M8 4h8v3.5H8zM9 12h6M9 16h4"/></svg>',
     settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.1M12 19.1v2.1M21.2 12h-2.1M4.9 12H2.8M18.5 5.5 17 7M7 17l-1.5 1.5M18.5 18.5 17 17M7 7 5.5 5.5"/></svg>',
-    local: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h6l2 2h8v10H4z"/><path d="M8 13h8"/></svg>'
   };
 
   const ITEMS = [
     { id: 'desktopNavHome', key: 'home', label: 'ホーム', href: 'home.html' },
     { id: 'desktopNavManga', key: 'manga', label: '漫画', href: 'manga.html' },
     { id: 'desktopNavVideo', key: 'video', label: '動画', href: 'video.html' },
-    { id: 'desktopNavStudy', key: 'study', label: '学習', href: 'study.html' },
-    { id: 'desktopNavLinks', key: 'links', label: 'リンク', href: 'links.html' },
     { id: 'desktopNavAuthor', key: 'author', label: '著者', href: 'reader.html#screen=author-cards' },
     { id: 'desktopNavBackup', key: 'backup', label: 'バックアップ', href: 'reader.html#screen=backup' },
     { id: 'desktopNavSettings', key: 'settings', label: '設定', href: 'reader.html#screen=settings' },
-    { id: 'desktopNavLocalReader', key: 'local', label: 'ローカル漫画', href: 'local-reader.html', optional: true },
   ];
 
   function pageName() {
@@ -38,9 +32,6 @@
   function activeKey() {
     const page = pageName();
     if (page === 'home.html') return 'home';
-    if (page === 'study.html') return 'study';
-    if (page === 'links.html') return 'links';
-    if (page === 'local-reader.html') return 'local';
     if (page === 'manga.html') return 'manga';
     if (page === 'video.html') return 'video';
     if (page !== 'reader.html') return '';
@@ -52,9 +43,6 @@
     return 'manga';
   }
 
-  function shouldShowLocal() {
-    return pageName() === 'local-reader.html' || Boolean(window.MangaReaderFeatures && window.MangaReaderFeatures.localReader);
-  }
 
   function blockDesktopScreenMarginClick(event) {
     if (!window.matchMedia || !window.matchMedia('(min-width: 900px)').matches) return;
@@ -274,7 +262,6 @@
     link.href = item.href;
     link.dataset.routeHref = item.href;
     decorateItem(link, item);
-    if (item.optional) link.hidden = !shouldShowLocal();
     return link;
   }
 
@@ -296,7 +283,6 @@
     for (const item of ITEMS) {
       const element = nav.querySelector('#' + item.id);
       if (!element) continue;
-      if (item.optional) element.hidden = !shouldShowLocal();
       const selected = item.key === active;
       element.classList.toggle('active', selected);
       if (selected) element.setAttribute('aria-current', 'page');
@@ -314,7 +300,7 @@
 
   function build() {
     const page = pageName();
-    if (page === 'index.html' || page === 'study.html' || page === 'sync.html') return null;
+    if (page === 'index.html' || page === 'sync.html') return null;
     const id = page === 'reader.html' ? 'desktopReaderNav' : 'appDesktopRail';
     let nav = document.getElementById(id);
     if (nav) {
@@ -337,7 +323,7 @@
     return nav;
   }
 
-  const api = { ITEMS, ICONS, ensureStyles, decorateItem, build, syncActive, activeKey, shouldShowLocal };
+  const api = { ITEMS, ICONS, ensureStyles, decorateItem, build, syncActive, activeKey };
   window.AppDesktopRail = api;
 
   const start = () => build();

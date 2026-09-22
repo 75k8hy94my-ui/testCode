@@ -57,12 +57,6 @@ test('manga cards restore the manga screen route before opening a work', () => {
   assert.match(body, /openReader: openMangaReader/);
 });
 
-test('local reader routes committed bookshelf writes through storage boundary', () => {
-  const source = read('local-reader.html');
-  assert.match(source, /MangaReaderStorage\.safeWriteJson\('mangaReaderSavedFolders'/);
-  assert.match(source, /MangaReaderStorage\.safeWriteJson\('mangaReaderSavedItems'/);
-  assert.doesNotMatch(source, /localStorage\.setItem\('mangaReaderSaved(?:Folders|Items)'/);
-});
 
 test('reader error UI builds candidate URLs as text nodes', () => {
   const source = readReader();
@@ -89,23 +83,6 @@ test('passkey flow gives a local IP a clear RP ID error', () => {
   const source = read('vault-session.js');
   assert.match(source, /127\.0\.0\.1では登録できません/);
   assert.match(source, /function passkeyRpId/);
-});
-
-test('local reader is disabled behind a reversible feature flag', () => {
-  assert.match(read('feature-flags.js'), /localReader:\s*false/);
-  assert.match(read('reader.html'), /MangaReaderFeatures\.localReader/);
-  assert.match(read('local-reader.html'), /ローカル漫画機能は現在停止中です/);
-});
-
-test('disabled local manga stays out of bookshelf views without deleting it', () => {
-  const source = readReader();
-  const runtime = read('manga-list-runtime.js');
-  const viewModel = read('manga-list-view-model.js');
-  assert.match(source, /function shelfVisibleItems\(\)/);
-  assert.match(source, /window\.MangaReaderFeatures && window\.MangaReaderFeatures\.localReader/);
-  assert.match(source, /!item\.localSync/);
-  assert.match(viewModel, /itemsList = visibleShelfItems\.filter\(\(it\) => !it\.folderId && !it\.series\)/);
-  assert.match(runtime, /items:\s*context\.shelfVisibleItems\(\)/);
 });
 
 test('narrow bookshelf controls wrap instead of clipping', () => {
@@ -171,7 +148,7 @@ test('reader surfaces share the Liquid Glass treatment', () => {
 });
 
 test('all app pages provide Liquid Glass and a no-backdrop fallback', () => {
-  for (const page of ['index.html', 'sync.html', 'reader.html', 'local-reader.html']) {
+  for (const page of ['index.html', 'sync.html', 'reader.html']) {
     const source = read(page);
     assert.match(source, /backdrop-filter/ , `${page} should define a glass surface`);
     assert.match(source, /@supports not \(\(backdrop-filter: blur\(1px\)\)/, `${page} should define a fallback`);
@@ -232,7 +209,6 @@ test('saved list does not duplicate manga and video navigation in its header', (
   assert.doesNotMatch(source, /id="authorCardsBtn"/);
   assert.match(source, /mobileNavManga\.addEventListener/);
   assert.match(source, /mobileNavVideo\.addEventListener/);
-  assert.match(source, /id="mobileNavLinks"/);
 });
 
 test('video list has its own history-backed screen route', () => {
@@ -575,20 +551,8 @@ test('navigable reader screens use history-backed screen views', () => {
   }
 });
 
-test('link and local-reader editors use history-backed screen views', () => {
-  const links = read('home-profile-spa.js') + '\n' + read('links-page.js');
-  const localReader = read('local-reader.html');
-  for (const [source, key] of [[links, 'link-edit'], [localReader, 'crop-editor']]) {
-    assert.match(source, /class="[^"]*\bscreenView\b[^"]*"/);
-    assert.match(source, /history\.pushState/);
-    assert.match(source, /addEventListener\(['"]popstate['"]/);
-    assert.match(source, new RegExp(key));
-  }
-  assert.doesNotMatch(links, /<dialog[^>]+id="editDialog"/);
-});
-
 test('screen navigation does not rely on native dialog overlays', () => {
-  for (const file of ['reader.html', 'home-profile-spa.js', 'local-reader.html']) {
+  for (const file of ['reader.html', 'home-profile-spa.js']) {
     const source = read(file);
     assert.doesNotMatch(source, /<dialog\b|showModal\(\)/);
   }

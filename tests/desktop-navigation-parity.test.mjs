@@ -16,8 +16,6 @@ test('desktop navigation provides a counterpart for every mobile reader destinat
   const parity = [
     ['mobileNavManga', 'desktopNavManga'],
     ['mobileNavVideo', 'desktopNavVideo'],
-    ['mobileNavStudy', 'desktopNavStudy'],
-    ['mobileNavLinks', 'desktopNavLinks'],
     ['mobileNavAuthor', 'desktopNavAuthor'],
     ['mobileNavBackup', 'desktopNavBackup'],
     ['mobileNavSettings', 'desktopNavSettings'],
@@ -29,7 +27,6 @@ test('desktop navigation provides a counterpart for every mobile reader destinat
   assert.match(source, /desktopReaderNav/);
   assert.match(rail, /デスクトップナビ/);
   assert.match(source, /desktopNavHome/);
-  assert.match(source, /desktopNavLocalReader/);
 });
 
 test('desktop navigation uses the shared fixed Liquid Glass rail and stays off narrow screens', () => {
@@ -54,18 +51,6 @@ test('saved URL and video screens rely on desktop navigation instead of a redund
   assert.match(desktop, /addEventListener\(['"]hashchange['"]/);
 });
 
-test('cross-document return routes point to real destinations', () => {
-  const links = read('links.html');
-  const desktop = read('desktop-navigation.js');
-  assert.match(links, /href=["']home\.html["']/);
-  // The implementation uses a RegExp literal, so do not couple this assertion to slash escaping.
-  assert.match(desktop, /local-reader/);
-  assert.match(desktop, /referrer\.pathname/);
-  assert.match(desktop, /url\.hash\s*=\s*['"]screen=saved-list['"]/);
-  assert.match(desktop, /readerScreen:\s*['"]saved-list['"]/);
-  assert.match(desktop, /dispatchEvent\(new Event\(['"]hashchange['"]\)\)/);
-});
-
 test('desktop navigation enhancement is bootstrapped after the reader code', () => {
   const source = read('recommendations.js');
   assert.match(source, /desktop-navigation\.js/);
@@ -73,16 +58,8 @@ test('desktop navigation enhancement is bootstrapped after the reader code', () 
 });
 
 test('major pages expose the same primary destinations and mark the current page', () => {
-  const pages = [
-    ['home.html', 'ホーム', 'home.html'],
-    ['index-search.html', '索引検索', 'index-search.html'],
-    ['hyakusen.html', '判例百選', 'hyakusen.html'],
-  ];
-  const destinations = [
-    ['ホーム', 'home.html'],
-    ['索引検索', 'index-search.html'],
-    ['判例百選', 'hyakusen.html'],
-  ];
+  const pages = [['home.html', 'ホーム', 'home.html']];
+  const destinations = [['ホーム', 'home.html']];
 
   for (const [file, currentLabel, currentHref] of pages) {
     const source = read(file);

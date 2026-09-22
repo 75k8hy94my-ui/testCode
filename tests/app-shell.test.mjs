@@ -17,7 +17,7 @@ test('global chrome does not fetch-replace pages or intercept SPA family clicks'
 test('home-family pages share one History API controller', () => {
   const spa = read('home-profile-spa.js');
   const shell = read('app-global-shell.js');
-  for (const page of ['home.html', 'profile.html', 'index-search.html', 'hyakusen.html', 'links.html']) {
+  for (const page of ['home.html', 'profile.html', 'manga.html', 'video.html']) {
     assert.match(shell, new RegExp(`['"]${page}['"]`));
     assert.match(read(page), /home-profile-spa\.js/);
     assert.match(read(page), /class=["']homeHeader["']/);
@@ -34,7 +34,7 @@ test('mobile home shell provides navigation to profile and other pages', () => {
   const spa = fs.readFileSync(new URL('../home-profile-spa.js', import.meta.url), 'utf8');
   assert.match(spa, /mobileBottomNav/);
   assert.match(spa, /profile\.html/);
-  assert.match(spa, /index-search\.html/);
+  assert.match(spa, /manga\.html/);
 });
 
 test('static verifier covers the shared shell and profile entry', () => {

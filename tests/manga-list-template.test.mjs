@@ -15,7 +15,7 @@ function loadTemplate() {
 
 const requiredIds = [
   'mangaListSection', 'smartListRow', 'historyListBtn', 'unreadListBtn',
-  'syncedListBtn', 'transferBudgetBtn', 'listToolbar', 'shelfSearchInput',
+  'transferBudgetBtn', 'listToolbar', 'shelfSearchInput',
   'listBackBtn', 'listFolderTitle', 'listNewFolderBtn', 'editShelfBtn',
   'bulkEditBtn', 'filterBtn', 'shelfSortSelect', 'groupAuthorBtn', 'dashboard',
   'filterRow', 'filterSeriesInput', 'filterAuthorInput', 'filterTagsInput',

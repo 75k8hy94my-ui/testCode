@@ -31,7 +31,7 @@
   }
 
   function shellMarkup() {
-    return '<header class="homeHeader" id="readerShellHeader"><div><h1 id="readerShellTitle">漫画</h1></div><div class="topbarActions"><nav class="topActions" aria-label="主要ページ"><a class="glassBtn" href="home.html">ホーム</a><a class="glassBtn topActionCurrent" aria-current="page" href="manga.html">本棚</a><a class="glassBtn" href="video.html">動画</a><a class="glassBtn" href="study.html">学習</a><a class="glassBtn" href="links.html">リンク</a></nav><div class="headerActions"><a class="glassBtn" href="sync.html">保管庫</a><a class="glassBtn" href="reader.html#screen=settings" data-reader-route="settings">設定</a></div></div></header>';
+    return '<header class="homeHeader" id="readerShellHeader"><div><h1 id="readerShellTitle">漫画</h1></div><div class="topbarActions"><nav class="topActions" aria-label="主要ページ"><a class="glassBtn" href="home.html">ホーム</a><a class="glassBtn topActionCurrent" aria-current="page" href="manga.html">本棚</a><a class="glassBtn" href="video.html">動画</a></nav><div class="headerActions"><a class="glassBtn" href="sync.html">保管庫</a><a class="glassBtn" href="reader.html#screen=settings" data-reader-route="settings">設定</a></div></div></header>';
   }
 
   function install() {

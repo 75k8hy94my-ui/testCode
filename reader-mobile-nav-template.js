@@ -6,7 +6,6 @@
   <button class="mobileBottomNavBtn" id="mobileNavMore" type="button" aria-label="その他" aria-haspopup="menu" aria-expanded="false"><svg class="mobileNavGlyph mobileNavGlyphMore" viewBox="0 0 200 200" aria-hidden="true"><circle fill="currentColor" cx="55" cy="100" r="9"></circle><circle fill="currentColor" cx="100" cy="100" r="9"></circle><circle fill="currentColor" cx="145" cy="100" r="9"></circle></svg><span>その他</span></button>
 </nav>
 <div id="mobileUtilityMenu" role="menu" aria-label="その他の操作" hidden>
-  <button id="mobileNavLinks" type="button" role="menuitem">リンク管理</button>
   <button id="mobileNavAuthor" type="button" role="menuitem">作者カード</button>
   <button id="mobileNavBackup" type="button" role="menuitem">バックアップ</button>
   <button id="mobileNavSettings" type="button" role="menuitem">設定</button>

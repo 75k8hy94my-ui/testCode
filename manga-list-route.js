@@ -132,7 +132,6 @@
         FAVORITES_FOLDER_ID: '__favorites__', FAVORITES_FOLDER_NAME: 'お気に入り',
         SERIES_FOLDER_ID: '__series__', SERIES_FOLDER_NAME: 'シリーズ',
         UNREAD_FOLDER_ID: '__unread_order__', UNREAD_FOLDER_NAME: '読んでいない順',
-        SYNCED_FOLDER_ID: '__synced__', SYNCED_FOLDER_NAME: '同期済み',
         BOOKSHELF_PAGE_SIZE: 25,
       };
       const safeWriteJson = (key, value) => {
@@ -223,8 +222,7 @@
       const readingRecordText = (item) => item.lastReadAt ? '既読' : '未読';
       const pageCount = (item) => Array.isArray(item.pages) ? item.pages.length + 'ページ' : '';
       const visibleItems = () => {
-        const enabled = !!(windowRef.MangaReaderFeatures && windowRef.MangaReaderFeatures.localReader);
-        return state().savedItems.filter((item) => enabled || !item.localSync).slice();
+        return state().savedItems.filter((item) => !item.localSync).slice();
       };
       const appendFolderPreview = (cover, items, emptyIcon, emptyAlt, kindLabel) => {
         const preview = items.slice(0, 4); if (!preview.length) { const img = documentRef.createElement('img'); img.src = emptyIcon; img.alt = emptyAlt; cover.appendChild(img); return; }
@@ -310,7 +308,6 @@
         const groupAuthor = elements.groupAuthorBtn;
         const history = elements.historyListBtn;
         const unread = elements.unreadListBtn;
-        const synced = rootElement.querySelector('#syncedListBtn');
         const back = elements.listBackBtn;
         const prev = elements.bookshelfPrevBtn;
         const next = elements.bookshelfNextBtn;
@@ -339,7 +336,6 @@
           onHistory: () => { setState({ currentFolderView: config.HISTORY_FOLDER_ID, currentSeriesView: null, currentAuthorView: null, bookshelfPage: 1 }); renderList(); },
           onUnread: () => { setState({ currentFolderView: config.UNREAD_FOLDER_ID, currentSeriesView: null, currentAuthorView: null, bookshelfPage: 1 }); renderList(); },
         }, { historyButton: history, unreadButton: unread });
-        if (synced) bind(synced, 'click', () => { setState({ currentFolderView: config.SYNCED_FOLDER_ID, currentSeriesView: null, currentAuthorView: null, bookshelfPage: 1 }); renderList(); });
         bindFactory(MangaListPaginationEventsFactory, { onPageChange: (delta) => { setState({ bookshelfPage: state().bookshelfPage + delta }); renderList(); } }, { prevButton: prev, nextButton: next });
         bindFactory(MangaListNavigationEventsFactory, { onBack: () => { setState({ currentFolderView: null, currentSeriesView: null, currentAuthorView: null, bookshelfPage: 1 }); renderList(); } }, { backButton: back });
         bindFactory(MangaListBulkEventsFactory, {

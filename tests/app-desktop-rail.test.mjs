@@ -5,14 +5,12 @@ import fs from 'node:fs';
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 
 test('desktop Liquid Glass rail appears only after the vault is unlocked', () => {
-  for (const page of ['home.html','reader.html','links.html','local-reader.html']) {
+  for (const page of ['home.html','reader.html','manga.html','video.html']) {
     assert.match(read(page), /app-desktop-rail\.js/, `${page} should load the shared rail`);
   }
   for (const page of ['index.html','sync.html']) {
     assert.doesNotMatch(read(page), /app-desktop-rail\.js/, `${page} should not load the shared rail before vault unlock`);
   }
-  assert.match(read('study.html'), /app-desktop-rail\.js/);
-  assert.match(read('app-desktop-rail.js'), /page === 'study\.html'/);
 });
 
 test('shared rail mirrors the study desktop Liquid Glass material', () => {
@@ -36,12 +34,9 @@ test('shared rail provides global destinations and page-aware active state', () 
     ['desktopNavHome','home.html'],
     ['desktopNavManga','manga.html'],
     ['desktopNavVideo','video.html'],
-    ['desktopNavStudy','study.html'],
-    ['desktopNavLinks','links.html'],
     ['desktopNavAuthor','reader.html#screen=author-cards'],
     ['desktopNavBackup','reader.html#screen=backup'],
     ['desktopNavSettings','reader.html#screen=settings'],
-    ['desktopNavLocalReader','local-reader.html']
   ];
   for (const [id, href] of destinations) {
     assert.ok(rail.includes(id));

@@ -12,7 +12,6 @@
       </div>
     </div>
     <div id="listTabRow">
-      <button class="listTab" id="localReaderBtn" type="button">ローカル漫画</button>
     </div>
     ${MangaListTemplate.createMarkup()}
     <div id="videoListSection" style="display:none;">

@@ -7,7 +7,7 @@ const cssExists = fs.existsSync(cssUrl);
 const css = cssExists ? fs.readFileSync(cssUrl, 'utf8') : '';
 const shell = fs.readFileSync(new URL('../home-profile-shell.css', import.meta.url), 'utf8');
 const globalShell = fs.readFileSync(new URL('../app-global-shell.css', import.meta.url), 'utf8');
-const targetPages = ['hyakusen.html', 'home.html', 'index-search.html'];
+const targetPages = ['home.html', 'profile.html', 'manga.html', 'video.html'];
 const pages = Object.fromEntries(targetPages.map((name) => [name, fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8')]));
 
 test('home-family pages load the shared home shell stylesheet', () => {

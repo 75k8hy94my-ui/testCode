@@ -11,7 +11,6 @@
       <div id="smartListRow">
         <button class="smartListBtn" id="historyListBtn" type="button">履歴</button>
         <button class="smartListBtn" id="unreadListBtn" type="button">読んでいない順</button>
-        <button class="smartListBtn" id="syncedListBtn" type="button">同期済み</button>
         <button class="smartListBtn" id="transferBudgetBtn" type="button">通信量</button>
       </div>
       <div id="listToolbar">

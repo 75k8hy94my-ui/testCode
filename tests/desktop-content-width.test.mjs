@@ -9,13 +9,3 @@ test('desktop app pages use the shared 920px content width', () => {
   assert.match(rail, /--app-desktop-content-max:\s*920px/);
   assert.match(rail, /max-width:\s*var\(--app-desktop-content-max\)/);
 });
-
-test('study desktop views expand to the same 920px content width', () => {
-  const studyData = read('study-data.js');
-  assert.match(studyData, /studyDesktopLayoutStyles/);
-  assert.match(studyData, /@media \(min-width: 900px\)/);
-  assert.match(studyData, /body\.top-level-nav\s*\{[^}]*padding-left:\s*144px/);
-  assert.match(studyData, /body\.top-level-nav #studyApp\s*\{[^}]*width:\s*min\(100%,\s*920px\)/);
-  assert.match(studyData, /\.lessonLauncher,\s*\.quizShell\s*\{[^}]*width:\s*100%/);
-  assert.match(studyData, /\.lessonLauncher,\s*\.quizShell\s*\{[^}]*max-width:\s*920px/);
-});

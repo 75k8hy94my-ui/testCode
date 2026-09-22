@@ -1,18 +1,10 @@
 (()=>{
 'use strict';
 const HOME_LAYOUT_KEY = 'mangaReaderHomeCards';
-const LEGACY_DEFAULT_CARD_IDS = ['bookshelf', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
-const DEFAULT_CARD_IDS = ['bookshelf', 'roppo', 'index-search', 'study', 'quiz', 'links', 'egov', 'courts', 'moj-exam'];
+const LEGACY_DEFAULT_CARD_IDS = ['bookshelf'];
+const DEFAULT_CARD_IDS = ['bookshelf'];
 const CARD_CATALOG = Object.freeze({
   bookshelf: Object.freeze({ id: 'bookshelf', title: '本棚', subtitle: '保存した漫画・資料を開く', kind: 'internal', href: 'manga.html', badge: 'APP' }),
-  roppo: Object.freeze({ id: 'roppo', title: '六法', subtitle: '主要法令を検索し、条文ごとにメモを残す', kind: 'internal', href: 'roppo.html', badge: 'LAW' }),
-  'index-search': Object.freeze({ id: 'index-search', title: '索引検索', subtitle: '教科書の事項・判例・条文索引を横断検索', kind: 'internal', href: 'index-search.html', badge: 'INDEX' }),
-  study: Object.freeze({ id: 'study', title: '司法試験学習', subtitle: '科目・論証・過去問・復習', kind: 'internal', href: 'study.html', badge: 'STUDY' }),
-  quiz: Object.freeze({ id: 'quiz', title: '定義クイズ', subtitle: '定義を思い出す練習を始める', kind: 'internal', href: 'study.html?view=quiz', badge: 'QUIZ' }),
-  links: Object.freeze({ id: 'links', title: 'リンク管理', subtitle: '学習・資料リンクをまとめて開く', kind: 'internal', href: 'links.html', badge: 'APP' }),
-  egov: Object.freeze({ id: 'egov', title: 'e-Gov 法令', subtitle: '現行法令・改正履歴を公式情報で確認', kind: 'official', href: 'https://laws.e-gov.go.jp/', badge: '公式' }),
-  courts: Object.freeze({ id: 'courts', title: '裁判所 判例', subtitle: '裁判例検索・最近の最高裁判例を確認', kind: 'official', href: 'https://www.courts.go.jp/hanrei/', badge: '公式' }),
-  'moj-exam': Object.freeze({ id: 'moj-exam', title: '法務省 司法試験', subtitle: '試験日程・問題・結果などの公式情報', kind: 'official', href: 'https://www.moj.go.jp/jinji/shihoushiken/jinji08_00025.html', badge: '公式' })
 });
 const isKnownCard = (id) => Object.prototype.hasOwnProperty.call(CARD_CATALOG, id);
 function normalizeLayout(value) {

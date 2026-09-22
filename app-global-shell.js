@@ -3,19 +3,13 @@
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
   if (location.pathname.endsWith('/index.html') || location.pathname === '/index.html') return;
 
-  const SPA_PAGES = Object.freeze(['home.html', 'profile.html', 'index-search.html', 'hyakusen.html', 'links.html', 'manga.html', 'video.html', 'reader.html']);
+  const SPA_PAGES = Object.freeze(['home.html', 'profile.html', 'manga.html', 'video.html', 'reader.html']);
   const labels = {
     'home.html': 'ホーム',
     'profile.html': 'プロフィール設定',
-    'index-search.html': '索引検索',
-    'hyakusen.html': '判例百選',
-    'links.html': 'リンク管理',
     'manga.html': '漫画',
     'video.html': '動画',
     'reader.html': '漫画',
-    'local-reader.html': 'ローカル漫画',
-    'study.html': '学習',
-    'roppo.html': '六法',
     'sync.html': '保管庫'
   };
 
@@ -48,7 +42,6 @@
     ensureStylesheet();
     const page = currentPage();
     const currentLabel = labels[page] || document.title;
-    if (page === 'study.html') setTimeout(() => document.getElementById('studyBottomNav')?.remove(), 0);
     const existing = document.getElementById('appGlobalHeader') || document.querySelector('.globalAppHeader');
     const header = existing || document.createElement('header');
     header.id = 'appGlobalHeader';
