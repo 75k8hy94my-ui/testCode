@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive,nosnippet">
+  <title>漫画一覧テストサンドボックス</title>
+  <link rel="stylesheet" href="app-global-shell.css?v=20260911-shell">
+  <link rel="stylesheet" href="home-profile-shell.css?v=20260918-mobile-nav">
+</head>
+<body>
+  <main class="homeShell" id="mangaSandboxApp">
+    <header class="homeHeader"><h1>漫画一覧テストサンドボックス</h1></header>
+    <section class="profileContent" aria-label="仮想同期">
+      <p>認証・保管庫・永続ストレージを使わない公開テスト環境です。</p>
+      <button id="virtual-save" type="button">仮想保存</button>
+      <button id="virtual-receive" type="button">仮想同期受信</button>
+      <button id="virtual-reset" type="button">初期状態へ戻す</button>
+      <p id="virtualSync" aria-live="polite"></p>
+    </section>
+    <div id="mangaSandboxMount"></div>
+  </main>
+  <script src="manga-list-route.js?v=20260922-manga-route"></script>
+  <script src="manga-sandbox.js?v=20260922-sandbox"></script>
+</body>
+</html>
