@@ -53,6 +53,7 @@
   }
 
   function createState(storage, keys) {
+    let legacyMigrated = false;
     let state = {
       savedItems: [], savedFolders: [], authorCards: [], savedVideos: [],
       currentFolderView: null, currentSeriesView: null, currentAuthorView: null,
@@ -70,6 +71,7 @@
           try {
             const legacy = JSON.parse(storage.getItem('mangaReaderSavedUrls') || '[]');
             if (Array.isArray(legacy) && legacy.length) {
+              legacyMigrated = true;
               loaded.savedItems = legacy.map((item) => ({
                 id: 'i-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
                 url: item.url,
@@ -85,6 +87,7 @@
         state = Object.assign(state, loaded, { savedVideos: Array.isArray(videos) ? videos : [] });
         return state;
       },
+      wasLegacyMigrated() { return legacyMigrated; },
     };
   }
 
@@ -141,7 +144,6 @@
       };
       const pageUrlFor = (base, page, index, width) => base + String(page).padStart(Math.max(1, Number(width) || 1), '0') + '.' + extCandidates[index];
       const readInfo = (key) => { try { const value = JSON.parse(storage.getItem(key) || '{}'); return value && typeof value === 'object' ? value : {}; } catch (_) { return {}; } };
-      const writeInfo = (key, value) => safeWriteJson(key, value);
       const getCachedMangaInfo = (key) => readInfo('mangaReaderInfoCache')[key] || null;
       const getLocalStoragePathFromUrl = (value) => {
         try { const path = new URL(value).pathname; const marker = '/storage/v1/object/public/local-manga/'; return path.includes(marker) ? path.slice(path.indexOf(marker) + marker.length) : ''; } catch (_) { return ''; }
@@ -232,14 +234,19 @@
       };
       const context = MangaListRuntimeContextFactory.create(contextDeps);
       runtime = MangaListRuntimeFactory.create(context);
-      const stateRuntime = MangaListStateRuntimeFactory.create({
-        load: data.load,
-        migrate: (loaded) => Object.assign(state(), loaded),
-        removeHistoryFolder: (loaded) => { loaded.savedFolders = loaded.savedFolders.filter((folder) => folder.id !== config.HISTORY_FOLDER_ID); return loaded; },
-        synchronizeAuthors: (loaded) => loaded,
-      });
-      const renderRuntime = MangaListRenderRuntimeFactory.create({ getState: state, getElements: () => elements, deriveViewModel: (value) => value, render: () => runtime.renderSavedList() });
-      const controller = MangaListControllerFactory.create({ init: stateRuntime.initialize, render: renderRuntime.render, open: () => renderRuntime.render(), activate: () => {}, getElements: () => elements });
+      const synchronizeAuthors = (loaded) => {
+        let changed = false;
+        loaded.savedItems.forEach((item) => {
+          const name = String(item.author || '').trim();
+          if (!name || loaded.authorCards.some((card) => card.name === name || card.circleName === name)) return;
+          loaded.authorCards.unshift({ id: 'a-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name, circleName: '', links: [], createdAt: Date.now() });
+          changed = true;
+        });
+        Object.assign(state(), loaded);
+        if (data.wasLegacyMigrated()) host.persistItems();
+        if (changed) host.persistAuthorCards();
+        return loaded;
+      };
       const eventBindings = () => {
         const cleanups = [];
         const bind = (node, type, handler) => { node.addEventListener(type, handler); cleanups.push(() => node.removeEventListener(type, handler)); };
@@ -295,7 +302,7 @@
         runtimeFactory: MangaListRuntimeFactory,
         contextFactory: MangaListRuntimeContextFactory,
         createContextDeps: ({ elements: mountedElements }) => { elements = mountedElements; return contextDeps; },
-        createStateDeps: () => ({ load: data.load, migrate: (loaded) => Object.assign(state(), loaded), removeHistoryFolder: (loaded) => { loaded.savedFolders = loaded.savedFolders.filter((folder) => folder.id !== config.HISTORY_FOLDER_ID); return loaded; }, synchronizeAuthors: (loaded) => loaded }),
+        createStateDeps: () => ({ load: data.load, migrate: (loaded) => Object.assign(state(), loaded), removeHistoryFolder: (loaded) => { loaded.savedFolders = loaded.savedFolders.filter((folder) => folder.id !== config.HISTORY_FOLDER_ID); return loaded; }, synchronizeAuthors }),
         createRenderDeps: () => ({ getState: state, getElements: () => elements, deriveViewModel: (value) => value, render: () => runtime.renderSavedList() }),
         createControllerDeps: ({ stateRuntime: entryStateRuntime, renderRuntime: entryRenderRuntime }) => ({ init: entryStateRuntime.initialize, render: entryRenderRuntime.render, open: () => entryRenderRuntime.render(), activate: () => {}, getElements: () => elements }),
         createEventBindings: eventBindings,
