@@ -73,3 +73,9 @@ test('authenticated top bars keep only the shared profile action', () => {
   assert.doesNotMatch(menu, /matchMedia\('\(min-width: 900px\)'\)\.matches\) return/);
   assert.match(read('sync.html'), /profile-menu\.js\?v=20260922-profile-header/);
 });
+
+test('login page has no top navigation menu', () => {
+  const index = read('index.html');
+  assert.doesNotMatch(index, /mobileTopBar|mobileTopNav/);
+  assert.doesNotMatch(index, /href=["'](?:home|manga|video|reader)\.html/);
+});
