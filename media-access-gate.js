@@ -252,7 +252,7 @@
     if (!root.document) return;
     const update = () => {
       root.document.querySelectorAll('[data-vpn-status-button]').forEach((button) => {
-        button.textContent = 'VPN未接続';
+        button.textContent = button.hasAttribute('data-vpn-recheck-button') ? 'VPN未接続（再確認）' : 'VPN未接続';
         button.title = message || 'VPNに接続すると漫画・動画を読み込めます。';
         button.dataset.vpnState = 'blocked';
       });
@@ -388,6 +388,11 @@
       panel.append(title, pre, controls);
       root.document.body.append(panel);
       root.document.addEventListener('click', (event) => {
+        const recheckButton = event.target && event.target.closest ? event.target.closest('[data-vpn-recheck-button]') : null;
+        if (recheckButton) {
+          checkVpn({ external: true });
+          return;
+        }
         const diagnosticsButton = event.target && event.target.closest ? event.target.closest('[data-vpn-diagnostics-button]') : null;
         if (diagnosticsButton) {
           panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
@@ -626,7 +631,10 @@
     if (!root.document) return;
     const labels = { allowed: 'VPN接続済み', blocked: 'VPN未接続', checking: 'VPN確認中', pending: 'VPN確認中' };
     root.document.querySelectorAll('[data-vpn-status-button]').forEach((button) => {
-      button.textContent = labels[nextStatus] || labels.pending;
+      const label = labels[nextStatus] || labels.pending;
+      button.textContent = button.hasAttribute('data-vpn-recheck-button') && nextStatus !== 'checking' && nextStatus !== 'pending'
+        ? label + '（再確認）'
+        : label;
       button.dataset.vpnState = nextStatus || 'pending';
     });
   }

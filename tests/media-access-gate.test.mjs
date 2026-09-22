@@ -266,3 +266,9 @@ test('profile exposes controls to release manually fixed non-VPN IPs', () => {
   assert.match(spa, /profileClearNonVpn/);
   assert.match(spa, /testCode\.manualNonVpnIps/);
 });
+
+test('explicit VPN recheck uses the full external verdict path', () => {
+  assert.match(source, /closest\('\[data-vpn-recheck-button\]'\)/);
+  assert.match(source, /recheckButton[\s\S]*checkVpn\(\{ external: true \}\)/);
+  assert.match(source, /diagnosticsButton[\s\S]*renderDiagnostics\(\)/);
+});

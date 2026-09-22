@@ -31,7 +31,7 @@ test('current entry pages keep their static bootstrap script baselines', () => {
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js',
     'app-global-shell.js?v=20260922-profile-header', 'app-desktop-rail.js',
     'profile-menu.js?v=20260922-profile-header', 'feature-flags.js',
-    'media-access-gate.js?v=20260918-vpn-panel-toggle',
+    'media-access-gate.js?v=20260922-vpn-tools',
     'manga-list-route.js?v=20260922-manga-route',
     'home-profile-spa.js?v=20260922-profile-header',
   ]);

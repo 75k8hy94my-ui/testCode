@@ -94,13 +94,13 @@ function renderVpnGate(target,route){
   const heading=document.createElement('h2');heading.textContent=route==='video'?'動画一覧を開くにはVPN接続が必要です':'漫画一覧を開くにはVPN接続が必要です';
   const message=document.createElement('p');message.className='profileLead';message.textContent='VPN接続を確認できるまで、保存データと一覧を表示しません。接続後に再確認してください。';
   const actions=document.createElement('div');actions.className='vpnRouteActions';
-  const button=document.createElement('button');button.type='button';button.className='glassBtn vpnStatusButton';button.dataset.vpnStatusButton='1';button.textContent='VPN確認中';button.title='VPN接続後に押して再確認できます。';
+  const button=document.createElement('button');button.type='button';button.className='glassBtn vpnStatusButton';button.dataset.vpnStatusButton='1';button.dataset.vpnRecheckButton='1';button.textContent='VPN確認中';button.title='VPN接続を完全に再確認します。';
   const diagnostics=document.createElement('button');diagnostics.type='button';diagnostics.className='glassBtn vpnDiagnosticsButton';diagnostics.dataset.vpnDiagnosticsButton='1';diagnostics.textContent='VPN診断';diagnostics.title='VPN判定の詳細を表示します。';
   actions.append(button,diagnostics);section.append(heading,message,actions);target.append(section);
 }
 async function ensureVpnGate(){
   if(window.MangaReaderMediaAccess)return window.MangaReaderMediaAccess;
-  await loadScript('media-access-gate.js?v=20260918-vpn-panel-toggle','spaMediaGate');
+  await loadScript('media-access-gate.js?v=20260922-vpn-tools','spaMediaGate');
   return window.MangaReaderMediaAccess;
 }
 function cleanupReaderRuntime(){cleanupMangaRoute();if(typeof window.MangaReaderRuntimeCleanup==='function')window.MangaReaderRuntimeCleanup();document.querySelectorAll('[data-reader-head-asset],[data-reader-spa-script]').forEach((node)=>node.remove());document.querySelectorAll('#app,#metadataSuggestions,#saveDialogOverlay,#customAddOverlay,#editItemOverlay,#bulkEditOverlay,#bulkDetectOverlay,#savedListOverlay,#videoAddOverlay,#videoPlayerOverlay,#authorCardOverlay,#tocOverlay,#settingsOverlay,#backupOverlay').forEach((node)=>node.remove());document.documentElement.classList.remove('reader-shell-page','reader-saved-list-route','reader-videoList-route','reader-authorList-route','reader-settings-route','reader-backup-route');}
@@ -130,12 +130,12 @@ async function renderVideo(generation){
     if(generation!==renderGeneration)return;
     if(!gate||!gate.canLoadExternalMedia()){renderVpnGate(target,'video');setTitle('video');syncHeaderRoute();return;}
     if(!window.VideoListRouteFactory)await loadScript('video-list-route.js?v=20260922-video-route','spaVideoListRoute');
-    if(!window.MangaReaderVideoTemplate)await loadScript('video-list-template.js?v=20260922-video-template','spaVideoListTemplate');
+    if(!window.MangaReaderVideoTemplate)await loadScript('video-list-template.js?v=20260922-vpn-tools','spaVideoListTemplate');
     if(generation!==renderGeneration)return;
     if(!videoRouteRuntime)videoRouteRuntime=window.VideoListRouteFactory.create({
       documentRef:document,
       loadScript,
-      loadMediaGate:()=>window.MangaReaderMediaAccess?Promise.resolve():loadScript('media-access-gate.js?v=20260918-vpn-panel-toggle','spaMediaGate'),
+      loadMediaGate:()=>window.MangaReaderMediaAccess?Promise.resolve():loadScript('media-access-gate.js?v=20260922-vpn-tools','spaMediaGate'),
     });
     await videoRouteRuntime.start({mountElement:target});
     if(generation!==renderGeneration){videoRouteRuntime.detach();return;}

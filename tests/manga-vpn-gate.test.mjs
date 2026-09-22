@@ -16,6 +16,7 @@ test('manga shells load the standalone bookshelf stylesheet', () => {
 test('manga and video routes wait for an allowed VPN verdict before starting list runtimes', () => {
   assert.match(spa, /function renderVpnGate\(/);
   assert.match(spa, /dataset\.vpnStatusButton='1'/);
+  assert.match(spa, /dataset\.vpnRecheckButton='1'/);
   assert.match(spa, /dataset\.vpnDiagnosticsButton='1'/);
   assert.match(spa, /className='glassBtn vpnDiagnosticsButton'/);
   assert.doesNotMatch(spa.slice(spa.indexOf('function renderVpnGate'), spa.indexOf('async function ensureVpnGate')), /button\.dataset\.vpnStatusButton='1'.*button\.dataset\.vpnDiagnosticsButton='1'/s);
@@ -43,4 +44,17 @@ test('standalone bookshelf CSS covers the primary manga surfaces', () => {
   for (const selector of ['book-card', 'book-cover', 'folder-card', 'listToolbar', 'smartListRow', 'filter-row', 'bookshelf-pagination']) {
     assert.match(css, new RegExp(`\\.${selector}|#${selector}`), selector);
   }
+});
+
+test('manga, video and reader list surfaces expose separate VPN recheck and diagnostics controls', () => {
+  const mangaTemplate = read('manga-list-template.js');
+  const videoTemplate = read('video-list-template.js');
+  const readerTemplate = read('reader-saved-list-template.js');
+  for (const source of [mangaTemplate, videoTemplate, readerTemplate]) {
+    assert.match(source, /data-vpn-recheck-button/);
+    assert.match(source, /data-vpn-diagnostics-button/);
+    assert.match(source, /data-vpn-status-button/);
+  }
+  assert.doesNotMatch(videoTemplate, /data-vpn-status-button\s+data-vpn-diagnostics-button/);
+  assert.doesNotMatch(readerTemplate, /data-vpn-status-button\s+data-vpn-diagnostics-button/);
 });

@@ -3,8 +3,9 @@
   const template = String.raw`<section id="savedListOverlay" class="screenView modalOverlay" role="region" aria-labelledby="savedListPanel">
     <div id="savedListPanel" class="modalPanel">
     <div class="panel-header">
-      <div class="listHeaderControls" data-vpn-header="saved-list" aria-label="VPN状態">
-        <button class="ctrlBtn vpnStatusButton" type="button" data-vpn-status-button data-vpn-diagnostics-button>VPN確認中</button>
+      <div class="listHeaderControls vpnListControls" data-vpn-header="saved-list" aria-label="VPN状態">
+        <button class="ctrlBtn vpnStatusButton vpnRecheckButton" type="button" data-vpn-status-button data-vpn-recheck-button title="VPN接続を完全に再確認します">VPN確認中</button>
+        <button class="ctrlBtn vpnDiagnosticsButton" type="button" data-vpn-diagnostics-button>VPN診断</button>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
         <button class="ctrlBtn" id="listThemeBtn" type="button" title="テーマ切替" aria-label="テーマ切替"></button>

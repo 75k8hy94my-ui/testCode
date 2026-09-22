@@ -2,7 +2,7 @@
   'use strict';
 
   const SCRIPT_URLS = [
-    ['manga-list-template.js?v=20260921-manga-template', 'mangaRouteTemplate'],
+    ['manga-list-template.js?v=20260922-vpn-tools', 'mangaRouteTemplate'],
     ['manga-list-search-events.js?v=20260922-search-events', 'mangaRouteSearchEvents'],
     ['manga-list-sort-events.js?v=20260922-sort-events', 'mangaRouteSortEvents'],
     ['manga-list-filter-events.js?v=20260922-filter-events', 'mangaRouteFilterEvents'],
