@@ -227,7 +227,7 @@
         openReader: (item) => host.navigateToReader(item), accessMedia: host.setupFeedImage,
         renderDashboard, renderAuthorDashboard,
         getVisibleItems: visibleItems, appendFolderPreview, createStaticCard: (input) => MangaListCardBoundary.createStaticCard(input), loadLocalCover: host.loadLocalCover, getCoverSourceCache: () => coverSourceCache, setupFeedImage: host.setupFeedImage,
-        makeHeartIcon, moveItemInList, moveFolderInList, rememberReaderReturnView: () => {}, closeSavedList: () => {}, setReadingListContext: () => {}, flashStatus: () => {}, openItem: (item) => host.navigateToReader(item), renderList,
+        makeHeartIcon, moveItemInList, moveFolderInList, renderList,
         updateBulkEditButton: () => {}, shelfVisibleItems: visibleItems, unreadOrderItems: () => visibleItems().filter((item) => !item.lastReadAt), itemDisplayTitle: title, itemSubtext, readingRecordText, itemPageCountText: pageCount,
         buildFavoritesFolderCard, buildSeriesFolderCard, buildSeriesGroupCard, buildAuthorGroupCard, buildSearchText,
         deriveViewModel: (input) => MangaListViewModel.derive(input), renderCards: (input) => MangaListRenderer.render(input), createDocumentFragment: () => documentRef.createDocumentFragment(),

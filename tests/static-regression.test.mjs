@@ -322,12 +322,12 @@ test('folder cards use one private operation dependency boundary without capturi
   const buildEnd = runtime.indexOf('\n    function buildBookCard(', buildStart);
   const build = runtime.slice(buildStart, buildEnd);
   assert.match(build, /context\.getVisibleItems\(\)/);
-  assert.match(build, /context\.openItem\(folderItems\[0\], false\)/);
+  assert.match(build, /context\.openReader\(folderItems\[0\], folderItems\)/);
   assert.match(build, /context\.persistAll\(\)/);
   assert.match(build, /context\.renderList\(\)/);
   assert.match(build, /context\.moveFolderInList\(folder, folderList, -1\)/);
   assert.match(build, /context\.moveFolderInList\(folder, folderList, 1\)/);
-  assert.equal((build.match(/context\.openItem\(folderItems\[0\], false\)/g) || []).length, 1);
+  assert.equal((build.match(/context\.openReader\(folderItems\[0\], folderItems\)/g) || []).length, 1);
   assert.equal((build.match(/context\.persistAll\(/g) || []).length, 1);
   assert.equal((build.match(/context\.moveFolderInList\(/g) || []).length, 2);
   assert.match(build, /e\.stopPropagation\(\)/);

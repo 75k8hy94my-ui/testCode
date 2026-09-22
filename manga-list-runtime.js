@@ -7,8 +7,7 @@
     'persistAll', 'renderDashboard', 'renderAuthorDashboard', 'updateBulkEditButton',
     'getVisibleItems', 'appendFolderPreview', 'createStaticCard', 'loadLocalCover',
     'getCoverSourceCache', 'setupFeedImage', 'makeHeartIcon', 'moveItemInList',
-    'moveFolderInList', 'rememberReaderReturnView', 'closeSavedList',
-    'setReadingListContext', 'openItem', 'renderList', 'buildFavoritesFolderCard',
+    'moveFolderInList', 'renderList', 'buildFavoritesFolderCard',
     'buildSeriesFolderCard', 'buildSeriesGroupCard', 'buildAuthorGroupCard',
     'buildSearchText',
     'deriveViewModel', 'renderCards', 'createDocumentFragment', 'openReader'
@@ -88,10 +87,7 @@
         if (folderItems.length === 1) {
           // 1冊だけのフォルダは直接開くが、閉じた際の戻り先はこのフォルダにする。
           context.setState({ currentFolderView: folder.id, currentSeriesView: null, reorderMode: false });
-          context.rememberReaderReturnView();
-          context.closeSavedList();
-          context.setReadingListContext(folderItems, 0);
-          context.openItem(folderItems[0], false);
+          context.openReader(folderItems[0], folderItems);
           return;
         }
         context.setState({ currentFolderView: folder.id, currentSeriesView: null, reorderMode: false });

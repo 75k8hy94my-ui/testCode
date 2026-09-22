@@ -44,3 +44,17 @@ test('card opening delegates the entire reader strategy to openReader', () => {
   assert.match(body, /return context\.openReader\(item, list\);/);
   assert.doesNotMatch(body, /getReaderScreen|rememberReaderReturnView|navigateReaderScreen|switchListTab|closeSavedList|setReadingListContext|flashStatus|openItem/);
 });
+
+test('single-item folder opening uses the same injected reader strategy', () => {
+  const source = read('manga-list-runtime.js');
+  const start = source.indexOf('if (folderItems.length === 1)');
+  const end = source.indexOf('\n        }', start);
+  const body = source.slice(start, end);
+  assert.match(body, /context\.openReader\(folderItems\[0\], folderItems\);/);
+  assert.doesNotMatch(body, /rememberReaderReturnView|closeSavedList|setReadingListContext|flashStatus|openItem/);
+});
+
+test('runtime no longer names reader-viewer-only opening dependencies', () => {
+  const source = read('manga-list-runtime.js');
+  assert.doesNotMatch(source, /rememberReaderReturnView|closeSavedList|setReadingListContext|flashStatus|openItem/);
+});
