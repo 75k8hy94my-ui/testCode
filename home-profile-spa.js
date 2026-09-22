@@ -12,7 +12,7 @@ const SPA_PAGES=(window.AppShell&&Array.isArray(AppShell.SPA_PAGES)?[...AppShell
 let layout=Home?Home.loadLayout():[];
 let editing=false,syncRunning=false,syncDirty=false,syncDirtyMessage='',syncClearTimer=null;
 let hyakusenView=null,hyakusenBootPromise=null,indexView=null,indexBootPromise=null,linksView=null,linksBootPromise=null;
-let mount=null,renderGeneration=0,mangaRouteRuntime=null,mangaRouteBootPromise=null;
+let mount=null,renderGeneration=0,mangaRouteRuntime=null,mangaRouteBootPromise=null,videoRouteRuntime=null;
 
 function ensureAppShell(){
   const app=document.getElementById('homeApp')||document.querySelector('.homeShell');
@@ -85,8 +85,9 @@ function syncHeaderRoute(){
   if(window.AppDesktopRail)AppDesktopRail.syncActive();
 }
 function cleanupMangaRoute(){if(mangaRouteRuntime){mangaRouteRuntime.cleanup();mangaRouteRuntime=null;}mangaRouteBootPromise=null;}
+function cleanupVideoRoute(){if(videoRouteRuntime)videoRouteRuntime.detach();}
 function cleanupReaderRuntime(){cleanupMangaRoute();if(typeof window.MangaReaderRuntimeCleanup==='function')window.MangaReaderRuntimeCleanup();document.querySelectorAll('[data-reader-head-asset],[data-reader-spa-script]').forEach((node)=>node.remove());document.querySelectorAll('#app,#metadataSuggestions,#saveDialogOverlay,#customAddOverlay,#editItemOverlay,#bulkEditOverlay,#bulkDetectOverlay,#savedListOverlay,#videoAddOverlay,#videoPlayerOverlay,#authorCardOverlay,#tocOverlay,#settingsOverlay,#backupOverlay').forEach((node)=>node.remove());document.documentElement.classList.remove('reader-shell-page','reader-saved-list-route','reader-videoList-route','reader-authorList-route','reader-settings-route','reader-backup-route');}
-function pruneReaderSurface(route){const remove=(selector)=>document.querySelectorAll(selector).forEach((node)=>node.remove());if(route==='manga'){remove('#videoAddOverlay,#videoPlayerOverlay,#settingsOverlay,#backupOverlay,#authorCardOverlay,#tocOverlay');}else if(route==='video'){remove('#mangaListSection,#saveItemOverlay,#customAddOverlay,#editItemOverlay,#bulkEditOverlay,#bulkDetectOverlay,#authorCardOverlay,#tocOverlay,#settingsOverlay,#backupOverlay');}else if(route==='reader'){remove('#savedListOverlay,#videoAddOverlay,#videoPlayerOverlay,#settingsOverlay,#backupOverlay,#authorCardOverlay,#tocOverlay');}}
+function pruneReaderSurface(route){const remove=(selector)=>document.querySelectorAll(selector).forEach((node)=>node.remove());if(route==='manga'){remove('#videoAddOverlay,#videoPlayerOverlay,#settingsOverlay,#backupOverlay,#authorCardOverlay,#tocOverlay');}else if(route==='reader'){remove('#savedListOverlay,#videoAddOverlay,#videoPlayerOverlay,#settingsOverlay,#backupOverlay,#authorCardOverlay,#tocOverlay');}}
 function activateReaderEntry(route){
   const tab=document.getElementById(route==='video'?'listTabVideo':'listTabManga');
   if(tab)tab.click();
@@ -101,6 +102,27 @@ async function ensureVideoEntryEnhancement(){
   await loadReaderAsset('video-thumbnail-time.js?v=20260916-video-thumbnail');
   const deadline=Date.now()+3000;
   while(!document.getElementById('videoLibraryApp')&&Date.now()<deadline) await new Promise((resolve)=>setTimeout(resolve,25));
+}
+async function renderVideo(generation){
+  const target=getMount();
+  if(!target)return;
+  cleanupReaderRuntime();
+  target.replaceChildren();
+  try{
+    if(!window.VideoListRouteFactory)await loadScript('video-list-route.js?v=20260922-video-route','spaVideoListRoute');
+    if(!window.MangaReaderVideoTemplate)await loadScript('video-list-template.js?v=20260922-video-template','spaVideoListTemplate');
+    if(generation!==renderGeneration)return;
+    if(!videoRouteRuntime)videoRouteRuntime=window.VideoListRouteFactory.create({
+      documentRef:document,
+      loadScript,
+      loadMediaGate:()=>loadScript('media-access-gate.js?v=20260918-vpn-panel-toggle','spaVideoMediaGate'),
+    });
+    await videoRouteRuntime.start({mountElement:target});
+    if(generation!==renderGeneration){videoRouteRuntime.detach();return;}
+    setTitle('video');syncHeaderRoute();
+  }catch(_){
+    if(generation===renderGeneration)target.innerHTML='<section class="profileContent"><h2>動画一覧を読み込めませんでした</h2><p>ホームへ戻って再試行してください。</p><a class="glassBtn" href="home.html">ホームへ戻る</a></section>';
+  }
 }
 async function renderManga(generation){
   const target=getMount();
@@ -149,7 +171,7 @@ async function renderReader(route=routeName(),generation=renderGeneration){
     if(generation===renderGeneration)target.innerHTML='<section class="profileContent"><h2>漫画を読み込めませんでした</h2><p>ホームへ戻って再試行してください。</p><a class="glassBtn" href="home.html">ホームへ戻る</a></section>';
   }
 }
-function renderRoute(){ensureAppShell();const route=routeName(),generation=++renderGeneration,app=document.getElementById('homeApp');document.documentElement.classList.toggle('reader-entry-manga',route==='manga');document.documentElement.classList.toggle('reader-entry-video',route==='video');if(app){app.classList.toggle('reader-route',['manga','video','reader'].includes(route));app.dataset.readerRoute=route;}if(!['manga','video','reader'].includes(route))cleanupReaderRuntime();else if(route!=='manga')cleanupMangaRoute();if(route==='profile')renderProfile();else if(route==='index-search')renderIndexSearch();else if(route==='hyakusen')renderHyakusen();else if(route==='links')renderLinks();else if(route==='manga')renderManga(generation);else if(route==='video'||route==='reader')renderReader(route,generation);else renderHome();document.dispatchEvent(new CustomEvent('home-profile-routechange',{detail:{route}}));}
+function renderRoute(){ensureAppShell();const route=routeName(),generation=++renderGeneration,app=document.getElementById('homeApp');document.documentElement.classList.toggle('reader-entry-manga',route==='manga');document.documentElement.classList.toggle('reader-entry-video',route==='video');if(app){app.classList.toggle('reader-route',['manga','video','reader'].includes(route));app.dataset.readerRoute=route;}if(route!=='video')cleanupVideoRoute();if(!['manga','video','reader'].includes(route))cleanupReaderRuntime();else if(route!=='manga'&&route!=='video')cleanupMangaRoute();if(route==='profile')renderProfile();else if(route==='index-search')renderIndexSearch();else if(route==='hyakusen')renderHyakusen();else if(route==='links')renderLinks();else if(route==='manga')renderManga(generation);else if(route==='video')renderVideo(generation);else if(route==='reader')renderReader(route,generation);else renderHome();document.dispatchEvent(new CustomEvent('home-profile-routechange',{detail:{route}}));}
 function navigate(path,{replace=false}={}){const target=new URL(path,location.href),name=target.pathname.split('/').pop();if(!SPA_PAGES.includes(name)){location.href=target.href;return;}if(replace)history.replaceState({appShellSPA:true},'',target.href);else history.pushState({appShellSPA:true},'',target.href);renderRoute();}
 function intercept(event){if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;const link=event.target.closest('a[href]');if(!link||link.target||link.hasAttribute('download'))return;const target=new URL(link.href,location.href),name=target.pathname.split('/').pop();if(target.origin===location.origin&&SPA_PAGES.includes(name)){event.preventDefault();navigate(target.href);}}
 async function start(){

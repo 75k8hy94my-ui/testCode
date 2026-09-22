@@ -43,11 +43,12 @@ test('current entry pages keep their static bootstrap script baselines', () => {
   ]);
 });
 
-test('current route dispatcher keeps manga independent and preserves reader/video bootstrap', () => {
+test('current route dispatcher keeps manga and video independent and preserves direct reader bootstrap', () => {
   assert.match(spa, /if\(name==='manga\.html'\)return'manga'/);
   assert.match(spa, /if\(name==='video\.html'\)return'video'/);
   assert.match(spa, /else if\(route==='manga'\)renderManga\(generation\)/);
-  assert.match(spa, /else if\(route==='video'\|\|route==='reader'\)renderReader\(route,generation\)/);
+  assert.match(spa, /else if\(route==='video'\)renderVideo\(generation\)/);
+  assert.match(spa, /else if\(route==='reader'\)renderReader\(route,generation\)/);
   assert.match(spa, /fetch\('reader\.html\?v=20260916-reader'/);
   assert.match(spa, /ReaderRouteRuntimeFactory\.create\(/);
   assert.match(spa, /reader-route-runtime\.js\?v=20260922-route-runtime/);
@@ -55,9 +56,9 @@ test('current route dispatcher keeps manga independent and preserves reader/vide
   assert.match(spa, /route==='video'\?'listTabVideo':'listTabManga'/);
 });
 
-test('current reader entry pruning excludes the opposite list surface', () => {
+test('current reader entry pruning remains reader-only while video uses its own surface', () => {
   assert.match(spa, /if\(route==='manga'\)\{remove\('#videoAddOverlay,#videoPlayerOverlay/);
-  assert.match(spa, /else if\(route==='video'\)\{remove\('#mangaListSection,#saveItemOverlay/);
+  assert.doesNotMatch(spa, /else if\(route==='video'\)\{remove\('#mangaListSection/);
 });
 
 test('reader bootstrap reports loading failure instead of silently swallowing it', () => {
