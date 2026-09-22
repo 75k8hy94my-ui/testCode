@@ -13,13 +13,7 @@
 </head>
 <body>
 <main class="homeShell" id="homeApp">
-<header class="homeHeader">
-<div><span class="eyebrow">HOME</span><h1 id="shellTitle">プロフィール設定</h1></div>
-<div class="topbarActions">
-<nav class="topActions" aria-label="主要ページ"><a id="headerHomeLink" class="glassBtn" href="home.html">ホーム</a></nav>
-<div class="headerActions"><a class="glassBtn" href="sync.html">保管庫</a><button class="glassBtn" id="editHomeBtn" type="button" hidden>カードを編集</button></div>
-</div>
-</header>
+<header class="homeHeader" data-profile-only-header="1"><div><span class="eyebrow">HOME</span><h1 id="shellTitle">プロフィール設定</h1></div><button class="headerProfileButton" type="button" data-profile-menu-trigger aria-label="アカウント" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg></button></header>
 <div id="routeContent"></div>
 </main>
 <script src="app-desktop-rail.js"></script>
@@ -28,8 +22,8 @@
 <script src="vault-payload.js"></script>
 <script src="encrypted-chunk-cache.js"></script>
 <script src="home-dashboard.js"></script>
-<script src="profile-menu.js?v=20260912-shell"></script>
-<script src="app-global-shell.js?v=20260912-shell"></script>
-<script src="home-profile-spa.js?v=20260922-spa-route-runtime"></script>
+<script src="profile-menu.js?v=20260922-profile-header"></script>
+<script src="app-global-shell.js?v=20260922-profile-header"></script>
+<script src="home-profile-spa.js?v=20260922-profile-header"></script>
 </body>
 </html>
