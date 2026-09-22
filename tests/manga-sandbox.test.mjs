@@ -21,4 +21,6 @@ test('manga sandbox exposes virtual save and sync controls', () => {
   assert.match(script, /virtual-save/);
   assert.match(script, /virtual-receive/);
   assert.match(script, /memoryStorage/);
+  assert.match(script, /folderId: 'sandbox-folder'/);
+  assert.match(script, /id: 'sandbox-4'/);
 });

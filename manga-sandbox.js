@@ -10,10 +10,12 @@
   const image = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="2" height="2"%3E%3Crect width="2" height="2" fill="%23dbeafe"/%3E%3C/svg%3E';
   const initial = {
     items: [
-      { id: 'sandbox-1', title: 'Sandbox Book One', author: 'Test Author', series: 'Test Series', tags: ['sample'], url: 'https://example.invalid/book-one/', pages: [image], addedAt: 2 },
-      { id: 'sandbox-2', title: 'Sandbox Book Two', author: 'Test Author', series: 'Test Series', tags: ['sample', 'second'], url: 'https://example.invalid/book-two/', pages: [image], addedAt: 1 },
+      { id: 'sandbox-1', title: 'Sandbox Book One', author: 'Test Author', series: 'Test Series', folderId: 'sandbox-folder', tags: ['sample'], url: 'https://example.invalid/book-one/', pages: [image], addedAt: 2 },
+      { id: 'sandbox-2', title: 'Sandbox Book Two', author: 'Test Author', folderId: 'sandbox-folder', tags: ['sample', 'second'], url: 'https://example.invalid/book-two/', pages: [image], addedAt: 1 },
+      { id: 'sandbox-3', title: 'Sandbox Book Zero', author: 'Test Author', tags: ['sample', 'third'], url: 'https://example.invalid/book-zero/', pages: [image], addedAt: 0 },
+      { id: 'sandbox-4', title: 'Sandbox Alpha', author: 'Test Author', tags: ['sample', 'fourth'], url: 'https://example.invalid/book-alpha/', pages: [image], addedAt: 3 },
     ],
-    folders: [{ id: 'sandbox-folder', name: 'Sandbox Folder', itemIds: ['sandbox-1'] }],
+    folders: [{ id: 'sandbox-folder', name: 'Sandbox Folder', itemIds: ['sandbox-1', 'sandbox-2'] }],
     authors: [{ id: 'sandbox-author', name: 'Test Author', circleName: '', links: [], createdAt: 1 }],
     videos: [],
   };
