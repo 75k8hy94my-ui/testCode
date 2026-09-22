@@ -115,6 +115,7 @@ async function renderManga(generation){
     if(generation!==renderGeneration){cleanupMangaRoute();return;}
     setTitle('manga');syncHeaderRoute();
   }catch(_){
+    cleanupMangaRoute();
     if(generation===renderGeneration)target.innerHTML='<section class="profileContent"><h2>漫画一覧を読み込めませんでした</h2><p>ホームへ戻って再試行してください。</p><a class="glassBtn" href="home.html">ホームへ戻る</a></section>';
   }
 }

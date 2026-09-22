@@ -54,3 +54,8 @@ test('manga shell keeps the existing shared authentication and vault bootstrap',
   assert.match(manga, /media-access-gate\.js\?v=20260918-vpn-panel-toggle/);
   assert.match(manga, /home-profile-spa\.js\?v=/);
 });
+
+test('manga route startup failure cleans the partially mounted runtime', () => {
+  assert.match(spa, /async function renderManga\(generation\)\{/);
+  assert.match(spa, /async function renderManga\(generation\)\{[\s\S]*?\}\s*catch\(_\)\{\s*cleanupMangaRoute\(\);/);
+});
