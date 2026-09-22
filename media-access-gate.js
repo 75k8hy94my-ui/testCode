@@ -668,6 +668,7 @@
     setManualIpDesignation,
     clearManualVpnDesignation,
     setAllowedForTesting,
+    syncUi: () => updateStatusButtons(status),
     installGuards,
     installDiagnosticsUi,
   };

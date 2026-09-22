@@ -128,7 +128,7 @@ async function renderVideo(generation){
   try{
     const gate=await ensureVpnGate();
     if(generation!==renderGeneration)return;
-    if(!gate||!gate.canLoadExternalMedia()){renderVpnGate(target,'video');setTitle('video');syncHeaderRoute();return;}
+    if(!gate||!gate.canLoadExternalMedia()){renderVpnGate(target,'video');if(gate&&typeof gate.syncUi==='function')gate.syncUi();setTitle('video');syncHeaderRoute();return;}
     if(!window.VideoListRouteFactory)await loadScript('video-list-route.js?v=20260922-video-route','spaVideoListRoute');
     if(!window.MangaReaderVideoTemplate)await loadScript('video-list-template.js?v=20260922-vpn-tools','spaVideoListTemplate');
     if(generation!==renderGeneration)return;
@@ -138,6 +138,7 @@ async function renderVideo(generation){
       loadMediaGate:()=>window.MangaReaderMediaAccess?Promise.resolve():loadScript('media-access-gate.js?v=20260922-vpn-tools','spaMediaGate'),
     });
     await videoRouteRuntime.start({mountElement:target});
+    if(gate&&typeof gate.syncUi==='function')gate.syncUi();
     if(generation!==renderGeneration){videoRouteRuntime.detach();return;}
     setTitle('video');syncHeaderRoute();
   }catch(_){
@@ -152,11 +153,12 @@ async function renderManga(generation){
   try{
     const gate=await ensureVpnGate();
     if(generation!==renderGeneration)return;
-    if(!gate||!gate.canLoadExternalMedia()){renderVpnGate(target,'manga');setTitle('manga');syncHeaderRoute();return;}
+    if(!gate||!gate.canLoadExternalMedia()){renderVpnGate(target,'manga');if(gate&&typeof gate.syncUi==='function')gate.syncUi();setTitle('manga');syncHeaderRoute();return;}
     if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20260922-manga-route','spaMangaListRoute');
     if(generation!==renderGeneration)return;
     mangaRouteRuntime=window.MangaListRouteFactory.create({documentRef:document,windowRef:window});
     await mangaRouteRuntime.start({mountElement:target});
+    if(gate&&typeof gate.syncUi==='function')gate.syncUi();
     if(generation!==renderGeneration){cleanupMangaRoute();return;}
     setTitle('manga');syncHeaderRoute();
   }catch(_){

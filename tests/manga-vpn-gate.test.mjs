@@ -47,14 +47,22 @@ test('standalone bookshelf CSS covers the primary manga surfaces', () => {
 });
 
 test('manga, video and reader list surfaces expose separate VPN recheck and diagnostics controls', () => {
-  const mangaTemplate = read('manga-list-template.js');
+  const mangaRoute = read('manga-list-route.js');
   const videoTemplate = read('video-list-template.js');
   const readerTemplate = read('reader-saved-list-template.js');
-  for (const source of [mangaTemplate, videoTemplate, readerTemplate]) {
-    assert.match(source, /data-vpn-recheck-button/);
-    assert.match(source, /data-vpn-diagnostics-button/);
-    assert.match(source, /data-vpn-status-button/);
+  for (const source of [mangaRoute, videoTemplate, readerTemplate]) {
+    assert.match(source, /vpnRecheckButton|data-vpn-recheck-button|vpnRecheckButton/);
+    assert.match(source, /vpnDiagnosticsButton|data-vpn-diagnostics-button/);
+    assert.match(source, /vpnStatusButton|data-vpn-status-button/);
   }
+  assert.doesNotMatch(read('manga-list-template.js'), /data-vpn-header="manga-list"/);
   assert.doesNotMatch(videoTemplate, /data-vpn-status-button\s+data-vpn-diagnostics-button/);
   assert.doesNotMatch(readerTemplate, /data-vpn-status-button\s+data-vpn-diagnostics-button/);
+});
+
+test('late-mounted VPN controls resync to the current verdict', () => {
+  assert.match(read('media-access-gate.js'), /syncUi:\s*\(\) => updateStatusButtons\(status\)/);
+  assert.match(read('manga-list-route.js'), /MangaReaderMediaAccess\.syncUi\(\)/);
+  assert.match(read('reader-saved-list-template.js'), /MangaReaderMediaAccess\.syncUi\(\)/);
+  assert.match(spa, /gate\.syncUi\(\)/);
 });

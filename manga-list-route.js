@@ -100,6 +100,31 @@
     };
   }
 
+  function installVpnControls(rootElement, documentRef) {
+    if (!rootElement || rootElement.querySelector('[data-vpn-header="manga-list"]')) return;
+    const controls = documentRef.createElement('div');
+    controls.className = 'listHeaderControls vpnListControls';
+    controls.dataset.vpnHeader = 'manga-list';
+    controls.setAttribute('aria-label', 'VPN状態');
+
+    const recheck = documentRef.createElement('button');
+    recheck.className = 'ctrlBtn vpnStatusButton vpnRecheckButton';
+    recheck.type = 'button';
+    recheck.dataset.vpnStatusButton = '1';
+    recheck.dataset.vpnRecheckButton = '1';
+    recheck.title = 'VPN接続を完全に再確認します';
+    recheck.textContent = 'VPN確認中';
+
+    const diagnostics = documentRef.createElement('button');
+    diagnostics.className = 'ctrlBtn vpnDiagnosticsButton';
+    diagnostics.type = 'button';
+    diagnostics.dataset.vpnDiagnosticsButton = '1';
+    diagnostics.textContent = 'VPN診断';
+
+    controls.append(recheck, diagnostics);
+    rootElement.insertBefore(controls, rootElement.firstChild);
+  }
+
   function createRoute(deps) {
     if (!deps || typeof deps !== 'object' || !deps.documentRef || !deps.windowRef) {
       throw new TypeError('MangaListRouteFactory requires documentRef and windowRef');
@@ -361,6 +386,10 @@
         createActivation: () => () => {},
       });
       const result = entry.start({ mountElement: input.mountElement });
+      installVpnControls(result.root, documentRef);
+      if (windowRef.MangaReaderMediaAccess && typeof windowRef.MangaReaderMediaAccess.syncUi === 'function') {
+        windowRef.MangaReaderMediaAccess.syncUi();
+      }
       elements = result.elements;
       activeEntry = entry;
       return Object.freeze({ root: result.root, elements: result.elements, cleanup: entry.cleanup });

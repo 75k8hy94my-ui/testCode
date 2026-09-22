@@ -272,3 +272,7 @@ test('explicit VPN recheck uses the full external verdict path', () => {
   assert.match(source, /recheckButton[\s\S]*checkVpn\(\{ external: true \}\)/);
   assert.match(source, /diagnosticsButton[\s\S]*renderDiagnostics\(\)/);
 });
+
+test('VPN UI can be resynchronized after route controls mount', () => {
+  assert.match(source, /syncUi:\s*\(\) => updateStatusButtons\(status\)/);
+});

@@ -3,10 +3,6 @@
 
   function createMarkup() {
     return String.raw`<div id="mangaListSection">
-      <div class="listHeaderControls vpnListControls" data-vpn-header="manga-list" aria-label="VPN状態">
-        <button class="ctrlBtn vpnStatusButton vpnRecheckButton" type="button" data-vpn-status-button data-vpn-recheck-button title="VPN接続を完全に再確認します">VPN確認中</button>
-        <button class="ctrlBtn vpnDiagnosticsButton" type="button" data-vpn-diagnostics-button>VPN診断</button>
-      </div>
       <div id="exportImportRow">
         <button class="textActionBtn" id="newBtn">新規</button>
         <button class="textActionBtn" id="addCustomBtn">個別追加</button>

@@ -27,4 +27,5 @@
 
 `;
   if (document.body && !document.getElementById('savedListOverlay')) document.body.insertAdjacentHTML('beforeend', template);
+  if (window.MangaReaderMediaAccess && typeof window.MangaReaderMediaAccess.syncUi === 'function') window.MangaReaderMediaAccess.syncUi();
 })();
