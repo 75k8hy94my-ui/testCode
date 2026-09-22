@@ -13,8 +13,25 @@ const removedPages = [
   'local-reader.html'
 ];
 
+const removedAssets = [
+  'index-conversion-prompt.js',
+  'supabase/functions/study-ai/core.mjs',
+  'supabase/functions/study-ai/index.ts'
+];
+
 test('unused feature entry pages are removed', () => {
   for (const page of removedPages) assert.equal(fs.existsSync(page), false, `${page} should be removed`);
+});
+
+test('unused feature assets are removed', () => {
+  for (const asset of removedAssets) assert.equal(fs.existsSync(asset), false, `${asset} should be removed`);
+});
+
+test('active shell CSS does not retain removed feature selectors', () => {
+  const css = read('home-profile-shell.css');
+  for (const selector of ['hyakusen', 'indexContent', 'indexShell', 'linksContent']) {
+    assert.doesNotMatch(css, new RegExp(selector), `${selector} should be removed from active shell CSS`);
+  }
 });
 
 test('retained entry pages do not link to removed feature routes', () => {
@@ -32,4 +49,3 @@ test('legacy payload fields remain available for compatibility', () => {
     assert.match(backup, new RegExp(`\\b${key}\\b`));
   }
 });
-
