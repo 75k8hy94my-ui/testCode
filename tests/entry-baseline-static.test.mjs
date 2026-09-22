@@ -30,7 +30,8 @@ test('current entry pages keep their static bootstrap script baselines', () => {
     'supabase-config.js', 'vault-session.js?v=20260813-vault-state', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js',
     'app-global-shell.js?v=20260912-shell', 'app-desktop-rail.js',
-    'profile-menu.js?v=20260912-shell', 'home-profile-spa.js?v=20260922-spa-route-runtime',
+    'profile-menu.js?v=20260912-shell', 'manga-list-route.js?v=20260922-manga-route',
+    'home-profile-spa.js?v=20260922-spa-route-runtime',
   ]);
   assert.deepEqual(scriptSources(pages.video), [
     'supabase-config.js', 'vault-session.js?v=20260813-vault-state', 'browser-storage.js',
@@ -40,10 +41,11 @@ test('current entry pages keep their static bootstrap script baselines', () => {
   ]);
 });
 
-test('current route dispatcher recognizes manga and video and renders through reader bootstrap', () => {
+test('current route dispatcher keeps manga independent and preserves reader/video bootstrap', () => {
   assert.match(spa, /if\(name==='manga\.html'\)return'manga'/);
   assert.match(spa, /if\(name==='video\.html'\)return'video'/);
-  assert.match(spa, /else if\(\['manga','video','reader'\]\.includes\(route\)\)renderReader\(route,generation\)/);
+  assert.match(spa, /else if\(route==='manga'\)renderManga\(generation\)/);
+  assert.match(spa, /else if\(route==='video'\|\|route==='reader'\)renderReader\(route,generation\)/);
   assert.match(spa, /fetch\('reader\.html\?v=20260916-reader'/);
   assert.match(spa, /ReaderRouteRuntimeFactory\.create\(/);
   assert.match(spa, /reader-route-runtime\.js\?v=20260922-route-runtime/);
