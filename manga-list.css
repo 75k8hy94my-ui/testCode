@@ -133,6 +133,7 @@
 #savedListEmpty { color: var(--manga-sub); text-align: center; padding: 24px 0; }
 
 .vpnRouteGate { max-width: 720px; margin: 0 auto; }
+.vpnRouteActions { display: flex; flex-wrap: wrap; gap: 10px; }
 .vpnRouteGate .vpnStatusButton { margin-top: 12px; }
 .vpnStatusButton[data-vpn-state="allowed"] { color: #16845f; border-color: rgba(22,132,95,.35); }
 .vpnStatusButton[data-vpn-state="blocked"] { color: #c44949; border-color: rgba(196,73,73,.35); }

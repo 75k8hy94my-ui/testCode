@@ -15,6 +15,10 @@ test('manga shells load the standalone bookshelf stylesheet', () => {
 
 test('manga and video routes wait for an allowed VPN verdict before starting list runtimes', () => {
   assert.match(spa, /function renderVpnGate\(/);
+  assert.match(spa, /dataset\.vpnStatusButton='1'/);
+  assert.match(spa, /dataset\.vpnDiagnosticsButton='1'/);
+  assert.match(spa, /className='glassBtn vpnDiagnosticsButton'/);
+  assert.doesNotMatch(spa.slice(spa.indexOf('function renderVpnGate'), spa.indexOf('async function ensureVpnGate')), /button\.dataset\.vpnStatusButton='1'.*button\.dataset\.vpnDiagnosticsButton='1'/s);
   assert.match(spa, /canLoadExternalMedia\(\)/);
   assert.match(spa, /if\(!gate\|\|!gate\.canLoadExternalMedia\(\)\)\{renderVpnGate/);
   const mangaRoute = spa.slice(spa.indexOf('async function renderManga'), spa.indexOf('async function renderReader'));

@@ -81,8 +81,10 @@ function renderVpnGate(target,route){
   const section=document.createElement('section');section.className='vpnRouteGate profileContent';section.setAttribute('aria-live','polite');
   const heading=document.createElement('h2');heading.textContent=route==='video'?'動画一覧を開くにはVPN接続が必要です':'漫画一覧を開くにはVPN接続が必要です';
   const message=document.createElement('p');message.className='profileLead';message.textContent='VPN接続を確認できるまで、保存データと一覧を表示しません。接続後に再確認してください。';
-  const button=document.createElement('button');button.type='button';button.className='glassBtn vpnStatusButton';button.dataset.vpnStatusButton='1';button.dataset.vpnDiagnosticsButton='1';button.textContent='VPN確認中';button.title='VPN接続後に押して再確認できます。';
-  section.append(heading,message,button);target.append(section);
+  const actions=document.createElement('div');actions.className='vpnRouteActions';
+  const button=document.createElement('button');button.type='button';button.className='glassBtn vpnStatusButton';button.dataset.vpnStatusButton='1';button.textContent='VPN確認中';button.title='VPN接続後に押して再確認できます。';
+  const diagnostics=document.createElement('button');diagnostics.type='button';diagnostics.className='glassBtn vpnDiagnosticsButton';diagnostics.dataset.vpnDiagnosticsButton='1';diagnostics.textContent='VPN診断';diagnostics.title='VPN判定の詳細を表示します。';
+  actions.append(button,diagnostics);section.append(heading,message,actions);target.append(section);
 }
 async function ensureVpnGate(){
   if(window.MangaReaderMediaAccess)return window.MangaReaderMediaAccess;
