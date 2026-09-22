@@ -3,6 +3,7 @@
 if (typeof window === 'undefined' || typeof document === 'undefined') return;
 const Home=window.MangaReaderHome;
 const config=window.MANGA_READER_SUPABASE||{};
+const marks={bookshelf:'本'};
 const $=(id)=>document.getElementById(id);
 const showLogin=()=>window.location.replace('index.html');
 const showVault=()=>window.location.replace('sync.html');
@@ -56,7 +57,7 @@ function renderProfile(){
   const target=getMount();if(!target)return;setTitle('profile');editing=false;
   const email=(session&&session.user&&session.user.email)||'';
   const light=currentTheme()==='light';
-  target.innerHTML='<section class="profileContent"><p id="homeSyncStatus" class="syncStatus" aria-live="polite"></p><h2>プロフィール設定</h2><p class="profileLead">アカウントと、端末／クラウドに残るデータの扱いです。</p><dl class="profileMeta"><div><dt>ログイン中</dt><dd id="profileEmail"></dd></div></dl><section class="profileCard"><h3>保管庫</h3><p>本棚・学習・索引設定・六法メモはブラウザ内で暗号化して同期します。リンク帳はこの端末にだけ残ります。</p><a class="glassBtn profileAction" href="sync.html">保管庫を開く</a></section><section class="profileCard"><h3>VPN診断</h3><p>「VPNではない」と固定したIPアドレスを管理します。</p><div id="profileNonVpnIps"></div></section><section class="profileCard"><h3>表示</h3><label class="profileCheck"><input id="profileThemeLight" type="checkbox">ライトテーマ</label></section><section class="profileCard"><h3>セッション</h3><p>ログアウトすると、この端末の保管庫データと索引キャッシュを消します。</p><button class="glassBtn profileDanger" id="profileLogoutBtn" type="button">ログアウト</button></section></section>';
+  target.innerHTML='<section class="profileContent"><p id="homeSyncStatus" class="syncStatus" aria-live="polite"></p><h2>プロフィール設定</h2><p class="profileLead">アカウントと、端末／クラウドに残るデータの扱いです。</p><dl class="profileMeta"><div><dt>ログイン中</dt><dd id="profileEmail"></dd></div></dl><section class="profileCard"><h3>保管庫</h3><p>本棚・動画・作者カードなどのデータはブラウザ内で暗号化して同期します。</p><a class="glassBtn profileAction" href="sync.html">保管庫を開く</a></section><section class="profileCard"><h3>VPN診断</h3><p>「VPNではない」と固定したIPアドレスを管理します。</p><div id="profileNonVpnIps"></div></section><section class="profileCard"><h3>表示</h3><label class="profileCheck"><input id="profileThemeLight" type="checkbox">ライトテーマ</label></section><section class="profileCard"><h3>セッション</h3><p>ログアウトすると、この端末の保管庫データを消します。</p><button class="glassBtn profileDanger" id="profileLogoutBtn" type="button">ログアウト</button></section></section>';
   const mail=$('profileEmail');if(mail)mail.textContent=email||'（メール未取得）';
   const theme=$('profileThemeLight');if(theme){theme.checked=light;theme.addEventListener('change',()=>{applyTheme(theme.checked?'light':'dark');runHomeSync('表示設定を保存しました')});}
   const logoutBtn=$('profileLogoutBtn');if(logoutBtn)logoutBtn.addEventListener('click',()=>{if(window.ProfileMenu&&typeof ProfileMenu.logout==='function')ProfileMenu.logout(logoutBtn);});

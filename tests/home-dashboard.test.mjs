@@ -70,6 +70,9 @@ test('home page is vault-gated, editable, and vault unlock enters it', () => {
   assert.match(spa, /window\.location\.replace\(['"]index\.html['"]\)/);
   assert.match(home, /id=["']editHomeBtn["']/);
   for (const id of ['homeGrid', 'addCardPanel', 'homeSyncStatus']) assert.match(spa, new RegExp(`id=["']${id}["']`));
+  assert.match(spa, /const marks=\{bookshelf:'本'\}/);
+  assert.doesNotMatch(spa, /学習・索引設定・六法メモ|索引キャッシュ|リンク帳/);
+  assert.match(spa, /本棚・動画・作者カードなどのデータ/);
   assert.match(home, /home-dashboard\.js/);
   assert.match(home, /vault-payload\.js/);
 
