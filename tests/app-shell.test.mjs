@@ -49,7 +49,7 @@ test('mobile bottom navigation stays visible on manga and video routes', () => {
   assert.doesNotMatch(css, /html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav[^{}]*\{display:none!important\}/);
   assert.match(css, /@media\(max-width:899px\)\{html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav\{display:flex!important\}\}/);
   for (const page of ['manga.html', 'video.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20260922-mobile-route-nav/);
+    assert.match(read(page), /home-profile-shell\.css\?v=20260923-vpn-contrast/);
   }
 });
 
@@ -78,4 +78,15 @@ test('login page has no top navigation menu', () => {
   const index = read('index.html');
   assert.doesNotMatch(index, /mobileTopBar|mobileTopNav/);
   assert.doesNotMatch(index, /href=["'](?:home|manga|video|reader)\.html/);
+});
+
+test('VPN gate keeps readable contrast on dark manga/video routes', () => {
+  const css = read('home-profile-shell.css');
+  assert.match(css, /reader-entry-manga \.vpnRouteGate \.vpnRouteActions \.glassBtn/);
+  assert.match(css, /background:#1c2430/);
+  assert.match(css, /color:#f8fafc/);
+  assert.match(css, /vpnStatusButton\[data-vpn-state="blocked"\][\s\S]*color:#ffb4b4/);
+  for (const page of ['home.html','profile.html','manga.html','video.html']) {
+    assert.match(read(page), /home-profile-shell\.css\?v=20260923-vpn-contrast/);
+  }
 });

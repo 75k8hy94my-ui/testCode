@@ -66,3 +66,10 @@ test('late-mounted VPN controls resync to the current verdict', () => {
   assert.match(read('reader-saved-list-template.js'), /MangaReaderMediaAccess\.syncUi\(\)/);
   assert.match(spa, /gate\.syncUi\(\)/);
 });
+
+test('VPN blocked gate uses high-contrast text and actions', () => {
+  const css = read('home-profile-shell.css');
+  assert.match(css, /\.vpnRouteGate h2[\s\S]*color:#f8fafc/);
+  assert.match(css, /\.vpnRouteGate \.profileLead[\s\S]*color:#b8c2d1/);
+  assert.match(css, /vpnStatusButton\[data-vpn-state="blocked"\][\s\S]*background:#35191d[\s\S]*color:#ffb4b4/);
+});
