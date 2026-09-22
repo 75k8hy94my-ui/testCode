@@ -27,6 +27,8 @@
     #vaultCredential { display:block; width:100%; height:clamp(54px,6vw,78px); border:1.5px solid var(--line); border-radius:3px; background:#fff; color:var(--text); padding:0 18px; font:inherit; font-size:clamp(18px,2vw,26px); box-shadow:none; outline:none; }
     #vaultCredential:focus { border-color:var(--focus); box-shadow:0 0 0 2px rgba(37,99,235,.12); }
     #vaultCredential.error { border-color:var(--danger); box-shadow:0 0 0 2px rgba(220,38,38,.10); }
+    #passkeyLoginBtn { display:block; width:100%; min-height:44px; margin-top:12px; border:1px solid var(--line); border-radius:3px; background:#fff; color:var(--text); font:inherit; cursor:pointer; }
+    #passkeyLoginBtn:hover, #passkeyLoginBtn:focus-visible { border-color:var(--focus); outline:none; }
     .sr-only { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
     #recoveryBox { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(88vw,680px); padding:22px; border:1px solid #d1d5db; background:#fff; }
     #recoveryBox code { display:block; margin:12px 0; padding:12px; border:1px solid #d1d5db; overflow-wrap:anywhere; user-select:all; }
@@ -66,6 +68,7 @@
     <div id="unlockView">
       <form id="unlockForm" novalidate>
         <input id="vaultCredential" name="vault-unlock-key" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" autofocus>
+        <button id="passkeyLoginBtn" type="button">パスキーでログイン</button>
         <button type="submit" hidden aria-hidden="true"></button>
         <p id="status" class="sr-only" aria-live="polite"></p>
       </form>
@@ -93,6 +96,7 @@
       vaultLogout:$('vaultLogoutBtn'),
       passkeyRegisterBtn:$('passkeyRegisterBtn'),
       passkeyUseBtn:$('passkeyUseBtn'),
+      passkeyLoginBtn:$('passkeyLoginBtn'),
       unlock:$('unlockView'),
       unlockForm:$('unlockForm'),
       credential:$('vaultCredential'),
@@ -240,6 +244,7 @@
     ui.vaultLogout.addEventListener('click',logout);
     ui.passkeyRegisterBtn.addEventListener('click',registerPasskey);
     ui.passkeyUseBtn.addEventListener('click',usePasskey);
+    ui.passkeyLoginBtn.addEventListener('click',()=>usePasskey());
     document.addEventListener('click',closeAccountMenu);
     document.addEventListener('keydown',(event)=>{ if (event.key === 'Escape') closeAccountMenu(); });
     ui.copy.addEventListener('click',async()=>{ try { await navigator.clipboard.writeText(ui.recoveryCode.textContent); } catch (_) {} });

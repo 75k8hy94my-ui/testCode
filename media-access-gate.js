@@ -41,6 +41,13 @@
   let diagnosticsUiInstalled = false;
   let diagnostics = freshDiagnostics();
 
+  function emitStatus() {
+    if (!root.document || typeof root.document.dispatchEvent !== 'function') return;
+    const EventCtor = root.CustomEvent || (root.document.defaultView && root.document.defaultView.CustomEvent);
+    if (typeof EventCtor !== 'function') return;
+    root.document.dispatchEvent(new EventCtor('manga-reader-vpn-status', { detail: { status } }));
+  }
+
   function freshDiagnostics() {
     return {
       ip: '',
@@ -517,6 +524,7 @@
 
   function applyFinalStatus(allowed) {
     status = allowed ? 'allowed' : 'blocked';
+    emitStatus();
     updateStatusButtons(status);
     if (status === 'allowed') diagnostics.error = null;
     diagnostics.final = status;
@@ -547,6 +555,7 @@
   async function checkVpn(options = {}) {
     const useExternalApi = options.external !== false;
     status = 'checking';
+    emitStatus();
     updateStatusButtons(status);
     diagnostics = freshDiagnostics();
     diagnostics.final = 'checking';
@@ -606,6 +615,7 @@
 
   function setAllowedForTesting(allowed) {
     status = allowed ? 'allowed' : 'blocked';
+    emitStatus();
     updateStatusButtons(status);
     diagnostics.final = status;
     if (allowed) restoreBlockedElements();
@@ -643,6 +653,7 @@
     isProtectedMediaUrl,
     canLoadExternalMedia,
     mediaUrl,
+    getStatus: () => status,
     checkVpn,
     getDiagnostics,
     getManualIpDesignation,

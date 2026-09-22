@@ -1,0 +1,153 @@
+:root {
+  --manga-bg: #0a0c11;
+  --manga-bg-soft: #0f1218;
+  --manga-panel: #161a23;
+  --manga-panel-2: #1d2230;
+  --manga-border: #262b38;
+  --manga-accent: #ff6b4a;
+  --manga-accent-2: #46d9c2;
+  --manga-accent-dim: rgba(255,107,74,.16);
+  --manga-text: #f1f2f6;
+  --manga-sub: #8d93a3;
+  --manga-radius-sm: 7px;
+  --manga-shadow-sm: 0 2px 10px rgba(0,0,0,.4);
+}
+
+#routeContent > #mangaListSection,
+#mangaSandboxMount > #mangaListSection {
+  min-height: calc(100vh - 54px);
+  padding: 18px 24px 40px;
+  background: var(--manga-bg);
+  color: var(--manga-text);
+}
+
+#mangaListSection button,
+#mangaListSection input,
+#mangaListSection select,
+#mangaSandboxMount button,
+#mangaSandboxMount input,
+#mangaSandboxMount select { font: inherit; }
+
+#exportImportRow,
+#listToolbar,
+#listNewFolderRow,
+#smartListRow,
+.filter-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#exportImportRow { padding: 10px 0; border-bottom: 1px solid var(--manga-border); }
+#listToolbar { margin-bottom: 10px; }
+#listFolderTitle { flex: 1 1 140px; font-size: 14px; font-weight: 700; }
+#listNewFolderRow { display: none; margin-bottom: 10px; }
+#listNewFolderRow input,
+.filter-row input,
+#shelfSearchInput,
+#shelfSortSelect {
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--manga-border);
+  border-radius: var(--manga-radius-sm);
+  background: var(--manga-bg-soft);
+  color: var(--manga-text);
+}
+#shelfSearchInput { flex: 1 1 180px; min-width: 0; }
+#shelfSortSelect { flex: 0 1 170px; }
+#listNewFolderRow input { flex: 1 1 180px; }
+.filter-row { display: none; margin: 0 0 10px; }
+.filter-row input { flex: 1 1 130px; min-width: 100px; }
+
+.ctrlBtn,
+.textActionBtn,
+.smartListBtn {
+  min-height: 36px;
+  border: 1px solid var(--manga-border);
+  border-radius: var(--manga-radius-sm);
+  background: var(--manga-panel-2);
+  color: var(--manga-text);
+  cursor: pointer;
+}
+.ctrlBtn { padding: 8px 12px; }
+.textActionBtn { padding: 7px 9px; border: 0; background: transparent; }
+.smartListBtn { padding: 0 11px; border-radius: 999px; background: rgba(255,255,255,.08); }
+.ctrlBtn:hover, .textActionBtn:hover, .smartListBtn:hover { border-color: var(--manga-accent); color: var(--manga-accent); }
+.ctrlBtn:disabled { opacity: .38; cursor: not-allowed; }
+
+#smartListRow { padding: 2px 0 12px; border-bottom: 1px solid var(--manga-border); margin-bottom: 10px; }
+.smartListLabel { color: var(--manga-sub); font-size: 12px; font-weight: 700; }
+#dashboard { display: grid; gap: 10px; margin: 12px 0; }
+.dashboard-row, .author-dashboard-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 7px; }
+
+#savedListItems {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  align-items: start;
+  gap: 18px 12px;
+  min-height: 120px;
+  overflow: visible;
+}
+.book-card { min-width: 0; cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
+.book-cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border: 1px solid var(--manga-border);
+  border-radius: 9px;
+  background: var(--manga-panel-2);
+  box-shadow: var(--manga-shadow-sm);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.book-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.book-card:not(.reorder-card):hover .book-cover { transform: translateY(-3px); border-color: #3a4156; }
+.book-card:not(.reorder-card):active .book-cover { transform: scale(.96); }
+.book-title { color: var(--manga-text); font-size: 11.5px; text-align: center; overflow-wrap: anywhere; }
+.book-series { color: var(--manga-accent-2); font-size: 10px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.book-author, .book-reading { color: var(--manga-sub); font-size: 10px; }
+.book-tags { display: flex; flex-wrap: wrap; gap: 3px; }
+.book-tag { max-width: 100%; padding: 2px 5px; border-radius: 6px; background: #edf2ff; color: #3657a7; font-size: 9px; }
+.book-delBtn, .book-favBtn {
+  position: absolute; width: 24px; height: 24px; padding: 0; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.12); background: rgba(10,12,17,.82); color: var(--manga-text); cursor: pointer;
+}
+.book-delBtn { top: 4px; right: 4px; }
+.book-favBtn { right: 4px; bottom: 4px; display: flex; align-items: center; justify-content: center; }
+.book-favBtn img { width: 13px; height: 13px; }
+.book-moveBtn { position: absolute; top: 50%; width: 34px; height: 38px; padding: 0; transform: translateY(-50%); border: 1px solid rgba(0,0,0,.14); border-radius: 10px; background: #fff; color: #1d1d1f; cursor: pointer; }
+.book-moveUpBtn { left: 5px; }
+.book-moveDownBtn { right: 5px; }
+.book-moveBtn:disabled { opacity: .3; cursor: not-allowed; }
+.folder-cover { display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, var(--manga-panel-2), var(--manga-bg-soft)); }
+.folder-cover img { width: 40%; height: auto; opacity: .85; }
+.folder-preview { display: grid; grid-template-columns: repeat(2, 1fr); width: 100%; height: 100%; background: var(--manga-panel-2); }
+.folder-preview img { width: 100%; height: 100%; object-fit: cover; min-width: 0; }
+.folder-kind-badge { position: absolute; left: 5px; bottom: 5px; padding: 2px 5px; border-radius: 5px; background: rgba(10,12,17,.78); color: var(--manga-text); font-size: 9px; }
+.folder-card.just-closed .book-cover { border-color: #22c55e; }
+
+.bookshelf-pagination { grid-column: 1 / -1; display: flex; justify-content: center; align-items: center; gap: 10px; width: min(100% - 28px, 680px); margin: 18px auto 8px; padding: 8px 10px; border: 1px solid rgba(255,255,255,.3); border-radius: 16px; background: rgba(29,35,49,.96); }
+.bookshelf-pagination span { min-width: 74px; color: var(--manga-text); text-align: center; }
+.bookshelfPagerButton { min-width: 64px; }
+#savedListEmpty { color: var(--manga-sub); text-align: center; padding: 24px 0; }
+
+.vpnRouteGate { max-width: 720px; margin: 0 auto; }
+.vpnRouteGate .vpnStatusButton { margin-top: 12px; }
+.vpnStatusButton[data-vpn-state="allowed"] { color: #16845f; border-color: rgba(22,132,95,.35); }
+.vpnStatusButton[data-vpn-state="blocked"] { color: #c44949; border-color: rgba(196,73,73,.35); }
+
+@media (max-width: 899px) {
+  #routeContent > #mangaListSection,
+  #mangaSandboxMount > #mangaListSection { padding: 12px 18px 92px; }
+}
+@media (max-width: 600px) {
+  #shelfSearchInput, #shelfSortSelect { flex: 1 1 100%; width: 100%; }
+  #savedListItems { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 12px; }
+  .bookshelfPagerButton { display: none; }
+}
+
+html[data-theme="light"] #routeContent > #mangaListSection,
+html[data-theme="light"] #mangaSandboxMount > #mangaListSection { --manga-bg: #f5f5f7; --manga-bg-soft: #fff; --manga-panel-2: #e3e5e8; --manga-border: #c9ccd1; --manga-text: #23272a; --manga-sub: #5b626b; color: var(--manga-text); }
+html[data-theme="light"] .book-cover { background: #e3e5e8; }
+html[data-theme="light"] .folder-cover { background: linear-gradient(145deg, #eef5ff, #dbeaff); }

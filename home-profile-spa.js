@@ -76,6 +76,19 @@ function syncHeaderRoute(){
 }
 function cleanupMangaRoute(){if(mangaRouteRuntime){mangaRouteRuntime.cleanup();mangaRouteRuntime=null;}mangaRouteBootPromise=null;}
 function cleanupVideoRoute(){if(videoRouteRuntime)videoRouteRuntime.detach();}
+function renderVpnGate(target,route){
+  target.replaceChildren();
+  const section=document.createElement('section');section.className='vpnRouteGate profileContent';section.setAttribute('aria-live','polite');
+  const heading=document.createElement('h2');heading.textContent=route==='video'?'動画一覧を開くにはVPN接続が必要です':'漫画一覧を開くにはVPN接続が必要です';
+  const message=document.createElement('p');message.className='profileLead';message.textContent='VPN接続を確認できるまで、保存データと一覧を表示しません。接続後に再確認してください。';
+  const button=document.createElement('button');button.type='button';button.className='glassBtn vpnStatusButton';button.dataset.vpnStatusButton='1';button.dataset.vpnDiagnosticsButton='1';button.textContent='VPN確認中';button.title='VPN接続後に押して再確認できます。';
+  section.append(heading,message,button);target.append(section);
+}
+async function ensureVpnGate(){
+  if(window.MangaReaderMediaAccess)return window.MangaReaderMediaAccess;
+  await loadScript('media-access-gate.js?v=20260918-vpn-panel-toggle','spaMediaGate');
+  return window.MangaReaderMediaAccess;
+}
 function cleanupReaderRuntime(){cleanupMangaRoute();if(typeof window.MangaReaderRuntimeCleanup==='function')window.MangaReaderRuntimeCleanup();document.querySelectorAll('[data-reader-head-asset],[data-reader-spa-script]').forEach((node)=>node.remove());document.querySelectorAll('#app,#metadataSuggestions,#saveDialogOverlay,#customAddOverlay,#editItemOverlay,#bulkEditOverlay,#bulkDetectOverlay,#savedListOverlay,#videoAddOverlay,#videoPlayerOverlay,#authorCardOverlay,#tocOverlay,#settingsOverlay,#backupOverlay').forEach((node)=>node.remove());document.documentElement.classList.remove('reader-shell-page','reader-saved-list-route','reader-videoList-route','reader-authorList-route','reader-settings-route','reader-backup-route');}
 function pruneReaderSurface(route){const remove=(selector)=>document.querySelectorAll(selector).forEach((node)=>node.remove());if(route==='manga'){remove('#videoAddOverlay,#videoPlayerOverlay,#settingsOverlay,#backupOverlay,#authorCardOverlay,#tocOverlay');}else if(route==='reader'){remove('#savedListOverlay,#videoAddOverlay,#videoPlayerOverlay,#settingsOverlay,#backupOverlay,#authorCardOverlay,#tocOverlay');}}
 function activateReaderEntry(route){
@@ -99,13 +112,16 @@ async function renderVideo(generation){
   cleanupReaderRuntime();
   target.replaceChildren();
   try{
+    const gate=await ensureVpnGate();
+    if(generation!==renderGeneration)return;
+    if(!gate||!gate.canLoadExternalMedia()){renderVpnGate(target,'video');setTitle('video');syncHeaderRoute();return;}
     if(!window.VideoListRouteFactory)await loadScript('video-list-route.js?v=20260922-video-route','spaVideoListRoute');
     if(!window.MangaReaderVideoTemplate)await loadScript('video-list-template.js?v=20260922-video-template','spaVideoListTemplate');
     if(generation!==renderGeneration)return;
     if(!videoRouteRuntime)videoRouteRuntime=window.VideoListRouteFactory.create({
       documentRef:document,
       loadScript,
-      loadMediaGate:()=>loadScript('media-access-gate.js?v=20260918-vpn-panel-toggle','spaVideoMediaGate'),
+      loadMediaGate:()=>window.MangaReaderMediaAccess?Promise.resolve():loadScript('media-access-gate.js?v=20260918-vpn-panel-toggle','spaMediaGate'),
     });
     await videoRouteRuntime.start({mountElement:target});
     if(generation!==renderGeneration){videoRouteRuntime.detach();return;}
@@ -120,6 +136,9 @@ async function renderManga(generation){
   cleanupReaderRuntime();
   target.replaceChildren();
   try{
+    const gate=await ensureVpnGate();
+    if(generation!==renderGeneration)return;
+    if(!gate||!gate.canLoadExternalMedia()){renderVpnGate(target,'manga');setTitle('manga');syncHeaderRoute();return;}
     if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20260922-manga-route','spaMangaListRoute');
     if(generation!==renderGeneration)return;
     mangaRouteRuntime=window.MangaListRouteFactory.create({documentRef:document,windowRef:window});
@@ -162,11 +181,12 @@ async function renderReader(route=routeName(),generation=renderGeneration){
   }
 }
 function renderRoute(){ensureAppShell();const route=routeName(),generation=++renderGeneration,app=document.getElementById('homeApp');document.documentElement.classList.toggle('reader-entry-manga',route==='manga');document.documentElement.classList.toggle('reader-entry-video',route==='video');if(app){app.classList.toggle('reader-route',['manga','video','reader'].includes(route));app.dataset.readerRoute=route;}if(route!=='video')cleanupVideoRoute();if(!['manga','video','reader'].includes(route))cleanupReaderRuntime();else if(route!=='manga'&&route!=='video')cleanupMangaRoute();if(route==='profile')renderProfile();else if(route==='manga')renderManga(generation);else if(route==='video')renderVideo(generation);else if(route==='reader')renderReader(route,generation);else renderHome();document.dispatchEvent(new CustomEvent('home-profile-routechange',{detail:{route}}));}
+function handleVpnStatusChange(){const route=routeName();if(route==='manga'||route==='video')renderRoute();}
 function navigate(path,{replace=false}={}){const target=new URL(path,location.href),name=target.pathname.split('/').pop();if(!SPA_PAGES.includes(name)){location.href=target.href;return;}if(replace)history.replaceState({appShellSPA:true},'',target.href);else history.pushState({appShellSPA:true},'',target.href);renderRoute();}
 function intercept(event){if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;const link=event.target.closest('a[href]');if(!link||link.target||link.hasAttribute('download'))return;const target=new URL(link.href,location.href),name=target.pathname.split('/').pop();if(target.origin===location.origin&&SPA_PAGES.includes(name)){event.preventDefault();navigate(target.href);}}
 async function start(){
   ensureAppShell();
-  if(!session||!session.refresh_token||!config.url||!config.publishableKey){showLogin();return;}if(!MangaVault.loadActive()){showVault();return;}try{await MangaVault.refreshSession();document.documentElement.classList.remove('auth-pending');}catch(_){MangaVault.saveSession(null);showLogin();return;}applyTheme(currentTheme());document.addEventListener('click',intercept);window.addEventListener('popstate',renderRoute);renderRoute();
+  if(!session||!session.refresh_token||!config.url||!config.publishableKey){showLogin();return;}if(!MangaVault.loadActive()){showVault();return;}try{await MangaVault.refreshSession();document.documentElement.classList.remove('auth-pending');}catch(_){MangaVault.saveSession(null);showLogin();return;}applyTheme(currentTheme());document.addEventListener('click',intercept);document.addEventListener('manga-reader-vpn-status',handleVpnStatusChange);window.addEventListener('popstate',renderRoute);renderRoute();
 }
 window.HomeProfileSPA={navigate,renderRoute,ensureAppShell};
 start();

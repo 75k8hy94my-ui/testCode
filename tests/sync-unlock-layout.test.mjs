@@ -46,6 +46,9 @@ test('single credential field accepts recovery keys through the existing unlock 
 test('passkey can be invoked manually and automatically when a registered wrapper exists', () => {
   assert.match(sync, /MangaVault\.initializeWithPasskey\(applyPayload\)/);
   assert.match(sync, /passkeyUseBtn\.addEventListener\('click',usePasskey\)/);
+  assert.match(sync, /id="passkeyLoginBtn"[^>]*>パスキーでログイン<\/button>/);
+  assert.doesNotMatch(sync, /id="passkeyLoginBtn"[^>]*hidden/);
+  assert.match(sync, /passkeyLoginBtn\.addEventListener\('click',\(\)=>usePasskey\(\)\)/);
   assert.match(sync, /async function autoUsePasskey\(\)/);
   assert.match(sync, /keyWraps\.passkeys|keyWraps\.passkey/);
   assert.match(sync, /autoUsePasskey\(\)/);
