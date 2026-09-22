@@ -23,6 +23,7 @@ test('manga route loads the shared runtime pieces without reader or video entry 
     'manga-list-mount.js',
     'manga-list-runtime-context.js',
     'manga-list-host-runtime.js',
+    'manga-list-image-cache.js',
     'manga-list-runtime.js',
   ]) assert.match(route, new RegExp(name.replace('.', '\\.') + '\\?v='));
   assert.doesNotMatch(route, /reader-saved-list-template|video-data\.js|video-library\.js/);

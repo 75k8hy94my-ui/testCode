@@ -23,6 +23,7 @@
     ['manga-list-bootstrap.js?v=20260922-bootstrap', 'mangaRouteBootstrap'],
     ['manga-list-controller.js?v=20260922-controller', 'mangaRouteController'],
     ['manga-list-runtime-context.js?v=20260922-runtime-context', 'mangaRouteContext'],
+    ['manga-list-image-cache.js?v=20260922-image-cache', 'mangaRouteImageCache'],
     ['manga-list-host-runtime.js?v=20260922-host-runtime', 'mangaRouteHost'],
     ['manga-list-runtime.js?v=20260922-shared-runtime', 'mangaRouteRuntime'],
     ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
@@ -156,7 +157,14 @@
       const getLocalStoragePathFromUrl = (value) => {
         try { const path = new URL(value).pathname; const marker = '/storage/v1/object/public/local-manga/'; return path.includes(marker) ? path.slice(path.indexOf(marker) + marker.length) : ''; } catch (_) { return ''; }
       };
-      const loadCachedLocalImage = async () => null;
+      const imageCache = MangaListImageCacheFactory.create({
+        indexedDB: windowRef.indexedDB,
+        urlApi: windowRef.URL,
+        fetch: windowRef.fetch.bind(windowRef),
+        readStorageItem: (key) => storage.getItem(key),
+        sessionKey: 'mangaReaderSupabaseSession',
+        recordTransferEstimate: () => true,
+      });
       const host = MangaListHostRuntimeFactory.create({
         safeWriteJson, getState: data.get, persistVideos() { safeWriteJson(keys.savedVideos, data.get().savedVideos); }, keys,
         sync: {
@@ -178,7 +186,7 @@
           getCoverFailedCache: () => coverFailedCache, pageUrlFor, extCandidates, loadTimeoutMs: 60000,
           sessionKey: 'mangaReaderSupabaseSession', readStorageItem: (key) => storage.getItem(key),
           getSupabaseConfig: () => windowRef.MANGA_READER_SUPABASE || {}, getLocalStoragePathFromUrl,
-          loadCachedLocalImage, rememberLocalCoverObjectUrl: (url) => coverObjectUrls.push(url),
+          loadCachedLocalImage: imageCache.loadCachedLocalImage, rememberLocalCoverObjectUrl: (url) => coverObjectUrls.push(url),
           setTimer: (callback, delay) => windowRef.setTimeout(callback, delay),
           clearTimer: (timer) => windowRef.clearTimeout(timer),
         },
