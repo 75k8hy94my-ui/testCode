@@ -140,6 +140,25 @@
           windowRef.MangaReaderStorage.safeWriteJson(key, value);
         } else storage.setItem(key, JSON.stringify(value));
       };
+      const transferLimitKey = 'mangaReaderStorageTransferLimitDaily';
+      const transferUsageKey = 'mangaReaderStorageTransferUsageDaily';
+      const transferDayKey = () => new Date().toISOString().slice(0, 10);
+      const transferLimitBytes = () => {
+        const value = Number(storage.getItem(transferLimitKey));
+        return Number.isFinite(value) && value > 0 ? value : 150 * 1024 * 1024;
+      };
+      const transferUsageBytes = () => {
+        try {
+          const saved = JSON.parse(storage.getItem(transferUsageKey) || 'null');
+          return saved && saved.day === transferDayKey() ? Number(saved.bytes) || 0 : 0;
+        } catch (_) { return 0; }
+      };
+      const recordTransferEstimate = (bytes) => {
+        const amount = Math.max(0, Number(bytes) || 0);
+        if (transferUsageBytes() + amount > transferLimitBytes()) return false;
+        safeWriteJson(transferUsageKey, { day: transferDayKey(), bytes: transferUsageBytes() + amount });
+        return true;
+      };
       const parseInputUrl = (value) => {
         let url = String(value || '').trim();
         if (!url) return null;
@@ -163,7 +182,7 @@
         fetch: windowRef.fetch.bind(windowRef),
         readStorageItem: (key) => storage.getItem(key),
         sessionKey: 'mangaReaderSupabaseSession',
-        recordTransferEstimate: () => true,
+        recordTransferEstimate,
       });
       const host = MangaListHostRuntimeFactory.create({
         safeWriteJson, getState: data.get, persistVideos() { safeWriteJson(keys.savedVideos, data.get().savedVideos); }, keys,

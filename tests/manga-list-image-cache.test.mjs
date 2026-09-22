@@ -19,4 +19,6 @@ test('manga route loads and injects the shared local-cover cache', () => {
   assert.match(route, /manga-list-image-cache\.js\?v=/);
   assert.match(route, /MangaListImageCacheFactory\.create\(/);
   assert.match(route, /loadCachedLocalImage/);
+  assert.match(route, /mangaReaderStorageTransferLimitDaily/);
+  assert.match(route, /mangaReaderStorageTransferUsageDaily/);
 });
