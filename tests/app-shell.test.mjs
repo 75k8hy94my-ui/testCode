@@ -43,3 +43,12 @@ test('static verifier covers the shared shell and profile entry', () => {
     assert.match(verifier, new RegExp(`['"]${file}['"]`));
   }
 });
+
+test('mobile bottom navigation stays visible on manga and video routes', () => {
+  const css = read('home-profile-shell.css');
+  assert.doesNotMatch(css, /html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav[^{}]*\{display:none!important\}/);
+  assert.match(css, /@media\(max-width:899px\)\{html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav\{display:flex!important\}\}/);
+  for (const page of ['manga.html', 'video.html']) {
+    assert.match(read(page), /home-profile-shell\.css\?v=20260922-mobile-route-nav/);
+  }
+});
