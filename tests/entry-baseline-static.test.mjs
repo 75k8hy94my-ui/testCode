@@ -30,7 +30,9 @@ test('current entry pages keep their static bootstrap script baselines', () => {
     'supabase-config.js', 'vault-session.js?v=20260813-vault-state', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js',
     'app-global-shell.js?v=20260912-shell', 'app-desktop-rail.js',
-    'profile-menu.js?v=20260912-shell', 'manga-list-route.js?v=20260922-manga-route',
+    'profile-menu.js?v=20260912-shell', 'feature-flags.js',
+    'media-access-gate.js?v=20260918-vpn-panel-toggle',
+    'manga-list-route.js?v=20260922-manga-route',
     'home-profile-spa.js?v=20260922-spa-route-runtime',
   ]);
   assert.deepEqual(scriptSources(pages.video), [

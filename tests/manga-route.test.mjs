@@ -50,5 +50,7 @@ test('manga shell keeps the existing shared authentication and vault bootstrap',
   assert.match(manga, /vault-session\.js/);
   assert.match(manga, /browser-storage\.js/);
   assert.match(manga, /vault-payload\.js/);
+  assert.match(manga, /feature-flags\.js/);
+  assert.match(manga, /media-access-gate\.js\?v=20260918-vpn-panel-toggle/);
   assert.match(manga, /home-profile-spa\.js\?v=/);
 });
