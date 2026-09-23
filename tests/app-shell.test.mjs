@@ -30,11 +30,15 @@ test('home-family pages share one History API controller', () => {
   assert.match(spa, /保管庫を開く/);
 });
 
-test('mobile home shell provides navigation to profile and other pages', () => {
-  const spa = fs.readFileSync(new URL('../home-profile-spa.js', import.meta.url), 'utf8');
-  assert.match(spa, /mobileBottomNav/);
-  assert.match(spa, /profile\.html/);
-  assert.match(spa, /manga\.html/);
+test('mobile home shell delegates navigation to the shared Liquid Glass component', () => {
+  const spa = read('home-profile-spa.js');
+  const nav = read('mobile-bottom-nav.js');
+  assert.match(spa, /MobileBottomNav\.ensureSpaNav/);
+  assert.match(spa, /MobileBottomNav\.syncActive/);
+  assert.match(nav, /profile\.html/);
+  assert.match(nav, /manga\.html/);
+  assert.match(nav, /video\.html/);
+  assert.match(nav, /home\.html/);
 });
 
 test('static verifier covers the shared shell and profile entry', () => {
@@ -71,7 +75,7 @@ test('authenticated top bars keep only the shared profile action', () => {
   const menu = read('profile-menu.js');
   assert.match(menu, /\[data-profile-menu-trigger\], #desktopProfileButton/);
   assert.doesNotMatch(menu, /matchMedia\('\(min-width: 900px\)'\)\.matches\) return/);
-  assert.match(read('sync.html'), /profile-menu\.js\?v=20260924-ios-theme-switch/);
+  assert.match(read('sync.html'), /profile-menu\\.js\\?v=20260924-theme-unified/);
 });
 
 test('login page has no top navigation menu', () => {
@@ -120,8 +124,8 @@ test('saved theme drives home profile manga video and header colors', () => {
   assert.match(globalCss, /--shell-header-bg/);
   for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
     assert.match(read(page), /home-profile-shell\.css\?v=20260924-ios-theme-switch/);
-    assert.match(read(page), /app-global-shell\.js\?v=20260924-ios-theme-switch/);
-    assert.match(read(page), /profile-menu\.js\?v=20260924-ios-theme-switch/);
+    assert.match(read(page), /app-global-shell\\.js\\?v=20260924-theme-unified/);
+    assert.match(read(page), /profile-menu\\.js\\?v=20260924-theme-unified/);
   }
 });
 
@@ -143,4 +147,34 @@ test('profile theme uses an iOS-style switch', () => {
   assert.match(css, /\.iosSwitch input:checked \+ \.iosSwitchTrack\{background:#34c759\}/);
   assert.match(css, /translateX\(20px\)/);
   assert.match(css, /\.iosSwitchTrack::after[\s\S]*width:27px[\s\S]*height:27px/);
+});
+
+test('shared mobile nav provides a moving Liquid Glass lens and adaptive interaction', () => {
+  const nav = read('mobile-bottom-nav.js');
+  const css = read('mobile-bottom-nav.css');
+  assert.match(nav, /className = 'liquidGlassSelection'/);
+  assert.match(nav, /lens\.animate\(/);
+  assert.match(nav, /scale3d\([^)]*\.95/);
+  assert.match(nav, /requestAnimationFrame/);
+  assert.match(nav, /--glass-light-x/);
+  assert.match(nav, /pointermove/);
+  assert.match(nav, /liquidNavCompact/);
+  assert.match(nav, /MutationObserver/);
+  assert.match(css, /backdrop-filter:blur\(36px\) saturate\(190%\) contrast\(108%\)/);
+  assert.match(css, /\.liquidGlassSelection/);
+  assert.match(css, /env\(safe-area-inset-bottom\)/);
+  assert.match(css, /prefers-reduced-motion:reduce/);
+  assert.match(css, /prefers-reduced-transparency:reduce/);
+  assert.match(css, /html\[data-theme="light"\] #mobileBottomNav\.liquidGlassNav/);
+});
+
+test('all authenticated mobile destinations load the shared Liquid Glass assets', () => {
+  for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
+    const source = read(page);
+    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-liquid-glass-nav/, page);
+    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-liquid-glass-nav/, page);
+  }
+  for (const page of ['home.html','profile.html','manga.html','video.html']) {
+    assert.match(read(page), /home-profile-spa\.js\?v=20260924-liquid-glass-nav/, page);
+  }
 });

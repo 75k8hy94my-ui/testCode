@@ -39,7 +39,9 @@ function ensureAppShell(){
     content.id='routeContent';
     app.appendChild(content);
   }
-  if(!document.getElementById('mobileBottomNav')){
+  if(window.MobileBottomNav&&typeof MobileBottomNav.ensureSpaNav==='function'){
+    MobileBottomNav.ensureSpaNav(app);
+  }else if(!document.getElementById('mobileBottomNav')){
     const nav=document.createElement('nav');nav.id='mobileBottomNav';nav.className='mobileBottomNav';nav.setAttribute('aria-label','モバイルメニュー');nav.innerHTML='<a href="home.html">ホーム</a><a href="manga.html">漫画</a><a href="video.html">動画</a><a href="profile.html">プロフィール</a>';app.append(nav);
   }
   mount=document.getElementById('routeContent');
@@ -85,6 +87,7 @@ function syncHeaderRoute(){
     link.classList.toggle('topActionCurrent',active);if(active)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');
   });
   if(window.AppDesktopRail)AppDesktopRail.syncActive();
+  if(window.MobileBottomNav&&typeof MobileBottomNav.syncActive==='function')MobileBottomNav.syncActive();
 }
 function cleanupMangaRoute(){if(mangaRouteRuntime){mangaRouteRuntime.cleanup();mangaRouteRuntime=null;}mangaRouteBootPromise=null;}
 function cleanupVideoRoute(){if(videoRouteRuntime)videoRouteRuntime.detach();}

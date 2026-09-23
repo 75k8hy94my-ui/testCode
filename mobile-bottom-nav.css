@@ -1,0 +1,326 @@
+/* Shared mobile Liquid Glass navigation */
+#mobileBottomNav.liquidGlassNav{display:none}
+
+@media(max-width:899px){
+  #mobileBottomNav.liquidGlassNav{
+    --glass-fill:rgba(21,25,33,.56);
+    --glass-edge:rgba(255,255,255,.30);
+    --glass-edge-soft:rgba(255,255,255,.14);
+    --glass-highlight:rgba(255,255,255,.48);
+    --glass-shadow:rgba(0,0,0,.28);
+    --glass-text:rgba(245,247,251,.72);
+    --glass-text-active:#fff;
+    --glass-lens:rgba(255,255,255,.13);
+    --glass-lens-edge:rgba(255,255,255,.28);
+    --glass-lens-shadow:rgba(0,0,0,.16);
+    --glass-accent-glow:rgba(118,177,255,.15);
+    position:fixed!important;
+    z-index:1200!important;
+    left:50%!important;
+    right:auto!important;
+    bottom:max(10px,env(safe-area-inset-bottom))!important;
+    width:min(360px,calc(100vw - 32px))!important;
+    min-height:62px;
+    margin:0!important;
+    padding:7px!important;
+    display:grid!important;
+    grid-auto-flow:column;
+    grid-auto-columns:minmax(0,1fr);
+    align-items:stretch;
+    gap:3px!important;
+    overflow:hidden;
+    isolation:isolate;
+    border:1px solid var(--glass-edge)!important;
+    border-radius:30px!important;
+    background:
+      radial-gradient(130% 240% at var(--glass-light-x,12%) var(--glass-light-y,0%),rgba(255,255,255,.21),transparent 43%),
+      radial-gradient(80% 150% at 92% 110%,var(--glass-accent-glow),transparent 62%),
+      linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.025)),
+      var(--glass-fill)!important;
+    box-shadow:
+      0 18px 45px var(--glass-shadow),
+      0 2px 7px rgba(0,0,0,.12),
+      inset 0 1px 0 var(--glass-highlight),
+      inset 0 -1px 0 rgba(0,0,0,.20),
+      inset 1px 0 0 var(--glass-edge-soft),
+      inset -1px 0 0 rgba(255,255,255,.08)!important;
+    -webkit-backdrop-filter:blur(36px) saturate(190%) contrast(108%)!important;
+    backdrop-filter:blur(36px) saturate(190%) contrast(108%)!important;
+    transform:translateX(-50%) translate3d(0,0,0) scale(1);
+    transform-origin:50% 100%;
+    transition:transform .32s cubic-bezier(.22,.86,.36,1),opacity .24s ease,box-shadow .24s ease;
+    will-change:transform;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  html[data-theme="light"] #mobileBottomNav.liquidGlassNav{
+    --glass-fill:rgba(244,247,251,.68);
+    --glass-edge:rgba(255,255,255,.92);
+    --glass-edge-soft:rgba(255,255,255,.64);
+    --glass-highlight:rgba(255,255,255,.98);
+    --glass-shadow:rgba(53,61,72,.17);
+    --glass-text:rgba(32,36,42,.62);
+    --glass-text-active:#181b20;
+    --glass-lens:rgba(255,255,255,.48);
+    --glass-lens-edge:rgba(255,255,255,.92);
+    --glass-lens-shadow:rgba(74,83,96,.12);
+    --glass-accent-glow:rgba(84,144,255,.12);
+  }
+
+  #mobileBottomNav.liquidGlassNav::before{
+    content:"";
+    position:absolute;
+    z-index:-2;
+    inset:0;
+    pointer-events:none;
+    border-radius:inherit;
+    background:
+      radial-gradient(55% 120% at var(--glass-light-x,18%) -12%,rgba(255,255,255,.42),transparent 68%),
+      linear-gradient(112deg,rgba(255,255,255,.17),transparent 27%,transparent 68%,rgba(255,255,255,.06));
+    opacity:.78;
+    mix-blend-mode:screen;
+  }
+
+  #mobileBottomNav.liquidGlassNav::after{
+    content:"";
+    position:absolute;
+    z-index:-1;
+    inset:1px;
+    pointer-events:none;
+    border-radius:29px;
+    border:1px solid var(--glass-edge-soft);
+    background:
+      linear-gradient(180deg,rgba(255,255,255,.18),transparent 22%),
+      linear-gradient(90deg,transparent 4%,rgba(255,255,255,.22) 22%,rgba(255,255,255,.06) 52%,rgba(255,255,255,.18) 82%,transparent 96%);
+    -webkit-mask:linear-gradient(#000,transparent 72%);
+    mask:linear-gradient(#000,transparent 72%);
+  }
+
+  #mobileBottomNav.liquidGlassNav.liquidNavCompact{
+    transform:translateX(-50%) translateY(5px) scale(.94);
+    opacity:.94;
+    box-shadow:
+      0 12px 30px var(--glass-shadow),
+      inset 0 1px 0 var(--glass-highlight),
+      inset 0 -1px 0 rgba(0,0,0,.16)!important;
+  }
+
+  .liquidGlassSelection{
+    position:absolute;
+    z-index:0;
+    top:6px;
+    bottom:6px;
+    left:0;
+    width:0;
+    opacity:0;
+    pointer-events:none;
+    border:1px solid var(--glass-lens-edge);
+    border-radius:24px;
+    background:
+      radial-gradient(90% 150% at var(--lens-light-x,22%) var(--lens-light-y,0%),rgba(255,255,255,.38),transparent 57%),
+      linear-gradient(150deg,rgba(255,255,255,.16),rgba(255,255,255,.035) 58%),
+      var(--glass-lens);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.58),
+      inset 0 -1px 0 rgba(0,0,0,.10),
+      0 4px 14px var(--glass-lens-shadow),
+      0 0 18px var(--glass-accent-glow);
+    -webkit-backdrop-filter:blur(20px) saturate(185%) brightness(1.05);
+    backdrop-filter:blur(20px) saturate(185%) brightness(1.05);
+    transform:translate3d(0,0,0);
+    transform-origin:center;
+    will-change:transform,width;
+  }
+
+  #mobileBottomNav.liquidGlassNav.liquidLensMoving .liquidGlassSelection{
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.70),
+      inset 0 -1px 0 rgba(0,0,0,.09),
+      0 5px 18px var(--glass-lens-shadow),
+      0 0 24px var(--glass-accent-glow);
+  }
+
+  #mobileBottomNav.liquidGlassNav .liquidGlassNavItem,
+  #mobileBottomNav.liquidGlassNav .mobileBottomNavBtn{
+    position:relative;
+    z-index:2;
+    min-width:0;
+    min-height:48px;
+    margin:0;
+    padding:5px 3px;
+    border:0!important;
+    border-radius:22px!important;
+    background:transparent!important;
+    color:var(--glass-text)!important;
+    box-shadow:none!important;
+    text-shadow:none!important;
+    text-decoration:none;
+    display:flex!important;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+    overflow:visible;
+    font:inherit;
+    font-size:10px;
+    font-weight:650;
+    line-height:1.08;
+    white-space:nowrap;
+    cursor:pointer;
+    -webkit-backdrop-filter:none!important;
+    backdrop-filter:none!important;
+    transform:translate3d(0,0,0) scale(1);
+    transition:color .20s ease,transform .18s cubic-bezier(.22,.86,.36,1),opacity .18s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  #mobileBottomNav.liquidGlassNav .liquidGlassNavItem.active,
+  #mobileBottomNav.liquidGlassNav .mobileBottomNavBtn.active,
+  #mobileBottomNav.liquidGlassNav .liquidGlassNavItem[aria-current="page"]{
+    color:var(--glass-text-active)!important;
+  }
+
+  #mobileBottomNav.liquidGlassNav .liquidGlassNavItem.liquidPressed,
+  #mobileBottomNav.liquidGlassNav .mobileBottomNavBtn.liquidPressed{
+    transform:scale(.93);
+  }
+
+  #mobileBottomNav.liquidGlassNav.glassPressed{
+    box-shadow:
+      0 14px 34px var(--glass-shadow),
+      inset 0 1px 0 var(--glass-highlight),
+      inset 0 -1px 0 rgba(0,0,0,.18)!important;
+  }
+
+  #mobileBottomNav.liquidGlassNav .mobileNavGlyph{
+    display:block;
+    width:20px;
+    height:20px;
+    flex:0 0 20px;
+    overflow:visible;
+    fill:none;
+    stroke:currentColor;
+    stroke-width:1.9;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+    transition:transform .22s cubic-bezier(.22,.86,.36,1),opacity .18s ease;
+  }
+
+  #mobileBottomNav.liquidGlassNav .mobileNavGlyphMore circle{
+    fill:currentColor;
+    stroke:none;
+  }
+
+  #mobileBottomNav.liquidGlassNav .liquidGlassNavItem.active .mobileNavGlyph,
+  #mobileBottomNav.liquidGlassNav .mobileBottomNavBtn.active .mobileNavGlyph,
+  #mobileBottomNav.liquidGlassNav .liquidGlassNavItem[aria-current="page"] .mobileNavGlyph{
+    transform:translateY(-1px) scale(1.05);
+  }
+
+  #mobileBottomNav.liquidGlassNav .liquidGlassNavLabel{
+    display:block;
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  #mobileBottomNav.liquidGlassNav .liquidGlassNavItem:focus-visible,
+  #mobileBottomNav.liquidGlassNav .mobileBottomNavBtn:focus-visible{
+    outline:2px solid color-mix(in srgb,var(--glass-text-active) 82%,transparent);
+    outline-offset:-2px;
+  }
+
+  .homeShell #routeContent{
+    padding-bottom:calc(100px + env(safe-area-inset-bottom))!important;
+  }
+
+  #mobileUtilityMenu{
+    position:fixed!important;
+    z-index:1201!important;
+    right:max(16px,calc((100vw - min(360px,calc(100vw - 32px))) / 2))!important;
+    bottom:calc(84px + max(10px,env(safe-area-inset-bottom)))!important;
+    min-width:178px;
+    padding:7px!important;
+    border:1px solid var(--glass-edge,rgba(255,255,255,.26))!important;
+    border-radius:20px!important;
+    background:
+      radial-gradient(120% 170% at 12% 0%,rgba(255,255,255,.16),transparent 44%),
+      var(--glass-fill,rgba(25,28,36,.70))!important;
+    color:var(--glass-text-active,#fff)!important;
+    box-shadow:0 18px 42px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.38)!important;
+    -webkit-backdrop-filter:blur(34px) saturate(175%) contrast(105%)!important;
+    backdrop-filter:blur(34px) saturate(175%) contrast(105%)!important;
+  }
+
+  html[data-theme="light"] #mobileUtilityMenu{
+    --glass-fill:rgba(245,247,250,.82);
+    --glass-edge:rgba(255,255,255,.92);
+    --glass-text-active:#202124;
+  }
+
+  #mobileUtilityMenu[hidden]{display:none!important}
+  #mobileUtilityMenu button{
+    width:100%;
+    min-height:40px;
+    padding:8px 12px;
+    border:1px solid transparent!important;
+    border-radius:13px!important;
+    background:transparent!important;
+    color:inherit!important;
+    box-shadow:none!important;
+    text-align:left;
+  }
+  #mobileUtilityMenu button:hover,
+  #mobileUtilityMenu button:focus-visible{
+    background:rgba(255,255,255,.12)!important;
+    border-color:rgba(255,255,255,.18)!important;
+    outline:none;
+  }
+  html[data-theme="light"] #mobileUtilityMenu button:hover,
+  html[data-theme="light"] #mobileUtilityMenu button:focus-visible{
+    background:rgba(255,255,255,.58)!important;
+    border-color:rgba(60,60,67,.10)!important;
+  }
+}
+
+@media(min-width:900px){
+  #mobileBottomNav.liquidGlassNav{display:none!important}
+}
+
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  @media(max-width:899px){
+    #mobileBottomNav.liquidGlassNav{
+      background:rgba(24,28,36,.96)!important;
+      -webkit-backdrop-filter:none!important;
+      backdrop-filter:none!important;
+    }
+    html[data-theme="light"] #mobileBottomNav.liquidGlassNav{background:rgba(250,251,253,.98)!important}
+    .liquidGlassSelection{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+    #mobileUtilityMenu{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+  }
+}
+
+@media(prefers-reduced-transparency:reduce){
+  @media(max-width:899px){
+    #mobileBottomNav.liquidGlassNav,
+    #mobileUtilityMenu{
+      -webkit-backdrop-filter:none!important;
+      backdrop-filter:none!important;
+      background:rgba(22,26,34,.97)!important;
+    }
+    html[data-theme="light"] #mobileBottomNav.liquidGlassNav,
+    html[data-theme="light"] #mobileUtilityMenu{background:rgba(250,251,253,.98)!important}
+    .liquidGlassSelection{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  #mobileBottomNav.liquidGlassNav,
+  #mobileBottomNav.liquidGlassNav .liquidGlassNavItem,
+  #mobileBottomNav.liquidGlassNav .mobileBottomNavBtn,
+  #mobileBottomNav.liquidGlassNav .mobileNavGlyph{
+    transition:none!important;
+    animation:none!important;
+  }
+}
