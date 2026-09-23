@@ -191,3 +191,58 @@ html[data-theme="light"].reader-entry-manga .vpnRouteGate .vpnStatusButton[data-
 html[data-theme="light"].reader-entry-video .vpnRouteGate .vpnStatusButton[data-vpn-state="allowed"]{
   background:#edf9f4;color:#087443;border-color:#3cb98a
 }
+
+.profileThemeRow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  min-height:44px;
+  color:var(--text);
+  font-size:15px;
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.iosSwitch{
+  position:relative;
+  display:inline-block;
+  flex:0 0 51px;
+  width:51px;
+  height:31px;
+}
+.iosSwitch input{
+  position:absolute;
+  inset:0;
+  z-index:2;
+  width:100%;
+  height:100%;
+  margin:0;
+  opacity:0;
+  cursor:pointer;
+}
+.iosSwitchTrack{
+  position:absolute;
+  inset:0;
+  border-radius:999px;
+  background:#e5e5ea;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.04);
+  transition:background-color .2s ease;
+}
+.iosSwitchTrack::after{
+  content:"";
+  position:absolute;
+  top:2px;
+  left:2px;
+  width:27px;
+  height:27px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:0 2px 5px rgba(0,0,0,.26),0 0 1px rgba(0,0,0,.18);
+  transition:transform .2s cubic-bezier(.3,1.5,.5,1);
+}
+.iosSwitch input:checked + .iosSwitchTrack{background:#34c759}
+.iosSwitch input:checked + .iosSwitchTrack::after{transform:translateX(20px)}
+.iosSwitch input:focus-visible + .iosSwitchTrack{outline:3px solid color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:3px}
+.iosSwitch input:active + .iosSwitchTrack::after{width:29px}
+html[data-theme="dark"] .iosSwitchTrack{background:#39393d;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+html[data-theme="dark"] .iosSwitch input:checked + .iosSwitchTrack{background:#30d158}

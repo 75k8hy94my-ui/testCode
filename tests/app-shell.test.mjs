@@ -49,7 +49,7 @@ test('mobile bottom navigation stays visible on manga and video routes', () => {
   assert.doesNotMatch(css, /html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav[^{}]*\{display:none!important\}/);
   assert.match(css, /@media\(max-width:899px\)\{html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav\{display:flex!important\}\}/);
   for (const page of ['manga.html', 'video.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20260924-theme-unified/);
+    assert.match(read(page), /home-profile-shell\.css\?v=20260924-ios-theme-switch/);
   }
 });
 
@@ -71,7 +71,7 @@ test('authenticated top bars keep only the shared profile action', () => {
   const menu = read('profile-menu.js');
   assert.match(menu, /\[data-profile-menu-trigger\], #desktopProfileButton/);
   assert.doesNotMatch(menu, /matchMedia\('\(min-width: 900px\)'\)\.matches\) return/);
-  assert.match(read('sync.html'), /profile-menu\.js\?v=20260924-theme-unified/);
+  assert.match(read('sync.html'), /profile-menu\.js\?v=20260924-ios-theme-switch/);
 });
 
 test('login page has no top navigation menu', () => {
@@ -87,7 +87,7 @@ test('VPN gate keeps readable contrast on dark manga/video routes', () => {
   assert.match(css, /color:#f8fafc/);
   assert.match(css, /vpnStatusButton\[data-vpn-state="blocked"\][\s\S]*color:#ffb4b4/);
   for (const page of ['home.html','profile.html','manga.html','video.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20260924-theme-unified/);
+    assert.match(read(page), /home-profile-shell\.css\?v=20260924-ios-theme-switch/);
   }
 });
 
@@ -119,9 +119,9 @@ test('saved theme drives home profile manga video and header colors', () => {
   assert.match(css, /reader-entry-video body[\s\S]*background:#0a0c11!important/);
   assert.match(globalCss, /--shell-header-bg/);
   for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20260924-theme-unified/);
-    assert.match(read(page), /app-global-shell\.js\?v=20260924-theme-unified/);
-    assert.match(read(page), /profile-menu\.js\?v=20260924-theme-unified/);
+    assert.match(read(page), /home-profile-shell\.css\?v=20260924-ios-theme-switch/);
+    assert.match(read(page), /app-global-shell\.js\?v=20260924-ios-theme-switch/);
+    assert.match(read(page), /profile-menu\.js\?v=20260924-ios-theme-switch/);
   }
 });
 
@@ -131,4 +131,16 @@ test('reader header inherits theme tokens outside homeShell', () => {
   assert.match(css, /html\[data-theme="dark"\]\{[^}]*--header-bg:/);
   assert.match(css, /\.homeHeader[\s\S]*background:var\(--header-bg\)!important/);
   assert.match(css, /headerProfileButton:hover\{background:var\(--header-hover\)!important/);
+});
+
+test('profile theme uses an iOS-style switch', () => {
+  const spa = read('home-profile-spa.js');
+  const css = read('home-profile-shell.css');
+  assert.match(spa, /class="profileThemeRow"/);
+  assert.match(spa, /class="iosSwitch"/);
+  assert.match(spa, /id="profileThemeLight" type="checkbox" role="switch"/);
+  assert.match(css, /\.iosSwitch\{[\s\S]*width:51px[\s\S]*height:31px/);
+  assert.match(css, /\.iosSwitch input:checked \+ \.iosSwitchTrack\{background:#34c759\}/);
+  assert.match(css, /translateX\(20px\)/);
+  assert.match(css, /\.iosSwitchTrack::after[\s\S]*width:27px[\s\S]*height:27px/);
 });
