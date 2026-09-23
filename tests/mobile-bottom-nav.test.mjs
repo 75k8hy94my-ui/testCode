@@ -59,7 +59,7 @@ test('reader keeps its special controls while using the shared glass engine', ()
   assert.match(template, /mobileNavManga/);
   assert.match(template, /mobileNavVideo/);
   assert.match(template, /mobileNavMore/);
-  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260924-liquid-glass-nav-edge'));
+  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260924-liquid-glass-scroll-edge'));
   assert.match(js, /readerFallbackTarget/);
   assert.match(js, /nav\.classList\.contains\('reader-mode'\)/);
   assert.match(js, /querySelector\('#mobileNavMore'\)/);
@@ -68,8 +68,8 @@ test('reader keeps its special controls while using the shared glass engine', ()
 test('shared nav is loaded by all target mobile pages', () => {
   for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
     const source = read(page);
-    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-liquid-glass-nav-edge/, page);
-    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-liquid-glass-nav-edge/, page);
+    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-liquid-glass-scroll-edge/, page);
+    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-liquid-glass-scroll-edge/, page);
   }
 });
 
@@ -96,4 +96,21 @@ test('clear glass remains legible on a flat light background', () => {
   assert.match(css, /inset 0 1\.5px 0 rgba\(255,255,255,.94\)/);
   assert.match(css, /inset 0 -1\.5px 0 rgba\(83,96,114,.18\)/);
   assert.match(css, /rgba\(102,124,151,.20\)/);
+});
+
+test('selection lens is inset inside each tab', () => {
+  assert.match(js, /const lensInset = nav\.dataset\.mobileNavKind === 'spa' \? 4 : 3/);
+  assert.match(js, /itemRect\.left - navRect\.left \+ lensInset/);
+  assert.match(js, /itemRect\.width - lensInset \* 2/);
+  assert.match(css, /top:7px;[\s\S]*bottom:7px;/);
+});
+
+test('Liquid Glass uses a native-style scroll edge under the floating bar', () => {
+  assert.match(js, /function ensureScrollEdge\(\)/);
+  assert.match(js, /id = 'liquidGlassScrollEdge'/);
+  assert.match(js, /liquidScrollActive/);
+  assert.match(css, /\.liquidGlassScrollEdge\{/);
+  assert.match(css, /height:132px/);
+  assert.match(css, /backdrop-filter:blur\(13px\) saturate\(125%\)/);
+  assert.match(css, /mask-image:linear-gradient/);
 });

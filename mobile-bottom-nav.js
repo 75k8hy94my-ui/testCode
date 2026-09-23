@@ -78,6 +78,18 @@
     return nav.querySelector('#mobileNavManga');
   }
 
+  function ensureScrollEdge() {
+    let edge = document.getElementById('liquidGlassScrollEdge');
+    if (!edge) {
+      edge = document.createElement('div');
+      edge.id = 'liquidGlassScrollEdge';
+      edge.className = 'liquidGlassScrollEdge';
+      edge.setAttribute('aria-hidden','true');
+      document.body.appendChild(edge);
+    }
+    return edge;
+  }
+
   function activeItem(nav) {
     if (!nav) return null;
     if (nav.dataset.mobileNavKind === 'spa') {
@@ -117,8 +129,9 @@
     const navRect = nav.getBoundingClientRect();
     const itemRect = target.getBoundingClientRect();
     if (!navRect.width || !itemRect.width) return;
-    const x = Math.round((itemRect.left - navRect.left) * 10) / 10;
-    const width = Math.round(itemRect.width * 10) / 10;
+    const lensInset = nav.dataset.mobileNavKind === 'spa' ? 4 : 3;
+    const x = Math.round((itemRect.left - navRect.left + lensInset) * 10) / 10;
+    const width = Math.round(Math.max(0, itemRect.width - lensInset * 2) * 10) / 10;
     const previous = state.lensMetrics;
 
     if (!previous || !animate || reduceMotion() || typeof lens.animate !== 'function') {
@@ -208,6 +221,7 @@
     state.lensMetrics = null;
     states.set(nav, state);
     currentNav = nav;
+    state.scrollEdge = ensureScrollEdge();
 
     nav.addEventListener('pointermove', (event) => updateLight(nav, event), { passive:true });
     nav.addEventListener('pointerdown', (event) => {
@@ -312,6 +326,8 @@
       if (!currentNav || !currentNav.isConnected) return;
       const movingDown = y > previous + 3;
       const movingUp = y < previous - 3;
+      const state = states.get(currentNav);
+      if (state && state.scrollEdge) state.scrollEdge.classList.toggle('liquidScrollActive', y > 14);
       if (movingDown && y > 72) currentNav.classList.add('liquidNavCompact');
       else if (movingUp || y < 28) currentNav.classList.remove('liquidNavCompact');
     });
