@@ -49,7 +49,7 @@ test('glass is theme-aware, safe-area-aware, and constrained on phones', () => {
   assert.match(css, /bottom:max\(10px,env\(safe-area-inset-bottom\)\)/);
   assert.match(css, /html\[data-theme="light"\] #mobileBottomNav\.liquidGlassNav/);
   assert.match(css, /--glass-fill:/);
-  assert.match(css, /blur\(36px\) saturate\(190%\) contrast\(108%\)/);
+  assert.match(css, /blur\\(34px\\) saturate\\(180%\\) contrast\\(106%\\)/);
   assert.match(css, /inset 0 1px 0 var\(--glass-highlight\)/);
 });
 
@@ -59,7 +59,7 @@ test('reader keeps its special controls while using the shared glass engine', ()
   assert.match(template, /mobileNavManga/);
   assert.match(template, /mobileNavVideo/);
   assert.match(template, /mobileNavMore/);
-  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260924-liquid-glass-nav'));
+  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260924-liquid-glass-nav-tuned'));
   assert.match(js, /readerFallbackTarget/);
   assert.match(js, /nav\.classList\.contains\('reader-mode'\)/);
   assert.match(js, /querySelector\('#mobileNavMore'\)/);
@@ -68,7 +68,15 @@ test('reader keeps its special controls while using the shared glass engine', ()
 test('shared nav is loaded by all target mobile pages', () => {
   for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
     const source = read(page);
-    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-liquid-glass-nav/, page);
-    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-liquid-glass-nav/, page);
+    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-liquid-glass-nav-tuned/, page);
+    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-liquid-glass-nav-tuned/, page);
   }
+});
+
+test('light glass stays translucent instead of becoming a white card', () => {
+  assert.match(css, /--glass-fill:rgba\(244,247,251,.46\)/);
+  assert.match(css, /--glass-lens:rgba\(255,255,255,.24\)/);
+  assert.match(css, /--glass-lens-edge:rgba\(255,255,255,.78\)/);
+  assert.match(css, /blur\(15px\) saturate\(175%\) brightness\(1.07\)/);
+  assert.match(css, /Light glass optical tuning/);
 });
