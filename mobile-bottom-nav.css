@@ -54,15 +54,15 @@
   }
 
   html[data-theme="light"] #mobileBottomNav.liquidGlassNav{
-    --glass-fill:rgba(244,247,251,.30);
+    --glass-fill:rgba(244,247,251,.24);
     --glass-edge:rgba(255,255,255,.74);
     --glass-edge-soft:rgba(255,255,255,.32);
     --glass-highlight:rgba(255,255,255,.82);
     --glass-shadow:rgba(53,61,72,.12);
     --glass-text:rgba(32,36,42,.62);
     --glass-text-active:#181b20;
-    --glass-lens:rgba(238,244,251,.085);
-    --glass-lens-edge:rgba(255,255,255,.56);
+    --glass-lens:rgba(229,238,248,.055);
+    --glass-lens-edge:rgba(255,255,255,.66);
     --glass-lens-shadow:rgba(65,73,84,.055);
     --glass-accent-glow:rgba(84,144,255,.045);
   }
@@ -400,5 +400,73 @@
       inset 0 -1px 0 rgba(90,98,110,.10),
       inset 1px 0 0 rgba(255,255,255,.28),
       inset -1px 0 0 rgba(255,255,255,.18)!important;
+  }
+}
+
+/* Edge-defined clear glass: preserve transparency, reveal thickness with asymmetric rims. */
+@media(max-width:899px){
+  html[data-theme="light"] #mobileBottomNav.liquidGlassNav{
+    border-color:rgba(255,255,255,.78)!important;
+    box-shadow:
+      0 15px 34px rgba(53,61,72,.10),
+      0 2px 5px rgba(53,61,72,.07),
+      inset 0 1.4px 0 rgba(255,255,255,.92),
+      inset 0 -1.4px 0 rgba(91,103,120,.16),
+      inset 1.2px 0 0 rgba(255,255,255,.34),
+      inset -1.2px 0 0 rgba(117,142,172,.10)!important;
+  }
+
+  html[data-theme="light"] #mobileBottomNav.liquidGlassNav::after{
+    inset:1px;
+    border-color:rgba(255,255,255,.34);
+    background:
+      linear-gradient(180deg,rgba(255,255,255,.34),transparent 17%),
+      linear-gradient(0deg,rgba(103,116,134,.08),transparent 18%),
+      linear-gradient(90deg,rgba(145,180,220,.045),transparent 18%,transparent 82%,rgba(120,155,198,.045));
+    opacity:.88;
+  }
+
+  html[data-theme="light"] .liquidGlassSelection{
+    border-color:rgba(255,255,255,.68);
+    background:
+      radial-gradient(90% 135% at var(--lens-light-x,22%) var(--lens-light-y,0%),rgba(255,255,255,.09),transparent 60%),
+      linear-gradient(155deg,rgba(255,255,255,.028),rgba(151,177,208,.008) 64%),
+      var(--glass-lens);
+    box-shadow:
+      inset 0 1.5px 0 rgba(255,255,255,.94),
+      inset 0 -1.5px 0 rgba(83,96,114,.18),
+      inset 1px 0 0 rgba(255,255,255,.34),
+      inset -1px 0 0 rgba(96,130,170,.11),
+      0 2px 7px rgba(66,76,90,.045),
+      0 0 9px rgba(90,150,255,.025);
+  }
+
+  html[data-theme="light"] .liquidGlassSelection::before{
+    background:
+      linear-gradient(180deg,rgba(255,255,255,.48),transparent 22%),
+      linear-gradient(0deg,rgba(92,107,127,.12),transparent 24%),
+      radial-gradient(120% 70% at 50% 112%,rgba(126,145,170,.09),transparent 72%);
+    opacity:.76;
+  }
+
+  html[data-theme="light"] .liquidGlassSelection::after{
+    left:12%;
+    right:12%;
+    bottom:1px;
+    height:1px;
+    background:linear-gradient(
+      90deg,
+      transparent,
+      rgba(102,124,151,.20) 20%,
+      rgba(255,255,255,.48) 48%,
+      rgba(105,129,158,.18) 80%,
+      transparent
+    );
+    opacity:.82;
+  }
+
+  html[data-theme="light"] #mobileBottomNav.liquidGlassNav .liquidGlassNavItem.active,
+  html[data-theme="light"] #mobileBottomNav.liquidGlassNav .liquidGlassNavItem[aria-current="page"]{
+    color:#171a1f!important;
   }
 }
