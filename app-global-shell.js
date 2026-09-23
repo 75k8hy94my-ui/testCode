@@ -16,7 +16,22 @@
   const currentPage = () => location.pathname.split('/').pop() || 'home.html';
   const isSpaPage = (name = currentPage()) => SPA_PAGES.includes(name);
 
-  window.AppShell = { SPA_PAGES, labels, currentPage, isSpaPage };
+  function storedTheme() {
+    try {
+      const raw = String(localStorage.getItem('mangaReaderTheme') || '').replace(/^"|"$/g, '').trim();
+      return raw === 'light' ? 'light' : 'dark';
+    } catch (_) { return 'dark'; }
+  }
+  function applyStoredTheme() {
+    const selected = storedTheme();
+    document.documentElement.dataset.theme = selected;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', selected === 'light' ? '#f4f6f8' : '#0a0c11');
+    return selected;
+  }
+
+  window.AppShell = { SPA_PAGES, labels, currentPage, isSpaPage, storedTheme, applyStoredTheme };
+  applyStoredTheme();
 
   // Home-family routes keep a persistent header via home-profile-spa.js.
   // Do not rewrite that chrome or intercept those clicks.
@@ -26,7 +41,7 @@
     if (document.querySelector('link[data-global-shell-style]')) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = 'app-global-shell.css?v=20260912-shell';
+    link.href = 'app-global-shell.css?v=20260924-theme-unified';
     link.dataset.globalShellStyle = '1';
     document.head.appendChild(link);
   }

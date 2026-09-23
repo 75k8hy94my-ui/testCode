@@ -55,3 +55,10 @@
   .global-shell-page #appGlobalHeader ~ #studyApp { padding-top:18px; }
   .global-shell-page #appGlobalHeader ~ main:not(.homeShell) { padding-top:18px; }
 }
+
+html[data-theme="light"]{--shell-header-bg:rgba(248,249,252,.94);--shell-header-text:#202124;--shell-header-border:rgba(60,60,67,.16);--shell-button-bg:rgba(255,255,255,.72);--shell-button-border:rgba(60,60,67,.16)}
+html[data-theme="dark"]{--shell-header-bg:rgba(15,18,24,.96);--shell-header-text:#f5f7fb;--shell-header-border:#2b3240;--shell-button-bg:#161a23;--shell-button-border:#384152}
+html[data-theme] #appGlobalHeader.globalAppHeader,
+html[data-theme] .globalAppHeader{background:var(--shell-header-bg)!important;color:var(--shell-header-text)!important;border-bottom-color:var(--shell-header-border)!important}
+html[data-theme] #appGlobalHeader .headerProfileButton,
+html[data-theme] .globalAppHeader .headerProfileButton{background:var(--shell-button-bg)!important;color:var(--shell-header-text)!important;border-color:var(--shell-button-border)!important}

@@ -49,7 +49,7 @@ test('mobile bottom navigation stays visible on manga and video routes', () => {
   assert.doesNotMatch(css, /html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav[^{}]*\{display:none!important\}/);
   assert.match(css, /@media\(max-width:899px\)\{html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav\{display:flex!important\}\}/);
   for (const page of ['manga.html', 'video.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20260924-profile-toast/);
+    assert.match(read(page), /home-profile-shell\.css\?v=20260924-theme-unified/);
   }
 });
 
@@ -71,7 +71,7 @@ test('authenticated top bars keep only the shared profile action', () => {
   const menu = read('profile-menu.js');
   assert.match(menu, /\[data-profile-menu-trigger\], #desktopProfileButton/);
   assert.doesNotMatch(menu, /matchMedia\('\(min-width: 900px\)'\)\.matches\) return/);
-  assert.match(read('sync.html'), /profile-menu\.js\?v=20260922-profile-header/);
+  assert.match(read('sync.html'), /profile-menu\.js\?v=20260924-theme-unified/);
 });
 
 test('login page has no top navigation menu', () => {
@@ -87,7 +87,7 @@ test('VPN gate keeps readable contrast on dark manga/video routes', () => {
   assert.match(css, /color:#f8fafc/);
   assert.match(css, /vpnStatusButton\[data-vpn-state="blocked"\][\s\S]*color:#ffb4b4/);
   for (const page of ['home.html','profile.html','manga.html','video.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20260924-profile-toast/);
+    assert.match(read(page), /home-profile-shell\.css\?v=20260924-theme-unified/);
   }
 });
 
@@ -100,4 +100,27 @@ test('profile save feedback is a compact toast instead of a full-width status ba
   assert.match(css, /\.profileToastStatus\{/);
   assert.match(css, /border-radius:999px/);
   assert.match(css, /bottom:calc\(88px \+ env\(safe-area-inset-bottom\)\)/);
+});
+
+test('saved theme drives home profile manga video and header colors', () => {
+  const spa = read('home-profile-spa.js');
+  const shell = read('app-global-shell.js');
+  const css = read('home-profile-shell.css');
+  const globalCss = read('app-global-shell.css');
+  assert.match(spa, /localStorage\.setItem\('mangaReaderTheme',selected\)/);
+  assert.match(spa, /document\.documentElement\.dataset\.theme=selected/);
+  assert.match(shell, /localStorage\.getItem\('mangaReaderTheme'\)/);
+  assert.match(shell, /applyStoredTheme\(\)/);
+  assert.match(css, /html\[data-theme="light"\] \.homeShell/);
+  assert.match(css, /html\[data-theme="dark"\] \.homeShell/);
+  assert.match(css, /--header-bg:/);
+  assert.match(css, /homeHeader[\s\S]*background:var\(--header-bg\)!important/);
+  assert.match(css, /reader-entry-manga body[\s\S]*background:#f4f6f8!important/);
+  assert.match(css, /reader-entry-video body[\s\S]*background:#0a0c11!important/);
+  assert.match(globalCss, /--shell-header-bg/);
+  for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
+    assert.match(read(page), /home-profile-shell\.css\?v=20260924-theme-unified/);
+    assert.match(read(page), /app-global-shell\.js\?v=20260924-theme-unified/);
+    assert.match(read(page), /profile-menu\.js\?v=20260924-theme-unified/);
+  }
 });
