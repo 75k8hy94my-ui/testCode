@@ -54,17 +54,17 @@
   }
 
   html[data-theme="light"] #mobileBottomNav.liquidGlassNav{
-    --glass-fill:rgba(244,247,251,.46);
-    --glass-edge:rgba(255,255,255,.84);
-    --glass-edge-soft:rgba(255,255,255,.46);
-    --glass-highlight:rgba(255,255,255,.90);
+    --glass-fill:rgba(244,247,251,.30);
+    --glass-edge:rgba(255,255,255,.74);
+    --glass-edge-soft:rgba(255,255,255,.32);
+    --glass-highlight:rgba(255,255,255,.82);
     --glass-shadow:rgba(53,61,72,.12);
     --glass-text:rgba(32,36,42,.62);
     --glass-text-active:#181b20;
-    --glass-lens:rgba(255,255,255,.24);
-    --glass-lens-edge:rgba(255,255,255,.78);
-    --glass-lens-shadow:rgba(74,83,96,.075);
-    --glass-accent-glow:rgba(84,144,255,.075);
+    --glass-lens:rgba(238,244,251,.085);
+    --glass-lens-edge:rgba(255,255,255,.56);
+    --glass-lens-shadow:rgba(65,73,84,.055);
+    --glass-accent-glow:rgba(84,144,255,.045);
   }
 
   #mobileBottomNav.liquidGlassNav::before{
@@ -117,16 +117,16 @@
     border:1px solid var(--glass-lens-edge);
     border-radius:24px;
     background:
-      radial-gradient(90% 150% at var(--lens-light-x,22%) var(--lens-light-y,0%),rgba(255,255,255,.22),transparent 57%),
-      linear-gradient(150deg,rgba(255,255,255,.09),rgba(255,255,255,.018) 58%),
+      radial-gradient(88% 135% at var(--lens-light-x,22%) var(--lens-light-y,0%),rgba(255,255,255,.15),transparent 58%),
+      linear-gradient(155deg,rgba(255,255,255,.055),rgba(190,204,222,.012) 62%),
       var(--glass-lens);
     box-shadow:
       inset 0 1px 0 rgba(255,255,255,.72),
       inset 0 -1px 0 rgba(75,82,92,.12),
       0 4px 14px var(--glass-lens-shadow),
       0 0 18px var(--glass-accent-glow);
-    -webkit-backdrop-filter:blur(15px) saturate(175%) brightness(1.07);
-    backdrop-filter:blur(15px) saturate(175%) brightness(1.07);
+    -webkit-backdrop-filter:blur(10px) saturate(165%) brightness(1.035);
+    backdrop-filter:blur(10px) saturate(165%) brightness(1.035);
     transform:translate3d(0,0,0);
     transform-origin:center;
     will-change:transform,width;
@@ -351,5 +351,54 @@
       inset 0 -1px 0 rgba(78,86,98,.10),
       0 3px 10px rgba(70,78,90,.075),
       0 0 14px rgba(90,150,255,.055);
+  }
+}
+
+/* Clear-lens refraction: selected state is edge-driven rather than white-filled. */
+@media(max-width:899px){
+  .liquidGlassSelection::before{
+    content:"";
+    position:absolute;
+    inset:1px;
+    border-radius:inherit;
+    pointer-events:none;
+    background:
+      linear-gradient(180deg,rgba(255,255,255,.34),transparent 24%),
+      radial-gradient(90% 60% at 50% 108%,rgba(111,126,148,.11),transparent 72%);
+    opacity:.72;
+    -webkit-mask:linear-gradient(#000 0 24%,transparent 58%,#000 100%);
+    mask:linear-gradient(#000 0 24%,transparent 58%,#000 100%);
+  }
+  .liquidGlassSelection::after{
+    content:"";
+    position:absolute;
+    left:14%;
+    right:14%;
+    bottom:2px;
+    height:1px;
+    pointer-events:none;
+    border-radius:999px;
+    background:linear-gradient(90deg,transparent,rgba(93,108,130,.16) 22%,rgba(255,255,255,.40) 50%,rgba(93,108,130,.14) 78%,transparent);
+    opacity:.72;
+  }
+  html[data-theme="light"] .liquidGlassSelection{
+    background:
+      radial-gradient(88% 135% at var(--lens-light-x,22%) var(--lens-light-y,0%),rgba(255,255,255,.12),transparent 58%),
+      linear-gradient(155deg,rgba(255,255,255,.045),rgba(170,190,214,.010) 62%),
+      var(--glass-lens);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.74),
+      inset 0 -1px 0 rgba(83,94,108,.13),
+      0 2px 8px rgba(70,78,90,.05),
+      0 0 10px rgba(90,150,255,.035);
+  }
+  html[data-theme="light"] #mobileBottomNav.liquidGlassNav{
+    box-shadow:
+      0 16px 38px rgba(53,61,72,.11),
+      0 1px 3px rgba(53,61,72,.08),
+      inset 0 1px 0 rgba(255,255,255,.80),
+      inset 0 -1px 0 rgba(90,98,110,.10),
+      inset 1px 0 0 rgba(255,255,255,.28),
+      inset -1px 0 0 rgba(255,255,255,.18)!important;
   }
 }

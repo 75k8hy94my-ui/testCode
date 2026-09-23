@@ -59,7 +59,7 @@ test('reader keeps its special controls while using the shared glass engine', ()
   assert.match(template, /mobileNavManga/);
   assert.match(template, /mobileNavVideo/);
   assert.match(template, /mobileNavMore/);
-  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260924-liquid-glass-nav-tuned'));
+  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260924-liquid-glass-nav-clear'));
   assert.match(js, /readerFallbackTarget/);
   assert.match(js, /nav\.classList\.contains\('reader-mode'\)/);
   assert.match(js, /querySelector\('#mobileNavMore'\)/);
@@ -68,15 +68,23 @@ test('reader keeps its special controls while using the shared glass engine', ()
 test('shared nav is loaded by all target mobile pages', () => {
   for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
     const source = read(page);
-    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-liquid-glass-nav-tuned/, page);
-    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-liquid-glass-nav-tuned/, page);
+    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-liquid-glass-nav-clear/, page);
+    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-liquid-glass-nav-clear/, page);
   }
 });
 
 test('light glass stays translucent instead of becoming a white card', () => {
-  assert.match(css, /--glass-fill:rgba\(244,247,251,.46\)/);
-  assert.match(css, /--glass-lens:rgba\(255,255,255,.24\)/);
-  assert.match(css, /--glass-lens-edge:rgba\(255,255,255,.78\)/);
-  assert.match(css, /blur\(15px\) saturate\(175%\) brightness\(1.07\)/);
+  assert.match(css, /--glass-fill:rgba\\(244,247,251,.30\\)/);
+  assert.match(css, /--glass-lens:rgba\\(238,244,251,.085\\)/);
+  assert.match(css, /--glass-lens-edge:rgba\\(255,255,255,.56\\)/);
+  assert.match(css, /blur\\(10px\\) saturate\\(165%\\) brightness\\(1.035\\)/);
   assert.match(css, /Light glass optical tuning/);
+});
+
+test('selected lens is edge-driven rather than white-filled', () => {
+  assert.match(css, /--glass-lens:rgba\(238,244,251,.085\)/);
+  assert.match(css, /\.liquidGlassSelection::before/);
+  assert.match(css, /\.liquidGlassSelection::after/);
+  assert.match(css, /bottom:2px/);
+  assert.match(css, /rgba\(93,108,130,.16\)/);
 });
