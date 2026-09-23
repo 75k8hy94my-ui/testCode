@@ -98,3 +98,9 @@ test('logout lives on the profile settings route', () => {
   assert.match(featureFlags, /getElementById\(['"]listLogoutBtn['"]\)/);
   assert.match(featureFlags, /readerLogout\.hidden\s*=\s*true/);
 });
+
+test('profile display setting save message stays concise', () => {
+  const spa = read('home-profile-spa.js');
+  assert.match(spa, /runHomeSync\('保存しました'\)/);
+  assert.doesNotMatch(spa, /表示設定を保存しました/);
+});

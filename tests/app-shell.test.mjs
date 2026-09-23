@@ -49,7 +49,7 @@ test('mobile bottom navigation stays visible on manga and video routes', () => {
   assert.doesNotMatch(css, /html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav[^{}]*\{display:none!important\}/);
   assert.match(css, /@media\(max-width:899px\)\{html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav\{display:flex!important\}\}/);
   for (const page of ['manga.html', 'video.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20260923-vpn-contrast/);
+    assert.match(read(page), /home-profile-shell\.css\?v=20260924-profile-toast/);
   }
 });
 
@@ -87,6 +87,17 @@ test('VPN gate keeps readable contrast on dark manga/video routes', () => {
   assert.match(css, /color:#f8fafc/);
   assert.match(css, /vpnStatusButton\[data-vpn-state="blocked"\][\s\S]*color:#ffb4b4/);
   for (const page of ['home.html','profile.html','manga.html','video.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20260923-vpn-contrast/);
+    assert.match(read(page), /home-profile-shell\.css\?v=20260924-profile-toast/);
   }
+});
+
+test('profile save feedback is a compact toast instead of a full-width status bar', () => {
+  const spa = read('home-profile-spa.js');
+  const css = read('home-profile-shell.css');
+  assert.match(spa, /class="syncStatus profileToastStatus"/);
+  assert.match(spa, /runHomeSync\('保存しました'\)/);
+  assert.doesNotMatch(spa, /表示設定を保存しました/);
+  assert.match(css, /\.profileToastStatus\{/);
+  assert.match(css, /border-radius:999px/);
+  assert.match(css, /bottom:calc\(88px \+ env\(safe-area-inset-bottom\)\)/);
 });

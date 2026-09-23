@@ -67,3 +67,32 @@ html.reader-entry-video .vpnRouteGate .vpnStatusButton[data-vpn-state="pending"]
   color:#e2e8f0;
   border-color:#64748b;
 }
+
+.profileToastStatus{
+  position:fixed!important;
+  z-index:1200!important;
+  left:50%!important;
+  right:auto!important;
+  top:auto!important;
+  bottom:24px!important;
+  transform:translateX(-50%);
+  width:max-content;
+  max-width:calc(100vw - 32px);
+  margin:0!important;
+  padding:8px 12px;
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:999px;
+  background:rgba(24,28,36,.94)!important;
+  color:#fff!important;
+  box-shadow:0 8px 24px rgba(0,0,0,.22);
+  font-size:13px;
+  line-height:1.3;
+  white-space:nowrap;
+  pointer-events:none;
+}
+.profileToastStatus:empty{display:none}
+@media(max-width:899px){
+  .profileToastStatus{
+    bottom:calc(88px + env(safe-area-inset-bottom))!important;
+  }
+}
