@@ -124,3 +124,11 @@ test('saved theme drives home profile manga video and header colors', () => {
     assert.match(read(page), /profile-menu\.js\?v=20260924-theme-unified/);
   }
 });
+
+test('reader header inherits theme tokens outside homeShell', () => {
+  const css = read('home-profile-shell.css');
+  assert.match(css, /html\[data-theme="light"\]\{[^}]*--header-bg:/);
+  assert.match(css, /html\[data-theme="dark"\]\{[^}]*--header-bg:/);
+  assert.match(css, /\.homeHeader[\s\S]*background:var\(--header-bg\)!important/);
+  assert.match(css, /headerProfileButton:hover\{background:var\(--header-hover\)!important/);
+});

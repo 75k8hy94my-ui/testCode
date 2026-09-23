@@ -98,8 +98,8 @@ html.reader-entry-video .vpnRouteGate .vpnStatusButton[data-vpn-state="pending"]
 }
 
 /* Unified application theme. The saved mangaReaderTheme value drives all home-family surfaces. */
-html[data-theme="light"]{color-scheme:light}
-html[data-theme="dark"]{color-scheme:dark}
+html[data-theme="light"]{color-scheme:light;--header-bg:rgba(255,255,255,.96);--header-text:#202124;--header-border:#dfe3e8;--header-hover:#eef1f5}
+html[data-theme="dark"]{color-scheme:dark;--header-bg:rgba(15,18,24,.96);--header-text:#f5f7fb;--header-border:#2b3240;--header-hover:#222936}
 html[data-theme="light"] body{background:#f4f6f8;color:#202124}
 html[data-theme="dark"] body{background:#0a0c11;color:#f1f2f6}
 html[data-theme="light"] .homeShell{
@@ -121,7 +121,7 @@ html[data-theme] .homeHeader{
 html[data-theme] .homeHeader .headerProfileButton{
   color:var(--header-text)!important;border-color:var(--header-border)!important;background:transparent!important
 }
-html[data-theme] .homeHeader .headerProfileButton:hover{background:var(--panel-2)!important}
+html[data-theme] .homeHeader .headerProfileButton:hover{background:var(--header-hover)!important}
 html[data-theme] .homeCard,
 html[data-theme] .profileMeta,
 html[data-theme] .profileCard,
