@@ -28,7 +28,7 @@ function scriptSources(html) {
 test('current entry pages keep their static bootstrap script baselines', () => {
   assert.deepEqual(scriptSources(pages.manga), [
     'supabase-config.js', 'vault-session.js?v=20260813-vault-state', 'browser-storage.js',
-    'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js',
+    'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20260922-profile-header', 'app-desktop-rail.js',
     'profile-menu.js?v=20260922-profile-header', 'feature-flags.js',
     'media-access-gate.js?v=20260922-vpn-tools',
@@ -37,7 +37,7 @@ test('current entry pages keep their static bootstrap script baselines', () => {
   ]);
   assert.deepEqual(scriptSources(pages.video), [
     'supabase-config.js', 'vault-session.js?v=20260813-vault-state', 'browser-storage.js',
-    'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js',
+    'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20260922-profile-header', 'app-desktop-rail.js',
     'profile-menu.js?v=20260922-profile-header', 'home-profile-spa.js?v=20260922-profile-header',
   ]);

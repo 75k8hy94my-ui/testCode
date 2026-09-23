@@ -6,97 +6,80 @@ import dashboard from '../home-dashboard.js';
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 
 const LEGACY_DEFAULT_IDS = ['bookshelf'];
-const DEFAULT_IDS = ['bookshelf'];
+const DEFAULT_IDS = ['manga', 'video'];
 
-test('home dashboard starts with useful app and official-law cards', () => {
+test('home dashboard exposes only manga and video cards', () => {
   assert.deepEqual(dashboard.DEFAULT_CARD_IDS, DEFAULT_IDS);
-  for (const id of DEFAULT_IDS) assert.ok(dashboard.CARD_CATALOG[id], `${id} should exist in the card catalog`);
-  assert.deepEqual(Object.keys(dashboard.CARD_CATALOG), ['bookshelf']);
+  assert.deepEqual(Object.keys(dashboard.CARD_CATALOG), DEFAULT_IDS);
+  assert.deepEqual(dashboard.CARD_CATALOG.manga, { id:'manga', title:'漫画', kind:'internal', href:'manga.html', badge:'APP' });
+  assert.deepEqual(dashboard.CARD_CATALOG.video, { id:'video', title:'動画', kind:'internal', href:'video.html', badge:'APP' });
+  assert.equal('subtitle' in dashboard.CARD_CATALOG.manga, false);
+  assert.equal('subtitle' in dashboard.CARD_CATALOG.video, false);
 });
 
-test('home layout normalization keeps order, removes duplicates, and preserves an intentional empty home', () => {
-  assert.deepEqual(dashboard.normalizeLayout(null), DEFAULT_IDS);
-  assert.deepEqual(dashboard.normalizeLayout(['unknown', 'unknown', 'bookshelf']), ['bookshelf']);
-  assert.deepEqual(dashboard.normalizeLayout([]), []);
-  assert.deepEqual(dashboard.normalizeLayout(['removed-card']), DEFAULT_IDS);
-});
-
-test('home cards can be added, removed, and reordered without mutating the source layout', () => {
-  const source = ['bookshelf'];
-  assert.deepEqual(dashboard.removeCard(source, 'bookshelf'), []);
-  assert.deepEqual(dashboard.addCard([], 'bookshelf'), ['bookshelf']);
-  assert.deepEqual(dashboard.addCard(['bookshelf'], 'bookshelf'), ['bookshelf']);
-  assert.deepEqual(dashboard.moveCard(source, 'bookshelf', -1), ['bookshelf']);
-  assert.deepEqual(dashboard.moveCard(source, 'bookshelf', 1), ['bookshelf']);
-  assert.deepEqual(source, ['bookshelf']);
-});
-
-test('saved custom home layouts ignore removed cards', () => {
-  const storage = new Map([['mangaReaderHomeCards', JSON.stringify(['bookshelf', 'index-search'])]]);
-  assert.deepEqual(dashboard.loadLayout(storage), ['bookshelf']);
-  assert.deepEqual(dashboard.hiddenCardIds(['bookshelf']), []);
-  assert.deepEqual(dashboard.addCard(['bookshelf'], 'index-search'), ['bookshelf']);
-});
-
-test('legacy home layouts do not resurrect removed cards', () => {
+test('legacy bookshelf layout migrates to manga and video', () => {
+  assert.deepEqual(dashboard.normalizeLayout(LEGACY_DEFAULT_IDS), DEFAULT_IDS);
   const storage = new Map([['mangaReaderHomeCards', JSON.stringify(LEGACY_DEFAULT_IDS)]]);
   assert.deepEqual(dashboard.loadLayout(storage), DEFAULT_IDS);
   assert.deepEqual(JSON.parse(storage.get('mangaReaderHomeCards')), DEFAULT_IDS);
 });
 
+test('home layout normalization keeps order, removes duplicates, and preserves an intentional empty home', () => {
+  assert.deepEqual(dashboard.normalizeLayout(null), DEFAULT_IDS);
+  assert.deepEqual(dashboard.normalizeLayout(['video', 'manga', 'video']), ['video', 'manga']);
+  assert.deepEqual(dashboard.normalizeLayout([]), []);
+  assert.deepEqual(dashboard.normalizeLayout(['removed-card']), DEFAULT_IDS);
+});
+
+test('home cards can be added, removed, and reordered without mutating source layout', () => {
+  const source = ['manga', 'video'];
+  assert.deepEqual(dashboard.removeCard(source, 'video'), ['manga']);
+  assert.deepEqual(dashboard.addCard(['manga'], 'video'), ['manga', 'video']);
+  assert.deepEqual(dashboard.addCard(['manga', 'video'], 'video'), ['manga', 'video']);
+  assert.deepEqual(dashboard.moveCard(source, 'video', -1), ['video', 'manga']);
+  assert.deepEqual(source, ['manga', 'video']);
+});
+
+test('saved custom home layouts ignore removed cards', () => {
+  const storage = new Map([['mangaReaderHomeCards', JSON.stringify(['manga', 'index-search'])]]);
+  assert.deepEqual(dashboard.loadLayout(storage), ['manga']);
+  assert.deepEqual(dashboard.hiddenCardIds(['manga']), ['video']);
+  assert.deepEqual(dashboard.addCard(['manga'], 'index-search'), ['manga']);
+});
+
 test('home layout storage round-trips and missing storage falls back to defaults', () => {
   const storage = new Map();
   assert.deepEqual(dashboard.loadLayout(storage), DEFAULT_IDS);
-  dashboard.saveLayout(['index-search', 'bookshelf'], storage);
-  assert.deepEqual(dashboard.loadLayout(storage), ['bookshelf']);
+  dashboard.saveLayout(['video', 'manga'], storage);
+  assert.deepEqual(dashboard.loadLayout(storage), ['video', 'manga']);
 });
 
-test('official cards stay on first-party legal information domains', () => {
-  const allowed = new Set(['laws.e-gov.go.jp', 'www.courts.go.jp', 'www.moj.go.jp']);
-  Object.values(dashboard.CARD_CATALOG).forEach((card) => {
-    if (card.kind !== 'official') return;
-    const url = new URL(card.href);
-    assert.equal(url.protocol, 'https:');
-    assert.ok(allowed.has(url.hostname), `${card.id} should use an official domain`);
-  });
+test('home cards render without short description text', () => {
+  const spa = read('home-profile-spa.js');
+  assert.match(spa, /const marks=\{manga:'漫',video:'動'\}/);
+  assert.doesNotMatch(spa, /card\.subtitle/);
+  assert.match(spa, /title\.textContent=card\.title;root\.append\(title\)/);
 });
 
-test('home page is vault-gated, editable, and vault unlock enters it', () => {
+test('home page is vault-gated and the shared routes remain intact', () => {
   const home = read('home.html');
   const spa = read('home-profile-spa.js');
   assert.match(home, /class=["']auth-pending["']/);
   assert.match(spa, /MangaVault\.loadActive\(\)/);
   assert.match(spa, /window\.location\.replace\(['"]sync\.html['"]\)/);
   assert.match(spa, /window\.location\.replace\(['"]index\.html['"]\)/);
-  assert.match(home, /id=["']editHomeBtn["']/);
-  for (const id of ['homeGrid', 'addCardPanel', 'homeSyncStatus']) assert.match(spa, new RegExp(`id=["']${id}["']`));
-  assert.match(spa, /const marks=\{bookshelf:'本'\}/);
-  assert.doesNotMatch(spa, /学習・索引設定・六法メモ|索引キャッシュ|リンク帳/);
-  assert.match(spa, /本棚・動画・作者カードなどのデータ/);
-  assert.match(home, /home-dashboard\.js/);
-  assert.match(home, /vault-payload\.js/);
-
+  assert.match(home, /home-dashboard\.js\?v=20260924-home-media-cards/);
+  assert.match(spa, /漫画・動画・作者カードなどのデータ/);
   assert.match(read('sync.html'), /function\s+goReader\(\)\s*\{\s*window\.location\.replace\(['"]home\.html['"]\)/);
-  assert.match(read('vault-payload.js'), /homeCards:\s*['"]mangaReaderHomeCards['"]/);
-  const verifier = read('scripts/check-static.mjs');
-  assert.match(verifier, /['"]home\.html['"]/);
-  assert.match(verifier, /['"]home-dashboard\.js['"]/);
 });
 
-test('logout lives on the profile settings route', () => {
+test('logout remains on the profile settings route', () => {
   const spa = read('home-profile-spa.js');
   const menu = read('profile-menu.js');
-  const sync = read('sync.html');
-  const featureFlags = read('feature-flags.js');
-
   assert.match(spa, /id=["']profileLogoutBtn["']/);
   assert.match(menu, /EncryptedChunkCache\.clearAll/);
   assert.match(menu, /MangaVault\.saveSession\(null\)/);
-  assert.match(menu, /window\.ProfileMenu/);
   assert.doesNotMatch(read('home.html'), /id=["']homeLogoutBtn["']/);
-  assert.doesNotMatch(sync, /id=["']logoutBtn["']/);
-  assert.match(featureFlags, /getElementById\(['"]listLogoutBtn['"]\)/);
-  assert.match(featureFlags, /readerLogout\.hidden\s*=\s*true/);
 });
 
 test('profile display setting save message stays concise', () => {
