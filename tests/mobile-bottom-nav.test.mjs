@@ -59,7 +59,7 @@ test('reader keeps its special controls while using the shared glass engine', ()
   assert.match(template, /mobileNavManga/);
   assert.match(template, /mobileNavVideo/);
   assert.match(template, /mobileNavMore/);
-  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260924-instagram-glass'));
+  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260924-instagram-drag'));
   assert.match(js, /readerFallbackTarget/);
   assert.match(js, /nav\.classList\.contains\('reader-mode'\)/);
   assert.match(js, /querySelector\('#mobileNavMore'\)/);
@@ -68,8 +68,8 @@ test('reader keeps its special controls while using the shared glass engine', ()
 test('shared nav is loaded by all target mobile pages', () => {
   for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
     const source = read(page);
-    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-instagram-glass/, page);
-    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-instagram-glass/, page);
+    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-instagram-drag/, page);
+    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-instagram-drag/, page);
   }
 });
 
@@ -145,4 +145,33 @@ test('SPA active state is monochrome icon fill rather than blue tint', () => {
   assert.match(css, /--glass-text-active:#111318/);
   assert.match(css, /html\[data-theme="dark"\][\s\S]*--glass-text-active:#fff/);
   assert.match(js, /if \(nav\.dataset\.mobileNavKind === 'spa'\)[\s\S]*lens\.style\.opacity = '0'/);
+});
+
+test('SPA tab bar supports Instagram-style long-press scrub navigation', () => {
+  assert.match(js, /const LONG_PRESS_MS = 340/);
+  assert.match(js, /const LONG_PRESS_MOVE_TOLERANCE = 12/);
+  assert.match(js, /function startSpaLongPressDrag/);
+  assert.match(js, /function positionDragLens/);
+  assert.match(js, /function nearestSpaItem/);
+  assert.match(js, /setPointerCapture/);
+  assert.match(js, /pointermove/);
+  assert.match(js, /event\.preventDefault\(\)/);
+  assert.match(js, /resetSpaDrag\(nav, state, \{ commit:drag\.active \}\)/);
+  assert.match(js, /destination\.click\(\)/);
+});
+
+test('long-press drag keeps normal taps and scrolling intact', () => {
+  assert.match(js, /Math\.hypot\(event\.clientX - drag\.startX, event\.clientY - drag\.startY\)/);
+  assert.match(js, /distance > LONG_PRESS_MOVE_TOLERANCE/);
+  assert.match(js, /suppressClickUntil = Date\.now\(\) \+ 650/);
+  assert.match(css, /touch-action:pan-y/);
+  assert.match(css, /-webkit-touch-callout:none/);
+});
+
+test('drag mode reveals a movable Instagram-like glass pill', () => {
+  assert.match(css, /\.liquidDragMode \.liquidGlassSelection/);
+  assert.match(css, /display:block!important/);
+  assert.match(css, /backdrop-filter:blur\(18px\) saturate\(145%\)/);
+  assert.match(css, /\.liquidDragPreview/);
+  assert.match(css, /transform:scale\(1\.055\)/);
 });
