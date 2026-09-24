@@ -122,6 +122,10 @@
     if (!state) return;
     const target = activeItem(nav);
     const lens = state.lens;
+    if (nav.dataset.mobileNavKind === 'spa') {
+      if (lens && !nav.classList.contains('liquidDragMode')) lens.style.opacity = '0';
+      return;
+    }
     if (!target || !target.isConnected || nav.getClientRects().length === 0) {
       lens.style.opacity = '0';
       return;
@@ -207,6 +211,188 @@
     nav.classList.remove('glassPressed');
   }
 
+  const LONG_PRESS_MS = 340;
+  const LONG_PRESS_MOVE_TOLERANCE = 12;
+
+  function spaNavItems(nav) {
+    return [...nav.querySelectorAll('[data-mobile-route]')];
+  }
+
+  function clearLongPressTimer(state) {
+    if (!state || !state.longPressTimer) return;
+    clearTimeout(state.longPressTimer);
+    state.longPressTimer = 0;
+  }
+
+  function nearestSpaItem(nav, clientX) {
+    const items = spaNavItems(nav);
+    let nearest = null;
+    let distance = Infinity;
+    items.forEach((item) => {
+      const rect = item.getBoundingClientRect();
+      const nextDistance = Math.abs(clientX - (rect.left + rect.width / 2));
+      if (nextDistance < distance) {
+        distance = nextDistance;
+        nearest = item;
+      }
+    });
+    return nearest;
+  }
+
+  function setDragPreview(nav, item) {
+    nav.querySelectorAll('.liquidDragPreview').forEach((node) => node.classList.remove('liquidDragPreview'));
+    if (item) item.classList.add('liquidDragPreview');
+    const state = states.get(nav);
+    if (state && state.drag) state.drag.previewItem = item || null;
+  }
+
+  function positionDragLens(nav, clientX) {
+    const state = states.get(nav);
+    if (!state || !state.drag || !state.drag.active || !state.lens) return;
+    const rect = nav.getBoundingClientRect();
+    const width = state.drag.lensWidth || 88;
+    const half = width / 2;
+    const center = Math.max(half + 5, Math.min(rect.width - half - 5, clientX - rect.left));
+    const x = Math.round((center - half) * 10) / 10;
+    state.lens.style.width = width + 'px';
+    state.lens.style.transform = 'translate3d(' + x + 'px,0,0) scale3d(1,1,1)';
+    state.lens.style.opacity = '1';
+    setDragPreview(nav, nearestSpaItem(nav, clientX));
+  }
+
+  function startSpaLongPressDrag(nav, state) {
+    const drag = state.drag;
+    if (!drag || drag.active || !drag.startItem) return;
+    drag.active = true;
+    clearLongPressTimer(state);
+    releasePress(nav);
+    nav.classList.add('liquidDragMode');
+    nav.classList.remove('liquidNavCompact');
+    const itemRect = drag.startItem.getBoundingClientRect();
+    drag.lensWidth = Math.min(96, Math.max(68, itemRect.width + 8));
+    try {
+      if (nav.setPointerCapture && drag.pointerId != null) nav.setPointerCapture(drag.pointerId);
+    } catch (_) {}
+    if (window.getSelection) {
+      const selection = window.getSelection();
+      if (selection && typeof selection.removeAllRanges === 'function') selection.removeAllRanges();
+    }
+    positionDragLens(nav, drag.lastX);
+    document.dispatchEvent(new CustomEvent('mobile-bottom-nav-dragstart', {
+      detail:{ route:drag.startItem.dataset.mobileRoute || '' }
+    }));
+  }
+
+  function resetSpaDrag(nav, state, { commit = false } = {}) {
+    if (!state || !state.drag) return;
+    const drag = state.drag;
+    clearLongPressTimer(state);
+    const wasActive = !!drag.active;
+    const destination = drag.previewItem;
+    const pointerId = drag.pointerId;
+
+    nav.classList.remove('liquidDragMode');
+    nav.querySelectorAll('.liquidDragPreview').forEach((node) => node.classList.remove('liquidDragPreview'));
+    if (state.lens) {
+      state.lens.style.opacity = '0';
+      state.lens.style.removeProperty('width');
+      state.lens.style.removeProperty('transform');
+    }
+    try {
+      if (nav.releasePointerCapture && pointerId != null && nav.hasPointerCapture && nav.hasPointerCapture(pointerId)) {
+        nav.releasePointerCapture(pointerId);
+      }
+    } catch (_) {}
+
+    state.drag = null;
+    releasePress(nav);
+
+    if (!wasActive) return;
+    state.suppressClickUntil = Date.now() + 650;
+    if (!commit || !destination) return;
+
+    const current = activeItem(nav);
+    if (destination === current) return;
+
+    state.commitDragClick = true;
+    requestAnimationFrame(() => {
+      if (!destination.isConnected) return;
+      destination.click();
+    });
+  }
+
+  function armSpaLongPress(nav, state, event, item) {
+    clearLongPressTimer(state);
+    state.drag = {
+      active:false,
+      pointerId:event.pointerId,
+      startX:event.clientX,
+      startY:event.clientY,
+      lastX:event.clientX,
+      lastY:event.clientY,
+      startItem:item,
+      previewItem:item,
+      lensWidth:0
+    };
+    state.longPressTimer = setTimeout(() => startSpaLongPressDrag(nav, state), LONG_PRESS_MS);
+  }
+
+  function bindSpaLongPressDrag(nav, state) {
+    nav.addEventListener('contextmenu', (event) => {
+      if (event.target.closest('[data-mobile-route]')) event.preventDefault();
+    });
+
+    nav.addEventListener('click', (event) => {
+      if (state.commitDragClick) {
+        state.commitDragClick = false;
+        return;
+      }
+      if (Date.now() < (state.suppressClickUntil || 0)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, true);
+
+    nav.addEventListener('pointerdown', (event) => {
+      if (event.button != null && event.button !== 0) return;
+      const item = event.target.closest('[data-mobile-route]');
+      if (!item || item.closest('#mobileBottomNav') !== nav) return;
+      armSpaLongPress(nav, state, event, item);
+    }, { passive:true });
+
+    nav.addEventListener('pointermove', (event) => {
+      const drag = state.drag;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      drag.lastX = event.clientX;
+      drag.lastY = event.clientY;
+
+      if (!drag.active) {
+        const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+        if (distance > LONG_PRESS_MOVE_TOLERANCE) {
+          clearLongPressTimer(state);
+          state.drag = null;
+        }
+        return;
+      }
+
+      event.preventDefault();
+      positionDragLens(nav, event.clientX);
+    }, { passive:false });
+
+    nav.addEventListener('pointerup', (event) => {
+      const drag = state.drag;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      if (drag.active) event.preventDefault();
+      resetSpaDrag(nav, state, { commit:drag.active });
+    }, { passive:false });
+
+    nav.addEventListener('pointercancel', (event) => {
+      const drag = state.drag;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      resetSpaDrag(nav, state, { commit:false });
+    }, { passive:true });
+  }
+
   function bindNav(nav) {
     let state = states.get(nav);
     if (state && state.bound) {
@@ -219,6 +405,9 @@
     state.bound = true;
     state.lens = ensureLens(nav);
     state.lensMetrics = null;
+    state.longPressTimer = 0;
+    state.suppressClickUntil = 0;
+    state.commitDragClick = false;
     states.set(nav, state);
     currentNav = nav;
     state.scrollEdge = ensureScrollEdge();
@@ -246,6 +435,7 @@
       state.resizeObserver = new ResizeObserver(() => scheduleLens(nav, false));
       state.resizeObserver.observe(nav);
     }
+    if (nav.dataset.mobileNavKind === 'spa') bindSpaLongPressDrag(nav, state);
     scheduleLens(nav, false);
     document.dispatchEvent(new CustomEvent('mobile-bottom-nav-ready', { detail:{ kind:nav.dataset.mobileNavKind || 'reader' } }));
     return nav;

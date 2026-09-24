@@ -59,7 +59,7 @@ test('reader keeps its special controls while using the shared glass engine', ()
   assert.match(template, /mobileNavManga/);
   assert.match(template, /mobileNavVideo/);
   assert.match(template, /mobileNavMore/);
-  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260924-liquid-glass-scroll-edge'));
+  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260924-instagram-drag'));
   assert.match(js, /readerFallbackTarget/);
   assert.match(js, /nav\.classList\.contains\('reader-mode'\)/);
   assert.match(js, /querySelector\('#mobileNavMore'\)/);
@@ -68,8 +68,8 @@ test('reader keeps its special controls while using the shared glass engine', ()
 test('shared nav is loaded by all target mobile pages', () => {
   for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
     const source = read(page);
-    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-liquid-glass-scroll-edge/, page);
-    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-liquid-glass-scroll-edge/, page);
+    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-instagram-drag/, page);
+    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-instagram-drag/, page);
   }
 });
 
@@ -111,4 +111,65 @@ test('Liquid Glass uses a native-style scroll edge under the floating bar', () =
   assert.match(css, /height:132px/);
   assert.match(css, /backdrop-filter:blur\(13px\) saturate\(125%\)/);
   assert.match(css, /mask-image:linear-gradient/);
+});
+
+test('selected tab uses iOS-style tint without opaque fill', () => {
+  assert.match(css, /--glass-active-tint:#007aff/);
+  assert.match(css, /--glass-active-tint:#0a84ff/);
+  assert.match(css, /html\[data-theme\] #mobileBottomNav\.liquidGlassNav \.liquidGlassNavItem\.active[\s\S]*color:var\(--glass-active-tint\)!important/);
+  assert.doesNotMatch(css, /color:#171a1f!important/);
+  assert.match(css, /filter:drop-shadow/);
+});
+
+test('scroll edge stays subtle and close to the bottom chrome', () => {
+  assert.match(css, /\.liquidGlassScrollEdge\{[\s\S]*height:96px/);
+  assert.match(css, /opacity:.30/);
+  assert.match(css, /blur\(6px\) saturate\(112%\)/);
+  assert.match(css, /\.liquidGlassScrollEdge\.liquidScrollActive[\s\S]*opacity:.56/);
+});
+
+test('SPA navigation matches Instagram-style icon-first Liquid Glass', () => {
+  assert.match(css, /Instagram-inspired Liquid Glass/);
+  assert.match(css, /data-mobile-nav-kind="spa"[\s\S]*min-height:54px/);
+  assert.match(css, /data-mobile-nav-kind="spa"[\s\S]*blur\(26px\) saturate\(155%\)/);
+  assert.match(css, /\.liquidGlassNavLabel[\s\S]*clip:rect\(0,0,0,0\)/);
+  assert.match(css, /\.liquidGlassSelection[\s\S]*display:none!important/);
+  assert.match(css, /#mobileNavHome\.active[\s\S]*fill:currentColor/);
+  assert.match(css, /#mobileNavVideo\.active[\s\S]*fill:var\(--ig-icon-cutout\)/);
+  assert.match(css, /body:has\(#mobileBottomNav\[data-mobile-nav-kind="spa"\]\) \.liquidGlassScrollEdge/);
+});
+
+test('SPA active state is monochrome icon fill rather than blue tint', () => {
+  assert.match(css, /--glass-text-active:#111318/);
+  assert.match(css, /html\[data-theme="dark"\][\s\S]*--glass-text-active:#fff/);
+  assert.match(js, /if \(nav\.dataset\.mobileNavKind === 'spa'\)[\s\S]*lens\.style\.opacity = '0'/);
+});
+
+test('SPA tab bar supports Instagram-style long-press scrub navigation', () => {
+  assert.match(js, /const LONG_PRESS_MS = 340/);
+  assert.match(js, /const LONG_PRESS_MOVE_TOLERANCE = 12/);
+  assert.match(js, /function startSpaLongPressDrag/);
+  assert.match(js, /function positionDragLens/);
+  assert.match(js, /function nearestSpaItem/);
+  assert.match(js, /setPointerCapture/);
+  assert.match(js, /pointermove/);
+  assert.match(js, /event\.preventDefault\(\)/);
+  assert.match(js, /resetSpaDrag\(nav, state, \{ commit:drag\.active \}\)/);
+  assert.match(js, /destination\.click\(\)/);
+});
+
+test('long-press drag keeps normal taps and scrolling intact', () => {
+  assert.match(js, /Math\.hypot\(event\.clientX - drag\.startX, event\.clientY - drag\.startY\)/);
+  assert.match(js, /distance > LONG_PRESS_MOVE_TOLERANCE/);
+  assert.match(js, /suppressClickUntil = Date\.now\(\) \+ 650/);
+  assert.match(css, /touch-action:pan-y/);
+  assert.match(css, /-webkit-touch-callout:none/);
+});
+
+test('drag mode reveals a movable Instagram-like glass pill', () => {
+  assert.match(css, /\.liquidDragMode \.liquidGlassSelection/);
+  assert.match(css, /display:block!important/);
+  assert.match(css, /backdrop-filter:blur\(18px\) saturate\(145%\)/);
+  assert.match(css, /\.liquidDragPreview/);
+  assert.match(css, /transform:scale\(1\.055\)/);
 });
