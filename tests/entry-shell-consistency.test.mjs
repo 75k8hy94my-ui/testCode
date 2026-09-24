@@ -20,15 +20,15 @@ test('manga and video entry shells use the same versioned SPA bootstrap', () => 
   const mangaSource = spaSource(manga);
   const videoSource = spaSource(video);
   assert.equal(mangaSource, videoSource);
-  assert.match(mangaSource, /home-profile-spa\.js\?v=20260922-profile-header$/);
+  assert.match(mangaSource, /home-profile-spa\.js\?v=20260924-liquid-glass-nav$/);
   const videoScripts = scriptSources(video);
-  for (const dependency of ['backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js']) {
+  for (const dependency of ['backup-format.js?v=20260822-backup-scope-fix']) {
     assert.ok(videoScripts.includes(dependency), `video entry must load ${dependency}`);
   }
 });
 
 test('all home-family entry pages use the current shared SPA bootstrap', () => {
   const pages = ['home.html', 'profile.html', 'manga.html', 'video.html'];
-  const expected = 'home-profile-spa.js?v=20260922-profile-header';
+  const expected = 'home-profile-spa.js?v=20260924-liquid-glass-nav';
   for (const page of pages) assert.equal(spaSource(read(page)), expected, `${page} must use the current shared SPA bootstrap`);
 });

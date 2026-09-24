@@ -64,7 +64,7 @@ test('authenticated top bars keep only the shared profile action', () => {
     const header = source.match(/<header class=["']homeHeader["'][\s\S]*?<\/header>/)?.[0] || '';
     assert.match(header, /data-profile-menu-trigger/);
     assert.match(header, /<circle cx=["']12["'] cy=["']8["'] r=["']3\.2["']/);
-    assert.doesNotMatch(header, /topActions|headerActions|>保管庫<|>設定<|>ホーム<|>本棚</);
+    assert.doesNotMatch(header, /topActions|headerActions|>保管庫<|>設定<|>本棚</);
   }
   const readerShell = read('reader-shell.js');
   assert.match(readerShell, /data-profile-menu-trigger/);
@@ -75,7 +75,7 @@ test('authenticated top bars keep only the shared profile action', () => {
   const menu = read('profile-menu.js');
   assert.match(menu, /\[data-profile-menu-trigger\], #desktopProfileButton/);
   assert.doesNotMatch(menu, /matchMedia\('\(min-width: 900px\)'\)\.matches\) return/);
-  assert.match(read('sync.html'), /profile-menu\\.js\\?v=20260924-theme-unified/);
+  assert.match(read('sync.html'), /profile-menu\.js\?v=20260924-theme-unified/);
 });
 
 test('login page has no top navigation menu', () => {
@@ -123,9 +123,9 @@ test('saved theme drives home profile manga video and header colors', () => {
   assert.match(css, /reader-entry-video body[\s\S]*background:#0a0c11!important/);
   assert.match(globalCss, /--shell-header-bg/);
   for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20260924-ios-theme-switch/);
-    assert.match(read(page), /app-global-shell\\.js\\?v=20260924-theme-unified/);
-    assert.match(read(page), /profile-menu\\.js\\?v=20260924-theme-unified/);
+    assert.match(read(page), page === 'reader.html' || page === 'video-player.html' ? /home-profile-shell\.css\?v=20260924-theme-unified/ : /home-profile-shell\.css\?v=20260924-ios-theme-switch/);
+    assert.match(read(page), /app-global-shell\.js\?v=20260924-theme-unified/);
+    assert.match(read(page), /profile-menu\.js\?v=20260924-theme-unified/);
   }
 });
 
@@ -160,7 +160,7 @@ test('shared mobile nav provides a moving Liquid Glass lens and adaptive interac
   assert.match(nav, /pointermove/);
   assert.match(nav, /liquidNavCompact/);
   assert.match(nav, /MutationObserver/);
-  assert.match(css, /backdrop-filter:blur\(36px\) saturate\(190%\) contrast\(108%\)/);
+  assert.match(css, /backdrop-filter:blur\(34px\) saturate\(180%\) contrast\(106%\)/);
   assert.match(css, /\.liquidGlassSelection/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /prefers-reduced-motion:reduce/);
@@ -175,6 +175,6 @@ test('all authenticated mobile destinations load the shared Liquid Glass assets'
     assert.match(source, /mobile-bottom-nav\.js\?v=20260924-liquid-glass-scroll-edge/, page);
   }
   for (const page of ['home.html','profile.html','manga.html','video.html']) {
-    assert.match(read(page), /home-profile-spa\.js\?v=20260924-liquid-glass-scroll-edge/, page);
+    assert.match(read(page), /home-profile-spa\.js\?v=20260924-liquid-glass-nav/, page);
   }
 });

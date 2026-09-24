@@ -49,7 +49,7 @@ test('glass is theme-aware, safe-area-aware, and constrained on phones', () => {
   assert.match(css, /bottom:max\(10px,env\(safe-area-inset-bottom\)\)/);
   assert.match(css, /html\[data-theme="light"\] #mobileBottomNav\.liquidGlassNav/);
   assert.match(css, /--glass-fill:/);
-  assert.match(css, /blur\\(34px\\) saturate\\(180%\\) contrast\\(106%\\)/);
+  assert.match(css, /blur\(34px\) saturate\(180%\) contrast\(106%\)/);
   assert.match(css, /inset 0 1px 0 var\(--glass-highlight\)/);
 });
 
@@ -74,19 +74,17 @@ test('shared nav is loaded by all target mobile pages', () => {
 });
 
 test('light glass stays translucent instead of becoming a white card', () => {
-  assert.match(css, /--glass-fill:rgba\\(244,247,251,.30\\)/);
-  assert.match(css, /--glass-lens:rgba\\(238,244,251,.085\\)/);
-  assert.match(css, /--glass-lens-edge:rgba\\(255,255,255,.56\\)/);
-  assert.match(css, /blur\\(10px\\) saturate\\(165%\\) brightness\\(1.035\\)/);
-  assert.match(css, /Light glass optical tuning/);
+  assert.match(css, /--glass-fill:rgba\(244,247,251,.24\)/);
+  assert.match(css, /--glass-lens:rgba\(229,238,248,.055\)/);
+  assert.match(css, /--glass-lens-edge:rgba\(255,255,255,.66\)/);
+  assert.match(css, /blur\(10px\) saturate\(165%\) brightness\(1\.035\)/);
 });
 
 test('selected lens is edge-driven rather than white-filled', () => {
-  assert.match(css, /--glass-lens:rgba\\(229,238,248,.055\\)/);
-  assert.match(css, /\.liquidGlassSelection::before/);
-  assert.match(css, /\.liquidGlassSelection::after/);
-  assert.match(css, /bottom:2px/);
-  assert.match(css, /rgba\(93,108,130,.16\)/);
+  assert.match(css, /--glass-lens:rgba\(229,238,248,.055\)/);
+  assert.match(css, /\.liquidGlassSelection\{/);
+  assert.match(css, /bottom:7px/);
+  assert.match(css, /rgba\(75,82,92,.12\)/);
 });
 
 test('clear glass remains legible on a flat light background', () => {

@@ -216,11 +216,35 @@
       if (existing.some((entry) => entry.id === wrapper.id)) throw new Error('このパスキーは既に登録されています。'); vault.keyWraps.passkeys = existing.concat(wrapper); delete vault.keyWraps.passkey; saveActive(vault); const payload = await decryptPayload(record.payload); await savePayload(payload); return true;
     });
   }
+  async function removePasskeys(passphrase) {
+    return withSession(async (token, user) => {
+      const record = await fetchRecord(token, user); if (!record) throw new Error('保管庫が見つかりません。');
+      const previous = loadActive(); await unlock(record.payload, passphrase, '');
+      const vault = loadActive(); const existing = Array.isArray(vault.keyWraps.passkeys) ? vault.keyWraps.passkeys : (vault.keyWraps.passkey ? [vault.keyWraps.passkey] : []);
+      if (!existing.length) throw new Error('解除できるパスキーが登録されていません。');
+      const nextKeyWraps = Object.assign({}, vault.keyWraps); delete nextKeyWraps.passkeys; delete nextKeyWraps.passkey;
+      saveActive({ rawKey: vault.rawKey, keyWraps: nextKeyWraps });
+      try { const payload = await decryptPayload(record.payload); await savePayload(payload); return true; }
+      catch (error) { if (previous) saveActive(previous); throw error; }
+    });
+  }
+  async function changePassphrase(passphrase, nextPassphrase) {
+    return withSession(async (token, user) => {
+      if (!nextPassphrase || nextPassphrase.length < 12) throw new Error('新しいパスフレーズは12文字以上にしてください。');
+      const record = await fetchRecord(token, user); if (!record) throw new Error('保管庫が見つかりません。');
+      const previous = loadActive(); await unlock(record.payload, passphrase, ''); const vault = loadActive();
+      const salt = randomBytes(16); const passphraseKey = await derivePassphrase(nextPassphrase, salt);
+      const nextKeyWraps = Object.assign({}, vault.keyWraps, { passphrase: { kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations: ITERATIONS, salt: b64url(salt) }, encryptedKey: await encrypt(passphraseKey, vault.rawKey) } });
+      saveActive({ rawKey: vault.rawKey, keyWraps: nextKeyWraps });
+      try { const payload = await decryptPayload(record.payload); await savePayload(payload); return true; }
+      catch (error) { if (previous) saveActive(previous); throw error; }
+    });
+  }
   async function initializeWithPasskey(applyPayload) {
     return withSession(async (token, user) => {
       const record = await fetchRecord(token, user); const keyWraps = record && record.payload && record.payload.keyWraps; const passkeys = keyWraps && (Array.isArray(keyWraps.passkeys) ? keyWraps.passkeys : (keyWraps.passkey ? [keyWraps.passkey] : []));
       if (!passkeys || !passkeys.length) throw new Error('このアカウントには保管庫パスキーが登録されていません。'); const rawKey = await unlockByPasskey(passkeys); const vault = { rawKey, keyWraps: record.payload.keyWraps }; saveActive(vault); await applyPayload(await decryptPayload(record.payload)); setMeta(user.id, { revision: record.revision || 1, updatedAt: record.updated_at }); return { created: false };
     });
   }
-  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, loadActive, waitForActive, refreshSession, api, withSession, fetchRecordForUi, initialize, initializeWithPasskey, registerPasskey, savePayload };
+  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, loadActive, waitForActive, refreshSession, api, withSession, fetchRecordForUi, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload };
 })();

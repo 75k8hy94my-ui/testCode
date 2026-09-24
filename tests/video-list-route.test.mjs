@@ -18,7 +18,7 @@ test('video route has a dedicated template and route runtime without reader HTML
 test('video route loads its existing video modules without fetching reader.html', () => {
   assert.match(spa, /renderVideo\(generation\)/);
   assert.match(spa, /video-list-route\.js\?v=20260922-video-route/);
-  assert.match(spa, /video-list-template\.js\?v=20260922-video-template/);
+  assert.match(spa, /video-list-template\.js\?v=20260922-vpn-tools/);
   assert.match(spa, /VideoListRouteFactory\.create\(/);
   assert.match(spa, /video-data\.js\?v=20260918-video-data-no-window/);
   assert.match(spa, /video-library\.js\?v=20260918-video-library-no-window/);
