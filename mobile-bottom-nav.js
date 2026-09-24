@@ -122,6 +122,10 @@
     if (!state) return;
     const target = activeItem(nav);
     const lens = state.lens;
+    if (nav.dataset.mobileNavKind === 'spa') {
+      if (lens) lens.style.opacity = '0';
+      return;
+    }
     if (!target || !target.isConnected || nav.getClientRects().length === 0) {
       lens.style.opacity = '0';
       return;

@@ -59,7 +59,7 @@ test('reader keeps its special controls while using the shared glass engine', ()
   assert.match(template, /mobileNavManga/);
   assert.match(template, /mobileNavVideo/);
   assert.match(template, /mobileNavMore/);
-  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260924-liquid-glass-active-tint'));
+  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260924-instagram-glass'));
   assert.match(js, /readerFallbackTarget/);
   assert.match(js, /nav\.classList\.contains\('reader-mode'\)/);
   assert.match(js, /querySelector\('#mobileNavMore'\)/);
@@ -68,8 +68,8 @@ test('reader keeps its special controls while using the shared glass engine', ()
 test('shared nav is loaded by all target mobile pages', () => {
   for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
     const source = read(page);
-    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-liquid-glass-active-tint/, page);
-    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-liquid-glass-active-tint/, page);
+    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-instagram-glass/, page);
+    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-instagram-glass/, page);
   }
 });
 
@@ -128,4 +128,21 @@ test('scroll edge stays subtle and close to the bottom chrome', () => {
   assert.match(css, /opacity:.30/);
   assert.match(css, /blur\(6px\) saturate\(112%\)/);
   assert.match(css, /\.liquidGlassScrollEdge\.liquidScrollActive[\s\S]*opacity:.56/);
+});
+
+test('SPA navigation matches Instagram-style icon-first Liquid Glass', () => {
+  assert.match(css, /Instagram-inspired Liquid Glass/);
+  assert.match(css, /data-mobile-nav-kind="spa"[\s\S]*min-height:54px/);
+  assert.match(css, /data-mobile-nav-kind="spa"[\s\S]*blur\(26px\) saturate\(155%\)/);
+  assert.match(css, /\.liquidGlassNavLabel[\s\S]*clip:rect\(0,0,0,0\)/);
+  assert.match(css, /\.liquidGlassSelection[\s\S]*display:none!important/);
+  assert.match(css, /#mobileNavHome\.active[\s\S]*fill:currentColor/);
+  assert.match(css, /#mobileNavVideo\.active[\s\S]*fill:var\(--ig-icon-cutout\)/);
+  assert.match(css, /body:has\(#mobileBottomNav\[data-mobile-nav-kind="spa"\]\) \.liquidGlassScrollEdge/);
+});
+
+test('SPA active state is monochrome icon fill rather than blue tint', () => {
+  assert.match(css, /--glass-text-active:#111318/);
+  assert.match(css, /html\[data-theme="dark"\][\s\S]*--glass-text-active:#fff/);
+  assert.match(js, /if \(nav\.dataset\.mobileNavKind === 'spa'\)[\s\S]*lens\.style\.opacity = '0'/);
 });
