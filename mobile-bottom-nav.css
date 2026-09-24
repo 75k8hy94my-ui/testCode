@@ -528,3 +528,54 @@
     opacity:.72;
   }
 }
+
+/* Final tab-state tuning: selection is communicated by tint, not a white fill. */
+@media(max-width:899px){
+  #mobileBottomNav.liquidGlassNav{
+    --glass-active-tint:#0a84ff;
+  }
+  html[data-theme="light"] #mobileBottomNav.liquidGlassNav{
+    --glass-active-tint:#007aff;
+  }
+  #mobileBottomNav.liquidGlassNav .liquidGlassNavItem.active,
+  #mobileBottomNav.liquidGlassNav .mobileBottomNavBtn.active,
+  #mobileBottomNav.liquidGlassNav .liquidGlassNavItem[aria-current="page"]{
+    color:var(--glass-active-tint)!important;
+  }
+  #mobileBottomNav.liquidGlassNav .liquidGlassNavItem.active .mobileNavGlyph,
+  #mobileBottomNav.liquidGlassNav .mobileBottomNavBtn.active .mobileNavGlyph,
+  #mobileBottomNav.liquidGlassNav .liquidGlassNavItem[aria-current="page"] .mobileNavGlyph{
+    filter:drop-shadow(0 0 4px color-mix(in srgb,var(--glass-active-tint) 22%,transparent));
+  }
+
+  /* Keep the scroll-edge effect close to the browser chrome instead of washing the page. */
+  .liquidGlassScrollEdge{
+    height:96px;
+    opacity:.30;
+    background:linear-gradient(
+      180deg,
+      rgba(244,247,251,0) 0%,
+      rgba(244,247,251,.02) 40%,
+      rgba(244,247,251,.12) 74%,
+      rgba(244,247,251,.22) 100%
+    );
+    -webkit-backdrop-filter:blur(6px) saturate(112%);
+    backdrop-filter:blur(6px) saturate(112%);
+    -webkit-mask-image:linear-gradient(180deg,transparent 0%,rgba(0,0,0,.18) 42%,#000 80%);
+    mask-image:linear-gradient(180deg,transparent 0%,rgba(0,0,0,.18) 42%,#000 80%);
+  }
+  .liquidGlassScrollEdge.liquidScrollActive{
+    opacity:.56;
+    -webkit-backdrop-filter:blur(10px) saturate(118%);
+    backdrop-filter:blur(10px) saturate(118%);
+  }
+  html[data-theme="dark"] .liquidGlassScrollEdge{
+    background:linear-gradient(
+      180deg,
+      rgba(10,12,17,0) 0%,
+      rgba(10,12,17,.035) 40%,
+      rgba(10,12,17,.18) 74%,
+      rgba(10,12,17,.30) 100%
+    );
+  }
+}

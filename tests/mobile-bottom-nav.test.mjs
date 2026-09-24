@@ -59,7 +59,7 @@ test('reader keeps its special controls while using the shared glass engine', ()
   assert.match(template, /mobileNavManga/);
   assert.match(template, /mobileNavVideo/);
   assert.match(template, /mobileNavMore/);
-  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260924-liquid-glass-scroll-edge'));
+  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260924-liquid-glass-final'));
   assert.match(js, /readerFallbackTarget/);
   assert.match(js, /nav\.classList\.contains\('reader-mode'\)/);
   assert.match(js, /querySelector\('#mobileNavMore'\)/);
@@ -68,8 +68,8 @@ test('reader keeps its special controls while using the shared glass engine', ()
 test('shared nav is loaded by all target mobile pages', () => {
   for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
     const source = read(page);
-    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-liquid-glass-scroll-edge/, page);
-    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-liquid-glass-scroll-edge/, page);
+    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-liquid-glass-final/, page);
+    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-liquid-glass-final/, page);
   }
 });
 
@@ -113,4 +113,18 @@ test('Liquid Glass uses a native-style scroll edge under the floating bar', () =
   assert.match(css, /height:132px/);
   assert.match(css, /backdrop-filter:blur\(13px\) saturate\(125%\)/);
   assert.match(css, /mask-image:linear-gradient/);
+});
+
+test('selected tab uses iOS-style tint without opaque fill', () => {
+  assert.match(css, /--glass-active-tint:#007aff/);
+  assert.match(css, /--glass-active-tint:#0a84ff/);
+  assert.match(css, /color:var\(--glass-active-tint\)!important/);
+  assert.match(css, /filter:drop-shadow/);
+});
+
+test('scroll edge stays subtle and close to the bottom chrome', () => {
+  assert.match(css, /\.liquidGlassScrollEdge\{[\s\S]*height:96px/);
+  assert.match(css, /opacity:.30/);
+  assert.match(css, /blur\(6px\) saturate\(112%\)/);
+  assert.match(css, /\.liquidGlassScrollEdge\.liquidScrollActive[\s\S]*opacity:.56/);
 });
