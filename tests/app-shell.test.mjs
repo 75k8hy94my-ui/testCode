@@ -171,10 +171,10 @@ test('shared mobile nav provides a moving Liquid Glass lens and adaptive interac
 test('all authenticated mobile destinations load the shared Liquid Glass assets', () => {
   for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
     const source = read(page);
-    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-liquid-glass-final/, page);
-    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-liquid-glass-final/, page);
+    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-liquid-glass-active-tint/, page);
+    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-liquid-glass-active-tint/, page);
   }
   for (const page of ['home.html','profile.html','manga.html','video.html']) {
-    assert.match(read(page), /home-profile-spa\.js\?v=20260924-liquid-glass-final/, page);
+    assert.match(read(page), /home-profile-spa\.js\?v=20260924-liquid-glass-active-tint/, page);
   }
 });

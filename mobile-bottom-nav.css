@@ -465,10 +465,6 @@
     opacity:.82;
   }
 
-  html[data-theme="light"] #mobileBottomNav.liquidGlassNav .liquidGlassNavItem.active,
-  html[data-theme="light"] #mobileBottomNav.liquidGlassNav .liquidGlassNavItem[aria-current="page"]{
-    color:#171a1f!important;
-  }
 }
 
 /* Native-style scroll edge: content dissolves softly beneath the floating tab bar. */
@@ -537,9 +533,9 @@
   html[data-theme="light"] #mobileBottomNav.liquidGlassNav{
     --glass-active-tint:#007aff;
   }
-  #mobileBottomNav.liquidGlassNav .liquidGlassNavItem.active,
-  #mobileBottomNav.liquidGlassNav .mobileBottomNavBtn.active,
-  #mobileBottomNav.liquidGlassNav .liquidGlassNavItem[aria-current="page"]{
+  html[data-theme] #mobileBottomNav.liquidGlassNav .liquidGlassNavItem.active,
+  html[data-theme] #mobileBottomNav.liquidGlassNav .mobileBottomNavBtn.active,
+  html[data-theme] #mobileBottomNav.liquidGlassNav .liquidGlassNavItem[aria-current="page"]{
     color:var(--glass-active-tint)!important;
   }
   #mobileBottomNav.liquidGlassNav .liquidGlassNavItem.active .mobileNavGlyph,
