@@ -1022,3 +1022,81 @@
     stroke-width:2.05!important;
   }
 }
+
+/* Instagram persistent selection pill: always visible, same object for tap and scrub. */
+@media(max-width:899px){
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"] .liquidGlassSelection{
+    display:block!important;
+    opacity:1!important;
+    top:4px;
+    bottom:4px;
+    z-index:1;
+    border-radius:24px;
+    border:1px solid rgba(255,255,255,.74);
+    background:
+      radial-gradient(110% 145% at var(--lens-light-x,28%) var(--lens-light-y,0%),rgba(255,255,255,.23),transparent 58%),
+      linear-gradient(180deg,rgba(255,255,255,.10),rgba(207,213,222,.055)),
+      rgba(190,196,204,.34);
+    box-shadow:
+      inset 0 1.3px 0 rgba(255,255,255,.92),
+      inset 0 -1px 0 rgba(82,94,110,.16),
+      0 4px 12px rgba(56,65,78,.09);
+    -webkit-backdrop-filter:blur(17px) saturate(145%) contrast(103%);
+    backdrop-filter:blur(17px) saturate(145%) contrast(103%);
+    transition:opacity .10s ease;
+    will-change:transform,width;
+  }
+
+  html[data-theme="dark"] #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"] .liquidGlassSelection{
+    border-color:rgba(255,255,255,.22);
+    background:
+      radial-gradient(110% 145% at var(--lens-light-x,28%) var(--lens-light-y,0%),rgba(255,255,255,.10),transparent 58%),
+      linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.016)),
+      rgba(255,255,255,.085);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.32),
+      inset 0 -1px 0 rgba(0,0,0,.22),
+      0 4px 13px rgba(0,0,0,.18);
+  }
+
+  /* Holding no longer creates a second preview state; the committed pill stays put. */
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidHoldArmed .liquidGlassSelection{
+    opacity:1!important;
+  }
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidHoldArmed .liquidHoldOrigin{
+    color:inherit!important;
+    transform:none!important;
+  }
+
+  /* Scrubbing moves the same pill; icons remain committed to the current page. */
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode .liquidGlassSelection{
+    opacity:1!important;
+    top:4px;
+    bottom:4px;
+    background:
+      radial-gradient(115% 150% at var(--lens-light-x,28%) var(--lens-light-y,0%),rgba(255,255,255,.28),transparent 56%),
+      linear-gradient(180deg,rgba(255,255,255,.13),rgba(205,212,221,.07)),
+      rgba(190,196,204,.38);
+    box-shadow:
+      inset 0 1.4px 0 rgba(255,255,255,.96),
+      inset 0 -1.2px 0 rgba(76,88,104,.18),
+      0 5px 15px rgba(52,61,74,.12);
+  }
+
+  html[data-theme="dark"] #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode .liquidGlassSelection{
+    background:
+      radial-gradient(115% 150% at var(--lens-light-x,28%) var(--lens-light-y,0%),rgba(255,255,255,.14),transparent 56%),
+      rgba(255,255,255,.11);
+  }
+
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode .liquidGlassNavItem.liquidDragPreview{
+    transform:none!important;
+  }
+
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidTapTransition .liquidGlassSelection{
+    box-shadow:
+      inset 0 1.4px 0 rgba(255,255,255,.98),
+      inset 0 -1px 0 rgba(76,88,104,.17),
+      0 5px 15px rgba(52,61,74,.11);
+  }
+}

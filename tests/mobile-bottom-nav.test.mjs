@@ -59,7 +59,7 @@ test('reader keeps its special controls while using the shared glass engine', ()
   assert.match(template, /mobileNavManga/);
   assert.match(template, /mobileNavVideo/);
   assert.match(template, /mobileNavMore/);
-  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260925-instagram-stable-icons'));
+  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260925-instagram-persistent-pill'));
   assert.match(js, /readerFallbackTarget/);
   assert.match(js, /nav\.classList\.contains\('reader-mode'\)/);
   assert.match(js, /querySelector\('#mobileNavMore'\)/);
@@ -68,8 +68,8 @@ test('reader keeps its special controls while using the shared glass engine', ()
 test('shared nav is loaded by all target mobile pages', () => {
   for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
     const source = read(page);
-    assert.match(source, /mobile-bottom-nav\.css\?v=20260925-instagram-stable-icons/, page);
-    assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-stable-icons/, page);
+    assert.match(source, /mobile-bottom-nav\.css\?v=20260925-instagram-persistent-pill/, page);
+    assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-persistent-pill/, page);
   }
 });
 
@@ -223,4 +223,27 @@ test('current page icon remains committed while glass pill moves', () => {
   assert.match(css, /liquidDragMode #mobileNavManga\.active[\s\S]*fill:currentColor!important/);
   assert.match(css, /liquidDragMode #mobileNavVideo\.active[\s\S]*fill:currentColor!important/);
   assert.match(css, /liquidDragMode #mobileNavProfile\.active[\s\S]*fill:currentColor!important/);
+});
+
+test('selection pill is always visible on SPA routes', () => {
+  assert.match(css, /Instagram persistent selection pill/);
+  assert.match(css, /data-mobile-nav-kind="spa"\] \.liquidGlassSelection\{[\s\S]*display:block!important[\s\S]*opacity:1!important/);
+  assert.match(js, /const lensInset = nav\.dataset\.mobileNavKind === 'spa' \? 5 : 3/);
+  assert.doesNotMatch(js, /nav\.dataset\.mobileNavKind === 'spa'\)[\s\S]{0,120}lens\.style\.opacity = '0'/);
+});
+
+test('ordinary tap slides the same pill before navigation', () => {
+  assert.match(js, /function animateSpaLensToItem/);
+  assert.match(js, /duration = 210/);
+  assert.match(js, /liquidTapTransition/);
+  assert.match(js, /function navigateSpaItemAfterLens/);
+  assert.match(js, /animateSpaLensToItem\(nav, item, \{ duration \}\)\.finally/);
+  assert.match(js, /navigateSpaItemAfterLens\(nav, state, tapItem, \{ duration:210 \}\)/);
+});
+
+test('scrub release snaps the persistent pill before changing page', () => {
+  assert.match(js, /navigateSpaItemAfterLens\(nav, state, destination, \{ duration:170 \}\)/);
+  assert.match(js, /animateSpaLensToItem\(nav, current, \{ duration:150 \}\)/);
+  assert.match(css, /liquidDragMode \.liquidGlassSelection/);
+  assert.match(css, /liquidDragPreview[\s\S]*transform:none!important/);
 });

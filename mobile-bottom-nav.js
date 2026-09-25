@@ -124,10 +124,6 @@
     if (!state) return;
     const target = activeItem(nav);
     const lens = state.lens;
-    if (nav.dataset.mobileNavKind === 'spa') {
-      if (lens && !nav.classList.contains('liquidDragMode') && !nav.classList.contains('liquidHoldArmed')) lens.style.opacity = '0';
-      return;
-    }
     if (!target || !target.isConnected || nav.getClientRects().length === 0) {
       lens.style.opacity = '0';
       return;
@@ -135,7 +131,7 @@
     const navRect = nav.getBoundingClientRect();
     const itemRect = target.getBoundingClientRect();
     if (!navRect.width || !itemRect.width) return;
-    const lensInset = nav.dataset.mobileNavKind === 'spa' ? 4 : 3;
+    const lensInset = nav.dataset.mobileNavKind === 'spa' ? 5 : 3;
     const x = Math.round((itemRect.left - navRect.left + lensInset) * 10) / 10;
     const width = Math.round(Math.max(0, itemRect.width - lensInset * 2) * 10) / 10;
     const previous = state.lensMetrics;
@@ -176,6 +172,71 @@
       if (nav.isConnected) nav.classList.remove('liquidLensMoving');
     });
     state.lensMetrics = { x, width };
+  }
+
+  function spaLensMetrics(nav, item) {
+    if (!nav || !item) return null;
+    const navRect = nav.getBoundingClientRect();
+    const itemRect = item.getBoundingClientRect();
+    if (!navRect.width || !itemRect.width) return null;
+    const inset = 5;
+    return {
+      x: Math.round((itemRect.left - navRect.left + inset) * 10) / 10,
+      width: Math.round(Math.max(0, itemRect.width - inset * 2) * 10) / 10
+    };
+  }
+
+  function animateSpaLensToItem(nav, item, { duration = 210 } = {}) {
+    const state = states.get(nav);
+    if (!state || !state.lens || !item) return Promise.resolve();
+    const next = spaLensMetrics(nav, item);
+    if (!next) return Promise.resolve();
+
+    const lens = state.lens;
+    const previous = state.lensMetrics || next;
+    state.lensMetrics = next;
+    lens.getAnimations().forEach((animation) => animation.cancel());
+    lens.style.width = next.width + 'px';
+    lens.style.transform = 'translate3d(' + next.x + 'px,0,0) scale3d(1,1,1)';
+    lens.style.opacity = '1';
+
+    if (reduceMotion() || typeof lens.animate !== 'function' || Math.abs(previous.x - next.x) < .5) {
+      return Promise.resolve();
+    }
+
+    const direction = next.x >= previous.x ? 1 : -1;
+    const distance = Math.abs(next.x - previous.x);
+    const stretch = Math.min(1.14, 1.045 + distance / 1100);
+    const middle = previous.x + (next.x - previous.x) * .56;
+    nav.classList.add('liquidTapTransition');
+
+    const animation = lens.animate([
+      { transform:'translate3d(' + previous.x + 'px,0,0) scale3d(1,1,1)', width:previous.width + 'px', offset:0 },
+      { transform:'translate3d(' + middle + 'px,0,0) scale3d(' + stretch + ',.97,1)', width:((previous.width + next.width) / 2) + 'px', offset:.58 },
+      { transform:'translate3d(' + (next.x + direction * Math.min(5,distance * .04)) + 'px,0,0) scale3d(.99,1.015,1)', width:next.width + 'px', offset:.84 },
+      { transform:'translate3d(' + next.x + 'px,0,0) scale3d(1,1,1)', width:next.width + 'px', offset:1 }
+    ], {
+      duration,
+      easing:'cubic-bezier(.22,.86,.36,1)',
+      fill:'none'
+    });
+    return animation.finished.catch(() => {}).finally(() => nav.classList.remove('liquidTapTransition'));
+  }
+
+  function navigateSpaItemAfterLens(nav, state, item, { duration = 210 } = {}) {
+    if (!item || !item.isConnected || state.navigationAnimating) return;
+    const current = activeItem(nav);
+    if (item === current) {
+      animateSpaLensToItem(nav, item, { duration:140 });
+      return;
+    }
+    state.navigationAnimating = true;
+    animateSpaLensToItem(nav, item, { duration }).finally(() => {
+      state.navigationAnimating = false;
+      if (!item.isConnected) return;
+      state.commitDragClick = true;
+      item.click();
+    });
   }
 
   function scheduleLens(nav = currentNav, animate = true) {
@@ -250,18 +311,17 @@
     if (state && state.drag) state.drag.previewItem = item || null;
   }
 
-  function positionHoldLens(nav, item) {
+  function positionHoldLens(nav) {
     const state = states.get(nav);
-    if (!state || !state.lens || !item) return;
-    const navRect = nav.getBoundingClientRect();
-    const itemRect = item.getBoundingClientRect();
-    if (!navRect.width || !itemRect.width) return;
-    const width = Math.min(62, Math.max(50, itemRect.width - 24));
-    const center = itemRect.left - navRect.left + itemRect.width / 2;
-    const x = Math.round((center - width / 2) * 10) / 10;
-    state.lens.style.width = width + 'px';
-    state.lens.style.transform = 'translate3d(' + x + 'px,0,0) scale3d(.94,.94,1)';
-    state.lens.style.opacity = '.48';
+    if (!state || !state.lens) return;
+    const current = activeItem(nav);
+    if (!current) return;
+    const metrics = spaLensMetrics(nav, current);
+    if (!metrics) return;
+    state.lensMetrics = metrics;
+    state.lens.style.width = metrics.width + 'px';
+    state.lens.style.transform = 'translate3d(' + metrics.x + 'px,0,0) scale3d(1,1,1)';
+    state.lens.style.opacity = '1';
   }
 
   function positionDragLens(nav, clientX) {
@@ -275,6 +335,7 @@
     state.lens.style.width = width + 'px';
     state.lens.style.transform = 'translate3d(' + x + 'px,0,0) scale3d(1,1,1)';
     state.lens.style.opacity = '1';
+    state.lensMetrics = { x, width };
     setDragPreview(nav, nearestSpaItem(nav, clientX));
   }
 
@@ -288,8 +349,9 @@
     releasePress(nav);
     nav.classList.add('liquidDragMode');
     nav.classList.remove('liquidNavCompact');
-    const itemRect = drag.startItem.getBoundingClientRect();
-    drag.lensWidth = Math.min(96, Math.max(68, itemRect.width + 8));
+    const current = activeItem(nav) || drag.startItem;
+    const currentMetrics = spaLensMetrics(nav, current);
+    drag.lensWidth = currentMetrics ? currentMetrics.width : 72;
     try {
       if (nav.setPointerCapture && drag.pointerId != null) nav.setPointerCapture(drag.pointerId);
     } catch (_) {}
@@ -315,11 +377,7 @@
     nav.querySelectorAll('.liquidDragPreview,.liquidHoldOrigin').forEach((node) => {
       node.classList.remove('liquidDragPreview','liquidHoldOrigin');
     });
-    if (state.lens) {
-      state.lens.style.opacity = '0';
-      state.lens.style.removeProperty('width');
-      state.lens.style.removeProperty('transform');
-    }
+    if (state.lens) state.lens.style.opacity = '1';
     try {
       if (nav.releasePointerCapture && pointerId != null && nav.hasPointerCapture && nav.hasPointerCapture(pointerId)) {
         nav.releasePointerCapture(pointerId);
@@ -329,18 +387,21 @@
     state.drag = null;
     releasePress(nav);
 
-    if (!wasActive) return;
+    if (!wasActive) {
+      scheduleLens(nav, false);
+      return;
+    }
     state.suppressClickUntil = Date.now() + 420;
-    if (!commit || !destination) return;
-
     const current = activeItem(nav);
-    if (destination === current) return;
-
-    state.commitDragClick = true;
-    requestAnimationFrame(() => {
-      if (!destination.isConnected) return;
-      destination.click();
-    });
+    if (!commit || !destination) {
+      if (current) animateSpaLensToItem(nav, current, { duration:150 });
+      return;
+    }
+    if (destination === current) {
+      animateSpaLensToItem(nav, current, { duration:150 });
+      return;
+    }
+    navigateSpaItemAfterLens(nav, state, destination, { duration:170 });
   }
 
   function armSpaLongPress(nav, state, event, item) {
@@ -359,7 +420,7 @@
     };
     nav.classList.add('liquidHoldArmed');
     item.classList.add('liquidHoldOrigin');
-    positionHoldLens(nav, item);
+    positionHoldLens(nav);
     state.longPressTimer = setTimeout(() => startSpaLongPressDrag(nav, state), LONG_PRESS_MS);
   }
 
@@ -436,12 +497,7 @@
       const tapItem = drag.startItem;
       resetSpaDrag(nav, state, { commit:false });
       if (!tapItem || moved > TAP_SLOP) return;
-
-      // Native click was intentionally cancelled on pointerdown; fire exactly one app click.
-      state.commitDragClick = true;
-      requestAnimationFrame(() => {
-        if (tapItem.isConnected) tapItem.click();
-      });
+      navigateSpaItemAfterLens(nav, state, tapItem, { duration:210 });
     }, { passive:false });
 
     nav.addEventListener('pointercancel', (event) => {
@@ -466,6 +522,7 @@
     state.longPressTimer = 0;
     state.suppressClickUntil = 0;
     state.commitDragClick = false;
+    state.navigationAnimating = false;
     states.set(nav, state);
     currentNav = nav;
     state.scrollEdge = ensureScrollEdge();
