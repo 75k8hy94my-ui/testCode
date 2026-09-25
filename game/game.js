@@ -128,6 +128,285 @@
     return "outer";
   }
 
+  function residentialBlockPlan(gx, gy, left, top, bw, bh) {
+    const vertical = hash2(gx, gy, 1600) > .43;
+    const roadWidth = 32 + Math.floor(hash2(gx, gy, 1601) * 9);
+    const roadBias = .40 + hash2(gx, gy, 1602) * .20;
+    const through = hash2(gx, gy, 1603) > .26;
+    const branch = hash2(gx, gy, 1604) > .54;
+    const branchSide = hash2(gx, gy, 1605) > .5 ? 1 : -1;
+    const branchRatio = .34 + hash2(gx, gy, 1606) * .32;
+    const houses = [];
+    const yards = [];
+    const parkingPads = [];
+    const driveways = [];
+    const lotLines = [];
+
+    const roadCenter = vertical
+      ? left + bw * roadBias
+      : top + bh * roadBias;
+    const roadStart = vertical ? top - BLOCK_MARGIN - 8 : left - BLOCK_MARGIN - 8;
+    const roadEnd = vertical
+      ? (through ? top + bh + BLOCK_MARGIN + 8 : top + bh * (.78 + hash2(gx, gy, 1607) * .1))
+      : (through ? left + bw + BLOCK_MARGIN + 8 : left + bw * (.78 + hash2(gx, gy, 1607) * .1));
+
+    const frontageStart = vertical ? top + 8 : left + 8;
+    const frontageEnd = vertical ? top + bh - 8 : left + bw - 8;
+    const frontageLength = frontageEnd - frontageStart;
+    const branchAt = frontageStart + frontageLength * branchRatio;
+
+    function makeSideLots(side, seedBase) {
+      const sideAvailable = vertical
+        ? (side < 0 ? roadCenter - roadWidth / 2 - left : left + bw - (roadCenter + roadWidth / 2))
+        : (side < 0 ? roadCenter - roadWidth / 2 - top : top + bh - (roadCenter + roadWidth / 2));
+
+      if (sideAvailable < 76) return;
+
+      const count = 2 + Math.floor(hash2(gx + side, gy, seedBase) * 2.99);
+      const weights = [];
+      let totalWeight = 0;
+      for (let i = 0; i < count; i += 1) {
+        const w = .78 + hash2(gx + i * 3, gy + side * 5, seedBase + 11 + i) * .55;
+        weights.push(w);
+        totalWeight += w;
+      }
+
+      let cursor = frontageStart;
+      for (let i = 0; i < count; i += 1) {
+        const lotSpan = frontageLength * (weights[i] / totalWeight);
+        const lotStart = cursor;
+        const lotEnd = i === count - 1 ? frontageEnd : cursor + lotSpan;
+        cursor = lotEnd;
+
+        // Leave room where a side street branches on this frontage.
+        const branchHalfWidth = roadWidth * .78 / 2 + 8;
+        if (
+          branch &&
+          side === branchSide &&
+          lotStart < branchAt + branchHalfWidth &&
+          lotEnd > branchAt - branchHalfWidth
+        ) continue;
+
+        const sideGap = 5 + hash2(gx + i, gy + side, seedBase + 30) * 7;
+        const rearGap = 7 + hash2(gx + i, gy + side, seedBase + 31) * 12;
+        const frontSetback = 12 + hash2(gx + i, gy + side, seedBase + 32) * 24;
+        const frontageMargin = 5 + hash2(gx + i, gy + side, seedBase + 33) * 8;
+        const lotAlong = Math.max(58, lotEnd - lotStart - 5);
+        const houseAlong = clamp(lotAlong - frontageMargin * 2, 44, 112);
+        const maxDepth = Math.max(48, sideAvailable - sideGap - rearGap - frontSetback);
+        const houseDepth = clamp(
+          48 + hash2(gx + i, gy + side, seedBase + 34) * 34,
+          44,
+          maxDepth
+        );
+
+        let x;
+        let y;
+        let w;
+        let h;
+        let frontage;
+
+        if (vertical) {
+          w = houseDepth;
+          h = houseAlong;
+          y = lotStart + frontageMargin;
+          if (side < 0) {
+            x = roadCenter - roadWidth / 2 - frontSetback - w;
+            frontage = "east";
+          } else {
+            x = roadCenter + roadWidth / 2 + frontSetback;
+            frontage = "west";
+          }
+        } else {
+          w = houseAlong;
+          h = houseDepth;
+          x = lotStart + frontageMargin;
+          if (side < 0) {
+            y = roadCenter - roadWidth / 2 - frontSetback - h;
+            frontage = "south";
+          } else {
+            y = roadCenter + roadWidth / 2 + frontSetback;
+            frontage = "north";
+          }
+        }
+
+        if (branch && side === branchSide) {
+          const branchHalfWidth = roadWidth * .78 / 2 + 8;
+          const crossesBranch = vertical
+            ? (y < branchAt + branchHalfWidth && y + h > branchAt - branchHalfWidth)
+            : (x < branchAt + branchHalfWidth && x + w > branchAt - branchHalfWidth);
+          if (crossesBranch) continue;
+        }
+
+        const smallApartment = hash2(gx + i * 7, gy + side * 9, seedBase + 35) > .91 && lotAlong > 92;
+        const houseStyle = smallApartment
+          ? "small-apartment"
+          : hash2(gx + i, gy + side, seedBase + 36) > .54
+            ? "gable"
+            : "hipped";
+
+        houses.push({
+          x, y, w, h, frontage, houseStyle,
+          floors: smallApartment ? 3 : (hash2(gx + i, gy + side, seedBase + 37) > .2 ? 2 : 1),
+          paletteShift: Math.floor(hash2(gx + i, gy + side, seedBase + 38) * VISUAL_PALETTES.length),
+          seed: seedBase + i * 13 + side * 3
+        });
+
+        // A small front parking slab or bicycle/car space is common but not universal.
+        if (hash2(gx + i, gy + side, seedBase + 39) > .34) {
+          if (vertical) {
+            const padW = Math.min(30, frontSetback - 4);
+            const padH = Math.min(36, houseAlong * .38);
+            parkingPads.push({
+              x: side < 0 ? x + w + 4 : roadCenter + roadWidth / 2 + 4,
+              y: y + 4 + hash2(gx + i, gy + side, seedBase + 40) * Math.max(0, h - padH - 8),
+              w: padW,
+              h: padH,
+              vertical: true
+            });
+          } else {
+            const padH = Math.min(30, frontSetback - 4);
+            const padW = Math.min(36, houseAlong * .38);
+            parkingPads.push({
+              x: x + 4 + hash2(gx + i, gy + side, seedBase + 40) * Math.max(0, w - padW - 8),
+              y: side < 0 ? y + h + 4 : roadCenter + roadWidth / 2 + 4,
+              w: padW,
+              h: padH,
+              vertical: false
+            });
+          }
+        }
+
+        // Small garden/backyard strip.
+        if (hash2(gx + i, gy + side, seedBase + 41) > .28) {
+          if (vertical) {
+            yards.push({
+              x: side < 0 ? left + 4 : x + w + 5,
+              y: y + 4,
+              w: Math.max(10, side < 0 ? x - left - 8 : left + bw - (x + w) - 9),
+              h: Math.max(20, h - 8)
+            });
+          } else {
+            yards.push({
+              x: x + 4,
+              y: side < 0 ? top + 4 : y + h + 5,
+              w: Math.max(20, w - 8),
+              h: Math.max(10, side < 0 ? y - top - 8 : top + bh - (y + h) - 9)
+            });
+          }
+        }
+
+        // Irregular lot boundary hints; not every boundary is fenced.
+        if (hash2(gx + i, gy + side, seedBase + 42) > .44) {
+          lotLines.push({
+            vertical: !vertical,
+            x1: vertical ? (side < 0 ? left + 4 : roadCenter + roadWidth / 2 + 4) : lotEnd,
+            y1: vertical ? lotEnd : (side < 0 ? top + 4 : roadCenter + roadWidth / 2 + 4),
+            x2: vertical ? (side < 0 ? roadCenter - roadWidth / 2 - 4 : left + bw - 4) : lotEnd,
+            y2: vertical ? lotEnd : (side < 0 ? roadCenter - roadWidth / 2 - 4 : top + bh - 4)
+          });
+        }
+      }
+    }
+
+    makeSideLots(-1, 1620);
+    makeSideLots(1, 1680);
+
+    // One occasional flag lot: narrow access strip to a house behind a frontage lot.
+    if (hash2(gx, gy, 1740) > .58) {
+      const side = hash2(gx, gy, 1741) > .5 ? 1 : -1;
+      const sideAvailable = vertical
+        ? (side < 0 ? roadCenter - roadWidth / 2 - left : left + bw - (roadCenter + roadWidth / 2))
+        : (side < 0 ? roadCenter - roadWidth / 2 - top : top + bh - (roadCenter + roadWidth / 2));
+      if (sideAvailable > 125) {
+        const along = frontageStart + frontageLength * (.18 + hash2(gx, gy, 1742) * .58);
+        const accessWidth = 12;
+        if (vertical) {
+          const hx = side < 0 ? left + 10 : left + bw - 72;
+          const hy = clamp(along - 30, top + 12, top + bh - 72);
+          const candidate = {
+            x: hx, y: hy, w: 62, h: 58,
+            frontage: side < 0 ? "east" : "west",
+            houseStyle: "flag-lot",
+            floors: 2,
+            paletteShift: Math.floor(hash2(gx, gy, 1743) * VISUAL_PALETTES.length),
+            seed: 1744
+          };
+          const blockedByHouse = houses.some((house) =>
+            candidate.x < house.x + house.w + 6 &&
+            candidate.x + candidate.w + 6 > house.x &&
+            candidate.y < house.y + house.h + 6 &&
+            candidate.y + candidate.h + 6 > house.y
+          );
+          const branchHalfWidth = roadWidth * .78 / 2 + 8;
+          const blockedByBranch =
+            branch &&
+            side === branchSide &&
+            candidate.y < branchAt + branchHalfWidth &&
+            candidate.y + candidate.h > branchAt - branchHalfWidth;
+          if (!blockedByHouse && !blockedByBranch) {
+            houses.push(candidate);
+            driveways.push({
+              x: side < 0 ? hx + 62 : roadCenter + roadWidth / 2,
+              y: hy + 23,
+              w: Math.max(12, side < 0 ? roadCenter - roadWidth / 2 - (hx + 62) : hx - (roadCenter + roadWidth / 2)),
+              h: accessWidth
+            });
+          }
+        } else {
+          const hx = clamp(along - 30, left + 12, left + bw - 72);
+          const hy = side < 0 ? top + 10 : top + bh - 68;
+          const candidate = {
+            x: hx, y: hy, w: 62, h: 58,
+            frontage: side < 0 ? "south" : "north",
+            houseStyle: "flag-lot",
+            floors: 2,
+            paletteShift: Math.floor(hash2(gx, gy, 1743) * VISUAL_PALETTES.length),
+            seed: 1744
+          };
+          const blockedByHouse = houses.some((house) =>
+            candidate.x < house.x + house.w + 6 &&
+            candidate.x + candidate.w + 6 > house.x &&
+            candidate.y < house.y + house.h + 6 &&
+            candidate.y + candidate.h + 6 > house.y
+          );
+          const branchHalfWidth = roadWidth * .78 / 2 + 8;
+          const blockedByBranch =
+            branch &&
+            side === branchSide &&
+            candidate.x < branchAt + branchHalfWidth &&
+            candidate.x + candidate.w > branchAt - branchHalfWidth;
+          if (!blockedByHouse && !blockedByBranch) {
+            houses.push(candidate);
+            driveways.push({
+              x: hx + 24,
+              y: side < 0 ? hy + 58 : roadCenter + roadWidth / 2,
+              w: accessWidth,
+              h: Math.max(12, side < 0 ? roadCenter - roadWidth / 2 - (hy + 58) : hy - (roadCenter + roadWidth / 2))
+            });
+          }
+        }
+      }
+    }
+
+    return {
+      vertical,
+      roadWidth,
+      roadCenter,
+      roadStart,
+      roadEnd,
+      through,
+      branch,
+      branchSide,
+      branchAt,
+      houses,
+      yards,
+      parkingPads,
+      driveways,
+      lotLines
+    };
+  }
+
   const NPCS = [
     { id: "aoi", name: "アオイ", x: PARK.x + 80, y: PARK.y + 65, color: "#e0a7b5", friendship: 0 },
     { id: "sora", name: "ソラ", x: CAFE.x + 72, y: CAFE.y - 58, color: "#a9c9e3", friendship: 0 },
@@ -336,23 +615,26 @@
         }
 
         if (style === "residential") {
-          const lotGap = 18;
-          const houseW = (bw - lotGap * 3) / 2;
-          const houseH = (bh - lotGap * 3) / 2;
-          for (let ix = 0; ix < 2; ix += 1) {
-            for (let iy = 0; iy < 2; iy += 1) {
-              const variant = 70 + ix * 2 + iy;
-              const setback = 8 + hash2(gx + ix, gy + iy, 1310) * 18;
-              buildings.push(makeBuilding(
-                left + lotGap + ix * (houseW + lotGap) + (iy ? setback * .25 : 0),
-                top + lotGap + iy * (houseH + lotGap) + setback * .25,
-                houseW - setback * .3,
-                houseH - setback * .35,
-                tint,
-                "low",
-                variant
-              ));
-            }
+          const plan = residentialBlockPlan(gx, gy, left, top, bw, bh);
+          for (let i = 0; i < plan.houses.length; i += 1) {
+            const house = plan.houses[i];
+            const building = makeBuilding(
+              house.x,
+              house.y,
+              house.w,
+              house.h,
+              tint * (.94 + hash2(gx + i, gy, 1750) * .08),
+              house.houseStyle === "small-apartment" ? "normal" : "low",
+              170 + i,
+              "residential"
+            );
+            building.floors = house.floors;
+            building.frontage = house.frontage;
+            building.houseStyle = house.houseStyle;
+            building.palette = house.paletteShift;
+            building.residentialSeed = house.seed;
+            building.balconies = house.houseStyle === "small-apartment";
+            buildings.push(building);
           }
           continue;
         }
@@ -2560,40 +2842,110 @@
         }
 
         if (style === "residential") {
-          const laneW = 38;
-          const offset = hash2(gx, gy, 1410) > .5 ? w * .38 : w * .58;
-          ctx.fillStyle = "#8c8f89";
-          // A narrow local street connects through the block; side driveways branch from it.
-          ctx.fillRect(x + offset - laneW / 2, y - BLOCK_MARGIN - 6, laneW, BLOCK_MARGIN + 18);
-          ctx.fillRect(x + offset - laneW / 2, y + h - 8, laneW, BLOCK_MARGIN + 14);
-          roundedRectPath(ctx, x + offset - laneW / 2, y + 5, laneW, h - 10, 6);
-          ctx.fill();
-          if (hash2(gx, gy, 1411) > .45) {
-            const branchY = y + h * (.35 + hash2(gx, gy, 1412) * .28);
-            const branchToRight = offset < w * .5;
-            ctx.fillRect(
-              branchToRight ? x + offset : x + 6,
-              branchY - laneW * .34,
-              branchToRight ? w - offset - 8 : offset - 6,
-              laneW * .68
-            );
+          const worldLeft = gx * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN;
+          const worldTop = gy * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN;
+          const plan = residentialBlockPlan(gx, gy, worldLeft, worldTop, w, h);
+
+          // Uneven private greenery is drawn before roads and houses.
+          for (const yard of plan.yards) {
+            const syard = worldToScreen(yard.x, yard.y);
+            ctx.fillStyle = "rgba(91,124,79,.72)";
+            roundedRectPath(ctx, syard.x, syard.y, yard.w, yard.h, 3);
+            ctx.fill();
+            if (yard.w > 24 && yard.h > 24) {
+              ctx.fillStyle = "rgba(130,154,102,.38)";
+              ctx.beginPath();
+              ctx.arc(syard.x + yard.w * .55, syard.y + yard.h * .48, Math.min(8, yard.w * .18, yard.h * .18), 0, Math.PI * 2);
+              ctx.fill();
+            }
           }
 
-          ctx.strokeStyle = "rgba(215,219,211,.24)";
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(x + offset - laneW / 2 + 4, y + 8);
-          ctx.lineTo(x + offset - laneW / 2 + 4, y + h - 8);
-          ctx.moveTo(x + offset + laneW / 2 - 4, y + 8);
-          ctx.lineTo(x + offset + laneW / 2 - 4, y + h - 8);
-          ctx.stroke();
+          // Main 4m-class local road. Some blocks are through streets, others terminate.
+          ctx.fillStyle = "#858984";
+          if (plan.vertical) {
+            const roadX = plan.roadCenter - plan.roadWidth / 2 - state.camera.x;
+            const roadY = plan.roadStart - state.camera.y;
+            const roadH = plan.roadEnd - plan.roadStart;
+            roundedRectPath(ctx, roadX, roadY, plan.roadWidth, roadH, 5);
+            ctx.fill();
 
-          // Small concrete parking pads and garden strips.
-          ctx.fillStyle = "#aaa9a1";
-          ctx.fillRect(x + 14, y + 18, 52, 38);
-          ctx.fillRect(x + w - 68, y + h - 58, 54, 40);
-          ctx.fillStyle = "#718b68";
-          ctx.fillRect(x + 18, y + h - 34, 62, 15);
+            // Japanese side gutters.
+            ctx.fillStyle = "rgba(72,79,76,.55)";
+            ctx.fillRect(roadX + 2, roadY, 3, roadH);
+            ctx.fillRect(roadX + plan.roadWidth - 5, roadY, 3, roadH);
+          } else {
+            const roadX = plan.roadStart - state.camera.x;
+            const roadY = plan.roadCenter - plan.roadWidth / 2 - state.camera.y;
+            const roadW = plan.roadEnd - plan.roadStart;
+            roundedRectPath(ctx, roadX, roadY, roadW, plan.roadWidth, 5);
+            ctx.fill();
+
+            ctx.fillStyle = "rgba(72,79,76,.55)";
+            ctx.fillRect(roadX, roadY + 2, roadW, 3);
+            ctx.fillRect(roadX, roadY + plan.roadWidth - 5, roadW, 3);
+          }
+
+          // Optional narrow side street / short cul-de-sac.
+          if (plan.branch) {
+            ctx.fillStyle = "#858984";
+            const branchW = plan.roadWidth * .78;
+            if (plan.vertical) {
+              const roadEdge = plan.branchSide < 0
+                ? plan.roadCenter - plan.roadWidth / 2
+                : plan.roadCenter + plan.roadWidth / 2;
+              const branchEnd = plan.branchSide < 0 ? worldLeft - 8 : worldLeft + w + 8;
+              const bx = Math.min(roadEdge, branchEnd) - state.camera.x;
+              const by = plan.branchAt - branchW / 2 - state.camera.y;
+              const bw2 = Math.abs(branchEnd - roadEdge);
+              roundedRectPath(ctx, bx, by, bw2, branchW, 4);
+              ctx.fill();
+            } else {
+              const roadEdge = plan.branchSide < 0
+                ? plan.roadCenter - plan.roadWidth / 2
+                : plan.roadCenter + plan.roadWidth / 2;
+              const branchEnd = plan.branchSide < 0 ? worldTop - 8 : worldTop + h + 8;
+              const bx = plan.branchAt - branchW / 2 - state.camera.x;
+              const by = Math.min(roadEdge, branchEnd) - state.camera.y;
+              const bh2 = Math.abs(branchEnd - roadEdge);
+              roundedRectPath(ctx, bx, by, branchW, bh2, 4);
+              ctx.fill();
+            }
+          }
+
+          // Flag-lot access strips and individual parking pads.
+          for (const driveway of plan.driveways) {
+            const p = worldToScreen(driveway.x, driveway.y);
+            ctx.fillStyle = "#a6a59e";
+            ctx.fillRect(p.x, p.y, driveway.w, driveway.h);
+          }
+          for (const pad of plan.parkingPads) {
+            const p = worldToScreen(pad.x, pad.y);
+            ctx.fillStyle = "#aaa9a2";
+            roundedRectPath(ctx, p.x, p.y, pad.w, pad.h, 2);
+            ctx.fill();
+            ctx.strokeStyle = "rgba(244,245,239,.34)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            if (hash2(Math.floor(pad.x), Math.floor(pad.y), 1770) > .58) {
+              drawParkingCarTop(
+                p.x + pad.w / 2,
+                p.y + pad.h / 2,
+                !pad.vertical,
+                hash2(Math.floor(pad.x), Math.floor(pad.y), 1771)
+              );
+            }
+          }
+
+          // Only some parcel boundaries are visible as low fences or block walls.
+          ctx.strokeStyle = "rgba(92,96,90,.48)";
+          ctx.lineWidth = 1.5;
+          for (const line of plan.lotLines) {
+            ctx.beginPath();
+            ctx.moveTo(line.x1 - state.camera.x, line.y1 - state.camera.y);
+            ctx.lineTo(line.x2 - state.camera.x, line.y2 - state.camera.y);
+            ctx.stroke();
+          }
+
           continue;
         }
 
@@ -2792,18 +3144,89 @@
           ctx.fillStyle = "#d7c49a";
           ctx.fillRect(center.x + 38, center.y + 58, 12, 16);
         } else if (style === "residential") {
-          // Hedges, low fences and utility clutter instead of commercial furniture.
-          ctx.fillStyle = "#607c5b";
-          ctx.fillRect(center.x - 126, center.y + 102, 72, 9);
-          ctx.fillRect(center.x + 54, center.y - 108, 68, 9);
-          ctx.strokeStyle = "#8d918a";
+          const left = baseX + ROAD_HALF + BLOCK_MARGIN;
+          const top = baseY + ROAD_HALF + BLOCK_MARGIN;
+          const size = ROAD_GAP - ROAD_WIDTH - BLOCK_MARGIN * 2;
+          const plan = residentialBlockPlan(gx, gy, left, top, size, size);
+
+          // Low walls / hedges follow parcel frontage rather than floating in the block.
           ctx.lineWidth = 2;
-          for (let n = 0; n < 5; n += 1) {
-            ctx.beginPath();
-            ctx.moveTo(center.x - 122 + n * 16, center.y + 88);
-            ctx.lineTo(center.x - 122 + n * 16, center.y + 106);
-            ctx.stroke();
+          for (let i = 0; i < plan.houses.length; i += 1) {
+            const house = plan.houses[i];
+            const frontageSeed = hash2(gx + i, gy, 1790);
+            const hedge = frontageSeed > .52;
+            const wallColor = hedge ? "#5d7959" : "#98978f";
+            ctx.strokeStyle = wallColor;
+            ctx.fillStyle = wallColor;
+
+            if (house.frontage === "east" || house.frontage === "west") {
+              const fx = house.frontage === "east" ? house.x + house.w + 7 : house.x - 7;
+              const fy = house.y + 5;
+              const p = worldToScreen(fx, fy);
+              const length = Math.max(16, house.h - 10);
+              if (hedge) ctx.fillRect(p.x - 3, p.y, 6, length);
+              else {
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(p.x, p.y + length);
+                ctx.stroke();
+              }
+            } else {
+              const fy = house.frontage === "south" ? house.y + house.h + 7 : house.y - 7;
+              const fx = house.x + 5;
+              const p = worldToScreen(fx, fy);
+              const length = Math.max(16, house.w - 10);
+              if (hedge) ctx.fillRect(p.x, p.y - 3, length, 6);
+              else {
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(p.x + length, p.y);
+                ctx.stroke();
+              }
+            }
           }
+
+          // Utility poles line only one side of the local street.
+          ctx.strokeStyle = "#555c59";
+          ctx.lineWidth = 3;
+          const poleCount = 3;
+          for (let n = 0; n < poleCount; n += 1) {
+            const t = .18 + n * .31;
+            let wx;
+            let wy;
+            if (plan.vertical) {
+              wx = plan.roadCenter + plan.roadWidth / 2 + 8;
+              wy = top + size * t;
+            } else {
+              wx = left + size * t;
+              wy = plan.roadCenter + plan.roadWidth / 2 + 8;
+            }
+            const p = worldToScreen(wx, wy);
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y + 8);
+            ctx.lineTo(p.x, p.y - 20);
+            ctx.stroke();
+            ctx.strokeStyle = "#414744";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(p.x - 7, p.y - 16);
+            ctx.lineTo(p.x + 7, p.y - 16);
+            ctx.stroke();
+            ctx.strokeStyle = "#555c59";
+            ctx.lineWidth = 3;
+          }
+
+          // A few front-garden trees, not the same two generic trees every block.
+          for (let i = 0; i < plan.yards.length; i += 1) {
+            if (hash2(gx + i, gy, 1791) < .45) continue;
+            const yard = plan.yards[i];
+            drawTree(
+              yard.x + yard.w * (.35 + hash2(gx, gy + i, 1792) * .3),
+              yard.y + yard.h * (.35 + hash2(gx, gy + i, 1793) * .3),
+              .55 + hash2(gx, gy + i, 1794) * .22
+            );
+          }
+          continue;
         } else if (style === "green") {
           drawTree(baseX + ROAD_GAP * .36, baseY + ROAD_GAP * .38, 1.05);
           drawTree(baseX + ROAD_GAP * .68, baseY + ROAD_GAP * .66, 1.1);
@@ -2976,6 +3399,149 @@
     }
   }
 
+  function drawResidentialBuilding(building, x, y, palette, time) {
+    const apartment = building.houseStyle === "small-apartment";
+    const elevation = apartment
+      ? clamp(20 + building.floors * 4.8, 28, 38)
+      : clamp(14 + building.floors * 4.2, 18, 28);
+    const roofDx = -elevation * BUILDING_DEPTH_X;
+    const roofDy = -elevation;
+    const rx = x + roofDx;
+    const ry = y + roofDy;
+    const seed = building.residentialSeed || 1800;
+    const roofColors = ["#665b55","#555b60","#6f6354","#55564f","#72574f"];
+    const roofColor = roofColors[Math.floor(hash2(Math.floor(building.x), Math.floor(building.y), seed) * roofColors.length) % roofColors.length];
+
+    ctx.fillStyle = "rgba(20,25,23," + (0.14 + time.night * .04).toFixed(2) + ")";
+    roundedRectPath(ctx, x + time.shadowX * .24, y + time.shadowY * .18, building.w, building.h, 4);
+    ctx.fill();
+
+    // Visible wall planes.
+    ctx.fillStyle = palette.wall;
+    ctx.beginPath();
+    ctx.moveTo(rx, ry + building.h);
+    ctx.lineTo(rx + building.w, ry + building.h);
+    ctx.lineTo(x + building.w, y + building.h);
+    ctx.lineTo(x, y + building.h);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(45,48,45,.22)";
+    ctx.beginPath();
+    ctx.moveTo(rx + building.w, ry);
+    ctx.lineTo(rx + building.w, ry + building.h);
+    ctx.lineTo(x + building.w, y + building.h);
+    ctx.lineTo(x + building.w, y);
+    ctx.closePath();
+    ctx.fill();
+
+    if (apartment) {
+      ctx.fillStyle = roofColor;
+      roundedRectPath(ctx, rx - 2, ry - 2, building.w + 4, building.h + 4, 4);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,.1)";
+      ctx.stroke();
+
+      // Small balconies on the visible front facade.
+      ctx.strokeStyle = "rgba(63,69,67,.62)";
+      ctx.lineWidth = 1;
+      for (let n = 0; n < Math.max(2, Math.floor(building.w / 34)); n += 1) {
+        const bx = x + 10 + n * ((building.w - 20) / Math.max(1, Math.floor(building.w / 34)));
+        ctx.strokeRect(bx, y + building.h - 15, 20, 5);
+      }
+    } else {
+      // Gabled / hipped-looking roof with an overhang and a visible ridge.
+      const overhang = 4;
+      const rw = building.w + overhang * 2;
+      const rh = building.h + overhang * 2;
+      const roofX = rx - overhang;
+      const roofY = ry - overhang;
+      const ridgeAlongX = building.w >= building.h;
+
+      if (ridgeAlongX) {
+        const midY = roofY + rh * .5;
+        ctx.fillStyle = roofColor;
+        ctx.beginPath();
+        ctx.moveTo(roofX, roofY);
+        ctx.lineTo(roofX + rw, roofY);
+        ctx.lineTo(roofX + rw, midY);
+        ctx.lineTo(roofX, midY);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(255,255,255,.07)";
+        ctx.beginPath();
+        ctx.moveTo(roofX, midY);
+        ctx.lineTo(roofX + rw, midY);
+        ctx.lineTo(roofX + rw, roofY + rh);
+        ctx.lineTo(roofX, roofY + rh);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(42,44,42,.62)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(roofX + 3, midY);
+        ctx.lineTo(roofX + rw - 3, midY);
+        ctx.stroke();
+      } else {
+        const midX = roofX + rw * .5;
+        ctx.fillStyle = roofColor;
+        ctx.beginPath();
+        ctx.moveTo(roofX, roofY);
+        ctx.lineTo(midX, roofY);
+        ctx.lineTo(midX, roofY + rh);
+        ctx.lineTo(roofX, roofY + rh);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(255,255,255,.07)";
+        ctx.beginPath();
+        ctx.moveTo(midX, roofY);
+        ctx.lineTo(roofX + rw, roofY);
+        ctx.lineTo(roofX + rw, roofY + rh);
+        ctx.lineTo(midX, roofY + rh);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(42,44,42,.62)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(midX, roofY + 3);
+        ctx.lineTo(midX, roofY + rh - 3);
+        ctx.stroke();
+      }
+
+      // Occasional small solar panel.
+      if (hash2(Math.floor(building.x), Math.floor(building.y), seed + 1) > .78) {
+        ctx.fillStyle = "#31464e";
+        const panelW = Math.min(24, building.w * .34);
+        const panelH = Math.min(13, building.h * .22);
+        ctx.fillRect(rx + building.w * .56 - panelW / 2, ry + building.h * .28 - panelH / 2, panelW, panelH);
+        ctx.strokeStyle = "rgba(190,214,218,.38)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(rx + building.w * .56 - panelW / 2, ry + building.h * .28 - panelH / 2, panelW, panelH);
+      }
+    }
+
+    // Windows on the visible south/front wall.
+    const facadeH = Math.max(10, elevation - 4);
+    const cols = apartment ? Math.max(2, Math.floor(building.w / 36)) : Math.max(1, Math.floor(building.w / 45));
+    for (let c = 0; c < cols; c += 1) {
+      const wx = x + 12 + c * ((building.w - 24) / Math.max(1, cols - 1));
+      const lit = time.night > .45 && hash2(Math.floor(building.x) + c, Math.floor(building.y), seed + 2) > .58;
+      ctx.fillStyle = lit ? "#dcbf78" : palette.glass;
+      ctx.fillRect(wx - 6, y + building.h - facadeH + 5, 12, 8);
+    }
+
+    // Small entrance cue on the facade closest to the access road when visible.
+    ctx.fillStyle = "#39413e";
+    if (building.frontage === "south" || building.frontage === "east") {
+      const doorX = building.frontage === "east" ? x + building.w - 13 : x + building.w * .5 - 5;
+      ctx.fillRect(doorX, y + building.h - Math.min(16, elevation * .7), 10, Math.min(16, elevation * .7));
+    }
+  }
+
   function drawBuildings() {
     const time = visualTime();
     const visible = buildings
@@ -2986,6 +3552,12 @@
       const x = building.x - state.camera.x;
       const y = building.y - state.camera.y;
       const palette = VISUAL_PALETTES[building.palette % VISUAL_PALETTES.length];
+
+      if (building.district === "residential") {
+        drawResidentialBuilding(building, x, y, palette, time);
+        continue;
+      }
+
       const baseElevation =
         building.kind === "tower" ? 34 :
         building.kind === "low" ? 17 :
