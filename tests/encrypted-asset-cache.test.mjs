@@ -20,24 +20,26 @@ class FakeRequest {
 }
 
 class FakeStore {
-  constructor(database) { this.database = database; }
-  get(key) { return new FakeRequest(() => this.database.records.get(key)); }
+  constructor(database, transaction) { this.database = database; this.transaction = transaction; }
+  get(key) { this.transaction.operations.push('get'); return new FakeRequest(() => this.database.records.get(key)); }
   getAll() { return new FakeRequest(() => [...this.database.records.values()].map(record => structuredClone(record))); }
-  put(record) { this.database.records.set(record.cacheKey, structuredClone(record)); return new FakeRequest(() => undefined); }
-  delete(key) { this.database.records.delete(key); return new FakeRequest(() => undefined); }
-  clear() { this.database.records.clear(); return new FakeRequest(() => undefined); }
+  put(record) { this.transaction.operations.push('put'); this.database.records.set(record.cacheKey, structuredClone(record)); return new FakeRequest(() => undefined); }
+  delete(key) { this.transaction.operations.push('delete'); this.database.records.delete(key); return new FakeRequest(() => undefined); }
+  clear() { this.transaction.operations.push('clear'); this.database.records.clear(); return new FakeRequest(() => undefined); }
 }
 
 class FakeTransaction {
   constructor(database) {
     this.database = database;
+    this.operations = [];
+    database.transactions.push(this);
     setTimeout(() => this.oncomplete?.(), 5);
   }
-  objectStore() { return new FakeStore(this.database); }
+  objectStore() { return new FakeStore(this.database, this); }
 }
 
 class FakeDatabase {
-  constructor() { this.records = new Map(); this.objectStoreNames = { contains: () => true }; }
+  constructor() { this.records = new Map(); this.transactions = []; this.objectStoreNames = { contains: () => true }; }
   transaction() { return new FakeTransaction(this); }
   close() {}
 }
@@ -126,6 +128,22 @@ test('retention, remove, removeAsset, and clear work', async () => {
   await cache.put({ assetId: 'asset-b', revision: 0, objectId: 'preview', encryptedBytes: data });
   await cache.clear();
   assert.equal((await cache.list()).length, 0);
+});
+
+test('setRetention reads and writes in separate transactions', async () => {
+  const cache = newCache();
+  await cache.clear();
+  const encryptedBytes = await encrypted();
+  idb.database.transactions.length = 0;
+  await cache.put({ assetId: 'asset-retention', revision: 0, objectId: 'preview', encryptedBytes });
+  idb.database.transactions.length = 0;
+  assert.equal(await cache.setRetention('asset-retention', 0, 'preview', 'pending'), true);
+  const getTransaction = idb.database.transactions.find(transaction => transaction.operations.includes('get'));
+  const putTransaction = idb.database.transactions.find(transaction => transaction.operations.includes('put'));
+  assert.ok(getTransaction);
+  assert.ok(putTransaction);
+  assert.notEqual(getTransaction, putTransaction);
+  assert.equal(getTransaction.operations.includes('put'), false);
 });
 
 test('eviction orders higher zoom levels, then older records within each level, then preview', async () => {

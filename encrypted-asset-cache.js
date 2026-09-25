@@ -200,12 +200,13 @@
         if (!VALID_RETENTION.has(retention)) throw new TypeError('retention is invalid');
         const cacheKey = makeCacheKey(assetId, revision, objectId);
         const database = await open();
-        const transaction = database.transaction(STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const current = await requestResult(store.get(cacheKey));
+        const readTransaction = database.transaction(STORE_NAME, 'readonly');
+        const current = await requestResult(readTransaction.objectStore(STORE_NAME).get(cacheKey));
+        await transactionDone(readTransaction);
         if (!current) return false;
-        store.put(sanitizeRecord({ ...current, retention }));
-        await transactionDone(transaction);
+        const writeTransaction = database.transaction(STORE_NAME, 'readwrite');
+        writeTransaction.objectStore(STORE_NAME).put(sanitizeRecord({ ...current, retention }));
+        await transactionDone(writeTransaction);
         return true;
       },
       async remove(assetId, revision, objectId) {
