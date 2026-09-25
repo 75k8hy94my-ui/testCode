@@ -98,7 +98,7 @@ button{font:inherit;color:inherit}
 .drive-info{display:flex;justify-content:space-between;gap:12px;font-size:10px;color:var(--muted);margin-top:3px}
 .drive-info b{color:var(--text)}
 .drive-destination{margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.08);font-size:10px;color:var(--accent)}
-.mobile-driving-controls{position:absolute;left:0;right:0;bottom:0;padding:18px max(18px,env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));display:none;justify-content:space-between;align-items:flex-end;pointer-events:none}
+.mobile-driving-controls{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);width:min(460px,calc(100% - 36px));padding:0;display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none}
 .mobile-driving-controls button{pointer-events:auto;border:1px solid rgba(255,255,255,.18);background:rgba(9,14,11,.8);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-size:11px;font-weight:800;letter-spacing:.07em}
 #driveBrakeButton,#driveAccelButton{width:96px;height:96px;border-radius:50%}
 #driveBrakeButton{background:rgba(96,43,37,.82)}
@@ -120,4 +120,9 @@ body:not(.driving) #mobileDrivingControls{display:none!important}
 
 @media(hover:none),(pointer:coarse){
   .mobile-driving-controls{display:flex}
+}
+
+@media(hover:hover) and (pointer:fine){
+  #driveBrakeButton,#driveAccelButton{width:82px;height:82px}
+  #driveMenuButton{width:78px;height:48px}
 }
