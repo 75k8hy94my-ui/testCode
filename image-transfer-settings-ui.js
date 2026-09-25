@@ -4,7 +4,6 @@
 
   const STYLE_ID = 'imageTransferSettingsStyle';
   const CARD_ID = 'profileImageTransferCard';
-  const STATS_EVENT_NAME = 'manga-reader-image-transfer-stats-changed';
   let mountedCard = null;
 
   function settingsApi() {
@@ -168,8 +167,9 @@
     if (event && event.detail && event.detail.route === 'profile') scheduleMount();
   });
   root.document.addEventListener('manga-reader-image-transfer-settings-changed', render);
-  root.document.addEventListener(STATS_EVENT_NAME, render);
+  const statsEventName = settingsApi() && settingsApi().STATS_EVENT_NAME || 'manga-reader-image-transfer-stats-changed';
+  root.document.addEventListener(statsEventName, render);
 
-  root.ImageTransferSettingsUI = Object.freeze({ mount, render, STATS_EVENT_NAME });
+  root.ImageTransferSettingsUI = Object.freeze({ mount, render, STATS_EVENT_NAME: statsEventName });
   scheduleMount();
 })(typeof window !== 'undefined' ? window : globalThis);
