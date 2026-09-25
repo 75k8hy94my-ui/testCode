@@ -108,9 +108,9 @@
   // dense station frontage, shopping streets, tiny dining alleys, quieter housing,
   // and a large green zone. Exact streets/names are intentionally not reproduced.
   const CITY_CORE = { minGX: 5, maxGX: 11, minGY: 4, maxGY: 10 };
-  const STATION_BLOCKS = new Set(["7,5","8,5","9,5","7,6","8,6","9,6"]);
-  const ARCADE_BLOCKS = new Set(["6,6","7,6","6,7","7,7"]);
-  const ALLEY_BLOCKS = new Set(["9,6","10,6","9,7","10,7"]);
+  const STATION_BLOCKS = new Set(["7,5","8,5","9,5","8,6"]);
+  const ARCADE_BLOCKS = new Set(["6,5","6,6","7,6","6,7","7,7"]);
+  const ALLEY_BLOCKS = new Set(["9,6","10,5","10,6","9,7","10,7"]);
   const RESIDENTIAL_BLOCKS = new Set([
     "4,7","4,8","4,9","5,7","5,8","5,9","5,10","6,9","6,10",
     "10,8","10,9","10,10","11,8","11,9"
