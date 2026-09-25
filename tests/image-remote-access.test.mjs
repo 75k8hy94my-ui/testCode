@@ -120,3 +120,75 @@ test('tracked remote reads can be aborted centrally when the VPN policy closes',
   assert.equal(aborted, 1);
   ticket.release();
 });
+
+
+test('runRemoteRead never invokes the remote operation when the VPN gate is closed', async () => {
+  const storage = memoryStorage();
+  let called = 0;
+  await assert.rejects(
+    () => remote.runRemoteRead(
+      { storage, now: today, estimatedBytes: 500, kind: 'preview', mediaAccess: media('blocked') },
+      async () => { called += 1; }
+    ),
+    error => error.name === 'ImageVpnRequiredError'
+  );
+  assert.equal(called, 0);
+});
+
+test('fetchBlob reserves estimate before fetch and records observed blob bytes', async () => {
+  const storage = memoryStorage({ mangaReaderImageVpnRequired: 'false' });
+  let calls = 0;
+  const result = await remote.fetchBlob(
+    'https://example.test/object.bin',
+    {},
+    {
+      storage,
+      now: today,
+      estimatedBytes: 2000,
+      kind: 'zoom',
+      mediaAccess: media('blocked'),
+      fetch: async () => {
+        calls += 1;
+        return {
+          ok: true,
+          status: 200,
+          async blob() { return new Blob([new Uint8Array(1500)], { type: 'application/octet-stream' }); }
+        };
+      }
+    }
+  );
+  assert.equal(calls, 1);
+  assert.equal(result.blob.size, 1500);
+  const state = settings.load(storage, today);
+  assert.equal(state.limitUsageBytes, 2000);
+  assert.equal(state.stats.observedBytes, 1500);
+  assert.equal(state.stats.zoomBytes, 1500);
+});
+
+test('fetchBlob performs no network request when the transfer limit would be exceeded', async () => {
+  const limit = 50 * 1024 * 1024;
+  const storage = memoryStorage({
+    mangaReaderImageVpnRequired: 'false',
+    mangaReaderStorageTransferLimitDaily: String(limit),
+    mangaReaderStorageTransferUsageDaily: JSON.stringify({ day: '2026-09-25', bytes: limit }),
+  });
+  let calls = 0;
+  await assert.rejects(
+    () => remote.fetchBlob(
+      'https://example.test/object.bin',
+      {},
+      {
+        storage,
+        now: today,
+        estimatedBytes: 1,
+        kind: 'preview',
+        fetch: async () => {
+          calls += 1;
+          throw new Error('must not be called');
+        }
+      }
+    ),
+    error => error.name === 'ImageTransferLimitError'
+  );
+  assert.equal(calls, 0);
+});
