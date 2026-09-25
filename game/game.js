@@ -128,6 +128,241 @@
     return "outer";
   }
 
+  function residentialBlockPlan(gx, gy, left, top, bw, bh) {
+    const vertical = hash2(gx, gy, 1600) > .43;
+    const roadWidth = 32 + Math.floor(hash2(gx, gy, 1601) * 9);
+    const roadBias = .40 + hash2(gx, gy, 1602) * .20;
+    const through = hash2(gx, gy, 1603) > .26;
+    const branch = hash2(gx, gy, 1604) > .54;
+    const branchSide = hash2(gx, gy, 1605) > .5 ? 1 : -1;
+    const branchRatio = .34 + hash2(gx, gy, 1606) * .32;
+    const houses = [];
+    const yards = [];
+    const parkingPads = [];
+    const driveways = [];
+    const lotLines = [];
+
+    const roadCenter = vertical
+      ? left + bw * roadBias
+      : top + bh * roadBias;
+    const roadStart = vertical ? top - BLOCK_MARGIN - 8 : left - BLOCK_MARGIN - 8;
+    const roadEnd = vertical
+      ? (through ? top + bh + BLOCK_MARGIN + 8 : top + bh * (.78 + hash2(gx, gy, 1607) * .1))
+      : (through ? left + bw + BLOCK_MARGIN + 8 : left + bw * (.78 + hash2(gx, gy, 1607) * .1));
+
+    const frontageStart = vertical ? top + 8 : left + 8;
+    const frontageEnd = vertical ? top + bh - 8 : left + bw - 8;
+    const frontageLength = frontageEnd - frontageStart;
+    const branchAt = frontageStart + frontageLength * branchRatio;
+
+    function makeSideLots(side, seedBase) {
+      const sideAvailable = vertical
+        ? (side < 0 ? roadCenter - roadWidth / 2 - left : left + bw - (roadCenter + roadWidth / 2))
+        : (side < 0 ? roadCenter - roadWidth / 2 - top : top + bh - (roadCenter + roadWidth / 2));
+
+      if (sideAvailable < 76) return;
+
+      const count = 2 + Math.floor(hash2(gx + side, gy, seedBase) * 2.99);
+      const weights = [];
+      let totalWeight = 0;
+      for (let i = 0; i < count; i += 1) {
+        const w = .78 + hash2(gx + i * 3, gy + side * 5, seedBase + 11 + i) * .55;
+        weights.push(w);
+        totalWeight += w;
+      }
+
+      let cursor = frontageStart;
+      for (let i = 0; i < count; i += 1) {
+        const lotSpan = frontageLength * (weights[i] / totalWeight);
+        const lotStart = cursor;
+        const lotEnd = i === count - 1 ? frontageEnd : cursor + lotSpan;
+        cursor = lotEnd;
+
+        // Leave room where a side street branches.
+        if (branch && Math.abs((lotStart + lotEnd) / 2 - branchAt) < 28) continue;
+
+        const sideGap = 5 + hash2(gx + i, gy + side, seedBase + 30) * 7;
+        const rearGap = 7 + hash2(gx + i, gy + side, seedBase + 31) * 12;
+        const frontSetback = 12 + hash2(gx + i, gy + side, seedBase + 32) * 24;
+        const frontageMargin = 5 + hash2(gx + i, gy + side, seedBase + 33) * 8;
+        const lotAlong = Math.max(58, lotEnd - lotStart - 5);
+        const houseAlong = Math.max(44, lotAlong - frontageMargin * 2);
+        const maxDepth = Math.max(48, sideAvailable - sideGap - rearGap - frontSetback);
+        const houseDepth = clamp(
+          48 + hash2(gx + i, gy + side, seedBase + 34) * 34,
+          44,
+          maxDepth
+        );
+
+        let x;
+        let y;
+        let w;
+        let h;
+        let frontage;
+
+        if (vertical) {
+          w = houseDepth;
+          h = houseAlong;
+          y = lotStart + frontageMargin;
+          if (side < 0) {
+            x = roadCenter - roadWidth / 2 - frontSetback - w;
+            frontage = "east";
+          } else {
+            x = roadCenter + roadWidth / 2 + frontSetback;
+            frontage = "west";
+          }
+        } else {
+          w = houseAlong;
+          h = houseDepth;
+          x = lotStart + frontageMargin;
+          if (side < 0) {
+            y = roadCenter - roadWidth / 2 - frontSetback - h;
+            frontage = "south";
+          } else {
+            y = roadCenter + roadWidth / 2 + frontSetback;
+            frontage = "north";
+          }
+        }
+
+        const smallApartment = hash2(gx + i * 7, gy + side * 9, seedBase + 35) > .91 && lotAlong > 92;
+        const houseStyle = smallApartment
+          ? "small-apartment"
+          : hash2(gx + i, gy + side, seedBase + 36) > .54
+            ? "gable"
+            : "hipped";
+
+        houses.push({
+          x, y, w, h, frontage, houseStyle,
+          floors: smallApartment ? 3 : (hash2(gx + i, gy + side, seedBase + 37) > .2 ? 2 : 1),
+          paletteShift: Math.floor(hash2(gx + i, gy + side, seedBase + 38) * VISUAL_PALETTES.length),
+          seed: seedBase + i * 13 + side * 3
+        });
+
+        // A small front parking slab or bicycle/car space is common but not universal.
+        if (hash2(gx + i, gy + side, seedBase + 39) > .34) {
+          if (vertical) {
+            const padW = Math.min(30, frontSetback - 4);
+            const padH = Math.min(36, houseAlong * .38);
+            parkingPads.push({
+              x: side < 0 ? x + w + 4 : roadCenter + roadWidth / 2 + 4,
+              y: y + 4 + hash2(gx + i, gy + side, seedBase + 40) * Math.max(0, h - padH - 8),
+              w: padW,
+              h: padH,
+              vertical: true
+            });
+          } else {
+            const padH = Math.min(30, frontSetback - 4);
+            const padW = Math.min(36, houseAlong * .38);
+            parkingPads.push({
+              x: x + 4 + hash2(gx + i, gy + side, seedBase + 40) * Math.max(0, w - padW - 8),
+              y: side < 0 ? y + h + 4 : roadCenter + roadWidth / 2 + 4,
+              w: padW,
+              h: padH,
+              vertical: false
+            });
+          }
+        }
+
+        // Small garden/backyard strip.
+        if (hash2(gx + i, gy + side, seedBase + 41) > .28) {
+          if (vertical) {
+            yards.push({
+              x: side < 0 ? left + 4 : x + w + 5,
+              y: y + 4,
+              w: Math.max(10, side < 0 ? x - left - 8 : left + bw - (x + w) - 9),
+              h: Math.max(20, h - 8)
+            });
+          } else {
+            yards.push({
+              x: x + 4,
+              y: side < 0 ? top + 4 : y + h + 5,
+              w: Math.max(20, w - 8),
+              h: Math.max(10, side < 0 ? y - top - 8 : top + bh - (y + h) - 9)
+            });
+          }
+        }
+
+        // Irregular lot boundary hints; not every boundary is fenced.
+        if (hash2(gx + i, gy + side, seedBase + 42) > .44) {
+          lotLines.push({
+            vertical: !vertical,
+            x1: vertical ? (side < 0 ? left + 4 : roadCenter + roadWidth / 2 + 4) : lotEnd,
+            y1: vertical ? lotEnd : (side < 0 ? top + 4 : roadCenter + roadWidth / 2 + 4),
+            x2: vertical ? (side < 0 ? roadCenter - roadWidth / 2 - 4 : left + bw - 4) : lotEnd,
+            y2: vertical ? lotEnd : (side < 0 ? roadCenter - roadWidth / 2 - 4 : top + bh - 4)
+          });
+        }
+      }
+    }
+
+    makeSideLots(-1, 1620);
+    makeSideLots(1, 1680);
+
+    // One occasional flag lot: narrow access strip to a house behind a frontage lot.
+    if (hash2(gx, gy, 1740) > .58) {
+      const side = hash2(gx, gy, 1741) > .5 ? 1 : -1;
+      const sideAvailable = vertical
+        ? (side < 0 ? roadCenter - roadWidth / 2 - left : left + bw - (roadCenter + roadWidth / 2))
+        : (side < 0 ? roadCenter - roadWidth / 2 - top : top + bh - (roadCenter + roadWidth / 2));
+      if (sideAvailable > 125) {
+        const along = frontageStart + frontageLength * (.18 + hash2(gx, gy, 1742) * .58);
+        const accessWidth = 12;
+        if (vertical) {
+          const hx = side < 0 ? left + 10 : left + bw - 72;
+          const hy = clamp(along - 30, top + 12, top + bh - 72);
+          houses.push({
+            x: hx, y: hy, w: 62, h: 58,
+            frontage: side < 0 ? "east" : "west",
+            houseStyle: "flag-lot",
+            floors: 2,
+            paletteShift: Math.floor(hash2(gx, gy, 1743) * VISUAL_PALETTES.length),
+            seed: 1744
+          });
+          driveways.push({
+            x: side < 0 ? hx + 62 : roadCenter + roadWidth / 2,
+            y: hy + 23,
+            w: Math.max(12, side < 0 ? roadCenter - roadWidth / 2 - (hx + 62) : hx - (roadCenter + roadWidth / 2)),
+            h: accessWidth
+          });
+        } else {
+          const hx = clamp(along - 30, left + 12, left + bw - 72);
+          const hy = side < 0 ? top + 10 : top + bh - 68;
+          houses.push({
+            x: hx, y: hy, w: 62, h: 58,
+            frontage: side < 0 ? "south" : "north",
+            houseStyle: "flag-lot",
+            floors: 2,
+            paletteShift: Math.floor(hash2(gx, gy, 1743) * VISUAL_PALETTES.length),
+            seed: 1744
+          });
+          driveways.push({
+            x: hx + 24,
+            y: side < 0 ? hy + 58 : roadCenter + roadWidth / 2,
+            w: accessWidth,
+            h: Math.max(12, side < 0 ? roadCenter - roadWidth / 2 - (hy + 58) : hy - (roadCenter + roadWidth / 2))
+          });
+        }
+      }
+    }
+
+    return {
+      vertical,
+      roadWidth,
+      roadCenter,
+      roadStart,
+      roadEnd,
+      through,
+      branch,
+      branchSide,
+      branchAt,
+      houses,
+      yards,
+      parkingPads,
+      driveways,
+      lotLines
+    };
+  }
+
   const NPCS = [
     { id: "aoi", name: "アオイ", x: PARK.x + 80, y: PARK.y + 65, color: "#e0a7b5", friendship: 0 },
     { id: "sora", name: "ソラ", x: CAFE.x + 72, y: CAFE.y - 58, color: "#a9c9e3", friendship: 0 },
@@ -336,23 +571,26 @@
         }
 
         if (style === "residential") {
-          const lotGap = 18;
-          const houseW = (bw - lotGap * 3) / 2;
-          const houseH = (bh - lotGap * 3) / 2;
-          for (let ix = 0; ix < 2; ix += 1) {
-            for (let iy = 0; iy < 2; iy += 1) {
-              const variant = 70 + ix * 2 + iy;
-              const setback = 8 + hash2(gx + ix, gy + iy, 1310) * 18;
-              buildings.push(makeBuilding(
-                left + lotGap + ix * (houseW + lotGap) + (iy ? setback * .25 : 0),
-                top + lotGap + iy * (houseH + lotGap) + setback * .25,
-                houseW - setback * .3,
-                houseH - setback * .35,
-                tint,
-                "low",
-                variant
-              ));
-            }
+          const plan = residentialBlockPlan(gx, gy, left, top, bw, bh);
+          for (let i = 0; i < plan.houses.length; i += 1) {
+            const house = plan.houses[i];
+            const building = makeBuilding(
+              house.x,
+              house.y,
+              house.w,
+              house.h,
+              tint * (.94 + hash2(gx + i, gy, 1750) * .08),
+              house.houseStyle === "small-apartment" ? "normal" : "low",
+              170 + i,
+              "residential"
+            );
+            building.floors = house.floors;
+            building.frontage = house.frontage;
+            building.houseStyle = house.houseStyle;
+            building.palette = house.paletteShift;
+            building.residentialSeed = house.seed;
+            building.balconies = house.houseStyle === "small-apartment";
+            buildings.push(building);
           }
           continue;
         }
