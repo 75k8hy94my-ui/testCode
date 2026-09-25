@@ -62,6 +62,9 @@
   const RUN_SPEED = 300;
   const SPEED_TO_KMH = 0.16;
   const SIGNAL_CYCLE = 20;
+  const LANE_OFFSET = 38;
+  const TURN_RADIUS = 86;
+  const ROUTE_SAMPLE_STEP = 16;
   const SAVE_KEY = "testCodeLifeSimSave:v1";
   const RENT = 12000;
   const keys = new Set();
@@ -131,6 +134,7 @@
     drive: {
       route: [],
       routeIndex: 0,
+      signals: [],
       destination: null,
       score: 100,
       rating: 100,
@@ -236,11 +240,17 @@
     const horizontal = hash2(seedA, seedB, 5) > 0.5;
     const roadIndex = 1 + Math.floor(hash2(seedA, seedB, 8) * 16);
     const along = COAST + 240 + hash2(seedA, seedB, 13) * (WORLD_SIZE - COAST * 2 - 480);
-    const lane = (hash2(seedA, seedB, 17) > 0.5 ? 1 : -1) * (34 + offset);
+    const forward = hash2(seedA, seedB, 19) > 0.5;
+
     if (horizontal) {
-      return { x: along, y: roadIndex * ROAD_GAP + lane, angle: hash2(seedA, seedB, 19) > 0.5 ? 0 : Math.PI };
+      const angle = forward ? 0 : Math.PI;
+      const lane = forward ? -(LANE_OFFSET + offset * 0.15) : (LANE_OFFSET + offset * 0.15);
+      return { x: along, y: roadIndex * ROAD_GAP + lane, angle };
     }
-    return { x: roadIndex * ROAD_GAP + lane, y: along, angle: hash2(seedA, seedB, 19) > 0.5 ? Math.PI / 2 : -Math.PI / 2 };
+
+    const angle = forward ? Math.PI / 2 : -Math.PI / 2;
+    const lane = forward ? (LANE_OFFSET + offset * 0.15) : -(LANE_OFFSET + offset * 0.15);
+    return { x: roadIndex * ROAD_GAP + lane, y: along, angle };
   }
 
   function generateTraffic() {
@@ -303,42 +313,298 @@
     return { x: place.x, y: place.gy * ROAD_GAP, orientation: "h" };
   }
 
-  function compactRoute(points) {
-    const result = [];
-    for (const point of points) {
-      const previous = result[result.length - 1];
-      if (!previous || distance(previous.x, previous.y, point.x, point.y) > 4) result.push(point);
+  function cardinalDirection(dx, dy) {
+    if (Math.abs(dx) >= Math.abs(dy)) return { x: dx >= 0 ? 1 : -1, y: 0 };
+    return { x: 0, y: dy >= 0 ? 1 : -1 };
+  }
+
+  function laneNormal(direction) {
+    return { x: direction.y, y: -direction.x };
+  }
+
+  function lanePoint(point, direction) {
+    const normal = laneNormal(direction);
+    return {
+      x: point.x + normal.x * LANE_OFFSET,
+      y: point.y + normal.y * LANE_OFFSET
+    };
+  }
+
+  function appendLine(points, from, to, step = ROUTE_SAMPLE_STEP) {
+    const d = distance(from.x, from.y, to.x, to.y);
+    if (d < 0.5) {
+      if (!points.length) points.push({ x: to.x, y: to.y });
+      return;
     }
-    return result;
+    const count = Math.max(1, Math.ceil(d / step));
+    for (let i = points.length ? 1 : 0; i <= count; i += 1) {
+      const t = i / count;
+      points.push({
+        x: from.x + (to.x - from.x) * t,
+        y: from.y + (to.y - from.y) * t
+      });
+    }
+  }
+
+  function appendQuadratic(points, p0, control, p1) {
+    const estimate = distance(p0.x, p0.y, control.x, control.y) + distance(control.x, control.y, p1.x, p1.y);
+    const count = Math.max(5, Math.ceil(estimate / ROUTE_SAMPLE_STEP));
+    for (let i = 1; i <= count; i += 1) {
+      const t = i / count;
+      const u = 1 - t;
+      points.push({
+        x: u * u * p0.x + 2 * u * t * control.x + t * t * p1.x,
+        y: u * u * p0.y + 2 * u * t * control.y + t * t * p1.y
+      });
+    }
+  }
+
+  function routeGridBounds(value) {
+    return clamp(value, 1, Math.floor(WORLD_SIZE / ROAD_GAP) - 1);
+  }
+
+  function nextIntersectionAhead(start, orientation, direction) {
+    if (orientation === "h") {
+      const gx = direction.x > 0
+        ? Math.ceil((start.x + 3) / ROAD_GAP)
+        : Math.floor((start.x - 3) / ROAD_GAP);
+      return { gx: routeGridBounds(gx), gy: routeGridBounds(Math.round(start.y / ROAD_GAP)) };
+    }
+    const gy = direction.y > 0
+      ? Math.ceil((start.y + 3) / ROAD_GAP)
+      : Math.floor((start.y - 3) / ROAD_GAP);
+    return { gx: routeGridBounds(Math.round(start.x / ROAD_GAP)), gy: routeGridBounds(gy) };
+  }
+
+  function gridRoute(startNode, goalNode, initialDirection) {
+    const directions = [
+      { x: 1, y: 0 },
+      { x: 0, y: 1 },
+      { x: -1, y: 0 },
+      { x: 0, y: -1 }
+    ];
+    const dirIndex = directions.findIndex((dir) => dir.x === initialDirection.x && dir.y === initialDirection.y);
+    const startKey = startNode.gx + "," + startNode.gy + "," + Math.max(0, dirIndex);
+    const open = [{ gx: startNode.gx, gy: startNode.gy, dir: Math.max(0, dirIndex), g: 0, f: 0, key: startKey }];
+    const best = new Map([[startKey, 0]]);
+    const previous = new Map();
+    let goalKey = null;
+
+    const heuristic = (gx, gy) => Math.abs(goalNode.gx - gx) + Math.abs(goalNode.gy - gy);
+
+    while (open.length) {
+      open.sort((a, b) => a.f - b.f);
+      const current = open.shift();
+      if (current.gx === goalNode.gx && current.gy === goalNode.gy) {
+        goalKey = current.key;
+        break;
+      }
+
+      for (let nextDir = 0; nextDir < directions.length; nextDir += 1) {
+        const move = directions[nextDir];
+        const ngx = current.gx + move.x;
+        const ngy = current.gy + move.y;
+        if (ngx < 1 || ngy < 1 || ngx > 17 || ngy > 17) continue;
+
+        const reverse = (nextDir + 2) % 4 === current.dir;
+        const turn = nextDir !== current.dir;
+        const stepCost = reverse ? 8 : turn ? 1.28 : 1;
+        const g = current.g + stepCost;
+        const key = ngx + "," + ngy + "," + nextDir;
+        if (best.has(key) && best.get(key) <= g) continue;
+
+        best.set(key, g);
+        previous.set(key, current.key);
+        open.push({
+          gx: ngx,
+          gy: ngy,
+          dir: nextDir,
+          g,
+          f: g + heuristic(ngx, ngy),
+          key
+        });
+      }
+    }
+
+    if (!goalKey) return [startNode];
+
+    const nodes = [];
+    let key = goalKey;
+    while (key) {
+      const [gx, gy, dir] = key.split(",").map(Number);
+      nodes.push({ gx, gy, dir });
+      if (key === startKey) break;
+      key = previous.get(key);
+    }
+    nodes.reverse();
+    return nodes;
+  }
+
+  function buildLanePath(skeleton) {
+    const clean = [];
+    for (const point of skeleton) {
+      const previous = clean[clean.length - 1];
+      if (!previous || distance(previous.x, previous.y, point.x, point.y) > 1) clean.push(point);
+    }
+    if (clean.length < 2) return [{ x: personalCar.x, y: personalCar.y }];
+
+    const directions = [];
+    for (let i = 0; i < clean.length - 1; i += 1) {
+      directions.push(cardinalDirection(clean[i + 1].x - clean[i].x, clean[i + 1].y - clean[i].y));
+    }
+
+    const points = [{ x: personalCar.x, y: personalCar.y }];
+    const firstLane = lanePoint(clean[0], directions[0]);
+    appendLine(points, points[points.length - 1], firstLane, 10);
+
+    let cursor = firstLane;
+    for (let i = 0; i < directions.length; i += 1) {
+      const direction = directions[i];
+      const segmentEnd = clean[i + 1];
+      const laneEnd = lanePoint(segmentEnd, direction);
+
+      if (i === directions.length - 1) {
+        appendLine(points, cursor, laneEnd);
+        cursor = laneEnd;
+        continue;
+      }
+
+      const nextDirection = directions[i + 1];
+      const isTurn = direction.x !== nextDirection.x || direction.y !== nextDirection.y;
+      if (!isTurn) {
+        appendLine(points, cursor, laneEnd);
+        cursor = laneEnd;
+        continue;
+      }
+
+      const currentLength = distance(clean[i].x, clean[i].y, segmentEnd.x, segmentEnd.y);
+      const nextLength = distance(segmentEnd.x, segmentEnd.y, clean[i + 2].x, clean[i + 2].y);
+      const radius = Math.max(34, Math.min(TURN_RADIUS, currentLength * 0.32, nextLength * 0.32));
+      const currentNormal = laneNormal(direction);
+      const nextNormal = laneNormal(nextDirection);
+      const approach = {
+        x: segmentEnd.x - direction.x * radius + currentNormal.x * LANE_OFFSET,
+        y: segmentEnd.y - direction.y * radius + currentNormal.y * LANE_OFFSET
+      };
+      const departure = {
+        x: segmentEnd.x + nextDirection.x * radius + nextNormal.x * LANE_OFFSET,
+        y: segmentEnd.y + nextDirection.y * radius + nextNormal.y * LANE_OFFSET
+      };
+      const control = {
+        x: segmentEnd.x + currentNormal.x * LANE_OFFSET + nextNormal.x * LANE_OFFSET,
+        y: segmentEnd.y + currentNormal.y * LANE_OFFSET + nextNormal.y * LANE_OFFSET
+      };
+
+      appendLine(points, cursor, approach);
+      appendQuadratic(points, approach, control, departure);
+      cursor = departure;
+    }
+
+    return points;
+  }
+
+  function nearestPathIndex(points, x, y) {
+    let bestIndex = 0;
+    let bestDistance = Infinity;
+    for (let i = 0; i < points.length; i += 1) {
+      const d = distance(points[i].x, points[i].y, x, y);
+      if (d < bestDistance) {
+        bestDistance = d;
+        bestIndex = i;
+      }
+    }
+    return bestIndex;
   }
 
   function buildDrivingRoute(place) {
     const start = roadSnap(personalCar.x, personalCar.y);
-    const startIntersection = start.orientation === "h"
-      ? { x: Math.round(start.x / ROAD_GAP) * ROAD_GAP, y: start.y }
-      : { x: start.x, y: Math.round(start.y / ROAD_GAP) * ROAD_GAP };
-    const end = destinationRoadPoint(place);
-    const endIntersection = { x: Math.round(end.x / ROAD_GAP) * ROAD_GAP, y: end.y };
-    const bend = { x: endIntersection.x, y: startIntersection.y };
+    let initialDirection;
+    if (start.orientation === "h") {
+      const sign = Math.abs(Math.cos(personalCar.angle)) > 0.25
+        ? (Math.cos(personalCar.angle) >= 0 ? 1 : -1)
+        : (place.x >= personalCar.x ? 1 : -1);
+      initialDirection = { x: sign, y: 0 };
+    } else {
+      const sign = Math.abs(Math.sin(personalCar.angle)) > 0.25
+        ? (Math.sin(personalCar.angle) >= 0 ? 1 : -1)
+        : (place.y >= personalCar.y ? 1 : -1);
+      initialDirection = { x: 0, y: sign };
+    }
 
-    return compactRoute([
+    const firstNode = nextIntersectionAhead(start, start.orientation, initialDirection);
+    const end = destinationRoadPoint(place);
+    const goalNode = {
+      gx: routeGridBounds(Math.round(end.x / ROAD_GAP)),
+      gy: routeGridBounds(Math.round(end.y / ROAD_GAP))
+    };
+    const gridNodes = gridRoute(firstNode, goalNode, initialDirection);
+    const skeleton = [
       { x: start.x, y: start.y },
-      startIntersection,
-      bend,
-      endIntersection,
-      { x: end.x, y: end.y, final: true }
-    ]);
+      { x: firstNode.gx * ROAD_GAP, y: firstNode.gy * ROAD_GAP }
+    ];
+
+    for (let i = 1; i < gridNodes.length; i += 1) {
+      skeleton.push({ x: gridNodes[i].gx * ROAD_GAP, y: gridNodes[i].gy * ROAD_GAP });
+    }
+    skeleton.push({ x: end.x, y: end.y });
+
+    const points = buildLanePath(skeleton);
+    const signals = [];
+    for (let i = 1; i < skeleton.length - 1; i += 1) {
+      const incoming = cardinalDirection(skeleton[i].x - skeleton[i - 1].x, skeleton[i].y - skeleton[i - 1].y);
+      const orientation = incoming.x !== 0 ? "h" : "v";
+      signals.push({
+        x: skeleton[i].x,
+        y: skeleton[i].y,
+        orientation,
+        pathIndex: nearestPathIndex(points, skeleton[i].x, skeleton[i].y)
+      });
+    }
+
+    return { points, signals };
   }
 
-  function isIntersectionPoint(point) {
-    if (!point) return false;
-    const rx = Math.round(point.x / ROAD_GAP) * ROAD_GAP;
-    const ry = Math.round(point.y / ROAD_GAP) * ROAD_GAP;
-    return Math.abs(point.x - rx) < 5 && Math.abs(point.y - ry) < 5;
+  function updateRouteProgress() {
+    const route = state.drive.route;
+    if (!route.length) return;
+    const start = Math.max(0, state.drive.routeIndex - 3);
+    const end = Math.min(route.length - 1, state.drive.routeIndex + 36);
+    let bestIndex = state.drive.routeIndex;
+    let bestDistance = Infinity;
+    for (let i = start; i <= end; i += 1) {
+      const d = distance(personalCar.x, personalCar.y, route[i].x, route[i].y);
+      if (d < bestDistance) {
+        bestDistance = d;
+        bestIndex = i;
+      }
+    }
+    state.drive.routeIndex = Math.max(state.drive.routeIndex, bestIndex);
+    while (
+      state.drive.routeIndex < route.length - 1 &&
+      distance(personalCar.x, personalCar.y, route[state.drive.routeIndex].x, route[state.drive.routeIndex].y) < 22
+    ) {
+      state.drive.routeIndex += 1;
+    }
+  }
+
+  function routeLookaheadTarget() {
+    const route = state.drive.route;
+    if (!route.length) return null;
+    const lookahead = 42 + personalCar.speed * 0.13;
+    let index = state.drive.routeIndex;
+    let previous = { x: personalCar.x, y: personalCar.y };
+    let accumulated = 0;
+    while (index < route.length) {
+      accumulated += distance(previous.x, previous.y, route[index].x, route[index].y);
+      if (accumulated >= lookahead) return route[index];
+      previous = route[index];
+      index += 1;
+    }
+    return route[route.length - 1];
   }
 
   function routeDirection() {
-    const target = state.drive.route[state.drive.routeIndex];
+    const target = routeLookaheadTarget();
     if (!target) return null;
     const dx = target.x - personalCar.x;
     const dy = target.y - personalCar.y;
@@ -363,21 +629,22 @@
   }
 
   function upcomingSignal() {
-    const direction = routeDirection();
-    if (!direction) return null;
-    for (let i = state.drive.routeIndex; i < state.drive.route.length; i += 1) {
-      const point = state.drive.route[i];
-      if (!isIntersectionPoint(point)) continue;
-      const d = distance(personalCar.x, personalCar.y, point.x, point.y);
-      if (d > 180) continue;
-      const stateName = signalStateAt(point.x, point.y, direction.orientation);
-      return {
-        state: stateName,
-        distance: d,
-        key: Math.round(point.x) + ":" + Math.round(point.y) + ":" + direction.orientation
-      };
+    let best = null;
+    for (const signal of state.drive.signals) {
+      if (signal.pathIndex < state.drive.routeIndex - 4) continue;
+      if (signal.pathIndex > state.drive.routeIndex + 46) continue;
+      const d = distance(personalCar.x, personalCar.y, signal.x, signal.y);
+      if (d > 210) continue;
+      if (!best || signal.pathIndex < best.pathIndex) {
+        best = {
+          state: signalStateAt(signal.x, signal.y, signal.orientation),
+          distance: d,
+          key: Math.round(signal.x) + ":" + Math.round(signal.y) + ":" + signal.orientation,
+          pathIndex: signal.pathIndex
+        };
+      }
     }
-    return null;
+    return best;
   }
 
   function leadVehicleInfo() {
@@ -405,7 +672,9 @@
 
   function setDrivingDestination(place) {
     state.drive.destination = place.id;
-    state.drive.route = buildDrivingRoute(place);
+    const plan = buildDrivingRoute(place);
+    state.drive.route = plan.points;
+    state.drive.signals = plan.signals;
     state.drive.routeIndex = 0;
     state.drive.score = 100;
     state.drive.speedingTimer = 0;
@@ -423,6 +692,7 @@
     showToast((destination ? destination.name : "目的地") + "に到着　運転評価 " + state.drive.score);
     state.drive.route = [];
     state.drive.routeIndex = 0;
+    state.drive.signals = [];
     state.drive.destination = null;
     personalCar.speed = 0;
     saveGame(false);
@@ -810,6 +1080,7 @@
     state.player.inVehicle = false;
     state.drive.route = [];
     state.drive.routeIndex = 0;
+    state.drive.signals = [];
     state.drive.destination = null;
     personalCar.speed = 0;
     document.body.classList.remove("driving");
@@ -996,23 +1267,15 @@
 
     const accelerating = touch.driveAccel || keys.has("w") || keys.has("arrowup");
     const braking = touch.driveBrake || keys.has("s") || keys.has("arrowdown") || keys.has(" ");
-    const route = state.drive.route;
-    let target = route[state.drive.routeIndex];
 
+    updateRouteProgress();
+    const target = routeLookaheadTarget();
     if (target) {
-      let d = distance(personalCar.x, personalCar.y, target.x, target.y);
-      if (d < 32 && state.drive.routeIndex < route.length - 1) {
-        state.drive.routeIndex += 1;
-        target = route[state.drive.routeIndex];
-        d = distance(personalCar.x, personalCar.y, target.x, target.y);
-      }
-
-      if (target) {
-        const desired = Math.atan2(target.y - personalCar.y, target.x - personalCar.x);
-        const diff = angleWrap(desired - personalCar.angle);
-        const turnFactor = clamp(Math.abs(personalCar.speed) / 120, 0.28, 1);
-        personalCar.angle += clamp(diff, -1.1, 1.1) * 2.5 * turnFactor * dt;
-      }
+      const desired = Math.atan2(target.y - personalCar.y, target.x - personalCar.x);
+      const diff = angleWrap(desired - personalCar.angle);
+      const speedRatio = clamp(personalCar.speed / 340, 0, 1);
+      const maxYawRate = 2.4 - speedRatio * 1.15;
+      personalCar.angle += clamp(diff, -maxYawRate * dt, maxYawRate * dt);
     }
 
     if (accelerating && !braking) personalCar.speed += 230 * dt;
@@ -1067,6 +1330,7 @@
     const oy = personalCar.y;
     personalCar.x += Math.cos(personalCar.angle) * personalCar.speed * dt;
     personalCar.y += Math.sin(personalCar.angle) * personalCar.speed * dt;
+
 
     if (!inWorld(personalCar.x, personalCar.y, 32) || collidesBuilding(personalCar.x, personalCar.y, 29)) {
       personalCar.x = ox;
@@ -1151,10 +1415,15 @@
       car.x += Math.cos(car.angle) * car.speed * dt;
       car.y += Math.sin(car.angle) * car.speed * dt;
 
-      if (!inWorld(car.x, car.y, 28) || collidesBuilding(car.x, car.y, 25)) {
+      if (!inWorld(car.x, car.y, 28)) {
+        if (car.x < COAST) car.x = WORLD_SIZE - COAST - 40;
+        if (car.x > WORLD_SIZE - COAST) car.x = COAST + 40;
+        if (car.y < COAST) car.y = WORLD_SIZE - COAST - 40;
+        if (car.y > WORLD_SIZE - COAST) car.y = COAST + 40;
+      } else if (collidesBuilding(car.x, car.y, 25)) {
         car.x = ox;
         car.y = oy;
-        car.angle += Math.PI;
+        car.speed *= 0.2;
       }
     }
   }
@@ -1868,6 +2137,7 @@
   if (state.player.inVehicle) {
     personalCar.speed = 0;
     state.drive.route = [];
+    state.drive.signals = [];
     state.drive.destination = null;
     document.body.classList.add("driving");
   }
