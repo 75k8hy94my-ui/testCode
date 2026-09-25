@@ -59,18 +59,23 @@
       '<div class="imageTransferDivider"></div>' +
       '<fieldset class="imageTransferModes"><legend>通信モード</legend>' + modeMarkup() + '</fieldset>' +
       '<label class="imageTransferLimit"><span><strong>1日の画像通信上限</strong></span><select id="profileImageDailyLimit" aria-label="1日の画像通信上限">' + limitMarkup(api) + '</select></label>' +
-      '<div class="imageTransferUsage" aria-live="polite">' +
-        '<div class="imageTransferUsageTop"><span>今日の制限カウント</span><strong id="profileImageUsageTotal">—</strong></div>' +
+      '<button class="imageTransferUsage" id="profileImageUsageButton" type="button" aria-haspopup="dialog" aria-controls="profileImageUsageDialog">' +
+        '<div class="imageTransferUsageTop"><span>推定使用量</span><strong id="profileImageUsageTotal">—</strong></div>' +
         '<div class="imageTransferUsageBar" aria-hidden="true"><span id="profileImageUsageFill"></span></div>' +
-        '<dl class="imageTransferStats">' +
-          '<div><dt>推計転送量</dt><dd id="profileImageEstimatedBytes">—</dd></div>' +
-          '<div><dt>受信オブジェクト量</dt><dd id="profileImageObservedBytes">—</dd></div>' +
-          '<div><dt>プレビュー</dt><dd id="profileImagePreviewBytes">—</dd></div>' +
-          '<div><dt>高画質タイル</dt><dd id="profileImageZoomBytes">—</dd></div>' +
-          '<div><dt>キャッシュで節約</dt><dd id="profileImageCacheSavedBytes">—</dd></div>' +
-          '<div><dt>部分読込で節約</dt><dd id="profileImagePartialSavedBytes">—</dd></div>' +
-          '<div><dt>Provider実測</dt><dd id="profileImageProviderBytes">未取得</dd></div>' +
-        '</dl>' +
+      '</button>' +
+      '<div class="imageTransferDialogBackdrop" id="profileImageUsageDialog" role="dialog" aria-modal="true" aria-labelledby="profileImageUsageDialogTitle" hidden>' +
+        '<div class="imageTransferDialog" role="document">' +
+          '<div class="imageTransferDialogHeader"><h4 id="profileImageUsageDialogTitle">推定使用量</h4><button class="imageTransferDialogClose" type="button" data-image-transfer-dialog-close aria-label="閉じる">×</button></div>' +
+          '<dl class="imageTransferStats">' +
+            '<div><dt>推計転送量</dt><dd id="profileImageEstimatedBytes">—</dd></div>' +
+            '<div><dt>受信オブジェクト量</dt><dd id="profileImageObservedBytes">—</dd></div>' +
+            '<div><dt>プレビュー</dt><dd id="profileImagePreviewBytes">—</dd></div>' +
+            '<div><dt>高画質タイル</dt><dd id="profileImageZoomBytes">—</dd></div>' +
+            '<div><dt>キャッシュで節約</dt><dd id="profileImageCacheSavedBytes">—</dd></div>' +
+            '<div><dt>部分読込で節約</dt><dd id="profileImagePartialSavedBytes">—</dd></div>' +
+            '<div><dt>Provider実測</dt><dd id="profileImageProviderBytes">未取得</dd></div>' +
+          '</dl>' +
+        '</div>' +
       '</div>';
     return section;
   }
@@ -134,6 +139,26 @@
 
     const limit = card.querySelector('#profileImageDailyLimit');
     if (limit) limit.addEventListener('change', () => api.setDailyLimitBytes(Number(limit.value)));
+
+    const usageButton = card.querySelector('#profileImageUsageButton');
+    const dialog = card.querySelector('#profileImageUsageDialog');
+    const closeButton = card.querySelector('[data-image-transfer-dialog-close]');
+    const closeDialog = () => {
+      if (!dialog || dialog.hidden) return;
+      dialog.hidden = true;
+      if (usageButton) usageButton.focus();
+    };
+    if (usageButton && dialog) usageButton.addEventListener('click', () => {
+      dialog.hidden = false;
+      if (closeButton) closeButton.focus();
+    });
+    if (closeButton) closeButton.addEventListener('click', closeDialog);
+    if (dialog) dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) closeDialog();
+    });
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && dialog && !dialog.hidden) closeDialog();
+    });
   }
 
   function mount() {
