@@ -4142,59 +4142,71 @@
     for (let gx = startX; gx <= endX; gx += 1) {
       for (let gy = startY; gy <= endY; gy += 1) {
         if (!isSignalizedIntersection(gx, gy)) continue;
+
+        const north = roadEdgeExists(gx, gy - 1, gx, gy);
+        const south = roadEdgeExists(gx, gy, gx, gy + 1);
+        const west = roadEdgeExists(gx - 1, gy, gx, gy);
+        const east = roadEdgeExists(gx, gy, gx + 1, gy);
+
         const wx = gx * ROAD_GAP;
         const wy = gy * ROAD_GAP;
         const sx = wx - state.camera.x;
         const sy = wy - state.camera.y;
         const hState = signalStateAt(wx, wy, "h");
         const vState = signalStateAt(wx, wy, "v");
-        const pole = ROAD_HALF + 30;
+        const halfRoad = intersectionHalfWidth(gx, gy);
+        const pole = halfRoad + 30;
+        const lane = Math.min(LANE_OFFSET, halfRoad * .42);
 
         ctx.strokeStyle = "#4d5552";
         ctx.lineWidth = 3;
 
-        // North approach: pole on sidewalk, arm over southbound lane.
-        ctx.beginPath();
-        ctx.moveTo(sx + ROAD_HALF + 11, sy - pole - 18);
-        ctx.lineTo(sx + ROAD_HALF + 11, sy - pole);
-        ctx.lineTo(sx + LANE_OFFSET, sy - pole);
-        ctx.stroke();
-        drawSignalHead(sx + LANE_OFFSET, sy - pole, "h", vState);
+        if (north) {
+          ctx.beginPath();
+          ctx.moveTo(sx + halfRoad + 11, sy - pole - 18);
+          ctx.lineTo(sx + halfRoad + 11, sy - pole);
+          ctx.lineTo(sx + lane, sy - pole);
+          ctx.stroke();
+          drawSignalHead(sx + lane, sy - pole, "h", vState);
+        }
 
-        // South approach.
-        ctx.beginPath();
-        ctx.moveTo(sx - ROAD_HALF - 11, sy + pole + 18);
-        ctx.lineTo(sx - ROAD_HALF - 11, sy + pole);
-        ctx.lineTo(sx - LANE_OFFSET, sy + pole);
-        ctx.stroke();
-        drawSignalHead(sx - LANE_OFFSET, sy + pole, "h", vState);
+        if (south) {
+          ctx.beginPath();
+          ctx.moveTo(sx - halfRoad - 11, sy + pole + 18);
+          ctx.lineTo(sx - halfRoad - 11, sy + pole);
+          ctx.lineTo(sx - lane, sy + pole);
+          ctx.stroke();
+          drawSignalHead(sx - lane, sy + pole, "h", vState);
+        }
 
-        // West approach.
-        ctx.beginPath();
-        ctx.moveTo(sx - pole - 18, sy - ROAD_HALF - 11);
-        ctx.lineTo(sx - pole, sy - ROAD_HALF - 11);
-        ctx.lineTo(sx - pole, sy - LANE_OFFSET);
-        ctx.stroke();
-        drawSignalHead(sx - pole, sy - LANE_OFFSET, "v", hState);
+        if (west) {
+          ctx.beginPath();
+          ctx.moveTo(sx - pole - 18, sy - halfRoad - 11);
+          ctx.lineTo(sx - pole, sy - halfRoad - 11);
+          ctx.lineTo(sx - pole, sy - lane);
+          ctx.stroke();
+          drawSignalHead(sx - pole, sy - lane, "v", hState);
+        }
 
-        // East approach.
-        ctx.beginPath();
-        ctx.moveTo(sx + pole + 18, sy + ROAD_HALF + 11);
-        ctx.lineTo(sx + pole, sy + ROAD_HALF + 11);
-        ctx.lineTo(sx + pole, sy + LANE_OFFSET);
-        ctx.stroke();
-        drawSignalHead(sx + pole, sy + LANE_OFFSET, "v", hState);
+        if (east) {
+          ctx.beginPath();
+          ctx.moveTo(sx + pole + 18, sy + halfRoad + 11);
+          ctx.lineTo(sx + pole, sy + halfRoad + 11);
+          ctx.lineTo(sx + pole, sy + lane);
+          ctx.stroke();
+          drawSignalHead(sx + pole, sy + lane, "v", hState);
+        }
 
-        // Separate pedestrian signals at the four corners.
         const pedV = vState === "red";
         const pedH = hState === "red";
-        drawPedestrianSignal(sx - ROAD_HALF - 18, sy - ROAD_HALF - 18, pedV);
-        drawPedestrianSignal(sx + ROAD_HALF + 18, sy + ROAD_HALF + 18, pedV);
-        drawPedestrianSignal(sx + ROAD_HALF + 18, sy - ROAD_HALF - 18, pedH);
-        drawPedestrianSignal(sx - ROAD_HALF - 18, sy + ROAD_HALF + 18, pedH);
+        if (north && west) drawPedestrianSignal(sx - halfRoad - 18, sy - halfRoad - 18, pedV);
+        if (south && east) drawPedestrianSignal(sx + halfRoad + 18, sy + halfRoad + 18, pedV);
+        if (north && east) drawPedestrianSignal(sx + halfRoad + 18, sy - halfRoad - 18, pedH);
+        if (south && west) drawPedestrianSignal(sx - halfRoad - 18, sy + halfRoad + 18, pedH);
       }
     }
   }
+
 
   function drawResidentialBuilding(building, x, y, palette, time) {
     const apartment = building.houseStyle === "small-apartment";
