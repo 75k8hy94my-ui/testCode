@@ -126,3 +126,24 @@ body:not(.driving) #mobileDrivingControls{display:none!important}
   #driveBrakeButton,#driveAccelButton{width:82px;height:82px}
   #driveMenuButton{width:78px;height:48px}
 }
+
+/* Unified visual polish for the upgraded city renderer. */
+#gameCanvas{image-rendering:auto;background:#788a75}
+.hud-card{
+  box-shadow:0 10px 30px rgba(7,12,10,.18),inset 0 1px 0 rgba(255,255,255,.035);
+  border-color:rgba(225,237,230,.14)
+}
+.status-card,.drive-card,.day-card,.objective-card{
+  background:linear-gradient(145deg,rgba(20,28,24,.88),rgba(14,20,17,.78))
+}
+.drive-card{box-shadow:0 12px 34px rgba(7,12,10,.22),0 0 0 1px rgba(101,184,211,.04)}
+.drive-speed-row strong{font-variant-numeric:tabular-nums;letter-spacing:-.04em}
+.action-sheet,.help-panel>div{
+  box-shadow:0 24px 70px rgba(4,8,6,.36),inset 0 1px 0 rgba(255,255,255,.04)
+}
+.top-actions button,.action-sheet button,.help-panel button{
+  transition:transform .12s ease,background .16s ease,border-color .16s ease
+}
+.top-actions button:hover,.action-sheet button:hover,.help-panel button:hover{
+  background:rgba(31,42,36,.96);border-color:rgba(255,255,255,.2)
+}
