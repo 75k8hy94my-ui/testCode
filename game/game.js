@@ -986,6 +986,14 @@
     state.drive.signalClock += dt;
     state.drive.collisionCooldown = Math.max(0, state.drive.collisionCooldown - dt);
 
+    if (!state.drive.destination || !state.drive.route.length) {
+      personalCar.speed *= Math.pow(0.72, dt * 10);
+      if (personalCar.speed < 1) personalCar.speed = 0;
+      state.player.x = personalCar.x;
+      state.player.y = personalCar.y;
+      return;
+    }
+
     const accelerating = touch.driveAccel || keys.has("w") || keys.has("arrowup");
     const braking = touch.driveBrake || keys.has("s") || keys.has("arrowdown") || keys.has(" ");
     const route = state.drive.route;
