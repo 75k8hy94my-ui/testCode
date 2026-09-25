@@ -13,6 +13,8 @@
     : (root.ImageTransferLedger || null);
   if (!settingsApi || !ledgerApi) throw new Error('Image transfer settings and ledger are required');
 
+  const activeControllers = new Set();
+
   function createAccessError(name, message, code) {
     const error = new Error(message);
     error.name = name;
@@ -67,6 +69,17 @@
     };
   }
 
+  function abortActiveRemoteReads() {
+    activeControllers.forEach((controller) => {
+      try { controller.abort(); } catch (_) {}
+    });
+    activeControllers.clear();
+  }
+
+  function releaseController(controller) {
+    if (controller) activeControllers.delete(controller);
+  }
+
   function acquire(options = {}) {
     const storage = options.storage;
     const now = options.now || new Date();
@@ -85,6 +98,8 @@
     }
 
     const kind = options.kind === 'preview' ? 'preview' : options.kind === 'zoom' ? 'zoom' : 'other';
+    const abortController = options.abortController && typeof options.abortController.abort === 'function' ? options.abortController : null;
+    if (abortController) activeControllers.add(abortController);
     let completed = false;
     return Object.freeze({
       estimatedBytes: reserved.amount,
@@ -95,7 +110,11 @@
       recordObserved(bytes) {
         if (completed) return ledgerApi.currentStats(storage, now);
         completed = true;
+        releaseController(abortController);
         return ledgerApi.recordObserved(bytes, kind, { storage, now });
+      },
+      release() {
+        releaseController(abortController);
       }
     });
   }
@@ -108,11 +127,22 @@
     return ledgerApi.recordPartialSavings(bytes, { storage: options.storage, now: options.now || new Date() });
   }
 
+  function enforceCurrentVpnPolicy() {
+    const settings = settingsApi.load();
+    if (settings.vpnRequired && !vpnAllowed(resolveMediaAccess())) abortActiveRemoteReads();
+  }
+
+  if (root.document && typeof root.document.addEventListener === 'function') {
+    root.document.addEventListener(settingsApi.EVENT_NAME, enforceCurrentVpnPolicy);
+    root.document.addEventListener('manga-reader-vpn-status', enforceCurrentVpnPolicy);
+  }
+
   return Object.freeze({
     evaluate,
     acquire,
     recordCacheHit,
     recordPartialSavings,
+    abortActiveRemoteReads,
     vpnAllowed,
     createAccessError,
   });
