@@ -84,7 +84,7 @@
       zoomRequests: number('zoomRequests'),
       cacheHits: number('cacheHits'),
       blockedByVpn: number('blockedByVpn'),
-      providerReportedBytes: sameDay && Number.isFinite(Number(source.providerReportedBytes)) && Number(source.providerReportedBytes) >= 0
+      providerReportedBytes: sameDay && source.providerReportedBytes != null && source.providerReportedBytes !== '' && Number.isFinite(Number(source.providerReportedBytes)) && Number(source.providerReportedBytes) >= 0
         ? Number(source.providerReportedBytes)
         : null,
       lastUpdatedAt: sameDay && Number.isFinite(Number(source.lastUpdatedAt)) ? Number(source.lastUpdatedAt) : 0,
