@@ -45,7 +45,7 @@
       '</label>' +
       '<div class="imageTransferDivider"></div>' +
       '<label class="imageTransferLimit"><span><strong>1日の画像通信上限</strong></span><select id="profileImageDailyLimit" aria-label="1日の画像通信上限">' + limitMarkup(api) + '</select></label>' +
-      '<button class="imageTransferUsage" id="profileImageUsageButton" type="button" aria-haspopup="dialog" aria-controls="profileImageUsageDialog">' +
+      '<button class="imageTransferUsage" id="profileImageUsageButton" type="button" aria-haspopup="dialog" aria-controls="profileImageUsageDialog" aria-expanded="false">' +
         '<div class="imageTransferUsageTop"><span>推定使用量</span><strong id="profileImageUsageTotal">—</strong></div>' +
         '<div class="imageTransferUsageBar" aria-hidden="true"><span id="profileImageUsageFill"></span></div>' +
       '</button>' +
@@ -123,10 +123,14 @@
     const closeDialog = () => {
       if (!dialog || dialog.hidden) return;
       dialog.hidden = true;
-      if (usageButton) usageButton.focus();
+      if (usageButton) {
+        usageButton.setAttribute('aria-expanded', 'false');
+        usageButton.focus();
+      }
     };
     if (usageButton && dialog) usageButton.addEventListener('click', () => {
       dialog.hidden = false;
+      usageButton.setAttribute('aria-expanded', 'true');
       if (closeButton) closeButton.focus();
     });
     if (closeButton) closeButton.addEventListener('click', closeDialog);
