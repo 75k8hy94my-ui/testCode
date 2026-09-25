@@ -1118,17 +1118,97 @@
     return angle;
   }
 
-  function roadSnap(x, y) {
-    const rx = Math.round(x / ROAD_GAP) * ROAD_GAP;
-    const ry = Math.round(y / ROAD_GAP) * ROAD_GAP;
-    if (Math.abs(x - rx) < Math.abs(y - ry)) {
-      return { x: rx, y, orientation: "v" };
+  function closestPointOnRoadEdge(x, y, axis, roadIndex, segmentIndex) {
+    const steps = 20;
+    const points = sampleRoadEdge(axis, roadIndex, segmentIndex, steps);
+    let best = null;
+    for (let i = 1; i < points.length; i += 1) {
+      const a = points[i - 1];
+      const b = points[i];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const length2 = dx * dx + dy * dy;
+      const u = length2 < .001 ? 0 : clamp(((x - a.x) * dx + (y - a.y) * dy) / length2, 0, 1);
+      const px = a.x + dx * u;
+      const py = a.y + dy * u;
+      const d = distance(x, y, px, py);
+      if (!best || d < best.distance) {
+        best = {
+          x:px,
+          y:py,
+          t:((i - 1) + u) / steps,
+          distance:d
+        };
+      }
     }
-    return { x, y: ry, orientation: "h" };
+    return best;
+  }
+
+  function roadSnap(x, y) {
+    const gx = Math.floor(x / ROAD_GAP);
+    const gy = Math.floor(y / ROAD_GAP);
+    let best = null;
+
+    for (let ix = gx - 3; ix <= gx + 3; ix += 1) {
+      for (let iy = gy - 3; iy <= gy + 3; iy += 1) {
+        if (roadEdgeExists(ix, iy, ix + 1, iy)) {
+          const hit = closestPointOnRoadEdge(x, y, "h", iy, ix);
+          if (hit && (!best || hit.distance < best.distance)) {
+            best = {
+              ...hit,
+              orientation:"h",
+              axis:"h",
+              roadIndex:iy,
+              segmentIndex:ix,
+              a:{ gx:ix, gy:iy },
+              b:{ gx:ix + 1, gy:iy }
+            };
+          }
+        }
+        if (roadEdgeExists(ix, iy, ix, iy + 1)) {
+          const hit = closestPointOnRoadEdge(x, y, "v", ix, iy);
+          if (hit && (!best || hit.distance < best.distance)) {
+            best = {
+              ...hit,
+              orientation:"v",
+              axis:"v",
+              roadIndex:ix,
+              segmentIndex:iy,
+              a:{ gx:ix, gy:iy },
+              b:{ gx:ix, gy:iy + 1 }
+            };
+          }
+        }
+      }
+    }
+
+    if (!best) {
+      return {
+        x, y,
+        orientation:"h",
+        axis:"h",
+        roadIndex:Math.round(y / ROAD_GAP),
+        segmentIndex:Math.floor(x / ROAD_GAP),
+        t:.5,
+        a:{ gx:routeGridBounds(Math.floor(x / ROAD_GAP)), gy:routeGridBounds(Math.round(y / ROAD_GAP)) },
+        b:{ gx:routeGridBounds(Math.ceil(x / ROAD_GAP)), gy:routeGridBounds(Math.round(y / ROAD_GAP)) },
+        distance:Infinity
+      };
+    }
+    best.nearestNode = best.t <= .5 ? best.a : best.b;
+    return best;
   }
 
   function destinationRoadPoint(place) {
-    return { x: place.x, y: place.gy * ROAD_GAP, orientation: "h" };
+    return roadSnap(place.x, place.y);
+  }
+
+  function nextIntersectionAhead(start, orientation, direction) {
+    if (start && start.a && start.b) {
+      if (orientation === "h") return direction.x >= 0 ? start.b : start.a;
+      return direction.y >= 0 ? start.b : start.a;
+    }
+    return start.nearestNode || start.a;
   }
 
   function cardinalDirection(dx, dy) {
@@ -1262,77 +1342,104 @@
     return nodes;
   }
 
-  function buildLanePath(skeleton) {
+  function chaikinSmooth(points, iterations = 2) {
+    let current = points.slice();
+    for (let pass = 0; pass < iterations; pass += 1) {
+      if (current.length < 3) break;
+      const next = [current[0]];
+      for (let i = 0; i < current.length - 1; i += 1) {
+        const a = current[i];
+        const b = current[i + 1];
+        next.push({
+          x:a.x * .75 + b.x * .25,
+          y:a.y * .75 + b.y * .25
+        });
+        next.push({
+          x:a.x * .25 + b.x * .75,
+          y:a.y * .25 + b.y * .75
+        });
+      }
+      next.push(current[current.length - 1]);
+      current = next;
+    }
+    return current;
+  }
+
+  function buildLanePath(centerline) {
     const clean = [];
-    for (const point of skeleton) {
+    for (const point of centerline) {
       const previous = clean[clean.length - 1];
-      if (!previous || distance(previous.x, previous.y, point.x, point.y) > 1) clean.push(point);
+      if (!previous || distance(previous.x, previous.y, point.x, point.y) > 2) clean.push(point);
     }
-    if (clean.length < 2) return [{ x: personalCar.x, y: personalCar.y }];
+    if (clean.length < 2) return [{ x:personalCar.x, y:personalCar.y }];
 
-    const directions = [];
-    for (let i = 0; i < clean.length - 1; i += 1) {
-      directions.push(cardinalDirection(clean[i + 1].x - clean[i].x, clean[i + 1].y - clean[i].y));
-    }
+    const smooth = chaikinSmooth(clean, 2);
+    const lanePoints = [];
 
-    const points = [{ x: personalCar.x, y: personalCar.y }];
-    const firstLane = lanePoint(clean[0], directions[0]);
-    appendLine(points, points[points.length - 1], firstLane, 10);
-
-    let cursor = firstLane;
-    for (let i = 0; i < directions.length; i += 1) {
-      const direction = directions[i];
-      const segmentEnd = clean[i + 1];
-      const laneEnd = lanePoint(segmentEnd, direction);
-
-      if (i === directions.length - 1) {
-        appendLine(points, cursor, laneEnd);
-        cursor = laneEnd;
-        continue;
-      }
-
-      const nextDirection = directions[i + 1];
-      const isTurn = direction.x !== nextDirection.x || direction.y !== nextDirection.y;
-      if (!isTurn) {
-        appendLine(points, cursor, laneEnd);
-        cursor = laneEnd;
-        continue;
-      }
-
-      const currentLength = distance(clean[i].x, clean[i].y, segmentEnd.x, segmentEnd.y);
-      const nextLength = distance(segmentEnd.x, segmentEnd.y, clean[i + 2].x, clean[i + 2].y);
-      const radius = Math.max(34, Math.min(TURN_RADIUS, currentLength * 0.32, nextLength * 0.32));
-      const currentNormal = laneNormal(direction);
-      const nextNormal = laneNormal(nextDirection);
-      const approach = {
-        x: segmentEnd.x - direction.x * radius + currentNormal.x * LANE_OFFSET,
-        y: segmentEnd.y - direction.y * radius + currentNormal.y * LANE_OFFSET
-      };
-      const departure = {
-        x: segmentEnd.x + nextDirection.x * radius + nextNormal.x * LANE_OFFSET,
-        y: segmentEnd.y + nextDirection.y * radius + nextNormal.y * LANE_OFFSET
-      };
-      const tangentIntersection = direction.x !== 0
-        ? { x: departure.x, y: approach.y }
-        : { x: approach.x, y: departure.y };
-      const kappa = 0.5522847498;
-      const tangentIn = distance(approach.x, approach.y, tangentIntersection.x, tangentIntersection.y) * kappa;
-      const tangentOut = distance(departure.x, departure.y, tangentIntersection.x, tangentIntersection.y) * kappa;
-      const control1 = {
-        x: approach.x + direction.x * tangentIn,
-        y: approach.y + direction.y * tangentIn
-      };
-      const control2 = {
-        x: departure.x - nextDirection.x * tangentOut,
-        y: departure.y - nextDirection.y * tangentOut
-      };
-
-      appendLine(points, cursor, approach);
-      appendCubic(points, approach, control1, control2, departure);
-      cursor = departure;
+    for (let i = 0; i < smooth.length; i += 1) {
+      const previous = smooth[Math.max(0, i - 1)];
+      const next = smooth[Math.min(smooth.length - 1, i + 1)];
+      let tx = next.x - previous.x;
+      let ty = next.y - previous.y;
+      const mag = Math.hypot(tx, ty) || 1;
+      tx /= mag;
+      ty /= mag;
+      const nx = ty;
+      const ny = -tx;
+      lanePoints.push({
+        x:smooth[i].x + nx * LANE_OFFSET,
+        y:smooth[i].y + ny * LANE_OFFSET
+      });
     }
 
+    const points = [{ x:personalCar.x, y:personalCar.y }];
+    appendLine(points, points[0], lanePoints[0], 10);
+    for (let i = 1; i < lanePoints.length; i += 1) {
+      appendLine(points, points[points.length - 1], lanePoints[i], ROUTE_SAMPLE_STEP);
+    }
     return points;
+  }
+
+  function roadEdgePointsBetweenNodes(a, b, steps = 10) {
+    if (a.gy === b.gy && Math.abs(a.gx - b.gx) === 1) {
+      const segmentIndex = Math.min(a.gx, b.gx);
+      const points = sampleRoadEdge("h", a.gy, segmentIndex, steps);
+      return b.gx > a.gx ? points : points.reverse();
+    }
+    if (a.gx === b.gx && Math.abs(a.gy - b.gy) === 1) {
+      const segmentIndex = Math.min(a.gy, b.gy);
+      const points = sampleRoadEdge("v", a.gx, segmentIndex, steps);
+      return b.gy > a.gy ? points : points.reverse();
+    }
+    return [
+      { x:a.gx * ROAD_GAP, y:a.gy * ROAD_GAP },
+      { x:b.gx * ROAD_GAP, y:b.gy * ROAD_GAP }
+    ];
+  }
+
+  function partialRoadEdgePoints(snap, node, fromSnap) {
+    const full = sampleRoadEdge(snap.axis, snap.roadIndex, snap.segmentIndex, 16);
+    const towardB = node.gx === snap.b.gx && node.gy === snap.b.gy;
+    const ordered = towardB ? full : full.slice().reverse();
+    const snapIndex = Math.round((towardB ? snap.t : 1 - snap.t) * 16);
+
+    if (fromSnap) {
+      const points = [{ x:snap.x, y:snap.y }];
+      for (let i = snapIndex + 1; i < ordered.length; i += 1) points.push(ordered[i]);
+      return points;
+    }
+
+    const points = [];
+    for (let i = 0; i <= snapIndex; i += 1) points.push(ordered[i]);
+    points.push({ x:snap.x, y:snap.y });
+    return points;
+  }
+
+  function appendDistinctPoints(target, source) {
+    for (const point of source) {
+      const previous = target[target.length - 1];
+      if (!previous || distance(previous.x, previous.y, point.x, point.y) > 1) target.push(point);
+    }
   }
 
   function nearestPathIndex(points, x, y) {
@@ -1355,175 +1462,77 @@
       const sign = Math.abs(Math.cos(personalCar.angle)) > 0.25
         ? (Math.cos(personalCar.angle) >= 0 ? 1 : -1)
         : (place.x >= personalCar.x ? 1 : -1);
-      initialDirection = { x: sign, y: 0 };
+      initialDirection = { x:sign, y:0 };
     } else {
       const sign = Math.abs(Math.sin(personalCar.angle)) > 0.25
         ? (Math.sin(personalCar.angle) >= 0 ? 1 : -1)
         : (place.y >= personalCar.y ? 1 : -1);
-      initialDirection = { x: 0, y: sign };
+      initialDirection = { x:0, y:sign };
     }
 
-    const firstNode = nextIntersectionAhead(start, start.orientation, initialDirection);
+    let firstNode = nextIntersectionAhead(start, start.orientation, initialDirection);
     const end = destinationRoadPoint(place);
-    const goalNode = {
-      gx: routeGridBounds(Math.round(end.x / ROAD_GAP)),
-      gy: routeGridBounds(Math.round(end.y / ROAD_GAP))
-    };
-    const gridNodes = gridRoute(firstNode, goalNode, initialDirection);
-    const skeleton = [
-      { x: start.x, y: start.y },
-      { x: firstNode.gx * ROAD_GAP, y: firstNode.gy * ROAD_GAP }
-    ];
+    const goalNode = end.nearestNode || end.a;
+
+    let gridNodes = gridRoute(firstNode, goalNode, initialDirection);
+
+    // A saved car may face the dead-end side of a local street. If routing from
+    // that endpoint fails, route through the opposite endpoint instead.
+    if (
+      gridNodes.length === 1 &&
+      (firstNode.gx !== goalNode.gx || firstNode.gy !== goalNode.gy)
+    ) {
+      const alternate = firstNode.gx === start.a.gx && firstNode.gy === start.a.gy ? start.b : start.a;
+      const alternateDirection = start.orientation === "h"
+        ? { x:alternate.gx > firstNode.gx ? 1 : -1, y:0 }
+        : { x:0, y:alternate.gy > firstNode.gy ? 1 : -1 };
+      const retry = gridRoute(alternate, goalNode, alternateDirection);
+      if (retry.length > 1 || (alternate.gx === goalNode.gx && alternate.gy === goalNode.gy)) {
+        firstNode = alternate;
+        gridNodes = retry;
+        initialDirection = alternateDirection;
+      }
+    }
+
+    const centerline = [];
+    appendDistinctPoints(centerline, partialRoadEdgePoints(start, firstNode, true));
 
     for (let i = 1; i < gridNodes.length; i += 1) {
-      skeleton.push({ x: gridNodes[i].gx * ROAD_GAP, y: gridNodes[i].gy * ROAD_GAP });
+      appendDistinctPoints(centerline, roadEdgePointsBetweenNodes(gridNodes[i - 1], gridNodes[i], 10));
     }
-    skeleton.push({ x: end.x, y: end.y });
 
-    const points = buildLanePath(skeleton);
+    if (gridNodes.length) {
+      const lastNode = gridNodes[gridNodes.length - 1];
+      if (lastNode.gx === goalNode.gx && lastNode.gy === goalNode.gy) {
+        appendDistinctPoints(centerline, partialRoadEdgePoints(end, goalNode, false));
+      }
+    }
+
+    if (centerline.length < 2) {
+      centerline.push({ x:start.x, y:start.y }, { x:end.x, y:end.y });
+    }
+
+    const points = buildLanePath(centerline);
     const signals = [];
-    for (let i = 1; i < skeleton.length - 1; i += 1) {
-      const incoming = cardinalDirection(skeleton[i].x - skeleton[i - 1].x, skeleton[i].y - skeleton[i - 1].y);
+    for (let i = 0; i < gridNodes.length; i += 1) {
+      const node = gridNodes[i];
+      if (!isSignalizedIntersection(node.gx, node.gy)) continue;
+      const previous = i > 0 ? gridNodes[i - 1] : firstNode;
+      const incoming = cardinalDirection(node.gx - previous.gx, node.gy - previous.gy);
       const orientation = incoming.x !== 0 ? "h" : "v";
+      const x = node.gx * ROAD_GAP;
+      const y = node.gy * ROAD_GAP;
       signals.push({
-        x: skeleton[i].x,
-        y: skeleton[i].y,
+        x,
+        y,
         orientation,
-        pathIndex: nearestPathIndex(points, skeleton[i].x, skeleton[i].y)
+        pathIndex:nearestPathIndex(points, x, y)
       });
     }
 
     return { points, signals };
   }
 
-  function updateRouteProgress() {
-    const route = state.drive.route;
-    if (!route.length) return;
-    const start = Math.max(0, state.drive.routeIndex - 3);
-    const end = Math.min(route.length - 1, state.drive.routeIndex + 36);
-    let bestIndex = state.drive.routeIndex;
-    let bestDistance = Infinity;
-    for (let i = start; i <= end; i += 1) {
-      const d = distance(personalCar.x, personalCar.y, route[i].x, route[i].y);
-      if (d < bestDistance) {
-        bestDistance = d;
-        bestIndex = i;
-      }
-    }
-    state.drive.routeIndex = Math.max(state.drive.routeIndex, bestIndex);
-    while (
-      state.drive.routeIndex < route.length - 1 &&
-      distance(personalCar.x, personalCar.y, route[state.drive.routeIndex].x, route[state.drive.routeIndex].y) < 22
-    ) {
-      state.drive.routeIndex += 1;
-    }
-  }
-
-  function routeLookaheadTarget() {
-    const route = state.drive.route;
-    if (!route.length) return null;
-    const lookahead = 42 + personalCar.speed * 0.13;
-    let index = state.drive.routeIndex;
-    let previous = { x: personalCar.x, y: personalCar.y };
-    let accumulated = 0;
-    while (index < route.length) {
-      accumulated += distance(previous.x, previous.y, route[index].x, route[index].y);
-      if (accumulated >= lookahead) return route[index];
-      previous = route[index];
-      index += 1;
-    }
-    return route[route.length - 1];
-  }
-
-  function routeDirection() {
-    const target = routeLookaheadTarget();
-    if (!target) return null;
-    const dx = target.x - personalCar.x;
-    const dy = target.y - personalCar.y;
-    if (Math.hypot(dx, dy) < 1) return null;
-    return { dx, dy, orientation: Math.abs(dx) >= Math.abs(dy) ? "h" : "v" };
-  }
-
-  function nearestRoadSegmentInfo(x, y, searchRadius = 2) {
-    const gx = Math.floor(x / ROAD_GAP);
-    const gy = Math.floor(y / ROAD_GAP);
-    let best = null;
-
-    for (let ix = gx - searchRadius; ix <= gx + searchRadius; ix += 1) {
-      for (let iy = gy - searchRadius; iy <= gy + searchRadius; iy += 1) {
-        if (roadEdgeExists(ix, iy, ix + 1, iy)) {
-          const d = roadDistanceToEdge(x, y, "h", iy, ix);
-          if (!best || d < best.distance) best = { axis:"h", roadIndex:iy, segmentIndex:ix, distance:d };
-        }
-        if (roadEdgeExists(ix, iy, ix, iy + 1)) {
-          const d = roadDistanceToEdge(x, y, "v", ix, iy);
-          if (!best || d < best.distance) best = { axis:"v", roadIndex:ix, segmentIndex:iy, distance:d };
-        }
-      }
-    }
-    return best;
-  }
-
-  function speedLimitAt(x, y) {
-    const info = nearestRoadSegmentInfo(x, y, 2);
-    if (!info) return 40;
-    const style = roadSegmentStyle(info.axis, info.roadIndex, info.segmentIndex);
-    if (style === "arterial") return 60;
-    if (style === "station" || style === "commercial") return 40;
-    if (style === "residential") return 30;
-    if (style === "park") return 40;
-    return 50;
-  }
-
-  function signalStateAt(ix, iy, orientation) {
-    const offset = hash2(Math.round(ix / ROAD_GAP), Math.round(iy / ROAD_GAP), 612) * SIGNAL_CYCLE;
-    const phase = (state.drive.signalClock + offset) % SIGNAL_CYCLE;
-    const horizontal = phase < 8 ? "green" : phase < 10 ? "yellow" : "red";
-    const vertical = phase >= 10 && phase < 18 ? "green" : phase >= 18 ? "yellow" : "red";
-    return orientation === "h" ? horizontal : vertical;
-  }
-
-  function upcomingSignal() {
-    let best = null;
-    for (const signal of state.drive.signals) {
-      if (signal.pathIndex < state.drive.routeIndex - 4) continue;
-      if (signal.pathIndex > state.drive.routeIndex + 46) continue;
-      const d = distance(personalCar.x, personalCar.y, signal.x, signal.y);
-      if (d > 210) continue;
-      if (!best || signal.pathIndex < best.pathIndex) {
-        best = {
-          state: signalStateAt(signal.x, signal.y, signal.orientation),
-          distance: d,
-          key: Math.round(signal.x) + ":" + Math.round(signal.y) + ":" + signal.orientation,
-          pathIndex: signal.pathIndex
-        };
-      }
-    }
-    return best;
-  }
-
-  function leadVehicleInfo() {
-    const hx = Math.cos(personalCar.angle);
-    const hy = Math.sin(personalCar.angle);
-    let best = null;
-    for (const car of traffic) {
-      const dx = car.x - personalCar.x;
-      const dy = car.y - personalCar.y;
-      const forward = dx * hx + dy * hy;
-      if (forward <= 0 || forward > 280) continue;
-      const lateral = Math.abs(dx * -hy + dy * hx);
-      if (lateral > 72) continue;
-      const sameDirection = Math.cos(car.angle) * hx + Math.sin(car.angle) * hy;
-      if (sameDirection < 0.35) continue;
-      if (!best || forward < best.distance) best = { car, distance: forward };
-    }
-    return best;
-  }
-
-  function penalizeDriving(amount, message) {
-    state.drive.score = clamp(state.drive.score - amount, 0, 100);
-    if (message) showToast(message);
-  }
 
   function setDrivingDestination(place) {
     state.drive.destination = place.id;
