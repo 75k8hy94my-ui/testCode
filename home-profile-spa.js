@@ -84,6 +84,10 @@ function renderProfile(){
   const resetPassphrase=$('profilePassphraseResetBtn');if(resetPassphrase)resetPassphrase.addEventListener('click',()=>{const current=currentPassphrase&&currentPassphrase.value;const next=$('profileNewPassphrase');const confirmation=$('profileNewPassphraseConfirm');if(!current||!next||!next.value){setProfileSecurityStatus('現在と新しいパスフレーズを入力してください。',true);return;}if(!confirmation||next.value!==confirmation.value){setProfileSecurityStatus('新しいパスフレーズが一致しません。',true);return;}runProfileSecurity(()=>MangaVault.changePassphrase(current,next.value),'パスフレーズを再設定しました。');});
   const logoutBtn=$('profileLogoutBtn');if(logoutBtn)logoutBtn.addEventListener('click',()=>{if(window.ProfileMenu&&typeof ProfileMenu.logout==='function')ProfileMenu.logout(logoutBtn);});
   renderFixedNonVpnIps();
+  loadScript('image-transfer-settings.js?v=20260925-image-sync-ui','imageTransferSettingsScript')
+    .then(()=>loadScript('image-transfer-settings-ui.js?v=20260925-image-sync-ui','imageTransferSettingsUiScript'))
+    .then(()=>{if(window.ImageTransferSettingsUI&&typeof ImageTransferSettingsUI.mount==='function')ImageTransferSettingsUI.mount();})
+    .catch(()=>{});
   const edit=$('editHomeBtn');if(edit)edit.hidden=true;syncHeaderRoute();
 }
 function loadScript(src,id){return new Promise((resolve,reject)=>{const existing=id&&document.getElementById(id);if(existing){if(existing.dataset.loaded==='1')resolve();else existing.addEventListener('load',resolve,{once:true});return;}const script=document.createElement('script');if(id)script.id=id;script.src=src;script.addEventListener('load',()=>{script.dataset.loaded='1';resolve();},{once:true});script.addEventListener('error',reject,{once:true});document.body.appendChild(script);});}
