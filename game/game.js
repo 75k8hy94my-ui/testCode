@@ -1351,7 +1351,7 @@
     }
 
     const signal = upcomingSignal();
-    if (signal && signal.state === "red" && signal.distance < 126 && personalCar.speed > 18 && !state.drive.violationKeys.has(signal.key)) {
+    if (signal && signal.state === "red" && signal.distance < 138 && personalCar.speed > 18 && !state.drive.violationKeys.has(signal.key)) {
       state.drive.violationKeys.add(signal.key);
       penalizeDriving(18, "赤信号を通過しました");
     }
@@ -1430,7 +1430,7 @@
       const roadLimit = speedLimitAt(car.x, car.y) / SPEED_TO_KMH;
       let targetSpeed = Math.min(car.cruise, roadLimit * 0.92);
       if ((signal === "red" || signal === "yellow") && intersectionDistance < 190) {
-        targetSpeed = Math.max(0, (intersectionDistance - 136) * 2.6);
+        targetSpeed = Math.max(0, (intersectionDistance - 150) * 2.6);
       }
 
       const hx = Math.cos(car.angle);
@@ -1775,14 +1775,14 @@
 
     // Yellow tactile paving at curb ramps.
     const curb = ROAD_HALF + 14;
-    drawTactilePad(sx - halfSpan - 13, sy - crossingOffset, false);
-    drawTactilePad(sx + halfSpan + 13, sy - crossingOffset, false);
-    drawTactilePad(sx - halfSpan - 13, sy + crossingOffset, false);
-    drawTactilePad(sx + halfSpan + 13, sy + crossingOffset, false);
-    drawTactilePad(sx - crossingOffset, sy - halfSpan - 13, true);
-    drawTactilePad(sx - crossingOffset, sy + halfSpan + 13, true);
-    drawTactilePad(sx + crossingOffset, sy - halfSpan - 13, true);
-    drawTactilePad(sx + crossingOffset, sy + halfSpan + 13, true);
+    drawTactilePad(sx - curb, sy - crossingOffset, false);
+    drawTactilePad(sx + curb, sy - crossingOffset, false);
+    drawTactilePad(sx - curb, sy + crossingOffset, false);
+    drawTactilePad(sx + curb, sy + crossingOffset, false);
+    drawTactilePad(sx - crossingOffset, sy - curb, true);
+    drawTactilePad(sx - crossingOffset, sy + curb, true);
+    drawTactilePad(sx + crossingOffset, sy - curb, true);
+    drawTactilePad(sx + crossingOffset, sy + curb, true);
 
     // Short white guard pipes on the sidewalk corners.
     drawGuardPipe(sx - curb - 20, sy - curb - 44, sx - curb - 20, sy - curb - 10);
@@ -1877,52 +1877,73 @@
       ctx.fillRect(0, cy + 42, viewWidth, 18);
     }
 
-    ctx.fillStyle = "#a7a89f";
+    // Sidewalks exist between intersections, not across the vehicle junction.
     for (let i = startX; i <= endX; i += 1) {
       const left = i * ROAD_GAP - ROAD_HALF - 16 - state.camera.x;
       const right = i * ROAD_GAP + ROAD_HALF - state.camera.x;
-      ctx.fillRect(left, 0, 16, viewHeight);
-      ctx.fillRect(right, 0, 16, viewHeight);
-      ctx.fillStyle = "rgba(255,255,255,.16)";
-      ctx.fillRect(left, 0, 2, viewHeight);
-      ctx.fillRect(right + 14, 0, 2, viewHeight);
-      ctx.fillStyle = "#a7a89f";
+      for (let gy = startY - 1; gy <= endY; gy += 1) {
+        const y1 = gy * ROAD_GAP + ROAD_HALF - state.camera.y;
+        const y2 = (gy + 1) * ROAD_GAP - ROAD_HALF - state.camera.y;
+        if (y2 <= y1) continue;
+        ctx.fillStyle = "#a9aaa4";
+        ctx.fillRect(left, y1, 16, y2 - y1);
+        ctx.fillRect(right, y1, 16, y2 - y1);
+        ctx.fillStyle = "rgba(255,255,255,.16)";
+        ctx.fillRect(left, y1, 2, y2 - y1);
+        ctx.fillRect(right + 14, y1, 2, y2 - y1);
+      }
     }
     for (let i = startY; i <= endY; i += 1) {
       const top = i * ROAD_GAP - ROAD_HALF - 16 - state.camera.y;
       const bottom = i * ROAD_GAP + ROAD_HALF - state.camera.y;
-      ctx.fillRect(0, top, viewWidth, 16);
-      ctx.fillRect(0, bottom, viewWidth, 16);
-      ctx.fillStyle = "rgba(255,255,255,.16)";
-      ctx.fillRect(0, top, viewWidth, 2);
-      ctx.fillRect(0, bottom + 14, viewWidth, 2);
-      ctx.fillStyle = "#a7a89f";
+      for (let gx = startX - 1; gx <= endX; gx += 1) {
+        const x1 = gx * ROAD_GAP + ROAD_HALF - state.camera.x;
+        const x2 = (gx + 1) * ROAD_GAP - ROAD_HALF - state.camera.x;
+        if (x2 <= x1) continue;
+        ctx.fillStyle = "#a9aaa4";
+        ctx.fillRect(x1, top, x2 - x1, 16);
+        ctx.fillRect(x1, bottom, x2 - x1, 16);
+        ctx.fillStyle = "rgba(255,255,255,.16)";
+        ctx.fillRect(x1, top, x2 - x1, 2);
+        ctx.fillRect(x1, bottom + 14, x2 - x1, 2);
+      }
     }
 
     // Japanese-style two-way streets: one lane each direction, edge lines, and
     // center lines that stop before each intersection instead of running through it.
     ctx.strokeStyle = "rgba(239,241,237,.68)";
     ctx.lineWidth = 2;
+    const edgeClearance = ROAD_HALF + 58;
     for (let i = startX; i <= endX; i += 1) {
       const sx = i * ROAD_GAP - state.camera.x;
-      for (const edge of [-ROAD_HALF + 18, ROAD_HALF - 18]) {
-        ctx.beginPath();
-        ctx.moveTo(sx + edge, 0);
-        ctx.lineTo(sx + edge, viewHeight);
-        ctx.stroke();
+      for (let gy = startY - 1; gy <= endY; gy += 1) {
+        const sy1 = gy * ROAD_GAP + edgeClearance - state.camera.y;
+        const sy2 = (gy + 1) * ROAD_GAP - edgeClearance - state.camera.y;
+        if (sy2 <= sy1) continue;
+        for (const edge of [-ROAD_HALF + 18, ROAD_HALF - 18]) {
+          ctx.beginPath();
+          ctx.moveTo(sx + edge, sy1);
+          ctx.lineTo(sx + edge, sy2);
+          ctx.stroke();
+        }
       }
     }
     for (let i = startY; i <= endY; i += 1) {
       const sy = i * ROAD_GAP - state.camera.y;
-      for (const edge of [-ROAD_HALF + 18, ROAD_HALF - 18]) {
-        ctx.beginPath();
-        ctx.moveTo(0, sy + edge);
-        ctx.lineTo(viewWidth, sy + edge);
-        ctx.stroke();
+      for (let gx = startX - 1; gx <= endX; gx += 1) {
+        const sx1 = gx * ROAD_GAP + edgeClearance - state.camera.x;
+        const sx2 = (gx + 1) * ROAD_GAP - edgeClearance - state.camera.x;
+        if (sx2 <= sx1) continue;
+        for (const edge of [-ROAD_HALF + 18, ROAD_HALF - 18]) {
+          ctx.beginPath();
+          ctx.moveTo(sx1, sy + edge);
+          ctx.lineTo(sx2, sy + edge);
+          ctx.stroke();
+        }
       }
     }
 
-    const intersectionClearance = ROAD_HALF + 44;
+    const intersectionClearance = ROAD_HALF + 66;
     for (let i = startX; i <= endX; i += 1) {
       const major = Math.abs(i) % 5 === 0;
       for (let gy = startY - 1; gy <= endY; gy += 1) {
