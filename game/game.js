@@ -1785,7 +1785,8 @@
 
     const item = nearestInteraction();
     if (!item) {
-      showToast("近くに利用できるものはありません");
+      if (state.player.inTrain) showToast("駅に停車してから降りられます");
+      else showToast("近くに利用できるものはありません");
       return;
     }
 
@@ -3440,7 +3441,7 @@
   }
 
   function drawCityLandmarks() {
-    const station = worldToScreen(8 * ROAD_GAP + ROAD_GAP / 2, 5 * ROAD_GAP + ROAD_GAP / 2);
+    const station = worldToScreen(TRAIN_STATIONS[1].accessX, TRAIN_STATIONS[1].accessY + 34);
     if (station.x > -400 && station.y > -400 && station.x < viewWidth + 400 && station.y < viewHeight + 400) {
       // Station entrance / canopy.
       ctx.fillStyle = "#4a5554";
@@ -3451,7 +3452,7 @@
       ctx.fillStyle = "#384340";
       ctx.font = "800 16px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("若葉駅", station.x, station.y - 5);
+      ctx.fillText("若葉駅 南口", station.x, station.y - 5);
       ctx.fillStyle = "#5a6864";
       ctx.fillRect(station.x - 76, station.y + 11, 10, 42);
       ctx.fillRect(station.x + 66, station.y + 11, 10, 42);
