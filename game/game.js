@@ -2276,6 +2276,234 @@
     ctx.fillRect(p.x + 6, p.y - 31, 9, 6);
   }
 
+  function drawNeighborhoodGround() {
+    const startGX = Math.floor(state.camera.x / ROAD_GAP) - 1;
+    const endGX = Math.ceil((state.camera.x + viewWidth) / ROAD_GAP) + 1;
+    const startGY = Math.floor(state.camera.y / ROAD_GAP) - 1;
+    const endGY = Math.ceil((state.camera.y + viewHeight) / ROAD_GAP) + 1;
+
+    for (let gx = startGX; gx <= endGX; gx += 1) {
+      for (let gy = startGY; gy <= endGY; gy += 1) {
+        const style = cityBlockStyle(gx, gy);
+        if (style === "outer") continue;
+
+        const x = gx * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN - state.camera.x;
+        const y = gy * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN - state.camera.y;
+        const w = ROAD_GAP - ROAD_WIDTH - BLOCK_MARGIN * 2;
+        const h = w;
+
+        if (style === "station") {
+          ctx.fillStyle = "#b7b4aa";
+          roundedRectPath(ctx, x + 6, y + 6, w - 12, h - 12, 10);
+          ctx.fill();
+
+          ctx.strokeStyle = "rgba(255,255,255,.19)";
+          ctx.lineWidth = 1;
+          for (let tx = x + 18; tx < x + w - 18; tx += 28) {
+            ctx.beginPath();
+            ctx.moveTo(tx, y + 12);
+            ctx.lineTo(tx, y + h - 12);
+            ctx.stroke();
+          }
+          for (let ty = y + 18; ty < y + h - 18; ty += 28) {
+            ctx.beginPath();
+            ctx.moveTo(x + 12, ty);
+            ctx.lineTo(x + w - 12, ty);
+            ctx.stroke();
+          }
+
+          // Compressed bus/taxi bays facing the arterial.
+          ctx.strokeStyle = "rgba(239,241,237,.65)";
+          ctx.lineWidth = 2;
+          for (let n = 0; n < 4; n += 1) {
+            const bx = x + 40 + n * 58;
+            ctx.strokeRect(bx, y + h - 55, 45, 36);
+          }
+          ctx.fillStyle = "rgba(52,69,67,.58)";
+          ctx.font = "700 10px system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("BUS", x + w - 54, y + h - 31);
+          continue;
+        }
+
+        if (style === "arcade") {
+          const laneW = 78;
+          const laneX = x + w / 2 - laneW / 2;
+          ctx.fillStyle = "#b9b5a8";
+          roundedRectPath(ctx, laneX, y + 5, laneW, h - 10, 7);
+          ctx.fill();
+          ctx.fillStyle = "rgba(236,231,212,.23)";
+          for (let ty = y + 14; ty < y + h - 12; ty += 24) {
+            ctx.fillRect(laneX + 6, ty, laneW - 12, 8);
+          }
+          ctx.strokeStyle = "rgba(73,81,78,.34)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(laneX + 8, y + 8);
+          ctx.lineTo(laneX + 8, y + h - 8);
+          ctx.moveTo(laneX + laneW - 8, y + 8);
+          ctx.lineTo(laneX + laneW - 8, y + h - 8);
+          ctx.stroke();
+          continue;
+        }
+
+        if (style === "alley") {
+          const laneW = 54;
+          const cx = x + w / 2;
+          const bendY = y + h * .58;
+          ctx.fillStyle = "#777a76";
+          roundedRectPath(ctx, cx - laneW / 2, y + 8, laneW, h * .62, 5);
+          ctx.fill();
+          roundedRectPath(ctx, cx - laneW / 2, bendY - laneW / 2, w * .42, laneW, 5);
+          ctx.fill();
+
+          ctx.fillStyle = "rgba(255,255,255,.07)";
+          for (let ty = y + 22; ty < bendY - 16; ty += 26) {
+            ctx.fillRect(cx - 3, ty, 6, 10);
+          }
+          ctx.fillStyle = "rgba(207,88,67,.14)";
+          ctx.fillRect(cx + 12, y + 20, 8, h * .45);
+          continue;
+        }
+
+        if (style === "residential") {
+          const laneW = 38;
+          const offset = hash2(gx, gy, 1410) > .5 ? w * .38 : w * .58;
+          ctx.fillStyle = "#8c8f89";
+          roundedRectPath(ctx, x + offset - laneW / 2, y + 5, laneW, h - 10, 6);
+          ctx.fill();
+
+          ctx.strokeStyle = "rgba(215,219,211,.24)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x + offset - laneW / 2 + 4, y + 8);
+          ctx.lineTo(x + offset - laneW / 2 + 4, y + h - 8);
+          ctx.moveTo(x + offset + laneW / 2 - 4, y + 8);
+          ctx.lineTo(x + offset + laneW / 2 - 4, y + h - 8);
+          ctx.stroke();
+
+          // Small concrete parking pads and garden strips.
+          ctx.fillStyle = "#aaa9a1";
+          ctx.fillRect(x + 14, y + 18, 52, 38);
+          ctx.fillRect(x + w - 68, y + h - 58, 54, 40);
+          ctx.fillStyle = "#718b68";
+          ctx.fillRect(x + 18, y + h - 34, 62, 15);
+          continue;
+        }
+
+        if (style === "green") {
+          ctx.fillStyle = "#708f67";
+          roundedRectPath(ctx, x + 6, y + 6, w - 12, h - 12, 16);
+          ctx.fill();
+
+          ctx.strokeStyle = "#c0b895";
+          ctx.lineWidth = 20;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(x + 30, y + h * .72);
+          ctx.bezierCurveTo(x + w * .28, y + h * .3, x + w * .66, y + h * .78, x + w - 28, y + h * .3);
+          ctx.stroke();
+
+          if ((gx + gy) % 2 === 0) {
+            ctx.fillStyle = "#557987";
+            ctx.beginPath();
+            ctx.ellipse(x + w * .72, y + h * .68, 45, 28, -.25, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          continue;
+        }
+
+        if (style === "mixed-core") {
+          ctx.fillStyle = "rgba(167,164,153,.22)";
+          ctx.fillRect(x + 8, y + h - 46, w - 16, 34);
+          for (let n = 0; n < 6; n += 1) {
+            ctx.fillStyle = n % 2 ? "rgba(192,183,154,.12)" : "rgba(255,255,255,.055)";
+            ctx.fillRect(x + 18 + n * 54, y + h - 42, 35, 26);
+          }
+        }
+      }
+    }
+  }
+
+  function drawCityLandmarks() {
+    const station = worldToScreen(8 * ROAD_GAP + ROAD_GAP / 2, 5 * ROAD_GAP + ROAD_GAP / 2);
+    if (station.x > -400 && station.y > -400 && station.x < viewWidth + 400 && station.y < viewHeight + 400) {
+      // Station entrance / canopy.
+      ctx.fillStyle = "#4a5554";
+      roundedRectPath(ctx, station.x - 92, station.y - 30, 184, 42, 7);
+      ctx.fill();
+      ctx.fillStyle = "#dfe5df";
+      ctx.fillRect(station.x - 82, station.y - 20, 164, 20);
+      ctx.fillStyle = "#384340";
+      ctx.font = "800 16px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("若葉駅", station.x, station.y - 5);
+      ctx.fillStyle = "#5a6864";
+      ctx.fillRect(station.x - 76, station.y + 11, 10, 42);
+      ctx.fillRect(station.x + 66, station.y + 11, 10, 42);
+
+      // Taxi rank.
+      ctx.fillStyle = "#d6d9d2";
+      ctx.font = "700 9px system-ui, sans-serif";
+      ctx.fillText("TAXI", station.x + 128, station.y + 78);
+    }
+
+    const arcade = worldToScreen(7 * ROAD_GAP + ROAD_GAP / 2, 6 * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN + 12);
+    if (arcade.x > -250 && arcade.y > -250 && arcade.x < viewWidth + 250 && arcade.y < viewHeight + 250) {
+      ctx.strokeStyle = "#5b6661";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(arcade.x - 48, arcade.y + 26);
+      ctx.lineTo(arcade.x - 48, arcade.y - 24);
+      ctx.lineTo(arcade.x + 48, arcade.y - 24);
+      ctx.lineTo(arcade.x + 48, arcade.y + 26);
+      ctx.stroke();
+      ctx.fillStyle = "#d9c77b";
+      roundedRectPath(ctx, arcade.x - 42, arcade.y - 38, 84, 21, 5);
+      ctx.fill();
+      ctx.fillStyle = "#493f2f";
+      ctx.font = "800 10px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("若葉サンモール", arcade.x, arcade.y - 24);
+    }
+
+    const shrine = worldToScreen(5 * ROAD_GAP + ROAD_GAP / 2, 9 * ROAD_GAP + ROAD_GAP / 2);
+    if (shrine.x > -220 && shrine.y > -220 && shrine.x < viewWidth + 220 && shrine.y < viewHeight + 220) {
+      ctx.strokeStyle = "#a64f43";
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(shrine.x - 23, shrine.y + 18);
+      ctx.lineTo(shrine.x - 23, shrine.y - 26);
+      ctx.moveTo(shrine.x + 23, shrine.y + 18);
+      ctx.lineTo(shrine.x + 23, shrine.y - 26);
+      ctx.moveTo(shrine.x - 35, shrine.y - 22);
+      ctx.lineTo(shrine.x + 35, shrine.y - 22);
+      ctx.moveTo(shrine.x - 29, shrine.y - 31);
+      ctx.lineTo(shrine.x + 29, shrine.y - 31);
+      ctx.stroke();
+      ctx.fillStyle = "#5f695e";
+      ctx.font = "700 9px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("若葉神社", shrine.x, shrine.y + 34);
+    }
+
+    const alley = worldToScreen(10 * ROAD_GAP + ROAD_GAP / 2, 6 * ROAD_GAP + ROAD_GAP / 2);
+    if (alley.x > -220 && alley.y > -220 && alley.x < viewWidth + 220 && alley.y < viewHeight + 220) {
+      ctx.fillStyle = "rgba(164,69,54,.84)";
+      for (let n = -2; n <= 2; n += 1) {
+        ctx.beginPath();
+        ctx.arc(alley.x + n * 20, alley.y - 58 + Math.abs(n) * 3, 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.strokeStyle = "rgba(74,62,54,.7)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(alley.x - 52, alley.y - 61);
+      ctx.lineTo(alley.x + 52, alley.y - 61);
+      ctx.stroke();
+    }
+  }
+
   function drawStreetProps() {
     const startX = Math.floor(state.camera.x / ROAD_GAP) - 1;
     const endX = Math.ceil((state.camera.x + viewWidth) / ROAD_GAP) + 1;
@@ -3163,10 +3391,12 @@
 
     beginWorldProjection();
     drawGround();
+    drawNeighborhoodGround();
     drawRoute();
     drawStreetProps();
     drawBuildings();
     for (const place of PLACES) drawPlace(place);
+    drawCityLandmarks();
     drawPedestrians();
     for (const npc of NPCS) drawNpc(npc);
     for (const car of traffic) drawCar(car, false);
