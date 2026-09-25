@@ -57,7 +57,8 @@ class FakeElement {
 
 function fakeDom() {
   const revoked = []; let serial = 0;
-  globalThis.document = { createElement: (tag) => new FakeElement(tag) };
+  const listeners = new Map();
+  globalThis.document = { createElement: (tag) => new FakeElement(tag), addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: (name) => listeners.delete(name), dispatchEvent: (event) => listeners.get(event.type)?.(event) };
   globalThis.URL = { createObjectURL: () => `blob:test-${++serial}`, revokeObjectURL: (url) => revoked.push(url) };
   return { revoked };
 }
@@ -138,9 +139,40 @@ test('pinch keeps the pointer midpoint stable instead of centering zoom', () => 
 });
 
 test('tile request concurrency never exceeds four', async () => {
-  fakeDom(); let active = 0; let maximum = 0; const release = []; const sync = { loadDecryptedObject: async () => { active += 1; maximum = Math.max(maximum, active); await new Promise((resolve) => release.push(resolve)); active -= 1; return new Uint8Array([1]); }, loadEncryptedObject: async () => new Uint8Array([2]) };
-  const reader = createEncryptedAssetReader({ container: new FakeElement('section'), sync, settings: { load: () => ({ networkMode: 'data-saver' }), STANDARD_NETWORK_MODE: 'standard', SAVER_NETWORK_MODE: 'data-saver' }, crypto: { encryptedAssetByteLength: (n) => n + 36, tileObjectId: (l, x, y) => `L${l}:${x}:${y}` }, manifest: manifest() });
-  reader.mount(); await new Promise((resolve) => setImmediate(resolve)); reader.setScale(2); await new Promise((resolve) => setImmediate(resolve)); assert.ok(maximum <= 4); release.forEach((resolve) => resolve()); reader.destroy();
+  fakeDom(); let active = 0; let maximum = 0; const release = []; const sync = { loadDecryptedObject: async (args) => { if (args.objectId === 'preview') return new Uint8Array([1]); active += 1; maximum = Math.max(maximum, active); await new Promise((resolve) => release.push(resolve)); active -= 1; return new Uint8Array([1]); }, loadEncryptedObject: async () => new Uint8Array([2]) };
+  const reader = createEncryptedAssetReader({ container: new FakeElement('section'), sync, settings: { load: () => ({ networkMode: 'standard' }), STANDARD_NETWORK_MODE: 'standard', SAVER_NETWORK_MODE: 'data-saver' }, crypto: { encryptedAssetByteLength: (n) => n + 36, tileObjectId: (l, x, y) => `L${l}:${x}:${y}` }, manifest: manifest() });
+  reader.mount(); await new Promise((resolve) => setImmediate(resolve)); reader.setScale(2); await new Promise((resolve) => setImmediate(resolve)); assert.equal(maximum, 4); assert.ok(maximum <= 4); release.forEach((resolve) => resolve()); reader.destroy();
+});
+
+test('visible request preempts an active prefetch when all four slots are occupied', async () => {
+  fakeDom(); const calls = []; const pending = []; let visibleStarted = false;
+  const sync = { loadDecryptedObject: async (args) => { calls.push(`visible:${args.objectId}`); visibleStarted = true; return new Uint8Array([1]); }, loadEncryptedObject: (args) => { calls.push(`prefetch:${args.objectId}`); return new Promise((resolve, reject) => { pending.push({ args, resolve, reject }); }); } };
+  const m = manifest(); m.preview = { ...m.preview, width: 1024, height: 256 }; m.zoom.levels = [{ level: 0, width: 2048, height: 512, longEdge: 2048, columns: 4, rows: 1, tiles: Array.from({ length: 4 }, (_, x) => ({ x, y: 0, pixelX: x * 512, pixelY: 0, width: 512, height: 512, mimeType: 'image/webp', bytes: 100, quality: 0.88 })) }];
+  const settings = { load: () => ({ networkMode: 'standard' }), STANDARD_NETWORK_MODE: 'standard', SAVER_NETWORK_MODE: 'data-saver' };
+  const reader = createEncryptedAssetReader({ container: new FakeElement('section'), sync, settings, crypto: { encryptedAssetByteLength: (n) => n + 36, tileObjectId: (l, x, y) => `L${l}:${x}:${y}` }, assetId: 'a', revision: 1, manifest: m });
+  reader.mount(); await new Promise((resolve) => setImmediate(resolve)); reader.setScale(2); await new Promise((resolve) => setImmediate(resolve)); assert.equal(pending.length, 2); reader.setTransform({ translateX: 250 }); await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(pending.some((entry) => entry.args.signal.aborted)); assert.equal(visibleStarted, true); assert.ok(calls.some((call) => call.startsWith('visible:'))); pending.forEach((entry) => entry.resolve(new Uint8Array([2]))); reader.destroy();
+});
+
+test('same-level pan removes rendered tile DOM and revokes its URL', async () => {
+  const urls = fakeDom(); const m = manifest(); m.preview = { ...m.preview, width: 1024, height: 256 }; m.zoom.levels = [{ level: 0, width: 2048, height: 512, longEdge: 2048, columns: 4, rows: 1, tiles: Array.from({ length: 4 }, (_, x) => ({ x, y: 0, pixelX: x * 512, pixelY: 0, width: 512, height: 512, mimeType: 'image/webp', bytes: 100, quality: 0.88 })) }];
+  const reader = createEncryptedAssetReader({ container: new FakeElement('section'), sync: { loadDecryptedObject: async () => new Uint8Array([1]), loadEncryptedObject: async () => new Uint8Array([2]) }, settings: { load: () => ({ networkMode: 'standard' }), STANDARD_NETWORK_MODE: 'standard', SAVER_NETWORK_MODE: 'data-saver' }, crypto: { encryptedAssetByteLength: (n) => n + 36, tileObjectId: (l, x, y) => `L${l}:${x}:${y}` }, assetId: 'a', revision: 1, manifest: m });
+  reader.mount(); await new Promise((resolve) => setImmediate(resolve)); reader.setScale(2); await new Promise((resolve) => setImmediate(resolve)); const viewport = reader.getState(); assert.ok(viewport.scale > 1); reader.setTransform({ translateX: 250 }); await new Promise((resolve) => setImmediate(resolve)); assert.ok(urls.revoked.length >= 1); reader.destroy(); assert.ok(urls.revoked.length >= 1);
+});
+
+test('transfer events switch standard prefetch to data-saver without stopping visible work', async () => {
+  fakeDom(); let mode = 'standard'; const pending = []; const calls = [];
+  const sync = { loadDecryptedObject: async (args) => { calls.push(`visible:${args.objectId}`); return new Uint8Array([1]); }, loadEncryptedObject: (args) => { calls.push(`prefetch:${args.objectId}`); return new Promise((resolve, reject) => pending.push({ args, resolve, reject })); } };
+  const settings = { EVENT_NAME: 'manga-reader-image-transfer-settings-changed', STATS_EVENT_NAME: 'manga-reader-image-transfer-stats-changed', load: () => ({ networkMode: mode }), STANDARD_NETWORK_MODE: 'standard', SAVER_NETWORK_MODE: 'data-saver' };
+  const reader = createEncryptedAssetReader({ container: new FakeElement('section'), sync, settings, crypto: { encryptedAssetByteLength: (n) => n + 36, tileObjectId: (l, x, y) => `L${l}:${x}:${y}` }, assetId: 'a', revision: 1, manifest: manifest() });
+  reader.mount(); await new Promise((resolve) => setImmediate(resolve)); reader.setScale(2); await new Promise((resolve) => setImmediate(resolve)); assert.ok(pending.length > 0); mode = 'data-saver'; globalThis.document.dispatchEvent({ type: settings.STATS_EVENT_NAME }); await new Promise((resolve) => setImmediate(resolve)); assert.ok(pending.some((entry) => entry.args.signal.aborted)); pending.forEach((entry) => entry.resolve(new Uint8Array([2]))); assert.ok(calls.some((call) => call.startsWith('visible:'))); reader.destroy();
+});
+
+test('same-level pan aborts obsolete visible requests and ignores late completion', async () => {
+  fakeDom(); const signals = []; const resolvers = []; const m = manifest(); m.preview = { ...m.preview, width: 1024, height: 256 }; m.zoom.levels = [{ level: 0, width: 2048, height: 512, longEdge: 2048, columns: 4, rows: 1, tiles: Array.from({ length: 4 }, (_, x) => ({ x, y: 0, pixelX: x * 512, pixelY: 0, width: 512, height: 512, mimeType: 'image/webp', bytes: 100, quality: 0.88 })) }];
+  const sync = { loadDecryptedObject: (args) => { if (args.objectId === 'preview') return Promise.resolve(new Uint8Array([1])); signals.push(args.signal); return new Promise((resolve) => resolvers.push(resolve)); }, loadEncryptedObject: async () => new Uint8Array([2]) };
+  const reader = createEncryptedAssetReader({ container: new FakeElement('section'), sync, settings: { load: () => ({ networkMode: 'data-saver' }), STANDARD_NETWORK_MODE: 'standard', SAVER_NETWORK_MODE: 'data-saver' }, crypto: { encryptedAssetByteLength: (n) => n + 36, tileObjectId: (l, x, y) => `L${l}:${x}:${y}` }, assetId: 'a', revision: 1, manifest: m });
+  reader.mount(); await new Promise((resolve) => setImmediate(resolve)); reader.setScale(2); await new Promise((resolve) => setTimeout(resolve, 190)); assert.ok(signals.length > 0); reader.setTransform({ translateX: 250 }); await new Promise((resolve) => setTimeout(resolve, 190)); assert.ok(signals.some((signal) => signal.aborted)); resolvers.forEach((resolve) => resolve(new Uint8Array([1]))); reader.destroy();
 });
 
 test('reader source is a classic script', () => {
