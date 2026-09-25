@@ -8,7 +8,8 @@
   --muted:#b9c4be;
   --accent:#f2d16b;
 }
-*{box-sizing:border-box}
+*{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+button{touch-action:manipulation}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#17201b;color:var(--text)}
 button{font:inherit;color:inherit}
 #gameShell{position:relative;width:100%;height:100%;overflow:hidden;touch-action:none;background:#17201b}

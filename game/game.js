@@ -1324,6 +1324,9 @@
     joystickKnob.style.transform = "translate(0,0)";
   }
 
+  document.getElementById("gameShell").addEventListener("contextmenu", (event) => event.preventDefault());
+  document.getElementById("gameShell").addEventListener("selectstart", (event) => event.preventDefault());
+
   window.addEventListener("resize", resize);
 
   window.addEventListener("keydown", (event) => {
