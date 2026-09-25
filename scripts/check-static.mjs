@@ -8,7 +8,7 @@ const pages = ['index.html', 'sync.html', 'home.html', 'profile.html', 'manga.ht
 const standalone = [
   'app-desktop-rail.js', 'app-global-shell.js', 'author-summary.js', 'backup-format.js', 'browser-storage.js', 'desktop-navigation.js',
   'encrypted-chunk-cache.js', 'encrypted-chunk-crypto.js', 'encrypted-chunk-sync.js', 'feature-flags.js', 'home-dashboard.js',
-  'home-profile-spa.js', 'mobile-bottom-nav.js', 'manga-sandbox.js', 'media-access-gate.js', 'profile-menu.js', 'shelf-search.js',
+  'home-profile-spa.js', 'mobile-bottom-nav.js', 'manga-sandbox.js', 'media-access-gate.js', 'profile-menu.js', 'image-transfer-settings.js', 'image-transfer-settings-ui.js', 'shelf-search.js',
   'status-message.js', 'reader-shell.js', 'reader-saved-list.js', 'reader-saved-list-template.js', 'reader-video-list.js', 'reader-author-list.js', 'reader-author-list-template.js', 'reader-toc-template.js', 'reader-mobile-nav-template.js', 'reader-settings.js', 'reader-backup.js',
   'supabase-config.js', 'url-parser.js', 'vault-payload.js', 'vault-session.js', 'video-data.js', 'video-library.js', 'video-routing-fix.js', 'video-thumbnail-time.js', 'video-list-route.js', 'video-list-template.js'
 ];
