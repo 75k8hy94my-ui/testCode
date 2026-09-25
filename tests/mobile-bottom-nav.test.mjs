@@ -59,7 +59,7 @@ test('reader keeps its special controls while using the shared glass engine', ()
   assert.match(template, /mobileNavManga/);
   assert.match(template, /mobileNavVideo/);
   assert.match(template, /mobileNavMore/);
-  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260924-instagram-drag'));
+  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260925-instagram-scrub'));
   assert.match(js, /readerFallbackTarget/);
   assert.match(js, /nav\.classList\.contains\('reader-mode'\)/);
   assert.match(js, /querySelector\('#mobileNavMore'\)/);
@@ -68,8 +68,8 @@ test('reader keeps its special controls while using the shared glass engine', ()
 test('shared nav is loaded by all target mobile pages', () => {
   for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
     const source = read(page);
-    assert.match(source, /mobile-bottom-nav\.css\?v=20260924-instagram-drag/, page);
-    assert.match(source, /mobile-bottom-nav\.js\?v=20260924-instagram-drag/, page);
+    assert.match(source, /mobile-bottom-nav\.css\?v=20260925-instagram-scrub/, page);
+    assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-scrub/, page);
   }
 });
 
@@ -146,8 +146,8 @@ test('SPA active state is monochrome icon fill rather than blue tint', () => {
 });
 
 test('SPA tab bar supports Instagram-style long-press scrub navigation', () => {
-  assert.match(js, /const LONG_PRESS_MS = 340/);
-  assert.match(js, /const LONG_PRESS_MOVE_TOLERANCE = 12/);
+  assert.match(js, /const LONG_PRESS_MS = 160/);
+  assert.match(js, /const QUICK_SCRUB_MS = 70/);
   assert.match(js, /function startSpaLongPressDrag/);
   assert.match(js, /function positionDragLens/);
   assert.match(js, /function nearestSpaItem/);
@@ -160,9 +160,9 @@ test('SPA tab bar supports Instagram-style long-press scrub navigation', () => {
 
 test('long-press drag keeps normal taps and scrolling intact', () => {
   assert.match(js, /Math\.hypot\(event\.clientX - drag\.startX, event\.clientY - drag\.startY\)/);
-  assert.match(js, /distance > LONG_PRESS_MOVE_TOLERANCE/);
+  assert.match(js, /Math.abs(dx) >= QUICK_SCRUB_X/);
   assert.match(js, /suppressClickUntil = Date\.now\(\) \+ 650/);
-  assert.match(css, /touch-action:pan-y/);
+  assert.match(css, /touch-action:none/);
   assert.match(css, /-webkit-touch-callout:none/);
 });
 
@@ -172,4 +172,38 @@ test('drag mode reveals a movable Instagram-like glass pill', () => {
   assert.match(css, /backdrop-filter:blur\(18px\) saturate\(145%\)/);
   assert.match(css, /\.liquidDragPreview/);
   assert.match(css, /transform:scale\(1\.055\)/);
+});
+
+test('scrub gesture captures immediately and does not lose to vertical page scrolling', () => {
+  assert.match(js, /event\.preventDefault\(\);[\s\S]*setPointerCapture\(event\.pointerId\)/);
+  assert.match(css, /touch-action:none/);
+  assert.match(css, /overscroll-behavior:none/);
+  assert.match(js, /pointermove[\s\S]*event\.preventDefault\(\)/);
+});
+
+test('scrub activates quickly on hold or horizontal intent', () => {
+  assert.match(js, /const LONG_PRESS_MS = 160/);
+  assert.match(js, /const QUICK_SCRUB_MS = 70/);
+  assert.match(js, /const QUICK_SCRUB_X = 7/);
+  assert.match(js, /horizontalIntent/);
+  assert.match(js, /elapsed >= QUICK_SCRUB_MS && horizontalIntent/);
+});
+
+test('SPA links cannot be lifted or dragged by Safari', () => {
+  assert.match(js, /link\.draggable = false/);
+  assert.match(js, /setAttribute\('draggable','false'\)/);
+  assert.match(js, /addEventListener\('dragstart', blockNativeLinkGesture\)/);
+  assert.match(js, /addEventListener\('contextmenu', blockNativeLinkGesture\)/);
+  assert.match(js, /addEventListener\('selectstart', blockNativeLinkGesture\)/);
+  assert.match(css, /-webkit-user-drag:none/);
+  assert.match(css, /-webkit-touch-callout:none/);
+});
+
+test('hold gives immediate visual feedback before drag mode begins', () => {
+  assert.match(js, /liquidHoldArmed/);
+  assert.match(js, /liquidHoldOrigin/);
+  assert.match(js, /positionHoldLens/);
+  assert.match(css, /\.liquidHoldArmed \.liquidGlassSelection/);
+  assert.match(css, /opacity:.48!important/);
+  assert.match(css, /\.liquidDragMode \.liquidGlassSelection[\s\S]*rgba\(190,196,204,.42\)/);
 });

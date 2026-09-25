@@ -47,6 +47,8 @@
     link.href = item.href;
     link.dataset.mobileRoute = item.key;
     link.className = 'liquidGlassNavItem';
+    link.draggable = false;
+    link.setAttribute('draggable','false');
     link.setAttribute('aria-label', item.label);
     link.innerHTML = ICONS[item.key] + '<span class="liquidGlassNavLabel">' + item.label + '</span>';
     return link;
@@ -123,7 +125,7 @@
     const target = activeItem(nav);
     const lens = state.lens;
     if (nav.dataset.mobileNavKind === 'spa') {
-      if (lens && !nav.classList.contains('liquidDragMode')) lens.style.opacity = '0';
+      if (lens && !nav.classList.contains('liquidDragMode') && !nav.classList.contains('liquidHoldArmed')) lens.style.opacity = '0';
       return;
     }
     if (!target || !target.isConnected || nav.getClientRects().length === 0) {
@@ -211,8 +213,10 @@
     nav.classList.remove('glassPressed');
   }
 
-  const LONG_PRESS_MS = 340;
-  const LONG_PRESS_MOVE_TOLERANCE = 12;
+  const LONG_PRESS_MS = 160;
+  const QUICK_SCRUB_MS = 70;
+  const QUICK_SCRUB_X = 7;
+  const TAP_SLOP = 14;
 
   function spaNavItems(nav) {
     return [...nav.querySelectorAll('[data-mobile-route]')];
@@ -246,6 +250,20 @@
     if (state && state.drag) state.drag.previewItem = item || null;
   }
 
+  function positionHoldLens(nav, item) {
+    const state = states.get(nav);
+    if (!state || !state.lens || !item) return;
+    const navRect = nav.getBoundingClientRect();
+    const itemRect = item.getBoundingClientRect();
+    if (!navRect.width || !itemRect.width) return;
+    const width = Math.min(62, Math.max(50, itemRect.width - 24));
+    const center = itemRect.left - navRect.left + itemRect.width / 2;
+    const x = Math.round((center - width / 2) * 10) / 10;
+    state.lens.style.width = width + 'px';
+    state.lens.style.transform = 'translate3d(' + x + 'px,0,0) scale3d(.94,.94,1)';
+    state.lens.style.opacity = '.48';
+  }
+
   function positionDragLens(nav, clientX) {
     const state = states.get(nav);
     if (!state || !state.drag || !state.drag.active || !state.lens) return;
@@ -265,6 +283,8 @@
     if (!drag || drag.active || !drag.startItem) return;
     drag.active = true;
     clearLongPressTimer(state);
+    nav.classList.remove('liquidHoldArmed');
+    nav.querySelectorAll('.liquidHoldOrigin').forEach((node) => node.classList.remove('liquidHoldOrigin'));
     releasePress(nav);
     nav.classList.add('liquidDragMode');
     nav.classList.remove('liquidNavCompact');
@@ -291,8 +311,10 @@
     const destination = drag.previewItem;
     const pointerId = drag.pointerId;
 
-    nav.classList.remove('liquidDragMode');
-    nav.querySelectorAll('.liquidDragPreview').forEach((node) => node.classList.remove('liquidDragPreview'));
+    nav.classList.remove('liquidDragMode','liquidHoldArmed');
+    nav.querySelectorAll('.liquidDragPreview,.liquidHoldOrigin').forEach((node) => {
+      node.classList.remove('liquidDragPreview','liquidHoldOrigin');
+    });
     if (state.lens) {
       state.lens.style.opacity = '0';
       state.lens.style.removeProperty('width');
@@ -308,7 +330,7 @@
     releasePress(nav);
 
     if (!wasActive) return;
-    state.suppressClickUntil = Date.now() + 650;
+    state.suppressClickUntil = Date.now() + 420;
     if (!commit || !destination) return;
 
     const current = activeItem(nav);
@@ -326,6 +348,7 @@
     state.drag = {
       active:false,
       pointerId:event.pointerId,
+      startedAt:performance.now(),
       startX:event.clientX,
       startY:event.clientY,
       lastX:event.clientX,
@@ -334,13 +357,21 @@
       previewItem:item,
       lensWidth:0
     };
+    nav.classList.add('liquidHoldArmed');
+    item.classList.add('liquidHoldOrigin');
+    positionHoldLens(nav, item);
     state.longPressTimer = setTimeout(() => startSpaLongPressDrag(nav, state), LONG_PRESS_MS);
   }
 
   function bindSpaLongPressDrag(nav, state) {
-    nav.addEventListener('contextmenu', (event) => {
-      if (event.target.closest('[data-mobile-route]')) event.preventDefault();
-    });
+    const blockNativeLinkGesture = (event) => {
+      if (!event.target.closest('[data-mobile-route]')) return;
+      event.preventDefault();
+    };
+
+    nav.addEventListener('contextmenu', blockNativeLinkGesture);
+    nav.addEventListener('dragstart', blockNativeLinkGesture);
+    nav.addEventListener('selectstart', blockNativeLinkGesture);
 
     nav.addEventListener('click', (event) => {
       if (state.commitDragClick) {
@@ -357,33 +388,60 @@
       if (event.button != null && event.button !== 0) return;
       const item = event.target.closest('[data-mobile-route]');
       if (!item || item.closest('#mobileBottomNav') !== nav) return;
+
+      // Own the gesture immediately so iOS Safari cannot scroll the page or lift the link.
+      event.preventDefault();
+      try {
+        if (nav.setPointerCapture && event.pointerId != null) nav.setPointerCapture(event.pointerId);
+      } catch (_) {}
       armSpaLongPress(nav, state, event, item);
-    }, { passive:true });
+    }, { passive:false });
 
     nav.addEventListener('pointermove', (event) => {
       const drag = state.drag;
       if (!drag || drag.pointerId !== event.pointerId) return;
+
+      event.preventDefault();
       drag.lastX = event.clientX;
       drag.lastY = event.clientY;
 
       if (!drag.active) {
-        const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
-        if (distance > LONG_PRESS_MOVE_TOLERANCE) {
-          clearLongPressTimer(state);
-          state.drag = null;
+        const dx = event.clientX - drag.startX;
+        const dy = event.clientY - drag.startY;
+        const elapsed = performance.now() - drag.startedAt;
+        const horizontalIntent = Math.abs(dx) >= QUICK_SCRUB_X && Math.abs(dx) > Math.abs(dy) * 1.05;
+        if (elapsed >= QUICK_SCRUB_MS && horizontalIntent) {
+          startSpaLongPressDrag(nav, state);
+          positionDragLens(nav, event.clientX);
+        } else {
+          positionHoldLens(nav, drag.startItem);
         }
         return;
       }
 
-      event.preventDefault();
       positionDragLens(nav, event.clientX);
     }, { passive:false });
 
     nav.addEventListener('pointerup', (event) => {
       const drag = state.drag;
       if (!drag || drag.pointerId !== event.pointerId) return;
-      if (drag.active) event.preventDefault();
-      resetSpaDrag(nav, state, { commit:drag.active });
+      event.preventDefault();
+
+      const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+      if (drag.active) {
+        resetSpaDrag(nav, state, { commit:true });
+        return;
+      }
+
+      const tapItem = drag.startItem;
+      resetSpaDrag(nav, state, { commit:false });
+      if (!tapItem || moved > TAP_SLOP) return;
+
+      // Native click was intentionally cancelled on pointerdown; fire exactly one app click.
+      state.commitDragClick = true;
+      requestAnimationFrame(() => {
+        if (tapItem.isConnected) tapItem.click();
+      });
     }, { passive:false });
 
     nav.addEventListener('pointercancel', (event) => {

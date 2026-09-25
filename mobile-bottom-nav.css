@@ -735,7 +735,8 @@
 /* Instagram-style long-press scrub selection. */
 @media(max-width:899px){
   #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"]{
-    touch-action:pan-y;
+    touch-action:none;
+    overscroll-behavior:none;
     -webkit-user-select:none;
     user-select:none;
     -webkit-touch-callout:none;
@@ -859,5 +860,77 @@
     #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode .liquidGlassNavItem{
       transition:none!important;
     }
+  }
+}
+
+/* Fast scrub gesture feedback: immediate hold halo, then a strong draggable glass pill. */
+@media(max-width:899px){
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"] .liquidGlassNavItem{
+    -webkit-user-drag:none;
+    user-drag:none;
+    -webkit-touch-callout:none;
+  }
+
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidHoldArmed{
+    transform:translateX(-50%) scale(1.006);
+  }
+
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidHoldArmed .liquidGlassSelection{
+    display:block!important;
+    opacity:.48!important;
+    top:7px;
+    bottom:7px;
+    z-index:1;
+    border-radius:20px;
+    border:1px solid rgba(255,255,255,.62);
+    background:
+      radial-gradient(110% 130% at 30% 0%,rgba(255,255,255,.20),transparent 58%),
+      rgba(205,211,219,.18);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.82),
+      inset 0 -1px 0 rgba(85,96,111,.10),
+      0 2px 8px rgba(59,68,80,.055);
+    -webkit-backdrop-filter:blur(12px) saturate(135%);
+    backdrop-filter:blur(12px) saturate(135%);
+    transition:opacity .08s ease,transform .12s cubic-bezier(.22,.86,.36,1),width .12s cubic-bezier(.22,.86,.36,1);
+  }
+
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidHoldArmed .liquidHoldOrigin{
+    z-index:2;
+    color:var(--glass-text-active)!important;
+    transform:scale(.96);
+  }
+
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode .liquidGlassSelection{
+    border-color:rgba(255,255,255,.84);
+    background:
+      radial-gradient(115% 150% at var(--lens-light-x,28%) var(--lens-light-y,0%),rgba(255,255,255,.30),transparent 56%),
+      linear-gradient(180deg,rgba(255,255,255,.14),rgba(214,220,229,.075)),
+      rgba(190,196,204,.42);
+    box-shadow:
+      inset 0 1.4px 0 rgba(255,255,255,.96),
+      inset 0 -1.2px 0 rgba(76,88,104,.18),
+      0 5px 15px rgba(52,61,74,.14);
+  }
+
+  html[data-theme="dark"] #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidHoldArmed .liquidGlassSelection{
+    border-color:rgba(255,255,255,.18);
+    background:rgba(255,255,255,.075);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 2px 9px rgba(0,0,0,.14);
+  }
+
+  html[data-theme="dark"] #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode .liquidGlassSelection{
+    border-color:rgba(255,255,255,.30);
+    background:
+      radial-gradient(115% 150% at var(--lens-light-x,28%) var(--lens-light-y,0%),rgba(255,255,255,.15),transparent 56%),
+      rgba(255,255,255,.13);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.42),
+      inset 0 -1px 0 rgba(0,0,0,.24),
+      0 5px 15px rgba(0,0,0,.24);
+  }
+
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode .liquidGlassNavItem.liquidDragPreview{
+    transform:scale(1.09);
   }
 }
