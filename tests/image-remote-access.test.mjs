@@ -101,7 +101,7 @@ test('provider-reported usage remains a separate nullable statistic', () => {
   assert.equal(state.stats.providerReportedBytes, 123456);
   ledger.recordProviderReported(null, { storage, now: today });
   state = settings.load(storage, today);
-  assert.equal(state.stats.providerReportedBytes, 0);
+  assert.equal(state.stats.providerReportedBytes, null);
 });
 
 test('tracked remote reads can be aborted centrally when the VPN policy closes', () => {
