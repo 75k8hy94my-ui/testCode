@@ -332,13 +332,19 @@
             paletteShift: Math.floor(hash2(gx, gy, 1743) * VISUAL_PALETTES.length),
             seed: 1744
           };
-          const blocked = houses.some((house) =>
+          const blockedByHouse = houses.some((house) =>
             candidate.x < house.x + house.w + 6 &&
             candidate.x + candidate.w + 6 > house.x &&
             candidate.y < house.y + house.h + 6 &&
             candidate.y + candidate.h + 6 > house.y
           );
-          if (!blocked) {
+          const branchHalfWidth = roadWidth * .78 / 2 + 8;
+          const blockedByBranch =
+            branch &&
+            side === branchSide &&
+            candidate.y < branchAt + branchHalfWidth &&
+            candidate.y + candidate.h > branchAt - branchHalfWidth;
+          if (!blockedByHouse && !blockedByBranch) {
             houses.push(candidate);
             driveways.push({
               x: side < 0 ? hx + 62 : roadCenter + roadWidth / 2,
@@ -358,13 +364,19 @@
             paletteShift: Math.floor(hash2(gx, gy, 1743) * VISUAL_PALETTES.length),
             seed: 1744
           };
-          const blocked = houses.some((house) =>
+          const blockedByHouse = houses.some((house) =>
             candidate.x < house.x + house.w + 6 &&
             candidate.x + candidate.w + 6 > house.x &&
             candidate.y < house.y + house.h + 6 &&
             candidate.y + candidate.h + 6 > house.y
           );
-          if (!blocked) {
+          const branchHalfWidth = roadWidth * .78 / 2 + 8;
+          const blockedByBranch =
+            branch &&
+            side === branchSide &&
+            candidate.x < branchAt + branchHalfWidth &&
+            candidate.x + candidate.w > branchAt - branchHalfWidth;
+          if (!blockedByHouse && !blockedByBranch) {
             houses.push(candidate);
             driveways.push({
               x: hx + 24,
