@@ -2423,7 +2423,7 @@
 
           // Short diagonal pedestrian cut-throughs break the rigid grid without
           // becoming part of the car navigation graph.
-          if (hash2(gx, gy, 1440) > .48) {
+          if (hash2(gx, gy, 22) < .06) {
             ctx.strokeStyle = "#93958e";
             ctx.lineWidth = 30;
             ctx.lineCap = "round";
