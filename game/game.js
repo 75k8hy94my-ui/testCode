@@ -104,6 +104,30 @@
   const PLACES = [HOME, CAFE, STORE, PARK, GYM, LIBRARY];
   const SPECIAL_BLOCKS = new Set(PLACES.map((place) => place.gx + "," + place.gy));
 
+  // Fictional compressed city layout inspired by the spatial mix around Kichijoji:
+  // dense station frontage, shopping streets, tiny dining alleys, quieter housing,
+  // and a large green zone. Exact streets/names are intentionally not reproduced.
+  const CITY_CORE = { minGX: 5, maxGX: 11, minGY: 4, maxGY: 10 };
+  const STATION_BLOCKS = new Set(["7,5","8,5","9,5","7,6","8,6","9,6"]);
+  const ARCADE_BLOCKS = new Set(["6,6","7,6","6,7","7,7"]);
+  const ALLEY_BLOCKS = new Set(["9,6","10,6","9,7","10,7"]);
+  const RESIDENTIAL_BLOCKS = new Set([
+    "4,7","4,8","4,9","5,7","5,8","5,9","5,10","6,9","6,10",
+    "10,8","10,9","10,10","11,8","11,9"
+  ]);
+  const GREEN_EDGE_BLOCKS = new Set(["7,9","8,9","9,9","7,10","8,10","9,10"]);
+
+  function cityBlockStyle(gx, gy) {
+    const key = gx + "," + gy;
+    if (STATION_BLOCKS.has(key)) return "station";
+    if (ARCADE_BLOCKS.has(key)) return "arcade";
+    if (ALLEY_BLOCKS.has(key)) return "alley";
+    if (GREEN_EDGE_BLOCKS.has(key)) return "green";
+    if (RESIDENTIAL_BLOCKS.has(key)) return "residential";
+    if (gx >= CITY_CORE.minGX && gx <= CITY_CORE.maxGX && gy >= CITY_CORE.minGY && gy <= CITY_CORE.maxGY) return "mixed-core";
+    return "outer";
+  }
+
   const NPCS = [
     { id: "aoi", name: "アオイ", x: PARK.x + 80, y: PARK.y + 65, color: "#e0a7b5", friendship: 0 },
     { id: "sora", name: "ソラ", x: CAFE.x + 72, y: CAFE.y - 58, color: "#a9c9e3", friendship: 0 },
@@ -228,30 +252,141 @@
 
   function generateBuildings() {
     const maxBlock = Math.floor(WORLD_SIZE / ROAD_GAP) - 1;
+
     for (let gx = 0; gx < maxBlock; gx += 1) {
       for (let gy = 0; gy < maxBlock; gy += 1) {
         if (SPECIAL_BLOCKS.has(gx + "," + gy)) continue;
+
         const left = gx * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN;
         const top = gy * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN;
         const right = (gx + 1) * ROAD_GAP - ROAD_HALF - BLOCK_MARGIN;
         const bottom = (gy + 1) * ROAD_GAP - ROAD_HALF - BLOCK_MARGIN;
         const bw = right - left;
         const bh = bottom - top;
-        const r = hash2(gx, gy, 22);
+        const style = cityBlockStyle(gx, gy);
         const tint = 0.76 + hash2(gx, gy, 91) * 0.18;
 
-        if (r < 0.15) continue;
-
-        const makeBuilding = (x, y, w, h, localTint, kind, variant = 0) => {
+        const makeBuilding = (x, y, w, h, localTint, kind, variant = 0, district = style) => {
           const palette = Math.floor(hash2(gx + variant, gy, 407) * VISUAL_PALETTES.length) % VISUAL_PALETTES.length;
           return {
-            x, y, w, h, tint: localTint, kind, palette,
-            floors: kind === "tower" ? 8 + Math.floor(hash2(gx, gy + variant, 408) * 5) : 2 + Math.floor(hash2(gx, gy + variant, 409) * 4),
+            x, y, w, h, tint: localTint, kind, palette, district,
+            floors:
+              kind === "tower" ? 7 + Math.floor(hash2(gx, gy + variant, 408) * 6) :
+              kind === "low" ? 1 + Math.floor(hash2(gx, gy + variant, 409) * 2) :
+              2 + Math.floor(hash2(gx, gy + variant, 409) * 4),
             roofDetail: Math.floor(hash2(gx, gy + variant, 410) * 4),
             facadeBand: hash2(gx + variant, gy, 411) > 0.5,
             balconies: kind !== "low" && hash2(gx, gy + variant, 412) > 0.62
           };
         };
+
+        if (style === "station") {
+          const plazaSide = hash2(gx, gy, 1301) > .5 ? 1 : -1;
+          const commercialH = bh * .46;
+          buildings.push(makeBuilding(
+            left + 12,
+            plazaSide > 0 ? top + 10 : bottom - commercialH - 10,
+            bw - 24,
+            commercialH,
+            tint,
+            hash2(gx, gy, 1302) > .52 ? "tower" : "normal",
+            11
+          ));
+          const shopW = (bw - 44) / 3;
+          const rowY = plazaSide > 0 ? bottom - 92 : top + 12;
+          for (let n = 0; n < 3; n += 1) {
+            buildings.push(makeBuilding(
+              left + 10 + n * (shopW + 7),
+              rowY,
+              shopW,
+              74,
+              tint * (.96 + n * .01),
+              "low",
+              20 + n
+            ));
+          }
+          continue;
+        }
+
+        if (style === "arcade") {
+          const corridor = 78;
+          const sideW = (bw - corridor - 36) / 2;
+          const unitH = (bh - 44) / 4;
+          for (let row = 0; row < 4; row += 1) {
+            const y = top + 10 + row * (unitH + 7);
+            buildings.push(makeBuilding(left + 8, y, sideW, unitH, tint, "low", 30 + row));
+            buildings.push(makeBuilding(right - sideW - 8, y + (row % 2 ? 4 : 0), sideW, unitH - 3, tint * .97, "low", 40 + row));
+          }
+          continue;
+        }
+
+        if (style === "alley") {
+          const lane = 54;
+          const cellW = (bw - lane - 44) / 2;
+          const cellH = (bh - lane - 54) / 3;
+          for (let row = 0; row < 3; row += 1) {
+            const y = top + 8 + row * (cellH + 8);
+            buildings.push(makeBuilding(left + 8, y, cellW, cellH, tint, "low", 50 + row));
+            buildings.push(makeBuilding(right - cellW - 8, y + 5, cellW, cellH - 4, tint * .95, "low", 60 + row));
+          }
+          // Close one side at the back so the pedestrian alley bends rather than
+          // reading as another straight grid street.
+          buildings.push(makeBuilding(left + cellW + 18, bottom - 76, lane + 10, 62, tint * .91, "low", 69));
+          continue;
+        }
+
+        if (style === "residential") {
+          const lotGap = 18;
+          const houseW = (bw - lotGap * 3) / 2;
+          const houseH = (bh - lotGap * 3) / 2;
+          for (let ix = 0; ix < 2; ix += 1) {
+            for (let iy = 0; iy < 2; iy += 1) {
+              const variant = 70 + ix * 2 + iy;
+              const setback = 8 + hash2(gx + ix, gy + iy, 1310) * 18;
+              buildings.push(makeBuilding(
+                left + lotGap + ix * (houseW + lotGap) + (iy ? setback * .25 : 0),
+                top + lotGap + iy * (houseH + lotGap) + setback * .25,
+                houseW - setback * .3,
+                houseH - setback * .35,
+                tint,
+                "low",
+                variant
+              ));
+            }
+          }
+          continue;
+        }
+
+        if (style === "green") {
+          if (hash2(gx, gy, 1320) > .48) {
+            buildings.push(makeBuilding(left + 34, top + 40, bw * .38, bh * .28, tint, "low", 80));
+          }
+          if (hash2(gx, gy, 1321) > .65) {
+            buildings.push(makeBuilding(right - bw * .32 - 26, bottom - bh * .24 - 28, bw * .32, bh * .24, tint, "low", 81));
+          }
+          continue;
+        }
+
+        const r = hash2(gx, gy, 22);
+        if (r < (style === "mixed-core" ? .06 : .15)) continue;
+
+        if (style === "mixed-core" && r > .52) {
+          const shopH = Math.max(68, bh * .22);
+          const unitW = (bw - 38) / 3;
+          for (let n = 0; n < 3; n += 1) {
+            buildings.push(makeBuilding(
+              left + 8 + n * (unitW + 7),
+              top + 10,
+              unitW,
+              shopH,
+              tint,
+              "low",
+              90 + n
+            ));
+          }
+          buildings.push(makeBuilding(left + 20, top + shopH + 34, bw - 40, bh - shopH - 54, tint * .95, "normal", 94));
+          continue;
+        }
 
         if (r < 0.55) {
           buildings.push(makeBuilding(
@@ -307,13 +442,28 @@
   }
 
   function generatePedestrians() {
-    for (let i = 0; i < 48; i += 1) {
-      let x = COAST + 300 + hash2(i, 2, 31) * (WORLD_SIZE - COAST * 2 - 600);
-      let y = COAST + 300 + hash2(i, 9, 71) * (WORLD_SIZE - COAST * 2 - 600);
+    const pedestrianCount = 76;
+    for (let i = 0; i < pedestrianCount; i += 1) {
+      const central = i < 44;
+      let x;
+      let y;
+      if (central) {
+        x = 3400 + hash2(i, 2, 31) * 3300;
+        y = 2700 + hash2(i, 9, 71) * 3600;
+      } else {
+        x = COAST + 300 + hash2(i, 2, 31) * (WORLD_SIZE - COAST * 2 - 600);
+        y = COAST + 300 + hash2(i, 9, 71) * (WORLD_SIZE - COAST * 2 - 600);
+      }
       let attempts = 0;
-      while ((!canStand(x, y, 10) || isRoad(x, y)) && attempts < 30) {
-        x = COAST + 300 + hash2(i + attempts, 12, 44) * (WORLD_SIZE - COAST * 2 - 600);
-        y = COAST + 300 + hash2(i + attempts, 16, 84) * (WORLD_SIZE - COAST * 2 - 600);
+      while ((!canStand(x, y, 10) || isRoad(x, y)) && attempts < 40) {
+        const a = i + attempts;
+        if (central) {
+          x = 3400 + hash2(a, 12, 44) * 3300;
+          y = 2700 + hash2(a, 16, 84) * 3600;
+        } else {
+          x = COAST + 300 + hash2(a, 12, 44) * (WORLD_SIZE - COAST * 2 - 600);
+          y = COAST + 300 + hash2(a, 16, 84) * (WORLD_SIZE - COAST * 2 - 600);
+        }
         attempts += 1;
       }
       pedestrians.push({
@@ -772,11 +922,19 @@
   }
 
   function currentDistrict(x, y) {
-    if (y > WORLD_SIZE * 0.72) return "南港";
-    if (y < WORLD_SIZE * 0.28) return "北丘";
+    const gx = Math.floor(x / ROAD_GAP);
+    const gy = Math.floor(y / ROAD_GAP);
+    const style = cityBlockStyle(gx, gy);
+    if (style === "station") return "若葉駅前";
+    if (style === "arcade") return "若葉サンモール";
+    if (style === "alley") return "路地飲食街";
+    if (style === "residential") return "西住宅街";
+    if (style === "green" || distance(x, y, PARK.x, PARK.y) < 650) return "公園通り";
+    if (style === "mixed-core") return "中央商業街";
+    if (y > WORLD_SIZE * 0.72) return "南地区";
+    if (y < WORLD_SIZE * 0.28) return "北地区";
     if (x < WORLD_SIZE * 0.3) return "西地区";
     if (x > WORLD_SIZE * 0.7) return "東地区";
-    if (distance(x, y, HOME.x, HOME.y) < 1500) return "中央区";
     return "City Days";
   }
 
