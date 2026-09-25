@@ -87,10 +87,21 @@
     stats.estimatedBytes = currentUsage + amount;
     stats.lastUpdatedAt = now.getTime();
     const saved = saveStats(stats, storage, now);
+    if (!saved) {
+      return {
+        ok: false,
+        reason: 'storage',
+        amount,
+        usageBytes: currentUsage,
+        limitBytes: settings.dailyLimitBytes,
+        networkMode: settings.networkMode,
+        stats
+      };
+    }
     writeLegacyUsage(stats.estimatedBytes, storage, now);
     return {
-      ok: !!saved,
-      reason: saved ? null : 'storage',
+      ok: true,
+      reason: null,
       amount,
       usageBytes: stats.estimatedBytes,
       limitBytes: settings.dailyLimitBytes,
