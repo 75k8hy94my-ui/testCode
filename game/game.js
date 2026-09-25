@@ -31,6 +31,17 @@
   const joystickKnob = document.getElementById("joystickKnob");
   const actionButton = document.getElementById("actionButton");
   const runButton = document.getElementById("runButton");
+  const driveHud = document.getElementById("driveHud");
+  const speedText = document.getElementById("speedText");
+  const speedLimitText = document.getElementById("speedLimitText");
+  const signalText = document.getElementById("signalText");
+  const gapText = document.getElementById("gapText");
+  const driveScoreText = document.getElementById("driveScoreText");
+  const driveDestinationText = document.getElementById("driveDestinationText");
+  const mobileDrivingControls = document.getElementById("mobileDrivingControls");
+  const driveBrakeButton = document.getElementById("driveBrakeButton");
+  const driveMenuButton = document.getElementById("driveMenuButton");
+  const driveAccelButton = document.getElementById("driveAccelButton");
 
   const needEls = {
     hunger: [document.getElementById("hungerBar"), document.getElementById("hungerText")],
@@ -49,13 +60,15 @@
   const PLAYER_RADIUS = 14;
   const WALK_SPEED = 200;
   const RUN_SPEED = 300;
+  const SPEED_TO_KMH = 0.16;
+  const SIGNAL_CYCLE = 20;
   const SAVE_KEY = "testCodeLifeSimSave:v1";
   const RENT = 12000;
   const keys = new Set();
   const buildings = [];
   const traffic = [];
   const pedestrians = [];
-  const touch = { x: 0, y: 0, run: false, pointerId: null };
+  const touch = { x: 0, y: 0, run: false, driveAccel: false, driveBrake: false, pointerId: null };
 
   function blockCenter(gx, gy) {
     return { x: gx * ROAD_GAP + ROAD_GAP / 2, y: gy * ROAD_GAP + ROAD_GAP / 2 };
@@ -114,6 +127,19 @@
       hygiene: 80,
       social: 65,
       fun: 70
+    },
+    drive: {
+      route: [],
+      routeIndex: 0,
+      destination: null,
+      score: 100,
+      rating: 100,
+      trips: 0,
+      signalClock: 0,
+      speedingTimer: 0,
+      gapTimer: 0,
+      collisionCooldown: 0,
+      violationKeys: new Set()
     },
     paused: false
   };
@@ -221,11 +247,13 @@
     const colors = ["#d5d8da", "#6689ad", "#b26f67", "#c6a35a", "#59635f", "#89769e", "#579079"];
     for (let i = 0; i < 22; i += 1) {
       const p = randomRoadPoint(i + 2, i * 7 + 3, 18);
+      const cruise = 150 + hash2(i, 4, 22) * 110;
       traffic.push({
         x: p.x,
         y: p.y,
         angle: p.angle,
-        speed: 80 + hash2(i, 4, 22) * 60,
+        speed: cruise * 0.7,
+        cruise,
         color: colors[i % colors.length]
       });
     }
@@ -254,6 +282,168 @@
 
   function actorPosition() {
     return state.player.inVehicle ? { x: personalCar.x, y: personalCar.y } : { x: state.player.x, y: state.player.y };
+  }
+
+  function angleWrap(angle) {
+    while (angle > Math.PI) angle -= Math.PI * 2;
+    while (angle < -Math.PI) angle += Math.PI * 2;
+    return angle;
+  }
+
+  function roadSnap(x, y) {
+    const rx = Math.round(x / ROAD_GAP) * ROAD_GAP;
+    const ry = Math.round(y / ROAD_GAP) * ROAD_GAP;
+    if (Math.abs(x - rx) < Math.abs(y - ry)) {
+      return { x: rx, y, orientation: "v" };
+    }
+    return { x, y: ry, orientation: "h" };
+  }
+
+  function destinationRoadPoint(place) {
+    return { x: place.x, y: place.gy * ROAD_GAP, orientation: "h" };
+  }
+
+  function compactRoute(points) {
+    const result = [];
+    for (const point of points) {
+      const previous = result[result.length - 1];
+      if (!previous || distance(previous.x, previous.y, point.x, point.y) > 4) result.push(point);
+    }
+    return result;
+  }
+
+  function buildDrivingRoute(place) {
+    const start = roadSnap(personalCar.x, personalCar.y);
+    const startIntersection = start.orientation === "h"
+      ? { x: Math.round(start.x / ROAD_GAP) * ROAD_GAP, y: start.y }
+      : { x: start.x, y: Math.round(start.y / ROAD_GAP) * ROAD_GAP };
+    const end = destinationRoadPoint(place);
+    const endIntersection = { x: Math.round(end.x / ROAD_GAP) * ROAD_GAP, y: end.y };
+    const bend = { x: endIntersection.x, y: startIntersection.y };
+
+    return compactRoute([
+      { x: start.x, y: start.y },
+      startIntersection,
+      bend,
+      endIntersection,
+      { x: end.x, y: end.y, final: true }
+    ]);
+  }
+
+  function isIntersectionPoint(point) {
+    if (!point) return false;
+    const rx = Math.round(point.x / ROAD_GAP) * ROAD_GAP;
+    const ry = Math.round(point.y / ROAD_GAP) * ROAD_GAP;
+    return Math.abs(point.x - rx) < 5 && Math.abs(point.y - ry) < 5;
+  }
+
+  function routeDirection() {
+    const target = state.drive.route[state.drive.routeIndex];
+    if (!target) return null;
+    const dx = target.x - personalCar.x;
+    const dy = target.y - personalCar.y;
+    if (Math.hypot(dx, dy) < 1) return null;
+    return { dx, dy, orientation: Math.abs(dx) >= Math.abs(dy) ? "h" : "v" };
+  }
+
+  function speedLimitAt(x, y) {
+    if (distance(x, y, HOME.x, HOME.y) < 1350) return 40;
+    const xi = Math.abs(Math.round(x / ROAD_GAP));
+    const yi = Math.abs(Math.round(y / ROAD_GAP));
+    if (xi % 5 === 0 || yi % 5 === 0) return 60;
+    return 50;
+  }
+
+  function signalStateAt(ix, iy, orientation) {
+    const offset = hash2(Math.round(ix / ROAD_GAP), Math.round(iy / ROAD_GAP), 612) * SIGNAL_CYCLE;
+    const phase = (state.drive.signalClock + offset) % SIGNAL_CYCLE;
+    const horizontal = phase < 8 ? "green" : phase < 10 ? "yellow" : "red";
+    const vertical = phase >= 10 && phase < 18 ? "green" : phase >= 18 ? "yellow" : "red";
+    return orientation === "h" ? horizontal : vertical;
+  }
+
+  function upcomingSignal() {
+    const direction = routeDirection();
+    if (!direction) return null;
+    for (let i = state.drive.routeIndex; i < state.drive.route.length; i += 1) {
+      const point = state.drive.route[i];
+      if (!isIntersectionPoint(point)) continue;
+      const d = distance(personalCar.x, personalCar.y, point.x, point.y);
+      if (d > 180) continue;
+      const stateName = signalStateAt(point.x, point.y, direction.orientation);
+      return {
+        state: stateName,
+        distance: d,
+        key: Math.round(point.x) + ":" + Math.round(point.y) + ":" + direction.orientation
+      };
+    }
+    return null;
+  }
+
+  function leadVehicleInfo() {
+    const hx = Math.cos(personalCar.angle);
+    const hy = Math.sin(personalCar.angle);
+    let best = null;
+    for (const car of traffic) {
+      const dx = car.x - personalCar.x;
+      const dy = car.y - personalCar.y;
+      const forward = dx * hx + dy * hy;
+      if (forward <= 0 || forward > 280) continue;
+      const lateral = Math.abs(dx * -hy + dy * hx);
+      if (lateral > 72) continue;
+      const sameDirection = Math.cos(car.angle) * hx + Math.sin(car.angle) * hy;
+      if (sameDirection < 0.35) continue;
+      if (!best || forward < best.distance) best = { car, distance: forward };
+    }
+    return best;
+  }
+
+  function penalizeDriving(amount, message) {
+    state.drive.score = clamp(state.drive.score - amount, 0, 100);
+    if (message) showToast(message);
+  }
+
+  function setDrivingDestination(place) {
+    state.drive.destination = place.id;
+    state.drive.route = buildDrivingRoute(place);
+    state.drive.routeIndex = 0;
+    state.drive.score = 100;
+    state.drive.speedingTimer = 0;
+    state.drive.gapTimer = 0;
+    state.drive.violationKeys = new Set();
+    showToast(place.name + "へのルートを設定しました");
+  }
+
+  function completeDrivingTrip() {
+    const destination = PLACES.find((place) => place.id === state.drive.destination);
+    state.drive.trips += 1;
+    state.drive.rating = Math.round(((state.drive.rating * (state.drive.trips - 1)) + state.drive.score) / state.drive.trips);
+    state.needs.fun += state.drive.score >= 90 ? 5 : 2;
+    clampNeeds();
+    showToast((destination ? destination.name : "目的地") + "に到着　運転評価 " + state.drive.score);
+    state.drive.route = [];
+    state.drive.routeIndex = 0;
+    state.drive.destination = null;
+    personalCar.speed = 0;
+    saveGame(false);
+  }
+
+  function openDrivingMenu() {
+    actionTitle.textContent = "カーナビ";
+    actionDescription.textContent = "目的地を選ぶとルートは自動で設定されます。運転中は速度だけを操作します。";
+    actionChoices.replaceChildren();
+
+    for (const place of PLACES) {
+      addChoice(
+        place.name,
+        state.drive.destination === place.id ? "現在の目的地" : "ルートを設定",
+        () => setDrivingDestination(place),
+        state.drive.destination === place.id
+      );
+    }
+
+    addChoice("車から降りる", "完全に停止しているときのみ", () => exitCar(), Math.abs(personalCar.speed) > 8);
+    actionSheet.hidden = false;
   }
 
   function currentDistrict(x, y) {
@@ -556,7 +746,9 @@
   function nearestInteraction() {
     const p = actorPosition();
 
-    if (state.player.inVehicle) return { type: "car-exit", label: "車から降りる" };
+    if (state.player.inVehicle) {
+      return { type: "car-menu", label: state.drive.destination ? "ルート・降車メニュー" : "目的地を選ぶ" };
+    }
 
     if (distance(p.x, p.y, personalCar.x, personalCar.y) < 70) {
       return { type: "car-enter", label: "自分の車に乗る" };
@@ -591,10 +783,16 @@
     state.player.inVehicle = true;
     state.player.x = personalCar.x;
     state.player.y = personalCar.y;
-    showToast("車に乗りました");
+    document.body.classList.add("driving");
+    showToast("乗車しました。まず目的地を選びます");
+    openDrivingMenu();
   }
 
   function exitCar() {
+    if (Math.abs(personalCar.speed) > 8) {
+      showToast("完全に停止してから降りてください");
+      return;
+    }
     const sideX = Math.cos(personalCar.angle + Math.PI / 2) * 48;
     const sideY = Math.sin(personalCar.angle + Math.PI / 2) * 48;
     const spots = [
@@ -610,7 +808,11 @@
     state.player.x = spot[0];
     state.player.y = spot[1];
     state.player.inVehicle = false;
-    personalCar.speed *= 0.25;
+    state.drive.route = [];
+    state.drive.routeIndex = 0;
+    state.drive.destination = null;
+    personalCar.speed = 0;
+    document.body.classList.remove("driving");
   }
 
   function performAction() {
@@ -626,7 +828,7 @@
     }
 
     if (item.type === "car-enter") enterCar();
-    if (item.type === "car-exit") exitCar();
+    if (item.type === "car-menu") openDrivingMenu();
     if (item.type === "place") openPlace(item.target);
     if (item.type === "npc") openNpc(item.target);
   }
@@ -666,6 +868,10 @@
         libraryVisits: state.libraryVisits,
         shiftsWorked: state.shiftsWorked,
         needs: state.needs,
+        driving: {
+          rating: state.drive.rating,
+          trips: state.drive.trips
+        },
         friends: Object.fromEntries(NPCS.map((npc) => [npc.id, npc.friendship])),
         savedAt: Date.now()
       }));
@@ -712,6 +918,10 @@
       state.fitness = Math.max(0, Math.floor(Number(saved.fitness) || 0));
       state.libraryVisits = Math.max(0, Math.floor(Number(saved.libraryVisits) || 0));
       state.shiftsWorked = Math.max(0, Math.floor(Number(saved.shiftsWorked) || 0));
+      if (saved.driving) {
+        state.drive.rating = clamp(Math.round(Number(saved.driving.rating) || 100), 0, 100);
+        state.drive.trips = Math.max(0, Math.floor(Number(saved.driving.trips) || 0));
+      }
 
       if (saved.needs) {
         for (const key of Object.keys(state.needs)) {
@@ -773,30 +983,85 @@
   }
 
   function updateCar(dt) {
-    let throttle = 0;
-    let steer = 0;
+    state.drive.signalClock += dt;
+    state.drive.collisionCooldown = Math.max(0, state.drive.collisionCooldown - dt);
 
-    if (Math.abs(touch.x) > 0.02 || Math.abs(touch.y) > 0.02) {
-      steer = touch.x;
-      throttle = -touch.y;
-    } else {
-      if (keys.has("w") || keys.has("arrowup")) throttle += 1;
-      if (keys.has("s") || keys.has("arrowdown")) throttle -= 1;
-      if (keys.has("a") || keys.has("arrowleft")) steer -= 1;
-      if (keys.has("d") || keys.has("arrowright")) steer += 1;
+    if (!state.drive.destination || !state.drive.route.length) {
+      personalCar.speed *= Math.pow(0.72, dt * 10);
+      if (personalCar.speed < 1) personalCar.speed = 0;
+      state.player.x = personalCar.x;
+      state.player.y = personalCar.y;
+      return;
     }
 
-    const onRoad = isRoad(personalCar.x, personalCar.y);
-    const maxSpeed = onRoad ? 355 : 190;
-    if (throttle > 0.05) personalCar.speed += 260 * throttle * dt;
-    else if (throttle < -0.05) personalCar.speed += 190 * throttle * dt;
-    else personalCar.speed *= Math.pow(0.86, dt * 10);
+    const accelerating = touch.driveAccel || keys.has("w") || keys.has("arrowup");
+    const braking = touch.driveBrake || keys.has("s") || keys.has("arrowdown") || keys.has(" ");
+    const route = state.drive.route;
+    let target = route[state.drive.routeIndex];
 
-    if (keys.has(" ")) personalCar.speed *= Math.pow(0.45, dt * 10);
-    personalCar.speed = clamp(personalCar.speed, -120, maxSpeed);
+    if (target) {
+      let d = distance(personalCar.x, personalCar.y, target.x, target.y);
+      if (d < 32 && state.drive.routeIndex < route.length - 1) {
+        state.drive.routeIndex += 1;
+        target = route[state.drive.routeIndex];
+        d = distance(personalCar.x, personalCar.y, target.x, target.y);
+      }
 
-    const turn = clamp(Math.abs(personalCar.speed) / 145, 0.16, 1.1);
-    personalCar.angle += steer * 2.15 * turn * dt * (personalCar.speed >= 0 ? 1 : -1);
+      if (target) {
+        const desired = Math.atan2(target.y - personalCar.y, target.x - personalCar.x);
+        const diff = angleWrap(desired - personalCar.angle);
+        const turnFactor = clamp(Math.abs(personalCar.speed) / 120, 0.28, 1);
+        personalCar.angle += clamp(diff, -1.1, 1.1) * 2.5 * turnFactor * dt;
+      }
+    }
+
+    if (accelerating && !braking) personalCar.speed += 230 * dt;
+    else if (braking) personalCar.speed -= 330 * dt;
+    else personalCar.speed *= Math.pow(0.93, dt * 10);
+
+    personalCar.speed = clamp(personalCar.speed, 0, 390);
+
+    const limit = speedLimitAt(personalCar.x, personalCar.y);
+    const kmh = personalCar.speed * SPEED_TO_KMH;
+    if (kmh > limit + 4) {
+      state.drive.speedingTimer += dt;
+      if (state.drive.speedingTimer >= 1.5) {
+        state.drive.speedingTimer = 0;
+        penalizeDriving(2, "速度超過: 制限 " + limit + " km/h");
+      }
+    } else {
+      state.drive.speedingTimer = Math.max(0, state.drive.speedingTimer - dt * 2);
+    }
+
+    const signal = upcomingSignal();
+    if (signal && signal.state === "red" && signal.distance < 34 && personalCar.speed > 18 && !state.drive.violationKeys.has(signal.key)) {
+      state.drive.violationKeys.add(signal.key);
+      penalizeDriving(18, "赤信号を通過しました");
+    }
+
+    const lead = leadVehicleInfo();
+    if (lead) {
+      const safeDistance = 55 + personalCar.speed * 0.42;
+      if (lead.distance < safeDistance) {
+        state.drive.gapTimer += dt;
+        if (state.drive.gapTimer >= 1.15) {
+          state.drive.gapTimer = 0;
+          penalizeDriving(2, "車間距離が近すぎます");
+        }
+      } else {
+        state.drive.gapTimer = Math.max(0, state.drive.gapTimer - dt);
+      }
+
+      if (lead.distance < 38) {
+        personalCar.speed = Math.min(personalCar.speed, Math.max(0, lead.car.speed - 20));
+        if (state.drive.collisionCooldown <= 0) {
+          state.drive.collisionCooldown = 2.5;
+          penalizeDriving(12, "前方車両に接触しました");
+        }
+      }
+    } else {
+      state.drive.gapTimer = 0;
+    }
 
     const ox = personalCar.x;
     const oy = personalCar.y;
@@ -806,19 +1071,86 @@
     if (!inWorld(personalCar.x, personalCar.y, 32) || collidesBuilding(personalCar.x, personalCar.y, 29)) {
       personalCar.x = ox;
       personalCar.y = oy;
-      personalCar.speed *= -0.2;
+      personalCar.speed = 0;
+      penalizeDriving(8, "路外へ出ました");
     }
 
     state.player.x = personalCar.x;
     state.player.y = personalCar.y;
+
+    const destination = state.drive.destination ? PLACES.find((place) => place.id === state.drive.destination) : null;
+    const finalPoint = route[route.length - 1];
+    if (destination && finalPoint && state.drive.routeIndex >= route.length - 1) {
+      const finalDistance = distance(personalCar.x, personalCar.y, finalPoint.x, finalPoint.y);
+      if (finalDistance < 58 && personalCar.speed < 8) completeDrivingTrip();
+    }
   }
 
   function updateTraffic(dt) {
     for (const car of traffic) {
+      const orientation = Math.abs(Math.cos(car.angle)) >= Math.abs(Math.sin(car.angle)) ? "h" : "v";
+      let nextX;
+      let nextY;
+      let intersectionDistance;
+
+      if (orientation === "h") {
+        nextX = car.angle === 0
+          ? Math.ceil((car.x + 1) / ROAD_GAP) * ROAD_GAP
+          : Math.floor((car.x - 1) / ROAD_GAP) * ROAD_GAP;
+        nextY = Math.round(car.y / ROAD_GAP) * ROAD_GAP;
+        intersectionDistance = Math.abs(nextX - car.x);
+      } else {
+        nextX = Math.round(car.x / ROAD_GAP) * ROAD_GAP;
+        nextY = Math.sin(car.angle) > 0
+          ? Math.ceil((car.y + 1) / ROAD_GAP) * ROAD_GAP
+          : Math.floor((car.y - 1) / ROAD_GAP) * ROAD_GAP;
+        intersectionDistance = Math.abs(nextY - car.y);
+      }
+
+      const signal = signalStateAt(nextX, nextY, orientation);
+      const roadLimit = speedLimitAt(car.x, car.y) / SPEED_TO_KMH;
+      let targetSpeed = Math.min(car.cruise, roadLimit * 0.92);
+      if ((signal === "red" || signal === "yellow") && intersectionDistance < 95) {
+        targetSpeed = Math.max(0, (intersectionDistance - 30) * 2.4);
+      }
+
+      const hx = Math.cos(car.angle);
+      const hy = Math.sin(car.angle);
+      let leadDistance = Infinity;
+      for (const other of traffic) {
+        if (other === car) continue;
+        const dx = other.x - car.x;
+        const dy = other.y - car.y;
+        const forward = dx * hx + dy * hy;
+        if (forward <= 0 || forward > 180) continue;
+        const lateral = Math.abs(dx * -hy + dy * hx);
+        if (lateral > 42) continue;
+        const sameDirection = Math.cos(other.angle) * hx + Math.sin(other.angle) * hy;
+        if (sameDirection > 0.7) leadDistance = Math.min(leadDistance, forward);
+      }
+
+      if (state.player.inVehicle) {
+        const dx = personalCar.x - car.x;
+        const dy = personalCar.y - car.y;
+        const forward = dx * hx + dy * hy;
+        const lateral = Math.abs(dx * -hy + dy * hx);
+        const sameDirection = Math.cos(personalCar.angle) * hx + Math.sin(personalCar.angle) * hy;
+        if (forward > 0 && forward < 180 && lateral < 55 && sameDirection > 0.5) {
+          leadDistance = Math.min(leadDistance, forward);
+        }
+      }
+
+      if (leadDistance < 120) {
+        targetSpeed = Math.min(targetSpeed, Math.max(0, (leadDistance - 36) * 2.1));
+      }
+
+      car.speed += (targetSpeed - car.speed) * Math.min(1, dt * 2.4);
+
       const ox = car.x;
       const oy = car.y;
       car.x += Math.cos(car.angle) * car.speed * dt;
       car.y += Math.sin(car.angle) * car.speed * dt;
+
       if (!inWorld(car.x, car.y, 28) || collidesBuilding(car.x, car.y, 25)) {
         car.x = ox;
         car.y = oy;
@@ -848,6 +1180,7 @@
   function update(dt) {
     if (state.paused || !actionSheet.hidden || !helpPanel.hidden) return;
 
+    if (!state.player.inVehicle) state.drive.signalClock += dt;
     if (state.player.inVehicle) updateCar(dt);
     else updatePlayerOnFoot(dt);
 
@@ -949,6 +1282,61 @@
       const b = i * ROAD_GAP + ROAD_HALF - state.camera.y;
       ctx.fillRect(0, a, viewWidth, 8);
       ctx.fillRect(0, b, viewWidth, 8);
+    }
+  }
+
+  function drawRoute() {
+    if (!state.player.inVehicle || !state.drive.route.length) return;
+    ctx.save();
+    ctx.strokeStyle = "rgba(98,194,255,.68)";
+    ctx.lineWidth = 6;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.setLineDash([14, 10]);
+    ctx.beginPath();
+    ctx.moveTo(personalCar.x - state.camera.x, personalCar.y - state.camera.y);
+    for (let i = state.drive.routeIndex; i < state.drive.route.length; i += 1) {
+      const point = state.drive.route[i];
+      ctx.lineTo(point.x - state.camera.x, point.y - state.camera.y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawTrafficLights() {
+    const startX = Math.floor(state.camera.x / ROAD_GAP) - 1;
+    const endX = Math.ceil((state.camera.x + viewWidth) / ROAD_GAP) + 1;
+    const startY = Math.floor(state.camera.y / ROAD_GAP) - 1;
+    const endY = Math.ceil((state.camera.y + viewHeight) / ROAD_GAP) + 1;
+    const lightColor = (name) => name === "green" ? "#65d47b" : name === "yellow" ? "#f0c95c" : "#e96862";
+
+    for (let gx = startX; gx <= endX; gx += 1) {
+      for (let gy = startY; gy <= endY; gy += 1) {
+        const wx = gx * ROAD_GAP;
+        const wy = gy * ROAD_GAP;
+        const sx = wx - state.camera.x;
+        const sy = wy - state.camera.y;
+        const h = signalStateAt(wx, wy, "h");
+        const v = signalStateAt(wx, wy, "v");
+
+        ctx.fillStyle = "#1b201e";
+        ctx.fillRect(sx - 52, sy - 61, 15, 22);
+        ctx.fillRect(sx + 38, sy + 39, 15, 22);
+        ctx.fillRect(sx + 39, sy - 52, 22, 15);
+        ctx.fillRect(sx - 61, sy + 38, 22, 15);
+
+        ctx.fillStyle = lightColor(h);
+        ctx.beginPath();
+        ctx.arc(sx - 44, sy - 50, 5, 0, Math.PI * 2);
+        ctx.arc(sx + 45, sy + 50, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = lightColor(v);
+        ctx.beginPath();
+        ctx.arc(sx + 50, sy - 44, 5, 0, Math.PI * 2);
+        ctx.arc(sx - 50, sy + 45, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
 
@@ -1160,6 +1548,20 @@
       mctx.fill();
     }
 
+    if (state.player.inVehicle && state.drive.route.length) {
+      mctx.save();
+      mctx.strokeStyle = "#68c9ff";
+      mctx.lineWidth = 3;
+      mctx.beginPath();
+      mctx.moveTo(w / 2, h / 2);
+      for (let i = state.drive.routeIndex; i < state.drive.route.length; i += 1) {
+        const point = state.drive.route[i];
+        mctx.lineTo(w / 2 + (point.x - p.x) * scale, h / 2 + (point.y - p.y) * scale);
+      }
+      mctx.stroke();
+      mctx.restore();
+    }
+
     for (const place of PLACES) dot(place.x, place.y, place.color, 4.2);
     dot(personalCar.x, personalCar.y, "#e8edf0", 2.7);
 
@@ -1179,6 +1581,20 @@
   }
 
   function updateObjective() {
+    if (state.player.inVehicle) {
+      const destination = PLACES.find((place) => place.id === state.drive.destination);
+      objectiveTitle.textContent = destination ? "運転中: " + destination.name : "目的地を選択";
+      if (!destination) objectiveText.textContent = "E / ROUTEから行き先を設定する";
+      else {
+        const signal = upcomingSignal();
+        const lead = leadVehicleInfo();
+        if (signal && signal.state === "red" && signal.distance < 120) objectiveText.textContent = "赤信号です。停止線の手前で止まる";
+        else if (lead && lead.distance < 130) objectiveText.textContent = "前走車との車間を保つ";
+        else objectiveText.textContent = "ルートは自動。速度と停止・発進だけを操作";
+      }
+      return;
+    }
+
     const n = state.needs;
     if (state.cash < 0) {
       objectiveTitle.textContent = "家計を立て直そう";
@@ -1242,6 +1658,28 @@
     rentText.textContent = "次の家賃: Day " + nextRentDay() + " / ¥" + RENT.toLocaleString("ja-JP");
     updateObjective();
 
+    driveHud.hidden = !state.player.inVehicle;
+    mobileDrivingControls.hidden = !state.player.inVehicle;
+    document.body.classList.toggle("driving", state.player.inVehicle);
+
+    if (state.player.inVehicle) {
+      const limit = speedLimitAt(personalCar.x, personalCar.y);
+      const signal = upcomingSignal();
+      const lead = leadVehicleInfo();
+      const destination = PLACES.find((place) => place.id === state.drive.destination);
+      speedText.textContent = Math.round(personalCar.speed * SPEED_TO_KMH);
+      speedLimitText.textContent = limit;
+      driveScoreText.textContent = state.drive.score;
+      driveDestinationText.textContent = destination ? "→ " + destination.name : "目的地を選択";
+      signalText.textContent = signal
+        ? (signal.state === "green" ? "信号 青" : signal.state === "yellow" ? "信号 黄" : "信号 赤")
+        : "信号 —";
+      signalText.classList.toggle("route-warning", Boolean(signal && signal.state === "yellow"));
+      signalText.classList.toggle("route-danger", Boolean(signal && signal.state === "red"));
+      gapText.textContent = lead ? "車間 " + Math.max(0, Math.round(lead.distance / 10)) + "m" : "車間 —";
+      gapText.classList.toggle("route-danger", Boolean(lead && lead.distance < 80));
+    }
+
     const interaction = nearestInteraction();
     if (interaction && actionSheet.hidden && helpPanel.hidden) {
       interactionText.textContent = interaction.label;
@@ -1255,6 +1693,8 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, viewWidth, viewHeight);
     drawGround();
+    drawRoute();
+    drawTrafficLights();
     drawBuildings();
     for (const place of PLACES) drawPlace(place);
     drawPedestrians();
@@ -1355,6 +1795,8 @@
     keys.clear();
     resetJoystick();
     touch.run = false;
+    touch.driveAccel = false;
+    touch.driveBrake = false;
   });
 
   joystick.addEventListener("pointerdown", (event) => {
@@ -1387,6 +1829,27 @@
   runButton.addEventListener("pointercancel", stopRun);
   runButton.addEventListener("lostpointercapture", stopRun);
 
+  const bindHoldButton = (button, key) => {
+    button.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      touch[key] = true;
+      try {
+        button.setPointerCapture(event.pointerId);
+      } catch (_) {}
+    });
+    const stop = () => { touch[key] = false; };
+    button.addEventListener("pointerup", stop);
+    button.addEventListener("pointercancel", stop);
+    button.addEventListener("lostpointercapture", stop);
+  };
+
+  bindHoldButton(driveAccelButton, "driveAccel");
+  bindHoldButton(driveBrakeButton, "driveBrake");
+  driveMenuButton.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    actionQueued = true;
+  });
+
   actionClose.addEventListener("click", closeActionSheet);
   helpButton.addEventListener("click", () => { helpPanel.hidden = false; });
   helpClose.addEventListener("click", () => { helpPanel.hidden = true; });
@@ -1402,6 +1865,12 @@
   generatePedestrians();
   loadGame();
   resize();
+  if (state.player.inVehicle) {
+    personalCar.speed = 0;
+    state.drive.route = [];
+    state.drive.destination = null;
+    document.body.classList.add("driving");
+  }
 
   if (!canStand(state.player.x, state.player.y)) {
     state.player.x = HOME.x + 55;
