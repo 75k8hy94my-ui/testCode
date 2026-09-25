@@ -20,6 +20,21 @@
     return error;
   }
 
+  async function isExistingObjectResponse(response) {
+    if (response.status !== 409 && response.status !== 400) return false;
+    let body = null;
+    try {
+      const readable = typeof response.clone === 'function' ? response.clone() : response;
+      if (typeof readable.json === 'function') body = await readable.json();
+      else if (typeof readable.text === 'function') body = await readable.text();
+    } catch {}
+    const code = String(body?.code || body?.error || body?.error_code || '').toLowerCase();
+    const message = String(body?.message || body?.msg || body || '').toLowerCase();
+    const duplicateCode = /resourcealreadyexists|keyalreadyexists|already_exists|duplicate/.test(code);
+    const duplicateMessage = /asset already exists|already exists/.test(message);
+    return duplicateCode || duplicateMessage;
+  }
+
   function createStorageTransport({ baseUrl, publishableKey, fetchImpl = globalThis.fetch } = {}) {
     if (typeof baseUrl !== 'string' || !baseUrl) throw new TypeError('baseUrl is required');
     if (typeof publishableKey !== 'string' || !publishableKey) throw new TypeError('publishableKey is required');
@@ -31,7 +46,7 @@
         method: 'POST', signal, body: bytes(encryptedBytes),
         headers: { apikey: publishableKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/octet-stream', 'x-upsert': 'false' }
       });
-      if (response.status === 409) return { created: false, exists: true };
+      if (await isExistingObjectResponse(response)) return { created: false, exists: true };
       if (!response.ok) throw httpError(response, 'storage upload');
       return { created: true, exists: false };
     }

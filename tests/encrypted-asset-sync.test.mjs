@@ -23,7 +23,7 @@ function makeCache() {
     records,
     async get(a, r, o) { return records.get(`${a}:${r}:${o}`) || null; },
     async put(record) { records.set(`${record.assetId}:${record.revision}:${record.objectId}`, { ...record, encryptedBytes: new Uint8Array(record.encryptedBytes) }); },
-    async setRetention(a, r, o, retention) { const item = records.get(`${a}:${r}:${o}`); if (!item) throw new Error('missing'); item.retention = retention; }
+    async setRetention(a, r, o, retention) { const item = records.get(`${a}:${r}:${o}`); if (!item) return false; item.retention = retention; return true; }
   };
 }
 function makeVault(remote, calls = []) {
@@ -100,6 +100,37 @@ test('duplicate upload verifies exact bytes and rejects mismatches', async () =>
   for (const record of cache.records.values()) record.retention = 'pending';
   const mismatch = await sync.publishPendingRevision({ vault: makeVault({ asset_id: assetId, revision: 1, deleted_at: null, updated_at: 'now' }), storage, cache, assetId, targetRevision: 1, objectIds: staged.objectIds });
   assert.equal(mismatch.conflict.reason, 'published-revision-mismatch');
+});
+
+test('partial finalize resumes with mixed pending and cache records after published metadata', async () => {
+  const cache = makeCache();
+  const staged = await sync.stageProcessedRevision({ cache, masterKey: key, assetId, targetRevision: 1, processed: makeProcessed() });
+  const storage = makeStorage();
+  const remote = { asset_id: assetId, revision: 1, deleted_at: null, updated_at: 'now' };
+  for (const objectId of staged.objectIds) storage.objects.set(`${userId}/${assetId}/1/${objectId === 'preview' ? 'preview' : objectId.replaceAll(':', '_')}.mrae`, staged.encryptedBytes[objectId]);
+  const originalSetRetention = cache.setRetention;
+  let calls = 0;
+  cache.setRetention = async (...args) => { calls += 1; if (calls === 2) throw new Error('simulated finalize failure'); return originalSetRetention(...args); };
+  await assert.rejects(sync.publishPendingRevision({ vault: makeVault(remote), storage, cache, assetId, targetRevision: 1, objectIds: staged.objectIds }));
+  assert.equal([...cache.records.values()].filter(record => record.retention === 'cache').length, 1);
+  cache.setRetention = originalSetRetention;
+  const result = await sync.publishPendingRevision({ vault: makeVault(remote), storage, cache, assetId, targetRevision: 1, objectIds: staged.objectIds });
+  assert.equal(result.ok, true);
+  assert.ok([...cache.records.values()].every(record => record.retention === 'cache'));
+});
+
+test('abort after final upload prevents metadata publish and keeps pending records', async () => {
+  const cache = makeCache();
+  const staged = await sync.stageProcessedRevision({ cache, masterKey: key, assetId, targetRevision: 1, processed: makeProcessed() });
+  const controller = new AbortController();
+  const storage = makeStorage();
+  const events = [];
+  const originalUpload = storage.upload;
+  storage.upload = async (...args) => { const result = await originalUpload(...args); if (storage.calls.filter(call => call[0] === 'upload').length === staged.objectIds.length) controller.abort(); return result; };
+  const vault = { async withSession(callback) { return callback('token', { id: userId }); }, async api(path) { events.push(path); return path.includes('/rpc/') ? [{ asset_id: assetId, revision: 1, deleted_at: null, updated_at: 'now' }] : []; } };
+  await assert.rejects(sync.publishPendingRevision({ vault, storage, cache, assetId, targetRevision: 1, objectIds: staged.objectIds, signal: controller.signal }), error => error.name === 'AbortError');
+  assert.equal(events.some(path => path.includes('/rpc/')), false);
+  assert.ok([...cache.records.values()].every(record => record.retention === 'pending'));
 });
 
 test('cache HIT avoids metadata/storage and cache MISS validates metadata before download and decrypts', async () => {

@@ -10,6 +10,14 @@
     return value;
   }
 
+  function throwIfAborted(signal) {
+    if (signal?.aborted) {
+      const error = new Error('Operation was aborted');
+      error.name = 'AbortError';
+      throw error;
+    }
+  }
+
   function equalBytes(a, b) {
     const left = a instanceof Uint8Array ? a : new Uint8Array(a);
     const right = b instanceof Uint8Array ? b : new Uint8Array(b);
@@ -55,14 +63,17 @@
     return vault.withSession((token, user) => callback(token, user));
   }
 
-  async function pendingObjects(cache, assetId, revision, objectIds) {
+  async function localObjects(cache, assetId, revision, objectIds, allowCache) {
     const result = {};
+    const records = {};
     for (const objectId of objectIds) {
       const record = await cache.get(assetId, revision, objectId);
-      if (!record || record.retention !== 'pending' || record.revision !== revision) throw new Error(`missing-pending-object:${objectId}`);
+      if (!record || record.revision !== revision || (record.retention !== 'pending' && (!allowCache || record.retention !== 'cache'))) throw new Error(`missing-pending-object:${objectId}`);
+      cryptoApi.validateEncryptedAsset(record.encryptedBytes);
       result[objectId] = new Uint8Array(record.encryptedBytes);
+      records[objectId] = record;
     }
-    return result;
+    return { bytes: result, records };
   }
 
   function validateObjectIds(objectIds) {
@@ -91,27 +102,32 @@
   }
 
   async function finalize(cache, assetId, revision, objectIds) {
-    for (const objectId of objectIds) await cache.setRetention(assetId, revision, objectId, 'cache');
+    for (const objectId of objectIds) {
+      const changed = await cache.setRetention(assetId, revision, objectId, 'cache');
+      if (changed === false) throw new Error(`local finalize failed:${objectId}`);
+    }
   }
 
   async function publishPendingRevision({ vault, storage, cache, assetId, targetRevision, objectIds, signal }) {
     const target = positiveRevision(targetRevision);
     validateObjectIds(objectIds);
-    const pending = await pendingObjects(cache, assetId, target, objectIds);
+    const local = await localObjects(cache, assetId, target, objectIds, true);
     const remote = await backendApi.fetchRemoteAsset(vault, assetId);
-    if (target === 1) {
-      if (remote) {
-        if (remote.revision === 1 && !remote.deletedAt) {
-          const verified = await session(vault, (token, user) => verifyRemoteObjects({ storage, token, userId: user.id, assetId, revision: target, objectIds, pending, signal }));
-          if (verified) { await finalize(cache, assetId, target, objectIds); return { ok: true, resumed: true }; }
-          return conflict(assetId, 'published-revision-mismatch', target, remote);
-        }
-        return conflict(assetId, 'remote-exists', target, remote);
-      }
-    } else if (remote && remote.revision === target && !remote.deletedAt) {
+    const recovery = remote && remote.revision === target && !remote.deletedAt;
+    if (!recovery && Object.values(local.records).some((record) => record.retention !== 'pending')) {
+      throw new Error('missing-pending-object');
+    }
+    const pending = local.bytes;
+    throwIfAborted(signal);
+    if (recovery) {
       const verified = await session(vault, (token, user) => verifyRemoteObjects({ storage, token, userId: user.id, assetId, revision: target, objectIds, pending, signal }));
       if (verified) { await finalize(cache, assetId, target, objectIds); return { ok: true, resumed: true }; }
       return conflict(assetId, 'published-revision-mismatch', target, remote);
+    }
+    if (target === 1) {
+      if (remote) {
+        return conflict(assetId, 'remote-exists', target, remote);
+      }
     } else if (!remote || remote.deletedAt) {
       return conflict(assetId, remote ? 'remote-deleted' : 'remote-missing', target, remote);
     } else if (remote.revision !== target - 1) {
@@ -120,6 +136,7 @@
 
     const uploaded = await session(vault, (token, user) => uploadObjects({ storage, token, userId: user.id, assetId, revision: target, objectIds, pending, signal }));
     if (!uploaded.ok) return conflict(assetId, uploaded.reason, target, remote);
+    throwIfAborted(signal);
     const published = target === 1 ? await backendApi.createRemoteAsset(vault, assetId) : await backendApi.publishRemoteAssetRevision(vault, assetId, target - 1);
     if (!published) {
       if (target === 1) {

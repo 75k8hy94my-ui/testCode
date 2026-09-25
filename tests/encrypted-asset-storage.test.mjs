@@ -5,8 +5,8 @@ import vm from 'node:vm';
 import storageApi from '../encrypted-asset-storage.js';
 
 const calls = [];
-function response(status, body = new Uint8Array()) {
-  return { status, ok: status >= 200 && status < 300, async arrayBuffer() { return body.buffer; } };
+function response(status, body = new Uint8Array(), errorBody = null) {
+  return { status, ok: status >= 200 && status < 300, async arrayBuffer() { return body.buffer; }, async json() { if (errorBody) return errorBody; throw new Error('no json'); }, clone() { return response(status, body, errorBody); } };
 }
 function transport(fetchImpl = async (url, options) => { calls.push({ url, options }); return response(201); }) {
   calls.length = 0;
@@ -28,7 +28,10 @@ test('upload encodes each path segment and sends raw create-only binary', async 
 });
 
 test('409 is an existing object, other HTTP errors throw with status', async () => {
-  assert.deepEqual(await transport(async () => response(409)).upload('u/a/1/preview.mrae', 't', new Uint8Array()), { created: false, exists: true });
+  assert.deepEqual(await transport(async () => response(409, new Uint8Array(), { code: 'ResourceAlreadyExists' })).upload('u/a/1/preview.mrae', 't', new Uint8Array()), { created: false, exists: true });
+  assert.deepEqual(await transport(async () => response(409, new Uint8Array(), { code: 'already_exists' })).upload('u/a/1/preview.mrae', 't', new Uint8Array()), { created: false, exists: true });
+  assert.deepEqual(await transport(async () => response(400, new Uint8Array(), { message: 'Asset Already Exists' })).upload('u/a/1/preview.mrae', 't', new Uint8Array()), { created: false, exists: true });
+  await assert.rejects(transport(async () => response(400, new Uint8Array(), { code: 'InvalidRequest' })).upload('u/a/1/preview.mrae', 't', new Uint8Array()), error => error.status === 400);
   await assert.rejects(transport(async () => response(500)).upload('u/a/1/preview.mrae', 't', new Uint8Array()), error => error.status === 500);
 });
 
