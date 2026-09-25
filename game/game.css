@@ -90,3 +90,30 @@ button{font:inherit;color:inherit}
   .action-sheet{bottom:calc(130px + env(safe-area-inset-bottom))}
   .action-choices{grid-template-columns:1fr}
 }
+
+.drive-card{top:92px;left:50%;transform:translateX(-50%);padding:9px 12px;min-width:210px;text-align:center}
+.drive-speed-row{display:flex;align-items:flex-end;justify-content:center;gap:5px;margin:2px 0 4px}
+.drive-speed-row strong{font-size:28px;line-height:1}
+.drive-speed-row span{font-size:10px;color:var(--muted);padding-bottom:3px}
+.drive-info{display:flex;justify-content:space-between;gap:12px;font-size:10px;color:var(--muted);margin-top:3px}
+.drive-info b{color:var(--text)}
+.drive-destination{margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.08);font-size:10px;color:var(--accent)}
+.mobile-driving-controls{position:absolute;left:0;right:0;bottom:0;padding:18px max(18px,env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none}
+.mobile-driving-controls button{pointer-events:auto;border:1px solid rgba(255,255,255,.18);background:rgba(9,14,11,.8);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-size:11px;font-weight:800;letter-spacing:.07em}
+#driveBrakeButton,#driveAccelButton{width:96px;height:96px;border-radius:50%}
+#driveBrakeButton{background:rgba(96,43,37,.82)}
+#driveAccelButton{background:rgba(42,91,58,.82)}
+#driveMenuButton{width:72px;height:54px;border-radius:14px;align-self:center}
+body.driving #mobileControls{display:none!important}
+body:not(.driving) #mobileDrivingControls{display:none!important}
+.route-warning{color:#f0b76b!important}
+.route-danger{color:#ed7770!important}
+@media(max-width:760px){
+  .drive-card{top:132px;left:auto;right:max(10px,env(safe-area-inset-right));transform:none;min-width:142px;padding:7px 9px}
+  .drive-speed-row strong{font-size:22px}
+  body.driving .objective-card{bottom:calc(126px + env(safe-area-inset-bottom))}
+}
+@media(max-width:420px){
+  #driveBrakeButton,#driveAccelButton{width:84px;height:84px}
+  #driveMenuButton{width:64px;height:48px}
+}
