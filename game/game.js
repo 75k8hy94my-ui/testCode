@@ -65,6 +65,14 @@
   const LANE_OFFSET = 38;
   const TURN_RADIUS = 86;
   const ROUTE_SAMPLE_STEP = 16;
+  const VISUAL_PALETTES = [
+    { wall:"#c8b89c", roof:"#746f69", trim:"#e8dcc5", glass:"#8ba6ad" },
+    { wall:"#b6b8b2", roof:"#61696a", trim:"#d8d9d3", glass:"#86a7b3" },
+    { wall:"#c79e84", roof:"#725d58", trim:"#ead2bc", glass:"#83a0aa" },
+    { wall:"#aaa8b6", roof:"#595967", trim:"#d7d3e2", glass:"#879cab" },
+    { wall:"#b9aa8d", roof:"#6a6358", trim:"#ded3bd", glass:"#839faa" }
+  ];
+  const VEHICLE_TYPES = ["compact","sedan","suv","van"];
   const SAVE_KEY = "testCodeLifeSimSave:v1";
   const RENT = 12000;
   const keys = new Set();
@@ -130,6 +138,16 @@
       hygiene: 80,
       social: 65,
       fun: 70
+    },
+    visual: {
+      weather: "clear",
+      weatherClock: 0,
+      weatherDuration: 42,
+      rainPhase: 0,
+      cameraLeadX: 0,
+      cameraLeadY: 0,
+      cameraLagX: 0,
+      cameraLagY: 0
     },
     drive: {
       route: [],
@@ -214,23 +232,30 @@
 
         if (r < 0.15) continue;
 
+        const makeBuilding = (x, y, w, h, localTint, kind, variant = 0) => {
+          const palette = Math.floor(hash2(gx + variant, gy, 407) * VISUAL_PALETTES.length) % VISUAL_PALETTES.length;
+          return {
+            x, y, w, h, tint: localTint, kind, palette,
+            floors: kind === "tower" ? 8 + Math.floor(hash2(gx, gy + variant, 408) * 5) : 2 + Math.floor(hash2(gx, gy + variant, 409) * 4),
+            roofDetail: Math.floor(hash2(gx, gy + variant, 410) * 4),
+            facadeBand: hash2(gx + variant, gy, 411) > 0.5,
+            balconies: kind !== "low" && hash2(gx, gy + variant, 412) > 0.62
+          };
+        };
+
         if (r < 0.55) {
-          buildings.push({
-            x: left + 20,
-            y: top + 20,
-            w: bw - 40,
-            h: bh - 40,
-            tint,
-            kind: hash2(gx, gy, 301) > 0.78 ? "tower" : "normal"
-          });
+          buildings.push(makeBuilding(
+            left + 20, top + 20, bw - 40, bh - 40, tint,
+            hash2(gx, gy, 301) > 0.78 ? "tower" : "normal"
+          ));
         } else if (r < 0.8) {
           const split = bw * (0.43 + hash2(gx, gy, 104) * 0.12);
-          buildings.push({ x: left + 12, y: top + 18, w: split - 22, h: bh - 36, tint, kind: "normal" });
-          buildings.push({ x: left + split + 10, y: top + 32, w: bw - split - 22, h: bh - 64, tint: tint * 0.94, kind: "normal" });
+          buildings.push(makeBuilding(left + 12, top + 18, split - 22, bh - 36, tint, "normal", 1));
+          buildings.push(makeBuilding(left + split + 10, top + 32, bw - split - 22, bh - 64, tint * 0.94, "normal", 2));
         } else {
           const split = bh * (0.43 + hash2(gx, gy, 205) * 0.12);
-          buildings.push({ x: left + 20, y: top + 12, w: bw - 40, h: split - 22, tint, kind: "normal" });
-          buildings.push({ x: left + 34, y: top + split + 10, w: bw - 68, h: bh - split - 22, tint: tint * 0.93, kind: "low" });
+          buildings.push(makeBuilding(left + 20, top + 12, bw - 40, split - 22, tint, "normal", 3));
+          buildings.push(makeBuilding(left + 34, top + split + 10, bw - 68, bh - split - 22, tint * 0.93, "low", 4));
         }
       }
     }
@@ -264,7 +289,9 @@
         angle: p.angle,
         speed: cruise * 0.7,
         cruise,
-        color: colors[i % colors.length]
+        color: colors[i % colors.length],
+        type: VEHICLE_TYPES[Math.floor(hash2(i, 8, 522) * VEHICLE_TYPES.length) % VEHICLE_TYPES.length],
+        brakeGlow: 0
       });
     }
   }
@@ -285,7 +312,11 @@
         dir: hash2(i, 3, 90) * Math.PI * 2,
         timer: 1 + hash2(i, 4, 93) * 4,
         speed: 28 + hash2(i, 8, 96) * 30,
-        color: ["#ddb29d", "#a9c5d9", "#d7bf82", "#baa9d3", "#9fc3a4"][i % 5]
+        color: ["#c77f66", "#718da7", "#ba9b58", "#8876a8", "#71957a"][i % 5],
+        pants: ["#394248","#554a45","#2f3b4d","#45464d"][i % 4],
+        hair: ["#302720","#4a3427","#1f2326","#684b36"][i % 4],
+        skin: ["#e5b394","#d49b77","#f0c3a4","#b97f62"][i % 4],
+        phase: hash2(i, 12, 97) * Math.PI * 2
       });
     }
   }
