@@ -990,29 +990,52 @@
     }
   }
 
-  function randomRoadPoint(seedA, seedB, offset = 0) {
-    const horizontal = hash2(seedA, seedB, 5) > 0.5;
-    const forward = hash2(seedA, seedB, 19) > 0.5;
-    const along = COAST + 240 + hash2(seedA, seedB, 13) * (WORLD_SIZE - COAST * 2 - 480);
-    const arterialList = horizontal ? [...EW_ARTERIALS] : [...NS_ARTERIALS];
-    const roadIndex = arterialList[Math.floor(hash2(seedA, seedB, 8) * arterialList.length) % arterialList.length];
-    const extraLane = hash2(seedA, seedB, 23) > .52 ? 28 : 0;
+  function trafficPoseAt(car, along = car.along) {
+    const raw = along / ROAD_GAP;
+    const segmentIndex = clamp(Math.floor(raw), 1, 16);
+    const t = clamp(raw - segmentIndex, 0, 1);
+    const axis = car.orientation;
+    const center = roadEdgePoint(axis, car.roadIndex, segmentIndex, t);
+    const ta = Math.max(0, t - .015);
+    const tb = Math.min(1, t + .015);
+    const a = roadEdgePoint(axis, car.roadIndex, segmentIndex, ta);
+    const b = roadEdgePoint(axis, car.roadIndex, segmentIndex, tb);
+    let tx = b.x - a.x;
+    let ty = b.y - a.y;
+    const mag = Math.hypot(tx, ty) || 1;
+    tx /= mag;
+    ty /= mag;
+    const nx = ty;
+    const ny = -tx;
+    const baseAngle = Math.atan2(ty, tx);
 
-    if (horizontal) {
-      const angle = forward ? 0 : Math.PI;
-      const lane = forward
-        ? -(LANE_OFFSET + extraLane + offset * 0.08)
-        : (LANE_OFFSET + extraLane + offset * 0.08);
-      return { x: along, y: roadIndex * ROAD_GAP + lane, angle, roadIndex, orientation:"h" };
-    }
-
-    const angle = forward ? Math.PI / 2 : -Math.PI / 2;
-    const lane = forward
-      ? (LANE_OFFSET + extraLane + offset * 0.08)
-      : -(LANE_OFFSET + extraLane + offset * 0.08);
-    return { x: roadIndex * ROAD_GAP + lane, y: along, angle, roadIndex, orientation:"v" };
+    return {
+      x:center.x + nx * car.laneOffset,
+      y:center.y + ny * car.laneOffset,
+      angle:car.directionSign > 0 ? baseAngle : angleWrap(baseAngle + Math.PI)
+    };
   }
 
+  function randomRoadPoint(seedA, seedB, offset = 0) {
+    const horizontal = hash2(seedA, seedB, 5) > .5;
+    const directionSign = hash2(seedA, seedB, 19) > .5 ? 1 : -1;
+    const minAlong = ROAD_GAP * 1.08;
+    const maxAlong = ROAD_GAP * 16.92;
+    const along = minAlong + hash2(seedA, seedB, 13) * (maxAlong - minAlong);
+    const arterialList = horizontal ? [...EW_ARTERIALS] : [...NS_ARTERIALS];
+    const roadIndex = arterialList[Math.floor(hash2(seedA, seedB, 8) * arterialList.length) % arterialList.length];
+    const laneMagnitude = LANE_OFFSET + (hash2(seedA, seedB, 23) > .52 ? 28 : 0) + offset * .05;
+    const laneOffset = directionSign > 0 ? laneMagnitude : -laneMagnitude;
+    const seedCar = {
+      orientation:horizontal ? "h" : "v",
+      roadIndex,
+      directionSign,
+      laneOffset,
+      along
+    };
+    const pose = trafficPoseAt(seedCar, along);
+    return { ...pose, ...seedCar };
+  }
 
   function generateTraffic() {
     const colors = ["#d5d8da", "#6689ad", "#b26f67", "#c6a35a", "#59635f", "#89769e", "#579079"];
@@ -1020,17 +1043,23 @@
       const p = randomRoadPoint(i + 2, i * 7 + 3, 18);
       const cruise = 150 + hash2(i, 4, 22) * 110;
       traffic.push({
-        x: p.x,
-        y: p.y,
-        angle: p.angle,
-        speed: cruise * 0.7,
+        x:p.x,
+        y:p.y,
+        angle:p.angle,
+        orientation:p.orientation,
+        roadIndex:p.roadIndex,
+        directionSign:p.directionSign,
+        laneOffset:p.laneOffset,
+        along:p.along,
+        speed:cruise * .7,
         cruise,
-        color: colors[i % colors.length],
-        type: VEHICLE_TYPES[Math.floor(hash2(i, 8, 522) * VEHICLE_TYPES.length) % VEHICLE_TYPES.length],
-        brakeGlow: 0
+        color:colors[i % colors.length],
+        type:VEHICLE_TYPES[Math.floor(hash2(i, 8, 522) * VEHICLE_TYPES.length) % VEHICLE_TYPES.length],
+        brakeGlow:0
       });
     }
   }
+
 
   function generatePedestrians() {
     const pedestrianCount = 76;
@@ -2370,37 +2399,44 @@
     }
   }
 
-  function updateTraffic(dt) {
-    for (const car of traffic) {
-      const orientation = Math.abs(Math.cos(car.angle)) >= Math.abs(Math.sin(car.angle)) ? "h" : "v";
-      let nextX;
-      let nextY;
-      let intersectionDistance;
+  function nextTrafficSignal(car) {
+    const forward = car.directionSign > 0;
+    let nodeIndex = forward
+      ? Math.ceil((car.along + 2) / ROAD_GAP)
+      : Math.floor((car.along - 2) / ROAD_GAP);
 
-      if (orientation === "h") {
-        nextX = car.angle === 0
-          ? Math.ceil((car.x + 1) / ROAD_GAP) * ROAD_GAP
-          : Math.floor((car.x - 1) / ROAD_GAP) * ROAD_GAP;
-        nextY = Math.round(car.y / ROAD_GAP) * ROAD_GAP;
-        intersectionDistance = Math.abs(nextX - car.x);
-      } else {
-        nextX = Math.round(car.x / ROAD_GAP) * ROAD_GAP;
-        nextY = Math.sin(car.angle) > 0
-          ? Math.ceil((car.y + 1) / ROAD_GAP) * ROAD_GAP
-          : Math.floor((car.y - 1) / ROAD_GAP) * ROAD_GAP;
-        intersectionDistance = Math.abs(nextY - car.y);
+    for (let step = 0; step < 7; step += 1) {
+      if (nodeIndex < 1 || nodeIndex > 17) break;
+      const gx = car.orientation === "h" ? nodeIndex : car.roadIndex;
+      const gy = car.orientation === "h" ? car.roadIndex : nodeIndex;
+      if (isSignalizedIntersection(gx, gy)) {
+        return {
+          x:gx * ROAD_GAP,
+          y:gy * ROAD_GAP,
+          orientation:car.orientation,
+          distance:Math.abs(nodeIndex * ROAD_GAP - car.along)
+        };
       }
+      nodeIndex += forward ? 1 : -1;
+    }
+    return null;
+  }
 
-      const nextGX = Math.round(nextX / ROAD_GAP);
-      const nextGY = Math.round(nextY / ROAD_GAP);
-      const signal = isSignalizedIntersection(nextGX, nextGY)
-        ? signalStateAt(nextX, nextY, orientation)
-        : "green";
-      const roadLimit = speedLimitAt(car.x, car.y) / SPEED_TO_KMH;
-      let targetSpeed = Math.min(car.cruise, roadLimit * 0.92);
-      const stopCenterDistance = STOP_LINE_OFFSET + VEHICLE_FRONT_OVERHANG;
-      if ((signal === "red" || signal === "yellow") && intersectionDistance < stopCenterDistance + 62) {
-        targetSpeed = Math.max(0, (intersectionDistance - stopCenterDistance) * 2.6);
+  function updateTraffic(dt) {
+    const minAlong = ROAD_GAP * 1.04;
+    const maxAlong = ROAD_GAP * 16.96;
+
+    for (const car of traffic) {
+      const nextSignal = nextTrafficSignal(car);
+      const roadLimit = 60 / SPEED_TO_KMH;
+      let targetSpeed = Math.min(car.cruise, roadLimit * .92);
+
+      if (nextSignal) {
+        const signal = signalStateAt(nextSignal.x, nextSignal.y, nextSignal.orientation);
+        const stopCenterDistance = STOP_LINE_OFFSET + VEHICLE_FRONT_OVERHANG;
+        if ((signal === "red" || signal === "yellow") && nextSignal.distance < stopCenterDistance + 75) {
+          targetSpeed = Math.max(0, (nextSignal.distance - stopCenterDistance) * 2.5);
+        }
       }
 
       const hx = Math.cos(car.angle);
@@ -2408,52 +2444,48 @@
       let leadDistance = Infinity;
       for (const other of traffic) {
         if (other === car) continue;
-        const dx = other.x - car.x;
-        const dy = other.y - car.y;
-        const forward = dx * hx + dy * hy;
-        if (forward <= 0 || forward > 180) continue;
-        const lateral = Math.abs(dx * -hy + dy * hx);
-        if (lateral > 42) continue;
-        const sameDirection = Math.cos(other.angle) * hx + Math.sin(other.angle) * hy;
-        if (sameDirection > 0.7) leadDistance = Math.min(leadDistance, forward);
+        if (
+          other.orientation !== car.orientation ||
+          other.roadIndex !== car.roadIndex ||
+          other.directionSign !== car.directionSign ||
+          Math.abs(other.laneOffset - car.laneOffset) > 18
+        ) continue;
+
+        let forwardDistance = (other.along - car.along) * car.directionSign;
+        if (forwardDistance < 0) forwardDistance += maxAlong - minAlong;
+        if (forwardDistance > 0 && forwardDistance < 190) leadDistance = Math.min(leadDistance, forwardDistance);
       }
 
       if (state.player.inVehicle) {
         const dx = personalCar.x - car.x;
         const dy = personalCar.y - car.y;
-        const forward = dx * hx + dy * hy;
+        const forwardDistance = dx * hx + dy * hy;
         const lateral = Math.abs(dx * -hy + dy * hx);
         const sameDirection = Math.cos(personalCar.angle) * hx + Math.sin(personalCar.angle) * hy;
-        if (forward > 0 && forward < 180 && lateral < 55 && sameDirection > 0.5) {
-          leadDistance = Math.min(leadDistance, forward);
+        if (forwardDistance > 0 && forwardDistance < 180 && lateral < 48 && sameDirection > .55) {
+          leadDistance = Math.min(leadDistance, forwardDistance);
         }
       }
 
-      if (leadDistance < 120) {
-        targetSpeed = Math.min(targetSpeed, Math.max(0, (leadDistance - 36) * 2.1));
+      if (leadDistance < 125) {
+        targetSpeed = Math.min(targetSpeed, Math.max(0, (leadDistance - 38) * 2.05));
       }
 
       const brakingNow = targetSpeed < car.speed - 10;
       car.brakeGlow += ((brakingNow ? 1 : 0) - car.brakeGlow) * Math.min(1, dt * 8);
       car.speed += (targetSpeed - car.speed) * Math.min(1, dt * 2.4);
 
-      const ox = car.x;
-      const oy = car.y;
-      car.x += Math.cos(car.angle) * car.speed * dt;
-      car.y += Math.sin(car.angle) * car.speed * dt;
+      car.along += car.directionSign * car.speed * dt;
+      if (car.along < minAlong) car.along = maxAlong;
+      if (car.along > maxAlong) car.along = minAlong;
 
-      if (!inWorld(car.x, car.y, 28)) {
-        if (car.x < COAST) car.x = WORLD_SIZE - COAST - 40;
-        if (car.x > WORLD_SIZE - COAST) car.x = COAST + 40;
-        if (car.y < COAST) car.y = WORLD_SIZE - COAST - 40;
-        if (car.y > WORLD_SIZE - COAST) car.y = COAST + 40;
-      } else if (collidesBuilding(car.x, car.y, 25)) {
-        car.x = ox;
-        car.y = oy;
-        car.speed *= 0.2;
-      }
+      const pose = trafficPoseAt(car);
+      car.x = pose.x;
+      car.y = pose.y;
+      car.angle = pose.angle;
     }
   }
+
 
   function updatePedestrians(dt) {
     for (const ped of pedestrians) {
