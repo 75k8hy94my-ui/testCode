@@ -640,10 +640,9 @@
   function roadCurveAmplitude(axis, roadIndex, segmentIndex) {
     const style = roadSegmentStyle(axis, roadIndex, segmentIndex);
     const seed = hash2(roadIndex, segmentIndex, axis === "h" ? 1891 : 1892);
-    if (style === "arterial") {
-      if (seed < .7) return 0;
-      return (seed > .85 ? 1 : -1) * (14 + seed * 10);
-    }
+    // Main four-lane arterials stay geometrically straight so through traffic
+    // can flow smoothly; secondary/local streets carry the visible bends.
+    if (style === "arterial") return 0;
     if (seed < .36) return 0;
     const amount = style === "residential" ? 20 : style === "local" ? 34 : 26;
     return (seed > .68 ? 1 : -1) * (10 + hash2(segmentIndex, roadIndex, 1893) * amount);
@@ -651,7 +650,11 @@
 
   function roadEdgePoint(axis, roadIndex, segmentIndex, t) {
     const amplitude = roadCurveAmplitude(axis, roadIndex, segmentIndex);
-    const curve = Math.sin(Math.PI * clamp(t, 0, 1)) * amplitude;
+    const u = clamp(t, 0, 1);
+    // Zero derivative at both ends makes adjacent curved street segments meet
+    // without a visible kink at T-junctions/intersections.
+    const bump = 16 * u * u * (1 - u) * (1 - u);
+    const curve = bump * amplitude;
     if (axis === "h") {
       return {
         x: (segmentIndex + t) * ROAD_GAP,
@@ -711,6 +714,39 @@
       }
     }
     return best <= 0;
+  }
+
+  function roadStyleAt(x, y) {
+    const gx = Math.floor(x / ROAD_GAP);
+    const gy = Math.floor(y / ROAD_GAP);
+    let best = null;
+
+    for (let ix = gx - 1; ix <= gx + 1; ix += 1) {
+      for (let iy = gy - 1; iy <= gy + 1; iy += 1) {
+        if (roadEdgeExists(ix, iy, ix + 1, iy)) {
+          const distanceToRoad = roadDistanceToEdge(x, y, "h", iy, ix);
+          if (!best || distanceToRoad < best.distance) {
+            best = { distance:distanceToRoad, style:roadSegmentStyle("h", iy, ix) };
+          }
+        }
+        if (roadEdgeExists(ix, iy, ix, iy + 1)) {
+          const distanceToRoad = roadDistanceToEdge(x, y, "v", ix, iy);
+          if (!best || distanceToRoad < best.distance) {
+            best = { distance:distanceToRoad, style:roadSegmentStyle("v", ix, iy) };
+          }
+        }
+      }
+    }
+    return best ? best.style : "local";
+  }
+
+  function speedLimitAt(x, y) {
+    const style = roadStyleAt(x, y);
+    if (style === "arterial") return 60;
+    if (style === "residential") return 30;
+    if (style === "station" || style === "commercial") return 40;
+    if (style === "park") return 40;
+    return 40;
   }
 
   function inWorld(x, y, radius = 0) {
@@ -2321,7 +2357,11 @@
         intersectionDistance = Math.abs(nextY - car.y);
       }
 
-      const signal = signalStateAt(nextX, nextY, orientation);
+      const nextGX = Math.round(nextX / ROAD_GAP);
+      const nextGY = Math.round(nextY / ROAD_GAP);
+      const signal = isSignalizedIntersection(nextGX, nextGY)
+        ? signalStateAt(nextX, nextY, orientation)
+        : "green";
       const roadLimit = speedLimitAt(car.x, car.y) / SPEED_TO_KMH;
       let targetSpeed = Math.min(car.cruise, roadLimit * 0.92);
       const stopCenterDistance = STOP_LINE_OFFSET + VEHICLE_FRONT_OVERHANG;
