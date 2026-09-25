@@ -72,6 +72,9 @@
   const LANE_OFFSET = 38;
   const TURN_RADIUS = 86;
   const ROUTE_SAMPLE_STEP = 16;
+  const WORLD_TILT_Y = 0.94;
+  const WORLD_TILT_X = 1.025;
+  const BUILDING_DEPTH_X = 0.18;
   const VISUAL_PALETTES = [
     { wall:"#c8b89c", roof:"#746f69", trim:"#e8dcc5", glass:"#8ba6ad" },
     { wall:"#b6b8b2", roof:"#61696a", trim:"#d8d9d3", glass:"#86a7b3" },
@@ -1573,6 +1576,19 @@
     clampNeeds();
   }
 
+  function beginWorldProjection() {
+    ctx.save();
+    const cx = viewWidth / 2;
+    const cy = viewHeight / 2;
+    ctx.translate(cx, cy);
+    ctx.scale(WORLD_TILT_X, WORLD_TILT_Y);
+    ctx.translate(-cx, -cy);
+  }
+
+  function endWorldProjection() {
+    ctx.restore();
+  }
+
   function worldToScreen(x, y) {
     return { x: x - state.camera.x, y: y - state.camera.y };
   }
@@ -2282,74 +2298,110 @@
 
   function drawBuildings() {
     const time = visualTime();
-    for (const building of buildings) {
-      if (!visibleRect(building, 80)) continue;
+    const visible = buildings
+      .filter((building) => visibleRect(building, 120))
+      .sort((a, b) => (a.y + a.h) - (b.y + b.h));
+
+    for (const building of visible) {
       const x = building.x - state.camera.x;
       const y = building.y - state.camera.y;
       const palette = VISUAL_PALETTES[building.palette % VISUAL_PALETTES.length];
-      const heightFactor = building.kind === "tower" ? 1.5 : building.kind === "low" ? .7 : 1;
+      const baseElevation =
+        building.kind === "tower" ? 34 :
+        building.kind === "low" ? 17 :
+        22;
+      const elevation = clamp(baseElevation + building.floors * 2.2, 19, 48);
+      const roofDx = -elevation * BUILDING_DEPTH_X;
+      const roofDy = -elevation;
+      const rx = x + roofDx;
+      const ry = y + roofDy;
 
-      ctx.fillStyle = "rgba(23,28,27," + (0.15 + time.night * .05).toFixed(2) + ")";
-      ctx.fillRect(x + time.shadowX * heightFactor, y + time.shadowY * heightFactor, building.w, building.h);
+      ctx.fillStyle = "rgba(20,25,23," + (0.16 + time.night * .04).toFixed(2) + ")";
+      roundedRectPath(
+        ctx,
+        x + time.shadowX * .32,
+        y + time.shadowY * .24,
+        building.w,
+        building.h,
+        5
+      );
+      ctx.fill();
 
       ctx.fillStyle = palette.wall;
-      roundedRectPath(ctx, x, y, building.w, building.h, 5);
+      ctx.beginPath();
+      ctx.moveTo(rx, ry + building.h);
+      ctx.lineTo(rx + building.w, ry + building.h);
+      ctx.lineTo(x + building.w, y + building.h);
+      ctx.lineTo(x, y + building.h);
+      ctx.closePath();
       ctx.fill();
 
-      ctx.fillStyle = "rgba(255,255,255,.09)";
-      ctx.fillRect(x + 5, y + 5, building.w - 10, 7);
-      ctx.fillStyle = palette.roof;
-      roundedRectPath(ctx, x + 9, y + 9, building.w - 18, 24, 3);
+      ctx.fillStyle = "rgba(42,47,45,.28)";
+      ctx.beginPath();
+      ctx.moveTo(rx + building.w, ry);
+      ctx.lineTo(rx + building.w, ry + building.h);
+      ctx.lineTo(x + building.w, y + building.h);
+      ctx.lineTo(x + building.w, y);
+      ctx.closePath();
       ctx.fill();
+
+      const facadeTop = ry + building.h + 5;
+      const facadeBottom = y + building.h - 5;
+      const facadeHeight = Math.max(8, facadeBottom - facadeTop);
+      const windowCols = Math.max(2, Math.floor((building.w - 34) / 42));
+      const windowW = Math.min(18, (building.w - 28) / windowCols - 8);
+      for (let col = 0; col < windowCols; col += 1) {
+        const denominator = Math.max(1, windowCols - 1);
+        const wx = rx + 19 + col * ((building.w - 38) / denominator);
+        const lit = time.night > .45 && hash2(Math.floor(building.x) + col, Math.floor(building.y), 911) > .5;
+        ctx.fillStyle = lit ? "#dcb96c" : palette.glass;
+        ctx.fillRect(wx - windowW / 2, facadeTop + Math.min(4, facadeHeight * .15), windowW, Math.min(10, facadeHeight * .48));
+        ctx.fillStyle = "rgba(255,255,255,.16)";
+        ctx.fillRect(wx - windowW / 2 + 2, facadeTop + Math.min(5, facadeHeight * .15), 2, Math.min(8, facadeHeight * .4));
+      }
+
+      const doorW = Math.min(34, building.w * .14);
+      const doorH = Math.min(22, elevation * .72);
+      ctx.fillStyle = "#35403e";
+      ctx.fillRect(x + building.w * .5 - doorW / 2, y + building.h - doorH, doorW, doorH);
+      ctx.fillStyle = "rgba(177,205,211,.5)";
+      ctx.fillRect(x + building.w * .5 - doorW * .36, y + building.h - doorH + 3, doorW * .72, 7);
+
+      ctx.fillStyle = palette.roof;
+      roundedRectPath(ctx, rx, ry, building.w, building.h, 5);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,.09)";
+      ctx.lineWidth = 1;
+      roundedRectPath(ctx, rx + 5, ry + 5, building.w - 10, building.h - 10, 4);
+      ctx.stroke();
 
       if (building.facadeBand) {
         ctx.fillStyle = palette.trim;
-        ctx.fillRect(x + 8, y + building.h * .56, building.w - 16, 6);
+        ctx.fillRect(rx + 8, ry + building.h - 12, building.w - 16, 5);
       }
-
-      const cols = Math.max(2, Math.floor((building.w - 28) / 38));
-      const rows = Math.max(2, Math.min(6, building.floors));
-      const gapX = (building.w - 32) / cols;
-      const gapY = (building.h - 70) / rows;
-      for (let cx = 0; cx < cols; cx += 1) {
-        for (let cy = 0; cy < rows; cy += 1) {
-          const wx = x + 19 + cx * gapX;
-          const wy = y + 45 + cy * gapY;
-          const lit = time.night > .45 && hash2(Math.floor(building.x) + cx, Math.floor(building.y) + cy, 911) > .52;
-          ctx.fillStyle = lit ? "#d9b86f" : palette.glass;
-          ctx.fillRect(wx, wy, 15, 10);
-          ctx.fillStyle = "rgba(255,255,255,.18)";
-          ctx.fillRect(wx + 2, wy + 1, 2, 8);
-          if (building.balconies && cy % 2 === 0) {
-            ctx.strokeStyle = "rgba(42,48,47,.55)";
-            ctx.lineWidth = 1;
-            ctx.strokeRect(wx - 4, wy + 12, 24, 5);
-          }
-        }
-      }
-
-      ctx.fillStyle = "#3b4545";
-      ctx.fillRect(x + building.w * .46, y + building.h - 31, building.w * .12, 31);
-      ctx.fillStyle = "rgba(185,209,214,.5)";
-      ctx.fillRect(x + building.w * .47, y + building.h - 28, building.w * .1, 10);
 
       if (building.roofDetail === 0) {
-        ctx.fillStyle = "#737b78";
-        ctx.fillRect(x + building.w - 50, y + 14, 25, 15);
-        ctx.strokeStyle = "#4b5451";
-        ctx.strokeRect(x + building.w - 50, y + 14, 25, 15);
+        ctx.fillStyle = "#747d79";
+        roundedRectPath(ctx, rx + building.w - 48, ry + 14, 26, 16, 3);
+        ctx.fill();
+        ctx.strokeStyle = "#505956";
+        ctx.stroke();
       } else if (building.roofDetail === 1) {
-        ctx.fillStyle = "#5d6765";
+        ctx.fillStyle = "#606a66";
         ctx.beginPath();
-        ctx.arc(x + building.w - 35, y + 21, 9, 0, Math.PI * 2);
+        ctx.arc(rx + building.w - 34, ry + 22, 9, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,.12)";
+        ctx.beginPath();
+        ctx.arc(rx + building.w - 37, ry + 19, 3, 0, Math.PI * 2);
         ctx.fill();
       } else if (building.roofDetail === 2) {
-        ctx.strokeStyle = "#58625f";
+        ctx.strokeStyle = "#56605d";
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(x + building.w - 42, y + 28);
-        ctx.lineTo(x + building.w - 42, y + 9);
-        ctx.lineTo(x + building.w - 27, y + 9);
+        ctx.moveTo(rx + building.w - 42, ry + 31);
+        ctx.lineTo(rx + building.w - 42, ry + 10);
+        ctx.lineTo(rx + building.w - 26, ry + 10);
         ctx.stroke();
       }
     }
@@ -2357,19 +2409,48 @@
 
   function drawFacilityBuilding(p, w, h, wall, roof, glass) {
     const time = visualTime();
+    const elevation = 25;
+    const roofDx = -elevation * BUILDING_DEPTH_X;
+    const roofDy = -elevation;
+    const left = p.x - w / 2;
+    const top = p.y - h / 2;
+    const rx = left + roofDx;
+    const ry = top + roofDy;
+
     ctx.fillStyle = "rgba(20,26,24,.2)";
-    roundedRectPath(ctx, p.x - w / 2 + time.shadowX * .8, p.y - h / 2 + time.shadowY * .8, w, h, 8);
+    roundedRectPath(ctx, left + time.shadowX * .32, top + time.shadowY * .24, w, h, 8);
     ctx.fill();
+
     ctx.fillStyle = wall;
-    roundedRectPath(ctx, p.x - w / 2, p.y - h / 2, w, h, 8);
+    ctx.beginPath();
+    ctx.moveTo(rx, ry + h);
+    ctx.lineTo(rx + w, ry + h);
+    ctx.lineTo(left + w, top + h);
+    ctx.lineTo(left, top + h);
+    ctx.closePath();
     ctx.fill();
+
+    ctx.fillStyle = "rgba(40,48,45,.28)";
+    ctx.beginPath();
+    ctx.moveTo(rx + w, ry);
+    ctx.lineTo(rx + w, ry + h);
+    ctx.lineTo(left + w, top + h);
+    ctx.lineTo(left + w, top);
+    ctx.closePath();
+    ctx.fill();
+
     ctx.fillStyle = roof;
-    roundedRectPath(ctx, p.x - w / 2 + 7, p.y - h / 2 + 7, w - 14, 22, 5);
+    roundedRectPath(ctx, rx, ry, w, h, 8);
     ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.1)";
+    ctx.lineWidth = 1;
+    roundedRectPath(ctx, rx + 6, ry + 6, w - 12, h - 12, 6);
+    ctx.stroke();
+
     ctx.fillStyle = glass;
-    ctx.fillRect(p.x - w * .35, p.y + h * .1, w * .7, h * .24);
+    ctx.fillRect(p.x - w * .34, top + h - 20, w * .68, 9);
     ctx.fillStyle = "#303a37";
-    ctx.fillRect(p.x - 22, p.y + h / 2 - 44, 44, 44);
+    ctx.fillRect(p.x - 20, top + h - 22, 40, 22);
   }
 
   function drawPlace(place) {
@@ -2477,50 +2558,56 @@
 
   function drawPerson(x, y, dir, shirt, pants, hair, skin, phase, scale = 1) {
     const p = worldToScreen(x, y);
-    if (p.x < -35 || p.y < -35 || p.x > viewWidth + 35 || p.y > viewHeight + 35) return;
+    if (p.x < -45 || p.y < -55 || p.x > viewWidth + 45 || p.y > viewHeight + 55) return;
     const moving = Math.sin(phase);
     const fx = Math.cos(dir);
     const fy = Math.sin(dir);
     const sx = -fy;
     const sy = fx;
-    const leg = moving * 5 * scale;
+    const leg = moving * 4.5 * scale;
+    const baseY = p.y + 9 * scale;
+    const hipY = p.y + 2 * scale;
+    const shoulderY = p.y - 9 * scale;
+    const headY = p.y - 20 * scale;
 
-    ctx.fillStyle = "rgba(18,24,22,.18)";
+    ctx.fillStyle = "rgba(18,24,22,.2)";
     ctx.beginPath();
-    ctx.ellipse(p.x + 2, p.y + 10, 9 * scale, 4 * scale, dir, 0, Math.PI * 2);
+    ctx.ellipse(p.x + 2, baseY + 4, 9 * scale, 4 * scale, dir, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.strokeStyle = pants;
     ctx.lineWidth = 4 * scale;
     ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.moveTo(p.x - sx * 3, p.y + 5);
-    ctx.lineTo(p.x - sx * 3 + fx * leg, p.y + 15 + fy * leg);
-    ctx.moveTo(p.x + sx * 3, p.y + 5);
-    ctx.lineTo(p.x + sx * 3 - fx * leg, p.y + 15 - fy * leg);
+    ctx.moveTo(p.x - sx * 3, hipY);
+    ctx.lineTo(p.x - sx * 3 + fx * leg, baseY + fy * leg);
+    ctx.moveTo(p.x + sx * 3, hipY);
+    ctx.lineTo(p.x + sx * 3 - fx * leg, baseY - fy * leg);
     ctx.stroke();
 
     ctx.strokeStyle = shirt;
     ctx.lineWidth = 3 * scale;
     ctx.beginPath();
-    ctx.moveTo(p.x - sx * 7, p.y - 1);
-    ctx.lineTo(p.x - sx * 10 - fx * leg * .55, p.y + 7);
-    ctx.moveTo(p.x + sx * 7, p.y - 1);
-    ctx.lineTo(p.x + sx * 10 + fx * leg * .55, p.y + 7);
+    ctx.moveTo(p.x - sx * 7, shoulderY + 4);
+    ctx.lineTo(p.x - sx * 10 - fx * leg * .5, p.y + fy * leg * .35);
+    ctx.moveTo(p.x + sx * 7, shoulderY + 4);
+    ctx.lineTo(p.x + sx * 10 + fx * leg * .5, p.y - fy * leg * .35);
     ctx.stroke();
 
     ctx.fillStyle = shirt;
-    roundedRectPath(ctx, p.x - 7 * scale, p.y - 5 * scale, 14 * scale, 15 * scale, 4 * scale);
+    roundedRectPath(ctx, p.x - 7 * scale, shoulderY, 14 * scale, 16 * scale, 4 * scale);
     ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.11)";
+    ctx.fillRect(p.x - 5 * scale, shoulderY + 2 * scale, 3 * scale, 10 * scale);
 
     ctx.fillStyle = skin;
     ctx.beginPath();
-    ctx.arc(p.x, p.y - 11 * scale, 7 * scale, 0, Math.PI * 2);
+    ctx.arc(p.x, headY, 7 * scale, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.fillStyle = hair;
     ctx.beginPath();
-    ctx.arc(p.x - fx * 1.5, p.y - 14 * scale, 7 * scale, Math.PI, Math.PI * 2);
+    ctx.arc(p.x - fx * 1.4, headY - 3 * scale, 7 * scale, Math.PI, Math.PI * 2);
     ctx.fill();
   }
 
@@ -2545,17 +2632,26 @@
 
   function drawCar(car, owned = false) {
     const p = worldToScreen(car.x, car.y);
-    if (p.x < -100 || p.y < -100 || p.x > viewWidth + 100 || p.y > viewHeight + 100) return;
+    if (p.x < -110 || p.y < -110 || p.x > viewWidth + 110 || p.y > viewHeight + 110) return;
     const type = car.type || (owned ? "sedan" : "compact");
     const dims = type === "compact" ? [66, 36] : type === "suv" ? [80, 43] : type === "van" ? [82, 42] : [76, 39];
     const length = dims[0];
     const width = dims[1];
+    const lift = type === "suv" || type === "van" ? 5 : 4;
     const braking = owned
       ? (state.player.inVehicle && (touch.driveBrake || keys.has("s") || keys.has("arrowdown") || keys.has(" ")))
       : Boolean(car.brakeGlow > .15);
 
     ctx.save();
-    ctx.translate(p.x, p.y);
+    ctx.translate(p.x + 3, p.y + 6);
+    ctx.rotate(car.angle);
+    ctx.fillStyle = "rgba(10,15,14,.24)";
+    roundedRectPath(ctx, -length / 2, -width / 2, length, width, 10);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(p.x, p.y - lift);
     ctx.rotate(car.angle);
 
     const time = visualTime();
@@ -2573,52 +2669,55 @@
       ctx.fill();
     }
 
-    ctx.fillStyle = "rgba(12,17,16,.24)";
-    roundedRectPath(ctx, -length / 2 + 4, -width / 2 + 5, length, width, 9);
+    ctx.fillStyle = "#252b2b";
+    roundedRectPath(ctx, -length / 2, -width / 2 + 4, length, width, type === "van" ? 7 : 11);
     ctx.fill();
 
-    ctx.fillStyle = "#161a1b";
+    ctx.fillStyle = "#15191a";
     ctx.fillRect(-length * .31, -width / 2 - 3, 14, 5);
     ctx.fillRect(length * .13, -width / 2 - 3, 14, 5);
     ctx.fillRect(-length * .31, width / 2 - 2, 14, 5);
     ctx.fillRect(length * .13, width / 2 - 2, 14, 5);
 
     ctx.fillStyle = car.color;
-    roundedRectPath(ctx, -length / 2, -width / 2, length, width, type === "van" ? 7 : 11);
+    roundedRectPath(ctx, -length / 2, -width / 2, length, width - 4, type === "van" ? 7 : 11);
     ctx.fill();
 
-    ctx.fillStyle = "rgba(255,255,255,.16)";
+    ctx.fillStyle = "rgba(255,255,255,.17)";
     roundedRectPath(ctx, -length / 2 + 5, -width / 2 + 4, length - 10, 7, 4);
     ctx.fill();
 
     const cabinStart = type === "van" ? -length * .18 : -length * .12;
     const cabinLength = type === "compact" ? length * .46 : length * .42;
-    ctx.fillStyle = "#27363b";
-    roundedRectPath(ctx, cabinStart, -width * .36, cabinLength, width * .72, 6);
+    ctx.save();
+    ctx.translate(0, -2.5);
+    ctx.fillStyle = "#26363b";
+    roundedRectPath(ctx, cabinStart, -width * .36, cabinLength, width * .68, 6);
     ctx.fill();
-    ctx.fillStyle = "#86a5ad";
-    roundedRectPath(ctx, cabinStart + 3, -width * .3, cabinLength * .43, width * .6, 3);
+    ctx.fillStyle = "#91adb5";
+    roundedRectPath(ctx, cabinStart + 3, -width * .3, cabinLength * .43, width * .55, 3);
     ctx.fill();
-    ctx.fillStyle = "#75949d";
-    roundedRectPath(ctx, cabinStart + cabinLength * .52, -width * .3, cabinLength * .41, width * .6, 3);
+    ctx.fillStyle = "#7899a3";
+    roundedRectPath(ctx, cabinStart + cabinLength * .52, -width * .3, cabinLength * .41, width * .55, 3);
     ctx.fill();
+    ctx.restore();
 
-    ctx.fillStyle = "#e8e1bf";
+    ctx.fillStyle = "#eee6c5";
     ctx.fillRect(length / 2 - 7, -width * .32, 5, 8);
-    ctx.fillRect(length / 2 - 7, width * .32 - 8, 5, 8);
+    ctx.fillRect(length / 2 - 7, width * .32 - 10, 5, 8);
     ctx.fillStyle = braking ? "#ff4d44" : "#a84843";
     ctx.fillRect(-length / 2 + 2, -width * .32, 5, 8);
-    ctx.fillRect(-length / 2 + 2, width * .32 - 8, 5, 8);
+    ctx.fillRect(-length / 2 + 2, width * .32 - 10, 5, 8);
 
     if (braking) {
       ctx.fillStyle = "rgba(255,72,58,.15)";
-      ctx.fillRect(-length / 2 - 12, -width / 2, 14, width);
+      ctx.fillRect(-length / 2 - 12, -width / 2, 14, width - 4);
     }
 
     if (owned) {
-      ctx.strokeStyle = "rgba(233,244,249,.8)";
+      ctx.strokeStyle = "rgba(233,244,249,.82)";
       ctx.lineWidth = 1.5;
-      roundedRectPath(ctx, -length / 2 - 3, -width / 2 - 3, length + 6, width + 6, 12);
+      roundedRectPath(ctx, -length / 2 - 3, -width / 2 - 3, length + 6, width + 2, 12);
       ctx.stroke();
     }
     ctx.restore();
@@ -2679,7 +2778,6 @@
         ctx.fillRect(0, 0, viewWidth, viewHeight);
       }
     }
-    drawStreetLightsGlow();
   }
 
   function drawWeather() {
@@ -2902,6 +3000,10 @@
   function render() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, viewWidth, viewHeight);
+    ctx.fillStyle = "#74836f";
+    ctx.fillRect(0, 0, viewWidth, viewHeight);
+
+    beginWorldProjection();
     drawGround();
     drawRoute();
     drawStreetProps();
@@ -2913,6 +3015,9 @@
     drawCar(personalCar, true);
     drawPlayer();
     drawTrafficLights();
+    drawStreetLightsGlow();
+    endWorldProjection();
+
     drawNightOverlay();
     drawWeather();
     drawMinimap();
