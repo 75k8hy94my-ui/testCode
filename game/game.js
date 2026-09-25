@@ -72,6 +72,15 @@
   const LANE_OFFSET = 38;
   const TURN_RADIUS = 86;
   const ROUTE_SAMPLE_STEP = 16;
+  const RAIL_Y = ROAD_GAP * 5 + ROAD_GAP / 2;
+  const RAIL_MIN_X = ROAD_GAP * 1.5;
+  const RAIL_MAX_X = WORLD_SIZE - ROAD_GAP * 1.5;
+  const RAIL_TRACK_GAP = 23;
+  const RAIL_CORRIDOR_HALF = 62;
+  const TRAIN_SPEED = 300;
+  const TRAIN_DWELL_SECONDS = 4.5;
+  const TRAIN_LENGTH = 212;
+  const TRAIN_WIDTH = 31;
   const WORLD_TILT_Y = 0.94;
   const WORLD_TILT_X = 1.025;
   const BUILDING_DEPTH_X = 0.18;
@@ -103,6 +112,37 @@
   const LIBRARY = { id: "library", name: "市立図書館", gx: 7, gy: 7, ...blockCenter(7, 7), color: "#9a8db9", symbol: "L" };
   const PLACES = [HOME, CAFE, STORE, PARK, GYM, LIBRARY];
   const SPECIAL_BLOCKS = new Set(PLACES.map((place) => place.gx + "," + place.gy));
+
+  const TRAIN_STATIONS = [
+    { id:"west", name:"西若葉駅", x:2100, y:RAIL_Y, accessX:2100, accessY:RAIL_Y + 112 },
+    { id:"central", name:"若葉駅", x:5100, y:RAIL_Y, accessX:5100, accessY:RAIL_Y + 112 },
+    { id:"east", name:"東若葉駅", x:8100, y:RAIL_Y, accessX:8100, accessY:RAIL_Y + 112 }
+  ];
+
+  const trains = [
+    {
+      id:"local-a",
+      name:"若葉線 A",
+      x:TRAIN_STATIONS[0].x,
+      y:RAIL_Y - RAIL_TRACK_GAP,
+      stationIndex:0,
+      targetIndex:1,
+      direction:1,
+      dwell:TRAIN_DWELL_SECONDS,
+      speed:0
+    },
+    {
+      id:"local-b",
+      name:"若葉線 B",
+      x:TRAIN_STATIONS[2].x,
+      y:RAIL_Y + RAIL_TRACK_GAP,
+      stationIndex:2,
+      targetIndex:1,
+      direction:-1,
+      dwell:TRAIN_DWELL_SECONDS * .45,
+      speed:0
+    }
+  ];
 
   // Fictional compressed city layout inspired by the spatial mix around Kichijoji:
   // dense station frontage, shopping streets, tiny dining alleys, quieter housing,
@@ -435,7 +475,9 @@
       y: HOME.y + 65,
       facingX: 0,
       facingY: 1,
-      inVehicle: false
+      inVehicle: false,
+      inTrain: false,
+      trainId: null
     },
     camera: { x: HOME.x - viewWidth / 2, y: HOME.y - viewHeight / 2 },
     day: 1,
@@ -527,6 +569,23 @@
 
   function canStand(x, y, radius = PLAYER_RADIUS) {
     return inWorld(x, y, radius) && !collidesBuilding(x, y, radius);
+  }
+
+  function intersectsRailClearance(rect) {
+    if (rect.x + rect.w < RAIL_MIN_X || rect.x > RAIL_MAX_X) return false;
+
+    const corridorTop = RAIL_Y - RAIL_CORRIDOR_HALF;
+    const corridorBottom = RAIL_Y + RAIL_CORRIDOR_HALF;
+    if (rect.y < corridorBottom && rect.y + rect.h > corridorTop) return true;
+
+    for (const station of TRAIN_STATIONS) {
+      const left = station.x - 145;
+      const right = station.x + 145;
+      const top = RAIL_Y - 118;
+      const bottom = RAIL_Y + 145;
+      if (rect.x < right && rect.x + rect.w > left && rect.y < bottom && rect.y + rect.h > top) return true;
+    }
+    return false;
   }
 
   function generateBuildings() {
@@ -685,6 +744,10 @@
           buildings.push(makeBuilding(left + 34, top + split + 10, bw - 68, bh - split - 22, tint * 0.93, "low", 4));
         }
       }
+    }
+
+    for (let i = buildings.length - 1; i >= 0; i -= 1) {
+      if (intersectsRailClearance(buildings[i])) buildings.splice(i, 1);
     }
   }
 
