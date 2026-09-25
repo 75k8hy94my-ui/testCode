@@ -186,7 +186,7 @@
         const frontSetback = 12 + hash2(gx + i, gy + side, seedBase + 32) * 24;
         const frontageMargin = 5 + hash2(gx + i, gy + side, seedBase + 33) * 8;
         const lotAlong = Math.max(58, lotEnd - lotStart - 5);
-        const houseAlong = Math.max(44, lotAlong - frontageMargin * 2);
+        const houseAlong = clamp(lotAlong - frontageMargin * 2, 44, 112);
         const maxDepth = Math.max(48, sideAvailable - sideGap - rearGap - frontSetback);
         const houseDepth = clamp(
           48 + hash2(gx + i, gy + side, seedBase + 34) * 34,
@@ -310,37 +310,55 @@
         if (vertical) {
           const hx = side < 0 ? left + 10 : left + bw - 72;
           const hy = clamp(along - 30, top + 12, top + bh - 72);
-          houses.push({
+          const candidate = {
             x: hx, y: hy, w: 62, h: 58,
             frontage: side < 0 ? "east" : "west",
             houseStyle: "flag-lot",
             floors: 2,
             paletteShift: Math.floor(hash2(gx, gy, 1743) * VISUAL_PALETTES.length),
             seed: 1744
-          });
-          driveways.push({
-            x: side < 0 ? hx + 62 : roadCenter + roadWidth / 2,
-            y: hy + 23,
-            w: Math.max(12, side < 0 ? roadCenter - roadWidth / 2 - (hx + 62) : hx - (roadCenter + roadWidth / 2)),
-            h: accessWidth
-          });
+          };
+          const blocked = houses.some((house) =>
+            candidate.x < house.x + house.w + 6 &&
+            candidate.x + candidate.w + 6 > house.x &&
+            candidate.y < house.y + house.h + 6 &&
+            candidate.y + candidate.h + 6 > house.y
+          );
+          if (!blocked) {
+            houses.push(candidate);
+            driveways.push({
+              x: side < 0 ? hx + 62 : roadCenter + roadWidth / 2,
+              y: hy + 23,
+              w: Math.max(12, side < 0 ? roadCenter - roadWidth / 2 - (hx + 62) : hx - (roadCenter + roadWidth / 2)),
+              h: accessWidth
+            });
+          }
         } else {
           const hx = clamp(along - 30, left + 12, left + bw - 72);
           const hy = side < 0 ? top + 10 : top + bh - 68;
-          houses.push({
+          const candidate = {
             x: hx, y: hy, w: 62, h: 58,
             frontage: side < 0 ? "south" : "north",
             houseStyle: "flag-lot",
             floors: 2,
             paletteShift: Math.floor(hash2(gx, gy, 1743) * VISUAL_PALETTES.length),
             seed: 1744
-          });
-          driveways.push({
-            x: hx + 24,
-            y: side < 0 ? hy + 58 : roadCenter + roadWidth / 2,
-            w: accessWidth,
-            h: Math.max(12, side < 0 ? roadCenter - roadWidth / 2 - (hy + 58) : hy - (roadCenter + roadWidth / 2))
-          });
+          };
+          const blocked = houses.some((house) =>
+            candidate.x < house.x + house.w + 6 &&
+            candidate.x + candidate.w + 6 > house.x &&
+            candidate.y < house.y + house.h + 6 &&
+            candidate.y + candidate.h + 6 > house.y
+          );
+          if (!blocked) {
+            houses.push(candidate);
+            driveways.push({
+              x: hx + 24,
+              y: side < 0 ? hy + 58 : roadCenter + roadWidth / 2,
+              w: accessWidth,
+              h: Math.max(12, side < 0 ? roadCenter - roadWidth / 2 - (hy + 58) : hy - (roadCenter + roadWidth / 2))
+            });
+          }
         }
       }
     }
