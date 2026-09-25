@@ -776,6 +776,38 @@
     return inWorld(x, y, radius) && !collidesBuilding(x, y, radius);
   }
 
+  function intersectsRoadNetworkClearance(rect) {
+    for (let gy = 1; gy <= 17; gy += 1) {
+      for (let gx = 1; gx < 17; gx += 1) {
+        if (!roadEdgeExists(gx, gy, gx + 1, gy)) continue;
+        const style = roadSegmentStyle("h", gy, gx);
+        const pad = roadWidthForStyle(style) / 2 + 12;
+        const points = sampleRoadEdge("h", gy, gx, 12);
+        if (points.some((p) =>
+          p.x >= rect.x - pad &&
+          p.x <= rect.x + rect.w + pad &&
+          p.y >= rect.y - pad &&
+          p.y <= rect.y + rect.h + pad
+        )) return true;
+      }
+    }
+    for (let gx = 1; gx <= 17; gx += 1) {
+      for (let gy = 1; gy < 17; gy += 1) {
+        if (!roadEdgeExists(gx, gy, gx, gy + 1)) continue;
+        const style = roadSegmentStyle("v", gx, gy);
+        const pad = roadWidthForStyle(style) / 2 + 12;
+        const points = sampleRoadEdge("v", gx, gy, 12);
+        if (points.some((p) =>
+          p.x >= rect.x - pad &&
+          p.x <= rect.x + rect.w + pad &&
+          p.y >= rect.y - pad &&
+          p.y <= rect.y + rect.h + pad
+        )) return true;
+      }
+    }
+    return false;
+  }
+
   function intersectsRailClearance(rect) {
     if (rect.x + rect.w < RAIL_MIN_X || rect.x > RAIL_MAX_X) return false;
 
@@ -952,7 +984,9 @@
     }
 
     for (let i = buildings.length - 1; i >= 0; i -= 1) {
-      if (intersectsRailClearance(buildings[i])) buildings.splice(i, 1);
+      if (intersectsRailClearance(buildings[i]) || intersectsRoadNetworkClearance(buildings[i])) {
+        buildings.splice(i, 1);
+      }
     }
   }
 
