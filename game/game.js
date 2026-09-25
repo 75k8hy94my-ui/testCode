@@ -1310,7 +1310,7 @@
     }
 
     const signal = upcomingSignal();
-    if (signal && signal.state === "red" && signal.distance < 34 && personalCar.speed > 18 && !state.drive.violationKeys.has(signal.key)) {
+    if (signal && signal.state === "red" && signal.distance < 72 && personalCar.speed > 18 && !state.drive.violationKeys.has(signal.key)) {
       state.drive.violationKeys.add(signal.key);
       penalizeDriving(18, "赤信号を通過しました");
     }
