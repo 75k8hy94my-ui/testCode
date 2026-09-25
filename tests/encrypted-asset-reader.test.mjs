@@ -52,6 +52,7 @@ class FakeElement {
   get firstChild() { return this.children[0] || null; }
   addEventListener(name, fn) { this.listeners.set(name, fn); }
   removeEventListener(name) { this.listeners.delete(name); }
+  setPointerCapture() {}
 }
 
 function fakeDom() {
@@ -79,6 +80,67 @@ test('renderer uses injected estimated bytes and does not request HQ at scale on
   const reader = createEncryptedAssetReader({ container: new FakeElement('section'), sync, settings: { load: () => ({ networkMode: 'standard' }), SAVER_NETWORK_MODE: 'data-saver', STANDARD_NETWORK_MODE: 'standard' }, remoteAccess: { recordPartialSavings() {} }, crypto: { encryptedAssetByteLength: (n) => n + 36, tileObjectId: (l, x, y) => `L${l}:${x}:${y}` }, assetId: 'a', revision: 1, manifest: manifest() });
   reader.mount(); await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(calls, ['preview']); assert.equal(estimates[0], 236); reader.destroy();
+});
+
+test('renderer installs self-contained layout styles and shares one content coordinate box', () => {
+  fakeDom();
+  const container = new FakeElement('section');
+  const reader = createEncryptedAssetReader({ container, sync: { loadDecryptedObject: async () => new Uint8Array([1]) }, settings: { load: () => ({ networkMode: 'standard' }), STANDARD_NETWORK_MODE: 'standard', SAVER_NETWORK_MODE: 'data-saver' }, crypto: { encryptedAssetByteLength: (n) => n + 36 }, manifest: manifest() });
+  reader.mount();
+  const viewport = container.children[0]; const content = viewport.children[0]; const preview = content.children[0]; const layer = content.children[1];
+  assert.equal(viewport.style.position, 'relative'); assert.equal(viewport.style.overflow, 'hidden'); assert.equal(viewport.style.touchAction, 'none');
+  assert.equal(content.style.position, 'absolute'); assert.equal(content.style.transformOrigin, 'center center');
+  assert.equal(preview.style.position, 'absolute'); assert.equal(preview.style.inset, '0'); assert.equal(preview.style.width, '100%');
+  assert.equal(layer.style.position, 'absolute'); assert.equal(layer.style.inset, '0'); assert.equal(layer.style.pointerEvents, 'none');
+  assert.equal(layer.style.width, '100%'); assert.equal(layer.style.height, '100%');
+  reader.destroy();
+});
+
+test('prefetched tile is later promoted to decrypted visible rendering', async () => {
+  fakeDom(); const calls = []; const pending = new Map();
+  const promotionManifest = manifest(); promotionManifest.preview = { ...promotionManifest.preview, width: 1024, height: 256 }; promotionManifest.zoom.levels = [{ level: 0, width: 2048, height: 512, longEdge: 2048, columns: 4, rows: 1, tiles: Array.from({ length: 4 }, (_, x) => ({ x, y: 0, pixelX: x * 512, pixelY: 0, width: 512, height: 512, mimeType: 'image/webp', bytes: 100, quality: 0.88 })) }];
+  const sync = { loadDecryptedObject: async (args) => { calls.push(`visible:${args.objectId}`); return new Uint8Array([1]); }, loadEncryptedObject: (args) => { calls.push(`prefetch:${args.objectId}`); return new Promise((resolve) => pending.set(args.objectId, resolve)); } };
+  const settings = { load: () => ({ networkMode: 'standard' }), STANDARD_NETWORK_MODE: 'standard', SAVER_NETWORK_MODE: 'data-saver' };
+  const reader = createEncryptedAssetReader({ container: new FakeElement('section'), sync, settings, crypto: { encryptedAssetByteLength: (n) => n + 36, tileObjectId: (l, x, y) => `L${l}:${x}:${y}` }, assetId: 'asset', revision: 1, manifest: promotionManifest });
+  reader.mount(); await new Promise((resolve) => setImmediate(resolve)); reader.setScale(2); await new Promise((resolve) => setImmediate(resolve));
+  const prefetched = [...pending.keys()][0]; assert.ok(prefetched);
+  pending.forEach((resolve) => resolve(new Uint8Array([2])));
+  await new Promise((resolve) => setImmediate(resolve));
+  const [level, x, y] = prefetched.match(/^L(\d+):(\d+):(\d+)$/).slice(1).map(Number);
+  reader.setTransform({ translateX: x === 0 ? 250 : -250, translateY: y === 0 ? 180 : -180 });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.ok(calls.includes(`visible:${prefetched}`));
+  reader.destroy();
+});
+
+test('visible requests use a separate priority queue and promote in-flight prefetches', async () => {
+  fakeDom(); const calls = []; let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const sync = { loadDecryptedObject: async (args) => { calls.push(`visible:${args.objectId}`); return new Uint8Array([1]); }, loadEncryptedObject: async (args) => { calls.push(`prefetch:${args.objectId}`); await gate; return new Uint8Array([2]); } };
+  const settings = { load: () => ({ networkMode: 'standard' }), STANDARD_NETWORK_MODE: 'standard', SAVER_NETWORK_MODE: 'data-saver' };
+  const reader = createEncryptedAssetReader({ container: new FakeElement('section'), sync, settings, crypto: { encryptedAssetByteLength: (n) => n + 36, tileObjectId: (l, x, y) => `L${l}:${x}:${y}` }, assetId: 'asset', revision: 1, manifest: manifest() });
+  reader.mount(); await new Promise((resolve) => setImmediate(resolve)); reader.setScale(2); await new Promise((resolve) => setImmediate(resolve));
+  reader.setTransform({ translateX: 240, translateY: 180 }); await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(calls.some((call) => call.startsWith('visible:'))); release(); await new Promise((resolve) => setImmediate(resolve)); reader.destroy();
+});
+
+test('null tile results are errors and never become rendered or prefetched', async () => {
+  fakeDom(); const errors = [];
+  const reader = createEncryptedAssetReader({ container: new FakeElement('section'), sync: { loadDecryptedObject: async (args) => args.objectId === 'preview' ? new Uint8Array([1]) : null, loadEncryptedObject: async () => null }, settings: { load: () => ({ networkMode: 'standard' }), STANDARD_NETWORK_MODE: 'standard', SAVER_NETWORK_MODE: 'data-saver' }, remoteAccess: { recordPartialSavings() {} }, crypto: { encryptedAssetByteLength: (n) => n + 36, tileObjectId: (l, x, y) => `L${l}:${x}:${y}` }, assetId: 'a', revision: 1, manifest: manifest(), onTileError: (error) => errors.push(error) });
+  reader.mount(); await new Promise((resolve) => setImmediate(resolve)); reader.setScale(2); await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(errors.some((error) => /unavailable/.test(error.message))); assert.equal(reader.getState().scale, 2); reader.destroy();
+});
+
+test('pinch keeps the pointer midpoint stable instead of centering zoom', () => {
+  fakeDom(); const container = new FakeElement('section'); const reader = createEncryptedAssetReader({ container, sync: { loadDecryptedObject: async () => new Uint8Array([1]) }, settings: { load: () => ({ networkMode: 'standard' }), STANDARD_NETWORK_MODE: 'standard', SAVER_NETWORK_MODE: 'data-saver' }, crypto: { encryptedAssetByteLength: (n) => n + 36 }, manifest: manifest() });
+  reader.mount(); const viewport = container.children[0]; viewport.listeners.get('pointerdown')({ pointerId: 1, clientX: 100, clientY: 100 }); viewport.listeners.get('pointerdown')({ pointerId: 2, clientX: 200, clientY: 100 }); viewport.listeners.get('pointermove')({ pointerId: 1, clientX: 50, clientY: 100 }); viewport.listeners.get('pointermove')({ pointerId: 2, clientX: 250, clientY: 100 });
+  const state = reader.getState(); assert.ok(state.scale > 1); assert.notEqual(state.translateX, 0); reader.destroy();
+});
+
+test('tile request concurrency never exceeds four', async () => {
+  fakeDom(); let active = 0; let maximum = 0; const release = []; const sync = { loadDecryptedObject: async () => { active += 1; maximum = Math.max(maximum, active); await new Promise((resolve) => release.push(resolve)); active -= 1; return new Uint8Array([1]); }, loadEncryptedObject: async () => new Uint8Array([2]) };
+  const reader = createEncryptedAssetReader({ container: new FakeElement('section'), sync, settings: { load: () => ({ networkMode: 'data-saver' }), STANDARD_NETWORK_MODE: 'standard', SAVER_NETWORK_MODE: 'data-saver' }, crypto: { encryptedAssetByteLength: (n) => n + 36, tileObjectId: (l, x, y) => `L${l}:${x}:${y}` }, manifest: manifest() });
+  reader.mount(); await new Promise((resolve) => setImmediate(resolve)); reader.setScale(2); await new Promise((resolve) => setImmediate(resolve)); assert.ok(maximum <= 4); release.forEach((resolve) => resolve()); reader.destroy();
 });
 
 test('reader source is a classic script', () => {
