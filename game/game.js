@@ -2798,40 +2798,110 @@
         }
 
         if (style === "residential") {
-          const laneW = 38;
-          const offset = hash2(gx, gy, 1410) > .5 ? w * .38 : w * .58;
-          ctx.fillStyle = "#8c8f89";
-          // A narrow local street connects through the block; side driveways branch from it.
-          ctx.fillRect(x + offset - laneW / 2, y - BLOCK_MARGIN - 6, laneW, BLOCK_MARGIN + 18);
-          ctx.fillRect(x + offset - laneW / 2, y + h - 8, laneW, BLOCK_MARGIN + 14);
-          roundedRectPath(ctx, x + offset - laneW / 2, y + 5, laneW, h - 10, 6);
-          ctx.fill();
-          if (hash2(gx, gy, 1411) > .45) {
-            const branchY = y + h * (.35 + hash2(gx, gy, 1412) * .28);
-            const branchToRight = offset < w * .5;
-            ctx.fillRect(
-              branchToRight ? x + offset : x + 6,
-              branchY - laneW * .34,
-              branchToRight ? w - offset - 8 : offset - 6,
-              laneW * .68
-            );
+          const worldLeft = gx * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN;
+          const worldTop = gy * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN;
+          const plan = residentialBlockPlan(gx, gy, worldLeft, worldTop, w, h);
+
+          // Uneven private greenery is drawn before roads and houses.
+          for (const yard of plan.yards) {
+            const syard = worldToScreen(yard.x, yard.y);
+            ctx.fillStyle = "rgba(91,124,79,.72)";
+            roundedRectPath(ctx, syard.x, syard.y, yard.w, yard.h, 3);
+            ctx.fill();
+            if (yard.w > 24 && yard.h > 24) {
+              ctx.fillStyle = "rgba(130,154,102,.38)";
+              ctx.beginPath();
+              ctx.arc(syard.x + yard.w * .55, syard.y + yard.h * .48, Math.min(8, yard.w * .18, yard.h * .18), 0, Math.PI * 2);
+              ctx.fill();
+            }
           }
 
-          ctx.strokeStyle = "rgba(215,219,211,.24)";
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(x + offset - laneW / 2 + 4, y + 8);
-          ctx.lineTo(x + offset - laneW / 2 + 4, y + h - 8);
-          ctx.moveTo(x + offset + laneW / 2 - 4, y + 8);
-          ctx.lineTo(x + offset + laneW / 2 - 4, y + h - 8);
-          ctx.stroke();
+          // Main 4m-class local road. Some blocks are through streets, others terminate.
+          ctx.fillStyle = "#858984";
+          if (plan.vertical) {
+            const roadX = plan.roadCenter - plan.roadWidth / 2 - state.camera.x;
+            const roadY = plan.roadStart - state.camera.y;
+            const roadH = plan.roadEnd - plan.roadStart;
+            roundedRectPath(ctx, roadX, roadY, plan.roadWidth, roadH, 5);
+            ctx.fill();
 
-          // Small concrete parking pads and garden strips.
-          ctx.fillStyle = "#aaa9a1";
-          ctx.fillRect(x + 14, y + 18, 52, 38);
-          ctx.fillRect(x + w - 68, y + h - 58, 54, 40);
-          ctx.fillStyle = "#718b68";
-          ctx.fillRect(x + 18, y + h - 34, 62, 15);
+            // Japanese side gutters.
+            ctx.fillStyle = "rgba(72,79,76,.55)";
+            ctx.fillRect(roadX + 2, roadY, 3, roadH);
+            ctx.fillRect(roadX + plan.roadWidth - 5, roadY, 3, roadH);
+          } else {
+            const roadX = plan.roadStart - state.camera.x;
+            const roadY = plan.roadCenter - plan.roadWidth / 2 - state.camera.y;
+            const roadW = plan.roadEnd - plan.roadStart;
+            roundedRectPath(ctx, roadX, roadY, roadW, plan.roadWidth, 5);
+            ctx.fill();
+
+            ctx.fillStyle = "rgba(72,79,76,.55)";
+            ctx.fillRect(roadX, roadY + 2, roadW, 3);
+            ctx.fillRect(roadX, roadY + plan.roadWidth - 5, roadW, 3);
+          }
+
+          // Optional narrow side street / short cul-de-sac.
+          if (plan.branch) {
+            ctx.fillStyle = "#858984";
+            const branchW = plan.roadWidth * .78;
+            if (plan.vertical) {
+              const roadEdge = plan.branchSide < 0
+                ? plan.roadCenter - plan.roadWidth / 2
+                : plan.roadCenter + plan.roadWidth / 2;
+              const branchEnd = plan.branchSide < 0 ? worldLeft - 8 : worldLeft + w + 8;
+              const bx = Math.min(roadEdge, branchEnd) - state.camera.x;
+              const by = plan.branchAt - branchW / 2 - state.camera.y;
+              const bw2 = Math.abs(branchEnd - roadEdge);
+              roundedRectPath(ctx, bx, by, bw2, branchW, 4);
+              ctx.fill();
+            } else {
+              const roadEdge = plan.branchSide < 0
+                ? plan.roadCenter - plan.roadWidth / 2
+                : plan.roadCenter + plan.roadWidth / 2;
+              const branchEnd = plan.branchSide < 0 ? worldTop - 8 : worldTop + h + 8;
+              const bx = plan.branchAt - branchW / 2 - state.camera.x;
+              const by = Math.min(roadEdge, branchEnd) - state.camera.y;
+              const bh2 = Math.abs(branchEnd - roadEdge);
+              roundedRectPath(ctx, bx, by, branchW, bh2, 4);
+              ctx.fill();
+            }
+          }
+
+          // Flag-lot access strips and individual parking pads.
+          for (const driveway of plan.driveways) {
+            const p = worldToScreen(driveway.x, driveway.y);
+            ctx.fillStyle = "#a6a59e";
+            ctx.fillRect(p.x, p.y, driveway.w, driveway.h);
+          }
+          for (const pad of plan.parkingPads) {
+            const p = worldToScreen(pad.x, pad.y);
+            ctx.fillStyle = "#aaa9a2";
+            roundedRectPath(ctx, p.x, p.y, pad.w, pad.h, 2);
+            ctx.fill();
+            ctx.strokeStyle = "rgba(244,245,239,.34)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            if (hash2(Math.floor(pad.x), Math.floor(pad.y), 1770) > .58) {
+              drawParkingCarTop(
+                p.x + pad.w / 2,
+                p.y + pad.h / 2,
+                !pad.vertical,
+                hash2(Math.floor(pad.x), Math.floor(pad.y), 1771)
+              );
+            }
+          }
+
+          // Only some parcel boundaries are visible as low fences or block walls.
+          ctx.strokeStyle = "rgba(92,96,90,.48)";
+          ctx.lineWidth = 1.5;
+          for (const line of plan.lotLines) {
+            ctx.beginPath();
+            ctx.moveTo(line.x1 - state.camera.x, line.y1 - state.camera.y);
+            ctx.lineTo(line.x2 - state.camera.x, line.y2 - state.camera.y);
+            ctx.stroke();
+          }
+
           continue;
         }
 
