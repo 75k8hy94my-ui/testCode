@@ -693,7 +693,8 @@
     state.drive.speedingTimer = 0;
     state.drive.gapTimer = 0;
     state.drive.violationKeys = new Set();
-    showToast(place.name + "へのルートを設定しました");
+    showToast(place.name + "へのルートを設定しました。W / ↑ または ACCEL で発進");
+    requestAnimationFrame(focusGameCanvas);
   }
 
   function completeDrivingTrip() {
@@ -778,9 +779,18 @@
     toastTimer = 2.6;
   }
 
+  function focusGameCanvas() {
+    try {
+      canvas.focus({ preventScroll: true });
+    } catch (_) {
+      canvas.focus();
+    }
+  }
+
   function closeActionSheet() {
     actionSheet.hidden = true;
     actionChoices.replaceChildren();
+    requestAnimationFrame(focusGameCanvas);
   }
 
   function addChoice(title, detail, handler, disabled = false) {
@@ -1872,7 +1882,7 @@
         const lead = leadVehicleInfo();
         if (signal && signal.state === "red" && signal.distance < 120) objectiveText.textContent = "赤信号です。停止線の手前で止まる";
         else if (lead && lead.distance < 130) objectiveText.textContent = "前走車との車間を保つ";
-        else objectiveText.textContent = "ルートは自動。速度と停止・発進だけを操作";
+        else objectiveText.textContent = "W / ↑・ACCELで加速、S / ↓・BRAKEで減速";
       }
       return;
     }
