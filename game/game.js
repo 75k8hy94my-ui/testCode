@@ -72,6 +72,15 @@
   const LANE_OFFSET = 38;
   const TURN_RADIUS = 86;
   const ROUTE_SAMPLE_STEP = 16;
+  const RAIL_Y = ROAD_GAP * 5 + ROAD_GAP / 2;
+  const RAIL_MIN_X = ROAD_GAP * 1.5;
+  const RAIL_MAX_X = WORLD_SIZE - ROAD_GAP * 1.5;
+  const RAIL_TRACK_GAP = 23;
+  const RAIL_CORRIDOR_HALF = 62;
+  const TRAIN_SPEED = 300;
+  const TRAIN_DWELL_SECONDS = 4.5;
+  const TRAIN_LENGTH = 212;
+  const TRAIN_WIDTH = 31;
   const WORLD_TILT_Y = 0.94;
   const WORLD_TILT_X = 1.025;
   const BUILDING_DEPTH_X = 0.18;
@@ -103,6 +112,37 @@
   const LIBRARY = { id: "library", name: "市立図書館", gx: 7, gy: 7, ...blockCenter(7, 7), color: "#9a8db9", symbol: "L" };
   const PLACES = [HOME, CAFE, STORE, PARK, GYM, LIBRARY];
   const SPECIAL_BLOCKS = new Set(PLACES.map((place) => place.gx + "," + place.gy));
+
+  const TRAIN_STATIONS = [
+    { id:"west", name:"西若葉駅", x:2100, y:RAIL_Y, accessX:2100, accessY:RAIL_Y + 112 },
+    { id:"central", name:"若葉駅", x:5100, y:RAIL_Y, accessX:5100, accessY:RAIL_Y + 112 },
+    { id:"east", name:"東若葉駅", x:8100, y:RAIL_Y, accessX:8100, accessY:RAIL_Y + 112 }
+  ];
+
+  const trains = [
+    {
+      id:"local-a",
+      name:"若葉線 A",
+      x:TRAIN_STATIONS[0].x,
+      y:RAIL_Y - RAIL_TRACK_GAP,
+      stationIndex:0,
+      targetIndex:1,
+      direction:1,
+      dwell:TRAIN_DWELL_SECONDS,
+      speed:0
+    },
+    {
+      id:"local-b",
+      name:"若葉線 B",
+      x:TRAIN_STATIONS[2].x,
+      y:RAIL_Y + RAIL_TRACK_GAP,
+      stationIndex:2,
+      targetIndex:1,
+      direction:-1,
+      dwell:TRAIN_DWELL_SECONDS * .45,
+      speed:0
+    }
+  ];
 
   // Fictional compressed city layout inspired by the spatial mix around Kichijoji:
   // dense station frontage, shopping streets, tiny dining alleys, quieter housing,
@@ -435,7 +475,9 @@
       y: HOME.y + 65,
       facingX: 0,
       facingY: 1,
-      inVehicle: false
+      inVehicle: false,
+      inTrain: false,
+      trainId: null
     },
     camera: { x: HOME.x - viewWidth / 2, y: HOME.y - viewHeight / 2 },
     day: 1,
@@ -527,6 +569,23 @@
 
   function canStand(x, y, radius = PLAYER_RADIUS) {
     return inWorld(x, y, radius) && !collidesBuilding(x, y, radius);
+  }
+
+  function intersectsRailClearance(rect) {
+    if (rect.x + rect.w < RAIL_MIN_X || rect.x > RAIL_MAX_X) return false;
+
+    const corridorTop = RAIL_Y - RAIL_CORRIDOR_HALF;
+    const corridorBottom = RAIL_Y + RAIL_CORRIDOR_HALF;
+    if (rect.y < corridorBottom && rect.y + rect.h > corridorTop) return true;
+
+    for (const station of TRAIN_STATIONS) {
+      const left = station.x - 145;
+      const right = station.x + 145;
+      const top = RAIL_Y - 118;
+      const bottom = RAIL_Y + 145;
+      if (rect.x < right && rect.x + rect.w > left && rect.y < bottom && rect.y + rect.h > top) return true;
+    }
+    return false;
   }
 
   function generateBuildings() {
@@ -686,6 +745,10 @@
         }
       }
     }
+
+    for (let i = buildings.length - 1; i >= 0; i -= 1) {
+      if (intersectsRailClearance(buildings[i])) buildings.splice(i, 1);
+    }
   }
 
   function randomRoadPoint(seedA, seedB, offset = 0) {
@@ -763,7 +826,113 @@
     }
   }
 
+  function trainById(id) {
+    return trains.find((train) => train.id === id) || null;
+  }
+
+  function stoppedStationForTrain(train) {
+    if (!train || train.dwell <= 0.05) return null;
+    return TRAIN_STATIONS[train.stationIndex] || null;
+  }
+
+  function nearestRailStationAccess(x, y, maxDistance = 125) {
+    let best = null;
+    let bestDistance = maxDistance;
+    for (const station of TRAIN_STATIONS) {
+      const d = distance(x, y, station.accessX, station.accessY);
+      if (d < bestDistance) {
+        best = station;
+        bestDistance = d;
+      }
+    }
+    return best;
+  }
+
+  function stoppedTrainAtStation(station) {
+    if (!station) return null;
+    return trains.find((train) => train.stationIndex === TRAIN_STATIONS.indexOf(station) && train.dwell > .05) || null;
+  }
+
+  function updateTrainSystem(dt) {
+    for (const train of trains) {
+      if (train.dwell > 0) {
+        train.dwell = Math.max(0, train.dwell - dt);
+        train.speed = 0;
+        continue;
+      }
+
+      const target = TRAIN_STATIONS[train.targetIndex];
+      if (!target) continue;
+
+      const direction = Math.sign(target.x - train.x) || train.direction;
+      train.speed += (TRAIN_SPEED - train.speed) * Math.min(1, dt * 2.2);
+      const nextX = train.x + direction * train.speed * dt;
+      const arrived = direction > 0 ? nextX >= target.x : nextX <= target.x;
+
+      if (arrived) {
+        train.x = target.x;
+        train.stationIndex = train.targetIndex;
+        train.speed = 0;
+        train.dwell = TRAIN_DWELL_SECONDS;
+
+        let nextIndex = train.stationIndex + train.direction;
+        if (nextIndex < 0 || nextIndex >= TRAIN_STATIONS.length) {
+          train.direction *= -1;
+          nextIndex = train.stationIndex + train.direction;
+        }
+        train.targetIndex = nextIndex;
+      } else {
+        train.x = clamp(nextX, RAIL_MIN_X, RAIL_MAX_X);
+      }
+    }
+
+    if (state.player.inTrain) {
+      const train = trainById(state.player.trainId);
+      if (!train) {
+        state.player.inTrain = false;
+        state.player.trainId = null;
+        return;
+      }
+      state.player.x = train.x;
+      state.player.y = train.y;
+    }
+  }
+
+  function boardTrain(train, station) {
+    if (!train || !station || train.dwell <= .05) {
+      showToast("電車はまだ到着していません");
+      return;
+    }
+    state.player.inVehicle = false;
+    state.player.inTrain = true;
+    state.player.trainId = train.id;
+    state.player.x = train.x;
+    state.player.y = train.y;
+    showToast(station.name + "から若葉線に乗車しました");
+  }
+
+  function exitTrain() {
+    const train = trainById(state.player.trainId);
+    const station = stoppedStationForTrain(train);
+    if (!train || !station) {
+      showToast("駅に停車してから降りてください");
+      return;
+    }
+
+    state.player.inTrain = false;
+    state.player.trainId = null;
+    state.player.x = station.accessX;
+    state.player.y = station.accessY;
+    state.player.facingX = 0;
+    state.player.facingY = 1;
+    showToast(station.name + "で降りました");
+  }
+
   function actorPosition() {
+    if (state.player.inTrain) {
+      const train = trainById(state.player.trainId);
+      if (train) return { x: train.x, y: train.y };
+    }
     return state.player.inVehicle ? { x: personalCar.x, y: personalCar.y } : { x: state.player.x, y: state.player.y };
   }
 
@@ -1520,8 +1689,24 @@
   function nearestInteraction() {
     const p = actorPosition();
 
+    if (state.player.inTrain) {
+      const train = trainById(state.player.trainId);
+      const station = stoppedStationForTrain(train);
+      return station
+        ? { type:"train-exit", target:station, label:station.name + "で降りる" }
+        : null;
+    }
+
     if (state.player.inVehicle) {
       return { type: "car-menu", label: state.drive.destination ? "ルート・降車メニュー" : "目的地を選ぶ" };
+    }
+
+    const railStation = nearestRailStationAccess(p.x, p.y);
+    if (railStation) {
+      const train = stoppedTrainAtStation(railStation);
+      return train
+        ? { type:"train-enter", target:train, station:railStation, label:railStation.name + "から電車に乗る" }
+        : { type:"train-wait", station:railStation, label:railStation.name + "で電車を待つ" };
     }
 
     if (distance(p.x, p.y, personalCar.x, personalCar.y) < 70) {
@@ -1554,6 +1739,8 @@
   }
 
   function enterCar() {
+    state.player.inTrain = false;
+    state.player.trainId = null;
     state.player.inVehicle = true;
     state.player.x = personalCar.x;
     state.player.y = personalCar.y;
@@ -1598,12 +1785,16 @@
 
     const item = nearestInteraction();
     if (!item) {
-      showToast("近くに利用できるものはありません");
+      if (state.player.inTrain) showToast("駅に停車してから降りられます");
+      else showToast("近くに利用できるものはありません");
       return;
     }
 
     if (item.type === "car-enter") enterCar();
     if (item.type === "car-menu") openDrivingMenu();
+    if (item.type === "train-enter") boardTrain(item.target, item.station);
+    if (item.type === "train-exit") exitTrain();
+    if (item.type === "train-wait") showToast("電車が到着したら E / ACTION で乗車できます");
     if (item.type === "place") openPlace(item.target);
     if (item.type === "npc") openNpc(item.target);
   }
@@ -1628,13 +1819,24 @@
           y: state.player.y,
           facingX: state.player.facingX,
           facingY: state.player.facingY,
-          inVehicle: state.player.inVehicle
+          inVehicle: state.player.inVehicle,
+          inTrain: state.player.inTrain,
+          trainId: state.player.trainId
         },
         car: {
           x: personalCar.x,
           y: personalCar.y,
           angle: personalCar.angle
         },
+        trains: trains.map((train) => ({
+          id: train.id,
+          x: train.x,
+          stationIndex: train.stationIndex,
+          targetIndex: train.targetIndex,
+          direction: train.direction,
+          dwell: train.dwell,
+          speed: train.speed
+        })),
         day: state.day,
         minute: state.minute,
         cash: state.cash,
@@ -1673,7 +1875,9 @@
         }
         state.player.facingX = Number(saved.player.facingX) || 0;
         state.player.facingY = Number(saved.player.facingY) || 1;
-        state.player.inVehicle = Boolean(saved.player.inVehicle);
+        state.player.inTrain = Boolean(saved.player.inTrain);
+        state.player.trainId = typeof saved.player.trainId === "string" ? saved.player.trainId : null;
+        state.player.inVehicle = Boolean(saved.player.inVehicle) && !state.player.inTrain;
       }
 
       if (saved.car) {
@@ -1684,6 +1888,22 @@
           personalCar.y = y;
         }
         personalCar.angle = Number(saved.car.angle) || 0;
+      }
+
+      if (Array.isArray(saved.trains)) {
+        for (const stored of saved.trains) {
+          const train = trainById(stored && stored.id);
+          if (!train) continue;
+          const x = Number(stored.x);
+          const stationIndex = Math.floor(Number(stored.stationIndex));
+          const targetIndex = Math.floor(Number(stored.targetIndex));
+          if (Number.isFinite(x)) train.x = clamp(x, RAIL_MIN_X, RAIL_MAX_X);
+          if (stationIndex >= 0 && stationIndex < TRAIN_STATIONS.length) train.stationIndex = stationIndex;
+          if (targetIndex >= 0 && targetIndex < TRAIN_STATIONS.length) train.targetIndex = targetIndex;
+          train.direction = Number(stored.direction) < 0 ? -1 : 1;
+          train.dwell = clamp(Number(stored.dwell) || 0, 0, TRAIN_DWELL_SECONDS);
+          train.speed = clamp(Number(stored.speed) || 0, 0, TRAIN_SPEED);
+        }
       }
 
       state.day = Math.max(1, Math.floor(Number(saved.day) || 1));
@@ -1709,7 +1929,17 @@
         for (const npc of NPCS) npc.friendship = Math.max(0, Math.floor(Number(saved.friends[npc.id]) || 0));
       }
 
-      if (state.player.inVehicle) {
+      if (state.player.inTrain) {
+        const train = trainById(state.player.trainId);
+        if (train) {
+          state.player.inVehicle = false;
+          state.player.x = train.x;
+          state.player.y = train.y;
+        } else {
+          state.player.inTrain = false;
+          state.player.trainId = null;
+        }
+      } else if (state.player.inVehicle) {
         state.player.x = personalCar.x;
         state.player.y = personalCar.y;
       }
@@ -1964,9 +2194,11 @@
   function update(dt) {
     if (state.paused || !actionSheet.hidden || !helpPanel.hidden) return;
 
+    updateTrainSystem(dt);
+
     if (!state.player.inVehicle) state.drive.signalClock += dt;
     if (state.player.inVehicle) updateCar(dt);
-    else updatePlayerOnFoot(dt);
+    else if (!state.player.inTrain) updatePlayerOnFoot(dt);
 
     updateTraffic(dt);
     updatePedestrians(dt);
@@ -1998,6 +2230,10 @@
       const lead = clamp(34 + personalCar.speed * .34, 34, 155);
       desiredLeadX = Math.cos(personalCar.angle) * lead;
       desiredLeadY = Math.sin(personalCar.angle) * lead;
+    } else if (state.player.inTrain) {
+      const train = trainById(state.player.trainId);
+      if (train) desiredLeadX = train.direction * 115;
+      desiredLeadY = 0;
     } else {
       desiredLeadX = state.player.facingX * 26;
       desiredLeadY = state.player.facingY * 26;
@@ -3003,8 +3239,209 @@
     }
   }
 
+  function drawRailInfrastructure() {
+    const left = RAIL_MIN_X - state.camera.x;
+    const right = RAIL_MAX_X - state.camera.x;
+    const y = RAIL_Y - state.camera.y;
+    if (right < -180 || left > viewWidth + 180 || y < -220 || y > viewHeight + 220) return;
+
+    const length = RAIL_MAX_X - RAIL_MIN_X;
+
+    // Elevated structure shadow and concrete deck.
+    ctx.fillStyle = "rgba(18,22,22,.18)";
+    roundedRectPath(ctx, left + 7, y - 48 + 13, length, 96, 8);
+    ctx.fill();
+
+    ctx.fillStyle = "#777d7a";
+    roundedRectPath(ctx, left, y - 48, length, 96, 8);
+    ctx.fill();
+
+    ctx.fillStyle = "#8a908c";
+    ctx.fillRect(left, y - 43, length, 7);
+    ctx.fillRect(left, y + 36, length, 7);
+
+    // Viaduct piers.
+    ctx.fillStyle = "#626967";
+    const firstPier = Math.floor(RAIL_MIN_X / 240) * 240;
+    for (let wx = firstPier; wx <= RAIL_MAX_X; wx += 240) {
+      if (TRAIN_STATIONS.some((station) => Math.abs(wx - station.x) < 150)) continue;
+      const sx = wx - state.camera.x;
+      ctx.fillRect(sx - 8, y + 40, 16, 34);
+      ctx.fillStyle = "rgba(255,255,255,.09)";
+      ctx.fillRect(sx - 6, y + 40, 3, 31);
+      ctx.fillStyle = "#626967";
+    }
+
+    // Sleepers and rails for both tracks.
+    for (const offset of [-RAIL_TRACK_GAP, RAIL_TRACK_GAP]) {
+      const trackY = y + offset;
+      ctx.strokeStyle = "#474c4b";
+      ctx.lineWidth = 3;
+      const sleeperStart = Math.floor(RAIL_MIN_X / 32) * 32;
+      for (let wx = sleeperStart; wx <= RAIL_MAX_X; wx += 32) {
+        const sx = wx - state.camera.x;
+        ctx.beginPath();
+        ctx.moveTo(sx, trackY - 12);
+        ctx.lineTo(sx, trackY + 12);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = "#303534";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(left, trackY - 7);
+      ctx.lineTo(right, trackY - 7);
+      ctx.moveTo(left, trackY + 7);
+      ctx.lineTo(right, trackY + 7);
+      ctx.stroke();
+
+      ctx.strokeStyle = "#b5b8b5";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(left, trackY - 7);
+      ctx.lineTo(right, trackY - 7);
+      ctx.moveTo(left, trackY + 7);
+      ctx.lineTo(right, trackY + 7);
+      ctx.stroke();
+    }
+
+    for (const station of TRAIN_STATIONS) {
+      const sx = station.x - state.camera.x;
+      if (sx < -260 || sx > viewWidth + 260) continue;
+
+      // Two side platforms.
+      ctx.fillStyle = "#c2c0b8";
+      roundedRectPath(ctx, sx - 132, y - 63, 264, 17, 4);
+      ctx.fill();
+      roundedRectPath(ctx, sx - 132, y + 46, 264, 17, 4);
+      ctx.fill();
+
+      // Yellow tactile strip.
+      ctx.fillStyle = "#d5b73d";
+      ctx.fillRect(sx - 124, y - 53, 248, 3);
+      ctx.fillRect(sx - 124, y + 50, 248, 3);
+
+      // Canopies.
+      ctx.fillStyle = "rgba(82,94,91,.88)";
+      roundedRectPath(ctx, sx - 88, y - 78, 176, 17, 5);
+      ctx.fill();
+      roundedRectPath(ctx, sx - 88, y + 62, 176, 17, 5);
+      ctx.fill();
+
+      // Platform supports.
+      ctx.fillStyle = "#565f5c";
+      for (const px of [-72, -24, 24, 72]) {
+        ctx.fillRect(sx + px - 2, y - 61, 4, 15);
+        ctx.fillRect(sx + px - 2, y + 46, 4, 15);
+      }
+
+      // Station name boards.
+      ctx.fillStyle = "#eef0ec";
+      roundedRectPath(ctx, sx - 48, y - 87, 96, 16, 3);
+      ctx.fill();
+      ctx.fillStyle = "#34423f";
+      ctx.font = "700 9px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(station.name, sx, y - 76);
+
+      // Stair/access marker toward street level.
+      const access = worldToScreen(station.accessX, station.accessY);
+      ctx.fillStyle = "#8b8f88";
+      ctx.beginPath();
+      ctx.moveTo(sx - 22, y + 62);
+      ctx.lineTo(sx + 22, y + 62);
+      ctx.lineTo(access.x + 16, access.y);
+      ctx.lineTo(access.x - 16, access.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,.32)";
+      ctx.lineWidth = 1;
+      for (let n = 0; n < 5; n += 1) {
+        const t = (n + 1) / 6;
+        const yy = y + 62 + (access.y - (y + 62)) * t;
+        const half = 22 - 6 * t;
+        ctx.beginPath();
+        ctx.moveTo(sx - half, yy);
+        ctx.lineTo(sx + half, yy);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = "rgba(30,39,36,.78)";
+      roundedRectPath(ctx, access.x - 42, access.y + 7, 84, 17, 5);
+      ctx.fill();
+      ctx.fillStyle = "#f4f5f2";
+      ctx.font = "700 9px system-ui, sans-serif";
+      ctx.fillText("若葉線 入口", access.x, access.y + 19);
+    }
+  }
+
+  function drawTrain(train) {
+    const p = worldToScreen(train.x, train.y);
+    if (p.x < -TRAIN_LENGTH || p.x > viewWidth + TRAIN_LENGTH || p.y < -100 || p.y > viewHeight + 100) return;
+
+    const movingRight = train.direction > 0;
+    const stopped = train.dwell > .05;
+
+    ctx.save();
+    ctx.translate(p.x, p.y - 5);
+
+    ctx.fillStyle = "rgba(14,18,18,.24)";
+    roundedRectPath(ctx, -TRAIN_LENGTH / 2 + 5, -TRAIN_WIDTH / 2 + 7, TRAIN_LENGTH, TRAIN_WIDTH, 9);
+    ctx.fill();
+
+    // Four connected cars.
+    const gap = 3;
+    const carCount = 4;
+    const carLength = (TRAIN_LENGTH - gap * (carCount - 1)) / carCount;
+    for (let i = 0; i < carCount; i += 1) {
+      const x = -TRAIN_LENGTH / 2 + i * (carLength + gap);
+      ctx.fillStyle = "#e2e5e2";
+      roundedRectPath(ctx, x, -TRAIN_WIDTH / 2, carLength, TRAIN_WIDTH, i === 0 || i === carCount - 1 ? 8 : 4);
+      ctx.fill();
+
+      // Wakaba line stripe.
+      ctx.fillStyle = "#4f8a6b";
+      ctx.fillRect(x + 2, 1, carLength - 4, 6);
+
+      // Windows.
+      ctx.fillStyle = "#75929a";
+      for (let w = 0; w < 4; w += 1) {
+        const wx = x + 7 + w * ((carLength - 14) / 4);
+        ctx.fillRect(wx, -TRAIN_WIDTH / 2 + 5, 7, 8);
+      }
+
+      // Doors. Bright when open at station.
+      ctx.fillStyle = stopped ? "#b9d8cf" : "#aeb9b6";
+      ctx.fillRect(x + carLength * .36, -TRAIN_WIDTH / 2 + 4, 7, TRAIN_WIDTH - 8);
+      ctx.fillRect(x + carLength * .62, -TRAIN_WIDTH / 2 + 4, 7, TRAIN_WIDTH - 8);
+
+      ctx.strokeStyle = "rgba(49,57,55,.45)";
+      ctx.lineWidth = 1;
+      roundedRectPath(ctx, x, -TRAIN_WIDTH / 2, carLength, TRAIN_WIDTH, 6);
+      ctx.stroke();
+    }
+
+    // Cab windshield and head/tail lights.
+    const frontX = movingRight ? TRAIN_LENGTH / 2 - 7 : -TRAIN_LENGTH / 2 + 7;
+    ctx.fillStyle = "#385057";
+    ctx.fillRect(frontX - 3, -TRAIN_WIDTH / 2 + 5, 6, TRAIN_WIDTH - 10);
+
+    ctx.fillStyle = stopped ? "#d3d3ca" : "#f3e7b0";
+    const lightX = movingRight ? TRAIN_LENGTH / 2 - 2 : -TRAIN_LENGTH / 2 + 2;
+    ctx.fillRect(lightX - 2, -9, 4, 5);
+    ctx.fillRect(lightX - 2, 4, 4, 5);
+
+    if (state.player.inTrain && state.player.trainId === train.id) {
+      ctx.strokeStyle = "rgba(116,211,165,.92)";
+      ctx.lineWidth = 2;
+      roundedRectPath(ctx, -TRAIN_LENGTH / 2 - 4, -TRAIN_WIDTH / 2 - 4, TRAIN_LENGTH + 8, TRAIN_WIDTH + 8, 10);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function drawCityLandmarks() {
-    const station = worldToScreen(8 * ROAD_GAP + ROAD_GAP / 2, 5 * ROAD_GAP + ROAD_GAP / 2);
+    const station = worldToScreen(TRAIN_STATIONS[1].accessX, TRAIN_STATIONS[1].accessY + 34);
     if (station.x > -400 && station.y > -400 && station.x < viewWidth + 400 && station.y < viewHeight + 400) {
       // Station entrance / canopy.
       ctx.fillStyle = "#4a5554";
@@ -3015,7 +3452,7 @@
       ctx.fillStyle = "#384340";
       ctx.font = "800 16px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("若葉駅", station.x, station.y - 5);
+      ctx.fillText("若葉駅 南口", station.x, station.y - 5);
       ctx.fillStyle = "#5a6864";
       ctx.fillRect(station.x - 76, station.y + 11, 10, 42);
       ctx.fillRect(station.x + 66, station.y + 11, 10, 42);
@@ -3976,7 +4413,7 @@
   }
 
   function drawPlayer() {
-    if (state.player.inVehicle) return;
+    if (state.player.inVehicle || state.player.inTrain) return;
     const dir = Math.atan2(state.player.facingY, state.player.facingX);
     const moving = keys.has("w") || keys.has("a") || keys.has("s") || keys.has("d") || Math.abs(touch.x) > .08 || Math.abs(touch.y) > .08;
     const phase = moving ? performance.now() * .009 : 0;
@@ -4122,6 +4559,16 @@
       mctx.restore();
     }
 
+    mctx.strokeStyle = "rgba(155,190,174,.8)";
+    mctx.lineWidth = 2;
+    const railY = h / 2 + (RAIL_Y - p.y) * scale;
+    mctx.beginPath();
+    mctx.moveTo(w / 2 + (RAIL_MIN_X - p.x) * scale, railY);
+    mctx.lineTo(w / 2 + (RAIL_MAX_X - p.x) * scale, railY);
+    mctx.stroke();
+
+    for (const station of TRAIN_STATIONS) dot(station.x, station.y, "#77c49b", 3.2);
+    for (const train of trains) dot(train.x, train.y, "#e6eee9", 2.4);
     for (const place of PLACES) dot(place.x, place.y, place.color, 4.2);
     dot(personalCar.x, personalCar.y, "#e8edf0", 2.7);
 
@@ -4141,6 +4588,18 @@
   }
 
   function updateObjective() {
+    if (state.player.inTrain) {
+      const train = trainById(state.player.trainId);
+      const station = stoppedStationForTrain(train);
+      objectiveTitle.textContent = station ? "若葉線: " + station.name : "若葉線で移動中";
+      if (station) objectiveText.textContent = "E / ACTION で " + station.name + " に降りられます";
+      else {
+        const next = train ? TRAIN_STATIONS[train.targetIndex] : null;
+        objectiveText.textContent = next ? "次は " + next.name : "電車で移動中";
+      }
+      return;
+    }
+
     if (state.player.inVehicle) {
       const destination = PLACES.find((place) => place.id === state.drive.destination);
       objectiveTitle.textContent = destination ? "運転中: " + destination.name : "目的地を選択";
@@ -4262,6 +4721,7 @@
     drawStreetProps();
     drawBuildings();
     for (const place of PLACES) drawPlace(place);
+    drawRailInfrastructure();
     drawCityLandmarks();
     drawPedestrians();
     for (const npc of NPCS) drawNpc(npc);
@@ -4269,6 +4729,7 @@
     drawCar(personalCar, true);
     drawPlayer();
     drawTrafficLights();
+    for (const train of trains) drawTrain(train);
     drawStreetLightsGlow();
     endWorldProjection();
 
