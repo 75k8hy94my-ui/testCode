@@ -629,9 +629,15 @@
   function roadCurveAmplitude(axis, roadIndex, segmentIndex) {
     const style = roadSegmentStyle(axis, roadIndex, segmentIndex);
     const seed = hash2(roadIndex, segmentIndex, axis === "h" ? 1891 : 1892);
-    // Main four-lane arterials stay geometrically straight so through traffic
-    // can flow smoothly; secondary/local streets carry the visible bends.
-    if (style === "arterial") return 0;
+
+    // Arterials bend only occasionally and with a much larger apparent radius.
+    // Local streets curve more often and more strongly.
+    if (style === "arterial") {
+      if (seed < .72) return 0;
+      const sign = hash2(segmentIndex, roadIndex, 1894) > .5 ? 1 : -1;
+      return sign * (10 + hash2(roadIndex, segmentIndex, 1895) * 14);
+    }
+
     if (seed < .36) return 0;
     const amount = style === "residential" ? 20 : style === "local" ? 34 : 26;
     return (seed > .68 ? 1 : -1) * (10 + hash2(segmentIndex, roadIndex, 1893) * amount);
