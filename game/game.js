@@ -2420,6 +2420,26 @@
             ctx.fillStyle = n % 2 ? "rgba(192,183,154,.12)" : "rgba(255,255,255,.055)";
             ctx.fillRect(x + 18 + n * 54, y + h - 42, 35, 26);
           }
+
+          // Short diagonal pedestrian cut-throughs break the rigid grid without
+          // becoming part of the car navigation graph.
+          if (hash2(gx, gy, 1440) > .48) {
+            ctx.strokeStyle = "#93958e";
+            ctx.lineWidth = 30;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            if ((gx + gy) % 2 === 0) {
+              ctx.moveTo(x + 34, y + h * .25);
+              ctx.lineTo(x + w - 34, y + h * .72);
+            } else {
+              ctx.moveTo(x + w - 34, y + h * .22);
+              ctx.lineTo(x + 34, y + h * .76);
+            }
+            ctx.stroke();
+            ctx.strokeStyle = "rgba(240,240,232,.18)";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
         }
       }
     }
@@ -2513,7 +2533,75 @@
       for (let gy = startY; gy <= endY; gy += 1) {
         const baseX = gx * ROAD_GAP;
         const baseY = gy * ROAD_GAP;
+        const style = cityBlockStyle(gx, gy);
         const seed = hash2(gx, gy, 810);
+
+        const center = worldToScreen(baseX + ROAD_GAP / 2, baseY + ROAD_GAP / 2);
+        if (style === "station") {
+          // Bicycle parking and bollards around the station plaza.
+          ctx.strokeStyle = "#59635f";
+          ctx.lineWidth = 1.5;
+          for (let n = -3; n <= 3; n += 1) {
+            const bx = center.x + n * 18;
+            const by = center.y + 132;
+            ctx.beginPath();
+            ctx.arc(bx - 4, by, 5, 0, Math.PI * 2);
+            ctx.arc(bx + 5, by, 5, 0, Math.PI * 2);
+            ctx.moveTo(bx - 4, by);
+            ctx.lineTo(bx + 1, by - 7);
+            ctx.lineTo(bx + 5, by);
+            ctx.stroke();
+          }
+          ctx.fillStyle = "#4f5b57";
+          for (let n = -3; n <= 3; n += 1) {
+            ctx.fillRect(center.x + n * 28 - 2, center.y - 132, 4, 15);
+          }
+        } else if (style === "arcade") {
+          // Dense projecting shop signs and alternating awnings.
+          for (let n = -2; n <= 2; n += 1) {
+            const sy = center.y + n * 52;
+            ctx.fillStyle = n % 2 ? "#a76055" : "#547b76";
+            ctx.fillRect(center.x - 92, sy - 11, 24, 15);
+            ctx.fillStyle = n % 2 ? "#6f8299" : "#b58b55";
+            ctx.fillRect(center.x + 68, sy - 7, 24, 15);
+            ctx.fillStyle = "rgba(239,226,195,.72)";
+            ctx.fillRect(center.x - 65, sy + 13, 130, 5);
+          }
+        } else if (style === "alley") {
+          // Lantern strings and standing signs make the narrow dining alleys read at night.
+          ctx.strokeStyle = "rgba(71,61,54,.75)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(center.x - 48, center.y - 92);
+          ctx.lineTo(center.x + 48, center.y - 92);
+          ctx.stroke();
+          for (let n = -2; n <= 2; n += 1) {
+            ctx.fillStyle = "#b85c4f";
+            ctx.beginPath();
+            ctx.arc(center.x + n * 21, center.y - 88 + Math.abs(n) * 2, 5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.fillStyle = "#433c36";
+          ctx.fillRect(center.x + 35, center.y + 54, 18, 27);
+          ctx.fillStyle = "#d7c49a";
+          ctx.fillRect(center.x + 38, center.y + 58, 12, 16);
+        } else if (style === "residential") {
+          // Hedges, low fences and utility clutter instead of commercial furniture.
+          ctx.fillStyle = "#607c5b";
+          ctx.fillRect(center.x - 126, center.y + 102, 72, 9);
+          ctx.fillRect(center.x + 54, center.y - 108, 68, 9);
+          ctx.strokeStyle = "#8d918a";
+          ctx.lineWidth = 2;
+          for (let n = 0; n < 5; n += 1) {
+            ctx.beginPath();
+            ctx.moveTo(center.x - 122 + n * 16, center.y + 88);
+            ctx.lineTo(center.x - 122 + n * 16, center.y + 106);
+            ctx.stroke();
+          }
+        } else if (style === "green") {
+          drawTree(baseX + ROAD_GAP * .36, baseY + ROAD_GAP * .38, 1.05);
+          drawTree(baseX + ROAD_GAP * .68, baseY + ROAD_GAP * .66, 1.1);
+        }
         if (seed > .18) {
           drawTree(baseX + ROAD_HALF + 35, baseY + 145, .82);
           drawTree(baseX + 145, baseY + ROAD_HALF + 35, .78);
