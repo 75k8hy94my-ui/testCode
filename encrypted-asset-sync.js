@@ -4,6 +4,7 @@
   const cryptoApi = typeof require === 'function' ? require('./encrypted-asset-crypto.js') : window.EncryptedAssetCrypto;
   const cacheApi = typeof require === 'function' ? require('./encrypted-asset-cache.js') : window.EncryptedAssetCache;
   const backendApi = typeof require === 'function' ? require('./encrypted-asset-backend.js') : window.EncryptedAssetBackend;
+  const remoteAccessApi = typeof require === 'function' ? require('./image-remote-access.js') : window.ImageRemoteAccess;
 
   function positiveRevision(value) {
     if (!Number.isInteger(value) || value < 1) throw new TypeError('targetRevision must be positive');
@@ -81,20 +82,35 @@
     objectIds.forEach(backendApi.objectId);
   }
 
-  async function verifyRemoteObjects({ storage, token, userId, assetId, revision, objectIds, pending, signal }) {
+  function objectKind(objectId) {
+    return objectId === 'preview' ? 'preview' : 'zoom';
+  }
+
+  async function verifyRemoteObjects({ storage, token, userId, assetId, revision, objectIds, pending, signal, transferStorage, now, mediaAccess }) {
     for (const objectId of objectIds) {
       const path = backendApi.buildStorageObjectPath(userId, assetId, revision, objectId);
-      const remote = await storage.download(path, token, signal);
+      const remote = await remoteAccessApi.runRemoteRead({
+        estimatedBytes: pending[objectId].byteLength,
+        kind: objectKind(objectId),
+        transferStorage,
+        storage: transferStorage,
+        now,
+        mediaAccess,
+        signal,
+      }, ({ signal: remoteSignal, recordObserved }) => storage.download(path, token, remoteSignal).then((bytes) => {
+        if (bytes) recordObserved(bytes.byteLength);
+        return bytes;
+      }));
       if (!remote || !equalBytes(remote, pending[objectId])) return false;
     }
     return true;
   }
 
-  async function uploadObjects({ storage, token, userId, assetId, revision, objectIds, pending, signal }) {
+  async function uploadObjects({ storage, token, userId, assetId, revision, objectIds, pending, signal, transferStorage, now, mediaAccess }) {
     for (const objectId of objectIds) {
       const path = backendApi.buildStorageObjectPath(userId, assetId, revision, objectId);
       const result = await storage.upload(path, token, pending[objectId], signal);
-      if (result.exists && !(await verifyRemoteObjects({ storage, token, userId, assetId, revision, objectIds: [objectId], pending, signal }))) {
+      if (result.exists && !(await verifyRemoteObjects({ storage, token, userId, assetId, revision, objectIds: [objectId], pending, signal, transferStorage, now, mediaAccess }))) {
         return { ok: false, reason: 'storage-object-mismatch' };
       }
     }
@@ -108,7 +124,7 @@
     }
   }
 
-  async function publishPendingRevision({ vault, storage, cache, assetId, targetRevision, objectIds, signal }) {
+  async function publishPendingRevision({ vault, storage, cache, assetId, targetRevision, objectIds, signal, transferStorage, now, mediaAccess }) {
     const target = positiveRevision(targetRevision);
     validateObjectIds(objectIds);
     const local = await localObjects(cache, assetId, target, objectIds, true);
@@ -120,7 +136,7 @@
     const pending = local.bytes;
     throwIfAborted(signal);
     if (recovery) {
-      const verified = await session(vault, (token, user) => verifyRemoteObjects({ storage, token, userId: user.id, assetId, revision: target, objectIds, pending, signal }));
+      const verified = await session(vault, (token, user) => verifyRemoteObjects({ storage, token, userId: user.id, assetId, revision: target, objectIds, pending, signal, transferStorage, now, mediaAccess }));
       if (verified) { await finalize(cache, assetId, target, objectIds); return { ok: true, resumed: true }; }
       return conflict(assetId, 'published-revision-mismatch', target, remote);
     }
@@ -134,7 +150,7 @@
       return conflict(assetId, 'revision-mismatch', target, remote);
     }
 
-    const uploaded = await session(vault, (token, user) => uploadObjects({ storage, token, userId: user.id, assetId, revision: target, objectIds, pending, signal }));
+    const uploaded = await session(vault, (token, user) => uploadObjects({ storage, token, userId: user.id, assetId, revision: target, objectIds, pending, signal, transferStorage, now, mediaAccess }));
     if (!uploaded.ok) return conflict(assetId, uploaded.reason, target, remote);
     throwIfAborted(signal);
     const published = target === 1 ? await backendApi.createRemoteAsset(vault, assetId) : await backendApi.publishRemoteAssetRevision(vault, assetId, target - 1);
@@ -142,7 +158,7 @@
       if (target === 1) {
         const raced = await backendApi.fetchRemoteAsset(vault, assetId);
         if (raced?.revision === 1 && !raced.deletedAt) {
-          const verified = await session(vault, (token, user) => verifyRemoteObjects({ storage, token, userId: user.id, assetId, revision: target, objectIds, pending, signal }));
+          const verified = await session(vault, (token, user) => verifyRemoteObjects({ storage, token, userId: user.id, assetId, revision: target, objectIds, pending, signal, transferStorage, now, mediaAccess }));
           if (verified) { await finalize(cache, assetId, target, objectIds); return { ok: true, resumed: true }; }
         }
         return conflict(assetId, 'create-conflict', target, raced || remote);
@@ -153,18 +169,27 @@
     return { ok: true, metadata: published };
   }
 
-  async function loadEncryptedObject({ vault, storage, cache, assetId, revision, objectId, signal }) {
+  async function loadEncryptedObject({ vault, storage, cache, assetId, revision, objectId, estimatedBytes, transferStorage, now, mediaAccess, signal }) {
     const hit = await cache.get(assetId, revision, objectId);
-    if (hit) return new Uint8Array(hit.encryptedBytes);
-    const remote = await backendApi.fetchRemoteAsset(vault, assetId);
-    if (!remote || remote.deletedAt || remote.revision !== revision) throw new Error('remote metadata does not match requested revision');
-    return session(vault, async (token, user) => {
-      const path = backendApi.buildStorageObjectPath(user.id, assetId, revision, objectId);
-      const encrypted = await storage.download(path, token, signal);
-      if (!encrypted) return null;
-      cryptoApi.validateEncryptedAsset(encrypted);
-      await cache.put({ assetId, revision, objectId, encryptedBytes: encrypted, retention: 'cache' });
-      return new Uint8Array(encrypted);
+    const ledgerStorage = transferStorage;
+    if (hit) {
+      const recorded = remoteAccessApi.recordCacheHit(hit.encryptedByteLength ?? hit.encryptedBytes.byteLength, { storage: ledgerStorage, now });
+      if (!recorded) throw new Error('image transfer ledger could not be saved');
+      return new Uint8Array(hit.encryptedBytes);
+    }
+    if (!Number.isInteger(estimatedBytes) || estimatedBytes < 1) throw new TypeError('estimatedBytes must be a positive integer');
+    return remoteAccessApi.runRemoteRead({ estimatedBytes, kind: objectKind(objectId), transferStorage: ledgerStorage, storage: ledgerStorage, now, mediaAccess, signal }, async ({ signal: remoteSignal, recordObserved }) => {
+      const remote = await backendApi.fetchRemoteAsset(vault, assetId);
+      if (!remote || remote.deletedAt || remote.revision !== revision) throw new Error('remote metadata does not match requested revision');
+      return session(vault, async (token, user) => {
+        const path = backendApi.buildStorageObjectPath(user.id, assetId, revision, objectId);
+        const encrypted = await storage.download(path, token, remoteSignal);
+        if (!encrypted) return null;
+        recordObserved(encrypted.byteLength);
+        cryptoApi.validateEncryptedAsset(encrypted);
+        await cache.put({ assetId, revision, objectId, encryptedBytes: encrypted, retention: 'cache' });
+        return new Uint8Array(encrypted);
+      });
     });
   }
 

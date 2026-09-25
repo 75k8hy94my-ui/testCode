@@ -25,6 +25,18 @@
   let diagnosticsUiInstalled = false;
   let diagnostics = freshDiagnostics();
 
+  function emitStatus() {
+    if (!root.document || typeof root.document.dispatchEvent !== 'function') return;
+    const EventCtor = root.CustomEvent || (root.document.defaultView && root.document.defaultView.CustomEvent);
+    if (typeof EventCtor === 'function') root.document.dispatchEvent(new EventCtor('manga-reader-vpn-status', { detail: { status } }));
+  }
+
+  function setStatus(nextStatus) {
+    if (status === nextStatus) return;
+    status = nextStatus;
+    emitStatus();
+  }
+
   function freshDiagnostics() {
     return {
       ip: '',
@@ -116,6 +128,10 @@
 
   function canLoadExternalMedia() {
     return status === 'allowed';
+  }
+
+  function getStatus() {
+    return status;
   }
 
   function mediaUrl(value, baseUrl) {
@@ -305,7 +321,7 @@
   }
 
   async function checkVpn() {
-    status = 'checking';
+    setStatus('checking');
     updateStatusButtons(status);
     diagnostics = freshDiagnostics();
     diagnostics.final = 'checking';
@@ -327,7 +343,7 @@
         diagnostics.protonExitMatch = await isKnownProtonExitIp(ip, signal);
         allowed = diagnostics.protonExitMatch;
       }
-      status = allowed ? 'allowed' : 'blocked';
+      setStatus(allowed ? 'allowed' : 'blocked');
       updateStatusButtons(status);
       if (status === 'allowed') diagnostics.error = null;
       diagnostics.final = status;
@@ -341,7 +357,7 @@
       }
       return status === 'allowed';
     } catch (error) {
-      status = 'blocked';
+      setStatus('blocked');
       updateStatusButtons(status);
       diagnostics.final = 'blocked';
       diagnostics.checkedAt = new Date().toISOString();
@@ -355,7 +371,7 @@
   }
 
   function setAllowedForTesting(allowed) {
-    status = allowed ? 'allowed' : 'blocked';
+    setStatus(allowed ? 'allowed' : 'blocked');
     updateStatusButtons(status);
     diagnostics.final = status;
     if (allowed) restoreBlockedElements();
@@ -379,5 +395,5 @@
     else if (root.setTimeout) root.setTimeout(checkVpn, 0);
   }
 
-  return { IP_URL, CHECK_URL, PROTON_EXIT_IPS_URL, PROTON_OWNED_IPV4_CIDRS, isVpnVerdict, isKnownProtonOwnedIp, isProtectedMediaUrl, canLoadExternalMedia, mediaUrl, checkVpn, getDiagnostics, setAllowedForTesting, installGuards, installDiagnosticsUi };
+  return { IP_URL, CHECK_URL, PROTON_EXIT_IPS_URL, PROTON_OWNED_IPV4_CIDRS, isVpnVerdict, isKnownProtonOwnedIp, isProtectedMediaUrl, canLoadExternalMedia, getStatus, mediaUrl, checkVpn, getDiagnostics, setAllowedForTesting, installGuards, installDiagnosticsUi };
 }));

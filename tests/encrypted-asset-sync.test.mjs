@@ -38,6 +38,12 @@ function makeStorage() {
     async download(path) { calls.push(['download', path]); return objects.has(path) ? new Uint8Array(objects.get(path)) : null; }
   };
 }
+function makeTransferStorage() {
+  const values = new Map();
+  return { getItem(key) { return values.has(key) ? values.get(key) : null; }, setItem(key, value) { values.set(key, String(value)); } };
+}
+const transferStorage = makeTransferStorage();
+const allowedMediaAccess = { getStatus: () => 'allowed', canLoadExternalMedia: () => true };
 
 test('stageProcessedRevision encrypts preview/tiles in deterministic order and stores pending', async () => {
   const cache = makeCache();
@@ -91,14 +97,14 @@ test('duplicate upload verifies exact bytes and rejects mismatches', async () =>
   const staged = await sync.stageProcessedRevision({ cache, masterKey: key, assetId, targetRevision: 1, processed: makeProcessed() });
   const storage = makeStorage();
   const vault = { async withSession(callback) { return callback('token', { id: userId }); }, async api(path) { return path.includes('/rpc/create_manga_reader_encrypted_asset') ? [{ asset_id: assetId, revision: 1, deleted_at: null, updated_at: 'now' }] : []; } };
-  const first = await sync.publishPendingRevision({ vault, storage, cache, assetId, targetRevision: 1, objectIds: staged.objectIds });
+  const first = await sync.publishPendingRevision({ vault, storage, cache, assetId, targetRevision: 1, objectIds: staged.objectIds, transferStorage, mediaAccess: allowedMediaAccess });
   assert.equal(first.ok, true);
   for (const record of cache.records.values()) record.retention = 'pending';
-  const retry = await sync.publishPendingRevision({ vault: makeVault({ asset_id: assetId, revision: 1, deleted_at: null, updated_at: 'now' }), storage, cache, assetId, targetRevision: 1, objectIds: staged.objectIds });
+  const retry = await sync.publishPendingRevision({ vault: makeVault({ asset_id: assetId, revision: 1, deleted_at: null, updated_at: 'now' }), storage, cache, assetId, targetRevision: 1, objectIds: staged.objectIds, transferStorage, mediaAccess: allowedMediaAccess });
   assert.equal(retry.ok, true);
   const firstPath = [...storage.objects.keys()][0]; storage.objects.set(firstPath, new Uint8Array([99]));
   for (const record of cache.records.values()) record.retention = 'pending';
-  const mismatch = await sync.publishPendingRevision({ vault: makeVault({ asset_id: assetId, revision: 1, deleted_at: null, updated_at: 'now' }), storage, cache, assetId, targetRevision: 1, objectIds: staged.objectIds });
+  const mismatch = await sync.publishPendingRevision({ vault: makeVault({ asset_id: assetId, revision: 1, deleted_at: null, updated_at: 'now' }), storage, cache, assetId, targetRevision: 1, objectIds: staged.objectIds, transferStorage, mediaAccess: allowedMediaAccess });
   assert.equal(mismatch.conflict.reason, 'published-revision-mismatch');
 });
 
@@ -111,10 +117,10 @@ test('partial finalize resumes with mixed pending and cache records after publis
   const originalSetRetention = cache.setRetention;
   let calls = 0;
   cache.setRetention = async (...args) => { calls += 1; if (calls === 2) throw new Error('simulated finalize failure'); return originalSetRetention(...args); };
-  await assert.rejects(sync.publishPendingRevision({ vault: makeVault(remote), storage, cache, assetId, targetRevision: 1, objectIds: staged.objectIds }));
+  await assert.rejects(sync.publishPendingRevision({ vault: makeVault(remote), storage, cache, assetId, targetRevision: 1, objectIds: staged.objectIds, transferStorage, mediaAccess: allowedMediaAccess }));
   assert.equal([...cache.records.values()].filter(record => record.retention === 'cache').length, 1);
   cache.setRetention = originalSetRetention;
-  const result = await sync.publishPendingRevision({ vault: makeVault(remote), storage, cache, assetId, targetRevision: 1, objectIds: staged.objectIds });
+  const result = await sync.publishPendingRevision({ vault: makeVault(remote), storage, cache, assetId, targetRevision: 1, objectIds: staged.objectIds, transferStorage, mediaAccess: allowedMediaAccess });
   assert.equal(result.ok, true);
   assert.ok([...cache.records.values()].every(record => record.retention === 'cache'));
 });
@@ -138,20 +144,63 @@ test('cache HIT avoids metadata/storage and cache MISS validates metadata before
   const encrypted = await assetCrypto.encryptAssetObject(key, assetId, 'preview', new Uint8Array([1, 2]));
   await cache.put({ assetId, revision: 1, objectId: 'preview', encryptedBytes: encrypted, retention: 'cache' });
   const storage = makeStorage(); const vault = makeVault({ asset_id: assetId, revision: 1, deleted_at: null, updated_at: 'now' });
-  assert.deepEqual(await sync.loadDecryptedObject({ vault, storage, cache, masterKey: key, assetId, revision: 1, objectId: 'preview' }), new Uint8Array([1, 2]));
+  assert.deepEqual(await sync.loadDecryptedObject({ vault, storage, cache, masterKey: key, assetId, revision: 1, objectId: 'preview', transferStorage }), new Uint8Array([1, 2]));
   assert.equal(vault.calls.length, 0);
   const missCache = makeCache(); const missStorage = makeStorage();
   missStorage.objects.set(`${userId}/${assetId}/1/preview.mrae`, encrypted);
-  assert.deepEqual(await sync.loadDecryptedObject({ vault: makeVault({ asset_id: assetId, revision: 1, deleted_at: null, updated_at: 'now' }), storage: missStorage, cache: missCache, masterKey: key, assetId, revision: 1, objectId: 'preview' }), new Uint8Array([1, 2]));
+  assert.deepEqual(await sync.loadDecryptedObject({ vault: makeVault({ asset_id: assetId, revision: 1, deleted_at: null, updated_at: 'now' }), storage: missStorage, cache: missCache, masterKey: key, assetId, revision: 1, objectId: 'preview', estimatedBytes: encrypted.byteLength, transferStorage, mediaAccess: allowedMediaAccess }), new Uint8Array([1, 2]));
 });
 
 test('remote revision mismatch or invalid binary blocks download/cache', async () => {
   const storage = makeStorage(); const cache = makeCache();
-  await assert.rejects(sync.loadEncryptedObject({ vault: makeVault({ asset_id: assetId, revision: 2, deleted_at: null, updated_at: 'now' }), storage, cache, assetId, revision: 1, objectId: 'preview' }));
+  await assert.rejects(sync.loadEncryptedObject({ vault: makeVault({ asset_id: assetId, revision: 2, deleted_at: null, updated_at: 'now' }), storage, cache, assetId, revision: 1, objectId: 'preview', estimatedBytes: 10, transferStorage: makeTransferStorage(), mediaAccess: allowedMediaAccess }));
   storage.objects.set(`${userId}/${assetId}/1/preview.mrae`, new Uint8Array([1, 2]));
-  await assert.rejects(sync.loadEncryptedObject({ vault: makeVault({ asset_id: assetId, revision: 1, deleted_at: null, updated_at: 'now' }), storage, cache, assetId, revision: 1, objectId: 'preview' }));
+  await assert.rejects(sync.loadEncryptedObject({ vault: makeVault({ asset_id: assetId, revision: 1, deleted_at: null, updated_at: 'now' }), storage, cache, assetId, revision: 1, objectId: 'preview', estimatedBytes: 10, transferStorage: makeTransferStorage(), mediaAccess: allowedMediaAccess }));
   assert.equal(cache.records.size, 0);
 });
+
+test('cache HIT bypasses VPN, metadata, storage, and budget while recording savings', async () => {
+  const cache = makeCache();
+  const encrypted = await assetCrypto.encryptAssetObject(key, assetId, 'preview', new Uint8Array([7]));
+  await cache.put({ assetId, revision: 1, objectId: 'preview', encryptedBytes: encrypted, encryptedByteLength: encrypted.byteLength, retention: 'cache' });
+  const transfer = makeTransferStorage();
+  let metadata = 0;
+  const result = await sync.loadEncryptedObject({ vault: { async api() { metadata += 1; return []; } }, storage: makeStorage(), cache, assetId, revision: 1, objectId: 'preview', transferStorage: transfer, mediaAccess: { getStatus: () => 'blocked', canLoadExternalMedia: () => false } });
+  assert.deepEqual(result, encrypted);
+  assert.equal(metadata, 0);
+  assert.equal(ledgerStats(transfer).cacheHits, 1);
+  assert.equal(ledgerStats(transfer).estimatedBytes, 0);
+});
+
+test('cache MISS is VPN-gated before metadata and storage, and VPN OFF permits remote read', async () => {
+  const cache = makeCache();
+  const encrypted = await assetCrypto.encryptAssetObject(key, assetId, 'preview', new Uint8Array([8]));
+  const storage = makeStorage();
+  storage.objects.set(`${userId}/${assetId}/1/preview.mrae`, encrypted);
+  const transfer = makeTransferStorage();
+  const calls = [];
+  const vault = { async api(path) { calls.push(path); return [{ asset_id: assetId, revision: 1, deleted_at: null, updated_at: 'now' }]; }, async withSession(callback) { return callback('token', { id: userId }); } };
+  await assert.rejects(sync.loadEncryptedObject({ vault, storage, cache, assetId, revision: 1, objectId: 'preview', estimatedBytes: encrypted.byteLength, transferStorage: transfer, mediaAccess: { getStatus: () => 'blocked', canLoadExternalMedia: () => false } }), error => error.name === 'ImageVpnRequiredError');
+  assert.equal(calls.length, 0); assert.equal(storage.calls.length, 0);
+  transfer.setItem('mangaReaderImageVpnRequired', 'false');
+  const result = await sync.loadEncryptedObject({ vault, storage, cache, assetId, revision: 1, objectId: 'preview', estimatedBytes: encrypted.byteLength, transferStorage: transfer, mediaAccess: { getStatus: () => 'blocked', canLoadExternalMedia: () => false } });
+  assert.deepEqual(result, encrypted);
+  assert.equal(calls.length, 1);
+  assert.equal(storage.calls.filter(call => call[0] === 'download').length, 1);
+});
+
+test('cache MISS requires a positive integer estimate before any remote request', async () => {
+  const calls = [];
+  const vault = { async api() { calls.push('metadata'); return []; } };
+  for (const estimatedBytes of [undefined, 0, -1, NaN, 1.5]) {
+    await assert.rejects(sync.loadEncryptedObject({ vault, storage: makeStorage(), cache: makeCache(), assetId, revision: 1, objectId: 'preview', estimatedBytes, transferStorage: makeTransferStorage(), mediaAccess: allowedMediaAccess }), error => error instanceof TypeError);
+  }
+  assert.equal(calls.length, 0);
+});
+
+function ledgerStats(storage) {
+  return JSON.parse(storage.getItem('mangaReaderImageTransferStats') || '{}');
+}
 
 test('tombstone wrapper delegates metadata only and module is classic', async () => {
   const vault = makeVault({ asset_id: assetId, revision: 2, deleted_at: 'deleted', updated_at: 'now' });
