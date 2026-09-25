@@ -81,6 +81,38 @@
   const TRAIN_DWELL_SECONDS = 4.5;
   const TRAIN_LENGTH = 212;
   const TRAIN_WIDTH = 31;
+
+  // Sparse Japanese-style street hierarchy. Arterials stay continuous while
+  // local streets exist only as selected runs, producing T-junctions and fewer
+  // intersections than the old full Manhattan grid.
+  const EW_ARTERIALS = new Set([2, 5, 8, 12, 16]);
+  const NS_ARTERIALS = new Set([2, 6, 10, 14, 17]);
+  const LOCAL_H_RUNS = new Map([
+    [3, [[2,6],[10,14]]],
+    [4, [[6,10]]],
+    [6, [[2,6],[10,14]]],
+    [7, [[5,11]]],
+    [9, [[6,10]]],
+    [10, [[2,6],[10,14]]],
+    [11, [[6,10]]],
+    [13, [[10,17]]],
+    [14, [[2,6]]],
+    [15, [[6,10],[14,17]]]
+  ]);
+  const LOCAL_V_RUNS = new Map([
+    [3, [[2,5],[8,12]]],
+    [4, [[5,8]]],
+    [5, [[2,8]]],
+    [7, [[5,12]]],
+    [8, [[5,9]]],
+    [9, [[5,12]]],
+    [11, [[8,16]]],
+    [12, [[2,8]]],
+    [13, [[12,16]]],
+    [15, [[8,16]]],
+    [16, [[12,16]]]
+  ]);
+
   const WORLD_TILT_Y = 0.94;
   const WORLD_TILT_X = 1.025;
   const BUILDING_DEPTH_X = 0.18;
@@ -535,13 +567,150 @@
     return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
   }
 
+  function segmentInRuns(runs, segmentIndex) {
+    if (!runs) return false;
+    return runs.some(([start, end]) => segmentIndex >= start && segmentIndex < end);
+  }
+
+  function roadEdgeExists(gx, gy, ngx, ngy) {
+    const dx = ngx - gx;
+    const dy = ngy - gy;
+    if (Math.abs(dx) + Math.abs(dy) !== 1) return false;
+    if (gx < 1 || gy < 1 || ngx < 1 || ngy < 1 || gx > 17 || gy > 17 || ngx > 17 || ngy > 17) return false;
+
+    if (dy === 0) {
+      const roadIndex = gy;
+      const segmentIndex = Math.min(gx, ngx);
+      if (EW_ARTERIALS.has(roadIndex)) return true;
+      return segmentInRuns(LOCAL_H_RUNS.get(roadIndex), segmentIndex);
+    }
+
+    const roadIndex = gx;
+    const segmentIndex = Math.min(gy, ngy);
+    if (NS_ARTERIALS.has(roadIndex)) return true;
+    return segmentInRuns(LOCAL_V_RUNS.get(roadIndex), segmentIndex);
+  }
+
+  function roadNeighbors(gx, gy) {
+    const out = [];
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const ngx = gx + dx;
+      const ngy = gy + dy;
+      if (roadEdgeExists(gx, gy, ngx, ngy)) out.push({ gx:ngx, gy:ngy, dx, dy });
+    }
+    return out;
+  }
+
+  function intersectionDegree(gx, gy) {
+    return roadNeighbors(gx, gy).length;
+  }
+
+  function isSignalizedIntersection(gx, gy) {
+    const degree = intersectionDegree(gx, gy);
+    if (degree < 3) return false;
+    const onEW = EW_ARTERIALS.has(gy);
+    const onNS = NS_ARTERIALS.has(gx);
+    return (onEW && onNS) || (degree >= 3 && (onEW || onNS) && hash2(gx, gy, 1880) > .28);
+  }
+
+  function roadSegmentStyle(axis, roadIndex, segmentIndex) {
+    if (axis === "h" && EW_ARTERIALS.has(roadIndex)) return "arterial";
+    if (axis === "v" && NS_ARTERIALS.has(roadIndex)) return "arterial";
+
+    const styles = axis === "v"
+      ? [cityBlockStyle(roadIndex - 1, segmentIndex), cityBlockStyle(roadIndex, segmentIndex)]
+      : [cityBlockStyle(segmentIndex, roadIndex - 1), cityBlockStyle(segmentIndex, roadIndex)];
+
+    if (styles.includes("station")) return "station";
+    if (styles.includes("arcade") || styles.includes("alley") || styles.includes("mixed-core")) return "commercial";
+    if (styles.includes("green")) return "park";
+    if (styles.includes("residential")) return "residential";
+    return "local";
+  }
+
+  function roadWidthForStyle(style) {
+    if (style === "arterial") return 216;
+    if (style === "station") return 188;
+    if (style === "commercial") return 158;
+    if (style === "park") return 148;
+    if (style === "residential") return 108;
+    return 136;
+  }
+
+  function roadCurveAmplitude(axis, roadIndex, segmentIndex) {
+    const style = roadSegmentStyle(axis, roadIndex, segmentIndex);
+    const seed = hash2(roadIndex, segmentIndex, axis === "h" ? 1891 : 1892);
+    if (style === "arterial") {
+      if (seed < .7) return 0;
+      return (seed > .85 ? 1 : -1) * (14 + seed * 10);
+    }
+    if (seed < .36) return 0;
+    const amount = style === "residential" ? 20 : style === "local" ? 34 : 26;
+    return (seed > .68 ? 1 : -1) * (10 + hash2(segmentIndex, roadIndex, 1893) * amount);
+  }
+
+  function roadEdgePoint(axis, roadIndex, segmentIndex, t) {
+    const amplitude = roadCurveAmplitude(axis, roadIndex, segmentIndex);
+    const curve = Math.sin(Math.PI * clamp(t, 0, 1)) * amplitude;
+    if (axis === "h") {
+      return {
+        x: (segmentIndex + t) * ROAD_GAP,
+        y: roadIndex * ROAD_GAP + curve
+      };
+    }
+    return {
+      x: roadIndex * ROAD_GAP + curve,
+      y: (segmentIndex + t) * ROAD_GAP
+    };
+  }
+
+  function sampleRoadEdge(axis, roadIndex, segmentIndex, steps = 12) {
+    const points = [];
+    for (let i = 0; i <= steps; i += 1) points.push(roadEdgePoint(axis, roadIndex, segmentIndex, i / steps));
+    return points;
+  }
+
+  function pointSegmentDistance(px, py, ax, ay, bx, by) {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const length2 = dx * dx + dy * dy;
+    if (length2 < .001) return distance(px, py, ax, ay);
+    const t = clamp(((px - ax) * dx + (py - ay) * dy) / length2, 0, 1);
+    return distance(px, py, ax + dx * t, ay + dy * t);
+  }
+
+  function roadDistanceToEdge(x, y, axis, roadIndex, segmentIndex) {
+    const points = sampleRoadEdge(axis, roadIndex, segmentIndex, 8);
+    let best = Infinity;
+    for (let i = 1; i < points.length; i += 1) {
+      best = Math.min(best, pointSegmentDistance(x, y, points[i - 1].x, points[i - 1].y, points[i].x, points[i].y));
+    }
+    return best;
+  }
+
   function roadDistance(value) {
     const mod = ((value % ROAD_GAP) + ROAD_GAP) % ROAD_GAP;
     return Math.min(mod, ROAD_GAP - mod);
   }
 
   function isRoad(x, y) {
-    return roadDistance(x) <= ROAD_HALF || roadDistance(y) <= ROAD_HALF;
+    const gx = Math.floor(x / ROAD_GAP);
+    const gy = Math.floor(y / ROAD_GAP);
+    let best = Infinity;
+
+    for (let ix = gx - 1; ix <= gx + 1; ix += 1) {
+      for (let iy = gy - 1; iy <= gy + 1; iy += 1) {
+        if (roadEdgeExists(ix, iy, ix + 1, iy)) {
+          const style = roadSegmentStyle("h", iy, ix);
+          best = Math.min(best, roadDistanceToEdge(x, y, "h", iy, ix) - roadWidthForStyle(style) / 2);
+        }
+        if (roadEdgeExists(ix, iy, ix, iy + 1)) {
+          const style = roadSegmentStyle("v", ix, iy);
+          best = Math.min(best, roadDistanceToEdge(x, y, "v", ix, iy) - roadWidthForStyle(style) / 2);
+        }
+      }
+    }
+    return best <= 0;
   }
 
   function inWorld(x, y, radius = 0) {
@@ -753,20 +922,27 @@
 
   function randomRoadPoint(seedA, seedB, offset = 0) {
     const horizontal = hash2(seedA, seedB, 5) > 0.5;
-    const roadIndex = 1 + Math.floor(hash2(seedA, seedB, 8) * 16);
-    const along = COAST + 240 + hash2(seedA, seedB, 13) * (WORLD_SIZE - COAST * 2 - 480);
     const forward = hash2(seedA, seedB, 19) > 0.5;
+    const along = COAST + 240 + hash2(seedA, seedB, 13) * (WORLD_SIZE - COAST * 2 - 480);
+    const arterialList = horizontal ? [...EW_ARTERIALS] : [...NS_ARTERIALS];
+    const roadIndex = arterialList[Math.floor(hash2(seedA, seedB, 8) * arterialList.length) % arterialList.length];
+    const extraLane = hash2(seedA, seedB, 23) > .52 ? 28 : 0;
 
     if (horizontal) {
       const angle = forward ? 0 : Math.PI;
-      const lane = forward ? -(LANE_OFFSET + offset * 0.15) : (LANE_OFFSET + offset * 0.15);
-      return { x: along, y: roadIndex * ROAD_GAP + lane, angle };
+      const lane = forward
+        ? -(LANE_OFFSET + extraLane + offset * 0.08)
+        : (LANE_OFFSET + extraLane + offset * 0.08);
+      return { x: along, y: roadIndex * ROAD_GAP + lane, angle, roadIndex, orientation:"h" };
     }
 
     const angle = forward ? Math.PI / 2 : -Math.PI / 2;
-    const lane = forward ? (LANE_OFFSET + offset * 0.15) : -(LANE_OFFSET + offset * 0.15);
-    return { x: roadIndex * ROAD_GAP + lane, y: along, angle };
+    const lane = forward
+      ? (LANE_OFFSET + extraLane + offset * 0.08)
+      : -(LANE_OFFSET + extraLane + offset * 0.08);
+    return { x: roadIndex * ROAD_GAP + lane, y: along, angle, roadIndex, orientation:"v" };
   }
+
 
   function generateTraffic() {
     const colors = ["#d5d8da", "#6689ad", "#b26f67", "#c6a35a", "#59635f", "#89769e", "#579079"];
@@ -1050,6 +1226,7 @@
         const ngx = current.gx + move.x;
         const ngy = current.gy + move.y;
         if (ngx < 1 || ngy < 1 || ngx > 17 || ngy > 17) continue;
+        if (!roadEdgeExists(current.gx, current.gy, ngx, ngy)) continue;
 
         const reverse = (nextDir + 2) % 4 === current.dir;
         const turn = nextDir !== current.dir;
@@ -1267,11 +1444,34 @@
     return { dx, dy, orientation: Math.abs(dx) >= Math.abs(dy) ? "h" : "v" };
   }
 
+  function nearestRoadSegmentInfo(x, y, searchRadius = 2) {
+    const gx = Math.floor(x / ROAD_GAP);
+    const gy = Math.floor(y / ROAD_GAP);
+    let best = null;
+
+    for (let ix = gx - searchRadius; ix <= gx + searchRadius; ix += 1) {
+      for (let iy = gy - searchRadius; iy <= gy + searchRadius; iy += 1) {
+        if (roadEdgeExists(ix, iy, ix + 1, iy)) {
+          const d = roadDistanceToEdge(x, y, "h", iy, ix);
+          if (!best || d < best.distance) best = { axis:"h", roadIndex:iy, segmentIndex:ix, distance:d };
+        }
+        if (roadEdgeExists(ix, iy, ix, iy + 1)) {
+          const d = roadDistanceToEdge(x, y, "v", ix, iy);
+          if (!best || d < best.distance) best = { axis:"v", roadIndex:ix, segmentIndex:iy, distance:d };
+        }
+      }
+    }
+    return best;
+  }
+
   function speedLimitAt(x, y) {
-    if (distance(x, y, HOME.x, HOME.y) < 1350) return 40;
-    const xi = Math.abs(Math.round(x / ROAD_GAP));
-    const yi = Math.abs(Math.round(y / ROAD_GAP));
-    if (xi % 5 === 0 || yi % 5 === 0) return 60;
+    const info = nearestRoadSegmentInfo(x, y, 2);
+    if (!info) return 40;
+    const style = roadSegmentStyle(info.axis, info.roadIndex, info.segmentIndex);
+    if (style === "arterial") return 60;
+    if (style === "station" || style === "commercial") return 40;
+    if (style === "residential") return 30;
+    if (style === "park") return 40;
     return 50;
   }
 
@@ -2547,19 +2747,6 @@
       ctx.fillText(String(limit), sx - LANE_OFFSET, sy + arrowDistance + 54);
       ctx.restore();
     }
-  }
-
-  function roadSegmentStyle(axis, roadIndex, segmentIndex) {
-    const styles = axis === "v"
-      ? [cityBlockStyle(roadIndex - 1, segmentIndex), cityBlockStyle(roadIndex, segmentIndex)]
-      : [cityBlockStyle(segmentIndex, roadIndex - 1), cityBlockStyle(segmentIndex, roadIndex)];
-
-    if (styles.includes("station")) return "station";
-    if (styles.includes("arcade") || styles.includes("alley") || styles.includes("mixed-core")) return "commercial";
-    if (styles.includes("green")) return "park";
-    if (styles.includes("residential")) return "residential";
-    if (Math.abs(roadIndex) % 5 === 0) return "arterial";
-    return "local";
   }
 
   function drawParkingCarTop(x, y, horizontal, seed) {
