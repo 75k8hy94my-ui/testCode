@@ -119,6 +119,42 @@
     });
   }
 
+  async function runRemoteRead(options = {}, operation) {
+    if (typeof operation !== 'function') throw new TypeError('remote image operation must be a function');
+    const Controller = root.AbortController;
+    const controller = options.abortController || (typeof Controller === 'function' ? new Controller() : null);
+    const ticket = acquire({ ...options, abortController: controller });
+    try {
+      return await operation({
+        signal: controller ? controller.signal : undefined,
+        networkMode: ticket.networkMode,
+        estimatedBytes: ticket.estimatedBytes,
+        recordObserved: ticket.recordObserved,
+      });
+    } finally {
+      ticket.release();
+    }
+  }
+
+  async function fetchBlob(url, fetchInit = {}, options = {}) {
+    const fetchImpl = options.fetch || root.fetch;
+    if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable');
+    return runRemoteRead(options, async (context) => {
+      const init = { ...fetchInit };
+      if (context.signal) init.signal = context.signal;
+      const response = await fetchImpl(url, init);
+      if (!response || response.ok !== true) {
+        const error = new Error('Remote image request failed');
+        error.name = 'ImageRemoteFetchError';
+        error.status = Number(response && response.status) || 0;
+        throw error;
+      }
+      const blob = await response.blob();
+      context.recordObserved(blob && typeof blob.size === 'number' ? blob.size : 0);
+      return { response, blob, networkMode: context.networkMode };
+    });
+  }
+
   function recordCacheHit(bytes, options = {}) {
     return ledgerApi.recordCacheHit(bytes, { storage: options.storage, now: options.now || new Date() });
   }
@@ -140,6 +176,8 @@
   return Object.freeze({
     evaluate,
     acquire,
+    runRemoteRead,
+    fetchBlob,
     recordCacheHit,
     recordPartialSavings,
     abortActiveRemoteReads,
