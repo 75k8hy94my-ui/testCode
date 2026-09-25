@@ -3239,7 +3239,7 @@
     }
   }
 
-  function drawRailInfrastructure() {
+  function drawRailUnderstructure() {
     const left = RAIL_MIN_X - state.camera.x;
     const right = RAIL_MAX_X - state.camera.x;
     const y = RAIL_Y - state.camera.y;
@@ -3247,20 +3247,12 @@
 
     const length = RAIL_MAX_X - RAIL_MIN_X;
 
-    // Elevated structure shadow and concrete deck.
+    // Ground shadow belongs below pedestrians and cars.
     ctx.fillStyle = "rgba(18,22,22,.18)";
     roundedRectPath(ctx, left + 7, y - 48 + 13, length, 96, 8);
     ctx.fill();
 
-    ctx.fillStyle = "#777d7a";
-    roundedRectPath(ctx, left, y - 48, length, 96, 8);
-    ctx.fill();
-
-    ctx.fillStyle = "#8a908c";
-    ctx.fillRect(left, y - 43, length, 7);
-    ctx.fillRect(left, y + 36, length, 7);
-
-    // Viaduct piers.
+    // Viaduct piers rise from street level and remain behind ground actors.
     ctx.fillStyle = "#626967";
     const firstPier = Math.floor(RAIL_MIN_X / 240) * 240;
     for (let wx = firstPier; wx <= RAIL_MAX_X; wx += 240) {
@@ -3271,6 +3263,25 @@
       ctx.fillRect(sx - 6, y + 40, 3, 31);
       ctx.fillStyle = "#626967";
     }
+  }
+
+  function drawRailDeck() {
+    const left = RAIL_MIN_X - state.camera.x;
+    const right = RAIL_MAX_X - state.camera.x;
+    const y = RAIL_Y - state.camera.y;
+    if (right < -180 || left > viewWidth + 180 || y < -220 || y > viewHeight + 220) return;
+
+    const length = RAIL_MAX_X - RAIL_MIN_X;
+
+    // The elevated deck is deliberately drawn after ground actors. Anyone
+    // walking or driving below the viaduct is therefore occluded by it.
+    ctx.fillStyle = "#777d7a";
+    roundedRectPath(ctx, left, y - 48, length, 96, 8);
+    ctx.fill();
+
+    ctx.fillStyle = "#8a908c";
+    ctx.fillRect(left, y - 43, length, 7);
+    ctx.fillRect(left, y + 36, length, 7);
 
     // Sleepers and rails for both tracks.
     for (const offset of [-RAIL_TRACK_GAP, RAIL_TRACK_GAP]) {
@@ -3309,33 +3320,29 @@
       const sx = station.x - state.camera.x;
       if (sx < -260 || sx > viewWidth + 260) continue;
 
-      // Two side platforms.
+      // Elevated side platforms.
       ctx.fillStyle = "#c2c0b8";
       roundedRectPath(ctx, sx - 132, y - 63, 264, 17, 4);
       ctx.fill();
       roundedRectPath(ctx, sx - 132, y + 46, 264, 17, 4);
       ctx.fill();
 
-      // Yellow tactile strip.
       ctx.fillStyle = "#d5b73d";
       ctx.fillRect(sx - 124, y - 53, 248, 3);
       ctx.fillRect(sx - 124, y + 50, 248, 3);
 
-      // Canopies.
       ctx.fillStyle = "rgba(82,94,91,.88)";
       roundedRectPath(ctx, sx - 88, y - 78, 176, 17, 5);
       ctx.fill();
       roundedRectPath(ctx, sx - 88, y + 62, 176, 17, 5);
       ctx.fill();
 
-      // Platform supports.
       ctx.fillStyle = "#565f5c";
       for (const px of [-72, -24, 24, 72]) {
         ctx.fillRect(sx + px - 2, y - 61, 4, 15);
         ctx.fillRect(sx + px - 2, y + 46, 4, 15);
       }
 
-      // Station name boards.
       ctx.fillStyle = "#eef0ec";
       roundedRectPath(ctx, sx - 48, y - 87, 96, 16, 3);
       ctx.fill();
@@ -3344,7 +3351,8 @@
       ctx.textAlign = "center";
       ctx.fillText(station.name, sx, y - 76);
 
-      // Stair/access marker toward street level.
+      // Station stairs stay attached to the elevated platform and may occlude
+      // ground actors where the staircase physically passes in front of them.
       const access = worldToScreen(station.accessX, station.accessY);
       ctx.fillStyle = "#8b8f88";
       ctx.beginPath();
@@ -3374,6 +3382,7 @@
       ctx.fillText("若葉線 入口", access.x, access.y + 19);
     }
   }
+
 
   function drawTrain(train) {
     const p = worldToScreen(train.x, train.y);
@@ -4721,7 +4730,7 @@
     drawStreetProps();
     drawBuildings();
     for (const place of PLACES) drawPlace(place);
-    drawRailInfrastructure();
+    drawRailUnderstructure();
     drawCityLandmarks();
     drawPedestrians();
     for (const npc of NPCS) drawNpc(npc);
@@ -4729,6 +4738,7 @@
     drawCar(personalCar, true);
     drawPlayer();
     drawTrafficLights();
+    drawRailDeck();
     for (const train of trains) drawTrain(train);
     drawStreetLightsGlow();
     endWorldProjection();
