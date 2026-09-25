@@ -346,15 +346,18 @@
     }
   }
 
-  function appendQuadratic(points, p0, control, p1) {
-    const estimate = distance(p0.x, p0.y, control.x, control.y) + distance(control.x, control.y, p1.x, p1.y);
-    const count = Math.max(5, Math.ceil(estimate / ROUTE_SAMPLE_STEP));
+  function appendCubic(points, p0, c1, c2, p1) {
+    const estimate =
+      distance(p0.x, p0.y, c1.x, c1.y) +
+      distance(c1.x, c1.y, c2.x, c2.y) +
+      distance(c2.x, c2.y, p1.x, p1.y);
+    const count = Math.max(7, Math.ceil(estimate / ROUTE_SAMPLE_STEP));
     for (let i = 1; i <= count; i += 1) {
       const t = i / count;
       const u = 1 - t;
       points.push({
-        x: u * u * p0.x + 2 * u * t * control.x + t * t * p1.x,
-        y: u * u * p0.y + 2 * u * t * control.y + t * t * p1.y
+        x: u * u * u * p0.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * p1.x,
+        y: u * u * u * p0.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * p1.y
       });
     }
   }
@@ -490,13 +493,18 @@
         x: segmentEnd.x + nextDirection.x * radius + nextNormal.x * LANE_OFFSET,
         y: segmentEnd.y + nextDirection.y * radius + nextNormal.y * LANE_OFFSET
       };
-      const control = {
-        x: segmentEnd.x + currentNormal.x * LANE_OFFSET + nextNormal.x * LANE_OFFSET,
-        y: segmentEnd.y + currentNormal.y * LANE_OFFSET + nextNormal.y * LANE_OFFSET
+      const tangent = radius * 0.62;
+      const control1 = {
+        x: approach.x + direction.x * tangent,
+        y: approach.y + direction.y * tangent
+      };
+      const control2 = {
+        x: departure.x - nextDirection.x * tangent,
+        y: departure.y - nextDirection.y * tangent
       };
 
       appendLine(points, cursor, approach);
-      appendQuadratic(points, approach, control, departure);
+      appendCubic(points, approach, control1, control2, departure);
       cursor = departure;
     }
 
