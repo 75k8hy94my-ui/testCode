@@ -13,6 +13,7 @@ const standalone = [
   'index-search-worker-client.js', 'legal-index-schema.js', 'legal-index-search.js', 'legal-index-search-worker.js', 'roppo-data.js', 'shelf-search.js',
   'image-compression-profile.js', 'image-pyramid-builder.js', 'image-photo-processor.js', 'image-processing-worker.js',
   'encrypted-asset-crypto.js',
+  'encrypted-asset-cache.js',
   'status-message.js', 'study-data.js', 'study-arguments.js', 'study-sync.js', 'study-quiz.js', 'study-audio.js', 'study-ai.js',
   'study-offline.js', 'supabase-config.js', 'url-parser.js', 'vault-payload.js', 'vault-session.js', 'video-thumbnail-time.js'
 ];
