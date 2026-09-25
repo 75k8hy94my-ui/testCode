@@ -1351,7 +1351,7 @@
     }
 
     const signal = upcomingSignal();
-    if (signal && signal.state === "red" && signal.distance < 72 && personalCar.speed > 18 && !state.drive.violationKeys.has(signal.key)) {
+    if (signal && signal.state === "red" && signal.distance < 138 && personalCar.speed > 18 && !state.drive.violationKeys.has(signal.key)) {
       state.drive.violationKeys.add(signal.key);
       penalizeDriving(18, "赤信号を通過しました");
     }
@@ -1429,8 +1429,8 @@
       const signal = signalStateAt(nextX, nextY, orientation);
       const roadLimit = speedLimitAt(car.x, car.y) / SPEED_TO_KMH;
       let targetSpeed = Math.min(car.cruise, roadLimit * 0.92);
-      if ((signal === "red" || signal === "yellow") && intersectionDistance < 95) {
-        targetSpeed = Math.max(0, (intersectionDistance - 30) * 2.4);
+      if ((signal === "red" || signal === "yellow") && intersectionDistance < 190) {
+        targetSpeed = Math.max(0, (intersectionDistance - 150) * 2.6);
       }
 
       const hx = Math.cos(car.angle);
@@ -1631,6 +1631,177 @@
     ctx.stroke();
   }
 
+  function drawRoadCenterSegmentVertical(worldX, worldY1, worldY2, major) {
+    const sx = worldX - state.camera.x;
+    const sy1 = worldY1 - state.camera.y;
+    const sy2 = worldY2 - state.camera.y;
+    ctx.strokeStyle = major ? "rgba(226,164,46,.9)" : "rgba(238,240,236,.72)";
+    ctx.lineWidth = major ? 3.2 : 2.2;
+    if (major) {
+      ctx.beginPath();
+      ctx.moveTo(sx, sy1);
+      ctx.lineTo(sx, sy2);
+      ctx.stroke();
+      return;
+    }
+    const dash = 22;
+    const gap = 18;
+    const period = dash + gap;
+    let wy = Math.floor(worldY1 / period) * period;
+    ctx.beginPath();
+    for (; wy <= worldY2; wy += period) {
+      const fromY = Math.max(wy, worldY1) - state.camera.y;
+      const toY = Math.min(wy + dash, worldY2) - state.camera.y;
+      if (toY <= fromY) continue;
+      ctx.moveTo(sx, fromY);
+      ctx.lineTo(sx, toY);
+    }
+    ctx.stroke();
+  }
+
+  function drawRoadCenterSegmentHorizontal(worldY, worldX1, worldX2, major) {
+    const sy = worldY - state.camera.y;
+    const sx1 = worldX1 - state.camera.x;
+    const sx2 = worldX2 - state.camera.x;
+    ctx.strokeStyle = major ? "rgba(226,164,46,.9)" : "rgba(238,240,236,.72)";
+    ctx.lineWidth = major ? 3.2 : 2.2;
+    if (major) {
+      ctx.beginPath();
+      ctx.moveTo(sx1, sy);
+      ctx.lineTo(sx2, sy);
+      ctx.stroke();
+      return;
+    }
+    const dash = 22;
+    const gap = 18;
+    const period = dash + gap;
+    let wx = Math.floor(worldX1 / period) * period;
+    ctx.beginPath();
+    for (; wx <= worldX2; wx += period) {
+      const fromX = Math.max(wx, worldX1) - state.camera.x;
+      const toX = Math.min(wx + dash, worldX2) - state.camera.x;
+      if (toX <= fromX) continue;
+      ctx.moveTo(fromX, sy);
+      ctx.lineTo(toX, sy);
+    }
+    ctx.stroke();
+  }
+
+  function drawRoadArrow(screenX, screenY, angle) {
+    ctx.save();
+    ctx.translate(screenX, screenY);
+    ctx.rotate(angle);
+    ctx.fillStyle = "rgba(244,245,240,.76)";
+    ctx.beginPath();
+    ctx.moveTo(23, 0);
+    ctx.lineTo(7, -8);
+    ctx.lineTo(7, -3);
+    ctx.lineTo(-18, -3);
+    ctx.lineTo(-18, 3);
+    ctx.lineTo(7, 3);
+    ctx.lineTo(7, 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawTactilePad(x, y, vertical = false) {
+    ctx.fillStyle = "#d8b736";
+    ctx.fillRect(x - (vertical ? 6 : 11), y - (vertical ? 11 : 6), vertical ? 12 : 22, vertical ? 22 : 12);
+    ctx.fillStyle = "rgba(103,83,22,.28)";
+    for (let ix = -1; ix <= 1; ix += 1) {
+      for (let iy = -1; iy <= 1; iy += 1) {
+        ctx.beginPath();
+        ctx.arc(x + ix * 6, y + iy * 4, 1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  function drawGuardPipe(x1, y1, x2, y2) {
+    ctx.strokeStyle = "#eceee9";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    const vertical = Math.abs(y2 - y1) > Math.abs(x2 - x1);
+    for (let t = .15; t < 1; t += .34) {
+      const x = x1 + (x2 - x1) * t;
+      const y = y1 + (y2 - y1) * t;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + (vertical ? 7 : 0), y + (vertical ? 0 : 7));
+      ctx.stroke();
+    }
+  }
+
+  function drawJapaneseIntersectionMarkings(sx, sy, wx, wy) {
+    const crossingOffset = ROAD_HALF + 24;
+    const crossingSpan = ROAD_WIDTH - 36;
+    const crossingDepth = 34;
+    const stripe = 5;
+    const stripeGap = 6;
+    const halfSpan = crossingSpan / 2;
+
+    ctx.fillStyle = "rgba(244,245,240,.88)";
+
+    // North/south crosswalks: bars run across the vertical roadway.
+    for (let d = -crossingDepth / 2; d <= crossingDepth / 2; d += stripe + stripeGap) {
+      ctx.fillRect(sx - halfSpan, sy - crossingOffset + d, crossingSpan, stripe);
+      ctx.fillRect(sx - halfSpan, sy + crossingOffset + d, crossingSpan, stripe);
+    }
+
+    // East/west crosswalks.
+    for (let d = -crossingDepth / 2; d <= crossingDepth / 2; d += stripe + stripeGap) {
+      ctx.fillRect(sx - crossingOffset + d, sy - halfSpan, stripe, crossingSpan);
+      ctx.fillRect(sx + crossingOffset + d, sy - halfSpan, stripe, crossingSpan);
+    }
+
+    // Stop lines are only across the approaching left-hand lane.
+    const stop = crossingOffset + crossingDepth / 2 + 12;
+    ctx.fillStyle = "rgba(247,247,243,.94)";
+    ctx.fillRect(sx + 5, sy - stop - 2.5, ROAD_HALF - 14, 5);
+    ctx.fillRect(sx - ROAD_HALF + 9, sy + stop - 2.5, ROAD_HALF - 14, 5);
+    ctx.fillRect(sx - stop - 2.5, sy - ROAD_HALF + 9, 5, ROAD_HALF - 14);
+    ctx.fillRect(sx + stop - 2.5, sy + 5, 5, ROAD_HALF - 14);
+
+    // Direction arrows before the stop line, aligned to left-hand traffic lanes.
+    const arrowDistance = stop + 58;
+    drawRoadArrow(sx + LANE_OFFSET, sy - arrowDistance, Math.PI / 2);
+    drawRoadArrow(sx - LANE_OFFSET, sy + arrowDistance, -Math.PI / 2);
+    drawRoadArrow(sx - arrowDistance, sy - LANE_OFFSET, 0);
+    drawRoadArrow(sx + arrowDistance, sy + LANE_OFFSET, Math.PI);
+
+    // Yellow tactile paving at curb ramps.
+    const curb = ROAD_HALF + 14;
+    drawTactilePad(sx - curb, sy - crossingOffset, false);
+    drawTactilePad(sx + curb, sy - crossingOffset, false);
+    drawTactilePad(sx - curb, sy + crossingOffset, false);
+    drawTactilePad(sx + curb, sy + crossingOffset, false);
+    drawTactilePad(sx - crossingOffset, sy - curb, true);
+    drawTactilePad(sx - crossingOffset, sy + curb, true);
+    drawTactilePad(sx + crossingOffset, sy - curb, true);
+    drawTactilePad(sx + crossingOffset, sy + curb, true);
+
+    // Short white guard pipes on the sidewalk corners.
+    drawGuardPipe(sx - curb - 20, sy - curb - 44, sx - curb - 20, sy - curb - 10);
+    drawGuardPipe(sx + curb + 20, sy + curb + 10, sx + curb + 20, sy + curb + 44);
+    drawGuardPipe(sx - curb - 44, sy + curb + 20, sx - curb - 10, sy + curb + 20);
+    drawGuardPipe(sx + curb + 10, sy - curb - 20, sx + curb + 44, sy - curb - 20);
+
+    // Occasional pavement speed marking on major roads.
+    const limit = speedLimitAt(wx, wy);
+    if (limit >= 50 && hash2(Math.round(wx / ROAD_GAP), Math.round(wy / ROAD_GAP), 1251) > .54) {
+      ctx.save();
+      ctx.fillStyle = "rgba(242,243,239,.5)";
+      ctx.font = "700 16px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(String(limit), sx - LANE_OFFSET, sy + arrowDistance + 54);
+      ctx.restore();
+    }
+  }
+
   function drawGround() {
     const time = visualTime();
     ctx.fillStyle = "#7e8f78";
@@ -1706,62 +1877,97 @@
       ctx.fillRect(0, cy + 42, viewWidth, 18);
     }
 
-    ctx.fillStyle = "#a7a89f";
+    // Sidewalks exist between intersections, not across the vehicle junction.
     for (let i = startX; i <= endX; i += 1) {
       const left = i * ROAD_GAP - ROAD_HALF - 16 - state.camera.x;
       const right = i * ROAD_GAP + ROAD_HALF - state.camera.x;
-      ctx.fillRect(left, 0, 16, viewHeight);
-      ctx.fillRect(right, 0, 16, viewHeight);
-      ctx.fillStyle = "rgba(255,255,255,.16)";
-      ctx.fillRect(left, 0, 2, viewHeight);
-      ctx.fillRect(right + 14, 0, 2, viewHeight);
-      ctx.fillStyle = "#a7a89f";
+      for (let gy = startY - 1; gy <= endY; gy += 1) {
+        const y1 = gy * ROAD_GAP + ROAD_HALF - state.camera.y;
+        const y2 = (gy + 1) * ROAD_GAP - ROAD_HALF - state.camera.y;
+        if (y2 <= y1) continue;
+        ctx.fillStyle = "#a9aaa4";
+        ctx.fillRect(left, y1, 16, y2 - y1);
+        ctx.fillRect(right, y1, 16, y2 - y1);
+        ctx.fillStyle = "rgba(255,255,255,.16)";
+        ctx.fillRect(left, y1, 2, y2 - y1);
+        ctx.fillRect(right + 14, y1, 2, y2 - y1);
+      }
     }
     for (let i = startY; i <= endY; i += 1) {
       const top = i * ROAD_GAP - ROAD_HALF - 16 - state.camera.y;
       const bottom = i * ROAD_GAP + ROAD_HALF - state.camera.y;
-      ctx.fillRect(0, top, viewWidth, 16);
-      ctx.fillRect(0, bottom, viewWidth, 16);
-      ctx.fillStyle = "rgba(255,255,255,.16)";
-      ctx.fillRect(0, top, viewWidth, 2);
-      ctx.fillRect(0, bottom + 14, viewWidth, 2);
-      ctx.fillStyle = "#a7a89f";
-    }
-
-    for (let i = startX; i <= endX; i += 1) {
-      drawWorldDashedVertical(i * ROAD_GAP, 20, 16, "rgba(236,210,106,.74)", 2.3);
-    }
-    for (let i = startY; i <= endY; i += 1) {
-      drawWorldDashedHorizontal(i * ROAD_GAP, 20, 16, "rgba(236,210,106,.74)", 2.3);
-    }
-
-    for (let i = startX; i <= endX; i += 1) {
-      for (const lane of [-LANE_OFFSET * 1.8, LANE_OFFSET * 1.8]) {
-        drawWorldDashedVertical(i * ROAD_GAP + lane, 12, 18, "rgba(242,244,239,.43)", 1.4);
-      }
-    }
-    for (let i = startY; i <= endY; i += 1) {
-      for (const lane of [-LANE_OFFSET * 1.8, LANE_OFFSET * 1.8]) {
-        drawWorldDashedHorizontal(i * ROAD_GAP + lane, 12, 18, "rgba(242,244,239,.43)", 1.4);
+      for (let gx = startX - 1; gx <= endX; gx += 1) {
+        const x1 = gx * ROAD_GAP + ROAD_HALF - state.camera.x;
+        const x2 = (gx + 1) * ROAD_GAP - ROAD_HALF - state.camera.x;
+        if (x2 <= x1) continue;
+        ctx.fillStyle = "#a9aaa4";
+        ctx.fillRect(x1, top, x2 - x1, 16);
+        ctx.fillRect(x1, bottom, x2 - x1, 16);
+        ctx.fillStyle = "rgba(255,255,255,.16)";
+        ctx.fillRect(x1, top, x2 - x1, 2);
+        ctx.fillRect(x1, bottom + 14, x2 - x1, 2);
       }
     }
 
-    ctx.fillStyle = "rgba(240,241,235,.78)";
+    // Japanese-style two-way streets: one lane each direction, edge lines, and
+    // center lines that stop before each intersection instead of running through it.
+    ctx.strokeStyle = "rgba(239,241,237,.68)";
+    ctx.lineWidth = 2;
+    const edgeClearance = ROAD_HALF + 58;
+    for (let i = startX; i <= endX; i += 1) {
+      const sx = i * ROAD_GAP - state.camera.x;
+      for (let gy = startY - 1; gy <= endY; gy += 1) {
+        const sy1 = gy * ROAD_GAP + edgeClearance - state.camera.y;
+        const sy2 = (gy + 1) * ROAD_GAP - edgeClearance - state.camera.y;
+        if (sy2 <= sy1) continue;
+        for (const edge of [-ROAD_HALF + 18, ROAD_HALF - 18]) {
+          ctx.beginPath();
+          ctx.moveTo(sx + edge, sy1);
+          ctx.lineTo(sx + edge, sy2);
+          ctx.stroke();
+        }
+      }
+    }
+    for (let i = startY; i <= endY; i += 1) {
+      const sy = i * ROAD_GAP - state.camera.y;
+      for (let gx = startX - 1; gx <= endX; gx += 1) {
+        const sx1 = gx * ROAD_GAP + edgeClearance - state.camera.x;
+        const sx2 = (gx + 1) * ROAD_GAP - edgeClearance - state.camera.x;
+        if (sx2 <= sx1) continue;
+        for (const edge of [-ROAD_HALF + 18, ROAD_HALF - 18]) {
+          ctx.beginPath();
+          ctx.moveTo(sx1, sy + edge);
+          ctx.lineTo(sx2, sy + edge);
+          ctx.stroke();
+        }
+      }
+    }
+
+    const intersectionClearance = ROAD_HALF + 66;
+    for (let i = startX; i <= endX; i += 1) {
+      const major = Math.abs(i) % 5 === 0;
+      for (let gy = startY - 1; gy <= endY; gy += 1) {
+        const y1 = gy * ROAD_GAP + intersectionClearance;
+        const y2 = (gy + 1) * ROAD_GAP - intersectionClearance;
+        if (y2 > y1) drawRoadCenterSegmentVertical(i * ROAD_GAP, y1, y2, major);
+      }
+    }
+    for (let i = startY; i <= endY; i += 1) {
+      const major = Math.abs(i) % 5 === 0;
+      for (let gx = startX - 1; gx <= endX; gx += 1) {
+        const x1 = gx * ROAD_GAP + intersectionClearance;
+        const x2 = (gx + 1) * ROAD_GAP - intersectionClearance;
+        if (x2 > x1) drawRoadCenterSegmentHorizontal(i * ROAD_GAP, x1, x2, major);
+      }
+    }
+
     for (let gx = startX; gx <= endX; gx += 1) {
       for (let gy = startY; gy <= endY; gy += 1) {
-        const sx = gx * ROAD_GAP - state.camera.x;
-        const sy = gy * ROAD_GAP - state.camera.y;
-        const zebraOffset = ROAD_HALF - 22;
-        for (let n = -3; n <= 3; n += 1) {
-          ctx.fillRect(sx - 5 + n * 11, sy - zebraOffset - 25, 7, 34);
-          ctx.fillRect(sx - 5 + n * 11, sy + zebraOffset - 9, 7, 34);
-          ctx.fillRect(sx - zebraOffset - 25, sy - 5 + n * 11, 34, 7);
-          ctx.fillRect(sx + zebraOffset - 9, sy - 5 + n * 11, 34, 7);
-        }
-        ctx.fillRect(sx - ROAD_HALF + 10, sy - ROAD_HALF + 25, ROAD_WIDTH - 20, 3);
-        ctx.fillRect(sx - ROAD_HALF + 10, sy + ROAD_HALF - 28, ROAD_WIDTH - 20, 3);
-        ctx.fillRect(sx - ROAD_HALF + 25, sy - ROAD_HALF + 10, 3, ROAD_WIDTH - 20);
-        ctx.fillRect(sx + ROAD_HALF - 28, sy - ROAD_HALF + 10, 3, ROAD_WIDTH - 20);
+        const wx = gx * ROAD_GAP;
+        const wy = gy * ROAD_GAP;
+        const sx = wx - state.camera.x;
+        const sy = wy - state.camera.y;
+        drawJapaneseIntersectionMarkings(sx, sy, wx, wy);
       }
     }
 
@@ -1871,6 +2077,26 @@
           drawLamp(baseX + ROAD_HALF + 23, baseY + 240);
           drawLamp(baseX + 240, baseY + ROAD_HALF + 23);
         }
+        if (seed > .58) {
+          const poleA = worldToScreen(baseX + ROAD_HALF + 30, baseY + 330);
+          const poleB = worldToScreen(baseX + 330, baseY + ROAD_HALF + 30);
+          ctx.strokeStyle = "#555c59";
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(poleA.x, poleA.y + 15);
+          ctx.lineTo(poleA.x, poleA.y - 24);
+          ctx.moveTo(poleB.x + 15, poleB.y);
+          ctx.lineTo(poleB.x - 24, poleB.y);
+          ctx.stroke();
+          ctx.strokeStyle = "#3e4543";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(poleA.x - 9, poleA.y - 18);
+          ctx.lineTo(poleA.x + 9, poleA.y - 18);
+          ctx.moveTo(poleB.x - 18, poleB.y - 9);
+          ctx.lineTo(poleB.x - 18, poleB.y + 9);
+          ctx.stroke();
+        }
         const p = worldToScreen(baseX + ROAD_HALF + 40, baseY + ROAD_HALF + 54);
         if (p.x > -40 && p.y > -40 && p.x < viewWidth + 40 && p.y < viewHeight + 40) {
           if (seed > .72) {
@@ -1912,12 +2138,48 @@
     ctx.restore();
   }
 
+  function drawSignalHead(x, y, orientation, stateName) {
+    const horizontal = orientation === "h";
+    const w = horizontal ? 34 : 12;
+    const h = horizontal ? 12 : 34;
+    ctx.fillStyle = "#262b2a";
+    roundedRectPath(ctx, x - w / 2, y - h / 2, w, h, 4);
+    ctx.fill();
+
+    const colors = horizontal
+      ? [["green", "#3c6651"], ["yellow", "#6a6034"], ["red", "#663b39"]]
+      : [["red", "#663b39"], ["yellow", "#6a6034"], ["green", "#3c6651"]];
+    const positions = horizontal ? [-10, 0, 10] : [-10, 0, 10];
+    for (let i = 0; i < 3; i += 1) {
+      const [name, dim] = colors[i];
+      ctx.fillStyle = name === stateName
+        ? (name === "green" ? "#58c57a" : name === "yellow" ? "#efc74f" : "#e65c55")
+        : dim;
+      ctx.beginPath();
+      ctx.arc(horizontal ? x + positions[i] : x, horizontal ? y : y + positions[i], 3.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawPedestrianSignal(x, y, canWalk) {
+    ctx.fillStyle = "#29302e";
+    roundedRectPath(ctx, x - 5, y - 8, 10, 16, 2);
+    ctx.fill();
+    ctx.fillStyle = canWalk ? "#50bd70" : "#67413e";
+    ctx.beginPath();
+    ctx.arc(x, y + 4, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = canWalk ? "#38543f" : "#e35b55";
+    ctx.beginPath();
+    ctx.arc(x, y - 4, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   function drawTrafficLights() {
     const startX = Math.floor(state.camera.x / ROAD_GAP) - 1;
     const endX = Math.ceil((state.camera.x + viewWidth) / ROAD_GAP) + 1;
     const startY = Math.floor(state.camera.y / ROAD_GAP) - 1;
     const endY = Math.ceil((state.camera.y + viewHeight) / ROAD_GAP) + 1;
-    const lightColor = (name) => name === "green" ? "#63d77d" : name === "yellow" ? "#efc958" : "#eb665e";
 
     for (let gx = startX; gx <= endX; gx += 1) {
       for (let gy = startY; gy <= endY; gy += 1) {
@@ -1925,31 +2187,52 @@
         const wy = gy * ROAD_GAP;
         const sx = wx - state.camera.x;
         const sy = wy - state.camera.y;
-        const h = signalStateAt(wx, wy, "h");
-        const v = signalStateAt(wx, wy, "v");
+        const hState = signalStateAt(wx, wy, "h");
+        const vState = signalStateAt(wx, wy, "v");
+        const pole = ROAD_HALF + 30;
 
-        ctx.strokeStyle = "#3a4140";
+        ctx.strokeStyle = "#4d5552";
         ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(sx - 65, sy - 68); ctx.lineTo(sx - 65, sy - 35); ctx.lineTo(sx - 41, sy - 35);
-        ctx.moveTo(sx + 65, sy + 68); ctx.lineTo(sx + 65, sy + 35); ctx.lineTo(sx + 41, sy + 35);
-        ctx.moveTo(sx + 68, sy - 65); ctx.lineTo(sx + 35, sy - 65); ctx.lineTo(sx + 35, sy - 41);
-        ctx.moveTo(sx - 68, sy + 65); ctx.lineTo(sx - 35, sy + 65); ctx.lineTo(sx - 35, sy + 41);
-        ctx.stroke();
 
-        const lights = [
-          [sx - 41, sy - 35, h], [sx + 41, sy + 35, h],
-          [sx + 35, sy - 41, v], [sx - 35, sy + 41, v]
-        ];
-        for (const [x, y, value] of lights) {
-          ctx.fillStyle = "#161a19";
-          roundedRectPath(ctx, x - 9, y - 7, 18, 14, 4);
-          ctx.fill();
-          ctx.fillStyle = lightColor(value);
-          ctx.beginPath();
-          ctx.arc(x, y, 4.5, 0, Math.PI * 2);
-          ctx.fill();
-        }
+        // North approach: pole on sidewalk, arm over southbound lane.
+        ctx.beginPath();
+        ctx.moveTo(sx + ROAD_HALF + 11, sy - pole - 18);
+        ctx.lineTo(sx + ROAD_HALF + 11, sy - pole);
+        ctx.lineTo(sx + LANE_OFFSET, sy - pole);
+        ctx.stroke();
+        drawSignalHead(sx + LANE_OFFSET, sy - pole, "h", vState);
+
+        // South approach.
+        ctx.beginPath();
+        ctx.moveTo(sx - ROAD_HALF - 11, sy + pole + 18);
+        ctx.lineTo(sx - ROAD_HALF - 11, sy + pole);
+        ctx.lineTo(sx - LANE_OFFSET, sy + pole);
+        ctx.stroke();
+        drawSignalHead(sx - LANE_OFFSET, sy + pole, "h", vState);
+
+        // West approach.
+        ctx.beginPath();
+        ctx.moveTo(sx - pole - 18, sy - ROAD_HALF - 11);
+        ctx.lineTo(sx - pole, sy - ROAD_HALF - 11);
+        ctx.lineTo(sx - pole, sy - LANE_OFFSET);
+        ctx.stroke();
+        drawSignalHead(sx - pole, sy - LANE_OFFSET, "v", hState);
+
+        // East approach.
+        ctx.beginPath();
+        ctx.moveTo(sx + pole + 18, sy + ROAD_HALF + 11);
+        ctx.lineTo(sx + pole, sy + ROAD_HALF + 11);
+        ctx.lineTo(sx + pole, sy + LANE_OFFSET);
+        ctx.stroke();
+        drawSignalHead(sx + pole, sy + LANE_OFFSET, "v", hState);
+
+        // Separate pedestrian signals at the four corners.
+        const pedV = vState === "red";
+        const pedH = hState === "red";
+        drawPedestrianSignal(sx - ROAD_HALF - 18, sy - ROAD_HALF - 18, pedV);
+        drawPedestrianSignal(sx + ROAD_HALF + 18, sy + ROAD_HALF + 18, pedV);
+        drawPedestrianSignal(sx + ROAD_HALF + 18, sy - ROAD_HALF - 18, pedH);
+        drawPedestrianSignal(sx - ROAD_HALF - 18, sy + ROAD_HALF + 18, pedH);
       }
     }
   }
@@ -2472,7 +2755,7 @@
       else {
         const signal = upcomingSignal();
         const lead = leadVehicleInfo();
-        if (signal && signal.state === "red" && signal.distance < 120) objectiveText.textContent = "赤信号です。停止線の手前で止まる";
+        if (signal && signal.state === "red" && signal.distance < 195) objectiveText.textContent = "赤信号です。横断歩道手前の停止線で止まる";
         else if (lead && lead.distance < 130) objectiveText.textContent = "前走車との車間を保つ";
         else objectiveText.textContent = "W / ↑・ACCELで加速、S / ↓・BRAKEで減速";
       }
