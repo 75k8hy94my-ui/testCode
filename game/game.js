@@ -3100,18 +3100,89 @@
           ctx.fillStyle = "#d7c49a";
           ctx.fillRect(center.x + 38, center.y + 58, 12, 16);
         } else if (style === "residential") {
-          // Hedges, low fences and utility clutter instead of commercial furniture.
-          ctx.fillStyle = "#607c5b";
-          ctx.fillRect(center.x - 126, center.y + 102, 72, 9);
-          ctx.fillRect(center.x + 54, center.y - 108, 68, 9);
-          ctx.strokeStyle = "#8d918a";
+          const left = baseX + ROAD_HALF + BLOCK_MARGIN;
+          const top = baseY + ROAD_HALF + BLOCK_MARGIN;
+          const size = ROAD_GAP - ROAD_WIDTH - BLOCK_MARGIN * 2;
+          const plan = residentialBlockPlan(gx, gy, left, top, size, size);
+
+          // Low walls / hedges follow parcel frontage rather than floating in the block.
           ctx.lineWidth = 2;
-          for (let n = 0; n < 5; n += 1) {
-            ctx.beginPath();
-            ctx.moveTo(center.x - 122 + n * 16, center.y + 88);
-            ctx.lineTo(center.x - 122 + n * 16, center.y + 106);
-            ctx.stroke();
+          for (let i = 0; i < plan.houses.length; i += 1) {
+            const house = plan.houses[i];
+            const frontageSeed = hash2(gx + i, gy, 1790);
+            const hedge = frontageSeed > .52;
+            const wallColor = hedge ? "#5d7959" : "#98978f";
+            ctx.strokeStyle = wallColor;
+            ctx.fillStyle = wallColor;
+
+            if (house.frontage === "east" || house.frontage === "west") {
+              const fx = house.frontage === "east" ? house.x + house.w + 7 : house.x - 7;
+              const fy = house.y + 5;
+              const p = worldToScreen(fx, fy);
+              const length = Math.max(16, house.h - 10);
+              if (hedge) ctx.fillRect(p.x - 3, p.y, 6, length);
+              else {
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(p.x, p.y + length);
+                ctx.stroke();
+              }
+            } else {
+              const fy = house.frontage === "south" ? house.y + house.h + 7 : house.y - 7;
+              const fx = house.x + 5;
+              const p = worldToScreen(fx, fy);
+              const length = Math.max(16, house.w - 10);
+              if (hedge) ctx.fillRect(p.x, p.y - 3, length, 6);
+              else {
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(p.x + length, p.y);
+                ctx.stroke();
+              }
+            }
           }
+
+          // Utility poles line only one side of the local street.
+          ctx.strokeStyle = "#555c59";
+          ctx.lineWidth = 3;
+          const poleCount = 3;
+          for (let n = 0; n < poleCount; n += 1) {
+            const t = .18 + n * .31;
+            let wx;
+            let wy;
+            if (plan.vertical) {
+              wx = plan.roadCenter + plan.roadWidth / 2 + 8;
+              wy = top + size * t;
+            } else {
+              wx = left + size * t;
+              wy = plan.roadCenter + plan.roadWidth / 2 + 8;
+            }
+            const p = worldToScreen(wx, wy);
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y + 8);
+            ctx.lineTo(p.x, p.y - 20);
+            ctx.stroke();
+            ctx.strokeStyle = "#414744";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(p.x - 7, p.y - 16);
+            ctx.lineTo(p.x + 7, p.y - 16);
+            ctx.stroke();
+            ctx.strokeStyle = "#555c59";
+            ctx.lineWidth = 3;
+          }
+
+          // A few front-garden trees, not the same two generic trees every block.
+          for (let i = 0; i < plan.yards.length; i += 1) {
+            if (hash2(gx + i, gy, 1791) < .45) continue;
+            const yard = plan.yards[i];
+            drawTree(
+              yard.x + yard.w * (.35 + hash2(gx, gy + i, 1792) * .3),
+              yard.y + yard.h * (.35 + hash2(gx, gy + i, 1793) * .3),
+              .55 + hash2(gx, gy + i, 1794) * .22
+            );
+          }
+          continue;
         } else if (style === "green") {
           drawTree(baseX + ROAD_GAP * .36, baseY + ROAD_GAP * .38, 1.05);
           drawTree(baseX + ROAD_GAP * .68, baseY + ROAD_GAP * .66, 1.1);
@@ -3284,6 +3355,149 @@
     }
   }
 
+  function drawResidentialBuilding(building, x, y, palette, time) {
+    const apartment = building.houseStyle === "small-apartment";
+    const elevation = apartment
+      ? clamp(20 + building.floors * 4.8, 28, 38)
+      : clamp(14 + building.floors * 4.2, 18, 28);
+    const roofDx = -elevation * BUILDING_DEPTH_X;
+    const roofDy = -elevation;
+    const rx = x + roofDx;
+    const ry = y + roofDy;
+    const seed = building.residentialSeed || 1800;
+    const roofColors = ["#665b55","#555b60","#6f6354","#55564f","#72574f"];
+    const roofColor = roofColors[Math.floor(hash2(Math.floor(building.x), Math.floor(building.y), seed) * roofColors.length) % roofColors.length];
+
+    ctx.fillStyle = "rgba(20,25,23," + (0.14 + time.night * .04).toFixed(2) + ")";
+    roundedRectPath(ctx, x + time.shadowX * .24, y + time.shadowY * .18, building.w, building.h, 4);
+    ctx.fill();
+
+    // Visible wall planes.
+    ctx.fillStyle = palette.wall;
+    ctx.beginPath();
+    ctx.moveTo(rx, ry + building.h);
+    ctx.lineTo(rx + building.w, ry + building.h);
+    ctx.lineTo(x + building.w, y + building.h);
+    ctx.lineTo(x, y + building.h);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(45,48,45,.22)";
+    ctx.beginPath();
+    ctx.moveTo(rx + building.w, ry);
+    ctx.lineTo(rx + building.w, ry + building.h);
+    ctx.lineTo(x + building.w, y + building.h);
+    ctx.lineTo(x + building.w, y);
+    ctx.closePath();
+    ctx.fill();
+
+    if (apartment) {
+      ctx.fillStyle = roofColor;
+      roundedRectPath(ctx, rx - 2, ry - 2, building.w + 4, building.h + 4, 4);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,.1)";
+      ctx.stroke();
+
+      // Small balconies on the visible front facade.
+      ctx.strokeStyle = "rgba(63,69,67,.62)";
+      ctx.lineWidth = 1;
+      for (let n = 0; n < Math.max(2, Math.floor(building.w / 34)); n += 1) {
+        const bx = x + 10 + n * ((building.w - 20) / Math.max(1, Math.floor(building.w / 34)));
+        ctx.strokeRect(bx, y + building.h - 15, 20, 5);
+      }
+    } else {
+      // Gabled / hipped-looking roof with an overhang and a visible ridge.
+      const overhang = 4;
+      const rw = building.w + overhang * 2;
+      const rh = building.h + overhang * 2;
+      const roofX = rx - overhang;
+      const roofY = ry - overhang;
+      const ridgeAlongX = building.w >= building.h;
+
+      if (ridgeAlongX) {
+        const midY = roofY + rh * .5;
+        ctx.fillStyle = roofColor;
+        ctx.beginPath();
+        ctx.moveTo(roofX, roofY);
+        ctx.lineTo(roofX + rw, roofY);
+        ctx.lineTo(roofX + rw, midY);
+        ctx.lineTo(roofX, midY);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(255,255,255,.07)";
+        ctx.beginPath();
+        ctx.moveTo(roofX, midY);
+        ctx.lineTo(roofX + rw, midY);
+        ctx.lineTo(roofX + rw, roofY + rh);
+        ctx.lineTo(roofX, roofY + rh);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(42,44,42,.62)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(roofX + 3, midY);
+        ctx.lineTo(roofX + rw - 3, midY);
+        ctx.stroke();
+      } else {
+        const midX = roofX + rw * .5;
+        ctx.fillStyle = roofColor;
+        ctx.beginPath();
+        ctx.moveTo(roofX, roofY);
+        ctx.lineTo(midX, roofY);
+        ctx.lineTo(midX, roofY + rh);
+        ctx.lineTo(roofX, roofY + rh);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(255,255,255,.07)";
+        ctx.beginPath();
+        ctx.moveTo(midX, roofY);
+        ctx.lineTo(roofX + rw, roofY);
+        ctx.lineTo(roofX + rw, roofY + rh);
+        ctx.lineTo(midX, roofY + rh);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(42,44,42,.62)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(midX, roofY + 3);
+        ctx.lineTo(midX, roofY + rh - 3);
+        ctx.stroke();
+      }
+
+      // Occasional small solar panel.
+      if (hash2(Math.floor(building.x), Math.floor(building.y), seed + 1) > .78) {
+        ctx.fillStyle = "#31464e";
+        const panelW = Math.min(24, building.w * .34);
+        const panelH = Math.min(13, building.h * .22);
+        ctx.fillRect(rx + building.w * .56 - panelW / 2, ry + building.h * .28 - panelH / 2, panelW, panelH);
+        ctx.strokeStyle = "rgba(190,214,218,.38)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(rx + building.w * .56 - panelW / 2, ry + building.h * .28 - panelH / 2, panelW, panelH);
+      }
+    }
+
+    // Windows on the visible south/front wall.
+    const facadeH = Math.max(10, elevation - 4);
+    const cols = apartment ? Math.max(2, Math.floor(building.w / 36)) : Math.max(1, Math.floor(building.w / 45));
+    for (let c = 0; c < cols; c += 1) {
+      const wx = x + 12 + c * ((building.w - 24) / Math.max(1, cols - 1));
+      const lit = time.night > .45 && hash2(Math.floor(building.x) + c, Math.floor(building.y), seed + 2) > .58;
+      ctx.fillStyle = lit ? "#dcbf78" : palette.glass;
+      ctx.fillRect(wx - 6, y + building.h - facadeH + 5, 12, 8);
+    }
+
+    // Small entrance cue on the facade closest to the access road when visible.
+    ctx.fillStyle = "#39413e";
+    if (building.frontage === "south" || building.frontage === "east") {
+      const doorX = building.frontage === "east" ? x + building.w - 13 : x + building.w * .5 - 5;
+      ctx.fillRect(doorX, y + building.h - Math.min(16, elevation * .7), 10, Math.min(16, elevation * .7));
+    }
+  }
+
   function drawBuildings() {
     const time = visualTime();
     const visible = buildings
@@ -3294,6 +3508,12 @@
       const x = building.x - state.camera.x;
       const y = building.y - state.camera.y;
       const palette = VISUAL_PALETTES[building.palette % VISUAL_PALETTES.length];
+
+      if (building.district === "residential") {
+        drawResidentialBuilding(building, x, y, palette, time);
+        continue;
+      }
+
       const baseElevation =
         building.kind === "tower" ? 34 :
         building.kind === "low" ? 17 :
