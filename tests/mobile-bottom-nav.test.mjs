@@ -59,7 +59,7 @@ test('reader keeps its special controls while using the shared glass engine', ()
   assert.match(template, /mobileNavManga/);
   assert.match(template, /mobileNavVideo/);
   assert.match(template, /mobileNavMore/);
-  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260925-instagram-persistent-pill'));
+  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260925-instagram-drag-lock'));
   assert.match(js, /readerFallbackTarget/);
   assert.match(js, /nav\.classList\.contains\('reader-mode'\)/);
   assert.match(js, /querySelector\('#mobileNavMore'\)/);
@@ -68,8 +68,8 @@ test('reader keeps its special controls while using the shared glass engine', ()
 test('shared nav is loaded by all target mobile pages', () => {
   for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
     const source = read(page);
-    assert.match(source, /mobile-bottom-nav\.css\?v=20260925-instagram-persistent-pill/, page);
-    assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-persistent-pill/, page);
+    assert.match(source, /mobile-bottom-nav\.css\?v=20260925-instagram-drag-lock/, page);
+    assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-drag-lock/, page);
   }
 });
 
@@ -246,4 +246,19 @@ test('scrub release snaps the persistent pill before changing page', () => {
   assert.match(js, /animateSpaLensToItem\(nav, current, \{ duration:150 \}\)/);
   assert.match(css, /liquidDragMode \.liquidGlassSelection/);
   assert.match(css, /liquidDragPreview[\s\S]*transform:none!important/);
+});
+
+test('drag owns the pill until pointer release without automatic snap-back', () => {
+  assert.match(js, /function spaLensIsManuallyControlled/);
+  assert.match(js, /state\.drag && state\.drag\.active/);
+  assert.match(js, /state\.navigationAnimating/);
+  assert.match(js, /function cancelAutomaticLensMotion/);
+  assert.match(js, /state\.lens\.getAnimations\(\)\.forEach\(\(animation\) => animation\.cancel\(\)\)/);
+  assert.match(js, /if \(spaLensIsManuallyControlled\(nav, state\)\) return;[\s\S]*const target = activeItem\(nav\)/);
+});
+
+test('observer and resize sync cannot steal the pill during scrub', () => {
+  assert.match(js, /state\.observer = new MutationObserver\([\s\S]*spaLensIsManuallyControlled\(nav, state\)[\s\S]*scheduleLens\(nav, true\)/);
+  assert.match(js, /state\.resizeObserver = new ResizeObserver\([\s\S]*!spaLensIsManuallyControlled\(nav, state\)[\s\S]*scheduleLens\(nav, false\)/);
+  assert.match(js, /function scheduleLens[\s\S]*if \(!state \|\| spaLensIsManuallyControlled\(nav, state\)\) return/);
 });

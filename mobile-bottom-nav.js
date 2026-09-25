@@ -118,10 +118,35 @@
     lens.style.opacity = '1';
   }
 
+  function spaLensIsManuallyControlled(nav, state = states.get(nav)) {
+    return !!(
+      nav &&
+      nav.dataset.mobileNavKind === 'spa' &&
+      state &&
+      ((state.drag && state.drag.active) || state.navigationAnimating)
+    );
+  }
+
+  function cancelAutomaticLensMotion(nav, state = states.get(nav)) {
+    if (!state) return;
+    if (state.measureRaf) {
+      cancelAnimationFrame(state.measureRaf);
+      state.measureRaf = 0;
+    }
+    if (state.lens && typeof state.lens.getAnimations === 'function') {
+      state.lens.getAnimations().forEach((animation) => animation.cancel());
+    }
+    if (nav) {
+      nav.classList.remove('liquidLensMoving');
+      nav.removeAttribute('data-lens-direction');
+    }
+  }
+
   function moveLens(nav, animate = true) {
     if (!nav || !nav.isConnected) return;
     const state = states.get(nav);
     if (!state) return;
+    if (spaLensIsManuallyControlled(nav, state)) return;
     const target = activeItem(nav);
     const lens = state.lens;
     if (!target || !target.isConnected || nav.getClientRects().length === 0) {
@@ -231,6 +256,7 @@
       return;
     }
     state.navigationAnimating = true;
+    cancelAutomaticLensMotion(nav, state);
     animateSpaLensToItem(nav, item, { duration }).finally(() => {
       state.navigationAnimating = false;
       if (!item.isConnected) return;
@@ -242,9 +268,13 @@
   function scheduleLens(nav = currentNav, animate = true) {
     if (!nav) return;
     const state = states.get(nav);
-    if (!state) return;
+    if (!state || spaLensIsManuallyControlled(nav, state)) return;
     cancelAnimationFrame(state.measureRaf || 0);
-    state.measureRaf = requestAnimationFrame(() => moveLens(nav, animate));
+    state.measureRaf = requestAnimationFrame(() => {
+      state.measureRaf = 0;
+      if (spaLensIsManuallyControlled(nav, state)) return;
+      moveLens(nav, animate);
+    });
   }
 
   function updateLight(nav, event) {
@@ -344,6 +374,7 @@
     if (!drag || drag.active || !drag.startItem) return;
     drag.active = true;
     clearLongPressTimer(state);
+    cancelAutomaticLensMotion(nav, state);
     nav.classList.remove('liquidHoldArmed');
     nav.querySelectorAll('.liquidHoldOrigin').forEach((node) => node.classList.remove('liquidHoldOrigin'));
     releasePress(nav);
@@ -542,12 +573,15 @@
     }, { passive:true });
 
     state.observer = new MutationObserver((records) => {
+      if (spaLensIsManuallyControlled(nav, state)) return;
       if (records.some((record) => record.type === 'attributes' || record.type === 'childList')) scheduleLens(nav, true);
     });
     state.observer.observe(nav, { subtree:true, childList:true, attributes:true, attributeFilter:['class','aria-current'] });
 
     if (typeof ResizeObserver === 'function') {
-      state.resizeObserver = new ResizeObserver(() => scheduleLens(nav, false));
+      state.resizeObserver = new ResizeObserver(() => {
+        if (!spaLensIsManuallyControlled(nav, state)) scheduleLens(nav, false);
+      });
       state.resizeObserver.observe(nav);
     }
     if (nav.dataset.mobileNavKind === 'spa') bindSpaLongPressDrag(nav, state);
