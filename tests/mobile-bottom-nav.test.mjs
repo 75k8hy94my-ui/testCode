@@ -59,7 +59,7 @@ test('reader keeps its special controls while using the shared glass engine', ()
   assert.match(template, /mobileNavManga/);
   assert.match(template, /mobileNavVideo/);
   assert.match(template, /mobileNavMore/);
-  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260925-instagram-scrub'));
+  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260925-instagram-stable-icons'));
   assert.match(js, /readerFallbackTarget/);
   assert.match(js, /nav\.classList\.contains\('reader-mode'\)/);
   assert.match(js, /querySelector\('#mobileNavMore'\)/);
@@ -68,8 +68,8 @@ test('reader keeps its special controls while using the shared glass engine', ()
 test('shared nav is loaded by all target mobile pages', () => {
   for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
     const source = read(page);
-    assert.match(source, /mobile-bottom-nav\.css\?v=20260925-instagram-scrub/, page);
-    assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-scrub/, page);
+    assert.match(source, /mobile-bottom-nav\.css\?v=20260925-instagram-stable-icons/, page);
+    assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-stable-icons/, page);
   }
 });
 
@@ -206,4 +206,21 @@ test('hold gives immediate visual feedback before drag mode begins', () => {
   assert.match(css, /\.liquidHoldArmed \.liquidGlassSelection/);
   assert.match(css, /opacity:.48!important/);
   assert.match(css, /\.liquidDragMode \.liquidGlassSelection[\s\S]*rgba\(190,196,204,.42\)/);
+});
+
+test('drag preview never changes committed icon color or fill', () => {
+  assert.match(css, /Instagram scrub state rule/);
+  assert.match(css, /liquidDragMode \.liquidGlassNavItem\.active[\s\S]*color:var\(--glass-text-active\)!important/);
+  assert.match(css, /liquidDragMode \.liquidGlassNavItem\.liquidDragPreview[\s\S]*color:var\(--glass-text\)!important/);
+  assert.match(css, /#mobileNavHome\.liquidDragPreview:not\(\.active\):not\(\[aria-current="page"\]\)[\s\S]*fill:none!important/);
+  assert.match(css, /#mobileNavManga\.liquidDragPreview:not\(\.active\):not\(\[aria-current="page"\]\)[\s\S]*fill:none!important/);
+  assert.match(css, /#mobileNavVideo\.liquidDragPreview:not\(\.active\):not\(\[aria-current="page"\]\)[\s\S]*fill:none!important/);
+  assert.match(css, /#mobileNavProfile\.liquidDragPreview:not\(\.active\):not\(\[aria-current="page"\]\)[\s\S]*fill:none!important/);
+});
+
+test('current page icon remains committed while glass pill moves', () => {
+  assert.match(css, /liquidDragMode #mobileNavHome\.active[\s\S]*fill:currentColor!important/);
+  assert.match(css, /liquidDragMode #mobileNavManga\.active[\s\S]*fill:currentColor!important/);
+  assert.match(css, /liquidDragMode #mobileNavVideo\.active[\s\S]*fill:currentColor!important/);
+  assert.match(css, /liquidDragMode #mobileNavProfile\.active[\s\S]*fill:currentColor!important/);
 });

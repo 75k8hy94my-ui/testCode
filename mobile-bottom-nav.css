@@ -934,3 +934,91 @@
     transform:scale(1.09);
   }
 }
+
+/* Instagram scrub state rule: moving the glass never previews icon color/fill. */
+@media(max-width:899px){
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidHoldArmed .liquidHoldOrigin{
+    color:inherit!important;
+  }
+
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode .liquidGlassNavItem{
+    color:var(--glass-text)!important;
+    opacity:1!important;
+  }
+
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode .liquidGlassNavItem.active,
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode .liquidGlassNavItem[aria-current="page"]{
+    color:var(--glass-text-active)!important;
+    opacity:1!important;
+  }
+
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode .liquidGlassNavItem.liquidDragPreview{
+    color:var(--glass-text)!important;
+    transform:scale(1.035);
+    opacity:1!important;
+  }
+
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode .liquidGlassNavItem.active.liquidDragPreview,
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode .liquidGlassNavItem[aria-current="page"].liquidDragPreview{
+    color:var(--glass-text-active)!important;
+  }
+
+  /* Current route keeps its committed filled icon throughout the scrub. */
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavHome.active .mobileNavGlyph path:first-child,
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavHome[aria-current="page"] .mobileNavGlyph path:first-child{
+    fill:currentColor!important;
+    stroke:currentColor!important;
+  }
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavHome.active .mobileNavGlyph path:last-child,
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavHome[aria-current="page"] .mobileNavGlyph path:last-child{
+    opacity:0!important;
+  }
+
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavManga.active .mobileNavGlyph path,
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavManga[aria-current="page"] .mobileNavGlyph path{
+    fill:currentColor!important;
+    stroke:currentColor!important;
+  }
+
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavVideo.active .mobileNavGlyph rect,
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavVideo[aria-current="page"] .mobileNavGlyph rect{
+    fill:currentColor!important;
+    stroke:currentColor!important;
+  }
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavVideo.active .mobileNavGlyph path,
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavVideo[aria-current="page"] .mobileNavGlyph path{
+    fill:var(--ig-icon-cutout)!important;
+    stroke:var(--ig-icon-cutout)!important;
+  }
+
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavProfile.active .mobileNavGlyph circle,
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavProfile[aria-current="page"] .mobileNavGlyph circle{
+    fill:currentColor!important;
+    stroke:currentColor!important;
+  }
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavProfile.active .mobileNavGlyph path,
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavProfile[aria-current="page"] .mobileNavGlyph path{
+    stroke-width:2.7!important;
+  }
+
+  /* A hovered destination never gains the committed filled-icon treatment. */
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavHome.liquidDragPreview:not(.active):not([aria-current="page"]) .mobileNavGlyph path:first-child,
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavManga.liquidDragPreview:not(.active):not([aria-current="page"]) .mobileNavGlyph path,
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavVideo.liquidDragPreview:not(.active):not([aria-current="page"]) .mobileNavGlyph rect,
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavProfile.liquidDragPreview:not(.active):not([aria-current="page"]) .mobileNavGlyph circle{
+    fill:none!important;
+  }
+
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavHome.liquidDragPreview:not(.active):not([aria-current="page"]) .mobileNavGlyph path:last-child{
+    opacity:1!important;
+  }
+
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavVideo.liquidDragPreview:not(.active):not([aria-current="page"]) .mobileNavGlyph path{
+    fill:none!important;
+    stroke:currentColor!important;
+  }
+
+  #mobileBottomNav.liquidGlassNav[data-mobile-nav-kind="spa"].liquidDragMode #mobileNavProfile.liquidDragPreview:not(.active):not([aria-current="page"]) .mobileNavGlyph path{
+    stroke-width:2.05!important;
+  }
+}
