@@ -1366,6 +1366,7 @@
     state.player.y = personalCar.y;
 
     const destination = state.drive.destination ? PLACES.find((place) => place.id === state.drive.destination) : null;
+    const route = state.drive.route;
     const finalPoint = route[route.length - 1];
     if (destination && finalPoint && state.drive.routeIndex >= route.length - 1) {
       const finalDistance = distance(personalCar.x, personalCar.y, finalPoint.x, finalPoint.y);
