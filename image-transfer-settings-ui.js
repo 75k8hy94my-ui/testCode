@@ -25,13 +25,13 @@
 
   function modeMarkup() {
     return [
-      ['data-saver', 'データ節約', 'ズーム停止後に必要部分だけ取得。先読みなし。'],
-      ['standard', '標準', '必要部分と周辺1タイルを先読み。'],
-      ['quality', '高画質優先', '高画質への切替を早め、周辺も広めに先読み。'],
-    ].map(([value, title, description]) =>
+      ['data-saver', 'データ節約'],
+      ['standard', '標準'],
+      ['quality', '高画質優先'],
+    ].map(([value, title]) =>
       '<label class="imageTransferMode">' +
         '<input type="radio" name="imageTransferMode" value="' + value + '">' +
-        '<span><strong>' + title + '</strong><small>' + description + '</small></span>' +
+        '<span><strong>' + title + '</strong></span>' +
       '</label>'
     ).join('');
   }
@@ -49,16 +49,16 @@
     section.id = CARD_ID;
     section.innerHTML =
       '<div class="imageTransferHeading">' +
-        '<div><h3>画像通信</h3><p>通常は強圧縮プレビューを使い、拡大時だけ表示範囲の高画質タイルを取得します。</p></div>' +
+        '<h3>画像通信</h3>' +
         '<span class="imageTransferLocalBadge">この端末のみ</span>' +
       '</div>' +
       '<label class="profileThemeRow imageTransferToggleRow">' +
-        '<span><strong>VPN接続時のみクラウド画像を読み込む</strong><small>キャッシュ済み画像はVPNなしでも表示できます。</small></span>' +
+        '<span><strong>VPN接続時のみクラウド画像を読み込む</strong></span>' +
         '<span class="iosSwitch"><input id="profileImageVpnRequired" type="checkbox" role="switch" aria-label="VPN接続時のみクラウド画像を読み込む"><span class="iosSwitchTrack" aria-hidden="true"></span></span>' +
       '</label>' +
       '<div class="imageTransferDivider"></div>' +
       '<fieldset class="imageTransferModes"><legend>通信モード</legend>' + modeMarkup() + '</fieldset>' +
-      '<label class="imageTransferLimit"><span><strong>1日の画像通信上限</strong><small>取得開始前の推計値で上限を判定します。</small></span><select id="profileImageDailyLimit" aria-label="1日の画像通信上限">' + limitMarkup(api) + '</select></label>' +
+      '<label class="imageTransferLimit"><span><strong>1日の画像通信上限</strong></span><select id="profileImageDailyLimit" aria-label="1日の画像通信上限">' + limitMarkup(api) + '</select></label>' +
       '<div class="imageTransferUsage" aria-live="polite">' +
         '<div class="imageTransferUsageTop"><span>今日の制限カウント</span><strong id="profileImageUsageTotal">—</strong></div>' +
         '<div class="imageTransferUsageBar" aria-hidden="true"><span id="profileImageUsageFill"></span></div>' +
@@ -71,7 +71,6 @@
           '<div><dt>部分読込で節約</dt><dd id="profileImagePartialSavedBytes">—</dd></div>' +
           '<div><dt>Provider実測</dt><dd id="profileImageProviderBytes">未取得</dd></div>' +
         '</dl>' +
-        '<p class="imageTransferFootnote">推計値は端末側に保存します。Provider実測値は、安全なAPI経路が利用可能になった場合だけ別途反映します。</p>' +
       '</div>';
     return section;
   }
