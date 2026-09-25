@@ -493,14 +493,19 @@
         x: segmentEnd.x + nextDirection.x * radius + nextNormal.x * LANE_OFFSET,
         y: segmentEnd.y + nextDirection.y * radius + nextNormal.y * LANE_OFFSET
       };
-      const tangent = radius * 0.62;
+      const tangentIntersection = direction.x !== 0
+        ? { x: departure.x, y: approach.y }
+        : { x: approach.x, y: departure.y };
+      const kappa = 0.5522847498;
+      const tangentIn = distance(approach.x, approach.y, tangentIntersection.x, tangentIntersection.y) * kappa;
+      const tangentOut = distance(departure.x, departure.y, tangentIntersection.x, tangentIntersection.y) * kappa;
       const control1 = {
-        x: approach.x + direction.x * tangent,
-        y: approach.y + direction.y * tangent
+        x: approach.x + direction.x * tangentIn,
+        y: approach.y + direction.y * tangentIn
       };
       const control2 = {
-        x: departure.x - nextDirection.x * tangent,
-        y: departure.y - nextDirection.y * tangent
+        x: departure.x - nextDirection.x * tangentOut,
+        y: departure.y - nextDirection.y * tangentOut
       };
 
       appendLine(points, cursor, approach);
