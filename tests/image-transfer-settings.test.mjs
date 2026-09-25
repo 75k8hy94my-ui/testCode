@@ -22,14 +22,13 @@ test('image transfer settings default to VPN required, standard mode, and 150 MB
   assert.equal(state.limitUsageBytes, 0);
 });
 
-test('image transfer settings persist device-local VPN, mode, and daily limit choices', () => {
+test('image transfer settings persist device-local VPN and daily limit choices', () => {
   const storage = memoryStorage();
   settings.setVpnRequired(false, storage);
-  settings.setNetworkMode('data-saver', storage);
   settings.setDailyLimitBytes(300 * 1024 * 1024, storage);
   const state = settings.load(storage);
   assert.equal(state.vpnRequired, false);
-  assert.equal(state.networkMode, 'data-saver');
+  assert.equal(state.networkMode, 'standard');
   assert.equal(state.dailyLimitBytes, 300 * 1024 * 1024);
 });
 
@@ -89,4 +88,27 @@ test('profile route lazy-loads image transfer settings without changing non-prof
   assert.match(spa, /image-transfer-settings\.js\?v=20260925-image-sync-ui/);
   assert.match(spa, /image-transfer-settings-ui\.js\?v=20260925-image-sync-ui/);
   assert.match(spa, /ImageTransferSettingsUI\.mount/);
+});
+
+
+test('image transfer mode switches silently to data saver only after estimated usage exceeds half the limit', () => {
+  const limit = 150 * 1024 * 1024;
+  const storage = memoryStorage({
+    mangaReaderStorageTransferLimitDaily: String(limit),
+    mangaReaderImageTransferStats: JSON.stringify({ day: '2026-09-25', estimatedBytes: limit / 2 }),
+  });
+  let state = settings.load(storage, new Date('2026-09-25T12:00:00Z'));
+  assert.equal(state.networkMode, 'standard');
+
+  storage.setItem('mangaReaderImageTransferStats', JSON.stringify({ day: '2026-09-25', estimatedBytes: (limit / 2) + 1 }));
+  state = settings.load(storage, new Date('2026-09-25T12:00:00Z'));
+  assert.equal(state.networkMode, 'data-saver');
+});
+
+test('image transfer UI does not expose network mode controls or automatic-switch messaging', () => {
+  const ui = fs.readFileSync(new URL('../image-transfer-settings-ui.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(ui, /通信モード/);
+  assert.doesNotMatch(ui, /データ節約/);
+  assert.doesNotMatch(ui, /高画質優先/);
+  assert.doesNotMatch(ui, /50%|半分|切り替/);
 });
