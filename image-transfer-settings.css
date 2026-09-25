@@ -7,14 +7,6 @@
 .imageTransferToggleRow strong,.imageTransferLimit strong{font-size:14px}
 .imageTransferToggleRow small,.imageTransferLimit small{display:block;color:var(--sub);font-size:12px;line-height:1.45}
 .imageTransferDivider{height:1px;background:var(--line)}
-.imageTransferModes{display:grid;gap:8px;margin:0;padding:0;border:0}
-.imageTransferModes legend{margin-bottom:8px;color:var(--text);font-size:13px;font-weight:700}
-.imageTransferMode{position:relative;display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);cursor:pointer}
-.imageTransferMode input{margin:3px 0 0;accent-color:var(--accent)}
-.imageTransferMode:has(input:checked){border-color:var(--accent);background:var(--accent-dim)}
-.imageTransferMode span{display:grid;gap:3px}
-.imageTransferMode strong{color:var(--text);font-size:13px}
-.imageTransferMode small{color:var(--sub);font-size:12px;line-height:1.4}
 .imageTransferLimit{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .imageTransferLimit>span{display:grid;gap:4px}
 .imageTransferLimit select{min-width:132px;min-height:38px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface-strong);color:var(--text);font:inherit}
