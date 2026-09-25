@@ -1754,6 +1754,27 @@
       }
     }
 
+    if (state.visual.weather === "rain") {
+      ctx.fillStyle = "rgba(113,148,159,.10)";
+      for (let i = startX; i <= endX; i += 1) {
+        const sx = i * ROAD_GAP - ROAD_HALF - state.camera.x;
+        ctx.fillRect(sx, 0, ROAD_WIDTH, viewHeight);
+      }
+      for (let i = startY; i <= endY; i += 1) {
+        const sy = i * ROAD_GAP - ROAD_HALF - state.camera.y;
+        ctx.fillRect(0, sy, viewWidth, ROAD_WIDTH);
+      }
+      ctx.fillStyle = "rgba(221,232,232,.07)";
+      for (let i = startX; i <= endX; i += 1) {
+        const sx = i * ROAD_GAP - state.camera.x;
+        ctx.fillRect(sx - 3, 0, 6, viewHeight);
+      }
+      for (let i = startY; i <= endY; i += 1) {
+        const sy = i * ROAD_GAP - state.camera.y;
+        ctx.fillRect(0, sy - 3, viewWidth, 6);
+      }
+    }
+
     ctx.fillStyle = "rgba(18,22,22,.36)";
     for (let gx = startX; gx <= endX; gx += 1) {
       for (let gy = startY; gy <= endY; gy += 1) {
