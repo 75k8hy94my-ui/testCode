@@ -37,6 +37,23 @@ test('enhanced editor presents URL as the only playback locator while legacy fie
   assert.match(bridge, /addEventListener\(['"]submit['"],[\s\S]*true\)/);
 });
 
+test('video editor locks URL until the explicit edit button and exposes one-click existing tags', () => {
+  const library = read('video-library.js');
+  assert.match(library, /videoLibraryUrlEdit/);
+  assert.match(library, /readOnly/);
+  assert.match(library, /videoLibrarySuggestedTags/);
+  assert.match(library, /suggestedTag\.addEventListener\(['"]click['"]/);
+});
+
+test('video library supports hiding videos and restoring them from the hidden list', () => {
+  const library = read('video-library.js');
+  assert.match(library, /videoLibraryHidden/);
+  assert.match(library, /動画を非表示/);
+  assert.match(library, /非表示/);
+  assert.match(library, /表示に戻す/);
+  assert.match(library, /hidden/);
+});
+
 test('video routing bridge plays direct video URLs with a video element and keeps legacy iframe playback', () => {
   const source = read('video-routing-fix.js');
   assert.match(source, /\.vl-open/);

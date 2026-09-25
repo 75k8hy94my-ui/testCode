@@ -67,6 +67,7 @@ test('VPN check falls back to Proton exit IP list when generic detection returns
   const Gate = loadGate({ fetch, setTimeout, clearTimeout });
   assert.equal(await Gate.checkVpn(), true);
   assert.match(calls[2], /ProtonVPN-IPs/);
+  assert.equal(Gate.getDiagnostics().error, null);
 });
 
 test('VPN check still uses Proton exit IP list when generic detection API errors', async () => {
@@ -81,6 +82,21 @@ test('VPN check still uses Proton exit IP list when generic detection API errors
   const Gate = loadGate({ fetch, setTimeout, clearTimeout });
   assert.equal(await Gate.checkVpn(), true);
   assert.match(calls[2], /ProtonVPN-IPs/);
+});
+
+test('VPN check accepts an IP in a Proton-listed /24 exit block', async () => {
+  const currentIp = '37.19.205.204';
+  const Gate = loadGate({
+    fetch: async (url) => {
+      if (url === Gate.IP_URL) return { ok: true, json: async () => ({ ip: currentIp }) };
+      if (url.startsWith(Gate.CHECK_URL)) return { ok: false, status: 503, json: async () => ({}) };
+      return { ok: true, json: async () => ['37.19.205.223'] };
+    },
+    setTimeout,
+    clearTimeout,
+  });
+  assert.equal(await Gate.checkVpn(), true);
+  assert.equal(Gate.getDiagnostics().protonExitMatch, true);
 });
 
 test('diagnostics expose IP, generic lookup result, Proton match, and final decision', async () => {
@@ -104,13 +120,21 @@ test('diagnostics expose IP, generic lookup result, Proton match, and final deci
 
 test('reader bootstrap loads the VPN gate before reader media and the gate covers image/video/iframe src', () => {
   const recommendations = fs.readFileSync(new URL('../recommendations.js', import.meta.url), 'utf8');
+  const reader = fs.readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
   assert.match(recommendations, /document\.write\([\s\S]*media-access-gate\.js/);
+  assert.match(reader, /data-vpn-header="saved-list"/);
+  assert.match(reader, /data-vpn-header="video-player"/);
+  assert.match(reader, /data-vpn-status-button/);
+  assert.match(reader, /data-vpn-diagnostics-button/);
   assert.match(source, /patchSrcProperty\(root\.HTMLImageElement\)/);
   assert.match(source, /patchSrcProperty\(root\.HTMLMediaElement\)/);
   assert.match(source, /patchSrcProperty\(root\.HTMLIFrameElement\)/);
   assert.match(source, /data-vpn-blocked-src/);
   assert.match(source, /\.vl-open/);
   assert.match(source, /VPN診断/);
+  assert.doesNotMatch(source, /button\.id = DIAGNOSTICS_BUTTON_ID/);
+  assert.match(source, /closest\('\[data-vpn-diagnostics-button\]'\)/);
+  assert.match(source, /abort\(\), 15000/);
   assert.match(source, /getDiagnostics/);
   assert.match(source, /checkVpn/);
 });

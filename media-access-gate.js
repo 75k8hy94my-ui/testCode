@@ -22,6 +22,7 @@
   const DIAGNOSTICS_PANEL_ID = 'vpnDiagnosticsPanel';
   let status = 'pending';
   let installed = false;
+  let diagnosticsUiInstalled = false;
   let diagnostics = freshDiagnostics();
 
   function freshDiagnostics() {
@@ -80,6 +81,13 @@
     return PROTON_OWNED_IPV4_CIDRS.some((cidr) => ipv4InCidr(ip, cidr));
   }
 
+  function ipv424(ip) {
+    const parts = String(ip || '').trim().split('.');
+    return parts.length === 4 && parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) >= 0 && Number(part) <= 255)
+      ? parts.slice(0, 3).join('.')
+      : '';
+  }
+
   function isVpnVerdict(value) {
     if (!value || typeof value !== 'object') return false;
     const privacy = value.privacy && typeof value.privacy === 'object' ? value.privacy : {};
@@ -123,30 +131,15 @@
 
   function showNotice(message) {
     if (!root.document) return;
-    const mount = () => {
-      if (!root.document.body) return;
-      let notice = root.document.getElementById(NOTICE_ID);
-      if (!notice) {
-        notice = root.document.createElement('div');
-        notice.id = NOTICE_ID;
-        notice.setAttribute('role', 'status');
-        notice.style.cssText = 'position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:99999;max-width:min(92vw,520px);display:flex;align-items:center;gap:10px;padding:11px 13px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(15,18,24,.94);color:#f5f7fb;box-shadow:0 12px 38px rgba(0,0,0,.42);font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backdrop-filter:blur(16px)';
-        const text = root.document.createElement('span');
-        text.dataset.vpnMediaMessage = '1';
-        text.style.flex = '1';
-        const button = root.document.createElement('button');
-        button.type = 'button';
-        button.textContent = '再確認';
-        button.style.cssText = 'border:1px solid rgba(255,255,255,.18);border-radius:10px;background:#262c38;color:#fff;padding:7px 10px;font:inherit;cursor:pointer';
-        button.addEventListener('click', () => checkVpn());
-        notice.append(text, button);
-        root.document.body.appendChild(notice);
-      }
-      const text = notice.querySelector('[data-vpn-media-message]');
-      if (text) text.textContent = message || 'VPNに接続すると漫画・動画を読み込めます。';
+    const update = () => {
+      root.document.querySelectorAll('[data-vpn-status-button]').forEach((button) => {
+        button.textContent = 'VPN未接続';
+        button.title = message || 'VPNに接続すると漫画・動画を読み込めます。';
+        button.dataset.vpnState = 'blocked';
+      });
     };
-    if (root.document.body) mount();
-    else root.document.addEventListener('DOMContentLoaded', mount, { once: true });
+    if (root.document.body) update();
+    else root.document.addEventListener('DOMContentLoaded', update, { once: true });
   }
 
   function diagnosticText() {
@@ -181,12 +174,8 @@
   function installDiagnosticsUi() {
     if (!root.document) return;
     const mount = () => {
-      if (!root.document.body || root.document.getElementById(DIAGNOSTICS_BUTTON_ID)) return;
-      const button = root.document.createElement('button');
-      button.id = DIAGNOSTICS_BUTTON_ID;
-      button.type = 'button';
-      button.textContent = 'VPN診断';
-      button.style.cssText = 'position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:99997;border:1px solid rgba(255,255,255,.16);border-radius:10px;background:rgba(24,28,36,.92);color:#fff;padding:7px 10px;font:12px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.28);cursor:pointer;backdrop-filter:blur(12px)';
+      if (!root.document.body || diagnosticsUiInstalled) return;
+      diagnosticsUiInstalled = true;
 
       const panel = root.document.createElement('div');
       panel.id = DIAGNOSTICS_PANEL_ID;
@@ -203,11 +192,17 @@
       recheck.style.cssText = 'border:1px solid rgba(255,255,255,.18);border-radius:9px;background:#262c38;color:#fff;padding:6px 9px;font:inherit;cursor:pointer';
       recheck.addEventListener('click', () => checkVpn());
       panel.append(title, pre, recheck);
-      button.addEventListener('click', () => {
-        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-        renderDiagnostics();
+      root.document.body.append(panel);
+      root.document.addEventListener('click', (event) => {
+        const diagnosticsButton = event.target && event.target.closest ? event.target.closest('[data-vpn-diagnostics-button]') : null;
+        if (diagnosticsButton) {
+          panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+          renderDiagnostics();
+          return;
+        }
+        const statusButton = event.target && event.target.closest ? event.target.closest('[data-vpn-status-button]') : null;
+        if (statusButton) checkVpn();
       });
-      root.document.body.append(panel, button);
       renderDiagnostics();
     };
     if (root.document.body) mount();
@@ -283,7 +278,10 @@
   async function isKnownProtonExitIp(ip, signal) {
     try {
       const list = await fetchJson(PROTON_EXIT_IPS_URL, signal);
-      return Array.isArray(list) && list.includes(ip);
+      if (!Array.isArray(list)) return false;
+      if (list.includes(ip)) return true;
+      const block = ipv424(ip);
+      return !!block && list.some((candidate) => ipv424(candidate) === block);
     } catch (_) {
       return false;
     }
@@ -308,11 +306,12 @@
 
   async function checkVpn() {
     status = 'checking';
+    updateStatusButtons(status);
     diagnostics = freshDiagnostics();
     diagnostics.final = 'checking';
     renderDiagnostics();
     const controller = typeof root.AbortController === 'function' ? new root.AbortController() : null;
-    const timer = root.setTimeout && controller ? root.setTimeout(() => controller.abort(), 5000) : null;
+    const timer = root.setTimeout && controller ? root.setTimeout(() => controller.abort(), 15000) : null;
     try {
       if (typeof root.fetch !== 'function') throw new Error('fetch unavailable');
       const ipPayload = await fetchJson(IP_URL, controller ? controller.signal : undefined);
@@ -329,6 +328,8 @@
         allowed = diagnostics.protonExitMatch;
       }
       status = allowed ? 'allowed' : 'blocked';
+      updateStatusButtons(status);
+      if (status === 'allowed') diagnostics.error = null;
       diagnostics.final = status;
       diagnostics.checkedAt = new Date().toISOString();
       renderDiagnostics();
@@ -341,6 +342,7 @@
       return status === 'allowed';
     } catch (error) {
       status = 'blocked';
+      updateStatusButtons(status);
       diagnostics.final = 'blocked';
       diagnostics.checkedAt = new Date().toISOString();
       diagnostics.error = diagnostics.error || (error && error.message ? error.message : 'VPN接続を確認できません');
@@ -354,13 +356,24 @@
 
   function setAllowedForTesting(allowed) {
     status = allowed ? 'allowed' : 'blocked';
+    updateStatusButtons(status);
     diagnostics.final = status;
     if (allowed) restoreBlockedElements();
     renderDiagnostics();
   }
 
+  function updateStatusButtons(nextStatus) {
+    if (!root.document) return;
+    const labels = { allowed: 'VPN接続済み', blocked: 'VPN未接続', checking: 'VPN確認中', pending: 'VPN確認中' };
+    root.document.querySelectorAll('[data-vpn-status-button]').forEach((button) => {
+      button.textContent = labels[nextStatus] || labels.pending;
+      button.dataset.vpnState = nextStatus || 'pending';
+    });
+  }
+
   installGuards();
   installDiagnosticsUi();
+  updateStatusButtons(status);
   if (root.document) {
     if (root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded', checkVpn, { once: true });
     else if (root.setTimeout) root.setTimeout(checkVpn, 0);
