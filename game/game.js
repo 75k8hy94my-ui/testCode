@@ -2517,6 +2517,9 @@
           const laneW = 78;
           const laneX = x + w / 2 - laneW / 2;
           ctx.fillStyle = "#b9b5a8";
+          // Open the pedestrian shopping street to both surrounding streets.
+          ctx.fillRect(laneX, y - BLOCK_MARGIN - 8, laneW, BLOCK_MARGIN + 18);
+          ctx.fillRect(laneX, y + h - 8, laneW, BLOCK_MARGIN + 16);
           roundedRectPath(ctx, laneX, y + 5, laneW, h - 10, 7);
           ctx.fill();
           ctx.fillStyle = "rgba(236,231,212,.23)";
@@ -2539,10 +2542,13 @@
           const cx = x + w / 2;
           const bendY = y + h * .58;
           ctx.fillStyle = "#777a76";
+          // Narrow alley enters from one street, bends, then exits sideways.
+          ctx.fillRect(cx - laneW / 2, y - BLOCK_MARGIN - 6, laneW, BLOCK_MARGIN + 22);
           roundedRectPath(ctx, cx - laneW / 2, y + 8, laneW, h * .62, 5);
           ctx.fill();
           roundedRectPath(ctx, cx - laneW / 2, bendY - laneW / 2, w * .42, laneW, 5);
           ctx.fill();
+          ctx.fillRect(cx + w * .38 - 8, bendY - laneW / 2, BLOCK_MARGIN + 28, laneW);
 
           ctx.fillStyle = "rgba(255,255,255,.07)";
           for (let ty = y + 22; ty < bendY - 16; ty += 26) {
@@ -2557,8 +2563,21 @@
           const laneW = 38;
           const offset = hash2(gx, gy, 1410) > .5 ? w * .38 : w * .58;
           ctx.fillStyle = "#8c8f89";
+          // A narrow local street connects through the block; side driveways branch from it.
+          ctx.fillRect(x + offset - laneW / 2, y - BLOCK_MARGIN - 6, laneW, BLOCK_MARGIN + 18);
+          ctx.fillRect(x + offset - laneW / 2, y + h - 8, laneW, BLOCK_MARGIN + 14);
           roundedRectPath(ctx, x + offset - laneW / 2, y + 5, laneW, h - 10, 6);
           ctx.fill();
+          if (hash2(gx, gy, 1411) > .45) {
+            const branchY = y + h * (.35 + hash2(gx, gy, 1412) * .28);
+            const branchToRight = offset < w * .5;
+            ctx.fillRect(
+              branchToRight ? x + offset : x + 6,
+              branchY - laneW * .34,
+              branchToRight ? w - offset - 8 : offset - 6,
+              laneW * .68
+            );
+          }
 
           ctx.strokeStyle = "rgba(215,219,211,.24)";
           ctx.lineWidth = 1;
