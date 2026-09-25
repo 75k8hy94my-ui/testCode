@@ -1758,14 +1758,37 @@
 
     ctx.fillStyle = "rgba(244,245,240,.88)";
 
-    // Zebra crossings sit just outside the vehicle intersection box.
-    for (let d = -CROSSWALK_DEPTH / 2; d <= CROSSWALK_DEPTH / 2; d += stripe + stripeGap) {
-      ctx.fillRect(sx - halfSpan, sy - CROSSWALK_OFFSET + d, crossingSpan, stripe);
-      ctx.fillRect(sx - halfSpan, sy + CROSSWALK_OFFSET + d, crossingSpan, stripe);
+    // Zebra crossings: each white bar runs in the pedestrian travel direction.
+    // North/south crossings use vertical bars repeated across the road.
+    for (let d = -halfSpan; d <= halfSpan; d += stripe + stripeGap) {
+      ctx.fillRect(
+        sx + d,
+        sy - CROSSWALK_OFFSET - CROSSWALK_DEPTH / 2,
+        stripe,
+        CROSSWALK_DEPTH
+      );
+      ctx.fillRect(
+        sx + d,
+        sy + CROSSWALK_OFFSET - CROSSWALK_DEPTH / 2,
+        stripe,
+        CROSSWALK_DEPTH
+      );
     }
-    for (let d = -CROSSWALK_DEPTH / 2; d <= CROSSWALK_DEPTH / 2; d += stripe + stripeGap) {
-      ctx.fillRect(sx - CROSSWALK_OFFSET + d, sy - halfSpan, stripe, crossingSpan);
-      ctx.fillRect(sx + CROSSWALK_OFFSET + d, sy - halfSpan, stripe, crossingSpan);
+
+    // East/west crossings use horizontal bars repeated across the road.
+    for (let d = -halfSpan; d <= halfSpan; d += stripe + stripeGap) {
+      ctx.fillRect(
+        sx - CROSSWALK_OFFSET - CROSSWALK_DEPTH / 2,
+        sy + d,
+        CROSSWALK_DEPTH,
+        stripe
+      );
+      ctx.fillRect(
+        sx + CROSSWALK_OFFSET - CROSSWALK_DEPTH / 2,
+        sy + d,
+        CROSSWALK_DEPTH,
+        stripe
+      );
     }
 
     // Japanese left-hand traffic: one stop line per incoming lane.
