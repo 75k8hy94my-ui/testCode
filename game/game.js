@@ -1595,6 +1595,42 @@
     context.closePath();
   }
 
+  function drawWorldDashedVertical(worldX, dashLength, gapLength, color, lineWidth) {
+    const period = dashLength + gapLength;
+    const minWorldY = state.camera.y - period;
+    const maxWorldY = state.camera.y + viewHeight + period;
+    let worldY = Math.floor(minWorldY / period) * period;
+    const screenX = worldX - state.camera.x;
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.beginPath();
+    for (; worldY <= maxWorldY; worldY += period) {
+      const sy = worldY - state.camera.y;
+      ctx.moveTo(screenX, sy);
+      ctx.lineTo(screenX, sy + dashLength);
+    }
+    ctx.stroke();
+  }
+
+  function drawWorldDashedHorizontal(worldY, dashLength, gapLength, color, lineWidth) {
+    const period = dashLength + gapLength;
+    const minWorldX = state.camera.x - period;
+    const maxWorldX = state.camera.x + viewWidth + period;
+    let worldX = Math.floor(minWorldX / period) * period;
+    const screenY = worldY - state.camera.y;
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.beginPath();
+    for (; worldX <= maxWorldX; worldX += period) {
+      const sx = worldX - state.camera.x;
+      ctx.moveTo(sx, screenY);
+      ctx.lineTo(sx + dashLength, screenY);
+    }
+    ctx.stroke();
+  }
+
   function drawGround() {
     const time = visualTime();
     ctx.fillStyle = "#7e8f78";
@@ -1692,48 +1728,23 @@
       ctx.fillStyle = "#a7a89f";
     }
 
-    ctx.strokeStyle = "rgba(236,210,106,.74)";
-    ctx.lineWidth = 2.3;
-    ctx.setLineDash([20, 16]);
     for (let i = startX; i <= endX; i += 1) {
-      const sx = i * ROAD_GAP - state.camera.x;
-      ctx.beginPath();
-      ctx.moveTo(sx, 0);
-      ctx.lineTo(sx, viewHeight);
-      ctx.stroke();
+      drawWorldDashedVertical(i * ROAD_GAP, 20, 16, "rgba(236,210,106,.74)", 2.3);
     }
     for (let i = startY; i <= endY; i += 1) {
-      const sy = i * ROAD_GAP - state.camera.y;
-      ctx.beginPath();
-      ctx.moveTo(0, sy);
-      ctx.lineTo(viewWidth, sy);
-      ctx.stroke();
+      drawWorldDashedHorizontal(i * ROAD_GAP, 20, 16, "rgba(236,210,106,.74)", 2.3);
     }
-    ctx.setLineDash([]);
 
-    ctx.strokeStyle = "rgba(242,244,239,.43)";
-    ctx.lineWidth = 1.4;
     for (let i = startX; i <= endX; i += 1) {
-      const sx = i * ROAD_GAP - state.camera.x;
       for (const lane of [-LANE_OFFSET * 1.8, LANE_OFFSET * 1.8]) {
-        ctx.setLineDash([12, 18]);
-        ctx.beginPath();
-        ctx.moveTo(sx + lane, 0);
-        ctx.lineTo(sx + lane, viewHeight);
-        ctx.stroke();
+        drawWorldDashedVertical(i * ROAD_GAP + lane, 12, 18, "rgba(242,244,239,.43)", 1.4);
       }
     }
     for (let i = startY; i <= endY; i += 1) {
-      const sy = i * ROAD_GAP - state.camera.y;
       for (const lane of [-LANE_OFFSET * 1.8, LANE_OFFSET * 1.8]) {
-        ctx.setLineDash([12, 18]);
-        ctx.beginPath();
-        ctx.moveTo(0, sy + lane);
-        ctx.lineTo(viewWidth, sy + lane);
-        ctx.stroke();
+        drawWorldDashedHorizontal(i * ROAD_GAP + lane, 12, 18, "rgba(242,244,239,.43)", 1.4);
       }
     }
-    ctx.setLineDash([]);
 
     ctx.fillStyle = "rgba(240,241,235,.78)";
     for (let gx = startX; gx <= endX; gx += 1) {
