@@ -2019,6 +2019,164 @@
     }
   }
 
+  function roadSegmentStyle(axis, roadIndex, segmentIndex) {
+    const styles = axis === "v"
+      ? [cityBlockStyle(roadIndex - 1, segmentIndex), cityBlockStyle(roadIndex, segmentIndex)]
+      : [cityBlockStyle(segmentIndex, roadIndex - 1), cityBlockStyle(segmentIndex, roadIndex)];
+
+    if (styles.includes("station")) return "station";
+    if (styles.includes("arcade") || styles.includes("alley") || styles.includes("mixed-core")) return "commercial";
+    if (styles.includes("green")) return "park";
+    if (styles.includes("residential")) return "residential";
+    if (Math.abs(roadIndex) % 5 === 0) return "arterial";
+    return "local";
+  }
+
+  function drawParkingCarTop(x, y, horizontal, seed) {
+    const length = 31;
+    const width = 14;
+    ctx.save();
+    ctx.translate(x, y);
+    if (!horizontal) ctx.rotate(Math.PI / 2);
+    ctx.fillStyle = "rgba(13,17,17,.18)";
+    roundedRectPath(ctx, -length / 2 + 2, -width / 2 + 2, length, width, 4);
+    ctx.fill();
+    const colors = ["#d5d7d4","#6d8495","#a06f62","#7b7e75","#8b7a91"];
+    ctx.fillStyle = colors[Math.floor(seed * colors.length) % colors.length];
+    roundedRectPath(ctx, -length / 2, -width / 2, length, width, 4);
+    ctx.fill();
+    ctx.fillStyle = "#81979e";
+    ctx.fillRect(-4, -width / 2 + 2, 11, width - 4);
+    ctx.restore();
+  }
+
+  function drawRoadSegmentTexture(axis, roadIndex, segmentIndex, start, end) {
+    const style = roadSegmentStyle(axis, roadIndex, segmentIndex);
+    const roadCenter = roadIndex * ROAD_GAP;
+    const horizontal = axis === "h";
+    const length = end - start;
+    if (length <= 0) return;
+
+    const sx = horizontal ? start - state.camera.x : roadCenter - state.camera.x;
+    const sy = horizontal ? roadCenter - state.camera.y : start - state.camera.y;
+    const sw = horizontal ? length : ROAD_WIDTH;
+    const sh = horizontal ? ROAD_WIDTH : length;
+
+    if (style === "arterial") {
+      ctx.fillStyle = "rgba(18,22,23,.16)";
+      ctx.fillRect(sx, sy, sw, sh);
+      ctx.fillStyle = "rgba(236,185,69,.22)";
+      if (horizontal) {
+        ctx.fillRect(sx, sy + ROAD_HALF - 18, sw, 4);
+        ctx.fillRect(sx, sy + ROAD_HALF - 12, sw, 2);
+      } else {
+        ctx.fillRect(sx + ROAD_HALF - 18, sy, 4, sh);
+        ctx.fillRect(sx + ROAD_HALF - 12, sy, 2, sh);
+      }
+      return;
+    }
+
+    if (style === "station") {
+      ctx.fillStyle = "rgba(72,84,88,.22)";
+      ctx.fillRect(sx, sy, sw, sh);
+      ctx.fillStyle = "rgba(72,111,133,.36)";
+      if (horizontal) ctx.fillRect(sx, sy + ROAD_HALF - 28, sw, 18);
+      else ctx.fillRect(sx + ROAD_HALF - 28, sy, 18, sh);
+
+      ctx.fillStyle = "rgba(245,246,242,.72)";
+      ctx.font = "700 10px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      if (horizontal && length > 160) {
+        ctx.fillText("BUS", sx + length * .5, sy + ROAD_HALF - 15);
+      } else if (!horizontal && length > 160) {
+        ctx.save();
+        ctx.translate(sx + ROAD_HALF - 15, sy + length * .5);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText("BUS", 0, 0);
+        ctx.restore();
+      }
+      return;
+    }
+
+    if (style === "commercial") {
+      ctx.fillStyle = "rgba(46,49,48,.11)";
+      ctx.fillRect(sx, sy, sw, sh);
+      ctx.strokeStyle = "rgba(239,241,236,.28)";
+      ctx.lineWidth = 1.5;
+      const bayStart = start + 34;
+      const bayEnd = end - 34;
+      const baySpacing = 74;
+      for (let p = bayStart; p < bayEnd - 34; p += baySpacing) {
+        const seed = hash2(roadIndex, Math.floor(p / 20), 1510);
+        if (seed < .38) continue;
+        if (horizontal) {
+          const x = p - state.camera.x;
+          const y = roadCenter + ROAD_HALF - 23 - state.camera.y;
+          ctx.strokeRect(x, y - 12, 48, 24);
+          if (seed > .72) drawParkingCarTop(x + 24, y, true, seed);
+        } else {
+          const x = roadCenter + ROAD_HALF - 23 - state.camera.x;
+          const y = p - state.camera.y;
+          ctx.strokeRect(x - 12, y, 24, 48);
+          if (seed > .72) drawParkingCarTop(x, y + 24, false, seed);
+        }
+      }
+      return;
+    }
+
+    if (style === "residential") {
+      // Visually narrow the carriageway and add Japanese-style side gutters.
+      const inset = 15;
+      ctx.fillStyle = "rgba(124,126,120,.28)";
+      if (horizontal) {
+        ctx.fillRect(sx, sy, sw, inset);
+        ctx.fillRect(sx, sy + ROAD_WIDTH - inset, sw, inset);
+        ctx.fillStyle = "rgba(51,57,55,.48)";
+        ctx.fillRect(sx, sy + inset - 3, sw, 3);
+        ctx.fillRect(sx, sy + ROAD_WIDTH - inset, sw, 3);
+      } else {
+        ctx.fillRect(sx, sy, inset, sh);
+        ctx.fillRect(sx + ROAD_WIDTH - inset, sy, inset, sh);
+        ctx.fillStyle = "rgba(51,57,55,.48)";
+        ctx.fillRect(sx + inset - 3, sy, 3, sh);
+        ctx.fillRect(sx + ROAD_WIDTH - inset, sy, 3, sh);
+      }
+      return;
+    }
+
+    if (style === "park") {
+      ctx.fillStyle = "rgba(59,73,64,.08)";
+      ctx.fillRect(sx, sy, sw, sh);
+      ctx.fillStyle = "rgba(74,130,91,.38)";
+      if (horizontal) ctx.fillRect(sx, sy - ROAD_HALF + 12, sw, 10);
+      else ctx.fillRect(sx - ROAD_HALF + 12, sy, 10, sh);
+      return;
+    }
+
+    // Local streets get a softer, patched asphalt surface.
+    ctx.fillStyle = "rgba(255,255,255,.018)";
+    ctx.fillRect(sx, sy, sw, sh);
+    const patches = 3;
+    for (let n = 0; n < patches; n += 1) {
+      const seed = hash2(roadIndex + n, segmentIndex, 1520);
+      if (horizontal) {
+        const px = sx + 28 + seed * Math.max(20, length - 70);
+        const py = sy + 26 + hash2(n, segmentIndex, 1521) * (ROAD_WIDTH - 52);
+        ctx.fillStyle = "rgba(18,22,22,.07)";
+        ctx.beginPath();
+        ctx.ellipse(px, py, 15 + seed * 12, 4 + seed * 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        const px = sx + 26 + hash2(n, segmentIndex, 1521) * (ROAD_WIDTH - 52);
+        const py = sy + 28 + seed * Math.max(20, length - 70);
+        ctx.fillStyle = "rgba(18,22,22,.07)";
+        ctx.beginPath();
+        ctx.ellipse(px, py, 4 + seed * 4, 15 + seed * 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
   function drawGround() {
     const time = visualTime();
     ctx.fillStyle = "#7e8f78";
@@ -2080,6 +2238,23 @@
     for (let i = startY; i <= endY; i += 1) {
       const sy = i * ROAD_GAP - ROAD_HALF - state.camera.y;
       ctx.fillRect(0, sy, viewWidth, ROAD_WIDTH);
+    }
+
+    // Road hierarchy: every block-to-block segment gets its own visual character.
+    const textureClearance = ROAD_HALF + 64;
+    for (let road = startX; road <= endX; road += 1) {
+      for (let seg = startY - 1; seg <= endY; seg += 1) {
+        const start = seg * ROAD_GAP + textureClearance;
+        const end = (seg + 1) * ROAD_GAP - textureClearance;
+        drawRoadSegmentTexture("v", road, seg, start, end);
+      }
+    }
+    for (let road = startY; road <= endY; road += 1) {
+      for (let seg = startX - 1; seg <= endX; seg += 1) {
+        const start = seg * ROAD_GAP + textureClearance;
+        const end = (seg + 1) * ROAD_GAP - textureClearance;
+        drawRoadSegmentTexture("h", road, seg, start, end);
+      }
     }
 
     ctx.fillStyle = "rgba(255,255,255,.025)";
