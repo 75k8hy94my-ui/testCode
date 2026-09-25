@@ -1463,6 +1463,8 @@
         targetSpeed = Math.min(targetSpeed, Math.max(0, (leadDistance - 36) * 2.1));
       }
 
+      const brakingNow = targetSpeed < car.speed - 10;
+      car.brakeGlow += ((brakingNow ? 1 : 0) - car.brakeGlow) * Math.min(1, dt * 8);
       car.speed += (targetSpeed - car.speed) * Math.min(1, dt * 2.4);
 
       const ox = car.x;
@@ -1486,6 +1488,7 @@
   function updatePedestrians(dt) {
     for (const ped of pedestrians) {
       ped.timer -= dt;
+      ped.phase += dt * ped.speed * .12;
       if (ped.timer <= 0) {
         ped.timer = 1.5 + Math.random() * 4;
         ped.dir += (Math.random() - 0.5) * 2;
@@ -1511,6 +1514,17 @@
     updateTraffic(dt);
     updatePedestrians(dt);
 
+    state.visual.weatherClock += dt;
+    state.visual.rainPhase += dt;
+    if (state.visual.weatherClock >= state.visual.weatherDuration) {
+      state.visual.weatherClock = 0;
+      const roll = hash2(state.day, Math.floor(state.minute / 60), Math.floor(performance.now() / 1000));
+      state.visual.weather = roll < .54 ? "clear" : roll < .76 ? "cloudy" : "rain";
+      state.visual.weatherDuration = 45 + roll * 50;
+      if (state.visual.weather === "rain") showToast("雨が降ってきました");
+      if (state.visual.weather === "clear") showToast("空が晴れてきました");
+    }
+
     const gameMinutes = dt * 0.7;
     advanceTime(gameMinutes);
 
@@ -1521,9 +1535,24 @@
     }
 
     const p = actorPosition();
-    const targetX = clamp(p.x - viewWidth / 2, 0, Math.max(0, WORLD_SIZE - viewWidth));
-    const targetY = clamp(p.y - viewHeight / 2, 0, Math.max(0, WORLD_SIZE - viewHeight));
-    const blend = 1 - Math.pow(0.88, dt * 60);
+    let desiredLeadX = 0;
+    let desiredLeadY = 0;
+    if (state.player.inVehicle) {
+      const lead = clamp(34 + personalCar.speed * .34, 34, 155);
+      desiredLeadX = Math.cos(personalCar.angle) * lead;
+      desiredLeadY = Math.sin(personalCar.angle) * lead;
+    } else {
+      desiredLeadX = state.player.facingX * 26;
+      desiredLeadY = state.player.facingY * 26;
+    }
+
+    const leadBlend = 1 - Math.pow(.9, dt * 60);
+    state.visual.cameraLeadX += (desiredLeadX - state.visual.cameraLeadX) * leadBlend;
+    state.visual.cameraLeadY += (desiredLeadY - state.visual.cameraLeadY) * leadBlend;
+
+    const targetX = clamp(p.x + state.visual.cameraLeadX - viewWidth / 2, 0, Math.max(0, WORLD_SIZE - viewWidth));
+    const targetY = clamp(p.y + state.visual.cameraLeadY - viewHeight / 2, 0, Math.max(0, WORLD_SIZE - viewHeight));
+    const blend = 1 - Math.pow(0.9, dt * 60);
     state.camera.x += (targetX - state.camera.x) * blend;
     state.camera.y += (targetY - state.camera.y) * blend;
 
@@ -2171,6 +2200,21 @@
     ctx.translate(p.x, p.y);
     ctx.rotate(car.angle);
 
+    const time = visualTime();
+    if (time.night > .4) {
+      const beam = ctx.createLinearGradient(length * .25, 0, length * 1.7, 0);
+      beam.addColorStop(0, "rgba(255,240,184," + (.13 * time.night).toFixed(2) + ")");
+      beam.addColorStop(1, "rgba(255,240,184,0)");
+      ctx.fillStyle = beam;
+      ctx.beginPath();
+      ctx.moveTo(length / 2 - 3, -width * .3);
+      ctx.lineTo(length * 1.7, -width * .75);
+      ctx.lineTo(length * 1.7, width * .75);
+      ctx.lineTo(length / 2 - 3, width * .3);
+      ctx.closePath();
+      ctx.fill();
+    }
+
     ctx.fillStyle = "rgba(12,17,16,.24)";
     roundedRectPath(ctx, -length / 2 + 4, -width / 2 + 5, length, width, 9);
     ctx.fill();
@@ -2502,7 +2546,7 @@
     ctx.clearRect(0, 0, viewWidth, viewHeight);
     drawGround();
     drawRoute();
-    drawTrafficLights();
+    drawStreetProps();
     drawBuildings();
     for (const place of PLACES) drawPlace(place);
     drawPedestrians();
@@ -2510,7 +2554,9 @@
     for (const car of traffic) drawCar(car, false);
     drawCar(personalCar, true);
     drawPlayer();
+    drawTrafficLights();
     drawNightOverlay();
+    drawWeather();
     drawMinimap();
     updateHUD();
   }
