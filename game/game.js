@@ -1108,9 +1108,40 @@
       }
 
       const signal = signalStateAt(nextX, nextY, orientation);
-      let targetSpeed = car.cruise;
+      const roadLimit = speedLimitAt(car.x, car.y) / SPEED_TO_KMH;
+      let targetSpeed = Math.min(car.cruise, roadLimit * 0.92);
       if ((signal === "red" || signal === "yellow") && intersectionDistance < 95) {
         targetSpeed = Math.max(0, (intersectionDistance - 30) * 2.4);
+      }
+
+      const hx = Math.cos(car.angle);
+      const hy = Math.sin(car.angle);
+      let leadDistance = Infinity;
+      for (const other of traffic) {
+        if (other === car) continue;
+        const dx = other.x - car.x;
+        const dy = other.y - car.y;
+        const forward = dx * hx + dy * hy;
+        if (forward <= 0 || forward > 180) continue;
+        const lateral = Math.abs(dx * -hy + dy * hx);
+        if (lateral > 42) continue;
+        const sameDirection = Math.cos(other.angle) * hx + Math.sin(other.angle) * hy;
+        if (sameDirection > 0.7) leadDistance = Math.min(leadDistance, forward);
+      }
+
+      if (state.player.inVehicle) {
+        const dx = personalCar.x - car.x;
+        const dy = personalCar.y - car.y;
+        const forward = dx * hx + dy * hy;
+        const lateral = Math.abs(dx * -hy + dy * hx);
+        const sameDirection = Math.cos(personalCar.angle) * hx + Math.sin(personalCar.angle) * hy;
+        if (forward > 0 && forward < 180 && lateral < 55 && sameDirection > 0.5) {
+          leadDistance = Math.min(leadDistance, forward);
+        }
+      }
+
+      if (leadDistance < 120) {
+        targetSpeed = Math.min(targetSpeed, Math.max(0, (leadDistance - 36) * 2.1));
       }
 
       car.speed += (targetSpeed - car.speed) * Math.min(1, dt * 2.4);
