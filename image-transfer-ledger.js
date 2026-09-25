@@ -156,8 +156,11 @@
     const storage = options.storage || defaultStorage();
     const now = options.now || new Date();
     const stats = currentStats(storage, now);
-    const amount = Number(bytes);
-    stats.providerReportedBytes = Number.isFinite(amount) && amount >= 0 ? amount : null;
+    if (bytes == null || bytes === '') stats.providerReportedBytes = null;
+    else {
+      const amount = Number(bytes);
+      stats.providerReportedBytes = Number.isFinite(amount) && amount >= 0 ? amount : null;
+    }
     return saveStats(stats, storage, now);
   }
 
