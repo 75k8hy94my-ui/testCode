@@ -27,7 +27,7 @@ test('home-family pages share one History API controller', () => {
   assert.match(spa, /function renderProfile/);
   assert.match(spa, /id="profileLogoutBtn"/);
   assert.match(spa, /id="profileThemeLight"/);
-  assert.match(spa, /保管庫を開く/);
+  assert.doesNotMatch(spa, /保管庫を開く/);
 });
 
 test('mobile home shell delegates navigation to the shared Liquid Glass component', () => {
