@@ -7,7 +7,6 @@
 
   const KEYS = Object.freeze({
     vpnRequired: 'mangaReaderImageVpnRequired',
-    networkMode: 'mangaReaderImageNetworkMode',
     dailyLimit: 'mangaReaderStorageTransferLimitDaily',
     legacyUsage: 'mangaReaderStorageTransferUsageDaily',
     stats: 'mangaReaderImageTransferStats',
@@ -17,8 +16,8 @@
   const STATS_EVENT_NAME = 'manga-reader-image-transfer-stats-changed';
   const DEFAULT_DAILY_LIMIT_BYTES = 150 * 1024 * 1024;
   const DAILY_LIMIT_OPTIONS = Object.freeze([50, 150, 300, 500].map((mb) => mb * 1024 * 1024));
-  const NETWORK_MODES = Object.freeze(['data-saver', 'standard', 'quality']);
-  const DEFAULT_NETWORK_MODE = 'standard';
+  const STANDARD_NETWORK_MODE = 'standard';
+  const SAVER_NETWORK_MODE = 'data-saver';
 
   function defaultStorage() {
     try { return root.localStorage || null; } catch (_) { return null; }
@@ -63,10 +62,6 @@
     return now.toISOString().slice(0, 10);
   }
 
-  function normalizeNetworkMode(value) {
-    return NETWORK_MODES.includes(value) ? value : DEFAULT_NETWORK_MODE;
-  }
-
   function normalizeDailyLimit(value) {
     const bytes = Number(value);
     return Number.isFinite(bytes) && bytes > 0 ? bytes : DEFAULT_DAILY_LIMIT_BYTES;
@@ -106,11 +101,14 @@
   function load(storage = defaultStorage(), now = new Date()) {
     const today = dayKey(now);
     const stats = normalizeStats(readJson(storage, KEYS.stats, null), today);
+    const dailyLimitBytes = normalizeDailyLimit(readRaw(storage, KEYS.dailyLimit));
+    const legacyBytes = legacyUsage(storage, today);
+    const estimatedUsageBytes = Math.max(legacyBytes, Number(stats.estimatedBytes) || 0);
     return {
       vpnRequired: readBoolean(storage, KEYS.vpnRequired, true),
-      networkMode: normalizeNetworkMode(readRaw(storage, KEYS.networkMode)),
-      dailyLimitBytes: normalizeDailyLimit(readRaw(storage, KEYS.dailyLimit)),
-      limitUsageBytes: legacyUsage(storage, today),
+      networkMode: estimatedUsageBytes > (dailyLimitBytes / 2) ? SAVER_NETWORK_MODE : STANDARD_NETWORK_MODE,
+      dailyLimitBytes,
+      limitUsageBytes: estimatedUsageBytes,
       stats,
     };
   }
@@ -130,12 +128,6 @@
 
   function setVpnRequired(value, storage = defaultStorage()) {
     writeRaw(storage, KEYS.vpnRequired, value ? 'true' : 'false');
-    return commit(storage);
-  }
-
-  function setNetworkMode(value, storage = defaultStorage()) {
-    const mode = normalizeNetworkMode(value);
-    writeRaw(storage, KEYS.networkMode, mode);
     return commit(storage);
   }
 
@@ -159,15 +151,13 @@
     STATS_EVENT_NAME,
     DEFAULT_DAILY_LIMIT_BYTES,
     DAILY_LIMIT_OPTIONS,
-    NETWORK_MODES,
-    DEFAULT_NETWORK_MODE,
+    STANDARD_NETWORK_MODE,
+    SAVER_NETWORK_MODE,
     dayKey,
-    normalizeNetworkMode,
     normalizeDailyLimit,
     normalizeStats,
     load,
     setVpnRequired,
-    setNetworkMode,
     setDailyLimitBytes,
     formatBytes,
   });
