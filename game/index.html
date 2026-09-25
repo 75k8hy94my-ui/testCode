@@ -3,35 +3,41 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#17231d">
-  <title>Aster Vale - 2D Open World Prototype</title>
+  <meta name="theme-color" content="#111416">
+  <title>Neon County - 2D Open World Crime Sandbox</title>
   <link rel="stylesheet" href="./game.css">
 </head>
 <body>
   <main id="gameShell">
-    <canvas id="gameCanvas" aria-label="2Dオープンワールドゲーム画面" tabindex="0"></canvas>
+    <canvas id="gameCanvas" aria-label="2Dオープンワールド犯罪サンドボックス" tabindex="0"></canvas>
 
     <section id="hud" aria-live="polite">
-      <div class="hud-card hud-status">
-        <strong id="areaName">Aster Vale</strong>
-        <span id="worldClock">06:00</span>
-        <span id="coords">X 0 / Y 0</span>
+      <div class="hud-card player-hud">
+        <div class="row strong"><span id="areaName">Neon County</span><span id="worldClock">12:00</span></div>
+        <div class="meter"><span>HP</span><div class="bar"><i id="healthBar"></i></div><b id="healthText">100</b></div>
+        <div class="row"><span id="cashText">$2,500</span><span id="ammoText">12 / 48</span></div>
       </div>
 
-      <div class="hud-card hud-quest">
-        <span class="eyebrow">QUEST</span>
-        <strong id="questTitle">街の人に話しかけよう</strong>
-        <span id="questProgress">E / アクションボタンで会話</span>
+      <div class="hud-card wanted-hud">
+        <span class="eyebrow">WANTED</span>
+        <strong id="wantedStars">☆☆☆☆☆</strong>
+        <span id="wantedStatus">CLEAR</span>
+      </div>
+
+      <div class="hud-card mission-hud">
+        <span class="eyebrow">MISSION</span>
+        <strong id="missionTitle">Rinに会う</strong>
+        <span id="missionText">黄色いマーカーへ向かえ</span>
       </div>
 
       <div class="hud-card minimap-card">
-        <canvas id="minimap" width="170" height="170" aria-label="ミニマップ"></canvas>
+        <canvas id="minimap" width="190" height="190" aria-label="ミニマップ"></canvas>
       </div>
     </section>
 
     <div id="interactionPrompt" class="interaction-prompt" hidden>
       <span class="keycap">E</span>
-      <span id="interactionText">話す</span>
+      <span id="interactionText">乗る</span>
     </div>
 
     <section id="dialogue" class="dialogue" hidden aria-live="assertive">
@@ -43,8 +49,10 @@
     <section id="helpPanel" class="help-panel" hidden>
       <div>
         <strong>操作</strong>
-        <p>移動: WASD / 矢印キー　ダッシュ: Shift　会話・取得: E / Space　ポーズ: Esc</p>
-        <p>スマホでは左のスティックで移動し、右のボタンで会話・取得できます。</p>
+        <p><b>徒歩:</b> WASD / 矢印 = 移動、Shift = ダッシュ、E = 会話・乗車、F / クリック = 射撃</p>
+        <p><b>車:</b> W/S = アクセル・ブレーキ、A/D = ハンドル、Space = ハンドブレーキ、E = 降車</p>
+        <p><b>共通:</b> Esc = ポーズ。犯罪を目撃されると手配度が上がり、警察が追跡します。</p>
+        <p>スマホでは左スティック＋右側のACTION / FIRE / BOOSTを使います。</p>
         <button id="helpClose" type="button">閉じる</button>
       </div>
     </section>
@@ -59,7 +67,8 @@
         <div id="joystickKnob" class="joystick-knob"></div>
       </div>
       <div class="mobile-actions">
-        <button id="sprintButton" type="button" aria-label="ダッシュ">⚡</button>
+        <button id="boostButton" type="button">BOOST</button>
+        <button id="fireButton" type="button">FIRE</button>
         <button id="actionButton" type="button">ACTION</button>
       </div>
     </div>
