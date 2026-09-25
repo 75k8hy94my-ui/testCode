@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17231d">
+  <title>Aster Vale - 2D Open World Prototype</title>
+  <link rel="stylesheet" href="./game.css">
+</head>
+<body>
+  <main id="gameShell">
+    <canvas id="gameCanvas" aria-label="2Dオープンワールドゲーム画面" tabindex="0"></canvas>
+
+    <section id="hud" aria-live="polite">
+      <div class="hud-card hud-status">
+        <strong id="areaName">Aster Vale</strong>
+        <span id="worldClock">06:00</span>
+        <span id="coords">X 0 / Y 0</span>
+      </div>
+
+      <div class="hud-card hud-quest">
+        <span class="eyebrow">QUEST</span>
+        <strong id="questTitle">街の人に話しかけよう</strong>
+        <span id="questProgress">E / アクションボタンで会話</span>
+      </div>
+
+      <div class="hud-card minimap-card">
+        <canvas id="minimap" width="170" height="170" aria-label="ミニマップ"></canvas>
+      </div>
+    </section>
+
+    <div id="interactionPrompt" class="interaction-prompt" hidden>
+      <span class="keycap">E</span>
+      <span id="interactionText">話す</span>
+    </div>
+
+    <section id="dialogue" class="dialogue" hidden aria-live="assertive">
+      <strong id="dialogueName"></strong>
+      <p id="dialogueText"></p>
+      <button id="dialogueClose" type="button">閉じる</button>
+    </section>
+
+    <section id="helpPanel" class="help-panel" hidden>
+      <div>
+        <strong>操作</strong>
+        <p>移動: WASD / 矢印キー　ダッシュ: Shift　会話・取得: E / Space　ポーズ: Esc</p>
+        <p>スマホでは左のスティックで移動し、右のボタンで会話・取得できます。</p>
+        <button id="helpClose" type="button">閉じる</button>
+      </div>
+    </section>
+
+    <div class="top-actions">
+      <button id="saveButton" type="button">保存</button>
+      <button id="helpButton" type="button">操作</button>
+    </div>
+
+    <div id="mobileControls" class="mobile-controls" aria-label="タッチ操作">
+      <div id="joystick" class="joystick" aria-label="移動スティック">
+        <div id="joystickKnob" class="joystick-knob"></div>
+      </div>
+      <div class="mobile-actions">
+        <button id="sprintButton" type="button" aria-label="ダッシュ">⚡</button>
+        <button id="actionButton" type="button">ACTION</button>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" hidden aria-live="polite"></div>
+    <div id="pausedOverlay" class="paused-overlay" hidden>
+      <strong>PAUSED</strong>
+      <span>Escで再開</span>
+    </div>
+  </main>
+
+  <script src="./game.js"></script>
+</body>
+</html>
