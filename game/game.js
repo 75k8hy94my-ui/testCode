@@ -826,7 +826,113 @@
     }
   }
 
+  function trainById(id) {
+    return trains.find((train) => train.id === id) || null;
+  }
+
+  function stoppedStationForTrain(train) {
+    if (!train || train.dwell <= 0.05) return null;
+    return TRAIN_STATIONS[train.stationIndex] || null;
+  }
+
+  function nearestRailStationAccess(x, y, maxDistance = 125) {
+    let best = null;
+    let bestDistance = maxDistance;
+    for (const station of TRAIN_STATIONS) {
+      const d = distance(x, y, station.accessX, station.accessY);
+      if (d < bestDistance) {
+        best = station;
+        bestDistance = d;
+      }
+    }
+    return best;
+  }
+
+  function stoppedTrainAtStation(station) {
+    if (!station) return null;
+    return trains.find((train) => train.stationIndex === TRAIN_STATIONS.indexOf(station) && train.dwell > .05) || null;
+  }
+
+  function updateTrainSystem(dt) {
+    for (const train of trains) {
+      if (train.dwell > 0) {
+        train.dwell = Math.max(0, train.dwell - dt);
+        train.speed = 0;
+        continue;
+      }
+
+      const target = TRAIN_STATIONS[train.targetIndex];
+      if (!target) continue;
+
+      const direction = Math.sign(target.x - train.x) || train.direction;
+      train.speed += (TRAIN_SPEED - train.speed) * Math.min(1, dt * 2.2);
+      const nextX = train.x + direction * train.speed * dt;
+      const arrived = direction > 0 ? nextX >= target.x : nextX <= target.x;
+
+      if (arrived) {
+        train.x = target.x;
+        train.stationIndex = train.targetIndex;
+        train.speed = 0;
+        train.dwell = TRAIN_DWELL_SECONDS;
+
+        let nextIndex = train.stationIndex + train.direction;
+        if (nextIndex < 0 || nextIndex >= TRAIN_STATIONS.length) {
+          train.direction *= -1;
+          nextIndex = train.stationIndex + train.direction;
+        }
+        train.targetIndex = nextIndex;
+      } else {
+        train.x = clamp(nextX, RAIL_MIN_X, RAIL_MAX_X);
+      }
+    }
+
+    if (state.player.inTrain) {
+      const train = trainById(state.player.trainId);
+      if (!train) {
+        state.player.inTrain = false;
+        state.player.trainId = null;
+        return;
+      }
+      state.player.x = train.x;
+      state.player.y = train.y;
+    }
+  }
+
+  function boardTrain(train, station) {
+    if (!train || !station || train.dwell <= .05) {
+      showToast("電車はまだ到着していません");
+      return;
+    }
+    state.player.inVehicle = false;
+    state.player.inTrain = true;
+    state.player.trainId = train.id;
+    state.player.x = train.x;
+    state.player.y = train.y;
+    showToast(station.name + "から若葉線に乗車しました");
+  }
+
+  function exitTrain() {
+    const train = trainById(state.player.trainId);
+    const station = stoppedStationForTrain(train);
+    if (!train || !station) {
+      showToast("駅に停車してから降りてください");
+      return;
+    }
+
+    state.player.inTrain = false;
+    state.player.trainId = null;
+    state.player.x = station.accessX;
+    state.player.y = station.accessY;
+    state.player.facingX = 0;
+    state.player.facingY = 1;
+    showToast(station.name + "で降りました");
+  }
+
   function actorPosition() {
+    if (state.player.inTrain) {
+      const train = trainById(state.player.trainId);
+      if (train) return { x: train.x, y: train.y };
+    }
     return state.player.inVehicle ? { x: personalCar.x, y: personalCar.y } : { x: state.player.x, y: state.player.y };
   }
 
@@ -1583,8 +1689,24 @@
   function nearestInteraction() {
     const p = actorPosition();
 
+    if (state.player.inTrain) {
+      const train = trainById(state.player.trainId);
+      const station = stoppedStationForTrain(train);
+      return station
+        ? { type:"train-exit", target:station, label:station.name + "で降りる" }
+        : null;
+    }
+
     if (state.player.inVehicle) {
       return { type: "car-menu", label: state.drive.destination ? "ルート・降車メニュー" : "目的地を選ぶ" };
+    }
+
+    const railStation = nearestRailStationAccess(p.x, p.y);
+    if (railStation) {
+      const train = stoppedTrainAtStation(railStation);
+      return train
+        ? { type:"train-enter", target:train, station:railStation, label:railStation.name + "から電車に乗る" }
+        : { type:"train-wait", station:railStation, label:railStation.name + "で電車を待つ" };
     }
 
     if (distance(p.x, p.y, personalCar.x, personalCar.y) < 70) {
@@ -1617,6 +1739,8 @@
   }
 
   function enterCar() {
+    state.player.inTrain = false;
+    state.player.trainId = null;
     state.player.inVehicle = true;
     state.player.x = personalCar.x;
     state.player.y = personalCar.y;
@@ -1667,6 +1791,9 @@
 
     if (item.type === "car-enter") enterCar();
     if (item.type === "car-menu") openDrivingMenu();
+    if (item.type === "train-enter") boardTrain(item.target, item.station);
+    if (item.type === "train-exit") exitTrain();
+    if (item.type === "train-wait") showToast("電車が到着したら E / ACTION で乗車できます");
     if (item.type === "place") openPlace(item.target);
     if (item.type === "npc") openNpc(item.target);
   }
@@ -1691,13 +1818,24 @@
           y: state.player.y,
           facingX: state.player.facingX,
           facingY: state.player.facingY,
-          inVehicle: state.player.inVehicle
+          inVehicle: state.player.inVehicle,
+          inTrain: state.player.inTrain,
+          trainId: state.player.trainId
         },
         car: {
           x: personalCar.x,
           y: personalCar.y,
           angle: personalCar.angle
         },
+        trains: trains.map((train) => ({
+          id: train.id,
+          x: train.x,
+          stationIndex: train.stationIndex,
+          targetIndex: train.targetIndex,
+          direction: train.direction,
+          dwell: train.dwell,
+          speed: train.speed
+        })),
         day: state.day,
         minute: state.minute,
         cash: state.cash,
@@ -1736,7 +1874,9 @@
         }
         state.player.facingX = Number(saved.player.facingX) || 0;
         state.player.facingY = Number(saved.player.facingY) || 1;
-        state.player.inVehicle = Boolean(saved.player.inVehicle);
+        state.player.inTrain = Boolean(saved.player.inTrain);
+        state.player.trainId = typeof saved.player.trainId === "string" ? saved.player.trainId : null;
+        state.player.inVehicle = Boolean(saved.player.inVehicle) && !state.player.inTrain;
       }
 
       if (saved.car) {
@@ -1747,6 +1887,22 @@
           personalCar.y = y;
         }
         personalCar.angle = Number(saved.car.angle) || 0;
+      }
+
+      if (Array.isArray(saved.trains)) {
+        for (const stored of saved.trains) {
+          const train = trainById(stored && stored.id);
+          if (!train) continue;
+          const x = Number(stored.x);
+          const stationIndex = Math.floor(Number(stored.stationIndex));
+          const targetIndex = Math.floor(Number(stored.targetIndex));
+          if (Number.isFinite(x)) train.x = clamp(x, RAIL_MIN_X, RAIL_MAX_X);
+          if (stationIndex >= 0 && stationIndex < TRAIN_STATIONS.length) train.stationIndex = stationIndex;
+          if (targetIndex >= 0 && targetIndex < TRAIN_STATIONS.length) train.targetIndex = targetIndex;
+          train.direction = Number(stored.direction) < 0 ? -1 : 1;
+          train.dwell = clamp(Number(stored.dwell) || 0, 0, TRAIN_DWELL_SECONDS);
+          train.speed = clamp(Number(stored.speed) || 0, 0, TRAIN_SPEED);
+        }
       }
 
       state.day = Math.max(1, Math.floor(Number(saved.day) || 1));
@@ -1772,7 +1928,17 @@
         for (const npc of NPCS) npc.friendship = Math.max(0, Math.floor(Number(saved.friends[npc.id]) || 0));
       }
 
-      if (state.player.inVehicle) {
+      if (state.player.inTrain) {
+        const train = trainById(state.player.trainId);
+        if (train) {
+          state.player.inVehicle = false;
+          state.player.x = train.x;
+          state.player.y = train.y;
+        } else {
+          state.player.inTrain = false;
+          state.player.trainId = null;
+        }
+      } else if (state.player.inVehicle) {
         state.player.x = personalCar.x;
         state.player.y = personalCar.y;
       }
@@ -2027,9 +2193,11 @@
   function update(dt) {
     if (state.paused || !actionSheet.hidden || !helpPanel.hidden) return;
 
+    updateTrainSystem(dt);
+
     if (!state.player.inVehicle) state.drive.signalClock += dt;
     if (state.player.inVehicle) updateCar(dt);
-    else updatePlayerOnFoot(dt);
+    else if (!state.player.inTrain) updatePlayerOnFoot(dt);
 
     updateTraffic(dt);
     updatePedestrians(dt);
@@ -2061,6 +2229,10 @@
       const lead = clamp(34 + personalCar.speed * .34, 34, 155);
       desiredLeadX = Math.cos(personalCar.angle) * lead;
       desiredLeadY = Math.sin(personalCar.angle) * lead;
+    } else if (state.player.inTrain) {
+      const train = trainById(state.player.trainId);
+      if (train) desiredLeadX = train.direction * 115;
+      desiredLeadY = 0;
     } else {
       desiredLeadX = state.player.facingX * 26;
       desiredLeadY = state.player.facingY * 26;
