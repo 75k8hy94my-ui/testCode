@@ -165,6 +165,92 @@ grant execute on function public.tombstone_manga_reader_encrypted_chunk(uuid, bi
 revoke execute on function public.cleanup_manga_reader_encrypted_chunk_tombstones(integer) from public, anon;
 grant execute on function public.cleanup_manga_reader_encrypted_chunk_tombstones(integer) to authenticated;
 
+create table if not exists public.manga_reader_encrypted_assets (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  asset_id uuid not null,
+  revision bigint not null default 1 check (revision > 0),
+  deleted_at timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, asset_id)
+);
+
+alter table public.manga_reader_encrypted_assets enable row level security;
+revoke all on table public.manga_reader_encrypted_assets from public, anon, authenticated;
+grant select on table public.manga_reader_encrypted_assets to authenticated;
+
+drop policy if exists "Users can read their own encrypted assets" on public.manga_reader_encrypted_assets;
+create policy "Users can read their own encrypted assets"
+on public.manga_reader_encrypted_assets for select
+to authenticated
+using ((select auth.uid()) = user_id);
+
+create or replace function public.create_manga_reader_encrypted_asset(expected_asset_id uuid)
+returns table(asset_id uuid, revision bigint, deleted_at timestamptz, updated_at timestamptz)
+language sql security
+definer
+set search_path = public
+as $$
+  insert into public.manga_reader_encrypted_assets (user_id, asset_id, revision, deleted_at, updated_at)
+  values ((select auth.uid()), expected_asset_id, 1, null, now())
+  on conflict (user_id, asset_id) do nothing
+  returning manga_reader_encrypted_assets.asset_id,
+            manga_reader_encrypted_assets.revision,
+            manga_reader_encrypted_assets.deleted_at,
+            manga_reader_encrypted_assets.updated_at;
+$$;
+
+create or replace function public.publish_manga_reader_encrypted_asset_revision(
+  expected_asset_id uuid,
+  expected_revision bigint
+)
+returns table(asset_id uuid, revision bigint, deleted_at timestamptz, updated_at timestamptz)
+language sql security
+definer
+set search_path = public
+as $$
+  update public.manga_reader_encrypted_assets
+  set revision = manga_reader_encrypted_assets.revision + 1,
+      updated_at = now()
+  where user_id = (select auth.uid())
+    and asset_id = expected_asset_id
+    and manga_reader_encrypted_assets.revision = expected_revision
+    and manga_reader_encrypted_assets.deleted_at is null
+  returning manga_reader_encrypted_assets.asset_id,
+            manga_reader_encrypted_assets.revision,
+            manga_reader_encrypted_assets.deleted_at,
+            manga_reader_encrypted_assets.updated_at;
+$$;
+
+create or replace function public.tombstone_manga_reader_encrypted_asset(
+  expected_asset_id uuid,
+  expected_revision bigint
+)
+returns table(asset_id uuid, revision bigint, deleted_at timestamptz, updated_at timestamptz)
+language sql security
+definer
+set search_path = public
+as $$
+  update public.manga_reader_encrypted_assets
+  set revision = manga_reader_encrypted_assets.revision + 1,
+      deleted_at = now(),
+      updated_at = now()
+  where user_id = (select auth.uid())
+    and asset_id = expected_asset_id
+    and manga_reader_encrypted_assets.revision = expected_revision
+    and manga_reader_encrypted_assets.deleted_at is null
+  returning manga_reader_encrypted_assets.asset_id,
+            manga_reader_encrypted_assets.revision,
+            manga_reader_encrypted_assets.deleted_at,
+            manga_reader_encrypted_assets.updated_at;
+$$;
+
+revoke execute on function public.create_manga_reader_encrypted_asset(uuid) from public, anon;
+grant execute on function public.create_manga_reader_encrypted_asset(uuid) to authenticated;
+revoke execute on function public.publish_manga_reader_encrypted_asset_revision(uuid, bigint) from public, anon;
+grant execute on function public.publish_manga_reader_encrypted_asset_revision(uuid, bigint) to authenticated;
+revoke execute on function public.tombstone_manga_reader_encrypted_asset(uuid, bigint) from public, anon;
+grant execute on function public.tombstone_manga_reader_encrypted_asset(uuid, bigint) to authenticated;
+
 -- ローカル漫画の同期用。画像本体はvaultのJSONに入れず、Storageへ1枚ずつ保存する。
 insert into storage.buckets (id, name, public)
 values ('local-manga', 'local-manga', false)
