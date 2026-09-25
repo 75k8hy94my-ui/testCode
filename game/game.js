@@ -1618,6 +1618,7 @@
         x,
         y,
         orientation,
+        stopOffset:stopLineOffsetAt(node.gx, node.gy),
         pathIndex:nearestPathIndex(points, x, y)
       });
     }
@@ -1625,6 +1626,88 @@
     return { points, signals };
   }
 
+
+  function updateRouteProgress() {
+    const route = state.drive.route;
+    if (!route.length) return;
+    const start = Math.max(0, state.drive.routeIndex - 3);
+    const end = Math.min(route.length - 1, state.drive.routeIndex + 36);
+    let bestIndex = state.drive.routeIndex;
+    let bestDistance = Infinity;
+    for (let i = start; i <= end; i += 1) {
+      const d = distance(personalCar.x, personalCar.y, route[i].x, route[i].y);
+      if (d < bestDistance) {
+        bestDistance = d;
+        bestIndex = i;
+      }
+    }
+    state.drive.routeIndex = Math.max(state.drive.routeIndex, bestIndex);
+    while (
+      state.drive.routeIndex < route.length - 1 &&
+      distance(personalCar.x, personalCar.y, route[state.drive.routeIndex].x, route[state.drive.routeIndex].y) < 22
+    ) {
+      state.drive.routeIndex += 1;
+    }
+  }
+
+  function routeLookaheadTarget() {
+    const route = state.drive.route;
+    if (!route.length) return null;
+    const lookahead = 42 + personalCar.speed * .13;
+    let index = state.drive.routeIndex;
+    let previous = { x:personalCar.x, y:personalCar.y };
+    let accumulated = 0;
+    while (index < route.length) {
+      accumulated += distance(previous.x, previous.y, route[index].x, route[index].y);
+      if (accumulated >= lookahead) return route[index];
+      previous = route[index];
+      index += 1;
+    }
+    return route[route.length - 1];
+  }
+
+  function upcomingSignal() {
+    let best = null;
+    for (const signal of state.drive.signals) {
+      if (signal.pathIndex < state.drive.routeIndex - 4) continue;
+      if (signal.pathIndex > state.drive.routeIndex + 46) continue;
+      const d = distance(personalCar.x, personalCar.y, signal.x, signal.y);
+      if (d > 240) continue;
+      if (!best || signal.pathIndex < best.pathIndex) {
+        best = {
+          state:signalStateAt(signal.x, signal.y, signal.orientation),
+          distance:d,
+          key:Math.round(signal.x) + ":" + Math.round(signal.y) + ":" + signal.orientation,
+          stopOffset:signal.stopOffset || STOP_LINE_OFFSET,
+          pathIndex:signal.pathIndex
+        };
+      }
+    }
+    return best;
+  }
+
+  function leadVehicleInfo() {
+    const hx = Math.cos(personalCar.angle);
+    const hy = Math.sin(personalCar.angle);
+    let best = null;
+    for (const car of traffic) {
+      const dx = car.x - personalCar.x;
+      const dy = car.y - personalCar.y;
+      const forward = dx * hx + dy * hy;
+      if (forward <= 0 || forward > 280) continue;
+      const lateral = Math.abs(dx * -hy + dy * hx);
+      if (lateral > 72) continue;
+      const sameDirection = Math.cos(car.angle) * hx + Math.sin(car.angle) * hy;
+      if (sameDirection < .35) continue;
+      if (!best || forward < best.distance) best = { car, distance:forward };
+    }
+    return best;
+  }
+
+  function penalizeDriving(amount, message) {
+    state.drive.score = clamp(state.drive.score - amount, 0, 100);
+    if (message) showToast(message);
+  }
 
   function setDrivingDestination(place) {
     state.drive.destination = place.id;
@@ -2367,7 +2450,7 @@
     if (
       signal &&
       signal.state === "red" &&
-      signal.distance < STOP_LINE_OFFSET + VEHICLE_FRONT_OVERHANG * 0.7 &&
+      signal.distance < (signal.stopOffset || STOP_LINE_OFFSET) + VEHICLE_FRONT_OVERHANG * 0.7 &&
       personalCar.speed > 18 &&
       !state.drive.violationKeys.has(signal.key)
     ) {
@@ -2439,6 +2522,7 @@
           x:gx * ROAD_GAP,
           y:gy * ROAD_GAP,
           orientation:car.orientation,
+          stopOffset:stopLineOffsetAt(gx, gy),
           distance:Math.abs(nodeIndex * ROAD_GAP - car.along)
         };
       }
@@ -2458,7 +2542,7 @@
 
       if (nextSignal) {
         const signal = signalStateAt(nextSignal.x, nextSignal.y, nextSignal.orientation);
-        const stopCenterDistance = STOP_LINE_OFFSET + VEHICLE_FRONT_OVERHANG;
+        const stopCenterDistance = (nextSignal.stopOffset || STOP_LINE_OFFSET) + VEHICLE_FRONT_OVERHANG;
         if ((signal === "red" || signal === "yellow") && nextSignal.distance < stopCenterDistance + 75) {
           targetSpeed = Math.max(0, (nextSignal.distance - stopCenterDistance) * 2.5);
         }
@@ -2794,100 +2878,104 @@
     }
   }
 
+  function intersectionHalfWidth(gx, gy) {
+    let half = 54;
+    const candidates = [
+      [gx, gy - 1, gx, gy, "v", gx, gy - 1],
+      [gx, gy, gx, gy + 1, "v", gx, gy],
+      [gx - 1, gy, gx, gy, "h", gy, gx - 1],
+      [gx, gy, gx + 1, gy, "h", gy, gx]
+    ];
+    for (const [ax, ay, bx, by, axis, roadIndex, segmentIndex] of candidates) {
+      if (!roadEdgeExists(ax, ay, bx, by)) continue;
+      half = Math.max(
+        half,
+        roadWidthForStyle(roadSegmentStyle(axis, roadIndex, segmentIndex)) / 2
+      );
+    }
+    return half;
+  }
+
+  function stopLineOffsetAt(gx, gy) {
+    return intersectionHalfWidth(gx, gy) + 22 + CROSSWALK_DEPTH / 2 + STOP_LINE_GAP;
+  }
+
   function drawJapaneseIntersectionMarkings(sx, sy, wx, wy) {
-    const crossingSpan = ROAD_WIDTH - 44;
+    const gx = Math.round(wx / ROAD_GAP);
+    const gy = Math.round(wy / ROAD_GAP);
+    const north = roadEdgeExists(gx, gy - 1, gx, gy);
+    const south = roadEdgeExists(gx, gy, gx, gy + 1);
+    const west = roadEdgeExists(gx - 1, gy, gx, gy);
+    const east = roadEdgeExists(gx, gy, gx + 1, gy);
+
+    const halfRoad = intersectionHalfWidth(gx, gy);
+    const crossingOffset = halfRoad + 22;
+    const stopOffset = stopLineOffsetAt(gx, gy);
+    const crossingSpan = halfRoad * 2 - 44;
     const stripe = 5;
     const stripeGap = 6;
     const halfSpan = crossingSpan / 2;
 
     ctx.fillStyle = "rgba(244,245,240,.88)";
 
-    // Zebra crossings: each white bar runs in the pedestrian travel direction.
-    // North/south crossings use vertical bars repeated across the road.
     for (let d = -halfSpan; d <= halfSpan; d += stripe + stripeGap) {
-      ctx.fillRect(
-        sx + d,
-        sy - CROSSWALK_OFFSET - CROSSWALK_DEPTH / 2,
-        stripe,
-        CROSSWALK_DEPTH
-      );
-      ctx.fillRect(
-        sx + d,
-        sy + CROSSWALK_OFFSET - CROSSWALK_DEPTH / 2,
-        stripe,
-        CROSSWALK_DEPTH
-      );
+      if (north) ctx.fillRect(sx + d, sy - crossingOffset - CROSSWALK_DEPTH / 2, stripe, CROSSWALK_DEPTH);
+      if (south) ctx.fillRect(sx + d, sy + crossingOffset - CROSSWALK_DEPTH / 2, stripe, CROSSWALK_DEPTH);
     }
 
-    // East/west crossings use horizontal bars repeated across the road.
     for (let d = -halfSpan; d <= halfSpan; d += stripe + stripeGap) {
-      ctx.fillRect(
-        sx - CROSSWALK_OFFSET - CROSSWALK_DEPTH / 2,
-        sy + d,
-        CROSSWALK_DEPTH,
-        stripe
-      );
-      ctx.fillRect(
-        sx + CROSSWALK_OFFSET - CROSSWALK_DEPTH / 2,
-        sy + d,
-        CROSSWALK_DEPTH,
-        stripe
-      );
+      if (west) ctx.fillRect(sx - crossingOffset - CROSSWALK_DEPTH / 2, sy + d, CROSSWALK_DEPTH, stripe);
+      if (east) ctx.fillRect(sx + crossingOffset - CROSSWALK_DEPTH / 2, sy + d, CROSSWALK_DEPTH, stripe);
     }
 
-    // Japanese left-hand traffic: one stop line per incoming lane.
-    // Keep a small gap at the center line and at the shoulder so the line reads
-    // as a lane-width stop line rather than a road-wide barrier.
     const inner = STOP_LINE_CENTER_MARGIN;
-    const outer = ROAD_HALF - STOP_LINE_EDGE_MARGIN;
-    const lineLength = outer - inner;
+    const outer = halfRoad - STOP_LINE_EDGE_MARGIN;
+    const lineLength = Math.max(24, outer - inner);
     const lineWidth = 4;
     ctx.fillStyle = "rgba(248,248,244,.96)";
 
-    // North approach, travelling south: east/right half of the vertical road.
-    ctx.fillRect(sx + inner, sy - STOP_LINE_OFFSET - lineWidth / 2, lineLength, lineWidth);
-    // South approach, travelling north: west/left half.
-    ctx.fillRect(sx - outer, sy + STOP_LINE_OFFSET - lineWidth / 2, lineLength, lineWidth);
-    // West approach, travelling east: north/top half of the horizontal road.
-    ctx.fillRect(sx - STOP_LINE_OFFSET - lineWidth / 2, sy - outer, lineWidth, lineLength);
-    // East approach, travelling west: south/bottom half.
-    ctx.fillRect(sx + STOP_LINE_OFFSET - lineWidth / 2, sy + inner, lineWidth, lineLength);
+    if (north) ctx.fillRect(sx + inner, sy - stopOffset - lineWidth / 2, lineLength, lineWidth);
+    if (south) ctx.fillRect(sx - outer, sy + stopOffset - lineWidth / 2, lineLength, lineWidth);
+    if (west) ctx.fillRect(sx - stopOffset - lineWidth / 2, sy - outer, lineWidth, lineLength);
+    if (east) ctx.fillRect(sx + stopOffset - lineWidth / 2, sy + inner, lineWidth, lineLength);
 
-    // Direction arrows sit behind the stop line.
-    const arrowDistance = STOP_LINE_OFFSET + 62;
-    drawRoadArrow(sx + LANE_OFFSET, sy - arrowDistance, Math.PI / 2);
-    drawRoadArrow(sx - LANE_OFFSET, sy + arrowDistance, -Math.PI / 2);
-    drawRoadArrow(sx - arrowDistance, sy - LANE_OFFSET, 0);
-    drawRoadArrow(sx + arrowDistance, sy + LANE_OFFSET, Math.PI);
+    const arrowDistance = stopOffset + 62;
+    const lane = Math.min(LANE_OFFSET, halfRoad * .42);
+    if (north) drawRoadArrow(sx + lane, sy - arrowDistance, Math.PI / 2);
+    if (south) drawRoadArrow(sx - lane, sy + arrowDistance, -Math.PI / 2);
+    if (west) drawRoadArrow(sx - arrowDistance, sy - lane, 0);
+    if (east) drawRoadArrow(sx + arrowDistance, sy + lane, Math.PI);
 
-    // Yellow tactile paving at curb ramps.
-    const curb = ROAD_HALF + 14;
-    drawTactilePad(sx - curb, sy - CROSSWALK_OFFSET, false);
-    drawTactilePad(sx + curb, sy - CROSSWALK_OFFSET, false);
-    drawTactilePad(sx - curb, sy + CROSSWALK_OFFSET, false);
-    drawTactilePad(sx + curb, sy + CROSSWALK_OFFSET, false);
-    drawTactilePad(sx - CROSSWALK_OFFSET, sy - curb, true);
-    drawTactilePad(sx - CROSSWALK_OFFSET, sy + curb, true);
-    drawTactilePad(sx + CROSSWALK_OFFSET, sy - curb, true);
-    drawTactilePad(sx + CROSSWALK_OFFSET, sy + curb, true);
+    const curb = halfRoad + 14;
+    if (north) {
+      drawTactilePad(sx - curb, sy - crossingOffset, false);
+      drawTactilePad(sx + curb, sy - crossingOffset, false);
+    }
+    if (south) {
+      drawTactilePad(sx - curb, sy + crossingOffset, false);
+      drawTactilePad(sx + curb, sy + crossingOffset, false);
+    }
+    if (west) {
+      drawTactilePad(sx - crossingOffset, sy - curb, true);
+      drawTactilePad(sx - crossingOffset, sy + curb, true);
+    }
+    if (east) {
+      drawTactilePad(sx + crossingOffset, sy - curb, true);
+      drawTactilePad(sx + crossingOffset, sy + curb, true);
+    }
 
-    // Short white guard pipes on the sidewalk corners.
-    drawGuardPipe(sx - curb - 20, sy - curb - 44, sx - curb - 20, sy - curb - 10);
-    drawGuardPipe(sx + curb + 20, sy + curb + 10, sx + curb + 20, sy + curb + 44);
-    drawGuardPipe(sx - curb - 44, sy + curb + 20, sx - curb - 10, sy + curb + 20);
-    drawGuardPipe(sx + curb + 10, sy - curb - 20, sx + curb + 44, sy - curb - 20);
-
-    // Occasional pavement speed marking on major roads.
     const limit = speedLimitAt(wx, wy);
-    if (limit >= 50 && hash2(Math.round(wx / ROAD_GAP), Math.round(wy / ROAD_GAP), 1251) > .54) {
+    if (limit >= 50 && hash2(gx, gy, 1251) > .54) {
       ctx.save();
       ctx.fillStyle = "rgba(242,243,239,.5)";
       ctx.font = "700 16px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(String(limit), sx - LANE_OFFSET, sy + arrowDistance + 54);
+      if (south) ctx.fillText(String(limit), sx - lane, sy + arrowDistance + 54);
+      else if (east) ctx.fillText(String(limit), sx + arrowDistance + 54, sy + lane);
       ctx.restore();
     }
   }
+
 
   function drawParkingCarTop(x, y, horizontal, seed) {
     const length = 31;
@@ -4879,7 +4967,7 @@
       else {
         const signal = upcomingSignal();
         const lead = leadVehicleInfo();
-        if (signal && signal.state === "red" && signal.distance < STOP_LINE_OFFSET + 85) objectiveText.textContent = "赤信号です。横断歩道手前の停止線で止まる";
+        if (signal && signal.state === "red" && signal.distance < (signal.stopOffset || STOP_LINE_OFFSET) + 85) objectiveText.textContent = "赤信号です。横断歩道手前の停止線で止まる";
         else if (lead && lead.distance < 130) objectiveText.textContent = "前走車との車間を保つ";
         else objectiveText.textContent = "W / ↑・ACCELで加速、S / ↓・BRAKEで減速";
       }
