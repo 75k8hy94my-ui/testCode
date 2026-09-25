@@ -2903,31 +2903,165 @@
     }
   }
 
+  function offsetRoadPoints(points, offset) {
+    return points.map((point, i) => {
+      const previous = points[Math.max(0, i - 1)];
+      const next = points[Math.min(points.length - 1, i + 1)];
+      let tx = next.x - previous.x;
+      let ty = next.y - previous.y;
+      const mag = Math.hypot(tx, ty) || 1;
+      tx /= mag;
+      ty /= mag;
+      return {
+        x:point.x + ty * offset,
+        y:point.y - tx * offset
+      };
+    });
+  }
+
+  function strokeWorldRoadPath(points, width, color, dash = null) {
+    if (!points.length) return;
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath();
+    ctx.moveTo(points[0].x - state.camera.x, points[0].y - state.camera.y);
+    for (let i = 1; i < points.length; i += 1) {
+      ctx.lineTo(points[i].x - state.camera.x, points[i].y - state.camera.y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawRoadEdge(axis, roadIndex, segmentIndex) {
+    const style = roadSegmentStyle(axis, roadIndex, segmentIndex);
+    const width = roadWidthForStyle(style);
+    const points = sampleRoadEdge(axis, roadIndex, segmentIndex, 14);
+
+    // Sidewalk / shoulder follows the exact curved street.
+    const sidewalkExtra =
+      style === "arterial" ? 34 :
+      style === "station" ? 32 :
+      style === "commercial" ? 28 :
+      style === "residential" ? 12 :
+      22;
+    strokeWorldRoadPath(points, width + sidewalkExtra, "#a7a9a3");
+
+    const asphalt =
+      style === "arterial" ? "#303638" :
+      style === "station" ? "#343a3d" :
+      style === "commercial" ? "#373c3d" :
+      style === "residential" ? "#444947" :
+      style === "park" ? "#3a403f" :
+      "#3b4142";
+    strokeWorldRoadPath(points, width, asphalt);
+
+    // Edge lines are omitted on the narrowest residential streets.
+    if (style !== "residential") {
+      const edgeOffset = width / 2 - (style === "arterial" ? 14 : 10);
+      strokeWorldRoadPath(offsetRoadPoints(points, edgeOffset), 1.8, "rgba(239,241,237,.62)");
+      strokeWorldRoadPath(offsetRoadPoints(points, -edgeOffset), 1.8, "rgba(239,241,237,.62)");
+    }
+
+    if (style === "arterial") {
+      // Two lanes in each direction.
+      strokeWorldRoadPath(points, 3.2, "rgba(226,164,46,.9)");
+      const divider = width * .25;
+      strokeWorldRoadPath(offsetRoadPoints(points, divider), 1.8, "rgba(239,241,237,.65)", [16, 14]);
+      strokeWorldRoadPath(offsetRoadPoints(points, -divider), 1.8, "rgba(239,241,237,.65)", [16, 14]);
+    } else if (style === "station") {
+      strokeWorldRoadPath(points, 2.2, "rgba(239,241,237,.72)", [18, 17]);
+      const busOffset = width / 2 - 25;
+      strokeWorldRoadPath(offsetRoadPoints(points, busOffset), 12, "rgba(67,110,137,.34)");
+    } else if (style === "commercial") {
+      strokeWorldRoadPath(points, 2, "rgba(239,241,237,.68)", [14, 22]);
+    } else if (style === "park") {
+      strokeWorldRoadPath(points, 2, "rgba(239,241,237,.6)", [20, 18]);
+      const bikeOffset = width / 2 - 17;
+      strokeWorldRoadPath(offsetRoadPoints(points, -bikeOffset), 8, "rgba(72,133,88,.42)");
+    } else if (style === "local") {
+      strokeWorldRoadPath(points, 1.8, "rgba(239,241,237,.56)", [20, 22]);
+    }
+
+    // Sparse asphalt repair seams make local streets less uniform.
+    if (style === "local" || style === "residential" || style === "commercial") {
+      const seed = hash2(roadIndex, segmentIndex, axis === "h" ? 1910 : 1911);
+      if (seed > .43) {
+        const t = .22 + seed * .56;
+        const p = roadEdgePoint(axis, roadIndex, segmentIndex, Math.min(.82, t));
+        const screen = worldToScreen(p.x, p.y);
+        ctx.save();
+        ctx.translate(screen.x, screen.y);
+        const tangentA = roadEdgePoint(axis, roadIndex, segmentIndex, Math.max(0, t - .02));
+        const tangentB = roadEdgePoint(axis, roadIndex, segmentIndex, Math.min(1, t + .02));
+        ctx.rotate(Math.atan2(tangentB.y - tangentA.y, tangentB.x - tangentA.x));
+        ctx.fillStyle = "rgba(15,19,19,.1)";
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 18 + seed * 13, 5 + seed * 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+  }
+
+  function drawSparseRoadNetwork() {
+    for (let gy = 1; gy <= 17; gy += 1) {
+      for (let gx = 1; gx < 17; gx += 1) {
+        if (roadEdgeExists(gx, gy, gx + 1, gy)) drawRoadEdge("h", gy, gx);
+      }
+    }
+    for (let gx = 1; gx <= 17; gx += 1) {
+      for (let gy = 1; gy < 17; gy += 1) {
+        if (roadEdgeExists(gx, gy, gx, gy + 1)) drawRoadEdge("v", gx, gy);
+      }
+    }
+
+    // Only meaningful, signalized junctions get the full zebra/stop-line treatment.
+    const startGX = Math.max(1, Math.floor(state.camera.x / ROAD_GAP) - 2);
+    const endGX = Math.min(17, Math.ceil((state.camera.x + viewWidth) / ROAD_GAP) + 2);
+    const startGY = Math.max(1, Math.floor(state.camera.y / ROAD_GAP) - 2);
+    const endGY = Math.min(17, Math.ceil((state.camera.y + viewHeight) / ROAD_GAP) + 2);
+    for (let gx = startGX; gx <= endGX; gx += 1) {
+      for (let gy = startGY; gy <= endGY; gy += 1) {
+        if (!isSignalizedIntersection(gx, gy)) continue;
+        drawJapaneseIntersectionMarkings(
+          gx * ROAD_GAP - state.camera.x,
+          gy * ROAD_GAP - state.camera.y,
+          gx * ROAD_GAP,
+          gy * ROAD_GAP
+        );
+      }
+    }
+  }
+
   function drawGround() {
     const time = visualTime();
     ctx.fillStyle = "#7e8f78";
     ctx.fillRect(0, 0, viewWidth, viewHeight);
 
+    // Subtle parcel variation, no longer implying that every 600px boundary is a road.
     const startBlockX = Math.floor(state.camera.x / ROAD_GAP) - 1;
     const endBlockX = Math.ceil((state.camera.x + viewWidth) / ROAD_GAP) + 1;
     const startBlockY = Math.floor(state.camera.y / ROAD_GAP) - 1;
     const endBlockY = Math.ceil((state.camera.y + viewHeight) / ROAD_GAP) + 1;
-
     for (let gx = startBlockX; gx <= endBlockX; gx += 1) {
       for (let gy = startBlockY; gy <= endBlockY; gy += 1) {
         const sx = gx * ROAD_GAP - state.camera.x;
         const sy = gy * ROAD_GAP - state.camera.y;
         const seed = hash2(gx, gy, 700);
-        ctx.fillStyle = seed > 0.5 ? "rgba(255,255,255,.018)" : "rgba(0,0,0,.018)";
-        ctx.fillRect(sx + ROAD_HALF, sy + ROAD_HALF, ROAD_GAP - ROAD_WIDTH, ROAD_GAP - ROAD_WIDTH);
+        ctx.fillStyle = seed > .5 ? "rgba(255,255,255,.012)" : "rgba(0,0,0,.014)";
+        ctx.fillRect(sx, sy, ROAD_GAP, ROAD_GAP);
       }
     }
 
     const edges = {
-      left: COAST - state.camera.x,
-      top: COAST - state.camera.y,
-      right: WORLD_SIZE - COAST - state.camera.x,
-      bottom: WORLD_SIZE - COAST - state.camera.y
+      left:COAST - state.camera.x,
+      top:COAST - state.camera.y,
+      right:WORLD_SIZE - COAST - state.camera.x,
+      bottom:WORLD_SIZE - COAST - state.camera.y
     };
 
     ctx.fillStyle = "#4e7d89";
@@ -2940,241 +3074,29 @@
     ctx.lineWidth = 2;
     for (let y = 28; y < viewHeight; y += 34) {
       ctx.beginPath();
-      ctx.moveTo(0, y + Math.sin((y + state.camera.x) * 0.012) * 5);
+      ctx.moveTo(0, y + Math.sin((y + state.camera.x) * .012) * 5);
       ctx.lineTo(Math.max(0, edges.left), y);
       ctx.stroke();
       if (edges.right < viewWidth) {
         ctx.beginPath();
         ctx.moveTo(edges.right, y);
-        ctx.lineTo(viewWidth, y + Math.cos((y + state.camera.y) * 0.01) * 4);
+        ctx.lineTo(viewWidth, y + Math.cos((y + state.camera.y) * .01) * 4);
         ctx.stroke();
       }
     }
 
-    const startX = Math.floor(state.camera.x / ROAD_GAP) - 1;
-    const endX = Math.ceil((state.camera.x + viewWidth) / ROAD_GAP) + 1;
-    const startY = Math.floor(state.camera.y / ROAD_GAP) - 1;
-    const endY = Math.ceil((state.camera.y + viewHeight) / ROAD_GAP) + 1;
+    drawSparseRoadNetwork();
 
-    ctx.fillStyle = "#343a3c";
-    for (let i = startX; i <= endX; i += 1) {
-      const sx = i * ROAD_GAP - ROAD_HALF - state.camera.x;
-      ctx.fillRect(sx, 0, ROAD_WIDTH, viewHeight);
-    }
-    for (let i = startY; i <= endY; i += 1) {
-      const sy = i * ROAD_GAP - ROAD_HALF - state.camera.y;
-      ctx.fillRect(0, sy, viewWidth, ROAD_WIDTH);
-    }
-
-    // Road hierarchy: every block-to-block segment gets its own visual character.
-    const textureClearance = ROAD_HALF + 64;
-    for (let road = startX; road <= endX; road += 1) {
-      for (let seg = startY - 1; seg <= endY; seg += 1) {
-        const start = seg * ROAD_GAP + textureClearance;
-        const end = (seg + 1) * ROAD_GAP - textureClearance;
-        drawRoadSegmentTexture("v", road, seg, start, end);
-      }
-    }
-    for (let road = startY; road <= endY; road += 1) {
-      for (let seg = startX - 1; seg <= endX; seg += 1) {
-        const start = seg * ROAD_GAP + textureClearance;
-        const end = (seg + 1) * ROAD_GAP - textureClearance;
-        drawRoadSegmentTexture("h", road, seg, start, end);
-      }
-    }
-
-    ctx.fillStyle = "rgba(255,255,255,.025)";
-    for (let i = startX; i <= endX; i += 1) {
-      const cx = i * ROAD_GAP - state.camera.x;
-      ctx.fillRect(cx - 60, 0, 18, viewHeight);
-      ctx.fillRect(cx + 42, 0, 18, viewHeight);
-    }
-    for (let i = startY; i <= endY; i += 1) {
-      const cy = i * ROAD_GAP - state.camera.y;
-      ctx.fillRect(0, cy - 60, viewWidth, 18);
-      ctx.fillRect(0, cy + 42, viewWidth, 18);
-    }
-
-    // Sidewalks exist between intersections, not across the vehicle junction.
-    for (let i = startX; i <= endX; i += 1) {
-      const left = i * ROAD_GAP - ROAD_HALF - 16 - state.camera.x;
-      const right = i * ROAD_GAP + ROAD_HALF - state.camera.x;
-      for (let gy = startY - 1; gy <= endY; gy += 1) {
-        const y1 = gy * ROAD_GAP + ROAD_HALF - state.camera.y;
-        const y2 = (gy + 1) * ROAD_GAP - ROAD_HALF - state.camera.y;
-        if (y2 <= y1) continue;
-        ctx.fillStyle = "#a9aaa4";
-        ctx.fillRect(left, y1, 16, y2 - y1);
-        ctx.fillRect(right, y1, 16, y2 - y1);
-        ctx.fillStyle = "rgba(255,255,255,.16)";
-        ctx.fillRect(left, y1, 2, y2 - y1);
-        ctx.fillRect(right + 14, y1, 2, y2 - y1);
-      }
-    }
-    for (let i = startY; i <= endY; i += 1) {
-      const top = i * ROAD_GAP - ROAD_HALF - 16 - state.camera.y;
-      const bottom = i * ROAD_GAP + ROAD_HALF - state.camera.y;
-      for (let gx = startX - 1; gx <= endX; gx += 1) {
-        const x1 = gx * ROAD_GAP + ROAD_HALF - state.camera.x;
-        const x2 = (gx + 1) * ROAD_GAP - ROAD_HALF - state.camera.x;
-        if (x2 <= x1) continue;
-        ctx.fillStyle = "#a9aaa4";
-        ctx.fillRect(x1, top, x2 - x1, 16);
-        ctx.fillRect(x1, bottom, x2 - x1, 16);
-        ctx.fillStyle = "rgba(255,255,255,.16)";
-        ctx.fillRect(x1, top, x2 - x1, 2);
-        ctx.fillRect(x1, bottom + 14, x2 - x1, 2);
-      }
-    }
-
-    // Japanese-style two-way streets: one lane each direction, edge lines, and
-    // center lines that stop before each intersection instead of running through it.
-    ctx.strokeStyle = "rgba(239,241,237,.68)";
-    ctx.lineWidth = 2;
-    const edgeClearance = ROAD_HALF + 58;
-    for (let i = startX; i <= endX; i += 1) {
-      const sx = i * ROAD_GAP - state.camera.x;
-      for (let gy = startY - 1; gy <= endY; gy += 1) {
-        const sy1 = gy * ROAD_GAP + edgeClearance - state.camera.y;
-        const sy2 = (gy + 1) * ROAD_GAP - edgeClearance - state.camera.y;
-        if (sy2 <= sy1) continue;
-        for (const edge of [-ROAD_HALF + 18, ROAD_HALF - 18]) {
-          ctx.beginPath();
-          ctx.moveTo(sx + edge, sy1);
-          ctx.lineTo(sx + edge, sy2);
-          ctx.stroke();
-        }
-      }
-    }
-    for (let i = startY; i <= endY; i += 1) {
-      const sy = i * ROAD_GAP - state.camera.y;
-      for (let gx = startX - 1; gx <= endX; gx += 1) {
-        const sx1 = gx * ROAD_GAP + edgeClearance - state.camera.x;
-        const sx2 = (gx + 1) * ROAD_GAP - edgeClearance - state.camera.x;
-        if (sx2 <= sx1) continue;
-        for (const edge of [-ROAD_HALF + 18, ROAD_HALF - 18]) {
-          ctx.beginPath();
-          ctx.moveTo(sx1, sy + edge);
-          ctx.lineTo(sx2, sy + edge);
-          ctx.stroke();
-        }
-      }
-    }
-
-    const intersectionClearance = ROAD_HALF + 66;
-    for (let i = startX; i <= endX; i += 1) {
-      for (let gy = startY - 1; gy <= endY; gy += 1) {
-        const y1 = gy * ROAD_GAP + intersectionClearance;
-        const y2 = (gy + 1) * ROAD_GAP - intersectionClearance;
-        const style = roadSegmentStyle("v", i, gy);
-        if (y2 > y1) drawRoadCenterSegmentVertical(i * ROAD_GAP, y1, y2, style);
-      }
-    }
-    for (let i = startY; i <= endY; i += 1) {
-      for (let gx = startX - 1; gx <= endX; gx += 1) {
-        const x1 = gx * ROAD_GAP + intersectionClearance;
-        const x2 = (gx + 1) * ROAD_GAP - intersectionClearance;
-        const style = roadSegmentStyle("h", i, gx);
-        if (x2 > x1) drawRoadCenterSegmentHorizontal(i * ROAD_GAP, x1, x2, style);
-      }
-    }
-
-    for (let gx = startX; gx <= endX; gx += 1) {
-      for (let gy = startY; gy <= endY; gy += 1) {
-        const wx = gx * ROAD_GAP;
-        const wy = gy * ROAD_GAP;
-        const sx = wx - state.camera.x;
-        const sy = wy - state.camera.y;
-        drawJapaneseIntersectionMarkings(sx, sy, wx, wy);
-      }
-    }
-
+    // Wet asphalt catches a soft cool reflection without repainting a full grid.
     if (state.visual.weather === "rain") {
-      ctx.fillStyle = "rgba(113,148,159,.10)";
-      for (let i = startX; i <= endX; i += 1) {
-        const sx = i * ROAD_GAP - ROAD_HALF - state.camera.x;
-        ctx.fillRect(sx, 0, ROAD_WIDTH, viewHeight);
-      }
-      for (let i = startY; i <= endY; i += 1) {
-        const sy = i * ROAD_GAP - ROAD_HALF - state.camera.y;
-        ctx.fillRect(0, sy, viewWidth, ROAD_WIDTH);
-      }
-      ctx.fillStyle = "rgba(221,232,232,.07)";
-      for (let i = startX; i <= endX; i += 1) {
-        const sx = i * ROAD_GAP - state.camera.x;
-        ctx.fillRect(sx - 3, 0, 6, viewHeight);
-      }
-      for (let i = startY; i <= endY; i += 1) {
-        const sy = i * ROAD_GAP - state.camera.y;
-        ctx.fillRect(0, sy - 3, viewWidth, 6);
-      }
+      ctx.fillStyle = "rgba(113,148,159,.035)";
+      ctx.fillRect(0, 0, viewWidth, viewHeight);
     }
 
-    ctx.fillStyle = "rgba(18,22,22,.36)";
-    for (let gx = startX; gx <= endX; gx += 1) {
-      for (let gy = startY; gy <= endY; gy += 1) {
-        if (hash2(gx, gy, 733) < 0.43) continue;
-        const sx = gx * ROAD_GAP + 128 - state.camera.x;
-        const sy = gy * ROAD_GAP - 34 - state.camera.y;
-        ctx.beginPath();
-        ctx.ellipse(sx, sy, 9, 6, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,.08)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-    }
-
-    if (time.daylight < 0.26) {
+    if (time.daylight < .26) {
       ctx.fillStyle = "rgba(248,224,165,.035)";
       ctx.fillRect(0, 0, viewWidth, viewHeight);
     }
-  }
-
-  function drawTree(x, y, scale = 1) {
-    const p = worldToScreen(x, y);
-    if (p.x < -60 || p.y < -60 || p.x > viewWidth + 60 || p.y > viewHeight + 60) return;
-    const time = visualTime();
-    ctx.fillStyle = "rgba(16,25,19,.18)";
-    ctx.beginPath();
-    ctx.ellipse(p.x + time.shadowX * .3, p.y + 10 + time.shadowY * .2, 18 * scale, 8 * scale, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#6c5140";
-    ctx.fillRect(p.x - 3 * scale, p.y - 2 * scale, 6 * scale, 17 * scale);
-    ctx.fillStyle = "#3f6c4d";
-    ctx.beginPath();
-    ctx.arc(p.x - 8 * scale, p.y - 10 * scale, 13 * scale, 0, Math.PI * 2);
-    ctx.arc(p.x + 7 * scale, p.y - 12 * scale, 15 * scale, 0, Math.PI * 2);
-    ctx.arc(p.x, p.y - 22 * scale, 14 * scale, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "rgba(143,185,129,.42)";
-    ctx.beginPath();
-    ctx.arc(p.x - 4 * scale, p.y - 20 * scale, 8 * scale, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  function drawLamp(x, y) {
-    const p = worldToScreen(x, y);
-    if (p.x < -30 || p.y < -60 || p.x > viewWidth + 30 || p.y > viewHeight + 60) return;
-    const time = visualTime();
-    if (time.night > .45) {
-      const glow = ctx.createRadialGradient(p.x, p.y - 29, 2, p.x, p.y - 29, 38);
-      glow.addColorStop(0, "rgba(255,224,157,.28)");
-      glow.addColorStop(1, "rgba(255,224,157,0)");
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y - 29, 38, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.strokeStyle = "#343b3d";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y + 8);
-    ctx.lineTo(p.x, p.y - 28);
-    ctx.lineTo(p.x + 9, p.y - 28);
-    ctx.stroke();
-    ctx.fillStyle = time.night > .45 ? "#ffd98a" : "#c5c8c4";
-    ctx.fillRect(p.x + 6, p.y - 31, 9, 6);
   }
 
   function drawNeighborhoodGround() {
@@ -3987,6 +3909,7 @@
 
     for (let gx = startX; gx <= endX; gx += 1) {
       for (let gy = startY; gy <= endY; gy += 1) {
+        if (!isSignalizedIntersection(gx, gy)) continue;
         const wx = gx * ROAD_GAP;
         const wy = gy * ROAD_GAP;
         const sx = wx - state.camera.x;
