@@ -1819,21 +1819,27 @@
     ctx.stroke();
   }
 
-  function drawRoadCenterSegmentVertical(worldX, worldY1, worldY2, major) {
+  function drawRoadCenterSegmentVertical(worldX, worldY1, worldY2, style) {
+    if (style === "residential") return;
     const sx = worldX - state.camera.x;
     const sy1 = worldY1 - state.camera.y;
     const sy2 = worldY2 - state.camera.y;
-    ctx.strokeStyle = major ? "rgba(226,164,46,.9)" : "rgba(238,240,236,.72)";
-    ctx.lineWidth = major ? 3.2 : 2.2;
-    if (major) {
+    const solid = style === "arterial";
+    ctx.strokeStyle = solid
+      ? "rgba(226,164,46,.9)"
+      : style === "station"
+        ? "rgba(235,190,79,.82)"
+        : "rgba(238,240,236,.66)";
+    ctx.lineWidth = solid ? 3.2 : style === "station" ? 2.6 : 2;
+    if (solid) {
       ctx.beginPath();
       ctx.moveTo(sx, sy1);
       ctx.lineTo(sx, sy2);
       ctx.stroke();
       return;
     }
-    const dash = 22;
-    const gap = 18;
+    const dash = style === "commercial" ? 16 : 22;
+    const gap = style === "commercial" ? 24 : 18;
     const period = dash + gap;
     let wy = Math.floor(worldY1 / period) * period;
     ctx.beginPath();
@@ -1847,21 +1853,27 @@
     ctx.stroke();
   }
 
-  function drawRoadCenterSegmentHorizontal(worldY, worldX1, worldX2, major) {
+  function drawRoadCenterSegmentHorizontal(worldY, worldX1, worldX2, style) {
+    if (style === "residential") return;
     const sy = worldY - state.camera.y;
     const sx1 = worldX1 - state.camera.x;
     const sx2 = worldX2 - state.camera.x;
-    ctx.strokeStyle = major ? "rgba(226,164,46,.9)" : "rgba(238,240,236,.72)";
-    ctx.lineWidth = major ? 3.2 : 2.2;
-    if (major) {
+    const solid = style === "arterial";
+    ctx.strokeStyle = solid
+      ? "rgba(226,164,46,.9)"
+      : style === "station"
+        ? "rgba(235,190,79,.82)"
+        : "rgba(238,240,236,.66)";
+    ctx.lineWidth = solid ? 3.2 : style === "station" ? 2.6 : 2;
+    if (solid) {
       ctx.beginPath();
       ctx.moveTo(sx1, sy);
       ctx.lineTo(sx2, sy);
       ctx.stroke();
       return;
     }
-    const dash = 22;
-    const gap = 18;
+    const dash = style === "commercial" ? 16 : 22;
+    const gap = style === "commercial" ? 24 : 18;
     const period = dash + gap;
     let wx = Math.floor(worldX1 / period) * period;
     ctx.beginPath();
@@ -2337,19 +2349,19 @@
 
     const intersectionClearance = ROAD_HALF + 66;
     for (let i = startX; i <= endX; i += 1) {
-      const major = Math.abs(i) % 5 === 0;
       for (let gy = startY - 1; gy <= endY; gy += 1) {
         const y1 = gy * ROAD_GAP + intersectionClearance;
         const y2 = (gy + 1) * ROAD_GAP - intersectionClearance;
-        if (y2 > y1) drawRoadCenterSegmentVertical(i * ROAD_GAP, y1, y2, major);
+        const style = roadSegmentStyle("v", i, gy);
+        if (y2 > y1) drawRoadCenterSegmentVertical(i * ROAD_GAP, y1, y2, style);
       }
     }
     for (let i = startY; i <= endY; i += 1) {
-      const major = Math.abs(i) % 5 === 0;
       for (let gx = startX - 1; gx <= endX; gx += 1) {
         const x1 = gx * ROAD_GAP + intersectionClearance;
         const x2 = (gx + 1) * ROAD_GAP - intersectionClearance;
-        if (x2 > x1) drawRoadCenterSegmentHorizontal(i * ROAD_GAP, x1, x2, major);
+        const style = roadSegmentStyle("h", i, gx);
+        if (x2 > x1) drawRoadCenterSegmentHorizontal(i * ROAD_GAP, x1, x2, style);
       }
     }
 
