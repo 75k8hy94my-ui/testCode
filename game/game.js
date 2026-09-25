@@ -2528,7 +2528,7 @@
     const length = dims[0];
     const width = dims[1];
     const braking = owned
-      ? (touch.driveBrake || keys.has("s") || keys.has("arrowdown") || keys.has(" "))
+      ? (state.player.inVehicle && (touch.driveBrake || keys.has("s") || keys.has("arrowdown") || keys.has(" ")))
       : Boolean(car.brakeGlow > .15);
 
     ctx.save();
