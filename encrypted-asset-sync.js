@@ -174,7 +174,7 @@
     const ledgerStorage = transferStorage;
     if (hit) {
       const recorded = remoteAccessApi.recordCacheHit(hit.encryptedByteLength ?? hit.encryptedBytes.byteLength, { storage: ledgerStorage, now });
-      if (!recorded) throw new Error('image transfer ledger could not be saved');
+      // Telemetry is intentionally best-effort: a durable encrypted cache hit must remain usable.
       return new Uint8Array(hit.encryptedBytes);
     }
     if (!Number.isInteger(estimatedBytes) || estimatedBytes < 1) throw new TypeError('estimatedBytes must be a positive integer');

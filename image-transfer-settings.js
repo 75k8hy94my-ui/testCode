@@ -27,7 +27,10 @@
     const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
     const same = String(source.day || '') === today;
     const number = (key) => same && Number.isFinite(Number(source[key])) && Number(source[key]) >= 0 ? Number(source[key]) : 0;
-    return { day: today, estimatedBytes: number('estimatedBytes'), observedBytes: number('observedBytes'), attemptedEstimatedBytes: number('attemptedEstimatedBytes'), previewBytes: number('previewBytes'), zoomBytes: number('zoomBytes'), previewRequests: number('previewRequests'), zoomRequests: number('zoomRequests'), cacheHits: number('cacheHits'), cacheSavedBytes: number('cacheSavedBytes'), partialSavedBytes: number('partialSavedBytes'), blockedByVpn: number('blockedByVpn'), providerReportedBytes: same && Number.isFinite(Number(source.providerReportedBytes)) && Number(source.providerReportedBytes) >= 0 ? Number(source.providerReportedBytes) : null, lastUpdatedAt: same ? number('lastUpdatedAt') : 0 };
+    const provider = same && source.providerReportedBytes != null && source.providerReportedBytes !== '' && Number.isFinite(Number(source.providerReportedBytes)) && Number(source.providerReportedBytes) >= 0
+      ? Number(source.providerReportedBytes)
+      : null;
+    return { day: today, estimatedBytes: number('estimatedBytes'), observedBytes: number('observedBytes'), attemptedEstimatedBytes: number('attemptedEstimatedBytes'), previewBytes: number('previewBytes'), zoomBytes: number('zoomBytes'), previewRequests: number('previewRequests'), zoomRequests: number('zoomRequests'), cacheHits: number('cacheHits'), cacheSavedBytes: number('cacheSavedBytes'), partialSavedBytes: number('partialSavedBytes'), blockedByVpn: number('blockedByVpn'), providerReportedBytes: provider, lastUpdatedAt: same ? number('lastUpdatedAt') : 0 };
   }
   function legacyUsage(storage, today) { const value = readJson(storage, KEYS.legacyUsage, null); const n = Number(value && value.day === today ? value.bytes : 0); return Number.isFinite(n) && n >= 0 ? n : 0; }
   function load(storage = defaultStorage(), now = new Date()) {

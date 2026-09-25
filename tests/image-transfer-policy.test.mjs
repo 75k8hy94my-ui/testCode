@@ -27,6 +27,25 @@ test('settings defaults and UTC legacy compatibility are stable', () => {
   assert.equal(settings.load(storage, now).limitUsageBytes, 20);
 });
 
+test('storage omission uses browser localStorage for VPN and usage settings', async () => {
+  const original = globalThis.localStorage;
+  const storage = memoryStorage();
+  storage.setItem(settings.KEYS.vpnRequired, 'false');
+  storage.setItem(settings.KEYS.dailyLimit, '100');
+  storage.setItem(settings.KEYS.legacyUsage, JSON.stringify({ day: settings.dayKey(now), bytes: 20 }));
+  storage.setItem(settings.KEYS.stats, JSON.stringify({ day: settings.dayKey(now), estimatedBytes: 30, providerReportedBytes: null }));
+  globalThis.localStorage = storage;
+  try {
+    let called = 0;
+    await remoteAccess.runRemoteRead({ estimatedBytes: 50, now, mediaAccess: { getStatus: () => 'blocked', canLoadExternalMedia: () => false } }, async () => { called += 1; });
+    assert.equal(called, 1);
+    assert.equal(settings.load(undefined, now).limitUsageBytes, 80);
+  } finally {
+    if (original === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = original;
+  }
+});
+
 test('network mode changes only after the exact half-limit boundary', () => {
   const storage = memoryStorage();
   const limit = settings.DEFAULT_DAILY_LIMIT_BYTES;
@@ -53,6 +72,15 @@ test('ledger separates estimate, observed, kind totals, cache and partial saving
   assert.equal(stats.cacheHits, 1);
   assert.equal(stats.cacheSavedBytes, 500);
   assert.equal(stats.partialSavedBytes, 20);
+});
+
+test('providerReportedBytes null survives writes while zero remains numeric', () => {
+  const storage = memoryStorage();
+  ledger.reserveEstimate(1, { storage, now });
+  ledger.recordObserved(1, 'preview', { storage, now });
+  assert.equal(ledger.currentStats(storage, now).providerReportedBytes, null);
+  ledger.recordProviderReported(0, { storage, now });
+  assert.equal(ledger.currentStats(storage, now).providerReportedBytes, 0);
 });
 
 test('limit equality is allowed and one byte over is rejected before operation', async () => {
@@ -105,6 +133,13 @@ test('central abort releases active remote operation tracking', async () => {
   remoteAccess.abortActiveRemoteReads();
   await assert.rejects(promise, error => error.name === 'AbortError');
   assert.equal(aborted, true);
+});
+
+test('external abort listener is removed when acquire rejects', async () => {
+  const listeners = new Map();
+  const signal = { aborted: false, addEventListener(name, callback) { listeners.set(name, callback); }, removeEventListener(name, callback) { assert.equal(listeners.get(name), callback); listeners.delete(name); } };
+  await assert.rejects(remoteAccess.runRemoteRead({ storage: memoryStorage(), now, estimatedBytes: 1, mediaAccess: blocked, signal }, async () => {}), error => error.name === 'ImageVpnRequiredError');
+  assert.equal(listeners.size, 0);
 });
 
 test('media gate exposes status and dispatches status changes', () => {

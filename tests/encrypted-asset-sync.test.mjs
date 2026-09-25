@@ -172,6 +172,17 @@ test('cache HIT bypasses VPN, metadata, storage, and budget while recording savi
   assert.equal(ledgerStats(transfer).estimatedBytes, 0);
 });
 
+test('cache HIT still returns bytes when telemetry storage fails', async () => {
+  const cache = makeCache();
+  const encrypted = await assetCrypto.encryptAssetObject(key, assetId, 'preview', new Uint8Array([6]));
+  await cache.put({ assetId, revision: 1, objectId: 'preview', encryptedBytes: encrypted, retention: 'cache' });
+  const failingStorage = { setItem() { throw new Error('quota'); }, getItem() { return null; } };
+  let metadata = 0;
+  const result = await sync.loadEncryptedObject({ vault: { async api() { metadata += 1; return []; } }, storage: makeStorage(), cache, assetId, revision: 1, objectId: 'preview', transferStorage: failingStorage, mediaAccess: { getStatus: () => 'blocked', canLoadExternalMedia: () => false } });
+  assert.deepEqual(result, encrypted);
+  assert.equal(metadata, 0);
+});
+
 test('cache MISS is VPN-gated before metadata and storage, and VPN OFF permits remote read', async () => {
   const cache = makeCache();
   const encrypted = await assetCrypto.encryptAssetObject(key, assetId, 'preview', new Uint8Array([8]));
