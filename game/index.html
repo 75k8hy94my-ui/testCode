@@ -30,6 +30,14 @@
         <span id="rentText">次の家賃: Day 8 / ¥12,000</span>
       </div>
 
+      <div id="driveHud" class="hud-card drive-card" hidden>
+        <span class="eyebrow">DRIVE</span>
+        <div class="drive-speed-row"><strong id="speedText">0</strong><span>km/h</span></div>
+        <div class="drive-info"><span>制限 <b id="speedLimitText">40</b></span><span id="signalText">信号 —</span></div>
+        <div class="drive-info"><span id="gapText">車間 —</span><span>評価 <b id="driveScoreText">100</b></span></div>
+        <div class="drive-destination" id="driveDestinationText">目的地を選択</div>
+      </div>
+
       <div class="hud-card objective-card">
         <span class="eyebrow">TODAY</span>
         <strong id="objectiveTitle">まず街を歩いてみよう</strong>
@@ -62,9 +70,9 @@
       <div>
         <strong>操作</strong>
         <p><b>徒歩:</b> WASD / 矢印 = 移動、Shift = 走る、E = 施設・人・自分の車を利用</p>
-        <p><b>車:</b> W/S = アクセル・ブレーキ、A/D = ハンドル、Space = ブレーキ、E = 降車</p>
-        <p>生活欲求を整えながら、仕事で収入を得て、買い物・運動・交流・休息を自由に組み合わせます。</p>
-        <p>スマホでは左スティック＋右のRUN / ACTIONを使います。</p>
+        <p><b>車:</b> 乗車後に目的地を選ぶとルートは自動設定。W / ↑ = 加速、S / ↓ / Space = 減速・停止、E = 行き先変更・降車。</p>
+        <p>操舵は自動です。信号、制限速度、前走車との車間を守ると運転評価が上がります。</p>
+        <p>スマホでは徒歩時は左スティック、運転時はBRAKE / ACCELだけを使います。</p>
         <button id="helpClose" type="button">閉じる</button>
       </div>
     </section>
@@ -74,7 +82,7 @@
       <button id="helpButton" type="button">操作</button>
     </div>
 
-    <div id="mobileControls" class="mobile-controls" aria-label="タッチ操作">
+    <div id="mobileControls" class="mobile-controls" aria-label="徒歩タッチ操作">
       <div id="joystick" class="joystick" aria-label="移動スティック">
         <div id="joystickKnob" class="joystick-knob"></div>
       </div>
@@ -82,6 +90,12 @@
         <button id="runButton" type="button">RUN</button>
         <button id="actionButton" type="button">ACTION</button>
       </div>
+    </div>
+
+    <div id="mobileDrivingControls" class="mobile-driving-controls" hidden aria-label="運転操作">
+      <button id="driveBrakeButton" type="button">BRAKE</button>
+      <button id="driveMenuButton" type="button">ROUTE</button>
+      <button id="driveAccelButton" type="button">ACCEL</button>
     </div>
 
     <div id="toast" class="toast" hidden aria-live="polite"></div>
