@@ -1507,21 +1507,24 @@
 
   function partialRoadEdgePoints(snap, node, fromSnap) {
     const full = sampleRoadEdge(snap.axis, snap.roadIndex, snap.segmentIndex, 16);
-    const towardB = node.gx === snap.b.gx && node.gy === snap.b.gy;
-    const ordered = towardB ? full : full.slice().reverse();
-    const snapIndex = Math.round((towardB ? snap.t : 1 - snap.t) * 16);
+    const nodeIsB = node.gx === snap.b.gx && node.gy === snap.b.gy;
 
     if (fromSnap) {
+      const ordered = nodeIsB ? full : full.slice().reverse();
+      const snapIndex = Math.round((nodeIsB ? snap.t : 1 - snap.t) * 16);
       const points = [{ x:snap.x, y:snap.y }];
       for (let i = snapIndex + 1; i < ordered.length; i += 1) points.push(ordered[i]);
       return points;
     }
 
+    const ordered = nodeIsB ? full.slice().reverse() : full;
+    const snapIndex = Math.round((nodeIsB ? 1 - snap.t : snap.t) * 16);
     const points = [];
     for (let i = 0; i <= snapIndex; i += 1) points.push(ordered[i]);
     points.push({ x:snap.x, y:snap.y });
     return points;
   }
+
 
   function appendDistinctPoints(target, source) {
     for (const point of source) {
@@ -1605,8 +1608,9 @@
     for (let i = 0; i < gridNodes.length; i += 1) {
       const node = gridNodes[i];
       if (!isSignalizedIntersection(node.gx, node.gy)) continue;
-      const previous = i > 0 ? gridNodes[i - 1] : firstNode;
-      const incoming = cardinalDirection(node.gx - previous.gx, node.gy - previous.gy);
+      const incoming = i > 0
+        ? cardinalDirection(node.gx - gridNodes[i - 1].gx, node.gy - gridNodes[i - 1].gy)
+        : initialDirection;
       const orientation = incoming.x !== 0 ? "h" : "v";
       const x = node.gx * ROAD_GAP;
       const y = node.gy * ROAD_GAP;
@@ -2156,6 +2160,36 @@
     }
   }
 
+  function migrateCarToCurrentRoadIfNeeded() {
+    const info = nearestRoadSegmentInfo(personalCar.x, personalCar.y, 3);
+    if (info) {
+      const style = roadSegmentStyle(info.axis, info.roadIndex, info.segmentIndex);
+      if (info.distance <= roadWidthForStyle(style) / 2 + 8) return;
+    }
+
+    const snap = roadSnap(personalCar.x, personalCar.y);
+    if (!Number.isFinite(snap.distance)) return;
+
+    const before = roadEdgePoint(snap.axis, snap.roadIndex, snap.segmentIndex, Math.max(0, snap.t - .02));
+    const after = roadEdgePoint(snap.axis, snap.roadIndex, snap.segmentIndex, Math.min(1, snap.t + .02));
+    let tx = after.x - before.x;
+    let ty = after.y - before.y;
+    const mag = Math.hypot(tx, ty) || 1;
+    tx /= mag;
+    ty /= mag;
+
+    const savedForward = Math.cos(personalCar.angle) * tx + Math.sin(personalCar.angle) * ty;
+    const directionSign = savedForward >= 0 ? 1 : -1;
+    const nx = ty;
+    const ny = -tx;
+    const offset = LANE_OFFSET * directionSign;
+
+    personalCar.x = snap.x + nx * offset;
+    personalCar.y = snap.y + ny * offset;
+    personalCar.angle = directionSign > 0 ? Math.atan2(ty, tx) : angleWrap(Math.atan2(ty, tx) + Math.PI);
+    personalCar.speed = 0;
+  }
+
   function loadGame() {
     try {
       const raw = localStorage.getItem(SAVE_KEY);
@@ -2186,6 +2220,8 @@
         }
         personalCar.angle = Number(saved.car.angle) || 0;
       }
+
+      migrateCarToCurrentRoadIfNeeded();
 
       if (Array.isArray(saved.trains)) {
         for (const stored of saved.trains) {
