@@ -3043,6 +3043,19 @@
   }
 
   function drawRoadEdge(axis, roadIndex, segmentIndex) {
+    const margin = 180;
+    if (axis === "h") {
+      const minX = segmentIndex * ROAD_GAP - state.camera.x;
+      const maxX = (segmentIndex + 1) * ROAD_GAP - state.camera.x;
+      const y = roadIndex * ROAD_GAP - state.camera.y;
+      if (maxX < -margin || minX > viewWidth + margin || y < -margin || y > viewHeight + margin) return;
+    } else {
+      const x = roadIndex * ROAD_GAP - state.camera.x;
+      const minY = segmentIndex * ROAD_GAP - state.camera.y;
+      const maxY = (segmentIndex + 1) * ROAD_GAP - state.camera.y;
+      if (x < -margin || x > viewWidth + margin || maxY < -margin || minY > viewHeight + margin) return;
+    }
+
     const style = roadSegmentStyle(axis, roadIndex, segmentIndex);
     const width = roadWidthForStyle(style);
     const points = sampleRoadEdge(axis, roadIndex, segmentIndex, 14);
