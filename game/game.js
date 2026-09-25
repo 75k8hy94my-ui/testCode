@@ -85,32 +85,21 @@
   // Sparse Japanese-style street hierarchy. Arterials stay continuous while
   // local streets exist only as selected runs, producing T-junctions and fewer
   // intersections than the old full Manhattan grid.
-  const EW_ARTERIALS = new Set([2, 5, 8, 12, 16]);
-  const NS_ARTERIALS = new Set([2, 6, 10, 14, 17]);
+  const EW_ARTERIALS = new Set([2, 6, 11, 16]);
+  const NS_ARTERIALS = new Set([2, 7, 12, 17]);
   const LOCAL_H_RUNS = new Map([
-    [3, [[2,6],[10,14]]],
-    [4, [[6,10]]],
-    [6, [[2,6],[10,14]]],
-    [7, [[5,11]]],
-    [9, [[6,10]]],
-    [10, [[2,6],[10,14]]],
-    [11, [[6,10]]],
-    [13, [[10,17]]],
-    [14, [[2,6]]],
-    [15, [[6,10],[14,17]]]
+    [4, [[2,7]]],
+    [8, [[7,12]]],
+    [9, [[7,12]]],
+    [13, [[12,17]]]
   ]);
   const LOCAL_V_RUNS = new Map([
-    [3, [[2,5],[8,12]]],
-    [4, [[5,8]]],
-    [5, [[2,8]]],
-    [7, [[5,12]]],
-    [8, [[5,9]]],
-    [9, [[5,12]]],
-    [11, [[8,16]]],
-    [12, [[2,8]]],
-    [13, [[12,16]]],
-    [15, [[8,16]]],
-    [16, [[12,16]]]
+    [4, [[2,6]]],
+    [5, [[6,11]]],
+    [9, [[6,11]]],
+    [10, [[6,11]]],
+    [14, [[11,16]]],
+    [15, [[11,16]]]
   ]);
 
   const WORLD_TILT_Y = 0.94;
@@ -486,9 +475,9 @@
   ];
 
   const personalCar = {
-    x: HOME.x,
-    y: Math.round(HOME.y / ROAD_GAP) * ROAD_GAP - 36,
-    angle: 0,
+    x: 9 * ROAD_GAP + LANE_OFFSET,
+    y: HOME.y,
+    angle: Math.PI / 2,
     speed: 0,
     color: "#6f8fac"
   };
