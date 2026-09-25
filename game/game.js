@@ -178,8 +178,14 @@
         const lotEnd = i === count - 1 ? frontageEnd : cursor + lotSpan;
         cursor = lotEnd;
 
-        // Leave room where a side street branches.
-        if (branch && Math.abs((lotStart + lotEnd) / 2 - branchAt) < 28) continue;
+        // Leave room where a side street branches on this frontage.
+        const branchHalfWidth = roadWidth * .78 / 2 + 8;
+        if (
+          branch &&
+          side === branchSide &&
+          lotStart < branchAt + branchHalfWidth &&
+          lotEnd > branchAt - branchHalfWidth
+        ) continue;
 
         const sideGap = 5 + hash2(gx + i, gy + side, seedBase + 30) * 7;
         const rearGap = 7 + hash2(gx + i, gy + side, seedBase + 31) * 12;
@@ -222,6 +228,14 @@
             y = roadCenter + roadWidth / 2 + frontSetback;
             frontage = "north";
           }
+        }
+
+        if (branch && side === branchSide) {
+          const branchHalfWidth = roadWidth * .78 / 2 + 8;
+          const crossesBranch = vertical
+            ? (y < branchAt + branchHalfWidth && y + h > branchAt - branchHalfWidth)
+            : (x < branchAt + branchHalfWidth && x + w > branchAt - branchHalfWidth);
+          if (crossesBranch) continue;
         }
 
         const smallApartment = hash2(gx + i * 7, gy + side * 9, seedBase + 35) > .91 && lotAlong > 92;
