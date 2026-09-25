@@ -23,19 +23,6 @@
     return root.document.querySelector('.profileContent');
   }
 
-  function modeMarkup() {
-    return [
-      ['data-saver', 'データ節約'],
-      ['standard', '標準'],
-      ['quality', '高画質優先'],
-    ].map(([value, title]) =>
-      '<label class="imageTransferMode">' +
-        '<input type="radio" name="imageTransferMode" value="' + value + '">' +
-        '<span><strong>' + title + '</strong></span>' +
-      '</label>'
-    ).join('');
-  }
-
   function limitMarkup(api) {
     return api.DAILY_LIMIT_OPTIONS.map((bytes) => {
       const mb = Math.round(bytes / (1024 * 1024));
@@ -57,7 +44,6 @@
         '<span class="iosSwitch"><input id="profileImageVpnRequired" type="checkbox" role="switch" aria-label="VPN接続時のみクラウド画像を読み込む"><span class="iosSwitchTrack" aria-hidden="true"></span></span>' +
       '</label>' +
       '<div class="imageTransferDivider"></div>' +
-      '<fieldset class="imageTransferModes"><legend>通信モード</legend>' + modeMarkup() + '</fieldset>' +
       '<label class="imageTransferLimit"><span><strong>1日の画像通信上限</strong></span><select id="profileImageDailyLimit" aria-label="1日の画像通信上限">' + limitMarkup(api) + '</select></label>' +
       '<button class="imageTransferUsage" id="profileImageUsageButton" type="button" aria-haspopup="dialog" aria-controls="profileImageUsageDialog">' +
         '<div class="imageTransferUsageTop"><span>推定使用量</span><strong id="profileImageUsageTotal">—</strong></div>' +
@@ -97,9 +83,6 @@
     const state = api.load();
     const vpn = mountedCard.querySelector('#profileImageVpnRequired');
     if (vpn) vpn.checked = state.vpnRequired;
-    mountedCard.querySelectorAll('input[name="imageTransferMode"]').forEach((radio) => {
-      radio.checked = radio.value === state.networkMode;
-    });
     const limit = mountedCard.querySelector('#profileImageDailyLimit');
     if (limit) limit.value = String(state.dailyLimitBytes);
 
@@ -130,12 +113,6 @@
   function bind(card, api) {
     const vpn = card.querySelector('#profileImageVpnRequired');
     if (vpn) vpn.addEventListener('change', () => api.setVpnRequired(vpn.checked));
-
-    card.querySelectorAll('input[name="imageTransferMode"]').forEach((radio) => {
-      radio.addEventListener('change', () => {
-        if (radio.checked) api.setNetworkMode(radio.value);
-      });
-    });
 
     const limit = card.querySelector('#profileImageDailyLimit');
     if (limit) limit.addEventListener('change', () => api.setDailyLimitBytes(Number(limit.value)));
