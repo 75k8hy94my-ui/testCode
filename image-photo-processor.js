@@ -77,9 +77,13 @@
         canvas.height = height;
         return canvas;
       },
-      drawImage(source, targetCanvas, { width, height, sourceX = 0, sourceY = 0, sourceWidth = width, sourceHeight = height } = {}) {
+      drawImage(source, targetCanvas, { width, height, sourceX, sourceY, sourceWidth, sourceHeight } = {}) {
         const context = targetCanvas.getContext('2d', { alpha: false });
-        context.drawImage(source, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
+        if (sourceWidth == null || sourceHeight == null) {
+          context.drawImage(source, 0, 0, width, height);
+        } else {
+          context.drawImage(source, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
+        }
       },
       async encode(canvas, mimeType, quality) {
         if (typeof canvas.convertToBlob === 'function') return canvas.convertToBlob({ type: mimeType, quality });
@@ -215,10 +219,14 @@
         signal?.removeEventListener?.('abort', onAbort);
         worker?.removeEventListener?.('message', onMessage);
         worker?.removeEventListener?.('error', onError);
+        if (worker) {
+          worker.onmessage = null;
+          worker.onerror = null;
+          worker.terminate?.();
+        }
         callback(value);
       };
       const onAbort = () => {
-        worker?.terminate?.();
         finish(reject, createAbortError());
       };
       const onError = event => {
@@ -265,7 +273,7 @@
 
   async function processPhoto(file, options = {}) {
     const workerFactory = options.workerFactory || defaultWorkerFactory();
-    if (options.preferWorker && workerFactory) {
+    if (options.preferWorker !== false && workerFactory) {
       try {
         return await runInWorker(file, options, workerFactory);
       } catch (error) {
@@ -275,7 +283,7 @@
     return processPhotoOnMainThread(file, options);
   }
 
-  const api = { processPhoto, processPhotoOnMainThread, createAbortError };
+  const api = { processPhoto, processPhotoOnMainThread, createAbortError, createDefaultRuntime };
   const host = typeof window !== 'undefined' ? window : (typeof self !== 'undefined' ? self : null);
   if (host) host.ImagePhotoProcessor = api;
   if (typeof module !== 'undefined') module.exports = api;

@@ -19,16 +19,16 @@ function fakeRuntime() {
   };
 }
 
-function workerFactoryWith(handler) {
+function workerFactoryWith(handler, state = {}) {
   return () => {
     const listeners = { message: [], error: [] };
     return {
       addEventListener(type, listener) { listeners[type].push(listener); },
       removeEventListener(type, listener) { listeners[type] = listeners[type].filter(candidate => candidate !== listener); },
       postMessage(message) {
-        handler(message, payload => listeners.message.forEach(listener => listener({ data: payload })));
+        handler(message, payload => listeners.message.forEach(listener => listener({ data: payload })), listeners);
       },
-      terminate() {}
+      terminate() { state.terminateCount = (state.terminateCount || 0) + 1; }
     };
   };
 }
@@ -47,6 +47,20 @@ test('worker and fallback expose the same result contract and geometry', async (
   assert.equal(workerResult.tileBlobs.length, fallbackResult.tileBlobs.length);
 });
 
+test('worker is the default path when a worker factory is available', async () => {
+  const state = {};
+  let usedWorker = false;
+  const result = await processor.processPhoto(fakePhoto(), {
+    workerFactory: workerFactoryWith((message, send) => {
+      usedWorker = true;
+      send({ type: 'complete', result: { manifest: { schemaVersion: 1 }, previewBlob: new Blob(['p']), tileBlobs: [] } });
+    }, state)
+  });
+  assert.equal(usedWorker, true);
+  assert.equal(state.terminateCount, 1);
+  assert.equal(result.manifest.schemaVersion, 1);
+});
+
 test('worker construction failure falls back to main-thread processing', async () => {
   const result = await processor.processPhoto(fakePhoto(), {
     preferWorker: true,
@@ -58,18 +72,33 @@ test('worker construction failure falls back to main-thread processing', async (
 });
 
 test('worker runtime error falls back without changing the result contract', async () => {
+  const state = {};
   const result = await processor.processPhoto(fakePhoto(), {
     preferWorker: true,
-    workerFactory: workerFactoryWith((message, send) => send({ type: 'error', error: { message: 'worker failed' } })),
+    workerFactory: workerFactoryWith((message, send) => send({ type: 'error', error: { message: 'worker failed' } }), state),
     runtime: fakeRuntime()
   });
   assert.equal(result.manifest.compressionProfileVersion, 1);
   assert.ok(result.previewBlob instanceof Blob);
+  assert.equal(state.terminateCount, 1);
+});
+
+test('worker error event terminates the worker before fallback', async () => {
+  const state = {};
+  const result = await processor.processPhoto(fakePhoto(), {
+    preferWorker: true,
+    workerFactory: workerFactoryWith((message, send, listeners) => {
+      listeners.error.forEach(listener => listener({ message: 'worker event failed' }));
+    }, state),
+    runtime: fakeRuntime()
+  });
+  assert.equal(result.manifest.schemaVersion, 1);
+  assert.equal(state.terminateCount, 1);
 });
 
 test('abort terminates worker and does not fall back as a successful result', async () => {
   const controller = new AbortController();
-  let terminated = false;
+  const state = {};
   const resultPromise = processor.processPhoto(fakePhoto(), {
     preferWorker: true,
     signal: controller.signal,
@@ -77,12 +106,12 @@ test('abort terminates worker and does not fall back as a successful result', as
       addEventListener() {},
       removeEventListener() {},
       postMessage() { controller.abort(); },
-      terminate() { terminated = true; }
+      terminate() { state.terminateCount = (state.terminateCount || 0) + 1; }
     }),
     runtime: fakeRuntime()
   });
   await assert.rejects(resultPromise, error => error.name === 'AbortError');
-  assert.equal(terminated, true);
+  assert.equal(state.terminateCount, 1);
 });
 
 test('new worker scripts are classic-script parseable', () => {

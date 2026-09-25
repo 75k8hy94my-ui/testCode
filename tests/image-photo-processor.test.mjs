@@ -8,6 +8,7 @@ function fakePhoto({ width = 6000, height = 4000, type = 'image/jpeg', size = 90
 
 function createFakeRuntime({ width = 6000, height = 4000, delay = 0 } = {}) {
   const encoded = [];
+  const drawCalls = [];
   const runtime = {
     async decode(file) {
       return {
@@ -24,15 +25,44 @@ function createFakeRuntime({ width = 6000, height = 4000, delay = 0 } = {}) {
       encoded.push({ width: canvas.width, height: canvas.height, quality, blob });
       return blob;
     },
-    drawImage() {},
+    drawImage(source, canvas, options = {}) {
+      drawCalls.push({ source, targetWidth: canvas.width, targetHeight: canvas.height, ...options });
+    },
     releaseCanvas() {},
-    encoded
+    encoded,
+    drawCalls
   };
   return runtime;
 }
 
 test('processor API is exposed', () => {
   assert.equal(typeof processor.processPhoto, 'function');
+});
+
+test('preview and level resize use the full source while tiles use an explicit source rectangle', async () => {
+  const runtime = createFakeRuntime();
+  await processor.processPhoto(fakePhoto(), { preferWorker: false, runtime });
+
+  const fullSourceResizes = runtime.drawCalls.filter(call => call.sourceWidth == null && call.sourceHeight == null);
+  assert.ok(fullSourceResizes.some(call => call.targetWidth === 1440 && call.targetHeight === 960));
+  assert.ok(fullSourceResizes.some(call => call.targetWidth === 2048 && call.targetHeight === 1365));
+  assert.ok(fullSourceResizes.some(call => call.targetWidth === 4096 && call.targetHeight === 2731));
+
+  const tileCrops = runtime.drawCalls.filter(call => call.sourceWidth != null || call.sourceHeight != null);
+  assert.ok(tileCrops.length > 0);
+  assert.ok(tileCrops.every(call => call.sourceX != null && call.sourceY != null && call.sourceWidth != null && call.sourceHeight != null));
+});
+
+test('default runtime emits full-source and crop drawImage signatures', () => {
+  const calls = [];
+  const source = { width: 6000, height: 4000 };
+  const canvas = { getContext() { return { drawImage: (...args) => calls.push(args) }; } };
+  const runtime = processor.createDefaultRuntime();
+
+  runtime.drawImage(source, canvas, { width: 1440, height: 960 });
+  runtime.drawImage(source, canvas, { width: 512, height: 512, sourceX: 512, sourceY: 0, sourceWidth: 512, sourceHeight: 512 });
+  assert.deepEqual(calls[0], [source, 0, 0, 1440, 960]);
+  assert.deepEqual(calls[1], [source, 512, 0, 512, 512, 0, 0, 512, 512]);
 });
 
 test('processor returns independent preview and tile blobs with manifest metadata', async () => {
