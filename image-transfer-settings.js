@@ -14,6 +14,7 @@
   });
 
   const EVENT_NAME = 'manga-reader-image-transfer-settings-changed';
+  const STATS_EVENT_NAME = 'manga-reader-image-transfer-stats-changed';
   const DEFAULT_DAILY_LIMIT_BYTES = 150 * 1024 * 1024;
   const DAILY_LIMIT_OPTIONS = Object.freeze([50, 150, 300, 500].map((mb) => mb * 1024 * 1024));
   const NETWORK_MODES = Object.freeze(['data-saver', 'standard', 'quality']);
@@ -155,6 +156,7 @@
   return Object.freeze({
     KEYS,
     EVENT_NAME,
+    STATS_EVENT_NAME,
     DEFAULT_DAILY_LIMIT_BYTES,
     DAILY_LIMIT_OPTIONS,
     NETWORK_MODES,
