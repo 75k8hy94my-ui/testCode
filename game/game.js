@@ -104,6 +104,30 @@
   const PLACES = [HOME, CAFE, STORE, PARK, GYM, LIBRARY];
   const SPECIAL_BLOCKS = new Set(PLACES.map((place) => place.gx + "," + place.gy));
 
+  // Fictional compressed city layout inspired by the spatial mix around Kichijoji:
+  // dense station frontage, shopping streets, tiny dining alleys, quieter housing,
+  // and a large green zone. Exact streets/names are intentionally not reproduced.
+  const CITY_CORE = { minGX: 5, maxGX: 11, minGY: 4, maxGY: 10 };
+  const STATION_BLOCKS = new Set(["7,5","8,5","9,5","8,6"]);
+  const ARCADE_BLOCKS = new Set(["6,5","6,6","7,6","6,7","7,7"]);
+  const ALLEY_BLOCKS = new Set(["9,6","10,5","10,6","9,7","10,7"]);
+  const RESIDENTIAL_BLOCKS = new Set([
+    "4,7","4,8","4,9","5,7","5,8","5,9","5,10","6,9","6,10",
+    "10,8","10,9","10,10","11,8","11,9"
+  ]);
+  const GREEN_EDGE_BLOCKS = new Set(["7,9","8,9","9,9","7,10","8,10","9,10"]);
+
+  function cityBlockStyle(gx, gy) {
+    const key = gx + "," + gy;
+    if (STATION_BLOCKS.has(key)) return "station";
+    if (ARCADE_BLOCKS.has(key)) return "arcade";
+    if (ALLEY_BLOCKS.has(key)) return "alley";
+    if (GREEN_EDGE_BLOCKS.has(key)) return "green";
+    if (RESIDENTIAL_BLOCKS.has(key)) return "residential";
+    if (gx >= CITY_CORE.minGX && gx <= CITY_CORE.maxGX && gy >= CITY_CORE.minGY && gy <= CITY_CORE.maxGY) return "mixed-core";
+    return "outer";
+  }
+
   const NPCS = [
     { id: "aoi", name: "アオイ", x: PARK.x + 80, y: PARK.y + 65, color: "#e0a7b5", friendship: 0 },
     { id: "sora", name: "ソラ", x: CAFE.x + 72, y: CAFE.y - 58, color: "#a9c9e3", friendship: 0 },
@@ -228,30 +252,141 @@
 
   function generateBuildings() {
     const maxBlock = Math.floor(WORLD_SIZE / ROAD_GAP) - 1;
+
     for (let gx = 0; gx < maxBlock; gx += 1) {
       for (let gy = 0; gy < maxBlock; gy += 1) {
         if (SPECIAL_BLOCKS.has(gx + "," + gy)) continue;
+
         const left = gx * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN;
         const top = gy * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN;
         const right = (gx + 1) * ROAD_GAP - ROAD_HALF - BLOCK_MARGIN;
         const bottom = (gy + 1) * ROAD_GAP - ROAD_HALF - BLOCK_MARGIN;
         const bw = right - left;
         const bh = bottom - top;
-        const r = hash2(gx, gy, 22);
+        const style = cityBlockStyle(gx, gy);
         const tint = 0.76 + hash2(gx, gy, 91) * 0.18;
 
-        if (r < 0.15) continue;
-
-        const makeBuilding = (x, y, w, h, localTint, kind, variant = 0) => {
+        const makeBuilding = (x, y, w, h, localTint, kind, variant = 0, district = style) => {
           const palette = Math.floor(hash2(gx + variant, gy, 407) * VISUAL_PALETTES.length) % VISUAL_PALETTES.length;
           return {
-            x, y, w, h, tint: localTint, kind, palette,
-            floors: kind === "tower" ? 8 + Math.floor(hash2(gx, gy + variant, 408) * 5) : 2 + Math.floor(hash2(gx, gy + variant, 409) * 4),
+            x, y, w, h, tint: localTint, kind, palette, district,
+            floors:
+              kind === "tower" ? 7 + Math.floor(hash2(gx, gy + variant, 408) * 6) :
+              kind === "low" ? 1 + Math.floor(hash2(gx, gy + variant, 409) * 2) :
+              2 + Math.floor(hash2(gx, gy + variant, 409) * 4),
             roofDetail: Math.floor(hash2(gx, gy + variant, 410) * 4),
             facadeBand: hash2(gx + variant, gy, 411) > 0.5,
             balconies: kind !== "low" && hash2(gx, gy + variant, 412) > 0.62
           };
         };
+
+        if (style === "station") {
+          const plazaSide = hash2(gx, gy, 1301) > .5 ? 1 : -1;
+          const commercialH = bh * .46;
+          buildings.push(makeBuilding(
+            left + 12,
+            plazaSide > 0 ? top + 10 : bottom - commercialH - 10,
+            bw - 24,
+            commercialH,
+            tint,
+            hash2(gx, gy, 1302) > .52 ? "tower" : "normal",
+            11
+          ));
+          const shopW = (bw - 44) / 3;
+          const rowY = plazaSide > 0 ? bottom - 92 : top + 12;
+          for (let n = 0; n < 3; n += 1) {
+            buildings.push(makeBuilding(
+              left + 10 + n * (shopW + 7),
+              rowY,
+              shopW,
+              74,
+              tint * (.96 + n * .01),
+              "low",
+              20 + n
+            ));
+          }
+          continue;
+        }
+
+        if (style === "arcade") {
+          const corridor = 78;
+          const sideW = (bw - corridor - 36) / 2;
+          const unitH = (bh - 44) / 4;
+          for (let row = 0; row < 4; row += 1) {
+            const y = top + 10 + row * (unitH + 7);
+            buildings.push(makeBuilding(left + 8, y, sideW, unitH, tint, "low", 30 + row));
+            buildings.push(makeBuilding(right - sideW - 8, y + (row % 2 ? 4 : 0), sideW, unitH - 3, tint * .97, "low", 40 + row));
+          }
+          continue;
+        }
+
+        if (style === "alley") {
+          const lane = 54;
+          const cellW = (bw - lane - 44) / 2;
+          const cellH = (bh - lane - 54) / 3;
+          for (let row = 0; row < 3; row += 1) {
+            const y = top + 8 + row * (cellH + 8);
+            buildings.push(makeBuilding(left + 8, y, cellW, cellH, tint, "low", 50 + row));
+            buildings.push(makeBuilding(right - cellW - 8, y + 5, cellW, cellH - 4, tint * .95, "low", 60 + row));
+          }
+          // Close one side at the back so the pedestrian alley bends rather than
+          // reading as another straight grid street.
+          buildings.push(makeBuilding(left + cellW + 18, bottom - 76, lane + 10, 62, tint * .91, "low", 69));
+          continue;
+        }
+
+        if (style === "residential") {
+          const lotGap = 18;
+          const houseW = (bw - lotGap * 3) / 2;
+          const houseH = (bh - lotGap * 3) / 2;
+          for (let ix = 0; ix < 2; ix += 1) {
+            for (let iy = 0; iy < 2; iy += 1) {
+              const variant = 70 + ix * 2 + iy;
+              const setback = 8 + hash2(gx + ix, gy + iy, 1310) * 18;
+              buildings.push(makeBuilding(
+                left + lotGap + ix * (houseW + lotGap) + (iy ? setback * .25 : 0),
+                top + lotGap + iy * (houseH + lotGap) + setback * .25,
+                houseW - setback * .3,
+                houseH - setback * .35,
+                tint,
+                "low",
+                variant
+              ));
+            }
+          }
+          continue;
+        }
+
+        if (style === "green") {
+          if (hash2(gx, gy, 1320) > .48) {
+            buildings.push(makeBuilding(left + 34, top + 40, bw * .38, bh * .28, tint, "low", 80));
+          }
+          if (hash2(gx, gy, 1321) > .65) {
+            buildings.push(makeBuilding(right - bw * .32 - 26, bottom - bh * .24 - 28, bw * .32, bh * .24, tint, "low", 81));
+          }
+          continue;
+        }
+
+        const r = hash2(gx, gy, 22);
+        if (r < (style === "mixed-core" ? .06 : .15)) continue;
+
+        if (style === "mixed-core" && r > .52) {
+          const shopH = Math.max(68, bh * .22);
+          const unitW = (bw - 38) / 3;
+          for (let n = 0; n < 3; n += 1) {
+            buildings.push(makeBuilding(
+              left + 8 + n * (unitW + 7),
+              top + 10,
+              unitW,
+              shopH,
+              tint,
+              "low",
+              90 + n
+            ));
+          }
+          buildings.push(makeBuilding(left + 20, top + shopH + 34, bw - 40, bh - shopH - 54, tint * .95, "normal", 94));
+          continue;
+        }
 
         if (r < 0.55) {
           buildings.push(makeBuilding(
@@ -307,13 +442,28 @@
   }
 
   function generatePedestrians() {
-    for (let i = 0; i < 48; i += 1) {
-      let x = COAST + 300 + hash2(i, 2, 31) * (WORLD_SIZE - COAST * 2 - 600);
-      let y = COAST + 300 + hash2(i, 9, 71) * (WORLD_SIZE - COAST * 2 - 600);
+    const pedestrianCount = 76;
+    for (let i = 0; i < pedestrianCount; i += 1) {
+      const central = i < 44;
+      let x;
+      let y;
+      if (central) {
+        x = 3400 + hash2(i, 2, 31) * 3300;
+        y = 2700 + hash2(i, 9, 71) * 3600;
+      } else {
+        x = COAST + 300 + hash2(i, 2, 31) * (WORLD_SIZE - COAST * 2 - 600);
+        y = COAST + 300 + hash2(i, 9, 71) * (WORLD_SIZE - COAST * 2 - 600);
+      }
       let attempts = 0;
-      while ((!canStand(x, y, 10) || isRoad(x, y)) && attempts < 30) {
-        x = COAST + 300 + hash2(i + attempts, 12, 44) * (WORLD_SIZE - COAST * 2 - 600);
-        y = COAST + 300 + hash2(i + attempts, 16, 84) * (WORLD_SIZE - COAST * 2 - 600);
+      while ((!canStand(x, y, 10) || isRoad(x, y)) && attempts < 40) {
+        const a = i + attempts;
+        if (central) {
+          x = 3400 + hash2(a, 12, 44) * 3300;
+          y = 2700 + hash2(a, 16, 84) * 3600;
+        } else {
+          x = COAST + 300 + hash2(a, 12, 44) * (WORLD_SIZE - COAST * 2 - 600);
+          y = COAST + 300 + hash2(a, 16, 84) * (WORLD_SIZE - COAST * 2 - 600);
+        }
         attempts += 1;
       }
       pedestrians.push({
@@ -772,11 +922,19 @@
   }
 
   function currentDistrict(x, y) {
-    if (y > WORLD_SIZE * 0.72) return "南港";
-    if (y < WORLD_SIZE * 0.28) return "北丘";
+    const gx = Math.floor(x / ROAD_GAP);
+    const gy = Math.floor(y / ROAD_GAP);
+    const style = cityBlockStyle(gx, gy);
+    if (style === "station") return "若葉駅前";
+    if (style === "arcade") return "若葉サンモール";
+    if (style === "alley") return "路地飲食街";
+    if (style === "residential") return "西住宅街";
+    if (style === "green" || distance(x, y, PARK.x, PARK.y) < 650) return "公園通り";
+    if (style === "mixed-core") return "中央商業街";
+    if (y > WORLD_SIZE * 0.72) return "南地区";
+    if (y < WORLD_SIZE * 0.28) return "北地区";
     if (x < WORLD_SIZE * 0.3) return "西地区";
     if (x > WORLD_SIZE * 0.7) return "東地区";
-    if (distance(x, y, HOME.x, HOME.y) < 1500) return "中央区";
     return "City Days";
   }
 
@@ -2118,6 +2276,254 @@
     ctx.fillRect(p.x + 6, p.y - 31, 9, 6);
   }
 
+  function drawNeighborhoodGround() {
+    const startGX = Math.floor(state.camera.x / ROAD_GAP) - 1;
+    const endGX = Math.ceil((state.camera.x + viewWidth) / ROAD_GAP) + 1;
+    const startGY = Math.floor(state.camera.y / ROAD_GAP) - 1;
+    const endGY = Math.ceil((state.camera.y + viewHeight) / ROAD_GAP) + 1;
+
+    for (let gx = startGX; gx <= endGX; gx += 1) {
+      for (let gy = startGY; gy <= endGY; gy += 1) {
+        const style = cityBlockStyle(gx, gy);
+        if (style === "outer") continue;
+
+        const x = gx * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN - state.camera.x;
+        const y = gy * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN - state.camera.y;
+        const w = ROAD_GAP - ROAD_WIDTH - BLOCK_MARGIN * 2;
+        const h = w;
+
+        if (style === "station") {
+          ctx.fillStyle = "#b7b4aa";
+          roundedRectPath(ctx, x + 6, y + 6, w - 12, h - 12, 10);
+          ctx.fill();
+
+          ctx.strokeStyle = "rgba(255,255,255,.19)";
+          ctx.lineWidth = 1;
+          for (let tx = x + 18; tx < x + w - 18; tx += 28) {
+            ctx.beginPath();
+            ctx.moveTo(tx, y + 12);
+            ctx.lineTo(tx, y + h - 12);
+            ctx.stroke();
+          }
+          for (let ty = y + 18; ty < y + h - 18; ty += 28) {
+            ctx.beginPath();
+            ctx.moveTo(x + 12, ty);
+            ctx.lineTo(x + w - 12, ty);
+            ctx.stroke();
+          }
+
+          // Compressed bus/taxi bays facing the arterial.
+          ctx.strokeStyle = "rgba(239,241,237,.65)";
+          ctx.lineWidth = 2;
+          for (let n = 0; n < 4; n += 1) {
+            const bx = x + 40 + n * 58;
+            ctx.strokeRect(bx, y + h - 55, 45, 36);
+          }
+          ctx.fillStyle = "rgba(52,69,67,.58)";
+          ctx.font = "700 10px system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("BUS", x + w - 54, y + h - 31);
+          continue;
+        }
+
+        if (style === "arcade") {
+          const laneW = 78;
+          const laneX = x + w / 2 - laneW / 2;
+          ctx.fillStyle = "#b9b5a8";
+          roundedRectPath(ctx, laneX, y + 5, laneW, h - 10, 7);
+          ctx.fill();
+          ctx.fillStyle = "rgba(236,231,212,.23)";
+          for (let ty = y + 14; ty < y + h - 12; ty += 24) {
+            ctx.fillRect(laneX + 6, ty, laneW - 12, 8);
+          }
+          ctx.strokeStyle = "rgba(73,81,78,.34)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(laneX + 8, y + 8);
+          ctx.lineTo(laneX + 8, y + h - 8);
+          ctx.moveTo(laneX + laneW - 8, y + 8);
+          ctx.lineTo(laneX + laneW - 8, y + h - 8);
+          ctx.stroke();
+          continue;
+        }
+
+        if (style === "alley") {
+          const laneW = 54;
+          const cx = x + w / 2;
+          const bendY = y + h * .58;
+          ctx.fillStyle = "#777a76";
+          roundedRectPath(ctx, cx - laneW / 2, y + 8, laneW, h * .62, 5);
+          ctx.fill();
+          roundedRectPath(ctx, cx - laneW / 2, bendY - laneW / 2, w * .42, laneW, 5);
+          ctx.fill();
+
+          ctx.fillStyle = "rgba(255,255,255,.07)";
+          for (let ty = y + 22; ty < bendY - 16; ty += 26) {
+            ctx.fillRect(cx - 3, ty, 6, 10);
+          }
+          ctx.fillStyle = "rgba(207,88,67,.14)";
+          ctx.fillRect(cx + 12, y + 20, 8, h * .45);
+          continue;
+        }
+
+        if (style === "residential") {
+          const laneW = 38;
+          const offset = hash2(gx, gy, 1410) > .5 ? w * .38 : w * .58;
+          ctx.fillStyle = "#8c8f89";
+          roundedRectPath(ctx, x + offset - laneW / 2, y + 5, laneW, h - 10, 6);
+          ctx.fill();
+
+          ctx.strokeStyle = "rgba(215,219,211,.24)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x + offset - laneW / 2 + 4, y + 8);
+          ctx.lineTo(x + offset - laneW / 2 + 4, y + h - 8);
+          ctx.moveTo(x + offset + laneW / 2 - 4, y + 8);
+          ctx.lineTo(x + offset + laneW / 2 - 4, y + h - 8);
+          ctx.stroke();
+
+          // Small concrete parking pads and garden strips.
+          ctx.fillStyle = "#aaa9a1";
+          ctx.fillRect(x + 14, y + 18, 52, 38);
+          ctx.fillRect(x + w - 68, y + h - 58, 54, 40);
+          ctx.fillStyle = "#718b68";
+          ctx.fillRect(x + 18, y + h - 34, 62, 15);
+          continue;
+        }
+
+        if (style === "green") {
+          ctx.fillStyle = "#708f67";
+          roundedRectPath(ctx, x + 6, y + 6, w - 12, h - 12, 16);
+          ctx.fill();
+
+          ctx.strokeStyle = "#c0b895";
+          ctx.lineWidth = 20;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(x + 30, y + h * .72);
+          ctx.bezierCurveTo(x + w * .28, y + h * .3, x + w * .66, y + h * .78, x + w - 28, y + h * .3);
+          ctx.stroke();
+
+          if ((gx + gy) % 2 === 0) {
+            ctx.fillStyle = "#557987";
+            ctx.beginPath();
+            ctx.ellipse(x + w * .72, y + h * .68, 45, 28, -.25, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          continue;
+        }
+
+        if (style === "mixed-core") {
+          ctx.fillStyle = "rgba(167,164,153,.22)";
+          ctx.fillRect(x + 8, y + h - 46, w - 16, 34);
+          for (let n = 0; n < 6; n += 1) {
+            ctx.fillStyle = n % 2 ? "rgba(192,183,154,.12)" : "rgba(255,255,255,.055)";
+            ctx.fillRect(x + 18 + n * 54, y + h - 42, 35, 26);
+          }
+
+          // Short diagonal pedestrian cut-throughs break the rigid grid without
+          // becoming part of the car navigation graph.
+          if (hash2(gx, gy, 22) < .06) {
+            ctx.strokeStyle = "#93958e";
+            ctx.lineWidth = 30;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            if ((gx + gy) % 2 === 0) {
+              ctx.moveTo(x + 34, y + h * .25);
+              ctx.lineTo(x + w - 34, y + h * .72);
+            } else {
+              ctx.moveTo(x + w - 34, y + h * .22);
+              ctx.lineTo(x + 34, y + h * .76);
+            }
+            ctx.stroke();
+            ctx.strokeStyle = "rgba(240,240,232,.18)";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+        }
+      }
+    }
+  }
+
+  function drawCityLandmarks() {
+    const station = worldToScreen(8 * ROAD_GAP + ROAD_GAP / 2, 5 * ROAD_GAP + ROAD_GAP / 2);
+    if (station.x > -400 && station.y > -400 && station.x < viewWidth + 400 && station.y < viewHeight + 400) {
+      // Station entrance / canopy.
+      ctx.fillStyle = "#4a5554";
+      roundedRectPath(ctx, station.x - 92, station.y - 30, 184, 42, 7);
+      ctx.fill();
+      ctx.fillStyle = "#dfe5df";
+      ctx.fillRect(station.x - 82, station.y - 20, 164, 20);
+      ctx.fillStyle = "#384340";
+      ctx.font = "800 16px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("若葉駅", station.x, station.y - 5);
+      ctx.fillStyle = "#5a6864";
+      ctx.fillRect(station.x - 76, station.y + 11, 10, 42);
+      ctx.fillRect(station.x + 66, station.y + 11, 10, 42);
+
+      // Taxi rank.
+      ctx.fillStyle = "#d6d9d2";
+      ctx.font = "700 9px system-ui, sans-serif";
+      ctx.fillText("TAXI", station.x + 128, station.y + 78);
+    }
+
+    const arcade = worldToScreen(7 * ROAD_GAP + ROAD_GAP / 2, 6 * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN + 12);
+    if (arcade.x > -250 && arcade.y > -250 && arcade.x < viewWidth + 250 && arcade.y < viewHeight + 250) {
+      ctx.strokeStyle = "#5b6661";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(arcade.x - 48, arcade.y + 26);
+      ctx.lineTo(arcade.x - 48, arcade.y - 24);
+      ctx.lineTo(arcade.x + 48, arcade.y - 24);
+      ctx.lineTo(arcade.x + 48, arcade.y + 26);
+      ctx.stroke();
+      ctx.fillStyle = "#d9c77b";
+      roundedRectPath(ctx, arcade.x - 42, arcade.y - 38, 84, 21, 5);
+      ctx.fill();
+      ctx.fillStyle = "#493f2f";
+      ctx.font = "800 10px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("若葉サンモール", arcade.x, arcade.y - 24);
+    }
+
+    const shrine = worldToScreen(5 * ROAD_GAP + ROAD_GAP / 2, 9 * ROAD_GAP + ROAD_GAP / 2);
+    if (shrine.x > -220 && shrine.y > -220 && shrine.x < viewWidth + 220 && shrine.y < viewHeight + 220) {
+      ctx.strokeStyle = "#a64f43";
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(shrine.x - 23, shrine.y + 18);
+      ctx.lineTo(shrine.x - 23, shrine.y - 26);
+      ctx.moveTo(shrine.x + 23, shrine.y + 18);
+      ctx.lineTo(shrine.x + 23, shrine.y - 26);
+      ctx.moveTo(shrine.x - 35, shrine.y - 22);
+      ctx.lineTo(shrine.x + 35, shrine.y - 22);
+      ctx.moveTo(shrine.x - 29, shrine.y - 31);
+      ctx.lineTo(shrine.x + 29, shrine.y - 31);
+      ctx.stroke();
+      ctx.fillStyle = "#5f695e";
+      ctx.font = "700 9px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("若葉神社", shrine.x, shrine.y + 34);
+    }
+
+    const alley = worldToScreen(10 * ROAD_GAP + ROAD_GAP / 2, 6 * ROAD_GAP + ROAD_GAP / 2);
+    if (alley.x > -220 && alley.y > -220 && alley.x < viewWidth + 220 && alley.y < viewHeight + 220) {
+      ctx.fillStyle = "rgba(164,69,54,.84)";
+      for (let n = -2; n <= 2; n += 1) {
+        ctx.beginPath();
+        ctx.arc(alley.x + n * 20, alley.y - 58 + Math.abs(n) * 3, 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.strokeStyle = "rgba(74,62,54,.7)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(alley.x - 52, alley.y - 61);
+      ctx.lineTo(alley.x + 52, alley.y - 61);
+      ctx.stroke();
+    }
+  }
+
   function drawStreetProps() {
     const startX = Math.floor(state.camera.x / ROAD_GAP) - 1;
     const endX = Math.ceil((state.camera.x + viewWidth) / ROAD_GAP) + 1;
@@ -2127,7 +2533,75 @@
       for (let gy = startY; gy <= endY; gy += 1) {
         const baseX = gx * ROAD_GAP;
         const baseY = gy * ROAD_GAP;
+        const style = cityBlockStyle(gx, gy);
         const seed = hash2(gx, gy, 810);
+
+        const center = worldToScreen(baseX + ROAD_GAP / 2, baseY + ROAD_GAP / 2);
+        if (style === "station") {
+          // Bicycle parking and bollards around the station plaza.
+          ctx.strokeStyle = "#59635f";
+          ctx.lineWidth = 1.5;
+          for (let n = -3; n <= 3; n += 1) {
+            const bx = center.x + n * 18;
+            const by = center.y + 132;
+            ctx.beginPath();
+            ctx.arc(bx - 4, by, 5, 0, Math.PI * 2);
+            ctx.arc(bx + 5, by, 5, 0, Math.PI * 2);
+            ctx.moveTo(bx - 4, by);
+            ctx.lineTo(bx + 1, by - 7);
+            ctx.lineTo(bx + 5, by);
+            ctx.stroke();
+          }
+          ctx.fillStyle = "#4f5b57";
+          for (let n = -3; n <= 3; n += 1) {
+            ctx.fillRect(center.x + n * 28 - 2, center.y - 132, 4, 15);
+          }
+        } else if (style === "arcade") {
+          // Dense projecting shop signs and alternating awnings.
+          for (let n = -2; n <= 2; n += 1) {
+            const sy = center.y + n * 52;
+            ctx.fillStyle = n % 2 ? "#a76055" : "#547b76";
+            ctx.fillRect(center.x - 92, sy - 11, 24, 15);
+            ctx.fillStyle = n % 2 ? "#6f8299" : "#b58b55";
+            ctx.fillRect(center.x + 68, sy - 7, 24, 15);
+            ctx.fillStyle = "rgba(239,226,195,.72)";
+            ctx.fillRect(center.x - 65, sy + 13, 130, 5);
+          }
+        } else if (style === "alley") {
+          // Lantern strings and standing signs make the narrow dining alleys read at night.
+          ctx.strokeStyle = "rgba(71,61,54,.75)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(center.x - 48, center.y - 92);
+          ctx.lineTo(center.x + 48, center.y - 92);
+          ctx.stroke();
+          for (let n = -2; n <= 2; n += 1) {
+            ctx.fillStyle = "#b85c4f";
+            ctx.beginPath();
+            ctx.arc(center.x + n * 21, center.y - 88 + Math.abs(n) * 2, 5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.fillStyle = "#433c36";
+          ctx.fillRect(center.x + 35, center.y + 54, 18, 27);
+          ctx.fillStyle = "#d7c49a";
+          ctx.fillRect(center.x + 38, center.y + 58, 12, 16);
+        } else if (style === "residential") {
+          // Hedges, low fences and utility clutter instead of commercial furniture.
+          ctx.fillStyle = "#607c5b";
+          ctx.fillRect(center.x - 126, center.y + 102, 72, 9);
+          ctx.fillRect(center.x + 54, center.y - 108, 68, 9);
+          ctx.strokeStyle = "#8d918a";
+          ctx.lineWidth = 2;
+          for (let n = 0; n < 5; n += 1) {
+            ctx.beginPath();
+            ctx.moveTo(center.x - 122 + n * 16, center.y + 88);
+            ctx.lineTo(center.x - 122 + n * 16, center.y + 106);
+            ctx.stroke();
+          }
+        } else if (style === "green") {
+          drawTree(baseX + ROAD_GAP * .36, baseY + ROAD_GAP * .38, 1.05);
+          drawTree(baseX + ROAD_GAP * .68, baseY + ROAD_GAP * .66, 1.1);
+        }
         if (seed > .18) {
           drawTree(baseX + ROAD_HALF + 35, baseY + 145, .82);
           drawTree(baseX + 145, baseY + ROAD_HALF + 35, .78);
@@ -3005,10 +3479,12 @@
 
     beginWorldProjection();
     drawGround();
+    drawNeighborhoodGround();
     drawRoute();
     drawStreetProps();
     drawBuildings();
     for (const place of PLACES) drawPlace(place);
+    drawCityLandmarks();
     drawPedestrians();
     for (const npc of NPCS) drawNpc(npc);
     for (const car of traffic) drawCar(car, false);
