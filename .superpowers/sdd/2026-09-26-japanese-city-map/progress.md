@@ -6,3 +6,5 @@ Pre-flight: Task 6's `mapVersion` migration is consumed only by the existing sav
 Task 1: complete (commits 95e2d5e..HEAD, tests: node --test tests/map-model.test.mjs → 5/5 pass)
 Task 2: complete (commits 9a59bca..HEAD, tests: npm test → 432/432 pass; node --check game/game.js → pass)
 Task 3: complete (commits decec04..HEAD, tests: npm test → 433/433 pass; node --check game/game.js → pass)
+Task 4: complete (commit 6d3de99, tests: node --test tests/game-runtime.test.mjs tests/map-model.test.mjs → 15/15 pass; npm test → 434/434 pass; browser reload + console warnings/errors → none)
+Task 5: in progress (rendering now uses MapModel polylines/parcels; browser reload verified with no runtime errors)

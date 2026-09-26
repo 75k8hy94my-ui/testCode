@@ -858,6 +858,26 @@
   }
 
   function generateBuildings() {
+    buildings.length = 0;
+    for (const parcel of mapModel.parcels) {
+      const inset = parcel.use === "shrine" ? 28 : 36;
+      buildings.push({
+        x: parcel.x + inset,
+        y: parcel.y + inset,
+        w: Math.max(110, parcel.w - inset * 2),
+        h: Math.max(90, parcel.h - inset * 2),
+        tint: .9,
+        kind: parcel.use === "commercial" ? "normal" : "low",
+        palette: parcel.use === "shrine" ? 2 : parcel.use === "commercial" ? 1 : 0,
+        district: parcel.district,
+        floors: parcel.use === "commercial" ? 3 : 2,
+        roofDetail: 1,
+        facadeBand: parcel.use === "commercial",
+        balconies: parcel.use === "residential"
+      });
+    }
+    return;
+
     const maxBlock = Math.floor(WORLD_SIZE / ROAD_GAP) - 1;
 
     for (let gx = 0; gx < maxBlock; gx += 1) {
@@ -3394,7 +3414,42 @@
     }
   }
 
+  function drawMapModelRoads() {
+    for (const edge of mapModel.edges) {
+      const points = edge.points;
+      const first = worldToScreen(points[0].x, points[0].y);
+      const last = worldToScreen(points.at(-1).x, points.at(-1).y);
+      if (Math.max(first.x, last.x) < -260 || Math.min(first.x, last.x) > viewWidth + 260 ||
+          Math.max(first.y, last.y) < -260 || Math.min(first.y, last.y) > viewHeight + 260) continue;
+      const screenPoints = points.map((point) => worldToScreen(point.x, point.y));
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(screenPoints[0].x, screenPoints[0].y);
+      for (let i = 1; i < screenPoints.length; i += 1) ctx.lineTo(screenPoints[i].x, screenPoints[i].y);
+      ctx.strokeStyle = edge.vehicle ? "rgba(36,45,43,.42)" : "rgba(65,105,73,.35)";
+      ctx.lineWidth = edge.width + (edge.vehicle ? 22 : 12);
+      ctx.stroke();
+      ctx.strokeStyle = edge.vehicle ? (edge.type === "arterial" ? "#59605d" : "#696f69") : "#7ca77c";
+      ctx.lineWidth = edge.width;
+      ctx.stroke();
+      if (edge.vehicle && edge.type !== "park") {
+        ctx.strokeStyle = edge.type === "arterial" ? "rgba(235,220,173,.72)" : "rgba(231,228,199,.5)";
+        ctx.lineWidth = 3;
+        ctx.setLineDash(edge.type === "arterial" ? [24, 22] : [14, 24]);
+        ctx.beginPath();
+        ctx.moveTo(screenPoints[0].x, screenPoints[0].y);
+        for (let i = 1; i < screenPoints.length; i += 1) ctx.lineTo(screenPoints[i].x, screenPoints[i].y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  }
+
   function drawSparseRoadNetwork() {
+    drawMapModelRoads();
+    return;
+
     for (let gy = 1; gy <= 17; gy += 1) {
       for (let gx = 1; gx < 17; gx += 1) {
         if (roadEdgeExists(gx, gy, gx + 1, gy)) drawRoadEdge("h", gy, gx);
@@ -3533,6 +3588,30 @@
   }
 
   function drawNeighborhoodGround() {
+    for (const district of mapModel.districts) {
+      const bounds = district.bounds;
+      const topLeft = worldToScreen(bounds.x, bounds.y);
+      const width = bounds.w;
+      const height = bounds.h;
+      const color = district.id === "park-shrine" ? "rgba(91,137,91,.36)"
+        : district.id.includes("residential") ? "rgba(191,186,151,.24)"
+        : "rgba(201,181,143,.25)";
+      ctx.fillStyle = color;
+      ctx.fillRect(topLeft.x, topLeft.y, width, height);
+    }
+    for (const parcel of mapModel.parcels) {
+      const p = worldToScreen(parcel.x, parcel.y);
+      ctx.fillStyle = parcel.use === "shrine" ? "rgba(171,143,111,.42)"
+        : parcel.use === "commercial" ? "rgba(213,190,151,.4)"
+        : "rgba(171,180,137,.34)";
+      roundedRectPath(ctx, p.x, p.y, parcel.w, parcel.h, 16);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,.16)";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+    return;
+
     const startGX = Math.floor(state.camera.x / ROAD_GAP) - 1;
     const endGX = Math.ceil((state.camera.x + viewWidth) / ROAD_GAP) + 1;
     const startGY = Math.floor(state.camera.y / ROAD_GAP) - 1;
@@ -4080,6 +4159,24 @@
   }
 
   function drawStreetProps() {
+    for (const edge of mapModel.edges) {
+      if (!edge.vehicle) continue;
+      const stride = edge.type === "arterial" ? 260 : 340;
+      let distance = 120;
+      const length = polylineLength(edge.points);
+      while (distance < length) {
+        const pose = pointAndTangentOnPolyline(edge.points, distance);
+        drawLamp(pose.point.x + pose.normal.x * (edge.width * .58), pose.point.y + pose.normal.y * (edge.width * .58));
+        distance += stride;
+      }
+    }
+    for (const parcel of mapModel.parcels) {
+      if (parcel.use !== "residential") continue;
+      drawTree(parcel.x + 46, parcel.y + 42, .72);
+      drawTree(parcel.x + parcel.w - 42, parcel.y + parcel.h - 42, .58);
+    }
+    return;
+
     const startX = Math.floor(state.camera.x / ROAD_GAP) - 1;
     const endX = Math.ceil((state.camera.x + viewWidth) / ROAD_GAP) + 1;
     const startY = Math.floor(state.camera.y / ROAD_GAP) - 1;
@@ -4335,6 +4432,26 @@
   }
 
   function drawTrafficLights() {
+    for (const node of mapModel.nodes) {
+      const signalized = mapModel.edges.some((edge) => edge.signalized && (edge.from === node.id || edge.to === node.id));
+      if (!signalized) continue;
+      const p = worldToScreen(node.x, node.y);
+      if (p.x < -180 || p.y < -180 || p.x > viewWidth + 180 || p.y > viewHeight + 180) continue;
+      const incident = mapModel.edges.find((edge) => edge.signalized && (edge.from === node.id || edge.to === node.id));
+      const otherId = incident.from === node.id ? incident.to : incident.from;
+      const other = mapModel.getNode(otherId);
+      const orientation = Math.abs(other.x - node.x) >= Math.abs(other.y - node.y) ? "h" : "v";
+      const stateName = signalStateAt(node.x, node.y, orientation);
+      ctx.strokeStyle = "#4d5552";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x + (orientation === "h" ? 34 : 0), p.y + (orientation === "v" ? 34 : 0));
+      ctx.stroke();
+      drawSignalHead(p.x + (orientation === "h" ? 34 : 0), p.y + (orientation === "v" ? 34 : 0), orientation, stateName);
+    }
+    return;
+
     const startX = Math.floor(state.camera.x / ROAD_GAP) - 1;
     const endX = Math.ceil((state.camera.x + viewWidth) / ROAD_GAP) + 1;
     const startY = Math.floor(state.camera.y / ROAD_GAP) - 1;
@@ -5075,6 +5192,23 @@
     }
   }
 
+  function drawMapModelMinimap(w, h, p, scale) {
+    for (const edge of mapModel.edges) {
+      mctx.strokeStyle = edge.vehicle ? (edge.type === "arterial" ? "#8d9891" : "#69766d") : "#6fa078";
+      mctx.lineWidth = Math.max(1.5, edge.width * scale * .75);
+      mctx.lineCap = "round";
+      mctx.lineJoin = "round";
+      mctx.beginPath();
+      const first = edge.points[0];
+      mctx.moveTo(w / 2 + (first.x - p.x) * scale, h / 2 + (first.y - p.y) * scale);
+      for (let i = 1; i < edge.points.length; i += 1) {
+        const point = edge.points[i];
+        mctx.lineTo(w / 2 + (point.x - p.x) * scale, h / 2 + (point.y - p.y) * scale);
+      }
+      mctx.stroke();
+    }
+  }
+
   function drawMinimap() {
     const w = minimap.width;
     const h = minimap.height;
@@ -5086,27 +5220,7 @@
     mctx.fillStyle = "#101613";
     mctx.fillRect(0, 0, w, h);
 
-    const startRoadX = Math.floor((p.x - range) / ROAD_GAP) - 1;
-    const endRoadX = Math.ceil((p.x + range) / ROAD_GAP) + 1;
-    const startRoadY = Math.floor((p.y - range) / ROAD_GAP) - 1;
-    const endRoadY = Math.ceil((p.y + range) / ROAD_GAP) + 1;
-
-    mctx.strokeStyle = "#59625e";
-    mctx.lineWidth = Math.max(3, ROAD_WIDTH * scale);
-    for (let i = startRoadX; i <= endRoadX; i += 1) {
-      const x = w / 2 + (i * ROAD_GAP - p.x) * scale;
-      mctx.beginPath();
-      mctx.moveTo(x, 0);
-      mctx.lineTo(x, h);
-      mctx.stroke();
-    }
-    for (let i = startRoadY; i <= endRoadY; i += 1) {
-      const y = h / 2 + (i * ROAD_GAP - p.y) * scale;
-      mctx.beginPath();
-      mctx.moveTo(0, y);
-      mctx.lineTo(w, y);
-      mctx.stroke();
-    }
+    drawMapModelMinimap(w, h, p, scale);
 
     function dot(wx, wy, color, radius) {
       const x = w / 2 + (wx - p.x) * scale;

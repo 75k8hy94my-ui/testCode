@@ -68,3 +68,11 @@ test('driving routes and traffic use the map graph and edge geometry', () => {
   assert.match(source, /edge\.points/);
   assert.match(source, /edge\.signalized/);
 });
+
+test('city rendering uses map parcels and polylines instead of grid-only geometry', () => {
+  assert.match(source, /mapModel\.parcels/);
+  assert.match(source, /mapModel\.edges/);
+  assert.match(source, /edge\.points/);
+  assert.match(source, /function drawMapModelRoads\(\)/);
+  assert.match(source, /function drawMapModelMinimap\(/);
+});
