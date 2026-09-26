@@ -33,13 +33,13 @@ test('current entry pages keep their static bootstrap script baselines', () => {
     'profile-menu.js?v=20260924-theme-unified', 'feature-flags.js',
     'media-access-gate.js?v=20260926-non-jp-vpn',
     'manga-list-route.js?v=20260926-route-owned-v3',
-    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20260926-manga-root-fix-v2',
+    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20260926-reader-shell-root-fix',
   ]);
   assert.deepEqual(scriptSources(pages.video), [
     'supabase-config.js', 'vault-session.js?v=20260813-vault-state', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20260924-theme-unified', 'app-desktop-rail.js',
-    'profile-menu.js?v=20260924-theme-unified', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20260926-manga-root-fix-v2',
+    'profile-menu.js?v=20260924-theme-unified', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20260926-reader-shell-root-fix',
   ]);
 });
 
@@ -49,7 +49,7 @@ test('current route dispatcher keeps manga and video independent and preserves d
   assert.match(spa, /else if\(route==='manga'\)renderManga\(generation\)/);
   assert.match(spa, /else if\(route==='video'\)renderVideo\(generation\)/);
   assert.match(spa, /else if\(route==='reader'\)renderReader\(route,generation\)/);
-  assert.match(spa, /fetch\('reader\.html\?v=20260926-reader-startup-fix'/);
+  assert.match(spa, /fetch\('reader\.html\?v=20260926-reader-shell-root-fix'/);
   assert.match(spa, /ReaderRouteRuntimeFactory\.create\(/);
   assert.match(spa, /reader-route-runtime\.js\?v=20260922-route-runtime/);
   assert.match(readerRouteRuntime, /if \(route === 'manga' \|\| route === 'video'\) deps\.activate\(route\)/);
