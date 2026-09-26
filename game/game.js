@@ -3593,7 +3593,7 @@
     });
     const strokeEdge = (edge, width, color, dash = []) => {
       const points = edge.points.map((point) => worldToScreen(point.x, point.y));
-      ctx.lineCap = "butt";
+      ctx.lineCap = edge.vehicle ? "butt" : "round";
       ctx.lineJoin = "round";
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
@@ -3614,7 +3614,7 @@
         const radius = Math.max(...incidentEdges.map((edge) => edge.width)) / 2 + (shadow ? 11 : 2);
         const hasArterial = incidentEdges.some((edge) => edge.type === "arterial");
         ctx.fillStyle = shadow
-          ? (hasArterial ? "rgba(36,45,43,.42)" : "rgba(65,105,73,.35)")
+          ? "rgba(36,45,43,.38)"
           : (hasArterial ? "#59605d" : "#696f69");
         ctx.beginPath();
         ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
@@ -3622,17 +3622,37 @@
       }
     };
 
+    const pedestrianSurface = (edge) =>
+      edge.type === "greenway" ? "#779d70" :
+      edge.type === "shopping-walk" ? "#b5aa90" :
+      edge.type === "plaza" ? "#b9b5a8" :
+      "#aaa9a1";
+    const vehicleSurface = (edge) =>
+      edge.type === "arterial" ? "#59605d" :
+      edge.type === "collector" ? "#626965" :
+      edge.type === "shopping" ? "#706d66" :
+      edge.type === "alley" ? "#777873" :
+      edge.type === "park" ? "#6d736c" :
+      "#6b706b";
+
     for (const edge of visibleEdges) {
-      strokeEdge(edge, edge.width + (edge.vehicle ? 22 : 12), edge.vehicle ? "rgba(36,45,43,.42)" : "rgba(65,105,73,.35)");
+      const shadow = edge.vehicle
+        ? "rgba(36,45,43,.38)"
+        : edge.type === "greenway"
+          ? "rgba(58,93,62,.28)"
+          : "rgba(70,71,66,.24)";
+      strokeEdge(edge, edge.width + (edge.vehicle ? 22 : 10), shadow);
     }
     drawJunctionPads(true);
     for (const edge of visibleEdges) {
-      strokeEdge(edge, edge.width, edge.vehicle ? (edge.type === "arterial" ? "#59605d" : "#696f69") : "#7ca77c");
+      strokeEdge(edge, edge.width, edge.vehicle ? vehicleSurface(edge) : pedestrianSurface(edge));
     }
     drawJunctionPads();
     for (const edge of visibleEdges) {
-      if (edge.vehicle && edge.type !== "park") {
-        strokeEdge(edge, 3, edge.type === "arterial" ? "rgba(235,220,173,.72)" : "rgba(231,228,199,.5)", edge.type === "arterial" ? [24, 22] : [14, 24]);
+      if (edge.vehicle && edge.type === "arterial") {
+        strokeEdge(edge, 3, "rgba(235,220,173,.74)", [24,22]);
+      } else if (edge.vehicle && edge.type === "collector" && edge.width >= 112) {
+        strokeEdge(edge, 2.2, "rgba(231,228,199,.55)", [16,20]);
       }
     }
     drawMapModelIntersectionMarkings();
