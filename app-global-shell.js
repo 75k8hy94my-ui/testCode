@@ -3,13 +3,13 @@
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
   if (location.pathname.endsWith('/index.html') || location.pathname === '/index.html') return;
 
-  const SPA_PAGES = Object.freeze(['home.html', 'profile.html', 'manga.html', 'video.html', 'reader.html']);
+  const SPA_PAGES = Object.freeze(['home.html', 'profile.html', 'manga.html', 'video.html']);
   const labels = {
     'home.html': 'ホーム',
     'profile.html': 'プロフィール設定',
     'manga.html': '漫画',
     'video.html': '動画',
-    'reader.html': '漫画',
+    'reader.html': '漫画リーダー',
     'sync.html': '保管庫'
   };
 
