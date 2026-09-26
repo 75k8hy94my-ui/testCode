@@ -872,186 +872,17 @@
 
   function generateBuildings() {
     buildings.length = 0;
-    for (const parcel of mapModel.parcels) {
-      const inset = parcel.use === "shrine" ? 28 : 36;
+    for (const site of mapModel.buildingSites || []) {
       buildings.push({
-        x: parcel.x + inset,
-        y: parcel.y + inset,
-        w: Math.max(110, parcel.w - inset * 2),
-        h: Math.max(90, parcel.h - inset * 2),
-        tint: .9,
-        kind: parcel.use === "commercial" ? "normal" : "low",
-        palette: parcel.use === "shrine" ? 2 : parcel.use === "commercial" ? 1 : 0,
-        district: parcel.district,
-        floors: parcel.use === "commercial" ? 3 : 2,
-        roofDetail: 1,
-        facadeBand: parcel.use === "commercial",
-        balconies: parcel.use === "residential"
+        ...site,
+        tint:.76 + hash2(Math.floor(site.x), Math.floor(site.y), 91) * .18,
+        palette:Number.isFinite(site.palette) ? site.palette : Math.floor(hash2(Math.floor(site.x), Math.floor(site.y), 407) * VISUAL_PALETTES.length),
+        floors:Math.max(1, Math.floor(site.floors || 1)),
+        roofDetail:Number.isFinite(site.roofDetail) ? site.roofDetail : Math.floor(hash2(Math.floor(site.x), Math.floor(site.y), 410) * 4),
+        facadeBand:Boolean(site.facadeBand),
+        balconies:Boolean(site.balconies),
+        residentialSeed:site.seed || Math.floor(site.x + site.y)
       });
-    }
-    return;
-
-    const maxBlock = Math.floor(WORLD_SIZE / ROAD_GAP) - 1;
-
-    for (let gx = 0; gx < maxBlock; gx += 1) {
-      for (let gy = 0; gy < maxBlock; gy += 1) {
-        if (SPECIAL_BLOCKS.has(gx + "," + gy)) continue;
-
-        const left = gx * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN;
-        const top = gy * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN;
-        const right = (gx + 1) * ROAD_GAP - ROAD_HALF - BLOCK_MARGIN;
-        const bottom = (gy + 1) * ROAD_GAP - ROAD_HALF - BLOCK_MARGIN;
-        const bw = right - left;
-        const bh = bottom - top;
-        const style = cityBlockStyle(gx, gy);
-        const tint = 0.76 + hash2(gx, gy, 91) * 0.18;
-
-        const makeBuilding = (x, y, w, h, localTint, kind, variant = 0, district = style) => {
-          const palette = Math.floor(hash2(gx + variant, gy, 407) * VISUAL_PALETTES.length) % VISUAL_PALETTES.length;
-          return {
-            x, y, w, h, tint: localTint, kind, palette, district,
-            floors:
-              kind === "tower" ? 7 + Math.floor(hash2(gx, gy + variant, 408) * 6) :
-              kind === "low" ? 1 + Math.floor(hash2(gx, gy + variant, 409) * 2) :
-              2 + Math.floor(hash2(gx, gy + variant, 409) * 4),
-            roofDetail: Math.floor(hash2(gx, gy + variant, 410) * 4),
-            facadeBand: hash2(gx + variant, gy, 411) > 0.5,
-            balconies: kind !== "low" && hash2(gx, gy + variant, 412) > 0.62
-          };
-        };
-
-        if (style === "station") {
-          const plazaSide = hash2(gx, gy, 1301) > .5 ? 1 : -1;
-          const commercialH = bh * .46;
-          buildings.push(makeBuilding(
-            left + 12,
-            plazaSide > 0 ? top + 10 : bottom - commercialH - 10,
-            bw - 24,
-            commercialH,
-            tint,
-            hash2(gx, gy, 1302) > .52 ? "tower" : "normal",
-            11
-          ));
-          const shopW = (bw - 44) / 3;
-          const rowY = plazaSide > 0 ? bottom - 92 : top + 12;
-          for (let n = 0; n < 3; n += 1) {
-            buildings.push(makeBuilding(
-              left + 10 + n * (shopW + 7),
-              rowY,
-              shopW,
-              74,
-              tint * (.96 + n * .01),
-              "low",
-              20 + n
-            ));
-          }
-          continue;
-        }
-
-        if (style === "arcade") {
-          const corridor = 78;
-          const sideW = (bw - corridor - 36) / 2;
-          const unitH = (bh - 44) / 4;
-          for (let row = 0; row < 4; row += 1) {
-            const y = top + 10 + row * (unitH + 7);
-            buildings.push(makeBuilding(left + 8, y, sideW, unitH, tint, "low", 30 + row));
-            buildings.push(makeBuilding(right - sideW - 8, y + (row % 2 ? 4 : 0), sideW, unitH - 3, tint * .97, "low", 40 + row));
-          }
-          continue;
-        }
-
-        if (style === "alley") {
-          const lane = 54;
-          const cellW = (bw - lane - 44) / 2;
-          const cellH = (bh - lane - 54) / 3;
-          for (let row = 0; row < 3; row += 1) {
-            const y = top + 8 + row * (cellH + 8);
-            buildings.push(makeBuilding(left + 8, y, cellW, cellH, tint, "low", 50 + row));
-            buildings.push(makeBuilding(right - cellW - 8, y + 5, cellW, cellH - 4, tint * .95, "low", 60 + row));
-          }
-          // Close one side at the back so the pedestrian alley bends rather than
-          // reading as another straight grid street.
-          buildings.push(makeBuilding(left + cellW + 18, bottom - 76, lane + 10, 62, tint * .91, "low", 69));
-          continue;
-        }
-
-        if (style === "residential") {
-          const plan = residentialBlockPlan(gx, gy, left, top, bw, bh);
-          for (let i = 0; i < plan.houses.length; i += 1) {
-            const house = plan.houses[i];
-            const building = makeBuilding(
-              house.x,
-              house.y,
-              house.w,
-              house.h,
-              tint * (.94 + hash2(gx + i, gy, 1750) * .08),
-              house.houseStyle === "small-apartment" ? "normal" : "low",
-              170 + i,
-              "residential"
-            );
-            building.floors = house.floors;
-            building.frontage = house.frontage;
-            building.houseStyle = house.houseStyle;
-            building.palette = house.paletteShift;
-            building.residentialSeed = house.seed;
-            building.balconies = house.houseStyle === "small-apartment";
-            buildings.push(building);
-          }
-          continue;
-        }
-
-        if (style === "green") {
-          if (hash2(gx, gy, 1320) > .48) {
-            buildings.push(makeBuilding(left + 34, top + 40, bw * .38, bh * .28, tint, "low", 80));
-          }
-          if (hash2(gx, gy, 1321) > .65) {
-            buildings.push(makeBuilding(right - bw * .32 - 26, bottom - bh * .24 - 28, bw * .32, bh * .24, tint, "low", 81));
-          }
-          continue;
-        }
-
-        const r = hash2(gx, gy, 22);
-        if (r < (style === "mixed-core" ? .06 : .15)) continue;
-
-        if (style === "mixed-core" && r > .52) {
-          const shopH = Math.max(68, bh * .22);
-          const unitW = (bw - 38) / 3;
-          for (let n = 0; n < 3; n += 1) {
-            buildings.push(makeBuilding(
-              left + 8 + n * (unitW + 7),
-              top + 10,
-              unitW,
-              shopH,
-              tint,
-              "low",
-              90 + n
-            ));
-          }
-          buildings.push(makeBuilding(left + 20, top + shopH + 34, bw - 40, bh - shopH - 54, tint * .95, "normal", 94));
-          continue;
-        }
-
-        if (r < 0.55) {
-          buildings.push(makeBuilding(
-            left + 20, top + 20, bw - 40, bh - 40, tint,
-            hash2(gx, gy, 301) > 0.78 ? "tower" : "normal"
-          ));
-        } else if (r < 0.8) {
-          const split = bw * (0.43 + hash2(gx, gy, 104) * 0.12);
-          buildings.push(makeBuilding(left + 12, top + 18, split - 22, bh - 36, tint, "normal", 1));
-          buildings.push(makeBuilding(left + split + 10, top + 32, bw - split - 22, bh - 64, tint * 0.94, "normal", 2));
-        } else {
-          const split = bh * (0.43 + hash2(gx, gy, 205) * 0.12);
-          buildings.push(makeBuilding(left + 20, top + 12, bw - 40, split - 22, tint, "normal", 3));
-          buildings.push(makeBuilding(left + 34, top + split + 10, bw - 68, bh - split - 22, tint * 0.93, "low", 4));
-        }
-      }
-    }
-
-    for (let i = buildings.length - 1; i >= 0; i -= 1) {
-      if (intersectsRailClearance(buildings[i]) || intersectsRoadNetworkClearance(buildings[i])) {
-        buildings.splice(i, 1);
-      }
     }
   }
 
@@ -3919,23 +3750,8 @@
 
   function drawGround() {
     const time = visualTime();
-    ctx.fillStyle = "#7e8f78";
+    ctx.fillStyle = "#7f8d78";
     ctx.fillRect(0, 0, viewWidth, viewHeight);
-
-    // Subtle parcel variation, no longer implying that every 600px boundary is a road.
-    const startBlockX = Math.floor(state.camera.x / ROAD_GAP) - 1;
-    const endBlockX = Math.ceil((state.camera.x + viewWidth) / ROAD_GAP) + 1;
-    const startBlockY = Math.floor(state.camera.y / ROAD_GAP) - 1;
-    const endBlockY = Math.ceil((state.camera.y + viewHeight) / ROAD_GAP) + 1;
-    for (let gx = startBlockX; gx <= endBlockX; gx += 1) {
-      for (let gy = startBlockY; gy <= endBlockY; gy += 1) {
-        const sx = gx * ROAD_GAP - state.camera.x;
-        const sy = gy * ROAD_GAP - state.camera.y;
-        const seed = hash2(gx, gy, 700);
-        ctx.fillStyle = seed > .5 ? "rgba(255,255,255,.012)" : "rgba(0,0,0,.014)";
-        ctx.fillRect(sx, sy, ROAD_GAP, ROAD_GAP);
-      }
-    }
 
     const edges = {
       left:COAST - state.camera.x,
@@ -3965,9 +3781,6 @@
       }
     }
 
-    drawSparseRoadNetwork();
-
-    // Wet asphalt catches a soft cool reflection without repainting a full grid.
     if (state.visual.weather === "rain") {
       ctx.fillStyle = "rgba(113,148,159,.035)";
       ctx.fillRect(0, 0, viewWidth, viewHeight);
@@ -4025,284 +3838,91 @@
     ctx.fillRect(p.x + 6, p.y - 31, 9, 6);
   }
 
+  function drawWorldPolygon(polygon) {
+    if (!polygon?.length) return;
+    const first = worldToScreen(polygon[0][0], polygon[0][1]);
+    ctx.beginPath();
+    ctx.moveTo(first.x, first.y);
+    for (let i = 1; i < polygon.length; i += 1) {
+      const point = worldToScreen(polygon[i][0], polygon[i][1]);
+      ctx.lineTo(point.x, point.y);
+    }
+    ctx.closePath();
+  }
+
   function drawNeighborhoodGround() {
+    const districtFill = {
+      "station-commercial":"rgba(201,181,143,.18)",
+      "park-shrine":"rgba(91,137,91,.18)",
+      "library-quarter":"rgba(178,173,145,.16)",
+      "west-residential":"rgba(191,186,151,.14)",
+      "south-residential":"rgba(194,187,151,.15)",
+      "east-commercial":"rgba(194,175,142,.16)",
+      "east-residential":"rgba(184,183,149,.14)"
+    };
+
     for (const district of mapModel.districts) {
-      const bounds = district.bounds;
-      const topLeft = worldToScreen(bounds.x, bounds.y);
-      const width = bounds.w;
-      const height = bounds.h;
-      const color = district.id === "park-shrine" ? "rgba(91,137,91,.36)"
-        : district.id.includes("residential") ? "rgba(191,186,151,.24)"
-        : "rgba(201,181,143,.25)";
-      ctx.fillStyle = color;
-      ctx.fillRect(topLeft.x, topLeft.y, width, height);
-    }
-    for (const parcel of mapModel.parcels) {
-      const p = worldToScreen(parcel.x, parcel.y);
-      ctx.fillStyle = parcel.use === "shrine" ? "rgba(171,143,111,.42)"
-        : parcel.use === "commercial" ? "rgba(213,190,151,.4)"
-        : "rgba(171,180,137,.34)";
-      roundedRectPath(ctx, p.x, p.y, parcel.w, parcel.h, 16);
+      ctx.fillStyle = districtFill[district.id] || "rgba(190,185,155,.12)";
+      drawWorldPolygon(district.polygon);
       ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,.16)";
-      ctx.lineWidth = 3;
-      ctx.stroke();
     }
-    return;
 
-    const startGX = Math.floor(state.camera.x / ROAD_GAP) - 1;
-    const endGX = Math.ceil((state.camera.x + viewWidth) / ROAD_GAP) + 1;
-    const startGY = Math.floor(state.camera.y / ROAD_GAP) - 1;
-    const endGY = Math.ceil((state.camera.y + viewHeight) / ROAD_GAP) + 1;
+    for (const space of mapModel.openSpaces || []) {
+      const bounds = space.bounds;
+      const screenBounds = { x:bounds.x - state.camera.x, y:bounds.y - state.camera.y, w:bounds.w, h:bounds.h };
+      if (screenBounds.x + screenBounds.w < -120 || screenBounds.y + screenBounds.h < -120 ||
+          screenBounds.x > viewWidth + 120 || screenBounds.y > viewHeight + 120) continue;
 
-    for (let gx = startGX; gx <= endGX; gx += 1) {
-      for (let gy = startGY; gy <= endGY; gy += 1) {
-        const style = cityBlockStyle(gx, gy);
-        if (style === "outer") continue;
+      ctx.fillStyle =
+        space.type === "park" ? "#638b61" :
+        space.type === "shrine" ? "#547552" :
+        space.type === "pocket-park" ? "#73956a" :
+        space.type === "schoolyard" ? "#b7a97f" :
+        space.type === "parking" ? "#666b67" :
+        "#b7b4aa";
+      drawWorldPolygon(space.polygon);
+      ctx.fill();
 
-        const x = gx * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN - state.camera.x;
-        const y = gy * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN - state.camera.y;
-        const w = ROAD_GAP - ROAD_WIDTH - BLOCK_MARGIN * 2;
-        const h = w;
-
-        if (style === "station") {
-          ctx.fillStyle = "#b7b4aa";
-          roundedRectPath(ctx, x + 6, y + 6, w - 12, h - 12, 10);
-          ctx.fill();
-
-          ctx.strokeStyle = "rgba(255,255,255,.19)";
-          ctx.lineWidth = 1;
-          for (let tx = x + 18; tx < x + w - 18; tx += 28) {
-            ctx.beginPath();
-            ctx.moveTo(tx, y + 12);
-            ctx.lineTo(tx, y + h - 12);
-            ctx.stroke();
-          }
-          for (let ty = y + 18; ty < y + h - 18; ty += 28) {
-            ctx.beginPath();
-            ctx.moveTo(x + 12, ty);
-            ctx.lineTo(x + w - 12, ty);
-            ctx.stroke();
-          }
-
-          // Compressed bus/taxi bays facing the arterial.
-          ctx.strokeStyle = "rgba(239,241,237,.65)";
-          ctx.lineWidth = 2;
-          for (let n = 0; n < 4; n += 1) {
-            const bx = x + 40 + n * 58;
-            ctx.strokeRect(bx, y + h - 55, 45, 36);
-          }
-          ctx.fillStyle = "rgba(52,69,67,.58)";
-          ctx.font = "700 10px system-ui, sans-serif";
-          ctx.textAlign = "center";
-          ctx.fillText("BUS", x + w - 54, y + h - 31);
-          continue;
-        }
-
-        if (style === "arcade") {
-          const laneW = 78;
-          const laneX = x + w / 2 - laneW / 2;
-          ctx.fillStyle = "#b9b5a8";
-          // Open the pedestrian shopping street to both surrounding streets.
-          ctx.fillRect(laneX, y - BLOCK_MARGIN - 8, laneW, BLOCK_MARGIN + 18);
-          ctx.fillRect(laneX, y + h - 8, laneW, BLOCK_MARGIN + 16);
-          roundedRectPath(ctx, laneX, y + 5, laneW, h - 10, 7);
-          ctx.fill();
-          ctx.fillStyle = "rgba(236,231,212,.23)";
-          for (let ty = y + 14; ty < y + h - 12; ty += 24) {
-            ctx.fillRect(laneX + 6, ty, laneW - 12, 8);
-          }
-          ctx.strokeStyle = "rgba(73,81,78,.34)";
-          ctx.lineWidth = 2;
+      if (space.type === "park" || space.type === "pocket-park") {
+        ctx.strokeStyle = "rgba(224,218,184,.72)";
+        ctx.lineWidth = space.type === "park" ? 16 : 9;
+        ctx.setLineDash(space.type === "park" ? [42,28] : [24,20]);
+        drawWorldPolygon(space.polygon);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (space.type === "plaza") {
+        ctx.save();
+        drawWorldPolygon(space.polygon);
+        ctx.clip();
+        ctx.strokeStyle = "rgba(255,255,255,.12)";
+        ctx.lineWidth = 1;
+        for (let x = screenBounds.x - 80; x < screenBounds.x + screenBounds.w + 80; x += 34) {
           ctx.beginPath();
-          ctx.moveTo(laneX + 8, y + 8);
-          ctx.lineTo(laneX + 8, y + h - 8);
-          ctx.moveTo(laneX + laneW - 8, y + 8);
-          ctx.lineTo(laneX + laneW - 8, y + h - 8);
+          ctx.moveTo(x, screenBounds.y - 40);
+          ctx.lineTo(x + 100, screenBounds.y + screenBounds.h + 40);
           ctx.stroke();
-          continue;
         }
-
-        if (style === "alley") {
-          const laneW = 54;
-          const cx = x + w / 2;
-          const bendY = y + h * .58;
-          ctx.fillStyle = "#777a76";
-          // Narrow alley enters from one street, bends, then exits sideways.
-          ctx.fillRect(cx - laneW / 2, y - BLOCK_MARGIN - 6, laneW, BLOCK_MARGIN + 22);
-          roundedRectPath(ctx, cx - laneW / 2, y + 8, laneW, h * .62, 5);
-          ctx.fill();
-          roundedRectPath(ctx, cx - laneW / 2, bendY - laneW / 2, w * .42, laneW, 5);
-          ctx.fill();
-          ctx.fillRect(cx + w * .38 - 8, bendY - laneW / 2, BLOCK_MARGIN + 28, laneW);
-
-          ctx.fillStyle = "rgba(255,255,255,.07)";
-          for (let ty = y + 22; ty < bendY - 16; ty += 26) {
-            ctx.fillRect(cx - 3, ty, 6, 10);
-          }
-          ctx.fillStyle = "rgba(207,88,67,.14)";
-          ctx.fillRect(cx + 12, y + 20, 8, h * .45);
-          continue;
-        }
-
-        if (style === "residential") {
-          const worldLeft = gx * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN;
-          const worldTop = gy * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN;
-          const plan = residentialBlockPlan(gx, gy, worldLeft, worldTop, w, h);
-
-          // Uneven private greenery is drawn before roads and houses.
-          for (const yard of plan.yards) {
-            const syard = worldToScreen(yard.x, yard.y);
-            ctx.fillStyle = "rgba(91,124,79,.72)";
-            roundedRectPath(ctx, syard.x, syard.y, yard.w, yard.h, 3);
-            ctx.fill();
-            if (yard.w > 24 && yard.h > 24) {
-              ctx.fillStyle = "rgba(130,154,102,.38)";
-              ctx.beginPath();
-              ctx.arc(syard.x + yard.w * .55, syard.y + yard.h * .48, Math.min(8, yard.w * .18, yard.h * .18), 0, Math.PI * 2);
-              ctx.fill();
-            }
-          }
-
-          // Main 4m-class local road. Some blocks are through streets, others terminate.
-          ctx.fillStyle = "#858984";
-          if (plan.vertical) {
-            const roadX = plan.roadCenter - plan.roadWidth / 2 - state.camera.x;
-            const roadY = plan.roadStart - state.camera.y;
-            const roadH = plan.roadEnd - plan.roadStart;
-            roundedRectPath(ctx, roadX, roadY, plan.roadWidth, roadH, 5);
-            ctx.fill();
-
-            // Japanese side gutters.
-            ctx.fillStyle = "rgba(72,79,76,.55)";
-            ctx.fillRect(roadX + 2, roadY, 3, roadH);
-            ctx.fillRect(roadX + plan.roadWidth - 5, roadY, 3, roadH);
-          } else {
-            const roadX = plan.roadStart - state.camera.x;
-            const roadY = plan.roadCenter - plan.roadWidth / 2 - state.camera.y;
-            const roadW = plan.roadEnd - plan.roadStart;
-            roundedRectPath(ctx, roadX, roadY, roadW, plan.roadWidth, 5);
-            ctx.fill();
-
-            ctx.fillStyle = "rgba(72,79,76,.55)";
-            ctx.fillRect(roadX, roadY + 2, roadW, 3);
-            ctx.fillRect(roadX, roadY + plan.roadWidth - 5, roadW, 3);
-          }
-
-          // Optional narrow side street / short cul-de-sac.
-          if (plan.branch) {
-            ctx.fillStyle = "#858984";
-            const branchW = plan.roadWidth * .78;
-            if (plan.vertical) {
-              const roadEdge = plan.branchSide < 0
-                ? plan.roadCenter - plan.roadWidth / 2
-                : plan.roadCenter + plan.roadWidth / 2;
-              const branchEnd = plan.branchSide < 0 ? worldLeft - 8 : worldLeft + w + 8;
-              const bx = Math.min(roadEdge, branchEnd) - state.camera.x;
-              const by = plan.branchAt - branchW / 2 - state.camera.y;
-              const bw2 = Math.abs(branchEnd - roadEdge);
-              roundedRectPath(ctx, bx, by, bw2, branchW, 4);
-              ctx.fill();
-            } else {
-              const roadEdge = plan.branchSide < 0
-                ? plan.roadCenter - plan.roadWidth / 2
-                : plan.roadCenter + plan.roadWidth / 2;
-              const branchEnd = plan.branchSide < 0 ? worldTop - 8 : worldTop + h + 8;
-              const bx = plan.branchAt - branchW / 2 - state.camera.x;
-              const by = Math.min(roadEdge, branchEnd) - state.camera.y;
-              const bh2 = Math.abs(branchEnd - roadEdge);
-              roundedRectPath(ctx, bx, by, branchW, bh2, 4);
-              ctx.fill();
-            }
-          }
-
-          // Flag-lot access strips and individual parking pads.
-          for (const driveway of plan.driveways) {
-            const p = worldToScreen(driveway.x, driveway.y);
-            ctx.fillStyle = "#a6a59e";
-            ctx.fillRect(p.x, p.y, driveway.w, driveway.h);
-          }
-          for (const pad of plan.parkingPads) {
-            const p = worldToScreen(pad.x, pad.y);
-            ctx.fillStyle = "#aaa9a2";
-            roundedRectPath(ctx, p.x, p.y, pad.w, pad.h, 2);
-            ctx.fill();
-            ctx.strokeStyle = "rgba(244,245,239,.34)";
-            ctx.lineWidth = 1;
-            ctx.stroke();
-            if (hash2(Math.floor(pad.x), Math.floor(pad.y), 1770) > .58) {
-              drawParkingCarTop(
-                p.x + pad.w / 2,
-                p.y + pad.h / 2,
-                !pad.vertical,
-                hash2(Math.floor(pad.x), Math.floor(pad.y), 1771)
-              );
-            }
-          }
-
-          // Only some parcel boundaries are visible as low fences or block walls.
-          ctx.strokeStyle = "rgba(92,96,90,.48)";
-          ctx.lineWidth = 1.5;
-          for (const line of plan.lotLines) {
-            ctx.beginPath();
-            ctx.moveTo(line.x1 - state.camera.x, line.y1 - state.camera.y);
-            ctx.lineTo(line.x2 - state.camera.x, line.y2 - state.camera.y);
-            ctx.stroke();
-          }
-
-          continue;
-        }
-
-        if (style === "green") {
-          ctx.fillStyle = "#708f67";
-          roundedRectPath(ctx, x + 6, y + 6, w - 12, h - 12, 16);
-          ctx.fill();
-
-          ctx.strokeStyle = "#c0b895";
-          ctx.lineWidth = 20;
-          ctx.lineCap = "round";
+        ctx.restore();
+      } else if (space.type === "parking") {
+        ctx.save();
+        drawWorldPolygon(space.polygon);
+        ctx.clip();
+        ctx.strokeStyle = "rgba(244,244,238,.55)";
+        ctx.lineWidth = 2;
+        for (let x = screenBounds.x + 22; x < screenBounds.x + screenBounds.w - 12; x += 42) {
           ctx.beginPath();
-          ctx.moveTo(x + 30, y + h * .72);
-          ctx.bezierCurveTo(x + w * .28, y + h * .3, x + w * .66, y + h * .78, x + w - 28, y + h * .3);
+          ctx.moveTo(x, screenBounds.y + 18);
+          ctx.lineTo(x - 8, screenBounds.y + screenBounds.h - 18);
           ctx.stroke();
-
-          if ((gx + gy) % 2 === 0) {
-            ctx.fillStyle = "#557987";
-            ctx.beginPath();
-            ctx.ellipse(x + w * .72, y + h * .68, 45, 28, -.25, 0, Math.PI * 2);
-            ctx.fill();
-          }
-          continue;
         }
-
-        if (style === "mixed-core") {
-          ctx.fillStyle = "rgba(167,164,153,.22)";
-          ctx.fillRect(x + 8, y + h - 46, w - 16, 34);
-          for (let n = 0; n < 6; n += 1) {
-            ctx.fillStyle = n % 2 ? "rgba(192,183,154,.12)" : "rgba(255,255,255,.055)";
-            ctx.fillRect(x + 18 + n * 54, y + h - 42, 35, 26);
-          }
-
-          // Short diagonal pedestrian cut-throughs break the rigid grid without
-          // becoming part of the car navigation graph.
-          if (hash2(gx, gy, 22) < .06) {
-            ctx.strokeStyle = "#93958e";
-            ctx.lineWidth = 30;
-            ctx.lineCap = "round";
-            ctx.beginPath();
-            if ((gx + gy) % 2 === 0) {
-              ctx.moveTo(x + 34, y + h * .25);
-              ctx.lineTo(x + w - 34, y + h * .72);
-            } else {
-              ctx.moveTo(x + w - 34, y + h * .22);
-              ctx.lineTo(x + 34, y + h * .76);
-            }
-            ctx.stroke();
-            ctx.strokeStyle = "rgba(240,240,232,.18)";
-            ctx.lineWidth = 2;
-            ctx.stroke();
-          }
-        }
+        ctx.restore();
+      } else if (space.type === "schoolyard") {
+        const center = worldToScreen(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2);
+        ctx.strokeStyle = "rgba(249,247,229,.55)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(center.x, center.y, Math.max(60,bounds.w * .34), Math.max(34,bounds.h * .26), 0, 0, Math.PI * 2);
+        ctx.stroke();
       }
     }
   }
@@ -5147,7 +4767,7 @@
       const y = building.y - state.camera.y;
       const palette = VISUAL_PALETTES[building.palette % VISUAL_PALETTES.length];
 
-      if (building.district === "residential") {
+      if (building.style === "residential") {
         drawResidentialBuilding(building, x, y, palette, time);
         continue;
       }
@@ -5871,6 +5491,7 @@
     beginWorldProjection();
     drawGround();
     drawNeighborhoodGround();
+    drawSparseRoadNetwork();
     drawRoute();
     drawStreetProps();
     drawBuildings();
