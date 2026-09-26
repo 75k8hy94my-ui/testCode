@@ -200,10 +200,10 @@
     {
       id:"local-a",
       name:"若葉線 A",
-      x:TRAIN_STATIONS[0].x,
+      x:TRAIN_STATIONS[1].x,
       y:RAIL_Y - RAIL_TRACK_GAP,
-      stationIndex:0,
-      targetIndex:1,
+      stationIndex:1,
+      targetIndex:2,
       direction:1,
       dwell:TRAIN_DWELL_SECONDS,
       speed:0
