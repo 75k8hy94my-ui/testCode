@@ -49,7 +49,7 @@ test('current route dispatcher keeps manga and video independent and preserves d
   assert.match(spa, /else if\(route==='manga'\)renderManga\(generation\)/);
   assert.match(spa, /else if\(route==='video'\)renderVideo\(generation\)/);
   assert.match(spa, /else if\(route==='reader'\)renderReader\(route,generation\)/);
-  assert.match(spa, /fetch\('reader\.html\?v=20260916-reader'/);
+  assert.match(spa, /fetch\('reader\.html\?v=20260926-reader-startup-fix'/);
   assert.match(spa, /ReaderRouteRuntimeFactory\.create\(/);
   assert.match(spa, /reader-route-runtime\.js\?v=20260922-route-runtime/);
   assert.match(readerRouteRuntime, /if \(route === 'manga' \|\| route === 'video'\) deps\.activate\(route\)/);
