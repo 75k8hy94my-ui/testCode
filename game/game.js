@@ -5606,6 +5606,108 @@
       const doorX = building.frontage === "east" ? x + building.w - 13 : x + building.w * .5 - 5;
       ctx.fillRect(doorX, y + building.h - Math.min(16, elevation * .7), 10, Math.min(16, elevation * .7));
     }
+
+    // Eaves, rain gutter and the ubiquitous outdoor AC unit add residential scale.
+    ctx.strokeStyle = "rgba(44,48,45,.5)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(rx - 3, ry + building.h + 2);
+    ctx.lineTo(rx + building.w + 3, ry + building.h + 2);
+    ctx.stroke();
+
+    if (hash2(Math.floor(building.x), Math.floor(building.y), seed + 4) > .38) {
+      const acX = x + building.w - 21;
+      const acY = y + building.h - 11;
+      ctx.fillStyle = "#b9bbb5";
+      roundedRectPath(ctx, acX, acY, 14, 9, 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(63,68,65,.48)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(acX + 7, acY + 4.5, 3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  function drawBuildingMicroDetails(building, x, y, rx, ry, elevation, palette, time) {
+    const seed = hash2(Math.floor(building.x / 7), Math.floor(building.y / 7), 2040);
+
+    // Roof parapet and service equipment.
+    ctx.strokeStyle = "rgba(36,42,40,.34)";
+    ctx.lineWidth = 1.2;
+    roundedRectPath(ctx, rx + 7, ry + 7, Math.max(8, building.w - 14), Math.max(8, building.h - 14), 3);
+    ctx.stroke();
+
+    if (building.w > 86 && building.h > 70) {
+      const unitCount = seed > .66 ? 2 : 1;
+      for (let i = 0; i < unitCount; i += 1) {
+        const ux = rx + building.w * (.24 + i * .28);
+        const uy = ry + building.h * (.24 + hash2(i, building.palette, 2041) * .28);
+        ctx.fillStyle = "#777f7c";
+        roundedRectPath(ctx, ux - 11, uy - 7, 22, 14, 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(38,44,43,.5)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(ux, uy, 4, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    if (building.kind === "tower" || seed > .82) {
+      const ax = rx + building.w * .7;
+      const ay = ry + building.h * .25;
+      ctx.strokeStyle = "#4f5755";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay + 12);
+      ctx.lineTo(ax, ay - 16);
+      ctx.moveTo(ax - 6, ay - 9);
+      ctx.lineTo(ax + 6, ay - 9);
+      ctx.stroke();
+    }
+
+    // Ground-floor awning/sign band gives the facade depth and street frontage.
+    if (building.w > 72) {
+      const awningY = y + building.h - Math.min(10, elevation * .34);
+      ctx.fillStyle = "rgba(42,48,46,.26)";
+      ctx.fillRect(x + building.w * .18, awningY + 3, building.w * .64, 4);
+      ctx.fillStyle = palette.trim;
+      ctx.fillRect(x + building.w * .18, awningY, building.w * .64, 3);
+    }
+
+    // Small outdoor AC units and drain pipes on visible facade.
+    if (seed > .34 && building.w > 70) {
+      const acX = x + building.w * .16;
+      const acY = y + building.h - Math.min(18, elevation * .62);
+      ctx.fillStyle = "#b3b6b0";
+      roundedRectPath(ctx, acX, acY, 13, 8, 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(56,61,59,.45)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(acX + 6.5, acY + 4, 2.7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(83,88,84,.35)";
+      ctx.beginPath();
+      ctx.moveTo(acX + 13, acY + 5);
+      ctx.lineTo(acX + 20, y + building.h - 2);
+      ctx.stroke();
+    }
+
+    // A few lit panes get a soft halo at night instead of a flat yellow square.
+    if (time.night > .52 && seed > .48) {
+      const gx = x + building.w * .72;
+      const gy = y + building.h - Math.min(16, elevation * .55);
+      const glow = ctx.createRadialGradient(gx, gy, 1, gx, gy, 18);
+      glow.addColorStop(0, "rgba(242,202,119,.12)");
+      glow.addColorStop(1, "rgba(242,202,119,0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(gx, gy, 18, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   function drawBuildings() {
@@ -5722,6 +5824,8 @@
         ctx.lineTo(rx + building.w - 26, ry + 10);
         ctx.stroke();
       }
+
+      drawBuildingMicroDetails(building, x, y, rx, ry, elevation, palette, time);
     }
   }
 
@@ -5994,10 +6098,11 @@
       ? (state.player.inVehicle && (touch.driveBrake || keys.has("s") || keys.has("arrowdown") || keys.has(" ")))
       : Boolean(car.brakeGlow > .15);
 
+    const time = visualTime();
     ctx.save();
-    ctx.translate(p.x + 3, p.y + 6);
+    ctx.translate(p.x + 3 + time.shadowX * .06, p.y + 6 + time.shadowY * .05);
     ctx.rotate(car.angle);
-    ctx.fillStyle = "rgba(10,15,14,.24)";
+    ctx.fillStyle = "rgba(10,15,14," + (0.22 + time.night * .04).toFixed(2) + ")";
     roundedRectPath(ctx, -length / 2, -width / 2, length, width, 10);
     ctx.fill();
     ctx.restore();
@@ -6006,7 +6111,6 @@
     ctx.translate(p.x, p.y - lift);
     ctx.rotate(car.angle);
 
-    const time = visualTime();
     if (time.night > .4) {
       const beam = ctx.createLinearGradient(length * .25, 0, length * 1.7, 0);
       beam.addColorStop(0, "rgba(255,240,184," + (.13 * time.night).toFixed(2) + ")");
@@ -6052,7 +6156,32 @@
     ctx.fillStyle = "#7899a3";
     roundedRectPath(ctx, cabinStart + cabinLength * .52, -width * .3, cabinLength * .41, width * .55, 3);
     ctx.fill();
+
+    // Windshield/roof reflection shifts with daylight.
+    const glassSheen = ctx.createLinearGradient(cabinStart, -width * .3, cabinStart + cabinLength, width * .3);
+    glassSheen.addColorStop(0, "rgba(255,255,255,.20)");
+    glassSheen.addColorStop(.48, "rgba(255,255,255,.03)");
+    glassSheen.addColorStop(1, "rgba(210,232,237,.13)");
+    ctx.fillStyle = glassSheen;
+    roundedRectPath(ctx, cabinStart + 2, -width * .28, cabinLength - 4, width * .18, 2);
+    ctx.fill();
     ctx.restore();
+
+    // Side mirrors.
+    ctx.fillStyle = car.color;
+    roundedRectPath(ctx, length * .08, -width / 2 - 4, 9, 5, 2);
+    ctx.fill();
+    roundedRectPath(ctx, length * .08, width / 2 - 1, 9, 5, 2);
+    ctx.fill();
+
+    // Wheel hubs make the tire silhouettes less blocky.
+    ctx.fillStyle = "#89908d";
+    for (const wx of [-length * .23, length * .23]) {
+      ctx.beginPath();
+      ctx.arc(wx, -width / 2 - 1, 2.2, 0, Math.PI * 2);
+      ctx.arc(wx, width / 2 - 1, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     ctx.fillStyle = "#eee6c5";
     ctx.fillRect(length / 2 - 7, -width * .32, 5, 8);
@@ -6065,6 +6194,14 @@
       ctx.fillStyle = "rgba(255,72,58,.15)";
       ctx.fillRect(-length / 2 - 12, -width / 2, 14, width - 4);
     }
+
+    // Tiny Japanese-style plates front and rear.
+    ctx.fillStyle = "#e7eee7";
+    ctx.fillRect(length / 2 - 5, -4, 3, 8);
+    ctx.fillRect(-length / 2 + 2, -4, 3, 8);
+    ctx.fillStyle = "rgba(54,73,61,.7)";
+    ctx.fillRect(length / 2 - 4.5, -2, 1.5, 4);
+    ctx.fillRect(-length / 2 + 2.5, -2, 1.5, 4);
 
     if (owned) {
       ctx.strokeStyle = "rgba(233,244,249,.82)";
