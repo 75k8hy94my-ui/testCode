@@ -5,7 +5,7 @@
   // reader script. Load the media gate at parse time as well so external
   // image/video URLs cannot begin loading before the VPN verdict is known.
   if (typeof document !== 'undefined' && !root.MangaReaderMediaAccess && document.readyState === 'loading') {
-    document.write('<script src="media-access-gate.js?v=20260922-vpn-tools"><\/script>');
+    document.write('<script src="media-access-gate.js?v=20260926-non-jp-vpn"><\/script>');
   }
 
   function activityTime(item) {
