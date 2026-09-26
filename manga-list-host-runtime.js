@@ -30,7 +30,7 @@
     'setTimer',
     'clearTimer',
   ];
-  const NAVIGATION_FUNCTION_NAMES = ['writeStorage', 'navigate'];
+  const NAVIGATION_FUNCTION_NAMES = ['writeStorage', 'navigate', 'buildReaderUrl'];
 
   function create(deps) {
     if (!deps || typeof deps !== 'object' || Array.isArray(deps)) {
@@ -195,13 +195,16 @@
     }
 
     function navigateToReader(item) {
-      if (item && item.id) {
-        deps.navigation.writeStorage(
-          deps.navigation.lastUrlKey,
-          JSON.stringify({ kind: 'item', itemId: item.id }),
-        );
-      }
-      deps.navigation.navigate(deps.navigation.readerUrl);
+      if (!item || !item.id) throw new Error('saved manga item id is required');
+      const itemId = String(item.id);
+      deps.navigation.writeStorage(
+        deps.navigation.lastUrlKey,
+        JSON.stringify({ kind: 'item', itemId }),
+      );
+      // The saved-item id is the canonical reader identity. Page/base URLs are
+      // source locations and may be shared, replaced, or reordered; they must
+      // never be used as the route identity for a saved manga.
+      deps.navigation.navigate(deps.navigation.buildReaderUrl(itemId, deps.navigation.readerUrl));
     }
 
     function persistFolders() {
