@@ -3450,12 +3450,31 @@
       ctx.setLineDash([]);
     };
 
+    const drawJunctionPads = (shadow = false) => {
+      for (const node of mapModel.nodes) {
+        const incidentEdges = mapModel.edges.filter((edge) => edge.vehicle && (edge.from === node.id || edge.to === node.id));
+        if (incidentEdges.length < 2) continue;
+        const point = worldToScreen(node.x, node.y);
+        if (point.x < -260 || point.y < -260 || point.x > viewWidth + 260 || point.y > viewHeight + 260) continue;
+        const radius = Math.max(...incidentEdges.map((edge) => edge.width)) / 2 + (shadow ? 11 : 2);
+        const hasArterial = incidentEdges.some((edge) => edge.type === "arterial");
+        ctx.fillStyle = shadow
+          ? (hasArterial ? "rgba(36,45,43,.42)" : "rgba(65,105,73,.35)")
+          : (hasArterial ? "#59605d" : "#696f69");
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    };
+
     for (const edge of visibleEdges) {
       strokeEdge(edge, edge.width + (edge.vehicle ? 22 : 12), edge.vehicle ? "rgba(36,45,43,.42)" : "rgba(65,105,73,.35)");
     }
+    drawJunctionPads(true);
     for (const edge of visibleEdges) {
       strokeEdge(edge, edge.width, edge.vehicle ? (edge.type === "arterial" ? "#59605d" : "#696f69") : "#7ca77c");
     }
+    drawJunctionPads();
     for (const edge of visibleEdges) {
       if (edge.vehicle && edge.type !== "park") {
         strokeEdge(edge, 3, edge.type === "arterial" ? "rgba(235,220,173,.72)" : "rgba(231,228,199,.5)", edge.type === "arterial" ? [24, 22] : [14, 24]);
