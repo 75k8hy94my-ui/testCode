@@ -102,8 +102,8 @@
   const VEHICLE_FRONT_OVERHANG = 38;
   const BLOCK_MARGIN = 34;
   const PLAYER_RADIUS = 14;
-  const WALK_SPEED = 200;
-  const RUN_SPEED = 300;
+  const WALK_SPEED = 34;
+  const RUN_SPEED = 62;
   const SPEED_TO_KMH = 0.16;
   const SIGNAL_CYCLE = 20;
   const LANE_OFFSET = 38;
@@ -1723,8 +1723,8 @@
         y:mapModel.getNode(profile.homeNodeId)?.y || HOME.y,
         dir:hash2(i, 3, 90) * Math.PI * 2,
         timer:0,
-        baseSpeed:30 + hash2(i, 8, 96) * 27,
-        speed:30 + hash2(i, 8, 96) * 27,
+        baseSpeed:28 + hash2(i, 8, 96) * 14,
+        speed:28 + hash2(i, 8, 96) * 14,
         color:["#c77f66","#718da7","#ba9b58","#8876a8","#71957a","#b26f67","#6f8fac"][i % 7],
         pants:["#394248","#554a45","#2f3b4d","#45464d"][i % 4],
         hair:["#302720","#4a3427","#1f2326","#684b36"][i % 4],
@@ -4667,6 +4667,24 @@
     ctx.fillStyle = "#7f8d78";
     ctx.fillRect(0, 0, viewWidth, viewHeight);
 
+    // Fine world-anchored ground variation prevents large flat green slabs.
+    const textureStep = 72;
+    const startTX = Math.floor(state.camera.x / textureStep) - 1;
+    const endTX = Math.ceil((state.camera.x + viewWidth) / textureStep) + 1;
+    const startTY = Math.floor(state.camera.y / textureStep) - 1;
+    const endTY = Math.ceil((state.camera.y + viewHeight) / textureStep) + 1;
+    for (let tx = startTX; tx <= endTX; tx += 1) {
+      for (let ty = startTY; ty <= endTY; ty += 1) {
+        const seed = hash2(tx, ty, 2010);
+        const px = tx * textureStep - state.camera.x + seed * 38;
+        const py = ty * textureStep - state.camera.y + hash2(tx, ty, 2011) * 38;
+        ctx.fillStyle = seed > .52 ? "rgba(226,235,211,.055)" : "rgba(40,62,43,.045)";
+        ctx.beginPath();
+        ctx.arc(px, py, 1.3 + seed * 1.7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
     const edges = {
       left:COAST - state.camera.x,
       top:COAST - state.camera.y,
@@ -4708,25 +4726,70 @@
 
   function drawTree(x, y, scale = 1) {
     const p = worldToScreen(x, y);
-    if (p.x < -60 || p.y < -60 || p.x > viewWidth + 60 || p.y > viewHeight + 60) return;
+    if (p.x < -70 || p.y < -80 || p.x > viewWidth + 70 || p.y > viewHeight + 80) return;
     const time = visualTime();
-    ctx.fillStyle = "rgba(16,25,19,.18)";
+    const seed = hash2(Math.floor(x / 13), Math.floor(y / 13), 2020);
+    const sway = Math.sin(state.visual.weatherClock * .7 + seed * 8) * (state.visual.weather === "rain" ? 1.6 : .7) * scale;
+
+    ctx.fillStyle = "rgba(16,25,19,.19)";
     ctx.beginPath();
-    ctx.ellipse(p.x + time.shadowX * .3, p.y + 10 + time.shadowY * .2, 18 * scale, 8 * scale, 0, 0, Math.PI * 2);
+    ctx.ellipse(
+      p.x + time.shadowX * .34,
+      p.y + 11 + time.shadowY * .22,
+      20 * scale,
+      8.5 * scale,
+      -.08,
+      0,
+      Math.PI * 2
+    );
     ctx.fill();
-    ctx.fillStyle = "#6c5140";
-    ctx.fillRect(p.x - 3 * scale, p.y - 2 * scale, 6 * scale, 17 * scale);
-    ctx.fillStyle = "#3f6c4d";
+
+    // Trunk + a visible fork.
+    ctx.strokeStyle = "#604838";
+    ctx.lineWidth = 6 * scale;
+    ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.arc(p.x - 8 * scale, p.y - 10 * scale, 13 * scale, 0, Math.PI * 2);
-    ctx.arc(p.x + 7 * scale, p.y - 12 * scale, 15 * scale, 0, Math.PI * 2);
-    ctx.arc(p.x, p.y - 22 * scale, 14 * scale, 0, Math.PI * 2);
+    ctx.moveTo(p.x, p.y + 14 * scale);
+    ctx.lineTo(p.x + sway * .25, p.y - 12 * scale);
+    ctx.stroke();
+    ctx.lineWidth = 3 * scale;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - 5 * scale);
+    ctx.lineTo(p.x - 8 * scale + sway, p.y - 17 * scale);
+    ctx.moveTo(p.x + 1 * scale, p.y - 7 * scale);
+    ctx.lineTo(p.x + 9 * scale + sway, p.y - 20 * scale);
+    ctx.stroke();
+
+    const dark = seed > .5 ? "#355f45" : "#3d6848";
+    const mid = seed > .5 ? "#477a52" : "#4d7b52";
+    const light = seed > .5 ? "#6b9865" : "#719d68";
+    const lobes = [
+      [-10,-13,14], [8,-16,16], [-2,-27,15], [14,-29,11], [-16,-29,10]
+    ];
+    ctx.fillStyle = dark;
+    for (const [ox, oy, r] of lobes) {
+      ctx.beginPath();
+      ctx.arc(p.x + (ox + sway) * scale, p.y + oy * scale, r * scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = mid;
+    ctx.beginPath();
+    ctx.arc(p.x - 3 * scale + sway, p.y - 28 * scale, 11 * scale, 0, Math.PI * 2);
+    ctx.arc(p.x + 10 * scale + sway, p.y - 20 * scale, 10 * scale, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "rgba(143,185,129,.42)";
+    ctx.fillStyle = "rgba(190,220,159,.34)";
     ctx.beginPath();
-    ctx.arc(p.x - 4 * scale, p.y - 20 * scale, 8 * scale, 0, Math.PI * 2);
+    ctx.arc(p.x - 8 * scale + sway, p.y - 35 * scale, 6.5 * scale, 0, Math.PI * 2);
+    ctx.arc(p.x + 5 * scale + sway, p.y - 31 * scale, 5 * scale, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tiny underside gives the canopy more depth.
+    ctx.fillStyle = "rgba(24,54,35,.22)";
+    ctx.beginPath();
+    ctx.ellipse(p.x + sway * .5, p.y - 11 * scale, 16 * scale, 5 * scale, 0, 0, Math.PI * 2);
     ctx.fill();
   }
+
 
   function drawLamp(x, y) {
     const p = worldToScreen(x, y);
