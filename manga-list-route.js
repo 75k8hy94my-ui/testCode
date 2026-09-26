@@ -34,11 +34,14 @@
   let stylesheetPromise = null;
 
   function ensureStylesheet(documentRef) {
+    // If this route already started loading its stylesheet, every concurrent
+    // route start must wait for that same load. Resolving merely because the
+    // <link> exists would reintroduce an unstyled-mount race.
+    if (stylesheetPromise) return stylesheetPromise;
     const existing = Array.from(documentRef.querySelectorAll('link[rel="stylesheet"]')).find((link) => {
       return String(link.getAttribute('href') || '').includes('manga-list.css');
     });
     if (existing) return Promise.resolve(existing);
-    if (stylesheetPromise) return stylesheetPromise;
     stylesheetPromise = new Promise((resolve, reject) => {
       const link = documentRef.createElement('link');
       link.rel = 'stylesheet';
@@ -46,6 +49,7 @@
       link.dataset.mangaListRouteStyle = '1';
       link.addEventListener('load', () => resolve(link), { once: true });
       link.addEventListener('error', () => {
+        link.remove();
         stylesheetPromise = null;
         reject(new Error('manga list stylesheet failed to load'));
       }, { once: true });
