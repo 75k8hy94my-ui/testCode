@@ -1269,7 +1269,8 @@
         seed:i + 17,
         routeEdgeIds:[],
         routeIndex:0,
-        routeTrips:0
+        routeTrips:0,
+        collisionYield:0
       };
       const currentEdge = mapModel.getEdge(car.edgeId);
       const startNodeId = car.directionSign > 0 ? currentEdge.to : currentEdge.from;
@@ -3791,12 +3792,14 @@
 
   function updateTraffic(dt) {
     for (const car of traffic) {
+      car.collisionYield = Math.max(0, (car.collisionYield || 0) - dt);
       const motionBefore = captureTrafficMotion(car);
       const edge = mapModel.getEdge(car.edgeId);
       if (!edge) continue;
       const edgeLength = car.edgeLength || polylineLength(edge.points);
       const roadLimit = (edge.speedLimit || 30) / SPEED_TO_KMH;
       let targetSpeed = Math.min(car.cruise, roadLimit * .92);
+      if (car.collisionYield > 0) targetSpeed = 0;
       let activeSignalStop = null;
 
       const endpoint = car.directionSign > 0 ? mapModel.getNode(edge.to) : mapModel.getNode(edge.from);
@@ -3878,6 +3881,18 @@
         restoreTrafficMotion(car, motionBefore);
         car.speed = 0;
         car.brakeGlow = 1;
+
+        if (hitPerson) {
+          car.collisionYield = Math.max(car.collisionYield || 0, .28);
+        } else if (hitVehicle === personalCar) {
+          car.collisionYield = Math.max(car.collisionYield || 0, .42);
+        } else if (hitVehicle) {
+          const myPriority = car.seed || 0;
+          const otherPriority = hitVehicle.seed || 0;
+          if (myPriority >= otherPriority) {
+            car.collisionYield = Math.max(car.collisionYield || 0, .52);
+          }
+        }
       }
     }
   }
@@ -4021,6 +4036,72 @@
       ped.waitTimer = 0;
       ped.phase += dt * ped.speed * .12;
       if (ped.collisionWait <= 0) attemptPedestrianMove(ped, ped.speed * dt);
+    }
+
+    resolvePedestrianOverlaps();
+  }
+
+  function tryNudgeStandingPedestrian(ped, dx, dy) {
+    if (!ped || ped.state !== "staying" || !ped.visible) return false;
+    const nx = ped.x + dx;
+    const ny = ped.y + dy;
+    if (!canStand(nx, ny, NPC_COLLISION_RADIUS)) return false;
+    if (personIntersectsAnyVehicle(nx, ny, NPC_COLLISION_RADIUS)) return false;
+    ped.x = nx;
+    ped.y = ny;
+    return true;
+  }
+
+  function resolvePedestrianOverlaps() {
+    const visible = visiblePedestrianColliders();
+
+    // If an outdoor activity begins on top of the player, move the NPC rather
+    // than moving the player's controlled character.
+    if (!state.player.inVehicle && !state.player.inTrain) {
+      for (const ped of visible) {
+        if (ped.state !== "staying") continue;
+        const dx = ped.x - state.player.x;
+        const dy = ped.y - state.player.y;
+        const d = Math.hypot(dx, dy);
+        const minimum = NPC_COLLISION_RADIUS + PLAYER_COLLISION_RADIUS;
+        if (d >= minimum) continue;
+        const ux = d > .001 ? dx / d : (hash2(ped.seed || 0, 1, 2052) > .5 ? 1 : -1);
+        const uy = d > .001 ? dy / d : 0;
+        tryNudgeStandingPedestrian(ped, ux * (minimum - d + 2), uy * (minimum - d + 2));
+      }
+    }
+
+    for (let i = 0; i < visible.length; i += 1) {
+      for (let j = i + 1; j < visible.length; j += 1) {
+        const a = visible[i];
+        const b = visible[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const d = Math.hypot(dx, dy);
+        const minimum = NPC_COLLISION_RADIUS * 2;
+        if (d >= minimum) continue;
+
+        let ux;
+        let uy;
+        if (d > .001) {
+          ux = dx / d;
+          uy = dy / d;
+        } else {
+          const angle = hash2(a.seed || i, b.seed || j, 2053) * Math.PI * 2;
+          ux = Math.cos(angle);
+          uy = Math.sin(angle);
+        }
+
+        const overlap = minimum - d + 1;
+        if (a.state === "staying" && b.state === "staying") {
+          tryNudgeStandingPedestrian(a, -ux * overlap * .5, -uy * overlap * .5);
+          tryNudgeStandingPedestrian(b, ux * overlap * .5, uy * overlap * .5);
+        } else if (a.state === "staying") {
+          tryNudgeStandingPedestrian(a, -ux * overlap, -uy * overlap);
+        } else if (b.state === "staying") {
+          tryNudgeStandingPedestrian(b, ux * overlap, uy * overlap);
+        }
+      }
     }
   }
 
