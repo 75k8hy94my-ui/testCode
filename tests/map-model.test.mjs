@@ -7,7 +7,7 @@ const { createMapModel } = mapModule;
 test('v2 map validates as a connected Japanese urban fabric', () => {
   const map = createMapModel();
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2');
+  assert.equal(map.version, 'japan-v2.1');
   assert.equal(map.worldSize, 10800);
   assert.ok(map.nodes.length >= 45);
   assert.ok(map.edges.length >= 55);
@@ -122,4 +122,23 @@ test('vegetation is kept clear of the pedestrian street surface', () => {
     const hit = map.nearestRoad(tree.x, tree.y);
     assert.ok(!hit || hit.distance > hit.edge.width / 2 + 15, tree.spaceId);
   }
+});
+
+
+test('facility entrances are separate from road-clear building footprints', () => {
+  const map = createMapModel();
+  for (const place of map.places.filter((place) => place.id !== 'park')) {
+    assert.ok(place.building, place.id);
+    assert.notDeepEqual([place.building.x, place.building.y], [place.x, place.y], place.id);
+    assert.ok(place.building.w >= 300, place.id);
+    assert.ok(place.building.h >= 260, place.id);
+  }
+  assert.deepEqual(map.validate(), []);
+});
+
+test('cafe body is not centered on its street-side interaction entrance', () => {
+  const map = createMapModel();
+  const cafe = map.places.find((place) => place.id === 'cafe');
+  assert.deepEqual([cafe.x, cafe.y], [4230, 5560]);
+  assert.deepEqual(cafe.building, { x:4380, y:5784, w:300, h:270 });
 });
