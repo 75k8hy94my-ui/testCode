@@ -32,8 +32,8 @@ test('game defines the ambient prop drawing helpers used by the city renderer', 
 });
 
 test('game defines the saved-car road migration helper', () => {
-  assert.match(source, /function nearestRoadSegmentInfo\(x, y, searchRadius = 2\)/);
-  assert.match(source, /nearestRoadSegmentInfo\(personalCar\.x, personalCar\.y, 3\)/);
+  assert.match(source, /function migrateCarToCurrentRoadIfNeeded\(\)/);
+  assert.match(source, /mapModel\.nearestRoad\(personalCar\.x, personalCar\.y, \{ vehicleOnly: true \}\)/);
 });
 
 test('game surfaces uncaught runtime errors on the game surface', () => {
@@ -75,4 +75,12 @@ test('city rendering uses map parcels and polylines instead of grid-only geometr
   assert.match(source, /edge\.points/);
   assert.match(source, /function drawMapModelRoads\(\)/);
   assert.match(source, /function drawMapModelMinimap\(/);
+});
+
+test('saved state carries the map version and sanitizes legacy positions', () => {
+  assert.match(source, /mapVersion:\s*mapModel\.version/);
+  assert.match(source, /function migratePlayerToCurrentMap\(/);
+  assert.match(source, /function migrateCarToCurrentRoadIfNeeded\(/);
+  assert.match(source, /mapModel\.nearestRoad\(personalCar\.x, personalCar\.y, \{ vehicleOnly: true \}\)/);
+  assert.match(source, /state\.drive\.route = \[\]/);
 });

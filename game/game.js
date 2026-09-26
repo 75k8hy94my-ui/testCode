@@ -2336,6 +2336,7 @@
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
         version: 1,
+        mapVersion: mapModel.version,
         player: {
           x: state.player.x,
           y: state.player.y,
@@ -2381,33 +2382,39 @@
     }
   }
 
+  function migratePlayerToCurrentMap(x, y) {
+    if (Number.isFinite(x) && Number.isFinite(y) && canStand(x, y)) return { x, y };
+    const entrance = mapModel.getNode(HOME.entranceNodeId);
+    return entrance ? { x: entrance.x, y: entrance.y } : { x: HOME.x, y: HOME.y };
+  }
+
   function migrateCarToCurrentRoadIfNeeded() {
-    const info = nearestRoadSegmentInfo(personalCar.x, personalCar.y, 3);
-    if (info) {
-      const style = roadSegmentStyle(info.axis, info.roadIndex, info.segmentIndex);
-      if (info.distance <= roadWidthForStyle(style) / 2 + 8) return;
+    const hit = mapModel.nearestRoad(personalCar.x, personalCar.y, { vehicleOnly: true });
+    if (!hit) {
+      const fallback = mapModel.nearestRoad(HOME.x, HOME.y, { vehicleOnly: true });
+      if (fallback) {
+        personalCar.x = fallback.point.x;
+        personalCar.y = fallback.point.y;
+      }
+      personalCar.speed = 0;
+      return;
     }
-
-    const snap = roadSnap(personalCar.x, personalCar.y);
-    if (!Number.isFinite(snap.distance)) return;
-
-    const before = roadEdgePoint(snap.axis, snap.roadIndex, snap.segmentIndex, Math.max(0, snap.t - .02));
-    const after = roadEdgePoint(snap.axis, snap.roadIndex, snap.segmentIndex, Math.min(1, snap.t + .02));
-    let tx = after.x - before.x;
-    let ty = after.y - before.y;
-    const mag = Math.hypot(tx, ty) || 1;
-    tx /= mag;
-    ty /= mag;
-
+    const edge = hit.edge;
+    const a = edge.points[hit.segmentIndex];
+    const b = edge.points[hit.segmentIndex + 1];
+    const tx = (b.x - a.x) / (Math.hypot(b.x - a.x, b.y - a.y) || 1);
+    const ty = (b.y - a.y) / (Math.hypot(b.x - a.x, b.y - a.y) || 1);
     const savedForward = Math.cos(personalCar.angle) * tx + Math.sin(personalCar.angle) * ty;
     const directionSign = savedForward >= 0 ? 1 : -1;
-    const nx = ty;
-    const ny = -tx;
+    const needsSnap = hit.distance > edge.width / 2 + 8;
     const offset = LANE_OFFSET * directionSign;
-
-    personalCar.x = snap.x + nx * offset;
-    personalCar.y = snap.y + ny * offset;
-    personalCar.angle = directionSign > 0 ? Math.atan2(ty, tx) : angleWrap(Math.atan2(ty, tx) + Math.PI);
+    personalCar.x = hit.point.x + ty * offset;
+    personalCar.y = hit.point.y - tx * offset;
+    if (!needsSnap && Number.isFinite(personalCar.x) && Number.isFinite(personalCar.y)) {
+      personalCar.x = hit.point.x + ty * offset;
+      personalCar.y = hit.point.y - tx * offset;
+    }
+    personalCar.angle = directionSign > 0 ? Math.atan2(ty, tx) : Math.atan2(-ty, -tx);
     personalCar.speed = 0;
   }
 
@@ -2417,14 +2424,14 @@
       if (!raw) return;
       const saved = JSON.parse(raw);
       if (!saved || saved.version !== 1) return;
+      const mapMatches = saved.mapVersion == null || saved.mapVersion === mapModel.version;
 
       if (saved.player) {
         const x = Number(saved.player.x);
         const y = Number(saved.player.y);
-        if (Number.isFinite(x) && Number.isFinite(y) && canStand(x, y)) {
-          state.player.x = x;
-          state.player.y = y;
-        }
+        const playerPosition = mapMatches ? migratePlayerToCurrentMap(x, y) : migratePlayerToCurrentMap(NaN, NaN);
+        state.player.x = playerPosition.x;
+        state.player.y = playerPosition.y;
         state.player.facingX = Number(saved.player.facingX) || 0;
         state.player.facingY = Number(saved.player.facingY) || 1;
         state.player.inTrain = Boolean(saved.player.inTrain);
@@ -2435,7 +2442,7 @@
       if (saved.car) {
         const x = Number(saved.car.x);
         const y = Number(saved.car.y);
-        if (Number.isFinite(x) && Number.isFinite(y) && inWorld(x, y, 30)) {
+        if (mapMatches && Number.isFinite(x) && Number.isFinite(y) && inWorld(x, y, 30)) {
           personalCar.x = x;
           personalCar.y = y;
         }
@@ -2443,6 +2450,14 @@
       }
 
       migrateCarToCurrentRoadIfNeeded();
+      if (!mapMatches) {
+        state.player.inVehicle = false;
+        state.player.inTrain = false;
+        state.player.trainId = null;
+        state.drive.route = [];
+        state.drive.routeIndex = 0;
+        state.drive.destination = null;
+      }
 
       if (Array.isArray(saved.trains)) {
         for (const stored of saved.trains) {
