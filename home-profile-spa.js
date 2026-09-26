@@ -111,7 +111,7 @@ function renderVpnGate(target,route){
 }
 async function ensureVpnGate(){
   if(window.MangaReaderMediaAccess)return window.MangaReaderMediaAccess;
-  await loadScript('media-access-gate.js?v=20260922-vpn-tools','spaMediaGate');
+  await loadScript('media-access-gate.js?v=20260926-non-jp-vpn','spaMediaGate');
   return window.MangaReaderMediaAccess;
 }
 function cleanupReaderRuntime(){cleanupMangaRoute();if(typeof window.MangaReaderRuntimeCleanup==='function')window.MangaReaderRuntimeCleanup();document.querySelectorAll('[data-reader-head-asset],[data-reader-spa-script]').forEach((node)=>node.remove());document.querySelectorAll('#app,#metadataSuggestions,#saveDialogOverlay,#customAddOverlay,#editItemOverlay,#bulkEditOverlay,#bulkDetectOverlay,#savedListOverlay,#videoAddOverlay,#videoPlayerOverlay,#authorCardOverlay,#tocOverlay,#settingsOverlay,#backupOverlay').forEach((node)=>node.remove());document.documentElement.classList.remove('reader-shell-page','reader-saved-list-route','reader-videoList-route','reader-authorList-route','reader-settings-route','reader-backup-route');}
@@ -122,7 +122,7 @@ function activateReaderEntry(route){
 }
 function installReaderHeadAssets(doc){document.querySelectorAll('[data-reader-head-asset]').forEach((node)=>node.remove());doc.head.querySelectorAll('link[rel="stylesheet"],style').forEach((source)=>{const asset=source.cloneNode(true);asset.dataset.readerHeadAsset='1';if(asset.tagName==='LINK')asset.href=new URL(source.getAttribute('href'),location.href).href;document.head.appendChild(asset);});}
 function loadReaderScript(source){return new Promise((resolve,reject)=>{if(source.src){const src=new URL(source.getAttribute('src'),location.href).href;if([...document.scripts].some((script)=>!script.dataset.readerSpaScript&&script.src===src)){resolve();return;}const script=document.createElement('script');script.dataset.readerSpaScript='1';script.src=src;script.onload=resolve;script.onerror=reject;document.body.appendChild(script);return;}const script=document.createElement('script');script.dataset.readerSpaScript='1';script.textContent=source.textContent;document.body.appendChild(script);resolve();});}
-function loadReaderAsset(src){const source=document.createElement('script');source.src=new URL(src,location.href).href;if(src.startsWith('media-access-gate.js?'))source.src=source.src.replace('vpn-recheck-session','vpn-panel-toggle');return loadReaderScript(source);}
+function loadReaderAsset(src){const source=document.createElement('script');source.src=new URL(src,location.href).href;return loadReaderScript(source);}
 async function ensureVideoEntryEnhancement(){
   await loadReaderAsset('video-data.js?v=20260918-video-data-no-window');
   await loadReaderAsset('video-library.js?v=20260918-video-library-no-window');
@@ -146,7 +146,7 @@ async function renderVideo(generation){
     if(!videoRouteRuntime)videoRouteRuntime=window.VideoListRouteFactory.create({
       documentRef:document,
       loadScript,
-      loadMediaGate:()=>window.MangaReaderMediaAccess?Promise.resolve():loadScript('media-access-gate.js?v=20260922-vpn-tools','spaMediaGate'),
+      loadMediaGate:()=>window.MangaReaderMediaAccess?Promise.resolve():loadScript('media-access-gate.js?v=20260926-non-jp-vpn','spaMediaGate'),
     });
     await videoRouteRuntime.start({mountElement:target});
     if(gate&&typeof gate.syncUi==='function')gate.syncUi();
@@ -192,7 +192,7 @@ async function renderReader(route=routeName(),generation=renderGeneration){
       parseHtml:(html)=>new DOMParser().parseFromString(html,'text/html'),
       installHeadAssets:installReaderHeadAssets,
       mountBody:(doc)=>target.replaceChildren(...[...doc.body.children].filter((node)=>node.tagName!=='SCRIPT')),
-      loadMediaGate:()=>loadReaderAsset('media-access-gate.js?v=20260918-vpn-recheck-session'),
+      loadMediaGate:()=>window.MangaReaderMediaAccess?Promise.resolve():loadReaderAsset('media-access-gate.js?v=20260926-non-jp-vpn'),
       getScripts:(doc)=>[...doc.querySelectorAll('script')],
       loadScript:loadReaderScript,
       getGeneration:()=>renderGeneration,
