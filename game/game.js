@@ -527,7 +527,7 @@
   const NPCS = [
     { id: "aoi", name: "アオイ", x: PARK.x + 80, y: PARK.y + 65, color: "#e0a7b5", friendship: 0 },
     { id: "sora", name: "ソラ", x: CAFE.x + 72, y: CAFE.y - 58, color: "#a9c9e3", friendship: 0 },
-    { id: "mei", name: "メイ", x: LIBRARY.x - 70, y: LIBRARY.y + 55, color: "#c8b58f", friendship: 0 }
+    { id: "mei", name: "メイ", x: LIBRARY.x, y: LIBRARY.y - 45, color: "#c8b58f", friendship: 0 }
   ];
 
   const personalCar = {
@@ -548,8 +548,8 @@
 
   const state = {
     player: {
-      x: HOME.x + 55,
-      y: HOME.y + 65,
+      x: HOME.x,
+      y: HOME.y,
       facingX: 0,
       facingY: 1,
       inVehicle: false,
@@ -6063,9 +6063,12 @@
   }
 
   if (!canStand(state.player.x, state.player.y)) {
-    state.player.x = HOME.x + 55;
-    state.player.y = HOME.y + 65;
+    const fallback = migratePlayerToCurrentMap(NaN, NaN);
+    state.player.x = fallback.x;
+    state.player.y = fallback.y;
     state.player.inVehicle = false;
+    state.player.inTrain = false;
+    state.player.trainId = null;
   }
 
   state.camera.x = clamp(state.player.x - viewWidth / 2, 0, Math.max(0, WORLD_SIZE - viewWidth));

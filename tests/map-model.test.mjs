@@ -83,3 +83,11 @@ test('every facility road node is attached to the vehicle graph', () => {
     assert.ok(map.findRoute(place.entranceNodeId, place.roadNodeId, { mode: 'pedestrian' }), place.id);
   }
 });
+
+
+test('road surface membership checks all overlapping edges, not only the nearest centerline', () => {
+  const map = createMapModel();
+  const central = map.stations.find((station) => station.id === 'central');
+  assert.equal(map.isWalkable(central.accessX, central.accessY, 14), true);
+  assert.equal(map.isRoad(central.x, central.y, { vehicleOnly: true }), true);
+});

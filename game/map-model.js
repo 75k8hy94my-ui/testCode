@@ -210,15 +210,27 @@
       return x >= bounds.x && x <= bounds.x + bounds.w && y >= bounds.y && y <= bounds.y + bounds.h;
     }
 
+    function isWithinRoadSurface(x, y, options = {}, padding = 0) {
+      const target = point(x, y);
+      const vehicleOnly = Boolean(options.vehicleOnly);
+      for (const edge of edges) {
+        if (vehicleOnly && !edge.vehicle) continue;
+        if (!vehicleOnly && !edge.pedestrian) continue;
+        const threshold = edge.width / 2 + padding;
+        for (let i = 1; i < edge.points.length; i += 1) {
+          if (pointSegmentProjection(target, edge.points[i - 1], edge.points[i]).distance <= threshold) return true;
+        }
+      }
+      return false;
+    }
+
     function isRoad(x, y, options = {}) {
-      const hit = nearestRoad(x, y, options);
-      return Boolean(hit && hit.distance <= hit.edge.width / 2);
+      return isWithinRoadSurface(x, y, options, 0);
     }
 
     function isWalkable(x, y, radius = 0) {
       if (parcels.some((parcel) => !parcel.walkable && contains(parcel, x, y))) return false;
-      const hit = nearestRoad(x, y);
-      return Boolean(hit && hit.distance <= hit.edge.width / 2 + radius);
+      return isWithinRoadSurface(x, y, { vehicleOnly:false }, radius);
     }
 
     function districtAt(x, y) {

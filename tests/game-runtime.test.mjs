@@ -200,3 +200,11 @@ test('traffic-light rendering includes every drivable approach at a signalized n
   assert.match(source, /const incidentEdges = vehicleEdgesAtNode\(node\.id\)/);
   assert.doesNotMatch(source, /mapModel\.edges\.filter\(\(edge\) => edge\.signalized && edge\.vehicle/);
 });
+
+
+test('fresh player and fixed NPC positions are on the current pedestrian graph', () => {
+  assert.match(source, /player:\s*\{\s*x: HOME\.x,\s*y: HOME\.y,/);
+  assert.match(source, /id: "mei"[\s\S]*x: LIBRARY\.x, y: LIBRARY\.y - 45/);
+  assert.match(source, /const fallback = migratePlayerToCurrentMap\(NaN, NaN\)/);
+  assert.doesNotMatch(source, /state\.player\.x = HOME\.x \+ 55/);
+});
