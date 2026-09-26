@@ -3787,6 +3787,19 @@ https://cdn.example.org/c/003.webp"></textarea>
       mangaListHostRuntime.navigateToReader(item);
       return;
     }
+
+    // Enter reader mode immediately. Some saved items have alternate URLs,
+    // and resolving those candidates can take several seconds. Previously the
+    // page sat in the inactive empty-reader shell until that async preflight
+    // finished, which looked exactly like a broken reader on iOS.
+    setMobileReaderMode(true);
+    if (!switchDirection) {
+      els.placeholder.style.display = 'none';
+      els.imgWrap.style.display = 'none';
+      els.spinner.style.display = 'block';
+    }
+    els.status.textContent = '読み込み中...';
+
     if (item && Array.isArray(item.pages) && item.pages.length) {
       await startReadingCustom(item, switchDirection);
     } else {
