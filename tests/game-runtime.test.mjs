@@ -18,6 +18,22 @@ test('game reports an unavailable canvas context instead of failing silently', (
   assert.match(source, /Canvas API を利用できません/);
 });
 
+test('game defines the traffic signal state helper used by rendering and updates', () => {
+  assert.match(source, /function signalStateAt\(worldX, worldY, orientation\)/);
+  assert.match(source, /signalStateAt\(signal\.x, signal\.y, signal\.orientation\)/);
+  assert.match(source, /signalStateAt\(wx, wy, "h"\)/);
+});
+
+test('game defines the ambient prop drawing helpers used by the city renderer', () => {
+  assert.match(source, /function drawTree\(x, y, scale = 1\)/);
+  assert.match(source, /function drawLamp\(x, y\)/);
+});
+
+test('game defines the saved-car road migration helper', () => {
+  assert.match(source, /function nearestRoadSegmentInfo\(x, y, searchRadius = 2\)/);
+  assert.match(source, /nearestRoadSegmentInfo\(personalCar\.x, personalCar\.y, 3\)/);
+});
+
 test('game surfaces uncaught runtime errors on the game surface', () => {
   assert.match(source, /window\.addEventListener\("error"/);
   assert.match(source, /window\.addEventListener\("unhandledrejection"/);

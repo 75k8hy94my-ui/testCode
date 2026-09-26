@@ -152,6 +152,23 @@
   const pedestrians = [];
   const touch = { x: 0, y: 0, run: false, driveAccel: false, driveBrake: false, pointerId: null };
 
+  function signalStateAt(worldX, worldY, orientation) {
+    const gx = Math.round(worldX / ROAD_GAP);
+    const gy = Math.round(worldY / ROAD_GAP);
+    const intersectionOffset = ((gx * 7 + gy * 11) % SIGNAL_CYCLE + SIGNAL_CYCLE) % SIGNAL_CYCLE;
+    const phase = ((state.drive.signalClock + intersectionOffset) % SIGNAL_CYCLE + SIGNAL_CYCLE) % SIGNAL_CYCLE;
+    const horizontal = orientation === "h";
+    if (horizontal) {
+      if (phase < 8) return "green";
+      if (phase < 10) return "yellow";
+      return "red";
+    }
+    if (phase < 10) return "red";
+    if (phase < 18) return "green";
+    if (phase < SIGNAL_CYCLE) return "yellow";
+    return "red";
+  }
+
   function blockCenter(gx, gy) {
     return { x: gx * ROAD_GAP + ROAD_GAP / 2, y: gy * ROAD_GAP + ROAD_GAP / 2 };
   }
@@ -713,6 +730,26 @@
     let best = Infinity;
     for (let i = 1; i < points.length; i += 1) {
       best = Math.min(best, pointSegmentDistance(x, y, points[i - 1].x, points[i - 1].y, points[i].x, points[i].y));
+    }
+    return best;
+  }
+
+  function nearestRoadSegmentInfo(x, y, searchRadius = 2) {
+    const gx = Math.floor(x / ROAD_GAP);
+    const gy = Math.floor(y / ROAD_GAP);
+    let best = null;
+
+    for (let ix = gx - searchRadius; ix <= gx + searchRadius; ix += 1) {
+      for (let iy = gy - searchRadius; iy <= gy + searchRadius; iy += 1) {
+        if (roadEdgeExists(ix, iy, ix + 1, iy)) {
+          const d = roadDistanceToEdge(x, y, "h", iy, ix);
+          if (!best || d < best.distance) best = { axis:"h", roadIndex:iy, segmentIndex:ix, distance:d };
+        }
+        if (roadEdgeExists(ix, iy, ix, iy + 1)) {
+          const d = roadDistanceToEdge(x, y, "v", ix, iy);
+          if (!best || d < best.distance) best = { axis:"v", roadIndex:ix, segmentIndex:iy, distance:d };
+        }
+      }
     }
     return best;
   }
@@ -3366,6 +3403,52 @@
       ctx.fillStyle = "rgba(248,224,165,.035)";
       ctx.fillRect(0, 0, viewWidth, viewHeight);
     }
+  }
+
+  function drawTree(x, y, scale = 1) {
+    const p = worldToScreen(x, y);
+    if (p.x < -60 || p.y < -60 || p.x > viewWidth + 60 || p.y > viewHeight + 60) return;
+    const time = visualTime();
+    ctx.fillStyle = "rgba(16,25,19,.18)";
+    ctx.beginPath();
+    ctx.ellipse(p.x + time.shadowX * .3, p.y + 10 + time.shadowY * .2, 18 * scale, 8 * scale, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#6c5140";
+    ctx.fillRect(p.x - 3 * scale, p.y - 2 * scale, 6 * scale, 17 * scale);
+    ctx.fillStyle = "#3f6c4d";
+    ctx.beginPath();
+    ctx.arc(p.x - 8 * scale, p.y - 10 * scale, 13 * scale, 0, Math.PI * 2);
+    ctx.arc(p.x + 7 * scale, p.y - 12 * scale, 15 * scale, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y - 22 * scale, 14 * scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(143,185,129,.42)";
+    ctx.beginPath();
+    ctx.arc(p.x - 4 * scale, p.y - 20 * scale, 8 * scale, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawLamp(x, y) {
+    const p = worldToScreen(x, y);
+    if (p.x < -30 || p.y < -60 || p.x > viewWidth + 30 || p.y > viewHeight + 60) return;
+    const time = visualTime();
+    if (time.night > .45) {
+      const glow = ctx.createRadialGradient(p.x, p.y - 29, 2, p.x, p.y - 29, 38);
+      glow.addColorStop(0, "rgba(255,224,157,.28)");
+      glow.addColorStop(1, "rgba(255,224,157,0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y - 29, 38, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = "#343b3d";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y + 8);
+    ctx.lineTo(p.x, p.y - 28);
+    ctx.lineTo(p.x + 9, p.y - 28);
+    ctx.stroke();
+    ctx.fillStyle = time.night > .45 ? "#ffd98a" : "#c5c8c4";
+    ctx.fillRect(p.x + 6, p.y - 31, 9, 6);
   }
 
   function drawNeighborhoodGround() {
