@@ -1685,7 +1685,9 @@
           collisionYield:0,
           junctionWait:0,
           trafficStall:0,
-          playerFlowPriority:0
+          playerFlowPriority:0,
+          stuckRecoveryCooldown:0,
+          stuckRecoveryCount:0
         };
         if (!traffic.some((other) => vehiclesIntersect(car, other, 8))) break;
         car = null;
@@ -2304,6 +2306,10 @@
         waitTimer:0,
         collisionWait:0,
         avoidanceOffset:0,
+        stuckTimer:0,
+        lastProgressX:null,
+        lastProgressY:null,
+        stuckRecoveryCount:0,
         stayTimer:0,
         activityMinutesRemaining:0,
         currentActivityId:null,
@@ -4468,6 +4474,58 @@
     relocateGridlockedTraffic(head);
   }
 
+  function releaseCarJunctionReservations(car) {
+    for (const [nodeId, reservation] of junctionReservations) {
+      if (reservation?.owner === car) junctionReservations.delete(nodeId);
+    }
+  }
+
+  function replanStuckTraffic(car) {
+    const edge = mapModel.getEdge(car.edgeId);
+    if (!edge) return false;
+
+    const endpointId = car.directionSign > 0 ? edge.to : edge.from;
+    const endpointDistance = trafficDistanceToEndpoint(car, edge);
+    if (endpointDistance > 210) return false;
+
+    const alternatives = vehicleEdgesAtNode(endpointId).filter((candidate) => candidate.id !== edge.id);
+    if (!alternatives.length) return false;
+
+    releaseCarJunctionReservations(car);
+    const replanned = planTrafficRoute(car, endpointId, edge.id);
+    if (!replanned) return false;
+
+    car.collisionYield = 0;
+    car.junctionWait = 0;
+    car.stuckRecoveryCooldown = 2.4;
+    car.stuckRecoveryCount = (car.stuckRecoveryCount || 0) + 1;
+    car.trafficStall = Math.min(car.trafficStall || 0, 1.4);
+    return true;
+  }
+
+  function recoverStuckTraffic(dt) {
+    for (const car of traffic) {
+      car.stuckRecoveryCooldown = Math.max(0, (car.stuckRecoveryCooldown || 0) - dt);
+      const stall = car.trafficStall || 0;
+      if (stall < 3.8 || car.stuckRecoveryCooldown > 0) continue;
+
+      // Prefer a normal reroute while the vehicle is visible. This keeps
+      // recovery believable and avoids cars disappearing in front of the user.
+      if (replanStuckTraffic(car)) continue;
+
+      // If an unresolved deadlock remains away from the camera, recycle that
+      // single vehicle to a clear road segment. This prevents remote jams from
+      // growing until they reach the player.
+      if (stall >= 7.5 && !trafficCarVisible(car, 220)) {
+        releaseCarJunctionReservations(car);
+        if (relocateGridlockedTraffic(car)) {
+          car.stuckRecoveryCooldown = 3.5;
+          car.stuckRecoveryCount = (car.stuckRecoveryCount || 0) + 1;
+        }
+      }
+    }
+  }
+
   function downstreamLaneClearance(car, endpoint, maxDistance = 260) {
     if (!endpoint) return Infinity;
 
@@ -4775,6 +4833,9 @@
         } else if (hitVehicle === personalCar) {
           car.collisionYield = Math.max(car.collisionYield || 0, .48);
         } else if (hitVehicle) {
+          // Repeated collision rollback is a real deadlock even when targetSpeed
+          // itself is non-zero, so feed it into the general stall detector.
+          car.trafficStall = (car.trafficStall || 0) + dt * 1.5;
           const myPriority = car.seed || 0;
           const otherPriority = hitVehicle.seed || 0;
           if (myPriority >= otherPriority) {
@@ -4785,6 +4846,7 @@
     }
 
     relievePlayerTrafficQueue(playerTrafficQueue);
+    recoverStuckTraffic(dt);
   }
 
 
@@ -4864,6 +4926,47 @@
     return false;
   }
 
+  function pedestrianVisibleOnScreen(ped, margin = 120) {
+    const sx = ped.x - state.camera.x;
+    const sy = ped.y - state.camera.y;
+    return sx >= -margin && sy >= -margin && sx <= viewWidth + margin && sy <= viewHeight + margin;
+  }
+
+  function recoverStuckPedestrian(ped) {
+    if (!ped || (ped.state !== "walking" && ped.state !== "waiting")) return false;
+
+    // First try the opposite sidewalk side plus extra clearance. This resolves
+    // face-to-face pedestrian deadlocks without teleporting.
+    ped.sideSign = (ped.sideSign || 1) * -1;
+    ped.avoidanceOffset = 18 + ((ped.seed || 0) % 3) * 4;
+    const shifted = pedestrianPoseAt(ped);
+    if (
+      canStand(shifted.x, shifted.y, NPC_COLLISION_RADIUS) &&
+      !personIntersectsAnyVehicle(shifted.x, shifted.y, NPC_COLLISION_RADIUS)
+    ) {
+      ped.x = shifted.x;
+      ped.y = shifted.y;
+      ped.dir = shifted.angle;
+      ped.collisionWait = .04;
+      ped.stuckTimer = 0;
+      ped.stuckRecoveryCount = (ped.stuckRecoveryCount || 0) + 1;
+      return true;
+    }
+
+    // If that fails, rebuild the pedestrian route from the nearest node.
+    const startNodeId = nearestPedestrianNodeId(ped.x, ped.y);
+    if (startNodeId) {
+      planCitizenAction(ped, startNodeId);
+      ped.collisionWait = 0;
+      ped.avoidanceOffset = 0;
+      ped.stuckTimer = 0;
+      ped.stuckRecoveryCount = (ped.stuckRecoveryCount || 0) + 1;
+      return true;
+    }
+
+    return false;
+  }
+
   function updatePedestrians(dt, gameMinutes) {
     const minutes = Math.max(0, Number(gameMinutes) || 0);
 
@@ -4871,6 +4974,37 @@
       const travelling = ped.state === "walking" || ped.state === "waiting";
       citizenUpdateNeeds(ped, minutes, travelling);
       ped.collisionWait = Math.max(0, (ped.collisionWait || 0) - dt);
+
+      const walkingNow = ped.state === "walking" || ped.state === "waiting";
+      if (walkingNow) {
+        const lastX = Number.isFinite(ped.lastProgressX) ? ped.lastProgressX : ped.x;
+        const lastY = Number.isFinite(ped.lastProgressY) ? ped.lastProgressY : ped.y;
+        const moved = distance(lastX, lastY, ped.x, ped.y);
+        const signalState = pedestrianSignalState(ped);
+        const legitimatelyWaiting = Boolean(
+          signalState &&
+          signalState.state !== "green" &&
+          signalState.beforeCrosswalk
+        );
+
+        if (moved < .45 && !legitimatelyWaiting) {
+          ped.stuckTimer = (ped.stuckTimer || 0) + dt;
+        } else {
+          ped.stuckTimer = Math.max(0, (ped.stuckTimer || 0) - dt * 2.2);
+        }
+
+        ped.lastProgressX = ped.x;
+        ped.lastProgressY = ped.y;
+
+        if ((ped.stuckTimer || 0) >= 3.2) {
+          recoverStuckPedestrian(ped);
+        }
+      } else {
+        ped.stuckTimer = 0;
+        ped.lastProgressX = ped.x;
+        ped.lastProgressY = ped.y;
+      }
+
       if ((ped.avoidanceOffset || 0) > .05 && ped.collisionWait <= 0) {
         ped.avoidanceOffset *= Math.pow(.16, dt);
       }
