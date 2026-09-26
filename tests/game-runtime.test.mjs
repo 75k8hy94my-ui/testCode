@@ -85,9 +85,8 @@ test('saved state carries the map version and sanitizes legacy positions', () =>
   assert.match(source, /state\.drive\.route = \[\]/);
 });
 
-test('road rendering gives shared junction nodes explicit geometry', () => {
-  assert.match(source, /function drawMapModelJunctions\(\)/);
-  assert.match(source, /mapModel\.nodes/);
-  assert.match(source, /incidentEdges\.length <= 1/);
-  assert.match(source, /drawMapModelJunctions\(\)/);
+test('road rendering joins shared endpoints without oversized junction blobs', () => {
+  assert.match(source, /ctx\.lineCap = "square"/);
+  assert.match(source, /mapModel\.edges/);
+  assert.doesNotMatch(source, /drawMapModelJunctions\(\);/);
 });

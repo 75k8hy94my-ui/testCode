@@ -3430,36 +3430,37 @@
   }
 
   function drawMapModelRoads() {
-    for (const edge of mapModel.edges) {
-      const points = edge.points;
-      const first = worldToScreen(points[0].x, points[0].y);
-      const last = worldToScreen(points.at(-1).x, points.at(-1).y);
-      if (Math.max(first.x, last.x) < -260 || Math.min(first.x, last.x) > viewWidth + 260 ||
-          Math.max(first.y, last.y) < -260 || Math.min(first.y, last.y) > viewHeight + 260) continue;
-      const screenPoints = points.map((point) => worldToScreen(point.x, point.y));
-      ctx.lineCap = "butt";
+    const visibleEdges = mapModel.edges.filter((edge) => {
+      const first = worldToScreen(edge.points[0].x, edge.points[0].y);
+      const last = worldToScreen(edge.points.at(-1).x, edge.points.at(-1).y);
+      return !(Math.max(first.x, last.x) < -260 || Math.min(first.x, last.x) > viewWidth + 260 ||
+        Math.max(first.y, last.y) < -260 || Math.min(first.y, last.y) > viewHeight + 260);
+    });
+    const strokeEdge = (edge, width, color, dash = []) => {
+      const points = edge.points.map((point) => worldToScreen(point.x, point.y));
+      ctx.lineCap = "square";
       ctx.lineJoin = "round";
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.setLineDash(dash);
       ctx.beginPath();
-      ctx.moveTo(screenPoints[0].x, screenPoints[0].y);
-      for (let i = 1; i < screenPoints.length; i += 1) ctx.lineTo(screenPoints[i].x, screenPoints[i].y);
-      ctx.strokeStyle = edge.vehicle ? "rgba(36,45,43,.42)" : "rgba(65,105,73,.35)";
-      ctx.lineWidth = edge.width + (edge.vehicle ? 22 : 12);
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i += 1) ctx.lineTo(points[i].x, points[i].y);
       ctx.stroke();
-      ctx.strokeStyle = edge.vehicle ? (edge.type === "arterial" ? "#59605d" : "#696f69") : "#7ca77c";
-      ctx.lineWidth = edge.width;
-      ctx.stroke();
+      ctx.setLineDash([]);
+    };
+
+    for (const edge of visibleEdges) {
+      strokeEdge(edge, edge.width + (edge.vehicle ? 22 : 12), edge.vehicle ? "rgba(36,45,43,.42)" : "rgba(65,105,73,.35)");
+    }
+    for (const edge of visibleEdges) {
+      strokeEdge(edge, edge.width, edge.vehicle ? (edge.type === "arterial" ? "#59605d" : "#696f69") : "#7ca77c");
+    }
+    for (const edge of visibleEdges) {
       if (edge.vehicle && edge.type !== "park") {
-        ctx.strokeStyle = edge.type === "arterial" ? "rgba(235,220,173,.72)" : "rgba(231,228,199,.5)";
-        ctx.lineWidth = 3;
-        ctx.setLineDash(edge.type === "arterial" ? [24, 22] : [14, 24]);
-        ctx.beginPath();
-        ctx.moveTo(screenPoints[0].x, screenPoints[0].y);
-        for (let i = 1; i < screenPoints.length; i += 1) ctx.lineTo(screenPoints[i].x, screenPoints[i].y);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        strokeEdge(edge, 3, edge.type === "arterial" ? "rgba(235,220,173,.72)" : "rgba(231,228,199,.5)", edge.type === "arterial" ? [24, 22] : [14, 24]);
       }
     }
-    drawMapModelJunctions();
   }
 
   function drawMapModelJunctions() {
