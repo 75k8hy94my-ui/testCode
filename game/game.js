@@ -3054,6 +3054,36 @@
           trips: state.drive.trips
         },
         friends: Object.fromEntries(NPCS.map((npc) => [npc.id, npc.friendship])),
+        citizens: pedestrians.map((ped) => ({
+          id:ped.id,
+          money:ped.money,
+          groceries:ped.groceries,
+          needs:{ ...ped.needs },
+          stress:ped.stress,
+          workedDay:ped.workedDay,
+          decisionCount:ped.decisionCount,
+          tripCount:ped.tripCount,
+          state:ped.state,
+          visible:ped.visible,
+          waitTimer:ped.waitTimer,
+          activityMinutesRemaining:ped.activityMinutesRemaining,
+          currentActivityId:ped.currentActivityId,
+          currentActivityLabel:ped.currentActivityLabel,
+          currentPlaceId:ped.currentPlaceId,
+          currentNodeId:ped.currentNodeId,
+          targetNodeId:ped.targetNodeId,
+          targetPlaceId:ped.targetPlaceId,
+          pendingActivity:ped.pendingActivity ? { ...ped.pendingActivity } : null,
+          edgeId:ped.edgeId,
+          edgeLength:ped.edgeLength,
+          directionSign:ped.directionSign,
+          along:ped.along,
+          routeEdgeIds:Array.isArray(ped.routeEdgeIds) ? [...ped.routeEdgeIds] : [],
+          routeIndex:ped.routeIndex,
+          x:ped.x,
+          y:ped.y,
+          dir:ped.dir
+        })),
         savedAt: Date.now()
       }));
       if (showMessage) showToast("生活データを保存しました");
@@ -3098,6 +3128,93 @@
     }
     personalCar.angle = directionSign > 0 ? Math.atan2(ty, tx) : Math.atan2(-ty, -tx);
     personalCar.speed = 0;
+  }
+
+  function restoreCitizenFromSave(ped, stored, mapMatches) {
+    if (!stored || stored.id !== ped.id) return;
+
+    if (Number.isFinite(Number(stored.money))) ped.money = Number(stored.money);
+    if (Number.isFinite(Number(stored.groceries))) ped.groceries = Math.max(0, Math.floor(Number(stored.groceries)));
+    if (stored.needs) {
+      for (const key of ["hunger","energy","social","fun"]) {
+        if (Number.isFinite(Number(stored.needs[key]))) ped.needs[key] = Number(stored.needs[key]);
+      }
+    }
+    if (Number.isFinite(Number(stored.stress))) ped.stress = Number(stored.stress);
+    if (Number.isFinite(Number(stored.workedDay))) ped.workedDay = Math.max(0, Math.floor(Number(stored.workedDay)));
+    if (Number.isFinite(Number(stored.decisionCount))) ped.decisionCount = Math.max(0, Math.floor(Number(stored.decisionCount)));
+    if (Number.isFinite(Number(stored.tripCount))) ped.tripCount = Math.max(0, Math.floor(Number(stored.tripCount)));
+    citizenClampNeeds(ped);
+
+    if (!mapMatches) {
+      ped.state = "deciding";
+      ped.currentNodeId = ped.homeNodeId;
+      ped.pendingActivity = null;
+      planCitizenAction(ped, ped.homeNodeId);
+      return;
+    }
+
+    const allowedStates = new Set(["walking","waiting","inside","staying"]);
+    const savedState = allowedStates.has(stored.state) ? stored.state : "deciding";
+    const savedCurrentNode = typeof stored.currentNodeId === "string" && mapModel.getNode(stored.currentNodeId)
+      ? stored.currentNodeId
+      : ped.homeNodeId;
+    const savedTargetNode = typeof stored.targetNodeId === "string" && mapModel.getNode(stored.targetNodeId)
+      ? stored.targetNodeId
+      : savedCurrentNode;
+
+    ped.currentNodeId = savedCurrentNode;
+    ped.targetNodeId = savedTargetNode;
+    ped.targetPlaceId = typeof stored.targetPlaceId === "string" ? stored.targetPlaceId : null;
+    ped.currentPlaceId = typeof stored.currentPlaceId === "string" ? stored.currentPlaceId : null;
+    ped.currentActivityId = typeof stored.currentActivityId === "string" ? stored.currentActivityId : null;
+    ped.currentActivityLabel = typeof stored.currentActivityLabel === "string" ? stored.currentActivityLabel : null;
+    ped.activityMinutesRemaining = Math.max(0, Number(stored.activityMinutesRemaining) || 0);
+    ped.waitTimer = Math.max(0, Number(stored.waitTimer) || 0);
+
+    const pending = stored.pendingActivity && typeof stored.pendingActivity === "object"
+      ? { ...stored.pendingActivity }
+      : null;
+    if (pending?.nodeId && !mapModel.getNode(pending.nodeId)) pending.nodeId = ped.homeNodeId;
+    ped.pendingActivity = pending;
+
+    if (savedState === "inside" || savedState === "staying") {
+      ped.state = savedState;
+      ped.visible = ped.specialNpcId ? true : savedState === "staying";
+      const node = mapModel.getNode(savedCurrentNode);
+      if (node) {
+        ped.x = node.x;
+        ped.y = node.y;
+      }
+      if (ped.activityMinutesRemaining <= .001) completeCitizenActivity(ped);
+      return;
+    }
+
+    const edge = typeof stored.edgeId === "string" ? mapModel.getEdge(stored.edgeId) : null;
+    const routeEdgeIds = Array.isArray(stored.routeEdgeIds)
+      ? stored.routeEdgeIds.filter((edgeId) => typeof edgeId === "string" && mapModel.getEdge(edgeId))
+      : [];
+    const routeValid = edge && routeEdgeIds.length && routeEdgeIds.length === (stored.routeEdgeIds?.length || 0);
+
+    if (routeValid) {
+      ped.state = savedState === "waiting" ? "waiting" : "walking";
+      ped.visible = true;
+      ped.routeEdgeIds = routeEdgeIds;
+      ped.routeIndex = clamp(Math.floor(Number(stored.routeIndex) || 0), 0, routeEdgeIds.length - 1);
+      ped.edgeId = edge.id;
+      ped.edgeLength = polylineLength(edge.points);
+      ped.directionSign = Number(stored.directionSign) < 0 ? -1 : 1;
+      ped.along = clamp(Number(stored.along) || 0, 0, ped.edgeLength);
+      const pose = pedestrianPoseAt(ped);
+      ped.x = pose.x;
+      ped.y = pose.y;
+      ped.dir = pose.angle;
+      return;
+    }
+
+    ped.state = "deciding";
+    ped.pendingActivity = null;
+    planCitizenAction(ped, savedCurrentNode);
   }
 
   function loadGame() {
@@ -3179,6 +3296,15 @@
       if (saved.friends) {
         for (const npc of NPCS) npc.friendship = Math.max(0, Math.floor(Number(saved.friends[npc.id]) || 0));
       }
+
+      if (Array.isArray(saved.citizens)) {
+        const savedCitizens = new Map(saved.citizens.map((value) => [value?.id, value]));
+        for (const ped of pedestrians) {
+          const stored = savedCitizens.get(ped.id);
+          if (stored) restoreCitizenFromSave(ped, stored, mapMatches);
+        }
+      }
+      syncNamedNpcCitizens();
 
       if (state.player.inTrain) {
         const train = trainById(state.player.trainId);
