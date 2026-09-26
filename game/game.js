@@ -811,33 +811,43 @@
     return inWorld(x, y, radius) && mapModel.isWalkable(x, y, radius) && !collidesBuilding(x, y, radius);
   }
 
-  function intersectsRoadNetworkClearance(rect) {
-    for (let gy = 1; gy <= 17; gy += 1) {
-      for (let gx = 1; gx < 17; gx += 1) {
-        if (!roadEdgeExists(gx, gy, gx + 1, gy)) continue;
-        const style = roadSegmentStyle("h", gy, gx);
-        const pad = roadWidthForStyle(style) / 2 + 12;
-        const points = sampleRoadEdge("h", gy, gx, 12);
-        if (points.some((p) =>
-          p.x >= rect.x - pad &&
-          p.x <= rect.x + rect.w + pad &&
-          p.y >= rect.y - pad &&
-          p.y <= rect.y + rect.h + pad
-        )) return true;
+  function segmentIntersectsExpandedRect(a, b, rect, pad) {
+    const left = rect.x - pad;
+    const right = rect.x + rect.w + pad;
+    const top = rect.y - pad;
+    const bottom = rect.y + rect.h + pad;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    let t0 = 0;
+    let t1 = 1;
+    const checks = [
+      [-dx, a.x - left],
+      [dx, right - a.x],
+      [-dy, a.y - top],
+      [dy, bottom - a.y]
+    ];
+    for (const [p, q] of checks) {
+      if (Math.abs(p) < 1e-9) {
+        if (q < 0) return false;
+        continue;
+      }
+      const ratio = q / p;
+      if (p < 0) {
+        if (ratio > t1) return false;
+        t0 = Math.max(t0, ratio);
+      } else {
+        if (ratio < t0) return false;
+        t1 = Math.min(t1, ratio);
       }
     }
-    for (let gx = 1; gx <= 17; gx += 1) {
-      for (let gy = 1; gy < 17; gy += 1) {
-        if (!roadEdgeExists(gx, gy, gx, gy + 1)) continue;
-        const style = roadSegmentStyle("v", gx, gy);
-        const pad = roadWidthForStyle(style) / 2 + 12;
-        const points = sampleRoadEdge("v", gx, gy, 12);
-        if (points.some((p) =>
-          p.x >= rect.x - pad &&
-          p.x <= rect.x + rect.w + pad &&
-          p.y >= rect.y - pad &&
-          p.y <= rect.y + rect.h + pad
-        )) return true;
+    return true;
+  }
+
+  function intersectsRoadNetworkClearance(rect) {
+    for (const edge of mapModel.edges) {
+      const pad = edge.width / 2 + (edge.vehicle ? 18 : 10);
+      for (let i = 1; i < edge.points.length; i += 1) {
+        if (segmentIntersectsExpandedRect(edge.points[i - 1], edge.points[i], rect, pad)) return true;
       }
     }
     return false;
@@ -1151,9 +1161,19 @@
     car.edgeId = next.id;
     car.directionSign = next.from === nodeId ? 1 : -1;
     car.edgeLength = polylineLength(next.points);
+    car.laneOffset = trafficLaneOffsetForEdge(next, Boolean(car.secondaryLane));
     car.along = car.directionSign > 0 ? 0 : car.edgeLength;
     car.routeIndex += 1;
     return true;
+  }
+
+  function trafficLaneOffsetForEdge(edge, secondaryLane = false) {
+    const maxOffset = Math.max(14, edge.width / 2 - 18);
+    const primaryOffset = Math.min(LANE_OFFSET, maxOffset);
+    const extraOffset = secondaryLane && edge.width >= 180
+      ? Math.min(28, Math.max(0, maxOffset - primaryOffset))
+      : 0;
+    return primaryOffset + extraOffset;
   }
 
   function randomRoadPoint(seedA, seedB, offset = 0) {
@@ -1162,13 +1182,14 @@
     const directionSign = hash2(seedA, seedB, 19) > .5 ? 1 : -1;
     const edgeLength = polylineLength(edge.points);
     const along = edgeLength * (.12 + hash2(seedA, seedB, 13) * .76);
-    const laneMagnitude = LANE_OFFSET + (hash2(seedA, seedB, 23) > .52 ? 28 : 0) + offset * .05;
-    const laneOffset = directionSign > 0 ? laneMagnitude : -laneMagnitude;
+    const secondaryLane = hash2(seedA, seedB, 23) > .52;
+    const laneOffset = trafficLaneOffsetForEdge(edge, secondaryLane) + offset * .05;
     const seedCar = {
       edgeId: edge.id,
       edgeLength,
       directionSign,
       laneOffset,
+      secondaryLane,
       along
     };
     const pose = trafficPoseAt(seedCar, along);
@@ -1226,7 +1247,7 @@
     ped.edgeId = route.edgeIds[0];
     ped.directionSign = mapModel.getEdge(ped.edgeId).from === startNodeId ? 1 : -1;
     ped.edgeLength = polylineLength(mapModel.getEdge(ped.edgeId).points);
-    ped.along = 0;
+    ped.along = ped.directionSign > 0 ? 0 : ped.edgeLength;
     ped.state = "walking";
     ped.waitTimer = 0;
     ped.tripCount = (ped.tripCount || 0) + 1;
@@ -1238,7 +1259,7 @@
     if (!edge) return { x: ped.x, y: ped.y, angle: ped.dir };
     const hit = pointAndTangentOnPolyline(edge.points, ped.along);
     const tangent = ped.directionSign > 0 ? hit.tangent : { x: -hit.tangent.x, y: -hit.tangent.y };
-    const sidewalkOffset = edge.width / 2 + 5;
+    const sidewalkOffset = edge.vehicle ? edge.width / 2 + 5 : Math.min(10, edge.width * .2);
     const side = ped.sideSign || 1;
     return {
       x: hit.point.x + tangent.y * sidewalkOffset * side,
@@ -1272,9 +1293,10 @@
       const homePlace = i < 30 && nearbyPedestrianPlaces.length
         ? nearbyPedestrianPlaces[i % nearbyPedestrianPlaces.length]
         : PLACES[i % PLACES.length];
-      const targetPlace = i < 30 && nearbyPedestrianPlaces.length
+      let targetPlace = i < 30 && nearbyPedestrianPlaces.length
         ? nearbyPedestrianPlaces[(i + 1) % nearbyPedestrianPlaces.length]
         : PLACES[(i * 3 + 2) % PLACES.length];
+      if (targetPlace.id === homePlace.id) targetPlace = PLACES[(i + 1) % PLACES.length];
       const ped = {
         x: homePlace.x,
         y: homePlace.y,
@@ -1299,7 +1321,8 @@
         stayTimer: 0
       };
       if (!buildPedestrianPlan(ped, homePlace.entranceNodeId, targetPlace.entranceNodeId)) continue;
-      ped.along = Math.min(ped.edgeLength * (.08 + hash2(i, 18, 99) * .32), Math.max(1, ped.edgeLength - 1));
+      const initialAlong = Math.min(ped.edgeLength * (.08 + hash2(i, 18, 99) * .32), Math.max(1, ped.edgeLength - 1));
+      ped.along = ped.directionSign > 0 ? initialAlong : Math.max(0, ped.edgeLength - initialAlong);
       const pose = pedestrianPoseAt(ped);
       ped.x = pose.x;
       ped.y = pose.y;
@@ -1712,9 +1735,13 @@
       ty /= mag;
       const nx = ty;
       const ny = -tx;
+      const roadHit = mapModel.nearestRoad(smooth[i].x, smooth[i].y, { vehicleOnly: true });
+      const laneOffset = roadHit
+        ? Math.min(LANE_OFFSET, Math.max(14, roadHit.edge.width / 2 - 18))
+        : LANE_OFFSET;
       lanePoints.push({
-        x:smooth[i].x + nx * LANE_OFFSET,
-        y:smooth[i].y + ny * LANE_OFFSET
+        x:smooth[i].x + nx * laneOffset,
+        y:smooth[i].y + ny * laneOffset
       });
     }
 
@@ -1763,6 +1790,18 @@
     return points;
   }
 
+
+  function edgeProjectionPointsToNode(edge, hit, nodeId) {
+    if (!edge || !hit) return [];
+    const segmentIndex = clamp(Math.floor(hit.segmentIndex), 0, edge.points.length - 2);
+    if (nodeId === edge.from) {
+      return [{ x:hit.point.x, y:hit.point.y }, ...edge.points.slice(0, segmentIndex + 1).reverse()];
+    }
+    if (nodeId === edge.to) {
+      return [{ x:hit.point.x, y:hit.point.y }, ...edge.points.slice(segmentIndex + 1)];
+    }
+    return [{ x:hit.point.x, y:hit.point.y }];
+  }
 
   function appendDistinctPoints(target, source) {
     for (const point of source) {
@@ -1874,14 +1913,18 @@
     const edge = startHit.edge;
     const from = mapModel.getNode(edge.from);
     const to = mapModel.getNode(edge.to);
-    const startNode = distance(startHit.point, from) <= distance(startHit.point, to) ? from : to;
-    const route = mapModel.findRoute(startNode.id, destinationNode.id, { mode: "vehicle" });
-    if (!route) return { points: [{ x: personalCar.x, y: personalCar.y }, { x: place.x, y: place.y }], signals: [] };
+    const fromStartPoints = edgeProjectionPointsToNode(edge, startHit, from.id);
+    const toStartPoints = edgeProjectionPointsToNode(edge, startHit, to.id);
+    const fromRoute = mapModel.findRoute(from.id, destinationNode.id, { mode: "vehicle" });
+    const toRoute = mapModel.findRoute(to.id, destinationNode.id, { mode: "vehicle" });
+    const fromCost = fromRoute ? polylineLength(fromStartPoints) + fromRoute.distance : Infinity;
+    const toCost = toRoute ? polylineLength(toStartPoints) + toRoute.distance : Infinity;
+    const startNode = fromCost <= toCost ? from : to;
+    const route = startNode === from ? fromRoute : toRoute;
+    if (!route) return { points: [{ x: personalCar.x, y: personalCar.y }, { x: destinationNode.x, y: destinationNode.y }], signals: [] };
 
     const centerline = [{ x: personalCar.x, y: personalCar.y }];
-    appendDistinctPoints(centerline, [startHit.point]);
-    const startPoints = startNode.id === edge.from ? edge.points : edge.points.slice().reverse();
-    appendDistinctPoints(centerline, startPoints);
+    appendDistinctPoints(centerline, startNode === from ? fromStartPoints : toStartPoints);
 
     let currentNodeId = startNode.id;
     for (const edgeId of route.edgeIds) {
@@ -1891,7 +1934,7 @@
       appendDistinctPoints(centerline, points);
       currentNodeId = currentNodeId === routeEdge.from ? routeEdge.to : routeEdge.from;
     }
-    appendDistinctPoints(centerline, [{ x: place.x, y: place.y }]);
+    appendDistinctPoints(centerline, [{ x: destinationNode.x, y: destinationNode.y }]);
 
     const points = buildLanePath(centerline);
     const signals = [];
@@ -2542,7 +2585,8 @@
     const savedForward = Math.cos(personalCar.angle) * tx + Math.sin(personalCar.angle) * ty;
     const directionSign = savedForward >= 0 ? 1 : -1;
     const needsSnap = hit.distance > edge.width / 2 + 8;
-    const offset = LANE_OFFSET * directionSign;
+    const laneOffset = Math.min(LANE_OFFSET, Math.max(14, edge.width / 2 - 18));
+    const offset = laneOffset * directionSign;
     personalCar.x = hit.point.x + ty * offset;
     personalCar.y = hit.point.y - tx * offset;
     if (!needsSnap && Number.isFinite(personalCar.x) && Number.isFinite(personalCar.y)) {
@@ -2904,6 +2948,7 @@
       let leadDistance = Infinity;
       for (const other of traffic) {
         if (other === car || other.edgeId !== car.edgeId || other.directionSign !== car.directionSign) continue;
+        if (Math.abs((other.laneOffset || 0) - (car.laneOffset || 0)) > 18) continue;
         const forwardDistance = (other.along - car.along) * car.directionSign;
         if (forwardDistance > 0 && forwardDistance < 190) leadDistance = Math.min(leadDistance, forwardDistance);
       }
@@ -3632,10 +3677,12 @@
 
   function drawMapModelRoads() {
     const visibleEdges = mapModel.edges.filter((edge) => {
-      const first = worldToScreen(edge.points[0].x, edge.points[0].y);
-      const last = worldToScreen(edge.points.at(-1).x, edge.points.at(-1).y);
-      return !(Math.max(first.x, last.x) < -260 || Math.min(first.x, last.x) > viewWidth + 260 ||
-        Math.max(first.y, last.y) < -260 || Math.min(first.y, last.y) > viewHeight + 260);
+      const points = edge.points.map((point) => worldToScreen(point.x, point.y));
+      const minX = Math.min(...points.map((point) => point.x));
+      const maxX = Math.max(...points.map((point) => point.x));
+      const minY = Math.min(...points.map((point) => point.y));
+      const maxY = Math.max(...points.map((point) => point.y));
+      return !(maxX < -260 || minX > viewWidth + 260 || maxY < -260 || minY > viewHeight + 260);
     });
     const strokeEdge = (edge, width, color, dash = []) => {
       const points = edge.points.map((point) => worldToScreen(point.x, point.y));
@@ -5925,6 +5972,7 @@
   generateBuildings();
   generateTraffic();
   generatePedestrians();
+  migrateCarToCurrentRoadIfNeeded();
   loadGame();
   seedPedestriansNearActor();
   resize();

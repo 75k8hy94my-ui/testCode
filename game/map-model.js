@@ -232,7 +232,10 @@
         if (ids.has(value.id)) errors.push(`duplicate node: ${value.id}`);
         ids.add(value.id);
       }
+      const edgeIds = new Set();
       for (const edge of edges) {
+        if (edgeIds.has(edge.id)) errors.push(`duplicate edge: ${edge.id}`);
+        edgeIds.add(edge.id);
         if (!getNode(edge.from) || !getNode(edge.to)) errors.push(`edge endpoint missing: ${edge.id}`);
         if (edge.points.length < 2) errors.push(`edge has too few points: ${edge.id}`);
         if (edge.width <= 0) errors.push(`edge width invalid: ${edge.id}`);
@@ -241,8 +244,17 @@
         if (end.x !== getNode(edge.to)?.x || end.y !== getNode(edge.to)?.y) errors.push(`edge end mismatch: ${edge.id}`);
       }
       for (const place of places) {
-        if (!getNode(place.entranceNodeId) || !getNode(place.roadNodeId)) errors.push(`place node missing: ${place.id}`);
-        if (!findRoute(place.entranceNodeId, place.entranceNodeId, { mode: "pedestrian" })) errors.push(`place unreachable: ${place.id}`);
+        const entranceNode = getNode(place.entranceNodeId);
+        const roadNode = getNode(place.roadNodeId);
+        if (!entranceNode || !roadNode) {
+          errors.push(`place node missing: ${place.id}`);
+          continue;
+        }
+        if (!findRoute(place.entranceNodeId, place.roadNodeId, { mode: "pedestrian" })) errors.push(`place unreachable: ${place.id}`);
+        if (!neighbors(place.roadNodeId, { mode: "vehicle" }).length) errors.push(`place road unreachable: ${place.id}`);
+      }
+      for (const station of stations) {
+        if (!getNode(station.roadNodeId)) errors.push(`station road node missing: ${station.id}`);
       }
       return errors;
     }

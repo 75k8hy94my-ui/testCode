@@ -146,3 +146,36 @@ test('road rendering joins shared endpoints without oversized junction blobs', (
   assert.match(source, /mapModel\.edges/);
   assert.doesNotMatch(source, /drawMapModelJunctions\(\);/);
 });
+
+
+test('driving route stays on the current road graph', () => {
+  assert.match(source, /function edgeProjectionPointsToNode\(edge, hit, nodeId\)/);
+  assert.match(source, /const fromCost = fromRoute \? polylineLength\(fromStartPoints\) \+ fromRoute\.distance : Infinity/);
+  assert.match(source, /appendDistinctPoints\(centerline, \[\{ x: destinationNode\.x, y: destinationNode\.y \}\]\)/);
+  assert.doesNotMatch(source, /appendDistinctPoints\(centerline, \[\{ x: place\.x, y: place\.y \}\]\)/);
+});
+
+test('building clearance follows the current map model rather than the retired grid', () => {
+  assert.match(source, /function segmentIntersectsExpandedRect\(a, b, rect, pad\)/);
+  assert.match(source, /function intersectsRoadNetworkClearance\(rect\)[\s\S]*for \(const edge of mapModel\.edges\)/);
+});
+
+test('traffic lanes respect road width and parallel lanes do not brake for each other', () => {
+  assert.match(source, /function trafficLaneOffsetForEdge\(edge, secondaryLane = false\)/);
+  assert.match(source, /Math\.abs\(\(other\.laneOffset \|\| 0\) - \(car\.laneOffset \|\| 0\)\) > 18/);
+});
+
+test('reverse-direction pedestrians start from the correct edge end', () => {
+  assert.match(source, /ped\.along = ped\.directionSign > 0 \? 0 : ped\.edgeLength/);
+  assert.match(source, /ped\.along = ped\.directionSign > 0 \? initialAlong : Math\.max\(0, ped\.edgeLength - initialAlong\)/);
+  assert.match(source, /edge\.vehicle \? edge\.width \/ 2 \+ 5 : Math\.min\(10, edge\.width \* \.2\)/);
+});
+
+test('fresh games snap the default car onto the current road graph', () => {
+  assert.match(source, /generatePedestrians\(\);\s*migrateCarToCurrentRoadIfNeeded\(\);\s*loadGame\(\);/);
+});
+
+test('road culling considers every point in a curved map edge', () => {
+  assert.match(source, /const points = edge\.points\.map\(\(point\) => worldToScreen\(point\.x, point\.y\)\)/);
+  assert.match(source, /const minX = Math\.min\(\.\.\.points\.map/);
+});

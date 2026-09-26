@@ -68,3 +68,18 @@ test('map model exposes irregular polylines and shared endpoints', () => {
     assert.deepEqual(edge.points.at(-1), { x: end.x, y: end.y });
   }
 });
+
+
+test('place validation requires a real pedestrian path to the road node', () => {
+  const map = createMapModel();
+  map.edges.find((edge) => edge.id === 'ped-home-entry').pedestrian = false;
+  assert.ok(map.validate().includes('place unreachable: home'));
+});
+
+test('every facility road node is attached to the vehicle graph', () => {
+  const map = createMapModel();
+  for (const place of map.places) {
+    assert.ok(map.neighbors(place.roadNodeId, { mode: 'vehicle' }).length > 0, place.id);
+    assert.ok(map.findRoute(place.entranceNodeId, place.roadNodeId, { mode: 'pedestrian' }), place.id);
+  }
+});
