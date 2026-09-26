@@ -1178,16 +1178,20 @@
     return 38;
   }
 
-  function trafficGoalNode(car, startNodeId) {
+  function trafficGoalNode(car, startNodeId, attempt = 0) {
     const candidates = mapModel.nodes.filter((node) => node.id !== startNodeId && mapModel.neighbors(node.id, { mode: "vehicle" }).length > 0);
     if (!candidates.length) return null;
-    const index = Math.floor(hash2(car.seed || 1, car.routeTrips || 0, 717) * candidates.length) % candidates.length;
+    const index = Math.floor(hash2(car.seed || 1, (car.routeTrips || 0) + attempt * 17, 717 + attempt * 13) * candidates.length) % candidates.length;
     return candidates[index].id;
   }
 
-  function buildTrafficRoute(car, startNodeId, goalNodeId) {
+  function buildTrafficRoute(car, startNodeId, goalNodeId, avoidFirstEdgeId = null) {
     const route = mapModel.findRoute(startNodeId, goalNodeId, { mode: "vehicle" });
     if (!route || !route.edgeIds.length) return false;
+
+    const alternatives = vehicleEdgesAtNode(startNodeId).filter((edge) => edge.id !== avoidFirstEdgeId);
+    if (avoidFirstEdgeId && alternatives.length && route.edgeIds[0] === avoidFirstEdgeId) return false;
+
     car.routeEdgeIds = route.edgeIds;
     car.routeIndex = 0;
     car.routeGoalNodeId = goalNodeId;
@@ -1195,18 +1199,45 @@
     return true;
   }
 
+  function planTrafficRoute(car, startNodeId, avoidFirstEdgeId = car.edgeId) {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const goalNodeId = trafficGoalNode(car, startNodeId, attempt);
+      if (goalNodeId && buildTrafficRoute(car, startNodeId, goalNodeId, avoidFirstEdgeId)) return true;
+    }
+
+    const alternatives = vehicleEdgesAtNode(startNodeId).filter((edge) => edge.id !== avoidFirstEdgeId);
+    if (alternatives.length) {
+      const pick = alternatives[Math.floor(hash2(car.seed || 1, car.routeTrips || 0, 733) * alternatives.length) % alternatives.length];
+      car.routeEdgeIds = [pick.id];
+      car.routeIndex = 0;
+      car.routeGoalNodeId = pick.from === startNodeId ? pick.to : pick.from;
+      car.routeTrips = (car.routeTrips || 0) + 1;
+      return true;
+    }
+
+    const goalNodeId = trafficGoalNode(car, startNodeId, 99);
+    return Boolean(goalNodeId && buildTrafficRoute(car, startNodeId, goalNodeId, null));
+  }
+
   function advanceTrafficRoute(car) {
     const current = mapModel.getEdge(car.edgeId);
     if (!current) return false;
     const nodeId = car.directionSign > 0 ? current.to : current.from;
     let nextId = car.routeEdgeIds?.[car.routeIndex];
-    if (!nextId) {
-      const goalNodeId = trafficGoalNode(car, nodeId);
-      if (!goalNodeId || !buildTrafficRoute(car, nodeId, goalNodeId)) return false;
+
+    if (!nextId || (nextId === current.id && vehicleEdgesAtNode(nodeId).length > 1)) {
+      if (!planTrafficRoute(car, nodeId, current.id)) return false;
       nextId = car.routeEdgeIds[car.routeIndex];
     }
-    const next = mapModel.getEdge(nextId);
+
+    let next = mapModel.getEdge(nextId);
+    if (!next || (next.from !== nodeId && next.to !== nodeId)) {
+      if (!planTrafficRoute(car, nodeId, current.id)) return false;
+      nextId = car.routeEdgeIds[car.routeIndex];
+      next = mapModel.getEdge(nextId);
+    }
     if (!next || (next.from !== nodeId && next.to !== nodeId)) return false;
+
     car.edgeId = next.id;
     car.directionSign = next.from === nodeId ? 1 : -1;
     car.edgeLength = polylineLength(next.points);
@@ -1248,33 +1279,42 @@
   function generateTraffic() {
     const colors = ["#d5d8da", "#6689ad", "#b26f67", "#c6a35a", "#59635f", "#89769e", "#579079"];
     for (let i = 0; i < 22; i += 1) {
-      const p = randomRoadPoint(i + 2, i * 7 + 3, 18);
-      const cruise = 150 + hash2(i, 4, 22) * 110;
-      const car = {
-        x:p.x,
-        y:p.y,
-        angle:p.angle,
-        edgeId:p.edgeId,
-        edgeLength:p.edgeLength,
-        orientation:p.orientation,
-        roadIndex:p.roadIndex,
-        directionSign:p.directionSign,
-        laneOffset:p.laneOffset,
-        along:p.along,
-        speed:cruise * .7,
-        cruise,
-        color:colors[i % colors.length],
-        type:VEHICLE_TYPES[Math.floor(hash2(i, 8, 522) * VEHICLE_TYPES.length) % VEHICLE_TYPES.length],
-        brakeGlow:0,
-        seed:i + 17,
-        routeEdgeIds:[],
-        routeIndex:0,
-        routeTrips:0,
-        collisionYield:0
-      };
+      let car = null;
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        const p = randomRoadPoint(i + 2 + attempt * 37, i * 7 + 3 + attempt * 19, 18);
+        const cruise = 150 + hash2(i, 4, 22) * 110;
+        car = {
+          x:p.x,
+          y:p.y,
+          angle:p.angle,
+          edgeId:p.edgeId,
+          edgeLength:p.edgeLength,
+          orientation:p.orientation,
+          roadIndex:p.roadIndex,
+          directionSign:p.directionSign,
+          laneOffset:p.laneOffset,
+          secondaryLane:p.secondaryLane,
+          along:p.along,
+          speed:cruise * .7,
+          cruise,
+          color:colors[i % colors.length],
+          type:VEHICLE_TYPES[Math.floor(hash2(i, 8, 522) * VEHICLE_TYPES.length) % VEHICLE_TYPES.length],
+          brakeGlow:0,
+          seed:i + 17,
+          routeEdgeIds:[],
+          routeIndex:0,
+          routeTrips:0,
+          collisionYield:0
+        };
+        if (!traffic.some((other) => vehiclesIntersect(car, other, 8))) break;
+        car = null;
+      }
+
+      if (!car) continue;
       const currentEdge = mapModel.getEdge(car.edgeId);
+      if (!currentEdge) continue;
       const startNodeId = car.directionSign > 0 ? currentEdge.to : currentEdge.from;
-      buildTrafficRoute(car, startNodeId, trafficGoalNode(car, startNodeId));
+      planTrafficRoute(car, startNodeId, currentEdge.id);
       traffic.push(car);
     }
   }
@@ -3790,6 +3830,114 @@
     car.routeTrips = snapshot.routeTrips;
   }
 
+  function trafficDistanceToEndpoint(car, edge = mapModel.getEdge(car.edgeId)) {
+    if (!edge) return Infinity;
+    const edgeLength = car.edgeLength || polylineLength(edge.points);
+    return car.directionSign > 0 ? edgeLength - car.along : car.along;
+  }
+
+  function trafficNextEdgeId(car) {
+    return car.routeEdgeIds?.[car.routeIndex] || null;
+  }
+
+  function trafficLeadInfo(car) {
+    const edge = mapModel.getEdge(car.edgeId);
+    if (!edge) return null;
+
+    let best = null;
+    const choose = (other, centerDistance) => {
+      if (!(centerDistance > 0) || !Number.isFinite(centerDistance)) return;
+      if (!best || centerDistance < best.distance) best = { car:other, distance:centerDistance };
+    };
+
+    for (const other of traffic) {
+      if (other === car) continue;
+
+      if (other.edgeId === car.edgeId && other.directionSign === car.directionSign) {
+        if (Math.abs((other.laneOffset || 0) - (car.laneOffset || 0)) > 18) continue;
+        choose(other, (other.along - car.along) * car.directionSign);
+        continue;
+      }
+
+      const nextEdgeId = trafficNextEdgeId(car);
+      if (!nextEdgeId || other.edgeId !== nextEdgeId) continue;
+      const endpointId = car.directionSign > 0 ? edge.to : edge.from;
+      const next = mapModel.getEdge(nextEdgeId);
+      if (!next || (next.from !== endpointId && next.to !== endpointId)) continue;
+      const expectedSign = next.from === endpointId ? 1 : -1;
+      if (other.directionSign !== expectedSign) continue;
+      if (Math.abs((other.laneOffset || 0) - trafficLaneOffsetForEdge(next, Boolean(car.secondaryLane))) > 20) continue;
+
+      const nextLength = other.edgeLength || polylineLength(next.points);
+      const otherFromNode = expectedSign > 0 ? other.along : nextLength - other.along;
+      choose(other, trafficDistanceToEndpoint(car, edge) + Math.max(0, otherFromNode));
+    }
+
+    return best;
+  }
+
+  function projectedObstacleDistance(car) {
+    const hx = Math.cos(car.angle);
+    const hy = Math.sin(car.angle);
+    const dims = vehicleDimensions(car);
+    const corridor = dims.width * .5 + 12;
+    let best = Infinity;
+
+    const considerPoint = (x, y, radius = 0) => {
+      const dx = x - car.x;
+      const dy = y - car.y;
+      const forward = dx * hx + dy * hy;
+      if (forward <= 0 || forward > 165) return;
+      const lateral = Math.abs(dx * -hy + dy * hx);
+      if (lateral > corridor + radius) return;
+      best = Math.min(best, Math.max(0, forward - dims.length * .5 - radius));
+    };
+
+    if (!state.player.inVehicle && !state.player.inTrain) {
+      considerPoint(state.player.x, state.player.y, PLAYER_COLLISION_RADIUS);
+    }
+    for (const ped of visiblePedestrianColliders()) {
+      considerPoint(ped.x, ped.y, NPC_COLLISION_RADIUS);
+    }
+
+    const dx = personalCar.x - car.x;
+    const dy = personalCar.y - car.y;
+    const forward = dx * hx + dy * hy;
+    const lateral = Math.abs(dx * -hy + dy * hx);
+    const headingDot = Math.cos(personalCar.angle) * hx + Math.sin(personalCar.angle) * hy;
+    const otherDims = vehicleDimensions(personalCar, true);
+    if (forward > 0 && forward < 210 && lateral < (dims.width + otherDims.width) * .5 + 10 && headingDot > -.25) {
+      best = Math.min(best, Math.max(0, forward - dims.length * .5 - otherDims.length * .5));
+    }
+
+    return best;
+  }
+
+  function junctionOccupiedByOther(car, endpoint) {
+    if (!endpoint) return false;
+    const incident = vehicleEdgesAtNode(endpoint.id);
+    if (incident.length < 3) return false;
+    const junctionRadius = Math.max(34, ...incident.map((candidate) => candidate.width * .5)) + 18;
+
+    for (const other of traffic) {
+      if (other === car) continue;
+      if (distance(other.x, other.y, endpoint.x, endpoint.y) > junctionRadius) continue;
+      if (other.edgeId === car.edgeId && other.directionSign === car.directionSign) continue;
+      return true;
+    }
+
+    return distance(personalCar.x, personalCar.y, endpoint.x, endpoint.y) <= junctionRadius;
+  }
+
+  function trafficShouldStopForSignal(car, signal, gapToStopLine) {
+    if (signal === "red") return true;
+    if (signal !== "yellow") return false;
+    const comfortableDecel = 260;
+    const reactionDistance = Math.max(10, car.speed * .12);
+    const stoppingDistance = (car.speed * car.speed) / (2 * comfortableDecel) + reactionDistance;
+    return gapToStopLine > stoppingDistance;
+  }
+
   function updateTraffic(dt) {
     for (const car of traffic) {
       car.collisionYield = Math.max(0, (car.collisionYield || 0) - dt);
@@ -3800,39 +3948,57 @@
       const roadLimit = (edge.speedLimit || 30) / SPEED_TO_KMH;
       let targetSpeed = Math.min(car.cruise, roadLimit * .92);
       if (car.collisionYield > 0) targetSpeed = 0;
-      let activeSignalStop = null;
+      let activeStop = null;
 
       const endpoint = car.directionSign > 0 ? mapModel.getNode(edge.to) : mapModel.getNode(edge.from);
+      const endpointDistance = trafficDistanceToEndpoint(car, edge);
+
       if (endpoint && isSignalizedMapNode(endpoint.id)) {
         const geometry = signalGeometryAtNode(endpoint.id, edge);
-        const distanceToSignal = car.directionSign > 0 ? edgeLength - car.along : car.along;
         const signal = signalStateAt(endpoint.x, endpoint.y, edgeOrientation(edge));
         const centerStopOffset = geometry.stopOffset + vehicleFrontOverhang(car);
+        const gapToStopLine = endpointDistance - centerStopOffset;
+        const stillApproachingLine = gapToStopLine >= -2;
 
-        // A car whose nose already crossed the stop line continues through the
-        // junction; otherwise it targets an exact center position that leaves
-        // the front bumper just behind the painted stop line.
-        const stillApproachingLine = distanceToSignal >= centerStopOffset - 2;
-        if (signal !== "green" && stillApproachingLine) {
-          activeSignalStop = { centerStopOffset, endpointId:endpoint.id };
-          if (distanceToSignal < centerStopOffset + 100) {
-            targetSpeed = Math.max(0, (distanceToSignal - centerStopOffset) * 2.35);
+        if (stillApproachingLine && trafficShouldStopForSignal(car, signal, Math.max(0, gapToStopLine))) {
+          activeStop = { centerStopOffset, endpointId:endpoint.id };
+          if (gapToStopLine < 130) {
+            targetSpeed = Math.min(targetSpeed, Math.max(0, gapToStopLine * 2.2));
           }
         }
       }
 
-      let leadDistance = Infinity;
-      for (const other of traffic) {
-        if (other === car || other.edgeId !== car.edgeId || other.directionSign !== car.directionSign) continue;
-        if (Math.abs((other.laneOffset || 0) - (car.laneOffset || 0)) > 18) continue;
-        const forwardDistance = (other.along - car.along) * car.directionSign;
-        if (forwardDistance > 0 && forwardDistance < 190) leadDistance = Math.min(leadDistance, forwardDistance);
+      if (endpoint && endpointDistance < 150 && junctionOccupiedByOther(car, endpoint)) {
+        const yieldOffset = activeStop?.centerStopOffset || Math.max(vehicleFrontOverhang(car) + 18, edge.width * .5 + 8);
+        const gapToYield = endpointDistance - yieldOffset;
+        if (gapToYield > -2) {
+          activeStop = { centerStopOffset:yieldOffset, endpointId:endpoint.id };
+          targetSpeed = Math.min(targetSpeed, Math.max(0, gapToYield * 2.05));
+        }
       }
-      if (leadDistance < 125) targetSpeed = Math.min(targetSpeed, Math.max(0, (leadDistance - 38) * 2.05));
 
-      const brakingNow = targetSpeed < car.speed - 10;
+      const lead = trafficLeadInfo(car);
+      if (lead) {
+        const dims = vehicleDimensions(car);
+        const leadDims = vehicleDimensions(lead.car);
+        const bumperGap = Math.max(0, lead.distance - dims.length * .5 - leadDims.length * .5);
+        const desiredGap = 16 + Math.min(54, car.speed * .22);
+        if (bumperGap < desiredGap + 70) {
+          targetSpeed = Math.min(targetSpeed, Math.max(0, (bumperGap - desiredGap) * 2.25));
+        }
+      }
+
+      const obstacleGap = projectedObstacleDistance(car);
+      if (obstacleGap < 105) {
+        const desiredObstacleGap = 18 + Math.min(38, car.speed * .16);
+        targetSpeed = Math.min(targetSpeed, Math.max(0, (obstacleGap - desiredObstacleGap) * 2.4));
+      }
+
+      const brakingNow = targetSpeed < car.speed - 8;
       car.brakeGlow += ((brakingNow ? 1 : 0) - car.brakeGlow) * Math.min(1, dt * 8);
-      car.speed += (targetSpeed - car.speed) * Math.min(1, dt * 2.4);
+      const response = targetSpeed < car.speed ? 3.5 : 1.8;
+      car.speed += (targetSpeed - car.speed) * Math.min(1, dt * response);
+      if (car.speed < .45 && targetSpeed <= .5) car.speed = 0;
 
       let remaining = car.speed * dt;
       let transitions = 0;
@@ -3840,14 +4006,14 @@
         const currentEdge = mapModel.getEdge(car.edgeId);
         if (!currentEdge) break;
         const currentLength = car.edgeLength || polylineLength(currentEdge.points);
-        const endpointDistance = car.directionSign > 0 ? currentLength - car.along : car.along;
+        const currentEndpointDistance = car.directionSign > 0 ? currentLength - car.along : car.along;
 
-        if (activeSignalStop && transitions === 0) {
-          const allowedToStop = Math.max(0, endpointDistance - activeSignalStop.centerStopOffset);
+        if (activeStop && transitions === 0) {
+          const allowedToStop = Math.max(0, currentEndpointDistance - activeStop.centerStopOffset);
           if (remaining >= allowedToStop) {
             car.along = car.directionSign > 0
-              ? Math.max(0, currentLength - activeSignalStop.centerStopOffset)
-              : Math.min(currentLength, activeSignalStop.centerStopOffset);
+              ? Math.max(0, currentLength - activeStop.centerStopOffset)
+              : Math.min(currentLength, activeStop.centerStopOffset);
             car.speed = 0;
             car.brakeGlow = Math.max(car.brakeGlow, .85);
             remaining = 0;
@@ -3855,13 +4021,13 @@
           }
         }
 
-        if (remaining < Math.max(1, endpointDistance)) {
+        if (remaining < Math.max(1, currentEndpointDistance)) {
           car.along += car.directionSign * remaining;
           remaining = 0;
           break;
         }
 
-        remaining = Math.max(0, remaining - Math.max(1, endpointDistance));
+        remaining = Math.max(0, remaining - Math.max(1, currentEndpointDistance));
         car.along = car.directionSign > 0 ? currentLength : 0;
         if (!advanceTrafficRoute(car)) {
           car.speed = 0;
@@ -3883,14 +4049,14 @@
         car.brakeGlow = 1;
 
         if (hitPerson) {
-          car.collisionYield = Math.max(car.collisionYield || 0, .28);
+          car.collisionYield = Math.max(car.collisionYield || 0, .34);
         } else if (hitVehicle === personalCar) {
-          car.collisionYield = Math.max(car.collisionYield || 0, .42);
+          car.collisionYield = Math.max(car.collisionYield || 0, .48);
         } else if (hitVehicle) {
           const myPriority = car.seed || 0;
           const otherPriority = hitVehicle.seed || 0;
           if (myPriority >= otherPriority) {
-            car.collisionYield = Math.max(car.collisionYield || 0, .52);
+            car.collisionYield = Math.max(car.collisionYield || 0, .58);
           }
         }
       }
