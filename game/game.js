@@ -1756,24 +1756,10 @@
 
 
   function seedPedestriansNearActor() {
-    const offsets = [-260, -180, -100, -20, 60, 140, 220, 300];
-    const nearbyCount = Math.min(offsets.length, pedestrians.length);
-    for (let i = 0; i < nearbyCount; i += 1) {
-      const hit = mapModel.nearestRoad(
-        state.player.x + offsets[i] * .35,
-        state.player.y + offsets[i] * .2
-      );
-      const edge = hit?.edge;
-      if (!edge?.pedestrian || !buildPedestrianPlan(pedestrians[i], edge.from, edge.to)) continue;
-      const ped = pedestrians[i];
-      ped.sideSign = i % 2 === 0 ? 1 : -1;
-      ped.along = clamp((hit.t || .5) * ped.edgeLength + (i - 3) * 42, 28, Math.max(28, ped.edgeLength - 28));
-      const pose = pedestrianPoseAt(ped);
-      ped.x = pose.x;
-      ped.y = pose.y;
-      ped.dir = pose.angle;
-    }
+    // Citizens now keep persistent homes, jobs and routes. Do not teleport a
+    // subset near the player just to manufacture crowd density.
   }
+
 
   function trainById(id) {
     return trains.find((train) => train.id === id) || null;
@@ -2533,7 +2519,7 @@
     }
   }
 
-  function advanceTime(minutes, decay = true) {
+  function advanceTime(minutes, decay = true, updateCitizens = true) {
     if (decay) decayNeeds(minutes);
     state.minute += minutes;
     while (state.minute >= 1440) {
@@ -2541,6 +2527,11 @@
       state.day += 1;
       chargeRentIfNeeded();
     }
+    while (state.minute < 0) {
+      state.minute += 1440;
+      state.day = Math.max(1, state.day - 1);
+    }
+    if (updateCitizens) fastForwardCitizens(minutes);
   }
 
   function nextRentDay() {
@@ -3407,18 +3398,22 @@
     }
   }
 
-  function updatePedestrians(dt) {
+  function updatePedestrians(dt, gameMinutes) {
+    const minutes = Math.max(0, Number(gameMinutes) || 0);
+
     for (const ped of pedestrians) {
-      ped.phase += dt * ped.speed * .12;
-      if (ped.state === "staying") {
-        ped.stayTimer -= dt;
-        if (ped.stayTimer <= 0) {
-          const currentEdge = mapModel.getEdge(ped.edgeId);
-          const currentNodeId = currentEdge
-            ? (ped.directionSign > 0 ? currentEdge.to : currentEdge.from)
-            : ped.targetNodeId;
-          choosePedestrianDestination(ped, currentNodeId);
-        }
+      const travelling = ped.state === "walking" || ped.state === "waiting";
+      citizenUpdateNeeds(ped, minutes, travelling);
+
+      if (ped.state === "inside" || ped.state === "staying") {
+        ped.activityMinutesRemaining = Math.max(0, ped.activityMinutesRemaining - minutes);
+        if (ped.state === "staying") ped.phase += dt * .7;
+        if (ped.activityMinutesRemaining <= .001) completeCitizenActivity(ped);
+        continue;
+      }
+
+      if (ped.state !== "walking" && ped.state !== "waiting") {
+        planCitizenAction(ped, ped.currentNodeId || ped.homeNodeId);
         continue;
       }
 
@@ -3426,58 +3421,69 @@
       if (signal === "red" || signal === "yellow") {
         ped.state = "waiting";
         ped.waitTimer = Math.min(1.2, ped.waitTimer + dt);
-        ped.phase -= dt * ped.speed * .12;
         continue;
       }
+
       ped.state = "walking";
-
-      let remaining = ped.speed * dt;
-      let transitions = 0;
-      while (remaining > 0 && transitions < 4) {
-        const edge = mapModel.getEdge(ped.edgeId);
-        if (!edge) break;
-        const edgeLength = ped.edgeLength || polylineLength(edge.points);
-        const endpointDistance = ped.directionSign > 0 ? edgeLength - ped.along : ped.along;
-        if (remaining < Math.max(1, endpointDistance)) {
-          ped.along += ped.directionSign * remaining;
-          remaining = 0;
-          break;
-        }
-        remaining = Math.max(0, remaining - Math.max(1, endpointDistance));
-        ped.along = ped.directionSign > 0 ? edgeLength : 0;
-        const currentNodeId = ped.directionSign > 0 ? edge.to : edge.from;
-        const nextId = ped.routeEdgeIds?.[ped.routeIndex + 1];
-        if (!nextId) {
-          ped.state = "staying";
-          ped.stayTimer = 2.5 + hash2(ped.seed, ped.tripCount, 1001) * 7;
-          remaining = 0;
-          break;
-        }
-        const next = mapModel.getEdge(nextId);
-        if (!next || (next.from !== currentNodeId && next.to !== currentNodeId)) {
-          ped.state = "staying";
-          ped.stayTimer = 3;
-          remaining = 0;
-          break;
-        }
-        ped.routeIndex += 1;
-        ped.edgeId = next.id;
-        ped.directionSign = next.from === currentNodeId ? 1 : -1;
-        ped.edgeLength = polylineLength(next.points);
-        ped.along = ped.directionSign > 0 ? 0 : ped.edgeLength;
-        transitions += 1;
-      }
-
-      const pose = pedestrianPoseAt(ped);
-      ped.x = pose.x;
-      ped.y = pose.y;
-      ped.dir = pose.angle;
+      ped.waitTimer = 0;
+      ped.phase += dt * ped.speed * .12;
+      moveCitizenAlongRoute(ped, ped.speed * dt);
     }
   }
+
+  function fastForwardCitizens(gameMinutes) {
+    const total = Math.max(0, Number(gameMinutes) || 0);
+    if (total <= .001 || !pedestrians.length) return;
+
+    for (const ped of pedestrians) {
+      let remaining = total;
+      let loops = 0;
+
+      while (remaining > .001 && loops < 18) {
+        loops += 1;
+
+        if (ped.state === "walking" || ped.state === "waiting") {
+          const travelDistance = citizenRemainingRouteDistance(ped);
+          const travelMinutes = Math.max(.05, travelDistance / Math.max(1, ped.speed) * .7);
+          const step = Math.min(remaining, travelMinutes);
+          citizenUpdateNeeds(ped, step, true);
+          moveCitizenAlongRoute(ped, ped.speed * (step / .7));
+          remaining -= step;
+          continue;
+        }
+
+        if (ped.state === "inside" || ped.state === "staying") {
+          const duration = Math.max(.05, ped.activityMinutesRemaining || .05);
+          const step = Math.min(remaining, duration);
+          citizenUpdateNeeds(ped, step, false);
+          ped.activityMinutesRemaining = Math.max(0, duration - step);
+          remaining -= step;
+
+          if (ped.activityMinutesRemaining <= .001) completeCitizenActivity(ped);
+          continue;
+        }
+
+        planCitizenAction(ped, ped.currentNodeId || ped.homeNodeId);
+      }
+
+      if (remaining > .001) {
+        citizenUpdateNeeds(ped, remaining, ped.state === "walking" || ped.state === "waiting");
+      }
+
+      if (ped.state === "walking" || ped.state === "waiting") {
+        const pose = pedestrianPoseAt(ped);
+        ped.x = pose.x;
+        ped.y = pose.y;
+        ped.dir = pose.angle;
+      }
+    }
+  }
+
 
   function update(dt) {
     if (state.paused || !actionSheet.hidden || !helpPanel.hidden) return;
 
+    const gameMinutes = dt * .7;
     updateTrainSystem(dt);
 
     if (!state.player.inVehicle) state.drive.signalClock += dt;
@@ -3485,7 +3491,8 @@
     else if (!state.player.inTrain) updatePlayerOnFoot(dt);
 
     updateTraffic(dt);
-    updatePedestrians(dt);
+    advanceTime(gameMinutes, true, false);
+    updatePedestrians(dt, gameMinutes);
 
     state.visual.weatherClock += dt;
     state.visual.rainPhase += dt;
@@ -3497,9 +3504,6 @@
       if (state.visual.weather === "rain") showToast("雨が降ってきました");
       if (state.visual.weather === "clear") showToast("空が晴れてきました");
     }
-
-    const gameMinutes = dt * 0.7;
-    advanceTime(gameMinutes);
 
     autosaveTimer += dt;
     if (autosaveTimer >= 5) {
