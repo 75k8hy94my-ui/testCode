@@ -1,6 +1,6 @@
 
 <!DOCTYPE html>
-<html lang="ja" class="auth-pending">
+<html lang="ja" class="auth-pending reader-shell-page">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -44,6 +44,25 @@
   #app {
     position: relative; height: 100vh; overflow: hidden;
     background: radial-gradient(ellipse 120% 80% at 50% -10%, #161a26 0%, var(--bg) 55%);
+  }
+  /* reader.html is a standalone document. The shared authenticated header and
+     the viewer divide the viewport directly; no SPA routeContent offset is
+     involved and no fixed pixel estimate of the mobile header is needed. */
+  html.reader-shell-page body {
+    height: 100dvh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  html.reader-shell-page #appGlobalHeader {
+    flex: 0 0 auto;
+  }
+  html.reader-shell-page #appGlobalHeader ~ #app {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto !important;
+    margin-top: 0 !important;
   }
   html.reader-entry-manga #app,
   html.reader-entry-video #app {
@@ -6807,11 +6826,5 @@ https://cdn.example.org/c/003.webp"></textarea>
   if (!requestedScreenOnLoad && !resumedOnLoad) location.replace('manga.html');
 })();
 </script>
-<script src="reader-shell.js?v=20260926-standalone-item-route"></script>
-<script src="reader-saved-list.js?v=20260915-saved-list"></script>
-<script src="reader-video-list.js?v=20260915-video-list"></script>
-<script src="reader-author-list.js?v=20260915-author-list"></script>
-<script src="reader-settings.js?v=20260915-settings"></script>
-<script src="reader-backup.js?v=20260915-backup"></script>
 </body>
 </html>
