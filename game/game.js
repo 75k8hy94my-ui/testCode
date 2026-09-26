@@ -525,7 +525,7 @@
   }
 
   const NPCS = [
-    { id: "aoi", name: "アオイ", x: PARK.x + 80, y: PARK.y + 65, color: "#e0a7b5", friendship: 0 },
+    { id: "aoi", name: "アオイ", x: PARK.x - 60, y: PARK.y, color: "#e0a7b5", friendship: 0 },
     { id: "sora", name: "ソラ", x: CAFE.x + 72, y: CAFE.y - 58, color: "#a9c9e3", friendship: 0 },
     { id: "mei", name: "メイ", x: LIBRARY.x, y: LIBRARY.y - 45, color: "#c8b58f", friendship: 0 }
   ];
