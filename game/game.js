@@ -4145,298 +4145,96 @@
   }
 
   function drawCityLandmarks() {
-    const station = worldToScreen(TRAIN_STATIONS[1].accessX, TRAIN_STATIONS[1].accessY + 34);
-    if (station.x > -400 && station.y > -400 && station.x < viewWidth + 400 && station.y < viewHeight + 400) {
-      // Station entrance / canopy.
+    const station = TRAIN_STATIONS[1];
+    const stationScreen = worldToScreen(station.accessX, station.accessY + 34);
+    if (stationScreen.x > -400 && stationScreen.y > -400 && stationScreen.x < viewWidth + 400 && stationScreen.y < viewHeight + 400) {
       ctx.fillStyle = "#4a5554";
-      roundedRectPath(ctx, station.x - 92, station.y - 30, 184, 42, 7);
+      roundedRectPath(ctx, stationScreen.x - 92, stationScreen.y - 30, 184, 42, 7);
       ctx.fill();
       ctx.fillStyle = "#dfe5df";
-      ctx.fillRect(station.x - 82, station.y - 20, 164, 20);
+      ctx.fillRect(stationScreen.x - 82, stationScreen.y - 20, 164, 20);
       ctx.fillStyle = "#384340";
       ctx.font = "800 16px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("若葉駅 南口", station.x, station.y - 5);
+      ctx.fillText("若葉駅 南口", stationScreen.x, stationScreen.y - 5);
       ctx.fillStyle = "#5a6864";
-      ctx.fillRect(station.x - 76, station.y + 11, 10, 42);
-      ctx.fillRect(station.x + 66, station.y + 11, 10, 42);
-
-      // Taxi rank.
-      ctx.fillStyle = "#d6d9d2";
-      ctx.font = "700 9px system-ui, sans-serif";
-      ctx.fillText("TAXI", station.x + 128, station.y + 78);
+      ctx.fillRect(stationScreen.x - 76, stationScreen.y + 11, 10, 42);
+      ctx.fillRect(stationScreen.x + 66, stationScreen.y + 11, 10, 42);
     }
 
-    const arcade = worldToScreen(7 * ROAD_GAP + ROAD_GAP / 2, 6 * ROAD_GAP + ROAD_HALF + BLOCK_MARGIN + 12);
-    if (arcade.x > -250 && arcade.y > -250 && arcade.x < viewWidth + 250 && arcade.y < viewHeight + 250) {
-      ctx.strokeStyle = "#5b6661";
-      ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.moveTo(arcade.x - 48, arcade.y + 26);
-      ctx.lineTo(arcade.x - 48, arcade.y - 24);
-      ctx.lineTo(arcade.x + 48, arcade.y - 24);
-      ctx.lineTo(arcade.x + 48, arcade.y + 26);
-      ctx.stroke();
-      ctx.fillStyle = "#d9c77b";
-      roundedRectPath(ctx, arcade.x - 42, arcade.y - 38, 84, 21, 5);
-      ctx.fill();
-      ctx.fillStyle = "#493f2f";
-      ctx.font = "800 10px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("若葉サンモール", arcade.x, arcade.y - 24);
-    }
-
-    const shrine = worldToScreen(5 * ROAD_GAP + ROAD_GAP / 2, 9 * ROAD_GAP + ROAD_GAP / 2);
-    if (shrine.x > -220 && shrine.y > -220 && shrine.x < viewWidth + 220 && shrine.y < viewHeight + 220) {
-      ctx.strokeStyle = "#a64f43";
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.moveTo(shrine.x - 23, shrine.y + 18);
-      ctx.lineTo(shrine.x - 23, shrine.y - 26);
-      ctx.moveTo(shrine.x + 23, shrine.y + 18);
-      ctx.lineTo(shrine.x + 23, shrine.y - 26);
-      ctx.moveTo(shrine.x - 35, shrine.y - 22);
-      ctx.lineTo(shrine.x + 35, shrine.y - 22);
-      ctx.moveTo(shrine.x - 29, shrine.y - 31);
-      ctx.lineTo(shrine.x + 29, shrine.y - 31);
-      ctx.stroke();
-      ctx.fillStyle = "#5f695e";
-      ctx.font = "700 9px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("若葉神社", shrine.x, shrine.y + 34);
-    }
-
-    const alley = worldToScreen(10 * ROAD_GAP + ROAD_GAP / 2, 6 * ROAD_GAP + ROAD_GAP / 2);
-    if (alley.x > -220 && alley.y > -220 && alley.x < viewWidth + 220 && alley.y < viewHeight + 220) {
-      ctx.fillStyle = "rgba(164,69,54,.84)";
-      for (let n = -2; n <= 2; n += 1) {
+    for (const landmark of mapModel.landmarks || []) {
+      const p = worldToScreen(landmark.x, landmark.y);
+      if (p.x < -220 || p.y < -220 || p.x > viewWidth + 220 || p.y > viewHeight + 220) continue;
+      if (landmark.type === "shopping-arch") {
+        ctx.strokeStyle = "#56645e";
+        ctx.lineWidth = 5;
         ctx.beginPath();
-        ctx.arc(alley.x + n * 20, alley.y - 58 + Math.abs(n) * 3, 6, 0, Math.PI * 2);
+        ctx.moveTo(p.x - 50, p.y + 26);
+        ctx.lineTo(p.x - 50, p.y - 26);
+        ctx.lineTo(p.x + 50, p.y - 26);
+        ctx.lineTo(p.x + 50, p.y + 26);
+        ctx.stroke();
+        ctx.fillStyle = "#d9c77b";
+        roundedRectPath(ctx, p.x - 44, p.y - 42, 88, 22, 5);
         ctx.fill();
+        ctx.fillStyle = "#493f2f";
+        ctx.font = "800 10px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(landmark.label, p.x, p.y - 27);
+      } else if (landmark.type === "shrine-gate") {
+        ctx.strokeStyle = "#a64f43";
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(p.x - 23, p.y + 18);
+        ctx.lineTo(p.x - 23, p.y - 26);
+        ctx.moveTo(p.x + 23, p.y + 18);
+        ctx.lineTo(p.x + 23, p.y - 26);
+        ctx.moveTo(p.x - 35, p.y - 22);
+        ctx.lineTo(p.x + 35, p.y - 22);
+        ctx.moveTo(p.x - 29, p.y - 31);
+        ctx.lineTo(p.x + 29, p.y - 31);
+        ctx.stroke();
+      } else if (landmark.type === "school-sign") {
+        ctx.fillStyle = "#e6e2cf";
+        roundedRectPath(ctx, p.x - 46, p.y - 18, 92, 28, 4);
+        ctx.fill();
+        ctx.fillStyle = "#44514b";
+        ctx.font = "700 10px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(landmark.label, p.x, p.y);
+      } else if (landmark.type === "bus-terminal") {
+        ctx.strokeStyle = "rgba(245,246,240,.7)";
+        ctx.lineWidth = 2;
+        for (let n = -2; n <= 2; n += 1) ctx.strokeRect(p.x + n * 40 - 16, p.y - 11, 32, 54);
+        ctx.fillStyle = "#d7dbd3";
+        ctx.font = "700 9px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("BUS", p.x, p.y + 58);
       }
-      ctx.strokeStyle = "rgba(74,62,54,.7)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(alley.x - 52, alley.y - 61);
-      ctx.lineTo(alley.x + 52, alley.y - 61);
-      ctx.stroke();
+    }
+  }
+
+  function forEachStreetLamp(callback) {
+    for (let edgeIndex = 0; edgeIndex < mapModel.edges.length; edgeIndex += 1) {
+      const edge = mapModel.edges[edgeIndex];
+      if (!edge.vehicle) continue;
+      const stride = edge.type === "arterial" ? 250 : edge.type === "collector" ? 300 : 360;
+      const length = polylineLength(edge.points);
+      let sampleIndex = 0;
+      for (let along = 120; along < length; along += stride) {
+        const pose = pointAndTangentOnPolyline(edge.points, along);
+        const normal = { x:-pose.tangent.y, y:pose.tangent.x };
+        const side = ((edgeIndex + sampleIndex) % 2 === 0 ? 1 : -1);
+        const offset = edge.width / 2 + 20;
+        callback(pose.point.x + normal.x * offset * side, pose.point.y + normal.y * offset * side, edge, edgeIndex, sampleIndex);
+        sampleIndex += 1;
+      }
     }
   }
 
   function drawStreetProps() {
-    for (const edge of mapModel.edges) {
-      if (!edge.vehicle) continue;
-      const stride = edge.type === "arterial" ? 260 : 340;
-      let distance = 120;
-        const length = polylineLength(edge.points);
-        while (distance < length) {
-          const pose = pointAndTangentOnPolyline(edge.points, distance);
-          const normal = { x: -pose.tangent.y, y: pose.tangent.x };
-          drawLamp(pose.point.x + normal.x * (edge.width * .58), pose.point.y + normal.y * (edge.width * .58));
-          distance += stride;
-        }
-    }
-    for (const parcel of mapModel.parcels) {
-      if (parcel.use !== "residential") continue;
-      drawTree(parcel.x + 46, parcel.y + 42, .72);
-      drawTree(parcel.x + parcel.w - 42, parcel.y + parcel.h - 42, .58);
-    }
-    return;
-
-    const startX = Math.floor(state.camera.x / ROAD_GAP) - 1;
-    const endX = Math.ceil((state.camera.x + viewWidth) / ROAD_GAP) + 1;
-    const startY = Math.floor(state.camera.y / ROAD_GAP) - 1;
-    const endY = Math.ceil((state.camera.y + viewHeight) / ROAD_GAP) + 1;
-    for (let gx = startX; gx <= endX; gx += 1) {
-      for (let gy = startY; gy <= endY; gy += 1) {
-        const baseX = gx * ROAD_GAP;
-        const baseY = gy * ROAD_GAP;
-        const style = cityBlockStyle(gx, gy);
-        const seed = hash2(gx, gy, 810);
-
-        const center = worldToScreen(baseX + ROAD_GAP / 2, baseY + ROAD_GAP / 2);
-        if (style === "station") {
-          // Bicycle parking and bollards around the station plaza.
-          ctx.strokeStyle = "#59635f";
-          ctx.lineWidth = 1.5;
-          for (let n = -3; n <= 3; n += 1) {
-            const bx = center.x + n * 18;
-            const by = center.y + 132;
-            ctx.beginPath();
-            ctx.arc(bx - 4, by, 5, 0, Math.PI * 2);
-            ctx.arc(bx + 5, by, 5, 0, Math.PI * 2);
-            ctx.moveTo(bx - 4, by);
-            ctx.lineTo(bx + 1, by - 7);
-            ctx.lineTo(bx + 5, by);
-            ctx.stroke();
-          }
-          ctx.fillStyle = "#4f5b57";
-          for (let n = -3; n <= 3; n += 1) {
-            ctx.fillRect(center.x + n * 28 - 2, center.y - 132, 4, 15);
-          }
-        } else if (style === "arcade") {
-          // Dense projecting shop signs and alternating awnings.
-          for (let n = -2; n <= 2; n += 1) {
-            const sy = center.y + n * 52;
-            ctx.fillStyle = n % 2 ? "#a76055" : "#547b76";
-            ctx.fillRect(center.x - 92, sy - 11, 24, 15);
-            ctx.fillStyle = n % 2 ? "#6f8299" : "#b58b55";
-            ctx.fillRect(center.x + 68, sy - 7, 24, 15);
-            ctx.fillStyle = "rgba(239,226,195,.72)";
-            ctx.fillRect(center.x - 65, sy + 13, 130, 5);
-          }
-        } else if (style === "alley") {
-          // Lantern strings and standing signs make the narrow dining alleys read at night.
-          ctx.strokeStyle = "rgba(71,61,54,.75)";
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.moveTo(center.x - 48, center.y - 92);
-          ctx.lineTo(center.x + 48, center.y - 92);
-          ctx.stroke();
-          for (let n = -2; n <= 2; n += 1) {
-            ctx.fillStyle = "#b85c4f";
-            ctx.beginPath();
-            ctx.arc(center.x + n * 21, center.y - 88 + Math.abs(n) * 2, 5, 0, Math.PI * 2);
-            ctx.fill();
-          }
-          ctx.fillStyle = "#433c36";
-          ctx.fillRect(center.x + 35, center.y + 54, 18, 27);
-          ctx.fillStyle = "#d7c49a";
-          ctx.fillRect(center.x + 38, center.y + 58, 12, 16);
-        } else if (style === "residential") {
-          const left = baseX + ROAD_HALF + BLOCK_MARGIN;
-          const top = baseY + ROAD_HALF + BLOCK_MARGIN;
-          const size = ROAD_GAP - ROAD_WIDTH - BLOCK_MARGIN * 2;
-          const plan = residentialBlockPlan(gx, gy, left, top, size, size);
-
-          // Low walls / hedges follow parcel frontage rather than floating in the block.
-          ctx.lineWidth = 2;
-          for (let i = 0; i < plan.houses.length; i += 1) {
-            const house = plan.houses[i];
-            const frontageSeed = hash2(gx + i, gy, 1790);
-            const hedge = frontageSeed > .52;
-            const wallColor = hedge ? "#5d7959" : "#98978f";
-            ctx.strokeStyle = wallColor;
-            ctx.fillStyle = wallColor;
-
-            if (house.frontage === "east" || house.frontage === "west") {
-              const fx = house.frontage === "east" ? house.x + house.w + 7 : house.x - 7;
-              const fy = house.y + 5;
-              const p = worldToScreen(fx, fy);
-              const length = Math.max(16, house.h - 10);
-              if (hedge) ctx.fillRect(p.x - 3, p.y, 6, length);
-              else {
-                ctx.beginPath();
-                ctx.moveTo(p.x, p.y);
-                ctx.lineTo(p.x, p.y + length);
-                ctx.stroke();
-              }
-            } else {
-              const fy = house.frontage === "south" ? house.y + house.h + 7 : house.y - 7;
-              const fx = house.x + 5;
-              const p = worldToScreen(fx, fy);
-              const length = Math.max(16, house.w - 10);
-              if (hedge) ctx.fillRect(p.x, p.y - 3, length, 6);
-              else {
-                ctx.beginPath();
-                ctx.moveTo(p.x, p.y);
-                ctx.lineTo(p.x + length, p.y);
-                ctx.stroke();
-              }
-            }
-          }
-
-          // Utility poles line only one side of the local street.
-          ctx.strokeStyle = "#555c59";
-          ctx.lineWidth = 3;
-          const poleCount = 3;
-          for (let n = 0; n < poleCount; n += 1) {
-            const t = .18 + n * .31;
-            let wx;
-            let wy;
-            if (plan.vertical) {
-              wx = plan.roadCenter + plan.roadWidth / 2 + 8;
-              wy = top + size * t;
-            } else {
-              wx = left + size * t;
-              wy = plan.roadCenter + plan.roadWidth / 2 + 8;
-            }
-            const p = worldToScreen(wx, wy);
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y + 8);
-            ctx.lineTo(p.x, p.y - 20);
-            ctx.stroke();
-            ctx.strokeStyle = "#414744";
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(p.x - 7, p.y - 16);
-            ctx.lineTo(p.x + 7, p.y - 16);
-            ctx.stroke();
-            ctx.strokeStyle = "#555c59";
-            ctx.lineWidth = 3;
-          }
-
-          // A few front-garden trees, not the same two generic trees every block.
-          for (let i = 0; i < plan.yards.length; i += 1) {
-            if (hash2(gx + i, gy, 1791) < .45) continue;
-            const yard = plan.yards[i];
-            drawTree(
-              yard.x + yard.w * (.35 + hash2(gx, gy + i, 1792) * .3),
-              yard.y + yard.h * (.35 + hash2(gx, gy + i, 1793) * .3),
-              .55 + hash2(gx, gy + i, 1794) * .22
-            );
-          }
-          continue;
-        } else if (style === "green") {
-          drawTree(baseX + ROAD_GAP * .36, baseY + ROAD_GAP * .38, 1.05);
-          drawTree(baseX + ROAD_GAP * .68, baseY + ROAD_GAP * .66, 1.1);
-        }
-        if (seed > .18) {
-          drawTree(baseX + ROAD_HALF + 35, baseY + 145, .82);
-          drawTree(baseX + 145, baseY + ROAD_HALF + 35, .78);
-        }
-        if (seed > .36) {
-          drawLamp(baseX + ROAD_HALF + 23, baseY + 240);
-          drawLamp(baseX + 240, baseY + ROAD_HALF + 23);
-        }
-        if (seed > .58) {
-          const poleA = worldToScreen(baseX + ROAD_HALF + 30, baseY + 330);
-          const poleB = worldToScreen(baseX + 330, baseY + ROAD_HALF + 30);
-          ctx.strokeStyle = "#555c59";
-          ctx.lineWidth = 4;
-          ctx.beginPath();
-          ctx.moveTo(poleA.x, poleA.y + 15);
-          ctx.lineTo(poleA.x, poleA.y - 24);
-          ctx.moveTo(poleB.x + 15, poleB.y);
-          ctx.lineTo(poleB.x - 24, poleB.y);
-          ctx.stroke();
-          ctx.strokeStyle = "#3e4543";
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(poleA.x - 9, poleA.y - 18);
-          ctx.lineTo(poleA.x + 9, poleA.y - 18);
-          ctx.moveTo(poleB.x - 18, poleB.y - 9);
-          ctx.lineTo(poleB.x - 18, poleB.y + 9);
-          ctx.stroke();
-        }
-        const p = worldToScreen(baseX + ROAD_HALF + 40, baseY + ROAD_HALF + 54);
-        if (p.x > -40 && p.y > -40 && p.x < viewWidth + 40 && p.y < viewHeight + 40) {
-          if (seed > .72) {
-            ctx.fillStyle = "#315c70";
-            ctx.fillRect(p.x, p.y, 12, 23);
-            ctx.fillStyle = "#cde0e6";
-            ctx.fillRect(p.x + 2, p.y + 3, 8, 5);
-            ctx.fillStyle = "#e3b65d";
-            ctx.fillRect(p.x + 3, p.y + 12, 6, 2);
-          } else if (seed < .2) {
-            ctx.fillStyle = "#5d4c3c";
-            ctx.fillRect(p.x - 12, p.y + 10, 28, 4);
-            ctx.fillRect(p.x - 9, p.y + 14, 3, 7);
-            ctx.fillRect(p.x + 10, p.y + 14, 3, 7);
-          }
-        }
-      }
-    }
+    forEachStreetLamp((x, y) => drawLamp(x, y));
+    for (const tree of mapModel.vegetation || []) drawTree(tree.x, tree.y, tree.scale || 1);
   }
 
   function drawRoute() {
@@ -4924,26 +4722,19 @@
     if (p.x < -300 || p.y < -300 || p.x > viewWidth + 300 || p.y > viewHeight + 300) return;
 
     if (place.id === "park") {
-      ctx.fillStyle = "#668f63";
-      roundedRectPath(ctx, p.x - 190, p.y - 190, 380, 380, 18);
+      ctx.fillStyle = "#b9b18f";
+      roundedRectPath(ctx, p.x - 48, p.y - 24, 96, 48, 9);
       ctx.fill();
-      ctx.fillStyle = "#b8b08d";
-      roundedRectPath(ctx, p.x - 14, p.y - 170, 28, 340, 8);
-      ctx.fill();
-      roundedRectPath(ctx, p.x - 170, p.y - 14, 340, 28, 8);
-      ctx.fill();
-      ctx.fillStyle = "#6f9a69";
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 54, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillStyle = "#4f6d50";
+      ctx.font = "800 12px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("中央公園", p.x, p.y + 4);
       ctx.fillStyle = "#6d8e92";
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 24, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y - 55, 18, 0, Math.PI * 2);
       ctx.fill();
-      for (let i = 0; i < 10; i += 1) {
-        const angle = i * Math.PI * 2 / 10;
-        drawTree(place.x + Math.cos(angle) * 135, place.y + Math.sin(angle) * 135, .95);
-      }
+      drawTree(place.x - 70, place.y - 10, .78);
+      drawTree(place.x + 72, place.y - 18, .72);
     } else if (place.id === "home") {
       drawFacilityBuilding(p, 300, 270, "#d0b68f", "#6d655c", "#8fa8ad");
       ctx.fillStyle = "#a07e5b";
@@ -5200,31 +4991,19 @@
   function drawStreetLightsGlow() {
     const time = visualTime();
     if (time.night < .35) return;
-    const startX = Math.floor(state.camera.x / ROAD_GAP) - 1;
-    const endX = Math.ceil((state.camera.x + viewWidth) / ROAD_GAP) + 1;
-    const startY = Math.floor(state.camera.y / ROAD_GAP) - 1;
-    const endY = Math.ceil((state.camera.y + viewHeight) / ROAD_GAP) + 1;
     ctx.save();
     ctx.globalCompositeOperation = "screen";
-    for (let gx = startX; gx <= endX; gx += 1) {
-      for (let gy = startY; gy <= endY; gy += 1) {
-        if (hash2(gx, gy, 810) <= .36) continue;
-        const pts = [
-          [gx * ROAD_GAP + ROAD_HALF + 23, gy * ROAD_GAP + 240],
-          [gx * ROAD_GAP + 240, gy * ROAD_GAP + ROAD_HALF + 23]
-        ];
-        for (const [wx, wy] of pts) {
-          const p = worldToScreen(wx, wy);
-          const glow = ctx.createRadialGradient(p.x, p.y - 24, 1, p.x, p.y - 24, 54);
-          glow.addColorStop(0, "rgba(255,220,145," + (0.22 * time.night).toFixed(2) + ")");
-          glow.addColorStop(1, "rgba(255,220,145,0)");
-          ctx.fillStyle = glow;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y - 24, 54, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-    }
+    forEachStreetLamp((wx, wy) => {
+      const p = worldToScreen(wx, wy);
+      if (p.x < -80 || p.y < -80 || p.x > viewWidth + 80 || p.y > viewHeight + 80) return;
+      const glow = ctx.createRadialGradient(p.x, p.y - 24, 1, p.x, p.y - 24, 54);
+      glow.addColorStop(0, "rgba(255,220,145," + (0.22 * time.night).toFixed(2) + ")");
+      glow.addColorStop(1, "rgba(255,220,145,0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y - 24, 54, 0, Math.PI * 2);
+      ctx.fill();
+    });
     ctx.restore();
   }
 
@@ -5280,6 +5059,22 @@
   }
 
   function drawMapModelMinimap(w, h, p, scale) {
+    for (const space of mapModel.openSpaces || []) {
+      if (!space.polygon?.length) continue;
+      mctx.fillStyle =
+        space.type === "park" || space.type === "pocket-park" ? "rgba(93,145,91,.42)" :
+        space.type === "shrine" ? "rgba(91,122,79,.4)" :
+        space.type === "plaza" ? "rgba(181,181,168,.26)" :
+        "rgba(143,137,116,.22)";
+      mctx.beginPath();
+      mctx.moveTo(w / 2 + (space.polygon[0][0] - p.x) * scale, h / 2 + (space.polygon[0][1] - p.y) * scale);
+      for (let i = 1; i < space.polygon.length; i += 1) {
+        mctx.lineTo(w / 2 + (space.polygon[i][0] - p.x) * scale, h / 2 + (space.polygon[i][1] - p.y) * scale);
+      }
+      mctx.closePath();
+      mctx.fill();
+    }
+
     for (const edge of mapModel.edges) {
       mctx.strokeStyle = edge.vehicle ? (edge.type === "arterial" ? "#8d9891" : "#69766d") : "#6fa078";
       mctx.lineWidth = Math.max(1.5, edge.width * scale * .75);
