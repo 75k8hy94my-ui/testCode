@@ -4485,9 +4485,23 @@
       const maxY = Math.max(...points.map((point) => point.y));
       return !(maxX < -260 || minX > viewWidth + 260 || maxY < -260 || minY > viewHeight + 260);
     });
-    const strokeEdge = (edge, width, color, dash = []) => {
-      const points = edge.points.map((point) => worldToScreen(point.x, point.y));
-      ctx.lineCap = edge.vehicle ? "butt" : "round";
+
+    const screenPoints = (edge) => edge.points.map((point) => worldToScreen(point.x, point.y));
+
+    const offsetPoints = (points, offset) => points.map((point, index) => {
+      const previous = points[Math.max(0, index - 1)];
+      const next = points[Math.min(points.length - 1, index + 1)];
+      let tx = next.x - previous.x;
+      let ty = next.y - previous.y;
+      const mag = Math.hypot(tx, ty) || 1;
+      tx /= mag;
+      ty /= mag;
+      return { x:point.x + ty * offset, y:point.y - tx * offset };
+    });
+
+    const strokePoints = (points, width, color, dash = [], lineCap = "round") => {
+      if (!points.length) return;
+      ctx.lineCap = lineCap;
       ctx.lineJoin = "round";
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
@@ -4499,17 +4513,24 @@
       ctx.setLineDash([]);
     };
 
-    const drawJunctionPads = (shadow = false) => {
+    const strokeEdge = (edge, width, color, dash = [], lineCap = null) => {
+      strokePoints(screenPoints(edge), width, color, dash, lineCap || (edge.vehicle ? "butt" : "round"));
+    };
+
+    const drawJunctionPads = (layer = "surface") => {
       for (const node of mapModel.nodes) {
         const incidentEdges = mapModel.edges.filter((edge) => edge.vehicle && (edge.from === node.id || edge.to === node.id));
         if (incidentEdges.length < 2) continue;
         const point = worldToScreen(node.x, node.y);
         if (point.x < -260 || point.y < -260 || point.x > viewWidth + 260 || point.y > viewHeight + 260) continue;
-        const radius = Math.max(...incidentEdges.map((edge) => edge.width)) / 2 + (shadow ? 11 : 2);
+        const widest = Math.max(...incidentEdges.map((edge) => edge.width));
+        const radius = widest / 2 + (layer === "shadow" ? 12 : layer === "curb" ? 7 : 2);
         const hasArterial = incidentEdges.some((edge) => edge.type === "arterial");
-        ctx.fillStyle = shadow
-          ? "rgba(36,45,43,.38)"
-          : (hasArterial ? "#59605d" : "#696f69");
+        ctx.fillStyle = layer === "shadow"
+          ? "rgba(27,34,33,.34)"
+          : layer === "curb"
+            ? "#999c96"
+            : (hasArterial ? "#505856" : "#646a65");
         ctx.beginPath();
         ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
         ctx.fill();
@@ -4522,35 +4543,91 @@
       edge.type === "plaza" ? "#b9b5a8" :
       "#aaa9a1";
     const vehicleSurface = (edge) =>
-      edge.type === "arterial" ? "#59605d" :
-      edge.type === "collector" ? "#626965" :
-      edge.type === "shopping" ? "#706d66" :
-      edge.type === "alley" ? "#777873" :
-      edge.type === "park" ? "#6d736c" :
-      "#6b706b";
+      edge.type === "arterial" ? "#4f5755" :
+      edge.type === "collector" ? "#5c625f" :
+      edge.type === "shopping" ? "#696762" :
+      edge.type === "alley" ? "#72736e" :
+      edge.type === "park" ? "#666d66" :
+      "#666b67";
 
     for (const edge of visibleEdges) {
       const shadow = edge.vehicle
-        ? "rgba(36,45,43,.38)"
+        ? "rgba(27,34,33,.34)"
         : edge.type === "greenway"
           ? "rgba(58,93,62,.28)"
           : "rgba(70,71,66,.24)";
-      strokeEdge(edge, edge.width + (edge.vehicle ? 22 : 10), shadow);
+      strokeEdge(edge, edge.width + (edge.vehicle ? 24 : 10), shadow);
     }
-    drawJunctionPads(true);
+    drawJunctionPads("shadow");
+
+    for (const edge of visibleEdges) {
+      if (edge.vehicle) strokeEdge(edge, edge.width + 13, "#9a9d97");
+    }
+    drawJunctionPads("curb");
+
     for (const edge of visibleEdges) {
       strokeEdge(edge, edge.width, edge.vehicle ? vehicleSurface(edge) : pedestrianSurface(edge));
     }
-    drawJunctionPads();
+    drawJunctionPads("surface");
+
     for (const edge of visibleEdges) {
-      if (edge.vehicle && edge.type === "arterial") {
-        strokeEdge(edge, 3, "rgba(235,220,173,.74)", [24,22]);
-      } else if (edge.vehicle && edge.type === "collector" && edge.width >= 112) {
-        strokeEdge(edge, 2.2, "rgba(231,228,199,.55)", [16,20]);
+      if (!edge.vehicle) continue;
+      const points = screenPoints(edge);
+      const half = edge.width / 2;
+
+      if (edge.type !== "alley" && edge.width >= 92) {
+        const edgeLineOffset = Math.max(half - 8, 22);
+        strokePoints(offsetPoints(points, edgeLineOffset), 1.7, "rgba(242,244,238,.66)", [], "butt");
+        strokePoints(offsetPoints(points, -edgeLineOffset), 1.7, "rgba(242,244,238,.66)", [], "butt");
+      }
+
+      if (edge.type === "arterial") {
+        strokePoints(offsetPoints(points, 3), 1.8, "rgba(229,197,95,.9)", [], "butt");
+        strokePoints(offsetPoints(points, -3), 1.8, "rgba(229,197,95,.9)", [], "butt");
+        const laneOffset = edge.width * .255;
+        strokePoints(offsetPoints(points, laneOffset), 1.7, "rgba(238,240,235,.68)", [18,16], "butt");
+        strokePoints(offsetPoints(points, -laneOffset), 1.7, "rgba(238,240,235,.68)", [18,16], "butt");
+      } else if (edge.type === "collector" && edge.width >= 112) {
+        strokePoints(points, 2.1, "rgba(235,232,209,.62)", [16,20], "butt");
+      } else if (edge.type === "shopping" && edge.width >= 100) {
+        strokePoints(points, 1.5, "rgba(240,240,233,.42)", [10,24], "butt");
+      }
+
+      const seed = hash2(edge.id.length, Math.floor(edge.width), 2030);
+      if (points.length >= 2 && seed > .34) {
+        const index = Math.min(points.length - 1, Math.max(0, Math.floor(seed * points.length)));
+        const p = points[index];
+        const prev = points[Math.max(0, index - 1)];
+        const next = points[Math.min(points.length - 1, index + 1)];
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(Math.atan2(next.y - prev.y, next.x - prev.x));
+        ctx.fillStyle = "rgba(28,31,30,.13)";
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 18 + seed * 16, 5 + seed * 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (edge.width >= 100 && seed > .58) {
+          ctx.strokeStyle = "rgba(28,31,30,.34)";
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.arc(9, -edge.width * .18, 6, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(9, -edge.width * .18, 2.5, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      if (state.visual.weather === "rain" && edge.width >= 100) {
+        strokePoints(offsetPoints(points, edge.width * .18), 7, "rgba(171,195,202,.07)", [], "butt");
       }
     }
+
     drawMapModelIntersectionMarkings();
   }
+
 
   function drawMapModelJunctions() {
     const convexHull = (points) => {
