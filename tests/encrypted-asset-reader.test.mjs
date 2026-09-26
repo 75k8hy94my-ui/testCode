@@ -154,6 +154,63 @@ test('visible request preempts an active prefetch when all four slots are occupi
   assert.ok(pending.some((entry) => entry.args.signal.aborted)); assert.equal(visibleStarted, true); assert.ok(calls.some((call) => call.startsWith('visible:'))); pending.forEach((entry) => entry.resolve(new Uint8Array([2]))); reader.destroy();
 });
 
+
+test('visible work preempts one of four active prefetches immediately', async () => {
+  fakeDom();
+  const prefetches = [];
+  const calls = [];
+  const m = manifest();
+  m.preview = { ...m.preview, width: 2048, height: 512 };
+  m.zoom.levels = [{
+    level: 0,
+    width: 4096,
+    height: 1024,
+    longEdge: 4096,
+    columns: 8,
+    rows: 2,
+    tiles: Array.from({ length: 16 }, (_, index) => {
+      const x = index % 8;
+      const y = Math.floor(index / 8);
+      return { x, y, pixelX: x * 512, pixelY: y * 512, width: 512, height: 512, mimeType: 'image/webp', bytes: 100, quality: 0.88 };
+    })
+  }];
+  const sync = {
+    async loadDecryptedObject(args) {
+      calls.push(`visible:${args.objectId}`);
+      return new Uint8Array([1]);
+    },
+    loadEncryptedObject(args) {
+      calls.push(`prefetch:${args.objectId}`);
+      return new Promise((resolve) => prefetches.push({ args, resolve }));
+    }
+  };
+  const settings = {
+    load: () => ({ networkMode: 'standard' }),
+    STANDARD_NETWORK_MODE: 'standard',
+    SAVER_NETWORK_MODE: 'data-saver'
+  };
+  const reader = createEncryptedAssetReader({
+    container: new FakeElement('section'),
+    sync,
+    settings,
+    crypto: { encryptedAssetByteLength: (n) => n + 36, tileObjectId: (l, x, y) => `L${l}:${x}:${y}` },
+    assetId: 'a',
+    revision: 1,
+    manifest: m
+  });
+  reader.mount();
+  await new Promise((resolve) => setImmediate(resolve));
+  reader.setScale(4);
+  for (let i = 0; i < 8 && prefetches.length < 4; i += 1) await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(prefetches.length, 4);
+  reader.setTransform({ translateX: 900 });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(prefetches.some((entry) => entry.args.signal.aborted));
+  assert.ok(calls.filter((call) => call.startsWith('visible:')).length > 0);
+  prefetches.forEach((entry) => entry.resolve(new Uint8Array([2])));
+  reader.destroy();
+});
+
 test('same-level pan removes rendered tile DOM and revokes its URL', async () => {
   const urls = fakeDom(); const m = manifest(); m.preview = { ...m.preview, width: 1024, height: 256 }; m.zoom.levels = [{ level: 0, width: 2048, height: 512, longEdge: 2048, columns: 4, rows: 1, tiles: Array.from({ length: 4 }, (_, x) => ({ x, y: 0, pixelX: x * 512, pixelY: 0, width: 512, height: 512, mimeType: 'image/webp', bytes: 100, quality: 0.88 })) }];
   const reader = createEncryptedAssetReader({ container: new FakeElement('section'), sync: { loadDecryptedObject: async () => new Uint8Array([1]), loadEncryptedObject: async () => new Uint8Array([2]) }, settings: { load: () => ({ networkMode: 'standard' }), STANDARD_NETWORK_MODE: 'standard', SAVER_NETWORK_MODE: 'data-saver' }, crypto: { encryptedAssetByteLength: (n) => n + 36, tileObjectId: (l, x, y) => `L${l}:${x}:${y}` }, assetId: 'a', revision: 1, manifest: m });
