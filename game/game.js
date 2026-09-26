@@ -4870,27 +4870,57 @@
 
   function drawLamp(x, y) {
     const p = worldToScreen(x, y);
-    if (p.x < -30 || p.y < -60 || p.x > viewWidth + 30 || p.y > viewHeight + 60) return;
+    if (p.x < -50 || p.y < -80 || p.x > viewWidth + 50 || p.y > viewHeight + 80) return;
     const time = visualTime();
-    if (time.night > .45) {
-      const glow = ctx.createRadialGradient(p.x, p.y - 29, 2, p.x, p.y - 29, 38);
-      glow.addColorStop(0, "rgba(255,224,157,.28)");
+
+    // Pole shadow follows the time-of-day sun vector.
+    ctx.strokeStyle = "rgba(25,31,30,.16)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(p.x + 1, p.y + 8);
+    ctx.lineTo(p.x + time.shadowX * .62, p.y + 8 + time.shadowY * .38);
+    ctx.stroke();
+
+    if (time.night > .38) {
+      const groundGlow = ctx.createRadialGradient(p.x + 5, p.y + 9, 3, p.x + 5, p.y + 9, 48);
+      groundGlow.addColorStop(0, "rgba(255,220,145," + (.12 * time.night).toFixed(2) + ")");
+      groundGlow.addColorStop(1, "rgba(255,220,145,0)");
+      ctx.fillStyle = groundGlow;
+      ctx.beginPath();
+      ctx.ellipse(p.x + 5, p.y + 9, 48, 20, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const glow = ctx.createRadialGradient(p.x + 10, p.y - 29, 2, p.x + 10, p.y - 29, 38);
+      glow.addColorStop(0, "rgba(255,224,157,.3)");
       glow.addColorStop(1, "rgba(255,224,157,0)");
       ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.arc(p.x, p.y - 29, 38, 0, Math.PI * 2);
+      ctx.arc(p.x + 10, p.y - 29, 38, 0, Math.PI * 2);
       ctx.fill();
     }
+
     ctx.strokeStyle = "#343b3d";
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(p.x, p.y + 8);
     ctx.lineTo(p.x, p.y - 28);
-    ctx.lineTo(p.x + 9, p.y - 28);
+    ctx.lineTo(p.x + 10, p.y - 28);
     ctx.stroke();
-    ctx.fillStyle = time.night > .45 ? "#ffd98a" : "#c5c8c4";
-    ctx.fillRect(p.x + 6, p.y - 31, 9, 6);
+
+    ctx.strokeStyle = "rgba(255,255,255,.12)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(p.x - 1, p.y + 5);
+    ctx.lineTo(p.x - 1, p.y - 25);
+    ctx.stroke();
+
+    ctx.fillStyle = "#252d2d";
+    roundedRectPath(ctx, p.x + 5, p.y - 33, 13, 8, 2);
+    ctx.fill();
+    ctx.fillStyle = time.night > .38 ? "#ffd98a" : "#c5c8c4";
+    ctx.fillRect(p.x + 7, p.y - 31, 9, 4);
   }
+
 
   function drawWorldPolygon(polygon) {
     if (!polygon?.length) return;
@@ -6239,6 +6269,31 @@
     ctx.restore();
   }
 
+  function drawAtmosphericGrade() {
+    const time = visualTime();
+
+    // Soft sunlight from upper-left keeps daytime from looking uniformly flat.
+    if (time.daylight > .08) {
+      const sunWash = ctx.createLinearGradient(0, 0, viewWidth, viewHeight);
+      sunWash.addColorStop(0, "rgba(255,244,216," + (.055 * time.daylight).toFixed(3) + ")");
+      sunWash.addColorStop(.55, "rgba(255,255,255,0)");
+      sunWash.addColorStop(1, "rgba(88,111,120," + (.025 * time.daylight).toFixed(3) + ")");
+      ctx.fillStyle = sunWash;
+      ctx.fillRect(0, 0, viewWidth, viewHeight);
+    }
+
+    // Slight edge falloff improves depth without touching the HUD/minimap.
+    const radius = Math.max(viewWidth, viewHeight) * .72;
+    const vignette = ctx.createRadialGradient(
+      viewWidth * .5, viewHeight * .45, Math.min(viewWidth, viewHeight) * .18,
+      viewWidth * .5, viewHeight * .45, radius
+    );
+    vignette.addColorStop(0, "rgba(9,15,17,0)");
+    vignette.addColorStop(1, "rgba(9,15,17," + (0.045 + time.night * .07).toFixed(3) + ")");
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, viewWidth, viewHeight);
+  }
+
   function drawNightOverlay() {
     const time = visualTime();
     const rain = state.visual.weather === "rain" ? .06 : 0;
@@ -6538,6 +6593,7 @@
 
     drawNightOverlay();
     drawWeather();
+    drawAtmosphericGrade();
     drawMinimap();
     updateHUD();
   }
