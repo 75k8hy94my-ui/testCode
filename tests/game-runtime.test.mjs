@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = fs.readFileSync(path.join(root, 'game', 'game.js'), 'utf8');
+const html = fs.readFileSync(path.join(root, 'game', 'index.html'), 'utf8');
+const mapSource = fs.readFileSync(path.join(root, 'game', 'map-model.js'), 'utf8');
 
 test('game keeps a timer fallback when requestAnimationFrame is unavailable', () => {
   assert.match(source, /const requestFrame = typeof window\.requestAnimationFrame === "function"/);
@@ -38,4 +40,17 @@ test('game surfaces uncaught runtime errors on the game surface', () => {
   assert.match(source, /window\.addEventListener\("error"/);
   assert.match(source, /window\.addEventListener\("unhandledrejection"/);
   assert.match(source, /ゲームの実行中にエラーが発生しました/);
+});
+
+test('game loads and validates the shared Japanese map model before runtime start', () => {
+  assert.match(html, /<script src="\.\/map-model\.js\?v=[^"]+"><\/script>/);
+  assert.ok(html.indexOf('map-model.js') < html.indexOf('game.js'));
+  assert.match(source, /CityDaysMapModel\?\.createMapModel\?\.\(\)/);
+  assert.match(source, /mapModel\.validate\(\)/);
+});
+
+test('game keeps all existing place and station identifiers from the map model', () => {
+  for (const id of ['home', 'cafe', 'store', 'park', 'gym', 'library', 'west', 'central', 'east']) {
+    assert.match(mapSource, new RegExp(`['\"]${id}['\"]`));
+  }
 });

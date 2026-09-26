@@ -37,6 +37,13 @@
     ? window.requestAnimationFrame.bind(window)
     : (callback) => window.setTimeout(() => callback(performance.now()), 16);
 
+  const mapModel = globalThis.CityDaysMapModel?.createMapModel?.();
+  const mapErrors = mapModel ? mapModel.validate() : ["MapModel を読み込めません。"];
+  if (!mapModel || mapErrors.length) {
+    showRuntimeError(mapErrors.join(" / "));
+    return;
+  }
+
   const areaNameEl = document.getElementById("areaName");
   const worldClockEl = document.getElementById("worldClock");
   const cashText = document.getElementById("cashText");
@@ -173,20 +180,21 @@
     return { x: gx * ROAD_GAP + ROAD_GAP / 2, y: gy * ROAD_GAP + ROAD_GAP / 2 };
   }
 
-  const HOME = { id: "home", name: "自宅", gx: 8, gy: 8, ...blockCenter(8, 8), color: "#d9b98b", symbol: "H" };
-  const CAFE = { id: "cafe", name: "カフェ LUNE", gx: 7, gy: 8, ...blockCenter(7, 8), color: "#c88f72", symbol: "C" };
-  const STORE = { id: "store", name: "スーパー MARCHÉ", gx: 9, gy: 8, ...blockCenter(9, 8), color: "#74a88a", symbol: "S" };
-  const PARK = { id: "park", name: "中央公園", gx: 8, gy: 7, ...blockCenter(8, 7), color: "#72a66d", symbol: "P" };
-  const GYM = { id: "gym", name: "CITY GYM", gx: 9, gy: 7, ...blockCenter(9, 7), color: "#7898bd", symbol: "G" };
-  const LIBRARY = { id: "library", name: "市立図書館", gx: 7, gy: 7, ...blockCenter(7, 7), color: "#9a8db9", symbol: "L" };
-  const PLACES = [HOME, CAFE, STORE, PARK, GYM, LIBRARY];
+  const placeForGame = (place) => ({
+    ...place,
+    gx: Math.round(place.x / ROAD_GAP),
+    gy: Math.round(place.y / ROAD_GAP)
+  });
+  const PLACES = mapModel.places.map(placeForGame);
+  const HOME = PLACES.find((place) => place.id === "home");
+  const CAFE = PLACES.find((place) => place.id === "cafe");
+  const STORE = PLACES.find((place) => place.id === "store");
+  const PARK = PLACES.find((place) => place.id === "park");
+  const GYM = PLACES.find((place) => place.id === "gym");
+  const LIBRARY = PLACES.find((place) => place.id === "library");
   const SPECIAL_BLOCKS = new Set(PLACES.map((place) => place.gx + "," + place.gy));
 
-  const TRAIN_STATIONS = [
-    { id:"west", name:"西若葉駅", x:2100, y:RAIL_Y, accessX:2100, accessY:RAIL_Y + 112 },
-    { id:"central", name:"若葉駅", x:5100, y:RAIL_Y, accessX:5100, accessY:RAIL_Y + 112 },
-    { id:"east", name:"東若葉駅", x:8100, y:RAIL_Y, accessX:8100, accessY:RAIL_Y + 112 }
-  ];
+  const TRAIN_STATIONS = mapModel.stations.map((station) => ({ ...station }));
 
   const trains = [
     {
