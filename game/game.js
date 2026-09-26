@@ -110,7 +110,7 @@
   const LANE_OFFSET = 38;
   const TURN_RADIUS = 86;
   const ROUTE_SAMPLE_STEP = 16;
-  const RAIL_Y = ROAD_GAP * 5 + ROAD_GAP / 2;
+  const RAIL_Y = mapModel.stations[1].y;
   const RAIL_MIN_X = ROAD_GAP * 1.5;
   const RAIL_MAX_X = WORLD_SIZE - ROAD_GAP * 1.5;
   const RAIL_TRACK_GAP = 23;

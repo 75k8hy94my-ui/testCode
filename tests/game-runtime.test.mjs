@@ -55,6 +55,10 @@ test('game keeps all existing place and station identifiers from the map model',
   }
 });
 
+test('rail line is anchored to the central station in the current map model', () => {
+  assert.match(source, /const RAIL_Y = mapModel\.stations\[1\]\.y/);
+});
+
 test('game delegates collision, nearest-road, and district queries to MapModel', () => {
   assert.match(source, /mapModel\.isRoad\(/);
   assert.match(source, /mapModel\.nearestRoad\(/);
