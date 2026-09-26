@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = fs.readFileSync(path.join(root, 'game', 'game.js'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'game', 'game.css'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'game', 'index.html'), 'utf8');
 const mapSource = fs.readFileSync(path.join(root, 'game', 'map-model.js'), 'utf8');
 
@@ -18,6 +19,12 @@ test('game keeps a timer fallback when requestAnimationFrame is unavailable', ()
 test('game reports an unavailable canvas context instead of failing silently', () => {
   assert.match(source, /typeof canvas\.getContext === "function"/);
   assert.match(source, /Canvas API を利用できません/);
+});
+
+test('status HUD masks canvas content at the top-left edge', () => {
+  assert.match(css, /#hud\{[^}]*z-index:5/);
+  assert.match(css, /\.status-card\{[^}]*z-index:6/);
+  assert.match(css, /\.status-card\{[^}]*background:rgba\(15,22,18,\.98\)/);
 });
 
 test('game defines the traffic signal state helper used by rendering and updates', () => {
