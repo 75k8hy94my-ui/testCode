@@ -179,3 +179,24 @@ test('road culling considers every point in a curved map edge', () => {
   assert.match(source, /const points = edge\.points\.map\(\(point\) => worldToScreen\(point\.x, point\.y\)\)/);
   assert.match(source, /const minX = Math\.min\(\.\.\.points\.map/);
 });
+
+
+test('map traffic signals are intersection-node based rather than whole-edge based', () => {
+  assert.match(source, /function isSignalizedMapNode\(nodeId\)/);
+  assert.match(source, /incidentEdges\.length >= 3 && incidentEdges\.some\(\(edge\) => edge\.signalized\)/);
+  assert.match(source, /if \(endpoint && isSignalizedMapNode\(endpoint\.id\)\)/);
+  assert.match(source, /!isSignalizedMapNode\(node\.id\)/);
+});
+
+test('cars, pedestrians, route guidance, and markings share stop-line geometry', () => {
+  assert.match(source, /function signalGeometryAtNode\(nodeId, approachEdge\)/);
+  assert.match(source, /stopOffset: signalGeometryAtNode\(node\.id, routeEdge\)\.stopOffset/);
+  assert.match(source, /const geometry = signalGeometryAtNode\(endpoint\.id, edge\)/);
+  assert.match(source, /function drawMapModelIntersectionMarkings\(\)/);
+  assert.match(source, /drawMapModelIntersectionMarkings\(\);/);
+});
+
+test('traffic-light rendering includes every drivable approach at a signalized node', () => {
+  assert.match(source, /const incidentEdges = vehicleEdgesAtNode\(node\.id\)/);
+  assert.doesNotMatch(source, /mapModel\.edges\.filter\(\(edge\) => edge\.signalized && edge\.vehicle/);
+});

@@ -1129,6 +1129,30 @@
     return from && to && Math.abs(to.x - from.x) >= Math.abs(to.y - from.y) ? "h" : "v";
   }
 
+  function vehicleEdgesAtNode(nodeId) {
+    return mapModel.neighbors(nodeId, { mode:"vehicle" }).map(({ edge }) => edge);
+  }
+
+  function isSignalizedMapNode(nodeId) {
+    const incidentEdges = vehicleEdgesAtNode(nodeId);
+    return incidentEdges.length >= 3 && incidentEdges.some((edge) => edge.signalized);
+  }
+
+  function signalGeometryAtNode(nodeId, approachEdge) {
+    const incidentEdges = vehicleEdgesAtNode(nodeId);
+    const junctionHalf = incidentEdges.length
+      ? Math.max(...incidentEdges.map((edge) => edge.width)) / 2 + 2
+      : (approachEdge?.width || ROAD_WIDTH) / 2;
+    const crossingDepth = clamp((approachEdge?.width || ROAD_WIDTH) * .18, 22, 30);
+    const crossingOffset = junctionHalf + 18;
+    return {
+      junctionHalf,
+      crossingDepth,
+      crossingOffset,
+      stopOffset: crossingOffset + crossingDepth / 2 + 14
+    };
+  }
+
   function trafficGoalNode(car, startNodeId) {
     const candidates = mapModel.nodes.filter((node) => node.id !== startNodeId && mapModel.neighbors(node.id, { mode: "vehicle" }).length > 0);
     if (!candidates.length) return null;
@@ -1270,10 +1294,12 @@
 
   function pedestrianSignalState(ped) {
     const edge = mapModel.getEdge(ped.edgeId);
-    if (!edge?.signalized) return null;
+    if (!edge) return null;
     const endpoint = ped.directionSign > 0 ? mapModel.getNode(edge.to) : mapModel.getNode(edge.from);
+    if (!endpoint || !isSignalizedMapNode(endpoint.id)) return null;
+    const geometry = signalGeometryAtNode(endpoint.id, edge);
     const distanceToSignal = ped.directionSign > 0 ? ped.edgeLength - ped.along : ped.along;
-    if (!endpoint || distanceToSignal > STOP_LINE_OFFSET + 90) return null;
+    if (distanceToSignal > geometry.stopOffset + 90) return null;
     return signalStateAt(endpoint.x, endpoint.y, edgeOrientation(edge));
   }
 
@@ -1942,13 +1968,13 @@
       const node = mapModel.getNode(route.nodeIds[i]);
       const previousNode = mapModel.getNode(route.nodeIds[i - 1]);
       const routeEdge = mapModel.getEdge(route.edgeIds[i - 1]);
-      if (!node || !previousNode || !routeEdge?.signalized) continue;
+      if (!node || !previousNode || !routeEdge || !isSignalizedMapNode(node.id)) continue;
       const orientation = Math.abs(node.x - previousNode.x) >= Math.abs(node.y - previousNode.y) ? "h" : "v";
       signals.push({
         x: node.x,
         y: node.y,
         orientation,
-        stopOffset: STOP_LINE_OFFSET,
+        stopOffset: signalGeometryAtNode(node.id, routeEdge).stopOffset,
         pathIndex: nearestPathIndex(points, node.x, node.y)
       });
     }
@@ -2935,13 +2961,13 @@
       const edgeLength = car.edgeLength || polylineLength(edge.points);
       const roadLimit = (edge.speedLimit || 30) / SPEED_TO_KMH;
       let targetSpeed = Math.min(car.cruise, roadLimit * .92);
-      const signalEdge = edge.signalized;
-      if (signalEdge) {
-        const endpoint = car.directionSign > 0 ? mapModel.getNode(edge.to) : mapModel.getNode(edge.from);
+      const endpoint = car.directionSign > 0 ? mapModel.getNode(edge.to) : mapModel.getNode(edge.from);
+      if (endpoint && isSignalizedMapNode(endpoint.id)) {
+        const geometry = signalGeometryAtNode(endpoint.id, edge);
         const distanceToSignal = car.directionSign > 0 ? edgeLength - car.along : car.along;
-        const signal = endpoint ? signalStateAt(endpoint.x, endpoint.y, edgeOrientation(edge)) : "green";
-        if (endpoint && signal !== "green" && distanceToSignal < STOP_LINE_OFFSET + 75) {
-          targetSpeed = Math.max(0, (distanceToSignal - STOP_LINE_OFFSET) * 2.5);
+        const signal = signalStateAt(endpoint.x, endpoint.y, edgeOrientation(edge));
+        if (signal !== "green" && distanceToSignal < geometry.stopOffset + 75) {
+          targetSpeed = Math.max(0, (distanceToSignal - geometry.stopOffset) * 2.5);
         }
       }
 
@@ -3675,6 +3701,56 @@
     }
   }
 
+  function drawMapModelIntersectionMarkings() {
+    ctx.save();
+    ctx.lineCap = "butt";
+    for (const node of mapModel.nodes) {
+      if (!isSignalizedMapNode(node.id)) continue;
+      const incidentEdges = vehicleEdgesAtNode(node.id);
+      for (const edge of incidentEdges) {
+        const adjacent = edge.from === node.id ? edge.points[1] : edge.points.at(-2);
+        if (!adjacent) continue;
+        let dx = adjacent.x - node.x;
+        let dy = adjacent.y - node.y;
+        const magnitude = Math.hypot(dx, dy) || 1;
+        dx /= magnitude;
+        dy /= magnitude;
+        const nx = -dy;
+        const ny = dx;
+        const geometry = signalGeometryAtNode(node.id, edge);
+        const crossingSpan = Math.max(34, edge.width - 34);
+        const stripeStep = 12;
+        ctx.strokeStyle = "rgba(244,245,240,.88)";
+        ctx.lineWidth = 5;
+        for (let offset = -crossingSpan / 2; offset <= crossingSpan / 2; offset += stripeStep) {
+          const cx = node.x + dx * geometry.crossingOffset + nx * offset;
+          const cy = node.y + dy * geometry.crossingOffset + ny * offset;
+          const halfDepth = geometry.crossingDepth / 2;
+          const a = worldToScreen(cx - dx * halfDepth, cy - dy * halfDepth);
+          const b = worldToScreen(cx + dx * halfDepth, cy + dy * halfDepth);
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        }
+
+        const stopCenterX = node.x + dx * geometry.stopOffset;
+        const stopCenterY = node.y + dy * geometry.stopOffset;
+        const laneStart = 5;
+        const laneEnd = Math.max(laneStart + 18, edge.width / 2 - 8);
+        const stopA = worldToScreen(stopCenterX + nx * laneStart, stopCenterY + ny * laneStart);
+        const stopB = worldToScreen(stopCenterX + nx * laneEnd, stopCenterY + ny * laneEnd);
+        ctx.strokeStyle = "rgba(248,248,244,.94)";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(stopA.x, stopA.y);
+        ctx.lineTo(stopB.x, stopB.y);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   function drawMapModelRoads() {
     const visibleEdges = mapModel.edges.filter((edge) => {
       const points = edge.points.map((point) => worldToScreen(point.x, point.y));
@@ -3728,6 +3804,7 @@
         strokeEdge(edge, 3, edge.type === "arterial" ? "rgba(235,220,173,.72)" : "rgba(231,228,199,.5)", edge.type === "arterial" ? [24, 22] : [14, 24]);
       }
     }
+    drawMapModelIntersectionMarkings();
   }
 
   function drawMapModelJunctions() {
@@ -4802,7 +4879,8 @@
 
   function drawTrafficLights() {
     for (const node of mapModel.nodes) {
-      const incidentEdges = mapModel.edges.filter((edge) => edge.signalized && edge.vehicle && (edge.from === node.id || edge.to === node.id));
+      if (!isSignalizedMapNode(node.id)) continue;
+      const incidentEdges = vehicleEdgesAtNode(node.id);
       if (!incidentEdges.length) continue;
       const p = worldToScreen(node.x, node.y);
       if (p.x < -180 || p.y < -180 || p.x > viewWidth + 180 || p.y > viewHeight + 180) continue;
