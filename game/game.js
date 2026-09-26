@@ -1744,9 +1744,11 @@
     const tangent = ped.directionSign > 0 ? hit.tangent : { x:-hit.tangent.x, y:-hit.tangent.y };
     const sidewalkOffset = edge.vehicle ? edge.width / 2 + 5 : Math.min(10, edge.width * .2);
     const side = ped.sideSign || 1;
+    const avoidance = Math.max(0, Number(ped.avoidanceOffset) || 0);
+    const lateralOffset = (sidewalkOffset + avoidance) * side;
     return {
-      x:hit.point.x + tangent.y * sidewalkOffset * side,
-      y:hit.point.y - tangent.x * sidewalkOffset * side,
+      x:hit.point.x + tangent.y * lateralOffset,
+      y:hit.point.y - tangent.x * lateralOffset,
       angle:Math.atan2(tangent.y, tangent.x)
     };
   }
@@ -1878,6 +1880,8 @@
         state:"deciding",
         visible:true,
         waitTimer:0,
+        collisionWait:0,
+        avoidanceOffset:0,
         stayTimer:0,
         activityMinutesRemaining:0,
         currentActivityId:null,
@@ -3822,12 +3826,92 @@
   }
 
 
+  function capturePedestrianMotion(ped) {
+    return {
+      edgeId:ped.edgeId,
+      edgeLength:ped.edgeLength,
+      directionSign:ped.directionSign,
+      along:ped.along,
+      routeIndex:ped.routeIndex,
+      currentNodeId:ped.currentNodeId,
+      targetNodeId:ped.targetNodeId,
+      x:ped.x,
+      y:ped.y,
+      dir:ped.dir,
+      state:ped.state,
+      waitTimer:ped.waitTimer
+    };
+  }
+
+  function restorePedestrianMotion(ped, snapshot) {
+    ped.edgeId = snapshot.edgeId;
+    ped.edgeLength = snapshot.edgeLength;
+    ped.directionSign = snapshot.directionSign;
+    ped.along = snapshot.along;
+    ped.routeIndex = snapshot.routeIndex;
+    ped.currentNodeId = snapshot.currentNodeId;
+    ped.targetNodeId = snapshot.targetNodeId;
+    ped.x = snapshot.x;
+    ped.y = snapshot.y;
+    ped.dir = snapshot.dir;
+    ped.state = snapshot.state;
+    ped.waitTimer = snapshot.waitTimer;
+  }
+
+  function pedestrianCollision(ped) {
+    const car = personIntersectsAnyVehicle(ped.x, ped.y, NPC_COLLISION_RADIUS);
+    if (car) return { type:"vehicle", target:car };
+    return personIntersectsAnotherPerson(ped.x, ped.y, NPC_COLLISION_RADIUS, ped, true);
+  }
+
+  function attemptPedestrianMove(ped, distanceUnits) {
+    if (distanceUnits <= .001) return true;
+    const snapshot = capturePedestrianMotion(ped);
+    moveCitizenAlongRoute(ped, distanceUnits);
+
+    // Arrival inside a building removes the person from physical street space.
+    if (ped.state === "inside" || !ped.visible) return true;
+
+    let collision = pedestrianCollision(ped);
+    if (!collision) {
+      ped.avoidanceOffset += (0 - (ped.avoidanceOffset || 0)) * .08;
+      return true;
+    }
+
+    restorePedestrianMotion(ped, snapshot);
+
+    if (collision.type === "pedestrian" || collision.type === "player") {
+      // Yield outward from the curb instead of stepping into the carriageway.
+      // This gives two pedestrians enough room to pass without teleporting
+      // across to the opposite sidewalk.
+      ped.avoidanceOffset = Math.max(ped.avoidanceOffset || 0, 16);
+      const shifted = pedestrianPoseAt(ped);
+      ped.x = shifted.x;
+      ped.y = shifted.y;
+      ped.dir = shifted.angle;
+
+      if (!pedestrianCollision(ped)) {
+        const shiftedSnapshot = capturePedestrianMotion(ped);
+        moveCitizenAlongRoute(ped, distanceUnits);
+        if (ped.state === "inside" || !ped.visible || !pedestrianCollision(ped)) return true;
+        restorePedestrianMotion(ped, shiftedSnapshot);
+      }
+    }
+
+    ped.collisionWait = .12 + hash2(ped.seed || 0, ped.tripCount || 0, 2051) * .18;
+    return false;
+  }
+
   function updatePedestrians(dt, gameMinutes) {
     const minutes = Math.max(0, Number(gameMinutes) || 0);
 
     for (const ped of pedestrians) {
       const travelling = ped.state === "walking" || ped.state === "waiting";
       citizenUpdateNeeds(ped, minutes, travelling);
+      ped.collisionWait = Math.max(0, (ped.collisionWait || 0) - dt);
+      if ((ped.avoidanceOffset || 0) > .05 && ped.collisionWait <= 0) {
+        ped.avoidanceOffset *= Math.pow(.16, dt);
+      }
 
       if (ped.state === "inside" || ped.state === "staying") {
         ped.activityMinutesRemaining = Math.max(0, ped.activityMinutesRemaining - minutes);
@@ -3856,7 +3940,7 @@
           ped.state = "walking";
           ped.waitTimer = 0;
           ped.phase += dt * ped.speed * .12;
-          moveCitizenAlongRoute(ped, step);
+          attemptPedestrianMove(ped, step);
         } else {
           ped.state = "waiting";
           ped.waitTimer = Math.min(1.2, ped.waitTimer + dt);
@@ -3879,7 +3963,7 @@
       ped.state = "walking";
       ped.waitTimer = 0;
       ped.phase += dt * ped.speed * .12;
-      moveCitizenAlongRoute(ped, ped.speed * dt);
+      if (ped.collisionWait <= 0) attemptPedestrianMove(ped, ped.speed * dt);
     }
   }
 
