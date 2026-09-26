@@ -411,7 +411,7 @@
     return sites;
   }
 
-  function createVegetation(openSpaces) {
+  function createVegetation(openSpaces, edges) {
     const trees = [];
     for (let spaceIndex = 0; spaceIndex < openSpaces.length; spaceIndex += 1) {
       const space = openSpaces[spaceIndex];
@@ -424,6 +424,16 @@
         const x = bounds.x + 20 + hash2(seed, 7, 1) * Math.max(1, bounds.w - 40);
         const y = bounds.y + 20 + hash2(seed, 13, 2) * Math.max(1, bounds.h - 40);
         if (!pointInPolygon(x, y, space.polygon)) continue;
+        const target = point(x, y);
+        const blocksPath = edges.some((edge) => {
+          if (!edge.pedestrian) return false;
+          const clearance = edge.width / 2 + 16;
+          for (let i = 1; i < edge.points.length; i += 1) {
+            if (pointSegmentProjection(target, edge.points[i - 1], edge.points[i]).distance <= clearance) return true;
+          }
+          return false;
+        });
+        if (blocksPath) continue;
         trees.push({ x:Math.round(x), y:Math.round(y), scale:.65 + hash2(seed, 19, 3) * .55, spaceId:space.id });
         accepted += 1;
       }
@@ -449,7 +459,7 @@
     }));
     const landmarks = LANDMARKS.map((value) => ({ ...value }));
     const buildingSites = createBuildingSites(edges, openSpaces, places, stations);
-    const vegetation = createVegetation(openSpaces);
+    const vegetation = createVegetation(openSpaces, edges);
     const parcels = buildingSites.map((site) => ({ id:"lot-" + site.id, x:site.x, y:site.y, w:site.w, h:site.h, use:site.use, district:site.district, walkable:false }));
     const adjacency = new Map(nodes.map((value) => [value.id, []]));
 
