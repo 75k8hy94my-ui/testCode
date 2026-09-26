@@ -1030,12 +1030,23 @@
       : (approachEdge?.width || ROAD_WIDTH) / 2;
     const crossingDepth = clamp((approachEdge?.width || ROAD_WIDTH) * .18, 22, 30);
     const crossingOffset = junctionHalf + 18;
+    const crossingNearEdge = crossingOffset + crossingDepth / 2;
     return {
       junctionHalf,
       crossingDepth,
       crossingOffset,
-      stopOffset: crossingOffset + crossingDepth / 2 + 14
+      crossingNearEdge,
+      pedestrianWaitOffset: crossingNearEdge + 5,
+      stopOffset: crossingNearEdge + 14
     };
+  }
+
+  function vehicleFrontOverhang(car) {
+    const type = car?.type || "sedan";
+    if (type === "compact") return 33;
+    if (type === "suv") return 40;
+    if (type === "van") return 41;
+    return 38;
   }
 
   function trafficGoalNode(car, startNodeId) {
@@ -1616,10 +1627,21 @@
     if (!edge) return null;
     const endpoint = ped.directionSign > 0 ? mapModel.getNode(edge.to) : mapModel.getNode(edge.from);
     if (!endpoint || !isSignalizedMapNode(endpoint.id)) return null;
+
     const geometry = signalGeometryAtNode(endpoint.id, edge);
     const distanceToSignal = ped.directionSign > 0 ? ped.edgeLength - ped.along : ped.along;
-    if (distanceToSignal > geometry.stopOffset + 90) return null;
-    return signalStateAt(endpoint.x, endpoint.y, edgeOrientation(edge));
+    const waitOffset = geometry.pedestrianWaitOffset;
+
+    if (distanceToSignal > waitOffset + 100) return null;
+
+    const stateName = signalStateAt(endpoint.x, endpoint.y, edgeOrientation(edge));
+    const beforeCrosswalk = distanceToSignal >= waitOffset;
+    return {
+      state:stateName,
+      distance:distanceToSignal,
+      waitOffset,
+      beforeCrosswalk
+    };
   }
 
   function citizenRemainingRouteDistance(ped) {
@@ -2405,17 +2427,44 @@
     return route[route.length - 1];
   }
 
+  function routeDistanceToIndex(targetIndex) {
+    const route = state.drive.route;
+    if (!route.length) return Infinity;
+    const startIndex = clamp(state.drive.routeIndex, 0, route.length - 1);
+    const endIndex = clamp(targetIndex, 0, route.length - 1);
+
+    if (endIndex < startIndex) {
+      let behind = 0;
+      let previous = { x:personalCar.x, y:personalCar.y };
+      for (let i = startIndex; i >= endIndex; i -= 1) {
+        behind += distance(previous, route[i]);
+        previous = route[i];
+      }
+      return -behind;
+    }
+
+    let total = 0;
+    let previous = { x:personalCar.x, y:personalCar.y };
+    for (let i = startIndex; i <= endIndex; i += 1) {
+      total += distance(previous, route[i]);
+      previous = route[i];
+    }
+    return total;
+  }
+
   function upcomingSignal() {
     let best = null;
     for (const signal of state.drive.signals) {
       if (signal.pathIndex < state.drive.routeIndex - 4) continue;
       if (signal.pathIndex > state.drive.routeIndex + 46) continue;
-      const d = distance(personalCar.x, personalCar.y, signal.x, signal.y);
-      if (d > 240) continue;
+
+      const routeDistance = routeDistanceToIndex(signal.pathIndex);
+      if (routeDistance > 280 || routeDistance < -70) continue;
+
       if (!best || signal.pathIndex < best.pathIndex) {
         best = {
           state:signalStateAt(signal.x, signal.y, signal.orientation),
-          distance:d,
+          distance:routeDistance,
           key:Math.round(signal.x) + ":" + Math.round(signal.y) + ":" + signal.orientation,
           stopOffset:signal.stopOffset || STOP_LINE_OFFSET,
           pathIndex:signal.pathIndex
@@ -2424,6 +2473,7 @@
     }
     return best;
   }
+
 
   function leadVehicleInfo() {
     const hx = Math.cos(personalCar.angle);
@@ -3411,7 +3461,7 @@
     if (
       signal &&
       signal.state === "red" &&
-      signal.distance < (signal.stopOffset || STOP_LINE_OFFSET) + VEHICLE_FRONT_OVERHANG * 0.7 &&
+      signal.distance < (signal.stopOffset || STOP_LINE_OFFSET) + vehicleFrontOverhang(personalCar) &&
       personalCar.speed > 18 &&
       !state.drive.violationKeys.has(signal.key)
     ) {
@@ -3564,13 +3614,24 @@
       const edgeLength = car.edgeLength || polylineLength(edge.points);
       const roadLimit = (edge.speedLimit || 30) / SPEED_TO_KMH;
       let targetSpeed = Math.min(car.cruise, roadLimit * .92);
+      let activeSignalStop = null;
+
       const endpoint = car.directionSign > 0 ? mapModel.getNode(edge.to) : mapModel.getNode(edge.from);
       if (endpoint && isSignalizedMapNode(endpoint.id)) {
         const geometry = signalGeometryAtNode(endpoint.id, edge);
         const distanceToSignal = car.directionSign > 0 ? edgeLength - car.along : car.along;
         const signal = signalStateAt(endpoint.x, endpoint.y, edgeOrientation(edge));
-        if (signal !== "green" && distanceToSignal < geometry.stopOffset + 75) {
-          targetSpeed = Math.max(0, (distanceToSignal - geometry.stopOffset) * 2.5);
+        const centerStopOffset = geometry.stopOffset + vehicleFrontOverhang(car);
+
+        // A car whose nose already crossed the stop line continues through the
+        // junction; otherwise it targets an exact center position that leaves
+        // the front bumper just behind the painted stop line.
+        const stillApproachingLine = distanceToSignal >= centerStopOffset - 2;
+        if (signal !== "green" && stillApproachingLine) {
+          activeSignalStop = { centerStopOffset, endpointId:endpoint.id };
+          if (distanceToSignal < centerStopOffset + 100) {
+            targetSpeed = Math.max(0, (distanceToSignal - centerStopOffset) * 2.35);
+          }
         }
       }
 
@@ -3586,17 +3647,34 @@
       const brakingNow = targetSpeed < car.speed - 10;
       car.brakeGlow += ((brakingNow ? 1 : 0) - car.brakeGlow) * Math.min(1, dt * 8);
       car.speed += (targetSpeed - car.speed) * Math.min(1, dt * 2.4);
+
       let remaining = car.speed * dt;
       let transitions = 0;
       while (remaining > 0 && transitions < 4) {
         const currentEdge = mapModel.getEdge(car.edgeId);
+        if (!currentEdge) break;
         const currentLength = car.edgeLength || polylineLength(currentEdge.points);
         const endpointDistance = car.directionSign > 0 ? currentLength - car.along : car.along;
+
+        if (activeSignalStop && transitions === 0) {
+          const allowedToStop = Math.max(0, endpointDistance - activeSignalStop.centerStopOffset);
+          if (remaining >= allowedToStop) {
+            car.along = car.directionSign > 0
+              ? Math.max(0, currentLength - activeSignalStop.centerStopOffset)
+              : Math.min(currentLength, activeSignalStop.centerStopOffset);
+            car.speed = 0;
+            car.brakeGlow = Math.max(car.brakeGlow, .85);
+            remaining = 0;
+            break;
+          }
+        }
+
         if (remaining < Math.max(1, endpointDistance)) {
           car.along += car.directionSign * remaining;
           remaining = 0;
           break;
         }
+
         remaining = Math.max(0, remaining - Math.max(1, endpointDistance));
         car.along = car.directionSign > 0 ? currentLength : 0;
         if (!advanceTrafficRoute(car)) {
@@ -3605,12 +3683,14 @@
         }
         transitions += 1;
       }
+
       const pose = trafficPoseAt(car, car.along);
       car.x = pose.x;
       car.y = pose.y;
       car.angle = pose.angle;
     }
   }
+
 
   function updatePedestrians(dt, gameMinutes) {
     const minutes = Math.max(0, Number(gameMinutes) || 0);
@@ -3632,12 +3712,40 @@
       }
 
       const signal = pedestrianSignalState(ped);
-      if (signal === "red" || signal === "yellow") {
-        ped.state = "waiting";
-        ped.waitTimer = Math.min(1.2, ped.waitTimer + dt);
+      const mustWait = Boolean(
+        signal &&
+        signal.state !== "green" &&
+        signal.beforeCrosswalk
+      );
+
+      if (mustWait) {
+        const distanceToWaitPoint = Math.max(0, signal.distance - signal.waitOffset);
+        const step = Math.min(ped.speed * dt, distanceToWaitPoint);
+
+        if (step > .25) {
+          ped.state = "walking";
+          ped.waitTimer = 0;
+          ped.phase += dt * ped.speed * .12;
+          moveCitizenAlongRoute(ped, step);
+        } else {
+          ped.state = "waiting";
+          ped.waitTimer = Math.min(1.2, ped.waitTimer + dt);
+          const edge = mapModel.getEdge(ped.edgeId);
+          if (edge) {
+            ped.along = ped.directionSign > 0
+              ? Math.max(0, ped.edgeLength - signal.waitOffset)
+              : Math.min(ped.edgeLength, signal.waitOffset);
+            const pose = pedestrianPoseAt(ped);
+            ped.x = pose.x;
+            ped.y = pose.y;
+            ped.dir = pose.angle;
+          }
+        }
         continue;
       }
 
+      // If the signal changes after the pedestrian has entered the crossing,
+      // keep moving. Never freeze a person in the middle of the roadway.
       ped.state = "walking";
       ped.waitTimer = 0;
       ped.phase += dt * ped.speed * .12;
