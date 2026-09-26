@@ -35,9 +35,12 @@
   }
 
   function install() {
-    if (document.getElementById('readerShellHeader') || document.querySelector('.homeHeader')) return;
+    // reader.html is a standalone document now. app-global-shell.js may have
+    // already installed the shared authenticated header; reuse it instead of
+    // creating a second reader-specific header.
+    const existingHeader = document.getElementById('appGlobalHeader') || document.querySelector('.globalAppHeader') || document.getElementById('readerShellHeader') || document.querySelector('.homeHeader');
     installShellStyle();
-    document.body.insertAdjacentHTML('afterbegin', shellMarkup());
+    if (!existingHeader) document.body.insertAdjacentHTML('afterbegin', shellMarkup());
     document.documentElement.classList.add('reader-shell-page');
     document.querySelectorAll('[data-reader-route]').forEach((link) => {
       link.addEventListener('click', (event) => {
