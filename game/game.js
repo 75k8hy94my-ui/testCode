@@ -5412,12 +5412,11 @@
         if (point.x < -260 || point.y < -260 || point.x > viewWidth + 260 || point.y > viewHeight + 260) continue;
         const widest = Math.max(...incidentEdges.map((edge) => edge.width));
         const radius = widest / 2 + (layer === "shadow" ? 12 : layer === "curb" ? 7 : 2);
-        const hasArterial = incidentEdges.some((edge) => edge.type === "arterial");
         ctx.fillStyle = layer === "shadow"
           ? "rgba(27,34,33,.34)"
           : layer === "curb"
             ? "#999c96"
-            : (hasArterial ? "#505856" : "#646a65");
+            : "#626863";
         ctx.beginPath();
         ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
         ctx.fill();
@@ -5429,13 +5428,10 @@
       edge.type === "shopping-walk" ? "#b5aa90" :
       edge.type === "plaza" ? "#b9b5a8" :
       "#aaa9a1";
-    const vehicleSurface = (edge) =>
-      edge.type === "arterial" ? "#4f5755" :
-      edge.type === "collector" ? "#5c625f" :
-      edge.type === "shopping" ? "#696762" :
-      edge.type === "alley" ? "#72736e" :
-      edge.type === "park" ? "#666d66" :
-      "#666b67";
+    // Keep the asphalt itself visually continuous. Road hierarchy is expressed
+    // by width, lane markings and roadside context instead of changing the
+    // pavement color at every edge/junction boundary.
+    const vehicleSurface = () => "#626863";
 
     for (const edge of visibleEdges) {
       const shadow = edge.vehicle
@@ -7250,7 +7246,7 @@
     }
 
     for (const edge of mapModel.edges) {
-      mctx.strokeStyle = edge.vehicle ? (edge.type === "arterial" ? "#8d9891" : "#69766d") : "#6fa078";
+      mctx.strokeStyle = edge.vehicle ? "#747d77" : "#6fa078";
       mctx.lineWidth = Math.max(1.5, edge.width * scale * .75);
       mctx.lineCap = "round";
       mctx.lineJoin = "round";
