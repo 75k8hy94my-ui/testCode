@@ -152,3 +152,162 @@ html[data-theme="light"] #routeContent > #mangaListSection,
 html[data-theme="light"] #mangaSandboxMount > #mangaListSection { --manga-bg: #f5f5f7; --manga-bg-soft: #fff; --manga-panel-2: #e3e5e8; --manga-border: #c9ccd1; --manga-text: #23272a; --manga-sub: #5b626b; color: var(--manga-text); }
 html[data-theme="light"] .book-cover { background: #e3e5e8; }
 html[data-theme="light"] .folder-cover { background: linear-gradient(145deg, #eef5ff, #dbeaff); }
+
+
+/* 2026-09-26 mobile bookshelf layout repair
+   Keep the list UI compact on iPhone-sized viewports and prevent cover media
+   from escaping the bookshelf grid. */
+#mangaListSection,
+#mangaListSection * {
+  min-width: 0;
+}
+
+#mangaListSection .vpnListControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+#mangaListSection .book-card {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  order: 1;
+}
+
+#mangaListSection .book-cover {
+  width: 100%;
+  max-width: 100%;
+}
+
+#mangaListSection .book-cover > img,
+#mangaListSection .folder-preview > img {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+#mangaListSection .bookshelf-pagination {
+  order: 20;
+}
+
+@media (max-width: 899px) {
+  /* The mobile header is in normal flow, so the desktop 54px route offset
+     must not remain below it. */
+  .homeShell #routeContent:has(> #mangaListSection) {
+    padding-top: 0;
+  }
+
+  #routeContent > #mangaListSection,
+  #mangaSandboxMount > #mangaListSection {
+    width: 100%;
+    max-width: 100%;
+    padding: 12px 14px calc(104px + env(safe-area-inset-bottom));
+    overflow-x: hidden;
+  }
+
+  #mangaListSection .vpnListControls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  #mangaListSection .vpnListControls .vpnStatusButton,
+  #mangaListSection .vpnListControls .vpnDiagnosticsButton {
+    width: 100%;
+    white-space: nowrap;
+  }
+
+  #mangaListSection #exportImportRow,
+  #mangaListSection #smartListRow {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  #mangaListSection #exportImportRow .textActionBtn,
+  #mangaListSection #smartListRow .smartListBtn {
+    width: 100%;
+    padding-left: 6px;
+    padding-right: 6px;
+    white-space: nowrap;
+  }
+
+  #mangaListSection #listToolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+    margin-top: 10px;
+  }
+
+  #mangaListSection #shelfSearchInput,
+  #mangaListSection #listFolderTitle,
+  #mangaListSection #shelfSortSelect,
+  #mangaListSection #groupAuthorBtn {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  #mangaListSection #listFolderTitle:empty {
+    display: none;
+  }
+
+  #mangaListSection #listToolbar > button,
+  #mangaListSection #shelfSortSelect {
+    min-height: 38px;
+    margin: 0;
+  }
+
+  #mangaListSection #shelfSearchInput {
+    min-height: 40px;
+    margin: 0;
+  }
+
+  #mangaListSection .filter-row,
+  #mangaListSection #listNewFolderRow {
+    gap: 7px;
+  }
+
+  #mangaListSection #savedListItems {
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px 10px;
+    align-items: start;
+  }
+
+  #mangaListSection .book-title {
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  #mangaListSection .bookshelf-pagination {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: none;
+    margin: 8px 0 0;
+    padding: 6px 8px;
+    min-height: 42px;
+  }
+
+  #mangaListSection .bookshelf-pagination span {
+    min-width: 52px;
+  }
+}
+
+@media (max-width: 380px) {
+  #mangaListSection #savedListItems {
+    gap: 14px 8px;
+  }
+
+  #mangaListSection #exportImportRow,
+  #mangaListSection #smartListRow {
+    gap: 5px;
+  }
+
+  #mangaListSection #exportImportRow .textActionBtn,
+  #mangaListSection #smartListRow .smartListBtn {
+    font-size: 12px;
+  }
+}
