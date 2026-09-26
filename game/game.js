@@ -1280,7 +1280,7 @@
 
   function generateTraffic() {
     const colors = ["#d5d8da", "#6689ad", "#b26f67", "#c6a35a", "#59635f", "#89769e", "#579079"];
-    for (let i = 0; i < 22; i += 1) {
+    for (let i = 0; i < 16; i += 1) {
       let car = null;
       for (let attempt = 0; attempt < 12; attempt += 1) {
         const p = randomRoadPoint(i + 2 + attempt * 37, i * 7 + 3 + attempt * 19, 18);
@@ -1307,7 +1307,9 @@
           routeIndex:0,
           routeTrips:0,
           collisionYield:0,
-          junctionWait:0
+          junctionWait:0,
+          trafficStall:0,
+          playerFlowPriority:0
         };
         if (!traffic.some((other) => vehiclesIntersect(car, other, 8))) break;
         car = null;
@@ -3969,6 +3971,97 @@
     }
   }
 
+  function markPlayerTrafficFlowPriority() {
+    for (const car of traffic) car.playerFlowPriority = 0;
+    if (!state.player.inVehicle) return [];
+
+    const first = leadVehicleInfo()?.car;
+    if (!first) return [];
+
+    const chain = [];
+    const seen = new Set();
+    let current = first;
+    for (let depth = 0; current && depth < 6 && !seen.has(current); depth += 1) {
+      seen.add(current);
+      chain.push(current);
+      current = trafficLeadInfo(current)?.car || null;
+    }
+
+    // Every car in the player's immediate queue gets priority over unrelated
+    // cross traffic. The front of the queue receives the strongest priority,
+    // because moving it releases all following vehicles including the player.
+    for (let i = 0; i < chain.length; i += 1) {
+      chain[i].playerFlowPriority = 20 + i * 5;
+    }
+    return chain;
+  }
+
+  function trafficCarVisible(car, margin = 120) {
+    const sx = car.x - state.camera.x;
+    const sy = car.y - state.camera.y;
+    return sx >= -margin && sy >= -margin && sx <= viewWidth + margin && sy <= viewHeight + margin;
+  }
+
+  function relocateGridlockedTraffic(car) {
+    if (!car || trafficCarVisible(car, 180)) return false;
+
+    const actor = state.player.inVehicle ? personalCar : state.player;
+    for (let attempt = 0; attempt < 28; attempt += 1) {
+      const p = randomRoadPoint((car.seed || 1) + 601 + attempt * 43, (car.routeTrips || 0) + 811 + attempt * 29, 18);
+      if (distance(p.x, p.y, actor.x, actor.y) < 620) continue;
+
+      const probe = {
+        ...car,
+        x:p.x,
+        y:p.y,
+        angle:p.angle,
+        edgeId:p.edgeId,
+        edgeLength:p.edgeLength,
+        directionSign:p.directionSign,
+        laneOffset:p.laneOffset,
+        secondaryLane:p.secondaryLane,
+        along:p.along
+      };
+      if (traffic.some((other) => other !== car && vehiclesIntersect(probe, other, 22))) continue;
+      if (vehiclesIntersect(probe, personalCar, 28)) continue;
+
+      car.x = p.x;
+      car.y = p.y;
+      car.angle = p.angle;
+      car.edgeId = p.edgeId;
+      car.edgeLength = p.edgeLength;
+      car.directionSign = p.directionSign;
+      car.laneOffset = p.laneOffset;
+      car.secondaryLane = p.secondaryLane;
+      car.along = p.along;
+      car.speed = Math.max(35, Math.min(car.cruise * .55, 95));
+      car.collisionYield = 0;
+      car.junctionWait = 0;
+      car.trafficStall = 0;
+      car.routeEdgeIds = [];
+      car.routeIndex = 0;
+
+      const edge = mapModel.getEdge(car.edgeId);
+      if (edge) {
+        const startNodeId = car.directionSign > 0 ? edge.to : edge.from;
+        planTrafficRoute(car, startNodeId, edge.id);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  function relievePlayerTrafficQueue(queue) {
+    if (!state.player.inVehicle || queue.length < 3) return;
+
+    // Only the head of a long queue is eligible for emergency cleanup. This
+    // avoids cars disappearing immediately in front of the player while still
+    // guaranteeing that an off-screen deadlock cannot block the road forever.
+    const head = queue[queue.length - 1];
+    if ((head.trafficStall || 0) < 6) return;
+    relocateGridlockedTraffic(head);
+  }
+
   function junctionCandidateWins(car, endpoint, gateDistance) {
     const candidates = traffic.filter((other) => {
       const approachDistance = trafficApproachDistanceToNode(other, endpoint.id);
@@ -3977,6 +4070,9 @@
     if (!candidates.length) return true;
 
     candidates.sort((a, b) => {
+      const flowDelta = (b.playerFlowPriority || 0) - (a.playerFlowPriority || 0);
+      if (flowDelta !== 0) return flowDelta;
+
       const waitDelta = (b.junctionWait || 0) - (a.junctionWait || 0);
       if (Math.abs(waitDelta) > .06) return waitDelta;
 
@@ -4013,7 +4109,14 @@
         current.expiresAt = trafficSimulationClock + .55;
         return true;
       }
-      if (current.expiresAt > trafficSimulationClock) return false;
+
+      const ownerInCore = current.owner &&
+        distance(current.owner.x, current.owner.y, endpoint.x, endpoint.y) <= coreRadius;
+      const playerQueueOverride = (car.playerFlowPriority || 0) > 0 &&
+        (car.junctionWait || 0) > 2.2 &&
+        !ownerInCore;
+
+      if (current.expiresAt > trafficSimulationClock && !playerQueueOverride) return false;
       junctionReservations.delete(endpoint.id);
     }
 
@@ -4060,6 +4163,7 @@
   function updateTraffic(dt) {
     trafficSimulationClock += dt;
     refreshJunctionReservations();
+    const playerTrafficQueue = markPlayerTrafficFlowPriority();
 
     for (const car of traffic) {
       car.collisionYield = Math.max(0, (car.collisionYield || 0) - dt);
@@ -4071,6 +4175,7 @@
       let targetSpeed = Math.min(car.cruise, roadLimit * .92);
       if (car.collisionYield > 0) targetSpeed = 0;
       let activeStop = null;
+      let blockReason = null;
 
       const endpoint = car.directionSign > 0 ? mapModel.getNode(edge.to) : mapModel.getNode(edge.from);
       const endpointDistance = trafficDistanceToEndpoint(car, edge);
@@ -4086,6 +4191,7 @@
 
         if (stillApproachingLine && trafficShouldStopForSignal(car, signal, Math.max(0, gapToStopLine))) {
           activeStop = { centerStopOffset, endpointId:endpoint.id, reason:"signal" };
+          blockReason = "signal";
           car.junctionWait = 0;
           if (gapToStopLine < 130) {
             targetSpeed = Math.min(targetSpeed, Math.max(0, gapToStopLine * 2.2));
@@ -4099,6 +4205,7 @@
           const gapToYield = endpointDistance - junctionYieldOffset;
           if (gapToYield > -2) {
             activeStop = { centerStopOffset:junctionYieldOffset, endpointId:endpoint.id, reason:"junction" };
+            blockReason = "junction";
             car.junctionWait = (car.junctionWait || 0) + dt;
             targetSpeed = Math.min(targetSpeed, Math.max(0, gapToYield * 2.05));
           }
@@ -4117,6 +4224,7 @@
         const desiredGap = 16 + Math.min(54, car.speed * .22);
         if (bumperGap < desiredGap + 70) {
           targetSpeed = Math.min(targetSpeed, Math.max(0, (bumperGap - desiredGap) * 2.25));
+          if (bumperGap <= desiredGap + 8 && !blockReason) blockReason = "npc";
         }
       }
 
@@ -4124,6 +4232,17 @@
       if (obstacleGap < 105) {
         const desiredObstacleGap = 18 + Math.min(38, car.speed * .16);
         targetSpeed = Math.min(targetSpeed, Math.max(0, (obstacleGap - desiredObstacleGap) * 2.4));
+        if (obstacleGap <= desiredObstacleGap + 6 && !blockReason) blockReason = "obstacle";
+      }
+
+      const stalledByTraffic = car.speed < 3 &&
+        targetSpeed < 8 &&
+        blockReason !== "signal" &&
+        blockReason !== "obstacle";
+      if (stalledByTraffic) {
+        car.trafficStall = (car.trafficStall || 0) + dt;
+      } else {
+        car.trafficStall = Math.max(0, (car.trafficStall || 0) - dt * 2.5);
       }
 
       const brakingNow = targetSpeed < car.speed - 8;
@@ -4193,6 +4312,8 @@
         }
       }
     }
+
+    relievePlayerTrafficQueue(playerTrafficQueue);
   }
 
 
