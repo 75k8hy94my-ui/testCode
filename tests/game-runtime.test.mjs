@@ -208,3 +208,10 @@ test('fresh player and fixed NPC positions are on the current pedestrian graph',
   assert.match(source, /const fallback = migratePlayerToCurrentMap\(NaN, NaN\)/);
   assert.doesNotMatch(source, /state\.player\.x = HOME\.x \+ 55/);
 });
+
+
+test('sleep returns the player to the current home entrance', () => {
+  assert.match(source, /showToast\("よく眠れました"\)/);
+  assert.doesNotMatch(source, /state\.player\.x = HOME\.x \+ 55/);
+  assert.doesNotMatch(source, /state\.player\.y = HOME\.y \+ 65/);
+});

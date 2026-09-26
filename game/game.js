@@ -2236,8 +2236,8 @@
         state.needs.hygiene -= 5;
         state.needs.fun += 3;
         clampNeeds();
-        state.player.x = HOME.x + 55;
-        state.player.y = HOME.y + 65;
+        state.player.x = HOME.x;
+        state.player.y = HOME.y;
         showToast("よく眠れました");
       });
       addChoice("家でのんびり", "60分 / 体力と楽しさを回復", () => {
