@@ -97,7 +97,7 @@ function syncHeaderRoute(){
   if(window.AppDesktopRail)AppDesktopRail.syncActive();
   if(window.MobileBottomNav&&typeof MobileBottomNav.syncActive==='function')MobileBottomNav.syncActive();
 }
-function cleanupMangaRoute(){if(mangaRouteRuntime){mangaRouteRuntime.cleanup();mangaRouteRuntime=null;}mangaRouteBootPromise=null;}
+function cleanupMangaRoute(runtime=mangaRouteRuntime){if(!runtime)return;if(typeof runtime.cleanup==='function')runtime.cleanup();if(mangaRouteRuntime===runtime)mangaRouteRuntime=null;mangaRouteBootPromise=null;}
 function cleanupVideoRoute(){if(videoRouteRuntime)videoRouteRuntime.detach();}
 function renderVpnGate(target,route){
   target.replaceChildren();
@@ -161,19 +161,22 @@ async function renderManga(generation){
   if(!target)return;
   cleanupReaderRuntime();
   target.replaceChildren();
+  let routeRuntime=null;
   try{
     const gate=await ensureVpnGate();
     if(generation!==renderGeneration)return;
     if(!gate||!gate.canLoadExternalMedia()){renderVpnGate(target,'manga');if(gate&&typeof gate.syncUi==='function')gate.syncUi();setTitle('manga');syncHeaderRoute();return;}
-    if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20260922-manga-route','spaMangaListRoute');
+    if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20260926-lifecycle-fix','spaMangaListRoute');
     if(generation!==renderGeneration)return;
-    mangaRouteRuntime=window.MangaListRouteFactory.create({documentRef:document,windowRef:window});
-    await mangaRouteRuntime.start({mountElement:target});
+    routeRuntime=window.MangaListRouteFactory.create({documentRef:document,windowRef:window});
+    mangaRouteRuntime=routeRuntime;
+    const mounted=await routeRuntime.start({mountElement:target});
+    if(generation!==renderGeneration||mangaRouteRuntime!==routeRuntime){cleanupMangaRoute(routeRuntime);return;}
+    if(!mounted)throw new Error('manga route start cancelled');
     if(gate&&typeof gate.syncUi==='function')gate.syncUi();
-    if(generation!==renderGeneration){cleanupMangaRoute();return;}
     setTitle('manga');syncHeaderRoute();
   }catch(_){
-    cleanupMangaRoute();
+    if(routeRuntime)cleanupMangaRoute(routeRuntime);
     if(generation===renderGeneration)target.innerHTML='<section class="profileContent"><h2>漫画一覧を読み込めませんでした</h2><p>ホームへ戻って再試行してください。</p><a class="glassBtn" href="home.html">ホームへ戻る</a></section>';
   }
 }
@@ -208,7 +211,17 @@ async function renderReader(route=routeName(),generation=renderGeneration){
   }
 }
 function renderRoute(){ensureAppShell();const route=routeName(),generation=++renderGeneration,app=document.getElementById('homeApp');document.documentElement.classList.toggle('reader-entry-manga',route==='manga');document.documentElement.classList.toggle('reader-entry-video',route==='video');if(app){app.classList.toggle('reader-route',['manga','video','reader'].includes(route));app.dataset.readerRoute=route;}if(route!=='video')cleanupVideoRoute();if(!['manga','video','reader'].includes(route))cleanupReaderRuntime();else if(route!=='manga'&&route!=='video')cleanupMangaRoute();if(route==='profile')renderProfile();else if(route==='manga')renderManga(generation);else if(route==='video')renderVideo(generation);else if(route==='reader')renderReader(route,generation);else renderHome();document.dispatchEvent(new CustomEvent('home-profile-routechange',{detail:{route}}));}
-function handleVpnStatusChange(){const route=routeName();if(route==='manga'||route==='video')renderRoute();}
+let lastVpnRouteStatus='';
+function handleVpnStatusChange(event){
+  const route=routeName();
+  if(route!=='manga'&&route!=='video')return;
+  const next=String(event&&event.detail&&event.detail.status||'');
+  if(next!=='allowed'&&next!=='blocked')return;
+  const marker=route+':'+next;
+  if(marker===lastVpnRouteStatus)return;
+  lastVpnRouteStatus=marker;
+  renderRoute();
+}
 function navigate(path,{replace=false}={}){const target=new URL(path,location.href),name=target.pathname.split('/').pop();if(!SPA_PAGES.includes(name)){location.href=target.href;return;}if(replace)history.replaceState({appShellSPA:true},'',target.href);else history.pushState({appShellSPA:true},'',target.href);renderRoute();}
 function intercept(event){if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;const link=event.target.closest('a[href]');if(!link||link.target||link.hasAttribute('download'))return;const target=new URL(link.href,location.href),name=target.pathname.split('/').pop();if(target.origin===location.origin&&SPA_PAGES.includes(name)){event.preventDefault();navigate(target.href);}}
 async function start(){
