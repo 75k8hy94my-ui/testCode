@@ -139,13 +139,14 @@
       } catch (_) {}
     }
 
-    function setupFeedImage(imgEl, baseUrlForItem, numberWidth, itemPattern) {
+    function setupFeedImage(imgEl, baseUrlForItem, numberWidth, itemPattern, itemId) {
       const parsed = deps.images.parseInputUrl(baseUrlForItem);
       const folderUrl = parsed ? parsed.baseUrl : baseUrlForItem;
-      const cached = deps.images.getCachedMangaInfo(folderUrl);
+      const identityKey = itemId ? 'item:' + String(itemId) : folderUrl;
+      const cached = deps.images.getCachedMangaInfo(identityKey, folderUrl);
       const pattern = itemPattern || (parsed && parsed.pattern) || (cached && cached.pattern) || null;
       const resolvedWidth = numberWidth || (cached && cached.numberWidth) || 1;
-      const cacheKey = [folderUrl, String(resolvedWidth), JSON.stringify(pattern || null), String(cached && cached.ext != null ? cached.ext : '')].join('|');
+      const cacheKey = [identityKey, folderUrl, String(resolvedWidth), JSON.stringify(pattern || null), String(cached && cached.ext != null ? cached.ext : '')].join('|');
       const sourceCache = deps.images.getCoverSourceCache();
       const failedCache = deps.images.getCoverFailedCache();
       const cachedSource = sourceCache.get(cacheKey);
@@ -153,7 +154,7 @@
         imgEl.addEventListener('error', () => {
           sourceCache.delete(cacheKey);
           failedCache.delete(cacheKey);
-          setupFeedImage(imgEl, baseUrlForItem, numberWidth, itemPattern);
+          setupFeedImage(imgEl, baseUrlForItem, numberWidth, itemPattern, itemId);
         }, { once: true });
         imgEl.src = cachedSource;
         return;
