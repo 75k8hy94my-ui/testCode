@@ -2771,19 +2771,76 @@
     actionSheet.hidden = false;
   }
 
+  function citizenMoodLabel(ped) {
+    const average = (ped.needs.hunger + ped.needs.energy + ped.needs.social + ped.needs.fun) / 4;
+    if (ped.stress > 75 || average < 28) return "かなり疲れている";
+    if (ped.stress > 55 || average < 45) return "少し余裕がない";
+    if (average > 76 && ped.stress < 30) return "機嫌がよさそう";
+    return "落ち着いている";
+  }
+
+  function citizenStatusText(ped) {
+    const activity = ped.currentActivityLabel
+      || ped.pendingActivity?.label
+      || (ped.state === "waiting" ? "信号待ち" : "移動中");
+    return [
+      ped.age + "歳",
+      ped.jobLabel,
+      activity,
+      citizenMoodLabel(ped)
+    ].join(" / ");
+  }
+
+  function openCitizen(ped) {
+    actionTitle.textContent = ped.name;
+    actionDescription.textContent =
+      citizenStatusText(ped) +
+      "\n所持金 ¥" + Math.round(ped.money).toLocaleString("ja-JP") +
+      " / 食料 " + ped.groceries +
+      "\n空腹 " + Math.round(ped.needs.hunger) +
+      "・体力 " + Math.round(ped.needs.energy) +
+      "・交流 " + Math.round(ped.needs.social) +
+      "・楽しさ " + Math.round(ped.needs.fun) +
+      "・ストレス " + Math.round(ped.stress);
+    actionChoices.replaceChildren();
+
+    addChoice("少し話す", "10分 / 相手の交流とストレスにも影響", () => {
+      state.needs.social += 12;
+      state.needs.fun += 4;
+      ped.needs.social += 16;
+      ped.needs.fun += 4;
+      ped.stress -= 7;
+      citizenClampNeeds(ped);
+      clampNeeds();
+      advanceTime(10);
+      showToast(ped.name + "と少し話しました");
+    });
+
+    actionSheet.hidden = false;
+  }
+
   function openNpc(npc) {
+    const citizen = pedestrians.find((ped) => ped.id === npc.citizenId || ped.specialNpcId === npc.id);
     actionTitle.textContent = npc.name;
-    actionDescription.textContent = npc.id === "aoi"
-      ? "公園でよく会う近所の人。"
-      : npc.id === "sora"
-        ? "カフェの同僚。"
-        : "図書館でよく見かける学生。";
+    actionDescription.textContent = citizen
+      ? citizenStatusText(citizen)
+      : (npc.id === "aoi"
+        ? "公園でよく会う近所の人。"
+        : npc.id === "sora"
+          ? "カフェの同僚。"
+          : "図書館でよく見かける学生。");
     actionChoices.replaceChildren();
     addChoice("少し話す", "30分 / 交流+24 / 楽しさ+7", () => {
       advanceTime(30);
       state.needs.social += 24;
       state.needs.fun += 7;
       npc.friendship += 1;
+      if (citizen) {
+        citizen.needs.social += 24;
+        citizen.needs.fun += 6;
+        citizen.stress -= 9;
+        citizenClampNeeds(citizen);
+      }
       clampNeeds();
       showToast(npc.name + "と話しました");
     });
@@ -2794,12 +2851,20 @@
         state.needs.fun += 22;
         state.needs.hunger -= 5;
         npc.friendship += 1;
+        if (citizen) {
+          citizen.needs.social += 32;
+          citizen.needs.fun += 18;
+          citizen.needs.hunger -= 5;
+          citizen.stress -= 14;
+          citizenClampNeeds(citizen);
+        }
         clampNeeds();
         showToast(npc.name + "と楽しい時間を過ごしました");
       });
     }
     actionSheet.hidden = false;
   }
+
 
   function nearestInteraction() {
     const p = actorPosition();
@@ -2831,13 +2896,35 @@
     let nearestNpc = null;
     let npcDistance = 72;
     for (const npc of NPCS) {
+      if (npc.hidden) continue;
       const d = distance(p.x, p.y, npc.x, npc.y);
       if (d < npcDistance) {
         nearestNpc = npc;
         npcDistance = d;
       }
     }
-    if (nearestNpc) return { type: "npc", target: nearestNpc, label: nearestNpc.name + "と話す" };
+    if (nearestNpc) return { type:"npc", target:nearestNpc, label:nearestNpc.name + "と話す" };
+
+    let nearestCitizen = null;
+    let citizenDistance = 58;
+    for (const citizen of pedestrians) {
+      if (!citizen.visible || citizen.specialNpcId) continue;
+      const d = distance(p.x, p.y, citizen.x, citizen.y);
+      if (d < citizenDistance) {
+        nearestCitizen = citizen;
+        citizenDistance = d;
+      }
+    }
+    if (nearestCitizen) {
+      const activity = nearestCitizen.currentActivityLabel
+        || nearestCitizen.pendingActivity?.label
+        || (nearestCitizen.state === "waiting" ? "信号待ち" : "移動中");
+      return {
+        type:"citizen",
+        target:nearestCitizen,
+        label:nearestCitizen.name + "（" + activity + "）"
+      };
+    }
 
     let nearestPlace = null;
     let placeDistance = 105;
@@ -2912,6 +2999,7 @@
     if (item.type === "train-wait") showToast("電車が到着したら E / ACTION で乗車できます");
     if (item.type === "place") openPlace(item.target);
     if (item.type === "npc") openNpc(item.target);
+    if (item.type === "citizen") openCitizen(item.target);
   }
 
   function resize() {
@@ -3493,6 +3581,7 @@
     updateTraffic(dt);
     advanceTime(gameMinutes, true, false);
     updatePedestrians(dt, gameMinutes);
+    syncNamedNpcCitizens();
 
     state.visual.weatherClock += dt;
     state.visual.rainPhase += dt;
@@ -5483,8 +5572,24 @@
     ctx.fill();
   }
 
+  function syncNamedNpcCitizens() {
+    for (const npc of NPCS) {
+      const citizen = pedestrians.find((ped) => ped.specialNpcId === npc.id);
+      if (!citizen) continue;
+      npc.x = citizen.x;
+      npc.y = citizen.y;
+      npc.dir = citizen.dir;
+      npc.hidden = !citizen.visible;
+      npc.activityLabel = citizen.currentActivityLabel
+        || citizen.pendingActivity?.label
+        || (citizen.state === "waiting" ? "信号待ち" : "移動中");
+      npc.citizenId = citizen.id;
+    }
+  }
+
   function drawNpc(npc) {
-    drawPerson(npc.x, npc.y, -Math.PI / 2, npc.color, "#394248", "#3c2d25", "#e7b28f", performance.now() * .004 + npc.x * .01, 1.05);
+    if (npc.hidden) return;
+    drawPerson(npc.x, npc.y, npc.dir ?? -Math.PI / 2, npc.color, "#394248", "#3c2d25", "#e7b28f", performance.now() * .004 + npc.x * .01, 1.05);
     const p = worldToScreen(npc.x, npc.y);
     if (p.x < -40 || p.y < -40 || p.x > viewWidth + 40 || p.y > viewHeight + 40) return;
     ctx.fillStyle = "rgba(12,18,15,.76)";
@@ -5498,6 +5603,7 @@
 
   function drawPedestrians() {
     for (const ped of pedestrians) {
+      if (!ped.visible || ped.specialNpcId) continue;
       drawPerson(ped.x, ped.y, ped.dir, ped.color, ped.pants, ped.hair, ped.skin, ped.phase, .92);
     }
   }
@@ -6081,6 +6187,7 @@
   generateBuildings();
   generateTraffic();
   generatePedestrians();
+  syncNamedNpcCitizens();
   migrateCarToCurrentRoadIfNeeded();
   loadGame();
   seedPedestriansNearActor();
