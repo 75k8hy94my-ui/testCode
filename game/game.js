@@ -4021,10 +4021,19 @@
             ped.along = ped.directionSign > 0
               ? Math.max(0, ped.edgeLength - signal.waitOffset)
               : Math.min(ped.edgeLength, signal.waitOffset);
-            const pose = pedestrianPoseAt(ped);
+            let pose = pedestrianPoseAt(ped);
             ped.x = pose.x;
             ped.y = pose.y;
             ped.dir = pose.angle;
+
+            const waitCollision = pedestrianCollision(ped);
+            if (waitCollision && (waitCollision.type === "pedestrian" || waitCollision.type === "player")) {
+              ped.avoidanceOffset = Math.max(ped.avoidanceOffset || 0, 16);
+              pose = pedestrianPoseAt(ped);
+              ped.x = pose.x;
+              ped.y = pose.y;
+              ped.dir = pose.angle;
+            }
           }
         }
         continue;
@@ -4100,6 +4109,19 @@
           tryNudgeStandingPedestrian(a, -ux * overlap, -uy * overlap);
         } else if (b.state === "staying") {
           tryNudgeStandingPedestrian(b, ux * overlap, uy * overlap);
+        } else {
+          const yielding = (a.seed || i) >= (b.seed || j) ? a : b;
+          yielding.avoidanceOffset = Math.max(yielding.avoidanceOffset || 0, 16);
+          const shifted = pedestrianPoseAt(yielding);
+          if (
+            canStand(shifted.x, shifted.y, NPC_COLLISION_RADIUS) &&
+            !personIntersectsAnyVehicle(shifted.x, shifted.y, NPC_COLLISION_RADIUS)
+          ) {
+            yielding.x = shifted.x;
+            yielding.y = shifted.y;
+            yielding.dir = shifted.angle;
+            yielding.collisionWait = Math.max(yielding.collisionWait || 0, .08);
+          }
         }
       }
     }
