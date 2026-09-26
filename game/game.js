@@ -1635,7 +1635,7 @@
     if (distanceToSignal > waitOffset + 100) return null;
 
     const stateName = signalStateAt(endpoint.x, endpoint.y, edgeOrientation(edge));
-    const beforeCrosswalk = distanceToSignal >= waitOffset - 1.5;
+    const beforeCrosswalk = distanceToSignal >= waitOffset;
     return {
       state:stateName,
       distance:distanceToSignal,
