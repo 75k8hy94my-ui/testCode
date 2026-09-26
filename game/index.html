@@ -73,12 +73,14 @@
         <p><b>車:</b> 乗車後に目的地を選ぶとルートは自動設定。W / ↑ = 加速、S / ↓ / Space = 減速・停止、E = 行き先変更・降車。</p>
         <p><b>電車:</b> 若葉線の駅入口でE / ACTION。電車が停車中なら乗車でき、乗車後は停車駅でE / ACTIONを押すと降車できます。</p>
         <p>操舵は自動です。信号、制限速度、前走車との車間を守ると運転評価が上がります。</p>
-        <p>スマホでは徒歩時は左スティック＋ACTION、運転時はBRAKE / ACCELを使います。</p>\n        <p><b>進行状況:</b> 現在は端末保存しません。ページを再読み込みすると最初から始まります。ログイン同期は今後対応予定です。</p>
+        <p>スマホでは徒歩時は左スティック＋ACTION、運転時はBRAKE / ACCELを使います。</p>
+        <p><b>音:</b> 最初のタップやキー入力で有効になります。右上の「音 ON / OFF」でいつでも切り替えられます。</p>\n        <p><b>進行状況:</b> 現在は端末保存しません。ページを再読み込みすると最初から始まります。ログイン同期は今後対応予定です。</p>
         <button id="helpClose" type="button">閉じる</button>
       </div>
     </section>
 
     <div class="top-actions">
+      <button id="soundButton" type="button" aria-pressed="true" title="音声をオフにする">音 ON</button>
       <button id="helpButton" type="button">操作</button>
     </div>
 
@@ -106,6 +108,6 @@
   </main>
 
   <script src="./map-model.js?v=20260926-facility-footprints"></script>
-  <script src="./game.js?v=20260926-entity-collisions"></script>
+  <script src="./game.js?v=20260927-web-audio-1"></script>
 </body>
 </html>

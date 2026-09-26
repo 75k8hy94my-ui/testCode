@@ -62,6 +62,7 @@
   const helpPanel = document.getElementById("helpPanel");
   const helpButton = document.getElementById("helpButton");
   const helpClose = document.getElementById("helpClose");
+  const soundButton = document.getElementById("soundButton");
   const toast = document.getElementById("toast");
   const pausedOverlay = document.getElementById("pausedOverlay");
   const joystick = document.getElementById("joystick");
@@ -195,6 +196,354 @@
     home_idle:"自宅で休息"
   };
   const touch = { x: 0, y: 0, run: false, driveAccel: false, driveBrake: false, pointerId: null };
+
+  const audioState = {
+    enabled:true,
+    supported:true,
+    context:null,
+    master:null,
+    noiseBuffer:null,
+    engineOsc:null,
+    engineHarmonic:null,
+    engineGain:null,
+    engineFilter:null,
+    roadLayer:null,
+    rainLayer:null,
+    ambientLayer:null,
+    brakeLayer:null,
+    npcOsc:null,
+    npcGain:null,
+    npcFilter:null,
+    trainOsc:null,
+    trainGain:null,
+    trainFilter:null,
+    footstepTimer:0,
+    footstepIndex:0
+  };
+
+  function updateSoundButton() {
+    if (!soundButton) return;
+    if (!audioState.supported) {
+      soundButton.textContent = "音 —";
+      soundButton.disabled = true;
+      soundButton.setAttribute("aria-pressed", "false");
+      soundButton.title = "このブラウザでは音声を利用できません";
+      return;
+    }
+    soundButton.disabled = false;
+    soundButton.textContent = audioState.enabled ? "音 ON" : "音 OFF";
+    soundButton.setAttribute("aria-pressed", audioState.enabled ? "true" : "false");
+    soundButton.title = audioState.enabled ? "音声をオフにする" : "音声をオンにする";
+  }
+
+  function smoothAudioParam(param, value, timeConstant = .08) {
+    const audioContext = audioState.context;
+    if (!audioContext || !param) return;
+    const now = audioContext.currentTime;
+    try {
+      param.cancelScheduledValues(now);
+      param.setTargetAtTime(value, now, Math.max(.01, timeConstant));
+    } catch (_) {
+      param.value = value;
+    }
+  }
+
+  function createGameNoiseBuffer(audioContext) {
+    const duration = 2;
+    const frameCount = Math.floor(audioContext.sampleRate * duration);
+    const buffer = audioContext.createBuffer(1, frameCount, audioContext.sampleRate);
+    const data = buffer.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < data.length; i += 1) {
+      const white = Math.random() * 2 - 1;
+      last = last * .22 + white * .78;
+      data[i] = last;
+    }
+    return buffer;
+  }
+
+  function createNoiseLayer(audioContext, type, frequency, q = .7) {
+    const source = audioContext.createBufferSource();
+    source.buffer = audioState.noiseBuffer;
+    source.loop = true;
+
+    const filter = audioContext.createBiquadFilter();
+    filter.type = type;
+    filter.frequency.value = frequency;
+    filter.Q.value = q;
+
+    const gain = audioContext.createGain();
+    gain.gain.value = 0;
+
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioState.master);
+    source.start();
+
+    return { source, filter, gain };
+  }
+
+  function initGameAudio() {
+    if (audioState.context) return true;
+    const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextCtor) {
+      audioState.supported = false;
+      updateSoundButton();
+      return false;
+    }
+
+    try {
+      const audioContext = new AudioContextCtor({ latencyHint:"interactive" });
+      audioState.context = audioContext;
+      audioState.master = audioContext.createGain();
+      audioState.master.gain.value = 0;
+      audioState.master.connect(audioContext.destination);
+      audioState.noiseBuffer = createGameNoiseBuffer(audioContext);
+
+      const engineFilter = audioContext.createBiquadFilter();
+      engineFilter.type = "lowpass";
+      engineFilter.frequency.value = 520;
+      engineFilter.Q.value = .55;
+      const engineGain = audioContext.createGain();
+      engineGain.gain.value = 0;
+      const engineOsc = audioContext.createOscillator();
+      engineOsc.type = "sawtooth";
+      engineOsc.frequency.value = 52;
+      const engineHarmonic = audioContext.createOscillator();
+      engineHarmonic.type = "triangle";
+      engineHarmonic.frequency.value = 104;
+      engineOsc.connect(engineFilter);
+      engineHarmonic.connect(engineFilter);
+      engineFilter.connect(engineGain);
+      engineGain.connect(audioState.master);
+      engineOsc.start();
+      engineHarmonic.start();
+      audioState.engineOsc = engineOsc;
+      audioState.engineHarmonic = engineHarmonic;
+      audioState.engineGain = engineGain;
+      audioState.engineFilter = engineFilter;
+
+      audioState.roadLayer = createNoiseLayer(audioContext, "bandpass", 390, .55);
+      audioState.rainLayer = createNoiseLayer(audioContext, "bandpass", 3300, .28);
+      audioState.ambientLayer = createNoiseLayer(audioContext, "lowpass", 310, .45);
+      audioState.brakeLayer = createNoiseLayer(audioContext, "bandpass", 1350, 2.4);
+
+      audioState.npcFilter = audioContext.createBiquadFilter();
+      audioState.npcFilter.type = "lowpass";
+      audioState.npcFilter.frequency.value = 360;
+      audioState.npcGain = audioContext.createGain();
+      audioState.npcGain.gain.value = 0;
+      audioState.npcOsc = audioContext.createOscillator();
+      audioState.npcOsc.type = "sawtooth";
+      audioState.npcOsc.frequency.value = 58;
+      audioState.npcOsc.connect(audioState.npcFilter);
+      audioState.npcFilter.connect(audioState.npcGain);
+      audioState.npcGain.connect(audioState.master);
+      audioState.npcOsc.start();
+
+      audioState.trainFilter = audioContext.createBiquadFilter();
+      audioState.trainFilter.type = "lowpass";
+      audioState.trainFilter.frequency.value = 310;
+      audioState.trainGain = audioContext.createGain();
+      audioState.trainGain.gain.value = 0;
+      audioState.trainOsc = audioContext.createOscillator();
+      audioState.trainOsc.type = "triangle";
+      audioState.trainOsc.frequency.value = 46;
+      audioState.trainOsc.connect(audioState.trainFilter);
+      audioState.trainFilter.connect(audioState.trainGain);
+      audioState.trainGain.connect(audioState.master);
+      audioState.trainOsc.start();
+
+      updateSoundButton();
+      return true;
+    } catch (error) {
+      console.warn("Web Audio initialization failed", error);
+      audioState.supported = false;
+      audioState.context = null;
+      updateSoundButton();
+      return false;
+    }
+  }
+
+  async function unlockGameAudio() {
+    if (!initGameAudio()) return false;
+    const audioContext = audioState.context;
+    if (!audioContext) return false;
+    if (audioContext.state === "suspended") {
+      try {
+        await audioContext.resume();
+      } catch (_) {
+        return false;
+      }
+    }
+    return audioContext.state === "running";
+  }
+
+  function setSoundEnabled(enabled) {
+    audioState.enabled = Boolean(enabled);
+    updateSoundButton();
+    if (audioState.master && audioState.context) {
+      smoothAudioParam(audioState.master.gain, audioState.enabled ? .58 : 0, .025);
+    }
+  }
+
+  function playUiTick() {
+    const audioContext = audioState.context;
+    if (!audioContext || audioContext.state !== "running" || !audioState.enabled) return;
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.value = 620;
+    gain.gain.setValueAtTime(.018, audioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(.0001, audioContext.currentTime + .045);
+    oscillator.connect(gain);
+    gain.connect(audioState.master);
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + .05);
+  }
+
+  function playFootstep() {
+    const audioContext = audioState.context;
+    if (
+      !audioContext ||
+      audioContext.state !== "running" ||
+      !audioState.enabled ||
+      !audioState.noiseBuffer
+    ) return;
+
+    const source = audioContext.createBufferSource();
+    source.buffer = audioState.noiseBuffer;
+    source.playbackRate.value = .82 + (audioState.footstepIndex % 3) * .07;
+    const filter = audioContext.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = 190 + (audioState.footstepIndex % 2) * 55;
+    filter.Q.value = .9;
+    const gain = audioContext.createGain();
+    const now = audioContext.currentTime;
+    gain.gain.setValueAtTime(.026, now);
+    gain.gain.exponentialRampToValueAtTime(.0001, now + .075);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioState.master);
+    const offset = (audioState.footstepIndex * .173) % 1.8;
+    source.start(now, offset, .085);
+    source.stop(now + .09);
+    audioState.footstepIndex += 1;
+  }
+
+  function nearestMovingTraffic(actor) {
+    let best = null;
+    for (const car of traffic) {
+      if ((car.speed || 0) < 4) continue;
+      const d = distance(actor.x, actor.y, car.x, car.y);
+      if (!best || d < best.distance) best = { car, distance:d };
+    }
+    return best;
+  }
+
+  function nearestTrainSound(actor) {
+    let best = null;
+    for (const train of trains) {
+      const d = distance(actor.x, actor.y, train.x, train.y);
+      if (!best || d < best.distance) best = { train, distance:d };
+    }
+    return best;
+  }
+
+  function updateGameAudio(dt) {
+    const audioContext = audioState.context;
+    if (!audioContext) return;
+
+    const quiet = !audioState.enabled ||
+      state.paused ||
+      !actionSheet.hidden ||
+      !helpPanel.hidden ||
+      document.hidden;
+    smoothAudioParam(audioState.master.gain, quiet ? 0 : .58, quiet ? .04 : .12);
+    if (quiet || audioContext.state !== "running") return;
+
+    const accelerating = state.player.inVehicle &&
+      (touch.driveAccel || keys.has("w") || keys.has("arrowup"));
+    const braking = state.player.inVehicle &&
+      (touch.driveBrake || keys.has("s") || keys.has("arrowdown") || keys.has(" "));
+    const carSpeedRatio = clamp(personalCar.speed / 390, 0, 1);
+
+    const engineGain = state.player.inVehicle
+      ? .014 + carSpeedRatio * .034 + (accelerating ? .01 : 0)
+      : 0;
+    const engineFrequency = 50 + carSpeedRatio * 118 + (accelerating ? 14 : 0);
+    smoothAudioParam(audioState.engineGain.gain, engineGain, .055);
+    smoothAudioParam(audioState.engineOsc.frequency, engineFrequency, .045);
+    smoothAudioParam(audioState.engineHarmonic.frequency, engineFrequency * 2.03, .045);
+    smoothAudioParam(audioState.engineFilter.frequency, 430 + carSpeedRatio * 520, .08);
+
+    const roadGain = state.player.inVehicle
+      ? Math.pow(carSpeedRatio, 1.35) * .045
+      : 0;
+    smoothAudioParam(audioState.roadLayer.gain.gain, roadGain, .08);
+    smoothAudioParam(audioState.roadLayer.filter.frequency, 300 + carSpeedRatio * 520, .09);
+
+    const brakeGain = braking && personalCar.speed > 34
+      ? .008 + carSpeedRatio * .018
+      : 0;
+    smoothAudioParam(audioState.brakeLayer.gain.gain, brakeGain, .035);
+    smoothAudioParam(audioState.brakeLayer.filter.frequency, 1050 + carSpeedRatio * 900, .05);
+
+    const actor = actorPosition();
+    const nearbyTraffic = nearestMovingTraffic(actor);
+    if (nearbyTraffic && nearbyTraffic.distance < 950) {
+      const attenuation = Math.pow(clamp(1 - nearbyTraffic.distance / 950, 0, 1), 1.5);
+      const speedRatio = clamp((nearbyTraffic.car.speed || 0) / 300, 0, 1);
+      smoothAudioParam(audioState.npcGain.gain, attenuation * (.007 + speedRatio * .023), .12);
+      smoothAudioParam(audioState.npcOsc.frequency, 52 + speedRatio * 86, .12);
+      smoothAudioParam(audioState.npcFilter.frequency, 270 + speedRatio * 330, .12);
+    } else {
+      smoothAudioParam(audioState.npcGain.gain, 0, .14);
+    }
+
+    const nearbyTrain = nearestTrainSound(actor);
+    if (nearbyTrain) {
+      const inThisTrain = state.player.inTrain && nearbyTrain.train.id === state.player.trainId;
+      const attenuation = inThisTrain
+        ? 1
+        : Math.pow(clamp(1 - nearbyTrain.distance / 1700, 0, 1), 1.35);
+      const speedRatio = clamp((nearbyTrain.train.speed || 0) / TRAIN_SPEED, 0, 1);
+      const trainGain = attenuation * (inThisTrain ? .042 : (.004 + speedRatio * .032));
+      smoothAudioParam(audioState.trainGain.gain, trainGain, .14);
+      smoothAudioParam(audioState.trainOsc.frequency, 43 + speedRatio * 46, .13);
+      smoothAudioParam(audioState.trainFilter.frequency, 230 + speedRatio * 260, .14);
+    } else {
+      smoothAudioParam(audioState.trainGain.gain, 0, .16);
+    }
+
+    const raining = state.visual.weather === "rain";
+    smoothAudioParam(audioState.rainLayer.gain.gain, raining ? .052 : 0, .3);
+    smoothAudioParam(audioState.ambientLayer.gain.gain, raining ? .008 : .014, .35);
+
+    const movingOnFoot = !state.player.inVehicle &&
+      !state.player.inTrain &&
+      (
+        Math.abs(touch.x) > .08 ||
+        Math.abs(touch.y) > .08 ||
+        keys.has("w") ||
+        keys.has("a") ||
+        keys.has("s") ||
+        keys.has("d") ||
+        keys.has("arrowup") ||
+        keys.has("arrowdown") ||
+        keys.has("arrowleft") ||
+        keys.has("arrowright")
+      );
+    if (movingOnFoot) {
+      audioState.footstepTimer -= dt;
+      if (audioState.footstepTimer <= 0) {
+        playFootstep();
+        audioState.footstepTimer = (touch.run || keys.has("shift")) ? .27 : .44;
+      }
+    } else {
+      audioState.footstepTimer = 0;
+    }
+  }
 
   function signalStateAt(worldX, worldY, orientation) {
     const gx = Math.round(worldX / ROAD_GAP);
@@ -7491,6 +7840,7 @@
     }
 
     update(dt);
+    updateGameAudio(dt);
 
     if (toastTimer > 0) {
       toastTimer -= dt;
@@ -7538,12 +7888,35 @@
     joystickKnob.style.transform = "translate(0,0)";
   }
 
-  document.getElementById("gameShell").addEventListener("contextmenu", (event) => event.preventDefault());
-  document.getElementById("gameShell").addEventListener("selectstart", (event) => event.preventDefault());
+  const gameShell = document.getElementById("gameShell");
+  gameShell.addEventListener("contextmenu", (event) => event.preventDefault());
+  gameShell.addEventListener("selectstart", (event) => event.preventDefault());
+  gameShell.addEventListener("pointerdown", () => {
+    void unlockGameAudio();
+  }, { passive:true });
+  gameShell.addEventListener("click", (event) => {
+    const button = event.target.closest?.("button");
+    if (button && button !== soundButton) playUiTick();
+  });
+
+  if (soundButton) {
+    soundButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      const nextEnabled = !audioState.enabled;
+      setSoundEnabled(nextEnabled);
+      if (nextEnabled) {
+        void unlockGameAudio().then((running) => {
+          if (running) playUiTick();
+        });
+      }
+    });
+  }
+  updateSoundButton();
 
   window.addEventListener("resize", resize);
 
   window.addEventListener("keydown", (event) => {
+    void unlockGameAudio();
     const key = event.key.toLowerCase();
     if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "w", "a", "s", "d", "e", "shift"].includes(key)) {
       event.preventDefault();
