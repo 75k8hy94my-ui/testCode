@@ -62,7 +62,6 @@
   const helpPanel = document.getElementById("helpPanel");
   const helpButton = document.getElementById("helpButton");
   const helpClose = document.getElementById("helpClose");
-  const saveButton = document.getElementById("saveButton");
   const toast = document.getElementById("toast");
   const pausedOverlay = document.getElementById("pausedOverlay");
   const joystick = document.getElementById("joystick");
@@ -151,7 +150,7 @@
     { wall:"#b9aa8d", roof:"#6a6358", trim:"#ded3bd", glass:"#839faa" }
   ];
   const VEHICLE_TYPES = ["compact","sedan","suv","van"];
-  const SAVE_KEY = "testCodeLifeSimSave:v1";
+  const LEGACY_SAVE_KEY = "testCodeLifeSimSave:v1";
   const RENT = 12000;
   const keys = new Set();
   const buildings = [];
@@ -2524,7 +2523,6 @@
     state.drive.signals = [];
     state.drive.destination = null;
     personalCar.speed = 0;
-    saveGame(false);
   }
 
   function openDrivingMenu() {
@@ -2621,8 +2619,7 @@
       if (disabled) return;
       handler();
       closeActionSheet();
-      saveGame(false);
-    });
+      });
     actionChoices.appendChild(button);
   }
 
@@ -3063,9 +3060,10 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  function saveGame(showMessage = false) {
-    try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({
+  function buildGameSnapshot() {
+    // Persistence-neutral snapshot. Future authenticated sync can send this
+    // object to the backend without reintroducing browser-local saves.
+    return {
         version: 1,
         mapVersion: mapModel.version,
         player: {
@@ -3135,13 +3133,17 @@
           dir:ped.dir
         })),
         savedAt: Date.now()
-      }));
-      if (showMessage) showToast("生活データを保存しました");
+      };
+  }
+
+  function clearLegacyLocalSave() {
+    try {
+      localStorage.removeItem(LEGACY_SAVE_KEY);
     } catch (error) {
-      console.warn("save failed", error);
-      if (showMessage) showToast("保存できませんでした");
+      console.warn("legacy save cleanup failed", error);
     }
   }
+
 
   function migratePlayerToCurrentMap(x, y) {
     if (Number.isFinite(x) && Number.isFinite(y) && canStand(x, y)) return { x, y };
@@ -3267,12 +3269,9 @@
     planCitizenAction(ped, savedCurrentNode);
   }
 
-  function loadGame() {
+  function applyGameSnapshot(saved) {
+    if (!saved || saved.version !== 1) return false;
     try {
-      const raw = localStorage.getItem(SAVE_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw);
-      if (!saved || saved.version !== 1) return;
       const mapMatches = saved.mapVersion == null || saved.mapVersion === mapModel.version;
 
       if (saved.player) {
@@ -3370,8 +3369,10 @@
         state.player.x = personalCar.x;
         state.player.y = personalCar.y;
       }
+      return true;
     } catch (error) {
-      console.warn("load failed", error);
+      console.warn("snapshot apply failed", error);
+      return false;
     }
   }
 
@@ -3831,8 +3832,7 @@
     autosaveTimer += dt;
     if (autosaveTimer >= 5) {
       autosaveTimer = 0;
-      saveGame(false);
-    }
+      }
 
     const p = actorPosition();
     let desiredLeadX = 0;
@@ -6411,19 +6411,12 @@
   actionClose.addEventListener("click", closeActionSheet);
   helpButton.addEventListener("click", () => { helpPanel.hidden = false; });
   helpClose.addEventListener("click", () => { helpPanel.hidden = true; });
-  saveButton.addEventListener("click", () => saveGame(true));
-
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) saveGame(false);
-  });
-  window.addEventListener("pagehide", () => saveGame(false));
-
+  clearLegacyLocalSave();
   generateBuildings();
   generateTraffic();
   generatePedestrians();
   syncNamedNpcCitizens();
   migrateCarToCurrentRoadIfNeeded();
-  loadGame();
   seedPedestriansNearActor();
   resize();
   if (state.player.inVehicle) {
