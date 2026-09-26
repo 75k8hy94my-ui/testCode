@@ -130,7 +130,7 @@
           img.addEventListener('load', () => coverSourceCache.set(source, img.currentSrc || img.src), { once: true });
         }
       } else {
-        context.setupFeedImage(img, item.url, item.numberWidth, item.pagePattern);
+        context.setupFeedImage(img, item.url, item.numberWidth, item.pagePattern, item.id);
       }
       if (reorderMode) {
         const idx = list.indexOf(item);
