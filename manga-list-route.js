@@ -1,6 +1,7 @@
 (function (root) {
   'use strict';
 
+  const STYLESHEET_URL = 'manga-list.css?v=20260926-route-owned';
   const SCRIPT_URLS = [
     ['manga-list-template.js?v=20260922-vpn-tools', 'mangaRouteTemplate'],
     ['manga-list-search-events.js?v=20260922-search-events', 'mangaRouteSearchEvents'],
@@ -30,6 +31,28 @@
   ];
 
   let dependencyPromise = null;
+  let stylesheetPromise = null;
+
+  function ensureStylesheet(documentRef) {
+    const existing = Array.from(documentRef.querySelectorAll('link[rel="stylesheet"]')).find((link) => {
+      return String(link.getAttribute('href') || '').includes('manga-list.css');
+    });
+    if (existing) return Promise.resolve(existing);
+    if (stylesheetPromise) return stylesheetPromise;
+    stylesheetPromise = new Promise((resolve, reject) => {
+      const link = documentRef.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = STYLESHEET_URL;
+      link.dataset.mangaListRouteStyle = '1';
+      link.addEventListener('load', () => resolve(link), { once: true });
+      link.addEventListener('error', () => {
+        stylesheetPromise = null;
+        reject(new Error('manga list stylesheet failed to load'));
+      }, { once: true });
+      documentRef.head.appendChild(link);
+    });
+    return stylesheetPromise;
+  }
 
   function loadScript(src, id, documentRef) {
     const existing = documentRef.getElementById(id);
@@ -140,7 +163,7 @@
         activeEntry.cleanup();
         activeEntry = null;
       }
-      await loadDependencies(documentRef);
+      await Promise.all([ensureStylesheet(documentRef), loadDependencies(documentRef)]);
       if (token !== lifecycle) return null;
       const storage = windowRef.localStorage;
       const keys = {
