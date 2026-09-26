@@ -520,7 +520,7 @@
     if (nearbyTraffic && nearbyTraffic.distance < 950) {
       const attenuation = Math.pow(clamp(1 - nearbyTraffic.distance / 950, 0, 1), 1.5);
       const speedRatio = clamp((nearbyTraffic.car.speed || 0) / 300, 0, 1);
-      smoothAudioParam(audioState.npcGain.gain, attenuation * (.007 + speedRatio * .023), .12);
+      smoothAudioParam(audioState.npcGain.gain, attenuation * (.007 + speedRatio * .023) * (state.player.inHome ? .18 : 1), .12);
       smoothAudioParam(audioState.npcOsc.frequency, 52 + speedRatio * 86, .12);
       smoothAudioParam(audioState.npcFilter.frequency, 270 + speedRatio * 330, .12);
     } else {
@@ -543,8 +543,8 @@
     }
 
     const raining = state.visual.weather === "rain";
-    smoothAudioParam(audioState.rainLayer.gain.gain, raining ? .052 : 0, .3);
-    smoothAudioParam(audioState.ambientLayer.gain.gain, raining ? .007 : .009, .35);
+    smoothAudioParam(audioState.rainLayer.gain.gain, raining ? (state.player.inHome ? .012 : .052) : 0, .3);
+    smoothAudioParam(audioState.ambientLayer.gain.gain, state.player.inHome ? .003 : (raining ? .007 : .009), .35);
 
     const movingOnFoot = !state.player.inVehicle &&
       !state.player.inTrain &&
@@ -606,6 +606,25 @@
   const GYM = PLACES.find((place) => place.id === "gym");
   const LIBRARY = PLACES.find((place) => place.id === "library");
   const SPECIAL_BLOCKS = new Set(PLACES.map((place) => place.gx + "," + place.gy));
+
+  const HOME_INTERIOR = { width:780, height:500 };
+  const HOME_FIXTURES = [
+    { id:"bed", label:"ベッド", x:62, y:60, w:190, h:112, interactX:260, interactY:125, range:72 },
+    { id:"shower", label:"シャワー", x:70, y:318, w:118, h:118, interactX:208, interactY:372, range:68 },
+    { id:"kitchen", label:"キッチン", x:510, y:55, w:205, h:82, interactX:505, interactY:153, range:78 },
+    { id:"sofa", label:"ソファ", x:486, y:330, w:205, h:74, interactX:476, interactY:365, range:74 },
+    { id:"exit", label:"玄関", x:356, y:455, w:68, h:25, interactX:390, interactY:438, range:62 }
+  ];
+  const HOME_OBSTACLES = [
+    ...HOME_FIXTURES.filter((fixture) => fixture.id !== "exit").map((fixture) => ({
+      x:fixture.x,
+      y:fixture.y,
+      w:fixture.w,
+      h:fixture.h
+    })),
+    { x:326, y:88, w:128, h:78 },
+    { x:294, y:276, w:168, h:82 }
+  ];
 
   const TRAIN_STATIONS = mapModel.stations.map((station) => ({ ...station }));
 
@@ -967,7 +986,10 @@
       facingY: 1,
       inVehicle: false,
       inTrain: false,
-      trainId: null
+      trainId: null,
+      inHome: false,
+      homeX: HOME_INTERIOR.width / 2,
+      homeY: HOME_INTERIOR.height - 76
     },
     camera: { x: HOME.x - viewWidth / 2, y: HOME.y - viewHeight / 2 },
     day: 1,
@@ -1327,6 +1349,7 @@
       includePlayer &&
       !state.player.inVehicle &&
       !state.player.inTrain &&
+      !state.player.inHome &&
       distance(x, y, state.player.x, state.player.y) < radius + PLAYER_COLLISION_RADIUS
     ) {
       return { type:"player", target:state.player };
@@ -1352,6 +1375,7 @@
     if (
       !state.player.inVehicle &&
       !state.player.inTrain &&
+      !state.player.inHome &&
       circleIntersectsVehicle(state.player.x, state.player.y, PLAYER_COLLISION_RADIUS, car, 1)
     ) return { type:"player", target:state.player };
 
@@ -2447,6 +2471,7 @@
   }
 
   function actorPosition() {
+    if (state.player.inHome) return { x:HOME.x, y:HOME.y };
     if (state.player.inTrain) {
       const train = trainById(state.player.trainId);
       if (train) return { x: train.x, y: train.y };
@@ -3199,55 +3224,170 @@
     return 1440 - state.minute + target;
   }
 
-  function openPlace(place) {
-    actionTitle.textContent = place.name;
-    actionDescription.textContent = "";
-    actionChoices.replaceChildren();
+  function homeFixtureById(id) {
+    return HOME_FIXTURES.find((fixture) => fixture.id === id) || null;
+  }
 
-    if (place.id === "home") {
-      actionDescription.textContent = "生活の拠点。食事、睡眠、身支度ができます。";
-      addChoice("料理する", "食料1個 / 45分 / 空腹を大きく回復", () => {
-        if (state.groceries <= 0) {
-          showToast("食料がありません。スーパーで買えます");
-          return;
-        }
-        state.groceries -= 1;
-        advanceTime(45);
-        state.needs.hunger += 52;
-        state.needs.fun += 4;
-        state.needs.hygiene -= 2;
-        clampNeeds();
-        showToast("家で料理を食べました");
-      });
-      addChoice("シャワー", "20分 / 清潔を最大まで回復", () => {
-        advanceTime(20);
-        state.needs.hygiene = 100;
-        state.needs.energy += 2;
-        clampNeeds();
-        showToast("さっぱりしました");
-      });
-      addChoice("眠る", "翌朝7:00まで / 体力を回復", () => {
-        const sleepMinutes = minutesUntil(7, 0);
-        advanceTime(sleepMinutes);
-        state.needs.energy = 100;
-        state.needs.hunger -= 8;
-        state.needs.hygiene -= 5;
-        state.needs.fun += 3;
-        clampNeeds();
-        state.player.x = HOME.x;
-        state.player.y = HOME.y;
-        showToast("よく眠れました");
-      });
-      addChoice("家でのんびり", "60分 / 体力と楽しさを回復", () => {
-        advanceTime(60);
-        state.needs.energy += 16;
-        state.needs.fun += 18;
-        state.needs.social -= 2;
-        clampNeeds();
-        showToast("家でゆっくり過ごしました");
-      });
+  function canHomeOccupy(x, y, radius = PLAYER_RADIUS) {
+    const wall = 28;
+    if (
+      x - radius < wall ||
+      y - radius < wall ||
+      x + radius > HOME_INTERIOR.width - wall ||
+      y + radius > HOME_INTERIOR.height - wall
+    ) return false;
+
+    for (const obstacle of HOME_OBSTACLES) {
+      if (circleRectCollision(x, y, radius, obstacle)) return false;
+    }
+    return true;
+  }
+
+  function enterHome() {
+    if (state.player.inVehicle || state.player.inTrain) return;
+    state.player.inHome = true;
+    state.player.homeX = HOME_INTERIOR.width / 2;
+    state.player.homeY = HOME_INTERIOR.height - 76;
+    state.player.facingX = 0;
+    state.player.facingY = -1;
+    touch.x = 0;
+    touch.y = 0;
+    showToast("自宅に入りました");
+  }
+
+  function exitHome() {
+    state.player.inHome = false;
+    state.player.x = HOME.x;
+    state.player.y = HOME.y;
+    state.player.facingX = 0;
+    state.player.facingY = 1;
+    state.visual.cameraLeadX = 0;
+    state.visual.cameraLeadY = 0;
+    showToast("外に出ました");
+  }
+
+  function updatePlayerAtHome(dt) {
+    let x = 0;
+    let y = 0;
+    const running = touch.run || keys.has("shift");
+
+    if (Math.abs(touch.x) > .03 || Math.abs(touch.y) > .03) {
+      x = touch.x;
+      y = touch.y;
+    } else {
+      if (keys.has("a") || keys.has("arrowleft")) x -= 1;
+      if (keys.has("d") || keys.has("arrowright")) x += 1;
+      if (keys.has("w") || keys.has("arrowup")) y -= 1;
+      if (keys.has("s") || keys.has("arrowdown")) y += 1;
     }
 
+    const mag = Math.hypot(x, y);
+    if (mag <= .02) return;
+    x /= Math.max(1, mag);
+    y /= Math.max(1, mag);
+    state.player.facingX = x;
+    state.player.facingY = y;
+
+    const speed = running ? RUN_SPEED * 1.08 : WALK_SPEED * 1.18;
+    const nx = state.player.homeX + x * speed * dt;
+    const ny = state.player.homeY + y * speed * dt;
+    if (canHomeOccupy(nx, state.player.homeY)) state.player.homeX = nx;
+    if (canHomeOccupy(state.player.homeX, ny)) state.player.homeY = ny;
+  }
+
+  function nearestHomeInteraction() {
+    if (!state.player.inHome) return null;
+    let nearest = null;
+    let nearestDistance = Infinity;
+
+    for (const fixture of HOME_FIXTURES) {
+      const d = distance(state.player.homeX, state.player.homeY, fixture.interactX, fixture.interactY);
+      if (d <= fixture.range && d < nearestDistance) {
+        nearest = fixture;
+        nearestDistance = d;
+      }
+    }
+
+    if (!nearest) return null;
+    return {
+      type:"home-fixture",
+      target:nearest,
+      label:nearest.id === "exit" ? "外へ出る" : nearest.label + "を使う"
+    };
+  }
+
+  function homeCook() {
+    if (state.groceries <= 0) {
+      showToast("食料がありません。スーパーで買えます");
+      return;
+    }
+    state.groceries -= 1;
+    advanceTime(45);
+    state.needs.hunger += 52;
+    state.needs.fun += 4;
+    state.needs.hygiene -= 2;
+    clampNeeds();
+    showToast("料理して食事をとりました");
+  }
+
+  function homeShower() {
+    advanceTime(20);
+    state.needs.hygiene = 100;
+    state.needs.energy += 2;
+    clampNeeds();
+    showToast("シャワーを浴びました");
+  }
+
+  function homeSleep() {
+    const sleepMinutes = minutesUntil(7, 0);
+    advanceTime(sleepMinutes);
+    state.needs.energy = 100;
+    state.needs.hunger -= 8;
+    state.needs.hygiene -= 5;
+    state.needs.fun += 3;
+    clampNeeds();
+    state.player.homeX = HOME_INTERIOR.width / 2;
+    state.player.homeY = HOME_INTERIOR.height - 76;
+    showToast("よく眠れました");
+  }
+
+  function homeRelax() {
+    advanceTime(60);
+    state.needs.energy += 16;
+    state.needs.fun += 18;
+    state.needs.social -= 2;
+    clampNeeds();
+    showToast("ソファでゆっくり過ごしました");
+  }
+
+  function openHomeFixture(fixture) {
+    if (!fixture) return;
+    if (fixture.id === "exit") {
+      exitHome();
+      return;
+    }
+
+    actionChoices.replaceChildren();
+    actionTitle.textContent = fixture.label;
+
+    if (fixture.id === "kitchen") {
+      actionDescription.textContent = "冷蔵庫の食料を使って料理できます。";
+      addChoice("料理する", "食料1個 / 45分 / 空腹を大きく回復", homeCook, state.groceries <= 0);
+    } else if (fixture.id === "shower") {
+      actionDescription.textContent = "浴室で身支度を整えます。";
+      addChoice("シャワーを浴びる", "20分 / 清潔を最大まで回復", homeShower);
+    } else if (fixture.id === "bed") {
+      actionDescription.textContent = "ベッドで翌朝まで眠れます。";
+      addChoice("眠る", "翌朝7:00まで / 体力を最大まで回復", homeSleep);
+    } else if (fixture.id === "sofa") {
+      actionDescription.textContent = "リビングで休息できます。";
+      addChoice("のんびりする", "60分 / 体力+16 / 楽しさ+18", homeRelax);
+    }
+
+    actionSheet.hidden = false;
+  }
+
+  function openPlace(place) {
     if (place.id === "store") {
       actionDescription.textContent = "食料品とちょっとした食事を買えます。";
       addChoice("食料を3個買う", "¥1,500 / 15分", () => {
@@ -3476,6 +3616,7 @@
 
 
   function nearestInteraction() {
+    if (state.player.inHome) return nearestHomeInteraction();
     const p = actorPosition();
 
     if (state.player.inTrain) {
@@ -3544,7 +3685,11 @@
         placeDistance = d;
       }
     }
-    if (nearestPlace) return { type: "place", target: nearestPlace, label: nearestPlace.name + "を利用" };
+    if (nearestPlace) return {
+      type:"place",
+      target:nearestPlace,
+      label:nearestPlace.id === "home" ? "自宅に入る" : nearestPlace.name + "を利用"
+    };
 
     return null;
   }
@@ -3607,6 +3752,7 @@
     if (item.type === "train-exit") exitTrain();
     if (item.type === "train-wait") showToast("電車が到着したら E / ACTION で乗車できます");
     if (item.type === "place") openPlace(item.target);
+    if (item.type === "home-fixture") openHomeFixture(item.target);
     if (item.type === "npc") openNpc(item.target);
     if (item.type === "citizen") openCitizen(item.target);
   }
@@ -3635,7 +3781,10 @@
           facingY: state.player.facingY,
           inVehicle: state.player.inVehicle,
           inTrain: state.player.inTrain,
-          trainId: state.player.trainId
+          trainId: state.player.trainId,
+          inHome: state.player.inHome,
+          homeX: state.player.homeX,
+          homeY: state.player.homeY
         },
         car: {
           x: personalCar.x,
@@ -4307,6 +4456,7 @@
     if (
       !state.player.inVehicle &&
       !state.player.inTrain &&
+      !state.player.inHome &&
       personOccupiesVehicleRoad(state.player.x, state.player.y)
     ) {
       considerPoint(state.player.x, state.player.y, PLAYER_COLLISION_RADIUS);
@@ -5207,7 +5357,8 @@
     updateTrainSystem(dt);
 
     if (!state.player.inVehicle) state.drive.signalClock += dt;
-    if (state.player.inVehicle) updateCar(dt);
+    if (state.player.inHome) updatePlayerAtHome(dt);
+    else if (state.player.inVehicle) updateCar(dt);
     else if (!state.player.inTrain) updatePlayerOnFoot(dt);
 
     updateTraffic(dt);
@@ -7798,6 +7949,266 @@
     drawPerson(state.player.x, state.player.y, dir, "#405c50", "#313b42", "#332a24", "#edbea0", phase, 1.12);
   }
 
+  function homeInteriorViewport() {
+    const paddingX = Math.max(18, Math.min(52, viewWidth * .045));
+    const paddingY = Math.max(18, Math.min(54, viewHeight * .05));
+    const scale = Math.min(
+      (viewWidth - paddingX * 2) / HOME_INTERIOR.width,
+      (viewHeight - paddingY * 2) / HOME_INTERIOR.height,
+      1.22
+    );
+    return {
+      scale,
+      x:(viewWidth - HOME_INTERIOR.width * scale) / 2,
+      y:(viewHeight - HOME_INTERIOR.height * scale) / 2
+    };
+  }
+
+  function homeToScreen(x, y) {
+    const viewport = homeInteriorViewport();
+    return {
+      x:viewport.x + x * viewport.scale,
+      y:viewport.y + y * viewport.scale,
+      scale:viewport.scale
+    };
+  }
+
+  function drawHomeFurnitureRect(x, y, w, h, fill, radius = 8) {
+    const a = homeToScreen(x, y);
+    const viewport = homeInteriorViewport();
+    ctx.fillStyle = "rgba(24,27,25,.18)";
+    roundedRectPath(ctx, a.x + 4 * viewport.scale, a.y + 6 * viewport.scale, w * viewport.scale, h * viewport.scale, radius * viewport.scale);
+    ctx.fill();
+    ctx.fillStyle = fill;
+    roundedRectPath(ctx, a.x, a.y, w * viewport.scale, h * viewport.scale, radius * viewport.scale);
+    ctx.fill();
+  }
+
+  function drawHomeInterior() {
+    const viewport = homeInteriorViewport();
+    const ox = viewport.x;
+    const oy = viewport.y;
+    const s = viewport.scale;
+    const w = HOME_INTERIOR.width * s;
+    const h = HOME_INTERIOR.height * s;
+
+    // Background outside the apartment.
+    ctx.fillStyle = "#202725";
+    ctx.fillRect(0, 0, viewWidth, viewHeight);
+
+    // Apartment drop shadow and timber floor.
+    ctx.fillStyle = "rgba(0,0,0,.28)";
+    roundedRectPath(ctx, ox + 12, oy + 15, w, h, 18 * s);
+    ctx.fill();
+
+    const floor = ctx.createLinearGradient(ox, oy, ox, oy + h);
+    floor.addColorStop(0, "#d5c3a3");
+    floor.addColorStop(1, "#c7b28e");
+    ctx.fillStyle = floor;
+    roundedRectPath(ctx, ox, oy, w, h, 16 * s);
+    ctx.fill();
+
+    // Floor boards.
+    ctx.strokeStyle = "rgba(105,79,50,.12)";
+    ctx.lineWidth = Math.max(1, s);
+    for (let y = 48; y < HOME_INTERIOR.height - 30; y += 34) {
+      const a = homeToScreen(30, y);
+      const b = homeToScreen(HOME_INTERIOR.width - 30, y);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+
+    // Walls and room dividers, with generous openings for movement.
+    ctx.strokeStyle = "#eee7da";
+    ctx.lineWidth = 18 * s;
+    ctx.lineCap = "square";
+    roundedRectPath(ctx, ox + 9 * s, oy + 9 * s, w - 18 * s, h - 18 * s, 10 * s);
+    ctx.stroke();
+
+    ctx.lineWidth = 10 * s;
+    const dividerA1 = homeToScreen(294, 30);
+    const dividerA2 = homeToScreen(294, 205);
+    ctx.beginPath();
+    ctx.moveTo(dividerA1.x, dividerA1.y);
+    ctx.lineTo(dividerA2.x, dividerA2.y);
+    ctx.stroke();
+
+    const dividerB1 = homeToScreen(250, 268);
+    const dividerB2 = homeToScreen(250, 445);
+    ctx.beginPath();
+    ctx.moveTo(dividerB1.x, dividerB1.y);
+    ctx.lineTo(dividerB2.x, dividerB2.y);
+    ctx.stroke();
+
+    // Rugs define living/dining zones.
+    const rug = homeToScreen(454, 265);
+    ctx.fillStyle = "#a98e72";
+    roundedRectPath(ctx, rug.x, rug.y, 266 * s, 165 * s, 15 * s);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.18)";
+    ctx.lineWidth = 2 * s;
+    roundedRectPath(ctx, rug.x + 8*s, rug.y + 8*s, 250*s, 149*s, 11*s);
+    ctx.stroke();
+
+    // Bed.
+    drawHomeFurnitureRect(62, 60, 190, 112, "#d8ddd7", 12);
+    let p = homeToScreen(70, 68);
+    ctx.fillStyle = "#f0eee7";
+    roundedRectPath(ctx, p.x, p.y, 174*s, 38*s, 8*s);
+    ctx.fill();
+    ctx.fillStyle = "#7891a2";
+    roundedRectPath(ctx, p.x, p.y + 42*s, 174*s, 58*s, 7*s);
+    ctx.fill();
+
+    // Shower / bathroom.
+    drawHomeFurnitureRect(70, 318, 118, 118, "#d9e1df", 10);
+    p = homeToScreen(84, 332);
+    ctx.fillStyle = "#9fbfc5";
+    roundedRectPath(ctx, p.x, p.y, 90*s, 90*s, 8*s);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.55)";
+    ctx.lineWidth = 2*s;
+    ctx.beginPath();
+    ctx.arc(p.x + 45*s, p.y + 45*s, 18*s, 0, Math.PI*2);
+    ctx.stroke();
+
+    // Kitchen counter, sink and cooktop.
+    drawHomeFurnitureRect(510, 55, 205, 82, "#9b8b74", 8);
+    p = homeToScreen(525, 67);
+    ctx.fillStyle = "#d6d8d2";
+    roundedRectPath(ctx, p.x, p.y, 58*s, 42*s, 5*s);
+    ctx.fill();
+    ctx.strokeStyle = "#6c7472";
+    ctx.lineWidth = 2*s;
+    ctx.stroke();
+    ctx.fillStyle = "#333837";
+    for (const dx of [104,143]) {
+      ctx.beginPath();
+      ctx.arc(p.x + dx*s, p.y + 20*s, 11*s, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // Dining table.
+    drawHomeFurnitureRect(326, 88, 128, 78, "#9b7657", 10);
+    p = homeToScreen(348, 106);
+    ctx.fillStyle = "rgba(255,245,224,.72)";
+    ctx.beginPath();
+    ctx.arc(p.x + 42*s, p.y + 21*s, 13*s, 0, Math.PI*2);
+    ctx.fill();
+
+    // Low table.
+    drawHomeFurnitureRect(294, 276, 168, 82, "#8f6c50", 12);
+
+    // Sofa.
+    drawHomeFurnitureRect(486, 330, 205, 74, "#657f75", 16);
+    p = homeToScreen(500, 340);
+    ctx.fillStyle = "#78968a";
+    roundedRectPath(ctx, p.x, p.y, 177*s, 21*s, 8*s);
+    ctx.fill();
+
+    // TV / media unit.
+    drawHomeFurnitureRect(520, 438, 155, 24, "#4d504d", 4);
+    p = homeToScreen(548, 403);
+    ctx.fillStyle = "#263335";
+    roundedRectPath(ctx, p.x, p.y, 99*s, 34*s, 5*s);
+    ctx.fill();
+    ctx.fillStyle = "rgba(154,190,200,.22)";
+    roundedRectPath(ctx, p.x + 4*s, p.y + 4*s, 91*s, 26*s, 3*s);
+    ctx.fill();
+
+    // Entrance / genkan.
+    p = homeToScreen(338, 442);
+    ctx.fillStyle = "#aaa69a";
+    roundedRectPath(ctx, p.x, p.y, 104*s, 43*s, 5*s);
+    ctx.fill();
+    ctx.fillStyle = "#5c625e";
+    ctx.fillRect(p.x + 17*s, p.y + 31*s, 70*s, 5*s);
+
+    // Small plants/decor.
+    for (const plant of [[455,78],[224,397],[713,270]]) {
+      const q = homeToScreen(plant[0], plant[1]);
+      ctx.fillStyle = "#806b52";
+      ctx.fillRect(q.x-6*s, q.y, 12*s, 12*s);
+      ctx.fillStyle = "#527657";
+      ctx.beginPath();
+      ctx.arc(q.x-5*s,q.y-7*s,8*s,0,Math.PI*2);
+      ctx.arc(q.x+5*s,q.y-10*s,9*s,0,Math.PI*2);
+      ctx.fill();
+    }
+
+    // Warm indoor lighting / night response.
+    const time = visualTime();
+    const light = ctx.createRadialGradient(
+      ox + w*.62, oy + h*.42, 20*s,
+      ox + w*.62, oy + h*.42, Math.max(w,h)*.62
+    );
+    light.addColorStop(0, "rgba(255,238,190," + (0.08 + time.night*.16).toFixed(2) + ")");
+    light.addColorStop(1, "rgba(255,238,190,0)");
+    ctx.fillStyle = light;
+    ctx.fillRect(ox, oy, w, h);
+
+    // Interaction labels when the player is close enough.
+    const interaction = nearestHomeInteraction();
+    if (interaction) {
+      const fixture = interaction.target;
+      const q = homeToScreen(fixture.interactX, fixture.interactY);
+      ctx.fillStyle = "rgba(21,28,25,.78)";
+      roundedRectPath(ctx, q.x - 48*s, q.y - 40*s, 96*s, 24*s, 7*s);
+      ctx.fill();
+      ctx.fillStyle = "#f4f7f5";
+      ctx.font = "700 " + Math.max(10, 11*s) + "px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(fixture.id === "exit" ? "玄関" : fixture.label, q.x, q.y - 24*s);
+    }
+
+    drawHomePlayer();
+  }
+
+  function drawHomePlayer() {
+    const p = homeToScreen(state.player.homeX, state.player.homeY);
+    const s = p.scale;
+    const dir = Math.atan2(state.player.facingY, state.player.facingX);
+    const moving = keys.has("w") || keys.has("a") || keys.has("s") || keys.has("d") ||
+      keys.has("arrowup") || keys.has("arrowdown") || keys.has("arrowleft") || keys.has("arrowright") ||
+      Math.abs(touch.x) > .08 || Math.abs(touch.y) > .08;
+    const step = moving ? Math.sin(performance.now() * .011) : 0;
+    const fx = Math.cos(dir);
+    const fy = Math.sin(dir);
+    const sx = -fy;
+    const sy = fx;
+
+    ctx.fillStyle = "rgba(20,24,22,.20)";
+    ctx.beginPath();
+    ctx.ellipse(p.x + 3*s, p.y + 11*s, 10*s, 4.5*s, dir, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.strokeStyle = "#313b42";
+    ctx.lineWidth = 4*s;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(p.x - sx*3*s, p.y + 2*s);
+    ctx.lineTo(p.x - sx*3*s + fx*step*4*s, p.y + 12*s + fy*step*3*s);
+    ctx.moveTo(p.x + sx*3*s, p.y + 2*s);
+    ctx.lineTo(p.x + sx*3*s - fx*step*4*s, p.y + 12*s - fy*step*3*s);
+    ctx.stroke();
+
+    ctx.fillStyle = "#405c50";
+    roundedRectPath(ctx, p.x - 8*s, p.y - 10*s, 16*s, 18*s, 5*s);
+    ctx.fill();
+
+    ctx.fillStyle = "#edbea0";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y - 18*s, 7.5*s, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = "#332a24";
+    ctx.beginPath();
+    ctx.arc(p.x - fx*1.5*s, p.y - 21*s, 7.5*s, Math.PI, Math.PI*2);
+    ctx.fill();
+  }
+
   function drawStreetLightsGlow() {
     const time = visualTime();
     if (time.night < .35) return;
@@ -8001,6 +8412,11 @@
   }
 
   function updateObjective() {
+    if (state.player.inHome) {
+      objectiveTitle.textContent = "自宅";
+      objectiveText.textContent = "家具に近づいて ACTION / E で料理・入浴・睡眠・休憩ができます";
+      return;
+    }
     if (state.player.inTrain) {
       const train = trainById(state.player.trainId);
       const station = stoppedStationForTrain(train);
@@ -8069,7 +8485,7 @@
 
   function updateHUD() {
     const p = actorPosition();
-    areaNameEl.textContent = currentDistrict(p.x, p.y);
+    areaNameEl.textContent = state.player.inHome ? "自宅" : currentDistrict(p.x, p.y);
     const hours = Math.floor(state.minute / 60);
     const minutes = Math.floor(state.minute % 60);
     worldClockEl.textContent = "Day " + state.day + "  " + String(hours).padStart(2, "0") + ":" + String(minutes).padStart(2, "0");
@@ -8093,6 +8509,7 @@
     driveHud.hidden = !state.player.inVehicle;
     mobileDrivingControls.hidden = !state.player.inVehicle;
     document.body.classList.toggle("driving", state.player.inVehicle);
+    if (minimap?.parentElement) minimap.parentElement.hidden = state.player.inHome;
 
     if (state.player.inVehicle) {
       const limit = speedLimitAt(personalCar.x, personalCar.y);
@@ -8124,6 +8541,13 @@
   function render() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, viewWidth, viewHeight);
+
+    if (state.player.inHome) {
+      drawHomeInterior();
+      updateHUD();
+      return;
+    }
+
     ctx.fillStyle = "#74836f";
     ctx.fillRect(0, 0, viewWidth, viewHeight);
 
