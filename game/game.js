@@ -1110,6 +1110,49 @@
     };
   }
 
+  function edgeOrientation(edge) {
+    const from = mapModel.getNode(edge.from);
+    const to = mapModel.getNode(edge.to);
+    return from && to && Math.abs(to.x - from.x) >= Math.abs(to.y - from.y) ? "h" : "v";
+  }
+
+  function trafficGoalNode(car, startNodeId) {
+    const candidates = mapModel.nodes.filter((node) => node.id !== startNodeId && mapModel.neighbors(node.id, { mode: "vehicle" }).length > 0);
+    if (!candidates.length) return null;
+    const index = Math.floor(hash2(car.seed || 1, car.routeTrips || 0, 717) * candidates.length) % candidates.length;
+    return candidates[index].id;
+  }
+
+  function buildTrafficRoute(car, startNodeId, goalNodeId) {
+    const route = mapModel.findRoute(startNodeId, goalNodeId, { mode: "vehicle" });
+    if (!route || !route.edgeIds.length) return false;
+    car.routeEdgeIds = route.edgeIds;
+    car.routeIndex = 0;
+    car.routeGoalNodeId = goalNodeId;
+    car.routeTrips = (car.routeTrips || 0) + 1;
+    return true;
+  }
+
+  function advanceTrafficRoute(car) {
+    const current = mapModel.getEdge(car.edgeId);
+    if (!current) return false;
+    const nodeId = car.directionSign > 0 ? current.to : current.from;
+    let nextId = car.routeEdgeIds?.[car.routeIndex];
+    if (!nextId) {
+      const goalNodeId = trafficGoalNode(car, nodeId);
+      if (!goalNodeId || !buildTrafficRoute(car, nodeId, goalNodeId)) return false;
+      nextId = car.routeEdgeIds[car.routeIndex];
+    }
+    const next = mapModel.getEdge(nextId);
+    if (!next || (next.from !== nodeId && next.to !== nodeId)) return false;
+    car.edgeId = next.id;
+    car.directionSign = next.from === nodeId ? 1 : -1;
+    car.edgeLength = polylineLength(next.points);
+    car.along = car.directionSign > 0 ? 0 : car.edgeLength;
+    car.routeIndex += 1;
+    return true;
+  }
+
   function randomRoadPoint(seedA, seedB, offset = 0) {
     const vehicleEdges = mapModel.edges.filter((edge) => edge.vehicle);
     const edge = vehicleEdges[Math.floor(hash2(seedA, seedB, 8) * vehicleEdges.length) % vehicleEdges.length];
@@ -1134,10 +1177,12 @@
     for (let i = 0; i < 22; i += 1) {
       const p = randomRoadPoint(i + 2, i * 7 + 3, 18);
       const cruise = 150 + hash2(i, 4, 22) * 110;
-      traffic.push({
+      const car = {
         x:p.x,
         y:p.y,
         angle:p.angle,
+        edgeId:p.edgeId,
+        edgeLength:p.edgeLength,
         orientation:p.orientation,
         roadIndex:p.roadIndex,
         directionSign:p.directionSign,
@@ -1147,49 +1192,109 @@
         cruise,
         color:colors[i % colors.length],
         type:VEHICLE_TYPES[Math.floor(hash2(i, 8, 522) * VEHICLE_TYPES.length) % VEHICLE_TYPES.length],
-        brakeGlow:0
-      });
+        brakeGlow:0,
+        seed:i + 17,
+        routeEdgeIds:[],
+        routeIndex:0,
+        routeTrips:0
+      };
+      const currentEdge = mapModel.getEdge(car.edgeId);
+      const startNodeId = car.directionSign > 0 ? currentEdge.to : currentEdge.from;
+      buildTrafficRoute(car, startNodeId, trafficGoalNode(car, startNodeId));
+      traffic.push(car);
     }
   }
 
 
+  function pedestrianGoalPlace(ped, startNodeId) {
+    const candidates = PLACES.filter((place) => place.entranceNodeId !== startNodeId && place.id !== ped.homePlaceId);
+    if (!candidates.length) return PLACES[0];
+    const index = Math.floor(hash2(ped.seed || 1, ped.tripCount || 0, 903) * candidates.length) % candidates.length;
+    return candidates[index];
+  }
+
+  function buildPedestrianPlan(ped, startNodeId, goalNodeId) {
+    const route = mapModel.findRoute(startNodeId, goalNodeId, { mode: "pedestrian" });
+    if (!route || !route.edgeIds.length) return false;
+    ped.routeEdgeIds = route.edgeIds;
+    ped.routeIndex = 0;
+    ped.targetNodeId = goalNodeId;
+    ped.targetPlaceId = PLACES.find((place) => place.entranceNodeId === goalNodeId)?.id || null;
+    ped.edgeId = route.edgeIds[0];
+    ped.directionSign = mapModel.getEdge(ped.edgeId).from === startNodeId ? 1 : -1;
+    ped.edgeLength = polylineLength(mapModel.getEdge(ped.edgeId).points);
+    ped.along = 0;
+    ped.state = "walking";
+    ped.waitTimer = 0;
+    ped.tripCount = (ped.tripCount || 0) + 1;
+    return true;
+  }
+
+  function pedestrianPoseAt(ped) {
+    const edge = mapModel.getEdge(ped.edgeId);
+    if (!edge) return { x: ped.x, y: ped.y, angle: ped.dir };
+    const hit = pointAndTangentOnPolyline(edge.points, ped.along);
+    const tangent = ped.directionSign > 0 ? hit.tangent : { x: -hit.tangent.x, y: -hit.tangent.y };
+    const sidewalkOffset = edge.width / 2 + 5;
+    const side = ped.sideSign || 1;
+    return {
+      x: hit.point.x + tangent.y * sidewalkOffset * side,
+      y: hit.point.y - tangent.x * sidewalkOffset * side,
+      angle: Math.atan2(tangent.y, tangent.x)
+    };
+  }
+
+  function pedestrianSignalState(ped) {
+    const edge = mapModel.getEdge(ped.edgeId);
+    if (!edge?.signalized) return null;
+    const endpoint = ped.directionSign > 0 ? mapModel.getNode(edge.to) : mapModel.getNode(edge.from);
+    const distanceToSignal = ped.directionSign > 0 ? ped.edgeLength - ped.along : ped.along;
+    if (!endpoint || distanceToSignal > STOP_LINE_OFFSET + 90) return null;
+    return signalStateAt(endpoint.x, endpoint.y, edgeOrientation(edge));
+  }
+
+  function choosePedestrianDestination(ped, startNodeId) {
+    const target = pedestrianGoalPlace(ped, startNodeId);
+    if (!target || !buildPedestrianPlan(ped, startNodeId, target.entranceNodeId)) return false;
+    ped.state = "walking";
+    return true;
+  }
+
   function generatePedestrians() {
     const pedestrianCount = 76;
     for (let i = 0; i < pedestrianCount; i += 1) {
-      const central = i < 44;
-      let x;
-      let y;
-      if (central) {
-        x = 3400 + hash2(i, 2, 31) * 3300;
-        y = 2700 + hash2(i, 9, 71) * 3600;
-      } else {
-        x = COAST + 300 + hash2(i, 2, 31) * (WORLD_SIZE - COAST * 2 - 600);
-        y = COAST + 300 + hash2(i, 9, 71) * (WORLD_SIZE - COAST * 2 - 600);
-      }
-      let attempts = 0;
-      while ((!canStand(x, y, 10) || isRoad(x, y)) && attempts < 40) {
-        const a = i + attempts;
-        if (central) {
-          x = 3400 + hash2(a, 12, 44) * 3300;
-          y = 2700 + hash2(a, 16, 84) * 3600;
-        } else {
-          x = COAST + 300 + hash2(a, 12, 44) * (WORLD_SIZE - COAST * 2 - 600);
-          y = COAST + 300 + hash2(a, 16, 84) * (WORLD_SIZE - COAST * 2 - 600);
-        }
-        attempts += 1;
-      }
-      pedestrians.push({
-        x,
-        y,
+      const homePlace = PLACES[i % PLACES.length];
+      const targetPlace = PLACES[(i * 3 + 2) % PLACES.length];
+      const ped = {
+        x: homePlace.x,
+        y: homePlace.y,
         dir: hash2(i, 3, 90) * Math.PI * 2,
-        timer: 1 + hash2(i, 4, 93) * 4,
+        timer: 0,
         speed: 28 + hash2(i, 8, 96) * 30,
         color: ["#c77f66", "#718da7", "#ba9b58", "#8876a8", "#71957a"][i % 5],
         pants: ["#394248","#554a45","#2f3b4d","#45464d"][i % 4],
         hair: ["#302720","#4a3427","#1f2326","#684b36"][i % 4],
         skin: ["#e5b394","#d49b77","#f0c3a4","#b97f62"][i % 4],
-        phase: hash2(i, 12, 97) * Math.PI * 2
-      });
+        phase: hash2(i, 12, 97) * Math.PI * 2,
+        seed: i + 41,
+        sideSign: hash2(i, 14, 98) > .5 ? 1 : -1,
+        homePlaceId: homePlace.id,
+        targetPlaceId: targetPlace.id,
+        targetNodeId: targetPlace.entranceNodeId,
+        routeEdgeIds: [],
+        routeIndex: 0,
+        tripCount: 0,
+        state: "walking",
+        waitTimer: 0,
+        stayTimer: 0
+      };
+      if (!buildPedestrianPlan(ped, homePlace.entranceNodeId, targetPlace.entranceNodeId)) continue;
+      ped.along = Math.min(ped.edgeLength * (.08 + hash2(i, 18, 99) * .32), Math.max(1, ped.edgeLength - 1));
+      const pose = pedestrianPoseAt(ped);
+      ped.x = pose.x;
+      ped.y = pose.y;
+      ped.dir = pose.angle;
+      pedestrians.push(ped);
     }
   }
 
@@ -2760,7 +2865,8 @@
       if (signalEdge) {
         const endpoint = car.directionSign > 0 ? mapModel.getNode(edge.to) : mapModel.getNode(edge.from);
         const distanceToSignal = car.directionSign > 0 ? edgeLength - car.along : car.along;
-        if (endpoint && (signalStateAt(endpoint.x, endpoint.y, "h") !== "green") && distanceToSignal < STOP_LINE_OFFSET + 75) {
+        const signal = endpoint ? signalStateAt(endpoint.x, endpoint.y, edgeOrientation(edge)) : "green";
+        if (endpoint && signal !== "green" && distanceToSignal < STOP_LINE_OFFSET + 75) {
           targetSpeed = Math.max(0, (distanceToSignal - STOP_LINE_OFFSET) * 2.5);
         }
       }
@@ -2776,9 +2882,25 @@
       const brakingNow = targetSpeed < car.speed - 10;
       car.brakeGlow += ((brakingNow ? 1 : 0) - car.brakeGlow) * Math.min(1, dt * 8);
       car.speed += (targetSpeed - car.speed) * Math.min(1, dt * 2.4);
-      car.along += car.directionSign * car.speed * dt;
-      if (car.along < 0) car.along += edgeLength;
-      if (car.along > edgeLength) car.along -= edgeLength;
+      let remaining = car.speed * dt;
+      let transitions = 0;
+      while (remaining > 0 && transitions < 4) {
+        const currentEdge = mapModel.getEdge(car.edgeId);
+        const currentLength = car.edgeLength || polylineLength(currentEdge.points);
+        const endpointDistance = car.directionSign > 0 ? currentLength - car.along : car.along;
+        if (remaining < Math.max(1, endpointDistance)) {
+          car.along += car.directionSign * remaining;
+          remaining = 0;
+          break;
+        }
+        remaining = Math.max(0, remaining - Math.max(1, endpointDistance));
+        car.along = car.directionSign > 0 ? currentLength : 0;
+        if (!advanceTrafficRoute(car)) {
+          car.speed = 0;
+          remaining = 0;
+        }
+        transitions += 1;
+      }
       const pose = trafficPoseAt(car, car.along);
       car.x = pose.x;
       car.y = pose.y;
@@ -2788,20 +2910,69 @@
 
   function updatePedestrians(dt) {
     for (const ped of pedestrians) {
-      ped.timer -= dt;
       ped.phase += dt * ped.speed * .12;
-      if (ped.timer <= 0) {
-        ped.timer = 1.5 + Math.random() * 4;
-        ped.dir += (Math.random() - 0.5) * 2;
+      if (ped.state === "staying") {
+        ped.stayTimer -= dt;
+        if (ped.stayTimer <= 0) {
+          const currentEdge = mapModel.getEdge(ped.edgeId);
+          const currentNodeId = currentEdge
+            ? (ped.directionSign > 0 ? currentEdge.to : currentEdge.from)
+            : ped.targetNodeId;
+          choosePedestrianDestination(ped, currentNodeId);
+        }
+        continue;
       }
-      const nx = ped.x + Math.cos(ped.dir) * ped.speed * dt;
-      const ny = ped.y + Math.sin(ped.dir) * ped.speed * dt;
-      if (canStand(nx, ny, 10) && !isRoad(nx, ny)) {
-        ped.x = nx;
-        ped.y = ny;
-      } else {
-        ped.dir += Math.PI * (0.65 + Math.random() * 0.7);
+
+      const signal = pedestrianSignalState(ped);
+      if (signal === "red" || signal === "yellow") {
+        ped.state = "waiting";
+        ped.waitTimer = Math.min(1.2, ped.waitTimer + dt);
+        ped.phase -= dt * ped.speed * .12;
+        continue;
       }
+      ped.state = "walking";
+
+      let remaining = ped.speed * dt;
+      let transitions = 0;
+      while (remaining > 0 && transitions < 4) {
+        const edge = mapModel.getEdge(ped.edgeId);
+        if (!edge) break;
+        const edgeLength = ped.edgeLength || polylineLength(edge.points);
+        const endpointDistance = ped.directionSign > 0 ? edgeLength - ped.along : ped.along;
+        if (remaining < Math.max(1, endpointDistance)) {
+          ped.along += ped.directionSign * remaining;
+          remaining = 0;
+          break;
+        }
+        remaining = Math.max(0, remaining - Math.max(1, endpointDistance));
+        ped.along = ped.directionSign > 0 ? edgeLength : 0;
+        const currentNodeId = ped.directionSign > 0 ? edge.to : edge.from;
+        const nextId = ped.routeEdgeIds?.[ped.routeIndex + 1];
+        if (!nextId) {
+          ped.state = "staying";
+          ped.stayTimer = 2.5 + hash2(ped.seed, ped.tripCount, 1001) * 7;
+          remaining = 0;
+          break;
+        }
+        const next = mapModel.getEdge(nextId);
+        if (!next || (next.from !== currentNodeId && next.to !== currentNodeId)) {
+          ped.state = "staying";
+          ped.stayTimer = 3;
+          remaining = 0;
+          break;
+        }
+        ped.routeIndex += 1;
+        ped.edgeId = next.id;
+        ped.directionSign = next.from === currentNodeId ? 1 : -1;
+        ped.edgeLength = polylineLength(next.points);
+        ped.along = ped.directionSign > 0 ? 0 : ped.edgeLength;
+        transitions += 1;
+      }
+
+      const pose = pedestrianPoseAt(ped);
+      ped.x = pose.x;
+      ped.y = pose.y;
+      ped.dir = pose.angle;
     }
   }
 

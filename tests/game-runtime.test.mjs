@@ -83,6 +83,24 @@ test('driving routes and traffic use the map graph and edge geometry', () => {
   assert.match(source, /edge\.signalized/);
 });
 
+test('ambient cars follow graph routes instead of teleporting between road ends', () => {
+  assert.match(source, /function buildTrafficRoute\(car, startNodeId, goalNodeId\)/);
+  assert.match(source, /route = mapModel\.findRoute\(startNodeId, goalNodeId, \{ mode: "vehicle" \}\)/);
+  assert.match(source, /function advanceTrafficRoute\(car\)/);
+  assert.match(source, /car\.routeIndex \+= 1/);
+  assert.match(source, /while \(remaining > 0 && transitions < 4\)/);
+});
+
+test('ambient pedestrians have destination plans, route states, and signal-aware crossings', () => {
+  assert.match(source, /function buildPedestrianPlan\(ped, startNodeId, goalNodeId\)/);
+  assert.match(source, /ped\.state = "walking"/);
+  assert.match(source, /ped\.state = "waiting"/);
+  assert.match(source, /ped\.state = "staying"/);
+  assert.match(source, /function pedestrianPoseAt\(ped\)/);
+  assert.match(source, /pedestrianSignalState\(ped\)/);
+  assert.match(source, /ped\.targetPlaceId/);
+});
+
 test('city rendering uses map parcels and polylines instead of grid-only geometry', () => {
   assert.match(source, /mapModel\.parcels/);
   assert.match(source, /mapModel\.edges/);
