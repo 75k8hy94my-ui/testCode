@@ -145,7 +145,7 @@ body:not(.driving) #mobileDrivingControls{display:none!important}
 .status-card,.drive-card,.day-card,.objective-card{
   background:linear-gradient(145deg,rgba(20,28,24,.88),rgba(14,20,17,.78))
 }
-.status-card{background:rgba(15,22,18,.98)}
+.status-card{left:0;background:rgba(15,22,18,.98)}
 .drive-card{box-shadow:0 12px 34px rgba(7,12,10,.22),0 0 0 1px rgba(101,184,211,.04)}
 .drive-speed-row strong{font-variant-numeric:tabular-nums;letter-spacing:-.04em}
 .action-sheet,.help-panel>div{

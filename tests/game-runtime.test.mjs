@@ -24,6 +24,7 @@ test('game reports an unavailable canvas context instead of failing silently', (
 test('status HUD masks canvas content at the top-left edge', () => {
   assert.match(css, /#hud\{[^}]*z-index:5/);
   assert.match(css, /\.status-card\{[^}]*z-index:6/);
+  assert.match(css, /\.status-card\{[^}]*left:0/);
   assert.match(css, /\.status-card\{[^}]*background:rgba\(15,22,18,\.98\)/);
 });
 
