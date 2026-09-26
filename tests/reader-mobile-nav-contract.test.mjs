@@ -37,3 +37,14 @@ test('reader mobile utility contract matches reader event bindings', () => {
   assert.match(reader, /els\.mobileUtilityMenu\.hidden = !open/);
   assert.match(reader, /els\.mobileNavMore\.setAttribute\('aria-expanded'/);
 });
+
+
+test('saved-item open enters mobile reader mode before alternate-source probing', () => {
+  const start = reader.indexOf('async function openItem(item, addToHistoryFlag, switchDirection)');
+  const end = reader.indexOf('function closeManga()', start);
+  assert.ok(start >= 0 && end > start);
+  const source = reader.slice(start, end);
+  assert.ok(source.indexOf('setMobileReaderMode(true)') < source.indexOf('Promise.any'));
+  assert.ok(source.indexOf("els.spinner.style.display = 'block'") < source.indexOf('Promise.any'));
+  assert.match(source, /els\.status\.textContent = '読み込み中\.\.\.'/);
+});
