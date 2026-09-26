@@ -166,7 +166,7 @@ async function renderManga(generation){
     const gate=await ensureVpnGate();
     if(generation!==renderGeneration)return;
     if(!gate||!gate.canLoadExternalMedia()){renderVpnGate(target,'manga');if(gate&&typeof gate.syncUi==='function')gate.syncUi();setTitle('manga');syncHeaderRoute();return;}
-    if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20260926-route-owned-v2','spaMangaListRoute');
+    if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20260926-route-owned-v3','spaMangaListRoute');
     if(generation!==renderGeneration)return;
     routeRuntime=window.MangaListRouteFactory.create({documentRef:document,windowRef:window});
     mangaRouteRuntime=routeRuntime;
