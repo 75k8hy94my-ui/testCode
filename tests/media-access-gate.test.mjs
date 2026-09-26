@@ -55,20 +55,77 @@ test('VPN check discovers the current public IP before querying the VPN verdict 
     assert.match(calls[1], /ip-api\.dev\/api\?q=203\.0\.113\.9&format=json/);
 });
 
-test('ordinary VPN checks skip the general external API unless explicitly requested', async () => {
+test('non-Japan IP is treated as VPN even when the provider VPN flag is false', async () => {
+  const currentIp = '203.0.113.55';
   const calls = [];
   const Gate = loadGate({
     fetch: async (url) => {
       calls.push(String(url));
-      if (url === Gate.IP_URL) return { ok: true, json: async () => ({ ip: '198.51.100.123' }) };
+      if (url === Gate.IP_URL) return { ok: true, json: async () => ({ ip: currentIp }) };
+      if (String(url).startsWith(Gate.CHECK_URL)) {
+        return { ok: true, json: async () => ({
+          is_vpn: false,
+          is_proxy: false,
+          location: { country_code: 'US', country: 'United States' },
+        }) };
+      }
+      throw new Error('Proton fallback should not run for a non-Japan IP');
+    },
+    setTimeout,
+    clearTimeout,
+  });
+  assert.equal(await Gate.checkVpn({ external: false }), true);
+  const diagnostics = Gate.getDiagnostics();
+  assert.equal(diagnostics.countryCode, 'US');
+  assert.equal(diagnostics.countryName, 'United States');
+  assert.equal(diagnostics.countryPolicy, 'non-jp-vpn');
+  assert.equal(diagnostics.final, 'allowed');
+  assert.equal(calls.length, 2);
+});
+
+test('Japan IP is not treated as VPN by country rule alone', async () => {
+  const currentIp = '203.0.113.56';
+  const Gate = loadGate({
+    fetch: async (url) => {
+      if (url === Gate.IP_URL) return { ok: true, json: async () => ({ ip: currentIp }) };
+      if (String(url).startsWith(Gate.CHECK_URL)) {
+        return { ok: true, json: async () => ({
+          is_vpn: false,
+          is_proxy: false,
+          location: { country_code: 'JP', country: 'Japan' },
+        }) };
+      }
       return { ok: true, json: async () => [] };
     },
     setTimeout,
     clearTimeout,
   });
   assert.equal(await Gate.checkVpn({ external: false }), false);
-  assert.equal(calls.some((url) => url.startsWith(Gate.CHECK_URL)), false);
-  assert.equal(Gate.getDiagnostics().generic.status, 'skipped-manual');
+  const diagnostics = Gate.getDiagnostics();
+  assert.equal(diagnostics.countryCode, 'JP');
+  assert.equal(diagnostics.countryPolicy, 'jp');
+  assert.equal(diagnostics.final, 'blocked');
+});
+
+
+test('ordinary VPN checks still resolve IP country even when the general VPN verdict is skipped', async () => {
+  const calls = [];
+  const Gate = loadGate({
+    fetch: async (url) => {
+      calls.push(String(url));
+      if (url === Gate.IP_URL) return { ok: true, json: async () => ({ ip: '198.51.100.123' }) };
+      if (String(url).startsWith(Gate.CHECK_URL)) return { ok: true, json: async () => ({ location: { country_code: 'JP' }, is_vpn: true }) };
+      return { ok: true, json: async () => [] };
+    },
+    setTimeout,
+    clearTimeout,
+  });
+  assert.equal(await Gate.checkVpn({ external: false }), false);
+  assert.equal(calls.some((url) => url.startsWith(Gate.CHECK_URL)), true);
+  const diagnostics = Gate.getDiagnostics();
+  assert.equal(diagnostics.generic.status, 'country-only');
+  assert.equal(diagnostics.countryCode, 'JP');
+  assert.equal(diagnostics.countryPolicy, 'jp');
 });
 
 test('known public VPN IP snapshot is used before external VPN lookup', async () => {
@@ -196,7 +253,7 @@ test('generic API outage is reported as unavailable rather than a VPN verdict', 
   const diagnostics = Gate.getDiagnostics();
   assert.equal(diagnostics.generic.status, 'unavailable');
   assert.equal(diagnostics.generic.httpStatus, 429);
-  assert.equal(diagnostics.error, '一般VPN判定APIを利用できません (HTTP 429)');
+  assert.equal(diagnostics.error, 'IP国・一般VPN判定APIを利用できません (HTTP 429)');
 });
 
 test('VPN check accepts an IP in a Proton-listed /24 exit block', async () => {
@@ -246,6 +303,7 @@ test('reader bootstrap loads the VPN gate before reader media and the gate cover
   assert.match(source, /patchSrcProperty\(root\.HTMLIFrameElement\)/);
   assert.match(source, /data-vpn-blocked-src/);
   assert.match(source, /VPN診断/);
+  assert.match(source, /国判定ルール: 日本以外のIPはVPNとして扱う/);
   assert.doesNotMatch(source, /button\.id = DIAGNOSTICS_BUTTON_ID/);
   assert.match(source, /closest\('\[data-vpn-diagnostics-button\]'\)/);
   assert.match(source, /abort\(\), 15000/);
