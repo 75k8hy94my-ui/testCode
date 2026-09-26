@@ -20,7 +20,7 @@ test('reader has encrypted precedence, fail-closed validation, and legacy fallba
   assert.match(source, /暗号化画像情報が壊れています/);
   assert.match(source, /if \(encryptedPages\)/);
   assert.match(source, /startReadingCustom\(item, switchDirection\)/);
-  assert.match(source, /startReading\(selectedUrl, addToHistoryFlag, switchDirection\)/);
+  assert.match(source, /startReading\(selectedUrl, addToHistoryFlag, switchDirection, resumeKey\)/);
   assert.match(source, /if \(encryptedReaderActive\) \{ renderEncryptedPage\(n, direction\); return; \}/);
 });
 
@@ -32,8 +32,8 @@ test('encrypted reader separates MangaVault session API from the active raw mast
   assert.match(source, /MangaVault\.loadActive\(\)/);
   assert.match(source, /masterKey: encryptedMasterKey\(\)/);
   assert.match(source, /vault: encryptedVaultApi\(\)/);
-  assert.match(source, /stageProcessedRevision\(\{ cache, masterKey,/);
-  assert.match(source, /publishPendingRevision\(\{ vault, storage, cache,/);
+  assert.match(source, /stageProcessedRevision\(\{[\s\S]{0,120}cache, masterKey,/);
+  assert.match(source, /publishPendingRevision\(\{[\s\S]{0,120}vault, storage, cache,/);
   assert.doesNotMatch(source, /const vault = encryptedVault\(\)/);
 });
 
@@ -66,4 +66,8 @@ test('encrypted renderer lifecycle and safety boundaries are wired', () => {
   assert.match(source, /body\.safe-mode \.encryptedAssetHost img/);
   assert.match(source, /encryptedStorageTransport/);
   assert.match(source, /EncryptedAssetCache\.createCache/);
+});
+
+test('encrypted items use current item-scoped resume keys on mainline', () => {
+  assert.match(source, /MangaReaderTarget\.itemResumeKey\(item\.id\)/);
 });
