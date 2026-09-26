@@ -4015,9 +4015,15 @@
     if (right < -180 || left > viewWidth + 180 || y < -220 || y > viewHeight + 220) return;
 
     const length = RAIL_MAX_X - RAIL_MIN_X;
+    const controlledActor = state.player.inVehicle ? personalCar : state.player;
+    const underRail = !state.player.inTrain && controlledActor.x >= RAIL_MIN_X && controlledActor.x <= RAIL_MAX_X &&
+      controlledActor.y >= RAIL_Y - RAIL_CORRIDOR_HALF && controlledActor.y <= RAIL_Y + RAIL_CORRIDOR_HALF;
 
-    // The elevated deck is deliberately drawn after ground actors. Anyone
-    // walking or driving below the viaduct is therefore occluded by it.
+    ctx.save();
+    ctx.globalAlpha = underRail ? 0.46 : 1;
+
+    // The deck is drawn after ground actors for depth, but becomes translucent
+    // only while the controlled actor is inside the under-rail corridor.
     ctx.fillStyle = "#777d7a";
     roundedRectPath(ctx, left, y - 48, length, 96, 8);
     ctx.fill();
@@ -4124,6 +4130,7 @@
       ctx.font = "700 9px system-ui, sans-serif";
       ctx.fillText("若葉線 入口", access.x, access.y + 19);
     }
+    ctx.restore();
   }
 
 

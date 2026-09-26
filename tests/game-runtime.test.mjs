@@ -34,6 +34,12 @@ test('game defines the ambient prop drawing helpers used by the city renderer', 
   assert.match(source, /function drawLamp\(x, y\)/);
 });
 
+test('elevated rail becomes translucent only for the controlled actor below it', () => {
+  assert.match(source, /const controlledActor = state\.player\.inVehicle \? personalCar : state\.player/);
+  assert.match(source, /controlledActor\.y >= RAIL_Y - RAIL_CORRIDOR_HALF/);
+  assert.match(source, /ctx\.globalAlpha = underRail \? 0\.46 : 1/);
+});
+
 test('game defines the saved-car road migration helper', () => {
   assert.match(source, /function migrateCarToCurrentRoadIfNeeded\(\)/);
   assert.match(source, /mapModel\.nearestRoad\(personalCar\.x, personalCar\.y, \{ vehicleOnly: true \}\)/);
