@@ -4546,22 +4546,42 @@
 
   function drawTrafficLights() {
     for (const node of mapModel.nodes) {
-      const signalized = mapModel.edges.some((edge) => edge.signalized && (edge.from === node.id || edge.to === node.id));
-      if (!signalized) continue;
+      const incidentEdges = mapModel.edges.filter((edge) => edge.signalized && edge.vehicle && (edge.from === node.id || edge.to === node.id));
+      if (!incidentEdges.length) continue;
       const p = worldToScreen(node.x, node.y);
       if (p.x < -180 || p.y < -180 || p.x > viewWidth + 180 || p.y > viewHeight + 180) continue;
-      const incident = mapModel.edges.find((edge) => edge.signalized && (edge.from === node.id || edge.to === node.id));
-      const otherId = incident.from === node.id ? incident.to : incident.from;
-      const other = mapModel.getNode(otherId);
-      const orientation = Math.abs(other.x - node.x) >= Math.abs(other.y - node.y) ? "h" : "v";
-      const stateName = signalStateAt(node.x, node.y, orientation);
+      const hasHorizontal = incidentEdges.some((edge) => {
+        const other = mapModel.getNode(edge.from === node.id ? edge.to : edge.from);
+        return other && Math.abs(other.x - node.x) >= Math.abs(other.y - node.y);
+      });
+      const hasVertical = incidentEdges.some((edge) => {
+        const other = mapModel.getNode(edge.from === node.id ? edge.to : edge.from);
+        return other && Math.abs(other.y - node.y) > Math.abs(other.x - node.x);
+      });
+      const halfRoad = Math.max(...incidentEdges.map((edge) => edge.width)) / 2;
+      const poleOffset = halfRoad + 28;
+      const hState = signalStateAt(node.x, node.y, "h");
+      const vState = signalStateAt(node.x, node.y, "v");
       ctx.strokeStyle = "#4d5552";
       ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-      ctx.lineTo(p.x + (orientation === "h" ? 34 : 0), p.y + (orientation === "v" ? 34 : 0));
-      ctx.stroke();
-      drawSignalHead(p.x + (orientation === "h" ? 34 : 0), p.y + (orientation === "v" ? 34 : 0), orientation, stateName);
+      if (hasHorizontal) {
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x, p.y - poleOffset);
+        ctx.stroke();
+        drawSignalHead(p.x, p.y - poleOffset, "h", hState);
+      }
+      if (hasVertical) {
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x + poleOffset, p.y);
+        ctx.stroke();
+        drawSignalHead(p.x + poleOffset, p.y, "v", vState);
+      }
+      if (hasHorizontal && hasVertical) {
+        drawPedestrianSignal(p.x - poleOffset, p.y - poleOffset, vState === "red");
+        drawPedestrianSignal(p.x + poleOffset, p.y + poleOffset, hState === "red");
+      }
     }
     return;
 

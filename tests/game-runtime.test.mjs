@@ -24,6 +24,9 @@ test('game defines the traffic signal state helper used by rendering and updates
   assert.match(source, /function signalStateAt\(worldX, worldY, orientation\)/);
   assert.match(source, /signalStateAt\(signal\.x, signal\.y, signal\.orientation\)/);
   assert.match(source, /signalStateAt\(wx, wy, "h"\)/);
+  assert.match(source, /const hasHorizontal = incidentEdges\.some/);
+  assert.match(source, /const hasVertical = incidentEdges\.some/);
+  assert.match(source, /drawPedestrianSignal\(p\.x - poleOffset/);
 });
 
 test('game defines the ambient prop drawing helpers used by the city renderer', () => {
