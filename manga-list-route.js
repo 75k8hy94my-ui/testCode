@@ -30,7 +30,6 @@
   ];
 
   let dependencyPromise = null;
-  let activeEntry = null;
 
   function loadScript(src, id, documentRef) {
     const existing = documentRef.getElementById(id);
@@ -131,10 +130,18 @@
     }
     const documentRef = deps.documentRef;
     const windowRef = deps.windowRef;
+    let activeEntry = null;
+    let lifecycle = 0;
 
     async function start(input) {
       if (!input || !input.mountElement) throw new TypeError('MangaListRouteFactory requires mountElement');
+      const token = ++lifecycle;
+      if (activeEntry) {
+        activeEntry.cleanup();
+        activeEntry = null;
+      }
       await loadDependencies(documentRef);
+      if (token !== lifecycle) return null;
       const storage = windowRef.localStorage;
       const keys = {
         savedItems: 'mangaReaderSavedItems',
@@ -386,6 +393,10 @@
         createActivation: () => () => {},
       });
       const result = entry.start({ mountElement: input.mountElement });
+      if (token !== lifecycle) {
+        entry.cleanup();
+        return null;
+      }
       installVpnControls(result.root, documentRef);
       if (windowRef.MangaReaderMediaAccess && typeof windowRef.MangaReaderMediaAccess.syncUi === 'function') {
         windowRef.MangaReaderMediaAccess.syncUi();
@@ -394,7 +405,13 @@
       activeEntry = entry;
       return Object.freeze({ root: result.root, elements: result.elements, cleanup: entry.cleanup });
     }
-    function cleanup() { if (activeEntry) { activeEntry.cleanup(); activeEntry = null; } }
+    function cleanup() {
+      lifecycle += 1;
+      if (activeEntry) {
+        activeEntry.cleanup();
+        activeEntry = null;
+      }
+    }
     return Object.freeze({ start, cleanup });
   }
 
