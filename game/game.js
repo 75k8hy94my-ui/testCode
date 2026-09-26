@@ -1769,6 +1769,44 @@
     return family + " " + given;
   }
 
+  function personAppearanceFromSeed(index) {
+    const stature = .94 + hash2(index, 211, 2201) * .14;
+    const build = .88 + hash2(index, 223, 2202) * .25;
+    const shoulder = .90 + hash2(index, 227, 2203) * .22;
+    const hip = .90 + hash2(index, 229, 2204) * .20;
+    const head = .94 + hash2(index, 233, 2205) * .13;
+    const hairStyle = Math.floor(hash2(index, 239, 2206) * 5) % 5;
+    const outfit = Math.floor(hash2(index, 241, 2207) * 4) % 4;
+    const accessoryRoll = hash2(index, 251, 2208);
+    return {
+      stature,
+      build,
+      shoulder,
+      hip,
+      head,
+      hairStyle,
+      outfit,
+      accessory:accessoryRoll > .82 ? "backpack" : accessoryRoll > .70 ? "bag" : "none",
+      shoe:hash2(index, 257, 2209) > .5 ? "#252a2b" : "#544c44",
+      gait:.88 + hash2(index, 263, 2210) * .24,
+      armSwing:.86 + hash2(index, 269, 2211) * .30
+    };
+  }
+
+  const PLAYER_APPEARANCE = {
+    stature:1.03,
+    build:1.02,
+    shoulder:1.02,
+    hip:.98,
+    head:1,
+    hairStyle:1,
+    outfit:1,
+    accessory:"none",
+    shoe:"#272d2f",
+    gait:1,
+    armSwing:1
+  };
+
   function citizenProfile(index, home, workPool) {
     const specialNpcId = index === 0 ? "aoi" : index === 1 ? "sora" : index === 2 ? "mei" : null;
     let age = 18 + Math.floor(hash2(index, 83, 1603) * 64);
@@ -2309,6 +2347,7 @@
         pants:["#394248","#554a45","#2f3b4d","#45464d"][i % 4],
         hair:["#302720","#4a3427","#1f2326","#684b36"][i % 4],
         skin:["#e5b394","#d49b77","#f0c3a4","#b97f62"][i % 4],
+        appearance:personAppearanceFromSeed(i),
         phase:hash2(i, 12, 97) * Math.PI * 2,
         seed:i + 41,
         sideSign:hash2(i, 14, 98) > .5 ? 1 : -1,
@@ -7705,59 +7744,361 @@
     ctx.fillText(place.symbol, entry.x, entry.y + 4);
   }
 
-  function drawPerson(x, y, dir, shirt, pants, hair, skin, phase, scale = 1) {
-    const p = worldToScreen(x, y);
-    if (p.x < -45 || p.y < -55 || p.x > viewWidth + 45 || p.y > viewHeight + 55) return;
-    const moving = Math.sin(phase);
-    const fx = Math.cos(dir);
-    const fy = Math.sin(dir);
-    const sx = -fy;
-    const sy = fx;
-    const leg = moving * 4.5 * scale;
-    const baseY = p.y + 9 * scale;
-    const hipY = p.y + 2 * scale;
-    const shoulderY = p.y - 9 * scale;
-    const headY = p.y - 20 * scale;
+  function drawPersonSpriteAtScreen(
+    px,
+    py,
+    dir,
+    shirt,
+    pants,
+    hair,
+    skin,
+    phase,
+    scale = 1,
+    appearance = null
+  ) {
+    const lookX = Math.cos(dir);
+    const lookY = Math.sin(dir);
+    const ap = appearance || PLAYER_APPEARANCE;
+    const stature = (ap.stature || 1) * scale;
+    const build = ap.build || 1;
+    const shoulderScale = ap.shoulder || 1;
+    const hipScale = ap.hip || 1;
+    const headScale = ap.head || 1;
+    const gait = (ap.gait || 1) * Math.sin(phase);
+    const gaitCos = (ap.gait || 1) * Math.cos(phase);
+    const armSwing = (ap.armSwing || 1) * gait;
+    const facingSide = clamp(lookX, -1, 1);
+    const facingFront = clamp((lookY + 1) * .5, 0, 1);
 
-    ctx.fillStyle = "rgba(18,24,22,.2)";
+    const footY = py + 14 * stature;
+    const hipY = py - 1 * stature;
+    const waistY = py - 7 * stature;
+    const shoulderY = py - 18 * stature;
+    const neckY = py - 23 * stature;
+    const headY = py - 31 * stature;
+
+    const shoulderHalf = 7.2 * stature * build * shoulderScale;
+    const hipHalf = 5.0 * stature * build * hipScale;
+    const headRx = 7.2 * stature * headScale;
+    const headRy = 8.5 * stature * headScale;
+    const strideX = lookX * gait * 5.8 * stature;
+    const strideY = lookY * gait * 2.4 * stature;
+    const armX = lookX * armSwing * 5.2 * stature;
+    const armY = lookY * armSwing * 1.8 * stature;
+
+    // Ground contact shadow anchors the figure to the street.
+    ctx.fillStyle = "rgba(16,21,20,.22)";
     ctx.beginPath();
-    ctx.ellipse(p.x + 2, baseY + 4, 9 * scale, 4 * scale, dir, 0, Math.PI * 2);
+    ctx.ellipse(
+      px + 2.5 * stature,
+      footY + 4.5 * stature,
+      10.5 * stature * build,
+      4.2 * stature,
+      lookX * .16,
+      0,
+      Math.PI * 2
+    );
     ctx.fill();
 
-    ctx.strokeStyle = pants;
-    ctx.lineWidth = 4 * scale;
+    // Optional bag/backpack is drawn behind the body.
+    if (ap.accessory === "backpack") {
+      ctx.fillStyle = "rgba(45,51,48,.92)";
+      roundedRectPath(
+        ctx,
+        px - 6.5 * stature - facingSide * 2 * stature,
+        shoulderY + 3 * stature,
+        13 * stature,
+        17 * stature,
+        4 * stature
+      );
+      ctx.fill();
+      ctx.strokeStyle = "rgba(20,25,24,.28)";
+      ctx.lineWidth = Math.max(1, 1.2 * stature);
+      ctx.stroke();
+    } else if (ap.accessory === "bag") {
+      ctx.strokeStyle = "rgba(58,48,39,.72)";
+      ctx.lineWidth = 1.8 * stature;
+      ctx.beginPath();
+      ctx.moveTo(px - shoulderHalf * .55, shoulderY + 2 * stature);
+      ctx.lineTo(px + shoulderHalf * .35, hipY + 5 * stature);
+      ctx.stroke();
+      ctx.fillStyle = "#6f5a45";
+      roundedRectPath(
+        ctx,
+        px + shoulderHalf * .18,
+        hipY + 1 * stature,
+        9 * stature,
+        8 * stature,
+        2 * stature
+      );
+      ctx.fill();
+    }
+
+    const leftHip = { x:px - hipHalf, y:hipY };
+    const rightHip = { x:px + hipHalf, y:hipY };
+    const leftKnee = {
+      x:leftHip.x + strideX * .52 - 1.2 * stature,
+      y:hipY + 8.2 * stature + strideY * .28 + Math.max(0, -gaitCos) * 1.4 * stature
+    };
+    const rightKnee = {
+      x:rightHip.x - strideX * .52 + 1.2 * stature,
+      y:hipY + 8.2 * stature - strideY * .28 + Math.max(0, gaitCos) * 1.4 * stature
+    };
+    const leftFoot = {
+      x:leftKnee.x + strideX * .46 + lookX * 1.6 * stature,
+      y:footY + strideY * .25
+    };
+    const rightFoot = {
+      x:rightKnee.x - strideX * .46 + lookX * 1.6 * stature,
+      y:footY - strideY * .25
+    };
+
+    // Legs are articulated at the knees instead of being two straight sticks.
     ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = pants;
+    ctx.lineWidth = 5.2 * stature * build;
     ctx.beginPath();
-    ctx.moveTo(p.x - sx * 3, hipY);
-    ctx.lineTo(p.x - sx * 3 + fx * leg, baseY + fy * leg);
-    ctx.moveTo(p.x + sx * 3, hipY);
-    ctx.lineTo(p.x + sx * 3 - fx * leg, baseY - fy * leg);
+    ctx.moveTo(leftHip.x, leftHip.y);
+    ctx.lineTo(leftKnee.x, leftKnee.y);
+    ctx.lineTo(leftFoot.x, leftFoot.y);
+    ctx.moveTo(rightHip.x, rightHip.y);
+    ctx.lineTo(rightKnee.x, rightKnee.y);
+    ctx.lineTo(rightFoot.x, rightFoot.y);
     ctx.stroke();
 
+    // Trouser seam/shading.
+    ctx.strokeStyle = "rgba(10,15,16,.16)";
+    ctx.lineWidth = Math.max(1, 1.1 * stature);
+    ctx.beginPath();
+    ctx.moveTo(leftHip.x + 1 * stature, leftHip.y + 1 * stature);
+    ctx.lineTo(leftKnee.x + 1 * stature, leftKnee.y);
+    ctx.moveTo(rightHip.x + 1 * stature, rightHip.y + 1 * stature);
+    ctx.lineTo(rightKnee.x + 1 * stature, rightKnee.y);
+    ctx.stroke();
+
+    // Shoes have length and facing instead of ending in round leg caps.
+    ctx.strokeStyle = ap.shoe || "#272d2f";
+    ctx.lineWidth = 3.6 * stature;
+    ctx.beginPath();
+    ctx.moveTo(leftFoot.x - 2.2 * stature, leftFoot.y);
+    ctx.lineTo(leftFoot.x + lookX * 4.6 * stature + 2.2 * stature, leftFoot.y + lookY * 1.2 * stature);
+    ctx.moveTo(rightFoot.x - 2.2 * stature, rightFoot.y);
+    ctx.lineTo(rightFoot.x + lookX * 4.6 * stature + 2.2 * stature, rightFoot.y + lookY * 1.2 * stature);
+    ctx.stroke();
+
+    const leftShoulder = { x:px - shoulderHalf, y:shoulderY };
+    const rightShoulder = { x:px + shoulderHalf, y:shoulderY };
+    const leftElbow = {
+      x:leftShoulder.x - armX * .48 - 2.3 * stature,
+      y:shoulderY + 9 * stature - armY * .38
+    };
+    const rightElbow = {
+      x:rightShoulder.x + armX * .48 + 2.3 * stature,
+      y:shoulderY + 9 * stature + armY * .38
+    };
+    const leftHand = {
+      x:leftElbow.x - armX * .42 - .8 * stature,
+      y:leftElbow.y + 8 * stature - armY * .32
+    };
+    const rightHand = {
+      x:rightElbow.x + armX * .42 + .8 * stature,
+      y:rightElbow.y + 8 * stature + armY * .32
+    };
+
+    // Arms behind the torso: sleeve + exposed forearm/hand.
     ctx.strokeStyle = shirt;
-    ctx.lineWidth = 3 * scale;
+    ctx.lineWidth = 5.0 * stature * build;
     ctx.beginPath();
-    ctx.moveTo(p.x - sx * 7, shoulderY + 4);
-    ctx.lineTo(p.x - sx * 10 - fx * leg * .5, p.y + fy * leg * .35);
-    ctx.moveTo(p.x + sx * 7, shoulderY + 4);
-    ctx.lineTo(p.x + sx * 10 + fx * leg * .5, p.y - fy * leg * .35);
+    ctx.moveTo(leftShoulder.x, leftShoulder.y);
+    ctx.lineTo(leftElbow.x, leftElbow.y);
+    ctx.moveTo(rightShoulder.x, rightShoulder.y);
+    ctx.lineTo(rightElbow.x, rightElbow.y);
     ctx.stroke();
 
-    ctx.fillStyle = shirt;
-    roundedRectPath(ctx, p.x - 7 * scale, shoulderY, 14 * scale, 16 * scale, 4 * scale);
-    ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,.11)";
-    ctx.fillRect(p.x - 5 * scale, shoulderY + 2 * scale, 3 * scale, 10 * scale);
+    ctx.strokeStyle = skin;
+    ctx.lineWidth = 3.5 * stature;
+    ctx.beginPath();
+    ctx.moveTo(leftElbow.x, leftElbow.y);
+    ctx.lineTo(leftHand.x, leftHand.y);
+    ctx.moveTo(rightElbow.x, rightElbow.y);
+    ctx.lineTo(rightHand.x, rightHand.y);
+    ctx.stroke();
 
     ctx.fillStyle = skin;
+    for (const hand of [leftHand, rightHand]) {
+      ctx.beginPath();
+      ctx.arc(hand.x, hand.y, 2.1 * stature, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Tapered torso gives visible shoulders, waist and hips.
+    const coatExtra = ap.outfit === 2 ? 3.8 * stature : 0;
+    ctx.fillStyle = shirt;
     ctx.beginPath();
-    ctx.arc(p.x, headY, 7 * scale, 0, Math.PI * 2);
+    ctx.moveTo(leftShoulder.x, leftShoulder.y);
+    ctx.quadraticCurveTo(px - shoulderHalf * .76, waistY, px - hipHalf - coatExtra, hipY + (ap.outfit === 2 ? 5 * stature : 0));
+    ctx.lineTo(px + hipHalf + coatExtra, hipY + (ap.outfit === 2 ? 5 * stature : 0));
+    ctx.quadraticCurveTo(px + shoulderHalf * .76, waistY, rightShoulder.x, rightShoulder.y);
+    ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = hair;
+    // Body-side shade and chest highlight.
+    ctx.fillStyle = "rgba(13,20,19,.13)";
     ctx.beginPath();
-    ctx.arc(p.x - fx * 1.4, headY - 3 * scale, 7 * scale, Math.PI, Math.PI * 2);
+    ctx.moveTo(px + 1.5 * stature, shoulderY);
+    ctx.lineTo(rightShoulder.x, shoulderY);
+    ctx.quadraticCurveTo(px + shoulderHalf * .72, waistY, px + hipHalf, hipY);
+    ctx.lineTo(px + 1.5 * stature, hipY);
+    ctx.closePath();
     ctx.fill();
+
+    ctx.fillStyle = "rgba(255,255,255,.10)";
+    ctx.beginPath();
+    ctx.moveTo(px - shoulderHalf * .62, shoulderY + 2 * stature);
+    ctx.lineTo(px - shoulderHalf * .16, shoulderY + 1.5 * stature);
+    ctx.lineTo(px - hipHalf * .12, hipY - 2 * stature);
+    ctx.lineTo(px - hipHalf * .55, hipY - 1 * stature);
+    ctx.closePath();
+    ctx.fill();
+
+    if (ap.outfit === 1 || ap.outfit === 2) {
+      ctx.strokeStyle = "rgba(26,32,31,.28)";
+      ctx.lineWidth = Math.max(1, 1.1 * stature);
+      ctx.beginPath();
+      ctx.moveTo(px, shoulderY + 1 * stature);
+      ctx.lineTo(px, hipY + (ap.outfit === 2 ? 4 * stature : 0));
+      ctx.stroke();
+    }
+    if (ap.outfit === 3) {
+      // Hoodie collar.
+      ctx.strokeStyle = "rgba(29,35,33,.35)";
+      ctx.lineWidth = 2 * stature;
+      ctx.beginPath();
+      ctx.arc(px, shoulderY + 1 * stature, 5.2 * stature, .15 * Math.PI, .85 * Math.PI);
+      ctx.stroke();
+    }
+
+    // Neck.
+    ctx.fillStyle = skin;
+    roundedRectPath(
+      ctx,
+      px - 2.6 * stature,
+      neckY - 1.5 * stature,
+      5.2 * stature,
+      7.5 * stature,
+      2 * stature
+    );
+    ctx.fill();
+
+    // Ears sit behind the head and make side-facing silhouettes clearer.
+    ctx.fillStyle = skin;
+    ctx.beginPath();
+    ctx.ellipse(px - headRx * .92, headY + 1 * stature, 2 * stature, 3 * stature, 0, 0, Math.PI * 2);
+    ctx.ellipse(px + headRx * .92, headY + 1 * stature, 2 * stature, 3 * stature, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Head with a subtle skin shadow.
+    ctx.fillStyle = skin;
+    ctx.beginPath();
+    ctx.ellipse(px, headY, headRx, headRy, facingSide * .05, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(120,73,55,.10)";
+    ctx.beginPath();
+    ctx.ellipse(px + headRx * .38, headY + 1 * stature, headRx * .45, headRy * .82, facingSide * .05, -.52 * Math.PI, .52 * Math.PI);
+    ctx.fill();
+
+    // Hair silhouettes. They are intentionally shape-based, not gender-coded.
+    ctx.fillStyle = hair;
+    const hairStyle = ap.hairStyle || 0;
+    if (hairStyle === 0) {
+      ctx.beginPath();
+      ctx.ellipse(px - facingSide * 1.0 * stature, headY - 3.3 * stature, headRx * 1.03, headRy * .70, facingSide * .08, Math.PI, Math.PI * 2);
+      ctx.fill();
+    } else if (hairStyle === 1) {
+      ctx.beginPath();
+      ctx.ellipse(px, headY - 2.8 * stature, headRx * 1.06, headRy * .78, facingSide * .06, Math.PI, Math.PI * 2.05);
+      ctx.fill();
+      ctx.fillRect(px - headRx*.88, headY - 3*stature, headRx*.27, 7*stature);
+    } else if (hairStyle === 2) {
+      ctx.beginPath();
+      ctx.ellipse(px, headY - 2.6 * stature, headRx * 1.08, headRy * .76, 0, Math.PI, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(px - headRx*.78, headY + 3*stature, 3.3*stature, 6.8*stature, -.12, 0, Math.PI*2);
+      ctx.ellipse(px + headRx*.78, headY + 3*stature, 3.3*stature, 6.8*stature, .12, 0, Math.PI*2);
+      ctx.fill();
+    } else if (hairStyle === 3) {
+      ctx.beginPath();
+      ctx.ellipse(px, headY - 3.2*stature, headRx*1.02, headRy*.72, 0, Math.PI, Math.PI*2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(px - headRx*.85, headY - 3*stature);
+      ctx.lineTo(px + headRx*.62, headY - 7.5*stature);
+      ctx.lineTo(px + headRx*.10, headY + .5*stature);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.ellipse(px, headY - 2.6*stature, headRx*1.10, headRy*.78, 0, Math.PI, Math.PI*2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(px - facingSide*1.5*stature, headY + 4.8*stature, headRx*.92, 5*stature, 0, 0, Math.PI);
+      ctx.fill();
+    }
+
+    // Face is only visible when not looking strongly away from the camera.
+    if (lookY > -.45) {
+      const eyeY = headY - .6 * stature;
+      const eyeSpread = 2.25 * stature;
+      const faceShift = lookX * 1.45 * stature;
+      ctx.fillStyle = "rgba(47,39,34,.72)";
+      if (Math.abs(lookX) < .78) {
+        ctx.beginPath();
+        ctx.arc(px - eyeSpread + faceShift, eyeY, .78 * stature, 0, Math.PI * 2);
+        ctx.arc(px + eyeSpread + faceShift, eyeY, .78 * stature, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.arc(px + faceShift, eyeY, .85 * stature, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Nose direction cue and small mouth line.
+      ctx.strokeStyle = "rgba(116,74,57,.38)";
+      ctx.lineWidth = Math.max(.8, .9 * stature);
+      ctx.beginPath();
+      ctx.moveTo(px + faceShift * .72, headY + .2 * stature);
+      ctx.lineTo(px + faceShift + lookX * 1.25 * stature, headY + 2.1 * stature);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(114,64,58,.42)";
+      ctx.beginPath();
+      ctx.moveTo(px - 1.5*stature + faceShift*.45, headY + 4.2*stature);
+      ctx.lineTo(px + 1.5*stature + faceShift*.45, headY + 4.2*stature);
+      ctx.stroke();
+    }
+
+    // Soft head highlight.
+    ctx.fillStyle = "rgba(255,239,222,.13)";
+    ctx.beginPath();
+    ctx.ellipse(
+      px - headRx*.33,
+      headY - headRy*.18,
+      headRx*.24,
+      headRy*.34,
+      -.3,
+      0,
+      Math.PI*2
+    );
+    ctx.fill();
+  }
+
+  function drawPerson(x, y, dir, shirt, pants, hair, skin, phase, scale = 1, appearance = null) {
+    const p = worldToScreen(x, y);
+    if (p.x < -60 || p.y < -75 || p.x > viewWidth + 60 || p.y > viewHeight + 75) return;
+    drawPersonSpriteAtScreen(p.x, p.y, dir, shirt, pants, hair, skin, phase, scale, appearance);
   }
 
   function syncNamedNpcCitizens() {
@@ -7772,12 +8113,27 @@
         || citizen.pendingActivity?.label
         || (citizen.state === "waiting" ? "信号待ち" : "移動中");
       npc.citizenId = citizen.id;
+      npc.appearance = citizen.appearance;
+      npc.pants = citizen.pants;
+      npc.hair = citizen.hair;
+      npc.skin = citizen.skin;
     }
   }
 
   function drawNpc(npc) {
     if (npc.hidden) return;
-    drawPerson(npc.x, npc.y, npc.dir ?? -Math.PI / 2, npc.color, "#394248", "#3c2d25", "#e7b28f", performance.now() * .004 + npc.x * .01, 1.05);
+    drawPerson(
+      npc.x,
+      npc.y,
+      npc.dir ?? -Math.PI / 2,
+      npc.color,
+      npc.pants || "#394248",
+      npc.hair || "#3c2d25",
+      npc.skin || "#e7b28f",
+      performance.now() * .004 + npc.x * .01,
+      1.05,
+      npc.appearance
+    );
     const p = worldToScreen(npc.x, npc.y);
     if (p.x < -40 || p.y < -40 || p.x > viewWidth + 40 || p.y > viewHeight + 40) return;
     ctx.fillStyle = "rgba(12,18,15,.76)";
@@ -7792,7 +8148,7 @@
   function drawPedestrians() {
     for (const ped of pedestrians) {
       if (!ped.visible || ped.specialNpcId) continue;
-      drawPerson(ped.x, ped.y, ped.dir, ped.color, ped.pants, ped.hair, ped.skin, ped.phase, .92);
+      drawPerson(ped.x, ped.y, ped.dir, ped.color, ped.pants, ped.hair, ped.skin, ped.phase, .92, ped.appearance);
     }
   }
 
@@ -7946,7 +8302,18 @@
     const dir = Math.atan2(state.player.facingY, state.player.facingX);
     const moving = keys.has("w") || keys.has("a") || keys.has("s") || keys.has("d") || Math.abs(touch.x) > .08 || Math.abs(touch.y) > .08;
     const phase = moving ? performance.now() * .009 : 0;
-    drawPerson(state.player.x, state.player.y, dir, "#405c50", "#313b42", "#332a24", "#edbea0", phase, 1.12);
+    drawPerson(
+      state.player.x,
+      state.player.y,
+      dir,
+      "#405c50",
+      "#313b42",
+      "#332a24",
+      "#edbea0",
+      phase,
+      1.12,
+      PLAYER_APPEARANCE
+    );
   }
 
   function homeInteriorViewport() {
@@ -8168,45 +8535,23 @@
 
   function drawHomePlayer() {
     const p = homeToScreen(state.player.homeX, state.player.homeY);
-    const s = p.scale;
     const dir = Math.atan2(state.player.facingY, state.player.facingX);
     const moving = keys.has("w") || keys.has("a") || keys.has("s") || keys.has("d") ||
       keys.has("arrowup") || keys.has("arrowdown") || keys.has("arrowleft") || keys.has("arrowright") ||
       Math.abs(touch.x) > .08 || Math.abs(touch.y) > .08;
-    const step = moving ? Math.sin(performance.now() * .011) : 0;
-    const fx = Math.cos(dir);
-    const fy = Math.sin(dir);
-    const sx = -fy;
-    const sy = fx;
-
-    ctx.fillStyle = "rgba(20,24,22,.20)";
-    ctx.beginPath();
-    ctx.ellipse(p.x + 3*s, p.y + 11*s, 10*s, 4.5*s, dir, 0, Math.PI*2);
-    ctx.fill();
-
-    ctx.strokeStyle = "#313b42";
-    ctx.lineWidth = 4*s;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(p.x - sx*3*s, p.y + 2*s);
-    ctx.lineTo(p.x - sx*3*s + fx*step*4*s, p.y + 12*s + fy*step*3*s);
-    ctx.moveTo(p.x + sx*3*s, p.y + 2*s);
-    ctx.lineTo(p.x + sx*3*s - fx*step*4*s, p.y + 12*s - fy*step*3*s);
-    ctx.stroke();
-
-    ctx.fillStyle = "#405c50";
-    roundedRectPath(ctx, p.x - 8*s, p.y - 10*s, 16*s, 18*s, 5*s);
-    ctx.fill();
-
-    ctx.fillStyle = "#edbea0";
-    ctx.beginPath();
-    ctx.arc(p.x, p.y - 18*s, 7.5*s, 0, Math.PI*2);
-    ctx.fill();
-
-    ctx.fillStyle = "#332a24";
-    ctx.beginPath();
-    ctx.arc(p.x - fx*1.5*s, p.y - 21*s, 7.5*s, Math.PI, Math.PI*2);
-    ctx.fill();
+    const phase = moving ? performance.now() * .009 : 0;
+    drawPersonSpriteAtScreen(
+      p.x,
+      p.y,
+      dir,
+      "#405c50",
+      "#313b42",
+      "#332a24",
+      "#edbea0",
+      phase,
+      1.12 * p.scale,
+      PLAYER_APPEARANCE
+    );
   }
 
   function drawStreetLightsGlow() {
