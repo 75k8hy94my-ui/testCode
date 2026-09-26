@@ -53,7 +53,7 @@ test('mobile bottom navigation stays visible on manga and video routes', () => {
   assert.doesNotMatch(css, /html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav[^{}]*\{display:none!important\}/);
   assert.match(css, /@media\(max-width:899px\)\{html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav\{display:flex!important\}\}/);
   for (const page of ['manga.html', 'video.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20260924-ios-theme-switch/);
+    assert.match(read(page), /home-profile-shell\.css\?v=20260926-reader-shell-root-fix/);
   }
 });
 
@@ -91,7 +91,7 @@ test('VPN gate keeps readable contrast on dark manga/video routes', () => {
   assert.match(css, /color:#f8fafc/);
   assert.match(css, /vpnStatusButton\[data-vpn-state="blocked"\][\s\S]*color:#ffb4b4/);
   for (const page of ['home.html','profile.html','manga.html','video.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20260924-ios-theme-switch/);
+    assert.match(read(page), /home-profile-shell\.css\?v=20260926-reader-shell-root-fix/);
   }
 });
 
@@ -123,7 +123,7 @@ test('saved theme drives home profile manga video and header colors', () => {
   assert.match(css, /reader-entry-video body[\s\S]*background:#0a0c11!important/);
   assert.match(globalCss, /--shell-header-bg/);
   for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
-    assert.match(read(page), page === 'reader.html' || page === 'video-player.html' ? /home-profile-shell\.css\?v=20260924-theme-unified/ : /home-profile-shell\.css\?v=20260924-ios-theme-switch/);
+    assert.match(read(page), page === 'reader.html' || page === 'video-player.html' ? /home-profile-shell\.css\?v=20260926-reader-shell-root-fix/ : /home-profile-shell\.css\?v=20260926-reader-shell-root-fix/);
     assert.match(read(page), /app-global-shell\.js\?v=20260924-theme-unified/);
     assert.match(read(page), /profile-menu\.js\?v=20260924-theme-unified/);
   }
@@ -175,6 +175,17 @@ test('all authenticated mobile destinations load the shared Liquid Glass assets'
     assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-drag-lock/, page);
   }
   for (const page of ['home.html','profile.html','manga.html','video.html']) {
-    assert.match(read(page), /home-profile-spa\.js\?v=20260926-manga-root-fix-v2/, page);
+    assert.match(read(page), /home-profile-spa\.js\?v=20260926-reader-shell-root-fix/, page);
   }
+});
+
+
+test('mobile reader route owns the remaining viewport instead of inheriting the desktop route offset', () => {
+  const css = read('home-profile-shell.css');
+  assert.match(css, /\.homeShell\.reader-route\[data-reader-route="reader"\]\{/);
+  assert.match(css, /\.homeShell\.reader-route\[data-reader-route="reader"\] > #routeContent\{/);
+  assert.match(css, /padding-top:0 !important/);
+  assert.match(css, /padding-bottom:0 !important/);
+  assert.match(css, /flex:1 1 auto/);
+  assert.match(css, /#routeContent > #app\{[\s\S]*position:absolute[\s\S]*inset:0[\s\S]*height:100% !important/);
 });
