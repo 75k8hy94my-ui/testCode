@@ -17,3 +17,9 @@ test('game reports an unavailable canvas context instead of failing silently', (
   assert.match(source, /typeof canvas\.getContext === "function"/);
   assert.match(source, /Canvas API を利用できません/);
 });
+
+test('game surfaces uncaught runtime errors on the game surface', () => {
+  assert.match(source, /window\.addEventListener\("error"/);
+  assert.match(source, /window\.addEventListener\("unhandledrejection"/);
+  assert.match(source, /ゲームの実行中にエラーが発生しました/);
+});

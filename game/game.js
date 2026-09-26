@@ -1,6 +1,25 @@
 (() => {
   "use strict";
 
+  function showRuntimeError(detail) {
+    const shell = document.getElementById("gameShell");
+    if (!shell) return;
+    let errorBox = shell.querySelector(".game-runtime-error");
+    if (!errorBox) {
+      errorBox = document.createElement("div");
+      errorBox.className = "game-runtime-error";
+      shell.appendChild(errorBox);
+    }
+    errorBox.textContent = "ゲームの実行中にエラーが発生しました。" + (detail ? " (" + detail + ")" : "");
+  }
+
+  window.addEventListener("error", (event) => {
+    showRuntimeError(event.error?.message || event.message || "unknown error");
+  });
+  window.addEventListener("unhandledrejection", (event) => {
+    showRuntimeError(event.reason?.message || String(event.reason || "unknown rejection"));
+  });
+
   const canvas = document.getElementById("gameCanvas");
   const canvasContext = typeof canvas.getContext === "function"
     ? canvas.getContext("2d", { alpha: false }) || canvas.getContext("2d")
@@ -10,10 +29,7 @@
   const mctx = typeof minimap.getContext === "function" ? minimap.getContext("2d") : null;
 
   if (!ctx || !mctx) {
-    const fallback = document.createElement("div");
-    fallback.className = "game-runtime-error";
-    fallback.textContent = "Canvas API を利用できません。Canvas 対応ブラウザで再読み込みしてください。";
-    document.getElementById("gameShell")?.appendChild(fallback);
+    showRuntimeError("Canvas API を利用できません。Canvas 対応ブラウザで再読み込みしてください。");
     return;
   }
 
