@@ -3845,40 +3845,64 @@
     return car.routeEdgeIds?.[car.routeIndex] || null;
   }
 
-  function trafficLeadInfo(car) {
+  function trafficLeadInfo(car, maxDistance = 320) {
     const edge = mapModel.getEdge(car.edgeId);
     if (!edge) return null;
 
     let best = null;
     const choose = (other, centerDistance) => {
-      if (!(centerDistance > 0) || !Number.isFinite(centerDistance)) return;
+      if (!(centerDistance > 0) || !Number.isFinite(centerDistance) || centerDistance > maxDistance) return;
       if (!best || centerDistance < best.distance) best = { car:other, distance:centerDistance };
     };
 
+    // Same edge first.
     for (const other of traffic) {
-      if (other === car) continue;
+      if (other === car || other.edgeId !== car.edgeId || other.directionSign !== car.directionSign) continue;
+      if (Math.abs((other.laneOffset || 0) - (car.laneOffset || 0)) > 20) continue;
+      choose(other, (other.along - car.along) * car.directionSign);
+    }
 
-      if (other.edgeId === car.edgeId && other.directionSign === car.directionSign) {
-        if (Math.abs((other.laneOffset || 0) - (car.laneOffset || 0)) > 18) continue;
-        choose(other, (other.along - car.along) * car.directionSign);
-        continue;
+    // Then follow the actual route across several short/curved edges. The old
+    // logic looked only one edge ahead, so a stopped car two tiny edges beyond
+    // a bend disappeared from the follower's perception.
+    let nodeId = car.directionSign > 0 ? edge.to : edge.from;
+    let accumulated = trafficDistanceToEndpoint(car, edge);
+    const routeIds = Array.isArray(car.routeEdgeIds) ? car.routeEdgeIds : [];
+
+    for (let i = car.routeIndex; i < routeIds.length && i < car.routeIndex + 4 && accumulated <= maxDistance; i += 1) {
+      const next = mapModel.getEdge(routeIds[i]);
+      if (!next || (next.from !== nodeId && next.to !== nodeId)) break;
+
+      const directionSign = next.from === nodeId ? 1 : -1;
+      const nextLength = polylineLength(next.points);
+      const expectedLaneOffset = trafficLaneOffsetForEdge(next, Boolean(car.secondaryLane));
+
+      for (const other of traffic) {
+        if (other === car || other.edgeId !== next.id || other.directionSign !== directionSign) continue;
+        if (Math.abs((other.laneOffset || 0) - expectedLaneOffset) > 22) continue;
+
+        const otherLength = other.edgeLength || nextLength;
+        const centerFromNode = directionSign > 0 ? other.along : otherLength - other.along;
+        choose(other, accumulated + Math.max(0, centerFromNode));
       }
 
-      const nextEdgeId = trafficNextEdgeId(car);
-      if (!nextEdgeId || other.edgeId !== nextEdgeId) continue;
-      const endpointId = car.directionSign > 0 ? edge.to : edge.from;
-      const next = mapModel.getEdge(nextEdgeId);
-      if (!next || (next.from !== endpointId && next.to !== endpointId)) continue;
-      const expectedSign = next.from === endpointId ? 1 : -1;
-      if (other.directionSign !== expectedSign) continue;
-      if (Math.abs((other.laneOffset || 0) - trafficLaneOffsetForEdge(next, Boolean(car.secondaryLane))) > 20) continue;
-
-      const nextLength = other.edgeLength || polylineLength(next.points);
-      const otherFromNode = expectedSign > 0 ? other.along : nextLength - other.along;
-      choose(other, trafficDistanceToEndpoint(car, edge) + Math.max(0, otherFromNode));
+      accumulated += nextLength;
+      nodeId = directionSign > 0 ? next.to : next.from;
     }
 
     return best;
+  }
+
+  function personOccupiesVehicleRoad(x, y) {
+    const hit = mapModel.nearestRoad(x, y, { vehicleOnly:true });
+    if (!hit?.edge) return false;
+
+    // Pedestrians normally walk just outside the paved vehicle surface
+    // (edge.width / 2 + ~5). Count them only after they actually enter the
+    // carriageway/crosswalk, otherwise a person on the sidewalk at the inside
+    // of a curve can make an NPC stop forever.
+    const halfWidth = (hit.edge.width || ROAD_WIDTH) / 2;
+    return hit.distance <= Math.max(8, halfWidth - 3);
   }
 
   function projectedObstacleDistance(car) {
@@ -3898,10 +3922,16 @@
       best = Math.min(best, Math.max(0, forward - dims.length * .5 - radius));
     };
 
-    if (!state.player.inVehicle && !state.player.inTrain) {
+    if (
+      !state.player.inVehicle &&
+      !state.player.inTrain &&
+      personOccupiesVehicleRoad(state.player.x, state.player.y)
+    ) {
       considerPoint(state.player.x, state.player.y, PLAYER_COLLISION_RADIUS);
     }
+
     for (const ped of visiblePedestrianColliders()) {
+      if (!personOccupiesVehicleRoad(ped.x, ped.y)) continue;
       considerPoint(ped.x, ped.y, NPC_COLLISION_RADIUS);
     }
 
@@ -4103,12 +4133,16 @@
     if (!endpoint || vehicleEdgesAtNode(endpoint.id).length < 3) return true;
 
     const dims = vehicleDimensions(car);
+    const coreRadius = junctionCoreRadius(endpoint);
     const requiredClearance =
-      junctionCoreRadius(endpoint) +
-      dims.length * .5 +
-      22;
+      coreRadius +
+      dims.length +
+      30;
 
-    return downstreamLaneClearance(car, endpoint, requiredClearance + 125) >= requiredClearance;
+    // Use rear-bumper clearance along the actual outgoing route. Requiring a
+    // full car length beyond the junction prevents a follower from entering
+    // when the lead vehicle is stopped immediately after a bend/merge.
+    return downstreamLaneClearance(car, endpoint, requiredClearance + 150) >= requiredClearance;
   }
 
   function junctionCandidateWins(car, endpoint, gateDistance) {
@@ -4281,7 +4315,7 @@
         const dims = vehicleDimensions(car);
         const leadDims = vehicleDimensions(lead.car);
         const bumperGap = Math.max(0, lead.distance - dims.length * .5 - leadDims.length * .5);
-        const desiredGap = 16 + Math.min(54, car.speed * .22);
+        const desiredGap = 22 + Math.min(62, car.speed * .24);
         if (bumperGap < desiredGap + 70) {
           targetSpeed = Math.min(targetSpeed, Math.max(0, (bumperGap - desiredGap) * 2.25));
           if (bumperGap <= desiredGap + 8 && !blockReason) blockReason = "npc";
