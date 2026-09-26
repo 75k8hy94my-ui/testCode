@@ -157,3 +157,8 @@ body:not(.driving) #mobileDrivingControls{display:none!important}
 .top-actions button:hover,.action-sheet button:hover,.help-panel button:hover{
   background:rgba(31,42,36,.96);border-color:rgba(255,255,255,.2)
 }
+
+
+#actionDescription {
+  white-space: pre-line;
+}
