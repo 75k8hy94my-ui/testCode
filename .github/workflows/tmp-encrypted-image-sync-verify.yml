@@ -1,0 +1,20 @@
+name: Temporary encrypted image sync verification
+on:
+  pull_request:
+    branches:
+      - feat/encrypted-image-sync
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/encrypted-asset-reader.test.mjs
+      - run: node --test tests/encrypted-asset-item.test.mjs
+      - run: node --test tests/encrypted-asset-reader-integration.test.mjs
+      - run: node --test tests/vault-payload.test.mjs
+      - run: npm test
+      - run: npm run verify:static
+      - run: git diff --check
