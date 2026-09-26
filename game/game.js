@@ -3438,7 +3438,7 @@
     });
     const strokeEdge = (edge, width, color, dash = []) => {
       const points = edge.points.map((point) => worldToScreen(point.x, point.y));
-      ctx.lineCap = "square";
+      ctx.lineCap = "butt";
       ctx.lineJoin = "round";
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
