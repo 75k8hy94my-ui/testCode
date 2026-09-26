@@ -5914,6 +5914,52 @@
       strokePoints(screenPoints(edge), width, color, dash, lineCap || (edge.vehicle ? "butt" : "round"));
     };
 
+    const drawRoadSurfaceDetail = (edge) => {
+      if (!edge.vehicle) return;
+      const length = polylineLength(edge.points);
+      const count = clamp(Math.floor(length / 95), 3, 13);
+      const half = edge.width / 2;
+
+      for (let i = 0; i < count; i += 1) {
+        const seed = hash2(edge.id.length + i * 17, Math.floor(edge.width) + i * 7, 2137);
+        const along = length * ((i + .35 + seed * .3) / count);
+        const pose = pointAndTangentOnPolyline(edge.points, along);
+        const lateralSeed = hash2(i, edge.id.length, 2138) - .5;
+        const lateral = lateralSeed * Math.max(16, edge.width * .68);
+        const wx = pose.point.x - pose.tangent.y * lateral;
+        const wy = pose.point.y + pose.tangent.x * lateral;
+        const p = worldToScreen(wx, wy);
+        const angle = Math.atan2(pose.tangent.y, pose.tangent.x);
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(angle);
+
+        ctx.fillStyle = seed > .52 ? "rgba(21,27,26,.055)" : "rgba(220,225,216,.035)";
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 8 + seed * 20, 1.1 + seed * 2.1, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (seed > .74) {
+          ctx.strokeStyle = "rgba(22,27,27,.10)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(-13, 0);
+          ctx.lineTo(13 + seed * 8, seed > .87 ? 2 : -1);
+          ctx.stroke();
+        }
+
+        if (state.visual.weather === "rain" && seed > .44) {
+          ctx.fillStyle = "rgba(199,217,220,.055)";
+          ctx.beginPath();
+          ctx.ellipse(4, -half * .12, 15 + seed * 23, 1.2 + seed * 1.7, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.restore();
+      }
+    };
+
     const drawJunctionPads = (layer = "surface") => {
       for (const node of mapModel.nodes) {
         const incidentEdges = mapModel.edges.filter((edge) => edge.vehicle && (edge.from === node.id || edge.to === node.id));
@@ -5962,6 +6008,17 @@
       strokeEdge(edge, edge.width, edge.vehicle ? vehicleSurface(edge) : pedestrianSurface(edge));
     }
     drawJunctionPads("surface");
+
+    // A fine inner curb highlight and asphalt variation give the roadway depth
+    // without reintroducing different pavement colors between connected edges.
+    for (const edge of visibleEdges) {
+      if (!edge.vehicle) continue;
+      const points = screenPoints(edge);
+      const inner = Math.max(18, edge.width / 2 - 4);
+      strokePoints(offsetPoints(points, inner), 1.2, "rgba(236,239,231,.10)", [], "butt");
+      strokePoints(offsetPoints(points, -inner), 1.2, "rgba(28,34,33,.14)", [], "butt");
+      drawRoadSurfaceDetail(edge);
+    }
 
     for (const edge of visibleEdges) {
       if (!edge.vehicle) continue;
@@ -6359,6 +6416,45 @@
         "#b7b4aa";
       drawWorldPolygon(space.polygon);
       ctx.fill();
+
+      if (space.type === "park" || space.type === "pocket-park" || space.type === "shrine") {
+        ctx.save();
+        drawWorldPolygon(space.polygon);
+        ctx.clip();
+
+        const step = space.type === "park" ? 74 : 88;
+        const minGX = Math.floor(bounds.x / step);
+        const maxGX = Math.ceil((bounds.x + bounds.w) / step);
+        const minGY = Math.floor(bounds.y / step);
+        const maxGY = Math.ceil((bounds.y + bounds.h) / step);
+        let detailCount = 0;
+
+        for (let gx = minGX; gx <= maxGX && detailCount < 54; gx += 1) {
+          for (let gy = minGY; gy <= maxGY && detailCount < 54; gy += 1) {
+            const seed = hash2(gx, gy, 2143);
+            if (seed < .22) continue;
+            const wx = gx * step + hash2(gx, gy, 2144) * step;
+            const wy = gy * step + hash2(gx, gy, 2145) * step;
+            const p = worldToScreen(wx, wy);
+
+            ctx.fillStyle = seed > .58 ? "rgba(205,222,177,.08)" : "rgba(31,77,41,.075)";
+            ctx.beginPath();
+            ctx.ellipse(p.x, p.y, 2.5 + seed * 5, 1.1 + seed * 2.2, seed * Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (seed > .77) {
+              ctx.strokeStyle = "rgba(45,88,49,.16)";
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(p.x, p.y + 2);
+              ctx.lineTo(p.x - 2 + seed * 4, p.y - 4 - seed * 3);
+              ctx.stroke();
+            }
+            detailCount += 1;
+          }
+        }
+        ctx.restore();
+      }
 
       if (space.type === "park" || space.type === "pocket-park") {
         ctx.strokeStyle = "rgba(224,218,184,.72)";
@@ -7013,15 +7109,27 @@
       }
     }
 
-    // Windows on the visible south/front wall.
+    // Windows on the visible south/front wall. Several rows make apartments
+    // and two-storey homes read as actual volumes rather than flat footprints.
     const facadeH = Math.max(10, elevation - 4);
     const cols = apartment ? Math.max(2, Math.floor(building.w / 36)) : Math.max(1, Math.floor(building.w / 45));
-    for (let c = 0; c < cols; c += 1) {
-      const wx = x + 12 + c * ((building.w - 24) / Math.max(1, cols - 1));
-      const lit = time.night > .45 && hash2(Math.floor(building.x) + c, Math.floor(building.y), seed + 2) > .58;
-      ctx.fillStyle = lit ? "#dcbf78" : palette.glass;
-      ctx.fillRect(wx - 6, y + building.h - facadeH + 5, 12, 8);
+    const rows = clamp(apartment ? building.floors : Math.min(2, building.floors), 1, 3);
+    for (let row = 0; row < rows; row += 1) {
+      const wy = y + building.h - facadeH + 4 + row * Math.max(8, (facadeH - 8) / rows);
+      for (let c = 0; c < cols; c += 1) {
+        const wx = x + 12 + c * ((building.w - 24) / Math.max(1, cols - 1));
+        const lit = time.night > .45 && hash2(Math.floor(building.x) + c, Math.floor(building.y) + row, seed + 2) > .58;
+        ctx.fillStyle = "rgba(31,42,44,.22)";
+        ctx.fillRect(wx - 7, wy - 1, 14, 10);
+        ctx.fillStyle = lit ? "#dcbf78" : palette.glass;
+        ctx.fillRect(wx - 5.5, wy, 11, 7);
+        ctx.fillStyle = "rgba(255,255,255,.13)";
+        ctx.fillRect(wx - 4.5, wy + 1, 1.4, 5);
+      }
     }
+
+    ctx.fillStyle = "rgba(28,34,32,.16)";
+    ctx.fillRect(x + 4, y + building.h - 3, Math.max(8, building.w - 8), 3);
 
     // Small entrance cue on the facade closest to the access road when visible.
     ctx.fillStyle = "#39413e";
@@ -7119,6 +7227,16 @@
       ctx.stroke();
     }
 
+    // Contact shadow and thin facade seams make the extrusion easier to read.
+    ctx.fillStyle = "rgba(20,25,23,.14)";
+    ctx.fillRect(x + 5, y + building.h - 3, Math.max(8, building.w - 10), 3);
+    ctx.strokeStyle = "rgba(255,255,255,.08)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(rx + 5, ry + 5);
+    ctx.lineTo(rx + Math.max(5, building.w - 5), ry + 5);
+    ctx.stroke();
+
     // A few lit panes get a soft halo at night instead of a flat yellow square.
     if (time.night > .52 && seed > .48) {
       const gx = x + building.w * .72;
@@ -7192,15 +7310,33 @@
       const facadeBottom = y + building.h - 5;
       const facadeHeight = Math.max(8, facadeBottom - facadeTop);
       const windowCols = Math.max(2, Math.floor((building.w - 34) / 42));
+      const windowRows = clamp(Math.floor(facadeHeight / 11), 1, 4);
       const windowW = Math.min(18, (building.w - 28) / windowCols - 8);
-      for (let col = 0; col < windowCols; col += 1) {
-        const denominator = Math.max(1, windowCols - 1);
-        const wx = rx + 19 + col * ((building.w - 38) / denominator);
-        const lit = time.night > .45 && hash2(Math.floor(building.x) + col, Math.floor(building.y), 911) > .5;
-        ctx.fillStyle = lit ? "#dcb96c" : palette.glass;
-        ctx.fillRect(wx - windowW / 2, facadeTop + Math.min(4, facadeHeight * .15), windowW, Math.min(10, facadeHeight * .48));
-        ctx.fillStyle = "rgba(255,255,255,.16)";
-        ctx.fillRect(wx - windowW / 2 + 2, facadeTop + Math.min(5, facadeHeight * .15), 2, Math.min(8, facadeHeight * .4));
+      const windowH = Math.min(8, Math.max(4, (facadeHeight - 4) / windowRows - 3));
+
+      for (let row = 0; row < windowRows; row += 1) {
+        const wy = facadeTop + 2 + row * ((facadeHeight - 3) / windowRows);
+        if (row > 0) {
+          ctx.strokeStyle = "rgba(41,47,45,.12)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(rx + 7, wy - 2);
+          ctx.lineTo(rx + building.w - 7, wy - 2);
+          ctx.stroke();
+        }
+
+        for (let col = 0; col < windowCols; col += 1) {
+          const denominator = Math.max(1, windowCols - 1);
+          const wx = rx + 19 + col * ((building.w - 38) / denominator);
+          const lit = time.night > .45 && hash2(Math.floor(building.x) + col, Math.floor(building.y) + row, 911) > .5;
+
+          ctx.fillStyle = "rgba(32,40,40,.20)";
+          ctx.fillRect(wx - windowW / 2 - 1, wy - 1, windowW + 2, windowH + 2);
+          ctx.fillStyle = lit ? "#dcb96c" : palette.glass;
+          ctx.fillRect(wx - windowW / 2, wy, windowW, windowH);
+          ctx.fillStyle = "rgba(255,255,255,.15)";
+          ctx.fillRect(wx - windowW / 2 + 2, wy + 1, 1.8, Math.max(2, windowH - 2));
+        }
       }
 
       const doorW = Math.min(34, building.w * .14);
@@ -7562,6 +7698,25 @@
     roundedRectPath(ctx, -length / 2, -width / 2, length, width - 4, type === "van" ? 7 : 11);
     ctx.fill();
 
+    // Lower body shade and a narrow hood highlight make the vehicle read as a
+    // rounded object while keeping the existing stylised top-down language.
+    const bodyShade = ctx.createLinearGradient(0, -width / 2, 0, width / 2);
+    bodyShade.addColorStop(0, "rgba(255,255,255,.12)");
+    bodyShade.addColorStop(.46, "rgba(255,255,255,0)");
+    bodyShade.addColorStop(1, "rgba(14,19,19,.22)");
+    ctx.fillStyle = bodyShade;
+    roundedRectPath(ctx, -length / 2 + 2, -width / 2 + 2, length - 4, width - 8, type === "van" ? 6 : 10);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(24,31,31,.25)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-length * .05, -width * .42);
+    ctx.lineTo(-length * .05, width * .34);
+    ctx.moveTo(length * .30, -width * .38);
+    ctx.lineTo(length * .30, width * .30);
+    ctx.stroke();
+
     ctx.fillStyle = "rgba(255,255,255,.17)";
     roundedRectPath(ctx, -length / 2 + 5, -width / 2 + 4, length - 10, 7, 4);
     ctx.fill();
@@ -7674,6 +7829,15 @@
       ctx.fillStyle = sunWash;
       ctx.fillRect(0, 0, viewWidth, viewHeight);
     }
+
+    // A tiny vertical haze separates near ground from distant city detail and
+    // is intentionally weak enough not to wash out road markings.
+    const haze = ctx.createLinearGradient(0, 0, 0, viewHeight);
+    haze.addColorStop(0, "rgba(214,226,224," + (.028 * time.daylight).toFixed(3) + ")");
+    haze.addColorStop(.48, "rgba(214,226,224,0)");
+    haze.addColorStop(1, "rgba(16,24,24," + (.018 + time.night * .018).toFixed(3) + ")");
+    ctx.fillStyle = haze;
+    ctx.fillRect(0, 0, viewWidth, viewHeight);
 
     // Slight edge falloff improves depth without touching the HUD/minimap.
     const radius = Math.max(viewWidth, viewHeight) * .72;
