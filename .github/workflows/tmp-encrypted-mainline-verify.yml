@@ -1,0 +1,17 @@
+name: Temporary encrypted mainline verification
+on:
+  pull_request:
+    branches:
+      - feat/encrypted-image-sync-mainline
+jobs:
+  verify-encrypted:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/encrypted-asset-crypto.test.mjs tests/encrypted-asset-cache.test.mjs tests/encrypted-asset-backend.test.mjs tests/encrypted-asset-storage.test.mjs tests/encrypted-asset-sync.test.mjs tests/encrypted-asset-reader.test.mjs tests/encrypted-asset-item.test.mjs tests/encrypted-asset-reader-integration.test.mjs
+      - run: node --test tests/image-photo-processor.test.mjs tests/image-processing-worker.test.mjs tests/image-pyramid-builder.test.mjs tests/image-transfer-policy.test.mjs tests/vault-payload.test.mjs tests/media-access-gate.test.mjs
+      - run: npm run verify:static
+      - run: git diff --check
