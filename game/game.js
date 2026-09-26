@@ -3384,7 +3384,6 @@
     if (Math.abs(touch.x) > 0.03 || Math.abs(touch.y) > 0.03) {
       x = touch.x;
       y = touch.y;
-      if (Math.hypot(x, y) > 0.92) running = true;
     } else {
       if (keys.has("a") || keys.has("arrowleft")) x -= 1;
       if (keys.has("d") || keys.has("arrowright")) x += 1;
