@@ -175,6 +175,68 @@ test('same-level pan aborts obsolete visible requests and ignores late completio
   reader.mount(); await new Promise((resolve) => setImmediate(resolve)); reader.setScale(2); await new Promise((resolve) => setTimeout(resolve, 190)); assert.ok(signals.length > 0); reader.setTransform({ translateX: 250 }); await new Promise((resolve) => setTimeout(resolve, 190)); assert.ok(signals.some((signal) => signal.aborted)); resolvers.forEach((resolve) => resolve(new Uint8Array([1]))); reader.destroy();
 });
 
+
+test('aborted same-level request cannot render after the viewport returns before stale completion', async () => {
+  fakeDom();
+  const calls = [];
+  const m = manifest();
+  m.preview = { ...m.preview, width: 1024, height: 256 };
+  m.zoom.levels = [{
+    level: 0,
+    width: 2048,
+    height: 512,
+    longEdge: 2048,
+    columns: 4,
+    rows: 1,
+    tiles: Array.from({ length: 4 }, (_, x) => ({
+      x, y: 0, pixelX: x * 512, pixelY: 0, width: 512, height: 512,
+      mimeType: 'image/webp', bytes: 100, quality: 0.88
+    }))
+  }];
+  const sync = {
+    loadDecryptedObject(args) {
+      if (args.objectId === 'preview') return Promise.resolve(new Uint8Array([1]));
+      return new Promise((resolve) => calls.push({ args, resolve }));
+    },
+    loadEncryptedObject: async () => new Uint8Array([2])
+  };
+  const settings = {
+    load: () => ({ networkMode: 'data-saver' }),
+    STANDARD_NETWORK_MODE: 'standard',
+    SAVER_NETWORK_MODE: 'data-saver'
+  };
+  const container = new FakeElement('section');
+  const reader = createEncryptedAssetReader({
+    container, sync, settings,
+    remoteAccess: { recordPartialSavings() {} },
+    crypto: { encryptedAssetByteLength: (n) => n + 36, tileObjectId: (l, x, y) => `L${l}:${x}:${y}` },
+    assetId: 'a', revision: 1, manifest: m
+  });
+  reader.mount();
+  await new Promise((resolve) => setImmediate(resolve));
+  reader.setScale(2);
+  await new Promise((resolve) => setTimeout(resolve, 190));
+  const stale = calls.find((entry) => entry.args.objectId === 'L0:2:0');
+  assert.ok(stale);
+  reader.setTransform({ translateX: 250 });
+  await new Promise((resolve) => setTimeout(resolve, 190));
+  assert.equal(stale.args.signal.aborted, true);
+  reader.setTransform({ translateX: 0 });
+  await new Promise((resolve) => setTimeout(resolve, 190));
+  const replacements = calls.filter((entry) => entry.args.objectId === 'L0:2:0');
+  assert.ok(replacements.length >= 2);
+  const replacement = replacements.at(-1);
+  const tileLayer = container.children[0].children[0].children[1];
+  stale.resolve(new Uint8Array([9]));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(tileLayer.children.length, 0);
+  replacement.resolve(new Uint8Array([8]));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(tileLayer.children.length, 1);
+  for (const entry of calls) if (entry !== stale && entry !== replacement) entry.resolve(new Uint8Array([7]));
+  reader.destroy();
+});
+
 test('reader source is a classic script', () => {
   assert.doesNotThrow(() => new vm.Script(fs.readFileSync('./encrypted-asset-reader.js', 'utf8')));
 });
