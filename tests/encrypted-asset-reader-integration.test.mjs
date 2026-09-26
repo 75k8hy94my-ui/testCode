@@ -24,12 +24,38 @@ test('reader has encrypted precedence, fail-closed validation, and legacy fallba
   assert.match(source, /if \(encryptedReaderActive\) \{ renderEncryptedPage\(n, direction\); return; \}/);
 });
 
-test('encrypted reader uses Vault rawKey and does not put fake URLs or plaintext binaries into items', () => {
-  assert.match(source, /vault\.rawKey/);
+test('encrypted reader separates MangaVault session API from the active raw master key', () => {
+  assert.match(source, /function encryptedVaultApi\(\)/);
+  assert.match(source, /typeof vaultApi\.withSession !== 'function'/);
+  assert.match(source, /typeof vaultApi\.api !== 'function'/);
+  assert.match(source, /function encryptedMasterKey\(\)/);
+  assert.match(source, /MangaVault\.loadActive\(\)/);
+  assert.match(source, /masterKey: encryptedMasterKey\(\)/);
+  assert.match(source, /vault: encryptedVaultApi\(\)/);
+  assert.match(source, /stageProcessedRevision\(\{ cache, masterKey,/);
+  assert.match(source, /publishPendingRevision\(\{ vault, storage, cache,/);
+  assert.doesNotMatch(source, /const vault = encryptedVault\(\)/);
+});
+
+test('encrypted items keep manifests but never fake URLs or plaintext binary payloads', () => {
   assert.match(source, /encryptedAssets/);
   assert.match(source, /encryptedReaderPages = encryptedPages/);
   assert.match(source, /pages = \[\]/);
   assert.doesNotMatch(source, /encryptedAssets[\s\S]{0,500}data:/);
+});
+
+test('encrypted render keeps the candidate renderer local until preview is ready', () => {
+  const start = source.indexOf('async function renderEncryptedPage');
+  const end = source.indexOf('async function startReadingEncrypted', start);
+  const body = source.slice(start, end);
+  const createIndex = body.indexOf('renderer = EncryptedAssetReader.createEncryptedAssetReader');
+  const readyCheckIndex = body.indexOf('if (renderId !== latestRenderId || !encryptedReaderActive)');
+  const globalAssignIndex = body.indexOf('encryptedCurrentRenderer = renderer');
+  assert.ok(createIndex >= 0);
+  assert.ok(readyCheckIndex > createIndex);
+  assert.ok(globalAssignIndex > readyCheckIndex);
+  assert.match(body, /if \(renderer\) \{ try \{ renderer\.destroy\(\); \}/);
+  assert.doesNotMatch(body, /catch \(error\)[\s\S]*encryptedCurrentRenderer\.destroy\(\)/);
 });
 
 test('encrypted renderer lifecycle and safety boundaries are wired', () => {
