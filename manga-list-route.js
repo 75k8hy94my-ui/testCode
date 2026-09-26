@@ -25,7 +25,8 @@
     ['manga-list-controller.js?v=20260922-controller', 'mangaRouteController'],
     ['manga-list-runtime-context.js?v=20260922-runtime-context', 'mangaRouteContext'],
     ['manga-list-image-cache.js?v=20260922-image-cache', 'mangaRouteImageCache'],
-    ['manga-list-host-runtime.js?v=20260922-host-runtime', 'mangaRouteHost'],
+    ['reader-target.js?v=20260926-item-identity', 'mangaReaderTarget'],
+    ['manga-list-host-runtime.js?v=20260926-item-reader-route', 'mangaRouteHost'],
     ['manga-list-runtime.js?v=20260922-shared-runtime', 'mangaRouteRuntime'],
     ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
   ];
@@ -270,7 +271,14 @@
         navigation: {
           lastUrlKey: 'mangaReaderLastUrl', readerUrl: 'reader.html',
           writeStorage: (key, value) => storage.setItem(key, value),
-          navigate: (url) => windowRef.HomeProfileSPA.navigate(url),
+          buildReaderUrl: (itemId, base) => windowRef.MangaReaderTarget.buildReaderUrl(itemId, base),
+          // reader.html is deliberately outside the home/manga/video SPA.
+          // Crossing this boundary reloads a dedicated reader document instead
+          // of transplanting reader.html into the bookshelf shell.
+          navigate: (url) => {
+            if (windowRef.location && typeof windowRef.location.assign === 'function') windowRef.location.assign(url);
+            else windowRef.location.href = url;
+          },
         },
       });
       const state = data.get;
