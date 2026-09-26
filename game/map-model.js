@@ -1,7 +1,7 @@
 (function initCityDaysMapModel(global) {
   "use strict";
 
-  const MAP_VERSION = "japan-v2";
+  const MAP_VERSION = "japan-v2.1";
   const WORLD_SIZE = 10800;
   const COAST = 160;
   const RAIL_Y = 4700;
@@ -128,12 +128,12 @@
   ];
 
   const PLACE_DEFINITIONS = [
-    { id:"home", name:"自宅", x:5050, y:6600, entranceNodeId:"home-entrance", roadNodeId:"home-road", color:"#d9b98b", symbol:"H" },
-    { id:"cafe", name:"カフェ LUNE", x:4230, y:5560, entranceNodeId:"cafe-entrance", roadNodeId:"cafe-road", color:"#c88f72", symbol:"C" },
-    { id:"store", name:"スーパー MARCHÉ", x:6630, y:5590, entranceNodeId:"store-entrance", roadNodeId:"store-road", color:"#74a88a", symbol:"S" },
+    { id:"home", name:"自宅", x:5050, y:6600, entranceNodeId:"home-entrance", roadNodeId:"home-road", building:{ x:5241, y:6728, w:300, h:270 }, color:"#d9b98b", symbol:"H" },
+    { id:"cafe", name:"カフェ LUNE", x:4230, y:5560, entranceNodeId:"cafe-entrance", roadNodeId:"cafe-road", building:{ x:4380, y:5784, w:300, h:270 }, color:"#c88f72", symbol:"C" },
+    { id:"store", name:"スーパー MARCHÉ", x:6630, y:5590, entranceNodeId:"store-entrance", roadNodeId:"store-road", building:{ x:6411, y:5809, w:320, h:260 }, color:"#74a88a", symbol:"S" },
     { id:"park", name:"中央公園", x:5250, y:3150, entranceNodeId:"park-entrance", roadNodeId:"park-road", color:"#72a66d", symbol:"P" },
-    { id:"gym", name:"CITY GYM", x:7180, y:3920, entranceNodeId:"gym-entrance", roadNodeId:"gym-road", color:"#7898bd", symbol:"G" },
-    { id:"library", name:"市立図書館", x:3420, y:3940, entranceNodeId:"library-entrance", roadNodeId:"library-road", color:"#9a8db9", symbol:"L" }
+    { id:"gym", name:"CITY GYM", x:7180, y:3920, entranceNodeId:"gym-entrance", roadNodeId:"gym-road", building:{ x:7399, y:3701, w:305, h:265 }, color:"#7898bd", symbol:"G" },
+    { id:"library", name:"市立図書館", x:3420, y:3940, entranceNodeId:"library-entrance", roadNodeId:"library-road", building:{ x:3420, y:4110, w:310, h:275 }, color:"#9a8db9", symbol:"L" }
   ];
 
   const STATION_DEFINITIONS = [
@@ -233,6 +233,16 @@
     );
   }
 
+  function facilityBuildingRect(place) {
+    if (!place?.building) return null;
+    return {
+      x:place.building.x - place.building.w / 2,
+      y:place.building.y - place.building.h / 2,
+      w:place.building.w,
+      h:place.building.h
+    };
+  }
+
   function segmentIntersectsExpandedRect(a, b, rect, pad) {
     const left = rect.x - pad;
     const right = rect.x + rect.w + pad;
@@ -314,7 +324,12 @@
   function createBuildingSites(edges, openSpaces, places, stations) {
     const sites = [];
     const reserved = [
-      ...places.map((place) => ({ x:place.x - 150, y:place.y - 130, w:300, h:260 })),
+      ...places.flatMap((place) => {
+        const areas = [{ x:place.x - 55, y:place.y - 55, w:110, h:110 }];
+        const building = facilityBuildingRect(place);
+        if (building) areas.push(building);
+        return areas;
+      }),
       ...stations.map((station) => ({ x:station.x - 230, y:station.y - 210, w:460, h:420 }))
     ];
 
@@ -445,7 +460,7 @@
     const nodes = BLUEPRINT_NODES.map((value) => ({ ...value }));
     const nodeMap = new Map(nodes.map((value) => [value.id, value]));
     const edges = BLUEPRINT_EDGES.map((value) => edgeFromDefinition(value, nodeMap));
-    const places = PLACE_DEFINITIONS.map((value) => ({ ...value }));
+    const places = PLACE_DEFINITIONS.map((value) => ({ ...value, building:value.building ? { ...value.building } : null }));
     const stations = STATION_DEFINITIONS.map((value) => ({ ...value }));
     const districts = DISTRICT_DEFINITIONS.map((value) => ({
       ...value,
@@ -597,6 +612,12 @@
         if (!findRoute(place.entranceNodeId, place.roadNodeId, { mode:"pedestrian" })) errors.push("place unreachable: " + place.id);
         if (!neighbors(place.roadNodeId, { mode:"vehicle" }).length) errors.push("place road unreachable: " + place.id);
         if (!isWalkable(place.x, place.y, 14)) errors.push("place not walkable: " + place.id);
+        const facility = facilityBuildingRect(place);
+        if (facility) {
+          if (edges.some((edge) => rectIntersectsEdge(facility, edge, edge.vehicle ? 18 : 10))) errors.push("facility intersects street: " + place.id);
+          if (openSpaces.some((space) => rectsOverlap(facility, space.bounds, 0))) errors.push("facility intersects open space: " + place.id);
+          if (buildingSites.some((site) => rectsOverlap(facility, site, 10))) errors.push("facility intersects generated building: " + place.id);
+        }
       }
 
       for (const station of stations) {
