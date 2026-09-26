@@ -52,11 +52,36 @@ test('manga shell keeps the existing shared authentication and vault bootstrap',
   assert.match(manga, /browser-storage\.js/);
   assert.match(manga, /vault-payload\.js/);
   assert.match(manga, /feature-flags\.js/);
-  assert.match(manga, /media-access-gate\.js\?v=20260922-vpn-tools/);
+  assert.match(manga, /media-access-gate\.js\?v=20260926-non-jp-vpn/);
   assert.match(manga, /home-profile-spa\.js\?v=/);
 });
 
-test('manga route startup failure cleans the partially mounted runtime', () => {
+test('manga route startup failure and stale renders clean only their own runtime', () => {
   assert.match(spa, /async function renderManga\(generation\)\{/);
-  assert.match(spa, /async function renderManga\(generation\)\{[\s\S]*?\}\s*catch\(_\)\{\s*cleanupMangaRoute\(\);/);
+  assert.match(spa, /let routeRuntime=null;/);
+  assert.match(spa, /mangaRouteRuntime=routeRuntime;/);
+  assert.match(spa, /generation!==renderGeneration\|\|mangaRouteRuntime!==routeRuntime/);
+  assert.match(spa, /cleanupMangaRoute\(routeRuntime\)/);
+  assert.match(spa, /function cleanupMangaRoute\(runtime=mangaRouteRuntime\)/);
+});
+
+test('manga route owns its stylesheet so SPA entry path cannot change shelf layout', () => {
+  assert.match(route, /const STYLESHEET_URL = 'manga-list\.css\?v=20260926-route-owned'/);
+  assert.match(route, /function ensureStylesheet\(documentRef\)/);
+  assert.match(route, /Promise\.all\(\[ensureStylesheet\(documentRef\), loadDependencies\(documentRef\)\]\)/);
+  assert.match(route, /dataset\.mangaListRouteStyle = '1'/);
+});
+
+test('manga route lifecycle is instance-local and cancellation-safe', () => {
+  assert.doesNotMatch(route, /let dependencyPromise = null;\s*let activeEntry = null;/);
+  assert.match(route, /const windowRef = deps\.windowRef;\s*let activeEntry = null;\s*let lifecycle = 0;/);
+  assert.match(route, /const token = \+\+lifecycle;/);
+  assert.match(route, /if \(token !== lifecycle\) return null;/);
+  assert.match(route, /function cleanup\(\) \{\s*lifecycle \+= 1;/);
+});
+
+test('transient VPN checking events do not recursively remount the manga shelf', () => {
+  assert.match(spa, /function handleVpnStatusChange\(event\)/);
+  assert.match(spa, /if\(next!=='allowed'&&next!=='blocked'\)return;/);
+  assert.match(spa, /if\(marker===lastVpnRouteStatus\)return;/);
 });
