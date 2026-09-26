@@ -1252,6 +1252,7 @@
 <script src="supabase-config.js"></script>
 <script src="vault-session.js?v=20260813-vault-state"></script>
 <script src="browser-storage.js"></script>
+<script src="reader-target.js?v=20260926-item-identity"></script>
 <script src="vault-payload.js"></script>
 <script src="backup-format.js?v=20260822-backup-scope-fix"></script>
 <script src="status-message.js"></script>
@@ -2595,10 +2596,30 @@ https://cdn.example.org/c/003.webp"></textarea>
     } catch (e) {}
   }
 
-  function getResumePage(url) {
+  function legacyIdentityKeys() {
+    const keys = [];
+    if (currentItem && currentItem.id) keys.push('custom:' + currentItem.id);
+    if (baseUrl) keys.push(baseUrl);
+    if (currentItem && currentItem.url) {
+      const parsed = parseInputUrl(currentItem.url);
+      keys.push(parsed ? parsed.baseUrl : currentItem.url);
+    }
+    return Array.from(new Set(keys.filter(Boolean)));
+  }
+
+  function getResumePage(key) {
     try {
       const map = JSON.parse(localStorage.getItem(LAST_PAGE_KEY) || '{}');
-      const rec = map[url];
+      let rec = map[key];
+      if (!rec && /^item:/.test(key || '')) {
+        for (const legacyKey of legacyIdentityKeys()) {
+          if (!map[legacyKey]) continue;
+          rec = map[legacyKey];
+          map[key] = rec;
+          localStorage.setItem(LAST_PAGE_KEY, JSON.stringify(map));
+          break;
+        }
+      }
       if (rec && !rec.wasLast && rec.page > 1) return rec.page;
     } catch (e) {}
     return null;
@@ -2785,7 +2806,17 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
   function loadCurrentToc() {
     const map = loadTocMap();
-    currentToc = (map[currentResumeKey] || []).slice().sort((a, b) => a.page - b.page);
+    let entries = map[currentResumeKey];
+    if (!entries && /^item:/.test(currentResumeKey || '')) {
+      for (const legacyKey of legacyIdentityKeys()) {
+        if (!Array.isArray(map[legacyKey])) continue;
+        entries = map[legacyKey];
+        map[currentResumeKey] = entries;
+        persistTocMap(map);
+        break;
+      }
+    }
+    currentToc = (entries || []).slice().sort((a, b) => a.page - b.page);
     updateTocButtonVisibility();
   }
   function saveCurrentToc() {
@@ -3203,13 +3234,12 @@ https://cdn.example.org/c/003.webp"></textarea>
   // If the URL currently being viewed matches a saved item (by base URL),
   // show that item's title in the header; otherwise clear it.
   function updateCurrentTitleDisplay() {
-    // Custom items (explicit page list) set their own title directly in
-    // startReadingCustom; baseUrl is empty for them, so don't let this
-    // baseUrl-keyed lookup clear it (e.g. when an unrelated item is deleted
-    // from the saved list while a custom manga is on screen). The favorite
-    // button is still refreshed below regardless, since getCurrentItem()
-    // handles the custom case itself (via currentItem).
-    if (!currentlyCustom) {
+    // A saved-item id is the canonical manga identity. URLs are only source
+    // locations and are not unique: two saved manga may legitimately share
+    // the same base/page URL or change source later.
+    if (currentItem && currentItem.id) {
+      els.currentTitle.textContent = itemDisplayTitle(currentItem);
+    } else if (!currentlyCustom) {
       if (!baseUrl) {
         els.currentTitle.textContent = '';
       } else {
@@ -3405,7 +3435,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // a spinner, so renderPage can do a real vertical slide once the new
   // manga's first page is ready — that's what makes the swipe feel live
   // instead of an instant cut.
-  async function startReading(url, addToHistoryFlag, switchDirection) {
+  async function startReading(url, addToHistoryFlag, switchDirection, resumeKeyOverride) {
     const parsed = parseInputUrl(url);
     if (!parsed) return;
     setMobileReaderMode(true);
@@ -3424,14 +3454,21 @@ https://cdn.example.org/c/003.webp"></textarea>
     const myGeneration = ++readingGeneration;
     baseUrl = parsed.baseUrl;
     pagePattern = parsed.pattern || null;
-    currentResumeKey = baseUrl;
+    currentResumeKey = resumeKeyOverride || baseUrl;
     currentlyCustom = false;
     splitSpreads = !!(currentItem && currentItem.splitSpreads);
     pageNumberWidth = Math.max(1, Number(parsed.numberWidth || (currentItem && currentItem.numberWidth)) || 1);
     loadCurrentToc();
     hideNextVolumeBanner();
     preferredExt = parsed.hintExt !== null ? parsed.hintExt : 0;
-    try { localStorage.setItem(LAST_URL_KEY, JSON.stringify({ kind: 'url', value: baseUrl })); } catch (e) {}
+    try {
+      if (currentItem && currentItem.id) {
+        if (window.MangaReaderTarget) MangaReaderTarget.persistItemTarget(currentItem.id, localStorage);
+        else localStorage.setItem(LAST_URL_KEY, JSON.stringify({ kind: 'item', itemId: currentItem.id }));
+      } else {
+        localStorage.setItem(LAST_URL_KEY, JSON.stringify({ kind: 'url', value: baseUrl }));
+      }
+    } catch (e) {}
     updateCurrentTitleDisplay();
     if (addToHistoryFlag) addToHistory(baseUrl);
 
@@ -3440,7 +3477,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     detectionDone = false;
     detectionHitLimit = false;
     currentPage = 1;
-    pendingResumePage = getResumePage(baseUrl);
+    pendingResumePage = getResumePage(currentResumeKey);
     els.readProgressBar.style.width = '0%'; // avoid a stale bar from the previous manga flashing during the lookup
 
     // Already know this manga from a previous visit — skip the probing
@@ -3725,7 +3762,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     handOffIncompleteDetection(); // 直前の漫画の検出未完了分を引き継ぐ（generationを進める前に）
     readingGeneration++; // invalidate any still-running sequential detection loop
     baseUrl = '';
-    currentResumeKey = 'custom:' + item.id;
+    currentResumeKey = window.MangaReaderTarget ? MangaReaderTarget.itemResumeKey(item.id) : ('item:' + item.id);
     currentlyCustom = true;
     splitSpreads = !!item.splitSpreads;
     loadCurrentToc();
@@ -3787,6 +3824,18 @@ https://cdn.example.org/c/003.webp"></textarea>
       mangaListHostRuntime.navigateToReader(item);
       return;
     }
+    if (item && item.id && (location.pathname.endsWith('/reader.html') || location.pathname === '/reader.html')) {
+      try {
+        if (window.MangaReaderTarget) {
+          MangaReaderTarget.persistItemTarget(item.id, localStorage);
+          const canonical = MangaReaderTarget.buildReaderUrl(item.id, 'reader.html');
+          const current = new URL(location.href);
+          if (current.searchParams.get('item') !== String(item.id)) {
+            history.replaceState({ ...(history.state || {}), readerItemId: String(item.id) }, '', canonical);
+          }
+        }
+      } catch (_) {}
+    }
 
     // Enter reader mode immediately. Some saved items have alternate URLs,
     // and resolving those candidates can take several seconds. Previously the
@@ -3820,7 +3869,10 @@ https://cdn.example.org/c/003.webp"></textarea>
           persistItems();
         }
       }
-      startReading(selectedUrl, addToHistoryFlag, switchDirection);
+      const resumeKey = item && item.id
+        ? (window.MangaReaderTarget ? MangaReaderTarget.itemResumeKey(item.id) : ('item:' + item.id))
+        : null;
+      startReading(selectedUrl, addToHistoryFlag, switchDirection, resumeKey);
     }
   }
 
@@ -6715,49 +6767,47 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.videoAInput.addEventListener('input', updateVideoPreview);
   els.videoBInput.addEventListener('input', updateVideoPreview);
 
-  // No URL bar anymore, so automatically resume the last-viewed manga on
-  // load (not counted as a "新規" open, so it isn't re-added to 履歴).
-  // LAST_URL_KEY is now a JSON envelope ({kind:'url',value} or
-  // {kind:'item',itemId}) so a custom (explicit page list) manga can be
-  // resumed too; older saved data was a plain URL string, handled below.
+  // reader.html is a dedicated reading document. A saved manga is addressed
+  // by its stable item id (?item=...), never by a page/base URL. The old
+  // mangaReaderLastUrl envelope remains only as a backward-compatible fallback
+  // for bookmarks created before item-addressed routing.
   const requestedScreenOnLoad = getReaderScreenFromLocation();
   let resumedOnLoad = false;
-  const shouldResumeLastManga = location.pathname.endsWith('/reader.html') || location.pathname === '/reader.html' || location.pathname === 'reader.html';
-  if (!requestedScreenOnLoad && shouldResumeLastManga) {
-    try {
-      const raw = localStorage.getItem(LAST_URL_KEY);
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw);
-          if (parsed && parsed.kind === 'url' && parsed.value) {
-            startReading(parsed.value, false);
-            resumedOnLoad = true;
-          } else if (parsed && parsed.kind === 'item' && parsed.itemId) {
-            const it = savedItems.find((x) => x.id === parsed.itemId);
-            if (it) { openItem(it, false); resumedOnLoad = true; }
-          }
-        } catch (e) { /* not JSON: legacy plain-string URL from before this change */ }
-        if (!resumedOnLoad && /^https?:\/\//i.test(raw)) { startReading(raw, false); resumedOnLoad = true; }
-      }
-    } catch (e) {}
-  }
-  // 明示された #screen=... は外部ナビゲーションの意図なので最優先する。
-  // ルート指定も前回の漫画もない場合だけ、保存一覧を既定画面として開く。
-  if (!requestedScreenOnLoad && !resumedOnLoad) {
-    if (location.pathname.endsWith('/reader.html') || location.pathname === '/reader.html') {
-      // A direct reader route without a valid resume target must never leave
-      // the user on an empty viewer. Return to the manga shelf instead.
-      if (window.HomeProfileSPA && typeof HomeProfileSPA.navigate === 'function') HomeProfileSPA.navigate('manga.html', { replace: true });
-      else location.replace('manga.html');
+  const routeItemId = window.MangaReaderTarget ? MangaReaderTarget.itemIdFromLocation(location) : '';
+
+  if (routeItemId) {
+    const item = savedItems.find((entry) => entry && String(entry.id) === routeItemId);
+    if (item) {
+      if (window.MangaReaderTarget) MangaReaderTarget.persistItemTarget(item.id, localStorage);
+      openItem(item, false);
+      resumedOnLoad = true;
     } else {
-      // Manga/video entry pages render the list as their normal document body.
-      // Do not route this initial view through the hash-based reader history.
-      renderReaderScreen(location.pathname.endsWith('/video.html') || location.pathname === '/video.html' ? 'video-list' : 'saved-list');
+      // A stale/deleted item id must not fall through to some unrelated URL.
+      location.replace('manga.html');
+      resumedOnLoad = true;
+    }
+  } else if (!requestedScreenOnLoad) {
+    const legacyTarget = window.MangaReaderTarget ? MangaReaderTarget.readLegacyTarget(localStorage) : null;
+    if (legacyTarget && legacyTarget.kind === 'item') {
+      const item = savedItems.find((entry) => entry && String(entry.id) === String(legacyTarget.itemId));
+      if (item) {
+        const canonical = MangaReaderTarget.buildReaderUrl(item.id, 'reader.html');
+        history.replaceState({ ...(history.state || {}), readerItemId: String(item.id) }, '', canonical);
+        openItem(item, false);
+        resumedOnLoad = true;
+      }
+    } else if (legacyTarget && legacyTarget.kind === 'url' && legacyTarget.value) {
+      startReading(legacyTarget.value, false);
+      resumedOnLoad = true;
     }
   }
+
+  // Reader is no longer a hidden bookshelf/video/settings route. If it has no
+  // concrete reading target, return to the independent manga shelf.
+  if (!requestedScreenOnLoad && !resumedOnLoad) location.replace('manga.html');
 })();
 </script>
-<script src="reader-shell.js?v=20260922-profile-header"></script>
+<script src="reader-shell.js?v=20260926-standalone-item-route"></script>
 <script src="reader-saved-list.js?v=20260915-saved-list"></script>
 <script src="reader-video-list.js?v=20260915-video-list"></script>
 <script src="reader-author-list.js?v=20260915-author-list"></script>
