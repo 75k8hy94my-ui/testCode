@@ -794,6 +794,16 @@
     return distance(x, y, nx, ny) < radius;
   }
 
+  function placeBuildingRect(place) {
+    if (!place?.building) return null;
+    return {
+      x:place.building.x - place.building.w / 2,
+      y:place.building.y - place.building.h / 2,
+      w:place.building.w,
+      h:place.building.h
+    };
+  }
+
   function collidesBuilding(x, y, radius) {
     for (const building of buildings) {
       if (
@@ -803,6 +813,17 @@
         y - radius > building.y + building.h
       ) continue;
       if (circleRectCollision(x, y, radius, building)) return true;
+    }
+    for (const place of PLACES) {
+      const facility = placeBuildingRect(place);
+      if (!facility) continue;
+      if (
+        x + radius < facility.x ||
+        y + radius < facility.y ||
+        x - radius > facility.x + facility.w ||
+        y - radius > facility.y + facility.h
+      ) continue;
+      if (circleRectCollision(x, y, radius, facility)) return true;
     }
     return false;
   }
@@ -4738,8 +4759,32 @@
   }
 
   function drawPlace(place) {
-    const p = worldToScreen(place.x, place.y);
-    if (p.x < -300 || p.y < -300 || p.x > viewWidth + 300 || p.y > viewHeight + 300) return;
+    const building = place.building;
+    const visualX = building?.x ?? place.x;
+    const visualY = building?.y ?? place.y;
+    const p = worldToScreen(visualX, visualY);
+    const entry = worldToScreen(place.x, place.y);
+    const visualOffscreen = p.x < -360 || p.y < -360 || p.x > viewWidth + 360 || p.y > viewHeight + 360;
+    const entryOffscreen = entry.x < -80 || entry.y < -80 || entry.x > viewWidth + 80 || entry.y > viewHeight + 80;
+    if (visualOffscreen && entryOffscreen) return;
+
+    if (building) {
+      ctx.save();
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "rgba(42,48,45,.2)";
+      ctx.lineWidth = 24;
+      ctx.beginPath();
+      ctx.moveTo(entry.x, entry.y);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      ctx.strokeStyle = "#aaa9a1";
+      ctx.lineWidth = 16;
+      ctx.beginPath();
+      ctx.moveTo(entry.x, entry.y);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     if (place.id === "park") {
       ctx.fillStyle = "#b9b18f";
@@ -4756,7 +4801,7 @@
       drawTree(place.x - 70, place.y - 10, .78);
       drawTree(place.x + 72, place.y - 18, .72);
     } else if (place.id === "home") {
-      drawFacilityBuilding(p, 300, 270, "#d0b68f", "#6d655c", "#8fa8ad");
+      drawFacilityBuilding(p, building?.w || 300, building?.h || 270, "#d0b68f", "#6d655c", "#8fa8ad");
       ctx.fillStyle = "#a07e5b";
       ctx.fillRect(p.x - 118, p.y - 70, 236, 12);
       ctx.fillStyle = "#f0e1c2";
@@ -4766,7 +4811,7 @@
       ctx.beginPath(); ctx.arc(p.x - 125, p.y + 90, 17, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc(p.x + 125, p.y + 90, 17, 0, Math.PI * 2); ctx.fill();
     } else if (place.id === "cafe") {
-      drawFacilityBuilding(p, 300, 270, "#b77a64", "#604f48", "#89a5a9");
+      drawFacilityBuilding(p, building?.w || 300, building?.h || 270, "#b77a64", "#604f48", "#89a5a9");
       ctx.fillStyle = "#f1d4b0";
       ctx.fillRect(p.x - 112, p.y - 18, 224, 20);
       for (let i = -5; i <= 5; i += 1) {
@@ -4778,7 +4823,7 @@
       ctx.textAlign = "center";
       ctx.fillText("LUNE", p.x, p.y - 35);
     } else if (place.id === "store") {
-      drawFacilityBuilding(p, 320, 260, "#6f9a82", "#455e55", "#a8c3c4");
+      drawFacilityBuilding(p, building?.w || 320, building?.h || 260, "#6f9a82", "#455e55", "#a8c3c4");
       ctx.fillStyle = "#e7ede5";
       ctx.fillRect(p.x - 125, p.y - 55, 250, 32);
       ctx.fillStyle = "#487660";
@@ -4790,7 +4835,7 @@
         ctx.strokeRect(p.x + i * 45 - 16, p.y + 106, 32, 52);
       }
     } else if (place.id === "gym") {
-      drawFacilityBuilding(p, 305, 265, "#718ead", "#465b70", "#8faebb");
+      drawFacilityBuilding(p, building?.w || 305, building?.h || 265, "#718ead", "#465b70", "#8faebb");
       ctx.fillStyle = "#e3ebee";
       ctx.fillRect(p.x - 118, p.y - 54, 236, 30);
       ctx.fillStyle = "#49657f";
@@ -4805,7 +4850,7 @@
       ctx.moveTo(p.x + 35, p.y + 10); ctx.lineTo(p.x + 35, p.y + 26);
       ctx.stroke();
     } else if (place.id === "library") {
-      drawFacilityBuilding(p, 310, 275, "#9d91b4", "#5d5868", "#9eb2bb");
+      drawFacilityBuilding(p, building?.w || 310, building?.h || 275, "#9d91b4", "#5d5868", "#9eb2bb");
       ctx.fillStyle = "#e3dced";
       ctx.fillRect(p.x - 125, p.y - 62, 250, 28);
       ctx.fillStyle = "#5e566c";
@@ -4826,11 +4871,11 @@
 
     ctx.fillStyle = "#f7f8f7";
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 15, 0, Math.PI * 2);
+    ctx.arc(entry.x, entry.y, 15, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = "#26312b";
     ctx.font = "800 12px system-ui, sans-serif";
-    ctx.fillText(place.symbol, p.x, p.y + 4);
+    ctx.fillText(place.symbol, entry.x, entry.y + 4);
   }
 
   function drawPerson(x, y, dir, shirt, pants, hair, skin, phase, scale = 1) {
