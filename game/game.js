@@ -157,6 +157,39 @@
   const buildings = [];
   const traffic = [];
   const pedestrians = [];
+  const CITIZEN_COUNT = 76;
+  const CITIZEN_GIVEN_NAMES = [
+    "ハル","ユウ","アキ","ナオ","ミナト","リン","カナ","ヒナ","レン","マコト",
+    "ユイ","ソウ","ミオ","リク","ナナ","カイ","サキ","トワ","レイ","ミサキ",
+    "コウ","チヒロ","アオ","ユナ","ケイ","ノゾミ","ショウ","エマ","タクミ","サラ"
+  ];
+  const CITIZEN_FAMILY_NAMES = [
+    "佐藤","鈴木","高橋","田中","伊藤","渡辺","山本","中村","小林","加藤",
+    "吉田","山田","佐々木","山口","松本","井上","木村","林","斎藤","清水"
+  ];
+  const CITIZEN_JOB_LABELS = {
+    cafe:"カフェ勤務",
+    retail:"スーパー勤務",
+    gym:"ジム勤務",
+    library:"図書館勤務",
+    office:"会社員",
+    student:"学生",
+    freelance:"フリーランス",
+    retired:"無職・退職"
+  };
+  const CITIZEN_ACTIVITY_LABELS = {
+    commute_work:"出勤中",
+    work:"勤務中",
+    sleep:"睡眠",
+    eat_home:"自宅で食事",
+    shop:"買い物",
+    eat_out:"外食",
+    park:"公園で休憩",
+    gym:"運動",
+    library:"読書・勉強",
+    socialize:"交流",
+    home_idle:"自宅で休息"
+  };
   const touch = { x: 0, y: 0, run: false, driveAccel: false, driveBrake: false, pointerId: null };
 
   function signalStateAt(worldX, worldY, orientation) {
@@ -1106,41 +1139,475 @@
   }
 
 
-  function pedestrianGoalPlace(ped, startNodeId) {
-    const candidates = PLACES.filter((place) => place.entranceNodeId !== startNodeId && place.id !== ped.homePlaceId);
-    if (!candidates.length) return PLACES[0];
-    const index = Math.floor(hash2(ped.seed || 1, ped.tripCount || 0, 903) * candidates.length) % candidates.length;
-    return candidates[index];
+  function nearestPedestrianNodeId(x, y) {
+    const hit = mapModel.nearestRoad(x, y);
+    const edge = hit?.edge;
+    if (!edge) return HOME?.entranceNodeId || mapModel.nodes[0]?.id || null;
+    const from = mapModel.getNode(edge.from);
+    const to = mapModel.getNode(edge.to);
+    if (!from) return to?.id || null;
+    if (!to) return from.id;
+    return distance(x, y, from.x, from.y) <= distance(x, y, to.x, to.y) ? from.id : to.id;
+  }
+
+  function citizenHomeCandidates() {
+    const preferred = (mapModel.buildingSites || []).filter((site) =>
+      site.use === "residential" || site.use === "mixed-low"
+    );
+    const fallback = (mapModel.buildingSites || []).filter((site) => site.use === "mixed");
+    const source = preferred.length ? preferred : fallback;
+    return source.map((site) => ({
+      site,
+      nodeId:nearestPedestrianNodeId(site.x + site.w / 2, site.y + site.h / 2)
+    })).filter((value) => value.nodeId);
+  }
+
+  function citizenWorkCandidates() {
+    return (mapModel.buildingSites || [])
+      .filter((site) => site.use === "commercial" || site.use === "mixed")
+      .map((site) => ({
+        site,
+        nodeId:nearestPedestrianNodeId(site.x + site.w / 2, site.y + site.h / 2)
+      }))
+      .filter((value) => value.nodeId);
+  }
+
+  function citizenName(index) {
+    if (index === 0) return "アオイ";
+    if (index === 1) return "ソラ";
+    if (index === 2) return "メイ";
+    const family = CITIZEN_FAMILY_NAMES[Math.floor(hash2(index, 71, 1601) * CITIZEN_FAMILY_NAMES.length) % CITIZEN_FAMILY_NAMES.length];
+    const given = CITIZEN_GIVEN_NAMES[Math.floor(hash2(index, 79, 1602) * CITIZEN_GIVEN_NAMES.length) % CITIZEN_GIVEN_NAMES.length];
+    return family + " " + given;
+  }
+
+  function citizenProfile(index, home, workPool) {
+    const specialNpcId = index === 0 ? "aoi" : index === 1 ? "sora" : index === 2 ? "mei" : null;
+    let age = 18 + Math.floor(hash2(index, 83, 1603) * 64);
+    let jobType;
+
+    if (specialNpcId === "sora") {
+      age = 24;
+      jobType = "cafe";
+    } else if (specialNpcId === "mei") {
+      age = 22;
+      jobType = "student";
+    } else if (specialNpcId === "aoi") {
+      age = 28;
+      jobType = "freelance";
+    } else if (age >= 68) {
+      jobType = "retired";
+    } else if (age <= 22) {
+      jobType = "student";
+    } else {
+      const roll = hash2(index, 89, 1604);
+      jobType = roll < .12 ? "cafe"
+        : roll < .23 ? "retail"
+          : roll < .31 ? "gym"
+            : roll < .39 ? "library"
+              : roll < .84 ? "office"
+                : "freelance";
+    }
+
+    const fixedPlace = jobType === "cafe" ? CAFE
+      : jobType === "retail" ? STORE
+        : jobType === "gym" ? GYM
+          : jobType === "library" || jobType === "student" ? LIBRARY
+            : null;
+
+    const genericWork = workPool.length
+      ? workPool[Math.floor(hash2(index, 97, 1605) * workPool.length) % workPool.length]
+      : null;
+    const workNodeId = fixedPlace?.entranceNodeId
+      || (jobType === "office" || jobType === "freelance" ? genericWork?.nodeId : null)
+      || null;
+
+    const workStart = jobType === "cafe" || jobType === "retail"
+      ? 7 * 60 + Math.floor(hash2(index, 101, 1606) * 150)
+      : 8 * 60 + Math.floor(hash2(index, 103, 1607) * 120);
+    const workMinutes = jobType === "freelance"
+      ? 300 + Math.floor(hash2(index, 107, 1608) * 180)
+      : 420 + Math.floor(hash2(index, 109, 1609) * 100);
+
+    return {
+      id:"citizen-" + String(index + 1).padStart(3, "0"),
+      name:citizenName(index),
+      specialNpcId,
+      age,
+      householdId:"household-" + String(Math.floor(index / 2) + 1).padStart(2, "0"),
+      homeSiteId:home?.site?.id || null,
+      homeNodeId:home?.nodeId || HOME.entranceNodeId,
+      jobType,
+      jobLabel:CITIZEN_JOB_LABELS[jobType] || "住民",
+      workNodeId,
+      workPlaceId:fixedPlace?.id || null,
+      workStart,
+      workEnd:(workStart + workMinutes) % 1440,
+      wage:jobType === "office" ? 7800
+        : jobType === "cafe" || jobType === "retail" ? 5400
+          : jobType === "gym" || jobType === "library" ? 5900
+            : jobType === "freelance" ? 4600
+              : 0,
+      wakeMinute:360 + Math.floor(hash2(index, 113, 1610) * 150),
+      sleepMinute:1320 + Math.floor(hash2(index, 127, 1611) * 100),
+      personality:{
+        social:.55 + hash2(index, 131, 1612) * .9,
+        active:.45 + hash2(index, 137, 1613) * 1.0,
+        curious:.45 + hash2(index, 139, 1614) * 1.0,
+        frugal:.45 + hash2(index, 149, 1615) * 1.0,
+        routine:.55 + hash2(index, 151, 1616) * .9
+      }
+    };
+  }
+
+  function citizenIsWorkday(ped) {
+    if (!ped.workNodeId || ped.jobType === "retired" || ped.jobType === "student") return false;
+    const weekday = (state.day - 1) % 7;
+    const offShift = Math.floor(hash2(ped.seed, 157, 1617) * 3);
+    if (ped.jobType === "cafe" || ped.jobType === "retail") return weekday !== offShift && weekday !== (offShift + 3) % 7;
+    return weekday < 5;
+  }
+
+  function citizenClampNeeds(ped) {
+    ped.needs.hunger = clamp(ped.needs.hunger, 0, 100);
+    ped.needs.energy = clamp(ped.needs.energy, 0, 100);
+    ped.needs.social = clamp(ped.needs.social, 0, 100);
+    ped.needs.fun = clamp(ped.needs.fun, 0, 100);
+    ped.stress = clamp(ped.stress, 0, 100);
+    ped.money = Math.max(-5000, ped.money);
+    ped.groceries = Math.max(0, Math.floor(ped.groceries));
+  }
+
+  function citizenUpdateNeeds(ped, gameMinutes, travelling = false) {
+    if (!Number.isFinite(gameMinutes) || gameMinutes <= 0) return;
+    const activityFactor = travelling ? 1.15 : .8;
+    ped.needs.hunger -= gameMinutes * .026 * activityFactor;
+    ped.needs.energy -= gameMinutes * .018 * activityFactor;
+    ped.needs.social -= gameMinutes * .007;
+    ped.needs.fun -= gameMinutes * .0055;
+    if (travelling) ped.stress += gameMinutes * .006;
+    citizenClampNeeds(ped);
+  }
+
+  function minuteUntil(target, from = state.minute) {
+    return (target - from + 1440) % 1440;
+  }
+
+  function citizenActivityNode(action, ped) {
+    if (action.nodeId) return action.nodeId;
+    if (action.placeId) return PLACES.find((place) => place.id === action.placeId)?.entranceNodeId || ped.homeNodeId;
+    return ped.homeNodeId;
+  }
+
+  function citizenActionCandidates(ped) {
+    const minute = state.minute;
+    const hungerDeficit = 100 - ped.needs.hunger;
+    const energyDeficit = 100 - ped.needs.energy;
+    const socialDeficit = 100 - ped.needs.social;
+    const funDeficit = 100 - ped.needs.fun;
+    const lateNight = minute >= ped.sleepMinute || minute < ped.wakeMinute - 30;
+    const workday = citizenIsWorkday(ped);
+    const untilWork = minuteUntil(ped.workStart, minute);
+    const workEndAbsolute = ped.workEnd > ped.workStart ? ped.workEnd : ped.workEnd + 1440;
+    const minuteAbsolute = minute < ped.workStart && ped.workEnd < ped.workStart ? minute + 1440 : minute;
+    const onShift = workday && minuteAbsolute >= ped.workStart && minuteAbsolute < workEndAbsolute;
+    const alreadyWorked = ped.workedDay === state.day;
+
+    const actions = [];
+    const add = (id, score, options = {}) => {
+      const noise = (hash2(ped.seed, ped.decisionCount || 0, options.noiseSeed || id.length * 37) - .5) * 12;
+      actions.push({
+        id,
+        label:CITIZEN_ACTIVITY_LABELS[id] || id,
+        score:score + noise,
+        nodeId:options.nodeId || null,
+        placeId:options.placeId || null,
+        duration:options.duration || 60,
+        indoor:Boolean(options.indoor)
+      });
+    };
+
+    add("sleep",
+      energyDeficit * 1.55 + (lateNight ? 105 : 0) + (ped.needs.energy < 22 ? 70 : 0),
+      {
+        nodeId:ped.homeNodeId,
+        duration:lateNight ? clamp(minuteUntil(ped.wakeMinute, minute), 120, 510) : 100,
+        indoor:true,
+        noiseSeed:1701
+      }
+    );
+
+    if (ped.workNodeId && workday && !alreadyWorked) {
+      const scheduleScore = onShift ? 195 : untilWork <= 90 ? 175 - untilWork * .55 : untilWork <= 180 ? 75 - untilWork * .2 : -40;
+      const moneyPressure = ped.money < 2500 ? 32 : ped.money < 7000 ? 14 : 0;
+      add("work", scheduleScore * ped.personality.routine + moneyPressure, {
+        nodeId:ped.workNodeId,
+        placeId:ped.workPlaceId,
+        duration:onShift ? clamp(workEndAbsolute - minuteAbsolute, 120, 540) : clamp((ped.workEnd - ped.workStart + 1440) % 1440, 240, 540),
+        indoor:true,
+        noiseSeed:1702
+      });
+    }
+
+    if (ped.groceries > 0) {
+      add("eat_home", hungerDeficit * 1.52 + ped.personality.frugal * 14, {
+        nodeId:ped.homeNodeId,
+        duration:35,
+        indoor:true,
+        noiseSeed:1703
+      });
+    }
+
+    if (ped.money >= 900) {
+      add("eat_out", hungerDeficit * 1.35 + (1.5 - ped.personality.frugal) * 20 + socialDeficit * .18, {
+        placeId:"cafe",
+        duration:45,
+        indoor:true,
+        noiseSeed:1704
+      });
+    }
+
+    if (ped.groceries <= 1 && ped.money >= 1200) {
+      add("shop", 72 + (1 - ped.groceries) * 25 + hungerDeficit * .28, {
+        placeId:"store",
+        duration:32,
+        indoor:true,
+        noiseSeed:1705
+      });
+    }
+
+    add("park", funDeficit * .78 + socialDeficit * .42 + ped.stress * .72 + ped.personality.active * 12, {
+      placeId:"park",
+      duration:70,
+      indoor:false,
+      noiseSeed:1706
+    });
+
+    if (ped.money >= 500 && ped.needs.energy > 32 && ped.needs.hunger > 28) {
+      add("gym", funDeficit * .48 + ped.stress * .5 + ped.personality.active * 34, {
+        placeId:"gym",
+        duration:80,
+        indoor:true,
+        noiseSeed:1707
+      });
+    }
+
+    add("library", funDeficit * .35 + ped.stress * .42 + ped.personality.curious * 32 + (ped.jobType === "student" ? 82 : 0), {
+      placeId:"library",
+      duration:ped.jobType === "student" ? 150 : 85,
+      indoor:true,
+      noiseSeed:1708
+    });
+
+    if (ped.money >= 500) {
+      const socialPlace = hash2(ped.seed, ped.decisionCount || 0, 1709) > .5 ? "cafe" : "park";
+      add("socialize", socialDeficit * 1.06 + funDeficit * .28 + ped.personality.social * 30, {
+        placeId:socialPlace,
+        duration:65,
+        indoor:socialPlace === "cafe",
+        noiseSeed:1710
+      });
+    }
+
+    add("home_idle",
+      32 + energyDeficit * .42 + ped.stress * .34 + (minute >= 20 * 60 ? 38 : 0),
+      {
+        nodeId:ped.homeNodeId,
+        duration:80 + Math.floor(hash2(ped.seed, ped.decisionCount || 0, 1711) * 80),
+        indoor:true,
+        noiseSeed:1712
+      }
+    );
+
+    actions.sort((a, b) => b.score - a.score);
+    return actions;
+  }
+
+  function chooseCitizenAction(ped) {
+    ped.decisionCount = (ped.decisionCount || 0) + 1;
+    const actions = citizenActionCandidates(ped);
+    return actions[0] || {
+      id:"home_idle",
+      label:CITIZEN_ACTIVITY_LABELS.home_idle,
+      nodeId:ped.homeNodeId,
+      duration:90,
+      indoor:true
+    };
   }
 
   function buildPedestrianPlan(ped, startNodeId, goalNodeId) {
-    const route = mapModel.findRoute(startNodeId, goalNodeId, { mode: "pedestrian" });
+    const route = mapModel.findRoute(startNodeId, goalNodeId, { mode:"pedestrian" });
     if (!route || !route.edgeIds.length) return false;
     ped.routeEdgeIds = route.edgeIds;
     ped.routeIndex = 0;
     ped.targetNodeId = goalNodeId;
-    ped.targetPlaceId = PLACES.find((place) => place.entranceNodeId === goalNodeId)?.id || null;
     ped.edgeId = route.edgeIds[0];
-    ped.directionSign = mapModel.getEdge(ped.edgeId).from === startNodeId ? 1 : -1;
-    ped.edgeLength = polylineLength(mapModel.getEdge(ped.edgeId).points);
+    const firstEdge = mapModel.getEdge(ped.edgeId);
+    if (!firstEdge) return false;
+    ped.directionSign = firstEdge.from === startNodeId ? 1 : -1;
+    ped.edgeLength = polylineLength(firstEdge.points);
     ped.along = ped.directionSign > 0 ? 0 : ped.edgeLength;
     ped.state = "walking";
+    ped.visible = true;
     ped.waitTimer = 0;
     ped.tripCount = (ped.tripCount || 0) + 1;
+    ped.currentNodeId = startNodeId;
     return true;
+  }
+
+  function citizenActivityPeerCount(ped, placeId) {
+    if (!placeId) return 0;
+    return pedestrians.filter((other) =>
+      other !== ped &&
+      other.currentPlaceId === placeId &&
+      (other.state === "inside" || other.state === "staying")
+    ).length;
+  }
+
+  function beginCitizenActivity(ped, action = ped.pendingActivity) {
+    if (!action) {
+      action = chooseCitizenAction(ped);
+    }
+    ped.pendingActivity = null;
+    ped.currentActivityId = action.id;
+    ped.currentActivityLabel = action.label || CITIZEN_ACTIVITY_LABELS[action.id] || action.id;
+    ped.currentPlaceId = action.placeId || null;
+    ped.currentNodeId = citizenActivityNode(action, ped);
+    ped.targetNodeId = ped.currentNodeId;
+    ped.activityMinutesRemaining = Math.max(8, Number(action.duration) || 60);
+    ped.state = action.indoor ? "inside" : "staying";
+    ped.visible = ped.specialNpcId ? true : !action.indoor;
+    ped.speed = ped.baseSpeed;
+  }
+
+  function completeCitizenActivity(ped) {
+    const peers = citizenActivityPeerCount(ped, ped.currentPlaceId);
+    switch (ped.currentActivityId) {
+      case "sleep":
+        ped.needs.energy += 70;
+        ped.needs.hunger -= 7;
+        ped.stress -= 24;
+        break;
+      case "work":
+        ped.money += ped.wage;
+        ped.needs.energy -= 13;
+        ped.needs.hunger -= 14;
+        ped.needs.fun -= 7;
+        ped.stress += 18;
+        ped.workedDay = state.day;
+        break;
+      case "eat_home":
+        if (ped.groceries > 0) ped.groceries -= 1;
+        ped.needs.hunger += 64;
+        ped.needs.energy += 5;
+        ped.stress -= 6;
+        break;
+      case "shop":
+        if (ped.money >= 1200) {
+          ped.money -= 1200;
+          ped.groceries += 3;
+        }
+        ped.needs.fun += 2;
+        break;
+      case "eat_out":
+        if (ped.money >= 900) ped.money -= 900;
+        ped.needs.hunger += 58;
+        ped.needs.social += 8 + Math.min(12, peers * 2);
+        ped.needs.fun += 8;
+        ped.stress -= 7;
+        break;
+      case "park":
+        ped.needs.fun += 27;
+        ped.needs.social += 8 + Math.min(16, peers * 2);
+        ped.needs.energy += 5;
+        ped.stress -= 28;
+        break;
+      case "gym":
+        if (ped.money >= 500) ped.money -= 500;
+        ped.needs.fun += 15;
+        ped.needs.energy -= 13;
+        ped.needs.hunger -= 9;
+        ped.stress -= 18;
+        break;
+      case "library":
+        ped.needs.fun += ped.jobType === "student" ? 8 : 14;
+        ped.needs.energy -= 4;
+        ped.stress -= 20;
+        break;
+      case "socialize":
+        if (ped.currentPlaceId === "cafe" && ped.money >= 500) ped.money -= 500;
+        ped.needs.social += 36 + Math.min(15, peers * 3);
+        ped.needs.fun += 18;
+        ped.stress -= 16;
+        break;
+      case "home_idle":
+        ped.needs.energy += 12;
+        ped.needs.fun += 8;
+        ped.stress -= 13;
+        break;
+    }
+    citizenClampNeeds(ped);
+    ped.currentActivityId = null;
+    ped.currentActivityLabel = null;
+    ped.currentPlaceId = null;
+    ped.activityMinutesRemaining = 0;
+    planCitizenAction(ped, ped.currentNodeId || ped.homeNodeId);
+  }
+
+  function planCitizenAction(ped, startNodeId) {
+    const action = chooseCitizenAction(ped);
+    const targetNodeId = citizenActivityNode(action, ped);
+    action.nodeId = targetNodeId;
+    ped.pendingActivity = action;
+    ped.targetNodeId = targetNodeId;
+    ped.targetPlaceId = action.placeId || null;
+
+    if (!targetNodeId || targetNodeId === startNodeId) {
+      ped.currentNodeId = startNodeId || targetNodeId || ped.homeNodeId;
+      beginCitizenActivity(ped, action);
+      return true;
+    }
+
+    if (buildPedestrianPlan(ped, startNodeId, targetNodeId)) {
+      ped.pendingActivity = action;
+      ped.targetPlaceId = action.placeId || null;
+      return true;
+    }
+
+    if (startNodeId !== ped.homeNodeId && buildPedestrianPlan(ped, startNodeId, ped.homeNodeId)) {
+      ped.pendingActivity = {
+        id:"home_idle",
+        label:CITIZEN_ACTIVITY_LABELS.home_idle,
+        nodeId:ped.homeNodeId,
+        duration:90,
+        indoor:true
+      };
+      ped.targetPlaceId = null;
+      return true;
+    }
+
+    ped.currentNodeId = startNodeId || ped.homeNodeId;
+    beginCitizenActivity(ped, {
+      id:"home_idle",
+      label:CITIZEN_ACTIVITY_LABELS.home_idle,
+      nodeId:ped.currentNodeId,
+      duration:60,
+      indoor:true
+    });
+    return false;
   }
 
   function pedestrianPoseAt(ped) {
     const edge = mapModel.getEdge(ped.edgeId);
-    if (!edge) return { x: ped.x, y: ped.y, angle: ped.dir };
+    if (!edge) return { x:ped.x, y:ped.y, angle:ped.dir };
     const hit = pointAndTangentOnPolyline(edge.points, ped.along);
-    const tangent = ped.directionSign > 0 ? hit.tangent : { x: -hit.tangent.x, y: -hit.tangent.y };
+    const tangent = ped.directionSign > 0 ? hit.tangent : { x:-hit.tangent.x, y:-hit.tangent.y };
     const sidewalkOffset = edge.vehicle ? edge.width / 2 + 5 : Math.min(10, edge.width * .2);
     const side = ped.sideSign || 1;
     return {
-      x: hit.point.x + tangent.y * sidewalkOffset * side,
-      y: hit.point.y - tangent.x * sidewalkOffset * side,
-      angle: Math.atan2(tangent.y, tangent.x)
+      x:hit.point.x + tangent.y * sidewalkOffset * side,
+      y:hit.point.y - tangent.x * sidewalkOffset * side,
+      angle:Math.atan2(tangent.y, tangent.x)
     };
   }
 
@@ -1155,79 +1622,144 @@
     return signalStateAt(endpoint.x, endpoint.y, edgeOrientation(edge));
   }
 
-  function choosePedestrianDestination(ped, startNodeId) {
-    const target = pedestrianGoalPlace(ped, startNodeId);
-    if (!target || !buildPedestrianPlan(ped, startNodeId, target.entranceNodeId)) return false;
-    ped.state = "walking";
-    return true;
+  function citizenRemainingRouteDistance(ped) {
+    const edge = mapModel.getEdge(ped.edgeId);
+    if (!edge) return 0;
+    let remaining = ped.directionSign > 0 ? ped.edgeLength - ped.along : ped.along;
+    for (let i = ped.routeIndex + 1; i < (ped.routeEdgeIds?.length || 0); i += 1) {
+      const next = mapModel.getEdge(ped.routeEdgeIds[i]);
+      if (next) remaining += polylineLength(next.points);
+    }
+    return Math.max(0, remaining);
   }
 
-  function generatePedestrians() {
-    const pedestrianCount = 76;
-    const nearbyPedestrianPlaces = ["cafe", "store", "home"]
-      .map((id) => PLACES.find((place) => place.id === id))
-      .filter(Boolean);
-    for (let i = 0; i < pedestrianCount; i += 1) {
-      const homePlace = i < 30 && nearbyPedestrianPlaces.length
-        ? nearbyPedestrianPlaces[i % nearbyPedestrianPlaces.length]
-        : PLACES[i % PLACES.length];
-      let targetPlace = i < 30 && nearbyPedestrianPlaces.length
-        ? nearbyPedestrianPlaces[(i + 1) % nearbyPedestrianPlaces.length]
-        : PLACES[(i * 3 + 2) % PLACES.length];
-      if (targetPlace.id === homePlace.id) targetPlace = PLACES[(i + 1) % PLACES.length];
-      const ped = {
-        x: homePlace.x,
-        y: homePlace.y,
-        dir: hash2(i, 3, 90) * Math.PI * 2,
-        timer: 0,
-        speed: 28 + hash2(i, 8, 96) * 30,
-        color: ["#c77f66", "#718da7", "#ba9b58", "#8876a8", "#71957a"][i % 5],
-        pants: ["#394248","#554a45","#2f3b4d","#45464d"][i % 4],
-        hair: ["#302720","#4a3427","#1f2326","#684b36"][i % 4],
-        skin: ["#e5b394","#d49b77","#f0c3a4","#b97f62"][i % 4],
-        phase: hash2(i, 12, 97) * Math.PI * 2,
-        seed: i + 41,
-        sideSign: hash2(i, 14, 98) > .5 ? 1 : -1,
-        homePlaceId: homePlace.id,
-        targetPlaceId: targetPlace.id,
-        targetNodeId: targetPlace.entranceNodeId,
-        routeEdgeIds: [],
-        routeIndex: 0,
-        tripCount: 0,
-        state: "walking",
-        waitTimer: 0,
-        stayTimer: 0
-      };
-      if (!buildPedestrianPlan(ped, homePlace.entranceNodeId, targetPlace.entranceNodeId)) continue;
-      const initialAlong = Math.min(ped.edgeLength * (.08 + hash2(i, 18, 99) * .32), Math.max(1, ped.edgeLength - 1));
-      ped.along = ped.directionSign > 0 ? initialAlong : Math.max(0, ped.edgeLength - initialAlong);
+  function moveCitizenAlongRoute(ped, distanceUnits) {
+    let remaining = Math.max(0, distanceUnits);
+    let transitions = 0;
+    while (remaining > 0 && transitions < 20) {
+      const edge = mapModel.getEdge(ped.edgeId);
+      if (!edge) return false;
+      const edgeLength = ped.edgeLength || polylineLength(edge.points);
+      const endpointDistance = ped.directionSign > 0 ? edgeLength - ped.along : ped.along;
+
+      if (remaining < Math.max(1, endpointDistance)) {
+        ped.along += ped.directionSign * remaining;
+        remaining = 0;
+        break;
+      }
+
+      remaining = Math.max(0, remaining - Math.max(1, endpointDistance));
+      ped.along = ped.directionSign > 0 ? edgeLength : 0;
+      const currentNodeId = ped.directionSign > 0 ? edge.to : edge.from;
+      ped.currentNodeId = currentNodeId;
+      const nextId = ped.routeEdgeIds?.[ped.routeIndex + 1];
+
+      if (!nextId) {
+        const pose = pedestrianPoseAt(ped);
+        ped.x = pose.x;
+        ped.y = pose.y;
+        ped.dir = pose.angle;
+        beginCitizenActivity(ped, ped.pendingActivity);
+        return true;
+      }
+
+      const next = mapModel.getEdge(nextId);
+      if (!next || (next.from !== currentNodeId && next.to !== currentNodeId)) {
+        planCitizenAction(ped, currentNodeId);
+        return false;
+      }
+
+      ped.routeIndex += 1;
+      ped.edgeId = next.id;
+      ped.directionSign = next.from === currentNodeId ? 1 : -1;
+      ped.edgeLength = polylineLength(next.points);
+      ped.along = ped.directionSign > 0 ? 0 : ped.edgeLength;
+      transitions += 1;
+    }
+
+    if (ped.state === "walking" || ped.state === "waiting") {
       const pose = pedestrianPoseAt(ped);
       ped.x = pose.x;
       ped.y = pose.y;
       ped.dir = pose.angle;
+    }
+    return false;
+  }
+
+  function generatePedestrians() {
+    pedestrians.length = 0;
+    const homes = citizenHomeCandidates();
+    const workPool = citizenWorkCandidates();
+    const fallbackHome = { site:null, nodeId:HOME.entranceNodeId };
+
+    for (let i = 0; i < CITIZEN_COUNT; i += 1) {
+      const householdIndex = Math.floor(i / 2);
+      const home = homes.length ? homes[householdIndex % homes.length] : fallbackHome;
+      const profile = citizenProfile(i, home, workPool);
+      const ped = {
+        ...profile,
+        x:mapModel.getNode(profile.homeNodeId)?.x || HOME.x,
+        y:mapModel.getNode(profile.homeNodeId)?.y || HOME.y,
+        dir:hash2(i, 3, 90) * Math.PI * 2,
+        timer:0,
+        baseSpeed:30 + hash2(i, 8, 96) * 27,
+        speed:30 + hash2(i, 8, 96) * 27,
+        color:["#c77f66","#718da7","#ba9b58","#8876a8","#71957a","#b26f67","#6f8fac"][i % 7],
+        pants:["#394248","#554a45","#2f3b4d","#45464d"][i % 4],
+        hair:["#302720","#4a3427","#1f2326","#684b36"][i % 4],
+        skin:["#e5b394","#d49b77","#f0c3a4","#b97f62"][i % 4],
+        phase:hash2(i, 12, 97) * Math.PI * 2,
+        seed:i + 41,
+        sideSign:hash2(i, 14, 98) > .5 ? 1 : -1,
+        money:3500 + Math.floor(hash2(i, 163, 1713) * 24000),
+        groceries:1 + Math.floor(hash2(i, 167, 1714) * 4),
+        needs:{
+          hunger:46 + hash2(i, 173, 1715) * 50,
+          energy:50 + hash2(i, 179, 1716) * 47,
+          social:38 + hash2(i, 181, 1717) * 58,
+          fun:40 + hash2(i, 191, 1718) * 55
+        },
+        stress:8 + hash2(i, 193, 1719) * 48,
+        routeEdgeIds:[],
+        routeIndex:0,
+        tripCount:0,
+        decisionCount:0,
+        state:"deciding",
+        visible:true,
+        waitTimer:0,
+        stayTimer:0,
+        activityMinutesRemaining:0,
+        currentActivityId:null,
+        currentActivityLabel:null,
+        currentPlaceId:null,
+        currentNodeId:profile.homeNodeId,
+        targetNodeId:profile.homeNodeId,
+        targetPlaceId:null,
+        pendingActivity:null,
+        workedDay:0
+      };
+
+      planCitizenAction(ped, profile.homeNodeId);
+
+      if (ped.state === "walking") {
+        const initialAlong = Math.min(ped.edgeLength * (.04 + hash2(i, 197, 1720) * .28), Math.max(1, ped.edgeLength - 1));
+        ped.along = ped.directionSign > 0 ? initialAlong : Math.max(0, ped.edgeLength - initialAlong);
+        const pose = pedestrianPoseAt(ped);
+        ped.x = pose.x;
+        ped.y = pose.y;
+        ped.dir = pose.angle;
+      }
+
       pedestrians.push(ped);
     }
   }
 
+
   function seedPedestriansNearActor() {
-    const offsets = [-260, -180, -100, -20, 60, 140, 220, 300];
-    const nearbyCount = Math.min(offsets.length, pedestrians.length);
-    for (let i = 0; i < nearbyCount; i += 1) {
-      const hit = mapModel.nearestRoad(
-        state.player.x + offsets[i] * .35,
-        state.player.y + offsets[i] * .2
-      );
-      const edge = hit?.edge;
-      if (!edge?.pedestrian || !buildPedestrianPlan(pedestrians[i], edge.from, edge.to)) continue;
-      const ped = pedestrians[i];
-      ped.sideSign = i % 2 === 0 ? 1 : -1;
-      ped.along = clamp((hit.t || .5) * ped.edgeLength + (i - 3) * 42, 28, Math.max(28, ped.edgeLength - 28));
-      const pose = pedestrianPoseAt(ped);
-      ped.x = pose.x;
-      ped.y = pose.y;
-      ped.dir = pose.angle;
-    }
+    // Citizens now keep persistent homes, jobs and routes. Do not teleport a
+    // subset near the player just to manufacture crowd density.
   }
+
 
   function trainById(id) {
     return trains.find((train) => train.id === id) || null;
@@ -1987,7 +2519,7 @@
     }
   }
 
-  function advanceTime(minutes, decay = true) {
+  function advanceTime(minutes, decay = true, updateCitizens = true) {
     if (decay) decayNeeds(minutes);
     state.minute += minutes;
     while (state.minute >= 1440) {
@@ -1995,6 +2527,11 @@
       state.day += 1;
       chargeRentIfNeeded();
     }
+    while (state.minute < 0) {
+      state.minute += 1440;
+      state.day = Math.max(1, state.day - 1);
+    }
+    if (updateCitizens) fastForwardCitizens(minutes);
   }
 
   function nextRentDay() {
@@ -2234,19 +2771,76 @@
     actionSheet.hidden = false;
   }
 
+  function citizenMoodLabel(ped) {
+    const average = (ped.needs.hunger + ped.needs.energy + ped.needs.social + ped.needs.fun) / 4;
+    if (ped.stress > 75 || average < 28) return "かなり疲れている";
+    if (ped.stress > 55 || average < 45) return "少し余裕がない";
+    if (average > 76 && ped.stress < 30) return "機嫌がよさそう";
+    return "落ち着いている";
+  }
+
+  function citizenStatusText(ped) {
+    const activity = ped.currentActivityLabel
+      || ped.pendingActivity?.label
+      || (ped.state === "waiting" ? "信号待ち" : "移動中");
+    return [
+      ped.age + "歳",
+      ped.jobLabel,
+      activity,
+      citizenMoodLabel(ped)
+    ].join(" / ");
+  }
+
+  function openCitizen(ped) {
+    actionTitle.textContent = ped.name;
+    actionDescription.textContent =
+      citizenStatusText(ped) +
+      "\n所持金 ¥" + Math.round(ped.money).toLocaleString("ja-JP") +
+      " / 食料 " + ped.groceries +
+      "\n空腹 " + Math.round(ped.needs.hunger) +
+      "・体力 " + Math.round(ped.needs.energy) +
+      "・交流 " + Math.round(ped.needs.social) +
+      "・楽しさ " + Math.round(ped.needs.fun) +
+      "・ストレス " + Math.round(ped.stress);
+    actionChoices.replaceChildren();
+
+    addChoice("少し話す", "10分 / 相手の交流とストレスにも影響", () => {
+      state.needs.social += 12;
+      state.needs.fun += 4;
+      ped.needs.social += 16;
+      ped.needs.fun += 4;
+      ped.stress -= 7;
+      citizenClampNeeds(ped);
+      clampNeeds();
+      advanceTime(10);
+      showToast(ped.name + "と少し話しました");
+    });
+
+    actionSheet.hidden = false;
+  }
+
   function openNpc(npc) {
+    const citizen = pedestrians.find((ped) => ped.id === npc.citizenId || ped.specialNpcId === npc.id);
     actionTitle.textContent = npc.name;
-    actionDescription.textContent = npc.id === "aoi"
-      ? "公園でよく会う近所の人。"
-      : npc.id === "sora"
-        ? "カフェの同僚。"
-        : "図書館でよく見かける学生。";
+    actionDescription.textContent = citizen
+      ? citizenStatusText(citizen)
+      : (npc.id === "aoi"
+        ? "公園でよく会う近所の人。"
+        : npc.id === "sora"
+          ? "カフェの同僚。"
+          : "図書館でよく見かける学生。");
     actionChoices.replaceChildren();
     addChoice("少し話す", "30分 / 交流+24 / 楽しさ+7", () => {
       advanceTime(30);
       state.needs.social += 24;
       state.needs.fun += 7;
       npc.friendship += 1;
+      if (citizen) {
+        citizen.needs.social += 24;
+        citizen.needs.fun += 6;
+        citizen.stress -= 9;
+        citizenClampNeeds(citizen);
+      }
       clampNeeds();
       showToast(npc.name + "と話しました");
     });
@@ -2257,12 +2851,20 @@
         state.needs.fun += 22;
         state.needs.hunger -= 5;
         npc.friendship += 1;
+        if (citizen) {
+          citizen.needs.social += 32;
+          citizen.needs.fun += 18;
+          citizen.needs.hunger -= 5;
+          citizen.stress -= 14;
+          citizenClampNeeds(citizen);
+        }
         clampNeeds();
         showToast(npc.name + "と楽しい時間を過ごしました");
       });
     }
     actionSheet.hidden = false;
   }
+
 
   function nearestInteraction() {
     const p = actorPosition();
@@ -2294,13 +2896,35 @@
     let nearestNpc = null;
     let npcDistance = 72;
     for (const npc of NPCS) {
+      if (npc.hidden) continue;
       const d = distance(p.x, p.y, npc.x, npc.y);
       if (d < npcDistance) {
         nearestNpc = npc;
         npcDistance = d;
       }
     }
-    if (nearestNpc) return { type: "npc", target: nearestNpc, label: nearestNpc.name + "と話す" };
+    if (nearestNpc) return { type:"npc", target:nearestNpc, label:nearestNpc.name + "と話す" };
+
+    let nearestCitizen = null;
+    let citizenDistance = 58;
+    for (const citizen of pedestrians) {
+      if (!citizen.visible || citizen.specialNpcId) continue;
+      const d = distance(p.x, p.y, citizen.x, citizen.y);
+      if (d < citizenDistance) {
+        nearestCitizen = citizen;
+        citizenDistance = d;
+      }
+    }
+    if (nearestCitizen) {
+      const activity = nearestCitizen.currentActivityLabel
+        || nearestCitizen.pendingActivity?.label
+        || (nearestCitizen.state === "waiting" ? "信号待ち" : "移動中");
+      return {
+        type:"citizen",
+        target:nearestCitizen,
+        label:nearestCitizen.name + "（" + activity + "）"
+      };
+    }
 
     let nearestPlace = null;
     let placeDistance = 105;
@@ -2375,6 +2999,7 @@
     if (item.type === "train-wait") showToast("電車が到着したら E / ACTION で乗車できます");
     if (item.type === "place") openPlace(item.target);
     if (item.type === "npc") openNpc(item.target);
+    if (item.type === "citizen") openCitizen(item.target);
   }
 
   function resize() {
@@ -2429,6 +3054,36 @@
           trips: state.drive.trips
         },
         friends: Object.fromEntries(NPCS.map((npc) => [npc.id, npc.friendship])),
+        citizens: pedestrians.map((ped) => ({
+          id:ped.id,
+          money:ped.money,
+          groceries:ped.groceries,
+          needs:{ ...ped.needs },
+          stress:ped.stress,
+          workedDay:ped.workedDay,
+          decisionCount:ped.decisionCount,
+          tripCount:ped.tripCount,
+          state:ped.state,
+          visible:ped.visible,
+          waitTimer:ped.waitTimer,
+          activityMinutesRemaining:ped.activityMinutesRemaining,
+          currentActivityId:ped.currentActivityId,
+          currentActivityLabel:ped.currentActivityLabel,
+          currentPlaceId:ped.currentPlaceId,
+          currentNodeId:ped.currentNodeId,
+          targetNodeId:ped.targetNodeId,
+          targetPlaceId:ped.targetPlaceId,
+          pendingActivity:ped.pendingActivity ? { ...ped.pendingActivity } : null,
+          edgeId:ped.edgeId,
+          edgeLength:ped.edgeLength,
+          directionSign:ped.directionSign,
+          along:ped.along,
+          routeEdgeIds:Array.isArray(ped.routeEdgeIds) ? [...ped.routeEdgeIds] : [],
+          routeIndex:ped.routeIndex,
+          x:ped.x,
+          y:ped.y,
+          dir:ped.dir
+        })),
         savedAt: Date.now()
       }));
       if (showMessage) showToast("生活データを保存しました");
@@ -2473,6 +3128,93 @@
     }
     personalCar.angle = directionSign > 0 ? Math.atan2(ty, tx) : Math.atan2(-ty, -tx);
     personalCar.speed = 0;
+  }
+
+  function restoreCitizenFromSave(ped, stored, mapMatches) {
+    if (!stored || stored.id !== ped.id) return;
+
+    if (Number.isFinite(Number(stored.money))) ped.money = Number(stored.money);
+    if (Number.isFinite(Number(stored.groceries))) ped.groceries = Math.max(0, Math.floor(Number(stored.groceries)));
+    if (stored.needs) {
+      for (const key of ["hunger","energy","social","fun"]) {
+        if (Number.isFinite(Number(stored.needs[key]))) ped.needs[key] = Number(stored.needs[key]);
+      }
+    }
+    if (Number.isFinite(Number(stored.stress))) ped.stress = Number(stored.stress);
+    if (Number.isFinite(Number(stored.workedDay))) ped.workedDay = Math.max(0, Math.floor(Number(stored.workedDay)));
+    if (Number.isFinite(Number(stored.decisionCount))) ped.decisionCount = Math.max(0, Math.floor(Number(stored.decisionCount)));
+    if (Number.isFinite(Number(stored.tripCount))) ped.tripCount = Math.max(0, Math.floor(Number(stored.tripCount)));
+    citizenClampNeeds(ped);
+
+    if (!mapMatches) {
+      ped.state = "deciding";
+      ped.currentNodeId = ped.homeNodeId;
+      ped.pendingActivity = null;
+      planCitizenAction(ped, ped.homeNodeId);
+      return;
+    }
+
+    const allowedStates = new Set(["walking","waiting","inside","staying"]);
+    const savedState = allowedStates.has(stored.state) ? stored.state : "deciding";
+    const savedCurrentNode = typeof stored.currentNodeId === "string" && mapModel.getNode(stored.currentNodeId)
+      ? stored.currentNodeId
+      : ped.homeNodeId;
+    const savedTargetNode = typeof stored.targetNodeId === "string" && mapModel.getNode(stored.targetNodeId)
+      ? stored.targetNodeId
+      : savedCurrentNode;
+
+    ped.currentNodeId = savedCurrentNode;
+    ped.targetNodeId = savedTargetNode;
+    ped.targetPlaceId = typeof stored.targetPlaceId === "string" ? stored.targetPlaceId : null;
+    ped.currentPlaceId = typeof stored.currentPlaceId === "string" ? stored.currentPlaceId : null;
+    ped.currentActivityId = typeof stored.currentActivityId === "string" ? stored.currentActivityId : null;
+    ped.currentActivityLabel = typeof stored.currentActivityLabel === "string" ? stored.currentActivityLabel : null;
+    ped.activityMinutesRemaining = Math.max(0, Number(stored.activityMinutesRemaining) || 0);
+    ped.waitTimer = Math.max(0, Number(stored.waitTimer) || 0);
+
+    const pending = stored.pendingActivity && typeof stored.pendingActivity === "object"
+      ? { ...stored.pendingActivity }
+      : null;
+    if (pending?.nodeId && !mapModel.getNode(pending.nodeId)) pending.nodeId = ped.homeNodeId;
+    ped.pendingActivity = pending;
+
+    if (savedState === "inside" || savedState === "staying") {
+      ped.state = savedState;
+      ped.visible = ped.specialNpcId ? true : savedState === "staying";
+      const node = mapModel.getNode(savedCurrentNode);
+      if (node) {
+        ped.x = node.x;
+        ped.y = node.y;
+      }
+      if (ped.activityMinutesRemaining <= .001) completeCitizenActivity(ped);
+      return;
+    }
+
+    const edge = typeof stored.edgeId === "string" ? mapModel.getEdge(stored.edgeId) : null;
+    const routeEdgeIds = Array.isArray(stored.routeEdgeIds)
+      ? stored.routeEdgeIds.filter((edgeId) => typeof edgeId === "string" && mapModel.getEdge(edgeId))
+      : [];
+    const routeValid = edge && routeEdgeIds.length && routeEdgeIds.length === (stored.routeEdgeIds?.length || 0);
+
+    if (routeValid) {
+      ped.state = savedState === "waiting" ? "waiting" : "walking";
+      ped.visible = true;
+      ped.routeEdgeIds = routeEdgeIds;
+      ped.routeIndex = clamp(Math.floor(Number(stored.routeIndex) || 0), 0, routeEdgeIds.length - 1);
+      ped.edgeId = edge.id;
+      ped.edgeLength = polylineLength(edge.points);
+      ped.directionSign = Number(stored.directionSign) < 0 ? -1 : 1;
+      ped.along = clamp(Number(stored.along) || 0, 0, ped.edgeLength);
+      const pose = pedestrianPoseAt(ped);
+      ped.x = pose.x;
+      ped.y = pose.y;
+      ped.dir = pose.angle;
+      return;
+    }
+
+    ped.state = "deciding";
+    ped.pendingActivity = null;
+    planCitizenAction(ped, savedCurrentNode);
   }
 
   function loadGame() {
@@ -2554,6 +3296,15 @@
       if (saved.friends) {
         for (const npc of NPCS) npc.friendship = Math.max(0, Math.floor(Number(saved.friends[npc.id]) || 0));
       }
+
+      if (Array.isArray(saved.citizens)) {
+        const savedCitizens = new Map(saved.citizens.map((value) => [value?.id, value]));
+        for (const ped of pedestrians) {
+          const stored = savedCitizens.get(ped.id);
+          if (stored) restoreCitizenFromSave(ped, stored, mapMatches);
+        }
+      }
+      syncNamedNpcCitizens();
 
       if (state.player.inTrain) {
         const train = trainById(state.player.trainId);
@@ -2861,18 +3612,22 @@
     }
   }
 
-  function updatePedestrians(dt) {
+  function updatePedestrians(dt, gameMinutes) {
+    const minutes = Math.max(0, Number(gameMinutes) || 0);
+
     for (const ped of pedestrians) {
-      ped.phase += dt * ped.speed * .12;
-      if (ped.state === "staying") {
-        ped.stayTimer -= dt;
-        if (ped.stayTimer <= 0) {
-          const currentEdge = mapModel.getEdge(ped.edgeId);
-          const currentNodeId = currentEdge
-            ? (ped.directionSign > 0 ? currentEdge.to : currentEdge.from)
-            : ped.targetNodeId;
-          choosePedestrianDestination(ped, currentNodeId);
-        }
+      const travelling = ped.state === "walking" || ped.state === "waiting";
+      citizenUpdateNeeds(ped, minutes, travelling);
+
+      if (ped.state === "inside" || ped.state === "staying") {
+        ped.activityMinutesRemaining = Math.max(0, ped.activityMinutesRemaining - minutes);
+        if (ped.state === "staying") ped.phase += dt * .7;
+        if (ped.activityMinutesRemaining <= .001) completeCitizenActivity(ped);
+        continue;
+      }
+
+      if (ped.state !== "walking" && ped.state !== "waiting") {
+        planCitizenAction(ped, ped.currentNodeId || ped.homeNodeId);
         continue;
       }
 
@@ -2880,58 +3635,69 @@
       if (signal === "red" || signal === "yellow") {
         ped.state = "waiting";
         ped.waitTimer = Math.min(1.2, ped.waitTimer + dt);
-        ped.phase -= dt * ped.speed * .12;
         continue;
       }
+
       ped.state = "walking";
-
-      let remaining = ped.speed * dt;
-      let transitions = 0;
-      while (remaining > 0 && transitions < 4) {
-        const edge = mapModel.getEdge(ped.edgeId);
-        if (!edge) break;
-        const edgeLength = ped.edgeLength || polylineLength(edge.points);
-        const endpointDistance = ped.directionSign > 0 ? edgeLength - ped.along : ped.along;
-        if (remaining < Math.max(1, endpointDistance)) {
-          ped.along += ped.directionSign * remaining;
-          remaining = 0;
-          break;
-        }
-        remaining = Math.max(0, remaining - Math.max(1, endpointDistance));
-        ped.along = ped.directionSign > 0 ? edgeLength : 0;
-        const currentNodeId = ped.directionSign > 0 ? edge.to : edge.from;
-        const nextId = ped.routeEdgeIds?.[ped.routeIndex + 1];
-        if (!nextId) {
-          ped.state = "staying";
-          ped.stayTimer = 2.5 + hash2(ped.seed, ped.tripCount, 1001) * 7;
-          remaining = 0;
-          break;
-        }
-        const next = mapModel.getEdge(nextId);
-        if (!next || (next.from !== currentNodeId && next.to !== currentNodeId)) {
-          ped.state = "staying";
-          ped.stayTimer = 3;
-          remaining = 0;
-          break;
-        }
-        ped.routeIndex += 1;
-        ped.edgeId = next.id;
-        ped.directionSign = next.from === currentNodeId ? 1 : -1;
-        ped.edgeLength = polylineLength(next.points);
-        ped.along = ped.directionSign > 0 ? 0 : ped.edgeLength;
-        transitions += 1;
-      }
-
-      const pose = pedestrianPoseAt(ped);
-      ped.x = pose.x;
-      ped.y = pose.y;
-      ped.dir = pose.angle;
+      ped.waitTimer = 0;
+      ped.phase += dt * ped.speed * .12;
+      moveCitizenAlongRoute(ped, ped.speed * dt);
     }
   }
+
+  function fastForwardCitizens(gameMinutes) {
+    const total = Math.max(0, Number(gameMinutes) || 0);
+    if (total <= .001 || !pedestrians.length) return;
+
+    for (const ped of pedestrians) {
+      let remaining = total;
+      let loops = 0;
+
+      while (remaining > .001 && loops < 18) {
+        loops += 1;
+
+        if (ped.state === "walking" || ped.state === "waiting") {
+          const travelDistance = citizenRemainingRouteDistance(ped);
+          const travelMinutes = Math.max(.05, travelDistance / Math.max(1, ped.speed) * .7);
+          const step = Math.min(remaining, travelMinutes);
+          citizenUpdateNeeds(ped, step, true);
+          moveCitizenAlongRoute(ped, ped.speed * (step / .7));
+          remaining -= step;
+          continue;
+        }
+
+        if (ped.state === "inside" || ped.state === "staying") {
+          const duration = Math.max(.05, ped.activityMinutesRemaining || .05);
+          const step = Math.min(remaining, duration);
+          citizenUpdateNeeds(ped, step, false);
+          ped.activityMinutesRemaining = Math.max(0, duration - step);
+          remaining -= step;
+
+          if (ped.activityMinutesRemaining <= .001) completeCitizenActivity(ped);
+          continue;
+        }
+
+        planCitizenAction(ped, ped.currentNodeId || ped.homeNodeId);
+      }
+
+      if (remaining > .001) {
+        citizenUpdateNeeds(ped, remaining, ped.state === "walking" || ped.state === "waiting");
+      }
+
+      if (ped.state === "walking" || ped.state === "waiting") {
+        const pose = pedestrianPoseAt(ped);
+        ped.x = pose.x;
+        ped.y = pose.y;
+        ped.dir = pose.angle;
+      }
+    }
+  }
+
 
   function update(dt) {
     if (state.paused || !actionSheet.hidden || !helpPanel.hidden) return;
 
+    const gameMinutes = dt * .7;
     updateTrainSystem(dt);
 
     if (!state.player.inVehicle) state.drive.signalClock += dt;
@@ -2939,7 +3705,9 @@
     else if (!state.player.inTrain) updatePlayerOnFoot(dt);
 
     updateTraffic(dt);
-    updatePedestrians(dt);
+    advanceTime(gameMinutes, true, false);
+    updatePedestrians(dt, gameMinutes);
+    syncNamedNpcCitizens();
 
     state.visual.weatherClock += dt;
     state.visual.rainPhase += dt;
@@ -2951,9 +3719,6 @@
       if (state.visual.weather === "rain") showToast("雨が降ってきました");
       if (state.visual.weather === "clear") showToast("空が晴れてきました");
     }
-
-    const gameMinutes = dt * 0.7;
-    advanceTime(gameMinutes);
 
     autosaveTimer += dt;
     if (autosaveTimer >= 5) {
@@ -4933,8 +5698,24 @@
     ctx.fill();
   }
 
+  function syncNamedNpcCitizens() {
+    for (const npc of NPCS) {
+      const citizen = pedestrians.find((ped) => ped.specialNpcId === npc.id);
+      if (!citizen) continue;
+      npc.x = citizen.x;
+      npc.y = citizen.y;
+      npc.dir = citizen.dir;
+      npc.hidden = !citizen.visible;
+      npc.activityLabel = citizen.currentActivityLabel
+        || citizen.pendingActivity?.label
+        || (citizen.state === "waiting" ? "信号待ち" : "移動中");
+      npc.citizenId = citizen.id;
+    }
+  }
+
   function drawNpc(npc) {
-    drawPerson(npc.x, npc.y, -Math.PI / 2, npc.color, "#394248", "#3c2d25", "#e7b28f", performance.now() * .004 + npc.x * .01, 1.05);
+    if (npc.hidden) return;
+    drawPerson(npc.x, npc.y, npc.dir ?? -Math.PI / 2, npc.color, "#394248", "#3c2d25", "#e7b28f", performance.now() * .004 + npc.x * .01, 1.05);
     const p = worldToScreen(npc.x, npc.y);
     if (p.x < -40 || p.y < -40 || p.x > viewWidth + 40 || p.y > viewHeight + 40) return;
     ctx.fillStyle = "rgba(12,18,15,.76)";
@@ -4948,6 +5729,7 @@
 
   function drawPedestrians() {
     for (const ped of pedestrians) {
+      if (!ped.visible || ped.specialNpcId) continue;
       drawPerson(ped.x, ped.y, ped.dir, ped.color, ped.pants, ped.hair, ped.skin, ped.phase, .92);
     }
   }
@@ -5531,6 +6313,7 @@
   generateBuildings();
   generateTraffic();
   generatePedestrians();
+  syncNamedNpcCitizens();
   migrateCarToCurrentRoadIfNeeded();
   loadGame();
   seedPedestriansNearActor();
