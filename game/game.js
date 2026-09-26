@@ -2427,17 +2427,44 @@
     return route[route.length - 1];
   }
 
+  function routeDistanceToIndex(targetIndex) {
+    const route = state.drive.route;
+    if (!route.length) return Infinity;
+    const startIndex = clamp(state.drive.routeIndex, 0, route.length - 1);
+    const endIndex = clamp(targetIndex, 0, route.length - 1);
+
+    if (endIndex < startIndex) {
+      let behind = 0;
+      let previous = { x:personalCar.x, y:personalCar.y };
+      for (let i = startIndex; i >= endIndex; i -= 1) {
+        behind += distance(previous, route[i]);
+        previous = route[i];
+      }
+      return -behind;
+    }
+
+    let total = 0;
+    let previous = { x:personalCar.x, y:personalCar.y };
+    for (let i = startIndex; i <= endIndex; i += 1) {
+      total += distance(previous, route[i]);
+      previous = route[i];
+    }
+    return total;
+  }
+
   function upcomingSignal() {
     let best = null;
     for (const signal of state.drive.signals) {
       if (signal.pathIndex < state.drive.routeIndex - 4) continue;
       if (signal.pathIndex > state.drive.routeIndex + 46) continue;
-      const d = distance(personalCar.x, personalCar.y, signal.x, signal.y);
-      if (d > 240) continue;
+
+      const routeDistance = routeDistanceToIndex(signal.pathIndex);
+      if (routeDistance > 280 || routeDistance < -70) continue;
+
       if (!best || signal.pathIndex < best.pathIndex) {
         best = {
           state:signalStateAt(signal.x, signal.y, signal.orientation),
-          distance:d,
+          distance:routeDistance,
           key:Math.round(signal.x) + ":" + Math.round(signal.y) + ":" + signal.orientation,
           stopOffset:signal.stopOffset || STOP_LINE_OFFSET,
           pathIndex:signal.pathIndex
@@ -2446,6 +2473,7 @@
     }
     return best;
   }
+
 
   function leadVehicleInfo() {
     const hx = Math.cos(personalCar.angle);
@@ -3433,7 +3461,7 @@
     if (
       signal &&
       signal.state === "red" &&
-      signal.distance < (signal.stopOffset || STOP_LINE_OFFSET) + VEHICLE_FRONT_OVERHANG * 0.7 &&
+      signal.distance < (signal.stopOffset || STOP_LINE_OFFSET) + vehicleFrontOverhang(personalCar) &&
       personalCar.speed > 18 &&
       !state.drive.violationKeys.has(signal.key)
     ) {
