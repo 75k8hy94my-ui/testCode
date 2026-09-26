@@ -248,3 +248,18 @@ test('large park comes from map open-space geometry rather than a fake square fa
   assert.doesNotMatch(source, /p\.x - 190, p\.y - 190, 380, 380/);
   assert.match(source, /space\.type === "park" \? "#638b61"/);
 });
+
+
+test('facility entrances and physical building footprints are rendered separately', () => {
+  assert.match(source, /const building = place\.building/);
+  assert.match(source, /const entry = worldToScreen\(place\.x, place\.y\)/);
+  assert.match(source, /ctx\.arc\(entry\.x, entry\.y, 15/);
+  assert.match(source, /ctx\.lineTo\(p\.x, p\.y\)/);
+});
+
+test('facility buildings participate in player collision', () => {
+  assert.match(source, /function placeBuildingRect\(place\)/);
+  assert.match(source, /for \(const place of PLACES\)/);
+  assert.match(source, /const facility = placeBuildingRect\(place\)/);
+  assert.match(source, /circleRectCollision\(x, y, radius, facility\)/);
+});
