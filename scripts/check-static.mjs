@@ -7,7 +7,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pages = ['index.html', 'sync.html', 'home.html', 'profile.html', 'manga.html', 'manga-sandbox.html', 'video.html', 'reader.html', 'video-player.html'];
 const standalone = [
   'app-desktop-rail.js', 'app-global-shell.js', 'author-summary.js', 'backup-format.js', 'browser-storage.js', 'desktop-navigation.js',
-  'encrypted-chunk-cache.js', 'encrypted-chunk-crypto.js', 'encrypted-chunk-sync.js', 'feature-flags.js', 'home-dashboard.js',
+  'encrypted-asset-backend.js', 'encrypted-asset-cache.js', 'encrypted-asset-crypto.js', 'encrypted-asset-item.js', 'encrypted-asset-reader.js', 'encrypted-asset-storage.js', 'encrypted-asset-sync.js',
+  'encrypted-chunk-cache.js', 'encrypted-chunk-crypto.js', 'encrypted-chunk-sync.js', 'image-compression-profile.js', 'image-photo-processor.js', 'image-processing-worker.js', 'image-pyramid-builder.js', 'image-remote-access.js', 'image-transfer-ledger.js', 'image-transfer-settings.js', 'feature-flags.js', 'home-dashboard.js',
   'home-profile-spa.js', 'mobile-bottom-nav.js', 'manga-sandbox.js', 'media-access-gate.js', 'profile-menu.js', 'shelf-search.js',
   'status-message.js', 'reader-shell.js', 'reader-saved-list.js', 'reader-saved-list-template.js', 'reader-video-list.js', 'reader-author-list.js', 'reader-author-list-template.js', 'reader-toc-template.js', 'reader-mobile-nav-template.js', 'reader-settings.js', 'reader-backup.js',
   'supabase-config.js', 'url-parser.js', 'vault-payload.js', 'vault-session.js', 'video-data.js', 'video-library.js', 'video-routing-fix.js', 'video-thumbnail-time.js', 'video-list-route.js', 'video-list-template.js'

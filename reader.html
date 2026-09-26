@@ -196,6 +196,8 @@
      that fights visibly with our live drag for the rest of the gesture. */
   #imgWrap { position: relative; width: 100%; height: 100%; touch-action: none; }
   #pageStage { position: absolute; inset: 0; overflow: hidden; }
+  .encryptedAssetHost { position: relative; width: 100%; height: 100%; overflow: hidden; }
+  body.safe-mode .encryptedAssetHost img { filter: blur(12px); transform: scale(1.08); }
   #pageStage.vertical-scroll { position: relative; inset: auto; height: 100%; overflow-y: auto; overflow-x: hidden; display: block; -webkit-overflow-scrolling: touch; }
   #imgWrap.vertical-scroll { touch-action: pan-y; overflow: hidden; }
   #imgWrap.vertical-scroll .clickzone { display: none; }
@@ -1273,6 +1275,20 @@
 <script src="browser-storage.js"></script>
 <script src="reader-target.js?v=20260926-item-identity"></script>
 <script src="vault-payload.js"></script>
+<script src="image-compression-profile.js"></script>
+<script src="image-pyramid-builder.js"></script>
+<script src="image-photo-processor.js"></script>
+<script src="image-processing-worker.js"></script>
+<script src="encrypted-asset-crypto.js"></script>
+<script src="encrypted-asset-cache.js"></script>
+<script src="encrypted-asset-backend.js"></script>
+<script src="encrypted-asset-storage.js"></script>
+<script src="image-transfer-settings.js"></script>
+<script src="image-transfer-ledger.js"></script>
+<script src="image-remote-access.js"></script>
+<script src="encrypted-asset-sync.js"></script>
+<script src="encrypted-asset-reader.js"></script>
+<script src="encrypted-asset-item.js"></script>
 <script src="backup-format.js?v=20260822-backup-scope-fix"></script>
 <script src="status-message.js"></script>
 <script src="shelf-search.js"></script>
@@ -1452,6 +1468,8 @@
     <textarea id="customPagesTextarea" rows="6" placeholder="https://example.com/a/page1.jpg
 https://example.com/b/p2.png
 https://cdn.example.org/c/003.webp"></textarea>
+    <label class="field-label" for="customEncryptedFilesInput">または写真ファイル（暗号化して保存）</label>
+    <input id="customEncryptedFilesInput" type="file" accept="image/*" multiple>
     <div class="dialog-actions">
       <button class="ctrlBtn" id="cancelCustomAddBtn">キャンセル</button>
       <button class="primaryBtn" id="confirmCustomAddBtn">追加</button>
@@ -1860,6 +1878,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     customSeriesNoAuthorInput: document.getElementById('customSeriesNoAuthorInput'),
     customVolumeInput: document.getElementById('customVolumeInput'),
     customPagesTextarea: document.getElementById('customPagesTextarea'),
+    customEncryptedFilesInput: document.getElementById('customEncryptedFilesInput'),
     cancelCustomAddBtn: document.getElementById('cancelCustomAddBtn'),
     confirmCustomAddBtn: document.getElementById('confirmCustomAddBtn'),
 
@@ -1984,6 +2003,12 @@ https://cdn.example.org/c/003.webp"></textarea>
   // LAST_URL_KEY) leaves this null; getCurrentSeriesInfo() falls back to
   // matching savedItems by base URL in that case.
   let currentItem = null;
+  let encryptedReaderPages = [];
+  let encryptedReaderActive = false;
+  let encryptedCurrentRenderer = null;
+  let encryptedCurrentSlide = null;
+  let encryptedCachePromise = null;
+  let encryptedStorageTransport = null;
   let pendingNextVolumeItem = null; // the saved item the 次の巻 banner currently points at
   let nextVolumeDismissed = false; // true once the user has closed the banner for this page
   let detecting = false;
@@ -1998,7 +2023,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // URLs continue to work unchanged.
   let pagePattern = null;
 
-  function displayedPageCount() { return splitSpreads ? pages.length * 2 : pages.length; }
+  function displayedPageCount() { return encryptedReaderActive ? encryptedReaderPages.length : (splitSpreads ? pages.length * 2 : pages.length); }
   function formatPageNumber(pageNum, width) { return String(pageNum).padStart(Math.max(1, Number(width) || 1), '0'); }
   function pageUrlFor(key, pageNum, extIndex, width, pattern) {
     const p = pattern || pagePattern;
@@ -2381,8 +2406,8 @@ https://cdn.example.org/c/003.webp"></textarea>
     try { localStorage.setItem(VERTICAL_SCROLL_KEY, verticalScrollEnabled ? '1' : '0'); } catch (e) {}
     els.pageStage.classList.toggle('vertical-scroll', verticalScrollEnabled);
     els.imgWrap.classList.toggle('vertical-scroll', verticalScrollEnabled);
-    if (verticalScrollEnabled && pages.length) renderVerticalPages(currentPage);
-    else if (!verticalScrollEnabled && pages.length) showPage(currentPage, null);
+    if (!encryptedReaderActive && verticalScrollEnabled && pages.length) renderVerticalPages(currentPage);
+    else if (!encryptedReaderActive && !verticalScrollEnabled && pages.length) showPage(currentPage, null);
     updateVerticalScrollMenu();
   }
   // Keep the action label readable even when an older cached page contains
@@ -3463,6 +3488,11 @@ https://cdn.example.org/c/003.webp"></textarea>
     const parsed = parseInputUrl(url);
     if (!parsed) return;
     setMobileReaderMode(true);
+    encryptedReaderActive = false;
+    encryptedReaderPages = [];
+    destroyEncryptedRenderer();
+    els.pageStage.classList.toggle('vertical-scroll', verticalScrollEnabled);
+    els.imgWrap.classList.toggle('vertical-scroll', verticalScrollEnabled);
     // Before we move on to the next manga, give the one we were just reading
     // a chance to finish its page count in the background if detectMorePages
     // hadn't gotten there yet (see handOffIncompleteDetection's comment).
@@ -3781,8 +3811,151 @@ https://cdn.example.org/c/003.webp"></textarea>
     await Promise.all([worker(), worker()]);
   }
 
+  function destroyEncryptedRenderer() {
+    if (encryptedCurrentRenderer) { try { encryptedCurrentRenderer.destroy(); } catch (_) {} }
+    encryptedCurrentRenderer = null;
+    if (encryptedCurrentSlide && encryptedCurrentSlide.parentNode) encryptedCurrentSlide.parentNode.removeChild(encryptedCurrentSlide);
+    encryptedCurrentSlide = null;
+  }
+
+  function encryptedVaultApi() {
+    const vaultApi = window.MangaVault;
+    if (!vaultApi || typeof vaultApi.withSession !== 'function' || typeof vaultApi.api !== 'function') throw new Error('ログインしてください。');
+    return vaultApi;
+  }
+
+  function encryptedMasterKey() {
+    const active = window.MangaVault && typeof MangaVault.loadActive === 'function' ? MangaVault.loadActive() : null;
+    if (!active || !active.rawKey) throw new Error('保管庫を開いてください。');
+    return active.rawKey;
+  }
+
+  function encryptedCache() {
+    if (!encryptedCachePromise) encryptedCachePromise = EncryptedAssetCache.createCache();
+    return encryptedCachePromise;
+  }
+
+  function encryptedStorage() {
+    if (!encryptedStorageTransport) {
+      const config = window.MANGA_READER_SUPABASE || {};
+      encryptedStorageTransport = EncryptedAssetStorage.createStorageTransport({ baseUrl: config.url, publishableKey: config.publishableKey });
+    }
+    return encryptedStorageTransport;
+  }
+
+  function encryptedSyncOptions(page) {
+    return {
+      vault: encryptedVaultApi(),
+      storage: encryptedStorage(),
+      cache: encryptedCache(),
+      masterKey: encryptedMasterKey(),
+      assetId: page.assetId,
+      revision: page.revision,
+      transferStorage: undefined,
+      mediaAccess: window.MangaReaderMediaAccess
+    };
+  }
+
+  async function renderEncryptedPage(n, direction) {
+    const page = encryptedReaderPages[n - 1];
+    if (!page) return;
+    const renderId = ++latestRenderId;
+    const previousRenderer = encryptedCurrentRenderer;
+    const previousSlide = encryptedCurrentSlide;
+    const newSlide = document.createElement('div');
+    newSlide.className = 'pageSlide encryptedPageSlide';
+    newSlide.style.visibility = 'hidden';
+    const host = document.createElement('div');
+    host.className = 'encryptedAssetHost';
+    newSlide.appendChild(host);
+    els.pageStage.appendChild(newSlide);
+    let ready = false;
+    let renderer = null;
+    try {
+      const options = encryptedSyncOptions(page);
+      renderer = EncryptedAssetReader.createEncryptedAssetReader({
+        container: host,
+        ...options,
+        manifest: page.manifest,
+        onPreviewReady: () => { ready = true; },
+        onPreviewError: (error) => { if (renderId === latestRenderId) flashStatus(error?.message || '画像を読み込めませんでした。'); }
+      });
+      renderer.mount();
+      await new Promise((resolve, reject) => {
+        const started = Date.now();
+        const check = () => {
+          if (ready) return resolve();
+          if (renderId !== latestRenderId || !encryptedReaderActive) return reject(new DOMException('stale render', 'AbortError'));
+          if (Date.now() - started > 10000) return reject(new Error('画像を読み込めませんでした。'));
+          setTimeout(check, 20);
+        };
+        check();
+      });
+      if (renderId !== latestRenderId || !encryptedReaderActive) {
+        renderer.destroy();
+        if (newSlide.parentNode) newSlide.parentNode.removeChild(newSlide);
+        return;
+      }
+      newSlide.style.visibility = 'visible';
+      newSlide.classList.add('current');
+      encryptedCurrentRenderer = renderer;
+      encryptedCurrentSlide = newSlide;
+      if (previousSlide && previousSlide.parentNode) {
+        previousSlide.classList.remove('current');
+        setTimeout(() => { if (previousSlide.parentNode) previousSlide.parentNode.removeChild(previousSlide); }, ANIM_DURATION + 60);
+      }
+      if (previousRenderer && previousRenderer !== renderer) { try { previousRenderer.destroy(); } catch (_) {} }
+    } catch (error) {
+      if (renderer) { try { renderer.destroy(); } catch (_) {} }
+      if (newSlide.parentNode) newSlide.parentNode.removeChild(newSlide);
+      if (error?.name !== 'AbortError' && renderId === latestRenderId) flashStatus(error?.message || '画像を読み込めませんでした。');
+    }
+  }
+
+  async function startReadingEncrypted(item, encryptedPages, switchDirection) {
+    setMobileReaderMode(true);
+    handOffIncompleteDetection();
+    readingGeneration++;
+    baseUrl = '';
+    pages = [];
+    encryptedReaderPages = encryptedPages;
+    encryptedReaderActive = true;
+    currentResumeKey = window.MangaReaderTarget ? MangaReaderTarget.itemResumeKey(item.id) : ('item:' + item.id);
+    currentlyCustom = true;
+    splitSpreads = false;
+    currentToc = [];
+    hideNextVolumeBanner();
+    detecting = false;
+    detectionDone = true;
+    detectionHitLimit = false;
+    currentPage = 1;
+    pendingResumePage = getResumePage(currentResumeKey);
+    els.currentTitle.textContent = itemDisplayTitle(item);
+    updateFavToggleButton();
+    els.pageStage.classList.remove('vertical-scroll');
+    els.imgWrap.classList.remove('vertical-scroll');
+    try {
+      if (window.MangaReaderTarget) MangaReaderTarget.persistItemTarget(item.id, localStorage);
+      else localStorage.setItem(LAST_URL_KEY, JSON.stringify({ kind: 'item', itemId: item.id }));
+    } catch (_) {}
+    els.placeholder.style.display = 'none';
+    els.spinner.style.display = 'none';
+    els.imgWrap.style.display = 'block';
+    els.controls.style.display = 'flex';
+    const startPage = pendingResumePage || 1;
+    pendingResumePage = null;
+    showPage(startPage, switchDirection === 'up' ? 'swipeUp' : switchDirection === 'down' ? 'swipeDown' : switchDirection === 'left' ? 'swipeLeft' : switchDirection === 'right' ? 'swipeRight' : null);
+    updateStatus();
+    updateCloseButtonVisibility();
+  }
+
   async function startReadingCustom(item, switchDirection) {
     setMobileReaderMode(true);
+    encryptedReaderActive = false;
+    encryptedReaderPages = [];
+    destroyEncryptedRenderer();
+    els.pageStage.classList.toggle('vertical-scroll', verticalScrollEnabled);
+    els.imgWrap.classList.toggle('vertical-scroll', verticalScrollEnabled);
     handOffIncompleteDetection(); // 直前の漫画の検出未完了分を引き継ぐ（generationを進める前に）
     readingGeneration++; // invalidate any still-running sequential detection loop
     baseUrl = '';
@@ -3861,6 +4034,21 @@ https://cdn.example.org/c/003.webp"></textarea>
       } catch (_) {}
     }
 
+    let encryptedPages = null;
+    try {
+      encryptedPages = EncryptedAssetItem.encryptedAssetPagesForItem(item);
+    } catch (_) {
+      encryptedReaderActive = false;
+      destroyEncryptedRenderer();
+      setMobileReaderMode(true);
+      els.spinner.style.display = 'none';
+      els.imgWrap.style.display = 'none';
+      els.placeholder.style.display = 'block';
+      els.placeholder.textContent = '暗号化画像情報が壊れています。';
+      flashStatus('暗号化画像情報が壊れています。');
+      return;
+    }
+
     // Enter reader mode immediately. Some saved items have alternate URLs,
     // and resolving those candidates can take several seconds. Previously the
     // page sat in the inactive empty-reader shell until that async preflight
@@ -3873,7 +4061,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     }
     els.status.textContent = '読み込み中...';
 
-    if (item && Array.isArray(item.pages) && item.pages.length) {
+    if (encryptedPages) {
+      await startReadingEncrypted(item, encryptedPages, switchDirection);
+    } else if (item && Array.isArray(item.pages) && item.pages.length) {
       await startReadingCustom(item, switchDirection);
     } else {
       const candidates = [item && item.url].concat(Array.isArray(item && item.alternateUrls) ? item.alternateUrls : []).filter(Boolean);
@@ -3914,6 +4104,9 @@ https://cdn.example.org/c/003.webp"></textarea>
     handOffIncompleteDetection();
     readingGeneration++;
     clearLocalSyncObjectUrls();
+    destroyEncryptedRenderer();
+    encryptedReaderPages = [];
+    encryptedReaderActive = false;
     baseUrl = '';
     pages = [];
     splitSpreads = false;
@@ -4109,6 +4302,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // changes again before this one finishes loading, the stale result is
   // dropped (latestRenderId guard) so a slow load can't clobber a newer page.
   function renderPage(n, direction) {
+    if (encryptedReaderActive) { renderEncryptedPage(n, direction); return; }
     const targetUrl = sourceUrlForPage(n);
     if (localSyncPaths.length && currentItem && currentItem.id === localSyncItemId && !targetUrl) {
       ensureLocalSyncWindow(n - 1).then(() => {
@@ -4305,18 +4499,20 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   function showPage(n, forceDirection) {
-    if (!pages.length) return;
+    if (!pages.length && !encryptedReaderActive) return;
     if (n < 1) n = 1;
     if (n > displayedPageCount()) n = displayedPageCount();
     const hasCurrent = !!els.pageStage.querySelector('.pageSlide');
     const pageChanged = hasCurrent && n !== currentPage;
     const direction = forceDirection || (!hasCurrent ? null : (n > currentPage ? 'next' : (n < currentPage ? 'prev' : null)));
     currentPage = n;
-    pruneStalePreloads(preloadWindowUrls(n));
+    if (!encryptedReaderActive) pruneStalePreloads(preloadWindowUrls(n));
     renderPage(n, direction);
     updateSlider();
-    for (let i = 1; i <= PRELOAD_AHEAD_COUNT; i++) preload(n + i);
-    preload(n - 1);
+    if (!encryptedReaderActive) {
+      for (let i = 1; i <= PRELOAD_AHEAD_COUNT; i++) preload(n + i);
+      preload(n - 1);
+    }
     persistLastPage();
     markCurrentItemReadIfEligible();
     nextVolumeDismissed = false;
@@ -4328,15 +4524,17 @@ https://cdn.example.org/c/003.webp"></textarea>
 
   // Instant, non-animated jump used when resuming to a saved page on load.
   function jumpToPage(n) {
-    if (!pages.length) return;
+    if (!pages.length && !encryptedReaderActive) return;
     if (n < 1) n = 1;
     if (n > displayedPageCount()) n = displayedPageCount();
     currentPage = n;
-    pruneStalePreloads(preloadWindowUrls(n));
+    if (!encryptedReaderActive) pruneStalePreloads(preloadWindowUrls(n));
     renderPage(n, null);
     updateSlider();
-    for (let i = 1; i <= PRELOAD_AHEAD_COUNT; i++) preload(n + i);
-    preload(n - 1);
+    if (!encryptedReaderActive) {
+      for (let i = 1; i <= PRELOAD_AHEAD_COUNT; i++) preload(n + i);
+      preload(n - 1);
+    }
     persistLastPage();
     markCurrentItemReadIfEligible();
     nextVolumeDismissed = false;
@@ -4349,7 +4547,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   function goLast() { showPage(displayedPageCount()); }
 
   function refreshCurrentView() {
-    if (pages.length) renderPage(currentPage, null);
+    if (pages.length || encryptedReaderActive) renderPage(currentPage, null);
   }
 
   function toggleBars() {
@@ -5115,6 +5313,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     updateSeriesForm(els.customSeriesInput, els.customNewSeriesRow, els.customNewSeriesInput, els.customVolumeInput, els.customTitleInput);
     updateSeriesAuthorForm(els.customSeriesInput, els.customNewSeriesInput, els.customSeriesAuthorRow, els.customNewSeriesAuthorInput, els.customSeriesNoAuthorInput, els.customAuthorInput);
     els.customPagesTextarea.value = '';
+    if (els.customEncryptedFilesInput) els.customEncryptedFilesInput.value = '';
     openReaderScreen('custom-add');
     els.customTitleInput.focus();
   }
@@ -5127,7 +5326,48 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
   function isCustomAddDialogOpen() { return currentReaderScreen === 'custom-add'; }
 
+  async function saveEncryptedPhotoFiles(files) {
+    const vault = encryptedVaultApi();
+    const masterKey = encryptedMasterKey();
+    const cache = encryptedCache();
+    const storage = encryptedStorage();
+    const processedPages = [];
+    for (const file of files) processedPages.push(await ImagePhotoProcessor.processPhoto(file));
+    const encryptedAssets = await EncryptedAssetItem.publishProcessedPages({
+      pages: processedPages,
+      createAssetId: () => crypto.randomUUID(),
+      stage: async ({ assetId, targetRevision, processed }) => EncryptedAssetSync.stageProcessedRevision({
+        cache, masterKey, assetId, targetRevision, processed
+      }),
+      publish: async ({ assetId, targetRevision, staged }) => EncryptedAssetSync.publishPendingRevision({
+        vault, storage, cache, assetId, targetRevision, objectIds: staged.objectIds
+      })
+    });
+    const title = els.customTitleInput.value.trim() || ('暗号化画像 ' + (savedItems.length + 1));
+    const item = {
+      id: genId('i'),
+      title,
+      author: els.customAuthorInput.value.trim(),
+      tags: parseTags(els.customTagsInput.value),
+      folderId: els.customFolderSelect.value === '__new__' ? null : (els.customFolderSelect.value || null),
+      series: '',
+      volume: null,
+      favorite: false,
+      encryptedAssets,
+      addedAt: Date.now()
+    };
+    savedItems.unshift(item);
+    persistAll();
+    closeCustomAddDialog();
+    flashStatus(files.length + 'ページを暗号化して保存しました');
+  }
+
   function confirmCustomAdd() {
+    const encryptedFiles = Array.from(els.customEncryptedFilesInput?.files || []);
+    if (encryptedFiles.length) {
+      saveEncryptedPhotoFiles(encryptedFiles).catch((error) => flashStatus(error?.message || '暗号化画像を保存できませんでした。'));
+      return;
+    }
     const pageUrls = els.customPagesTextarea.value
       .split('\n')
       .map((s) => s.trim())
