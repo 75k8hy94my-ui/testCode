@@ -1022,7 +1022,49 @@
     }
   }
 
+  function polylineLength(points) {
+    let length = 0;
+    for (let i = 1; i < points.length; i += 1) length += distance(points[i - 1], points[i]);
+    return length;
+  }
+
+  function pointAndTangentOnPolyline(points, distanceAlong) {
+    let remaining = distanceAlong;
+    for (let i = 1; i < points.length; i += 1) {
+      const a = points[i - 1];
+      const b = points[i];
+      const segmentLength = distance(a, b);
+      if (remaining <= segmentLength || i === points.length - 1) {
+        const t = segmentLength < .001 ? 0 : clamp(remaining / segmentLength, 0, 1);
+        const x = a.x + (b.x - a.x) * t;
+        const y = a.y + (b.y - a.y) * t;
+        const magnitude = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        return { point: { x, y }, tangent: { x: (b.x - a.x) / magnitude, y: (b.y - a.y) / magnitude } };
+      }
+      remaining -= segmentLength;
+    }
+    const last = points.at(-1);
+    const before = points.at(-2) || last;
+    const magnitude = Math.hypot(last.x - before.x, last.y - before.y) || 1;
+    return { point: { ...last }, tangent: { x: (last.x - before.x) / magnitude, y: (last.y - before.y) / magnitude } };
+  }
+
   function trafficPoseAt(car, along = car.along) {
+    if (car.edgeId) {
+      const edge = mapModel.getEdge(car.edgeId);
+      if (edge) {
+        const hit = pointAndTangentOnPolyline(edge.points, along);
+        const directionSign = car.directionSign || 1;
+        const tangent = directionSign > 0 ? hit.tangent : { x: -hit.tangent.x, y: -hit.tangent.y };
+        const nx = tangent.y;
+        const ny = -tangent.x;
+        return {
+          x: hit.point.x + nx * car.laneOffset,
+          y: hit.point.y + ny * car.laneOffset,
+          angle: Math.atan2(tangent.y, tangent.x)
+        };
+      }
+    }
     const raw = along / ROAD_GAP;
     const segmentIndex = clamp(Math.floor(raw), 1, 16);
     const t = clamp(raw - segmentIndex, 0, 1);
@@ -1049,18 +1091,16 @@
   }
 
   function randomRoadPoint(seedA, seedB, offset = 0) {
-    const horizontal = hash2(seedA, seedB, 5) > .5;
+    const vehicleEdges = mapModel.edges.filter((edge) => edge.vehicle);
+    const edge = vehicleEdges[Math.floor(hash2(seedA, seedB, 8) * vehicleEdges.length) % vehicleEdges.length];
     const directionSign = hash2(seedA, seedB, 19) > .5 ? 1 : -1;
-    const minAlong = ROAD_GAP * 1.08;
-    const maxAlong = ROAD_GAP * 16.92;
-    const along = minAlong + hash2(seedA, seedB, 13) * (maxAlong - minAlong);
-    const arterialList = horizontal ? [...EW_ARTERIALS] : [...NS_ARTERIALS];
-    const roadIndex = arterialList[Math.floor(hash2(seedA, seedB, 8) * arterialList.length) % arterialList.length];
+    const edgeLength = polylineLength(edge.points);
+    const along = edgeLength * (.12 + hash2(seedA, seedB, 13) * .76);
     const laneMagnitude = LANE_OFFSET + (hash2(seedA, seedB, 23) > .52 ? 28 : 0) + offset * .05;
     const laneOffset = directionSign > 0 ? laneMagnitude : -laneMagnitude;
     const seedCar = {
-      orientation:horizontal ? "h" : "v",
-      roadIndex,
+      edgeId: edge.id,
+      edgeLength,
       directionSign,
       laneOffset,
       along
@@ -1589,7 +1629,7 @@
     return bestIndex;
   }
 
-  function buildDrivingRoute(place) {
+  function buildLegacyDrivingRoute(place) {
     const start = roadSnap(personalCar.x, personalCar.y);
     let initialDirection;
     if (start.orientation === "h") {
@@ -1666,6 +1706,54 @@
       });
     }
 
+    return { points, signals };
+  }
+
+  function buildDrivingRoute(place) {
+    const startHit = mapModel.nearestRoad(personalCar.x, personalCar.y, { vehicleOnly: true });
+    const destinationNode = mapModel.getNode(place.roadNodeId);
+    if (!startHit || !destinationNode) {
+      return { points: [{ x: personalCar.x, y: personalCar.y }, { x: place.x, y: place.y }], signals: [] };
+    }
+
+    const edge = startHit.edge;
+    const from = mapModel.getNode(edge.from);
+    const to = mapModel.getNode(edge.to);
+    const startNode = distance(startHit.point, from) <= distance(startHit.point, to) ? from : to;
+    const route = mapModel.findRoute(startNode.id, destinationNode.id, { mode: "vehicle" });
+    if (!route) return { points: [{ x: personalCar.x, y: personalCar.y }, { x: place.x, y: place.y }], signals: [] };
+
+    const centerline = [{ x: personalCar.x, y: personalCar.y }];
+    appendDistinctPoints(centerline, [startHit.point]);
+    const startPoints = startNode.id === edge.from ? edge.points : edge.points.slice().reverse();
+    appendDistinctPoints(centerline, startPoints);
+
+    let currentNodeId = startNode.id;
+    for (const edgeId of route.edgeIds) {
+      const routeEdge = mapModel.getEdge(edgeId);
+      if (!routeEdge) continue;
+      const points = currentNodeId === routeEdge.from ? routeEdge.points : routeEdge.points.slice().reverse();
+      appendDistinctPoints(centerline, points);
+      currentNodeId = currentNodeId === routeEdge.from ? routeEdge.to : routeEdge.from;
+    }
+    appendDistinctPoints(centerline, [{ x: place.x, y: place.y }]);
+
+    const points = buildLanePath(centerline);
+    const signals = [];
+    for (let i = 1; i < route.nodeIds.length; i += 1) {
+      const node = mapModel.getNode(route.nodeIds[i]);
+      const previousNode = mapModel.getNode(route.nodeIds[i - 1]);
+      const routeEdge = mapModel.getEdge(route.edgeIds[i - 1]);
+      if (!node || !previousNode || !routeEdge?.signalized) continue;
+      const orientation = Math.abs(node.x - previousNode.x) >= Math.abs(node.y - previousNode.y) ? "h" : "v";
+      signals.push({
+        x: node.x,
+        y: node.y,
+        orientation,
+        stopOffset: STOP_LINE_OFFSET,
+        pathIndex: nearestPathIndex(points, node.x, node.y)
+      });
+    }
     return { points, signals };
   }
 
@@ -2561,7 +2649,7 @@
     return null;
   }
 
-  function updateTraffic(dt) {
+  function updateLegacyTraffic(dt) {
     const minAlong = ROAD_GAP * 1.04;
     const maxAlong = ROAD_GAP * 16.96;
 
@@ -2625,6 +2713,43 @@
     }
   }
 
+
+  function updateTraffic(dt) {
+    for (const car of traffic) {
+      const edge = mapModel.getEdge(car.edgeId);
+      if (!edge) continue;
+      const edgeLength = car.edgeLength || polylineLength(edge.points);
+      const roadLimit = (edge.speedLimit || 30) / SPEED_TO_KMH;
+      let targetSpeed = Math.min(car.cruise, roadLimit * .92);
+      const signalEdge = edge.signalized;
+      if (signalEdge) {
+        const endpoint = car.directionSign > 0 ? mapModel.getNode(edge.to) : mapModel.getNode(edge.from);
+        const distanceToSignal = car.directionSign > 0 ? edgeLength - car.along : car.along;
+        if (endpoint && (signalStateAt(endpoint.x, endpoint.y, "h") !== "green") && distanceToSignal < STOP_LINE_OFFSET + 75) {
+          targetSpeed = Math.max(0, (distanceToSignal - STOP_LINE_OFFSET) * 2.5);
+        }
+      }
+
+      let leadDistance = Infinity;
+      for (const other of traffic) {
+        if (other === car || other.edgeId !== car.edgeId || other.directionSign !== car.directionSign) continue;
+        const forwardDistance = (other.along - car.along) * car.directionSign;
+        if (forwardDistance > 0 && forwardDistance < 190) leadDistance = Math.min(leadDistance, forwardDistance);
+      }
+      if (leadDistance < 125) targetSpeed = Math.min(targetSpeed, Math.max(0, (leadDistance - 38) * 2.05));
+
+      const brakingNow = targetSpeed < car.speed - 10;
+      car.brakeGlow += ((brakingNow ? 1 : 0) - car.brakeGlow) * Math.min(1, dt * 8);
+      car.speed += (targetSpeed - car.speed) * Math.min(1, dt * 2.4);
+      car.along += car.directionSign * car.speed * dt;
+      if (car.along < 0) car.along += edgeLength;
+      if (car.along > edgeLength) car.along -= edgeLength;
+      const pose = trafficPoseAt(car, car.along);
+      car.x = pose.x;
+      car.y = pose.y;
+      car.angle = pose.angle;
+    }
+  }
 
   function updatePedestrians(dt) {
     for (const ped of pedestrians) {

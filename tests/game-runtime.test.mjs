@@ -61,3 +61,10 @@ test('game delegates collision, nearest-road, and district queries to MapModel',
   assert.match(source, /mapModel\.isWalkable\(/);
   assert.match(source, /mapModel\.districtAt\(/);
 });
+
+test('driving routes and traffic use the map graph and edge geometry', () => {
+  assert.match(source, /mapModel\.findRoute\(/);
+  assert.match(source, /mapModel\.getEdge\(/);
+  assert.match(source, /edge\.points/);
+  assert.match(source, /edge\.signalized/);
+});
