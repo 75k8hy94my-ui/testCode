@@ -54,3 +54,10 @@ test('game keeps all existing place and station identifiers from the map model',
     assert.match(mapSource, new RegExp(`['\"]${id}['\"]`));
   }
 });
+
+test('game delegates collision, nearest-road, and district queries to MapModel', () => {
+  assert.match(source, /mapModel\.isRoad\(/);
+  assert.match(source, /mapModel\.nearestRoad\(/);
+  assert.match(source, /mapModel\.isWalkable\(/);
+  assert.match(source, /mapModel\.districtAt\(/);
+});

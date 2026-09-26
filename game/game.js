@@ -768,56 +768,17 @@
   }
 
   function isRoad(x, y) {
-    const gx = Math.floor(x / ROAD_GAP);
-    const gy = Math.floor(y / ROAD_GAP);
-    let best = Infinity;
-
-    for (let ix = gx - 1; ix <= gx + 1; ix += 1) {
-      for (let iy = gy - 1; iy <= gy + 1; iy += 1) {
-        if (roadEdgeExists(ix, iy, ix + 1, iy)) {
-          const style = roadSegmentStyle("h", iy, ix);
-          best = Math.min(best, roadDistanceToEdge(x, y, "h", iy, ix) - roadWidthForStyle(style) / 2);
-        }
-        if (roadEdgeExists(ix, iy, ix, iy + 1)) {
-          const style = roadSegmentStyle("v", ix, iy);
-          best = Math.min(best, roadDistanceToEdge(x, y, "v", ix, iy) - roadWidthForStyle(style) / 2);
-        }
-      }
-    }
-    return best <= 0;
+    return mapModel.isRoad(x, y, { vehicleOnly: true });
   }
 
   function roadStyleAt(x, y) {
-    const gx = Math.floor(x / ROAD_GAP);
-    const gy = Math.floor(y / ROAD_GAP);
-    let best = null;
-
-    for (let ix = gx - 1; ix <= gx + 1; ix += 1) {
-      for (let iy = gy - 1; iy <= gy + 1; iy += 1) {
-        if (roadEdgeExists(ix, iy, ix + 1, iy)) {
-          const distanceToRoad = roadDistanceToEdge(x, y, "h", iy, ix);
-          if (!best || distanceToRoad < best.distance) {
-            best = { distance:distanceToRoad, style:roadSegmentStyle("h", iy, ix) };
-          }
-        }
-        if (roadEdgeExists(ix, iy, ix, iy + 1)) {
-          const distanceToRoad = roadDistanceToEdge(x, y, "v", ix, iy);
-          if (!best || distanceToRoad < best.distance) {
-            best = { distance:distanceToRoad, style:roadSegmentStyle("v", ix, iy) };
-          }
-        }
-      }
-    }
-    return best ? best.style : "local";
+    const hit = mapModel.nearestRoad(x, y, { vehicleOnly: true });
+    return hit ? hit.edge.type : "local";
   }
 
   function speedLimitAt(x, y) {
-    const style = roadStyleAt(x, y);
-    if (style === "arterial") return 60;
-    if (style === "residential") return 30;
-    if (style === "station" || style === "commercial") return 40;
-    if (style === "park") return 40;
-    return 40;
+    const hit = mapModel.nearestRoad(x, y, { vehicleOnly: true });
+    return hit ? hit.edge.speedLimit : 30;
   }
 
   function inWorld(x, y, radius = 0) {
@@ -844,7 +805,7 @@
   }
 
   function canStand(x, y, radius = PLAYER_RADIUS) {
-    return inWorld(x, y, radius) && !collidesBuilding(x, y, radius);
+    return inWorld(x, y, radius) && mapModel.isWalkable(x, y, radius) && !collidesBuilding(x, y, radius);
   }
 
   function intersectsRoadNetworkClearance(rect) {
@@ -1839,20 +1800,7 @@
   }
 
   function currentDistrict(x, y) {
-    const gx = Math.floor(x / ROAD_GAP);
-    const gy = Math.floor(y / ROAD_GAP);
-    const style = cityBlockStyle(gx, gy);
-    if (style === "station") return "若葉駅前";
-    if (style === "arcade") return "若葉サンモール";
-    if (style === "alley") return "路地飲食街";
-    if (style === "residential") return "西住宅街";
-    if (style === "green" || distance(x, y, PARK.x, PARK.y) < 650) return "公園通り";
-    if (style === "mixed-core") return "中央商業街";
-    if (y > WORLD_SIZE * 0.72) return "南地区";
-    if (y < WORLD_SIZE * 0.28) return "北地区";
-    if (x < WORLD_SIZE * 0.3) return "西地区";
-    if (x > WORLD_SIZE * 0.7) return "東地区";
-    return "City Days";
+    return mapModel.districtAt(x, y)?.name || "City Days";
   }
 
   function clampNeeds() {
