@@ -402,7 +402,7 @@
     oscillator.stop(audioContext.currentTime + .05);
   }
 
-  function playFootstep() {
+  function playFootstep(running = false) {
     const audioContext = audioState.context;
     if (
       !audioContext ||
@@ -411,23 +411,49 @@
       !audioState.noiseBuffer
     ) return;
 
-    const source = audioContext.createBufferSource();
-    source.buffer = audioState.noiseBuffer;
-    source.playbackRate.value = .82 + (audioState.footstepIndex % 3) * .07;
-    const filter = audioContext.createBiquadFilter();
-    filter.type = "bandpass";
-    filter.frequency.value = 190 + (audioState.footstepIndex % 2) * 55;
-    filter.Q.value = .9;
-    const gain = audioContext.createGain();
     const now = audioContext.currentTime;
-    gain.gain.setValueAtTime(.026, now);
-    gain.gain.exponentialRampToValueAtTime(.0001, now + .075);
-    source.connect(filter);
-    filter.connect(gain);
-    gain.connect(audioState.master);
+    const alternate = audioState.footstepIndex % 2;
+    const strength = running ? 1.32 : 1;
+
+    // Short mid/high-frequency contact gives the shoe strike enough presence
+    // to remain audible over traffic and ambience.
+    const contact = audioContext.createBufferSource();
+    contact.buffer = audioState.noiseBuffer;
+    contact.playbackRate.value = (running ? 1.08 : .94) + alternate * .07;
+
+    const contactFilter = audioContext.createBiquadFilter();
+    contactFilter.type = "bandpass";
+    contactFilter.frequency.value = (running ? 760 : 620) + alternate * 110;
+    contactFilter.Q.value = .85;
+
+    const contactGain = audioContext.createGain();
+    contactGain.gain.setValueAtTime(.082 * strength, now);
+    contactGain.gain.exponentialRampToValueAtTime(.0001, now + (running ? .095 : .115));
+
+    contact.connect(contactFilter);
+    contactFilter.connect(contactGain);
+    contactGain.connect(audioState.master);
+
+    // A small low thump makes the step feel like weight hitting pavement,
+    // rather than only a hiss/click from the noise layer.
+    const thump = audioContext.createOscillator();
+    thump.type = "sine";
+    thump.frequency.setValueAtTime(running ? 118 : 102, now);
+    thump.frequency.exponentialRampToValueAtTime(running ? 72 : 66, now + .075);
+
+    const thumpGain = audioContext.createGain();
+    thumpGain.gain.setValueAtTime((running ? .07 : .048), now);
+    thumpGain.gain.exponentialRampToValueAtTime(.0001, now + .09);
+
+    thump.connect(thumpGain);
+    thumpGain.connect(audioState.master);
+
     const offset = (audioState.footstepIndex * .173) % 1.8;
-    source.start(now, offset, .085);
-    source.stop(now + .09);
+    contact.start(now, offset, running ? .11 : .13);
+    contact.stop(now + .14);
+    thump.start(now);
+    thump.stop(now + .095);
+
     audioState.footstepIndex += 1;
   }
 
@@ -518,7 +544,7 @@
 
     const raining = state.visual.weather === "rain";
     smoothAudioParam(audioState.rainLayer.gain.gain, raining ? .052 : 0, .3);
-    smoothAudioParam(audioState.ambientLayer.gain.gain, raining ? .008 : .014, .35);
+    smoothAudioParam(audioState.ambientLayer.gain.gain, raining ? .007 : .009, .35);
 
     const movingOnFoot = !state.player.inVehicle &&
       !state.player.inTrain &&
@@ -535,10 +561,11 @@
         keys.has("arrowright")
       );
     if (movingOnFoot) {
+      const runningOnFoot = touch.run || keys.has("shift");
       audioState.footstepTimer -= dt;
       if (audioState.footstepTimer <= 0) {
-        playFootstep();
-        audioState.footstepTimer = (touch.run || keys.has("shift")) ? .27 : .44;
+        playFootstep(runningOnFoot);
+        audioState.footstepTimer = runningOnFoot ? .24 : .39;
       }
     } else {
       audioState.footstepTimer = 0;
