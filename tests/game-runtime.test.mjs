@@ -41,7 +41,7 @@ test('game defines the traffic signal state helper used by rendering and updates
 test('game defines the ambient prop drawing helpers used by the city renderer', () => {
   assert.match(source, /function drawTree\(x, y, scale = 1\)/);
   assert.match(source, /function drawLamp\(x, y\)/);
-  assert.match(source, /const normal = \{ x: -pose\.tangent\.y, y: pose\.tangent\.x \}/);
+  assert.match(source, /const normal = \{ x:-pose\.tangent\.y, y:pose\.tangent\.x \}/);
 });
 
 test('elevated rail becomes translucent only for the controlled actor below it', () => {
@@ -123,10 +123,14 @@ test('game distance helper supports map polyline point objects', () => {
   assert.match(source, /Math\.hypot\(ax\.x - ay\.x, ax\.y - ay\.y\)/);
 });
 
-test('city rendering uses map parcels and polylines instead of grid-only geometry', () => {
-  assert.match(source, /mapModel\.parcels/);
+test('city rendering is driven by v2 urban-fabric data instead of grid-only geometry', () => {
+  assert.match(source, /mapModel\.buildingSites/);
+  assert.match(source, /mapModel\.openSpaces/);
+  assert.match(source, /mapModel\.landmarks/);
+  assert.match(source, /mapModel\.vegetation/);
   assert.match(source, /mapModel\.edges/);
   assert.match(source, /edge\.points/);
+  assert.match(source, /function drawWorldPolygon\(polygon\)/);
   assert.match(source, /function drawMapModelRoads\(\)/);
   assert.match(source, /function drawMapModelMinimap\(/);
 });
@@ -202,8 +206,9 @@ test('traffic-light rendering includes every drivable approach at a signalized n
 });
 
 
-test('fresh player and fixed NPC positions are on the current pedestrian graph', () => {
+test('fresh player and fixed NPC positions follow current map anchors', () => {
   assert.match(source, /player:\s*\{\s*x: HOME\.x,\s*y: HOME\.y,/);
+  assert.match(source, /id: "aoi"[\s\S]*x: PARK\.x - 60, y: PARK\.y/);
   assert.match(source, /id: "mei"[\s\S]*x: LIBRARY\.x, y: LIBRARY\.y - 45/);
   assert.match(source, /const fallback = migratePlayerToCurrentMap\(NaN, NaN\)/);
   assert.doesNotMatch(source, /state\.player\.x = HOME\.x \+ 55/);
@@ -214,4 +219,32 @@ test('sleep returns the player to the current home entrance', () => {
   assert.match(source, /showToast\("よく眠れました"\)/);
   assert.doesNotMatch(source, /state\.player\.x = HOME\.x \+ 55/);
   assert.doesNotMatch(source, /state\.player\.y = HOME\.y \+ 65/);
+});
+
+
+test('v2 road rendering visually distinguishes street hierarchy and pedestrian surfaces', () => {
+  assert.match(source, /const pedestrianSurface = \(edge\) =>/);
+  assert.match(source, /edge\.type === "shopping-walk" \? "#b5aa90"/);
+  assert.match(source, /const vehicleSurface = \(edge\) =>/);
+  assert.match(source, /edge\.type === "alley" \? "#777873"/);
+  assert.match(source, /edge\.vehicle && edge\.type === "arterial"/);
+  assert.match(source, /edge\.vehicle && edge\.type === "collector" && edge\.width >= 112/);
+});
+
+test('v2 map removes the old 600px ground-block painting from the active renderer', () => {
+  const drawGround = source.slice(source.indexOf('function drawGround()'), source.indexOf('function drawTree('));
+  assert.doesNotMatch(drawGround, /ROAD_GAP/);
+  assert.doesNotMatch(drawGround, /startBlockX|endBlockX|startBlockY|endBlockY/);
+});
+
+test('v2 landmarks and street lighting use map coordinates', () => {
+  assert.match(source, /for \(const landmark of mapModel\.landmarks \|\| \[\]\)/);
+  assert.match(source, /function forEachStreetLamp\(callback\)/);
+  assert.match(source, /forEachStreetLamp\(\(x, y\) => drawLamp\(x, y\)\)/);
+  assert.match(source, /forEachStreetLamp\(\(wx, wy\) =>/);
+});
+
+test('large park comes from map open-space geometry rather than a fake square facility block', () => {
+  assert.doesNotMatch(source, /p\.x - 190, p\.y - 190, 380, 380/);
+  assert.match(source, /space\.type === "park" \? "#638b61"/);
 });
