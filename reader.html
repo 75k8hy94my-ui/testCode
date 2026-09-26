@@ -3719,10 +3719,16 @@ https://cdn.example.org/c/003.webp"></textarea>
     encryptedCurrentSlide = null;
   }
 
-  function encryptedVault() {
-    const vault = window.MangaVault && MangaVault.loadActive ? MangaVault.loadActive() : null;
-    if (!vault || !vault.rawKey) throw new Error('保管庫を開いてください。');
-    return vault;
+  function encryptedVaultApi() {
+    const vaultApi = window.MangaVault;
+    if (!vaultApi || typeof vaultApi.withSession !== 'function' || typeof vaultApi.api !== 'function') throw new Error('ログインしてください。');
+    return vaultApi;
+  }
+
+  function encryptedMasterKey() {
+    const active = window.MangaVault && typeof MangaVault.loadActive === 'function' ? MangaVault.loadActive() : null;
+    if (!active || !active.rawKey) throw new Error('保管庫を開いてください。');
+    return active.rawKey;
   }
 
   function encryptedCache() {
@@ -3739,8 +3745,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   function encryptedSyncOptions(page) {
-    const vault = encryptedVault();
-    return { vault, storage: encryptedStorage(), cache: encryptedCache(), masterKey: vault.rawKey, assetId: page.assetId, revision: page.revision, transferStorage: undefined, mediaAccess: window.MangaReaderMediaAccess };
+    return { vault: encryptedVaultApi(), storage: encryptedStorage(), cache: encryptedCache(), masterKey: encryptedMasterKey(), assetId: page.assetId, revision: page.revision, transferStorage: undefined, mediaAccess: window.MangaReaderMediaAccess };
   }
 
   async function renderEncryptedPage(n, direction) {
@@ -3748,6 +3753,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!page) return;
     const renderId = ++latestRenderId;
     const previousRenderer = encryptedCurrentRenderer;
+    const previousSlide = encryptedCurrentSlide;
     const newSlide = document.createElement('div');
     newSlide.className = 'pageSlide encryptedPageSlide';
     newSlide.style.visibility = 'hidden';
@@ -3756,28 +3762,32 @@ https://cdn.example.org/c/003.webp"></textarea>
     newSlide.appendChild(host);
     els.pageStage.appendChild(newSlide);
     let ready = false;
+    let renderer = null;
     try {
       const options = encryptedSyncOptions(page);
-      const renderer = EncryptedAssetReader.createEncryptedAssetReader({ container: host, ...options, manifest: page.manifest, onPreviewReady: () => { ready = true; } });
-      encryptedCurrentRenderer = renderer;
+      renderer = EncryptedAssetReader.createEncryptedAssetReader({ container: host, ...options, manifest: page.manifest, onPreviewReady: () => { ready = true; } });
       renderer.mount();
       await new Promise((resolve, reject) => {
         const started = Date.now();
         const check = () => { if (ready) return resolve(); if (Date.now() - started > 10000) return reject(new Error('画像を読み込めませんでした。')); setTimeout(check, 20); };
         check();
       });
-      if (renderId !== latestRenderId || !encryptedReaderActive) { renderer.destroy(); if (newSlide.parentNode) newSlide.parentNode.removeChild(newSlide); return; }
-      const previous = encryptedCurrentSlide;
+      if (renderId !== latestRenderId || !encryptedReaderActive) {
+        renderer.destroy();
+        if (newSlide.parentNode) newSlide.parentNode.removeChild(newSlide);
+        return;
+      }
       newSlide.style.visibility = 'visible';
       newSlide.classList.add('current');
-      if (previous && previous.parentNode) {
-        previous.classList.remove('current');
-        setTimeout(() => { if (previous.parentNode) previous.parentNode.removeChild(previous); }, ANIM_DURATION + 60);
-      }
+      encryptedCurrentRenderer = renderer;
       encryptedCurrentSlide = newSlide;
+      if (previousSlide && previousSlide.parentNode) {
+        previousSlide.classList.remove('current');
+        setTimeout(() => { if (previousSlide.parentNode) previousSlide.parentNode.removeChild(previousSlide); }, ANIM_DURATION + 60);
+      }
       if (previousRenderer && previousRenderer !== renderer) { try { previousRenderer.destroy(); } catch (_) {} }
     } catch (error) {
-      if (encryptedCurrentRenderer) { try { encryptedCurrentRenderer.destroy(); } catch (_) {} }
+      if (renderer) { try { renderer.destroy(); } catch (_) {} }
       if (newSlide.parentNode) newSlide.parentNode.removeChild(newSlide);
       if (renderId === latestRenderId) flashStatus(error.message || '画像を読み込めませんでした。');
     }
@@ -5139,7 +5149,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   function isCustomAddDialogOpen() { return currentReaderScreen === 'custom-add'; }
 
   async function saveEncryptedPhotoFiles(files) {
-    const vault = encryptedVault();
+    const vault = encryptedVaultApi();
+    const masterKey = encryptedMasterKey();
     const cache = encryptedCache();
     const storage = encryptedStorage();
     const processedPages = [];
@@ -5147,7 +5158,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     const encryptedAssets = await EncryptedAssetItem.publishProcessedPages({
       pages: processedPages,
       createAssetId: () => crypto.randomUUID(),
-      stage: async ({ assetId, targetRevision, processed }) => EncryptedAssetSync.stageProcessedRevision({ cache, masterKey: vault.rawKey, assetId, targetRevision, processed }),
+      stage: async ({ assetId, targetRevision, processed }) => EncryptedAssetSync.stageProcessedRevision({ cache, masterKey, assetId, targetRevision, processed }),
       publish: async ({ assetId, targetRevision, staged }) => EncryptedAssetSync.publishPendingRevision({ vault, storage, cache, assetId, targetRevision, objectIds: staged.objectIds })
     });
     const title = els.customTitleInput.value.trim() || ('暗号化画像 ' + (savedItems.length + 1));
