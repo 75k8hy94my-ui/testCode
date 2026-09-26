@@ -3498,15 +3498,33 @@
         junctionPoints.push(
           worldToScreen(node.x + nx * halfWidth, node.y + ny * halfWidth),
           worldToScreen(node.x - nx * halfWidth, node.y - ny * halfWidth),
-          worldToScreen(node.x + dx / length * halfWidth * .7, node.y + dy / length * halfWidth * .7)
+          worldToScreen(node.x + dx / length * halfWidth * 1.45, node.y + dy / length * halfWidth * 1.45)
         );
       }
       const hull = convexHull(junctionPoints);
       if (hull.length < 3) continue;
       const drawHull = () => {
+        const cornerRadius = 10;
+        const rounded = hull.map((point, index) => {
+          const previous = hull[(index + hull.length - 1) % hull.length];
+          const next = hull[(index + 1) % hull.length];
+          const toPrevious = Math.hypot(previous.x - point.x, previous.y - point.y) || 1;
+          const toNext = Math.hypot(next.x - point.x, next.y - point.y) || 1;
+          const distance = Math.min(cornerRadius, toPrevious * .35, toNext * .35);
+          return {
+            point,
+            before: { x: point.x + (previous.x - point.x) * distance / toPrevious, y: point.y + (previous.y - point.y) * distance / toPrevious },
+            after: { x: point.x + (next.x - point.x) * distance / toNext, y: point.y + (next.y - point.y) * distance / toNext }
+          };
+        });
         ctx.beginPath();
-        ctx.moveTo(hull[0].x, hull[0].y);
-        for (let i = 1; i < hull.length; i += 1) ctx.lineTo(hull[i].x, hull[i].y);
+        ctx.moveTo(rounded[0].after.x, rounded[0].after.y);
+        for (let i = 1; i <= rounded.length; i += 1) {
+          const current = rounded[i % rounded.length];
+          const previous = rounded[(i - 1) % rounded.length];
+          ctx.lineTo(current.before.x, current.before.y);
+          ctx.quadraticCurveTo(current.point.x, current.point.y, current.after.x, current.after.y);
+        }
         ctx.closePath();
       };
       ctx.fillStyle = "rgba(36,45,43,.42)";
