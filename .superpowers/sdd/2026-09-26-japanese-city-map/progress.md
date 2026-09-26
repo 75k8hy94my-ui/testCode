@@ -10,3 +10,4 @@ Task 4: complete (commit 6d3de99, tests: node --test tests/game-runtime.test.mjs
 Task 5: complete (commit aaf0a7b, tests: npm test → 435/435 pass; npm run verify:static → pass; browser reload + screenshot + console warnings/errors → none)
 Task 6: complete (save payload now writes mapVersion; legacy/unknown map positions migrate to walkable/home and vehicle-road points; transient driving state resets for unknown map versions; focused tests → 12/12 pass; node --check game/game.js → pass)
 Task 7: complete (final verification: npm test → 436/436 pass; npm run verify:static → pass; node --check game/game.js → pass; git diff --check → pass; browser reload screenshot and console warnings/errors → none)
+Follow-up: complete (junction rendering now uses butt-ended road strokes plus direction-aware convex-hull connection surfaces; focused tests → 18/18 pass; npm test → 437/437 pass; browser reload + console warnings/errors → none)

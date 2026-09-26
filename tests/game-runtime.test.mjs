@@ -84,3 +84,10 @@ test('saved state carries the map version and sanitizes legacy positions', () =>
   assert.match(source, /mapModel\.nearestRoad\(personalCar\.x, personalCar\.y, \{ vehicleOnly: true \}\)/);
   assert.match(source, /state\.drive\.route = \[\]/);
 });
+
+test('road rendering gives shared junction nodes explicit geometry', () => {
+  assert.match(source, /function drawMapModelJunctions\(\)/);
+  assert.match(source, /mapModel\.nodes/);
+  assert.match(source, /incidentEdges\.length <= 1/);
+  assert.match(source, /drawMapModelJunctions\(\)/);
+});

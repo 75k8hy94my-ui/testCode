@@ -3437,7 +3437,7 @@
       if (Math.max(first.x, last.x) < -260 || Math.min(first.x, last.x) > viewWidth + 260 ||
           Math.max(first.y, last.y) < -260 || Math.min(first.y, last.y) > viewHeight + 260) continue;
       const screenPoints = points.map((point) => worldToScreen(point.x, point.y));
-      ctx.lineCap = "round";
+      ctx.lineCap = "butt";
       ctx.lineJoin = "round";
       ctx.beginPath();
       ctx.moveTo(screenPoints[0].x, screenPoints[0].y);
@@ -3458,6 +3458,66 @@
         ctx.stroke();
         ctx.setLineDash([]);
       }
+    }
+    drawMapModelJunctions();
+  }
+
+  function drawMapModelJunctions() {
+    const convexHull = (points) => {
+      const sorted = points.slice().sort((a, b) => a.x - b.x || a.y - b.y);
+      const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+      const lower = [];
+      for (const point of sorted) {
+        while (lower.length >= 2 && cross(lower.at(-2), lower.at(-1), point) <= 0) lower.pop();
+        lower.push(point);
+      }
+      const upper = [];
+      for (const point of sorted.reverse()) {
+        while (upper.length >= 2 && cross(upper.at(-2), upper.at(-1), point) <= 0) upper.pop();
+        upper.push(point);
+      }
+      return lower.slice(0, -1).concat(upper.slice(0, -1));
+    };
+
+    for (const node of mapModel.nodes) {
+      const incidentEdges = mapModel.edges.filter((edge) => edge.from === node.id || edge.to === node.id);
+      if (incidentEdges.length <= 1) continue;
+      const p = worldToScreen(node.x, node.y);
+      if (p.x < -260 || p.y < -260 || p.x > viewWidth + 260 || p.y > viewHeight + 260) continue;
+      const vehicleEdges = incidentEdges.filter((edge) => edge.vehicle);
+      const usableEdges = vehicleEdges.length ? vehicleEdges : incidentEdges;
+      const junctionPoints = [];
+      for (const edge of usableEdges) {
+        const raw = edge.from === node.id ? edge.points[1] : edge.points.at(-2);
+        const dx = raw.x - node.x;
+        const dy = raw.y - node.y;
+        const length = Math.hypot(dx, dy) || 1;
+        const nx = -dy / length;
+        const ny = dx / length;
+        const halfWidth = edge.width / 2 + 5;
+        junctionPoints.push(
+          worldToScreen(node.x + nx * halfWidth, node.y + ny * halfWidth),
+          worldToScreen(node.x - nx * halfWidth, node.y - ny * halfWidth),
+          worldToScreen(node.x + dx / length * halfWidth * .7, node.y + dy / length * halfWidth * .7)
+        );
+      }
+      const hull = convexHull(junctionPoints);
+      if (hull.length < 3) continue;
+      const drawHull = () => {
+        ctx.beginPath();
+        ctx.moveTo(hull[0].x, hull[0].y);
+        for (let i = 1; i < hull.length; i += 1) ctx.lineTo(hull[i].x, hull[i].y);
+        ctx.closePath();
+      };
+      ctx.fillStyle = "rgba(36,45,43,.42)";
+      ctx.save();
+      ctx.translate(0, 11);
+      drawHull();
+      ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = vehicleEdges.length ? "#626863" : "#7ca77c";
+      drawHull();
+      ctx.fill();
     }
   }
 
