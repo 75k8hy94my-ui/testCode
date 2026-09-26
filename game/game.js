@@ -4062,6 +4062,55 @@
     relocateGridlockedTraffic(head);
   }
 
+  function downstreamLaneClearance(car, endpoint, maxDistance = 260) {
+    if (!endpoint) return Infinity;
+
+    let nodeId = endpoint.id;
+    let accumulated = 0;
+    const routeIds = Array.isArray(car.routeEdgeIds) ? car.routeEdgeIds : [];
+
+    for (let i = car.routeIndex; i < routeIds.length && i < car.routeIndex + 4; i += 1) {
+      const edge = mapModel.getEdge(routeIds[i]);
+      if (!edge || (edge.from !== nodeId && edge.to !== nodeId)) break;
+
+      const directionSign = edge.from === nodeId ? 1 : -1;
+      const edgeLength = polylineLength(edge.points);
+      const expectedLaneOffset = trafficLaneOffsetForEdge(edge, Boolean(car.secondaryLane));
+
+      for (const other of traffic) {
+        if (other === car || other.edgeId !== edge.id || other.directionSign !== directionSign) continue;
+        if (Math.abs((other.laneOffset || 0) - expectedLaneOffset) > 20) continue;
+
+        const otherLength = other.edgeLength || edgeLength;
+        const centerFromNode = directionSign > 0 ? other.along : otherLength - other.along;
+        if (centerFromNode < -2) continue;
+
+        const rearClearance = accumulated +
+          Math.max(0, centerFromNode) -
+          vehicleDimensions(other).length * .5;
+        if (rearClearance >= 0 && rearClearance <= maxDistance) return rearClearance;
+      }
+
+      accumulated += edgeLength;
+      if (accumulated >= maxDistance) return Infinity;
+      nodeId = directionSign > 0 ? edge.to : edge.from;
+    }
+
+    return Infinity;
+  }
+
+  function junctionHasExitSpace(car, endpoint) {
+    if (!endpoint || vehicleEdgesAtNode(endpoint.id).length < 3) return true;
+
+    const dims = vehicleDimensions(car);
+    const requiredClearance =
+      junctionCoreRadius(endpoint) +
+      dims.length * .5 +
+      22;
+
+    return downstreamLaneClearance(car, endpoint, requiredClearance + 125) >= requiredClearance;
+  }
+
   function junctionCandidateWins(car, endpoint, gateDistance) {
     const candidates = traffic.filter((other) => {
       const approachDistance = trafficApproachDistanceToNode(other, endpoint.id);
@@ -4200,8 +4249,19 @@
       }
 
       if (endpoint && !activeStop && endpointDistance < junctionYieldOffset + 150) {
-        const hasPermit = requestJunctionEntry(car, endpoint, endpointDistance, junctionYieldOffset);
-        if (!hasPermit) {
+        const hasExitSpace = junctionHasExitSpace(car, endpoint);
+        const hasPermit = hasExitSpace &&
+          requestJunctionEntry(car, endpoint, endpointDistance, junctionYieldOffset);
+
+        if (!hasExitSpace) {
+          const gapToYield = endpointDistance - junctionYieldOffset;
+          if (gapToYield > -2) {
+            activeStop = { centerStopOffset:junctionYieldOffset, endpointId:endpoint.id, reason:"spillback" };
+            blockReason = "spillback";
+            car.junctionWait = Math.max(0, (car.junctionWait || 0) - dt * 2);
+            targetSpeed = Math.min(targetSpeed, Math.max(0, gapToYield * 2.05));
+          }
+        } else if (!hasPermit) {
           const gapToYield = endpointDistance - junctionYieldOffset;
           if (gapToYield > -2) {
             activeStop = { centerStopOffset:junctionYieldOffset, endpointId:endpoint.id, reason:"junction" };
@@ -4238,7 +4298,8 @@
       const stalledByTraffic = car.speed < 3 &&
         targetSpeed < 8 &&
         blockReason !== "signal" &&
-        blockReason !== "obstacle";
+        blockReason !== "obstacle" &&
+        blockReason !== "spillback";
       if (stalledByTraffic) {
         car.trafficStall = (car.trafficStall || 0) + dt;
       } else {
