@@ -26,8 +26,8 @@
     ['manga-list-runtime-context.js?v=20260922-runtime-context', 'mangaRouteContext'],
     ['manga-list-image-cache.js?v=20260922-image-cache', 'mangaRouteImageCache'],
     ['reader-target.js?v=20260926-item-identity', 'mangaReaderTarget'],
-    ['manga-list-host-runtime.js?v=20260926-item-reader-route', 'mangaRouteHost'],
-    ['manga-list-runtime.js?v=20260922-shared-runtime', 'mangaRouteRuntime'],
+    ['manga-list-host-runtime.js?v=20260926-item-reader-route-v2', 'mangaRouteHost'],
+    ['manga-list-runtime.js?v=20260926-item-cover-identity', 'mangaRouteRuntime'],
     ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
   ];
 
@@ -231,7 +231,16 @@
       };
       const pageUrlFor = (base, page, index, width) => base + String(page).padStart(Math.max(1, Number(width) || 1), '0') + '.' + extCandidates[index];
       const readInfo = (key) => { try { const value = JSON.parse(storage.getItem(key) || '{}'); return value && typeof value === 'object' ? value : {}; } catch (_) { return {}; } };
-      const getCachedMangaInfo = (key) => readInfo('mangaReaderInfoCache')[key] || null;
+      const getCachedMangaInfo = (identityKey, legacySourceKey) => {
+        const cache = readInfo('mangaReaderInfoCache');
+        if (cache[identityKey]) return cache[identityKey];
+        if (String(identityKey || '').startsWith('item:') && legacySourceKey && cache[legacySourceKey]) {
+          cache[identityKey] = cache[legacySourceKey];
+          safeWriteJson('mangaReaderInfoCache', cache);
+          return cache[identityKey];
+        }
+        return null;
+      };
       const getLocalStoragePathFromUrl = (value) => {
         try { const path = new URL(value).pathname; const marker = '/storage/v1/object/public/local-manga/'; return path.includes(marker) ? path.slice(path.indexOf(marker) + marker.length) : ''; } catch (_) { return ''; }
       };
@@ -294,7 +303,7 @@
       const appendFolderPreview = (cover, items, emptyIcon, emptyAlt, kindLabel) => {
         const preview = items.slice(0, 4); if (!preview.length) { const img = documentRef.createElement('img'); img.src = emptyIcon; img.alt = emptyAlt; cover.appendChild(img); return; }
         const box = documentRef.createElement('div'); box.className = 'folder-preview preview-count-' + preview.length;
-        preview.forEach((item) => { const img = documentRef.createElement('img'); img.alt = title(item); if (item.pages && item.pages[0]) img.src = item.pages[0]; else host.setupFeedImage(img, item.url, item.numberWidth, item.pagePattern); box.appendChild(img); });
+        preview.forEach((item) => { const img = documentRef.createElement('img'); img.alt = title(item); if (item.pages && item.pages[0]) img.src = item.pages[0]; else host.setupFeedImage(img, item.url, item.numberWidth, item.pagePattern, item.id); box.appendChild(img); });
         cover.appendChild(box); const badge = documentRef.createElement('span'); badge.className = 'folder-kind-badge'; badge.textContent = kindLabel || 'フォルダ'; cover.appendChild(badge);
       };
       const makeHeartIcon = () => { const img = documentRef.createElement('img'); img.alt = ''; return img; };
