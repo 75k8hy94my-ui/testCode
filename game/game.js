@@ -158,6 +158,8 @@
   const keys = new Set();
   const buildings = [];
   const traffic = [];
+  const junctionReservations = new Map();
+  let trafficSimulationClock = 0;
   const pedestrians = [];
   const CITIZEN_COUNT = 76;
   const CITIZEN_GIVEN_NAMES = [
@@ -1304,7 +1306,8 @@
           routeEdgeIds:[],
           routeIndex:0,
           routeTrips:0,
-          collisionYield:0
+          collisionYield:0,
+          junctionWait:0
         };
         if (!traffic.some((other) => vehiclesIntersect(car, other, 8))) break;
         car = null;
@@ -3913,20 +3916,136 @@
     return best;
   }
 
-  function junctionOccupiedByOther(car, endpoint) {
-    if (!endpoint) return false;
+  function junctionCoreRadius(endpoint) {
     const incident = vehicleEdgesAtNode(endpoint.id);
-    if (incident.length < 3) return false;
-    const junctionRadius = Math.max(34, ...incident.map((candidate) => candidate.width * .5)) + 18;
+    if (!incident.length) return 52;
+    const widest = Math.max(...incident.map((edge) => edge.width || ROAD_WIDTH));
+    return clamp(widest * .34 + 20, 48, 82);
+  }
 
-    for (const other of traffic) {
-      if (other === car) continue;
-      if (distance(other.x, other.y, endpoint.x, endpoint.y) > junctionRadius) continue;
-      if (other.edgeId === car.edgeId && other.directionSign === car.directionSign) continue;
+  function junctionReleaseRadius(endpoint) {
+    const incident = vehicleEdgesAtNode(endpoint.id);
+    const widest = incident.length
+      ? Math.max(...incident.map((edge) => edge.width || ROAD_WIDTH))
+      : ROAD_WIDTH;
+    return clamp(widest * .55 + 62, 105, 165);
+  }
+
+  function trafficApproachDistanceToNode(car, nodeId) {
+    const edge = mapModel.getEdge(car.edgeId);
+    if (!edge) return Infinity;
+    const endpointId = car.directionSign > 0 ? edge.to : edge.from;
+    if (endpointId !== nodeId) return Infinity;
+    return trafficDistanceToEndpoint(car, edge);
+  }
+
+  function trafficSignalAllowsEntry(car, endpoint) {
+    const edge = mapModel.getEdge(car.edgeId);
+    if (!edge || !isSignalizedMapNode(endpoint.id)) return true;
+    const distanceToNode = trafficDistanceToEndpoint(car, edge);
+    const geometry = signalGeometryAtNode(endpoint.id, edge);
+    const centerStopOffset = geometry.stopOffset + vehicleFrontOverhang(car);
+    const gapToStopLine = distanceToNode - centerStopOffset;
+    if (gapToStopLine < -2) return true;
+    const signal = signalStateAt(endpoint.x, endpoint.y, edgeOrientation(edge));
+    return !trafficShouldStopForSignal(car, signal, Math.max(0, gapToStopLine));
+  }
+
+  function refreshJunctionReservations() {
+    for (const [nodeId, reservation] of junctionReservations) {
+      const endpoint = mapModel.getNode(nodeId);
+      const owner = reservation?.owner;
+      if (!endpoint || !owner || !traffic.includes(owner)) {
+        junctionReservations.delete(nodeId);
+        continue;
+      }
+
+      const releaseRadius = junctionReleaseRadius(endpoint);
+      if (distance(owner.x, owner.y, endpoint.x, endpoint.y) <= releaseRadius) {
+        reservation.expiresAt = trafficSimulationClock + .45;
+      } else if (reservation.expiresAt <= trafficSimulationClock) {
+        junctionReservations.delete(nodeId);
+      }
+    }
+  }
+
+  function junctionCandidateWins(car, endpoint, gateDistance) {
+    const candidates = traffic.filter((other) => {
+      const approachDistance = trafficApproachDistanceToNode(other, endpoint.id);
+      return approachDistance <= gateDistance && trafficSignalAllowsEntry(other, endpoint);
+    });
+    if (!candidates.length) return true;
+
+    candidates.sort((a, b) => {
+      const waitDelta = (b.junctionWait || 0) - (a.junctionWait || 0);
+      if (Math.abs(waitDelta) > .06) return waitDelta;
+
+      const aDistance = trafficApproachDistanceToNode(a, endpoint.id);
+      const bDistance = trafficApproachDistanceToNode(b, endpoint.id);
+      if (Math.abs(aDistance - bDistance) > 4) return aDistance - bDistance;
+
+      return (a.seed || 0) - (b.seed || 0);
+    });
+    return candidates[0] === car;
+  }
+
+  function requestJunctionEntry(car, endpoint, endpointDistance, yieldOffset) {
+    if (!endpoint || vehicleEdgesAtNode(endpoint.id).length < 3) return true;
+
+    const coreRadius = junctionCoreRadius(endpoint);
+    const gateDistance = Math.max(yieldOffset + 38, coreRadius + 58);
+
+    // Once the nose has crossed the yield/stop line, never freeze the car in
+    // the junction. Give it the reservation so it can clear the conflict area.
+    if (endpointDistance < yieldOffset - 2) {
+      junctionReservations.set(endpoint.id, {
+        owner:car,
+        expiresAt:trafficSimulationClock + .55
+      });
       return true;
     }
 
-    return distance(personalCar.x, personalCar.y, endpoint.x, endpoint.y) <= junctionRadius;
+    if (endpointDistance > gateDistance) return true;
+
+    const current = junctionReservations.get(endpoint.id);
+    if (current) {
+      if (current.owner === car) {
+        current.expiresAt = trafficSimulationClock + .55;
+        return true;
+      }
+      if (current.expiresAt > trafficSimulationClock) return false;
+      junctionReservations.delete(endpoint.id);
+    }
+
+    // A vehicle physically inside the central conflict area owns it even if
+    // its previous reservation has just expired.
+    for (const other of traffic) {
+      if (other === car) continue;
+      if (distance(other.x, other.y, endpoint.x, endpoint.y) <= coreRadius) {
+        junctionReservations.set(endpoint.id, {
+          owner:other,
+          expiresAt:trafficSimulationClock + .55
+        });
+        return false;
+      }
+    }
+
+    // The player's car is treated as a physical occupant only while actually
+    // inside the junction, so merely waiting nearby cannot freeze NPC traffic.
+    if (
+      state.player.inVehicle &&
+      distance(personalCar.x, personalCar.y, endpoint.x, endpoint.y) <= coreRadius
+    ) {
+      return false;
+    }
+
+    if (!junctionCandidateWins(car, endpoint, gateDistance)) return false;
+
+    junctionReservations.set(endpoint.id, {
+      owner:car,
+      expiresAt:trafficSimulationClock + .55
+    });
+    return true;
   }
 
   function trafficShouldStopForSignal(car, signal, gapToStopLine) {
@@ -3939,6 +4058,9 @@
   }
 
   function updateTraffic(dt) {
+    trafficSimulationClock += dt;
+    refreshJunctionReservations();
+
     for (const car of traffic) {
       car.collisionYield = Math.max(0, (car.collisionYield || 0) - dt);
       const motionBefore = captureTrafficMotion(car);
@@ -3952,6 +4074,7 @@
 
       const endpoint = car.directionSign > 0 ? mapModel.getNode(edge.to) : mapModel.getNode(edge.from);
       const endpointDistance = trafficDistanceToEndpoint(car, edge);
+      let junctionYieldOffset = Math.max(vehicleFrontOverhang(car) + 18, (edge.width || ROAD_WIDTH) * .5 + 8);
 
       if (endpoint && isSignalizedMapNode(endpoint.id)) {
         const geometry = signalGeometryAtNode(endpoint.id, edge);
@@ -3959,22 +4082,31 @@
         const centerStopOffset = geometry.stopOffset + vehicleFrontOverhang(car);
         const gapToStopLine = endpointDistance - centerStopOffset;
         const stillApproachingLine = gapToStopLine >= -2;
+        junctionYieldOffset = centerStopOffset;
 
         if (stillApproachingLine && trafficShouldStopForSignal(car, signal, Math.max(0, gapToStopLine))) {
-          activeStop = { centerStopOffset, endpointId:endpoint.id };
+          activeStop = { centerStopOffset, endpointId:endpoint.id, reason:"signal" };
+          car.junctionWait = 0;
           if (gapToStopLine < 130) {
             targetSpeed = Math.min(targetSpeed, Math.max(0, gapToStopLine * 2.2));
           }
         }
       }
 
-      if (endpoint && endpointDistance < 150 && junctionOccupiedByOther(car, endpoint)) {
-        const yieldOffset = activeStop?.centerStopOffset || Math.max(vehicleFrontOverhang(car) + 18, edge.width * .5 + 8);
-        const gapToYield = endpointDistance - yieldOffset;
-        if (gapToYield > -2) {
-          activeStop = { centerStopOffset:yieldOffset, endpointId:endpoint.id };
-          targetSpeed = Math.min(targetSpeed, Math.max(0, gapToYield * 2.05));
+      if (endpoint && !activeStop && endpointDistance < junctionYieldOffset + 150) {
+        const hasPermit = requestJunctionEntry(car, endpoint, endpointDistance, junctionYieldOffset);
+        if (!hasPermit) {
+          const gapToYield = endpointDistance - junctionYieldOffset;
+          if (gapToYield > -2) {
+            activeStop = { centerStopOffset:junctionYieldOffset, endpointId:endpoint.id, reason:"junction" };
+            car.junctionWait = (car.junctionWait || 0) + dt;
+            targetSpeed = Math.min(targetSpeed, Math.max(0, gapToYield * 2.05));
+          }
+        } else {
+          car.junctionWait = Math.max(0, (car.junctionWait || 0) - dt * 3);
         }
+      } else if (!activeStop) {
+        car.junctionWait = Math.max(0, (car.junctionWait || 0) - dt * 2);
       }
 
       const lead = trafficLeadInfo(car);
