@@ -191,7 +191,7 @@ async function renderReader(route=routeName(),generation=renderGeneration){
       setEditing:(value)=>{editing=value;},
       getMount,
       createLoading:()=>{const loading=document.createElement('p');loading.className='syncStatus';loading.textContent='読み込み中…';return loading;},
-      fetchReader:()=>fetch('reader.html?v=20260926-reader-startup-fix',{cache:'no-store'}),
+      fetchReader:()=>fetch('reader.html?v=20260926-reader-shell-root-fix',{cache:'no-store'}),
       parseHtml:(html)=>new DOMParser().parseFromString(html,'text/html'),
       installHeadAssets:installReaderHeadAssets,
       mountBody:(doc)=>target.replaceChildren(...[...doc.body.children].filter((node)=>node.tagName!=='SCRIPT')),
