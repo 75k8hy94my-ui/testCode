@@ -29,6 +29,6 @@ test('manga and video entry shells use the same versioned SPA bootstrap', () => 
 
 test('all home-family entry pages use the current shared SPA bootstrap', () => {
   const pages = ['home.html', 'profile.html', 'manga.html', 'video.html'];
-  const expected = 'home-profile-spa.js?v=20260924-liquid-glass-nav';
+  const expected = 'home-profile-spa.js?v=20260926-reader-startup-fix';
   for (const page of pages) assert.equal(spaSource(read(page)), expected, `${page} must use the current shared SPA bootstrap`);
 });
