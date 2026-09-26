@@ -102,6 +102,9 @@
   const VEHICLE_FRONT_OVERHANG = 38;
   const BLOCK_MARGIN = 34;
   const PLAYER_RADIUS = 14;
+  const PLAYER_COLLISION_RADIUS = 11;
+  const NPC_COLLISION_RADIUS = 7.5;
+  const VEHICLE_COLLISION_SCALE = 0.9;
   const WALK_SPEED = 34;
   const RUN_SPEED = 62;
   const SPEED_TO_KMH = 0.16;
@@ -864,6 +867,133 @@
     return inWorld(x, y, radius) && mapModel.isWalkable(x, y, radius) && !collidesBuilding(x, y, radius);
   }
 
+  function vehicleDimensions(car, owned = false) {
+    const type = car?.type || (owned ? "sedan" : "compact");
+    if (type === "compact") return { type, length:66, width:36 };
+    if (type === "suv") return { type, length:80, width:43 };
+    if (type === "van") return { type, length:82, width:42 };
+    return { type, length:76, width:39 };
+  }
+
+  function vehicleCollisionShape(car, padding = 0) {
+    const owned = car === personalCar;
+    const dims = vehicleDimensions(car, owned);
+    return {
+      x:car.x,
+      y:car.y,
+      angle:car.angle || 0,
+      halfLength:dims.length * .5 * VEHICLE_COLLISION_SCALE + padding,
+      halfWidth:dims.width * .5 * VEHICLE_COLLISION_SCALE + padding
+    };
+  }
+
+  function circleIntersectsVehicle(x, y, radius, car, padding = 0) {
+    const shape = vehicleCollisionShape(car, padding);
+    const dx = x - shape.x;
+    const dy = y - shape.y;
+    const cos = Math.cos(shape.angle);
+    const sin = Math.sin(shape.angle);
+    const localX = dx * cos + dy * sin;
+    const localY = -dx * sin + dy * cos;
+    const closestX = clamp(localX, -shape.halfLength, shape.halfLength);
+    const closestY = clamp(localY, -shape.halfWidth, shape.halfWidth);
+    const ox = localX - closestX;
+    const oy = localY - closestY;
+    return ox * ox + oy * oy < radius * radius;
+  }
+
+  function vehiclesIntersect(a, b, padding = 0) {
+    if (!a || !b || a === b) return false;
+    const sa = vehicleCollisionShape(a, padding);
+    const sb = vehicleCollisionShape(b, padding);
+    const axes = [
+      { x:Math.cos(sa.angle), y:Math.sin(sa.angle) },
+      { x:-Math.sin(sa.angle), y:Math.cos(sa.angle) },
+      { x:Math.cos(sb.angle), y:Math.sin(sb.angle) },
+      { x:-Math.sin(sb.angle), y:Math.cos(sb.angle) }
+    ];
+    const delta = { x:sb.x - sa.x, y:sb.y - sa.y };
+    const af = { x:Math.cos(sa.angle), y:Math.sin(sa.angle) };
+    const as = { x:-Math.sin(sa.angle), y:Math.cos(sa.angle) };
+    const bf = { x:Math.cos(sb.angle), y:Math.sin(sb.angle) };
+    const bs = { x:-Math.sin(sb.angle), y:Math.cos(sb.angle) };
+
+    for (const axis of axes) {
+      const centerDistance = Math.abs(delta.x * axis.x + delta.y * axis.y);
+      const ra =
+        sa.halfLength * Math.abs(af.x * axis.x + af.y * axis.y) +
+        sa.halfWidth * Math.abs(as.x * axis.x + as.y * axis.y);
+      const rb =
+        sb.halfLength * Math.abs(bf.x * axis.x + bf.y * axis.y) +
+        sb.halfWidth * Math.abs(bs.x * axis.x + bs.y * axis.y);
+      if (centerDistance >= ra + rb) return false;
+    }
+    return true;
+  }
+
+  function visiblePedestrianColliders() {
+    return pedestrians.filter((ped) => ped.visible && ped.state !== "inside");
+  }
+
+  function personIntersectsAnyVehicle(x, y, radius, ignoreCar = null) {
+    if (personalCar !== ignoreCar && circleIntersectsVehicle(x, y, radius, personalCar, 1)) return personalCar;
+    for (const car of traffic) {
+      if (car === ignoreCar) continue;
+      if (circleIntersectsVehicle(x, y, radius, car, 1)) return car;
+    }
+    return null;
+  }
+
+  function personIntersectsAnotherPerson(x, y, radius, ignorePed = null, includePlayer = true) {
+    if (
+      includePlayer &&
+      !state.player.inVehicle &&
+      !state.player.inTrain &&
+      distance(x, y, state.player.x, state.player.y) < radius + PLAYER_COLLISION_RADIUS
+    ) {
+      return { type:"player", target:state.player };
+    }
+
+    for (const ped of visiblePedestrianColliders()) {
+      if (ped === ignorePed) continue;
+      if (distance(x, y, ped.x, ped.y) < radius + NPC_COLLISION_RADIUS) {
+        return { type:"pedestrian", target:ped };
+      }
+    }
+    return null;
+  }
+
+  function canPlayerOccupy(x, y) {
+    if (!canStand(x, y, PLAYER_RADIUS)) return false;
+    if (personIntersectsAnyVehicle(x, y, PLAYER_COLLISION_RADIUS)) return false;
+    if (personIntersectsAnotherPerson(x, y, PLAYER_COLLISION_RADIUS, null, false)) return false;
+    return true;
+  }
+
+  function vehicleIntersectsAnyPerson(car) {
+    if (
+      !state.player.inVehicle &&
+      !state.player.inTrain &&
+      circleIntersectsVehicle(state.player.x, state.player.y, PLAYER_COLLISION_RADIUS, car, 1)
+    ) return { type:"player", target:state.player };
+
+    for (const ped of visiblePedestrianColliders()) {
+      if (circleIntersectsVehicle(ped.x, ped.y, NPC_COLLISION_RADIUS, car, 1)) {
+        return { type:"pedestrian", target:ped };
+      }
+    }
+    return null;
+  }
+
+  function vehicleIntersectsAnyVehicle(car) {
+    if (car !== personalCar && vehiclesIntersect(car, personalCar, 1)) return personalCar;
+    for (const other of traffic) {
+      if (other === car) continue;
+      if (vehiclesIntersect(car, other, 1)) return other;
+    }
+    return null;
+  }
+
   function segmentIntersectsExpandedRect(a, b, rect, pad) {
     const left = rect.x - pad;
     const right = rect.x + rect.w + pad;
@@ -1139,7 +1269,8 @@
         seed:i + 17,
         routeEdgeIds:[],
         routeIndex:0,
-        routeTrips:0
+        routeTrips:0,
+        collisionYield:0
       };
       const currentEdge = mapModel.getEdge(car.edgeId);
       const startNodeId = car.directionSign > 0 ? currentEdge.to : currentEdge.from;
@@ -1614,9 +1745,11 @@
     const tangent = ped.directionSign > 0 ? hit.tangent : { x:-hit.tangent.x, y:-hit.tangent.y };
     const sidewalkOffset = edge.vehicle ? edge.width / 2 + 5 : Math.min(10, edge.width * .2);
     const side = ped.sideSign || 1;
+    const avoidance = Math.max(0, Number(ped.avoidanceOffset) || 0);
+    const lateralOffset = (sidewalkOffset + avoidance) * side;
     return {
-      x:hit.point.x + tangent.y * sidewalkOffset * side,
-      y:hit.point.y - tangent.x * sidewalkOffset * side,
+      x:hit.point.x + tangent.y * lateralOffset,
+      y:hit.point.y - tangent.x * lateralOffset,
       angle:Math.atan2(tangent.y, tangent.x)
     };
   }
@@ -1748,6 +1881,8 @@
         state:"deciding",
         visible:true,
         waitTimer:0,
+        collisionWait:0,
+        avoidanceOffset:0,
         stayTimer:0,
         activityMinutesRemaining:0,
         currentActivityId:null,
@@ -3010,7 +3145,7 @@
       [personalCar.x - sideX, personalCar.y - sideY],
       [personalCar.x - Math.cos(personalCar.angle) * 54, personalCar.y - Math.sin(personalCar.angle) * 54]
     ];
-    const spot = spots.find(([x, y]) => canStand(x, y, PLAYER_RADIUS));
+    const spot = spots.find(([x, y]) => canPlayerOccupy(x, y));
     if (!spot) {
       showToast("ここでは降りられません");
       return;
@@ -3404,8 +3539,8 @@
 
       const nx = state.player.x + x * speed * dt;
       const ny = state.player.y + y * speed * dt;
-      if (canStand(nx, state.player.y)) state.player.x = nx;
-      if (canStand(state.player.x, ny)) state.player.y = ny;
+      if (canPlayerOccupy(nx, state.player.y)) state.player.x = nx;
+      if (canPlayerOccupy(state.player.x, ny)) state.player.y = ny;
 
       if (running) {
         state.needs.energy -= dt * 0.4;
@@ -3425,6 +3560,13 @@
       state.player.y = personalCar.y;
       return;
     }
+
+    const motionBefore = {
+      x:personalCar.x,
+      y:personalCar.y,
+      angle:personalCar.angle,
+      speed:personalCar.speed
+    };
 
     const accelerating = touch.driveAccel || keys.has("w") || keys.has("arrowup");
     const braking = touch.driveBrake || keys.has("s") || keys.has("arrowdown") || keys.has(" ");
@@ -3484,26 +3626,34 @@
 
       if (lead.distance < 38) {
         personalCar.speed = Math.min(personalCar.speed, Math.max(0, lead.car.speed - 20));
-        if (state.drive.collisionCooldown <= 0) {
-          state.drive.collisionCooldown = 2.5;
-          penalizeDriving(12, "前方車両に接触しました");
-        }
       }
     } else {
       state.drive.gapTimer = 0;
     }
 
-    const ox = personalCar.x;
-    const oy = personalCar.y;
     personalCar.x += Math.cos(personalCar.angle) * personalCar.speed * dt;
     personalCar.y += Math.sin(personalCar.angle) * personalCar.speed * dt;
 
 
-    if (!inWorld(personalCar.x, personalCar.y, 32) || collidesBuilding(personalCar.x, personalCar.y, 29)) {
-      personalCar.x = ox;
-      personalCar.y = oy;
+    const offWorldOrBuilding =
+      !inWorld(personalCar.x, personalCar.y, 32) ||
+      collidesBuilding(personalCar.x, personalCar.y, 29);
+
+    const hitVehicle = offWorldOrBuilding ? null : vehicleIntersectsAnyVehicle(personalCar);
+    const hitPerson = offWorldOrBuilding ? null : vehicleIntersectsAnyPerson(personalCar);
+
+    if (offWorldOrBuilding || hitVehicle || hitPerson) {
+      personalCar.x = motionBefore.x;
+      personalCar.y = motionBefore.y;
+      personalCar.angle = motionBefore.angle;
       personalCar.speed = 0;
-      penalizeDriving(8, "路外へ出ました");
+
+      if (state.drive.collisionCooldown <= 0) {
+        state.drive.collisionCooldown = 1.6;
+        if (hitPerson) penalizeDriving(16, "歩行者に接触しました");
+        else if (hitVehicle) penalizeDriving(10, "車両に接触しました");
+        else penalizeDriving(8, "路外へ出ました");
+      }
     }
 
     state.player.x = personalCar.x;
@@ -3607,13 +3757,49 @@
   }
 
 
+  function captureTrafficMotion(car) {
+    return {
+      x:car.x,
+      y:car.y,
+      angle:car.angle,
+      speed:car.speed,
+      edgeId:car.edgeId,
+      edgeLength:car.edgeLength,
+      directionSign:car.directionSign,
+      laneOffset:car.laneOffset,
+      along:car.along,
+      routeEdgeIds:Array.isArray(car.routeEdgeIds) ? [...car.routeEdgeIds] : [],
+      routeIndex:car.routeIndex,
+      routeGoalNodeId:car.routeGoalNodeId,
+      routeTrips:car.routeTrips
+    };
+  }
+
+  function restoreTrafficMotion(car, snapshot) {
+    car.x = snapshot.x;
+    car.y = snapshot.y;
+    car.angle = snapshot.angle;
+    car.edgeId = snapshot.edgeId;
+    car.edgeLength = snapshot.edgeLength;
+    car.directionSign = snapshot.directionSign;
+    car.laneOffset = snapshot.laneOffset;
+    car.along = snapshot.along;
+    car.routeEdgeIds = [...snapshot.routeEdgeIds];
+    car.routeIndex = snapshot.routeIndex;
+    car.routeGoalNodeId = snapshot.routeGoalNodeId;
+    car.routeTrips = snapshot.routeTrips;
+  }
+
   function updateTraffic(dt) {
     for (const car of traffic) {
+      car.collisionYield = Math.max(0, (car.collisionYield || 0) - dt);
+      const motionBefore = captureTrafficMotion(car);
       const edge = mapModel.getEdge(car.edgeId);
       if (!edge) continue;
       const edgeLength = car.edgeLength || polylineLength(edge.points);
       const roadLimit = (edge.speedLimit || 30) / SPEED_TO_KMH;
       let targetSpeed = Math.min(car.cruise, roadLimit * .92);
+      if (car.collisionYield > 0) targetSpeed = 0;
       let activeSignalStop = null;
 
       const endpoint = car.directionSign > 0 ? mapModel.getNode(edge.to) : mapModel.getNode(edge.from);
@@ -3688,9 +3874,105 @@
       car.x = pose.x;
       car.y = pose.y;
       car.angle = pose.angle;
+
+      const hitVehicle = vehicleIntersectsAnyVehicle(car);
+      const hitPerson = vehicleIntersectsAnyPerson(car);
+      if (hitVehicle || hitPerson) {
+        restoreTrafficMotion(car, motionBefore);
+        car.speed = 0;
+        car.brakeGlow = 1;
+
+        if (hitPerson) {
+          car.collisionYield = Math.max(car.collisionYield || 0, .28);
+        } else if (hitVehicle === personalCar) {
+          car.collisionYield = Math.max(car.collisionYield || 0, .42);
+        } else if (hitVehicle) {
+          const myPriority = car.seed || 0;
+          const otherPriority = hitVehicle.seed || 0;
+          if (myPriority >= otherPriority) {
+            car.collisionYield = Math.max(car.collisionYield || 0, .52);
+          }
+        }
+      }
     }
   }
 
+
+  function capturePedestrianMotion(ped) {
+    return {
+      edgeId:ped.edgeId,
+      edgeLength:ped.edgeLength,
+      directionSign:ped.directionSign,
+      along:ped.along,
+      routeIndex:ped.routeIndex,
+      currentNodeId:ped.currentNodeId,
+      targetNodeId:ped.targetNodeId,
+      x:ped.x,
+      y:ped.y,
+      dir:ped.dir,
+      state:ped.state,
+      waitTimer:ped.waitTimer
+    };
+  }
+
+  function restorePedestrianMotion(ped, snapshot) {
+    ped.edgeId = snapshot.edgeId;
+    ped.edgeLength = snapshot.edgeLength;
+    ped.directionSign = snapshot.directionSign;
+    ped.along = snapshot.along;
+    ped.routeIndex = snapshot.routeIndex;
+    ped.currentNodeId = snapshot.currentNodeId;
+    ped.targetNodeId = snapshot.targetNodeId;
+    ped.x = snapshot.x;
+    ped.y = snapshot.y;
+    ped.dir = snapshot.dir;
+    ped.state = snapshot.state;
+    ped.waitTimer = snapshot.waitTimer;
+  }
+
+  function pedestrianCollision(ped) {
+    const car = personIntersectsAnyVehicle(ped.x, ped.y, NPC_COLLISION_RADIUS);
+    if (car) return { type:"vehicle", target:car };
+    return personIntersectsAnotherPerson(ped.x, ped.y, NPC_COLLISION_RADIUS, ped, true);
+  }
+
+  function attemptPedestrianMove(ped, distanceUnits) {
+    if (distanceUnits <= .001) return true;
+    const snapshot = capturePedestrianMotion(ped);
+    moveCitizenAlongRoute(ped, distanceUnits);
+
+    // Arrival inside a building removes the person from physical street space.
+    if (ped.state === "inside" || !ped.visible) return true;
+
+    let collision = pedestrianCollision(ped);
+    if (!collision) {
+      ped.avoidanceOffset += (0 - (ped.avoidanceOffset || 0)) * .08;
+      return true;
+    }
+
+    restorePedestrianMotion(ped, snapshot);
+
+    if (collision.type === "pedestrian" || collision.type === "player") {
+      // Yield outward from the curb instead of stepping into the carriageway.
+      // This gives two pedestrians enough room to pass without teleporting
+      // across to the opposite sidewalk.
+      ped.avoidanceOffset = Math.max(ped.avoidanceOffset || 0, 16);
+      const shifted = pedestrianPoseAt(ped);
+      ped.x = shifted.x;
+      ped.y = shifted.y;
+      ped.dir = shifted.angle;
+
+      if (!pedestrianCollision(ped)) {
+        const shiftedSnapshot = capturePedestrianMotion(ped);
+        moveCitizenAlongRoute(ped, distanceUnits);
+        if (ped.state === "inside" || !ped.visible || !pedestrianCollision(ped)) return true;
+        restorePedestrianMotion(ped, shiftedSnapshot);
+      }
+    }
+
+    ped.collisionWait = .12 + hash2(ped.seed || 0, ped.tripCount || 0, 2051) * .18;
+    return false;
+  }
 
   function updatePedestrians(dt, gameMinutes) {
     const minutes = Math.max(0, Number(gameMinutes) || 0);
@@ -3698,6 +3980,10 @@
     for (const ped of pedestrians) {
       const travelling = ped.state === "walking" || ped.state === "waiting";
       citizenUpdateNeeds(ped, minutes, travelling);
+      ped.collisionWait = Math.max(0, (ped.collisionWait || 0) - dt);
+      if ((ped.avoidanceOffset || 0) > .05 && ped.collisionWait <= 0) {
+        ped.avoidanceOffset *= Math.pow(.16, dt);
+      }
 
       if (ped.state === "inside" || ped.state === "staying") {
         ped.activityMinutesRemaining = Math.max(0, ped.activityMinutesRemaining - minutes);
@@ -3726,7 +4012,7 @@
           ped.state = "walking";
           ped.waitTimer = 0;
           ped.phase += dt * ped.speed * .12;
-          moveCitizenAlongRoute(ped, step);
+          attemptPedestrianMove(ped, step);
         } else {
           ped.state = "waiting";
           ped.waitTimer = Math.min(1.2, ped.waitTimer + dt);
@@ -3735,10 +4021,19 @@
             ped.along = ped.directionSign > 0
               ? Math.max(0, ped.edgeLength - signal.waitOffset)
               : Math.min(ped.edgeLength, signal.waitOffset);
-            const pose = pedestrianPoseAt(ped);
+            let pose = pedestrianPoseAt(ped);
             ped.x = pose.x;
             ped.y = pose.y;
             ped.dir = pose.angle;
+
+            const waitCollision = pedestrianCollision(ped);
+            if (waitCollision && (waitCollision.type === "pedestrian" || waitCollision.type === "player")) {
+              ped.avoidanceOffset = Math.max(ped.avoidanceOffset || 0, 16);
+              pose = pedestrianPoseAt(ped);
+              ped.x = pose.x;
+              ped.y = pose.y;
+              ped.dir = pose.angle;
+            }
           }
         }
         continue;
@@ -3749,7 +4044,86 @@
       ped.state = "walking";
       ped.waitTimer = 0;
       ped.phase += dt * ped.speed * .12;
-      moveCitizenAlongRoute(ped, ped.speed * dt);
+      if (ped.collisionWait <= 0) attemptPedestrianMove(ped, ped.speed * dt);
+    }
+
+    resolvePedestrianOverlaps();
+  }
+
+  function tryNudgeStandingPedestrian(ped, dx, dy) {
+    if (!ped || ped.state !== "staying" || !ped.visible) return false;
+    const nx = ped.x + dx;
+    const ny = ped.y + dy;
+    if (!canStand(nx, ny, NPC_COLLISION_RADIUS)) return false;
+    if (personIntersectsAnyVehicle(nx, ny, NPC_COLLISION_RADIUS)) return false;
+    ped.x = nx;
+    ped.y = ny;
+    return true;
+  }
+
+  function resolvePedestrianOverlaps() {
+    const visible = visiblePedestrianColliders();
+
+    // If an outdoor activity begins on top of the player, move the NPC rather
+    // than moving the player's controlled character.
+    if (!state.player.inVehicle && !state.player.inTrain) {
+      for (const ped of visible) {
+        if (ped.state !== "staying") continue;
+        const dx = ped.x - state.player.x;
+        const dy = ped.y - state.player.y;
+        const d = Math.hypot(dx, dy);
+        const minimum = NPC_COLLISION_RADIUS + PLAYER_COLLISION_RADIUS;
+        if (d >= minimum) continue;
+        const ux = d > .001 ? dx / d : (hash2(ped.seed || 0, 1, 2052) > .5 ? 1 : -1);
+        const uy = d > .001 ? dy / d : 0;
+        tryNudgeStandingPedestrian(ped, ux * (minimum - d + 2), uy * (minimum - d + 2));
+      }
+    }
+
+    for (let i = 0; i < visible.length; i += 1) {
+      for (let j = i + 1; j < visible.length; j += 1) {
+        const a = visible[i];
+        const b = visible[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const d = Math.hypot(dx, dy);
+        const minimum = NPC_COLLISION_RADIUS * 2;
+        if (d >= minimum) continue;
+
+        let ux;
+        let uy;
+        if (d > .001) {
+          ux = dx / d;
+          uy = dy / d;
+        } else {
+          const angle = hash2(a.seed || i, b.seed || j, 2053) * Math.PI * 2;
+          ux = Math.cos(angle);
+          uy = Math.sin(angle);
+        }
+
+        const overlap = minimum - d + 1;
+        if (a.state === "staying" && b.state === "staying") {
+          tryNudgeStandingPedestrian(a, -ux * overlap * .5, -uy * overlap * .5);
+          tryNudgeStandingPedestrian(b, ux * overlap * .5, uy * overlap * .5);
+        } else if (a.state === "staying") {
+          tryNudgeStandingPedestrian(a, -ux * overlap, -uy * overlap);
+        } else if (b.state === "staying") {
+          tryNudgeStandingPedestrian(b, ux * overlap, uy * overlap);
+        } else {
+          const yielding = (a.seed || i) >= (b.seed || j) ? a : b;
+          yielding.avoidanceOffset = Math.max(yielding.avoidanceOffset || 0, 16);
+          const shifted = pedestrianPoseAt(yielding);
+          if (
+            canStand(shifted.x, shifted.y, NPC_COLLISION_RADIUS) &&
+            !personIntersectsAnyVehicle(shifted.x, shifted.y, NPC_COLLISION_RADIUS)
+          ) {
+            yielding.x = shifted.x;
+            yielding.y = shifted.y;
+            yielding.dir = shifted.angle;
+            yielding.collisionWait = Math.max(yielding.collisionWait || 0, .08);
+          }
+        }
+      }
     }
   }
 
@@ -6118,10 +6492,10 @@
   function drawCar(car, owned = false) {
     const p = worldToScreen(car.x, car.y);
     if (p.x < -110 || p.y < -110 || p.x > viewWidth + 110 || p.y > viewHeight + 110) return;
-    const type = car.type || (owned ? "sedan" : "compact");
-    const dims = type === "compact" ? [66, 36] : type === "suv" ? [80, 43] : type === "van" ? [82, 42] : [76, 39];
-    const length = dims[0];
-    const width = dims[1];
+    const dims = vehicleDimensions(car, owned);
+    const type = dims.type;
+    const length = dims.length;
+    const width = dims.width;
     const lift = type === "suv" || type === "van" ? 5 : 4;
     const braking = owned
       ? (state.player.inVehicle && (touch.driveBrake || keys.has("s") || keys.has("arrowdown") || keys.has(" ")))
