@@ -603,6 +603,9 @@
   }
 
   function distance(ax, ay, bx, by) {
+    if (typeof ax === "object" && typeof ay === "object") {
+      return Math.hypot(ax.x - ay.x, ax.y - ay.y);
+    }
     return Math.hypot(ax - bx, ay - by);
   }
 
@@ -1262,9 +1265,16 @@
 
   function generatePedestrians() {
     const pedestrianCount = 76;
+    const nearbyPedestrianPlaces = ["cafe", "store", "home"]
+      .map((id) => PLACES.find((place) => place.id === id))
+      .filter(Boolean);
     for (let i = 0; i < pedestrianCount; i += 1) {
-      const homePlace = PLACES[i % PLACES.length];
-      const targetPlace = PLACES[(i * 3 + 2) % PLACES.length];
+      const homePlace = i < 30 && nearbyPedestrianPlaces.length
+        ? nearbyPedestrianPlaces[i % nearbyPedestrianPlaces.length]
+        : PLACES[i % PLACES.length];
+      const targetPlace = i < 30 && nearbyPedestrianPlaces.length
+        ? nearbyPedestrianPlaces[(i + 1) % nearbyPedestrianPlaces.length]
+        : PLACES[(i * 3 + 2) % PLACES.length];
       const ped = {
         x: homePlace.x,
         y: homePlace.y,
@@ -1295,6 +1305,26 @@
       ped.y = pose.y;
       ped.dir = pose.angle;
       pedestrians.push(ped);
+    }
+  }
+
+  function seedPedestriansNearActor() {
+    const offsets = [-260, -180, -100, -20, 60, 140, 220, 300];
+    const nearbyCount = Math.min(offsets.length, pedestrians.length);
+    for (let i = 0; i < nearbyCount; i += 1) {
+      const hit = mapModel.nearestRoad(
+        state.player.x + offsets[i] * .35,
+        state.player.y + offsets[i] * .2
+      );
+      const edge = hit?.edge;
+      if (!edge?.pedestrian || !buildPedestrianPlan(pedestrians[i], edge.from, edge.to)) continue;
+      const ped = pedestrians[i];
+      ped.sideSign = i % 2 === 0 ? 1 : -1;
+      ped.along = clamp((hit.t || .5) * ped.edgeLength + (i - 3) * 42, 28, Math.max(28, ped.edgeLength - 28));
+      const pose = pedestrianPoseAt(ped);
+      ped.x = pose.x;
+      ped.y = pose.y;
+      ped.dir = pose.angle;
     }
   }
 
@@ -4454,12 +4484,13 @@
       if (!edge.vehicle) continue;
       const stride = edge.type === "arterial" ? 260 : 340;
       let distance = 120;
-      const length = polylineLength(edge.points);
-      while (distance < length) {
-        const pose = pointAndTangentOnPolyline(edge.points, distance);
-        drawLamp(pose.point.x + pose.normal.x * (edge.width * .58), pose.point.y + pose.normal.y * (edge.width * .58));
-        distance += stride;
-      }
+        const length = polylineLength(edge.points);
+        while (distance < length) {
+          const pose = pointAndTangentOnPolyline(edge.points, distance);
+          const normal = { x: -pose.tangent.y, y: pose.tangent.x };
+          drawLamp(pose.point.x + normal.x * (edge.width * .58), pose.point.y + normal.y * (edge.width * .58));
+          distance += stride;
+        }
     }
     for (const parcel of mapModel.parcels) {
       if (parcel.use !== "residential") continue;
@@ -5895,6 +5926,7 @@
   generateTraffic();
   generatePedestrians();
   loadGame();
+  seedPedestriansNearActor();
   resize();
   if (state.player.inVehicle) {
     personalCar.speed = 0;

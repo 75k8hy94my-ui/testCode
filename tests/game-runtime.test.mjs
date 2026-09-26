@@ -41,6 +41,7 @@ test('game defines the traffic signal state helper used by rendering and updates
 test('game defines the ambient prop drawing helpers used by the city renderer', () => {
   assert.match(source, /function drawTree\(x, y, scale = 1\)/);
   assert.match(source, /function drawLamp\(x, y\)/);
+  assert.match(source, /const normal = \{ x: -pose\.tangent\.y, y: pose\.tangent\.x \}/);
 });
 
 test('elevated rail becomes translucent only for the controlled actor below it', () => {
@@ -108,6 +109,18 @@ test('ambient pedestrians have destination plans, route states, and signal-aware
   assert.match(source, /function pedestrianPoseAt\(ped\)/);
   assert.match(source, /pedestrianSignalState\(ped\)/);
   assert.match(source, /ped\.targetPlaceId/);
+});
+
+test('ambient pedestrians seed the active central roads', () => {
+  assert.match(source, /const nearbyPedestrianPlaces = \["cafe", "store", "home"\]/);
+  assert.match(source, /i < 30 && nearbyPedestrianPlaces\.length/);
+  assert.match(source, /function seedPedestriansNearActor\(\)/);
+  assert.match(source, /seedPedestriansNearActor\(\);/);
+});
+
+test('game distance helper supports map polyline point objects', () => {
+  assert.match(source, /typeof ax === "object"/);
+  assert.match(source, /Math\.hypot\(ax\.x - ay\.x, ax\.y - ay\.y\)/);
 });
 
 test('city rendering uses map parcels and polylines instead of grid-only geometry', () => {
