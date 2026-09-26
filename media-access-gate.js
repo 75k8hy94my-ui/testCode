@@ -51,6 +51,9 @@
   function freshDiagnostics() {
     return {
       ip: '',
+      countryCode: '',
+      countryName: '',
+      countryPolicy: 'pending',
       generic: { status: 'pending', httpStatus: null, verdict: null },
       protonOwnedNetworkMatch: null,
       protonExitMatch: null,
@@ -64,6 +67,9 @@
   function getDiagnostics() {
     return {
       ip: diagnostics.ip,
+      countryCode: diagnostics.countryCode,
+      countryName: diagnostics.countryName,
+      countryPolicy: diagnostics.countryPolicy,
       generic: { ...diagnostics.generic },
       protonOwnedNetworkMatch: diagnostics.protonOwnedNetworkMatch,
       protonExitMatch: diagnostics.protonExitMatch,
@@ -265,17 +271,32 @@
     const d = diagnostics;
     const generic = d.generic.status === 'success'
       ? (d.generic.verdict ? 'VPN判定: YES' : 'VPN判定: NO')
-      : d.generic.status === 'unavailable'
-        ? '判定不能' + (d.generic.httpStatus ? ' (HTTP ' + d.generic.httpStatus + ')' : '')
-        : d.generic.status === 'error'
-          ? 'エラー' + (d.generic.httpStatus ? ' (HTTP ' + d.generic.httpStatus + ')' : '')
-        : d.generic.status === 'checking' ? '確認中' : '未確認';
+      : d.generic.status === 'country-only'
+        ? '国判定のみ実施'
+        : d.generic.status === 'unavailable'
+          ? '判定不能' + (d.generic.httpStatus ? ' (HTTP ' + d.generic.httpStatus + ')' : '')
+          : d.generic.status === 'error'
+            ? 'エラー' + (d.generic.httpStatus ? ' (HTTP ' + d.generic.httpStatus + ')' : '')
+          : d.generic.status === 'checking' ? '確認中' : '未確認';
     const owned = d.protonOwnedNetworkMatch === true ? '一致' : d.protonOwnedNetworkMatch === false ? '不一致' : '未確認';
     const proton = d.protonExitMatch === true ? '一致' : d.protonExitMatch === false ? '不一致' : '未確認';
     const manual = d.manualDesignation === 'vpn' ? 'VPNとして手動指定' : d.manualDesignation === 'non-vpn' ? 'VPNではないと固定' : 'なし';
+    const country = d.countryCode
+      ? (d.countryName ? d.countryCode + ' (' + d.countryName + ')' : d.countryCode)
+      : '未確認';
+    const countryPolicy = d.countryPolicy === 'non-jp-vpn'
+      ? '日本国外IPのためVPNとして扱う'
+      : d.countryPolicy === 'jp'
+        ? '日本IPのため国判定だけではVPN扱いしない'
+        : d.countryPolicy === 'unavailable'
+          ? '国判定不能'
+          : '未判定';
     const final = d.final === 'allowed' ? '許可' : d.final === 'blocked' ? 'ブロック' : d.final === 'checking' ? '確認中' : '未判定';
     return [
       '現在IP: ' + (d.ip || '取得前'),
+      '国判定: ' + country,
+      '国判定ルール: 日本以外のIPはVPNとして扱う',
+      '国判定結果: ' + countryPolicy,
       '手動指定: ' + manual,
       'Proton保有ネットワーク: ' + owned,
       '一般VPN判定: ' + generic,
@@ -510,21 +531,49 @@
     }
   }
 
-  async function genericVpnVerdict(ip, signal) {
+  function countryInfoFromPayload(payload) {
+    const location = payload && payload.location && typeof payload.location === 'object' ? payload.location : {};
+    const countryCode = String(location.country_code || '').trim().toUpperCase();
+    const countryName = String(location.country || '').trim();
+    return { countryCode, countryName };
+  }
+
+  async function lookupIpAssessment(ip, signal, includeVpnVerdict) {
     diagnostics.generic = { status: 'checking', httpStatus: null, verdict: null };
     renderDiagnostics();
     try {
       const payload = await fetchJson(CHECK_URL + '?q=' + encodeURIComponent(ip) + '&format=json', signal);
-      const verdict = isVpnVerdict(payload);
-      diagnostics.generic = { status: 'success', httpStatus: 200, verdict };
+      const country = countryInfoFromPayload(payload);
+      diagnostics.countryCode = country.countryCode;
+      diagnostics.countryName = country.countryName;
+      diagnostics.countryPolicy = country.countryCode
+        ? (country.countryCode === 'JP' ? 'jp' : 'non-jp-vpn')
+        : 'unavailable';
+      const verdict = includeVpnVerdict ? isVpnVerdict(payload) : null;
+      diagnostics.generic = {
+        status: includeVpnVerdict ? 'success' : 'country-only',
+        httpStatus: 200,
+        verdict,
+      };
       renderDiagnostics();
-      return verdict;
+      return {
+        countryCode: country.countryCode,
+        countryName: country.countryName,
+        nonJapanVpn: !!country.countryCode && country.countryCode !== 'JP',
+        vpnVerdict: verdict === true,
+      };
     } catch (error) {
+      diagnostics.countryPolicy = 'unavailable';
       diagnostics.generic = { status: 'unavailable', httpStatus: error && error.httpStatus || null, verdict: null };
-      diagnostics.error = '一般VPN判定APIを利用できません' + (error && error.httpStatus ? ' (HTTP ' + error.httpStatus + ')' : '');
+      diagnostics.error = 'IP国・一般VPN判定APIを利用できません' + (error && error.httpStatus ? ' (HTTP ' + error.httpStatus + ')' : '');
       renderDiagnostics();
-      return false;
+      return { countryCode: '', countryName: '', nonJapanVpn: false, vpnVerdict: false };
     }
+  }
+
+  async function genericVpnVerdict(ip, signal) {
+    const assessment = await lookupIpAssessment(ip, signal, true);
+    return assessment.vpnVerdict;
   }
 
   function applyFinalStatus(allowed) {
@@ -585,11 +634,13 @@
       if (allowed) {
         diagnostics.generic = { status: 'skipped-known-ip', httpStatus: null, verdict: true };
         renderDiagnostics();
-      } else if (!useExternalApi) {
-        diagnostics.generic = { status: 'skipped-manual', httpStatus: null, verdict: null };
-        renderDiagnostics();
       } else {
-        allowed = await genericVpnVerdict(ip, signal);
+        const assessment = await lookupIpAssessment(ip, signal, useExternalApi);
+        if (assessment.nonJapanVpn) {
+          allowed = true;
+        } else if (useExternalApi) {
+          allowed = assessment.vpnVerdict;
+        }
       }
       if (!allowed) {
         diagnostics.protonExitMatch = await isKnownProtonExitIp(ip, signal);
@@ -656,6 +707,7 @@
     MANUAL_VPN_IPS_KEY,
     MANUAL_NON_VPN_IPS_KEY,
     isVpnVerdict,
+    countryInfoFromPayload,
     isKnownProtonOwnedIp,
     isKnownVpnIp,
     isProtectedMediaUrl,
