@@ -71,8 +71,15 @@
   html.reader-entry-video #videoListSection {
     overflow: visible !important;
   }
-  html.reader-shell-page #topbar {
-    top: 54px !important;
+  @media (min-width: 900px) {
+    html.reader-shell-page #topbar {
+      top: 54px !important;
+    }
+  }
+  @media (max-width: 899px) {
+    html.reader-shell-page #topbar {
+      top: 0 !important;
+    }
   }
   #videoListSection:not([data-video-library-enhanced="1"]) #videoListToolbar,
   #videoListSection:not([data-video-library-enhanced="1"]) #videoListItems,
@@ -3298,16 +3305,33 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
 
   // ---------- image loading / detection ----------
+  async function waitForMediaAccessCheck() {
+    const gate = window.MangaReaderMediaAccess;
+    if (!gate || typeof gate.getStatus !== 'function') return;
+    const current = gate.getStatus();
+    if ((current === 'pending' || current === 'checking') && typeof gate.checkVpn === 'function') {
+      try { await gate.checkVpn({ external: false }); } catch (_) {}
+    }
+  }
+
   function loadImageResult(url, timeoutMs = LOAD_TIMEOUT_MS) {
     return new Promise((resolve) => {
-      const img = new Image();
-      let done = false;
-      const timer = setTimeout(() => {
-        if (!done) { done = true; img.src = ''; resolve('timeout'); }
-      }, timeoutMs);
-      img.onload = () => { if (!done) { done = true; clearTimeout(timer); resolve('loaded'); } };
-      img.onerror = () => { if (!done) { done = true; clearTimeout(timer); resolve('missing'); } };
-      img.src = url;
+      let settled = false;
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        resolve(result);
+      };
+      Promise.resolve(waitForMediaAccessCheck()).then(() => {
+        const img = new Image();
+        let done = false;
+        const timer = setTimeout(() => {
+          if (!done) { done = true; img.src = ''; finish('timeout'); }
+        }, timeoutMs);
+        img.onload = () => { if (!done) { done = true; clearTimeout(timer); finish('loaded'); } };
+        img.onerror = () => { if (!done) { done = true; clearTimeout(timer); finish('missing'); } };
+        img.src = url;
+      }).catch(() => finish('timeout'));
     });
   }
   async function loadImage(url, timeoutMs) { return (await loadImageResult(url, timeoutMs)) === 'loaded'; }
@@ -6695,10 +6719,17 @@ https://cdn.example.org/c/003.webp"></textarea>
   }
   // 明示された #screen=... は外部ナビゲーションの意図なので最優先する。
   // ルート指定も前回の漫画もない場合だけ、保存一覧を既定画面として開く。
-  if (!requestedScreenOnLoad && !resumedOnLoad && !location.pathname.endsWith('/reader.html') && location.pathname !== '/reader.html') {
-    // Manga/video entry pages render the list as their normal document body.
-    // Do not route this initial view through the hash-based reader history.
-    renderReaderScreen(location.pathname.endsWith('/video.html') || location.pathname === '/video.html' ? 'video-list' : 'saved-list');
+  if (!requestedScreenOnLoad && !resumedOnLoad) {
+    if (location.pathname.endsWith('/reader.html') || location.pathname === '/reader.html') {
+      // A direct reader route without a valid resume target must never leave
+      // the user on an empty viewer. Return to the manga shelf instead.
+      if (window.HomeProfileSPA && typeof HomeProfileSPA.navigate === 'function') HomeProfileSPA.navigate('manga.html', { replace: true });
+      else location.replace('manga.html');
+    } else {
+      // Manga/video entry pages render the list as their normal document body.
+      // Do not route this initial view through the hash-based reader history.
+      renderReaderScreen(location.pathname.endsWith('/video.html') || location.pathname === '/video.html' ? 'video-list' : 'saved-list');
+    }
   }
 })();
 </script>
