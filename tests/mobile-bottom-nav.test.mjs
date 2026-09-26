@@ -97,7 +97,7 @@ test('clear glass remains legible on a flat light background', () => {
 });
 
 test('selection lens is inset inside each tab', () => {
-  assert.match(js, /const lensInset = nav\.dataset\.mobileNavKind === 'spa' \? 4 : 3/);
+  assert.match(js, /const lensInset = nav\.dataset\.mobileNavKind === 'spa' \? 5 : 3/);
   assert.match(js, /itemRect\.left - navRect\.left \+ lensInset/);
   assert.match(js, /itemRect\.width - lensInset \* 2/);
   assert.match(css, /top:7px;[\s\S]*bottom:7px;/);
@@ -154,14 +154,14 @@ test('SPA tab bar supports Instagram-style long-press scrub navigation', () => {
   assert.match(js, /setPointerCapture/);
   assert.match(js, /pointermove/);
   assert.match(js, /event\.preventDefault\(\)/);
-  assert.match(js, /resetSpaDrag\(nav, state, \{ commit:drag\.active \}\)/);
-  assert.match(js, /destination\.click\(\)/);
+  assert.match(js, /resetSpaDrag\(nav, state, \{ commit:true \}\)/);
+  assert.match(js, /navigateSpaItemAfterLens\(nav, state, destination/);
 });
 
 test('long-press drag keeps normal taps and scrolling intact', () => {
   assert.match(js, /Math\.hypot\(event\.clientX - drag\.startX, event\.clientY - drag\.startY\)/);
-  assert.match(js, /Math.abs(dx) >= QUICK_SCRUB_X/);
-  assert.match(js, /suppressClickUntil = Date\.now\(\) \+ 650/);
+  assert.match(js, /Math.abs\(dx\) >= QUICK_SCRUB_X && Math.abs\(dx\) > Math.abs\(dy\) \* 1\.05/);
+  assert.match(js, /suppressClickUntil = Date\.now\(\) \+ 420/);
   assert.match(css, /touch-action:none/);
   assert.match(css, /-webkit-touch-callout:none/);
 });

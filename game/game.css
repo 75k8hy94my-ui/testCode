@@ -14,6 +14,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#17201b;col
 button{font:inherit;color:inherit}
 #gameShell{position:relative;width:100%;height:100%;overflow:hidden;touch-action:none;background:#17201b}
 #gameCanvas{display:block;width:100%;height:100%;outline:none}
+.game-runtime-error{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:min(560px,calc(100% - 32px));padding:16px 18px;border:1px solid rgba(255,255,255,.2);border-radius:14px;background:rgba(9,14,11,.9);color:#f4f7f4;text-align:center;line-height:1.6;z-index:10}
 #hud{position:absolute;inset:0;pointer-events:none}
 .hud-card{position:absolute;background:var(--panel);border:1px solid var(--border);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:13px;color:var(--text)}
 .status-card{left:max(12px,env(safe-area-inset-left));top:max(12px,env(safe-area-inset-top));padding:10px 12px;display:grid;gap:8px;min-width:240px}

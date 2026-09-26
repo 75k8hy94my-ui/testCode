@@ -2,9 +2,24 @@
   "use strict";
 
   const canvas = document.getElementById("gameCanvas");
-  const ctx = canvas.getContext("2d", { alpha: false }) || canvas.getContext("2d");
+  const canvasContext = typeof canvas.getContext === "function"
+    ? canvas.getContext("2d", { alpha: false }) || canvas.getContext("2d")
+    : null;
+  const ctx = canvasContext;
   const minimap = document.getElementById("minimap");
-  const mctx = minimap.getContext("2d");
+  const mctx = typeof minimap.getContext === "function" ? minimap.getContext("2d") : null;
+
+  if (!ctx || !mctx) {
+    const fallback = document.createElement("div");
+    fallback.className = "game-runtime-error";
+    fallback.textContent = "Canvas API を利用できません。Canvas 対応ブラウザで再読み込みしてください。";
+    document.getElementById("gameShell")?.appendChild(fallback);
+    return;
+  }
+
+  const requestFrame = typeof window.requestAnimationFrame === "function"
+    ? window.requestAnimationFrame.bind(window)
+    : (callback) => window.setTimeout(() => callback(performance.now()), 16);
 
   const areaNameEl = document.getElementById("areaName");
   const worldClockEl = document.getElementById("worldClock");
@@ -5135,7 +5150,7 @@
     }
 
     render();
-    requestAnimationFrame(frame);
+    requestFrame(frame);
   }
 
   function togglePause() {
@@ -5294,5 +5309,5 @@
   state.camera.y = clamp(state.player.y - viewHeight / 2, 0, Math.max(0, WORLD_SIZE - viewHeight));
 
   showToast("CITY DAYSへようこそ。今日は自由に過ごせます");
-  requestAnimationFrame(frame);
+  requestFrame(frame);
 })();
