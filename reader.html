@@ -1557,8 +1557,8 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="manga-list-view-model.js?v=20260921-view-model-self"></script>
 <script src="manga-list-renderer.js?v=20260921-renderer"></script>
 <script src="manga-list-runtime-context.js?v=20260922-runtime-context"></script>
-<script src="manga-list-host-runtime.js?v=20260922-host-runtime"></script>
-<script src="manga-list-runtime.js?v=20260922-shared-runtime"></script>
+<script src="manga-list-host-runtime.js?v=20260926-item-reader-route-v2"></script>
+<script src="manga-list-runtime.js?v=20260926-item-cover-identity"></script>
 <script src="manga-list-controller.js?v=20260921-controller-factory"></script>
 <script src="manga-surface-activation.js?v=20260921-surface-activation"></script>
 <script src="manga-list-elements.js?v=20260921-elements-boundary"></script>
@@ -2252,10 +2252,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       lastUrlKey: LAST_URL_KEY,
       readerUrl: 'reader.html',
       writeStorage: (key, value) => localStorage.setItem(key, value),
-      navigate: (url) => {
-        if (window.HomeProfileSPA && typeof HomeProfileSPA.navigate === 'function') HomeProfileSPA.navigate(url);
-        else location.href = url;
-      },
+      buildReaderUrl: (itemId, base) => MangaReaderTarget.buildReaderUrl(itemId, base),
+      navigate: (url) => location.assign(url),
     },
   });
   const persistItems = () => mangaListHostRuntime.persistItems();
