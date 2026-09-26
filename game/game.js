@@ -3560,6 +3560,13 @@
       return;
     }
 
+    const motionBefore = {
+      x:personalCar.x,
+      y:personalCar.y,
+      angle:personalCar.angle,
+      speed:personalCar.speed
+    };
+
     const accelerating = touch.driveAccel || keys.has("w") || keys.has("arrowup");
     const braking = touch.driveBrake || keys.has("s") || keys.has("arrowdown") || keys.has(" ");
 
@@ -3618,26 +3625,34 @@
 
       if (lead.distance < 38) {
         personalCar.speed = Math.min(personalCar.speed, Math.max(0, lead.car.speed - 20));
-        if (state.drive.collisionCooldown <= 0) {
-          state.drive.collisionCooldown = 2.5;
-          penalizeDriving(12, "前方車両に接触しました");
-        }
       }
     } else {
       state.drive.gapTimer = 0;
     }
 
-    const ox = personalCar.x;
-    const oy = personalCar.y;
     personalCar.x += Math.cos(personalCar.angle) * personalCar.speed * dt;
     personalCar.y += Math.sin(personalCar.angle) * personalCar.speed * dt;
 
 
-    if (!inWorld(personalCar.x, personalCar.y, 32) || collidesBuilding(personalCar.x, personalCar.y, 29)) {
-      personalCar.x = ox;
-      personalCar.y = oy;
+    const offWorldOrBuilding =
+      !inWorld(personalCar.x, personalCar.y, 32) ||
+      collidesBuilding(personalCar.x, personalCar.y, 29);
+
+    const hitVehicle = offWorldOrBuilding ? null : vehicleIntersectsAnyVehicle(personalCar);
+    const hitPerson = offWorldOrBuilding ? null : vehicleIntersectsAnyPerson(personalCar);
+
+    if (offWorldOrBuilding || hitVehicle || hitPerson) {
+      personalCar.x = motionBefore.x;
+      personalCar.y = motionBefore.y;
+      personalCar.angle = motionBefore.angle;
       personalCar.speed = 0;
-      penalizeDriving(8, "路外へ出ました");
+
+      if (state.drive.collisionCooldown <= 0) {
+        state.drive.collisionCooldown = 1.6;
+        if (hitPerson) penalizeDriving(16, "歩行者に接触しました");
+        else if (hitVehicle) penalizeDriving(10, "車両に接触しました");
+        else penalizeDriving(8, "路外へ出ました");
+      }
     }
 
     state.player.x = personalCar.x;
@@ -3741,8 +3756,42 @@
   }
 
 
+  function captureTrafficMotion(car) {
+    return {
+      x:car.x,
+      y:car.y,
+      angle:car.angle,
+      speed:car.speed,
+      edgeId:car.edgeId,
+      edgeLength:car.edgeLength,
+      directionSign:car.directionSign,
+      laneOffset:car.laneOffset,
+      along:car.along,
+      routeEdgeIds:Array.isArray(car.routeEdgeIds) ? [...car.routeEdgeIds] : [],
+      routeIndex:car.routeIndex,
+      routeGoalNodeId:car.routeGoalNodeId,
+      routeTrips:car.routeTrips
+    };
+  }
+
+  function restoreTrafficMotion(car, snapshot) {
+    car.x = snapshot.x;
+    car.y = snapshot.y;
+    car.angle = snapshot.angle;
+    car.edgeId = snapshot.edgeId;
+    car.edgeLength = snapshot.edgeLength;
+    car.directionSign = snapshot.directionSign;
+    car.laneOffset = snapshot.laneOffset;
+    car.along = snapshot.along;
+    car.routeEdgeIds = [...snapshot.routeEdgeIds];
+    car.routeIndex = snapshot.routeIndex;
+    car.routeGoalNodeId = snapshot.routeGoalNodeId;
+    car.routeTrips = snapshot.routeTrips;
+  }
+
   function updateTraffic(dt) {
     for (const car of traffic) {
+      const motionBefore = captureTrafficMotion(car);
       const edge = mapModel.getEdge(car.edgeId);
       if (!edge) continue;
       const edgeLength = car.edgeLength || polylineLength(edge.points);
@@ -3822,6 +3871,14 @@
       car.x = pose.x;
       car.y = pose.y;
       car.angle = pose.angle;
+
+      const hitVehicle = vehicleIntersectsAnyVehicle(car);
+      const hitPerson = vehicleIntersectsAnyPerson(car);
+      if (hitVehicle || hitPerson) {
+        restoreTrafficMotion(car, motionBefore);
+        car.speed = 0;
+        car.brakeGlow = 1;
+      }
     }
   }
 
