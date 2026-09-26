@@ -1575,8 +1575,8 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="manga-list-view-model.js?v=20260921-view-model-self"></script>
 <script src="manga-list-renderer.js?v=20260921-renderer"></script>
 <script src="manga-list-runtime-context.js?v=20260922-runtime-context"></script>
-<script src="manga-list-host-runtime.js?v=20260922-host-runtime"></script>
-<script src="manga-list-runtime.js?v=20260922-shared-runtime"></script>
+<script src="manga-list-host-runtime.js?v=20260926-item-reader-route-v2"></script>
+<script src="manga-list-runtime.js?v=20260926-item-cover-identity"></script>
 <script src="manga-list-controller.js?v=20260921-controller-factory"></script>
 <script src="manga-surface-activation.js?v=20260921-surface-activation"></script>
 <script src="manga-list-elements.js?v=20260921-elements-boundary"></script>
@@ -1990,10 +1990,9 @@ https://cdn.example.org/c/003.webp"></textarea>
   let splitSpreads = false;
   let preferredExt = 0;    // index into EXT_CANDIDATES
   let pageNumberWidth = 1; // filename zero-padding width: 1 -> 1.jpg, 2 -> 01.jpg
-  // Key used to look up/save resume-page position in LAST_PAGE_KEY. For a
-  // normal 連番ベースURL manga this is just baseUrl; for a "custom" manga
-  // (explicit non-sequential page list, see startReadingCustom) there's no
-  // baseUrl, so a synthetic 'custom:<itemId>' key is used instead.
+  // Canonical identity for reader-owned state (resume page, TOC, learned
+  // page-count metadata). Saved manga use item:<id>; only unsaved legacy/raw
+  // URL sessions fall back to a source URL key.
   let currentResumeKey = '';
   let currentlyCustom = false; // true while a custom (fixed page list) manga is open
   let currentToc = []; // [{page, name}] chapter markers for the manga at currentResumeKey, sorted by page
@@ -2278,10 +2277,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       lastUrlKey: LAST_URL_KEY,
       readerUrl: 'reader.html',
       writeStorage: (key, value) => localStorage.setItem(key, value),
-      navigate: (url) => {
-        if (window.HomeProfileSPA && typeof HomeProfileSPA.navigate === 'function') HomeProfileSPA.navigate(url);
-        else location.href = url;
-      },
+      buildReaderUrl: (itemId, base) => MangaReaderTarget.buildReaderUrl(itemId, base),
+      navigate: (url) => location.assign(url),
     },
   });
   const persistItems = () => mangaListHostRuntime.persistItems();
@@ -2681,14 +2678,21 @@ https://cdn.example.org/c/003.webp"></textarea>
     try { localStorage.setItem(MANGA_INFO_CACHE_KEY, JSON.stringify(mangaInfoCache || {})); } catch (e) {}
     scheduleCloudSync();
   }
-  function getCachedMangaInfo(baseUrlKey) {
-    return loadMangaInfoCache()[baseUrlKey] || null;
+  function getCachedMangaInfo(identityKey, legacySourceKey) {
+    const cache = loadMangaInfoCache();
+    if (cache[identityKey]) return cache[identityKey];
+    if (/^item:/.test(identityKey || '') && legacySourceKey && cache[legacySourceKey]) {
+      cache[identityKey] = cache[legacySourceKey];
+      persistMangaInfoCache();
+      return cache[identityKey];
+    }
+    return null;
   }
   // info: { ext: index into EXT_CANDIDATES, count: known page count, hitLimit: bool }
-  function setCachedMangaInfo(baseUrlKey, info) {
+  function setCachedMangaInfo(identityKey, info) {
     const cache = loadMangaInfoCache();
-    delete cache[baseUrlKey]; // re-insert at the end so key order reflects recency for the eviction below
-    cache[baseUrlKey] = info;
+    delete cache[identityKey]; // re-insert at the end so key order reflects recency for the eviction below
+    cache[identityKey] = info;
     const keys = Object.keys(cache);
     if (keys.length > MANGA_INFO_CACHE_MAX) {
       keys.slice(0, keys.length - MANGA_INFO_CACHE_MAX).forEach((k) => delete cache[k]);
@@ -2771,13 +2775,14 @@ https://cdn.example.org/c/003.webp"></textarea>
   // opts.force: 既にキャッシュ済みでも取得し直す（編集ダイアログの明示ボタン用）。
   // opts.onDone(result|null): 完了時コールバック（result===nullは1ページ目すら
   // 見つからなかった場合）。同じkeyに対して同時に1つだけ走らせる。
-  function ensurePageCountDetected(key, opts) {
+  function ensurePageCountDetected(sourceKey, opts) {
     const o = opts || {};
-    if (!key || pageCountDetectionInProgress.has(key)) {
+    const cacheKey = o.cacheKey || sourceKey;
+    if (!sourceKey || !cacheKey || pageCountDetectionInProgress.has(cacheKey)) {
       if (o.onDone) o.onDone(undefined); // already running — caller can ignore
       return Promise.resolve(undefined);
     }
-    const cached = getCachedMangaInfo(key);
+    const cached = getCachedMangaInfo(cacheKey, sourceKey);
     if (!o.force && cached && cached.state !== 'retryable') {
       if (o.onDone) o.onDone(cached);
       return Promise.resolve(cached);
@@ -2786,35 +2791,35 @@ https://cdn.example.org/c/003.webp"></textarea>
     const extHint = o.retry && cached ? cached.ext : null;
     const numberWidth = Math.max(1, Number(o.numberWidth || (cached && cached.numberWidth)) || 1);
     const pattern = o.pattern || (cached && cached.pattern) || null;
-    pageCountDetectionInProgress.add(key);
-    const task = detectPageCountForKey(key, fromCount, extHint, numberWidth, (count, ext) => {
-      setCachedMangaInfo(key, { ext: ext, count: count, numberWidth: numberWidth, pattern: pattern, hitLimit: false, state: 'retryable', retryFrom: count + 1 });
+    pageCountDetectionInProgress.add(cacheKey);
+    const task = detectPageCountForKey(sourceKey, fromCount, extHint, numberWidth, (count, ext) => {
+      setCachedMangaInfo(cacheKey, { ext: ext, count: count, numberWidth: numberWidth, pattern: pattern, hitLimit: false, state: 'retryable', retryFrom: count + 1 });
       if (o.onProgress) o.onProgress(count, ext);
     }, pattern)
       .then((result) => {
-        if (result) setCachedMangaInfo(key, { ext: result.ext, count: result.count, numberWidth: numberWidth, pattern: pattern, hitLimit: result.hitLimit, state: result.state || 'complete', retryFrom: result.retryFrom || null });
+        if (result) setCachedMangaInfo(cacheKey, { ext: result.ext, count: result.count, numberWidth: numberWidth, pattern: pattern, hitLimit: result.hitLimit, state: result.state || 'complete', retryFrom: result.retryFrom || null });
         if (o.onDone) o.onDone(result);
         return result;
       })
       .catch(() => { if (o.onDone) o.onDone(null); })
-      .finally(() => { pageCountDetectionInProgress.delete(key); });
+      .finally(() => { pageCountDetectionInProgress.delete(cacheKey); });
     return task;
   }
 
   // detectMorePagesがreadingGenerationの変化で中断された直後にだけ呼ぶ想定の
   // 引き継ぎ専用ルート。pages.length（既に確定済みの最後のページ）の続きから
   // 始めるので、止まった時点のページをもう一度確認したりはしない。
-  function continuePageCountDetection(key, fromCount, ext, numberWidth, pattern) {
-    if (!key || fromCount <= 0 || pageCountDetectionInProgress.has(key)) return;
-    pageCountDetectionInProgress.add(key);
-    runPageCountLoop(key, fromCount, ext, numberWidth, (count, curExt) => {
-      setCachedMangaInfo(key, { ext: curExt, count, numberWidth, pattern: pattern, hitLimit: false, state: 'retryable', retryFrom: count + 1 });
+  function continuePageCountDetection(sourceKey, cacheKey, fromCount, ext, numberWidth, pattern) {
+    if (!sourceKey || !cacheKey || fromCount <= 0 || pageCountDetectionInProgress.has(cacheKey)) return;
+    pageCountDetectionInProgress.add(cacheKey);
+    runPageCountLoop(sourceKey, fromCount, ext, numberWidth, (count, curExt) => {
+      setCachedMangaInfo(cacheKey, { ext: curExt, count, numberWidth, pattern: pattern, hitLimit: false, state: 'retryable', retryFrom: count + 1 });
     }, pattern)
       .then((result) => {
-        setCachedMangaInfo(key, { ext: result.ext, count: result.count, numberWidth, pattern: pattern, hitLimit: result.hitLimit, state: result.state || 'complete', retryFrom: result.retryFrom || null });
+        setCachedMangaInfo(cacheKey, { ext: result.ext, count: result.count, numberWidth, pattern: pattern, hitLimit: result.hitLimit, state: result.state || 'complete', retryFrom: result.retryFrom || null });
       })
       .catch(() => {})
-      .finally(() => { pageCountDetectionInProgress.delete(key); });
+      .finally(() => { pageCountDetectionInProgress.delete(cacheKey); });
   }
 
   // detectMorePagesがまだ終わっていない状態でreadingGenerationが変わる
@@ -2823,7 +2828,7 @@ https://cdn.example.org/c/003.webp"></textarea>
   // 自身とは絶対に同時に走らない。
   function handOffIncompleteDetection() {
     if (detecting && !detectionDone && baseUrl && pages.length > 0) {
-      continuePageCountDetection(baseUrl, pages.length, preferredExt, pageNumberWidth, pagePattern);
+      continuePageCountDetection(baseUrl, currentResumeKey || baseUrl, pages.length, preferredExt, pageNumberWidth, pagePattern);
     }
   }
 
@@ -3079,7 +3084,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (!item || !els.nextVolumeCover) return;
     els.nextVolumeCover.alt = itemDisplayTitle(item);
     if (Array.isArray(item.pages) && item.pages.length) els.nextVolumeCover.src = item.pages[0];
-    else setupFeedImage(els.nextVolumeCover, item.url, item.numberWidth, item.pagePattern);
+    else setupFeedImage(els.nextVolumeCover, item.url, item.numberWidth, item.pagePattern, item.id);
   }
 
   function updateNextVolumeBanner() {
@@ -3533,13 +3538,13 @@ https://cdn.example.org/c/003.webp"></textarea>
     // entirely and render immediately using the remembered extension/page
     // count. A single background check confirms it's still accurate (and
     // looks for pages added since); see verifyCachedMangaInBackground.
-    const cached = getCachedMangaInfo(baseUrl);
+    const cached = getCachedMangaInfo(currentResumeKey, baseUrl);
     if (cached && cached.count > 0) {
       preferredExt = cached.ext;
       pagePattern = parsed.pattern || cached.pattern || null;
       pageNumberWidth = Math.max(1, Number(parsed.numberWidth || (currentItem && currentItem.numberWidth) || cached.numberWidth) || 1);
       if (Number(cached.numberWidth) !== pageNumberWidth) {
-      setCachedMangaInfo(baseUrl, { ...cached, numberWidth: pageNumberWidth, pattern: pagePattern || cached.pattern || null });
+      setCachedMangaInfo(currentResumeKey, { ...cached, numberWidth: pageNumberWidth, pattern: pagePattern || cached.pattern || null });
       }
       pages = Array.from({ length: cached.count }, (_, i) => pageUrlFor(baseUrl, i + 1, cached.ext, pageNumberWidth, pagePattern));
       els.placeholder.style.display = 'none';
@@ -3575,7 +3580,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       if (firstResult.kind === 'timeout') {
         // Keep the timeout visible to the bulk retry tool even when page 1
         // could not be obtained. A later retry starts at page 1.
-        setCachedMangaInfo(baseUrl, { ext: preferredExt, count: 0, numberWidth: pageNumberWidth, pattern: pagePattern, hitLimit: false, state: 'retryable', retryFrom: 1 });
+        setCachedMangaInfo(currentResumeKey, { ext: preferredExt, count: 0, numberWidth: pageNumberWidth, pattern: pagePattern, hitLimit: false, state: 'retryable', retryFrom: 1 });
       }
       els.spinner.style.display = 'none';
       els.imgWrap.style.display = 'none';
@@ -3623,7 +3628,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       }
       updateStatus();
       updateSlider();
-      setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, numberWidth: pageNumberWidth, pattern: pagePattern, hitLimit: false, state: endState === 'missing' ? 'complete' : 'retryable', retryFrom: endState === 'missing' ? null : pages.length + 1 });
+      setCachedMangaInfo(currentResumeKey, { ext: preferredExt, count: pages.length, numberWidth: pageNumberWidth, pattern: pagePattern, hitLimit: false, state: endState === 'missing' ? 'complete' : 'retryable', retryFrom: endState === 'missing' ? null : pages.length + 1 });
 
       if (brokeEarly || pageNum > MAX_PAGES_SAFETY) {
         detectionHitLimit = pageNum > MAX_PAGES_SAFETY;
@@ -3634,7 +3639,7 @@ https://cdn.example.org/c/003.webp"></textarea>
         persistLastPage();
         updateNextVolumeBanner();
         markCurrentItemReadIfEligible();
-        setCachedMangaInfo(baseUrl, { ext: preferredExt, count: pages.length, numberWidth: pageNumberWidth, pattern: pagePattern, hitLimit: detectionHitLimit, state: endState === 'timeout' ? 'retryable' : 'complete', retryFrom: endState === 'timeout' ? pages.length + 1 : null });
+        setCachedMangaInfo(currentResumeKey, { ext: preferredExt, count: pages.length, numberWidth: pageNumberWidth, pattern: pagePattern, hitLimit: detectionHitLimit, state: endState === 'timeout' ? 'retryable' : 'complete', retryFrom: endState === 'timeout' ? pages.length + 1 : null });
         return;
       }
     }
@@ -3651,7 +3656,7 @@ https://cdn.example.org/c/003.webp"></textarea>
     if (generation !== readingGeneration) return;
     if (firstResult === 'timeout') return;
     if (firstResult !== 'loaded') {
-      clearCachedMangaInfo(baseUrl);
+      clearCachedMangaInfo(currentResumeKey);
       pages = [];
       currentPage = 1;
       detecting = true;
@@ -5749,7 +5754,9 @@ https://cdn.example.org/c/003.webp"></textarea>
   function itemPageCountText(item) {
     if (Array.isArray(item.pages) && item.pages.length) return (item.splitSpreads ? item.pages.length * 2 : item.pages.length) + 'ページ';
     if (!item.url) return '';
-    const info = getCachedMangaInfo(mangaCacheKeyFor(item.url));
+    const sourceKey = mangaCacheKeyFor(item.url);
+    const infoKey = item && item.id ? ('item:' + item.id) : sourceKey;
+    const info = getCachedMangaInfo(infoKey, sourceKey);
     if (!info) return 'ページ数未取得';
     const count = (Number(info.count) || 0) * (item.splitSpreads ? 2 : 1);
     if (info.state === 'retryable') return count ? count + 'ページまで確認済み' : '再試行待ち';
@@ -6109,18 +6116,19 @@ https://cdn.example.org/c/003.webp"></textarea>
   let bulkDetectCancelRequested = false;
 
   function bulkDetectCandidates(mode) {
-    const unique = new Map();
+    const jobs = [];
     savedItems.forEach((item) => {
       if (!item.url || (Array.isArray(item.pages) && item.pages.length)) return;
-      const key = mangaCacheKeyFor(item.url);
-      if (!key || unique.has(key)) return;
-      const cache = getCachedMangaInfo(key);
+      const sourceKey = mangaCacheKeyFor(item.url);
+      const cacheKey = item && item.id ? ('item:' + item.id) : sourceKey;
+      if (!sourceKey || !cacheKey) return;
+      const cache = getCachedMangaInfo(cacheKey, sourceKey);
       const include = mode === 'retry'
         ? cache && cache.state === 'retryable'
         : !cache;
-      if (include) unique.set(key, { key: key, item: item, cache: cache });
+      if (include) jobs.push({ sourceKey, cacheKey, item, cache });
     });
-    return Array.from(unique.values());
+    return jobs;
   }
 
   function refreshBulkDetectSummary() {
@@ -6166,7 +6174,8 @@ https://cdn.example.org/c/003.webp"></textarea>
       const fromPage = mode === 'retry' && job.cache ? (Number(job.cache.count) || 0) + 1 : 1;
       els.bulkDetectProgress.textContent = '読み込み中 (' + (completed + 1) + ' / ' + jobs.length + ')\n' + itemDisplayTitle(job.item) + '\n' + fromPage + 'ページ目から確認しています…';
       const parsedJob = parseInputUrl(job.item.url);
-      const result = await ensurePageCountDetected(job.key, {
+      const result = await ensurePageCountDetected(job.sourceKey, {
+        cacheKey: job.cacheKey,
         force: true,
         retry: mode === 'retry',
         numberWidth: job.item.numberWidth,
@@ -6662,8 +6671,8 @@ https://cdn.example.org/c/003.webp"></textarea>
   els.redetectBtn.addEventListener('click', () => {
     if (currentlyCustom || !baseUrl) return;
     if (!confirm('保存されているページ数の記録を消して、最初から再検出します。よろしいですか？')) return;
-    clearCachedMangaInfo(baseUrl);
-    startReading(baseUrl, false);
+    clearCachedMangaInfo(currentResumeKey);
+    startReading(baseUrl, false, null, currentResumeKey || baseUrl);
   });
   els.pageSlider.addEventListener('input', (e) => showPage(parseInt(e.target.value, 10) || 1));
 
