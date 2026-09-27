@@ -138,7 +138,7 @@
   ];
 
   const PLACE_DEFINITIONS = [
-    { id:"home", name:"自宅", x:5050, y:6600, entranceNodeId:"home-entrance", roadNodeId:"home-road", building:{ x:5165, y:6725, w:124, h:104 }, color:"#d9b98b", symbol:"H" },
+    { id:"home", name:"自宅", x:5050, y:6600, entranceNodeId:"home-entrance", roadNodeId:"home-road", building:{ x:5145, y:6695, w:118, h:96 }, color:"#d9b98b", symbol:"H" },
     { id:"cafe", name:"カフェ LUNE", x:4230, y:5560, entranceNodeId:"cafe-entrance", roadNodeId:"cafe-road", building:{ x:4380, y:5784, w:300, h:270 }, color:"#c88f72", symbol:"C" },
     { id:"store", name:"スーパー MARCHÉ", x:6630, y:5590, entranceNodeId:"store-entrance", roadNodeId:"store-road", building:{ x:6411, y:5809, w:320, h:260 }, color:"#74a88a", symbol:"S" },
     { id:"park", name:"中央公園", x:5250, y:3150, entranceNodeId:"park-entrance", roadNodeId:"park-road", color:"#72a66d", symbol:"P" },
