@@ -7,7 +7,7 @@ const { createMapModel } = mapModule;
 test('v2 map validates as a connected Japanese urban fabric', () => {
   const map = createMapModel();
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2.2');
+  assert.equal(map.version, 'japan-v2.3');
   assert.equal(map.worldSize, 10800);
   assert.ok(map.nodes.length >= 45);
   assert.ok(map.edges.length >= 55);
@@ -24,6 +24,27 @@ test('street topology includes dead ends, T junctions, curves, and unequal stree
   assert.ok(vehicleDegrees.filter((degree) => degree === 3).length >= 5);
   assert.ok(map.edges.filter((edge) => edge.points.length >= 4).length >= 20);
   assert.ok(new Set(map.edges.filter((edge) => edge.vehicle).map((edge) => edge.width)).size >= 8);
+});
+
+
+test('two-way vehicle streets are wide enough for collision geometry', () => {
+  const map = createMapModel();
+  const vehicleEdges = map.edges.filter((edge) => edge.vehicle);
+  assert.ok(vehicleEdges.length > 0);
+  assert.ok(vehicleEdges.every((edge) => edge.width >= 78));
+  assert.ok(vehicleEdges.some((edge) => edge.sourceWidth < edge.width));
+});
+
+test('vehicle streets expose a separate pedestrian shoulder', () => {
+  const map = createMapModel();
+  for (const edge of map.edges.filter((value) => value.vehicle && value.pedestrian)) {
+    const corridor = map.pedestrianCorridor(edge.id);
+    assert.ok(corridor, edge.id);
+    assert.ok(corridor.width >= 38, edge.id);
+    assert.ok(corridor.innerOffset > edge.width / 2, edge.id);
+    assert.ok(corridor.centerOffset > corridor.innerOffset, edge.id);
+    assert.ok(corridor.outerOffset > corridor.centerOffset, edge.id);
+  }
 });
 
 
