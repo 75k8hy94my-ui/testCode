@@ -4,7 +4,7 @@
   const SPRITE_W = 64;
   const SPRITE_H = 88;
   const BASELINE = 80;
-  const CACHE_LIMIT = 480;
+  const CACHE_LIMIT = 360;
   const cache = new Map();
 
   const BODY_TYPES = [
@@ -132,13 +132,15 @@
   }
 
   function createCanvas(width, height) {
-    if (typeof OffscreenCanvas === "function") return new OffscreenCanvas(width, height);
+    // Prefer a normal detached canvas for broad Safari/iOS compatibility.
+    // OffscreenCanvas remains a fallback for worker-like environments.
     if (global.document?.createElement) {
       const canvas = global.document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
       return canvas;
     }
+    if (typeof OffscreenCanvas === "function") return new OffscreenCanvas(width, height);
     return null;
   }
 
