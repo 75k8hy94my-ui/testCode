@@ -298,7 +298,7 @@
     const width = vehicle ? Math.max(78, rawWidth) : rawWidth;
     const sidewalkWidth = vehicle && pedestrian ? vehicleSidewalkWidthForType(type) : 0;
     return {
-      id, from, to, points, type, width, speedLimit, vehicle, pedestrian,
+      id, from, to, points, type, width, sourceWidth:rawWidth, speedLimit, vehicle, pedestrian,
       signalized, sidewalkWidth
     };
   }
@@ -794,7 +794,14 @@
           // Fixed facility footprints predate the generated sidewalk shoulder.
           // They may intentionally sit close to one side of a street entrance;
           // runtime building collision still prevents pedestrians entering them.
-          if (edges.some((edge) => rectIntersectsEdge(facility, edge, edge.vehicle ? 18 : 10))) errors.push("facility intersects street: " + place.id);
+          if (edges.some((edge) => {
+            const originalHalfWidth = (edge.sourceWidth || edge.width) / 2;
+            const widenedHalfWidth = edge.width / 2;
+            const preservedExtra = edge.vehicle
+              ? Math.max(0, originalHalfWidth + 18 - widenedHalfWidth)
+              : 10;
+            return rectIntersectsEdge(facility, edge, preservedExtra);
+          })) errors.push("facility intersects street: " + place.id);
           if (openSpaces.some((space) => rectsOverlap(facility, space.bounds, 0))) errors.push("facility intersects open space: " + place.id);
           if (buildingSites.some((site) => rectsOverlap(facility, site, 10))) errors.push("facility intersects generated building: " + place.id);
         }
