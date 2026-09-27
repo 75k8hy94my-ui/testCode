@@ -5142,17 +5142,13 @@
       return true;
     }
 
-    // If that fails, rebuild the pedestrian route from the nearest node.
-    const startNodeId = nearestPedestrianNodeId(ped.x, ped.y);
-    if (startNodeId) {
-      planCitizenAction(ped, startNodeId);
-      ped.collisionWait = 0;
-      ped.avoidanceOffset = 0;
-      ped.stuckTimer = 0;
-      ped.stuckRecoveryCount = (ped.stuckRecoveryCount || 0) + 1;
-      return true;
-    }
-
+    // Never rebuild from an arbitrary nearest node while the pedestrian is
+    // still in the middle of an edge. buildPedestrianPlan starts at a node
+    // endpoint, so doing that here makes a stuck person visibly teleport.
+    // Keep the current route and give the collision system time to clear.
+    ped.collisionWait = .7 + ((ped.seed || 0) % 3) * .15;
+    ped.avoidanceOffset = 0;
+    ped.stuckTimer = 0;
     return false;
   }
 

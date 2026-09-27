@@ -175,6 +175,11 @@ test('reverse-direction pedestrians start from the correct edge end', () => {
   assert.match(source, /edge\.vehicle \? edge\.width \/ 2 \+ 5 : Math\.min\(10, edge\.width \* \.2\)/);
 });
 
+test('stuck pedestrian recovery does not rebuild from an arbitrary nearest node', () => {
+  assert.match(source, /Never rebuild from an arbitrary nearest node while the pedestrian is/);
+  assert.match(source, /ped\.collisionWait = \.7 \+ \(\(ped\.seed \|\| 0\) % 3\) \* \.15/);
+});
+
 test('fresh games snap the default car onto the current road graph', () => {
   assert.match(source, /generatePedestrians\(\);\s*migrateCarToCurrentRoadIfNeeded\(\);\s*loadGame\(\);/);
 });
