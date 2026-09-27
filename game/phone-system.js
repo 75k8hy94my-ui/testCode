@@ -68,7 +68,7 @@
       const battery = Math.max(12,100 - ((model.day || 1) * 3 + Math.floor((model.minute || 0) / 90)) % 70);
       return '<div class="ios-statusbar"><b>' + timeText(model.minute) + '</b>' +
         '<button class="dynamic-island" type="button" data-phone-action="notifications" aria-label="通知"><span></span></button>' +
-        '<div class="ios-status-icons"><span>▮▮▮</span><span>⌁</span><span class="battery">' + battery + '</span></div></div>';
+        '<button class="ios-status-icons" type="button" data-phone-action="control" aria-label="コントロールセンター"><span>▮▮▮</span><span>⌁</span><span class="battery">' + battery + '</span></button></div>';
     }
     function homeIndicator() {
       return '<button class="ios-home-indicator" type="button" data-phone-action="home-screen" aria-label="ホーム"><span></span></button>';
