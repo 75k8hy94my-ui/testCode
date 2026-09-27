@@ -209,8 +209,10 @@ test('pedestrian route progress remains inside the active edge bounds', () => {
   assert.match(source, /ped\.along = clamp\(ped\.along, 0, edgeLength\);/);
 });
 
-test('pedestrians traverse sidewalk corners continuously instead of snapping between edge offsets', () => {
+test('pedestrians traverse route starts and sidewalk corners continuously', () => {
+  assert.match(source, /function makePedestrianTransition\(from, to\)/);
   assert.match(source, /function makePedestrianJunctionTransition\(ped, currentEdge, nextEdge, nextDirectionSign\)/);
+  assert.match(source, /ped\.junctionTransition = previousPose[\s\S]*makePedestrianTransition\(previousPose, firstPose\)/);
   assert.match(source, /ped\.junctionTransition = junctionTransition/);
   assert.match(source, /function pedestrianTransitionPose\(transition\)/);
   assert.match(source, /transition\.progress \+= step/);
