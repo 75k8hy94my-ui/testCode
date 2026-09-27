@@ -8897,17 +8897,23 @@
   }
 
   function homeInteriorViewport() {
-    const paddingX = Math.max(18, Math.min(52, viewWidth * .045));
-    const paddingY = Math.max(18, Math.min(54, viewHeight * .05));
-    const scale = Math.min(
-      (viewWidth - paddingX * 2) / HOME_INTERIOR.width,
-      (viewHeight - paddingY * 2) / HOME_INTERIOR.height,
-      1.22
+    const fitScale = Math.min(
+      viewWidth / HOME_INTERIOR.width,
+      viewHeight / HOME_INTERIOR.height
     );
+    const scale = Math.max(1, fitScale);
+    const roomWidth = HOME_INTERIOR.width * scale;
+    const roomHeight = HOME_INTERIOR.height * scale;
+    const centeredX = viewWidth / 2 - state.player.homeX * scale;
+    const centeredY = viewHeight / 2 - state.player.homeY * scale;
     return {
       scale,
-      x:(viewWidth - HOME_INTERIOR.width * scale) / 2,
-      y:(viewHeight - HOME_INTERIOR.height * scale) / 2
+      x:roomWidth <= viewWidth
+        ? (viewWidth - roomWidth) / 2
+        : clamp(centeredX, viewWidth - roomWidth, 0),
+      y:roomHeight <= viewHeight
+        ? (viewHeight - roomHeight) / 2
+        : clamp(centeredY, viewHeight - roomHeight, 0)
     };
   }
 

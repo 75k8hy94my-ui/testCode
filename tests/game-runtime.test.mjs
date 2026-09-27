@@ -345,3 +345,11 @@ test('smartphone has an always available responsive panel', () => {
   assert.match(source, /smartphoneToggle\.addEventListener\("click"/);
   assert.match(css, /\.smartphone-panel[\s\S]*@media\(max-width:760px\)[\s\S]*\.smartphone-panel/);
 });
+
+test('home map uses the street world scale and follows the player camera', () => {
+  const viewport = source.slice(source.indexOf('function homeInteriorViewport'), source.indexOf('function homeToScreen'));
+  assert.match(viewport, /const scale = Math\.max\(1, fitScale\)/);
+  assert.match(viewport, /state\.player\.homeX \* scale/);
+  assert.match(viewport, /state\.player\.homeY \* scale/);
+  assert.doesNotMatch(viewport, /1\.22/);
+});
