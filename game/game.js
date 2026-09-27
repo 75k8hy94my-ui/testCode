@@ -2119,6 +2119,17 @@
   function buildPedestrianPlan(ped, startNodeId, goalNodeId) {
     const route = mapModel.findRoute(startNodeId, goalNodeId, { mode:"pedestrian" });
     if (!route || !route.edgeIds.length) return false;
+
+    const previousState = ped.state;
+    const previousPose = (
+      ped.visible &&
+      (previousState === "walking" || previousState === "waiting" || previousState === "staying") &&
+      Number.isFinite(ped.x) &&
+      Number.isFinite(ped.y)
+    )
+      ? { x:ped.x, y:ped.y, angle:Number.isFinite(ped.dir) ? ped.dir : 0 }
+      : null;
+
     ped.routeEdgeIds = route.edgeIds;
     ped.routeIndex = 0;
     ped.targetNodeId = goalNodeId;
@@ -2128,7 +2139,18 @@
     ped.directionSign = firstEdge.from === startNodeId ? 1 : -1;
     ped.edgeLength = polylineLength(firstEdge.points);
     ped.along = ped.directionSign > 0 ? 0 : ped.edgeLength;
-    ped.junctionTransition = null;
+
+    const firstPose = pedestrianEdgePose(
+      firstEdge,
+      ped.directionSign,
+      ped.along,
+      ped.sideSign,
+      ped.avoidanceOffset
+    );
+    ped.junctionTransition = previousPose
+      ? makePedestrianTransition(previousPose, firstPose)
+      : null;
+
     ped.state = "walking";
     ped.visible = true;
     ped.waitTimer = 0;
@@ -2343,6 +2365,19 @@
     return total;
   }
 
+  function makePedestrianTransition(from, to) {
+    const direct = distance(from.x, from.y, to.x, to.y);
+    if (direct < 1.25) return null;
+    const control = pedestrianCornerControl(from, to);
+    return {
+      from:{ ...from },
+      control,
+      to:{ ...to },
+      length:Math.max(direct, pedestrianQuadraticLength(from, control, to)),
+      progress:0
+    };
+  }
+
   function pedestrianTransitionPose(transition) {
     const t = transition.length > .001
       ? clamp(transition.progress / transition.length, 0, 1)
@@ -2378,18 +2413,7 @@
       ped.sideSign,
       ped.avoidanceOffset
     );
-    const direct = distance(from.x, from.y, to.x, to.y);
-    if (direct < 1.25) return null;
-
-    const control = pedestrianCornerControl(from, to);
-    const length = Math.max(direct, pedestrianQuadraticLength(from, control, to));
-    return {
-      from,
-      control,
-      to,
-      length,
-      progress:0
-    };
+    return makePedestrianTransition(from, to);
   }
 
   function pedestrianPoseAt(ped) {
