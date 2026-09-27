@@ -2128,6 +2128,7 @@
     ped.directionSign = firstEdge.from === startNodeId ? 1 : -1;
     ped.edgeLength = polylineLength(firstEdge.points);
     ped.along = ped.directionSign > 0 ? 0 : ped.edgeLength;
+    ped.junctionTransition = null;
     ped.state = "walking";
     ped.visible = true;
     ped.waitTimer = 0;
@@ -2156,6 +2157,9 @@
     ped.currentNodeId = citizenActivityNode(action, ped);
     ped.targetNodeId = ped.currentNodeId;
     ped.activityMinutesRemaining = Math.max(8, Number(action.duration) || 60);
+    ped.junctionTransition = null;
+    ped.avoidanceTarget = 0;
+    ped.avoidanceHold = 0;
     ped.state = action.indoor ? "inside" : "staying";
     ped.visible = ped.specialNpcId ? true : !action.indoor;
     ped.speed = ped.baseSpeed;
@@ -2278,15 +2282,12 @@
     return false;
   }
 
-  function pedestrianPoseAt(ped) {
-    const edge = mapModel.getEdge(ped.edgeId);
-    if (!edge) return { x:ped.x, y:ped.y, angle:ped.dir };
-    const hit = pointAndTangentOnPolyline(edge.points, ped.along);
-    const tangent = ped.directionSign > 0 ? hit.tangent : { x:-hit.tangent.x, y:-hit.tangent.y };
+  function pedestrianEdgePose(edge, directionSign, along, sideSign = 1, avoidanceOffset = 0) {
+    const edgeLength = polylineLength(edge.points);
+    const hit = pointAndTangentOnPolyline(edge.points, clamp(along, 0, edgeLength));
+    const tangent = directionSign > 0 ? hit.tangent : { x:-hit.tangent.x, y:-hit.tangent.y };
     const sidewalkOffset = edge.vehicle ? edge.width / 2 + 5 : Math.min(10, edge.width * .2);
-    const side = ped.sideSign || 1;
-    const avoidance = Math.max(0, Number(ped.avoidanceOffset) || 0);
-    const lateralOffset = (sidewalkOffset + avoidance) * side;
+    const lateralOffset = (sidewalkOffset + Math.max(0, Number(avoidanceOffset) || 0)) * (sideSign || 1);
     return {
       x:hit.point.x + tangent.y * lateralOffset,
       y:hit.point.y - tangent.x * lateralOffset,
@@ -2294,7 +2295,120 @@
     };
   }
 
+  function pedestrianCornerControl(fromPose, toPose) {
+    const ax = Math.cos(fromPose.angle);
+    const ay = Math.sin(fromPose.angle);
+    const bx = Math.cos(toPose.angle);
+    const by = Math.sin(toPose.angle);
+    const cross = ax * by - ay * bx;
+    const midpoint = {
+      x:(fromPose.x + toPose.x) * .5,
+      y:(fromPose.y + toPose.y) * .5
+    };
+    if (Math.abs(cross) < .08) return midpoint;
+
+    const dx = toPose.x - fromPose.x;
+    const dy = toPose.y - fromPose.y;
+    const t = (dx * by - dy * bx) / cross;
+    const intersection = {
+      x:fromPose.x + ax * t,
+      y:fromPose.y + ay * t
+    };
+    const direct = Math.max(1, distance(fromPose.x, fromPose.y, toPose.x, toPose.y));
+    if (
+      distance(fromPose.x, fromPose.y, intersection.x, intersection.y) > direct * 2.4 + 24 ||
+      distance(toPose.x, toPose.y, intersection.x, intersection.y) > direct * 2.4 + 24
+    ) {
+      return midpoint;
+    }
+    return intersection;
+  }
+
+  function pedestrianQuadraticPoint(from, control, to, t) {
+    const inv = 1 - t;
+    return {
+      x:inv * inv * from.x + 2 * inv * t * control.x + t * t * to.x,
+      y:inv * inv * from.y + 2 * inv * t * control.y + t * t * to.y
+    };
+  }
+
+  function pedestrianQuadraticLength(from, control, to) {
+    let total = 0;
+    let previous = from;
+    for (let i = 1; i <= 8; i += 1) {
+      const point = pedestrianQuadraticPoint(from, control, to, i / 8);
+      total += distance(previous.x, previous.y, point.x, point.y);
+      previous = point;
+    }
+    return total;
+  }
+
+  function pedestrianTransitionPose(transition) {
+    const t = transition.length > .001
+      ? clamp(transition.progress / transition.length, 0, 1)
+      : 1;
+    const point = pedestrianQuadraticPoint(transition.from, transition.control, transition.to, t);
+    const inv = 1 - t;
+    const dx = 2 * inv * (transition.control.x - transition.from.x) +
+      2 * t * (transition.to.x - transition.control.x);
+    const dy = 2 * inv * (transition.control.y - transition.from.y) +
+      2 * t * (transition.to.y - transition.control.y);
+    return {
+      x:point.x,
+      y:point.y,
+      angle:Math.hypot(dx, dy) > .001 ? Math.atan2(dy, dx) : transition.to.angle
+    };
+  }
+
+  function makePedestrianJunctionTransition(ped, currentEdge, nextEdge, nextDirectionSign) {
+    const currentAlong = ped.directionSign > 0 ? ped.edgeLength : 0;
+    const nextLength = polylineLength(nextEdge.points);
+    const nextAlong = nextDirectionSign > 0 ? 0 : nextLength;
+    const from = pedestrianEdgePose(
+      currentEdge,
+      ped.directionSign,
+      currentAlong,
+      ped.sideSign,
+      ped.avoidanceOffset
+    );
+    const to = pedestrianEdgePose(
+      nextEdge,
+      nextDirectionSign,
+      nextAlong,
+      ped.sideSign,
+      ped.avoidanceOffset
+    );
+    const direct = distance(from.x, from.y, to.x, to.y);
+    if (direct < 1.25) return null;
+
+    const control = pedestrianCornerControl(from, to);
+    const length = Math.max(direct, pedestrianQuadraticLength(from, control, to));
+    return {
+      from,
+      control,
+      to,
+      length,
+      progress:0
+    };
+  }
+
+  function pedestrianPoseAt(ped) {
+    if (ped.junctionTransition) return pedestrianTransitionPose(ped.junctionTransition);
+    const edge = mapModel.getEdge(ped.edgeId);
+    if (!edge) return { x:ped.x, y:ped.y, angle:ped.dir };
+    return pedestrianEdgePose(
+      edge,
+      ped.directionSign,
+      ped.along,
+      ped.sideSign,
+      ped.avoidanceOffset
+    );
+  }
+
   function pedestrianSignalState(ped) {
+    // Once a pedestrian has entered the junction connector, never stop them
+    // mid-corner because the signal changed for the next edge.
+    if (ped.junctionTransition) return null;
     const edge = mapModel.getEdge(ped.edgeId);
     if (!edge) return null;
     const endpoint = ped.directionSign > 0 ? mapModel.getNode(edge.to) : mapModel.getNode(edge.from);
@@ -2321,6 +2435,9 @@
     const edge = mapModel.getEdge(ped.edgeId);
     if (!edge) return 0;
     let remaining = ped.directionSign > 0 ? ped.edgeLength - ped.along : ped.along;
+    if (ped.junctionTransition) {
+      remaining += Math.max(0, ped.junctionTransition.length - ped.junctionTransition.progress);
+    }
     for (let i = ped.routeIndex + 1; i < (ped.routeEdgeIds?.length || 0); i += 1) {
       const next = mapModel.getEdge(ped.routeEdgeIds[i]);
       if (next) remaining += polylineLength(next.points);
@@ -2331,7 +2448,21 @@
   function moveCitizenAlongRoute(ped, distanceUnits) {
     let remaining = Math.max(0, distanceUnits);
     let transitions = 0;
-    while (remaining > 0 && transitions < 20) {
+    while (remaining > .001 && transitions < 20) {
+      if (ped.junctionTransition) {
+        const transition = ped.junctionTransition;
+        const transitionRemaining = Math.max(0, transition.length - transition.progress);
+        const step = Math.min(remaining, transitionRemaining);
+        transition.progress += step;
+        remaining -= step;
+
+        if (transition.progress < transition.length - .001) break;
+        transition.progress = transition.length;
+        ped.junctionTransition = null;
+        transitions += 1;
+        continue;
+      }
+
       const edge = mapModel.getEdge(ped.edgeId);
       if (!edge) return false;
       const edgeLength = ped.edgeLength || polylineLength(edge.points);
@@ -2339,13 +2470,13 @@
       ped.along = clamp(ped.along, 0, edgeLength);
       const endpointDistance = ped.directionSign > 0 ? edgeLength - ped.along : ped.along;
 
-      if (remaining < Math.max(1, endpointDistance)) {
+      if (endpointDistance > .001 && remaining < endpointDistance) {
         ped.along = clamp(ped.along + ped.directionSign * remaining, 0, edgeLength);
         remaining = 0;
         break;
       }
 
-      remaining = Math.max(0, remaining - Math.max(1, endpointDistance));
+      remaining = Math.max(0, remaining - endpointDistance);
       ped.along = ped.directionSign > 0 ? edgeLength : 0;
       const currentNodeId = ped.directionSign > 0 ? edge.to : edge.from;
       ped.currentNodeId = currentNodeId;
@@ -2366,11 +2497,20 @@
         return false;
       }
 
+      const nextDirectionSign = next.from === currentNodeId ? 1 : -1;
+      const junctionTransition = makePedestrianJunctionTransition(
+        ped,
+        edge,
+        next,
+        nextDirectionSign
+      );
+
       ped.routeIndex += 1;
       ped.edgeId = next.id;
-      ped.directionSign = next.from === currentNodeId ? 1 : -1;
+      ped.directionSign = nextDirectionSign;
       ped.edgeLength = polylineLength(next.points);
       ped.along = ped.directionSign > 0 ? 0 : ped.edgeLength;
+      ped.junctionTransition = junctionTransition;
       transitions += 1;
     }
 
@@ -2441,6 +2581,9 @@
         waitTimer:0,
         collisionWait:0,
         avoidanceOffset:0,
+        avoidanceTarget:0,
+        avoidanceHold:0,
+        junctionTransition:null,
         stuckTimer:0,
         lastProgressX:null,
         lastProgressY:null,
@@ -5112,6 +5255,17 @@
   }
 
 
+  function clonePedestrianTransition(transition) {
+    if (!transition) return null;
+    return {
+      from:{ ...transition.from },
+      control:{ ...transition.control },
+      to:{ ...transition.to },
+      length:transition.length,
+      progress:transition.progress
+    };
+  }
+
   function capturePedestrianMotion(ped) {
     return {
       edgeId:ped.edgeId,
@@ -5121,6 +5275,7 @@
       routeIndex:ped.routeIndex,
       currentNodeId:ped.currentNodeId,
       targetNodeId:ped.targetNodeId,
+      junctionTransition:clonePedestrianTransition(ped.junctionTransition),
       x:ped.x,
       y:ped.y,
       dir:ped.dir,
@@ -5137,6 +5292,7 @@
     ped.routeIndex = snapshot.routeIndex;
     ped.currentNodeId = snapshot.currentNodeId;
     ped.targetNodeId = snapshot.targetNodeId;
+    ped.junctionTransition = clonePedestrianTransition(snapshot.junctionTransition);
     ped.x = snapshot.x;
     ped.y = snapshot.y;
     ped.dir = snapshot.dir;
@@ -5154,8 +5310,59 @@
     return Number.isFinite(Number(ped?.seed)) ? Number(ped.seed) : 0;
   }
 
+  function requestPedestrianAvoidance(ped, offset = 16, holdSeconds = .65) {
+    if (!ped) return;
+    ped.avoidanceTarget = Math.max(Number(ped.avoidanceTarget) || 0, Math.max(0, offset));
+    ped.avoidanceHold = Math.max(Number(ped.avoidanceHold) || 0, Math.max(0, holdSeconds));
+  }
+
+  function updatePedestrianAvoidance(ped, dt) {
+    if (!ped || ped.junctionTransition) return;
+    ped.avoidanceHold = Math.max(0, (Number(ped.avoidanceHold) || 0) - dt);
+    if (ped.avoidanceHold <= 0) ped.avoidanceTarget = 0;
+
+    const current = Math.max(0, Number(ped.avoidanceOffset) || 0);
+    const target = Math.max(0, Number(ped.avoidanceTarget) || 0);
+    const rate = target > current ? 38 : 24;
+    const delta = clamp(target - current, -rate * dt, rate * dt);
+    if (Math.abs(delta) < .001) return;
+
+    const edge = mapModel.getEdge(ped.edgeId);
+    if (!edge) return;
+    const nextOffset = Math.max(0, current + delta);
+    const pose = pedestrianEdgePose(
+      edge,
+      ped.directionSign,
+      ped.along,
+      ped.sideSign,
+      nextOffset
+    );
+
+    // Avoidance is a continuous sidestep on the same sidewalk. If the outward
+    // side is blocked, wait in place rather than swapping to the opposite curb.
+    if (
+      nextOffset > current &&
+      (
+        !canStand(pose.x, pose.y, NPC_COLLISION_RADIUS) ||
+        personIntersectsAnyVehicle(pose.x, pose.y, NPC_COLLISION_RADIUS)
+      )
+    ) {
+      ped.avoidanceTarget = current;
+      ped.avoidanceHold = 0;
+      return;
+    }
+
+    ped.avoidanceOffset = nextOffset;
+    if (ped.state === "walking" || ped.state === "waiting") {
+      ped.x = pose.x;
+      ped.y = pose.y;
+      ped.dir = pose.angle;
+    }
+  }
+
   function pedestrianFollowingLimit(ped, distanceUnits) {
     const requested = Math.max(0, distanceUnits);
+    if (ped.junctionTransition) return requested;
     const minimumGap = 24;
     let allowed = requested;
 
@@ -5163,7 +5370,7 @@
     // after movement and makes a same-direction queue oscillate forever when
     // several pedestrians share a narrow dead-end sidewalk.
     for (const other of visiblePedestrianColliders()) {
-      if (other === ped || other.edgeId !== ped.edgeId) continue;
+      if (other === ped || other.junctionTransition || other.edgeId !== ped.edgeId) continue;
       if (other.directionSign !== ped.directionSign) continue;
       const ahead = (other.along - ped.along) * ped.directionSign;
       if (ahead <= 0 || ahead >= allowed + minimumGap) continue;
@@ -5179,60 +5386,38 @@
       ped.collisionWait = Math.max(ped.collisionWait || 0, .08);
       return false;
     }
+
     const snapshot = capturePedestrianMotion(ped);
     moveCitizenAlongRoute(ped, safeDistance);
 
     // Arrival inside a building removes the person from physical street space.
     if (ped.state === "inside" || !ped.visible) return true;
 
-    let collision = pedestrianCollision(ped);
-    if (!collision) {
-      ped.avoidanceOffset += (0 - (ped.avoidanceOffset || 0)) * .08;
-      return true;
-    }
+    const collision = pedestrianCollision(ped);
+    if (!collision) return true;
 
+    // Roll back route progress first. Collision avoidance is then requested as
+    // a gradual sidestep; no collision branch may rewrite sideSign or x/y.
     restorePedestrianMotion(ped, snapshot);
 
-    if (collision.type === "pedestrian" || collision.type === "player") {
-      if (collision.type === "pedestrian") {
-        const yieldingPed = pedestrianPriority(ped) < pedestrianPriority(collision.target)
-          ? ped
-          : collision.target;
-        yieldingPed.sideSign = (yieldingPed.sideSign || 1) * -1;
-        yieldingPed.avoidanceOffset = 18;
-        const yieldPose = pedestrianPoseAt(yieldingPed);
-        if (
-          canStand(yieldPose.x, yieldPose.y, NPC_COLLISION_RADIUS) &&
-          !personIntersectsAnyVehicle(yieldPose.x, yieldPose.y, NPC_COLLISION_RADIUS)
-        ) {
-          yieldingPed.x = yieldPose.x;
-          yieldingPed.y = yieldPose.y;
-          yieldingPed.dir = yieldPose.angle;
-          yieldingPed.collisionWait = .22;
-        }
-        if (yieldingPed === ped) {
-          ped.collisionWait = .22;
-          return false;
-        }
+    if (collision.type === "pedestrian") {
+      const yieldingPed = pedestrianPriority(ped) < pedestrianPriority(collision.target)
+        ? ped
+        : collision.target;
+      requestPedestrianAvoidance(yieldingPed, 18, .8);
+      yieldingPed.collisionWait = Math.max(yieldingPed.collisionWait || 0, .20);
+      if (yieldingPed !== ped) {
+        ped.collisionWait = Math.max(ped.collisionWait || 0, .08);
       }
-      // Yield outward from the curb instead of stepping into the carriageway.
-      // This gives two pedestrians enough room to pass without teleporting
-      // across to the opposite sidewalk.
-      ped.avoidanceOffset = Math.max(ped.avoidanceOffset || 0, 16);
-      const shifted = pedestrianPoseAt(ped);
-      ped.x = shifted.x;
-      ped.y = shifted.y;
-      ped.dir = shifted.angle;
-
-      if (!pedestrianCollision(ped)) {
-        const shiftedSnapshot = capturePedestrianMotion(ped);
-        moveCitizenAlongRoute(ped, safeDistance);
-        if (ped.state === "inside" || !ped.visible || !pedestrianCollision(ped)) return true;
-        restorePedestrianMotion(ped, shiftedSnapshot);
-      }
+    } else if (collision.type === "player") {
+      requestPedestrianAvoidance(ped, 18, .75);
+      ped.collisionWait = Math.max(ped.collisionWait || 0, .18);
+    } else {
+      ped.collisionWait = Math.max(
+        ped.collisionWait || 0,
+        .12 + hash2(ped.seed || 0, ped.tripCount || 0, 2051) * .18
+      );
     }
-
-    ped.collisionWait = .12 + hash2(ped.seed || 0, ped.tripCount || 0, 2051) * .18;
     return false;
   }
 
@@ -5245,32 +5430,15 @@
   function recoverStuckPedestrian(ped) {
     if (!ped || (ped.state !== "walking" && ped.state !== "waiting")) return false;
 
-    // First try the opposite sidewalk side plus extra clearance. This resolves
-    // face-to-face pedestrian deadlocks without teleporting.
-    ped.sideSign = (ped.sideSign || 1) * -1;
-    ped.avoidanceOffset = 18 + ((ped.seed || 0) % 3) * 4;
-    const shifted = pedestrianPoseAt(ped);
-    if (
-      canStand(shifted.x, shifted.y, NPC_COLLISION_RADIUS) &&
-      !personIntersectsAnyVehicle(shifted.x, shifted.y, NPC_COLLISION_RADIUS)
-    ) {
-      ped.x = shifted.x;
-      ped.y = shifted.y;
-      ped.dir = shifted.angle;
-      ped.collisionWait = .04;
-      ped.stuckTimer = 0;
-      ped.stuckRecoveryCount = (ped.stuckRecoveryCount || 0) + 1;
-      return true;
-    }
-
-    // Never rebuild from an arbitrary nearest node while the pedestrian is
-    // still in the middle of an edge. buildPedestrianPlan starts at a node
-    // endpoint, so doing that here makes a stuck person visibly teleport.
-    // Keep the current route and give the collision system time to clear.
-    ped.collisionWait = .7 + ((ped.seed || 0) % 3) * .15;
-    ped.avoidanceOffset = 0;
+    // Recovery must never switch sidewalks or rebuild from an arbitrary node.
+    // Ask for a larger continuous sidestep on the current sidewalk and wait for
+    // nearby traffic to clear. The sidestep itself is rate-limited per frame.
+    const extra = 20 + ((ped.seed || 0) % 3) * 3;
+    requestPedestrianAvoidance(ped, extra, 1.1);
+    ped.collisionWait = .55 + ((ped.seed || 0) % 3) * .12;
     ped.stuckTimer = 0;
-    return false;
+    ped.stuckRecoveryCount = (ped.stuckRecoveryCount || 0) + 1;
+    return true;
   }
 
   function updatePedestrians(dt, gameMinutes) {
@@ -5280,6 +5448,7 @@
       const travelling = ped.state === "walking" || ped.state === "waiting";
       citizenUpdateNeeds(ped, minutes, travelling);
       ped.collisionWait = Math.max(0, (ped.collisionWait || 0) - dt);
+      updatePedestrianAvoidance(ped, dt);
 
       const walkingNow = ped.state === "walking" || ped.state === "waiting";
       if (walkingNow) {
@@ -5309,10 +5478,6 @@
         ped.stuckTimer = 0;
         ped.lastProgressX = ped.x;
         ped.lastProgressY = ped.y;
-      }
-
-      if ((ped.avoidanceOffset || 0) > .05 && ped.collisionWait <= 0) {
-        ped.avoidanceOffset *= Math.pow(.16, dt);
       }
 
       if (ped.state === "inside" || ped.state === "staying") {
@@ -5358,11 +5523,8 @@
 
             const waitCollision = pedestrianCollision(ped);
             if (waitCollision && (waitCollision.type === "pedestrian" || waitCollision.type === "player")) {
-              ped.avoidanceOffset = Math.max(ped.avoidanceOffset || 0, 16);
-              pose = pedestrianPoseAt(ped);
-              ped.x = pose.x;
-              ped.y = pose.y;
-              ped.dir = pose.angle;
+              requestPedestrianAvoidance(ped, 16, .8);
+              ped.collisionWait = Math.max(ped.collisionWait || 0, .12);
             }
           }
         }
@@ -5441,17 +5603,8 @@
           tryNudgeStandingPedestrian(b, ux * overlap, uy * overlap);
         } else {
           const yielding = (a.seed || i) >= (b.seed || j) ? a : b;
-          yielding.avoidanceOffset = Math.max(yielding.avoidanceOffset || 0, 16);
-          const shifted = pedestrianPoseAt(yielding);
-          if (
-            canStand(shifted.x, shifted.y, NPC_COLLISION_RADIUS) &&
-            !personIntersectsAnyVehicle(shifted.x, shifted.y, NPC_COLLISION_RADIUS)
-          ) {
-            yielding.x = shifted.x;
-            yielding.y = shifted.y;
-            yielding.dir = shifted.angle;
-            yielding.collisionWait = Math.max(yielding.collisionWait || 0, .08);
-          }
+          requestPedestrianAvoidance(yielding, 18, .7);
+          yielding.collisionWait = Math.max(yielding.collisionWait || 0, .10);
         }
       }
     }
