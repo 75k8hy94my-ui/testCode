@@ -31,7 +31,7 @@ test('two-way vehicle streets are wide enough for collision geometry', () => {
   const map = createMapModel();
   const vehicleEdges = map.edges.filter((edge) => edge.vehicle);
   assert.ok(vehicleEdges.length > 0);
-  assert.ok(vehicleEdges.every((edge) => edge.width >= 78));
+  assert.ok(vehicleEdges.every((edge) => edge.width >= 80));
   assert.ok(vehicleEdges.some((edge) => edge.sourceWidth < edge.width));
 });
 
