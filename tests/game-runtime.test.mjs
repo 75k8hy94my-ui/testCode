@@ -131,6 +131,21 @@ test('ambient pedestrians have destination plans, route states, and signal-aware
   assert.match(source, /ped\.targetPlaceId/);
 });
 
+test('citizens carry deterministic age and gender into appearance generation', () => {
+  assert.match(source, /const gender = specialGender \|\| \(hash2\(index, 81, 16025\) < \.5 \? "male" : "female"\)/);
+  assert.match(source, /ageGroup:citizenAgeGroup\(age\)/);
+  assert.match(source, /name:citizenName\(index, gender\)/);
+  assert.match(source, /appearance:personAppearanceFromSeed\(i, profile\)/);
+  assert.match(source, /const ageSpeedFactor = profile\.ageGroup === "senior"/);
+  assert.match(source, /baseSpeed,/);
+  assert.match(source, /speed:baseSpeed/);
+});
+
+test('named citizens have authored gender presentation', () => {
+  assert.match(source, /specialNpcId === "sora" \? "male"/);
+  assert.match(source, /specialNpcId === "aoi" \|\| specialNpcId === "mei" \? "female"/);
+});
+
 test('ambient pedestrians seed the active central roads', () => {
   assert.match(source, /const nearbyPedestrianPlaces = \["cafe", "store", "home"\]/);
   assert.match(source, /i < 30 && nearbyPedestrianPlaces\.length/);
