@@ -235,6 +235,42 @@ test('pedestrian collisions preserve sidewalk side and use continuous avoidance'
   assert.doesNotMatch(source, /yieldingPed\.sideSign\s*=/);
 });
 
+
+test('pedestrians use dedicated sidewalk lanes outside the carriageway', () => {
+  assert.match(source, /function pedestrianSidewalkLayout\(edge, directionSign = 1\)/);
+  assert.match(source, /mapModel\.pedestrianCorridor\?\.\(edge\.id\)/);
+  assert.match(source, /const flowBias = directionSign > 0 \? 7 : -7/);
+  const pose = source.slice(
+    source.indexOf('function pedestrianEdgePose('),
+    source.indexOf('function pedestrianCornerControl(')
+  );
+  assert.doesNotMatch(pose, /edge\.width \/ 2 \+ 5/);
+});
+
+test('same-direction pedestrian queues only block the same sidewalk side', () => {
+  const following = source.slice(
+    source.indexOf('function pedestrianFollowingLimit('),
+    source.indexOf('function attemptPedestrianMove(')
+  );
+  assert.match(following, /other\.directionSign !== ped\.directionSign/);
+  assert.match(following, /\(other\.sideSign \|\| 1\) !== \(ped\.sideSign \|\| 1\)/);
+});
+
+test('pedestrians sidestep away from vehicles instead of only retrying in place', () => {
+  const attempt = source.slice(
+    source.indexOf('function attemptPedestrianMove('),
+    source.indexOf('function pedestrianVisibleOnScreen(')
+  );
+  assert.match(attempt, /requestPedestrianAvoidance\(ped, 16, \.95\)/);
+  assert.match(source, /const NPC_COLLISION_RADIUS = 6\.5/);
+});
+
+test('vehicle roads render a visible pedestrian shoulder outside the curb', () => {
+  assert.match(source, /const corridor = edge\.vehicle \? mapModel\.pedestrianCorridor\?\.\(edge\.id\) : null/);
+  assert.match(source, /edge\.width \+ sidewalkWidth \* 2/);
+  assert.match(source, /Vehicle streets have a real pedestrian shoulder/);
+});
+
 test('pedestrian generation spaces walkers before the first frame', () => {
   assert.match(source, /function pedestrianSpawnSpacing\(edgeId, edgeLength, along\)/);
   assert.match(source, /pedestrianSpawnSpacing\(ped\.edgeId, ped\.edgeLength, ped\.along\)/);
