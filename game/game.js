@@ -3429,6 +3429,7 @@
     state.drive.route = [];
     state.drive.routeIndex = 0;
     state.drive.signals = [];
+    if (state.phone?.waypoint === state.drive.destination) state.phone.waypoint = null;
     state.drive.destination = null;
     personalCar.speed = 0;
   }
@@ -4374,6 +4375,11 @@
       state.fitness = Math.max(0, Math.floor(Number(saved.fitness) || 0));
       state.libraryVisits = Math.max(0, Math.floor(Number(saved.libraryVisits) || 0));
       state.shiftsWorked = Math.max(0, Math.floor(Number(saved.shiftsWorked) || 0));
+      if (saved.phone && typeof saved.phone.waypoint === "string" && PLACES.some((place) => place.id === saved.phone.waypoint)) {
+        state.phone.waypoint = saved.phone.waypoint;
+      } else {
+        state.phone.waypoint = null;
+      }
       if (saved.driving) {
         state.drive.rating = clamp(Math.round(Number(saved.driving.rating) || 100), 0, 100);
         state.drive.trips = Math.max(0, Math.floor(Number(saved.driving.trips) || 0));
@@ -9247,6 +9253,10 @@
   }
 
   function togglePause() {
+    if (smartphonePanel && !smartphonePanel.hidden) {
+      setSmartphoneOpen(false);
+      return;
+    }
     if (!actionSheet.hidden) {
       closeActionSheet();
       return;
