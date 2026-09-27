@@ -178,10 +178,13 @@
   let trafficSimulationClock = 0;
   const pedestrians = [];
   const CITIZEN_COUNT = 76;
-  const CITIZEN_GIVEN_NAMES = [
-    "ハル","ユウ","アキ","ナオ","ミナト","リン","カナ","ヒナ","レン","マコト",
-    "ユイ","ソウ","ミオ","リク","ナナ","カイ","サキ","トワ","レイ","ミサキ",
-    "コウ","チヒロ","アオ","ユナ","ケイ","ノゾミ","ショウ","エマ","タクミ","サラ"
+  const CITIZEN_GIVEN_NAMES_MALE = [
+    "ハル","ユウ","ミナト","レン","マコト","ソウ","リク","カイ","トワ","コウ",
+    "ケイ","ショウ","タクミ","レイ","アオ","ナオ"
+  ];
+  const CITIZEN_GIVEN_NAMES_FEMALE = [
+    "リン","カナ","ヒナ","ユイ","ミオ","ナナ","サキ","ミサキ","チヒロ","ユナ",
+    "ノゾミ","エマ","サラ","アキ","ハル","レイ"
   ];
   const CITIZEN_FAMILY_NAMES = [
     "佐藤","鈴木","高橋","田中","伊藤","渡辺","山本","中村","小林","加藤",
@@ -1838,13 +1841,21 @@
       .filter((value) => value.nodeId);
   }
 
-  function citizenName(index) {
+  function citizenName(index, gender = "male") {
     if (index === 0) return "アオイ";
     if (index === 1) return "ソラ";
     if (index === 2) return "メイ";
     const family = CITIZEN_FAMILY_NAMES[Math.floor(hash2(index, 71, 1601) * CITIZEN_FAMILY_NAMES.length) % CITIZEN_FAMILY_NAMES.length];
-    const given = CITIZEN_GIVEN_NAMES[Math.floor(hash2(index, 79, 1602) * CITIZEN_GIVEN_NAMES.length) % CITIZEN_GIVEN_NAMES.length];
+    const names = gender === "female" ? CITIZEN_GIVEN_NAMES_FEMALE : CITIZEN_GIVEN_NAMES_MALE;
+    const given = names[Math.floor(hash2(index, 79, 1602) * names.length) % names.length];
     return family + " " + given;
+  }
+
+  function citizenAgeGroup(age) {
+    if (age <= 24) return "young";
+    if (age <= 44) return "adult";
+    if (age <= 64) return "mature";
+    return "senior";
   }
 
   function personAppearanceFromSeed(index, profile = {}) {
@@ -1855,6 +1866,10 @@
 
   function citizenProfile(index, home, workPool) {
     const specialNpcId = index === 0 ? "aoi" : index === 1 ? "sora" : index === 2 ? "mei" : null;
+    const specialGender = specialNpcId === "sora" ? "male"
+      : specialNpcId === "aoi" || specialNpcId === "mei" ? "female"
+        : null;
+    const gender = specialGender || (hash2(index, 81, 16025) < .5 ? "male" : "female");
     let age = 18 + Math.floor(hash2(index, 83, 1603) * 64);
     let jobType;
 
@@ -1903,9 +1918,11 @@
 
     return {
       id:"citizen-" + String(index + 1).padStart(3, "0"),
-      name:citizenName(index),
+      name:citizenName(index, gender),
       specialNpcId,
+      gender,
       age,
+      ageGroup:citizenAgeGroup(age),
       householdId:"household-" + String(Math.floor(index / 2) + 1).padStart(2, "0"),
       homeSiteId:home?.site?.id || null,
       homeNodeId:home?.nodeId || HOME.entranceNodeId,
@@ -2562,14 +2579,19 @@
       const householdIndex = Math.floor(i / 2);
       const home = homes.length ? homes[householdIndex % homes.length] : fallbackHome;
       const profile = citizenProfile(i, home, workPool);
+      const ageSpeedFactor = profile.ageGroup === "senior" ? .80 + hash2(i, 82, 16026) * .10
+        : profile.ageGroup === "mature" ? .92 + hash2(i, 82, 16026) * .08
+          : profile.ageGroup === "young" ? 1.02 + hash2(i, 82, 16026) * .08
+            : .97 + hash2(i, 82, 16026) * .08;
+      const baseSpeed = (28 + hash2(i, 8, 96) * 14) * ageSpeedFactor;
       const ped = {
         ...profile,
         x:mapModel.getNode(profile.homeNodeId)?.x || HOME.x,
         y:mapModel.getNode(profile.homeNodeId)?.y || HOME.y,
         dir:hash2(i, 3, 90) * Math.PI * 2,
         timer:0,
-        baseSpeed:28 + hash2(i, 8, 96) * 14,
-        speed:28 + hash2(i, 8, 96) * 14,
+        baseSpeed,
+        speed:baseSpeed,
         color:["#c77f66","#718da7","#ba9b58","#8876a8","#71957a","#b26f67","#6f8fac"][i % 7],
         pants:["#394248","#554a45","#2f3b4d","#45464d"][i % 4],
         hair:["#302720","#4a3427","#1f2326","#684b36"][i % 4],
