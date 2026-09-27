@@ -27,6 +27,27 @@ test('street topology includes dead ends, T junctions, curves, and unequal stree
 });
 
 
+test('two-way vehicle streets are wide enough for collision geometry', () => {
+  const map = createMapModel();
+  const vehicleEdges = map.edges.filter((edge) => edge.vehicle);
+  assert.ok(vehicleEdges.length > 0);
+  assert.ok(vehicleEdges.every((edge) => edge.width >= 80));
+  assert.ok(vehicleEdges.some((edge) => edge.sourceWidth < edge.width));
+});
+
+test('vehicle streets expose a separate pedestrian shoulder', () => {
+  const map = createMapModel();
+  for (const edge of map.edges.filter((value) => value.vehicle && value.pedestrian)) {
+    const corridor = map.pedestrianCorridor(edge.id);
+    assert.ok(corridor, edge.id);
+    assert.ok(corridor.width >= 38, edge.id);
+    assert.ok(corridor.innerOffset > edge.width / 2, edge.id);
+    assert.ok(corridor.centerOffset > corridor.innerOffset, edge.id);
+    assert.ok(corridor.outerOffset > corridor.centerOffset, edge.id);
+  }
+});
+
+
 test('major signalized junctions avoid five-way vehicle conflicts', () => {
   const map = createMapModel();
   const degree = (nodeId) => map.neighbors(nodeId, { mode:'vehicle' }).length;

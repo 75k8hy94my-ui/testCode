@@ -68,6 +68,26 @@ test('game loads and validates the shared Japanese map model before runtime star
   assert.match(source, /mapModel\.validate\(\)/);
 });
 
+
+test('game loads the sprite character renderer before the game runtime', () => {
+  assert.match(html, /<script src="\.\/character-renderer\.js\?v=[^"]+"><\/script>/);
+  assert.ok(html.indexOf('map-model.js') < html.indexOf('character-renderer.js'));
+  assert.ok(html.indexOf('character-renderer.js') < html.indexOf('game.js'));
+  assert.match(source, /const characterRenderer = globalThis\.CityDaysCharacterRenderer/);
+  assert.match(source, /characterRenderer\.createAppearance\(index \+ 41, profile\)/);
+  assert.match(source, /characterRenderer\.draw\(ctx,/);
+  assert.doesNotMatch(source, /function drawPersonSpriteAtScreen\(/);
+  assert.doesNotMatch(source, /function drawHumanSegment\(/);
+});
+
+test('all person categories share the same character renderer', () => {
+  assert.match(source, /ped\.appearance,[\s\S]*ped\.state/);
+  assert.match(source, /PLAYER_APPEARANCE,[\s\S]*moving \? "walk" : "idle"/);
+  assert.match(source, /npc\.appearance,[\s\S]*npc\.state \|\| "idle"/);
+  assert.match(source, /npc\.phase = citizen\.phase/);
+  assert.match(source, /npc\.state = citizen\.state/);
+});
+
 test('game keeps all existing place and station identifiers from the map model', () => {
   for (const id of ['home', 'cafe', 'store', 'park', 'gym', 'library', 'west', 'central', 'east']) {
     assert.match(mapSource, new RegExp(`['\"]${id}['\"]`));
@@ -109,6 +129,21 @@ test('ambient pedestrians have destination plans, route states, and signal-aware
   assert.match(source, /function pedestrianPoseAt\(ped\)/);
   assert.match(source, /pedestrianSignalState\(ped\)/);
   assert.match(source, /ped\.targetPlaceId/);
+});
+
+test('citizens carry deterministic age and gender into appearance generation', () => {
+  assert.match(source, /const gender = specialGender \|\| \(hash2\(index, 81, 16025\) < \.5 \? "male" : "female"\)/);
+  assert.match(source, /ageGroup:citizenAgeGroup\(age\)/);
+  assert.match(source, /name:citizenName\(index, gender\)/);
+  assert.match(source, /appearance:personAppearanceFromSeed\(i, profile\)/);
+  assert.match(source, /const ageSpeedFactor = profile\.ageGroup === "senior"/);
+  assert.match(source, /baseSpeed,/);
+  assert.match(source, /speed:baseSpeed/);
+});
+
+test('named citizens have authored gender presentation', () => {
+  assert.match(source, /specialNpcId === "sora" \? "male"/);
+  assert.match(source, /specialNpcId === "aoi" \|\| specialNpcId === "mei" \? "female"/);
 });
 
 test('ambient pedestrians seed the active central roads', () => {
@@ -198,6 +233,42 @@ test('pedestrian collisions preserve sidewalk side and use continuous avoidance'
   assert.match(source, /requestPedestrianAvoidance\(yieldingPed, 18, \.8\)/);
   assert.match(source, /function updatePedestrianAvoidance\(ped, dt\)/);
   assert.doesNotMatch(source, /yieldingPed\.sideSign\s*=/);
+});
+
+
+test('pedestrians use dedicated sidewalk lanes outside the carriageway', () => {
+  assert.match(source, /function pedestrianSidewalkLayout\(edge, directionSign = 1\)/);
+  assert.match(source, /mapModel\.pedestrianCorridor\?\.\(edge\.id\)/);
+  assert.match(source, /const flowBias = directionSign > 0 \? 7 : -7/);
+  const pose = source.slice(
+    source.indexOf('function pedestrianEdgePose('),
+    source.indexOf('function pedestrianCornerControl(')
+  );
+  assert.doesNotMatch(pose, /edge\.width \/ 2 \+ 5/);
+});
+
+test('same-direction pedestrian queues only block the same sidewalk side', () => {
+  const following = source.slice(
+    source.indexOf('function pedestrianFollowingLimit('),
+    source.indexOf('function attemptPedestrianMove(')
+  );
+  assert.match(following, /other\.directionSign !== ped\.directionSign/);
+  assert.match(following, /\(other\.sideSign \|\| 1\) !== \(ped\.sideSign \|\| 1\)/);
+});
+
+test('pedestrians sidestep away from vehicles instead of only retrying in place', () => {
+  const attempt = source.slice(
+    source.indexOf('function attemptPedestrianMove('),
+    source.indexOf('function pedestrianVisibleOnScreen(')
+  );
+  assert.match(attempt, /requestPedestrianAvoidance\(ped, 16, \.95\)/);
+  assert.match(source, /const NPC_COLLISION_RADIUS = 6\.5/);
+});
+
+test('vehicle roads render a visible pedestrian shoulder outside the curb', () => {
+  assert.match(source, /const corridor = edge\.vehicle \? mapModel\.pedestrianCorridor\?\.\(edge\.id\) : null/);
+  assert.match(source, /edge\.width \+ sidewalkWidth \* 2/);
+  assert.match(source, /Vehicle streets have a real pedestrian shoulder/);
 });
 
 test('pedestrian generation spaces walkers before the first frame', () => {

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#18201d">
   <link rel="icon" href="data:,">
   <title>City Days - 2D Life Sim</title>
-  <link rel="stylesheet" href="./game.css?v=20260927-home-phone">
+  <link rel="stylesheet" href="./game.css?v=20260927-iphone-phone-1">
 </head>
 <body>
   <main id="gameShell">
@@ -88,22 +88,7 @@
       <button id="helpButton" type="button">操作</button>
     </div>
 
-    <section id="smartphonePanel" class="smartphone-panel" aria-label="スマートフォン" hidden>
-      <header class="smartphone-header">
-        <div><span class="eyebrow">WAKABA MOBILE</span><strong>スマートフォン</strong></div>
-        <button id="phoneClose" type="button" data-phone-nav="close" aria-label="スマホを閉じる">×</button>
-      </header>
-      <div class="phone-screen">
-        <div class="phone-widget phone-time"><span id="phoneClock">Day 1 · 08:00</span><b id="phoneCash">¥8,000</b></div>
-        <p id="phoneMessage" class="phone-message">今日も若葉の街で、自由に過ごしましょう。</p>
-        <div id="phoneNeeds" class="phone-needs" aria-label="生活状況"></div>
-        <nav class="phone-apps" aria-label="スマホアプリ">
-          <button type="button" data-phone-nav="status"><span>♥</span><b>生活</b></button>
-          <button type="button" data-phone-nav="home"><span>⌂</span><b>自宅</b></button>
-        </nav>
-      </div>
-      <footer class="smartphone-home-indicator"><span></span></footer>
-    </section>
+    <section id="smartphonePanel" class="smartphone-panel" aria-label="スマートフォン" hidden></section>
 
     <div id="mobileControls" class="mobile-controls" aria-label="徒歩タッチ操作">
       <div id="joystick" class="joystick" aria-label="移動スティック">
@@ -128,7 +113,9 @@
     </div>
   </main>
 
-  <script src="./map-model.js?v=20260927-junction-geometry-1"></script>
-  <script src="./game.js?v=20260927-home-phone-2"></script>
+  <script src="./map-model.js?v=20260927-road-clearance-1"></script>
+  <script src="./character-renderer.js?v=20260927-character-v3-1"></script>
+  <script src="./phone-system.js?v=20260927-iphone-phone-2"></script>
+  <script src="./game.js?v=20260927-iphone-phone-1"></script>
 </body>
 </html>
