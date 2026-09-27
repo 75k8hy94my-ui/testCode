@@ -1,7 +1,7 @@
 (function initCityDaysMapModel(global) {
   "use strict";
 
-  const MAP_VERSION = "japan-v2.2";
+  const MAP_VERSION = "japan-v2.3";
   const WORLD_SIZE = 10800;
   const COAST = 160;
   const RAIL_Y = 4700;
@@ -274,14 +274,33 @@
     return true;
   }
 
+  function vehicleSidewalkWidthForType(type) {
+    if (type === "arterial") return 46;
+    if (type === "collector") return 42;
+    if (type === "shopping") return 42;
+    if (type === "park") return 40;
+    if (type === "residential") return 40;
+    if (type === "alley") return 38;
+    return 40;
+  }
+
   function edgeFromDefinition(definition, nodeMap) {
-    const [id, from, to, rawPoints, type, width, speedLimit, vehicle, pedestrian, signalized] = definition;
+    const [id, from, to, rawPoints, type, rawWidth, speedLimit, vehicle, pedestrian, signalized] = definition;
     const points = rawPoints.map(([x, y]) => point(x, y));
     const first = nodeMap.get(from);
     const last = nodeMap.get(to);
     points[0] = point(first.x, first.y);
     points[points.length - 1] = point(last.x, last.y);
-    return { id, from, to, points, type, width, speedLimit, vehicle, pedestrian, signalized };
+
+    // Two-way vehicle edges must physically fit two normal cars. Very narrow
+    // Japanese alleys remain visually narrow relative to collectors/arterials,
+    // but are no longer narrower than the collision geometry of two vehicles.
+    const width = vehicle ? Math.max(78, rawWidth) : rawWidth;
+    const sidewalkWidth = vehicle && pedestrian ? vehicleSidewalkWidthForType(type) : 0;
+    return {
+      id, from, to, points, type, width, speedLimit, vehicle, pedestrian,
+      signalized, sidewalkWidth
+    };
   }
 
   function rectIntersectsEdge(rect, edge, extra = 0) {
@@ -384,7 +403,11 @@
         if (district && !pointInPolygon(centerX, centerY, district.polygon)) continue;
         if (reserved.some((area) => rectsOverlap(rect, area, 18))) continue;
         if (openSpaces.length && rectHitsOpenSpace(rect, openSpaces)) continue;
-        if (edges.some((edge) => rectIntersectsEdge(rect, edge, edge.vehicle ? 18 : 10))) continue;
+        if (edges.some((edge) => rectIntersectsEdge(
+          rect,
+          edge,
+          edge.vehicle ? (edge.sidewalkWidth || vehicleSidewalkWidthForType(edge.type)) + 8 : 10
+        ))) continue;
         if (rect.y < RAIL_Y + 120 && rect.y + rect.h > RAIL_Y - 120 && rect.x < 9300 && rect.x + rect.w > 1100) continue;
         if (sites.some((site) => rectsOverlap(rect, site, style === "residential" ? 18 : 12))) continue;
 
@@ -441,7 +464,9 @@
         const target = point(x, y);
         const blocksPath = edges.some((edge) => {
           if (!edge.pedestrian) return false;
-          const clearance = edge.width / 2 + 16;
+          const clearance = edge.width / 2 + (edge.vehicle
+            ? (edge.sidewalkWidth || vehicleSidewalkWidthForType(edge.type)) + 8
+            : 16);
           for (let i = 1; i < edge.points.length; i += 1) {
             if (pointSegmentProjection(target, edge.points[i - 1], edge.points[i]).distance <= clearance) return true;
           }
@@ -676,13 +701,44 @@
       return x >= bounds.x && x <= bounds.x + bounds.w && y >= bounds.y && y <= bounds.y + bounds.h;
     }
 
+    function pedestrianCorridor(edgeIdOrEdge) {
+      const edge = typeof edgeIdOrEdge === "string" ? getEdge(edgeIdOrEdge) : edgeIdOrEdge;
+      if (!edge || !edge.pedestrian) return null;
+      if (!edge.vehicle) {
+        return {
+          edgeId:edge.id,
+          vehicle:false,
+          width:edge.width,
+          innerOffset:0,
+          centerOffset:0,
+          outerOffset:edge.width / 2
+        };
+      }
+
+      const width = edge.sidewalkWidth || vehicleSidewalkWidthForType(edge.type);
+      const innerOffset = edge.width / 2 + 6;
+      const outerOffset = edge.width / 2 + width;
+      const centerOffset = Math.min(outerOffset - 10, edge.width / 2 + 22);
+      return {
+        edgeId:edge.id,
+        vehicle:true,
+        width,
+        innerOffset,
+        centerOffset,
+        outerOffset
+      };
+    }
+
     function isWithinRoadSurface(x, y, options = {}, padding = 0) {
       const target = point(x, y);
       const vehicleOnly = Boolean(options.vehicleOnly);
       for (const edge of edges) {
         if (vehicleOnly && !edge.vehicle) continue;
         if (!vehicleOnly && !edge.pedestrian) continue;
-        const threshold = edge.width / 2 + padding;
+        const corridor = !vehicleOnly ? pedestrianCorridor(edge) : null;
+        const threshold = corridor?.vehicle
+          ? corridor.outerOffset + padding
+          : edge.width / 2 + padding;
         for (let i = 1; i < edge.points.length; i += 1) {
           if (pointSegmentProjection(target, edge.points[i - 1], edge.points[i]).distance <= threshold) return true;
         }
@@ -718,6 +774,8 @@
         if (!getNode(edge.from) || !getNode(edge.to)) errors.push("edge endpoint missing: " + edge.id);
         if (edge.points.length < 2) errors.push("edge has too few points: " + edge.id);
         if (edge.width <= 0) errors.push("edge width invalid: " + edge.id);
+        if (edge.vehicle && edge.width < 78) errors.push("vehicle edge too narrow: " + edge.id);
+        if (edge.vehicle && edge.pedestrian && (edge.sidewalkWidth || 0) < 38) errors.push("sidewalk too narrow: " + edge.id);
         if (edge.points[0].x !== getNode(edge.from)?.x || edge.points[0].y !== getNode(edge.from)?.y) errors.push("edge start mismatch: " + edge.id);
         const end = edge.points.at(-1);
         if (end.x !== getNode(edge.to)?.x || end.y !== getNode(edge.to)?.y) errors.push("edge end mismatch: " + edge.id);
@@ -733,7 +791,11 @@
         if (!isWalkable(place.x, place.y, 14)) errors.push("place not walkable: " + place.id);
         const facility = facilityBuildingRect(place);
         if (facility) {
-          if (edges.some((edge) => rectIntersectsEdge(facility, edge, edge.vehicle ? 18 : 10))) errors.push("facility intersects street: " + place.id);
+          if (edges.some((edge) => rectIntersectsEdge(
+            facility,
+            edge,
+            edge.vehicle ? (edge.sidewalkWidth || vehicleSidewalkWidthForType(edge.type)) + 8 : 10
+          ))) errors.push("facility intersects street: " + place.id);
           if (openSpaces.some((space) => rectsOverlap(facility, space.bounds, 0))) errors.push("facility intersects open space: " + place.id);
           if (buildingSites.some((site) => rectsOverlap(facility, site, 10))) errors.push("facility intersects generated building: " + place.id);
         }
@@ -745,7 +807,11 @@
       }
 
       for (const site of buildingSites) {
-        if (edges.some((edge) => rectIntersectsEdge(site, edge, edge.vehicle ? 8 : 4))) errors.push("building intersects street: " + site.id);
+        if (edges.some((edge) => rectIntersectsEdge(
+          site,
+          edge,
+          edge.vehicle ? (edge.sidewalkWidth || vehicleSidewalkWidthForType(edge.type)) : 4
+        ))) errors.push("building intersects street: " + site.id);
       }
 
       for (const junctionNode of nodes) {
@@ -797,6 +863,7 @@
       isWalkable,
       districtAt,
       findRoute,
+      pedestrianCorridor,
       junctionGeometry,
       validate
     });
