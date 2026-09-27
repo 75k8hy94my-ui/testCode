@@ -1731,7 +1731,9 @@
   }
 
   function trafficLaneOffsetForEdge(edge, secondaryLane = false) {
-    const maxOffset = Math.max(14, edge.width / 2 - 18);
+    // Keep the vehicle body inside the carriageway even on the narrowest
+    // two-way street. This still leaves enough separation for two NPC vans.
+    const maxOffset = Math.max(18, edge.width / 2 - 20);
     const primaryOffset = Math.min(LANE_OFFSET, maxOffset);
     const extraOffset = secondaryLane && edge.width >= 180
       ? Math.min(28, Math.max(0, maxOffset - primaryOffset))
