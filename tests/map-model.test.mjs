@@ -7,7 +7,7 @@ const { createMapModel } = mapModule;
 test('v2 map validates as a connected Japanese urban fabric', () => {
   const map = createMapModel();
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2.1');
+  assert.equal(map.version, 'japan-v2.2');
   assert.equal(map.worldSize, 10800);
   assert.ok(map.nodes.length >= 45);
   assert.ok(map.edges.length >= 55);
@@ -24,6 +24,53 @@ test('street topology includes dead ends, T junctions, curves, and unequal stree
   assert.ok(vehicleDegrees.filter((degree) => degree === 3).length >= 5);
   assert.ok(map.edges.filter((edge) => edge.points.length >= 4).length >= 20);
   assert.ok(new Set(map.edges.filter((edge) => edge.vehicle).map((edge) => edge.width)).size >= 8);
+});
+
+
+test('major signalized junctions avoid five-way vehicle conflicts', () => {
+  const map = createMapModel();
+  const degree = (nodeId) => map.neighbors(nodeId, { mode:'vehicle' }).length;
+
+  assert.equal(degree('central'), 3);
+  assert.equal(degree('central-west'), 3);
+  assert.equal(degree('east-junction'), 4);
+  assert.ok(degree('west-junction') <= 4);
+
+  const centralEdges = map.neighbors('central', { mode:'vehicle' }).map(({ edge }) => edge.id);
+  assert.ok(!centralEdges.includes('shopping-central-cafe'));
+  assert.ok(!centralEdges.includes('shopping-central-market'));
+
+  const eastEdges = map.neighbors('east-junction', { mode:'vehicle' }).map(({ edge }) => edge.id);
+  assert.ok(!eastEdges.includes('shopping-store-east'));
+});
+
+test('junction geometry derives ordered stop and crossing offsets per approach', () => {
+  const map = createMapModel();
+  const approaches = map.neighbors('west-junction', { mode:'vehicle' }).map(({ edge }) => edge);
+  const geometries = approaches.map((edge) => map.junctionGeometry('west-junction', edge.id));
+
+  for (const geometry of geometries) {
+    assert.ok(geometry);
+    assert.ok(geometry.crossingInnerEdge > geometry.conflictBoundary);
+    assert.ok(geometry.crossingOuterEdge > geometry.crossingInnerEdge);
+    assert.ok(geometry.stopOffset > geometry.crossingOuterEdge);
+    assert.ok(geometry.yieldOffset > geometry.conflictBoundary);
+  }
+
+  const westbound = map.junctionGeometry('west-junction', 'arterial-west-core');
+  const northApproach = map.junctionGeometry('west-junction', 'collector-west-north');
+  assert.notEqual(Math.round(westbound.stopOffset), Math.round(northApproach.stopOffset));
+  assert.ok(northApproach.stopOffset > westbound.stopOffset);
+});
+
+test('junction center pads no longer use the widest road as a circular radius', () => {
+  const map = createMapModel();
+  const incident = map.neighbors('west-junction', { mode:'vehicle' }).map(({ edge }) => edge);
+  const widestHalf = Math.max(...incident.map((edge) => edge.width / 2));
+  const generated = map.junctionGeometry('west-junction');
+
+  assert.ok(generated.padRadius < widestHalf);
+  assert.ok(generated.conflictRadius >= generated.padRadius);
 });
 
 test('districts are irregular polygons instead of rectangular grid sectors', () => {
