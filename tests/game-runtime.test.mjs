@@ -242,12 +242,26 @@ test('map traffic signals are intersection-node based rather than whole-edge bas
   assert.match(source, /!isSignalizedMapNode\(node\.id\)/);
 });
 
-test('cars, pedestrians, route guidance, and markings share stop-line geometry', () => {
+test('cars, pedestrians, route guidance, and markings share generated stop-line geometry', () => {
   assert.match(source, /function signalGeometryAtNode\(nodeId, approachEdge\)/);
+  assert.match(source, /mapModel\.junctionGeometry\?\.\(nodeId, approachEdge\?\.id\)/);
   assert.match(source, /stopOffset: signalGeometryAtNode\(node\.id, routeEdge\)\.stopOffset/);
-  assert.match(source, /const geometry = signalGeometryAtNode\(endpoint\.id, edge\)/);
+  assert.match(source, /const geometry = approachGeometry \|\| signalGeometryAtNode\(endpoint\.id, edge\)/);
   assert.match(source, /function drawMapModelIntersectionMarkings\(\)/);
   assert.match(source, /drawMapModelIntersectionMarkings\(\);/);
+});
+
+test('unsignalized junctions keep the whole vehicle behind the generated yield boundary', () => {
+  assert.match(source, /const approachGeometry = endpoint \? signalGeometryAtNode\(endpoint\.id, edge\) : null/);
+  assert.match(source, /const yieldLineOffset = approachGeometry\?\.yieldOffset/);
+  assert.match(source, /let junctionYieldOffset = yieldLineOffset \+ vehicleFrontOverhang\(car\)/);
+  assert.doesNotMatch(source, /let junctionYieldOffset = Math\.max\(vehicleFrontOverhang\(car\) \+ 18/);
+});
+
+test('road rendering uses generated center pads instead of widest-road circles', () => {
+  assert.match(source, /const generated = mapModel\.junctionGeometry\?\.\(node\.id\)/);
+  assert.match(source, /const baseRadius = generated\?\.padRadius \?\? fallbackHalf/);
+  assert.doesNotMatch(source, /const radius = widest \/ 2 \+ \(layer === "shadow"/);
 });
 
 test('traffic-light rendering includes every drivable approach at a signalized node', () => {
