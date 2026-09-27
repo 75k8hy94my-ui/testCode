@@ -68,6 +68,26 @@ test('game loads and validates the shared Japanese map model before runtime star
   assert.match(source, /mapModel\.validate\(\)/);
 });
 
+
+test('game loads the sprite character renderer before the game runtime', () => {
+  assert.match(html, /<script src="\.\/character-renderer\.js\?v=[^"]+"><\/script>/);
+  assert.ok(html.indexOf('map-model.js') < html.indexOf('character-renderer.js'));
+  assert.ok(html.indexOf('character-renderer.js') < html.indexOf('game.js'));
+  assert.match(source, /const characterRenderer = globalThis\.CityDaysCharacterRenderer/);
+  assert.match(source, /characterRenderer\.createAppearance\(index \+ 41, profile\)/);
+  assert.match(source, /characterRenderer\.draw\(ctx,/);
+  assert.doesNotMatch(source, /function drawPersonSpriteAtScreen\(/);
+  assert.doesNotMatch(source, /function drawHumanSegment\(/);
+});
+
+test('all person categories share the same character renderer', () => {
+  assert.match(source, /ped\.appearance,[\s\S]*ped\.state/);
+  assert.match(source, /PLAYER_APPEARANCE,[\s\S]*moving \? "walk" : "idle"/);
+  assert.match(source, /npc\.appearance,[\s\S]*npc\.state \|\| "idle"/);
+  assert.match(source, /npc\.phase = citizen\.phase/);
+  assert.match(source, /npc\.state = citizen\.state/);
+});
+
 test('game keeps all existing place and station identifiers from the map model', () => {
   for (const id of ['home', 'cafe', 'store', 'park', 'gym', 'library', 'west', 'central', 'east']) {
     assert.match(mapSource, new RegExp(`['\"]${id}['\"]`));
