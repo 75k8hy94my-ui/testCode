@@ -102,8 +102,8 @@ test('enterable home uses the same residential renderer and scale language as ne
   const cafeDrawStart = source.indexOf('} else if (place.id === "cafe") {', homeDrawStart);
   const homeDraw = source.slice(homeDrawStart, cafeDrawStart);
 
-  assert.match(homeDraw, /const homeW = building\?\.w \|\| 124/);
-  assert.match(homeDraw, /const homeH = building\?\.h \|\| 104/);
+  assert.match(homeDraw, /const homeW = building\?\.w \|\| 118/);
+  assert.match(homeDraw, /const homeH = building\?\.h \|\| 96/);
   assert.match(homeDraw, /drawResidentialBuilding\(/);
   assert.doesNotMatch(homeDraw, /drawFacilityBuilding\(/);
   assert.doesNotMatch(homeDraw, /\|\| 300/);
