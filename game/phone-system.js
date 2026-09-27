@@ -54,6 +54,8 @@
     let calc = "0";
     let noteDraft = "";
     let reminderDraft = "";
+    let pointerActive = false;
+    let lastRenderedSignature = "";
     const calls = [];
     const photos = [];
     const notes = [{id:1,title:"買うもの",text:"牛乳\nパン\nコーヒー",day:1}];
@@ -335,11 +337,37 @@
         '<button class="ios-side-close" type="button" data-phone-action="close">×</button>' + homeIndicator() + '</div>';
     }
 
+    function modelSignature(value) {
+      const needs = value.needs || {};
+      return JSON.stringify({
+        day:value.day,
+        minute:Math.floor(Number(value.minute) || 0),
+        cash:Math.floor(Number(value.cash) || 0),
+        groceries:value.groceries,
+        fitness:value.fitness,
+        libraryVisits:value.libraryVisits,
+        shiftsWorked:value.shiftsWorked,
+        district:value.district,
+        weather:value.weather,
+        soundEnabled:value.soundEnabled,
+        inHome:value.inHome,
+        inVehicle:value.inVehicle,
+        inTrain:value.inTrain,
+        drivingRating:value.drivingRating,
+        nextRentDay:value.nextRentDay,
+        waypoint:value.waypoint ? [value.waypoint.id,Math.round((value.waypoint.distance || 0) / 20)] : null,
+        needs:["hunger","energy","hygiene","social","fun"].map(function(key){return Math.round(Number(needs[key]) || 0);}),
+        npcs:(value.npcs || []).map(function(n){return [n.id,n.friendship,n.hidden,n.activity,Math.round((n.distance || 0) / 25)];}),
+        trains:(value.trains || []).map(function(t){return [t.id,t.stationIndex,t.targetIndex,Math.round((t.dwell || 0) * 2)];})
+      });
+    }
+
     function render() {
       root.classList.toggle("phone-theme-light",theme === "light");
       root.classList.toggle("phone-reduce-motion",reduceMotion);
       root.style.setProperty("--phone-text-scale",String(textScale));
       root.innerHTML = locked ? lockScreen() : overlay === "notifications" ? notifications() : overlay === "control" ? controlCenter() : appScreen();
+      lastRenderedSignature = modelSignature(model);
     }
     function goHome() { app = null; activeContact = null; overlay = null; render(); }
     function evaluate(expression) {
@@ -361,6 +389,15 @@
         if (calc.length > 28) calc = calc.slice(-28);
       }
     }
+
+    root.addEventListener("pointerdown",function(){
+      pointerActive = true;
+    }, { passive:true });
+    const releasePointer = function(){
+      setTimeout(function(){ pointerActive = false; }, 0);
+    };
+    root.addEventListener("pointerup",releasePointer,{ passive:true });
+    root.addEventListener("pointercancel",releasePointer,{ passive:true });
 
     root.addEventListener("input",function(event){
       if (event.target && event.target.dataset.phoneInput === "note") noteDraft = event.target.value;
@@ -424,7 +461,12 @@
     });
 
     return Object.freeze({
-      update:function(next){ model = next || model; if (!root.hidden) render(); },
+      update:function(next){
+        model = next || model;
+        if (root.hidden || pointerActive) return;
+        const signature = modelSignature(model);
+        if (signature !== lastRenderedSignature) render();
+      },
       open:function(){ render(); },
       home:goHome,
       openApp:function(id){ if (APPS.some(function(def){return def[0] === id;})) { app = id; overlay = null; render(); } },
