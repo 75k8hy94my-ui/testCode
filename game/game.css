@@ -52,6 +52,21 @@ button{font:inherit;color:inherit}
 .help-panel{position:absolute;inset:0;display:grid;place-items:center;padding:22px;background:rgba(0,0,0,.48);z-index:10}
 .help-panel>div{width:min(560px,100%);padding:20px;border:1px solid var(--border);background:var(--panel-strong);border-radius:14px;line-height:1.55}
 .help-panel p{color:var(--muted)}
+.smartphone-panel{position:absolute;right:max(18px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));z-index:12;width:310px;max-height:calc(100vh - 36px);overflow:auto;padding:10px;border:1px solid rgba(255,255,255,.24);border-radius:28px;background:linear-gradient(145deg,#39443e,#111814 55%);box-shadow:0 24px 70px rgba(0,0,0,.52),inset 0 1px 0 rgba(255,255,255,.16);color:var(--text)}
+.smartphone-header{display:flex;justify-content:space-between;align-items:center;padding:7px 7px 12px}
+.smartphone-header strong{display:block;margin-top:3px;font-size:14px}
+.smartphone-header button{width:32px;height:32px;border:1px solid var(--border);border-radius:50%;background:rgba(255,255,255,.08);color:var(--text);font-size:20px}
+.phone-screen{min-height:390px;padding:14px;border-radius:19px;background:radial-gradient(ellipse at 80% 0%,rgba(109,153,119,.38),transparent 48%),linear-gradient(160deg,#25332b,#121b17 72%);}
+.phone-widget{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(6,12,9,.38);font-size:12px}
+.phone-widget span{color:#d2dbd5}.phone-widget b{font-size:14px}
+.phone-message{min-height:48px;margin:13px 3px;color:#d9e4dc;font-size:13px;line-height:1.5}
+.phone-needs{display:grid;gap:7px;padding:12px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(6,12,9,.3)}
+.phone-need{display:flex;justify-content:space-between;color:#c4d0c8;font-size:12px}.phone-need b{color:#f5f7f4;font-variant-numeric:tabular-nums}
+.phone-apps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:17px}
+.phone-apps button{display:grid;justify-items:center;gap:4px;padding:9px 2px;border:0;border-radius:13px;background:rgba(255,255,255,.08);color:var(--text)}
+.phone-apps button span{display:grid;place-items:center;width:37px;height:37px;border-radius:11px;background:linear-gradient(145deg,#8bae8c,#52765c);font-size:22px}
+.phone-apps button b{font-size:10px}
+.smartphone-home-indicator{display:grid;place-items:center;padding-top:9px}.smartphone-home-indicator span{width:76px;height:4px;border-radius:5px;background:rgba(255,255,255,.65)}
 .mobile-controls{position:absolute;left:0;right:0;bottom:0;padding:18px max(18px,env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));display:none;justify-content:space-between;align-items:flex-end;pointer-events:none}
 .joystick{width:126px;height:126px;border-radius:50%;background:rgba(4,8,5,.34);border:1px solid rgba(255,255,255,.17);position:relative;pointer-events:auto;touch-action:none}
 .joystick-knob{position:absolute;width:58px;height:58px;border-radius:50%;left:34px;top:34px;background:rgba(245,248,246,.8);border:2px solid rgba(0,0,0,.18);transform:translate(0,0)}
@@ -78,6 +93,13 @@ body:has(#actionSheet:not([hidden])) .objective-card{visibility:hidden}
   .objective-card{bottom:calc(160px + env(safe-area-inset-bottom));width:min(310px,calc(100% - 24px))}
   .interaction-prompt{bottom:calc(154px + env(safe-area-inset-bottom))}
   .action-sheet{bottom:calc(160px + env(safe-area-inset-bottom))}
+  .smartphone-panel{inset:0;width:100%;height:100vh;height:100dvh;min-height:100vh;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));border:0;border-radius:0;display:flex;flex-direction:column;background:linear-gradient(155deg,#36453b,#101813 62%)}
+  .smartphone-header{padding:8px 4px 16px}.smartphone-header strong{font-size:18px}
+  .phone-screen{flex:1;min-height:0;padding:clamp(18px,5vh,38px);border-radius:25px;display:flex;flex-direction:column;justify-content:center;gap:12px}
+  .phone-message{font-size:15px;margin:9px 3px}
+  .phone-needs{gap:12px;padding:16px}.phone-need{font-size:14px}
+  .phone-apps{gap:14px;margin-top:16px}.phone-apps button{padding:12px 3px}.phone-apps button span{width:52px;height:52px;font-size:27px}.phone-apps button b{font-size:12px}
+  .smartphone-home-indicator{padding-top:12px}
 }
 @media(hover:none),(pointer:coarse){
   .mobile-controls{display:flex}

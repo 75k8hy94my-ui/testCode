@@ -327,3 +327,21 @@ test('facility buildings participate in player collision', () => {
   assert.match(source, /const facility = placeBuildingRect\(place\)/);
   assert.match(source, /circleRectCollision\(x, y, radius, facility\)/);
 });
+
+test('home interior transitions preserve outdoor position and use a separate scene', () => {
+  assert.ok(source.includes("state.player.outdoorHomeX = state.player.x;"));
+  assert.ok(source.includes("state.player.x = Number.isFinite(state.player.outdoorHomeX) ? state.player.outdoorHomeX : HOME.x;"));
+  assert.match(source, /function render\(\)[\s\S]*if \(state\.player\.inHome\)[\s\S]*drawHomeInterior\(\)/);
+  assert.match(source, /if \(place\.id === "home"\)[\s\S]*addChoice\("自宅に入る"[\s\S]*enterHome\(\)/);
+});
+
+test('home movement is slightly faster than normal walking', () => {
+  assert.match(source, /const speed = running \? RUN_SPEED \* 1\.08 : WALK_SPEED \* 1\.18/);
+});
+
+test('smartphone has an always available responsive panel', () => {
+  assert.match(html, /id="smartphoneToggle"/);
+  assert.match(html, /id="smartphonePanel"/);
+  assert.match(source, /smartphoneToggle\.addEventListener\("click"/);
+  assert.match(css, /\.smartphone-panel[\s\S]*@media\(max-width:760px\)[\s\S]*\.smartphone-panel/);
+});

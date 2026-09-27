@@ -65,6 +65,13 @@
   const soundButton = document.getElementById("soundButton");
   const toast = document.getElementById("toast");
   const pausedOverlay = document.getElementById("pausedOverlay");
+  const smartphoneToggle = document.getElementById("smartphoneToggle");
+  const smartphonePanel = document.getElementById("smartphonePanel");
+  const phoneCash = document.getElementById("phoneCash");
+  const phoneClock = document.getElementById("phoneClock");
+  const phoneNeeds = document.getElementById("phoneNeeds");
+  const phoneMessage = document.getElementById("phoneMessage");
+  const phoneNavButtons = document.querySelectorAll("[data-phone-nav]");
   const joystick = document.getElementById("joystick");
   const joystickKnob = document.getElementById("joystickKnob");
   const actionButton = document.getElementById("actionButton");
@@ -1015,7 +1022,9 @@
       trainId: null,
       inHome: false,
       homeX: HOME_INTERIOR.width / 2,
-      homeY: HOME_INTERIOR.height - 76
+      homeY: HOME_INTERIOR.height - 76,
+      outdoorHomeX: HOME.x,
+      outdoorHomeY: HOME.y
     },
     camera: { x: HOME.x - viewWidth / 2, y: HOME.y - viewHeight / 2 },
     day: 1,
@@ -3534,6 +3543,8 @@
 
   function enterHome() {
     if (state.player.inVehicle || state.player.inTrain) return;
+    state.player.outdoorHomeX = state.player.x;
+    state.player.outdoorHomeY = state.player.y;
     state.player.inHome = true;
     state.player.homeX = HOME_INTERIOR.width / 2;
     state.player.homeY = HOME_INTERIOR.height - 76;
@@ -3546,8 +3557,8 @@
 
   function exitHome() {
     state.player.inHome = false;
-    state.player.x = HOME.x;
-    state.player.y = HOME.y;
+    state.player.x = Number.isFinite(state.player.outdoorHomeX) ? state.player.outdoorHomeX : HOME.x;
+    state.player.y = Number.isFinite(state.player.outdoorHomeY) ? state.player.outdoorHomeY : HOME.y;
     state.player.facingX = 0;
     state.player.facingY = 1;
     state.visual.cameraLeadX = 0;
@@ -3677,6 +3688,11 @@
   }
 
   function openPlace(place) {
+    if (place.id === "home") {
+      actionDescription.textContent = "自宅の中では家具を使って、料理・入浴・睡眠・休憩ができます。";
+      addChoice("自宅に入る", "屋内マップへ移動します", () => enterHome());
+    }
+
     if (place.id === "store") {
       actionDescription.textContent = "食料品とちょっとした食事を買えます。";
       addChoice("食料を3個買う", "¥1,500 / 15分", () => {
@@ -4073,7 +4089,9 @@
           trainId: state.player.trainId,
           inHome: state.player.inHome,
           homeX: state.player.homeX,
-          homeY: state.player.homeY
+          homeY: state.player.homeY,
+          outdoorHomeX: state.player.outdoorHomeX,
+          outdoorHomeY: state.player.outdoorHomeY
         },
         car: {
           x: personalCar.x,
@@ -9390,9 +9408,41 @@
     objectiveText.textContent = "仕事・買い物・運動・読書・交流を自由に選べる";
   }
 
+  function setSmartphoneOpen(open) {
+    if (!smartphonePanel || !smartphoneToggle) return;
+    const isOpen = Boolean(open);
+    smartphonePanel.hidden = !isOpen;
+    smartphoneToggle.setAttribute("aria-expanded", String(isOpen));
+    document.body.classList.toggle("smartphone-open", isOpen);
+  }
+
+  function updateSmartphone() {
+    if (!phoneCash || !phoneClock || !phoneNeeds || !phoneMessage) return;
+    phoneCash.textContent = "¥" + Math.floor(state.cash).toLocaleString("ja-JP");
+    phoneClock.textContent = "Day " + state.day + " · " +
+      String(Math.floor(state.minute / 60)).padStart(2, "0") + ":" +
+      String(Math.floor(state.minute % 60)).padStart(2, "0");
+    phoneNeeds.replaceChildren();
+    for (const [key, label] of [["hunger", "空腹"], ["energy", "体力"], ["hygiene", "清潔"], ["social", "交流"], ["fun", "楽しさ"]]) {
+      const row = document.createElement("div");
+      row.className = "phone-need";
+      const name = document.createElement("span");
+      name.textContent = label;
+      const value = document.createElement("b");
+      value.textContent = Math.round(clamp(state.needs[key], 0, 100)) + "%";
+      row.append(name, value);
+      phoneNeeds.appendChild(row);
+    }
+    phoneMessage.textContent = state.player.inHome
+      ? "自宅で過ごしています。ACTIONで家具を利用できます。"
+      : state.player.inVehicle
+        ? "安全運転で目的地へ向かいましょう。"
+        : "今日も若葉の街で、自由に過ごしましょう。";
+  }
+
   function updateHUD() {
     const p = actorPosition();
-    areaNameEl.textContent = state.player.inHome ? "自宅" : currentDistrict(p.x, p.y);
+    areaNameEl.textContent = state.player.inHome ? "自宅・室内" : currentDistrict(p.x, p.y);
     const hours = Math.floor(state.minute / 60);
     const minutes = Math.floor(state.minute % 60);
     worldClockEl.textContent = "Day " + state.day + "  " + String(hours).padStart(2, "0") + ":" + String(minutes).padStart(2, "0");
@@ -9412,6 +9462,7 @@
     lifeStatus.textContent = minimum < 20 ? "かなりつらい" : average > 75 ? "とても充実" : average > 55 ? "いい感じ" : "少し疲れ気味";
     rentText.textContent = "次の家賃: Day " + nextRentDay() + " / ¥" + RENT.toLocaleString("ja-JP");
     updateObjective();
+    updateSmartphone();
 
     driveHud.hidden = !state.player.inVehicle;
     mobileDrivingControls.hidden = !state.player.inVehicle;
@@ -9569,11 +9620,33 @@
   }
   updateSoundButton();
 
+  if (smartphoneToggle) {
+    smartphoneToggle.addEventListener("click", () => {
+      setSmartphoneOpen(smartphonePanel.hidden);
+    });
+  }
+  phoneNavButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const destination = button.dataset.phoneNav;
+      if (destination === "status") showToast("生活状況を確認しました");
+      if (destination === "home") {
+        if (state.player.inHome) showToast("自宅で過ごしています");
+        else if (distance(state.player.x, state.player.y, HOME.x, HOME.y) <= 230) enterHome();
+        else showToast("自宅は遠すぎるため、街を歩いて向かいましょう");
+      }
+      if (destination === "close") setSmartphoneOpen(false);
+    });
+  });
+
   window.addEventListener("resize", resize);
 
   window.addEventListener("keydown", (event) => {
     void unlockGameAudio();
     const key = event.key.toLowerCase();
+    if (key === "p" && !event.repeat) {
+      setSmartphoneOpen(smartphonePanel?.hidden ?? false);
+      return;
+    }
     if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "w", "a", "s", "d", "e", "shift"].includes(key)) {
       event.preventDefault();
     }

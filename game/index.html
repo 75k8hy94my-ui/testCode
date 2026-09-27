@@ -4,8 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#18201d">
+  <link rel="icon" href="data:,">
   <title>City Days - 2D Life Sim</title>
-  <link rel="stylesheet" href="./game.css?v=20260926-citizen-ai">
+  <link rel="stylesheet" href="./game.css?v=20260927-home-phone">
 </head>
 <body>
   <main id="gameShell">
@@ -74,6 +75,7 @@
         <p><b>車:</b> 乗車後に目的地を選ぶとルートは自動設定。W / ↑ = 加速、S / ↓ / Space = 減速・停止、E = 行き先変更・降車。</p>
         <p><b>電車:</b> 若葉線の駅入口でE / ACTION。電車が停車中なら乗車でき、乗車後は停車駅でE / ACTIONを押すと降車できます。</p>
         <p>操舵は自動です。信号、制限速度、前走車との車間を守ると運転評価が上がります。</p>
+        <p><b>スマートフォン:</b> 画面右上の「スマホ」またはPキーでいつでも開閉できます。生活状況を確認し、自宅の近くなら自宅へ移動できます。</p>
         <p>スマホでは徒歩時は左スティック＋ACTION、運転時はBRAKE / ACCELを使います。</p>
         <p><b>音:</b> 最初のタップやキー入力で有効になります。右上の「音 ON / OFF」でいつでも切り替えられます。</p>\n        <p><b>進行状況:</b> 現在は端末保存しません。ページを再読み込みすると最初から始まります。ログイン同期は今後対応予定です。</p>
         <button id="helpClose" type="button">閉じる</button>
@@ -81,9 +83,27 @@
     </section>
 
     <div class="top-actions">
+      <button id="smartphoneToggle" type="button" aria-controls="smartphonePanel" aria-expanded="false" title="スマホを開く (P)">スマホ</button>
       <button id="soundButton" type="button" aria-pressed="true" title="音声をオフにする">音 ON</button>
       <button id="helpButton" type="button">操作</button>
     </div>
+
+    <section id="smartphonePanel" class="smartphone-panel" aria-label="スマートフォン" hidden>
+      <header class="smartphone-header">
+        <div><span class="eyebrow">WAKABA MOBILE</span><strong>スマートフォン</strong></div>
+        <button id="phoneClose" type="button" data-phone-nav="close" aria-label="スマホを閉じる">×</button>
+      </header>
+      <div class="phone-screen">
+        <div class="phone-widget phone-time"><span id="phoneClock">Day 1 · 08:00</span><b id="phoneCash">¥8,000</b></div>
+        <p id="phoneMessage" class="phone-message">今日も若葉の街で、自由に過ごしましょう。</p>
+        <div id="phoneNeeds" class="phone-needs" aria-label="生活状況"></div>
+        <nav class="phone-apps" aria-label="スマホアプリ">
+          <button type="button" data-phone-nav="status"><span>♥</span><b>生活</b></button>
+          <button type="button" data-phone-nav="home"><span>⌂</span><b>自宅</b></button>
+        </nav>
+      </div>
+      <footer class="smartphone-home-indicator"><span></span></footer>
+    </section>
 
     <div id="mobileControls" class="mobile-controls" aria-label="徒歩タッチ操作">
       <div id="joystick" class="joystick" aria-label="移動スティック">
@@ -109,6 +129,6 @@
   </main>
 
   <script src="./map-model.js?v=20260927-junction-geometry-1"></script>
-  <script src="./game.js?v=20260927-road-junctions-1"></script>
+  <script src="./game.js?v=20260927-home-phone-2"></script>
 </body>
 </html>
