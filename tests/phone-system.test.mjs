@@ -66,3 +66,16 @@ test('phone waypoint persists in game snapshots', () => {
   assert.match(gameSource, /phone:\s*\{[\s\S]*waypoint: state\.phone\?\.waypoint/);
   assert.match(gameSource, /saved\.phone && typeof saved\.phone\.waypoint === "string"/);
 });
+
+
+test('phone remains clickable inside the pointer-disabled HUD', () => {
+  assert.match(css, /\.smartphone-panel\{[\s\S]*pointer-events:auto/);
+  assert.match(css, /\.smartphone-panel button\{[\s\S]*pointer-events:auto/);
+});
+
+test('live phone updates do not replace buttons during pointer interaction', () => {
+  assert.match(phoneSource, /let pointerActive = false/);
+  assert.match(phoneSource, /root\.addEventListener\("pointerdown"[\s\S]*pointerActive = true/);
+  assert.match(phoneSource, /if \(root\.hidden \|\| pointerActive\) return/);
+  assert.match(phoneSource, /signature !== lastRenderedSignature/);
+});
