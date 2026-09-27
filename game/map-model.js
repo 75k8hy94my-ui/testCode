@@ -295,7 +295,7 @@
     // Two-way vehicle edges must physically fit two normal cars. Very narrow
     // Japanese alleys remain visually narrow relative to collectors/arterials,
     // but are no longer narrower than the collision geometry of two vehicles.
-    const width = vehicle ? Math.max(78, rawWidth) : rawWidth;
+    const width = vehicle ? Math.max(80, rawWidth) : rawWidth;
     const sidewalkWidth = vehicle && pedestrian ? vehicleSidewalkWidthForType(type) : 0;
     return {
       id, from, to, points, type, width, sourceWidth:rawWidth, speedLimit, vehicle, pedestrian,
@@ -774,7 +774,7 @@
         if (!getNode(edge.from) || !getNode(edge.to)) errors.push("edge endpoint missing: " + edge.id);
         if (edge.points.length < 2) errors.push("edge has too few points: " + edge.id);
         if (edge.width <= 0) errors.push("edge width invalid: " + edge.id);
-        if (edge.vehicle && edge.width < 78) errors.push("vehicle edge too narrow: " + edge.id);
+        if (edge.vehicle && edge.width < 80) errors.push("vehicle edge too narrow: " + edge.id);
         if (edge.vehicle && edge.pedestrian && (edge.sidewalkWidth || 0) < 38) errors.push("sidewalk too narrow: " + edge.id);
         if (edge.points[0].x !== getNode(edge.from)?.x || edge.points[0].y !== getNode(edge.from)?.y) errors.push("edge start mismatch: " + edge.id);
         const end = edge.points.at(-1);
