@@ -21,11 +21,36 @@ test('character appearance generation is deterministic', () => {
 });
 
 test('age and job information affect generated character styling', () => {
-  const student = renderer.createAppearance(77, { age:20, jobType:'student' });
-  const retired = renderer.createAppearance(77, { age:74, jobType:'retired' });
+  const student = renderer.createAppearance(77, { age:20, gender:'male', jobType:'student' });
+  const retired = renderer.createAppearance(77, { age:74, gender:'male', jobType:'retired' });
 
+  assert.equal(student.ageGroup, 'young');
+  assert.equal(retired.ageGroup, 'senior');
   assert.notEqual(student.posture, retired.posture);
   assert.ok(retired.posture < student.posture);
+  assert.ok(retired.gait < student.gait);
+  assert.ok(retired.stride < student.stride);
+  assert.ok(retired.stature < student.stature);
+});
+
+test('male and female citizens receive visibly different body silhouettes', () => {
+  const male = renderer.createAppearance(123, { age:32, gender:'male', jobType:'office' });
+  const female = renderer.createAppearance(123, { age:32, gender:'female', jobType:'office' });
+
+  assert.equal(male.gender, 'male');
+  assert.equal(female.gender, 'female');
+  assert.ok(male.shoulderScale > female.shoulderScale);
+  assert.ok(female.hipScale > male.hipScale);
+  assert.ok(male.jawScale > female.jawScale);
+  assert.notEqual(male.hairStyle, female.hairStyle);
+});
+
+test('senior appearance can use age-specific hair and face metadata', () => {
+  const senior = renderer.createAppearance(101, { age:74, gender:'female', jobType:'retired' });
+  assert.equal(senior.ageGroup, 'senior');
+  assert.equal(typeof senior.hairGray, 'boolean');
+  assert.ok(senior.faceHeightScale <= 1);
+  assert.ok(senior.armSwing < 1);
 });
 
 test('named characters receive stable authored appearances', () => {
@@ -34,9 +59,13 @@ test('named characters receive stable authored appearances', () => {
   const mei = renderer.createAppearance(43, { specialNpcId:'mei', age:22, jobType:'student' });
 
   assert.equal(aoi.id, 'aoi-41');
+  assert.equal(aoi.gender, 'female');
   assert.equal(aoi.hairStyle, 8);
+  assert.equal(sora.gender, 'male');
   assert.equal(sora.accessory, 'tote');
+  assert.equal(mei.gender, 'female');
   assert.equal(mei.accessory, 'backpack');
+  assert.equal(mei.bottomGarment, 'skirt');
   assert.notEqual(aoi.top, sora.top);
 });
 
