@@ -73,11 +73,7 @@
   const pausedOverlay = document.getElementById("pausedOverlay");
   const smartphoneToggle = document.getElementById("smartphoneToggle");
   const smartphonePanel = document.getElementById("smartphonePanel");
-  const phoneCash = document.getElementById("phoneCash");
-  const phoneClock = document.getElementById("phoneClock");
-  const phoneNeeds = document.getElementById("phoneNeeds");
-  const phoneMessage = document.getElementById("phoneMessage");
-  const phoneNavButtons = document.querySelectorAll("[data-phone-nav]");
+  let phoneSystem = null;
   const joystick = document.getElementById("joystick");
   const joystickKnob = document.getElementById("joystickKnob");
   const actionButton = document.getElementById("actionButton");
@@ -1059,6 +1055,9 @@
       cameraLeadY: 0,
       cameraLagX: 0,
       cameraLagY: 0
+    },
+    phone: {
+      waypoint: null
     },
     drive: {
       route: [],
@@ -4139,6 +4138,9 @@
         libraryVisits: state.libraryVisits,
         shiftsWorked: state.shiftsWorked,
         needs: state.needs,
+        phone: {
+          waypoint: state.phone?.waypoint || null
+        },
         driving: {
           rating: state.drive.rating,
           trips: state.drive.trips
@@ -8841,6 +8843,31 @@
       mctx.restore();
     }
 
+    const phoneWaypoint = PLACES.find((place) => place.id === state.phone?.waypoint);
+    if (phoneWaypoint && !state.player.inVehicle) {
+      const wx = w / 2 + (phoneWaypoint.x - p.x) * scale;
+      const wy = h / 2 + (phoneWaypoint.y - p.y) * scale;
+      mctx.save();
+      mctx.strokeStyle = "rgba(10,132,255,.8)";
+      mctx.setLineDash([4, 4]);
+      mctx.lineWidth = 1.5;
+      mctx.beginPath();
+      mctx.moveTo(w / 2, h / 2);
+      mctx.lineTo(wx, wy);
+      mctx.stroke();
+      mctx.setLineDash([]);
+      if (wx >= -8 && wy >= -8 && wx <= w + 8 && wy <= h + 8) {
+        mctx.fillStyle = "#0a84ff";
+        mctx.beginPath();
+        mctx.arc(wx, wy, 5.5, 0, Math.PI * 2);
+        mctx.fill();
+        mctx.strokeStyle = "#fff";
+        mctx.lineWidth = 1.5;
+        mctx.stroke();
+      }
+      mctx.restore();
+    }
+
     mctx.strokeStyle = "rgba(155,190,174,.8)";
     mctx.lineWidth = 2;
     const railY = h / 2 + (RAIL_Y - p.y) * scale;
@@ -8901,6 +8928,21 @@
       return;
     }
 
+    const phoneWaypoint = PLACES.find((place) => place.id === state.phone?.waypoint);
+    if (phoneWaypoint) {
+      const p = actorPosition();
+      const remaining = distance(p.x, p.y, phoneWaypoint.x, phoneWaypoint.y);
+      if (remaining <= 105) {
+        state.phone.waypoint = null;
+        objectiveTitle.textContent = phoneWaypoint.name;
+        objectiveText.textContent = "目的地に到着しました";
+      } else {
+        objectiveTitle.textContent = "徒歩ナビ: " + phoneWaypoint.name;
+        objectiveText.textContent = "あと約" + Math.max(1, Math.round(remaining / 10) * 10) + "m";
+        return;
+      }
+    }
+
     const n = state.needs;
     if (state.cash < 0) {
       objectiveTitle.textContent = "家計を立て直そう";
@@ -8941,36 +8983,149 @@
     objectiveText.textContent = "仕事・買い物・運動・読書・交流を自由に選べる";
   }
 
+  function phoneStatusMessage() {
+    if (state.player.inHome) return "自宅で過ごしています。家具を利用できます。";
+    if (state.player.inVehicle) return "運転中です。安全運転で目的地へ向かいましょう。";
+    if (state.player.inTrain) return "若葉線で移動中です。";
+    const waypoint = PLACES.find((place) => place.id === state.phone?.waypoint);
+    if (waypoint) return waypoint.name + "へ徒歩で案内中です。";
+    return "今日も若葉の街で、自由に過ごしましょう。";
+  }
+
+  function phoneModelSnapshot() {
+    const p = actorPosition();
+    const waypointPlace = PLACES.find((place) => place.id === state.phone?.waypoint);
+    return {
+      day:state.day,
+      minute:state.minute,
+      cash:state.cash,
+      groceries:state.groceries,
+      fitness:state.fitness,
+      libraryVisits:state.libraryVisits,
+      shiftsWorked:state.shiftsWorked,
+      needs:{ ...state.needs },
+      district:state.player.inHome ? "自宅・室内" : currentDistrict(p.x, p.y),
+      weather:state.visual.weather,
+      soundEnabled:audioState.enabled,
+      inHome:state.player.inHome,
+      inVehicle:state.player.inVehicle,
+      inTrain:state.player.inTrain,
+      drivingRating:state.drive.rating,
+      drivingTrips:state.drive.trips,
+      nextRentDay:nextRentDay(),
+      rent:RENT,
+      statusMessage:phoneStatusMessage(),
+      homeDistance:state.player.inHome ? 0 : distance(p.x, p.y, HOME.x, HOME.y),
+      carDistance:distance(p.x, p.y, personalCar.x, personalCar.y),
+      waypoint:waypointPlace ? {
+        id:waypointPlace.id,
+        name:waypointPlace.name,
+        distance:distance(p.x, p.y, waypointPlace.x, waypointPlace.y)
+      } : null,
+      places:PLACES.map((place) => ({
+        id:place.id,
+        name:place.name,
+        color:place.color,
+        district:currentDistrict(place.x, place.y),
+        distance:distance(p.x, p.y, place.x, place.y)
+      })),
+      npcs:NPCS.map((npc) => ({
+        id:npc.id,
+        name:npc.name,
+        friendship:npc.friendship,
+        hidden:Boolean(npc.hidden),
+        activity:npc.activityLabel || "移動中",
+        distance:distance(p.x, p.y, npc.x, npc.y)
+      })),
+      stations:TRAIN_STATIONS.map((station) => ({
+        id:station.id,
+        name:station.name,
+        distance:distance(p.x, p.y, station.accessX, station.accessY)
+      })),
+      trains:trains.map((train) => ({
+        id:train.id,
+        stationIndex:train.stationIndex,
+        targetIndex:train.targetIndex,
+        dwell:train.dwell,
+        speed:train.speed
+      }))
+    };
+  }
+
+  function setPhoneWaypoint(placeId) {
+    const place = PLACES.find((value) => value.id === placeId);
+    if (!place) return;
+    state.phone.waypoint = place.id;
+    if (state.player.inVehicle) {
+      setDrivingDestination(place);
+    } else {
+      showToast(place.name + "への徒歩ナビを開始しました");
+    }
+    updateSmartphone();
+  }
+
+  function clearPhoneWaypoint() {
+    state.phone.waypoint = null;
+    if (state.player.inVehicle) {
+      state.drive.route = [];
+      state.drive.routeIndex = 0;
+      state.drive.signals = [];
+      state.drive.destination = null;
+    }
+    showToast("案内を終了しました");
+    updateSmartphone();
+  }
+
+  function phoneHomeAction() {
+    if (state.player.inHome) {
+      showToast("自宅で過ごしています");
+      return;
+    }
+    const p = actorPosition();
+    if (!state.player.inVehicle && !state.player.inTrain && distance(p.x, p.y, HOME.x, HOME.y) <= 230) {
+      enterHome();
+      return;
+    }
+    setPhoneWaypoint("home");
+  }
+
+  function capturePhonePhoto() {
+    try {
+      const thumb = document.createElement("canvas");
+      const maxWidth = 360;
+      const scale = Math.min(1, maxWidth / Math.max(1, canvas.width));
+      thumb.width = Math.max(1, Math.round(canvas.width * scale));
+      thumb.height = Math.max(1, Math.round(canvas.height * scale));
+      const tctx = thumb.getContext("2d");
+      if (!tctx) return null;
+      tctx.drawImage(canvas, 0, 0, thumb.width, thumb.height);
+      const p = actorPosition();
+      return {
+        dataUrl:thumb.toDataURL("image/jpeg", .72),
+        day:state.day,
+        minute:state.minute,
+        location:state.player.inHome ? "自宅" : currentDistrict(p.x, p.y)
+      };
+    } catch (error) {
+      console.warn("phone camera capture failed", error);
+      return null;
+    }
+  }
+
   function setSmartphoneOpen(open) {
     if (!smartphonePanel || !smartphoneToggle) return;
     const isOpen = Boolean(open);
     smartphonePanel.hidden = !isOpen;
     smartphoneToggle.setAttribute("aria-expanded", String(isOpen));
     document.body.classList.toggle("smartphone-open", isOpen);
+    if (isOpen) {
+      updateSmartphone();
+      phoneSystem?.open();
+    }
   }
 
   function updateSmartphone() {
-    if (!phoneCash || !phoneClock || !phoneNeeds || !phoneMessage) return;
-    phoneCash.textContent = "¥" + Math.floor(state.cash).toLocaleString("ja-JP");
-    phoneClock.textContent = "Day " + state.day + " · " +
-      String(Math.floor(state.minute / 60)).padStart(2, "0") + ":" +
-      String(Math.floor(state.minute % 60)).padStart(2, "0");
-    phoneNeeds.replaceChildren();
-    for (const [key, label] of [["hunger", "空腹"], ["energy", "体力"], ["hygiene", "清潔"], ["social", "交流"], ["fun", "楽しさ"]]) {
-      const row = document.createElement("div");
-      row.className = "phone-need";
-      const name = document.createElement("span");
-      name.textContent = label;
-      const value = document.createElement("b");
-      value.textContent = Math.round(clamp(state.needs[key], 0, 100)) + "%";
-      row.append(name, value);
-      phoneNeeds.appendChild(row);
-    }
-    phoneMessage.textContent = state.player.inHome
-      ? "自宅で過ごしています。ACTIONで家具を利用できます。"
-      : state.player.inVehicle
-        ? "安全運転で目的地へ向かいましょう。"
-        : "今日も若葉の街で、自由に過ごしましょう。";
+    phoneSystem?.update(phoneModelSnapshot());
   }
 
   function updateHUD() {
@@ -9153,23 +9308,39 @@
   }
   updateSoundButton();
 
+  if (smartphonePanel && globalThis.CityDaysPhoneSystem?.createPhoneSystem) {
+    phoneSystem = globalThis.CityDaysPhoneSystem.createPhoneSystem({
+      root:smartphonePanel,
+      callbacks:{
+        close:() => setSmartphoneOpen(false),
+        route:(placeId) => setPhoneWaypoint(placeId),
+        clearRoute:() => clearPhoneWaypoint(),
+        capturePhoto:() => capturePhonePhoto(),
+        setSound:(enabled) => {
+          setSoundEnabled(enabled);
+          if (enabled) void unlockGameAudio();
+          updateSmartphone();
+        },
+        homeAction:() => phoneHomeAction(),
+        call:(npcId) => {
+          const npc = NPCS.find((value) => value.id === npcId);
+          showToast((npc?.name || "連絡先") + "に電話しました");
+        },
+        message:(npcId) => {
+          const npc = NPCS.find((value) => value.id === npcId);
+          showToast((npc?.name || "連絡先") + "にメッセージを送りました");
+        },
+        toast:(message) => showToast(message)
+      }
+    });
+    updateSmartphone();
+  }
+
   if (smartphoneToggle) {
     smartphoneToggle.addEventListener("click", () => {
       setSmartphoneOpen(smartphonePanel.hidden);
     });
   }
-  phoneNavButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      const destination = button.dataset.phoneNav;
-      if (destination === "status") showToast("生活状況を確認しました");
-      if (destination === "home") {
-        if (state.player.inHome) showToast("自宅で過ごしています");
-        else if (distance(state.player.x, state.player.y, HOME.x, HOME.y) <= 230) enterHome();
-        else showToast("自宅は遠すぎるため、街を歩いて向かいましょう");
-      }
-      if (destination === "close") setSmartphoneOpen(false);
-    });
-  });
 
   window.addEventListener("resize", resize);
 
