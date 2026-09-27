@@ -124,7 +124,7 @@ test('residential districts have connected local streets and street-fronting low
   const homes = map.buildingSites.filter((site) => ['west-housing', 'south-housing', 'east-housing'].includes(site.zoneId));
 
   assert.ok(localRoads.length >= 5);
-  assert.ok(localRoads.every((edge) => edge.vehicle && edge.width >= 52 && edge.width <= 72));
+  assert.ok(localRoads.every((edge) => edge.vehicle && edge.sourceWidth >= 52 && edge.sourceWidth <= 72));
   assert.ok(homes.length >= 100);
   assert.ok(homes.filter((home) => home.zoneId === 'west-housing').length >= 18);
   assert.ok(homes.filter((home) => home.zoneId === 'south-housing').length >= 50);

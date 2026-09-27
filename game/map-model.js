@@ -358,7 +358,7 @@
       if (!edge.vehicle || !(["residential", "alley"].includes(edge.type) || edge.type === "collector" && edge.width <= 122)) continue;
       let length = 0;
       for (let segment = 1; segment < edge.points.length; segment += 1) length += distance(edge.points[segment - 1], edge.points[segment]);
-      for (let along = 48 + hash2(zoneIndex, edgeIndex, 2201) * 28; along < length - 48; along += 82) {
+      for (let along = 48 + hash2(zoneIndex, edgeIndex, 2201) * 28; along < length - 48; along += 60) {
         let remaining = along;
         let pose = null;
         for (let segment = 1; segment < edge.points.length; segment += 1) {
@@ -403,7 +403,13 @@
       if (district && !pointInPolygon(centerX, centerY, district.polygon)) continue;
       if (reserved.some((area) => rectsOverlap(rect, area, 18))) continue;
       if (openSpaces.length && rectHitsOpenSpace(rect, openSpaces)) continue;
-      if (edges.some((road) => rectIntersectsEdge(rect, road, road.vehicle ? 8 : 4))) continue;
+      if (edges.some((road) => rectIntersectsEdge(
+        rect,
+        road,
+        road.vehicle
+          ? (road.id === edge.id ? 8 : (road.sidewalkWidth || vehicleSidewalkWidthForType(road.type)) + 8)
+          : 4
+      ))) continue;
       if (sites.some((site) => rectsOverlap(rect, site, 14))) continue;
 
       sites.push({
@@ -914,7 +920,11 @@
         if (edges.some((edge) => rectIntersectsEdge(
           site,
           edge,
-          edge.vehicle ? (edge.sidewalkWidth || vehicleSidewalkWidthForType(edge.type)) : 4
+          edge.vehicle && edge.id === site.frontageEdgeId
+            ? 8
+            : edge.vehicle
+              ? (edge.sidewalkWidth || vehicleSidewalkWidthForType(edge.type)) + 8
+              : 4
         ))) errors.push("building intersects street: " + site.id);
       }
 
