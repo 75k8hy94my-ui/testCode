@@ -1581,20 +1581,30 @@
   }
 
   function signalGeometryAtNode(nodeId, approachEdge) {
+    const generated = mapModel.junctionGeometry?.(nodeId, approachEdge?.id);
+    if (generated) return generated;
+
+    // Compatibility fallback for older map models. Current maps derive the
+    // boundary per approach from the connected road directions and widths.
     const incidentEdges = vehicleEdgesAtNode(nodeId);
     const junctionHalf = incidentEdges.length
-      ? Math.max(...incidentEdges.map((edge) => edge.width)) / 2 + 2
+      ? Math.min(...incidentEdges.map((edge) => edge.width)) / 2 + 6
       : (approachEdge?.width || ROAD_WIDTH) / 2;
     const crossingDepth = clamp((approachEdge?.width || ROAD_WIDTH) * .18, 22, 30);
-    const crossingOffset = junctionHalf + 18;
-    const crossingNearEdge = crossingOffset + crossingDepth / 2;
+    const crossingInnerEdge = junctionHalf + 6;
+    const crossingOffset = crossingInnerEdge + crossingDepth / 2;
+    const crossingOuterEdge = crossingInnerEdge + crossingDepth;
     return {
       junctionHalf,
+      conflictBoundary:junctionHalf,
       crossingDepth,
+      crossingInnerEdge,
       crossingOffset,
-      crossingNearEdge,
-      pedestrianWaitOffset: crossingNearEdge + 5,
-      stopOffset: crossingNearEdge + 14
+      crossingOuterEdge,
+      crossingNearEdge:crossingOuterEdge,
+      pedestrianWaitOffset:crossingOuterEdge + 5,
+      stopOffset:crossingOuterEdge + 12,
+      yieldOffset:junctionHalf + 10
     };
   }
 
@@ -4760,6 +4770,14 @@
   }
 
   function junctionCoreRadius(endpoint) {
+    const generated = mapModel.junctionGeometry?.(endpoint.id);
+    if (generated) {
+      return clamp(
+        Math.max(generated.padRadius + 18, generated.conflictRadius * .58 + 18),
+        48,
+        108
+      );
+    }
     const incident = vehicleEdgesAtNode(endpoint.id);
     if (!incident.length) return 52;
     const widest = Math.max(...incident.map((edge) => edge.width || ROAD_WIDTH));
@@ -4767,11 +4785,7 @@
   }
 
   function junctionReleaseRadius(endpoint) {
-    const incident = vehicleEdgesAtNode(endpoint.id);
-    const widest = incident.length
-      ? Math.max(...incident.map((edge) => edge.width || ROAD_WIDTH))
-      : ROAD_WIDTH;
-    return clamp(widest * .55 + 62, 105, 165);
+    return clamp(junctionCoreRadius(endpoint) + 58, 105, 172);
   }
 
   function trafficApproachDistanceToNode(car, nodeId) {
@@ -5125,10 +5139,17 @@
 
       const endpoint = car.directionSign > 0 ? mapModel.getNode(edge.to) : mapModel.getNode(edge.from);
       const endpointDistance = trafficDistanceToEndpoint(car, edge);
-      let junctionYieldOffset = Math.max(vehicleFrontOverhang(car) + 18, (edge.width || ROAD_WIDTH) * .5 + 8);
+      const approachGeometry = endpoint ? signalGeometryAtNode(endpoint.id, edge) : null;
+      const yieldLineOffset = approachGeometry?.yieldOffset
+        ?? ((edge.width || ROAD_WIDTH) * .5 + 10);
+
+      // This is a center-of-car distance, not a painted-line distance. Keeping
+      // the front overhang outside the generated junction boundary prevents a
+      // yielding vehicle from blocking cross traffic at unsignalized T-junctions.
+      let junctionYieldOffset = yieldLineOffset + vehicleFrontOverhang(car);
 
       if (endpoint && isSignalizedMapNode(endpoint.id)) {
-        const geometry = signalGeometryAtNode(endpoint.id, edge);
+        const geometry = approachGeometry || signalGeometryAtNode(endpoint.id, edge);
         const signal = signalStateAt(endpoint.x, endpoint.y, edgeOrientation(edge));
         const centerStopOffset = geometry.stopOffset + vehicleFrontOverhang(car);
         const gapToStopLine = endpointDistance - centerStopOffset;
@@ -6450,8 +6471,15 @@
         if (incidentEdges.length < 2) continue;
         const point = worldToScreen(node.x, node.y);
         if (point.x < -260 || point.y < -260 || point.x > viewWidth + 260 || point.y > viewHeight + 260) continue;
-        const widest = Math.max(...incidentEdges.map((edge) => edge.width));
-        const radius = widest / 2 + (layer === "shadow" ? 12 : layer === "curb" ? 7 : 2);
+
+        // Do not inflate a T-junction to half the widest road. The map model
+        // generates only the small center pad needed to join the road strokes;
+        // approach-specific overlap is handled by junctionGeometry.
+        const generated = mapModel.junctionGeometry?.(node.id);
+        const fallbackHalf = Math.min(...incidentEdges.map((edge) => edge.width)) / 2 + 6;
+        const baseRadius = generated?.padRadius ?? fallbackHalf;
+        const radius = baseRadius + (layer === "shadow" ? 10 : layer === "curb" ? 5 : 0);
+
         ctx.fillStyle = layer === "shadow"
           ? "rgba(27,34,33,.34)"
           : layer === "curb"
