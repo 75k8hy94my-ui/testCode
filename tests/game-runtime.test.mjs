@@ -175,9 +175,10 @@ test('reverse-direction pedestrians start from the correct edge end', () => {
   assert.match(source, /edge\.vehicle \? edge\.width \/ 2 \+ 5 : Math\.min\(10, edge\.width \* \.2\)/);
 });
 
-test('stuck pedestrian recovery does not rebuild from an arbitrary nearest node', () => {
-  assert.match(source, /Never rebuild from an arbitrary nearest node while the pedestrian is/);
-  assert.match(source, /ped\.collisionWait = \.7 \+ \(\(ped\.seed \|\| 0\) % 3\) \* \.15/);
+test('stuck pedestrian recovery stays on the current sidewalk without teleporting', () => {
+  assert.match(source, /Recovery must never switch sidewalks or rebuild from an arbitrary node/);
+  assert.match(source, /requestPedestrianAvoidance\(ped, extra, 1\.1\)/);
+  assert.doesNotMatch(source, /ped\.sideSign\s*=\s*\(ped\.sideSign/);
 });
 
 test('pedestrians reserve same-direction following space before advancing', () => {
@@ -191,10 +192,12 @@ test('traffic reverses at a true dead-end instead of remaining permanently stall
   assert.match(source, /if \(reverseTrafficAtDeadEnd\(car, current\)\) return true;/);
 });
 
-test('pedestrian collisions have deterministic right of way and move the yielding walker aside', () => {
+test('pedestrian collisions preserve sidewalk side and use continuous avoidance', () => {
   assert.match(source, /function pedestrianPriority\(ped\)/);
   assert.match(source, /const yieldingPed = pedestrianPriority\(ped\) < pedestrianPriority\(collision\.target\)/);
-  assert.match(source, /yieldingPed\.sideSign = \(yieldingPed\.sideSign \|\| 1\) \* -1/);
+  assert.match(source, /requestPedestrianAvoidance\(yieldingPed, 18, \.8\)/);
+  assert.match(source, /function updatePedestrianAvoidance\(ped, dt\)/);
+  assert.doesNotMatch(source, /yieldingPed\.sideSign\s*=/);
 });
 
 test('pedestrian generation spaces walkers before the first frame', () => {
@@ -204,6 +207,20 @@ test('pedestrian generation spaces walkers before the first frame', () => {
 
 test('pedestrian route progress remains inside the active edge bounds', () => {
   assert.match(source, /ped\.along = clamp\(ped\.along, 0, edgeLength\);/);
+});
+
+test('pedestrians traverse sidewalk corners continuously instead of snapping between edge offsets', () => {
+  assert.match(source, /function makePedestrianJunctionTransition\(ped, currentEdge, nextEdge, nextDirectionSign\)/);
+  assert.match(source, /ped\.junctionTransition = junctionTransition/);
+  assert.match(source, /function pedestrianTransitionPose\(transition\)/);
+  assert.match(source, /transition\.progress \+= step/);
+  assert.match(source, /junctionTransition:clonePedestrianTransition\(ped\.junctionTransition\)/);
+});
+
+test('pedestrian sidewalk side is immutable after spawn', () => {
+  const assignments = source.match(/sideSign\s*=/g) || [];
+  assert.equal(assignments.length, 1);
+  assert.match(source, /sideSign:hash2\(i, 14, 98\) > \.5 \? 1 : -1/);
 });
 
 test('fresh games snap the default car onto the current road graph', () => {
