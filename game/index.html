@@ -13,36 +13,38 @@
     <canvas id="gameCanvas" aria-label="2D都市生活シミュレーション" tabindex="0"></canvas>
 
     <section id="hud" aria-live="polite">
-      <div class="hud-card status-card">
-        <div class="row strong"><span id="areaName">City Days</span><span id="worldClock">Day 1 08:00</span></div>
-        <div class="row"><span id="cashText">¥8,000</span><span id="foodText">食料 2</span></div>
-        <div id="needsGrid" class="needs-grid">
-          <div class="need"><span>空腹</span><div><i id="hungerBar"></i></div><b id="hungerText">75</b></div>
-          <div class="need"><span>体力</span><div><i id="energyBar"></i></div><b id="energyText">85</b></div>
-          <div class="need"><span>清潔</span><div><i id="hygieneBar"></i></div><b id="hygieneText">80</b></div>
-          <div class="need"><span>交流</span><div><i id="socialBar"></i></div><b id="socialText">65</b></div>
-          <div class="need"><span>楽しさ</span><div><i id="funBar"></i></div><b id="funText">70</b></div>
+      <div class="hud-info-stack" aria-label="生活情報">
+        <div class="hud-card status-card">
+          <div class="row strong"><span id="areaName">City Days</span><span id="worldClock">Day 1 08:00</span></div>
+          <div class="row"><span id="cashText">¥8,000</span><span id="foodText">食料 2</span></div>
+          <div id="needsGrid" class="needs-grid">
+            <div class="need"><span>空腹</span><div><i id="hungerBar"></i></div><b id="hungerText">75</b></div>
+            <div class="need"><span>体力</span><div><i id="energyBar"></i></div><b id="energyText">85</b></div>
+            <div class="need"><span>清潔</span><div><i id="hygieneBar"></i></div><b id="hygieneText">80</b></div>
+            <div class="need"><span>交流</span><div><i id="socialBar"></i></div><b id="socialText">65</b></div>
+            <div class="need"><span>楽しさ</span><div><i id="funBar"></i></div><b id="funText">70</b></div>
+          </div>
         </div>
-      </div>
 
-      <div class="hud-card day-card">
-        <span class="eyebrow">LIFE</span>
-        <strong id="lifeStatus">ふつう</strong>
-        <span id="rentText">次の家賃: Day 8 / ¥12,000</span>
-      </div>
+        <div class="hud-card day-card">
+          <span class="eyebrow">LIFE</span>
+          <strong id="lifeStatus">ふつう</strong>
+          <span id="rentText">次の家賃: Day 8 / ¥12,000</span>
+        </div>
 
-      <div id="driveHud" class="hud-card drive-card" hidden>
-        <span class="eyebrow">DRIVE</span>
-        <div class="drive-speed-row"><strong id="speedText">0</strong><span>km/h</span></div>
-        <div class="drive-info"><span>制限 <b id="speedLimitText">40</b></span><span id="signalText">信号 —</span></div>
-        <div class="drive-info"><span id="gapText">車間 —</span><span>評価 <b id="driveScoreText">100</b></span></div>
-        <div class="drive-destination" id="driveDestinationText">目的地を選択</div>
-      </div>
+        <div id="driveHud" class="hud-card drive-card" hidden>
+          <span class="eyebrow">DRIVE</span>
+          <div class="drive-speed-row"><strong id="speedText">0</strong><span>km/h</span></div>
+          <div class="drive-info"><span>制限 <b id="speedLimitText">40</b></span><span id="signalText">信号 —</span></div>
+          <div class="drive-info"><span id="gapText">車間 —</span><span>評価 <b id="driveScoreText">100</b></span></div>
+          <div class="drive-destination" id="driveDestinationText">目的地を選択</div>
+        </div>
 
-      <div class="hud-card objective-card">
-        <span class="eyebrow">TODAY</span>
-        <strong id="objectiveTitle">まず街を歩いてみよう</strong>
-        <span id="objectiveText">自宅・スーパー・カフェ・公園・ジムを利用できます</span>
+        <div class="hud-card objective-card">
+          <span class="eyebrow">TODAY</span>
+          <strong id="objectiveTitle">まず街を歩いてみよう</strong>
+          <span id="objectiveText">自宅・スーパー・カフェ・公園・ジムを利用できます</span>
+        </div>
       </div>
 
       <div class="hud-card minimap-card">
