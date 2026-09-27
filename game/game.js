@@ -44,6 +44,12 @@
     return;
   }
 
+  const characterRenderer = globalThis.CityDaysCharacterRenderer;
+  if (!characterRenderer?.createAppearance || !characterRenderer?.draw) {
+    showRuntimeError("CharacterRenderer を読み込めません。");
+    return;
+  }
+
   const areaNameEl = document.getElementById("areaName");
   const worldClockEl = document.getElementById("worldClock");
   const cashText = document.getElementById("cashText");
@@ -1841,45 +1847,11 @@
     return family + " " + given;
   }
 
-  function personAppearanceFromSeed(index) {
-    const stature = .96 + hash2(index, 211, 2201) * .10;
-    const build = .93 + hash2(index, 223, 2202) * .16;
-    const shoulder = .95 + hash2(index, 227, 2203) * .12;
-    const hip = .96 + hash2(index, 229, 2204) * .10;
-    const head = .94 + hash2(index, 233, 2205) * .08;
-    const hairStyle = Math.floor(hash2(index, 239, 2206) * 7) % 7;
-    const outfit = Math.floor(hash2(index, 241, 2207) * 5) % 5;
-    const accessoryRoll = hash2(index, 251, 2208);
-    return {
-      stature,
-      build,
-      shoulder,
-      hip,
-      head,
-      hairStyle,
-      outfit,
-      accessory:accessoryRoll > .88 ? "backpack" : accessoryRoll > .79 ? "bag" : "none",
-      shoe:hash2(index, 257, 2209) > .5 ? "#25292a" : "#4a443e",
-      gait:.94 + hash2(index, 263, 2210) * .12,
-      armSwing:.92 + hash2(index, 269, 2211) * .16,
-      posture:.97 + hash2(index, 271, 2212) * .06,
-      hairVolume:.94 + hash2(index, 277, 2213) * .12
-    };
+  function personAppearanceFromSeed(index, profile = {}) {
+    return characterRenderer.createAppearance(index + 41, profile);
   }
 
-  const PLAYER_APPEARANCE = {
-    stature:1.03,
-    build:1.02,
-    shoulder:1.02,
-    hip:.98,
-    head:1,
-    hairStyle:1,
-    outfit:1,
-    accessory:"none",
-    shoe:"#272d2f",
-    gait:1,
-    armSwing:1
-  };
+  const PLAYER_APPEARANCE = characterRenderer.createAppearance(9001, { role:"player" });
 
   function citizenProfile(index, home, workPool) {
     const specialNpcId = index === 0 ? "aoi" : index === 1 ? "sora" : index === 2 ? "mei" : null;
@@ -2602,7 +2574,7 @@
         pants:["#394248","#554a45","#2f3b4d","#45464d"][i % 4],
         hair:["#302720","#4a3427","#1f2326","#684b36"][i % 4],
         skin:["#e5b394","#d49b77","#f0c3a4","#b97f62"][i % 4],
-        appearance:personAppearanceFromSeed(i),
+        appearance:personAppearanceFromSeed(i, profile),
         phase:hash2(i, 12, 97) * Math.PI * 2,
         seed:i + 41,
         sideSign:hash2(i, 14, 98) > .5 ? 1 : -1,
@@ -8101,73 +8073,16 @@
     ctx.fillText(place.symbol, entry.x, entry.y + 4);
   }
 
-  function drawHumanSegment(a, b, startWidth, endWidth, fill, alpha = 1) {
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const length = Math.hypot(dx, dy) || 1;
-    const nx = -dy / length;
-    const ny = dx / length;
-    const aHalf = startWidth * .5;
-    const bHalf = endWidth * .5;
-
-    ctx.save();
-    ctx.globalAlpha *= alpha;
-    ctx.fillStyle = fill;
-    ctx.beginPath();
-    ctx.moveTo(a.x + nx * aHalf, a.y + ny * aHalf);
-    ctx.lineTo(b.x + nx * bHalf, b.y + ny * bHalf);
-    ctx.quadraticCurveTo(
-      b.x + dx / length * bHalf * .34,
-      b.y + dy / length * bHalf * .34,
-      b.x - nx * bHalf,
-      b.y - ny * bHalf
-    );
-    ctx.lineTo(a.x - nx * aHalf, a.y - ny * aHalf);
-    ctx.quadraticCurveTo(
-      a.x - dx / length * aHalf * .28,
-      a.y - dy / length * aHalf * .28,
-      a.x + nx * aHalf,
-      a.y + ny * aHalf
-    );
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
+  function characterLodAtScreen(p, scale) {
+    if (scale < .9) return "mid";
+    const centerDistance = Math.hypot(p.x - viewWidth / 2, p.y - viewHeight / 2);
+    const farThreshold = Math.max(viewWidth, viewHeight) * .56;
+    return centerDistance > farThreshold ? "mid" : "near";
   }
 
-  function drawHumanShoe(foot, lookX, lookY, stature, fill, alpha = 1) {
-    const dirX = Math.abs(lookX) > .12 ? lookX : (lookY >= 0 ? .22 : -.22);
-    const dirY = lookY * .20;
-    const angle = Math.atan2(dirY, dirX);
-    ctx.save();
-    ctx.globalAlpha *= alpha;
-    ctx.translate(foot.x + dirX * 1.2 * stature, foot.y + dirY * .8 * stature);
-    ctx.rotate(angle);
-    ctx.fillStyle = fill;
-    roundedRectPath(
-      ctx,
-      -2.4 * stature,
-      -1.45 * stature,
-      6.3 * stature,
-      2.9 * stature,
-      1.35 * stature
-    );
-    ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,.10)";
-    roundedRectPath(
-      ctx,
-      .9 * stature,
-      -1.0 * stature,
-      2.0 * stature,
-      .55 * stature,
-      .25 * stature
-    );
-    ctx.fill();
-    ctx.restore();
-  }
-
-  function drawPersonSpriteAtScreen(
-    px,
-    py,
+  function drawPerson(
+    x,
+    y,
     dir,
     shirt,
     pants,
@@ -8175,510 +8090,27 @@
     skin,
     phase,
     scale = 1,
-    appearance = null
+    appearance = null,
+    visualState = "walk"
   ) {
-    const ap = appearance || PLAYER_APPEARANCE;
-    const lookX = Math.cos(dir);
-    const lookY = Math.sin(dir);
-    const profile = Math.abs(lookX);
-    const front = lookY > .24;
-    const back = lookY < -.32;
-    const stature = (ap.stature || 1) * scale;
-    const build = ap.build || 1;
-    const posture = ap.posture || 1;
-    const hairVolume = ap.hairVolume || 1;
-
-    // Human proportions: longer legs, smaller head and a narrower waist.
-    const headScale = ap.head || 1;
-    const shoulderHalf = 6.4 * stature * build * (ap.shoulder || 1) * (1 - profile * .18);
-    const waistHalf = 4.05 * stature * build * (1 - profile * .24);
-    const hipHalf = 4.55 * stature * build * (ap.hip || 1) * (1 - profile * .15);
-    const headRx = 4.9 * stature * headScale * (1 - profile * .10);
-    const headRy = 6.15 * stature * headScale;
-
-    const footY = py + 21.5 * stature;
-    const kneeY = py + 9.2 * stature;
-    const hipY = py - 3.1 * stature;
-    const waistY = py - 10.1 * stature;
-    const shoulderY = py - 21.0 * stature;
-    const neckY = py - 25.1 * stature;
-    const headY = py - 31.6 * stature;
-
-    const cycle = Math.sin(phase) * (ap.gait || 1);
-    const cycleCos = Math.cos(phase);
-    const bob = (1 - Math.abs(cycleCos)) * .55 * stature;
-    const stride = cycle * 5.25 * stature;
-    const armSwing = cycle * 4.25 * stature * (ap.armSwing || 1);
-    const lean = Math.min(1.05 * stature, Math.abs(cycle) * .72 * stature);
-    const leanX = lookX * lean;
-    const leanY = Math.max(0, lookY) * lean * .10;
-    const torsoX = px + leanX * .26;
-    const torsoShiftY = leanY + (1 - posture) * 8 * stature;
-    const headX = px + leanX * .43;
-    const headShiftY = torsoShiftY + (1 - posture) * 4 * stature;
-
-    // Compact ground shadow keeps feet visually attached to the pavement.
-    ctx.fillStyle = "rgba(13,18,17,.20)";
-    ctx.beginPath();
-    ctx.ellipse(
-      px + 1.8 * stature,
-      footY + 3.5 * stature,
-      8.7 * stature * build,
-      2.9 * stature,
-      0,
-      0,
-      Math.PI * 2
-    );
-    ctx.fill();
-
-    const strideX = lookX * stride;
-    const strideY = lookY * stride * .42;
-
-    const leftHip = { x:torsoX - hipHalf * .62, y:hipY - bob + torsoShiftY };
-    const rightHip = { x:torsoX + hipHalf * .62, y:hipY - bob + torsoShiftY };
-    const leftKnee = {
-      x:leftHip.x + strideX * .40 - .72 * stature,
-      y:kneeY - bob + torsoShiftY + strideY * .18
-    };
-    const rightKnee = {
-      x:rightHip.x - strideX * .40 + .72 * stature,
-      y:kneeY - bob + torsoShiftY - strideY * .18
-    };
-    const leftFoot = {
-      x:leftKnee.x + strideX * .43 + lookX * 1.5 * stature,
-      y:footY + strideY * .30
-    };
-    const rightFoot = {
-      x:rightKnee.x - strideX * .43 + lookX * 1.5 * stature,
-      y:footY - strideY * .30
-    };
-
-    const leftShoulder = {
-      x:torsoX - shoulderHalf,
-      y:shoulderY - bob + torsoShiftY
-    };
-    const rightShoulder = {
-      x:torsoX + shoulderHalf,
-      y:shoulderY - bob + torsoShiftY
-    };
-    const leftElbow = {
-      x:leftShoulder.x - lookX * armSwing * .43 - 1.35 * stature,
-      y:shoulderY + 8.2 * stature - bob + torsoShiftY - lookY * armSwing * .15
-    };
-    const rightElbow = {
-      x:rightShoulder.x + lookX * armSwing * .43 + 1.35 * stature,
-      y:shoulderY + 8.2 * stature - bob + torsoShiftY + lookY * armSwing * .15
-    };
-    const leftWrist = {
-      x:leftElbow.x - lookX * armSwing * .34,
-      y:leftElbow.y + 7.15 * stature
-    };
-    const rightWrist = {
-      x:rightElbow.x + lookX * armSwing * .34,
-      y:rightElbow.y + 7.15 * stature
-    };
-
-    const leftIsRear = lookX > 0;
-    const rearHip = leftIsRear ? leftHip : rightHip;
-    const rearKnee = leftIsRear ? leftKnee : rightKnee;
-    const rearFoot = leftIsRear ? leftFoot : rightFoot;
-    const frontHip = leftIsRear ? rightHip : leftHip;
-    const frontKnee = leftIsRear ? rightKnee : leftKnee;
-    const frontFoot = leftIsRear ? rightFoot : leftFoot;
-    const rearShoulder = leftIsRear ? leftShoulder : rightShoulder;
-    const rearElbow = leftIsRear ? leftElbow : rightElbow;
-    const rearWrist = leftIsRear ? leftWrist : rightWrist;
-    const frontShoulder = leftIsRear ? rightShoulder : leftShoulder;
-    const frontElbow = leftIsRear ? rightElbow : leftElbow;
-    const frontWrist = leftIsRear ? rightWrist : leftWrist;
-
-    const longSleeve = ap.outfit !== 0;
-    const shoeColor = ap.shoe || "#282d2e";
-
-    // Rear leg: tapered thigh and shin instead of a stroked stick.
-    drawHumanSegment(rearHip, rearKnee, 5.1 * stature * build, 4.2 * stature * build, pants, .70);
-    drawHumanSegment(rearKnee, rearFoot, 4.2 * stature * build, 3.25 * stature * build, pants, .70);
-    drawHumanShoe(rearFoot, lookX, lookY, stature, shoeColor, .72);
-
-    // Rear arm.
-    if (longSleeve) {
-      drawHumanSegment(rearShoulder, rearElbow, 4.25 * stature * build, 3.6 * stature, shirt, .68);
-      drawHumanSegment(rearElbow, rearWrist, 3.55 * stature, 2.65 * stature, shirt, .68);
-    } else {
-      const rearSleeve = {
-        x:rearShoulder.x + (rearElbow.x - rearShoulder.x) * .43,
-        y:rearShoulder.y + (rearElbow.y - rearShoulder.y) * .43
-      };
-      drawHumanSegment(rearShoulder, rearSleeve, 4.3 * stature * build, 3.9 * stature, shirt, .68);
-      drawHumanSegment(rearSleeve, rearElbow, 3.25 * stature, 2.85 * stature, skin, .68);
-      drawHumanSegment(rearElbow, rearWrist, 2.85 * stature, 2.2 * stature, skin, .68);
-    }
-
-    // Backpack belongs behind the torso and is offset toward the camera-opposite side.
-    if (ap.accessory === "backpack") {
-      ctx.save();
-      ctx.globalAlpha = .90;
-      ctx.fillStyle = "#48504c";
-      roundedRectPath(
-        ctx,
-        torsoX - 5.0 * stature - lookX * 1.15 * stature,
-        shoulderY + 1.7 * stature - bob + torsoShiftY,
-        10.0 * stature,
-        14.6 * stature,
-        3.0 * stature
-      );
-      ctx.fill();
-      ctx.strokeStyle = "rgba(19,25,23,.22)";
-      ctx.lineWidth = .8 * stature;
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    // Pelvis prevents a visual gap between the torso and articulated legs.
-    ctx.fillStyle = pants;
-    roundedRectPath(
-      ctx,
-      torsoX - hipHalf * .88,
-      hipY - 1.8 * stature - bob + torsoShiftY,
-      hipHalf * 1.76,
-      5.0 * stature,
-      1.5 * stature
-    );
-    ctx.fill();
-
-    const coat = ap.outfit === 2;
-    const hemY = hipY + (coat ? 5.1 : 1.5) * stature - bob + torsoShiftY;
-    const hemHalf = hipHalf + (coat ? 1.75 : 0) * stature;
-
-    // Torso with curved shoulder/waist transitions.
-    ctx.fillStyle = shirt;
-    ctx.beginPath();
-    ctx.moveTo(leftShoulder.x, leftShoulder.y);
-    ctx.quadraticCurveTo(
-      torsoX - waistHalf - .35 * stature,
-      waistY - bob + torsoShiftY,
-      torsoX - hemHalf,
-      hemY
-    );
-    if (coat) {
-      ctx.quadraticCurveTo(torsoX, hemY + .85 * stature, torsoX + hemHalf, hemY);
-    } else {
-      ctx.lineTo(torsoX + hemHalf, hemY);
-    }
-    ctx.quadraticCurveTo(
-      torsoX + waistHalf + .35 * stature,
-      waistY - bob + torsoShiftY,
-      rightShoulder.x,
-      rightShoulder.y
-    );
-    ctx.quadraticCurveTo(torsoX, shoulderY - 1.0 * stature - bob + torsoShiftY, leftShoulder.x, leftShoulder.y);
-    ctx.closePath();
-    ctx.fill();
-
-    // Subtle body-side shade adds volume without cartoon outlines.
-    ctx.fillStyle = "rgba(13,18,18,.10)";
-    ctx.beginPath();
-    ctx.moveTo(torsoX + shoulderHalf * .20, shoulderY - .6 * stature - bob + torsoShiftY);
-    ctx.lineTo(rightShoulder.x, rightShoulder.y);
-    ctx.quadraticCurveTo(torsoX + waistHalf, waistY - bob + torsoShiftY, torsoX + hemHalf, hemY);
-    ctx.lineTo(torsoX + hemHalf * .18, hemY);
-    ctx.closePath();
-    ctx.fill();
-
-    // Outfit-specific details are deliberately low-contrast.
-    if (ap.outfit === 1) {
-      ctx.strokeStyle = "rgba(23,29,28,.25)";
-      ctx.lineWidth = .85 * stature;
-      ctx.beginPath();
-      ctx.moveTo(torsoX, shoulderY + 1.1 * stature - bob + torsoShiftY);
-      ctx.lineTo(torsoX, hemY - 1.1 * stature);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(torsoX - 3.5 * stature, shoulderY + 1.6 * stature - bob + torsoShiftY);
-      ctx.lineTo(torsoX, shoulderY + 4.5 * stature - bob + torsoShiftY);
-      ctx.lineTo(torsoX + 3.5 * stature, shoulderY + 1.6 * stature - bob + torsoShiftY);
-      ctx.stroke();
-    } else if (ap.outfit === 2) {
-      ctx.strokeStyle = "rgba(23,29,28,.22)";
-      ctx.lineWidth = .8 * stature;
-      ctx.beginPath();
-      ctx.moveTo(torsoX, shoulderY + .8 * stature - bob + torsoShiftY);
-      ctx.lineTo(torsoX, hemY - 1.0 * stature);
-      ctx.stroke();
-    } else if (ap.outfit === 3) {
-      ctx.strokeStyle = "rgba(24,30,29,.24)";
-      ctx.lineWidth = 1.35 * stature;
-      ctx.beginPath();
-      ctx.arc(
-        torsoX,
-        shoulderY + 1.0 * stature - bob + torsoShiftY,
-        4.1 * stature,
-        .10 * Math.PI,
-        .90 * Math.PI
-      );
-      ctx.stroke();
-    } else if (ap.outfit === 4) {
-      ctx.strokeStyle = "rgba(255,255,255,.09)";
-      ctx.lineWidth = .75 * stature;
-      ctx.beginPath();
-      ctx.moveTo(torsoX - shoulderHalf * .72, shoulderY + 5.4 * stature - bob + torsoShiftY);
-      ctx.lineTo(torsoX + shoulderHalf * .72, shoulderY + 5.4 * stature - bob + torsoShiftY);
-      ctx.stroke();
-    }
-
-    // Front leg.
-    drawHumanSegment(frontHip, frontKnee, 5.2 * stature * build, 4.25 * stature * build, pants, 1);
-    drawHumanSegment(frontKnee, frontFoot, 4.25 * stature * build, 3.3 * stature * build, pants, 1);
-
-    // A narrow highlight on the front trouser leg makes the knee read as a joint.
-    ctx.save();
-    ctx.globalAlpha = .10;
-    drawHumanSegment(
-      {x:frontHip.x - .55 * stature, y:frontHip.y},
-      {x:frontKnee.x - .35 * stature, y:frontKnee.y},
-      1.05 * stature,
-      .75 * stature,
-      "#ffffff",
-      1
-    );
-    ctx.restore();
-    drawHumanShoe(frontFoot, lookX, lookY, stature, shoeColor, 1);
-
-    // Front arm.
-    if (longSleeve) {
-      drawHumanSegment(frontShoulder, frontElbow, 4.3 * stature * build, 3.65 * stature, shirt, 1);
-      drawHumanSegment(frontElbow, frontWrist, 3.6 * stature, 2.7 * stature, shirt, 1);
-    } else {
-      const frontSleeve = {
-        x:frontShoulder.x + (frontElbow.x - frontShoulder.x) * .43,
-        y:frontShoulder.y + (frontElbow.y - frontShoulder.y) * .43
-      };
-      drawHumanSegment(frontShoulder, frontSleeve, 4.35 * stature * build, 3.95 * stature, shirt, 1);
-      drawHumanSegment(frontSleeve, frontElbow, 3.3 * stature, 2.9 * stature, skin, 1);
-      drawHumanSegment(frontElbow, frontWrist, 2.9 * stature, 2.25 * stature, skin, 1);
-    }
-
-    // Hands are tiny rounded forms instead of large circles.
-    ctx.fillStyle = skin;
-    ctx.beginPath();
-    ctx.ellipse(frontWrist.x, frontWrist.y + .55 * stature, 1.25 * stature, 1.65 * stature, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Cross-body bag sits on top of the torso.
-    if (ap.accessory === "bag") {
-      ctx.strokeStyle = "rgba(65,53,43,.64)";
-      ctx.lineWidth = 1.15 * stature;
-      ctx.beginPath();
-      ctx.moveTo(torsoX - shoulderHalf * .56, shoulderY + 1.0 * stature - bob + torsoShiftY);
-      ctx.lineTo(torsoX + hipHalf * .48, hipY + 2.7 * stature - bob + torsoShiftY);
-      ctx.stroke();
-      ctx.fillStyle = "#665343";
-      roundedRectPath(
-        ctx,
-        torsoX + hipHalf * .10,
-        hipY - .6 * stature - bob + torsoShiftY,
-        6.7 * stature,
-        5.7 * stature,
-        1.6 * stature
-      );
-      ctx.fill();
-    }
-
-    // Neck.
-    ctx.fillStyle = skin;
-    roundedRectPath(
-      ctx,
-      headX - 1.75 * stature,
-      neckY - bob + headShiftY,
-      3.5 * stature,
-      5.0 * stature,
-      1.45 * stature
-    );
-    ctx.fill();
-
-    // Ear is visible only in a strong profile.
-    if (profile > .50) {
-      const earSide = lookX > 0 ? 1 : -1;
-      ctx.fillStyle = skin;
-      ctx.beginPath();
-      ctx.ellipse(
-        headX + earSide * headRx * .88,
-        headY + .35 * stature - bob + headShiftY,
-        1.15 * stature,
-        1.65 * stature,
-        0,
-        0,
-        Math.PI * 2
-      );
-      ctx.fill();
-    }
-
-    // Head shape uses a jaw and chin instead of an ellipse.
-    const faceY = headY - bob + headShiftY;
-    ctx.fillStyle = skin;
-    ctx.beginPath();
-    ctx.moveTo(headX - headRx * .73, faceY - headRy * .72);
-    ctx.bezierCurveTo(
-      headX - headRx * .44,
-      faceY - headRy * 1.03,
-      headX + headRx * .43,
-      faceY - headRy * 1.03,
-      headX + headRx * .75,
-      faceY - headRy * .70
-    );
-    ctx.quadraticCurveTo(
-      headX + headRx * .92,
-      faceY - headRy * .06,
-      headX + headRx * .60,
-      faceY + headRy * .50
-    );
-    ctx.quadraticCurveTo(
-      headX + headRx * .28,
-      faceY + headRy * .90,
-      headX,
-      faceY + headRy
-    );
-    ctx.quadraticCurveTo(
-      headX - headRx * .30,
-      faceY + headRy * .88,
-      headX - headRx * .60,
-      faceY + headRy * .50
-    );
-    ctx.quadraticCurveTo(
-      headX - headRx * .92,
-      faceY - headRy * .06,
-      headX - headRx * .73,
-      faceY - headRy * .72
-    );
-    ctx.closePath();
-    ctx.fill();
-
-    // Face-side shade.
-    ctx.save();
-    ctx.globalAlpha = .075;
-    ctx.fillStyle = "#6e4337";
-    ctx.beginPath();
-    ctx.moveTo(headX + headRx * .20, faceY - headRy * .80);
-    ctx.quadraticCurveTo(headX + headRx * .90, faceY, headX + headRx * .54, faceY + headRy * .52);
-    ctx.quadraticCurveTo(headX + headRx * .25, faceY + headRy * .86, headX, faceY + headRy * .96);
-    ctx.lineTo(headX + headRx * .03, faceY - headRy * .88);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-
-    // Hair silhouette. Seven variants keep the crowd from looking cloned.
-    ctx.fillStyle = hair;
-    const hv = hairVolume;
-    const hairStyle = ap.hairStyle || 0;
-    if (hairStyle === 0) {
-      ctx.beginPath();
-      ctx.ellipse(headX, faceY - 2.35 * stature, headRx * 1.02 * hv, headRy * .55, 0, Math.PI, Math.PI * 2);
-      ctx.fill();
-    } else if (hairStyle === 1) {
-      ctx.beginPath();
-      ctx.ellipse(headX, faceY - 2.1 * stature, headRx * 1.05 * hv, headRy * .61, 0, Math.PI, Math.PI * 2.02);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(headX - headRx * .82, faceY - 2.5 * stature);
-      ctx.lineTo(headX - headRx * .56, faceY + 1.9 * stature);
-      ctx.lineTo(headX - headRx * .28, faceY - .7 * stature);
-      ctx.closePath();
-      ctx.fill();
-    } else if (hairStyle === 2) {
-      ctx.beginPath();
-      ctx.ellipse(headX, faceY - 1.9 * stature, headRx * 1.06 * hv, headRy * .62, 0, Math.PI, Math.PI * 2);
-      ctx.fill();
-      roundedRectPath(ctx, headX - headRx * .91, faceY - 1.8 * stature, 2.0 * stature, 7.6 * stature, 1.0 * stature);
-      ctx.fill();
-      roundedRectPath(ctx, headX + headRx * .50, faceY - 1.8 * stature, 2.0 * stature, 7.6 * stature, 1.0 * stature);
-      ctx.fill();
-    } else if (hairStyle === 3) {
-      ctx.beginPath();
-      ctx.ellipse(headX, faceY - 2.0 * stature, headRx * 1.04 * hv, headRy * .57, 0, Math.PI, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(headX - headRx * .78, faceY - 2.6 * stature);
-      ctx.lineTo(headX + headRx * .58, faceY - 5.6 * stature);
-      ctx.lineTo(headX + headRx * .04, faceY + .5 * stature);
-      ctx.closePath();
-      ctx.fill();
-    } else if (hairStyle === 4) {
-      ctx.beginPath();
-      ctx.ellipse(headX, faceY - 1.85 * stature, headRx * 1.08 * hv, headRy * .63, 0, Math.PI, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(headX, faceY + 2.6 * stature, headRx * .89 * hv, 3.5 * stature, 0, 0, Math.PI);
-      ctx.fill();
-    } else if (hairStyle === 5) {
-      ctx.beginPath();
-      ctx.ellipse(headX, faceY - 2.0 * stature, headRx * 1.03 * hv, headRy * .59, 0, Math.PI, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(headX - lookX * 2.0 * stature, faceY - headRy * .96, 2.4 * stature * hv, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.beginPath();
-      ctx.ellipse(headX, faceY - 1.95 * stature, headRx * 1.04 * hv, headRy * .60, 0, Math.PI, Math.PI * 2);
-      ctx.fill();
-      const ponySide = lookX >= 0 ? -1 : 1;
-      ctx.beginPath();
-      ctx.ellipse(
-        headX + ponySide * headRx * .88,
-        faceY + .5 * stature,
-        1.75 * stature,
-        4.7 * stature,
-        ponySide * .18,
-        0,
-        Math.PI * 2
-      );
-      ctx.fill();
-    }
-
-    // Very small facial cues. Silhouette remains the primary readability cue.
-    if (!back) {
-      const faceShift = lookX * .90 * stature;
-      const eyeY = faceY - .25 * stature;
-      ctx.fillStyle = "rgba(43,36,33,.64)";
-      if (profile < .68) {
-        ctx.beginPath();
-        ctx.ellipse(headX - 1.38 * stature + faceShift, eyeY, .43 * stature, .54 * stature, 0, 0, Math.PI * 2);
-        ctx.ellipse(headX + 1.38 * stature + faceShift, eyeY, .43 * stature, .54 * stature, 0, 0, Math.PI * 2);
-        ctx.fill();
-      } else {
-        ctx.beginPath();
-        ctx.ellipse(headX + faceShift, eyeY, .46 * stature, .56 * stature, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      if (front && profile < .72) {
-        ctx.strokeStyle = "rgba(104,60,54,.28)";
-        ctx.lineWidth = Math.max(.55, .62 * stature);
-        ctx.beginPath();
-        ctx.moveTo(headX - .82 * stature, faceY + 3.0 * stature);
-        ctx.quadraticCurveTo(headX, faceY + 3.35 * stature, headX + .82 * stature, faceY + 3.0 * stature);
-        ctx.stroke();
-      }
-    }
-
-    // Small cheek/temple highlight.
-    ctx.fillStyle = "rgba(255,244,232,.09)";
-    ctx.beginPath();
-    ctx.ellipse(
-      headX - headRx * .26,
-      faceY - .85 * stature,
-      headRx * .17,
-      headRy * .24,
-      -.18,
-      0,
-      Math.PI * 2
-    );
-    ctx.fill();
-  }
-
-  function drawPerson(x, y, dir, shirt, pants, hair, skin, phase, scale = 1, appearance = null) {
     const p = worldToScreen(x, y);
-    if (p.x < -60 || p.y < -75 || p.x > viewWidth + 60 || p.y > viewHeight + 75) return;
-    drawPersonSpriteAtScreen(p.x, p.y, dir, shirt, pants, hair, skin, phase, scale, appearance);
+    if (p.x < -70 || p.y < -100 || p.x > viewWidth + 70 || p.y > viewHeight + 100) return;
+
+    const resolvedAppearance = appearance || characterRenderer.createAppearance(
+      Math.round(x * 7 + y * 13),
+      {}
+    );
+    characterRenderer.draw(ctx, {
+      x:p.x,
+      y:p.y,
+      direction:dir,
+      phase,
+      scale,
+      appearance:resolvedAppearance,
+      state:visualState,
+      lod:characterLodAtScreen(p, scale),
+      timeMs:performance.now()
+    });
   }
 
   function syncNamedNpcCitizens() {
@@ -8697,6 +8129,9 @@
       npc.pants = citizen.pants;
       npc.hair = citizen.hair;
       npc.skin = citizen.skin;
+      npc.phase = citizen.phase;
+      npc.state = citizen.state;
+      npc.speed = citizen.speed;
     }
   }
 
@@ -8710,25 +8145,38 @@
       npc.pants || "#394248",
       npc.hair || "#3c2d25",
       npc.skin || "#e7b28f",
-      performance.now() * .004 + npc.x * .01,
+      npc.phase ?? performance.now() * .004,
       1.02,
-      npc.appearance
+      npc.appearance,
+      npc.state || "idle"
     );
     const p = worldToScreen(npc.x, npc.y);
     if (p.x < -40 || p.y < -40 || p.x > viewWidth + 40 || p.y > viewHeight + 40) return;
     ctx.fillStyle = "rgba(12,18,15,.76)";
-    roundedRectPath(ctx, p.x - 27, p.y - 33, 54, 17, 6);
+    roundedRectPath(ctx, p.x - 27, p.y - 76, 54, 17, 6);
     ctx.fill();
     ctx.fillStyle = "#f4f6f5";
     ctx.font = "600 10px system-ui, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(npc.name, p.x, p.y - 21);
+    ctx.fillText(npc.name, p.x, p.y - 64);
   }
 
   function drawPedestrians() {
     for (const ped of pedestrians) {
       if (!ped.visible || ped.specialNpcId) continue;
-      drawPerson(ped.x, ped.y, ped.dir, ped.color, ped.pants, ped.hair, ped.skin, ped.phase, .98, ped.appearance);
+      drawPerson(
+        ped.x,
+        ped.y,
+        ped.dir,
+        ped.color,
+        ped.pants,
+        ped.hair,
+        ped.skin,
+        ped.phase,
+        .98,
+        ped.appearance,
+        ped.state
+      );
     }
   }
 
@@ -8892,7 +8340,8 @@
       "#edbea0",
       phase,
       1.08,
-      PLAYER_APPEARANCE
+      PLAYER_APPEARANCE,
+      moving ? "walk" : "idle"
     );
   }
 
