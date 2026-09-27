@@ -502,6 +502,126 @@
       return length;
     }
 
+    function edgeOutwardDirection(edge, nodeId) {
+      const junctionNode = getNode(nodeId);
+      if (!junctionNode || !edge) return null;
+      const adjacent = edge.from === nodeId
+        ? edge.points[1]
+        : edge.to === nodeId
+          ? edge.points.at(-2)
+          : null;
+      if (!adjacent) return null;
+      const dx = adjacent.x - junctionNode.x;
+      const dy = adjacent.y - junctionNode.y;
+      const magnitude = Math.hypot(dx, dy);
+      if (magnitude < .001) return null;
+      return { x:dx / magnitude, y:dy / magnitude };
+    }
+
+    function vehicleEdgesAtNode(nodeId) {
+      return (adjacency.get(nodeId) || [])
+        .map(({ edge }) => edge)
+        .filter((edge) => edge.vehicle);
+    }
+
+    function junctionGeometry(nodeId, approachEdgeId = null) {
+      const junctionNode = getNode(nodeId);
+      if (!junctionNode) return null;
+      const incidentEdges = vehicleEdgesAtNode(nodeId);
+      if (!incidentEdges.length) return null;
+
+      // The old renderer filled every junction with a circle based on the
+      // widest connected road. At an unequal-width or skewed intersection this
+      // made the physical junction much larger than the roads themselves.
+      // A small pad only closes the central seam; per-approach conflict extents
+      // below describe where other road surfaces actually intrude.
+      const halfWidths = incidentEdges.map((edge) => edge.width / 2);
+      const smallestHalf = Math.min(...halfWidths);
+      const padRadius = Math.max(28, Math.min(72, smallestHalf + 6));
+
+      if (!approachEdgeId) {
+        const approachGeometries = incidentEdges
+          .map((edge) => junctionGeometry(nodeId, edge.id))
+          .filter(Boolean);
+        const conflictRadius = approachGeometries.length
+          ? Math.max(...approachGeometries.map((value) => value.conflictBoundary))
+          : padRadius;
+        return {
+          nodeId,
+          padRadius,
+          conflictRadius,
+          incidentEdgeIds:incidentEdges.map((edge) => edge.id)
+        };
+      }
+
+      const approachEdge = incidentEdges.find((edge) => edge.id === approachEdgeId);
+      if (!approachEdge) return null;
+      const approachDirection = edgeOutwardDirection(approachEdge, nodeId);
+      if (!approachDirection) return null;
+
+      let conflictBoundary = padRadius;
+      for (const otherEdge of incidentEdges) {
+        if (otherEdge.id === approachEdge.id) continue;
+        const otherDirection = edgeOutwardDirection(otherEdge, nodeId);
+        if (!otherDirection) continue;
+
+        const dot =
+          approachDirection.x * otherDirection.x +
+          approachDirection.y * otherDirection.y;
+        const cross = Math.abs(
+          approachDirection.x * otherDirection.y -
+          approachDirection.y * otherDirection.x
+        );
+
+        // An edge that leaves the node on the opposite side does not project
+        // into this approach because road strokes use butt caps at the node.
+        if (dot < -.04) continue;
+
+        const otherHalfWidth = otherEdge.width / 2 + 2;
+        if (cross < .08) {
+          if (dot > .96) {
+            conflictBoundary = Math.max(
+              conflictBoundary,
+              Math.min(190, otherHalfWidth + 8)
+            );
+          }
+          continue;
+        }
+
+        // For a skewed branch, its road-width strip can extend a long way into
+        // this approach. Project that strip onto the approach direction.
+        const projectedExtent = otherHalfWidth / cross;
+        conflictBoundary = Math.max(
+          conflictBoundary,
+          Math.min(190, projectedExtent)
+        );
+      }
+
+      const crossingDepth = Math.max(22, Math.min(30, approachEdge.width * .18));
+      const crossingInnerEdge = conflictBoundary + 6;
+      const crossingOffset = crossingInnerEdge + crossingDepth / 2;
+      const crossingOuterEdge = crossingInnerEdge + crossingDepth;
+      const pedestrianWaitOffset = crossingOuterEdge + 5;
+      const stopOffset = crossingOuterEdge + 12;
+      const yieldOffset = conflictBoundary + 10;
+
+      return {
+        nodeId,
+        approachEdgeId:approachEdge.id,
+        padRadius,
+        conflictBoundary,
+        junctionHalf:conflictBoundary,
+        crossingDepth,
+        crossingInnerEdge,
+        crossingOffset,
+        crossingOuterEdge,
+        crossingNearEdge:crossingOuterEdge,
+        pedestrianWaitOffset,
+        stopOffset,
+        yieldOffset
+      };
+    }
+
     function findRoute(startNodeId, endNodeId, options = {}) {
       if (!getNode(startNodeId) || !getNode(endNodeId)) return null;
       if (startNodeId === endNodeId) return { nodeIds:[startNodeId], edgeIds:[], distance:0 };
@@ -629,6 +749,30 @@
         if (edges.some((edge) => rectIntersectsEdge(site, edge, edge.vehicle ? 8 : 4))) errors.push("building intersects street: " + site.id);
       }
 
+      for (const junctionNode of nodes) {
+        const incidentVehicleEdges = vehicleEdgesAtNode(junctionNode.id);
+        if (incidentVehicleEdges.length < 3) continue;
+        for (const approachEdge of incidentVehicleEdges) {
+          const geometry = junctionGeometry(junctionNode.id, approachEdge.id);
+          if (!geometry) {
+            errors.push("junction geometry missing: " + junctionNode.id + "/" + approachEdge.id);
+            continue;
+          }
+          if (!(geometry.crossingInnerEdge > geometry.conflictBoundary)) {
+            errors.push("crosswalk enters junction: " + junctionNode.id + "/" + approachEdge.id);
+          }
+          if (!(geometry.stopOffset > geometry.crossingOuterEdge)) {
+            errors.push("stop line overlaps crosswalk: " + junctionNode.id + "/" + approachEdge.id);
+          }
+          if (!(geometry.yieldOffset > geometry.conflictBoundary)) {
+            errors.push("yield line enters junction: " + junctionNode.id + "/" + approachEdge.id);
+          }
+          if (geometry.stopOffset >= edgeLength(approachEdge) - 45) {
+            errors.push("stop line leaves no approach room: " + junctionNode.id + "/" + approachEdge.id);
+          }
+        }
+      }
+
       return errors;
     }
 
@@ -654,6 +798,7 @@
       isWalkable,
       districtAt,
       findRoute,
+      junctionGeometry,
       validate
     });
   }
