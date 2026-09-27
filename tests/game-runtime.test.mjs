@@ -21,12 +21,21 @@ test('game reports an unavailable canvas context instead of failing silently', (
   assert.match(source, /Canvas API を利用できません/);
 });
 
-test('status HUD masks canvas content at the top-left edge', () => {
-  assert.match(css, /#hud\{[^}]*z-index:5/);
-  assert.match(css, /\.status-card\{[^}]*z-index:6/);
-  assert.match(css, /\.status-card\{[^}]*left:0/);
-  assert.match(css, /\.status-card\{[^}]*border-radius:0 12px 12px 0/);
-  assert.match(css, /\.status-card\{[^}]*background:rgba\(15,22,18,\.98\)/);
+test('persistent HUD information is consolidated in the lower-left corner', () => {
+  assert.match(html, /class="hud-info-stack"/);
+  assert.match(css, /\.hud-info-stack\{[\s\S]*left:max\(12px,env\(safe-area-inset-left\)\)/);
+  assert.match(css, /\.hud-info-stack\{[\s\S]*bottom:max\(14px,env\(safe-area-inset-bottom\)\)/);
+  assert.match(css, /\.hud-info-stack \.hud-card\{[\s\S]*position:relative/);
+  assert.match(css, /\.hud-info-stack \.hud-card\{[\s\S]*top:auto/);
+  assert.match(css, /\.hud-info-stack \.hud-card\{[\s\S]*transform:none/);
+});
+
+test('minimap remains independent in the upper-right and driving HUD no longer occupies top-center', () => {
+  assert.match(css, /\.minimap-card\{[\s\S]*right:max\(12px,env\(safe-area-inset-right\)\)[\s\S]*top:max\(12px,env\(safe-area-inset-top\)\)/);
+  assert.match(css, /\.hud-info-stack \.drive-card\{[\s\S]*text-align:left/);
+  const finalLayout = css.slice(css.indexOf('Persistent HUD consolidation'));
+  assert.doesNotMatch(finalLayout, /\.drive-card\{[^}]*left:50%/);
+  assert.doesNotMatch(finalLayout, /\.day-card\{[^}]*left:50%/);
 });
 
 test('game defines the traffic signal state helper used by rendering and updates', () => {
