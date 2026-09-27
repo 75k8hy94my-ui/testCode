@@ -97,6 +97,19 @@ test('all person categories share the same character renderer', () => {
   assert.match(source, /npc\.state = citizen\.state/);
 });
 
+test('enterable home uses the same residential renderer and scale language as neighborhood houses', () => {
+  const homeDrawStart = source.indexOf('} else if (place.id === "home") {');
+  const cafeDrawStart = source.indexOf('} else if (place.id === "cafe") {', homeDrawStart);
+  const homeDraw = source.slice(homeDrawStart, cafeDrawStart);
+
+  assert.match(homeDraw, /const homeW = building\?\.w \|\| 124/);
+  assert.match(homeDraw, /const homeH = building\?\.h \|\| 104/);
+  assert.match(homeDraw, /drawResidentialBuilding\(/);
+  assert.doesNotMatch(homeDraw, /drawFacilityBuilding\(/);
+  assert.doesNotMatch(homeDraw, /\|\| 300/);
+  assert.doesNotMatch(homeDraw, /\|\| 270/);
+});
+
 test('game keeps all existing place and station identifiers from the map model', () => {
   for (const id of ['home', 'cafe', 'store', 'park', 'gym', 'library', 'west', 'central', 'east']) {
     assert.match(mapSource, new RegExp(`['\"]${id}['\"]`));
