@@ -110,6 +110,8 @@
   const RUN_SPEED = 62;
   const SPEED_TO_KMH = 0.16;
   const SIGNAL_CYCLE = 20;
+  const PEDESTRIAN_FLASH_SECONDS = 2;
+  const PEDESTRIAN_FLASH_INTERVAL = .34;
   const LANE_OFFSET = 38;
   const TURN_RADIUS = 86;
   const ROUTE_SAMPLE_STEP = 16;
@@ -572,11 +574,15 @@
     }
   }
 
-  function signalStateAt(worldX, worldY, orientation) {
+  function signalCyclePhaseAt(worldX, worldY) {
     const gx = Math.round(worldX / ROAD_GAP);
     const gy = Math.round(worldY / ROAD_GAP);
     const intersectionOffset = ((gx * 7 + gy * 11) % SIGNAL_CYCLE + SIGNAL_CYCLE) % SIGNAL_CYCLE;
-    const phase = ((state.drive.signalClock + intersectionOffset) % SIGNAL_CYCLE + SIGNAL_CYCLE) % SIGNAL_CYCLE;
+    return ((state.drive.signalClock + intersectionOffset) % SIGNAL_CYCLE + SIGNAL_CYCLE) % SIGNAL_CYCLE;
+  }
+
+  function signalStateAt(worldX, worldY, orientation) {
+    const phase = signalCyclePhaseAt(worldX, worldY);
     const horizontal = orientation === "h";
     if (horizontal) {
       if (phase < 8) return "green";
@@ -587,6 +593,26 @@
     if (phase < 18) return "green";
     if (phase < SIGNAL_CYCLE) return "yellow";
     return "red";
+  }
+
+  function pedestrianSignalAt(worldX, worldY, orientation) {
+    const phase = signalCyclePhaseAt(worldX, worldY);
+    const horizontal = orientation === "h";
+    const greenStart = horizontal ? 0 : 10;
+    const greenEnd = horizontal ? 8 : 18;
+
+    if (phase < greenStart || phase >= greenEnd) {
+      return { state:"stop", lit:false, phase };
+    }
+
+    const flashStart = greenEnd - PEDESTRIAN_FLASH_SECONDS;
+    if (phase < flashStart) {
+      return { state:"walk", lit:true, phase };
+    }
+
+    const flashElapsed = phase - flashStart;
+    const lit = Math.floor(flashElapsed / PEDESTRIAN_FLASH_INTERVAL) % 2 === 0;
+    return { state:"flashing", lit, phase };
   }
 
   function blockCenter(gx, gy) {
@@ -2253,10 +2279,11 @@
 
     if (distanceToSignal > waitOffset + 100) return null;
 
-    const stateName = signalStateAt(endpoint.x, endpoint.y, edgeOrientation(edge));
+    const pedestrianSignal = pedestrianSignalAt(endpoint.x, endpoint.y, edgeOrientation(edge));
     const beforeCrosswalk = distanceToSignal >= waitOffset;
     return {
-      state:stateName,
+      state:pedestrianSignal.state,
+      lit:pedestrianSignal.lit,
       distance:distanceToSignal,
       waitOffset,
       beforeCrosswalk
@@ -5170,7 +5197,7 @@
         const signalState = pedestrianSignalState(ped);
         const legitimatelyWaiting = Boolean(
           signalState &&
-          signalState.state !== "green" &&
+          signalState.state !== "walk" &&
           signalState.beforeCrosswalk
         );
 
@@ -5211,7 +5238,7 @@
       const signal = pedestrianSignalState(ped);
       const mustWait = Boolean(
         signal &&
-        signal.state !== "green" &&
+        signal.state !== "walk" &&
         signal.beforeCrosswalk
       );
 
@@ -7042,15 +7069,24 @@
     }
   }
 
-  function drawPedestrianSignal(x, y, canWalk) {
+  function drawPedestrianSignal(x, y, signal) {
+    const signalState = signal?.state || "stop";
+    const greenLit = signalState === "walk" || (signalState === "flashing" && signal.lit);
+    const redLit = signalState === "stop";
+
     ctx.fillStyle = "#29302e";
     roundedRectPath(ctx, x - 5, y - 8, 10, 16, 2);
     ctx.fill();
-    ctx.fillStyle = canWalk ? "#50bd70" : "#67413e";
+
+    // Lower lamp: walk. During the final two seconds it flashes instead of
+    // changing straight from green to red.
+    ctx.fillStyle = greenLit ? "#57ce79" : "#38543f";
     ctx.beginPath();
     ctx.arc(x, y + 4, 2.4, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = canWalk ? "#38543f" : "#e35b55";
+
+    // Upper lamp: stop. It remains dark while the green lamp is flashing.
+    ctx.fillStyle = redLit ? "#e35b55" : "#67413e";
     ctx.beginPath();
     ctx.arc(x, y - 4, 2.4, 0, Math.PI * 2);
     ctx.fill();
@@ -7092,8 +7128,16 @@
         drawSignalHead(p.x + poleOffset, p.y, "v", vState);
       }
       if (hasHorizontal && hasVertical) {
-        drawPedestrianSignal(p.x - poleOffset, p.y - poleOffset, vState === "red");
-        drawPedestrianSignal(p.x + poleOffset, p.y + poleOffset, hState === "red");
+        drawPedestrianSignal(
+          p.x - poleOffset,
+          p.y - poleOffset,
+          pedestrianSignalAt(node.x, node.y, "h")
+        );
+        drawPedestrianSignal(
+          p.x + poleOffset,
+          p.y + poleOffset,
+          pedestrianSignalAt(node.x, node.y, "v")
+        );
       }
     }
     return;
@@ -7161,12 +7205,12 @@
           drawSignalHead(sx + pole, sy + lane, "v", hState);
         }
 
-        const pedV = vState === "red";
-        const pedH = hState === "red";
-        if (north && west) drawPedestrianSignal(sx - halfRoad - 18, sy - halfRoad - 18, pedV);
-        if (south && east) drawPedestrianSignal(sx + halfRoad + 18, sy + halfRoad + 18, pedV);
-        if (north && east) drawPedestrianSignal(sx + halfRoad + 18, sy - halfRoad - 18, pedH);
-        if (south && west) drawPedestrianSignal(sx - halfRoad - 18, sy + halfRoad + 18, pedH);
+        const pedHorizontal = pedestrianSignalAt(wx, wy, "h");
+        const pedVertical = pedestrianSignalAt(wx, wy, "v");
+        if (north && west) drawPedestrianSignal(sx - halfRoad - 18, sy - halfRoad - 18, pedHorizontal);
+        if (south && east) drawPedestrianSignal(sx + halfRoad + 18, sy + halfRoad + 18, pedHorizontal);
+        if (north && east) drawPedestrianSignal(sx + halfRoad + 18, sy - halfRoad - 18, pedVertical);
+        if (south && west) drawPedestrianSignal(sx - halfRoad - 18, sy + halfRoad + 18, pedVertical);
       }
     }
   }
