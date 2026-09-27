@@ -23,12 +23,15 @@
   ];
   const BOTTOMS = ["#313a41","#46474e","#51443d","#374354","#4d5147","#3c3a3c","#665d52"];
   const SHOES = ["#202426","#383a39","#514941","#e5e1d7","#313844"];
+  const GRAY_HAIRS = ["#777570","#8a8780","#aaa69d","#676866","#918d87"];
+  const MALE_HAIR_STYLES = [0,1,2,3,4,5,11];
+  const FEMALE_HAIR_STYLES = [1,3,4,6,8,10,11];
 
   const SPECIAL = {
-    player:{ bodyType:"balanced", hairStyle:2, topStyle:3, bottomStyle:0, accessory:"none", top:"#405c50", bottom:"#313b42", hair:"#332a24", skin:"#edbea0", shoe:"#272d2f" },
-    aoi:{ bodyType:"tall", hairStyle:8, topStyle:6, bottomStyle:2, accessory:"shoulder", top:"#c98f9d", bottom:"#42444b", hair:"#332923", skin:"#e8b596", shoe:"#3a3431" },
-    sora:{ bodyType:"balanced", hairStyle:4, topStyle:4, bottomStyle:1, accessory:"tote", top:"#7fa3be", bottom:"#3c4650", hair:"#292522", skin:"#efc1a2", shoe:"#30363a" },
-    mei:{ bodyType:"slim", hairStyle:10, topStyle:8, bottomStyle:4, accessory:"backpack", top:"#ad9a74", bottom:"#41464b", hair:"#3d3028", skin:"#e9b99b", shoe:"#45413c" }
+    player:{ gender:"male", bodyType:"balanced", hairStyle:2, topStyle:3, bottomStyle:0, bottomGarment:"pants", accessory:"none", top:"#405c50", bottom:"#313b42", hair:"#332a24", skin:"#edbea0", shoe:"#272d2f" },
+    aoi:{ gender:"female", bodyType:"tall", hairStyle:8, topStyle:6, bottomStyle:2, bottomGarment:"pants", accessory:"shoulder", top:"#c98f9d", bottom:"#42444b", hair:"#332923", skin:"#e8b596", shoe:"#3a3431" },
+    sora:{ gender:"male", bodyType:"balanced", hairStyle:4, topStyle:4, bottomStyle:1, bottomGarment:"pants", accessory:"tote", top:"#7fa3be", bottom:"#3c4650", hair:"#292522", skin:"#efc1a2", shoe:"#30363a" },
+    mei:{ gender:"female", bodyType:"slim", hairStyle:10, topStyle:8, bottomStyle:4, bottomGarment:"skirt", accessory:"backpack", top:"#ad9a74", bottom:"#41464b", hair:"#3d3028", skin:"#e9b99b", shoe:"#45413c" }
   };
 
   const WALK = [
@@ -81,21 +84,45 @@
     return BODY_TYPES.find((value) => value.id === id) || BODY_TYPES[0];
   }
 
+  function ageGroupFor(age) {
+    if (age <= 24) return "young";
+    if (age <= 44) return "adult";
+    if (age <= 64) return "mature";
+    return "senior";
+  }
+
   function createAppearance(seed, profile = {}) {
     const specialKey = profile.role === "player" ? "player" : profile.specialNpcId;
     const special = specialKey ? SPECIAL[specialKey] : null;
-    const age = Number(profile.age) || 30;
-    const retired = profile.jobType === "retired" || age >= 68;
+    const age = Math.max(18, Math.min(86, Number(profile.age) || 30));
+    const ageGroup = ageGroupFor(age);
+    const retired = profile.jobType === "retired" || ageGroup === "senior";
     const student = profile.jobType === "student" || age <= 22;
     const office = profile.jobType === "office";
-    const bodyType = special?.bodyType || BODY_TYPES[Math.floor(hash(seed, 11) * BODY_TYPES.length) % BODY_TYPES.length].id;
-    const hairStyle = special?.hairStyle ?? Math.floor(hash(seed, 17) * 12) % 12;
+    const gender = special?.gender || (profile.gender === "female" || profile.gender === "male"
+      ? profile.gender
+      : hash(seed, 7) < .5 ? "male" : "female");
+
+    const bodyChoices = gender === "male"
+      ? ["balanced","broad","tall","balanced","compact","slim"]
+      : ["balanced","slim","compact","tall","balanced","broad"];
+    const bodyType = special?.bodyType || bodyChoices[Math.floor(hash(seed, 11) * bodyChoices.length) % bodyChoices.length];
+
+    const preferredHair = gender === "male" ? MALE_HAIR_STYLES : FEMALE_HAIR_STYLES;
+    const crossoverHair = gender === "male" ? FEMALE_HAIR_STYLES : MALE_HAIR_STYLES;
+    const hairPool = hash(seed, 13) > .82 ? crossoverHair : preferredHair;
+    const hairStyle = special?.hairStyle ?? hairPool[Math.floor(hash(seed, 17) * hairPool.length) % hairPool.length];
+
     const topStyle = special?.topStyle ?? (
       office ? (hash(seed, 19) > .35 ? 5 : 1)
       : student ? Math.floor(hash(seed, 19) * 5)
       : Math.floor(hash(seed, 19) * 10)
     );
     const bottomStyle = special?.bottomStyle ?? Math.floor(hash(seed, 23) * 6) % 6;
+    const bottomGarment = special?.bottomGarment || (
+      gender === "female" && hash(seed, 25) > (office ? .72 : .64) ? "skirt" : "pants"
+    );
+
     const accessoryRoll = hash(seed, 29);
     const accessory = special?.accessory || (
       office && accessoryRoll > .72 ? "briefcase"
@@ -105,29 +132,51 @@
       : accessoryRoll > .64 ? "shoulder"
       : "none"
     );
-    const posture = retired ? .93 + hash(seed, 31) * .035 : .975 + hash(seed, 31) * .035;
+
+    const agePosture = ageGroup === "senior" ? .905 + hash(seed, 31) * .045
+      : ageGroup === "mature" ? .955 + hash(seed, 31) * .035
+      : .982 + hash(seed, 31) * .025;
+    const genderHeight = gender === "male" ? 1.018 : .985;
+    const ageHeight = ageGroup === "senior" ? .955 : ageGroup === "young" ? .992 : 1;
+    const baseStature = specialKey === "player" ? 1.02 : (.95 + hash(seed, 37) * .11) * genderHeight * ageHeight;
+
+    const grayChance = ageGroup === "senior" ? .72 : ageGroup === "mature" ? .20 : .015;
+    const useGrayHair = !special?.hair && hash(seed, 39) < grayChance;
+    const chosenTop = special?.top || pick(TOPS, seed, 47);
 
     return {
-      rendererVersion:2,
+      rendererVersion:3,
       id:(specialKey || "citizen") + "-" + seed,
       seed,
       age,
+      ageGroup,
+      gender,
       bodyType,
-      stature:specialKey === "player" ? 1.02 : .95 + hash(seed, 37) * .11,
-      posture,
+      stature:baseStature,
+      posture:agePosture,
+      shoulderScale:gender === "male" ? 1.07 : .94,
+      hipScale:gender === "female" ? 1.08 : .96,
+      waistScale:gender === "female" ? .95 : 1.02,
+      legScale:ageGroup === "senior" ? .96 : ageGroup === "young" ? 1.02 : 1,
+      faceWidthScale:(gender === "female" ? .95 : 1.03) * (ageGroup === "young" ? 1.02 : 1),
+      faceHeightScale:ageGroup === "senior" ? .98 : ageGroup === "young" ? 1.02 : 1,
+      jawScale:gender === "female" ? .69 : .80,
       hairStyle,
       topStyle,
       bottomStyle,
+      bottomGarment,
       accessory,
       skin:special?.skin || pick(SKINS, seed, 41),
-      hair:special?.hair || pick(HAIRS, seed, 43),
-      top:special?.top || pick(TOPS, seed, 47),
+      hair:special?.hair || (useGrayHair ? pick(GRAY_HAIRS, seed, 43) : pick(HAIRS, seed, 43)),
+      hairGray:useGrayHair,
+      top:chosenTop,
       bottom:special?.bottom || pick(BOTTOMS, seed, 53),
       shoe:special?.shoe || pick(SHOES, seed, 59),
-      accent:shade(special?.top || pick(TOPS, seed, 47), hash(seed, 61) > .5 ? 22 : -22),
-      glasses:!specialKey && age > 34 && hash(seed, 67) > .82,
-      gait:.92 + hash(seed, 71) * .16,
-      stride:.92 + hash(seed, 73) * .15
+      accent:shade(chosenTop, hash(seed, 61) > .5 ? 22 : -22),
+      glasses:!specialKey && age > 34 && hash(seed, 67) > (ageGroup === "senior" ? .58 : .82),
+      gait:(ageGroup === "senior" ? .80 : ageGroup === "mature" ? .92 : ageGroup === "young" ? 1.05 : 1) * (.96 + hash(seed, 71) * .08),
+      stride:(ageGroup === "senior" ? .80 : ageGroup === "mature" ? .93 : ageGroup === "young" ? 1.04 : 1) * (.96 + hash(seed, 73) * .08),
+      armSwing:(ageGroup === "senior" ? .82 : ageGroup === "mature" ? .94 : 1) * (.96 + hash(seed, 79) * .08)
     };
   }
 
@@ -221,6 +270,36 @@
     roundedRect(ctx, -3.4, -1.45, 7.1, 2.9, 1.3);
     ctx.fill();
     ctx.restore();
+  }
+
+  function drawLowerGarment(ctx, ap, centerX, hipY, kneeY, bodyWidth) {
+    if (ap.bottomGarment !== "skirt") {
+      ctx.fillStyle = ap.bottom;
+      roundedRect(ctx, centerX - 5.2 * bodyWidth, hipY - 1.7, 10.4 * bodyWidth, 5.2, 1.8);
+      ctx.fill();
+      return;
+    }
+
+    const hipHalf = 5.7 * bodyWidth * (ap.hipScale || 1);
+    const hemHalf = hipHalf * 1.18;
+    const hemY = Math.min(kneeY + 3.5, hipY + 16);
+    ctx.fillStyle = "rgba(30,33,32,.25)";
+    ctx.beginPath();
+    ctx.moveTo(centerX - hipHalf - .7, hipY - 1);
+    ctx.lineTo(centerX + hipHalf + .7, hipY - 1);
+    ctx.lineTo(centerX + hemHalf + .7, hemY + .7);
+    ctx.lineTo(centerX - hemHalf - .7, hemY + .7);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = ap.bottom;
+    ctx.beginPath();
+    ctx.moveTo(centerX - hipHalf, hipY);
+    ctx.lineTo(centerX + hipHalf, hipY);
+    ctx.lineTo(centerX + hemHalf, hemY);
+    ctx.lineTo(centerX - hemHalf, hemY);
+    ctx.closePath();
+    ctx.fill();
   }
 
   function drawHair(ctx, ap, cx, cy, rx, ry, facing, lod) {
@@ -322,9 +401,9 @@
 
   function drawTorso(ctx, ap, body, centerX, shoulderY, waistY, hipY, facing, pose, lod) {
     const profile = Math.abs(facing.x);
-    const shoulder = 7.5 * body.width * body.shoulder * (1 - profile * .14);
-    const waist = 4.8 * body.width * (1 - profile * .19);
-    const hip = 5.4 * body.width * (1 - profile * .12);
+    const shoulder = 7.5 * body.width * body.shoulder * (ap.shoulderScale || 1) * (1 - profile * .14);
+    const waist = 4.8 * body.width * (ap.waistScale || 1) * (1 - profile * .19);
+    const hip = 5.4 * body.width * (ap.hipScale || 1) * (1 - profile * .12);
     const twist = pose.twist * facing.x * .45;
 
     ctx.fillStyle = "rgba(30,33,32,.28)";
@@ -380,14 +459,31 @@
 
   function drawFace(ctx, ap, cx, cy, rx, ry, facing, pose, lod) {
     const back = facing.y < -.34;
+    const jaw = rx * (ap.jawScale || .76);
+
+    const facePath = (ox = 0, oy = 0, expand = 0) => {
+      ctx.beginPath();
+      ctx.moveTo(cx + ox, cy - ry - expand + oy);
+      ctx.bezierCurveTo(
+        cx + rx + expand + ox, cy - ry * .82 + oy,
+        cx + rx + expand + ox, cy + ry * .28 + oy,
+        cx + jaw + expand * .6 + ox, cy + ry * .66 + oy
+      );
+      ctx.quadraticCurveTo(cx + ox, cy + ry + expand + oy, cx - jaw - expand * .6 + ox, cy + ry * .66 + oy);
+      ctx.bezierCurveTo(
+        cx - rx - expand + ox, cy + ry * .28 + oy,
+        cx - rx - expand + ox, cy - ry * .82 + oy,
+        cx + ox, cy - ry - expand + oy
+      );
+      ctx.closePath();
+    };
+
     ctx.fillStyle = "rgba(49,42,37,.20)";
-    ctx.beginPath();
-    ctx.ellipse(cx + .5, cy + .8, rx + .7, ry + .6, 0, 0, Math.PI * 2);
+    facePath(.5, .8, .65);
     ctx.fill();
 
     ctx.fillStyle = ap.skin;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    facePath();
     ctx.fill();
 
     if (back || lod === "far") return;
@@ -421,6 +517,29 @@
         ctx.strokeRect(cx - 3.1 + faceTurn * .2, cy - 1.6, 2.6, 2.0);
         ctx.strokeRect(cx + .5 + faceTurn * .2, cy - 1.6, 2.6, 2.0);
       }
+
+      if (ap.ageGroup === "mature" || ap.ageGroup === "senior") {
+        const alpha = ap.ageGroup === "senior" ? .22 : .12;
+        ctx.strokeStyle = "rgba(92,65,57," + alpha + ")";
+        ctx.lineWidth = .55;
+        ctx.beginPath();
+        ctx.moveTo(cx - 3.1, cy + .3);
+        ctx.quadraticCurveTo(cx - 3.8, cy + 1.4, cx - 3.0, cy + 2.0);
+        ctx.moveTo(cx + 3.1, cy + .3);
+        ctx.quadraticCurveTo(cx + 3.8, cy + 1.4, cx + 3.0, cy + 2.0);
+        ctx.stroke();
+      }
+
+      if (ap.ageGroup === "senior") {
+        ctx.strokeStyle = "rgba(92,65,57,.18)";
+        ctx.lineWidth = .5;
+        ctx.beginPath();
+        ctx.moveTo(cx - 2.4, cy - 2.9);
+        ctx.lineTo(cx - .7, cy - 3.15);
+        ctx.moveTo(cx + .7, cy - 3.15);
+        ctx.lineTo(cx + 2.4, cy - 2.9);
+        ctx.stroke();
+      }
     }
   }
 
@@ -436,7 +555,7 @@
     const body = bodyById(ap.bodyType);
     const pose = poseFor(state, frame);
     const stature = (ap.stature || 1) * body.height;
-    const legScale = body.leg * stature;
+    const legScale = body.leg * stature * (ap.legScale || 1);
     const bodyWidth = body.width;
     const centerX = SPRITE_W / 2 + facing.x * pose.twist * .55;
     const baseline = BASELINE;
@@ -447,10 +566,10 @@
     const shoulderY = hipY - 20.5 * stature * ap.posture;
     const neckY = shoulderY - 5.0 * stature;
     const headY = neckY - 7.0 * stature;
-    const headRx = 5.0 * stature * (1 - Math.abs(facing.x) * .08);
-    const headRy = 6.2 * stature;
+    const headRx = 5.0 * stature * (ap.faceWidthScale || 1) * (1 - Math.abs(facing.x) * .08);
+    const headRy = 6.2 * stature * (ap.faceHeightScale || 1);
 
-    const stride = 6.5 * pose.stride * ap.stride * stature;
+    const stride = 6.5 * pose.stride * ap.stride * ap.gait * stature;
     const lateral = Math.max(1.8, 3.2 * bodyWidth * (1 - Math.abs(facing.x) * .20));
     const leftHip = { x:centerX - lateral, y:hipY };
     const rightHip = { x:centerX + lateral, y:hipY };
@@ -471,10 +590,10 @@
       y:footBaseY - pose.liftR * 3.8 - facing.y * stride * .12
     };
 
-    const shoulderHalf = 7.3 * bodyWidth * body.shoulder;
+    const shoulderHalf = 7.3 * bodyWidth * body.shoulder * (ap.shoulderScale || 1);
     const leftShoulder = { x:centerX - shoulderHalf, y:shoulderY };
     const rightShoulder = { x:centerX + shoulderHalf, y:shoulderY };
-    const armTravel = 4.8 * pose.arm * stature;
+    const armTravel = 4.8 * pose.arm * stature * (ap.armSwing || 1);
     const leftElbow = {
       x:leftShoulder.x - facing.x * armTravel * .55 - 1.0,
       y:shoulderY + 8.8 * stature
@@ -522,9 +641,7 @@
     drawAccessoryBehind(ctx, ap, { x:centerX, y:(shoulderY + hipY) / 2 }, facing, .92);
     drawTorso(ctx, ap, body, centerX, shoulderY, waistY, hipY, facing, pose, lod);
 
-    ctx.fillStyle = ap.bottom;
-    roundedRect(ctx, centerX - 5.2 * bodyWidth, hipY - 1.7, 10.4 * bodyWidth, 5.2, 1.8);
-    ctx.fill();
+    drawLowerGarment(ctx, ap, centerX, hipY, (leftKnee.y + rightKnee.y) / 2, bodyWidth);
 
     drawLimb(ctx, frontHip, frontKnee, 5.9, 4.25, ap.bottom, 1);
     drawLimb(ctx, frontKnee, frontFoot, 5.0, 3.55, ap.bottom, 1);
@@ -558,8 +675,9 @@
 
   function appearanceKey(ap) {
     return [
-      ap.id, ap.bodyType, ap.hairStyle, ap.topStyle, ap.bottomStyle, ap.accessory,
-      ap.skin, ap.hair, ap.top, ap.bottom, ap.shoe, ap.glasses ? 1 : 0
+      ap.id, ap.gender, ap.ageGroup, ap.bodyType, ap.hairStyle, ap.topStyle,
+      ap.bottomStyle, ap.bottomGarment, ap.accessory, ap.skin, ap.hair, ap.top,
+      ap.bottom, ap.shoe, ap.glasses ? 1 : 0
     ].join("|");
   }
 
