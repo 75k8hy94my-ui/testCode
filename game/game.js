@@ -8082,8 +8082,8 @@
       drawTree(place.x - 70, place.y - 10, .78);
       drawTree(place.x + 72, place.y - 18, .72);
     } else if (place.id === "home") {
-      const homeW = building?.w || 124;
-      const homeH = building?.h || 104;
+      const homeW = building?.w || 118;
+      const homeH = building?.h || 96;
       const homeVisual = {
         x:(building?.x ?? place.x) - homeW / 2,
         y:(building?.y ?? place.y) - homeH / 2,
