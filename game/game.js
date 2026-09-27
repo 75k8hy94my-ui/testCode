@@ -117,7 +117,7 @@
   const BLOCK_MARGIN = 34;
   const PLAYER_RADIUS = 14;
   const PLAYER_COLLISION_RADIUS = 11;
-  const NPC_COLLISION_RADIUS = 7.5;
+  const NPC_COLLISION_RADIUS = 6.5;
   const VEHICLE_COLLISION_SCALE = 0.9;
   const WALK_SPEED = 34;
   const RUN_SPEED = 62;
@@ -2312,12 +2312,40 @@
     return false;
   }
 
+  function pedestrianSidewalkLayout(edge, directionSign = 1) {
+    if (!edge?.vehicle) {
+      const baseOffset = Math.min(10, edge?.width * .2 || 10);
+      return { baseOffset, maxAvoidance:Math.max(8, (edge?.width || 40) * .22) };
+    }
+
+    const corridor = mapModel.pedestrianCorridor?.(edge.id);
+    const centerOffset = corridor?.centerOffset ?? (edge.width / 2 + 22);
+    const outerOffset = corridor?.outerOffset ?? (edge.width / 2 + 40);
+
+    // Opposing pedestrians on the same physical sidewalk use two subtle
+    // walking lines. Because the normal reverses with directionSign, changing
+    // the radial magnitude by +/-7 separates oncoming people without sending
+    // anyone into the carriageway.
+    const flowBias = directionSign > 0 ? 7 : -7;
+    const baseOffset = centerOffset + flowBias;
+    const maxAvoidance = Math.max(
+      0,
+      outerOffset - baseOffset - NPC_COLLISION_RADIUS - 2
+    );
+    return { baseOffset, maxAvoidance, corridor };
+  }
+
   function pedestrianEdgePose(edge, directionSign, along, sideSign = 1, avoidanceOffset = 0) {
     const edgeLength = polylineLength(edge.points);
     const hit = pointAndTangentOnPolyline(edge.points, clamp(along, 0, edgeLength));
     const tangent = directionSign > 0 ? hit.tangent : { x:-hit.tangent.x, y:-hit.tangent.y };
-    const sidewalkOffset = edge.vehicle ? edge.width / 2 + 5 : Math.min(10, edge.width * .2);
-    const lateralOffset = (sidewalkOffset + Math.max(0, Number(avoidanceOffset) || 0)) * (sideSign || 1);
+    const layout = pedestrianSidewalkLayout(edge, directionSign);
+    const avoidance = clamp(
+      Math.max(0, Number(avoidanceOffset) || 0),
+      0,
+      layout.maxAvoidance
+    );
+    const lateralOffset = (layout.baseOffset + avoidance) * (sideSign || 1);
     return {
       x:hit.point.x + tangent.y * lateralOffset,
       y:hit.point.y - tangent.x * lateralOffset,
@@ -5369,7 +5397,12 @@
 
   function requestPedestrianAvoidance(ped, offset = 16, holdSeconds = .65) {
     if (!ped) return;
-    ped.avoidanceTarget = Math.max(Number(ped.avoidanceTarget) || 0, Math.max(0, offset));
+    const edge = mapModel.getEdge(ped.edgeId);
+    const maxAvoidance = edge
+      ? pedestrianSidewalkLayout(edge, ped.directionSign).maxAvoidance
+      : Math.max(0, offset);
+    const requested = Math.min(Math.max(0, offset), maxAvoidance);
+    ped.avoidanceTarget = Math.max(Number(ped.avoidanceTarget) || 0, requested);
     ped.avoidanceHold = Math.max(Number(ped.avoidanceHold) || 0, Math.max(0, holdSeconds));
   }
 
@@ -5378,15 +5411,16 @@
     ped.avoidanceHold = Math.max(0, (Number(ped.avoidanceHold) || 0) - dt);
     if (ped.avoidanceHold <= 0) ped.avoidanceTarget = 0;
 
-    const current = Math.max(0, Number(ped.avoidanceOffset) || 0);
-    const target = Math.max(0, Number(ped.avoidanceTarget) || 0);
-    const rate = target > current ? 38 : 24;
+    const edge = mapModel.getEdge(ped.edgeId);
+    if (!edge) return;
+    const layout = pedestrianSidewalkLayout(edge, ped.directionSign);
+    const current = clamp(Math.max(0, Number(ped.avoidanceOffset) || 0), 0, layout.maxAvoidance);
+    const target = clamp(Math.max(0, Number(ped.avoidanceTarget) || 0), 0, layout.maxAvoidance);
+    const rate = target > current ? 34 : 22;
     const delta = clamp(target - current, -rate * dt, rate * dt);
     if (Math.abs(delta) < .001) return;
 
-    const edge = mapModel.getEdge(ped.edgeId);
-    if (!edge) return;
-    const nextOffset = Math.max(0, current + delta);
+    const nextOffset = clamp(current + delta, 0, layout.maxAvoidance);
     const pose = pedestrianEdgePose(
       edge,
       ped.directionSign,
@@ -5429,6 +5463,7 @@
     for (const other of visiblePedestrianColliders()) {
       if (other === ped || other.junctionTransition || other.edgeId !== ped.edgeId) continue;
       if (other.directionSign !== ped.directionSign) continue;
+      if ((other.sideSign || 1) !== (ped.sideSign || 1)) continue;
       const ahead = (other.along - ped.along) * ped.directionSign;
       if (ahead <= 0 || ahead >= allowed + minimumGap) continue;
       allowed = Math.min(allowed, Math.max(0, ahead - minimumGap));
@@ -5470,9 +5505,12 @@
       requestPedestrianAvoidance(ped, 18, .75);
       ped.collisionWait = Math.max(ped.collisionWait || 0, .18);
     } else {
+      // A vehicle beside a narrow sidewalk should make the pedestrian tuck
+      // outward first, not enter an endless stop/retry loop at the curb.
+      requestPedestrianAvoidance(ped, 16, .95);
       ped.collisionWait = Math.max(
         ped.collisionWait || 0,
-        .12 + hash2(ped.seed || 0, ped.tripCount || 0, 2051) * .18
+        .08 + hash2(ped.seed || 0, ped.tripCount || 0, 2051) * .10
       );
     }
     return false;
@@ -5490,9 +5528,10 @@
     // Recovery must never switch sidewalks or rebuild from an arbitrary node.
     // Ask for a larger continuous sidestep on the current sidewalk and wait for
     // nearby traffic to clear. The sidestep itself is rate-limited per frame.
-    const extra = 20 + ((ped.seed || 0) % 3) * 3;
-    requestPedestrianAvoidance(ped, extra, 1.1);
-    ped.collisionWait = .55 + ((ped.seed || 0) % 3) * .12;
+    const edge = mapModel.getEdge(ped.edgeId);
+    const room = edge ? pedestrianSidewalkLayout(edge, ped.directionSign).maxAvoidance : 12;
+    requestPedestrianAvoidance(ped, room, 1.05);
+    ped.collisionWait = .30 + ((ped.seed || 0) % 3) * .08;
     ped.stuckTimer = 0;
     ped.stuckRecoveryCount = (ped.stuckRecoveryCount || 0) + 1;
     return true;
@@ -6514,14 +6553,29 @@
     const vehicleSurface = () => "#626863";
 
     for (const edge of visibleEdges) {
+      const corridor = edge.vehicle ? mapModel.pedestrianCorridor?.(edge.id) : null;
+      const sidewalkWidth = corridor?.width || 0;
       const shadow = edge.vehicle
-        ? "rgba(27,34,33,.34)"
+        ? "rgba(27,34,33,.30)"
         : edge.type === "greenway"
           ? "rgba(58,93,62,.28)"
           : "rgba(70,71,66,.24)";
-      strokeEdge(edge, edge.width + (edge.vehicle ? 24 : 10), shadow);
+      strokeEdge(
+        edge,
+        edge.vehicle ? edge.width + sidewalkWidth * 2 + 10 : edge.width + 10,
+        shadow
+      );
     }
     drawJunctionPads("shadow");
+
+    // Vehicle streets have a real pedestrian shoulder outside the curb rather
+    // than placing walkers on a 5px strip at the asphalt edge.
+    for (const edge of visibleEdges) {
+      if (!edge.vehicle || !edge.pedestrian) continue;
+      const corridor = mapModel.pedestrianCorridor?.(edge.id);
+      const sidewalkWidth = corridor?.width || 38;
+      strokeEdge(edge, edge.width + sidewalkWidth * 2, "#aaa9a1");
+    }
 
     for (const edge of visibleEdges) {
       if (edge.vehicle) strokeEdge(edge, edge.width + 13, "#9a9d97");
