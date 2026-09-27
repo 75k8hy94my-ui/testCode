@@ -7,7 +7,7 @@ const { createMapModel } = mapModule;
 test('v2 map validates as a connected Japanese urban fabric', () => {
   const map = createMapModel();
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2.3');
+  assert.equal(map.version, 'japan-v2.4');
   assert.equal(map.worldSize, 10800);
   assert.ok(map.nodes.length >= 45);
   assert.ok(map.edges.length >= 55);
@@ -126,17 +126,17 @@ test('residential districts have connected local streets and street-fronting low
   assert.ok(localRoads.length >= 5);
   assert.ok(localRoads.every((edge) => edge.vehicle && edge.sourceWidth >= 52 && edge.sourceWidth <= 72));
   assert.ok(homes.length >= 100);
-  assert.ok(homes.filter((home) => home.zoneId === 'west-housing').length >= 18);
-  assert.ok(homes.filter((home) => home.zoneId === 'south-housing').length >= 50);
-  assert.ok(homes.filter((home) => home.zoneId === 'east-housing').length >= 35);
+  assert.ok(homes.filter((home) => home.zoneId === 'west-housing').length >= 28);
+  assert.ok(homes.filter((home) => home.zoneId === 'south-housing').length >= 40);
+  assert.ok(homes.filter((home) => home.zoneId === 'east-housing').length >= 26);
   for (const home of homes) {
     const road = map.getEdge(home.frontageEdgeId);
     assert.ok(road?.vehicle, home.id + ' must face a vehicle street');
     assert.ok(['residential', 'alley', 'collector'].includes(road.type), home.id + ' must face a neighborhood street');
     assert.equal(home.houseStyle, 'detached');
     assert.ok(home.floors <= 2, home.id + ' must remain low-rise');
-    assert.ok(home.frontSetback >= 10 && home.frontSetback <= 28);
-    assert.ok(map.nearestRoad(home.x + home.w / 2, home.y + home.h / 2, { vehicleOnly:true }).distance < 145);
+    assert.ok(home.frontSetback >= 16 && home.frontSetback <= 34);
+    assert.ok(map.nearestRoad(home.x + home.w / 2, home.y + home.h / 2, { vehicleOnly:true }).distance < 180);
 
     const center = { x:home.x + home.w / 2, y:home.y + home.h / 2 };
     let closest = null;
@@ -157,6 +157,25 @@ test('residential districts have connected local streets and street-fronting low
     assert.ok(measuredSetback >= home.frontSetback - 1, home.id + ' must preserve its declared street setback: ' + JSON.stringify({ measuredSetback, declared:home.frontSetback, edgeId:road.id }));
   }
   assert.deepEqual(map.validate(), []);
+});
+
+test('enterable home exterior matches surrounding detached-house scale', () => {
+  const map = createMapModel();
+  const playerHome = map.places.find((place) => place.id === 'home');
+  const homes = map.buildingSites.filter((site) => ['west-housing', 'south-housing', 'east-housing'].includes(site.zoneId));
+  const areas = homes.map((home) => home.w * home.h).sort((a, b) => a - b);
+  const medianArea = areas[Math.floor(areas.length / 2)];
+  const playerHomeArea = playerHome.building.w * playerHome.building.h;
+
+  assert.ok(playerHome.building.w >= 100 && playerHome.building.w <= 140);
+  assert.ok(playerHome.building.h >= 80 && playerHome.building.h <= 115);
+  assert.ok(playerHomeArea >= medianArea * .75);
+  assert.ok(playerHomeArea <= medianArea * 1.45);
+
+  for (const home of homes) {
+    assert.ok(home.w >= 90 && home.w <= 130, home.id + ' width');
+    assert.ok(home.h >= 74 && home.h <= 108, home.id + ' height');
+  }
 });
 
 test('all existing facilities and stations remain addressable', () => {

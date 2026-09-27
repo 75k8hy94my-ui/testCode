@@ -265,3 +265,112 @@ body:not(.driving) #mobileDrivingControls{display:none!important}
 #actionDescription {
   white-space: pre-line;
 }
+
+
+/* Persistent HUD consolidation: keep the road/signal sightline clear. */
+.hud-info-stack{
+  position:absolute;
+  left:max(12px,env(safe-area-inset-left));
+  bottom:max(14px,env(safe-area-inset-bottom));
+  z-index:6;
+  width:min(310px,calc(100vw - 24px));
+  display:grid;
+  overflow:hidden;
+  border:1px solid rgba(225,237,230,.14);
+  border-radius:14px;
+  background:linear-gradient(145deg,rgba(15,22,18,.94),rgba(10,16,13,.88));
+  box-shadow:0 14px 38px rgba(6,10,8,.28),inset 0 1px 0 rgba(255,255,255,.035);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px)
+}
+.hud-info-stack .hud-card{
+  position:relative;
+  inset:auto;
+  left:auto;
+  right:auto;
+  top:auto;
+  bottom:auto;
+  transform:none;
+  width:100%;
+  min-width:0;
+  margin:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none
+}
+.hud-info-stack .hud-card + .hud-card{border-top:1px solid rgba(225,237,230,.10)}
+.hud-info-stack .status-card{
+  padding:10px 12px;
+  display:grid;
+  gap:7px;
+  background:transparent;
+  box-shadow:none
+}
+.hud-info-stack .day-card{
+  padding:8px 12px;
+  display:grid;
+  grid-template-columns:auto 1fr;
+  grid-template-areas:"eyebrow life" "rent rent";
+  column-gap:9px;
+  row-gap:2px;
+  text-align:left
+}
+.hud-info-stack .day-card .eyebrow{grid-area:eyebrow;align-self:center}
+.hud-info-stack .day-card strong{grid-area:life;margin:0;font-size:13px}
+.hud-info-stack .day-card #rentText{grid-area:rent;font-size:10px;color:var(--muted)}
+.hud-info-stack .drive-card{
+  padding:8px 12px;
+  text-align:left;
+  min-width:0
+}
+.hud-info-stack .drive-card .eyebrow{margin-bottom:4px}
+.hud-info-stack .drive-speed-row{justify-content:flex-start;margin:0 0 4px}
+.hud-info-stack .drive-speed-row strong{font-size:23px}
+.hud-info-stack .drive-info{max-width:260px}
+.hud-info-stack .drive-destination{margin-top:5px;padding-top:5px}
+.hud-info-stack .objective-card{
+  padding:9px 12px 10px;
+  display:grid;
+  gap:2px
+}
+.hud-info-stack .objective-card strong{font-size:13px}
+.hud-info-stack .objective-card span:last-child{font-size:11px;line-height:1.35}
+.hud-info-stack .needs-grid{gap:4px}
+.hud-info-stack .need{grid-template-columns:30px 1fr 23px}
+
+/* The minimap remains independent at the upper-right. */
+.minimap-card{
+  right:max(12px,env(safe-area-inset-right));
+  top:max(12px,env(safe-area-inset-top))
+}
+
+/* Phone/sound/help and the actual movement controls remain operation UI. */
+@media(max-width:760px){
+  .hud-info-stack{
+    left:max(10px,env(safe-area-inset-left));
+    bottom:calc(160px + env(safe-area-inset-bottom));
+    width:min(285px,calc(100vw - 20px));
+    max-height:46vh;
+    overflow:auto
+  }
+  .hud-info-stack .status-card{padding:8px 10px}
+  .hud-info-stack .row.strong{font-size:11px}
+  .hud-info-stack .row{font-size:9px}
+  .hud-info-stack .day-card,
+  .hud-info-stack .drive-card,
+  .hud-info-stack .objective-card{padding-left:10px;padding-right:10px}
+  .hud-info-stack .drive-speed-row strong{font-size:19px}
+  .hud-info-stack .objective-card{bottom:auto;width:100%}
+  body.driving .hud-info-stack{bottom:calc(122px + env(safe-area-inset-bottom))}
+}
+@media(max-width:420px){
+  .hud-info-stack{
+    width:min(260px,calc(100vw - 20px));
+    bottom:calc(150px + env(safe-area-inset-bottom));
+    max-height:43vh
+  }
+  body.driving .hud-info-stack{bottom:calc(112px + env(safe-area-inset-bottom))}
+}

@@ -8199,15 +8199,34 @@
       drawTree(place.x - 70, place.y - 10, .78);
       drawTree(place.x + 72, place.y - 18, .72);
     } else if (place.id === "home") {
-      drawFacilityBuilding(p, building?.w || 300, building?.h || 270, "#d0b68f", "#6d655c", "#8fa8ad");
-      ctx.fillStyle = "#a07e5b";
-      ctx.fillRect(p.x - 118, p.y - 70, 236, 12);
-      ctx.fillStyle = "#f0e1c2";
-      ctx.fillRect(p.x - 95, p.y - 38, 44, 26);
-      ctx.fillRect(p.x + 51, p.y - 38, 44, 26);
-      ctx.fillStyle = "#6f8a68";
-      ctx.beginPath(); ctx.arc(p.x - 125, p.y + 90, 17, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(p.x + 125, p.y + 90, 17, 0, Math.PI * 2); ctx.fill();
+      const homeW = building?.w || 118;
+      const homeH = building?.h || 96;
+      const homeVisual = {
+        x:(building?.x ?? place.x) - homeW / 2,
+        y:(building?.y ?? place.y) - homeH / 2,
+        w:homeW,
+        h:homeH,
+        floors:2,
+        houseStyle:"detached",
+        frontage:"south",
+        residentialSeed:7301
+      };
+      drawResidentialBuilding(
+        homeVisual,
+        p.x - homeW / 2,
+        p.y - homeH / 2,
+        { wall:"#d0b68f", roof:"#6d655c", glass:"#8fa8ad", trim:"#a07e5b" },
+        visualTime()
+      );
+
+      // A compact porch identifies the enterable house without making its
+      // footprint visually larger than the neighboring detached homes.
+      const porchW = Math.min(34, homeW * .28);
+      ctx.fillStyle = "#8c785f";
+      roundedRectPath(ctx, p.x - porchW / 2, p.y + homeH * .34, porchW, 8, 2);
+      ctx.fill();
+      ctx.fillStyle = "#d8c39d";
+      ctx.fillRect(p.x - 4, p.y + homeH * .28, 8, 15);
     } else if (place.id === "cafe") {
       drawFacilityBuilding(p, building?.w || 300, building?.h || 270, "#b77a64", "#604f48", "#89a5a9");
       ctx.fillStyle = "#f1d4b0";

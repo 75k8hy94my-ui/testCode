@@ -1,7 +1,7 @@
 (function initCityDaysMapModel(global) {
   "use strict";
 
-  const MAP_VERSION = "japan-v2.3";
+  const MAP_VERSION = "japan-v2.4";
   const WORLD_SIZE = 10800;
   const COAST = 160;
   const RAIL_Y = 4700;
@@ -138,7 +138,7 @@
   ];
 
   const PLACE_DEFINITIONS = [
-    { id:"home", name:"自宅", x:5050, y:6600, entranceNodeId:"home-entrance", roadNodeId:"home-road", building:{ x:5241, y:6728, w:300, h:270 }, color:"#d9b98b", symbol:"H" },
+    { id:"home", name:"自宅", x:5050, y:6600, entranceNodeId:"home-entrance", roadNodeId:"home-road", building:{ x:5145, y:6695, w:118, h:96 }, color:"#d9b98b", symbol:"H" },
     { id:"cafe", name:"カフェ LUNE", x:4230, y:5560, entranceNodeId:"cafe-entrance", roadNodeId:"cafe-road", building:{ x:4380, y:5784, w:300, h:270 }, color:"#c88f72", symbol:"C" },
     { id:"store", name:"スーパー MARCHÉ", x:6630, y:5590, entranceNodeId:"store-entrance", roadNodeId:"store-road", building:{ x:6411, y:5809, w:320, h:260 }, color:"#74a88a", symbol:"S" },
     { id:"park", name:"中央公園", x:5250, y:3150, entranceNodeId:"park-entrance", roadNodeId:"park-road", color:"#72a66d", symbol:"P" },
@@ -358,7 +358,7 @@
       if (!edge.vehicle || !(["residential", "alley"].includes(edge.type) || edge.type === "collector" && edge.width <= 122)) continue;
       let length = 0;
       for (let segment = 1; segment < edge.points.length; segment += 1) length += distance(edge.points[segment - 1], edge.points[segment]);
-      for (let along = 48 + hash2(zoneIndex, edgeIndex, 2201) * 28; along < length - 48; along += 60) {
+      for (let along = 66 + hash2(zoneIndex, edgeIndex, 2201) * 34; along < length - 66; along += 96) {
         let remaining = along;
         let pose = null;
         for (let segment = 1; segment < edge.points.length; segment += 1) {
@@ -391,9 +391,9 @@
       if (accepted >= zone.target) break;
       const { edge, pose, side } = candidate;
       const seed = zoneIndex * 10000 + candidate.edgeIndex * 251 + Math.floor(candidate.along) * 3 + (side > 0 ? 1 : 2);
-      const w = 48 + hash2(seed, 3, 2203) * 22;
-      const h = 40 + hash2(seed, 5, 2204) * 18;
-      const frontSetback = 12 + hash2(seed, 7, 2205) * 14;
+      const w = 92 + hash2(seed, 3, 2203) * 34;
+      const h = 76 + hash2(seed, 5, 2204) * 28;
+      const frontSetback = 16 + hash2(seed, 7, 2205) * 18;
       const normal = { x:-pose.tangent.y, y:pose.tangent.x };
       const support = Math.abs(normal.x) * w / 2 + Math.abs(normal.y) * h / 2;
       const centerOffset = edge.width / 2 + frontSetback + support + 8;
@@ -410,7 +410,7 @@
           ? (road.id === edge.id ? 8 : (road.sidewalkWidth || vehicleSidewalkWidthForType(road.type)) + 8)
           : 4
       ))) continue;
-      if (sites.some((site) => rectsOverlap(rect, site, 14))) continue;
+      if (sites.some((site) => rectsOverlap(rect, site, 18))) continue;
 
       sites.push({
         id:zone.id + "-" + accepted,
