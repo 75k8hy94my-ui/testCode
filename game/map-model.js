@@ -1,7 +1,7 @@
 (function initCityDaysMapModel(global) {
   "use strict";
 
-  const MAP_VERSION = "japan-v2.2";
+  const MAP_VERSION = "japan-v2.3";
   const WORLD_SIZE = 10800;
   const COAST = 160;
   const RAIL_Y = 4700;
@@ -53,6 +53,11 @@
     node("south-dead-b", 5450, 7650, "south-residential"),
     node("east-court", 6850, 7050, "east-residential"),
     node("east-dead", 7300, 7480, "east-residential"),
+    node("west-lane-a", 1760, 5600, "west-residential"),
+    node("west-lane-b", 3190, 6930, "west-residential"),
+    node("south-lane-a", 3900, 6750, "south-residential"),
+    node("east-lane-a", 6500, 7400, "east-residential"),
+    node("east-lane-b", 7500, 7200, "east-residential"),
     node("park-path-west", 4860, 2860, "park-shrine"),
     node("park-path-east", 5660, 2880, "park-shrine"),
     node("shrine-path", 4520, 2680, "park-shrine"),
@@ -105,6 +110,12 @@
     ["local-east-dead", "east-court", "east-dead", [[6850,7050],[7020,7190],[7170,7350],[7300,7480]], "alley", 58, 15, true, true, false],
     ["local-east-southeast", "east-court", "south-east", [[6850,7050],[7240,6970],[7700,6800],[8150,6600]], "residential", 76, 20, true, true, false],
     ["residential-southeast-loop", "south-east", "east-south", [[8150,6600],[7920,6480],[7600,6320],[7300,6200]], "residential", 82, 20, true, true, false],
+
+    ["housing-lane-west-a", "west-court", "west-lane-a", [[2250,5850],[2100,5760],[1940,5680],[1760,5600]], "alley", 58, 15, true, true, false],
+    ["housing-lane-west-b", "south-west", "west-lane-b", [[2850,6550],[2940,6670],[3060,6800],[3190,6930]], "alley", 58, 15, true, true, false],
+    ["housing-lane-south-a", "res-west", "south-lane-a", [[3600,5950],[3690,6200],[3800,6460],[3900,6750]], "alley", 60, 15, true, true, false],
+    ["housing-lane-east-a", "east-court", "east-lane-a", [[6850,7050],[6740,7170],[6620,7290],[6500,7400]], "alley", 58, 15, true, true, false],
+    ["housing-lane-east-b", "east-court", "east-lane-b", [[6850,7050],[7050,7100],[7270,7160],[7500,7200]], "alley", 58, 15, true, true, false],
 
     ["ped-home-entry", "home-entrance", "home-road", [[5050,6600],[5050,6510],[5050,6420]], "sidewalk", 40, 5, false, true, false],
     ["ped-cafe-entry", "cafe-entrance", "cafe-road", [[4230,5560],[4280,5520],[4350,5480]], "sidewalk", 42, 5, false, true, false],
@@ -320,6 +331,88 @@
     return best;
   }
 
+  function createResidentialFrontageSites(zone, zoneIndex, edges, openSpaces, reserved, sites) {
+    const district = DISTRICT_DEFINITIONS.find((value) => value.id === zone.district);
+    const candidates = [];
+    for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex += 1) {
+      const edge = edges[edgeIndex];
+      if (!edge.vehicle || !(["residential", "alley"].includes(edge.type) || edge.type === "collector" && edge.width <= 122)) continue;
+      let length = 0;
+      for (let segment = 1; segment < edge.points.length; segment += 1) length += distance(edge.points[segment - 1], edge.points[segment]);
+      for (let along = 48 + hash2(zoneIndex, edgeIndex, 2201) * 28; along < length - 48; along += 82) {
+        let remaining = along;
+        let pose = null;
+        for (let segment = 1; segment < edge.points.length; segment += 1) {
+          const a = edge.points[segment - 1];
+          const b = edge.points[segment];
+          const segmentLength = distance(a, b);
+          if (remaining <= segmentLength || segment === edge.points.length - 1) {
+            const t = segmentLength < .001 ? 0 : Math.max(0, Math.min(1, remaining / segmentLength));
+            const magnitude = segmentLength || 1;
+            pose = {
+              x:a.x + (b.x - a.x) * t,
+              y:a.y + (b.y - a.y) * t,
+              tangent:{ x:(b.x - a.x) / magnitude, y:(b.y - a.y) / magnitude }
+            };
+            break;
+          }
+          remaining -= segmentLength;
+        }
+        if (!pose || district && !pointInPolygon(pose.x, pose.y, district.polygon)) continue;
+        for (const side of [-1, 1]) candidates.push({ edge, edgeIndex, along, pose, side });
+      }
+    }
+    candidates.sort((a, b) =>
+      hash2(zoneIndex * 1000 + a.edgeIndex, Math.floor(a.along), a.side + 2202) -
+      hash2(zoneIndex * 1000 + b.edgeIndex, Math.floor(b.along), b.side + 2202)
+    );
+
+    let accepted = 0;
+    for (const candidate of candidates) {
+      if (accepted >= zone.target) break;
+      const { edge, pose, side } = candidate;
+      const seed = zoneIndex * 10000 + candidate.edgeIndex * 251 + Math.floor(candidate.along) * 3 + (side > 0 ? 1 : 2);
+      const w = 48 + hash2(seed, 3, 2203) * 22;
+      const h = 40 + hash2(seed, 5, 2204) * 18;
+      const frontSetback = 12 + hash2(seed, 7, 2205) * 14;
+      const normal = { x:-pose.tangent.y, y:pose.tangent.x };
+      const support = Math.abs(normal.x) * w / 2 + Math.abs(normal.y) * h / 2;
+      const centerOffset = edge.width / 2 + frontSetback + support + 8;
+      const centerX = pose.x + normal.x * centerOffset * side;
+      const centerY = pose.y + normal.y * centerOffset * side;
+      const rect = { x:Math.round(centerX - w / 2), y:Math.round(centerY - h / 2), w:Math.round(w), h:Math.round(h) };
+      if (district && !pointInPolygon(centerX, centerY, district.polygon)) continue;
+      if (reserved.some((area) => rectsOverlap(rect, area, 18))) continue;
+      if (openSpaces.length && rectHitsOpenSpace(rect, openSpaces)) continue;
+      if (edges.some((road) => rectIntersectsEdge(rect, road, road.vehicle ? 8 : 4))) continue;
+      if (sites.some((site) => rectsOverlap(rect, site, 14))) continue;
+
+      sites.push({
+        id:zone.id + "-" + accepted,
+        zoneId:zone.id,
+        ...rect,
+        use:zone.use,
+        district:zone.district,
+        style:"residential",
+        kind:"low",
+        floors:hash2(seed, 11, 2206) > .78 ? 2 : 1,
+        frontage:Math.abs(normal.x) > Math.abs(normal.y)
+          ? (normal.x * side < 0 ? "east" : "west")
+          : (normal.y * side < 0 ? "south" : "north"),
+        frontageEdgeId:edge.id,
+        frontSetback:Math.round(frontSetback),
+        houseStyle:"detached",
+        palette:Math.floor(hash2(seed, 13, 2207) * 5),
+        roofDetail:Math.floor(hash2(seed, 17, 2208) * 4),
+        facadeBand:false,
+        balconies:false,
+        seed
+      });
+      accepted += 1;
+    }
+    return accepted;
+  }
+
   function createBuildingSites(edges, openSpaces, places, stations) {
     const sites = [];
     const reserved = [
@@ -334,6 +427,10 @@
 
     for (let zoneIndex = 0; zoneIndex < BUILDING_ZONES.length; zoneIndex += 1) {
       const zone = BUILDING_ZONES[zoneIndex];
+      if (["west-housing", "south-housing", "east-housing"].includes(zone.id)) {
+        createResidentialFrontageSites(zone, zoneIndex, edges, openSpaces, reserved, sites);
+        continue;
+      }
       let accepted = 0;
       const maxAttempts = zone.target * 24;
       for (let attempt = 0; attempt < maxAttempts && accepted < zone.target; attempt += 1) {
@@ -399,6 +496,7 @@
 
         const site = {
           id:zone.id + "-" + accepted,
+          zoneId:zone.id,
           x:Math.round(x),
           y:Math.round(y),
           w:Math.round(w),

@@ -7,7 +7,7 @@ const { createMapModel } = mapModule;
 test('v2 map validates as a connected Japanese urban fabric', () => {
   const map = createMapModel();
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2.2');
+  assert.equal(map.version, 'japan-v2.3');
   assert.equal(map.worldSize, 10800);
   assert.ok(map.nodes.length >= 45);
   assert.ok(map.edges.length >= 55);
@@ -97,6 +97,47 @@ test('urban fabric contains dense buildings and multiple real open-space types',
   assert.ok(map.vegetation.length >= 50);
 });
 
+test('residential districts have connected local streets and street-fronting low-rise homes', () => {
+  const map = createMapModel();
+  const localRoads = map.edges.filter((edge) => edge.id.startsWith('housing-lane-'));
+  const homes = map.buildingSites.filter((site) => ['west-housing', 'south-housing', 'east-housing'].includes(site.zoneId));
+
+  assert.ok(localRoads.length >= 5);
+  assert.ok(localRoads.every((edge) => edge.vehicle && edge.width >= 52 && edge.width <= 72));
+  assert.ok(homes.length >= 100);
+  assert.ok(homes.filter((home) => home.zoneId === 'west-housing').length >= 18);
+  assert.ok(homes.filter((home) => home.zoneId === 'south-housing').length >= 50);
+  assert.ok(homes.filter((home) => home.zoneId === 'east-housing').length >= 35);
+  for (const home of homes) {
+    const road = map.getEdge(home.frontageEdgeId);
+    assert.ok(road?.vehicle, home.id + ' must face a vehicle street');
+    assert.ok(['residential', 'alley', 'collector'].includes(road.type), home.id + ' must face a neighborhood street');
+    assert.equal(home.houseStyle, 'detached');
+    assert.ok(home.floors <= 2, home.id + ' must remain low-rise');
+    assert.ok(home.frontSetback >= 10 && home.frontSetback <= 28);
+    assert.ok(map.nearestRoad(home.x + home.w / 2, home.y + home.h / 2, { vehicleOnly:true }).distance < 145);
+
+    const center = { x:home.x + home.w / 2, y:home.y + home.h / 2 };
+    let closest = null;
+    for (let i = 1; i < road.points.length; i += 1) {
+      const a = road.points[i - 1];
+      const b = road.points[i];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const lengthSquared = dx * dx + dy * dy;
+      const t = Math.max(0, Math.min(1, ((center.x - a.x) * dx + (center.y - a.y) * dy) / lengthSquared));
+      const projection = { x:a.x + dx * t, y:a.y + dy * t };
+      const distance = Math.hypot(center.x - projection.x, center.y - projection.y);
+      if (!closest || distance < closest.distance) closest = { projection, distance, tangent:{ x:dx / Math.sqrt(lengthSquared), y:dy / Math.sqrt(lengthSquared) } };
+    }
+    const normal = { x:-closest.tangent.y, y:closest.tangent.x };
+    const support = Math.abs(normal.x) * home.w / 2 + Math.abs(normal.y) * home.h / 2;
+    const measuredSetback = closest.distance - support - road.width / 2;
+    assert.ok(measuredSetback >= home.frontSetback - 1, home.id + ' must preserve its declared street setback: ' + JSON.stringify({ measuredSetback, declared:home.frontSetback, edgeId:road.id }));
+  }
+  assert.deepEqual(map.validate(), []);
+});
+
 test('all existing facilities and stations remain addressable', () => {
   const map = createMapModel();
   assert.deepEqual(map.places.map((place) => place.id), ['home','cafe','store','park','gym','library']);
@@ -124,9 +165,18 @@ test('walking and vehicle graphs reach every facility pair', () => {
 test('nearest-road and surface membership distinguish vehicle and pedestrian streets', () => {
   const map = createMapModel();
   const vehicleEdge = map.edges.find((edge) => edge.vehicle);
-  const pedestrianEdge = map.edges.find((edge) => edge.pedestrian && !edge.vehicle);
   const vehiclePoint = vehicleEdge.points[Math.floor(vehicleEdge.points.length / 2)];
-  const pedestrianPoint = pedestrianEdge.points[Math.floor(pedestrianEdge.points.length / 2)];
+  const pedestrianSample = map.edges
+    .filter((edge) => edge.pedestrian && !edge.vehicle)
+    .flatMap((edge) => edge.points.slice(1).map((point, index) => ({ edge, point, start:edge.points[index] })))
+    .map(({ edge, start, point }) => ({
+      edge,
+      point:{ x:(start.x + point.x) / 2, y:(start.y + point.y) / 2 }
+    }))
+    .find(({ point }) => !map.isRoad(point.x, point.y, { vehicleOnly:true }));
+  assert.ok(pedestrianSample);
+  const pedestrianEdge = pedestrianSample.edge;
+  const pedestrianPoint = pedestrianSample.point;
 
   assert.equal(map.nearestRoad(vehiclePoint.x, vehiclePoint.y, { vehicleOnly:true }).edgeId, vehicleEdge.id);
   assert.equal(map.isRoad(pedestrianPoint.x, pedestrianPoint.y, { vehicleOnly:true }), false);
