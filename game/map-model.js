@@ -1,7 +1,7 @@
 (function initCityDaysMapModel(global) {
   "use strict";
 
-  const MAP_VERSION = "japan-v2.1";
+  const MAP_VERSION = "japan-v2.2";
   const WORLD_SIZE = 10800;
   const COAST = 160;
   const RAIL_Y = 4700;
@@ -81,10 +81,9 @@
     ["collector-north-market", "central-north", "north-market", [[5200,4200],[5480,4280],[5790,4380],[6100,4470]], "shopping", 100, 20, true, true, false],
     ["collector-market-east", "north-market", "north-east", [[6100,4470],[6460,4410],[6900,4330],[7480,4250]], "residential", 92, 20, true, true, false],
 
-    ["shopping-central-cafe", "central", "cafe-road", [[5200,5050],[4990,5150],[4750,5310],[4350,5480]], "shopping", 92, 20, true, true, false],
-    ["shopping-central-market", "central", "market-lane", [[5200,5050],[5270,5170],[5390,5300],[5550,5420]], "shopping", 94, 20, true, true, false],
+    ["shopping-central-cafe", "central-west", "cafe-road", [[4200,5050],[4230,5180],[4280,5340],[4350,5480]], "shopping", 92, 20, true, true, false],
+    ["shopping-central-market", "cafe-road", "market-lane", [[4350,5480],[4700,5455],[5150,5435],[5550,5420]], "shopping", 94, 20, true, true, false],
     ["shopping-market-store", "market-lane", "store-road", [[5550,5420],[5850,5480],[6150,5520],[6500,5500]], "shopping", 100, 20, true, true, false],
-    ["shopping-store-east", "store-road", "east-junction", [[6500,5500],[6740,5380],[7040,5200],[7380,5000]], "collector", 114, 30, true, true, false],
 
     ["residential-cafe-west", "cafe-road", "res-west", [[4350,5480],[4120,5620],[3860,5780],[3600,5950]], "residential", 78, 20, true, true, false],
     ["residential-west-home", "res-west", "home-west", [[3600,5950],[3850,6030],[4100,6140],[4350,6250]], "alley", 70, 15, true, true, false],
