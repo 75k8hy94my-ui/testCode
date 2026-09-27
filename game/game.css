@@ -52,21 +52,97 @@ button{font:inherit;color:inherit}
 .help-panel{position:absolute;inset:0;display:grid;place-items:center;padding:22px;background:rgba(0,0,0,.48);z-index:10}
 .help-panel>div{width:min(560px,100%);padding:20px;border:1px solid var(--border);background:var(--panel-strong);border-radius:14px;line-height:1.55}
 .help-panel p{color:var(--muted)}
-.smartphone-panel{position:absolute;right:max(18px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));z-index:12;width:310px;max-height:calc(100vh - 36px);overflow:auto;padding:10px;border:1px solid rgba(255,255,255,.24);border-radius:28px;background:linear-gradient(145deg,#39443e,#111814 55%);box-shadow:0 24px 70px rgba(0,0,0,.52),inset 0 1px 0 rgba(255,255,255,.16);color:var(--text)}
-.smartphone-header{display:flex;justify-content:space-between;align-items:center;padding:7px 7px 12px}
-.smartphone-header strong{display:block;margin-top:3px;font-size:14px}
-.smartphone-header button{width:32px;height:32px;border:1px solid var(--border);border-radius:50%;background:rgba(255,255,255,.08);color:var(--text);font-size:20px}
-.phone-screen{min-height:390px;padding:14px;border-radius:19px;background:radial-gradient(ellipse at 80% 0%,rgba(109,153,119,.38),transparent 48%),linear-gradient(160deg,#25332b,#121b17 72%);}
-.phone-widget{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(6,12,9,.38);font-size:12px}
-.phone-widget span{color:#d2dbd5}.phone-widget b{font-size:14px}
-.phone-message{min-height:48px;margin:13px 3px;color:#d9e4dc;font-size:13px;line-height:1.5}
-.phone-needs{display:grid;gap:7px;padding:12px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(6,12,9,.3)}
-.phone-need{display:flex;justify-content:space-between;color:#c4d0c8;font-size:12px}.phone-need b{color:#f5f7f4;font-variant-numeric:tabular-nums}
-.phone-apps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:17px}
-.phone-apps button{display:grid;justify-items:center;gap:4px;padding:9px 2px;border:0;border-radius:13px;background:rgba(255,255,255,.08);color:var(--text)}
-.phone-apps button span{display:grid;place-items:center;width:37px;height:37px;border-radius:11px;background:linear-gradient(145deg,#8bae8c,#52765c);font-size:22px}
-.phone-apps button b{font-size:10px}
-.smartphone-home-indicator{display:grid;place-items:center;padding-top:9px}.smartphone-home-indicator span{width:76px;height:4px;border-radius:5px;background:rgba(255,255,255,.65)}
+
+.smartphone-panel{
+  --phone-bg:#000;--phone-surface:#1c1c1e;--phone-surface-2:#2c2c2e;--phone-text:#f5f5f7;--phone-muted:#a9a9b0;
+  --phone-blue:#0a84ff;--phone-separator:rgba(255,255,255,.11);--phone-text-scale:1;
+  position:absolute;right:max(18px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));z-index:20;
+  width:390px;height:min(780px,calc(100vh - 36px));padding:7px;border:1px solid rgba(255,255,255,.28);border-radius:52px;
+  overflow:hidden;background:#080808;box-shadow:0 32px 90px rgba(0,0,0,.58),inset 0 0 0 2px rgba(255,255,255,.055);
+  color:var(--phone-text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",system-ui,sans-serif;
+  font-size:calc(14px * var(--phone-text-scale))
+}
+.smartphone-panel *{box-sizing:border-box}
+.smartphone-panel button,.smartphone-panel input,.smartphone-panel textarea{font:inherit}
+.smartphone-panel button{min-height:0;padding:0;border:0;background:none;color:inherit}
+.smartphone-panel.phone-theme-light{--phone-bg:#f2f2f7;--phone-surface:#fff;--phone-surface-2:#e9e9ee;--phone-text:#111;--phone-muted:#696970;--phone-separator:rgba(0,0,0,.09)}
+.smartphone-panel.phone-reduce-motion *{transition:none!important;animation:none!important}
+.ios-wallpaper,.ios-app-screen,.ios-lock-screen,.ios-overlay-panel{position:relative;width:100%;height:100%;overflow:hidden;border-radius:45px;background:var(--phone-bg);color:var(--phone-text)}
+.ios-wallpaper{background:
+  radial-gradient(circle at 18% 14%,rgba(255,122,74,.72),transparent 30%),
+  radial-gradient(circle at 82% 24%,rgba(62,149,255,.72),transparent 35%),
+  radial-gradient(circle at 52% 78%,rgba(129,74,255,.62),transparent 42%),
+  linear-gradient(145deg,#201632,#07151d 58%,#16111c)}
+.phone-theme-light .ios-wallpaper{background:
+  radial-gradient(circle at 20% 14%,rgba(255,164,116,.88),transparent 31%),
+  radial-gradient(circle at 82% 26%,rgba(111,185,255,.78),transparent 37%),
+  radial-gradient(circle at 50% 80%,rgba(187,150,255,.68),transparent 44%),
+  linear-gradient(145deg,#d9e7ff,#f4e6ff 58%,#e8f4ef)}
+.ios-statusbar{height:46px;padding:9px 20px 0;display:grid;grid-template-columns:1fr 112px 1fr;align-items:start;position:relative;z-index:8;font-size:12px;font-weight:700}
+.ios-statusbar>b{padding-top:4px;font-variant-numeric:tabular-nums}
+.dynamic-island{justify-self:center;width:108px;height:29px!important;border-radius:18px!important;background:#000!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.025)}
+.dynamic-island span{display:block;width:7px;height:7px;margin-left:auto;margin-right:12px;border-radius:50%;background:#10213c;box-shadow:0 0 0 1px #1e314b}
+.ios-status-icons{justify-self:end;display:flex;align-items:center;gap:5px;padding-top:3px;font-size:10px}
+.ios-status-icons .battery{display:inline-grid;place-items:center;min-width:25px;height:13px;padding:0 3px;border:1px solid currentColor;border-radius:4px;font-size:8px}
+.ios-home{height:calc(100% - 46px);padding:7px 17px 88px;overflow:auto;scrollbar-width:none}
+.ios-home::-webkit-scrollbar,.ios-app-content::-webkit-scrollbar{display:none}
+.ios-widget-row{display:grid;grid-template-columns:1.35fr .9fr;gap:11px;margin:4px 0 11px}
+.ios-widget{height:112px!important;padding:13px!important;border-radius:23px!important;text-align:left;background:rgba(22,22,26,.74)!important;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 8px 24px rgba(0,0,0,.13)}
+.ios-clock-widget{display:flex;flex-direction:column}.ios-clock-widget small,.ios-weather-widget small{opacity:.72}.ios-clock-widget strong{font-size:31px;letter-spacing:-.05em;margin-top:5px}.ios-clock-widget span{margin-top:auto;font-size:12px}
+.ios-weather-widget{display:grid;grid-template-rows:1fr auto auto}.ios-weather-widget .weather-glyph{font-size:32px}.ios-weather-widget strong{font-size:16px}
+.ios-live-card{width:100%;display:flex;align-items:center;gap:10px;padding:10px 12px!important;margin-bottom:12px;border-radius:18px!important;background:rgba(22,22,26,.67)!important;backdrop-filter:blur(18px)}
+.ios-live-card>span{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:#0a84ff;font-size:19px}.ios-live-card div{display:grid;text-align:left}.ios-live-card small{color:#d3d3da}
+.ios-app-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:13px 8px}
+.ios-app{display:grid!important;justify-items:center!important;gap:5px!important;color:#fff!important;text-shadow:0 1px 4px rgba(0,0,0,.45);overflow:visible!important}
+.phone-theme-light .ios-app{color:#17171a!important;text-shadow:0 1px 3px rgba(255,255,255,.45)}
+.ios-app-icon{display:grid;place-items:center;width:54px;height:54px;border-radius:13px;background:var(--app-color);color:#111;font-size:25px;font-weight:650;box-shadow:inset 0 1px 0 rgba(255,255,255,.48),0 3px 9px rgba(0,0,0,.2)}
+.ios-app b{max-width:74px;font-size:10px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ios-page-dots{display:flex;justify-content:center;gap:5px;padding:14px 0 7px}.ios-page-dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.82)}.ios-page-dots i+ i{opacity:.35}
+.ios-dock{position:absolute;left:13px;right:13px;bottom:17px;height:76px;padding:8px 12px;display:grid;grid-template-columns:repeat(4,1fr);align-items:center;border-radius:26px;background:rgba(238,238,245,.22);backdrop-filter:blur(28px) saturate(150%);-webkit-backdrop-filter:blur(28px) saturate(150%)}
+.phone-theme-light .ios-dock{background:rgba(255,255,255,.54)}
+.ios-dock .ios-app b{display:none}.ios-dock .ios-app-icon{width:53px;height:53px}
+.ios-side-close{position:absolute!important;right:10px;top:49px;width:28px;height:28px!important;border-radius:50%!important;background:rgba(0,0,0,.32)!important;color:#fff!important;font-size:16px;z-index:12;backdrop-filter:blur(10px)}
+.ios-home-indicator{position:absolute!important;left:50%;bottom:4px;transform:translateX(-50%);width:142px;height:18px!important;z-index:16}
+.ios-home-indicator span{display:block;width:126px;height:5px;margin:auto;border-radius:99px;background:currentColor;opacity:.86}
+.ios-app-screen{background:var(--phone-bg)}
+.ios-app-header{height:47px;padding:3px 15px 6px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;border-bottom:1px solid var(--phone-separator);background:color-mix(in srgb,var(--phone-bg) 86%,transparent);position:relative;z-index:4}
+.ios-app-header>button{justify-self:start!important;color:var(--phone-blue)!important;font-size:14px}.ios-app-header>button span{font-size:12px}.ios-app-header>strong{font-size:15px}.ios-app-header>div{justify-self:end}.ios-app-header>div button{color:var(--phone-blue)!important}
+.ios-app-content{height:calc(100% - 93px);padding:14px;overflow:auto;background:var(--phone-bg)}
+.ios-section{margin:0 0 17px;border-radius:14px;background:var(--phone-surface);overflow:hidden}
+.ios-section>h3{margin:0;padding:10px 13px 7px;color:var(--phone-muted);font-size:11px;font-weight:600;text-transform:none}
+.ios-list-row,.ios-contact-row,.ios-place-row,.ios-setting-row{width:100%;display:flex!important;align-items:center!important;gap:11px!important;padding:10px 13px!important;min-height:52px!important;text-align:left;border-top:1px solid var(--phone-separator)!important}
+.ios-section> :first-child:not(h3){border-top:0!important}.ios-section h3+*{border-top:0!important}
+.ios-list-row>span:first-child{width:27px;text-align:center}.ios-list-row div,.ios-place-row div{display:grid;gap:2px;min-width:0;flex:1}.ios-list-row b,.ios-contact-row b,.ios-place-row b{font-size:13px}.ios-list-row small,.ios-contact-row small,.ios-place-row small{color:var(--phone-muted);font-size:10px}.ios-list-row em,.ios-place-row em{margin-left:auto;color:var(--phone-muted);font-size:10px;font-style:normal}
+.ios-contact-row>span:nth-child(2){display:grid;gap:2px;flex:1;text-align:left}.ios-contact-row em{font-size:20px;color:var(--phone-muted);font-style:normal}
+.ios-avatar{display:grid!important;place-items:center;width:39px!important;height:39px;border-radius:50%;background:var(--avatar);color:#fff;font-weight:700;font-size:15px}.ios-avatar.small{width:30px!important;height:30px!important;font-size:12px}
+.ios-thread{min-height:370px;display:flex;flex-direction:column;justify-content:flex-end;gap:7px;padding:10px 3px}.ios-bubble{max-width:79%;padding:8px 11px;border-radius:17px;font-size:12px;line-height:1.35}.ios-bubble.them{align-self:flex-start;background:var(--phone-surface-2)}.ios-bubble.me{align-self:flex-end;background:#0a84ff;color:#fff}
+.ios-quick-replies{display:flex;gap:6px;overflow:auto;padding:9px 0}.ios-quick-replies button,.ios-button-row button{padding:8px 10px!important;border-radius:14px!important;background:var(--phone-surface)!important;color:var(--phone-blue)!important;white-space:nowrap}
+.ios-map-card,.ios-find-map{height:174px;position:relative;overflow:hidden;margin-bottom:13px;border-radius:18px;background:#d6d1b6}
+.ios-map-grid{position:absolute;inset:-40px;background:linear-gradient(35deg,transparent 44%,rgba(255,255,255,.95) 45% 50%,transparent 51%),linear-gradient(125deg,transparent 42%,rgba(255,255,255,.8) 43% 48%,transparent 49%),#cad7b7;background-size:100px 100px}
+.map-user-dot,.find-me{position:absolute;left:51%;top:48%;width:15px;height:15px;border:3px solid #fff;border-radius:50%;background:#0a84ff;box-shadow:0 2px 7px rgba(0,0,0,.25)}.ios-map-card>div:last-child{position:absolute;left:12px;bottom:10px;display:grid;padding:7px 10px;border-radius:10px;background:rgba(255,255,255,.88);color:#111}.ios-map-card small{font-size:9px}
+.ios-place-row>span{color:var(--place);font-size:18px}.ios-place-row.active{background:rgba(10,132,255,.13)!important}.ios-place-row.active em{color:var(--phone-blue)}
+.ios-wide-button{width:100%;padding:12px!important;border-radius:13px!important;background:var(--phone-blue)!important;color:#fff!important;font-weight:650}.ios-wide-button.destructive{background:#ff453a!important}
+.ios-camera-view{height:480px;display:grid;place-content:center;text-align:center;position:relative;border-radius:18px;background:radial-gradient(circle at 50% 45%,#263b35,#0a0c0c 65%);overflow:hidden}.ios-camera-view:before{content:"";position:absolute;inset:0;background:linear-gradient(120deg,transparent 35%,rgba(255,255,255,.07) 50%,transparent 65%)}.camera-focus{width:76px;height:76px;margin:auto;border:1px solid rgba(255,220,80,.8)}.ios-camera-view span{margin-top:16px;font-weight:650}.ios-camera-view small{color:#aeb7b2}
+.ios-camera-controls{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;justify-items:center;padding:15px}.camera-shutter{width:64px;height:64px!important;border:4px solid #fff!important;border-radius:50%!important}.camera-shutter span{display:block;width:50px;height:50px;margin:auto;border-radius:50%;background:#fff}.camera-thumb{width:44px;height:44px!important;border-radius:8px!important;background:#252525!important;overflow:hidden}.camera-thumb img{width:100%;height:100%;object-fit:cover}.camera-flip{width:38px;height:38px!important;border-radius:50%!important;background:#2c2c2e!important}
+.ios-photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}.ios-photo{aspect-ratio:1!important;overflow:hidden;background:#222!important}.ios-photo img{width:100%;height:100%;object-fit:cover}.ios-footnote{display:block;padding:13px;text-align:center;color:var(--phone-muted)}
+.ios-weather-hero{padding:26px 12px 30px;text-align:center;border-radius:24px;background:linear-gradient(#2f78c8,#7fb9eb);color:#fff;margin-bottom:13px}.ios-weather-hero small{display:block;font-size:16px}.ios-weather-hero strong{display:block;font-size:72px;font-weight:200;letter-spacing:-.08em}.ios-weather-hero span,.ios-weather-hero em{display:block;font-style:normal}.ios-glass-card{padding:12px;border-radius:17px;background:var(--phone-surface);margin-bottom:12px}.ios-glass-card h3{margin:0 0 8px;font-size:11px;color:var(--phone-muted)}.ios-forecast{display:grid;grid-template-columns:1fr 1fr auto;padding:9px 0;border-top:1px solid var(--phone-separator)}.ios-forecast:first-of-type{border-top:0}.ios-forecast em{font-style:normal}
+.ios-calendar-date{display:grid;justify-items:center;padding:20px;margin-bottom:14px;border-radius:20px;background:var(--phone-surface)}.ios-calendar-date small{color:#ff453a;font-weight:800}.ios-calendar-date strong{font-size:62px}.ios-calendar-date span{color:var(--phone-muted)}.ios-event{display:grid;grid-template-columns:52px 1fr;gap:10px;padding:11px 13px;border-top:1px solid var(--phone-separator)}.ios-event time{color:var(--phone-muted);font-size:10px}.ios-event div{display:grid}.ios-event small{color:var(--phone-muted)}
+.ios-world-clock{text-align:center;padding:38px 0}.ios-world-clock strong{display:block;font-size:58px;font-weight:250}.ios-world-clock span{font-size:17px}.ios-world-clock small{display:block;color:var(--phone-muted)}
+.ios-note-editor{width:100%;min-height:132px;padding:13px;border:0;border-radius:14px;background:var(--phone-surface);color:var(--phone-text);resize:vertical;outline:none;margin-bottom:8px}.ios-note-card{padding:12px 13px;border-top:1px solid var(--phone-separator)}.ios-note-card p{margin:5px 0;color:var(--phone-muted);font-size:11px}.ios-note-card small{color:var(--phone-muted)}
+.ios-inline-input{display:flex;gap:7px;margin-bottom:13px}.ios-inline-input input{min-width:0;flex:1;padding:10px 12px;border:0;border-radius:12px;background:var(--phone-surface);color:var(--phone-text);outline:none}.ios-inline-input button{padding:8px 11px!important;border-radius:11px!important;background:var(--phone-blue)!important;color:#fff!important}.ios-reminder{width:100%;display:flex!important;align-items:center;gap:10px!important;padding:11px 13px!important;text-align:left;border-top:1px solid var(--phone-separator)!important}.ios-reminder i{display:grid;place-items:center;width:20px;height:20px;border:2px solid #0a84ff;border-radius:50%;font-size:11px}.ios-reminder.done span{text-decoration:line-through;color:var(--phone-muted)}
+.ios-wallet-card{height:190px;padding:20px;border-radius:24px;background:linear-gradient(135deg,#1c1c1e,#43434a 55%,#131317);color:#fff;display:flex;flex-direction:column;box-shadow:0 15px 35px rgba(0,0,0,.25);margin-bottom:16px}.ios-wallet-card small{letter-spacing:.12em}.ios-wallet-card strong{font-size:34px;margin-top:20px}.ios-wallet-card span{margin-top:auto;letter-spacing:.16em}
+.ios-health-ring{width:170px;height:170px;margin:10px auto 22px;border-radius:50%;display:grid;place-content:center;text-align:center;background:radial-gradient(circle,var(--phone-bg) 55%,transparent 57%),conic-gradient(#ff375f 0 76%,#333 76%)}.ios-health-ring strong{font-size:33px}.ios-health-ring span{font-size:9px;color:var(--phone-muted)}.ios-health-row{display:grid;grid-template-columns:48px 1fr 28px;gap:8px;align-items:center;padding:10px 13px;border-top:1px solid var(--phone-separator);font-size:11px}.ios-health-row>div{height:7px;border-radius:8px;background:var(--phone-surface-2);overflow:hidden}.ios-health-row i{display:block;height:100%;border-radius:8px}
+.ios-metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0}.ios-metric-grid>div{display:grid;padding:13px;border-radius:14px;background:var(--phone-surface)}.ios-metric-grid small{color:var(--phone-muted)}.ios-metric-grid b{font-size:19px;margin-top:4px}
+.ios-find-map{background:linear-gradient(30deg,#c7dcb9,#d8d2b8)}.find-car{position:absolute;left:27%;top:63%;color:#fff;text-shadow:0 1px 4px #000}.ios-transit-line{display:flex;align-items:center;justify-content:center;gap:10px;padding:20px}.ios-transit-line span{width:65px;height:5px;border-radius:8px;background:#4267d5}.ios-transit-row{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:10px;padding:11px 13px;border-top:1px solid var(--phone-separator)}.ios-transit-row i{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#4267d5;color:#fff;font-style:normal}.ios-transit-row div{display:grid}.ios-transit-row small,.ios-transit-row em{color:var(--phone-muted);font-size:10px;font-style:normal}
+.ios-mail-list article{display:grid;grid-template-columns:38px 1fr;gap:9px;padding:11px 4px;border-bottom:1px solid var(--phone-separator)}.ios-mail-list article>span{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#3c8cf5;color:#fff}.ios-mail-list article div{display:grid}.ios-mail-list strong{font-size:12px}.ios-mail-list p{margin:2px 0;color:var(--phone-muted);font-size:10px}
+.ios-news-hero{padding:17px;border-radius:18px;background:linear-gradient(145deg,#eee,#bbb);color:#111}.ios-news-hero small{font-weight:800;color:#d71920}.ios-news-hero strong{display:block;font-size:21px;margin-top:17px}.ios-news-hero p{margin-bottom:0}.ios-news-row{display:grid;grid-template-columns:72px 1fr;gap:10px;padding:11px;border-top:1px solid var(--phone-separator)}.ios-news-row>div{height:52px;border-radius:8px;background:linear-gradient(135deg,#56796d,#9ea77e)}.ios-news-row span{display:grid}.ios-news-row small{color:var(--phone-muted)}
+.ios-album-art{width:240px;height:240px;margin:20px auto;border-radius:17px;display:grid;place-content:center;text-align:center;background:linear-gradient(135deg,#ff496f,#6f43e7);color:#fff;font-size:38px;font-weight:800;box-shadow:0 20px 40px rgba(0,0,0,.28)}.ios-now-playing{display:grid;text-align:center}.ios-now-playing small,.ios-now-playing span{color:var(--phone-muted)}.ios-now-playing strong{font-size:19px}.ios-player-controls{display:flex;justify-content:center;align-items:center;gap:30px;padding:22px}.ios-player-controls button{font-size:24px}.ios-player-controls button:nth-child(2){width:52px;height:52px!important;border-radius:50%!important;background:var(--phone-text)!important;color:var(--phone-bg)!important}
+.ios-calc-display{min-height:110px;display:flex;align-items:flex-end;justify-content:flex-end;padding:12px;font-size:42px;overflow:hidden}.ios-calc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.ios-calc-grid button{aspect-ratio:1;border-radius:50%!important;background:#333336!important;font-size:20px}.ios-calc-grid button:nth-child(4n){background:#ff9f0a!important;color:#fff!important}.ios-calc-grid button:nth-child(-n+3){background:#a5a5a9!important;color:#111!important}.ios-calc-grid button:last-child{background:#ff9f0a!important}
+.ios-home-house{height:190px;border-radius:22px;background:linear-gradient(145deg,#d18a49,#70482f);display:grid;place-content:center;text-align:center;color:#fff;margin-bottom:16px}.ios-home-house span{font-size:48px}.ios-home-house strong{font-size:22px}.ios-home-house small{opacity:.8}.ios-setting-row{justify-content:space-between!important}.ios-setting-row.action em{color:var(--phone-muted);font-style:normal}.ios-switch{width:48px;height:28px!important;border-radius:18px!important;background:#3a3a3d!important;padding:2px!important;transition:.18s}.ios-switch i{display:block;width:24px;height:24px;border-radius:50%;background:#fff;transition:.18s}.ios-switch.on{background:#30d158!important}.ios-switch.on i{transform:translateX(20px)}.ios-settings-profile{display:flex;align-items:center;gap:11px;padding:15px;margin-bottom:14px;border-radius:14px;background:var(--phone-surface)}.ios-settings-profile>span{display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:#7f86a0;color:#fff;font-weight:700}.ios-settings-profile div{display:grid}.ios-settings-profile small{color:var(--phone-muted)}
+.ios-empty{padding:26px;text-align:center;color:var(--phone-muted)}.ios-empty.tall{display:grid;place-content:center;min-height:390px}
+.ios-lock-screen{background:radial-gradient(circle at 50% 18%,#69628a,#182333 45%,#0a0b0e);color:#fff}.ios-lock-screen main{padding:35px 20px;text-align:center}.ios-lock-screen main>small{font-size:16px}.ios-lock-screen main>strong{display:block;font-size:76px;font-weight:180;letter-spacing:-.07em}.ios-lock-screen main>span{display:block}.ios-lock-notification{margin-top:80px;padding:13px;text-align:left;border-radius:18px;background:rgba(235,235,245,.24);backdrop-filter:blur(25px)}.ios-lock-notification p{margin:4px 0 0;font-size:11px}.ios-unlock{position:absolute!important;left:50%;bottom:42px;transform:translateX(-50%);padding:9px 18px!important;border-radius:18px!important;background:rgba(255,255,255,.16)!important}
+.ios-overlay-panel{background:rgba(25,25,28,.86);backdrop-filter:blur(34px);-webkit-backdrop-filter:blur(34px)}.phone-theme-light .ios-overlay-panel{background:rgba(239,239,244,.89)}.ios-overlay-panel>header{height:48px;padding:7px 14px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center}.ios-overlay-panel>header button{justify-self:start;color:var(--phone-blue)!important}.ios-overlay-panel>main{padding:12px;height:calc(100% - 94px);overflow:auto}.ios-notification{padding:12px 13px;margin-bottom:9px;border-radius:18px;background:var(--phone-surface)}.ios-notification p{margin:4px 0;font-size:11px}.ios-notification small{color:var(--phone-muted)}
+.ios-control-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.ios-control-grid button{height:105px!important;padding:13px!important;display:grid!important;align-content:space-between;text-align:left;border-radius:22px!important;background:var(--phone-surface)!important}.ios-control-grid button.active{background:#0a84ff!important;color:#fff!important}.ios-control-grid b{font-size:26px}.ios-control-grid span{font-size:11px}
 .mobile-controls{position:absolute;left:0;right:0;bottom:0;padding:18px max(18px,env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));display:none;justify-content:space-between;align-items:flex-end;pointer-events:none}
 .joystick{width:126px;height:126px;border-radius:50%;background:rgba(4,8,5,.34);border:1px solid rgba(255,255,255,.17);position:relative;pointer-events:auto;touch-action:none}
 .joystick-knob{position:absolute;width:58px;height:58px;border-radius:50%;left:34px;top:34px;background:rgba(245,248,246,.8);border:2px solid rgba(0,0,0,.18);transform:translate(0,0)}
@@ -93,13 +169,15 @@ body:has(#actionSheet:not([hidden])) .objective-card{visibility:hidden}
   .objective-card{bottom:calc(160px + env(safe-area-inset-bottom));width:min(310px,calc(100% - 24px))}
   .interaction-prompt{bottom:calc(154px + env(safe-area-inset-bottom))}
   .action-sheet{bottom:calc(160px + env(safe-area-inset-bottom))}
-  .smartphone-panel{inset:0;width:100%;height:100vh;height:100dvh;min-height:100vh;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));border:0;border-radius:0;display:flex;flex-direction:column;background:linear-gradient(155deg,#36453b,#101813 62%)}
-  .smartphone-header{padding:8px 4px 16px}.smartphone-header strong{font-size:18px}
-  .phone-screen{flex:1;min-height:0;padding:clamp(18px,5vh,38px);border-radius:25px;display:flex;flex-direction:column;justify-content:center;gap:12px}
-  .phone-message{font-size:15px;margin:9px 3px}
-  .phone-needs{gap:12px;padding:16px}.phone-need{font-size:14px}
-  .phone-apps{gap:14px;margin-top:16px}.phone-apps button{padding:12px 3px}.phone-apps button span{width:52px;height:52px;font-size:27px}.phone-apps button b{font-size:12px}
-  .smartphone-home-indicator{padding-top:12px}
+  .smartphone-panel{inset:0;width:100%;height:100vh;height:100dvh;padding:0;border:0;border-radius:0;background:#000;box-shadow:none}
+  .ios-wallpaper,.ios-app-screen,.ios-lock-screen,.ios-overlay-panel{border-radius:0}
+  .ios-statusbar{padding-top:max(9px,env(safe-area-inset-top));height:calc(46px + env(safe-area-inset-top))}
+  .ios-home{height:calc(100% - 46px - env(safe-area-inset-top));padding-left:max(17px,env(safe-area-inset-left));padding-right:max(17px,env(safe-area-inset-right));padding-bottom:calc(92px + env(safe-area-inset-bottom))}
+  .ios-dock{bottom:calc(16px + env(safe-area-inset-bottom))}
+  .ios-home-indicator{bottom:calc(3px + env(safe-area-inset-bottom))}
+  .ios-app-content{height:calc(100% - 93px - env(safe-area-inset-top));padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+  .ios-side-close{top:calc(48px + env(safe-area-inset-top))}
+
 }
 @media(hover:none),(pointer:coarse){
   .mobile-controls{display:flex}
