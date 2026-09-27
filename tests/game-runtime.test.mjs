@@ -9,6 +9,7 @@ const source = fs.readFileSync(path.join(root, 'game', 'game.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'game', 'game.css'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'game', 'index.html'), 'utf8');
 const mapSource = fs.readFileSync(path.join(root, 'game', 'map-model.js'), 'utf8');
+const overtakeSource = fs.readFileSync(path.join(root, 'game', 'traffic-overtake.js'), 'utf8');
 
 test('game keeps a timer fallback when requestAnimationFrame is unavailable', () => {
   assert.match(source, /const requestFrame = typeof window\.requestAnimationFrame === "function"/);
@@ -202,6 +203,18 @@ test('building clearance follows the current map model rather than the retired g
 test('traffic lanes respect road width and parallel lanes do not brake for each other', () => {
   assert.match(source, /function trafficLaneOffsetForEdge\(edge, secondaryLane = false\)/);
   assert.match(source, /Math\.abs\(\(other\.laneOffset \|\| 0\) - \(car\.laneOffset \|\| 0\)\) > 18/);
+});
+
+test('traffic checks passing clearance for a parked personal car and shifts back after passing', () => {
+  assert.match(html, /traffic-overtake\.js/);
+  assert.match(overtakeSource, /function plan\(/);
+  assert.match(source, /function trafficParkedCarInfo\(car\)/);
+  assert.match(source, /trafficOvertake\.blocksLane\(/);
+  assert.match(source, /function trafficOvertakePlan\(car, obstacle\)/);
+  assert.match(source, /opposingVehicles/);
+  assert.match(source, /car\.overtakePlan = trafficOvertakePlan\(car, parkedObstacle\)/);
+  assert.match(source, /function updateTrafficOvertake\(car\)/);
+  assert.match(source, /trafficOvertake\.offsetAt\(plan, car\.along\)/);
 });
 
 test('reverse-direction pedestrians start from the correct edge end', () => {

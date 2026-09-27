@@ -50,6 +50,12 @@
     return;
   }
 
+  const trafficOvertake = globalThis.CityDaysTrafficOvertake;
+  if (!trafficOvertake?.plan) {
+    showRuntimeError("TrafficOvertake を読み込めません。");
+    return;
+  }
+
   const areaNameEl = document.getElementById("areaName");
   const worldClockEl = document.getElementById("worldClock");
   const cashText = document.getElementById("cashText");
@@ -1788,6 +1794,7 @@
           routeEdgeIds:[],
           routeIndex:0,
           routeTrips:0,
+          overtakePlan:null,
           collisionYield:0,
           junctionWait:0,
           trafficStall:0,
@@ -4682,6 +4689,7 @@
       edgeLength:car.edgeLength,
       directionSign:car.directionSign,
       laneOffset:car.laneOffset,
+      overtakePlan:car.overtakePlan ? { ...car.overtakePlan } : null,
       along:car.along,
       routeEdgeIds:Array.isArray(car.routeEdgeIds) ? [...car.routeEdgeIds] : [],
       routeIndex:car.routeIndex,
@@ -4698,6 +4706,7 @@
     car.edgeLength = snapshot.edgeLength;
     car.directionSign = snapshot.directionSign;
     car.laneOffset = snapshot.laneOffset;
+    car.overtakePlan = snapshot.overtakePlan ? { ...snapshot.overtakePlan } : null;
     car.along = snapshot.along;
     car.routeEdgeIds = [...snapshot.routeEdgeIds];
     car.routeIndex = snapshot.routeIndex;
@@ -4817,6 +4826,108 @@
     }
 
     return best;
+  }
+
+  function trafficAlongAtRoadHit(edge, hit) {
+    if (!edge || !hit || hit.edgeId !== edge.id) return null;
+    let along = 0;
+    for (let i = 1; i < edge.points.length; i += 1) {
+      const segmentLength = distance(edge.points[i - 1], edge.points[i]);
+      if (i - 1 === hit.segmentIndex) return along + segmentLength * hit.t;
+      along += segmentLength;
+    }
+    return null;
+  }
+
+  function parkedVehicleExtentOnRoad(edge, hit, directionSign, axis = "normal") {
+    const a = edge.points[hit.segmentIndex];
+    const b = edge.points[hit.segmentIndex + 1];
+    if (!a || !b) return Infinity;
+    const magnitude = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const tx = (b.x - a.x) / magnitude * directionSign;
+    const ty = (b.y - a.y) / magnitude * directionSign;
+    const nx = ty;
+    const ny = -tx;
+    const headingX = Math.cos(personalCar.angle);
+    const headingY = Math.sin(personalCar.angle);
+    const sideX = -headingY;
+    const sideY = headingX;
+    const dims = vehicleDimensions(personalCar, true);
+    const ax = axis === "normal" ? nx : tx;
+    const ay = axis === "normal" ? ny : ty;
+    return VEHICLE_COLLISION_SCALE * (
+      dims.length * .5 * Math.abs(headingX * ax + headingY * ay) +
+      dims.width * .5 * Math.abs(sideX * ax + sideY * ay)
+    );
+  }
+
+  function trafficParkedCarInfo(car) {
+    const edge = mapModel.getEdge(car.edgeId);
+    if (!edge || !edge.vehicle || state.player.inVehicle || state.player.inHome || (personalCar.speed || 0) > 2) return null;
+    const parkedHit = mapModel.nearestRoad(personalCar.x, personalCar.y, { vehicleOnly:true });
+    if (!parkedHit || parkedHit.edgeId !== edge.id || parkedHit.distance > edge.width / 2 + 36) return null;
+    const parkedAlong = trafficAlongAtRoadHit(edge, parkedHit);
+    if (!Number.isFinite(parkedAlong)) return null;
+    const actualDistance = (parkedAlong - car.along) * car.directionSign;
+    if (actualDistance <= 0 || actualDistance > 360) return null;
+    const a = edge.points[parkedHit.segmentIndex];
+    const b = edge.points[parkedHit.segmentIndex + 1];
+    if (!a || !b) return null;
+    const magnitude = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const normalX = (b.y - a.y) / magnitude * car.directionSign;
+    const normalY = -(b.x - a.x) / magnitude * car.directionSign;
+    const obstacleLateral = (personalCar.x - parkedHit.point.x) * normalX + (personalCar.y - parkedHit.point.y) * normalY;
+    const carHalfWidth = vehicleDimensions(car).width * VEHICLE_COLLISION_SCALE / 2;
+    const obstacleHalfWidth = parkedVehicleExtentOnRoad(edge, parkedHit, car.directionSign);
+    const obstacleHalfLength = parkedVehicleExtentOnRoad(edge, parkedHit, car.directionSign, "tangent");
+    const blocksLane = trafficOvertake.blocksLane({
+      carOffset:car.laneOffset,
+      carHalfWidth,
+      obstacleLateral,
+      obstacleHalfWidth
+    });
+    if (!blocksLane) return null;
+    const centerGap = actualDistance - vehicleDimensions(car).length * VEHICLE_COLLISION_SCALE / 2 - obstacleHalfLength;
+    return { edge, hit:parkedHit, actualDistance, centerGap, obstacleLateral, obstacleHalfWidth, carHalfWidth };
+  }
+
+  function trafficOvertakePlan(car, obstacle) {
+    if (!obstacle) return null;
+    const { edge, actualDistance, obstacleLateral, obstacleHalfWidth, carHalfWidth } = obstacle;
+
+    const endpointDistance = trafficDistanceToEndpoint(car, edge);
+    const opposingVehicles = traffic.filter((other) =>
+      other !== car && other.edgeId === edge.id && other.directionSign !== car.directionSign
+    ).map((other) => ({
+      distance:(other.along - car.along) * car.directionSign,
+      halfLength:vehicleDimensions(other).length / 2
+    }));
+    const plan = trafficOvertake.plan({
+      roadWidth:edge.width,
+      carHalfWidth,
+      currentOffset:car.laneOffset,
+      obstacleDistance:actualDistance,
+      obstacleLateral,
+      obstacleHalfWidth,
+      opposingVehicles
+    });
+    if (!plan || endpointDistance <= plan.endDistance + 100) return null;
+    return {
+      startAlong:car.along + car.directionSign * plan.startDistance,
+      endAlong:car.along + car.directionSign * plan.endDistance,
+      directionSign:car.directionSign,
+      fromOffset:car.laneOffset,
+      targetOffset:plan.targetOffset
+    };
+  }
+
+  function updateTrafficOvertake(car) {
+    const plan = car.overtakePlan;
+    if (!plan || plan.directionSign !== car.directionSign) return false;
+    const result = trafficOvertake.offsetAt(plan, car.along);
+    car.laneOffset = result.offset;
+    if (result.complete) car.overtakePlan = null;
+    return result.complete;
   }
 
   function junctionCoreRadius(endpoint) {
@@ -5256,7 +5367,12 @@
         }
       }
 
-      const obstacleGap = projectedObstacleDistance(car);
+      const parkedObstacle = trafficParkedCarInfo(car);
+      const parkedGap = parkedObstacle?.centerGap ?? Infinity;
+      const obstacleGap = Math.min(projectedObstacleDistance(car), parkedGap);
+      if (!car.overtakePlan && parkedGap < 180) {
+        car.overtakePlan = trafficOvertakePlan(car, parkedObstacle);
+      }
       if (obstacleGap < 105) {
         const desiredObstacleGap = 18 + Math.min(38, car.speed * .16);
         targetSpeed = Math.min(targetSpeed, Math.max(0, (obstacleGap - desiredObstacleGap) * 2.4));
@@ -5316,10 +5432,11 @@
         transitions += 1;
       }
 
-      const pose = trafficPoseAt(car, car.along);
-      car.x = pose.x;
-      car.y = pose.y;
-      car.angle = pose.angle;
+      updateTrafficOvertake(car);
+      const steeredPose = trafficPoseAt(car, car.along);
+      car.x = steeredPose.x;
+      car.y = steeredPose.y;
+      car.angle = steeredPose.angle;
 
       const hitVehicle = vehicleIntersectsAnyVehicle(car);
       const hitPerson = vehicleIntersectsAnyPerson(car);
