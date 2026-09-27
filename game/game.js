@@ -1647,6 +1647,25 @@
     return Boolean(goalNodeId && buildTrafficRoute(car, startNodeId, goalNodeId, null));
   }
 
+  function reverseTrafficAtDeadEnd(car, current) {
+    if (!car || !current) return false;
+    const nodeId = car.directionSign > 0 ? current.to : current.from;
+    const exits = vehicleEdgesAtNode(nodeId);
+    if (exits.length !== 1 || exits[0].id !== current.id) return false;
+
+    // A dead-end is a valid route endpoint, not a reason to leave the car
+    // frozen forever. Turn around at the endpoint while preserving the same
+    // edge and world position; no teleport or arbitrary-node recovery occurs.
+    car.directionSign *= -1;
+    car.along = car.directionSign > 0 ? 0 : (car.edgeLength || polylineLength(current.points));
+    car.routeEdgeIds = [current.id];
+    car.routeIndex = 0;
+    car.routeGoalNodeId = car.directionSign > 0 ? current.to : current.from;
+    car.junctionWait = 0;
+    car.collisionYield = 0;
+    return true;
+  }
+
   function advanceTrafficRoute(car) {
     const current = mapModel.getEdge(car.edgeId);
     if (!current) return false;
@@ -1654,17 +1673,25 @@
     let nextId = car.routeEdgeIds?.[car.routeIndex];
 
     if (!nextId || (nextId === current.id && vehicleEdgesAtNode(nodeId).length > 1)) {
-      if (!planTrafficRoute(car, nodeId, current.id)) return false;
+      if (!planTrafficRoute(car, nodeId, current.id)) {
+        if (reverseTrafficAtDeadEnd(car, current)) return true;
+        return false;
+      }
       nextId = car.routeEdgeIds[car.routeIndex];
     }
 
     let next = mapModel.getEdge(nextId);
     if (!next || (next.from !== nodeId && next.to !== nodeId)) {
-      if (!planTrafficRoute(car, nodeId, current.id)) return false;
+      if (!planTrafficRoute(car, nodeId, current.id)) {
+        if (reverseTrafficAtDeadEnd(car, current)) return true;
+        return false;
+      }
       nextId = car.routeEdgeIds[car.routeIndex];
       next = mapModel.getEdge(nextId);
     }
-    if (!next || (next.from !== nodeId && next.to !== nodeId)) return false;
+    if (!next || (next.from !== nodeId && next.to !== nodeId)) {
+      return reverseTrafficAtDeadEnd(car, current);
+    }
 
     car.edgeId = next.id;
     car.directionSign = next.from === nodeId ? 1 : -1;
@@ -2308,10 +2335,12 @@
       const edge = mapModel.getEdge(ped.edgeId);
       if (!edge) return false;
       const edgeLength = ped.edgeLength || polylineLength(edge.points);
+      ped.edgeLength = edgeLength;
+      ped.along = clamp(ped.along, 0, edgeLength);
       const endpointDistance = ped.directionSign > 0 ? edgeLength - ped.along : ped.along;
 
       if (remaining < Math.max(1, endpointDistance)) {
-        ped.along += ped.directionSign * remaining;
+        ped.along = clamp(ped.along + ped.directionSign * remaining, 0, edgeLength);
         remaining = 0;
         break;
       }
@@ -2352,6 +2381,20 @@
       ped.dir = pose.angle;
     }
     return false;
+  }
+
+  function pedestrianSpawnSpacing(edgeId, edgeLength, along) {
+    let candidate = along;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const conflict = pedestrians.find((other) =>
+        other.edgeId === edgeId && Math.abs(other.along - candidate) < 34
+      );
+      if (!conflict) break;
+      candidate += candidate >= conflict.along ? 38 : -38;
+      if (candidate < 8) candidate = Math.min(edgeLength - 8, conflict.along + 38);
+      if (candidate > edgeLength - 8) candidate = Math.max(8, conflict.along - 38);
+    }
+    return clamp(candidate, 8, Math.max(8, edgeLength - 8));
   }
 
   function generatePedestrians() {
@@ -2419,6 +2462,7 @@
       if (ped.state === "walking") {
         const initialAlong = Math.min(ped.edgeLength * (.04 + hash2(i, 197, 1720) * .28), Math.max(1, ped.edgeLength - 1));
         ped.along = ped.directionSign > 0 ? initialAlong : Math.max(0, ped.edgeLength - initialAlong);
+        ped.along = pedestrianSpawnSpacing(ped.edgeId, ped.edgeLength, ped.along);
         const pose = pedestrianPoseAt(ped);
         ped.x = pose.x;
         ped.y = pose.y;
@@ -5106,10 +5150,37 @@
     return personIntersectsAnotherPerson(ped.x, ped.y, NPC_COLLISION_RADIUS, ped, true);
   }
 
+  function pedestrianPriority(ped) {
+    return Number.isFinite(Number(ped?.seed)) ? Number(ped.seed) : 0;
+  }
+
+  function pedestrianFollowingLimit(ped, distanceUnits) {
+    const requested = Math.max(0, distanceUnits);
+    const minimumGap = 24;
+    let allowed = requested;
+
+    // Reserve space on the route before moving. Collision rollback happens
+    // after movement and makes a same-direction queue oscillate forever when
+    // several pedestrians share a narrow dead-end sidewalk.
+    for (const other of visiblePedestrianColliders()) {
+      if (other === ped || other.edgeId !== ped.edgeId) continue;
+      if (other.directionSign !== ped.directionSign) continue;
+      const ahead = (other.along - ped.along) * ped.directionSign;
+      if (ahead <= 0 || ahead >= allowed + minimumGap) continue;
+      allowed = Math.min(allowed, Math.max(0, ahead - minimumGap));
+    }
+    return allowed;
+  }
+
   function attemptPedestrianMove(ped, distanceUnits) {
     if (distanceUnits <= .001) return true;
+    const safeDistance = pedestrianFollowingLimit(ped, distanceUnits);
+    if (safeDistance <= .001) {
+      ped.collisionWait = Math.max(ped.collisionWait || 0, .08);
+      return false;
+    }
     const snapshot = capturePedestrianMotion(ped);
-    moveCitizenAlongRoute(ped, distanceUnits);
+    moveCitizenAlongRoute(ped, safeDistance);
 
     // Arrival inside a building removes the person from physical street space.
     if (ped.state === "inside" || !ped.visible) return true;
@@ -5123,6 +5194,27 @@
     restorePedestrianMotion(ped, snapshot);
 
     if (collision.type === "pedestrian" || collision.type === "player") {
+      if (collision.type === "pedestrian") {
+        const yieldingPed = pedestrianPriority(ped) < pedestrianPriority(collision.target)
+          ? ped
+          : collision.target;
+        yieldingPed.sideSign = (yieldingPed.sideSign || 1) * -1;
+        yieldingPed.avoidanceOffset = 18;
+        const yieldPose = pedestrianPoseAt(yieldingPed);
+        if (
+          canStand(yieldPose.x, yieldPose.y, NPC_COLLISION_RADIUS) &&
+          !personIntersectsAnyVehicle(yieldPose.x, yieldPose.y, NPC_COLLISION_RADIUS)
+        ) {
+          yieldingPed.x = yieldPose.x;
+          yieldingPed.y = yieldPose.y;
+          yieldingPed.dir = yieldPose.angle;
+          yieldingPed.collisionWait = .22;
+        }
+        if (yieldingPed === ped) {
+          ped.collisionWait = .22;
+          return false;
+        }
+      }
       // Yield outward from the curb instead of stepping into the carriageway.
       // This gives two pedestrians enough room to pass without teleporting
       // across to the opposite sidewalk.
@@ -5134,7 +5226,7 @@
 
       if (!pedestrianCollision(ped)) {
         const shiftedSnapshot = capturePedestrianMotion(ped);
-        moveCitizenAlongRoute(ped, distanceUnits);
+        moveCitizenAlongRoute(ped, safeDistance);
         if (ped.state === "inside" || !ped.visible || !pedestrianCollision(ped)) return true;
         restorePedestrianMotion(ped, shiftedSnapshot);
       }

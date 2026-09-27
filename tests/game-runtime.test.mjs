@@ -180,6 +180,32 @@ test('stuck pedestrian recovery does not rebuild from an arbitrary nearest node'
   assert.match(source, /ped\.collisionWait = \.7 \+ \(\(ped\.seed \|\| 0\) % 3\) \* \.15/);
 });
 
+test('pedestrians reserve same-direction following space before advancing', () => {
+  assert.match(source, /function pedestrianFollowingLimit\(ped, distanceUnits\)/);
+  assert.match(source, /const safeDistance = pedestrianFollowingLimit\(ped, distanceUnits\)/);
+  assert.match(source, /moveCitizenAlongRoute\(ped, safeDistance\)/);
+});
+
+test('traffic reverses at a true dead-end instead of remaining permanently stalled', () => {
+  assert.match(source, /function reverseTrafficAtDeadEnd\(car, current\)/);
+  assert.match(source, /if \(reverseTrafficAtDeadEnd\(car, current\)\) return true;/);
+});
+
+test('pedestrian collisions have deterministic right of way and move the yielding walker aside', () => {
+  assert.match(source, /function pedestrianPriority\(ped\)/);
+  assert.match(source, /const yieldingPed = pedestrianPriority\(ped\) < pedestrianPriority\(collision\.target\)/);
+  assert.match(source, /yieldingPed\.sideSign = \(yieldingPed\.sideSign \|\| 1\) \* -1/);
+});
+
+test('pedestrian generation spaces walkers before the first frame', () => {
+  assert.match(source, /function pedestrianSpawnSpacing\(edgeId, edgeLength, along\)/);
+  assert.match(source, /pedestrianSpawnSpacing\(ped\.edgeId, ped\.edgeLength, ped\.along\)/);
+});
+
+test('pedestrian route progress remains inside the active edge bounds', () => {
+  assert.match(source, /ped\.along = clamp\(ped\.along, 0, edgeLength\);/);
+});
+
 test('fresh games snap the default car onto the current road graph', () => {
   assert.match(source, /generatePedestrians\(\);\s*migrateCarToCurrentRoadIfNeeded\(\);\s*loadGame\(\);/);
 });
