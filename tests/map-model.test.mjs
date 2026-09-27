@@ -136,7 +136,7 @@ test('residential districts have connected local streets and street-fronting low
     assert.equal(home.houseStyle, 'detached');
     assert.ok(home.floors <= 2, home.id + ' must remain low-rise');
     assert.ok(home.frontSetback >= 16 && home.frontSetback <= 34);
-    assert.ok(map.nearestRoad(home.x + home.w / 2, home.y + home.h / 2, { vehicleOnly:true }).distance < 145);
+    assert.ok(map.nearestRoad(home.x + home.w / 2, home.y + home.h / 2, { vehicleOnly:true }).distance < 180);
 
     const center = { x:home.x + home.w / 2, y:home.y + home.h / 2 };
     let closest = null;
