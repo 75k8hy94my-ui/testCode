@@ -210,7 +210,7 @@ test('enterable home exterior matches surrounding detached-house scale', () => {
 
 test('all existing facilities and stations remain addressable', () => {
   const map = createMapModel();
-  assert.deepEqual(map.places.map((place) => place.id), ['home','cafe','store','park','gym','library','community-center']);
+  assert.deepEqual(map.places.map((place) => place.id), ['home','cafe','store','park','gym','library','community-center','fuel-station']);
   assert.deepEqual(map.stations.map((station) => station.id), ['west','central','east']);
   for (const place of map.places) {
     assert.ok(map.getNode(place.entranceNodeId));
@@ -322,4 +322,15 @@ test('cafe body is not centered on its street-side interaction entrance', () => 
   const cafe = map.places.find((place) => place.id === 'cafe');
   assert.deepEqual([cafe.x, cafe.y], [4230, 5560]);
   assert.deepEqual(cafe.building, { x:4380, y:5784, w:300, h:270 });
+});
+
+test('Wakaba fuel station is reachable on foot and by car without map collisions', () => {
+  const map = createMapModel();
+  const station = map.places.find((place) => place.id === 'fuel-station');
+  assert.ok(station);
+  assert.equal(station.name, '若葉石油');
+  assert.equal(station.type, 'fuel-station');
+  assert.ok(map.findRoute('home-entrance', station.entranceNodeId, { mode:'pedestrian' }));
+  assert.ok(map.findRoute('home-road', station.roadNodeId, { mode:'vehicle' }));
+  assert.deepEqual(map.validate(), []);
 });

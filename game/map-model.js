@@ -24,6 +24,8 @@
     node("gym-road", 7050, 3800, "park-shrine"),
     node("gym-entrance", 7180, 3920, "park-shrine"),
     node("north-east", 7480, 4250, "east-commercial"),
+    node("fuel-station-road", 7900, 4050, "east-commercial"),
+    node("fuel-station-entrance", 8000, 3890, "east-commercial"),
     node("central-north", 5200, 4200, "station-commercial"),
     node("north-market", 6100, 4470, "station-commercial"),
     node("central-west", 4200, 5050, "station-commercial"),
@@ -84,6 +86,8 @@
     ["park-local-east", "park-road", "park-east", [[5250,3380],[5560,3340],[5920,3370],[6250,3450]], "park", 92, 20, true, true, false],
     ["collector-park-gym", "park-east", "gym-road", [[6250,3450],[6520,3510],[6820,3650],[7050,3800]], "collector", 108, 30, true, true, false],
     ["collector-gym-northeast", "gym-road", "north-east", [[7050,3800],[7200,3950],[7360,4100],[7480,4250]], "collector", 120, 30, true, true, false],
+    ["commercial-fuel-station", "north-east", "fuel-station-road", [[7480,4250],[7620,4200],[7770,4120],[7900,4050]], "shopping", 94, 22, true, true, false],
+    ["ped-fuel-station-entry", "fuel-station-entrance", "fuel-station-road", [[8000,3890],[7970,3940],[7930,4000],[7900,4050]], "sidewalk", 42, 5, false, true, false],
     ["collector-northeast-east", "north-east", "east-junction", [[7480,4250],[7440,4470],[7410,4740],[7380,5000]], "collector", 132, 40, true, true, false],
     ["collector-north-market", "central-north", "north-market", [[5200,4200],[5480,4280],[5790,4380],[6100,4470]], "shopping", 100, 20, true, true, false],
     ["collector-market-east", "north-market", "north-east", [[6100,4470],[6460,4410],[6900,4330],[7480,4250]], "residential", 92, 20, true, true, false],
@@ -146,7 +150,8 @@
     { id:"park", name:"中央公園", x:5250, y:3150, entranceNodeId:"park-entrance", roadNodeId:"park-road", color:"#72a66d", symbol:"P" },
     { id:"gym", name:"CITY GYM", x:7180, y:3920, entranceNodeId:"gym-entrance", roadNodeId:"gym-road", building:{ x:7399, y:3701, w:305, h:265 }, color:"#7898bd", symbol:"G" },
     { id:"library", name:"市立図書館", x:3420, y:3940, entranceNodeId:"library-entrance", roadNodeId:"library-road", building:{ x:3420, y:4110, w:310, h:275 }, color:"#9a8db9", symbol:"L" },
-    { id:"community-center", name:"若葉コミュニティセンター", x:4540, y:4280, entranceNodeId:"community-center-entrance", roadNodeId:"civic-east", building:{ x:4740, y:4500, w:320, h:280 }, color:"#d3a66b", symbol:"W" }
+    { id:"community-center", name:"若葉コミュニティセンター", x:4540, y:4280, entranceNodeId:"community-center-entrance", roadNodeId:"civic-east", building:{ x:4740, y:4500, w:320, h:280 }, color:"#d3a66b", symbol:"W" },
+    { id:"fuel-station", name:"若葉石油", type:"fuel-station", x:8000, y:3890, entranceNodeId:"fuel-station-entrance", roadNodeId:"fuel-station-road", building:{ x:8330, y:3650, w:340, h:290 }, color:"#d9d7c7", symbol:"GS" }
   ];
 
   const STATION_DEFINITIONS = [
