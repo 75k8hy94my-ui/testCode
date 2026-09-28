@@ -8859,6 +8859,52 @@
     ctx.restore();
   }
 
+  function drawParkFishingPond(parkPosition) {
+    const x = parkPosition.x + 69;
+    const y = parkPosition.y - 43;
+    ctx.save();
+    ctx.fillStyle = "rgba(37,54,45,.22)";
+    ctx.beginPath();
+    ctx.ellipse(x + 2, y + 4, 38, 25, -.12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#b6a77b";
+    ctx.beginPath();
+    ctx.ellipse(x, y, 38, 25, -.12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#71845f";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = "#4f8585";
+    ctx.beginPath();
+    ctx.ellipse(x, y - 1, 31, 18, -.12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(218,237,218,.48)";
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.ellipse(x - 4, y - 1, 15, 6, -.12, .35, 2.35);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(x + 7, y + 3, 8, 3, -.12, .2, 2.5);
+    ctx.stroke();
+    // A short timber landing makes the fishing position legible at a glance.
+    ctx.fillStyle = "#80694c";
+    roundedRectPath(ctx, x + 27, y - 6, 17, 7, 2);
+    ctx.fill();
+    ctx.strokeStyle = "#b49a70";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + 31, y - 5);
+    ctx.lineTo(x + 31, y);
+    ctx.moveTo(x + 39, y - 5);
+    ctx.lineTo(x + 39, y);
+    ctx.stroke();
+    ctx.fillStyle = "#f0e7cf";
+    ctx.font = "700 8px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("釣り場", x, y + 35);
+    ctx.restore();
+  }
+
   function drawPlace(place) {
     const building = place.building;
     const visualX = building?.x ?? place.x;
@@ -8895,10 +8941,7 @@
       ctx.font = "800 12px system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("中央公園", p.x, p.y + 4);
-      ctx.fillStyle = "#6d8e92";
-      ctx.beginPath();
-      ctx.arc(p.x, p.y - 55, 18, 0, Math.PI * 2);
-      ctx.fill();
+      drawParkFishingPond(p);
       drawCommunityGardenBeds(p);
       drawTree(place.x - 70, place.y - 10, .78);
       drawTree(place.x + 72, place.y - 18, .72);

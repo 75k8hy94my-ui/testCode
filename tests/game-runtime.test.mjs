@@ -161,6 +161,14 @@ test('bait purchase, park casting, and fish cooking validate and apply model res
   assert.match(source, /advanceTime\(result\.recipe\.duration\)/);
 });
 
+test('central park rendering identifies a pond and fishing spot separately from the garden beds', () => {
+  assert.match(source, /function drawParkFishingPond\(parkPosition\)/);
+  assert.match(source, /drawParkFishingPond\(p\)/);
+  assert.match(source, /池で釣りをする/);
+  assert.match(source, /今は魚が食いつきにくい時間です/);
+  assert.match(source, /釣り餌がありません/);
+});
+
 test('fuel model loads before runtime and the personal car starts with its migration-safe tank level', () => {
   assert.match(html, /<script src="\.\/car-fuel\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('car-fuel.js') < html.indexOf('game.js'));
