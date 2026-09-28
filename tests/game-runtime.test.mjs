@@ -137,6 +137,12 @@ test('garden actions expose crop progress and mobile action choices stay scrolla
   assert.match(css, /\.action-sheet\{[^}]*max-height:\s*min\(72dvh,560px\)[^}]*overflow-y:\s*auto/);
 });
 
+test('disabled garden actions explain missing seeds, full beds, and insufficient purchase funds', () => {
+  assert.match(source, /種がありません · スーパーで購入/);
+  assert.match(source, /畝が満杯です · 収穫して空ける/);
+  assert.match(source, /資金不足/);
+});
+
 test('fuel model loads before runtime and the personal car starts with its migration-safe tank level', () => {
   assert.match(html, /<script src="\.\/car-fuel\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('car-fuel.js') < html.indexOf('game.js'));

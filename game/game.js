@@ -4005,7 +4005,7 @@
 
     if (place.id === "store") {
       actionDescription.textContent = "食料品とちょっとした食事を買えます。";
-      addChoice("菜園の種を買う", "3粒 / ¥600 / 5分", () => {
+      addChoice("菜園の種を買う", state.cash < communityGardenModel.SEED_PACK_COST ? "¥600 / 資金不足" : "3粒 / ¥600 / 5分", () => {
         const result = communityGardenModel.buySeedPack(state.garden, state.cash);
         if (!result.ok) {
           showToast("種を買うには¥600必要です");
@@ -4130,7 +4130,10 @@
       }).join(" / ");
       actionDescription.textContent = "無料で休んだり、人と話したりできます。菜園の種 " + state.garden.seeds + "粒 / 空き畝 " + emptyCount + "。" + plotSummary;
       for (const crop of Object.values(communityGardenModel.CROPS)) {
-        const detail = crop.name + " / 収穫 " + crop.yield + "個 / 成長 " + crop.growthMinutes + "分";
+        const disabledReason = state.garden.seeds < 1
+          ? "種がありません · スーパーで購入"
+          : emptyCount < 1 ? "畝が満杯です · 収穫して空ける" : "";
+        const detail = crop.name + " / 収穫 " + crop.yield + "個 / 成長 " + crop.growthMinutes + "分" + (disabledReason ? " / " + disabledReason : "");
         addChoice(crop.name + "を植える", detail, () => {
           const now = communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute));
           const preview = communityGardenModel.plant(state.garden, now + 10, crop.id);

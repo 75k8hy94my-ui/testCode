@@ -13,6 +13,22 @@ test('a ¥600 seed pack adds three seeds and cannot be bought without funds', ()
   assert.equal(original.seeds, 0);
 });
 
+test('seed pack award does not silently stop at an arbitrary inventory cap', () => {
+  const starting = { seeds:998, plots:garden.createProgress().plots };
+  const result = garden.buySeedPack(starting, 600);
+  assert.equal(result.ok, true);
+  assert.equal(result.progress.seeds, 1001);
+  assert.equal(result.cashRemaining, 0);
+});
+
+test('seed pack is rejected without charge if the safe integer limit would be exceeded', () => {
+  const starting = { seeds:Number.MAX_SAFE_INTEGER - 2, plots:garden.createProgress().plots };
+  const result = garden.buySeedPack(starting, 600);
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'seed-limit');
+  assert.equal(result.progress.seeds, Number.MAX_SAFE_INTEGER - 2);
+});
+
 test('radish, tomato, and sweet potato mature at their moist-time thresholds and yield groceries', () => {
   const cases = [
     ['radish', 180, 3],

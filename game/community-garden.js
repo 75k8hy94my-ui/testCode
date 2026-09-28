@@ -23,7 +23,9 @@
 
   function normalizeProgress(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return createProgress();
-    const seeds = Number.isFinite(value.seeds) ? Math.min(999, Math.max(0, Math.floor(value.seeds))) : 0;
+    const seeds = Number.isFinite(value.seeds)
+      ? Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.floor(value.seeds)))
+      : 0;
     const source = Array.isArray(value.plots) ? value.plots : [];
     const plots = Array.from({ length:PLOT_COUNT }, (_, id) => {
       const raw = source[id];
@@ -71,7 +73,8 @@
   function buySeedPack(value, cash) {
     const progress = normalizeProgress(value);
     if (!Number.isFinite(cash) || cash < SEED_PACK_COST) return { ok:false, reason:'insufficient-funds', progress };
-    progress.seeds = Math.min(999, progress.seeds + SEEDS_PER_PACK);
+    if (progress.seeds > Number.MAX_SAFE_INTEGER - SEEDS_PER_PACK) return { ok:false, reason:'seed-limit', progress };
+    progress.seeds += SEEDS_PER_PACK;
     return { ok:true, progress, cashRemaining:Math.floor(cash) - SEED_PACK_COST };
   }
 
