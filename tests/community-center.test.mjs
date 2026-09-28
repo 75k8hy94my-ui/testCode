@@ -9,11 +9,12 @@ test('weekly classes expose the agreed schedule, price, duration and skill', () 
     startMinute:course.startMinute,
     cost:course.cost,
     duration:course.duration,
-    skill:course.skill
+    skill:course.skill,
+    skillName:course.skillName
   })), [
-    { id:'cooking', weekdays:[1,5], startMinute:600, cost:300, duration:60, skill:'cooking' },
-    { id:'craft', weekdays:[2,5], startMinute:840, cost:200, duration:75, skill:'craft' },
-    { id:'exercise', weekdays:[0,3], startMinute:1080, cost:0, duration:45, skill:'exercise' }
+    { id:'cooking', weekdays:[1,5], startMinute:600, cost:300, duration:60, skill:'cooking', skillName:'料理' },
+    { id:'craft', weekdays:[2,5], startMinute:840, cost:200, duration:75, skill:'craft', skillName:'手芸' },
+    { id:'exercise', weekdays:[0,3], startMinute:1080, cost:0, duration:45, skill:'exercise', skillName:'体操' }
   ]);
   assert.ok(Object.isFrozen(communityCenter.COURSES));
   assert.ok(communityCenter.COURSES.every(Object.isFrozen));
@@ -42,6 +43,33 @@ test('next class calculation crosses midnight and the end of the week', () => {
 
 test('unknown course IDs do not produce sessions', () => {
   assert.equal(communityCenter.getSession('pottery', 2, 600), null);
+});
+
+test('class availability explains closed sessions, insufficient cash, and completed attendance', () => {
+  const closed = communityCenter.getCourseAvailability('cooking', 2, 611, 8000, null);
+  const unaffordable = communityCenter.getCourseAvailability('cooking', 2, 600, 299, null);
+  const attended = communityCenter.getCourseAvailability('cooking', 2, 600, 8000, {
+    attendance:[{ courseId:'cooking', day:2 }]
+  });
+
+  assert.equal(closed.available, false);
+  assert.equal(closed.reason, 'not-open');
+  assert.equal(unaffordable.available, false);
+  assert.equal(unaffordable.reason, 'insufficient-funds');
+  assert.equal(attended.available, false);
+  assert.equal(attended.reason, 'already-attended');
+});
+
+test('completing a class awards skill once and records the scheduled day', () => {
+  const started = communityCenter.getSession('cooking', 2, 600);
+  const once = communityCenter.completeCourse({ skills:{ cooking:98 }, attendance:[] }, started);
+  const twice = communityCenter.completeCourse(once, started);
+
+  assert.deepEqual(once, {
+    skills:{ cooking:100, craft:0, exercise:0 },
+    attendance:[{ courseId:'cooking', day:2 }]
+  });
+  assert.deepEqual(twice, once);
 });
 
 test('progress migration defaults, clamps, and filters attendance records', () => {

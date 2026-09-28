@@ -44,6 +44,12 @@
     return;
   }
 
+  const communityCenterModel = globalThis.CityDaysCommunityCenter;
+  if (!communityCenterModel?.getSession || !communityCenterModel?.getCourseAvailability || !communityCenterModel?.completeCourse) {
+    showRuntimeError("CommunityCenter を読み込めません。");
+    return;
+  }
+
   const characterRenderer = globalThis.CityDaysCharacterRenderer;
   if (!characterRenderer?.createAppearance || !characterRenderer?.draw) {
     showRuntimeError("CharacterRenderer を読み込めません。");
@@ -1046,6 +1052,7 @@
     groceries: 2,
     fitness: 0,
     libraryVisits: 0,
+    communityCenter:communityCenterModel.normalizeProgress(null),
     shiftsWorked: 0,
     needs: {
       hunger: 75,
@@ -3715,6 +3722,9 @@
   }
 
   function openPlace(place) {
+    actionTitle.textContent = place.name;
+    actionChoices.replaceChildren();
+
     if (place.id === "home") {
       actionDescription.textContent = "自宅の中では家具を使って、料理・入浴・睡眠・休憩ができます。";
       addChoice("自宅に入る", "屋内マップへ移動します", () => enterHome());
@@ -3847,6 +3857,69 @@
         clampNeeds();
         showToast("しっかり勉強しました");
       });
+    }
+
+    if (place.id === "community-center") {
+      actionDescription.textContent = "曜日ごとに開かれる講座に参加できます。参加すると技能が上がり、街の人とも交流できます。";
+      for (const course of communityCenterModel.COURSES) {
+        const availability = communityCenterModel.getCourseAvailability(
+          course.id,
+          state.day,
+          state.minute,
+          state.cash,
+          state.communityCenter
+        );
+        const session = availability.session;
+        const sessionTime = session
+          ? "Day " + session.day + " " + String(Math.floor(course.startMinute / 60)).padStart(2, "0") + ":" + String(course.startMinute % 60).padStart(2, "0")
+          : "開催予定なし";
+        const reason = availability.reason === "not-open" ? "開始時刻から10分以内に受付"
+          : availability.reason === "insufficient-funds" ? "所持金が足りません"
+            : availability.reason === "already-attended" ? "この日の講座は参加済み"
+              : "";
+        const skill = state.communityCenter.skills[course.skill];
+        const detail = (session?.accepting ? "受付中" : "次回 " + sessionTime) +
+          " / ¥" + course.cost.toLocaleString("ja-JP") + " / " + course.duration + "分 / " +
+          course.skillName + "技能 " + skill + "→" + Math.min(100, skill + 5) + (reason ? " / " + reason : "");
+        addChoice(course.name, detail, () => {
+          const currentAvailability = communityCenterModel.getCourseAvailability(
+            course.id,
+            state.day,
+            state.minute,
+            state.cash,
+            state.communityCenter
+          );
+          if (!currentAvailability.available) {
+            const message = currentAvailability.reason === "insufficient-funds" ? "参加費が足りません"
+              : currentAvailability.reason === "already-attended" ? "この日の講座には参加済みです"
+                : "講座の受付時間外です";
+            showToast(message);
+            return;
+          }
+
+          const scheduledSession = currentAvailability.session;
+          state.cash -= course.cost;
+          advanceTime(course.duration);
+          state.communityCenter = communityCenterModel.completeCourse(state.communityCenter, scheduledSession);
+          if (course.skill === "cooking") {
+            state.needs.hunger += 10;
+            state.needs.fun += 14;
+          } else if (course.skill === "craft") {
+            state.needs.social += 10;
+            state.needs.fun += 15;
+            state.needs.energy -= 4;
+          } else if (course.skill === "exercise") {
+            state.needs.energy -= 6;
+            state.needs.fun += 12;
+            state.needs.hygiene -= 6;
+          }
+          clampNeeds();
+          showToast(course.name + "に参加し、" + course.skillName + "技能が上がりました");
+        }, !availability.available);
+      }
+      actionDescription.textContent += "\n料理 " + state.communityCenter.skills.cooking +
+        " / 手芸 " + state.communityCenter.skills.craft +
+        " / 体操 " + state.communityCenter.skills.exercise + "（各100まで）";
     }
 
     actionSheet.hidden = false;
@@ -4140,6 +4213,7 @@
         groceries: state.groceries,
         fitness: state.fitness,
         libraryVisits: state.libraryVisits,
+        communityCenter:communityCenterModel.normalizeProgress(state.communityCenter),
         shiftsWorked: state.shiftsWorked,
         needs: state.needs,
         phone: {
@@ -4377,6 +4451,7 @@
       state.groceries = Math.max(0, Math.floor(Number(saved.groceries) || 0));
       state.fitness = Math.max(0, Math.floor(Number(saved.fitness) || 0));
       state.libraryVisits = Math.max(0, Math.floor(Number(saved.libraryVisits) || 0));
+      state.communityCenter = communityCenterModel.normalizeProgress(saved.communityCenter);
       state.shiftsWorked = Math.max(0, Math.floor(Number(saved.shiftsWorked) || 0));
       if (saved.phone && typeof saved.phone.waypoint === "string" && PLACES.some((place) => place.id === saved.phone.waypoint)) {
         state.phone.waypoint = saved.phone.waypoint;
@@ -8302,6 +8377,21 @@
       ctx.fillText("CITY LIBRARY", p.x, p.y - 43);
       ctx.fillStyle = "#ddd9cf";
       for (let i = -2; i <= 2; i += 1) ctx.fillRect(p.x + i * 47 - 5, p.y + 12, 10, 79);
+    } else if (place.id === "community-center") {
+      drawFacilityBuilding(p, building?.w || 320, building?.h || 280, "#d8c59e", "#6f6958", "#9bb7b5");
+      ctx.fillStyle = "#efe4c9";
+      roundedRectPath(ctx, p.x - 124, p.y - 60, 248, 34, 4);
+      ctx.fill();
+      ctx.fillStyle = "#5c5648";
+      ctx.font = "800 15px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("若葉コミュニティセンター", p.x, p.y - 38);
+      ctx.fillStyle = "#a67f4c";
+      ctx.fillRect(p.x - 98, p.y + 4, 196, 6);
+      for (let i = -2; i <= 2; i += 1) {
+        ctx.fillStyle = i === 0 ? "#715b43" : "#e4d7b9";
+        ctx.fillRect(p.x + i * 38 - 12, p.y + 35, 24, 56);
+      }
     }
 
     ctx.fillStyle = "rgba(18,24,21,.76)";

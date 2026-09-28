@@ -10,9 +10,9 @@
   const MINUTES_PER_DAY = 1440;
   const MINUTES_PER_WEEK = MINUTES_PER_DAY * 7;
   const COURSES = Object.freeze([
-    Object.freeze({ id:"cooking", name:"家庭料理の会", weekdays:Object.freeze([1, 5]), startMinute:600, cost:300, duration:60, skill:"cooking" }),
-    Object.freeze({ id:"craft", name:"手芸サークル", weekdays:Object.freeze([2, 5]), startMinute:840, cost:200, duration:75, skill:"craft" }),
-    Object.freeze({ id:"exercise", name:"ゆったり体操", weekdays:Object.freeze([0, 3]), startMinute:1080, cost:0, duration:45, skill:"exercise" })
+    Object.freeze({ id:"cooking", name:"家庭料理の会", weekdays:Object.freeze([1, 5]), startMinute:600, cost:300, duration:60, skill:"cooking", skillName:"料理" }),
+    Object.freeze({ id:"craft", name:"手芸サークル", weekdays:Object.freeze([2, 5]), startMinute:840, cost:200, duration:75, skill:"craft", skillName:"手芸" }),
+    Object.freeze({ id:"exercise", name:"ゆったり体操", weekdays:Object.freeze([0, 3]), startMinute:1080, cost:0, duration:45, skill:"exercise", skillName:"体操" })
   ]);
   const COURSE_IDS = new Set(COURSES.map((course) => course.id));
 
@@ -78,5 +78,30 @@
     };
   }
 
-  return Object.freeze({ COURSES, getSession, listSessions, normalizeProgress });
+  function getCourseAvailability(courseId, day, minute, cash, progress) {
+    const session = getSession(courseId, day, minute);
+    if (!session) return { session:null, available:false, reason:"unknown-course" };
+    if (!session.accepting) return { session, available:false, reason:"not-open" };
+    const normalized = normalizeProgress(progress);
+    if (normalized.attendance.some((record) => record.courseId === courseId && record.day === session.day)) {
+      return { session, available:false, reason:"already-attended" };
+    }
+    if (!Number.isFinite(Number(cash)) || Number(cash) < session.course.cost) {
+      return { session, available:false, reason:"insufficient-funds" };
+    }
+    return { session, available:true, reason:null };
+  }
+
+  function completeCourse(progress, session) {
+    const normalized = normalizeProgress(progress);
+    const course = session?.course;
+    const day = Number(session?.day);
+    if (!course || !COURSE_IDS.has(course.id) || !Number.isInteger(day) || day < 1) return normalized;
+    if (normalized.attendance.some((record) => record.courseId === course.id && record.day === day)) return normalized;
+    normalized.skills[course.skill] = Math.min(100, normalized.skills[course.skill] + 5);
+    normalized.attendance.push({ courseId:course.id, day });
+    return normalized;
+  }
+
+  return Object.freeze({ COURSES, getSession, listSessions, normalizeProgress, getCourseAvailability, completeCourse });
 });

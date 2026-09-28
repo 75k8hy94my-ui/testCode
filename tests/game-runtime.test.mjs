@@ -104,6 +104,24 @@ test('game loads the community center schedule model before the runtime', () => 
   assert.ok(html.indexOf('community-center.js') < html.indexOf('game.js'));
 });
 
+test('player course progress is present in snapshots and older saves receive safe defaults', () => {
+  assert.match(source, /communityCenter:\s*communityCenterModel\.normalizeProgress\(state\.communityCenter\)/);
+  assert.match(source, /state\.communityCenter\s*=\s*communityCenterModel\.normalizeProgress\(saved\.communityCenter\)/);
+});
+
+test('community center actions revalidate entry, charge once, and award completion effects', () => {
+  const start = source.indexOf('if (place.id === "community-center")');
+  const end = source.indexOf('actionSheet.hidden = false;', start);
+  const action = source.slice(start, end);
+
+  assert.ok(start >= 0 && end > start);
+  assert.match(action, /getCourseAvailability\(/);
+  assert.match(action, /state\.cash\s*-=\s*course\.cost/);
+  assert.match(action, /advanceTime\(course\.duration\)/);
+  assert.match(action, /completeCourse\(/);
+  assert.match(action, /clampNeeds\(\)/);
+});
+
 test('game loads overtake safety before the overtake planner and runtime', () => {
   assert.match(html, /<script src="\.\/traffic-overtake-safety\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('traffic-overtake-safety.js') < html.indexOf('traffic-overtake.js'));
@@ -504,7 +522,7 @@ test('smartphone has an always available responsive panel', () => {
 
 test('visible smartphone refreshes world data at a bounded cadence and resets while closed', () => {
   const frame = source.slice(source.indexOf('function frame('),source.indexOf('function togglePause('));
-  assert.match(html,/game\.js\?v=20260928-live-phone-refresh-1/);
+  assert.match(html,/game\.js\?v=[^"]+/);
   assert.match(source,/const SMARTPHONE_REFRESH_INTERVAL = 0\.25/);
   assert.match(source,/let smartphoneRefreshElapsed = 0/);
   assert.match(frame,/smartphoneRefreshElapsed \+= dt/);

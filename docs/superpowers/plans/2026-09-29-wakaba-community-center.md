@@ -75,10 +75,10 @@
 - Consumes `CityDaysCommunityCenter.COURSES`, `getSession`, and `normalizeProgress`.
 - Produces save snapshot field `communityCenter` and a location action sheet for `community-center`.
 
-- [ ] **Step 1: Failing tests** — assert snapshot defaults and restoration of skill/attendance, old-save migration, affordance at the new place, rejection after the 10-minute window and on insufficient cash, and successful participation changing cash/time once then applying skill/need effects on completion.
-- [ ] **Step 2: RED** — run the focused runtime test; expected missing field and interaction assertions.
-- [ ] **Step 3: Minimal implementation** — add normalized player progression; show course choices with current/next schedule, cost, and reason when unavailable; charge once on enrollment; complete once at the existing time-advance boundary; clamp skills and needs.
-- [ ] **Step 4: GREEN** — run focused runtime tests then `npm test`.
+- [x] **Step 1: Failing tests** — assert snapshot defaults and restoration of skill/attendance, old-save migration, affordance at the new place, rejection after the 10-minute window and on insufficient cash, and successful participation changing cash/time once then applying skill/need effects on completion.
+- [x] **Step 2: RED** — run the focused runtime test; expected missing field and interaction assertions.
+- [x] **Step 3: Minimal implementation** — add normalized player progression; show course choices with current/next schedule, cost, and reason when unavailable; charge once on enrollment; complete once at the existing time-advance boundary; clamp skills and needs.
+- [x] **Step 4: GREEN** — run focused runtime tests then `npm test`.
 - [ ] **Step 5: Commit** — `feat(game): add playable community classes`.
 
 ### Task 4: 住民参加・交流接続と最終検証
