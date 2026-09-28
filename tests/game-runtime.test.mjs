@@ -107,6 +107,7 @@ test('game loads the community center schedule model before the runtime', () => 
 test('community garden model loads before game runtime and progresses with absolute game time', () => {
   assert.match(html, /<script src="\.\/community-garden\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('community-garden.js') < html.indexOf('game.js'));
+  assert.match(html, /<script src="\.\/game\.js\?v=20260929-community-garden-1"><\/script>/);
   assert.match(source, /const communityGardenModel = globalThis\.CommunityGarden/);
   assert.match(source, /communityGardenModel\.advance\([\s\S]{0,100}communityGardenModel\.absoluteMinute\(state\.day, Math\.floor\(state\.minute\)\)\s*\)/);
 });
@@ -226,7 +227,7 @@ test('public bath rules load before runtime and the sento interaction applies it
 
 test('clinic map and runtime changes request fresh browser assets', () => {
   assert.match(html, /map-model\.js\?v=20260929-wakaba-clinic-1/);
-  assert.match(html, /game\.js\?v=20260929-wakaba-clinic-1/);
+  assert.match(html, /game\.js\?v=20260929-community-garden-1/);
 });
 
 test('health model loads before runtime and has a visible sixth needs meter', () => {
