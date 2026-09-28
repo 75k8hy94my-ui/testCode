@@ -68,6 +68,12 @@
     return;
   }
 
+  const cafeWorkModel = globalThis.CityDaysCafeWork;
+  if (!cafeWorkModel?.listShifts || !cafeWorkModel?.completeShift) {
+    showRuntimeError("CafeWork を読み込めません。");
+    return;
+  }
+
   const characterRenderer = globalThis.CityDaysCharacterRenderer;
   if (!characterRenderer?.createAppearance || !characterRenderer?.draw) {
     showRuntimeError("CharacterRenderer を読み込めません。");
@@ -1073,6 +1079,7 @@
     libraryVisits: 0,
     communityCenter:communityCenterModel.normalizeProgress(null),
     shiftsWorked: 0,
+    lastShiftDay: 0,
     needs: {
       hunger: 75,
       energy: 85,
@@ -3857,25 +3864,58 @@
     }
 
     if (place.id === "cafe") {
-      actionDescription.textContent = "ここが勤務先。7:00〜18:00に4時間シフトへ入れます。";
-      addChoice("4時間働く", "給与 ¥4,800 / 7:00〜18:00", () => {
-        if (state.minute < 7 * 60 || state.minute > 18 * 60) {
-          showToast("勤務できるのは7:00〜18:00です");
-          return;
-        }
-        if (state.needs.energy < 20 || state.needs.hunger < 20) {
-          showToast("体力か空腹が厳しく、今日は働けません");
-          return;
-        }
-        advanceTime(240);
-        state.cash += 4800;
-        state.needs.social += 10;
-        state.needs.fun -= 3;
-        state.needs.hygiene -= 8;
-        state.shiftsWorked += 1;
-        clampNeeds();
-        showToast("シフト終了 +¥4,800");
-      });
+      const level = cafeWorkModel.careerLevel(state.shiftsWorked);
+      actionDescription.textContent = "勤務経験 " + state.shiftsWorked + "回 / " + level +
+        "（一人前5回・ベテラン12回） · 営業 7:00〜18:00 · 1日1シフト";
+      for (const status of cafeWorkModel.listShifts({
+        day:state.day,
+        minute:state.minute,
+        lastShiftDay:state.lastShiftDay,
+        shiftsWorked:state.shiftsWorked,
+        energy:state.needs.energy,
+        hunger:state.needs.hunger
+      })) {
+        const shift = status.shift;
+        const detail = status.available
+          ? (shift.duration / 60) + "時間 / 給与 ¥" + status.pay.toLocaleString("ja-JP")
+          : status.reason === "already-worked" ? "今日は勤務済みです"
+            : status.reason === "experience-required" ? "勤務経験 " + shift.minimumExperience + "回で解放 / 現在 " + state.shiftsWorked + "回"
+              : status.reason === "too-early" ? "勤務開始は7:00からです"
+                : status.reason === "closing-time" ? "閉店までに終わりません"
+                  : status.reason === "too-tired" ? "体力20以上が必要です"
+                    : "空腹20以上が必要です";
+        addChoice(shift.name, detail, () => {
+          const result = cafeWorkModel.completeShift({
+            day:state.day,
+            minute:state.minute,
+            lastShiftDay:state.lastShiftDay,
+            shiftsWorked:state.shiftsWorked,
+            energy:state.needs.energy,
+            hunger:state.needs.hunger
+          }, shift.id);
+          if (!result.ok) {
+            const message = result.reason === "already-worked" ? "今日はもう勤務しました"
+              : result.reason === "experience-required" ? "ロングシフトには勤務経験が必要です"
+                : result.reason === "too-early" ? "勤務開始は7:00からです"
+                  : result.reason === "closing-time" ? "閉店までに終わりません"
+                    : result.reason === "too-tired" ? "体力を回復してから働きましょう"
+                      : "先に食事をとってから働きましょう";
+            showToast(message);
+            return;
+          }
+          advanceTime(shift.duration);
+          state.cash += result.pay;
+          state.needs.social += shift.duration / 24;
+          state.needs.fun -= shift.duration / 80;
+          state.needs.hygiene -= shift.duration / 30;
+          state.needs.energy -= Math.max(0, (shift.duration - 240) / 60 * 1.5);
+          state.shiftsWorked = result.shiftsWorked;
+          state.lastShiftDay = state.day;
+          clampNeeds();
+          const promotion = result.careerLevel !== level ? " · " + result.careerLevel + "に昇格" : "";
+          showToast(shift.name + "終了 +¥" + result.pay.toLocaleString("ja-JP") + promotion);
+        }, !status.available);
+      }
       addChoice("ランチ", "¥900 / 30分 / 空腹+45", () => {
         if (!canPay(900)) return;
         state.cash -= 900;
@@ -4338,6 +4378,7 @@
         libraryVisits: state.libraryVisits,
         communityCenter:communityCenterModel.normalizeProgress(state.communityCenter),
         shiftsWorked: state.shiftsWorked,
+        lastShiftDay:state.lastShiftDay,
         needs: state.needs,
         phone: {
           waypoint: state.phone?.waypoint || null
@@ -4576,6 +4617,7 @@
       state.libraryVisits = Math.max(0, Math.floor(Number(saved.libraryVisits) || 0));
       state.communityCenter = communityCenterModel.normalizeProgress(saved.communityCenter);
       state.shiftsWorked = Math.max(0, Math.floor(Number(saved.shiftsWorked) || 0));
+      state.lastShiftDay = Math.max(0, Math.floor(Number(saved.lastShiftDay) || 0));
       if (saved.phone && typeof saved.phone.waypoint === "string" && PLACES.some((place) => place.id === saved.phone.waypoint)) {
         state.phone.waypoint = saved.phone.waypoint;
       } else {
