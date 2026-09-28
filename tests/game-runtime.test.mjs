@@ -185,6 +185,11 @@ test('public bath rules load before runtime and the sento interaction applies it
   assert.match(action, /clampNeeds\(\)/);
 });
 
+test('bathhouse map and runtime changes request fresh browser assets', () => {
+  assert.match(html, /map-model\.js\?v=20260929-wakaba-bath-1/);
+  assert.match(html, /game\.js\?v=20260929-wakaba-bath-1/);
+});
+
 test('public bath has a distinct Japanese sign, noren, and bathhouse roof in the city rendering', () => {
   const renderer = source.slice(source.indexOf('function drawPlace(place)'), source.indexOf('function characterLodAtScreen'));
   const start = renderer.indexOf('} else if (place.id === "public-bath")');
