@@ -122,6 +122,19 @@ test('community center actions revalidate entry, charge once, and award completi
   assert.match(action, /clampNeeds\(\)/);
 });
 
+test('citizens plan community classes through their normal pedestrian activity lifecycle', () => {
+  const candidates = source.slice(source.indexOf('function citizenActionCandidates('), source.indexOf('function chooseCitizenAction('));
+  const completion = source.slice(source.indexOf('function completeCitizenActivity('), source.indexOf('function planCitizenAction('));
+  assert.match(candidates, /getCitizenCourseOpportunity\(state\.day,\s*minute,/);
+  assert.match(candidates, /add\("community_class"/);
+  assert.match(candidates, /placeId:"community-center"/);
+  assert.match(completion, /case "community_class":/);
+  assert.match(source, /sessionStartAbsoluteMinute:options\.sessionStartAbsoluteMinute/);
+  assert.match(source, /currentPlaceId:ped\.currentPlaceId/);
+  const begin = source.slice(source.indexOf('function beginCitizenActivity('), source.indexOf('function completeCitizenActivity('));
+  assert.match(begin, /isCitizenCourseArrivalValid\(/);
+});
+
 test('game loads overtake safety before the overtake planner and runtime', () => {
   assert.match(html, /<script src="\.\/traffic-overtake-safety\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('traffic-overtake-safety.js') < html.indexOf('traffic-overtake.js'));

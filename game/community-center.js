@@ -103,5 +103,57 @@
     return normalized;
   }
 
-  return Object.freeze({ COURSES, getSession, listSessions, normalizeProgress, getCourseAvailability, completeCourse });
+  function getCitizenCourseOpportunity(day, minute, citizen) {
+    if (!citizen || typeof citizen !== "object" || citizen.onShift || citizen.lateNight) return null;
+    const needs = citizen.needs && typeof citizen.needs === "object" ? citizen.needs : {};
+    const energy = Number(needs.energy);
+    const hunger = Number(needs.hunger);
+    const money = Number(citizen.money);
+    if (!Number.isFinite(energy) || energy < 18 || !Number.isFinite(hunger) || hunger < 15 || !Number.isFinite(money)) return null;
+
+    const now = (safeDay(day) - 1) * MINUTES_PER_DAY + safeMinute(minute);
+    const personality = citizen.personality && typeof citizen.personality === "object" ? citizen.personality : {};
+    const social = Number(personality.social) || 0;
+    const curious = Number(personality.curious) || 0;
+    const active = Number(personality.active) || 0;
+    const socialDeficit = 100 - (Number(needs.social) || 0);
+    const funDeficit = 100 - (Number(needs.fun) || 0);
+
+    for (const course of COURSES) {
+      const session = getSession(course.id, day, minute);
+      if (!session || money < course.cost) continue;
+      const minutesUntilStart = session.startAbsoluteMinute - now;
+      if (minutesUntilStart < -10 || minutesUntilStart > 45) continue;
+      if (course.skill === "exercise" && (energy < 35 || hunger < 25)) continue;
+      return {
+        id:"community_class",
+        course,
+        session,
+        duration:Math.max(8, course.duration + minutesUntilStart),
+        score:48 + socialDeficit * .25 + funDeficit * .2 + social * 16 + curious * 12 + active * 8 - Math.max(0, minutesUntilStart) * .35
+      };
+    }
+    return null;
+  }
+
+  function isCitizenCourseArrivalValid(courseId, expectedStartAbsoluteMinute, day, minute, cash) {
+    const course = COURSES.find((value) => value.id === courseId);
+    const expectedStart = Number(expectedStartAbsoluteMinute);
+    if (!course || !Number.isFinite(expectedStart)) return false;
+    const session = getSession(courseId, day, minute);
+    if (!session || session.startAbsoluteMinute !== expectedStart) return false;
+    const now = (safeDay(day) - 1) * MINUTES_PER_DAY + safeMinute(minute);
+    return expectedStart - now <= 45 && now <= expectedStart + 10 && Number(cash) >= course.cost;
+  }
+
+  return Object.freeze({
+    COURSES,
+    getSession,
+    listSessions,
+    normalizeProgress,
+    getCourseAvailability,
+    completeCourse,
+    getCitizenCourseOpportunity,
+    isCitizenCourseArrivalValid
+  });
 });

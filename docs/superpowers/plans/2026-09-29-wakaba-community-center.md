@@ -79,7 +79,7 @@
 - [x] **Step 2: RED** — run the focused runtime test; expected missing field and interaction assertions.
 - [x] **Step 3: Minimal implementation** — add normalized player progression; show course choices with current/next schedule, cost, and reason when unavailable; charge once on enrollment; complete once at the existing time-advance boundary; clamp skills and needs.
 - [x] **Step 4: GREEN** — run focused runtime tests then `npm test`.
-- [ ] **Step 5: Commit** — `feat(game): add playable community classes`.
+- [x] **Step 5: Commit** — `feat(game): add playable community classes`.
 
 ### Task 4: 住民参加・交流接続と最終検証
 
@@ -92,8 +92,8 @@
 - Consumes place ID `community-center`, course schedule API, and player-independent citizen activities.
 - Produces deterministic eligible attendee selection per citizen/day, activity candidate `community_class`, and completion return to ordinary candidate selection.
 
-- [ ] **Step 1: Failing tests** — assert no candidate outside a session window; eligible residents can choose an attending class based on schedule/needs/personality; blocked route or session expiry returns them to ordinary activities without position teleport; on-site player can have a brief conversation with attending residents.
-- [ ] **Step 2: RED** — run focused runtime tests; expected missing activity candidate/interaction.
-- [ ] **Step 3: Minimal implementation** — add a bounded class activity candidate to existing citizen planner; use stable citizen ID and day selection, existing route/indoor/completion machinery, and ordinary replanning on expiry/failure; expose nearby attendees through existing location interaction.
-- [ ] **Step 4: GREEN and full verification** — run focused tests, `npm test`, `npm run verify:static`, then CLI headless Playwright/Chromium at `http://localhost:4173/game/index.html`; collect full-page desktop screenshot, console errors/warnings, pageerrors, failed requests; inspect DOM/computed styles/canvas and mobile screenshot as needed.
-- [ ] **Step 5: Commit and push** — `feat(game): add community center resident activities`; verify `main` and `origin/main` are synchronized before reporting.
+- [x] **Step 1: Failing tests** — assert no candidate outside a session window; eligible residents can choose an attending class based on schedule/needs/personality; blocked route or session expiry returns them to ordinary activities without position teleport; on-site player can have a brief conversation with attending residents.
+- [x] **Step 2: RED** — run focused runtime tests; expected missing activity candidate/interaction.
+- [x] **Step 3: Minimal implementation** — add a bounded class activity candidate to existing citizen planner; use stable citizen ID and day selection, existing route/indoor/completion machinery, and ordinary replanning on expiry/failure; expose nearby attendees through existing location interaction.
+- [x] **Step 4: GREEN and full verification** — run focused tests, `npm test`, `npm run verify:static`, then CLI headless Playwright/Chromium at `http://localhost:4173/game/index.html`; collect full-page desktop screenshot, console errors/warnings, pageerrors, failed requests; inspect DOM/computed styles/canvas and mobile screenshot as needed.
+- [x] **Step 5: Commit and push** — `feat(game): add community center resident activities`; verify `main` and `origin/main` are synchronized before reporting.

@@ -45,7 +45,13 @@
   }
 
   const communityCenterModel = globalThis.CityDaysCommunityCenter;
-  if (!communityCenterModel?.getSession || !communityCenterModel?.getCourseAvailability || !communityCenterModel?.completeCourse) {
+  if (
+    !communityCenterModel?.getSession ||
+    !communityCenterModel?.getCourseAvailability ||
+    !communityCenterModel?.completeCourse ||
+    !communityCenterModel?.getCitizenCourseOpportunity ||
+    !communityCenterModel?.isCitizenCourseArrivalValid
+  ) {
     showRuntimeError("CommunityCenter を読み込めません。");
     return;
   }
@@ -220,6 +226,7 @@
     park:"公園で休憩",
     gym:"運動",
     library:"読書・勉強",
+    community_class:"コミュニティ講座",
     socialize:"交流",
     home_idle:"自宅で休息"
   };
@@ -2030,7 +2037,11 @@
         nodeId:options.nodeId || null,
         placeId:options.placeId || null,
         duration:options.duration || 60,
-        indoor:Boolean(options.indoor)
+        indoor:Boolean(options.indoor),
+        courseId:options.courseId || null,
+        sessionDay:options.sessionDay || null,
+        sessionStartAbsoluteMinute:options.sessionStartAbsoluteMinute || null,
+        label:options.label || CITIZEN_ACTIVITY_LABELS[id] || id
       });
     };
 
@@ -2116,6 +2127,28 @@
       });
     }
 
+    const classOpportunity = communityCenterModel.getCitizenCourseOpportunity(state.day, minute, {
+      money:ped.money,
+      onShift,
+      lateNight,
+      needs:ped.needs,
+      personality:ped.personality
+    });
+    if (classOpportunity) {
+      add("community_class", classOpportunity.score, {
+        placeId:"community-center",
+        duration:classOpportunity.duration,
+        indoor:false,
+        courseId:classOpportunity.course.id,
+        sessionDay:classOpportunity.session.day,
+        sessionStartAbsoluteMinute:classOpportunity.session.startAbsoluteMinute,
+        label:classOpportunity.session.startAbsoluteMinute > (state.day - 1) * 1440 + minute
+          ? classOpportunity.course.skillName + "講座の開始待ち"
+          : classOpportunity.course.name + "に参加中",
+        noiseSeed:1713
+      });
+    }
+
     add("home_idle",
       32 + energyDeficit * .42 + ped.stress * .34 + (minute >= 20 * 60 ? 38 : 0),
       {
@@ -2198,6 +2231,37 @@
     if (!action) {
       action = chooseCitizenAction(ped);
     }
+    if (action.id === "community_class") {
+      const course = communityCenterModel.COURSES.find((value) => value.id === action.courseId);
+      const now = (state.day - 1) * 1440 + state.minute;
+      const sessionStart = Number(action.sessionStartAbsoluteMinute);
+      if (
+        !course ||
+        !communityCenterModel.isCitizenCourseArrivalValid(
+          course.id,
+          sessionStart,
+          state.day,
+          state.minute,
+          ped.money
+        )
+      ) {
+        ped.pendingActivity = null;
+        ped.targetPlaceId = null;
+        ped.state = "deciding";
+        ped.visible = true;
+        planCitizenAction(ped, ped.currentNodeId || ped.homeNodeId);
+        return;
+      }
+      ped.money -= course.cost;
+      action = {
+        ...action,
+        duration:Math.max(8, sessionStart + course.duration - now),
+        indoor:false,
+        label:now < sessionStart
+          ? course.skillName + "講座の開始待ち"
+          : course.name + "に参加中"
+      };
+    }
     ped.pendingActivity = null;
     ped.currentActivityId = action.id;
     ped.currentActivityLabel = action.label || CITIZEN_ACTIVITY_LABELS[action.id] || action.id;
@@ -2271,6 +2335,12 @@
         if (ped.currentPlaceId === "cafe" && ped.money >= 500) ped.money -= 500;
         ped.needs.social += 36 + Math.min(15, peers * 3);
         ped.needs.fun += 18;
+        ped.stress -= 16;
+        break;
+      case "community_class":
+        ped.needs.social += 10 + Math.min(10, peers * 2);
+        ped.needs.fun += 14 + Math.min(12, peers * 2);
+        ped.needs.energy -= 4;
         ped.stress -= 16;
         break;
       case "home_idle":

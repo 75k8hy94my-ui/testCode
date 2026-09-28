@@ -72,6 +72,51 @@ test('completing a class awards skill once and records the scheduled day', () =>
   assert.deepEqual(twice, once);
 });
 
+test('citizens can choose a nearby class before it starts and hold that plan until arrival', () => {
+  const citizen = {
+    money:1000,
+    onShift:false,
+    lateNight:false,
+    needs:{ hunger:70, energy:75, social:35, fun:40 },
+    personality:{ social:0.8, curious:0.7, active:0.6 }
+  };
+  const opportunity = communityCenter.getCitizenCourseOpportunity(2, 555, citizen);
+
+  assert.equal(opportunity.course.id, 'cooking');
+  assert.equal(opportunity.session.day, 2);
+  assert.equal(opportunity.session.startAbsoluteMinute, 2040);
+  assert.equal(opportunity.duration, 105);
+  assert.equal(opportunity.id, 'community_class');
+});
+
+test('citizens skip classes outside the travel window, during work, or without enough needs and money', () => {
+  const citizen = {
+    money:1000,
+    onShift:false,
+    lateNight:false,
+    needs:{ hunger:70, energy:75, social:35, fun:40 },
+    personality:{ social:0.8, curious:0.7, active:0.6 }
+  };
+
+  assert.equal(communityCenter.getCitizenCourseOpportunity(2, 554, citizen), null);
+  assert.equal(communityCenter.getCitizenCourseOpportunity(2, 555, { ...citizen, onShift:true }), null);
+  assert.equal(communityCenter.getCitizenCourseOpportunity(2, 555, { ...citizen, money:299 }), null);
+  assert.equal(communityCenter.getCitizenCourseOpportunity(2, 555, {
+    ...citizen,
+    needs:{ ...citizen.needs, energy:15 }
+  }), null);
+  assert.equal(communityCenter.getCitizenCourseOpportunity(2, 611, citizen), null);
+});
+
+test('citizen arrival revalidates the planned session, travel deadline, and fare', () => {
+  assert.equal(communityCenter.isCitizenCourseArrivalValid('cooking', 2040, 2, 555, 1000), true);
+  assert.equal(communityCenter.isCitizenCourseArrivalValid('cooking', 2040, 2, 610, 1000), true);
+  assert.equal(communityCenter.isCitizenCourseArrivalValid('cooking', 2040, 2, 611, 1000), false);
+  assert.equal(communityCenter.isCitizenCourseArrivalValid('cooking', 2040, 2, 554, 1000), false);
+  assert.equal(communityCenter.isCitizenCourseArrivalValid('cooking', 2040, 2, 600, 299), false);
+  assert.equal(communityCenter.isCitizenCourseArrivalValid('pottery', 2040, 2, 600, 1000), false);
+});
+
 test('progress migration defaults, clamps, and filters attendance records', () => {
   assert.deepEqual(communityCenter.normalizeProgress(undefined), {
     skills:{ cooking:0, craft:0, exercise:0 },
