@@ -74,6 +74,12 @@
     return;
   }
 
+  const parkFishingModel = globalThis.ParkFishingModel;
+  if (!parkFishingModel?.createProgress || !parkFishingModel?.normalizeProgress || !parkFishingModel?.getFishingWindow || !parkFishingModel?.biteChance || !parkFishingModel?.buyBait || !parkFishingModel?.cast) {
+    showRuntimeError("ParkFishing を読み込めません。");
+    return;
+  }
+
   const homeCookingModel = globalThis.CityDaysHomeCooking;
   if (!homeCookingModel?.listRecipes || !homeCookingModel?.cookMeal) {
     showRuntimeError("HomeCooking を読み込めません。");
@@ -1115,6 +1121,7 @@
     communityCenter:communityCenterModel.normalizeProgress(null),
     deliveryWork:deliveryWorkModel.createProgress(),
     garden:communityGardenModel.createProgress(),
+    fishing:parkFishingModel.createProgress(),
     shiftsWorked: 0,
     lastShiftDay: 0,
     needs: {
@@ -3806,13 +3813,14 @@
 
   function applyHomeMeal(result) {
     state.groceries = result.groceriesRemaining;
+    if (Number.isFinite(result.fishRemaining)) state.fishing = { ...state.fishing, fish:result.fishRemaining };
     advanceTime(result.recipe.duration);
     for (const [need, amount] of Object.entries(result.recipe.effects)) {
       state.needs[need] += amount;
     }
     state.communityCenter.skills.cooking = result.cookingSkill;
     clampNeeds();
-    showToast(result.recipe.name + "を作り、料理技能が上がりました");
+      showToast(result.recipe.name + "を作りました");
   }
 
   function homeShower() {
@@ -3856,21 +3864,22 @@
     actionTitle.textContent = fixture.label;
 
     if (fixture.id === "kitchen") {
-      actionDescription.textContent = "料理技能を磨くと、食料を使った満足感の高い献立が解放されます。";
-      for (const status of homeCookingModel.listRecipes(state.communityCenter.skills.cooking, state.groceries)) {
+      actionDescription.textContent = "料理技能 " + state.communityCenter.skills.cooking + " / 魚 " + state.fishing.fish + "匹 / 食料 " + state.groceries + "個。釣った魚を料理できます。";
+      for (const status of homeCookingModel.listRecipes(state.communityCenter.skills.cooking, state.groceries, state.fishing.fish)) {
         const recipe = status.recipe;
         const detail = !status.unlocked
           ? "料理技能 " + recipe.minimumSkill + "で解放 / 現在 " + state.communityCenter.skills.cooking
-          : "食料 " + recipe.groceries + "個 / " + recipe.duration + "分 / 空腹+" + recipe.effects.hunger +
-            " / 料理技能+" + recipe.skillGain + (status.available ? "" : " / 食料が足りません");
+          : (recipe.fish ? "魚 " + recipe.fish + "匹 / " : "") + "食料 " + recipe.groceries + "個 / " + recipe.duration + "分 / 空腹+" + recipe.effects.hunger +
+            " / 料理技能+" + recipe.skillGain + (status.available ? "" : status.reason === "insufficient-fish" ? " / 魚が足りません" : " / 食料が足りません");
         addChoice(recipe.name, detail, () => {
           const result = homeCookingModel.cookMeal(
             state.communityCenter.skills.cooking,
             state.groceries,
-            recipe.id
+            recipe.id,
+            state.fishing.fish
           );
           if (!result.ok) {
-            showToast(result.reason === "skill-required" ? "料理技能が足りません" : "食料がありません。スーパーで買えます");
+            showToast(result.reason === "skill-required" ? "料理技能が足りません" : result.reason === "insufficient-fish" ? "魚がありません。公園で釣れます" : "食料がありません。スーパーで買えます");
             return;
           }
           applyHomeMeal(result);
@@ -4005,6 +4014,16 @@
 
     if (place.id === "store") {
       actionDescription.textContent = "食料品とちょっとした食事を買えます。";
+      addChoice("釣り餌を買う", state.cash < parkFishingModel.BAIT_PACK_COST ? "5回分 / ¥500 / 資金不足" : "5回分 / ¥500 / 所持 " + state.fishing.bait + "個", () => {
+        const result = parkFishingModel.buyBait(state.fishing, state.cash);
+        if (!result.ok) {
+          showToast("釣り餌を買うには¥500必要です");
+          return;
+        }
+        state.fishing = result.progress;
+        state.cash = result.cashRemaining;
+        showToast("釣り餌を5個買いました");
+      }, state.cash < parkFishingModel.BAIT_PACK_COST);
       addChoice("菜園の種を買う", state.cash < communityGardenModel.SEED_PACK_COST ? "¥600 / 資金不足" : "3粒 / ¥600 / 5分", () => {
         const result = communityGardenModel.buySeedPack(state.garden, state.cash);
         if (!result.ok) {
@@ -4120,6 +4139,22 @@
     }
 
     if (place.id === "park") {
+      const fishingWindow = parkFishingModel.getFishingWindow(Math.floor(state.minute));
+      const currentChance = parkFishingModel.biteChance(state.fishing, Math.floor(state.minute));
+      const fishNames = { crucian:"フナ", bluegill:"ブルーギル", carp:"コイ", catfish:"ナマズ" };
+      const fishingSummary = fishingWindow
+        ? "釣り餌 " + state.fishing.bait + "個 / 魚 " + state.fishing.fish + "匹 / 釣り技能 " + state.fishing.skill + " / 今は" + fishNames[fishingWindow.fishType] + "が狙えます（成功率 " + Math.round(currentChance * 100) + "%）"
+        : "釣り餌 " + state.fishing.bait + "個 / 魚 " + state.fishing.fish + "匹 / 釣り技能 " + state.fishing.skill;
+      addChoice("池で釣りをする", fishingWindow ? fishNames[fishingWindow.fishType] + " / 25分 / 成功率 " + Math.round(currentChance * 100) + (state.fishing.bait < 1 ? " / 釣り餌がありません" : "") : "25分 / 今は魚が食いつきにくい時間です" + (state.fishing.bait < 1 ? " / 釣り餌がありません" : ""), () => {
+        const result = parkFishingModel.cast(state.fishing, state.day, Math.floor(state.minute), Math.random());
+        if (!result.ok) {
+          showToast(result.reason === "no-bait" ? "釣り餌がありません。スーパーで購入できます" : "今は釣りができません");
+          return;
+        }
+        state.fishing = result.progress;
+        advanceTime(result.duration);
+        showToast(result.caught ? fishNames[result.fishType] + "が釣れました！ 釣り技能が上がりました" : "魚は食いつきませんでした。釣り技能が上がりました");
+      }, state.fishing.bait < 1);
       const gardenNow = communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute));
       const plotStatuses = communityGardenModel.listPlotStatuses(state.garden, gardenNow);
       const emptyCount = plotStatuses.filter((plot) => plot.status === "empty").length;
@@ -4128,7 +4163,7 @@
         const crop = communityGardenModel.CROPS[plot.cropId];
         return "畝" + (plot.id + 1) + " " + crop.name + " · 成長あと" + plot.remainingGrowth + "分 · 水分あと" + plot.wetRemaining + "分 · 収穫" + plot.yield + "個";
       }).join(" / ");
-      actionDescription.textContent = "無料で休んだり、人と話したりできます。菜園の種 " + state.garden.seeds + "粒 / 空き畝 " + emptyCount + "。" + plotSummary;
+      actionDescription.textContent = "無料で休んだり、人と話したりできます。" + fishingSummary + "。菜園の種 " + state.garden.seeds + "粒 / 空き畝 " + emptyCount + "。" + plotSummary;
       for (const crop of Object.values(communityGardenModel.CROPS)) {
         const disabledReason = state.garden.seeds < 1
           ? "種がありません · スーパーで購入"
@@ -4714,6 +4749,7 @@
         communityCenter:communityCenterModel.normalizeProgress(state.communityCenter),
         deliveryWork:deliveryWorkModel.normalizeProgress(state.deliveryWork),
         communityGarden:communityGardenModel.normalizeProgress(state.garden),
+        fishing:parkFishingModel.normalizeProgress(state.fishing),
         shiftsWorked: state.shiftsWorked,
         lastShiftDay:state.lastShiftDay,
         needs: state.needs,
@@ -4957,6 +4993,7 @@
       state.communityCenter = communityCenterModel.normalizeProgress(saved.communityCenter);
       state.deliveryWork = deliveryWorkModel.normalizeProgress(saved.deliveryWork);
       state.garden = communityGardenModel.normalizeProgress(saved.communityGarden);
+      state.fishing = parkFishingModel.normalizeProgress(saved.fishing);
       state.shiftsWorked = Math.max(0, Math.floor(Number(saved.shiftsWorked) || 0));
       state.lastShiftDay = Math.max(0, Math.floor(Number(saved.lastShiftDay) || 0));
       if (saved.phone && typeof saved.phone.waypoint === "string" && PLACES.some((place) => place.id === saved.phone.waypoint)) {

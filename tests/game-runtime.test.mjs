@@ -107,7 +107,7 @@ test('game loads the community center schedule model before the runtime', () => 
 test('community garden model loads before game runtime and progresses with absolute game time', () => {
   assert.match(html, /<script src="\.\/community-garden\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('community-garden.js') < html.indexOf('game.js'));
-  assert.match(html, /<script src="\.\/game\.js\?v=20260929-community-garden-1"><\/script>/);
+  assert.match(html, /<script src="\.\/game\.js\?v=20260929-park-fishing-1"><\/script>/);
   assert.match(source, /const communityGardenModel = globalThis\.CommunityGarden/);
   assert.match(source, /communityGardenModel\.advance\([\s\S]{0,100}communityGardenModel\.absoluteMinute\(state\.day, Math\.floor\(state\.minute\)\)\s*\)/);
 });
@@ -142,6 +142,23 @@ test('disabled garden actions explain missing seeds, full beds, and insufficient
   assert.match(source, /種がありません · スーパーで購入/);
   assert.match(source, /畝が満杯です · 収穫して空ける/);
   assert.match(source, /資金不足/);
+});
+
+test('park fishing model loads before runtime and state is included in snapshot migration', () => {
+  assert.match(html, /<script src="\.\/park-fishing\.js\?v=[^"]+"><\/script>/);
+  assert.ok(html.indexOf('park-fishing.js') < html.indexOf('game.js'));
+  assert.match(source, /const parkFishingModel = globalThis\.ParkFishingModel/);
+  assert.match(source, /fishing:parkFishingModel\.normalizeProgress\(state\.fishing\)/);
+  assert.match(source, /state\.fishing\s*=\s*parkFishingModel\.normalizeProgress\(saved\.fishing\)/);
+});
+
+test('bait purchase, park casting, and fish cooking validate and apply model results', () => {
+  assert.match(source, /parkFishingModel\.buyBait\(state\.fishing, state\.cash\)/);
+  assert.match(source, /parkFishingModel\.cast\(state\.fishing, state\.day, Math\.floor\(state\.minute\), Math\.random\(\)\)/);
+  assert.match(source, /homeCookingModel\.listRecipes\(state\.communityCenter\.skills\.cooking, state\.groceries, state\.fishing\.fish\)/);
+  assert.match(source, /fishRemaining/);
+  assert.match(source, /advanceTime\(result\.duration\)/);
+  assert.match(source, /advanceTime\(result\.recipe\.duration\)/);
 });
 
 test('fuel model loads before runtime and the personal car starts with its migration-safe tank level', () => {
@@ -227,7 +244,7 @@ test('public bath rules load before runtime and the sento interaction applies it
 
 test('clinic map and runtime changes request fresh browser assets', () => {
   assert.match(html, /map-model\.js\?v=20260929-wakaba-clinic-1/);
-  assert.match(html, /game\.js\?v=20260929-community-garden-1/);
+  assert.match(html, /game\.js\?v=20260929-park-fishing-1/);
 });
 
 test('health model loads before runtime and has a visible sixth needs meter', () => {
