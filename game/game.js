@@ -4123,7 +4123,12 @@
       const gardenNow = communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute));
       const plotStatuses = communityGardenModel.listPlotStatuses(state.garden, gardenNow);
       const emptyCount = plotStatuses.filter((plot) => plot.status === "empty").length;
-      actionDescription.textContent = "無料で休んだり、人と話したりできます。菜園の種 " + state.garden.seeds + "粒 / 空き畝 " + emptyCount + "。各作物は乾くと成長が止まります。";
+      const plotSummary = plotStatuses.map((plot) => {
+        if (plot.status === "empty") return "畝" + (plot.id + 1) + " 空き";
+        const crop = communityGardenModel.CROPS[plot.cropId];
+        return "畝" + (plot.id + 1) + " " + crop.name + " · 成長あと" + plot.remainingGrowth + "分 · 水分あと" + plot.wetRemaining + "分 · 収穫" + plot.yield + "個";
+      }).join(" / ");
+      actionDescription.textContent = "無料で休んだり、人と話したりできます。菜園の種 " + state.garden.seeds + "粒 / 空き畝 " + emptyCount + "。" + plotSummary;
       for (const crop of Object.values(communityGardenModel.CROPS)) {
         const detail = crop.name + " / 収穫 " + crop.yield + "個 / 成長 " + crop.growthMinutes + "分";
         addChoice(crop.name + "を植える", detail, () => {
@@ -8765,6 +8770,55 @@
     ctx.fillRect(p.x - 20, top + h - 22, 40, 22);
   }
 
+  function drawCommunityGardenBeds(parkPosition) {
+    const now = communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute));
+    const plots = communityGardenModel.listPlotStatuses(state.garden, now);
+    const left = parkPosition.x - 53;
+    const top = parkPosition.y + 34;
+    ctx.save();
+    ctx.fillStyle = "#8caa72";
+    roundedRectPath(ctx, left, top, 106, 38, 7);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(46,75,47,.65)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    for (const plot of plots) {
+      const x = parkPosition.x + (plot.id - 1) * 35;
+      const y = top + 7;
+      ctx.fillStyle = "rgba(29,36,27,.22)";
+      roundedRectPath(ctx, x - 15, y + 2, 30, 22, 3);
+      ctx.fill();
+      ctx.fillStyle = "#967455";
+      roundedRectPath(ctx, x - 15, y, 30, 21, 3);
+      ctx.fill();
+      ctx.fillStyle = plot.status === "empty" ? "#594331" : "#67472f";
+      roundedRectPath(ctx, x - 11, y + 3, 22, 15, 2);
+      ctx.fill();
+      if (plot.status !== "empty") {
+        const cropColor = plot.status === "ready"
+          ? ({ radish:"#f0e4d1", tomato:"#c95543", "sweet-potato":"#c27b45" }[plot.cropId] || "#dfbb68")
+          : "#739b55";
+        ctx.strokeStyle = "#56834c";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y + 15);
+        ctx.lineTo(x, y + 8);
+        ctx.stroke();
+        ctx.fillStyle = cropColor;
+        ctx.beginPath();
+        ctx.ellipse(x - 3, y + 8, 4, 2.4, -.45, 0, Math.PI * 2);
+        ctx.ellipse(x + 3, y + 8, 4, 2.4, .45, 0, Math.PI * 2);
+        ctx.fill();
+        if (plot.status === "ready") {
+          ctx.beginPath();
+          ctx.arc(x, y + 13, 3.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+    ctx.restore();
+  }
+
   function drawPlace(place) {
     const building = place.building;
     const visualX = building?.x ?? place.x;
@@ -8805,6 +8859,7 @@
       ctx.beginPath();
       ctx.arc(p.x, p.y - 55, 18, 0, Math.PI * 2);
       ctx.fill();
+      drawCommunityGardenBeds(p);
       drawTree(place.x - 70, place.y - 10, .78);
       drawTree(place.x + 72, place.y - 18, .72);
     } else if (place.id === "home") {

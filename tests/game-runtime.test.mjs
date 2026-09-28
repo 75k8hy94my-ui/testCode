@@ -121,6 +121,22 @@ test('store and park expose validated garden actions and snapshots preserve lega
   assert.match(source, /state\.garden\s*=\s*communityGardenModel\.normalizeProgress\(saved\.communityGarden\)/);
 });
 
+test('central park renderer draws three garden beds with empty, growing, and ripe visual states', () => {
+  assert.match(source, /function drawCommunityGardenBeds\(parkPosition\)/);
+  assert.match(source, /drawCommunityGardenBeds\(p\)/);
+  assert.match(source, /status === "empty"/);
+  assert.match(source, /status === "ready"/);
+  assert.match(source, /plot\.status !== "empty"/);
+});
+
+test('garden actions expose crop progress and mobile action choices stay scrollable', () => {
+  assert.match(source, /菜園の種 " \+ state\.garden\.seeds/);
+  assert.match(source, /plot\.remainingGrowth/);
+  assert.match(source, /plot\.wetRemaining/);
+  assert.match(source, /収穫" \+ plot\.yield/);
+  assert.match(css, /\.action-sheet\{[^}]*max-height:\s*min\(72dvh,560px\)[^}]*overflow-y:\s*auto/);
+});
+
 test('fuel model loads before runtime and the personal car starts with its migration-safe tank level', () => {
   assert.match(html, /<script src="\.\/car-fuel\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('car-fuel.js') < html.indexOf('game.js'));
