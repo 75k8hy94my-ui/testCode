@@ -68,6 +68,12 @@
     return;
   }
 
+  const communityGardenModel = globalThis.CommunityGarden;
+  if (!communityGardenModel?.createProgress || !communityGardenModel?.normalizeProgress || !communityGardenModel?.advance || !communityGardenModel?.absoluteMinute || !communityGardenModel?.buySeedPack || !communityGardenModel?.plant || !communityGardenModel?.water || !communityGardenModel?.harvest || !communityGardenModel?.listPlotStatuses) {
+    showRuntimeError("CommunityGarden を読み込めません。");
+    return;
+  }
+
   const homeCookingModel = globalThis.CityDaysHomeCooking;
   if (!homeCookingModel?.listRecipes || !homeCookingModel?.cookMeal) {
     showRuntimeError("HomeCooking を読み込めません。");
@@ -1108,6 +1114,7 @@
     libraryVisits: 0,
     communityCenter:communityCenterModel.normalizeProgress(null),
     deliveryWork:deliveryWorkModel.createProgress(),
+    garden:communityGardenModel.createProgress(),
     shiftsWorked: 0,
     lastShiftDay: 0,
     needs: {
@@ -3619,6 +3626,10 @@
       state.minute += 1440;
       state.day = Math.max(1, state.day - 1);
     }
+    state.garden = communityGardenModel.advance(
+      state.garden,
+      communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute))
+    );
     if (updateCitizens) fastForwardCitizens(minutes);
   }
 
@@ -3994,6 +4005,17 @@
 
     if (place.id === "store") {
       actionDescription.textContent = "食料品とちょっとした食事を買えます。";
+      addChoice("菜園の種を買う", "3粒 / ¥600 / 5分", () => {
+        const result = communityGardenModel.buySeedPack(state.garden, state.cash);
+        if (!result.ok) {
+          showToast("種を買うには¥600必要です");
+          return;
+        }
+        state.garden = result.progress;
+        state.cash = result.cashRemaining;
+        advanceTime(5);
+        showToast("菜園の種を3粒買いました");
+      }, state.cash < communityGardenModel.SEED_PACK_COST);
       addChoice("食料を3個買う", "¥1,500 / 15分", () => {
         if (!canPay(1500)) return;
         state.cash -= 1500;
@@ -4098,7 +4120,60 @@
     }
 
     if (place.id === "park") {
-      actionDescription.textContent = "無料で休んだり、人と話したりできます。";
+      const gardenNow = communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute));
+      const plotStatuses = communityGardenModel.listPlotStatuses(state.garden, gardenNow);
+      const emptyCount = plotStatuses.filter((plot) => plot.status === "empty").length;
+      actionDescription.textContent = "無料で休んだり、人と話したりできます。菜園の種 " + state.garden.seeds + "粒 / 空き畝 " + emptyCount + "。各作物は乾くと成長が止まります。";
+      for (const crop of Object.values(communityGardenModel.CROPS)) {
+        const detail = crop.name + " / 収穫 " + crop.yield + "個 / 成長 " + crop.growthMinutes + "分";
+        addChoice(crop.name + "を植える", detail, () => {
+          const now = communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute));
+          const preview = communityGardenModel.plant(state.garden, now + 10, crop.id);
+          if (!preview.ok) {
+            showToast(preview.reason === "no-seeds" ? "先にスーパーで種を買ってください" : "菜園に空き畝がありません");
+            return;
+          }
+          advanceTime(10);
+          const result = communityGardenModel.plant(state.garden, communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute)), crop.id);
+          if (!result.ok) return;
+          state.garden = result.progress;
+          showToast(crop.name + "を植えました · 畝" + (result.plotId + 1));
+        }, state.garden.seeds < 1 || emptyCount < 1);
+      }
+      for (const plot of plotStatuses) {
+        if (plot.status === "empty") continue;
+        const crop = communityGardenModel.CROPS[plot.cropId];
+        if (plot.status === "ready") {
+          addChoice("畝" + (plot.id + 1) + "を収穫", crop.name + " / 食料 " + plot.yield + "個 / 10分", () => {
+            const now = communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute));
+            if (!communityGardenModel.harvest(state.garden, now + 10, plot.id).ok) {
+              showToast("収穫できる状態ではありません");
+              return;
+            }
+            advanceTime(10);
+            const result = communityGardenModel.harvest(state.garden, communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute)), plot.id);
+            if (!result.ok) return;
+            state.garden = result.progress;
+            state.groceries += result.yield;
+            showToast(crop.name + "を収穫し、食料が" + result.yield + "個増えました");
+          });
+        } else if (plot.wetRemaining <= 0) {
+          addChoice("畝" + (plot.id + 1) + "に水をやる", crop.name + " · あと" + plot.remainingGrowth + "分 / 5分", () => {
+            const now = communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute));
+            if (!communityGardenModel.water(state.garden, now + 5, plot.id).ok) {
+              showToast("この畝には水をやれません");
+              return;
+            }
+            advanceTime(5);
+            const result = communityGardenModel.water(state.garden, communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute)), plot.id);
+            if (!result.ok) return;
+            state.garden = result.progress;
+            showToast(crop.name + "に水をやりました");
+          });
+        } else {
+          addChoice("畝" + (plot.id + 1) + "の様子", crop.name + " · 成長あと" + plot.remainingGrowth + "分 / 水分あと" + plot.wetRemaining + "分", () => {}, true);
+        }
+      }
       addChoice("ベンチで休む", "60分 / 楽しさ+25 / 体力+9", () => {
         advanceTime(60);
         state.needs.fun += 25;
@@ -4630,6 +4705,7 @@
         libraryVisits: state.libraryVisits,
         communityCenter:communityCenterModel.normalizeProgress(state.communityCenter),
         deliveryWork:deliveryWorkModel.normalizeProgress(state.deliveryWork),
+        communityGarden:communityGardenModel.normalizeProgress(state.garden),
         shiftsWorked: state.shiftsWorked,
         lastShiftDay:state.lastShiftDay,
         needs: state.needs,
@@ -4872,6 +4948,7 @@
       state.libraryVisits = Math.max(0, Math.floor(Number(saved.libraryVisits) || 0));
       state.communityCenter = communityCenterModel.normalizeProgress(saved.communityCenter);
       state.deliveryWork = deliveryWorkModel.normalizeProgress(saved.deliveryWork);
+      state.garden = communityGardenModel.normalizeProgress(saved.communityGarden);
       state.shiftsWorked = Math.max(0, Math.floor(Number(saved.shiftsWorked) || 0));
       state.lastShiftDay = Math.max(0, Math.floor(Number(saved.lastShiftDay) || 0));
       if (saved.phone && typeof saved.phone.waypoint === "string" && PLACES.some((place) => place.id === saved.phone.waypoint)) {

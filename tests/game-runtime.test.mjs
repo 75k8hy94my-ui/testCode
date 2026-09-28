@@ -104,6 +104,23 @@ test('game loads the community center schedule model before the runtime', () => 
   assert.ok(html.indexOf('community-center.js') < html.indexOf('game.js'));
 });
 
+test('community garden model loads before game runtime and progresses with absolute game time', () => {
+  assert.match(html, /<script src="\.\/community-garden\.js\?v=[^"]+"><\/script>/);
+  assert.ok(html.indexOf('community-garden.js') < html.indexOf('game.js'));
+  assert.match(source, /const communityGardenModel = globalThis\.CommunityGarden/);
+  assert.match(source, /communityGardenModel\.advance\([\s\S]{0,100}communityGardenModel\.absoluteMinute\(state\.day, Math\.floor\(state\.minute\)\)\s*\)/);
+});
+
+test('store and park expose validated garden actions and snapshots preserve legacy defaults and garden state', () => {
+  assert.match(source, /communityGardenModel\.buySeedPack\(state\.garden, state\.cash\)/);
+  assert.match(source, /communityGardenModel\.plant\(state\.garden, communityGardenModel\.absoluteMinute/);
+  assert.match(source, /communityGardenModel\.water\(state\.garden, communityGardenModel\.absoluteMinute/);
+  assert.match(source, /communityGardenModel\.harvest\(state\.garden, communityGardenModel\.absoluteMinute/);
+  assert.match(source, /state\.groceries\s*\+=\s*result\.yield/);
+  assert.match(source, /communityGarden:\s*communityGardenModel\.normalizeProgress\(state\.garden\)/);
+  assert.match(source, /state\.garden\s*=\s*communityGardenModel\.normalizeProgress\(saved\.communityGarden\)/);
+});
+
 test('fuel model loads before runtime and the personal car starts with its migration-safe tank level', () => {
   assert.match(html, /<script src="\.\/car-fuel\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('car-fuel.js') < html.indexOf('game.js'));
