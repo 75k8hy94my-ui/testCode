@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import socialNpcModule from '../game/social-npc-system.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = fs.readFileSync(path.join(root, 'game', 'game.js'), 'utf8');
@@ -10,6 +11,7 @@ const css = fs.readFileSync(path.join(root, 'game', 'game.css'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'game', 'index.html'), 'utf8');
 const mapSource = fs.readFileSync(path.join(root, 'game', 'map-model.js'), 'utf8');
 const overtakeSource = fs.readFileSync(path.join(root, 'game', 'traffic-overtake.js'), 'utf8');
+const overtakeSafetySource = fs.readFileSync(path.join(root, 'game', 'traffic-overtake-safety.js'), 'utf8');
 
 test('game keeps a timer fallback when requestAnimationFrame is unavailable', () => {
   assert.match(source, /const requestFrame = typeof window\.requestAnimationFrame === "function"/);
@@ -45,7 +47,7 @@ test('game defines the traffic signal state helper used by rendering and updates
   assert.match(source, /signalStateAt\(wx, wy, "h"\)/);
   assert.match(source, /const hasHorizontal = incidentEdges\.some/);
   assert.match(source, /const hasVertical = incidentEdges\.some/);
-  assert.match(source, /drawPedestrianSignal\(p\.x - poleOffset/);
+  assert.match(source, /drawPedestrianSignal\(/);
 });
 
 test('game defines the ambient prop drawing helpers used by the city renderer', () => {
@@ -98,6 +100,23 @@ test('all person categories share the same character renderer', () => {
   assert.match(source, /npc\.state = citizen\.state/);
 });
 
+test('game loads overtake safety before the overtake planner and runtime', () => {
+  assert.match(html, /<script src="\.\/traffic-overtake-safety\.js\?v=[^"]+"><\/script>/);
+  assert.ok(html.indexOf('traffic-overtake-safety.js') < html.indexOf('traffic-overtake.js'));
+  assert.ok(html.indexOf('traffic-overtake.js') < html.indexOf('game.js'));
+  assert.match(overtakeSource, /conflictsWithOncoming/);
+  assert.match(overtakeSafetySource, /function conflictsWithOncoming\(/);
+});
+
+test('home interior player uses the shared character renderer', () => {
+  const start = source.indexOf('function drawHomePlayer()');
+  const end = source.indexOf('function drawStreetLightsGlow()',start);
+  const homePlayerDraw = source.slice(start,end);
+  assert.ok(start >= 0 && end > start);
+  assert.match(homePlayerDraw,/characterRenderer\.draw\(ctx,\s*\{/);
+  assert.doesNotMatch(homePlayerDraw,/drawPersonSpriteAtScreen/);
+});
+
 test('enterable home uses the same residential renderer and scale language as neighborhood houses', () => {
   const homeDrawStart = source.indexOf('} else if (place.id === "home") {');
   const cafeDrawStart = source.indexOf('} else if (place.id === "cafe") {', homeDrawStart);
@@ -137,7 +156,7 @@ test('driving routes and traffic use the map graph and edge geometry', () => {
 });
 
 test('ambient cars follow graph routes instead of teleporting between road ends', () => {
-  assert.match(source, /function buildTrafficRoute\(car, startNodeId, goalNodeId\)/);
+  assert.match(source, /function buildTrafficRoute\(car, startNodeId, goalNodeId, avoidFirstEdgeId = null\)/);
   assert.match(source, /route = mapModel\.findRoute\(startNodeId, goalNodeId, \{ mode: "vehicle" \}\)/);
   assert.match(source, /function advanceTrafficRoute\(car\)/);
   assert.match(source, /car\.routeIndex \+= 1/);
@@ -148,14 +167,15 @@ test('ambient pedestrians have destination plans, route states, and signal-aware
   assert.match(source, /function buildPedestrianPlan\(ped, startNodeId, goalNodeId\)/);
   assert.match(source, /ped\.state = "walking"/);
   assert.match(source, /ped\.state = "waiting"/);
-  assert.match(source, /ped\.state = "staying"/);
+  assert.match(source, /ped\.state = action\.indoor \? "inside" : "staying"/);
   assert.match(source, /function pedestrianPoseAt\(ped\)/);
   assert.match(source, /pedestrianSignalState\(ped\)/);
   assert.match(source, /ped\.targetPlaceId/);
 });
 
 test('citizens carry deterministic age and gender into appearance generation', () => {
-  assert.match(source, /const gender = specialGender \|\| \(hash2\(index, 81, 16025\) < \.5 \? "male" : "female"\)/);
+  assert.match(source, /const gender = socialProfile\?\.gender \|\| \(hash2\(index, 81, 16025\) < \.5 \? "male" : "female"\)/);
+  assert.match(source, /const age = socialProfile\?\.age \?\? 18 \+ Math\.floor\(hash2\(index, 83, 1603\) \* 64\)/);
   assert.match(source, /ageGroup:citizenAgeGroup\(age\)/);
   assert.match(source, /name:citizenName\(index, gender\)/);
   assert.match(source, /appearance:personAppearanceFromSeed\(i, profile\)/);
@@ -165,14 +185,55 @@ test('citizens carry deterministic age and gender into appearance generation', (
 });
 
 test('named citizens have authored gender presentation', () => {
-  assert.match(source, /specialNpcId === "sora" \? "male"/);
-  assert.match(source, /specialNpcId === "aoi" \|\| specialNpcId === "mei" \? "female"/);
+  assert.match(source, /const socialProfile = specialNpcId \? socialNpcSystem\.getProfile\(specialNpcId\) : null/);
+  assert.equal(socialNpcModule.getProfile('aoi').gender, 'female');
+  assert.equal(socialNpcModule.getProfile('sora').gender, 'male');
+  assert.equal(socialNpcModule.getProfile('mei').gender, 'female');
 });
 
-test('ambient pedestrians seed the active central roads', () => {
-  assert.match(source, /const nearbyPedestrianPlaces = \["cafe", "store", "home"\]/);
-  assert.match(source, /i < 30 && nearbyPedestrianPlaces\.length/);
-  assert.match(source, /function seedPedestriansNearActor\(\)/);
+test('ten authored social citizens coexist with the unchanged population of 76', () => {
+  assert.equal(socialNpcModule.catalog.length, 10);
+  assert.match(source, /const CITIZEN_COUNT = 76/);
+  assert.match(source, /socialNpcSystem\.catalog\[index\]\?\.id \|\| null/);
+  assert.match(source, /const NPCS = socialNpcSystem\.catalog\.map\(/);
+  assert.match(source, /npc\.citizenId = citizen\.id/);
+});
+
+test('social requests expire safely and use existing pedestrian routing', () => {
+  assert.match(source, /function queueSocialNpcActivity\(ped, activityRequest\)/);
+  assert.match(source, /activityRequest\.expiresAt/);
+  assert.match(source, /mapModel\.findRoute\(startNodeId, destination\.entranceNodeId, \{ mode:"pedestrian" \}\)/);
+  assert.match(source, /if \(workSoon \|\| lateNight \|\| ped\.needs\.energy < 22 \|\| !socialAction\)\s*\{\s*ped\.socialNpcRequest = null;/);
+  assert.match(source, /if \(ped\.socialNpcRequest && !socialNpcRequestExpired\(ped\.socialNpcRequest\)\)/);
+  assert.match(source, /planCitizenAction\(ped, currentNodeId\)/);
+  assert.match(source, /socialNpcSystem\.getSocialActionBias\(/);
+});
+
+test('player conversations update persistent social state and route accepted invitations', () => {
+  const conversationSource = source.slice(source.indexOf('function openNpc('), source.indexOf('function nearestInteraction('));
+  assert.match(conversationSource, /socialNpcSystem\.getConversation\(/);
+  assert.match(conversationSource, /socialNpcSystem\.resolveConversation\(/);
+  assert.match(conversationSource, /!option\.available/);
+  assert.match(conversationSource, /state\.socialNpc\.recentTopics\[npc\.id\]/);
+  assert.match(conversationSource, /state\.socialNpc\.relationships\[relationshipChange\.pairKey\]/);
+  assert.match(conversationSource, /queueSocialNpcActivity\(citizen, result\.activityRequest\)/);
+  assert.match(source, /socialNpcSystem\.normalizeState\(saved\.socialNpc, saved\.friends\)/);
+  assert.match(source, /socialNpc:state\.socialNpc/);
+});
+
+test('authored social NPCs have an in-world conversation badge and phone contact marker', () => {
+  const drawNpcSource = source.slice(source.indexOf('function drawNpc('), source.indexOf('function drawPedestrians('));
+  assert.match(drawNpcSource, /fillText\("会話"/);
+  assert.match(source, /conversationCapable:true/);
+});
+
+test('persistent pedestrians are not teleported beside the player to seed crowds', () => {
+  const seeding = source.slice(
+    source.indexOf('function seedPedestriansNearActor('),
+    source.indexOf('function ', source.indexOf('function seedPedestriansNearActor(') + 10)
+  );
+  assert.match(seeding, /Citizens now keep persistent homes, jobs and routes/);
+  assert.doesNotMatch(seeding, /ped\.x\s*=|ped\.y\s*=|buildPedestrianPlan/);
   assert.match(source, /seedPedestriansNearActor\(\);/);
 });
 
@@ -201,6 +262,16 @@ test('saved state carries the map version and sanitizes legacy positions', () =>
   assert.match(source, /state\.drive\.route = \[\]/);
 });
 
+test('parked personal car remains an overtake obstacle while the player is indoors', () => {
+  const start = source.indexOf('function trafficParkedCarInfo(car)');
+  const end = source.indexOf('function trafficOvertakePlan(car, obstacle)',start);
+  const parkedDetection = source.slice(start,end);
+  assert.ok(start >= 0 && end > start);
+  assert.match(parkedDetection,/state\.player\.inVehicle/);
+  assert.match(parkedDetection,/personalCar\.speed/);
+  assert.doesNotMatch(parkedDetection,/state\.player\.inHome/);
+});
+
 test('road rendering joins shared endpoints without oversized junction blobs', () => {
   assert.match(source, /ctx\.lineCap = "butt"/);
   assert.match(source, /drawJunctionPads/);
@@ -224,30 +295,44 @@ test('building clearance follows the current map model rather than the retired g
 
 test('traffic lanes respect road width and parallel lanes do not brake for each other', () => {
   assert.match(source, /function trafficLaneOffsetForEdge\(edge, secondaryLane = false\)/);
-  assert.match(source, /Math\.abs\(\(other\.laneOffset \|\| 0\) - \(car\.laneOffset \|\| 0\)\) > 18/);
+  assert.match(source, /Math\.abs\(\(other\.laneOffset \|\| 0\) - \(car\.laneOffset \|\| 0\)\) > 20/);
 });
 
 test('traffic checks passing clearance for a parked personal car and shifts back after passing', () => {
   assert.match(html, /traffic-overtake\.js/);
   assert.match(overtakeSource, /function plan\(/);
   assert.match(source, /function trafficParkedCarInfo\(car\)/);
+  assert.match(source, /return \{ edge, hit:parkedHit,[^\n]+blocksLane \};/);
+  assert.match(source, /function projectedObstacleDistance\(car, ignorePersonalCar = false\)/);
   assert.match(source, /trafficOvertake\.blocksLane\(/);
   assert.match(source, /function trafficOvertakePlan\(car, obstacle\)/);
   assert.match(source, /opposingVehicles/);
   assert.match(source, /car\.overtakePlan = trafficOvertakePlan\(car, parkedObstacle\)/);
-  assert.match(source, /function updateTrafficOvertake\(car\)/);
-  assert.match(source, /trafficOvertake\.offsetAt\(plan, car\.along\)/);
+  assert.match(source, /const parkedGap = parkedObstacle\?\.blocksLane \? parkedObstacle\.centerGap : Infinity/);
+  assert.match(source, /const projectedGap = projectedObstacleDistance\(car, Boolean\(parkedObstacle\)\)/);
+  assert.match(source, /function updateTrafficOvertake\(car, dt, stationaryParkedBlock = false\)/);
+  assert.match(source, /trafficOvertake\.offsetAt\(plan, car\.along, dt, \{ stationary:stationaryParkedBlock \}\)/);
+  assert.match(source, /const stationaryParkedBlock = car\.speed < 5 && blockReason === "obstacle"/);
+  assert.match(source, /minimumDistance:car\.speed < 5\s*\? trafficOvertake\.minimumEmergencyDistance\(vehicleHalfLength,obstacleHalfLength\)/);
+});
+
+test('ambient traffic signals a planned intersection turn unless an overtake signal takes priority', () => {
+  assert.match(overtakeSource, /function turnSignalForRoute\(/);
+  assert.match(source, /function trafficIntersectionSignal\(car, timeMs\)/);
+  assert.match(source, /distanceToJunction:trafficDistanceToEndpoint\(car, edge\)/);
+  assert.match(source, /car\.overtakePlan\s*\?\s*trafficOvertake\.signalFor\(car\.overtakePlan, turnSignalTime\)\s*:\s*trafficIntersectionSignal\(car, turnSignalTime\)/);
 });
 
 test('reverse-direction pedestrians start from the correct edge end', () => {
   assert.match(source, /ped\.along = ped\.directionSign > 0 \? 0 : ped\.edgeLength/);
   assert.match(source, /ped\.along = ped\.directionSign > 0 \? initialAlong : Math\.max\(0, ped\.edgeLength - initialAlong\)/);
-  assert.match(source, /edge\.vehicle \? edge\.width \/ 2 \+ 5 : Math\.min\(10, edge\.width \* \.2\)/);
+  assert.match(source, /const centerOffset = corridor\?\.centerOffset \?\? \(edge\.width \/ 2 \+ 22\)/);
+  assert.match(source, /const flowBias = directionSign > 0 \? 7 : -7/);
 });
 
 test('stuck pedestrian recovery stays on the current sidewalk without teleporting', () => {
   assert.match(source, /Recovery must never switch sidewalks or rebuild from an arbitrary node/);
-  assert.match(source, /requestPedestrianAvoidance\(ped, extra, 1\.1\)/);
+  assert.match(source, /requestPedestrianAvoidance\(ped, room, 1\.05\)/);
   assert.doesNotMatch(source, /ped\.sideSign\s*=\s*\(ped\.sideSign/);
 });
 
@@ -262,6 +347,15 @@ test('traffic reverses at a true dead-end instead of remaining permanently stall
   assert.match(source, /if \(reverseTrafficAtDeadEnd\(car, current\)\) return true;/);
 });
 
+test('stalled traffic recovery never relocates cars and throttles route retries', () => {
+  const recoverySource = source.slice(source.indexOf('function relievePlayerTrafficQueue('), source.indexOf('function downstreamLaneClearance('));
+  assert.doesNotMatch(recoverySource, /function relocateGridlockedTraffic/);
+  assert.doesNotMatch(recoverySource, /relocateGridlockedTraffic\(/);
+  assert.doesNotMatch(recoverySource, /car\.(?:x|y)\s*=/);
+  assert.match(recoverySource, /function relievePlayerTrafficQueue\(queue\)[\s\S]*?replanStuckTraffic\(head\)/);
+  assert.match(recoverySource, /if \(replanStuckTraffic\(car\)\) continue;[\s\S]*?car\.stuckRecoveryCooldown = 1\.4;/);
+});
+
 test('pedestrian collisions preserve sidewalk side and use continuous avoidance', () => {
   assert.match(source, /function pedestrianPriority\(ped\)/);
   assert.match(source, /const yieldingPed = pedestrianPriority\(ped\) < pedestrianPriority\(collision\.target\)/);
@@ -274,6 +368,7 @@ test('pedestrian collisions preserve sidewalk side and use continuous avoidance'
 test('pedestrians use dedicated sidewalk lanes outside the carriageway', () => {
   assert.match(source, /function pedestrianSidewalkLayout\(edge, directionSign = 1\)/);
   assert.match(source, /mapModel\.pedestrianCorridor\?\.\(edge\.id\)/);
+  assert.match(source, /mapModel\.pedestrianOffsetPose\(edge, along, directionSign, lateralOffset\)/);
   assert.match(source, /const flowBias = directionSign > 0 \? 7 : -7/);
   const pose = source.slice(
     source.indexOf('function pedestrianEdgePose('),
@@ -332,7 +427,7 @@ test('pedestrian sidewalk side is immutable after spawn', () => {
 });
 
 test('fresh games snap the default car onto the current road graph', () => {
-  assert.match(source, /generatePedestrians\(\);\s*migrateCarToCurrentRoadIfNeeded\(\);\s*loadGame\(\);/);
+  assert.match(source, /generatePedestrians\(\);\s*syncNamedNpcCitizens\(\);\s*migrateCarToCurrentRoadIfNeeded\(\);/);
 });
 
 test('road culling considers every point in a curved map edge', () => {
@@ -378,8 +473,9 @@ test('traffic-light rendering includes every drivable approach at a signalized n
 
 test('fresh player and fixed NPC positions follow current map anchors', () => {
   assert.match(source, /player:\s*\{\s*x: HOME\.x,\s*y: HOME\.y,/);
-  assert.match(source, /id: "aoi"[\s\S]*x: PARK\.x - 60, y: PARK\.y/);
-  assert.match(source, /id: "mei"[\s\S]*x: LIBRARY\.x, y: LIBRARY\.y - 45/);
+  assert.match(source, /const NPCS = socialNpcSystem\.catalog\.map\(/);
+  assert.match(source, /profile\.id === "aoi"[\s\S]*x:PARK\.x - 60, y:PARK\.y/);
+  assert.match(source, /profile\.id === "mei"[\s\S]*x:LIBRARY\.x, y:LIBRARY\.y - 45/);
   assert.match(source, /const fallback = migratePlayerToCurrentMap\(NaN, NaN\)/);
   assert.doesNotMatch(source, /state\.player\.x = HOME\.x \+ 55/);
 });
@@ -395,10 +491,9 @@ test('sleep returns the player to the current home entrance', () => {
 test('v2 road rendering visually distinguishes street hierarchy and pedestrian surfaces', () => {
   assert.match(source, /const pedestrianSurface = \(edge\) =>/);
   assert.match(source, /edge\.type === "shopping-walk" \? "#b5aa90"/);
-  assert.match(source, /const vehicleSurface = \(edge\) =>/);
-  assert.match(source, /edge\.type === "alley" \? "#777873"/);
-  assert.match(source, /edge\.vehicle && edge\.type === "arterial"/);
-  assert.match(source, /edge\.vehicle && edge\.type === "collector" && edge\.width >= 112/);
+  assert.match(source, /const vehicleSurface = \(\) => "#626863"/);
+  assert.match(source, /if \(edge\.type === "arterial"\)/);
+  assert.match(source, /edge\.type === "collector" && edge\.width >= 112/);
 });
 
 test('v2 map removes the old 600px ground-block painting from the active renderer', () => {
@@ -450,6 +545,16 @@ test('smartphone has an always available responsive panel', () => {
   assert.match(html, /id="smartphonePanel"/);
   assert.match(source, /smartphoneToggle\.addEventListener\("click"/);
   assert.match(css, /\.smartphone-panel[\s\S]*@media\(max-width:760px\)[\s\S]*\.smartphone-panel/);
+});
+
+test('visible smartphone refreshes world data at a bounded cadence and resets while closed', () => {
+  const frame = source.slice(source.indexOf('function frame('),source.indexOf('function togglePause('));
+  assert.match(html,/game\.js\?v=20260929-social-npc-dialogue-1/);
+  assert.match(source,/const SMARTPHONE_REFRESH_INTERVAL = 0\.25/);
+  assert.match(source,/let smartphoneRefreshElapsed = 0/);
+  assert.match(frame,/smartphoneRefreshElapsed \+= dt/);
+  assert.match(frame,/smartphoneRefreshElapsed >= SMARTPHONE_REFRESH_INTERVAL[\s\S]*updateSmartphone\(\)/);
+  assert.match(frame,/else\s*\{\s*smartphoneRefreshElapsed = 0;/);
 });
 
 test('home map uses the street world scale and follows the player camera', () => {

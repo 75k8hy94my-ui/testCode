@@ -50,6 +50,12 @@
     return;
   }
 
+  const socialNpcSystem = globalThis.CityDaysSocialNpcSystem;
+  if (!socialNpcSystem?.catalog || socialNpcSystem.catalog.length !== 10) {
+    showRuntimeError("SocialNpcSystem を読み込めません。");
+    return;
+  }
+
   const trafficOvertake = globalThis.CityDaysTrafficOvertake;
   if (!trafficOvertake?.plan) {
     showRuntimeError("TrafficOvertake を読み込めません。");
@@ -79,7 +85,9 @@
   const pausedOverlay = document.getElementById("pausedOverlay");
   const smartphoneToggle = document.getElementById("smartphoneToggle");
   const smartphonePanel = document.getElementById("smartphonePanel");
+  const SMARTPHONE_REFRESH_INTERVAL = 0.25;
   let phoneSystem = null;
+  let smartphoneRefreshElapsed = 0;
   const joystick = document.getElementById("joystick");
   const joystickKnob = document.getElementById("joystickKnob");
   const actionButton = document.getElementById("actionButton");
@@ -1000,11 +1008,23 @@
     };
   }
 
-  const NPCS = [
-    { id: "aoi", name: "アオイ", x: PARK.x - 60, y: PARK.y, color: "#e0a7b5", friendship: 0 },
-    { id: "sora", name: "ソラ", x: CAFE.x + 72, y: CAFE.y - 58, color: "#a9c9e3", friendship: 0 },
-    { id: "mei", name: "メイ", x: LIBRARY.x, y: LIBRARY.y - 45, color: "#c8b58f", friendship: 0 }
-  ];
+  const NPCS = socialNpcSystem.catalog.map((profile, index) => {
+    const place = PLACES.find((value) => value.id === profile.preferredPlaceId) || HOME;
+    const fallback = profile.id === "aoi"
+      ? { x:PARK.x - 60, y:PARK.y }
+      : profile.id === "sora"
+        ? { x:CAFE.x + 72, y:CAFE.y - 58 }
+        : profile.id === "mei"
+          ? { x:LIBRARY.x, y:LIBRARY.y - 45 }
+          : { x:place.x, y:place.y };
+    return {
+      ...profile,
+      x:fallback.x,
+      y:fallback.y,
+      friendship:0,
+      citizenId:"citizen-" + String(index + 1).padStart(3, "0")
+    };
+  });
 
   const personalCar = {
     x: 9 * ROAD_GAP + LANE_OFFSET,
@@ -1052,6 +1072,7 @@
       social: 65,
       fun: 70
     },
+    socialNpc: socialNpcSystem.createInitialState(),
     visual: {
       weather: "clear",
       weatherClock: 0,
@@ -1063,7 +1084,8 @@
       cameraLagY: 0
     },
     phone: {
-      waypoint: null
+      waypoint: null,
+      friendWaypointId: null
     },
     drive: {
       route: [],
@@ -1873,23 +1895,14 @@
   const PLAYER_APPEARANCE = characterRenderer.createAppearance(9001, { role:"player" });
 
   function citizenProfile(index, home, workPool) {
-    const specialNpcId = index === 0 ? "aoi" : index === 1 ? "sora" : index === 2 ? "mei" : null;
-    const specialGender = specialNpcId === "sora" ? "male"
-      : specialNpcId === "aoi" || specialNpcId === "mei" ? "female"
-        : null;
-    const gender = specialGender || (hash2(index, 81, 16025) < .5 ? "male" : "female");
-    let age = 18 + Math.floor(hash2(index, 83, 1603) * 64);
+    const specialNpcId = socialNpcSystem.catalog[index]?.id || null;
+    const socialProfile = specialNpcId ? socialNpcSystem.getProfile(specialNpcId) : null;
+    const gender = socialProfile?.gender || (hash2(index, 81, 16025) < .5 ? "male" : "female");
+    const age = socialProfile?.age ?? 18 + Math.floor(hash2(index, 83, 1603) * 64);
     let jobType;
 
-    if (specialNpcId === "sora") {
-      age = 24;
-      jobType = "cafe";
-    } else if (specialNpcId === "mei") {
-      age = 22;
-      jobType = "student";
-    } else if (specialNpcId === "aoi") {
-      age = 28;
-      jobType = "freelance";
+    if (socialProfile) {
+      jobType = socialProfile.jobType;
     } else if (age >= 68) {
       jobType = "retired";
     } else if (age <= 22) {
@@ -1917,12 +1930,13 @@
       || (jobType === "office" || jobType === "freelance" ? genericWork?.nodeId : null)
       || null;
 
-    const workStart = jobType === "cafe" || jobType === "retail"
+    const workStart = socialProfile?.schedule.workStart ?? (jobType === "cafe" || jobType === "retail"
       ? 7 * 60 + Math.floor(hash2(index, 101, 1606) * 150)
-      : 8 * 60 + Math.floor(hash2(index, 103, 1607) * 120);
+      : 8 * 60 + Math.floor(hash2(index, 103, 1607) * 120));
     const workMinutes = jobType === "freelance"
       ? 300 + Math.floor(hash2(index, 107, 1608) * 180)
       : 420 + Math.floor(hash2(index, 109, 1609) * 100);
+    const workEnd = socialProfile?.schedule.workEnd ?? (workStart + workMinutes) % 1440;
 
     return {
       id:"citizen-" + String(index + 1).padStart(3, "0"),
@@ -1939,26 +1953,31 @@
       workNodeId,
       workPlaceId:fixedPlace?.id || null,
       workStart,
-      workEnd:(workStart + workMinutes) % 1440,
+      workEnd,
       wage:jobType === "office" ? 7800
         : jobType === "cafe" || jobType === "retail" ? 5400
           : jobType === "gym" || jobType === "library" ? 5900
             : jobType === "freelance" ? 4600
               : 0,
-      wakeMinute:360 + Math.floor(hash2(index, 113, 1610) * 150),
-      sleepMinute:1320 + Math.floor(hash2(index, 127, 1611) * 100),
+      wakeMinute:socialProfile?.schedule.wakeMinute ?? 360 + Math.floor(hash2(index, 113, 1610) * 150),
+      sleepMinute:socialProfile?.schedule.sleepMinute ?? 1320 + Math.floor(hash2(index, 127, 1611) * 100),
       personality:{
-        social:.55 + hash2(index, 131, 1612) * .9,
-        active:.45 + hash2(index, 137, 1613) * 1.0,
-        curious:.45 + hash2(index, 139, 1614) * 1.0,
+        social:socialProfile?.personality.social ?? .55 + hash2(index, 131, 1612) * .9,
+        active:socialProfile?.personality.active ?? .45 + hash2(index, 137, 1613) * 1.0,
+        curious:socialProfile?.personality.curious ?? .45 + hash2(index, 139, 1614) * 1.0,
         frugal:.45 + hash2(index, 149, 1615) * 1.0,
-        routine:.55 + hash2(index, 151, 1616) * .9
+        routine:socialProfile?.personality.routine ?? .55 + hash2(index, 151, 1616) * .9
       }
     };
   }
 
   function citizenIsWorkday(ped) {
     if (!ped.workNodeId || ped.jobType === "retired" || ped.jobType === "student") return false;
+    if (ped.specialNpcId) {
+      const profile = socialNpcSystem.getProfile(ped.specialNpcId);
+      const weekday = ((state.day - 1) % 7) + 1;
+      return Boolean(profile?.schedule.workdays.includes(weekday));
+    }
     const weekday = (state.day - 1) % 7;
     const offShift = Math.floor(hash2(ped.seed, 157, 1617) * 3);
     if (ped.jobType === "cafe" || ped.jobType === "retail") return weekday !== offShift && weekday !== (offShift + 3) % 7;
@@ -1994,6 +2013,33 @@
     if (action.nodeId) return action.nodeId;
     if (action.placeId) return PLACES.find((place) => place.id === action.placeId)?.entranceNodeId || ped.homeNodeId;
     return ped.homeNodeId;
+  }
+
+  function socialNpcRequestExpired(request) {
+    if (!request || !Number.isFinite(Number(request.expiresAt))) return true;
+    const now = (Math.max(1, Math.floor(state.day)) - 1) * 1440 + state.minute;
+    return now >= Number(request.expiresAt);
+  }
+
+  function queueSocialNpcActivity(ped, activityRequest) {
+    if (!ped?.specialNpcId || activityRequest?.actionId !== "socialize") return false;
+    const destination = PLACES.find((place) => place.id === activityRequest.placeId);
+    if (!destination?.entranceNodeId || socialNpcRequestExpired(activityRequest)) return false;
+    const startNodeId = ped.currentNodeId || ped.homeNodeId;
+    if (!startNodeId) return false;
+    if (startNodeId !== destination.entranceNodeId && !mapModel.findRoute(startNodeId, destination.entranceNodeId, { mode:"pedestrian" })) {
+      return false;
+    }
+
+    ped.socialNpcRequest = {
+      actionId:"socialize",
+      placeId:destination.id,
+      expiresAt:Number(activityRequest.expiresAt)
+    };
+    if (ped.state !== "walking" && ped.state !== "waiting") {
+      planCitizenAction(ped, startNodeId);
+    }
+    return true;
   }
 
   function citizenActionCandidates(ped) {
@@ -2116,6 +2162,41 @@
       }
     );
 
+    if (ped.specialNpcId) {
+      const nearbySocialNpcIds = pedestrians
+        .filter((other) => other !== ped && other.specialNpcId && Math.hypot(other.x - ped.x, other.y - ped.y) <= 260)
+        .map((other) => other.specialNpcId);
+      const socialAction = actions.find((action) => action.id === "socialize");
+      if (socialAction) {
+        socialAction.score += socialNpcSystem.getSocialActionBias({
+          npcId:ped.specialNpcId,
+          action:socialAction.id,
+          minute,
+          day:state.day,
+          relationships:state.socialNpc.relationships,
+          nearbySocialNpcIds
+        });
+      }
+
+      if (ped.socialNpcRequest) {
+        if (socialNpcRequestExpired(ped.socialNpcRequest)) {
+          ped.socialNpcRequest = null;
+        } else {
+          const workSoon = ped.workNodeId && workday && !alreadyWorked && (onShift || untilWork <= 90);
+          if (workSoon || lateNight || ped.needs.energy < 22 || !socialAction) {
+            ped.socialNpcRequest = null;
+          } else {
+            const remaining = ped.socialNpcRequest.expiresAt - ((state.day - 1) * 1440 + minute);
+            socialAction.placeId = ped.socialNpcRequest.placeId;
+            socialAction.indoor = socialAction.placeId === "cafe";
+            socialAction.duration = Math.max(8, Math.min(90, remaining));
+            socialAction.score = Math.max(socialAction.score, 170);
+            socialAction.socialNpcRequest = true;
+          }
+        }
+      }
+    }
+
     actions.sort((a, b) => b.score - a.score);
     return actions;
   }
@@ -2192,6 +2273,7 @@
     ped.currentActivityId = action.id;
     ped.currentActivityLabel = action.label || CITIZEN_ACTIVITY_LABELS[action.id] || action.id;
     ped.currentPlaceId = action.placeId || null;
+    if (action.socialNpcRequest) ped.socialNpcRequest = null;
     ped.currentNodeId = citizenActivityNode(action, ped);
     ped.targetNodeId = ped.currentNodeId;
     ped.activityMinutesRemaining = Math.max(8, Number(action.duration) || 60);
@@ -2344,9 +2426,6 @@
   }
 
   function pedestrianEdgePose(edge, directionSign, along, sideSign = 1, avoidanceOffset = 0) {
-    const edgeLength = polylineLength(edge.points);
-    const hit = pointAndTangentOnPolyline(edge.points, clamp(along, 0, edgeLength));
-    const tangent = directionSign > 0 ? hit.tangent : { x:-hit.tangent.x, y:-hit.tangent.y };
     const layout = pedestrianSidewalkLayout(edge, directionSign);
     const avoidance = clamp(
       Math.max(0, Number(avoidanceOffset) || 0),
@@ -2354,11 +2433,7 @@
       layout.maxAvoidance
     );
     const lateralOffset = (layout.baseOffset + avoidance) * (sideSign || 1);
-    return {
-      x:hit.point.x + tangent.y * lateralOffset,
-      y:hit.point.y - tangent.x * lateralOffset,
-      angle:Math.atan2(tangent.y, tangent.x)
-    };
+    return mapModel.pedestrianOffsetPose(edge, along, directionSign, lateralOffset);
   }
 
   function pedestrianCornerControl(fromPose, toPose) {
@@ -2550,6 +2625,18 @@
       ped.currentNodeId = currentNodeId;
       const nextId = ped.routeEdgeIds?.[ped.routeIndex + 1];
 
+      if (ped.socialNpcRequest && socialNpcRequestExpired(ped.socialNpcRequest)) {
+        ped.socialNpcRequest = null;
+      }
+      if (ped.socialNpcRequest && !socialNpcRequestExpired(ped.socialNpcRequest)) {
+        const pose = pedestrianPoseAt(ped);
+        ped.x = pose.x;
+        ped.y = pose.y;
+        ped.dir = pose.angle;
+        planCitizenAction(ped, currentNodeId);
+        return true;
+      }
+
       if (!nextId) {
         const pose = pedestrianPoseAt(ped);
         ped.x = pose.x;
@@ -2622,6 +2709,7 @@
       const baseSpeed = (28 + hash2(i, 8, 96) * 14) * ageSpeedFactor;
       const ped = {
         ...profile,
+        socialNpcRequest:null,
         x:mapModel.getNode(profile.homeNodeId)?.x || HOME.x,
         y:mapModel.getNode(profile.homeNodeId)?.y || HOME.y,
         dir:hash2(i, 3, 90) * Math.PI * 2,
@@ -3906,46 +3994,62 @@
 
   function openNpc(npc) {
     const citizen = pedestrians.find((ped) => ped.id === npc.citizenId || ped.specialNpcId === npc.id);
-    actionTitle.textContent = npc.name;
-    actionDescription.textContent = citizen
-      ? citizenStatusText(citizen)
-      : (npc.id === "aoi"
-        ? "公園でよく会う近所の人。"
-        : npc.id === "sora"
-          ? "カフェの同僚。"
-          : "図書館でよく見かける学生。");
-    actionChoices.replaceChildren();
-    addChoice("少し話す", "30分 / 交流+24 / 楽しさ+7", () => {
-      advanceTime(30);
-      state.needs.social += 24;
-      state.needs.fun += 7;
-      npc.friendship += 1;
-      if (citizen) {
-        citizen.needs.social += 24;
-        citizen.needs.fun += 6;
-        citizen.stress -= 9;
-        citizenClampNeeds(citizen);
-      }
-      clampNeeds();
-      showToast(npc.name + "と話しました");
+    const nearbySocialNpcIds = citizen
+      ? pedestrians
+        .filter((ped) => ped !== citizen && ped.specialNpcId && Math.hypot(ped.x - citizen.x, ped.y - citizen.y) <= 260)
+        .map((ped) => ped.specialNpcId)
+      : [];
+    const conversation = socialNpcSystem.getConversation({
+      npcId:npc.id,
+      minute:state.minute,
+      day:state.day,
+      activityId:citizen?.currentActivityId,
+      friendship:state.socialNpc.friendship[npc.id] ?? npc.friendship,
+      relationships:state.socialNpc.relationships,
+      recentTopic:state.socialNpc.recentTopics[npc.id],
+      nearbySocialNpcIds
     });
-    if (npc.friendship >= 2) {
-      addChoice("一緒に過ごす", "90分 / 交流+38 / 楽しさ+22", () => {
-        advanceTime(90);
-        state.needs.social += 38;
-        state.needs.fun += 22;
-        state.needs.hunger -= 5;
-        npc.friendship += 1;
+    actionTitle.textContent = npc.name;
+    actionDescription.textContent = (citizen ? citizenStatusText(citizen) + "\n" : "") + conversation.line;
+    actionChoices.replaceChildren();
+    const labels = new Map(conversation.options.map((option) => [option.id, option]));
+    for (const optionId of ["greet", "ask", "invite"]) {
+      const option = labels.get(optionId);
+      if (!option) continue;
+      addChoice(option.label, optionId === "invite" ? "誘いに応じると、NPCが行き先へ移動します" : "時間帯・近況に応じた会話", () => {
+        const result = socialNpcSystem.resolveConversation({
+          npcId:npc.id,
+          optionId,
+          minute:state.minute,
+          day:state.day,
+          activityId:citizen?.currentActivityId,
+          friendship:state.socialNpc.friendship[npc.id] ?? npc.friendship,
+          relationships:state.socialNpc.relationships,
+          recentTopic:state.socialNpc.recentTopics[npc.id],
+          nearbySocialNpcIds,
+          needs:state.needs
+        });
+        state.socialNpc.recentTopics[npc.id] = result.topic;
+        state.socialNpc.friendship[npc.id] = clamp((state.socialNpc.friendship[npc.id] || 0) + result.friendshipDelta, 0, 100);
+        npc.friendship = state.socialNpc.friendship[npc.id];
+        for (const relationshipChange of result.relationshipChanges) {
+          state.socialNpc.relationships[relationshipChange.pairKey] = clamp(
+            (state.socialNpc.relationships[relationshipChange.pairKey] || 0) + relationshipChange.delta, 0, 100
+          );
+        }
+        state.needs.social += result.needsDelta.social;
+        state.needs.fun += result.needsDelta.fun;
         if (citizen) {
-          citizen.needs.social += 32;
-          citizen.needs.fun += 18;
-          citizen.needs.hunger -= 5;
-          citizen.stress -= 14;
+          citizen.needs.social += Math.round(result.needsDelta.social * 1.25);
+          citizen.needs.fun += result.needsDelta.fun;
+          citizen.stress -= optionId === "invite" ? 3 : 2;
           citizenClampNeeds(citizen);
         }
         clampNeeds();
-        showToast(npc.name + "と楽しい時間を過ごしました");
-      });
+        advanceTime(optionId === "invite" ? 15 : 10);
+        if (result.activityRequest && citizen) queueSocialNpcActivity(citizen, result.activityRequest);
+        showToast(result.response);
+      }, !option.available);
     }
     actionSheet.hidden = false;
   }
@@ -4154,6 +4258,7 @@
           trips: state.drive.trips
         },
         friends: Object.fromEntries(NPCS.map((npc) => [npc.id, npc.friendship])),
+        socialNpc:state.socialNpc,
         citizens: pedestrians.map((ped) => ({
           id:ped.id,
           money:ped.money,
@@ -4402,6 +4507,8 @@
       if (saved.friends) {
         for (const npc of NPCS) npc.friendship = Math.max(0, Math.floor(Number(saved.friends[npc.id]) || 0));
       }
+      state.socialNpc = socialNpcSystem.normalizeState(saved.socialNpc, saved.friends);
+      for (const npc of NPCS) npc.friendship = state.socialNpc.friendship[npc.id];
 
       if (Array.isArray(saved.citizens)) {
         const savedCitizens = new Map(saved.citizens.map((value) => [value?.id, value]));
@@ -4724,6 +4831,23 @@
     return car.routeEdgeIds?.[car.routeIndex] || null;
   }
 
+  function trafficIntersectionSignal(car, timeMs) {
+    const edge = mapModel.getEdge(car.edgeId);
+    if (!edge) return null;
+    const nodeId = car.directionSign > 0 ? edge.to : edge.from;
+    const next = mapModel.getEdge(trafficNextEdgeId(car));
+    if (!next || (next.from !== nodeId && next.to !== nodeId)) return null;
+    const nextDirectionSign = next.from === nodeId ? 1 : -1;
+    return trafficOvertake.turnSignalForRoute({
+      currentPoints:edge.points,
+      currentDirectionSign:car.directionSign,
+      nextPoints:next.points,
+      nextDirectionSign,
+      distanceToJunction:trafficDistanceToEndpoint(car, edge),
+      timeMs
+    });
+  }
+
   function trafficLeadInfo(car, maxDistance = 320) {
     const edge = mapModel.getEdge(car.edgeId);
     if (!edge) return null;
@@ -4784,7 +4908,7 @@
     return hit.distance <= Math.max(8, halfWidth - 3);
   }
 
-  function projectedObstacleDistance(car) {
+  function projectedObstacleDistance(car, ignorePersonalCar = false) {
     const hx = Math.cos(car.angle);
     const hy = Math.sin(car.angle);
     const dims = vehicleDimensions(car);
@@ -4815,14 +4939,16 @@
       considerPoint(ped.x, ped.y, NPC_COLLISION_RADIUS);
     }
 
-    const dx = personalCar.x - car.x;
-    const dy = personalCar.y - car.y;
-    const forward = dx * hx + dy * hy;
-    const lateral = Math.abs(dx * -hy + dy * hx);
-    const headingDot = Math.cos(personalCar.angle) * hx + Math.sin(personalCar.angle) * hy;
-    const otherDims = vehicleDimensions(personalCar, true);
-    if (forward > 0 && forward < 210 && lateral < (dims.width + otherDims.width) * .5 + 10 && headingDot > -.25) {
-      best = Math.min(best, Math.max(0, forward - dims.length * .5 - otherDims.length * .5));
+    if (!ignorePersonalCar) {
+      const dx = personalCar.x - car.x;
+      const dy = personalCar.y - car.y;
+      const forward = dx * hx + dy * hy;
+      const lateral = Math.abs(dx * -hy + dy * hx);
+      const headingDot = Math.cos(personalCar.angle) * hx + Math.sin(personalCar.angle) * hy;
+      const otherDims = vehicleDimensions(personalCar, true);
+      if (forward > 0 && forward < 210 && lateral < (dims.width + otherDims.width) * .5 + 10 && headingDot > -.25) {
+        best = Math.min(best, Math.max(0, forward - dims.length * .5 - otherDims.length * .5));
+      }
     }
 
     return best;
@@ -4863,7 +4989,7 @@
 
   function trafficParkedCarInfo(car) {
     const edge = mapModel.getEdge(car.edgeId);
-    if (!edge || !edge.vehicle || state.player.inVehicle || state.player.inHome || (personalCar.speed || 0) > 2) return null;
+    if (!edge || !edge.vehicle || state.player.inVehicle || (personalCar.speed || 0) > 2) return null;
     const parkedHit = mapModel.nearestRoad(personalCar.x, personalCar.y, { vehicleOnly:true });
     if (!parkedHit || parkedHit.edgeId !== edge.id || parkedHit.distance > edge.width / 2 + 36) return null;
     const parkedAlong = trafficAlongAtRoadHit(edge, parkedHit);
@@ -4886,45 +5012,53 @@
       obstacleLateral,
       obstacleHalfWidth
     });
-    if (!blocksLane) return null;
     const centerGap = actualDistance - vehicleDimensions(car).length * VEHICLE_COLLISION_SCALE / 2 - obstacleHalfLength;
-    return { edge, hit:parkedHit, actualDistance, centerGap, obstacleLateral, obstacleHalfWidth, carHalfWidth };
+    return { edge, hit:parkedHit, actualDistance, centerGap, obstacleLateral, obstacleHalfWidth, obstacleHalfLength, carHalfWidth, blocksLane };
   }
 
   function trafficOvertakePlan(car, obstacle) {
     if (!obstacle) return null;
-    const { edge, actualDistance, obstacleLateral, obstacleHalfWidth, carHalfWidth } = obstacle;
+    const { edge, actualDistance, obstacleLateral, obstacleHalfWidth, obstacleHalfLength, carHalfWidth } = obstacle;
 
     const endpointDistance = trafficDistanceToEndpoint(car, edge);
+    const vehicleHalfLength = vehicleDimensions(car).length * VEHICLE_COLLISION_SCALE / 2;
     const opposingVehicles = traffic.filter((other) =>
       other !== car && other.edgeId === edge.id && other.directionSign !== car.directionSign
     ).map((other) => ({
       distance:(other.along - car.along) * car.directionSign,
-      halfLength:vehicleDimensions(other).length / 2
+      halfLength:vehicleDimensions(other).length * VEHICLE_COLLISION_SCALE / 2,
+      speed:other.speed,
+      cruiseSpeed:other.cruise
     }));
-    const plan = trafficOvertake.plan({
+    return trafficOvertake.planForObstacle({
       roadWidth:edge.width,
       carHalfWidth,
+      vehicleHalfLength,
       currentOffset:car.laneOffset,
       obstacleDistance:actualDistance,
+      minimumDistance:car.speed < 5
+        ? trafficOvertake.minimumEmergencyDistance(vehicleHalfLength,obstacleHalfLength)
+        : 130,
       obstacleLateral,
       obstacleHalfWidth,
+      obstacleHalfLength,
+      endpointDistance,
+      currentAlong:car.along,
+      directionSign:car.directionSign,
+      planningSpeed:Math.max(car.speed, 85),
       opposingVehicles
     });
-    if (!plan || endpointDistance <= plan.endDistance + 100) return null;
-    return {
-      startAlong:car.along + car.directionSign * plan.startDistance,
-      endAlong:car.along + car.directionSign * plan.endDistance,
-      directionSign:car.directionSign,
-      fromOffset:car.laneOffset,
-      targetOffset:plan.targetOffset
-    };
+    if (!blocksLane) return null;
   }
 
-  function updateTrafficOvertake(car) {
+  function updateTrafficOvertake(car, dt, stationaryParkedBlock = false) {
     const plan = car.overtakePlan;
     if (!plan || plan.directionSign !== car.directionSign) return false;
-    const result = trafficOvertake.offsetAt(plan, car.along);
+    const result = trafficOvertake.offsetAt(plan, car.along, dt, { stationary:stationaryParkedBlock });
+    if (Number.isFinite(result.shiftProgress)) plan.shiftProgress = result.shiftProgress;
+    if (Number.isFinite(result.stationaryShiftStart)) plan.stationaryShiftStart = result.stationaryShiftStart;
+    if (Number.isFinite(result.stationaryShiftElapsed)) plan.stationaryShiftElapsed = result.stationaryShiftElapsed;
+    if (Number.isFinite(result.stationaryShiftProgress)) plan.stationaryShiftProgress = result.stationaryShiftProgress;
     car.laneOffset = result.offset;
     if (result.complete) car.overtakePlan = null;
     return result.complete;
@@ -5012,70 +5146,14 @@
     return chain;
   }
 
-  function trafficCarVisible(car, margin = 120) {
-    const sx = car.x - state.camera.x;
-    const sy = car.y - state.camera.y;
-    return sx >= -margin && sy >= -margin && sx <= viewWidth + margin && sy <= viewHeight + margin;
-  }
-
-  function relocateGridlockedTraffic(car) {
-    if (!car || trafficCarVisible(car, 180)) return false;
-
-    const actor = state.player.inVehicle ? personalCar : state.player;
-    for (let attempt = 0; attempt < 28; attempt += 1) {
-      const p = randomRoadPoint((car.seed || 1) + 601 + attempt * 43, (car.routeTrips || 0) + 811 + attempt * 29, 18);
-      if (distance(p.x, p.y, actor.x, actor.y) < 620) continue;
-
-      const probe = {
-        ...car,
-        x:p.x,
-        y:p.y,
-        angle:p.angle,
-        edgeId:p.edgeId,
-        edgeLength:p.edgeLength,
-        directionSign:p.directionSign,
-        laneOffset:p.laneOffset,
-        secondaryLane:p.secondaryLane,
-        along:p.along
-      };
-      if (traffic.some((other) => other !== car && vehiclesIntersect(probe, other, 22))) continue;
-      if (vehiclesIntersect(probe, personalCar, 28)) continue;
-
-      car.x = p.x;
-      car.y = p.y;
-      car.angle = p.angle;
-      car.edgeId = p.edgeId;
-      car.edgeLength = p.edgeLength;
-      car.directionSign = p.directionSign;
-      car.laneOffset = p.laneOffset;
-      car.secondaryLane = p.secondaryLane;
-      car.along = p.along;
-      car.speed = Math.max(35, Math.min(car.cruise * .55, 95));
-      car.collisionYield = 0;
-      car.junctionWait = 0;
-      car.trafficStall = 0;
-      car.routeEdgeIds = [];
-      car.routeIndex = 0;
-
-      const edge = mapModel.getEdge(car.edgeId);
-      if (edge) {
-        const startNodeId = car.directionSign > 0 ? edge.to : edge.from;
-        planTrafficRoute(car, startNodeId, edge.id);
-      }
-      return true;
-    }
-    return false;
-  }
-
   function relievePlayerTrafficQueue(queue) {
     if (!state.player.inVehicle || queue.length < 3) return;
 
-    // Only the head of a long queue is eligible for emergency cleanup. This
-    // avoids cars disappearing immediately in front of the player while still
-    // guaranteeing that an off-screen deadlock cannot block the road forever.
+    // Let the head resume by replanning at a nearby junction; never skip it to
+    // another road segment just because it is remote from the camera.
     const head = queue[queue.length - 1];
-    if ((head.trafficStall || 0) < 6) return;
-    relocateGridlockedTraffic(head);
+    if ((head.trafficStall || 0) < 6 || (head.stuckRecoveryCooldown || 0) > 0) return;
+    if (!replanStuckTraffic(head)) head.stuckRecoveryCooldown = 1.4;
   }
 
   function releaseCarJunctionReservations(car) {
@@ -5113,20 +5191,12 @@
       const stall = car.trafficStall || 0;
       if (stall < 3.8 || car.stuckRecoveryCooldown > 0) continue;
 
-      // Prefer a normal reroute while the vehicle is visible. This keeps
-      // recovery believable and avoids cars disappearing in front of the user.
+      // Recover only by selecting a real route from a nearby junction.
       if (replanStuckTraffic(car)) continue;
 
-      // If an unresolved deadlock remains away from the camera, recycle that
-      // single vehicle to a clear road segment. This prevents remote jams from
-      // growing until they reach the player.
-      if (stall >= 7.5 && !trafficCarVisible(car, 220)) {
-        releaseCarJunctionReservations(car);
-        if (relocateGridlockedTraffic(car)) {
-          car.stuckRecoveryCooldown = 3.5;
-          car.stuckRecoveryCount = (car.stuckRecoveryCount || 0) + 1;
-        }
-      }
+      // If it cannot reach or leave a junction yet, wait and retry later.
+      // This keeps location/progress continuous and avoids per-frame replans.
+      car.stuckRecoveryCooldown = 1.4;
     }
   }
 
@@ -5368,8 +5438,9 @@
       }
 
       const parkedObstacle = trafficParkedCarInfo(car);
-      const parkedGap = parkedObstacle?.centerGap ?? Infinity;
-      const obstacleGap = Math.min(projectedObstacleDistance(car), parkedGap);
+      const parkedGap = parkedObstacle?.blocksLane ? parkedObstacle.centerGap : Infinity;
+      const projectedGap = projectedObstacleDistance(car, Boolean(parkedObstacle));
+      const obstacleGap = Math.min(projectedGap, parkedGap);
       if (!car.overtakePlan && parkedGap < 180) {
         car.overtakePlan = trafficOvertakePlan(car, parkedObstacle);
       }
@@ -5432,7 +5503,9 @@
         transitions += 1;
       }
 
-      updateTrafficOvertake(car);
+      const stationaryParkedBlock = car.speed < 5 && blockReason === "obstacle" &&
+        parkedObstacle?.blocksLane && parkedGap <= projectedGap;
+      updateTrafficOvertake(car, dt, stationaryParkedBlock);
       const steeredPose = trafficPoseAt(car, car.along);
       car.x = steeredPose.x;
       car.y = steeredPose.y;
@@ -8381,6 +8454,12 @@
     ctx.font = "600 10px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(npc.name, p.x, p.y - 64);
+    ctx.fillStyle = "#8ee8cc";
+    roundedRectPath(ctx, p.x - 20, p.y - 97, 40, 15, 6);
+    ctx.fill();
+    ctx.fillStyle = "#173d34";
+    ctx.font = "700 9px system-ui, sans-serif";
+    ctx.fillText("会話", p.x, p.y - 86);
   }
 
   function drawPedestrians() {
@@ -8413,6 +8492,10 @@
     const braking = owned
       ? (state.player.inVehicle && (touch.driveBrake || keys.has("s") || keys.has("arrowdown") || keys.has(" ")))
       : Boolean(car.brakeGlow > .15);
+    const turnSignalTime = performance.now();
+    const turnSignal = owned ? null : car.overtakePlan
+      ? trafficOvertake.signalFor(car.overtakePlan, turnSignalTime)
+      : trafficIntersectionSignal(car, turnSignalTime);
 
     const time = visualTime();
     ctx.save();
@@ -8537,6 +8620,8 @@
     ctx.fillStyle = "rgba(54,73,61,.7)";
     ctx.fillRect(length / 2 - 4.5, -2, 1.5, 4);
     ctx.fillRect(-length / 2 + 2.5, -2, 1.5, 4);
+
+    if (turnSignal) trafficOvertake.drawSignal(ctx, length, width, turnSignal);
 
     if (owned) {
       ctx.strokeStyle = "rgba(233,244,249,.82)";
@@ -8797,18 +8882,17 @@
       keys.has("arrowup") || keys.has("arrowdown") || keys.has("arrowleft") || keys.has("arrowright") ||
       Math.abs(touch.x) > .08 || Math.abs(touch.y) > .08;
     const phase = moving ? performance.now() * .009 : 0;
-    drawPersonSpriteAtScreen(
-      p.x,
-      p.y,
-      dir,
-      "#405c50",
-      "#313b42",
-      "#332a24",
-      "#edbea0",
+    characterRenderer.draw(ctx, {
+      x:p.x,
+      y:p.y,
+      direction:dir,
       phase,
-      1.08 * p.scale,
-      PLAYER_APPEARANCE
-    );
+      scale:1.08 * p.scale,
+      appearance:PLAYER_APPEARANCE,
+      state:moving ? "walk" : "idle",
+      lod:characterLodAtScreen(p, p.scale),
+      timeMs:performance.now()
+    });
   }
 
   function drawStreetLightsGlow() {
@@ -9010,6 +9094,31 @@
       mctx.restore();
     }
 
+    const friendWaypoint = phoneFriendWaypointTarget();
+    if (friendWaypoint && !friendWaypoint.hidden && !state.player.inVehicle && !state.player.inTrain && !state.player.inHome) {
+      const wx = w / 2 + (friendWaypoint.x - p.x) * scale;
+      const wy = h / 2 + (friendWaypoint.y - p.y) * scale;
+      mctx.save();
+      mctx.strokeStyle = "rgba(232,120,157,.9)";
+      mctx.setLineDash([4, 4]);
+      mctx.lineWidth = 1.8;
+      mctx.beginPath();
+      mctx.moveTo(w / 2, h / 2);
+      mctx.lineTo(wx, wy);
+      mctx.stroke();
+      mctx.setLineDash([]);
+      if (wx >= -8 && wy >= -8 && wx <= w + 8 && wy <= h + 8) {
+        mctx.fillStyle = "#e8789d";
+        mctx.beginPath();
+        mctx.arc(wx, wy, 5.5, 0, Math.PI * 2);
+        mctx.fill();
+        mctx.strokeStyle = "#fff";
+        mctx.lineWidth = 1.5;
+        mctx.stroke();
+      }
+      mctx.restore();
+    }
+
     mctx.strokeStyle = "rgba(155,190,174,.8)";
     mctx.lineWidth = 2;
     const railY = h / 2 + (RAIL_Y - p.y) * scale;
@@ -9085,6 +9194,29 @@
       }
     }
 
+    if (state.phone?.friendWaypointId) {
+      const friend = phoneFriendWaypointTarget();
+      if (!friend) {
+        state.phone.friendWaypointId = null;
+      } else if (friend.hidden) {
+        objectiveTitle.textContent = friend.name + "は屋内にいます";
+        objectiveText.textContent = "安全のため、屋内にいる間は現在地を表示しません";
+        return;
+      } else {
+        const p = actorPosition();
+        const remaining = distance(p.x, p.y, friend.x, friend.y);
+        if (remaining <= 52) {
+          state.phone.friendWaypointId = null;
+          objectiveTitle.textContent = friend.name + "の近くです";
+          objectiveText.textContent = "周囲を見渡して話しかけてみましょう";
+        } else {
+          objectiveTitle.textContent = friend.name + "に会いに行く";
+          objectiveText.textContent = "現在地まで約" + Math.max(1, Math.round(remaining / 10) * 10) + "m · スマホの『探す』で追跡中";
+          return;
+        }
+      }
+    }
+
     const n = state.needs;
     if (state.cash < 0) {
       objectiveTitle.textContent = "家計を立て直そう";
@@ -9125,10 +9257,19 @@
     objectiveText.textContent = "仕事・買い物・運動・読書・交流を自由に選べる";
   }
 
+  function phoneFriendWaypointTarget() {
+    const id = state.phone?.friendWaypointId;
+    if (!id) return null;
+    return NPCS.find((npc) => npc.id === id) || null;
+  }
+
   function phoneStatusMessage() {
     if (state.player.inHome) return "自宅で過ごしています。家具を利用できます。";
     if (state.player.inVehicle) return "運転中です。安全運転で目的地へ向かいましょう。";
     if (state.player.inTrain) return "若葉線で移動中です。";
+    const friend = phoneFriendWaypointTarget();
+    if (friend && !friend.hidden) return friend.name + "に会いに向かっています。";
+    if (friend?.hidden) return friend.name + "は屋内にいます。現在地は表示されません。";
     const waypoint = PLACES.find((place) => place.id === state.phone?.waypoint);
     if (waypoint) return waypoint.name + "へ徒歩で案内中です。";
     return "今日も若葉の街で、自由に過ごしましょう。";
@@ -9137,6 +9278,7 @@
   function phoneModelSnapshot() {
     const p = actorPosition();
     const waypointPlace = PLACES.find((place) => place.id === state.phone?.waypoint);
+    const friendWaypoint = phoneFriendWaypointTarget();
     return {
       day:state.day,
       minute:state.minute,
@@ -9164,6 +9306,14 @@
         name:waypointPlace.name,
         distance:distance(p.x, p.y, waypointPlace.x, waypointPlace.y)
       } : null,
+      friendWaypoint:friendWaypoint ? {
+        id:friendWaypoint.id,
+        name:friendWaypoint.name,
+        hidden:Boolean(friendWaypoint.hidden),
+        ...(friendWaypoint.hidden ? {} : {
+          distance:distance(p.x, p.y, friendWaypoint.x, friendWaypoint.y)
+        })
+      } : null,
       places:PLACES.map((place) => ({
         id:place.id,
         name:place.name,
@@ -9174,10 +9324,13 @@
       npcs:NPCS.map((npc) => ({
         id:npc.id,
         name:npc.name,
-        friendship:npc.friendship,
+        friendship:state.socialNpc.friendship[npc.id] ?? npc.friendship,
+        conversationCapable:true,
         hidden:Boolean(npc.hidden),
         activity:npc.activityLabel || "移動中",
-        distance:distance(p.x, p.y, npc.x, npc.y)
+        distance:npc.hidden ? null : distance(p.x, p.y, npc.x, npc.y),
+        mapDX:npc.hidden ? null : npc.x - p.x,
+        mapDY:npc.hidden ? null : npc.y - p.y
       })),
       stations:TRAIN_STATIONS.map((station) => ({
         id:station.id,
@@ -9198,6 +9351,7 @@
     const place = PLACES.find((value) => value.id === placeId);
     if (!place) return;
     state.phone.waypoint = place.id;
+    state.phone.friendWaypointId = null;
     if (state.player.inVehicle) {
       setDrivingDestination(place);
     } else {
@@ -9206,8 +9360,22 @@
     updateSmartphone();
   }
 
+  function setPhoneFriendWaypoint(npcId) {
+    const npc = NPCS.find((value) => value.id === npcId && !value.hidden);
+    if (!npc) return;
+    if (state.player.inHome || state.player.inVehicle || state.player.inTrain) {
+      showToast("徒歩で外にいるときに案内できます");
+      return;
+    }
+    state.phone.waypoint = null;
+    state.phone.friendWaypointId = npc.id;
+    showToast(npc.name + "に会いに行く案内を開始しました");
+    updateSmartphone();
+  }
+
   function clearPhoneWaypoint() {
     state.phone.waypoint = null;
+    state.phone.friendWaypointId = null;
     if (state.player.inVehicle) {
       state.drive.route = [];
       state.drive.routeIndex = 0;
@@ -9377,6 +9545,15 @@
     }
 
     update(dt);
+    if (smartphonePanel && !smartphonePanel.hidden) {
+      smartphoneRefreshElapsed += dt;
+      if (smartphoneRefreshElapsed >= SMARTPHONE_REFRESH_INTERVAL) {
+        smartphoneRefreshElapsed %= SMARTPHONE_REFRESH_INTERVAL;
+        updateSmartphone();
+      }
+    } else {
+      smartphoneRefreshElapsed = 0;
+    }
     updateGameAudio(dt);
 
     if (toastTimer > 0) {
@@ -9460,6 +9637,7 @@
       callbacks:{
         close:() => setSmartphoneOpen(false),
         route:(placeId) => setPhoneWaypoint(placeId),
+        friendRoute:(npcId) => setPhoneFriendWaypoint(npcId),
         clearRoute:() => clearPhoneWaypoint(),
         capturePhoto:() => capturePhonePhoto(),
         setSound:(enabled) => {

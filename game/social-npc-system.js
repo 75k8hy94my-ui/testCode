@@ -121,6 +121,25 @@
     return { friendship, relationships:relationshipState, recentTopics };
   }
 
+  function normalizeState(saved, legacyFriendship) {
+    const initial = createInitialState();
+    const value = saved && typeof saved === "object" ? saved : {};
+    const legacy = legacyFriendship && typeof legacyFriendship === "object" ? legacyFriendship : {};
+    for (const profile of catalog) {
+      const rawFriendship = value.friendship && Object.hasOwn(value.friendship, profile.id)
+        ? value.friendship[profile.id]
+        : legacy[profile.id];
+      initial.friendship[profile.id] = clamp(rawFriendship, 0, 100);
+      const topic = value.recentTopics?.[profile.id];
+      initial.recentTopics[profile.id] = typeof topic === "string" && topic.length <= 100 ? topic : null;
+    }
+    for (const relationship of relationships) {
+      const key = pairKey(relationship.aId, relationship.bId);
+      initial.relationships[key] = clamp(value.relationships?.[key] ?? relationship.initialAffinity, 0, 100);
+    }
+    return initial;
+  }
+
   const MAX_AFFINITY = 100;
   const MAX_SOCIAL_BIAS = 30;
   const PLACE_NAMES = { park:"公園", cafe:"カフェ", store:"スーパー", gym:"ジム", library:"図書館", home:"家" };
@@ -310,7 +329,7 @@
   }
 
   const api = Object.freeze({
-    catalog, relationships, getProfile, getRelationship, createInitialState,
+    catalog, relationships, getProfile, getRelationship, createInitialState, normalizeState,
     getConversation, resolveConversation, getSocialActionBias
   });
   global.CityDaysSocialNpcSystem = api;

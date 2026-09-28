@@ -57,11 +57,11 @@
 - Modify: `tests/social-npc-system.test.mjs`
 
 **Interfaces:**
-- Add `getConversation({ npcId, minute, day, activityId, friendship, relationship }) -> { topic, line, options }`. `minute` is game minutes in `[0, 1440)`; `day` is the existing one-based day counter. Output is deterministic for identical input.
-- Add `resolveConversation({ npcId, optionId, minute, day, activityId, friendship, relationship, needs }) -> { response, friendshipDelta, relationshipDelta, needsDelta, activityRequest, topic }`. Supported option IDs: `greet`, `ask`, `invite`. `activityRequest` is `null` when unavailable/refused, otherwise `{ actionId, placeId, expiresAt }` in absolute game minutes (day-indexed).
+- Add `getConversation({ npcId, minute, day, activityId, friendship, relationships, recentTopic, nearbySocialNpcIds }) -> { topic, line, options }`. `minute` is game minutes in `[0, 1440)`; `day` is the existing one-based day counter. Output is deterministic for identical input.
+- Add `resolveConversation({ npcId, optionId, minute, day, activityId, friendship, relationships, nearbySocialNpcIds, needs }) -> { response, friendshipDelta, relationshipChanges, needsDelta, activityRequest, topic }`. Supported option IDs: `greet`, `ask`, `invite`. `relationshipChanges` is a list of `{ pairKey, delta }` entries for authored pairs and defaults to empty. `activityRequest` is `null` when unavailable/refused, otherwise `{ actionId, placeId, expiresAt }`, where `expiresAt = (day - 1) * 1440 + minute + duration` in absolute game minutes.
 - Add `getSocialActionBias({ npcId, action, minute, day, relationships, nearbySocialNpcIds }) -> number`; bias is bounded and may not itself decide action selection.
 
-- [ ] **Step 1: Write tests** for time/day/activity-sensitive dialogue, personality-specific options, deterministic repeated queries, valid and refused invitations, affinity limits, midnight-aware request expiry, and social bias only applying to eligible social actions.
+- [ ] **Step 1: Write tests** for time/day/activity/recent-topic-sensitive dialogue, relationship-aware nearby-person lines, personality-specific options, deterministic repeated queries, valid and refused invitations, friendship/relationship bounds, midnight-aware request expiry in absolute game minutes, and social bias only applying to eligible social actions.
 - [ ] **Step 2: Run the focused test** and confirm each new policy behavior fails before implementation.
 - [ ] **Step 3: Implement deterministic policies and authored dialogue variants** without randomness or external services. Enforce bounded affinity deltas and invitation expiry; work/sleep activity rules must refuse or defer invitations.
 - [ ] **Step 4: Run the focused test** and confirm all policy cases pass.

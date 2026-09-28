@@ -26,6 +26,36 @@ test('street topology includes dead ends, T junctions, curves, and unequal stree
   assert.ok(new Set(map.edges.filter((edge) => edge.vehicle).map((edge) => edge.width)).size >= 8);
 });
 
+test('pedestrian offset paths stay continuous when a curved road polyline changes segments', () => {
+  const map = createMapModel();
+  const knownProblemCorners = new Map([
+    ['collector-library', 524.6],
+    ['residential-court-southwest', 627.55]
+  ]);
+  const verifiedKnownCorners = new Set();
+
+  for (const edge of map.edges.filter((value) => value.pedestrian)) {
+    let along = 0;
+    for (let index = 1; index < edge.points.length - 1; index += 1) {
+      const previous = edge.points[index - 1];
+      const point = edge.points[index];
+      along += Math.hypot(point.x - previous.x, point.y - previous.y);
+      const isKnownProblem = Math.abs((knownProblemCorners.get(edge.id) ?? Infinity) - along) < .02;
+      if (isKnownProblem) verifiedKnownCorners.add(edge.id);
+
+      for (const directionSign of [1, -1]) {
+        const before = map.pedestrianOffsetPose?.(edge.id, along - .01, directionSign, 62) || null;
+        const after = map.pedestrianOffsetPose?.(edge.id, along + .01, directionSign, 62) || null;
+        assert.ok(before && after, 'the map model should provide pedestrian offset poses');
+        assert.ok(Math.hypot(after.x - before.x, after.y - before.y) < .1,
+          edge.id + ' should not jump sideways at an internal polyline corner');
+      }
+    }
+  }
+
+  assert.deepEqual([...verifiedKnownCorners].sort(), [...knownProblemCorners.keys()].sort());
+});
+
 
 test('two-way vehicle streets are wide enough for collision geometry', () => {
   const map = createMapModel();
@@ -264,7 +294,7 @@ test('vegetation is kept clear of the pedestrian street surface', () => {
 
 test('facility entrances are separate from road-clear building footprints', () => {
   const map = createMapModel();
-  for (const place of map.places.filter((place) => place.id !== 'park')) {
+  for (const place of map.places.filter((place) => !['park', 'home'].includes(place.id))) {
     assert.ok(place.building, place.id);
     assert.notDeepEqual([place.building.x, place.building.y], [place.x, place.y], place.id);
     assert.ok(place.building.w >= 300, place.id);

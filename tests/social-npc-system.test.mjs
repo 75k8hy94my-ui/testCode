@@ -57,6 +57,22 @@ test('initial social state has stable friendship, pair affinity, and recent-topi
   for (const topic of Object.values(state.recentTopics)) assert.equal(topic, null);
 });
 
+test('saved social state normalizes legacy, partial, and out-of-range values', () => {
+  const state = socialNpc.normalizeState({
+    friendship:{ aoi:140, sora:-5, unknown:90 },
+    relationships:{ 'aoi|sora':-12, 'mei|rin':72, unknown:500 },
+    recentTopics:{ aoi:'街角の写真', sora:42 }
+  }, { aoi:7, mei:4 });
+  assert.equal(state.friendship.aoi, 100);
+  assert.equal(state.friendship.sora, 0);
+  assert.equal(state.friendship.mei, 4);
+  assert.equal(state.friendship.unknown, undefined);
+  assert.equal(state.relationships['aoi|sora'], 0);
+  assert.equal(state.relationships['mei|rin'], 72);
+  assert.equal(state.recentTopics.aoi, '街角の写真');
+  assert.equal(state.recentTopics.sora, null);
+});
+
 test('social NPC module loads before the game runtime', () => {
   assert.match(html, /social-npc-system\.js\?v=[^\"]+/);
   assert.ok(html.indexOf('social-npc-system.js') < html.indexOf('game.js'));
