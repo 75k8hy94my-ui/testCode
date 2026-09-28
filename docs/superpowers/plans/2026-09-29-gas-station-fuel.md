@@ -91,5 +91,5 @@
 - [x] 再度 `npm test` と `npm run verify:static` を実行。
 - [x] 差分と無視対象の作業台帳/デバッグ物を区別し、ユーザーの未追跡ファイルはステージしない。
 - [x] 現在ブランチの変更をコードレビューし、重大な問題はTDDで修正。
-- [ ] `git status`, upstream、コミット履歴を確認してすべての作業コミットをPush。
-- [ ] Push後のローカル/remote同期を確認。
+- [x] `git status`, upstream、コミット履歴を確認してすべての作業コミットをPush。
+- [x] Push後のローカル/remote同期を確認。
