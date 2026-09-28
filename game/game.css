@@ -202,6 +202,10 @@ body:has(#actionSheet:not([hidden])) .objective-card{visibility:hidden}
 .drive-speed-row span{font-size:10px;color:var(--muted);padding-bottom:3px}
 .drive-info{display:flex;justify-content:space-between;gap:12px;font-size:10px;color:var(--muted);margin-top:3px}
 .drive-info b{color:var(--text)}
+.drive-fuel-meter{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:7px;margin:6px 0 4px;font-size:10px;color:var(--muted)}
+.drive-fuel-meter>div{height:7px;overflow:hidden;border-radius:99px;background:rgba(255,255,255,.16)}
+.drive-fuel-meter i{display:block;width:30%;height:100%;border-radius:inherit;background:#86c886;transition:width .2s ease,background .2s ease}
+.drive-fuel-meter b{color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
 .drive-destination{margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.08);font-size:10px;color:var(--accent)}
 .mobile-driving-controls{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);width:min(460px,calc(100% - 36px));padding:0;display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none}
 .mobile-driving-controls button{pointer-events:auto;border:1px solid rgba(255,255,255,.18);background:rgba(9,14,11,.8);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-size:11px;font-weight:800;letter-spacing:.07em}

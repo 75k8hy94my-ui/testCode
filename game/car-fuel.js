@@ -6,7 +6,7 @@
   const INITIAL_FUEL_LITERS = 12;
   const CAN_CAPACITY_LITERS = 5;
   const CAN_PRICE = 1200;
-  const roundLiters = (value) => Math.round(value * 100) / 100;
+  const roundLiters = (value) => Math.round(value * 1000000) / 1000000;
 
   function normalizeFuel(value) {
     const numeric = Number(value);

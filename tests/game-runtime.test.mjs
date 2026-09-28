@@ -129,6 +129,33 @@ test('car fuel is consumed only for accepted movement and an empty tank cannot a
   assert.match(exhausted, /exitCar\(\)/);
 });
 
+test('fuel HUD exposes a readable fuel level and a labeled visual meter', () => {
+  assert.match(html, /id="driveFuelText"/);
+  assert.match(html, /id="driveFuelBar"/);
+  assert.match(html, /aria-label="燃料残量"/);
+  assert.match(css, /\.drive-fuel-meter/);
+  assert.match(source, /driveFuelBar\.style\.width\s*=\s*\(personalCar\.fuelLiters\s*\/\s*carFuelModel\.CAPACITY_LITERS\s*\*\s*100\)\s*\+\s*"%"/);
+});
+
+test('fuel station offers safe refueling and one-can purchase, with a nearby-car emergency interaction', () => {
+  const station = source.slice(source.indexOf('if (place.id === "fuel-station")'), source.indexOf('if (place.id === "cafe")'));
+  assert.match(station, /addChoice\("10 L給油"/);
+  assert.match(station, /addChoice\("満タンまで給油"/);
+  assert.match(station, /addChoice\("携行缶を購入"/);
+  assert.match(source, /function refuelAtStation\(/);
+  assert.match(source, /function usePortableCan\(/);
+  const interaction = source.slice(source.indexOf('function nearestInteraction()'), source.indexOf('function enterCar()'));
+  assert.match(interaction, /type:\s*"car-refuel"/);
+  assert.match(source, /item\.type === "car-refuel"/);
+});
+
+test('fuel station has a distinct illustrated pump canopy and Japanese signage', () => {
+  const renderer = source.slice(source.indexOf('function drawPlace(place)'), source.indexOf('function characterLodAtScreen'));
+  assert.match(renderer, /place\.id === "fuel-station"/);
+  assert.match(renderer, /若葉石油/);
+  assert.match(renderer, /給油/);
+});
+
 test('player course progress is present in snapshots and older saves receive safe defaults', () => {
   assert.match(source, /communityCenter:\s*communityCenterModel\.normalizeProgress\(state\.communityCenter\)/);
   assert.match(source, /state\.communityCenter\s*=\s*communityCenterModel\.normalizeProgress\(saved\.communityCenter\)/);

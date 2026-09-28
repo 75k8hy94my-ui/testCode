@@ -124,6 +124,8 @@
   const runButton = document.getElementById("runButton");
   const driveHud = document.getElementById("driveHud");
   const speedText = document.getElementById("speedText");
+  const driveFuelText = document.getElementById("driveFuelText");
+  const driveFuelBar = document.getElementById("driveFuelBar");
   const speedLimitText = document.getElementById("speedLimitText");
   const signalText = document.getElementById("signalText");
   const gapText = document.getElementById("gapText");
@@ -3871,6 +3873,17 @@
       });
     }
 
+    if (place.id === "fuel-station") {
+      const nearbyCar = !state.player.inVehicle && !state.player.inHome && personalCar.speed <= 1 &&
+        distance(personalCar.x, personalCar.y, mapModel.getNode(place.roadNodeId).x, mapModel.getNode(place.roadNodeId).y) <= 260;
+      actionDescription.textContent = nearbyCar
+        ? "給油は停車中の車に行えます。燃料 " + personalCar.fuelLiters.toFixed(1) + " / " + carFuelModel.CAPACITY_LITERS + " L"
+        : "給油は車を給油機の近くに停車させてから行います。携行缶は車のそばで使えます。";
+      addChoice("10 L給油", "最大10 L / 1 L ¥" + carFuelModel.PRICE_PER_LITER + " / 5分", () => refuelAtStation(10), !nearbyCar || personalCar.fuelLiters >= carFuelModel.CAPACITY_LITERS);
+      addChoice("満タンまで給油", "最大 " + carFuelModel.CAPACITY_LITERS + " L / 5分", () => refuelAtStation(carFuelModel.CAPACITY_LITERS - personalCar.fuelLiters), !nearbyCar || personalCar.fuelLiters >= carFuelModel.CAPACITY_LITERS);
+      addChoice("携行缶を購入", "5 L / ¥" + carFuelModel.CAN_PRICE.toLocaleString("ja-JP") + " / 1本まで", buyPortableCan, personalCar.portableCanCount >= 1 || state.cash < carFuelModel.CAN_PRICE);
+    }
+
     if (place.id === "cafe") {
       const level = cafeWorkModel.careerLevel(state.shiftsWorked);
       actionDescription.textContent = "勤務経験 " + state.shiftsWorked + "回 / " + level +
@@ -4216,6 +4229,9 @@
     }
 
     if (distance(p.x, p.y, personalCar.x, personalCar.y) < 70) {
+      if (personalCar.portableCanCount > 0 && personalCar.fuelLiters < carFuelModel.CAPACITY_LITERS && personalCar.speed <= 1) {
+        return { type:"car-refuel", label:"携行缶で車に給油する" };
+      }
       return { type: "car-enter", label: "自分の車に乗る" };
     }
 
@@ -4316,6 +4332,56 @@
     return true;
   }
 
+  function refuelAtStation(requestedLiters) {
+    const station = PLACES.find((place) => place.id === "fuel-station");
+    if (!station || state.player.inHome || state.player.inVehicle || distance(state.player.x, state.player.y, station.x, station.y) > 125) {
+      showToast("給油所の入口で操作してください");
+      return;
+    }
+    const roadNode = mapModel.getNode(station.roadNodeId);
+    if (!roadNode || personalCar.speed > 1 || distance(personalCar.x, personalCar.y, roadNode.x, roadNode.y) > 260) {
+      showToast("自分の車を給油機の近くに停車させてください");
+      return;
+    }
+    const result = carFuelModel.refuel(personalCar.fuelLiters, requestedLiters, state.cash);
+    if (!result.ok) {
+      showToast(result.reason === "tank-full" ? "燃料は満タンです" : result.reason === "insufficient-funds" ? "給油するお金が足りません" : "給油量を確認してください");
+      return;
+    }
+    state.cash = result.cashRemaining;
+    personalCar.fuelLiters = result.fuel;
+    advanceTime(5);
+    showToast(result.liters + " L給油しました −¥" + result.cost.toLocaleString("ja-JP"));
+  }
+
+  function buyPortableCan() {
+    const result = carFuelModel.buyCan(personalCar.portableCanCount, state.cash);
+    if (!result.ok) {
+      showToast(result.reason === "can-already-owned" ? "携行缶は1本までです" : "携行缶を買うお金が足りません");
+      return;
+    }
+    state.cash = result.cashRemaining;
+    personalCar.portableCanCount = result.count;
+    advanceTime(3);
+    showToast("5 L携行缶を購入しました −¥" + carFuelModel.CAN_PRICE.toLocaleString("ja-JP"));
+  }
+
+  function usePortableCan() {
+    if (state.player.inHome || state.player.inVehicle || personalCar.speed > 1 || distance(state.player.x, state.player.y, personalCar.x, personalCar.y) > 76) {
+      showToast("停車中の自分の車のそばで使用できます");
+      return;
+    }
+    const result = carFuelModel.useCan(personalCar.fuelLiters, personalCar.portableCanCount);
+    if (!result.ok) {
+      showToast(result.reason === "no-can" ? "携行缶を持っていません" : "燃料は満タンです");
+      return;
+    }
+    personalCar.fuelLiters = result.fuel;
+    personalCar.portableCanCount = result.count;
+    advanceTime(5);
+    showToast("携行缶から" + result.liters + " L補給しました");
+  }
+
   function performAction() {
     if (!actionSheet.hidden) {
       closeActionSheet();
@@ -4330,6 +4396,7 @@
     }
 
     if (item.type === "car-enter") enterCar();
+    if (item.type === "car-refuel") usePortableCan();
     if (item.type === "car-menu") openDrivingMenu();
     if (item.type === "train-enter") boardTrain(item.target, item.station);
     if (item.type === "train-exit") exitTrain();
@@ -8584,6 +8651,38 @@
         ctx.fillStyle = i === 0 ? "#715b43" : "#e4d7b9";
         ctx.fillRect(p.x + i * 38 - 12, p.y + 35, 24, 56);
       }
+    } else if (place.id === "fuel-station") {
+      drawFacilityBuilding(p, building?.w || 340, building?.h || 290, "#e0dfd3", "#59655f", "#9ab7bb");
+      ctx.fillStyle = "#f2eee1";
+      roundedRectPath(ctx, p.x - 108, p.y - 72, 216, 38, 5);
+      ctx.fill();
+      ctx.fillStyle = "#3f6251";
+      ctx.font = "800 20px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("若葉石油", p.x, p.y - 46);
+      ctx.fillStyle = "#d7d9ce";
+      roundedRectPath(ctx, p.x - 156, p.y + 82, 312, 76, 6);
+      ctx.fill();
+      ctx.fillStyle = "#d94e3f";
+      ctx.fillRect(p.x - 156, p.y + 82, 312, 12);
+      ctx.fillStyle = "#35433d";
+      ctx.fillRect(p.x - 160, p.y + 150, 320, 10);
+      for (const pumpX of [-96, 0, 96]) {
+        ctx.fillStyle = "#697d78";
+        roundedRectPath(ctx, p.x + pumpX - 20, p.y + 105, 40, 42, 5);
+        ctx.fill();
+        ctx.fillStyle = "#f3f1e7";
+        ctx.fillRect(p.x + pumpX - 13, p.y + 111, 26, 13);
+        ctx.strokeStyle = "#343e39";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(p.x + pumpX + 17, p.y + 115);
+        ctx.bezierCurveTo(p.x + pumpX + 34, p.y + 124, p.x + pumpX + 28, p.y + 145, p.x + pumpX + 18, p.y + 145);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "#f6f3e8";
+      ctx.font = "700 11px system-ui, sans-serif";
+      ctx.fillText("給油", p.x, p.y + 177);
     }
 
     ctx.fillStyle = "rgba(18,24,21,.76)";
@@ -9701,6 +9800,9 @@
       const lead = leadVehicleInfo();
       const destination = PLACES.find((place) => place.id === state.drive.destination);
       speedText.textContent = Math.round(personalCar.speed * SPEED_TO_KMH);
+      driveFuelText.textContent = personalCar.fuelLiters.toFixed(1) + " / " + carFuelModel.CAPACITY_LITERS + " L";
+      driveFuelBar.style.width = (personalCar.fuelLiters / carFuelModel.CAPACITY_LITERS * 100) + "%";
+      driveFuelBar.style.background = personalCar.fuelLiters <= 5 ? "#e79b63" : "#86c886";
       speedLimitText.textContent = limit;
       driveScoreText.textContent = state.drive.score;
       driveDestinationText.textContent = destination ? "→ " + destination.name : "目的地を選択";

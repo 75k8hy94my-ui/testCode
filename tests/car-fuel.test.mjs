@@ -14,13 +14,21 @@ test('fuel normalization clamps invalid saves and defaults missing fuel for lega
   assert.equal(fuel.normalizeFuel(-4), 0);
   assert.equal(fuel.normalizeFuel(900), 40);
   assert.equal(fuel.normalizeFuel('not fuel'), 12);
-  assert.equal(fuel.normalizeFuel(3.456), 3.46);
+  assert.equal(fuel.normalizeFuel(3.456), 3.456);
 });
 
 test('fuel consumption follows distance and never becomes negative', () => {
   assert.deepEqual(fuel.consumeFuel(12, 1250), { fuel:10.75, consumed:1.25 });
   assert.deepEqual(fuel.consumeFuel(0.2, 1000), { fuel:0, consumed:0.2 });
   assert.deepEqual(fuel.consumeFuel(12, -10), { fuel:12, consumed:0 });
+});
+
+test('small per-frame fuel use accumulates instead of rounding away during normal driving', () => {
+  let fuelAmount = 12;
+  for (let frame = 0; frame < 1000; frame += 1) {
+    fuelAmount = fuel.consumeFuel(fuelAmount, 3.2).fuel;
+  }
+  assert.equal(fuelAmount, 8.8);
 });
 
 test('refueling charges only delivered liters and rejects full tanks or insufficient funds', () => {
