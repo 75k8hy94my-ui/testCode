@@ -107,7 +107,7 @@ test('game loads the community center schedule model before the runtime', () => 
 test('community garden model loads before game runtime and progresses with absolute game time', () => {
   assert.match(html, /<script src="\.\/community-garden\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('community-garden.js') < html.indexOf('game.js'));
-  assert.match(html, /<script src="\.\/game\.js\?v=20260929-park-fishing-1"><\/script>/);
+  assert.match(html, /<script src="\.\/game\.js\?v=20260929-home-tv-1"><\/script>/);
   assert.match(source, /const communityGardenModel = globalThis\.CommunityGarden/);
   assert.match(source, /communityGardenModel\.advance\([\s\S]{0,100}communityGardenModel\.absoluteMinute\(state\.day, Math\.floor\(state\.minute\)\)\s*\)/);
 });
@@ -168,6 +168,25 @@ test('central park rendering identifies a pond and fishing spot separately from 
   assert.match(source, /成功率 " \+ Math\.round\(currentChance \* 100\) \+ "%"/);
   assert.match(source, /今は魚が食いつきにくい時間です/);
   assert.match(source, /釣り餌がありません/);
+});
+
+test('home television model loads before runtime and the TV is an enterable home fixture', () => {
+  assert.match(html, /<script src="\.\/home-television\.js\?v=[^"]+"><\/script>/);
+  assert.ok(html.indexOf('home-television.js') < html.indexOf('game.js'));
+  assert.match(source, /const homeTelevisionModel = globalThis\.CityDaysHomeTelevision/);
+  assert.match(source, /id:"tv", label:"テレビ", x:520, y:392, w:155, h:70, interactX:475, interactY:425/);
+  assert.match(source, /fixture\.id === "tv"[\s\S]{0,500}homeTelevisionModel\.getProgram\(Math\.floor\(state\.minute\)\)/);
+  assert.match(source, /homeTelevisionModel\.watch\(Math\.floor\(state\.minute\)\)/);
+});
+
+test('watching TV uses normal time advancement and applies broadcast effects with a capped cooking skill', () => {
+  const fixture = source.slice(source.indexOf('fixture.id === "tv"'), source.indexOf('fixture.id === "shower"'));
+  assert.match(fixture, /advanceTime\(result\.duration\)/);
+  assert.match(fixture, /for \(const \[need, amount\] of Object\.entries\(result\.effects\)\)/);
+  assert.match(fixture, /state\.communityCenter\.skills\.cooking\s*=\s*Math\.min\(100/);
+  assert.match(fixture, /clampNeeds\(\)/);
+  assert.match(source, /fixture\.id === "sofa"[\s\S]*homeRelax/);
+  assert.match(source, /fixture\.id === "bed"[\s\S]*homeSleep/);
 });
 
 test('fuel model loads before runtime and the personal car starts with its migration-safe tank level', () => {
@@ -253,7 +272,7 @@ test('public bath rules load before runtime and the sento interaction applies it
 
 test('clinic map and runtime changes request fresh browser assets', () => {
   assert.match(html, /map-model\.js\?v=20260929-wakaba-clinic-1/);
-  assert.match(html, /game\.js\?v=20260929-park-fishing-1/);
+  assert.match(html, /game\.js\?v=20260929-home-tv-1/);
 });
 
 test('health model loads before runtime and has a visible sixth needs meter', () => {

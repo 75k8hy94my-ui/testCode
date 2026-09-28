@@ -56,10 +56,10 @@
 - Consumes Task 1 `getProgram(minute)` and `watch(minute)`.
 - Produces an interactable `tv` fixture and time-revalidated watch action; watching advances time and applies program needs effects and capped cooking-skill gain.
 
-- [ ] **Step 1: Add failing runtime tests** for script ordering, fixture collision/interaction location, action details, time/effects application, cooking-skill cap, and unchanged legacy home actions.
-- [ ] **Step 2: Run `node --test tests/game-runtime.test.mjs`**; expect TV fixture integration checks to fail.
-- [ ] **Step 3: Integrate the fixture** at the existing media unit and use `homeTelevisionModel.watch(Math.floor(state.minute))` inside the click handler before changing game state.
-- [ ] **Step 4: Run runtime and model tests**; expect both suites to pass.
+- [x] **Step 1: Add failing runtime tests** for script ordering, fixture collision/interaction location, action details, time/effects application, cooking-skill cap, and unchanged legacy home actions.
+- [x] **Step 2: Run `node --test tests/game-runtime.test.mjs`**; both new integration tests failed as expected before implementation.
+- [x] **Step 3: Integrate the fixture** at the existing media unit and use `homeTelevisionModel.watch(Math.floor(state.minute))` inside the click handler before changing game state.
+- [x] **Step 4: Run runtime and model tests**; 104 tests passed.
 - [ ] **Step 5: Commit** as `feat(game): make home television interactive`.
 
 ### Task 3: Screen program indicator and headless gameplay verification

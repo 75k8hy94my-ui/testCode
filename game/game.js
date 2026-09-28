@@ -86,6 +86,12 @@
     return;
   }
 
+  const homeTelevisionModel = globalThis.CityDaysHomeTelevision;
+  if (!homeTelevisionModel?.getProgram || !homeTelevisionModel?.watch) {
+    showRuntimeError("HomeTelevision を読み込めません。");
+    return;
+  }
+
   const gymTrainingModel = globalThis.CityDaysGymTraining;
   if (!gymTrainingModel?.listWorkouts || !gymTrainingModel?.completeWorkout) {
     showRuntimeError("GymTraining を読み込めません。");
@@ -729,6 +735,7 @@
     { id:"shower", label:"シャワー", x:70, y:318, w:118, h:118, interactX:208, interactY:372, range:68 },
     { id:"kitchen", label:"キッチン", x:510, y:55, w:205, h:82, interactX:505, interactY:153, range:78 },
     { id:"sofa", label:"ソファ", x:486, y:330, w:205, h:74, interactX:476, interactY:365, range:74 },
+    { id:"tv", label:"テレビ", x:520, y:392, w:155, h:70, interactX:475, interactY:425, range:72 },
     { id:"exit", label:"玄関", x:356, y:455, w:68, h:25, interactX:390, interactY:438, range:62 }
   ];
   const HOME_OBSTACLES = [
@@ -3884,6 +3891,30 @@
           }
           applyHomeMeal(result);
         }, !status.available);
+      }
+    } else if (fixture.id === "tv") {
+      const program = homeTelevisionModel.getProgram(Math.floor(state.minute));
+      if (!program) {
+        actionDescription.textContent = "現在の放送時間を確認できません。";
+      } else {
+        const changes = Object.entries(program.effects).map(([need, amount]) => {
+          const labels = { fun:"楽しさ", social:"交流", energy:"体力" };
+          return (labels[need] || need) + (amount >= 0 ? "+" : "") + amount;
+        });
+        if (program.cookingSkillGain) changes.push("料理技能+" + program.cookingSkillGain);
+        actionDescription.textContent = "放送中: " + program.title + " / " + program.duration + "分 / " + changes.join(" / ");
+        addChoice("現在の番組を見る", program.title + " / " + program.duration + "分", () => {
+          const result = homeTelevisionModel.watch(Math.floor(state.minute));
+          if (!result.ok) {
+            showToast("現在の放送時間を確認できません");
+            return;
+          }
+          advanceTime(result.duration);
+          for (const [need, amount] of Object.entries(result.effects)) state.needs[need] += amount;
+          state.communityCenter.skills.cooking = Math.min(100, state.communityCenter.skills.cooking + result.cookingSkillGain);
+          clampNeeds();
+          showToast("「" + result.program.title + "」を見ました");
+        });
       }
     } else if (fixture.id === "shower") {
       actionDescription.textContent = "浴室で身支度を整えます。";
