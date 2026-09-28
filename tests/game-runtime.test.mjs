@@ -99,6 +99,11 @@ test('all person categories share the same character renderer', () => {
   assert.match(source, /npc\.state = citizen\.state/);
 });
 
+test('game loads the community center schedule model before the runtime', () => {
+  assert.match(html, /<script src="\.\/community-center\.js\?v=[^"]+"><\/script>/);
+  assert.ok(html.indexOf('community-center.js') < html.indexOf('game.js'));
+});
+
 test('game loads overtake safety before the overtake planner and runtime', () => {
   assert.match(html, /<script src="\.\/traffic-overtake-safety\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('traffic-overtake-safety.js') < html.indexOf('traffic-overtake.js'));
