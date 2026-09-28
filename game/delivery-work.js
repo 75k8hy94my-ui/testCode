@@ -14,7 +14,13 @@
   const validDay = (day) => Number.isInteger(day) && day >= 1 && day <= 1000000;
   const validMinute = (minute) => Number.isInteger(minute) && minute >= 0 && minute < 1440;
   const offerIdPattern = /^delivery-(\d+)-([0-2])$/;
-  const validOfferId = (id) => typeof id === "string" && offerIdPattern.test(id);
+  const validOfferId = (id) => {
+    if (typeof id !== "string") return false;
+    const match = offerIdPattern.exec(id);
+    if (!match) return false;
+    const day = Number(match[1]);
+    return validDay(day) && id === `delivery-${day}-${match[2]}`;
+  };
   const cloneProgress = (progress) => ({
     active: progress.active ? { ...progress.active } : null,
     consumedOfferIds: [...progress.consumedOfferIds]
@@ -24,39 +30,8 @@
     return { active: null, consumedOfferIds: [] };
   }
 
-  function normalizeProgress(raw) {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return createProgress();
-    const consumedOfferIds = Array.isArray(raw.consumedOfferIds)
-      ? [...new Set(raw.consumedOfferIds.filter(validOfferId))].slice(-MAX_CONSUMED)
-      : [];
-    let active = null;
-    const saved = raw.active;
-    if (saved && typeof saved === "object" && !Array.isArray(saved)
-      && validOfferId(saved.id)
-      && DESTINATIONS.some((destination) => destination.id === saved.destinationPlaceId)
-      && typeof saved.parcelName === "string" && saved.parcelName.length <= 60
-      && Number.isInteger(saved.reward) && saved.reward >= 100 && saved.reward <= 100000
-      && Number.isInteger(saved.deadlineAbsoluteMinute) && saved.deadlineAbsoluteMinute >= 0
-      && Number.isInteger(saved.acceptedAbsoluteMinute) && saved.acceptedAbsoluteMinute >= 0
-      && saved.deadlineAbsoluteMinute > saved.acceptedAbsoluteMinute
-      && Number.isInteger(saved.durationMinutes) && saved.durationMinutes >= 1 && saved.durationMinutes <= 180) {
-      active = {
-        id: saved.id,
-        destinationPlaceId: saved.destinationPlaceId,
-        parcelName: saved.parcelName,
-        durationMinutes: saved.durationMinutes,
-        reward: saved.reward,
-        acceptedAbsoluteMinute: saved.acceptedAbsoluteMinute,
-        deadlineAbsoluteMinute: saved.deadlineAbsoluteMinute
-      };
-      if (!consumedOfferIds.includes(active.id)) consumedOfferIds.push(active.id);
-    }
-    return { active, consumedOfferIds: consumedOfferIds.slice(-MAX_CONSUMED) };
-  }
-
-  function listOffers(day, progress) {
+  function getDailyOffers(day) {
     if (!validDay(day)) return [];
-    const normalized = normalizeProgress(progress);
     const offset = (day - 1) % DESTINATIONS.length;
     return [0, 1, 2].map((slot) => {
       const destination = DESTINATIONS[(offset + slot) % DESTINATIONS.length];
@@ -67,7 +42,51 @@
         durationMinutes: destination.duration,
         reward: destination.reward
       };
-    }).filter((offer) => !normalized.consumedOfferIds.includes(offer.id));
+    });
+  }
+
+  function normalizeProgress(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return createProgress();
+    const consumedOfferIds = Array.isArray(raw.consumedOfferIds)
+      ? [...new Set(raw.consumedOfferIds.filter(validOfferId))].slice(-MAX_CONSUMED)
+      : [];
+    let active = null;
+    const saved = raw.active;
+    const match = saved && typeof saved.id === "string" ? offerIdPattern.exec(saved.id) : null;
+    const offerDay = match ? Number(match[1]) : NaN;
+    const expectedOffer = validOfferId(saved?.id)
+      ? getDailyOffers(offerDay).find((offer) => offer.id === saved.id)
+      : null;
+    const acceptedAbsoluteMinute = Number(saved?.acceptedAbsoluteMinute);
+    if (saved && typeof saved === "object" && !Array.isArray(saved)
+      && expectedOffer
+      && saved.destinationPlaceId === expectedOffer.destinationPlaceId
+      && saved.parcelName === expectedOffer.parcelName
+      && saved.reward === expectedOffer.reward
+      && saved.durationMinutes === expectedOffer.durationMinutes
+      && Number.isInteger(saved.deadlineAbsoluteMinute) && saved.deadlineAbsoluteMinute >= 0
+      && Number.isInteger(acceptedAbsoluteMinute)
+      && acceptedAbsoluteMinute >= (offerDay - 1) * 1440
+      && acceptedAbsoluteMinute < offerDay * 1440
+      && saved.deadlineAbsoluteMinute === acceptedAbsoluteMinute + expectedOffer.durationMinutes) {
+      active = {
+        id: saved.id,
+        destinationPlaceId: saved.destinationPlaceId,
+        parcelName: saved.parcelName,
+        durationMinutes: saved.durationMinutes,
+        reward: saved.reward,
+        acceptedAbsoluteMinute,
+        deadlineAbsoluteMinute: saved.deadlineAbsoluteMinute
+      };
+      if (!consumedOfferIds.includes(active.id)) consumedOfferIds.push(active.id);
+    }
+    return { active, consumedOfferIds: consumedOfferIds.slice(-MAX_CONSUMED) };
+  }
+
+  function listOffers(day, progress) {
+    if (!validDay(day)) return [];
+    const normalized = normalizeProgress(progress);
+    return getDailyOffers(day).filter((offer) => !normalized.consumedOfferIds.includes(offer.id));
   }
 
   function absoluteMinute(day, minute) {
