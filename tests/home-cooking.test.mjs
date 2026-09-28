@@ -61,3 +61,33 @@ test('meal preparation normalizes invalid inventory and clamps cooking skill at 
     cookingSkill:100
   });
 });
+
+test('grilled fish is listed only for callers opting into fish inventory and consumes one fish', () => {
+  assert.equal(cooking.listRecipes(0, 0).length, 3);
+  const noFish = cooking.listRecipes(0, 0, 0).find((entry) => entry.recipe.id === 'grilled-fish');
+  assert.deepEqual({ unlocked:noFish.unlocked, available:noFish.available, reason:noFish.reason }, {
+    unlocked:true, available:false, reason:'insufficient-fish'
+  });
+  const status = cooking.listRecipes(0, 0, 1).find((entry) => entry.recipe.id === 'grilled-fish');
+  assert.equal(status.available, true);
+  assert.equal(status.recipe.duration, 50);
+  assert.deepEqual(cooking.cookMeal(0, 0, 'grilled-fish', 1), {
+    ok:true,
+    recipe:status.recipe,
+    groceriesRemaining:0,
+    fishRemaining:0,
+    cookingSkill:1
+  });
+});
+
+test('fish rice requires skill 25, a fish, and a grocery without consuming either on failure', () => {
+  assert.deepEqual(cooking.cookMeal(24, 4, 'fish-rice', 2), { ok:false, reason:'skill-required' });
+  assert.deepEqual(cooking.cookMeal(25, 4, 'fish-rice', 0), { ok:false, reason:'insufficient-fish' });
+  assert.deepEqual(cooking.cookMeal(25, 0, 'fish-rice', 1), { ok:false, reason:'insufficient-groceries' });
+  const result = cooking.cookMeal(25, 1, 'fish-rice', 1);
+  assert.equal(result.ok, true);
+  assert.equal(result.groceriesRemaining, 0);
+  assert.equal(result.fishRemaining, 0);
+  assert.equal(result.cookingSkill, 27);
+  assert.equal(result.recipe.duration, 65);
+});
