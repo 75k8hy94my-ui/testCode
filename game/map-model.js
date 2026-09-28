@@ -1,7 +1,7 @@
 (function initCityDaysMapModel(global) {
   "use strict";
 
-  const MAP_VERSION = "japan-v2.4";
+  const MAP_VERSION = "japan-v2.5";
   const WORLD_SIZE = 10800;
   const COAST = 160;
   const RAIL_Y = 4700;
@@ -27,6 +27,7 @@
     node("central-north", 5200, 4200, "station-commercial"),
     node("north-market", 6100, 4470, "station-commercial"),
     node("central-west", 4200, 5050, "station-commercial"),
+    node("community-center-entrance", 4540, 4280, "station-commercial"),
     node("central", 5200, 5050, "station-commercial"),
     node("central-station-entry", 5200, 4840, "station-commercial"),
     node("east-junction", 7380, 5000, "east-commercial"),
@@ -77,6 +78,7 @@
     ["collector-library-civic", "library-road", "civic-east", [[3500,3800],[3760,3830],[4010,3920],[4300,4050]], "collector", 104, 30, true, true, false],
     ["collector-civic-central", "civic-east", "central-north", [[4300,4050],[4580,4120],[4900,4160],[5200,4200]], "collector", 116, 30, true, true, false],
     ["collector-central-north", "central-north", "central", [[5200,4200],[5190,4490],[5215,4780],[5200,5050]], "collector", 144, 40, true, true, false],
+    ["ped-community-center", "civic-east", "community-center-entrance", [[4300,4050],[4360,4115],[4440,4195],[4540,4280]], "sidewalk", 44, 5, false, true, false],
     ["collector-library-park", "library-road", "park-west", [[3500,3800],[3750,3650],[4070,3510],[4450,3420]], "residential", 92, 20, true, true, false],
     ["park-local-west", "park-west", "park-road", [[4450,3420],[4710,3360],[4980,3340],[5250,3380]], "park", 88, 20, true, true, false],
     ["park-local-east", "park-road", "park-east", [[5250,3380],[5560,3340],[5920,3370],[6250,3450]], "park", 92, 20, true, true, false],
@@ -143,7 +145,8 @@
     { id:"store", name:"スーパー MARCHÉ", x:6630, y:5590, entranceNodeId:"store-entrance", roadNodeId:"store-road", building:{ x:6411, y:5809, w:320, h:260 }, color:"#74a88a", symbol:"S" },
     { id:"park", name:"中央公園", x:5250, y:3150, entranceNodeId:"park-entrance", roadNodeId:"park-road", color:"#72a66d", symbol:"P" },
     { id:"gym", name:"CITY GYM", x:7180, y:3920, entranceNodeId:"gym-entrance", roadNodeId:"gym-road", building:{ x:7399, y:3701, w:305, h:265 }, color:"#7898bd", symbol:"G" },
-    { id:"library", name:"市立図書館", x:3420, y:3940, entranceNodeId:"library-entrance", roadNodeId:"library-road", building:{ x:3420, y:4110, w:310, h:275 }, color:"#9a8db9", symbol:"L" }
+    { id:"library", name:"市立図書館", x:3420, y:3940, entranceNodeId:"library-entrance", roadNodeId:"library-road", building:{ x:3420, y:4110, w:310, h:275 }, color:"#9a8db9", symbol:"L" },
+    { id:"community-center", name:"若葉コミュニティセンター", x:4540, y:4280, entranceNodeId:"community-center-entrance", roadNodeId:"civic-east", building:{ x:4740, y:4500, w:320, h:280 }, color:"#d3a66b", symbol:"W" }
   ];
 
   const STATION_DEFINITIONS = [

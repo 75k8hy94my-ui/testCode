@@ -7,7 +7,7 @@ const { createMapModel } = mapModule;
 test('v2 map validates as a connected Japanese urban fabric', () => {
   const map = createMapModel();
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2.4');
+  assert.equal(map.version, 'japan-v2.5');
   assert.equal(map.worldSize, 10800);
   assert.ok(map.nodes.length >= 45);
   assert.ok(map.edges.length >= 55);
@@ -210,7 +210,7 @@ test('enterable home exterior matches surrounding detached-house scale', () => {
 
 test('all existing facilities and stations remain addressable', () => {
   const map = createMapModel();
-  assert.deepEqual(map.places.map((place) => place.id), ['home','cafe','store','park','gym','library']);
+  assert.deepEqual(map.places.map((place) => place.id), ['home','cafe','store','park','gym','library','community-center']);
   assert.deepEqual(map.stations.map((station) => station.id), ['west','central','east']);
   for (const place of map.places) {
     assert.ok(map.getNode(place.entranceNodeId));
@@ -220,6 +220,20 @@ test('all existing facilities and stations remain addressable', () => {
   for (const station of map.stations) {
     assert.equal(map.isWalkable(station.accessX, station.accessY, 14), true, station.id);
   }
+});
+
+test('community center has a walkable entrance, civic-road access, and clear building footprint', () => {
+  const map = createMapModel();
+  const center = map.places.find((place) => place.id === 'community-center');
+
+  assert.ok(center);
+  assert.equal(center.name, '若葉コミュニティセンター');
+  assert.ok(center.building.w >= 300 && center.building.h >= 260);
+  assert.ok(map.getNode(center.entranceNodeId));
+  assert.ok(map.findRoute('central-station-entry', center.entranceNodeId, { mode:'pedestrian' }));
+  assert.ok(map.neighbors(center.roadNodeId, { mode:'vehicle' }).length > 0);
+  assert.deepEqual(map.validate(), []);
+  assert.equal(map.version, 'japan-v2.5');
 });
 
 test('walking and vehicle graphs reach every facility pair', () => {

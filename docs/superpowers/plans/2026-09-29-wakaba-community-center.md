@@ -46,7 +46,7 @@
 - [x] **Step 2: RED** — run `node --test tests/community-center.test.mjs`; expected assertion failures because module/global is missing.
 - [x] **Step 3: Minimal implementation** — define Tuesday/Saturday 10:00 cooking (300円/60分), Wednesday/Saturday 14:00 crafts (200円/75分), Monday/Thursday 18:00 exercise (無料/45分); implement deterministic session math and normalization.
 - [x] **Step 4: GREEN** — run `node --test tests/community-center.test.mjs` and the focused static-script inclusion assertion.
-- [ ] **Step 5: Commit** — `feat(game): add community course schedule model`.
+- [x] **Step 5: Commit** — `feat(game): add community course schedule model`.
 
 ### Task 2: マップ施設・徒歩接続
 
@@ -58,11 +58,11 @@
 - Consumes `CityDaysCommunityCenter` only indirectly; map place ID is `community-center`.
 - Produces a place with a pedestrian entrance node and a road node connected by existing map edge definitions.
 
-- [ ] **Step 1: Failing tests** — assert the new place exists with stable ID, pedestrian route to its entrance, vehicle-accessible road node, and no building overlap with existing facility buildings or open spaces; assert all pre-existing facility-to-facility routes remain connected.
-- [ ] **Step 2: RED** — run `node --test tests/map-model.test.mjs`; expected missing-place assertion.
-- [ ] **Step 3: Minimal implementation** — add the center near civic/library district, add explicit pedestrian entrance edge to a connected node and only add vehicle connectivity if the chosen road node supports it; keep building outside plaza, roads, and existing building sites.
-- [ ] **Step 4: GREEN** — run map-model tests and inspect the model validator output.
-- [ ] **Step 5: Commit** — `feat(game): add community center to city map`.
+- [x] **Step 1: Failing tests** — assert the new place exists with stable ID, pedestrian route to its entrance, vehicle-accessible road node, and no building overlap with existing facility buildings or open spaces; assert all pre-existing facility-to-facility routes remain connected.
+- [x] **Step 2: RED** — run `node --test tests/map-model.test.mjs`; expected missing-place assertion.
+- [x] **Step 3: Minimal implementation** — add the center near civic/library district, add explicit pedestrian entrance edge to a connected node and only add vehicle connectivity if the chosen road node supports it; keep building outside plaza, roads, and existing building sites.
+- [x] **Step 4: GREEN** — run map-model tests and inspect the model validator output.
+- [x] **Step 5: Commit** — `feat(game): add community center to city map`.
 
 ### Task 3: プレイヤー講座・進行保存
 
