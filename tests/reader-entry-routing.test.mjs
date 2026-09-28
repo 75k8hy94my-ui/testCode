@@ -12,12 +12,15 @@ test('desktop video destination deep-links directly to the video list', () => {
   assert.match(rail, /video\.html/);
 });
 
-test('reader startup honors an explicit screen route before resume and default-list logic', () => {
+test('reader startup honors explicit item and screen routes before legacy resume and shelf fallback', () => {
   const reader = readReader();
   assert.match(reader, /const requestedScreenOnLoad = getReaderScreenFromLocation\(\);/);
-  assert.match(reader, /if \(!requestedScreenOnLoad && shouldResumeLastManga\) \{[\s\S]*localStorage\.getItem\(LAST_URL_KEY\)/);
-  assert.match(reader, /shouldResumeLastManga = location\.pathname\.endsWith\('\/reader\.html'\)/);
-  assert.match(reader, /if \(!requestedScreenOnLoad && !resumedOnLoad && !location\.pathname\.endsWith\('\/reader\.html'\)/);
+  const startup = reader.slice(reader.indexOf('const requestedScreenOnLoad = getReaderScreenFromLocation();'));
+  assert.match(startup, /const routeItemId = window\.MangaReaderTarget \? MangaReaderTarget\.itemIdFromLocation\(location\) : '';/);
+  assert.match(startup, /if \(routeItemId\) \{[\s\S]*savedItems\.find\(\(entry\) => entry && String\(entry\.id\) === routeItemId\)/);
+  assert.match(startup, /\} else if \(!requestedScreenOnLoad\) \{[\s\S]*MangaReaderTarget\.readLegacyTarget\(localStorage\)/);
+  assert.match(startup, /if \(!requestedScreenOnLoad && !resumedOnLoad\) location\.replace\('manga\.html'\);/);
+  assert.match(reader, /renderReaderScreen\(getReaderScreenFromLocation\(\)\);/);
 });
 
 test('reader location parser recognizes the video-list route', () => {

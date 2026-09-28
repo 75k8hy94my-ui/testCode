@@ -9,7 +9,6 @@ const pages = {
   video: read('video.html'),
 };
 const spa = read('home-profile-spa.js');
-const readerRouteRuntime = read('reader-route-runtime.js');
 const reader = read('reader.html');
 const readerTemplates = [
   'reader-saved-list-template.js', 'reader-author-list-template.js', 'reader-toc-template.js',
@@ -43,28 +42,31 @@ test('current entry pages keep their static bootstrap script baselines', () => {
   ]);
 });
 
-test('current route dispatcher keeps manga and video independent and preserves direct reader bootstrap', () => {
+test('manga and video are app-shell routes while reader remains an independent document', () => {
   assert.match(spa, /if\(name==='manga\.html'\)return'manga'/);
   assert.match(spa, /if\(name==='video\.html'\)return'video'/);
   assert.match(spa, /else if\(route==='manga'\)renderManga\(generation\)/);
   assert.match(spa, /else if\(route==='video'\)renderVideo\(generation\)/);
-  assert.match(spa, /else if\(route==='reader'\)renderReader\(route,generation\)/);
-  assert.match(spa, /fetch\('reader\.html\?v=20260926-reader-shell-root-fix'/);
-  assert.match(spa, /ReaderRouteRuntimeFactory\.create\(/);
-  assert.match(spa, /reader-route-runtime\.js\?v=20260922-route-runtime/);
-  assert.match(readerRouteRuntime, /if \(route === 'manga' \|\| route === 'video'\) deps\.activate\(route\)/);
-  assert.match(spa, /route==='video'\?'listTabVideo':'listTabManga'/);
+  assert.doesNotMatch(spa, /renderReader\(/);
+  assert.match(spa, /if\(!SPA_PAGES\.includes\(name\)\)\{location\.href=target\.href;return;\}/);
+  assert.match(reader, /class="auth-pending reader-shell-page"/);
+  assert.match(reader, /reader-target\.js\?v=20260926-item-identity/);
 });
 
-test('current reader entry pruning remains reader-only while video uses its own surface', () => {
-  assert.match(spa, /if\(route==='manga'\)\{remove\('#videoAddOverlay,#videoPlayerOverlay/);
-  assert.doesNotMatch(spa, /else if\(route==='video'\)\{remove\('#mangaListSection/);
+test('manga and video mount through their own route runtimes', () => {
+  const mangaRoute = spa.slice(spa.indexOf('async function renderManga'), spa.indexOf('function renderRoute'));
+  const videoRoute = spa.slice(spa.indexOf('async function renderVideo'), spa.indexOf('async function renderManga'));
+  assert.match(mangaRoute, /MangaListRouteFactory\.create\(/);
+  assert.match(videoRoute, /VideoListRouteFactory\.create\(/);
+  assert.doesNotMatch(videoRoute, /MangaListRouteFactory|fetch\(['"]reader\.html/);
+  assert.doesNotMatch(mangaRoute, /VideoListRouteFactory|video-data\.js/);
 });
 
-test('reader bootstrap reports loading failure instead of silently swallowing it', () => {
-  assert.match(spa, /renderError:\(mount\)=>\{mount\.innerHTML=/);
-  assert.match(readerRouteRuntime, /if \(generation === deps\.getGeneration\(\)\) deps\.renderError\(target, error\)/);
-  assert.match(spa, /漫画を読み込めませんでした/);
+test('manga and video route startup failures render visible recovery messages', () => {
+  const mangaRoute = spa.slice(spa.indexOf('async function renderManga'), spa.indexOf('function renderRoute'));
+  const videoRoute = spa.slice(spa.indexOf('async function renderVideo'), spa.indexOf('async function renderManga'));
+  assert.match(mangaRoute, /catch\(_\)\{[\s\S]*漫画一覧を読み込めませんでした/);
+  assert.match(videoRoute, /catch\(_\)\{[\s\S]*動画一覧を読み込めませんでした/);
 });
 
 test('authentication branches remain explicit in the current SPA bootstrap', () => {

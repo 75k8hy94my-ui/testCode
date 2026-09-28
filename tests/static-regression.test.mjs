@@ -42,8 +42,10 @@ test('directly entered URLs keep the save action visible until explicitly saved'
 
 test('bookshelf cover cache separates filename patterns and can recover stale sources', () => {
   const body = read('manga-list-host-runtime.js');
-  assert.match(body, /const cacheKey = \[folderUrl, String\(resolvedWidth\), JSON\.stringify\(pattern \|\| null\)/);
+  assert.match(body, /const identityKey = itemId \? 'item:' \+ String\(itemId\) : folderUrl/);
+  assert.match(body, /const cacheKey = \[identityKey, folderUrl, String\(resolvedWidth\), JSON\.stringify\(pattern \|\| null\)/);
   assert.match(body, /sourceCache\.delete\(cacheKey\)/);
+  assert.match(body, /failedCache\.delete\(cacheKey\)/);
 });
 
 test('manga cards restore the manga screen route before opening a work', () => {

@@ -25,7 +25,7 @@ test('buildBookCard delegates static DOM creation and keeps interaction logic in
   assert.match(runtime, /context\.updateBulkEditButton\(\)/);
   assert.match(runtime, /stopPropagation\(\)/);
   assert.match(runtime, /context\.loadLocalCover\(item, img\)/);
-  assert.match(runtime, /context\.setupFeedImage\(img, item\.url, item\.numberWidth, item\.pagePattern\)/);
+  assert.match(runtime, /context\.setupFeedImage\(img, item\.url, item\.numberWidth, item\.pagePattern, item\.id\)/);
 });
 
 test('normal manga card clicks use one reader interaction boundary in the original order', () => {
@@ -52,7 +52,7 @@ test('buildBookCard uses one private cover dependency boundary without changing 
   assert.match(build, /context\.loadLocalCover\(item, img\)/);
   assert.match(build, /coverSourceCache\.get\(source\)/);
   assert.match(build, /coverSourceCache\.set\(source, img\.currentSrc \|\| img\.src\)/);
-  assert.match(build, /context\.setupFeedImage\(img, item\.url, item\.numberWidth, item\.pagePattern\)/);
+  assert.match(build, /context\.setupFeedImage\(img, item\.url, item\.numberWidth, item\.pagePattern, item\.id\)/);
   assert.equal((build.match(/context\.loadLocalCover\(item, img\)/g) || []).length, 1);
   assert.equal((build.match(/context\.setupFeedImage\(/g) || []).length, 1);
 });

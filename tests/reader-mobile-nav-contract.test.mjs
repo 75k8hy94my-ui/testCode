@@ -26,7 +26,9 @@ test('reader mobile template replaces the generic SPA nav when reader controls a
 test('reader mobile template keeps each reader id unique and does not affect generic SPA routes', () => {
   for (const id of readerIds) assert.match(template, new RegExp(`id="${id}"`), id);
   assert.match(spa, /if\(!document\.getElementById\('mobileBottomNav'\)\)/);
-  assert.match(spa, /if\(!\['manga','video','reader'\]\.includes\(route\)\)cleanupReaderRuntime\(\)/);
+  assert.match(spa, /function routeName\(path=location\.pathname\)/);
+  assert.doesNotMatch(spa, /['"]reader\.html['"]|route==='reader'/);
+  assert.match(spa, /if\(!SPA_PAGES\.includes\(name\)\)\{location\.href=target\.href;return;\}/);
   assert.match(template, /id="mobileUtilityMenu"/);
 });
 

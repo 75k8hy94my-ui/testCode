@@ -39,6 +39,10 @@ function deps(calls) {
       readerUrl: 'reader.html',
       writeStorage(key, value) { calls.push(['navigation-write', key, value]); },
       navigate(url) { calls.push(['navigate', url]); },
+      buildReaderUrl(itemId, base) {
+        calls.push(['build-reader-url', itemId, base]);
+        return `${base}?item=${encodeURIComponent(itemId)}`;
+      },
     },
   };
 }
@@ -46,7 +50,7 @@ function deps(calls) {
 function imageDeps(calls) {
   return {
     parseInputUrl(value) { calls.push(['parse', value]); return { baseUrl: value + '/base', pattern: null }; },
-    getCachedMangaInfo() { calls.push('cached-info'); return null; },
+    getCachedMangaInfo(...args) { calls.push(['cached-info', ...args]); return null; },
     getCoverSourceCache() { calls.push('source-cache'); return new Map(); },
     getCoverFailedCache() { calls.push('failed-cache'); return new Set(); },
     pageUrlFor(baseUrl, page, extIndex, width) { return baseUrl + '/' + page + '-' + extIndex + '-' + width; },
@@ -77,6 +81,9 @@ test('host factory exposes the shared persistence callbacks and rejects missing 
     delete missing[key];
     assert.throws(() => factory.create(missing), (error) => error.name === 'TypeError' && error.message.includes(key === 'keys' ? 'keys' : key));
   }
+  const missingReaderUrlBuilder = deps([]);
+  delete missingReaderUrlBuilder.navigation.buildReaderUrl;
+  assert.throws(() => factory.create(missingReaderUrlBuilder), (error) => error.name === 'TypeError' && error.message.includes('buildReaderUrl'));
   for (const name of [
     'hasActiveVault', 'clearTimer', 'setTimer', 'savePayload', 'buildBasePayload',
     'getSavedVideos', 'readStorageItem', 'getMangaInfo', 'getToc', 'getTheme',
@@ -165,12 +172,13 @@ test('host preserves manga item payload and reader navigation order', () => {
   host.navigateToReader({ id: 'item-1' });
   assert.deepEqual(calls, [
     ['navigation-write', 'last-url-key', JSON.stringify({ kind: 'item', itemId: 'item-1' })],
-    ['navigate', 'reader.html'],
+    ['build-reader-url', 'item-1', 'reader.html'],
+    ['navigate', 'reader.html?item=item-1'],
   ]);
 
   calls.length = 0;
-  host.navigateToReader({});
-  assert.deepEqual(calls, [['navigate', 'reader.html']]);
+  assert.throws(() => host.navigateToReader({}), /saved manga item id is required/);
+  assert.deepEqual(calls, []);
 });
 
 test('host setupFeedImage preserves extension fallback and shared cover cache updates', () => {
@@ -191,14 +199,17 @@ test('host setupFeedImage preserves extension fallback and shared cover cache up
     src: '',
     addEventListener(type, callback) { handlers[type] = callback; },
   };
-  host.setupFeedImage(img, 'https://example.test/manga', 3, null);
+  host.setupFeedImage(img, 'https://example.test/manga', 3, null, 'item-1');
   assert.equal(img.src, 'https://example.test/manga/base/1-0-3');
+  assert.deepEqual(calls.find((call) => Array.isArray(call) && call[0] === 'cached-info'), [
+    'cached-info', 'item:item-1', 'https://example.test/manga/base',
+  ]);
   handlers.error();
   assert.equal(img.src, 'https://example.test/manga/base/1-1-3');
   img.currentSrc = img.src;
   handlers.load();
   assert.equal(sourceCache.size, 1);
-  host.setupFeedImage(img, 'https://example.test/manga', 3, null);
+  host.setupFeedImage(img, 'https://example.test/manga', 3, null, 'item-1');
   assert.equal(img.src, 'https://example.test/manga/base/1-1-3');
 });
 
