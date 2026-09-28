@@ -1,7 +1,7 @@
 (function initCityDaysMapModel(global) {
   "use strict";
 
-  const MAP_VERSION = "japan-v2.5";
+  const MAP_VERSION = "japan-v2.4";
   const WORLD_SIZE = 10800;
   const COAST = 160;
   const RAIL_Y = 4700;

@@ -7,7 +7,7 @@ const { createMapModel } = mapModule;
 test('v2 map validates as a connected Japanese urban fabric', () => {
   const map = createMapModel();
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2.5');
+  assert.equal(map.version, 'japan-v2.4');
   assert.equal(map.worldSize, 10800);
   assert.ok(map.nodes.length >= 45);
   assert.ok(map.edges.length >= 55);
@@ -233,7 +233,7 @@ test('community center has a walkable entrance, civic-road access, and clear bui
   assert.ok(map.findRoute('central-station-entry', center.entranceNodeId, { mode:'pedestrian' }));
   assert.ok(map.neighbors(center.roadNodeId, { mode:'vehicle' }).length > 0);
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2.5');
+  assert.equal(map.version, 'japan-v2.4');
 });
 
 test('walking and vehicle graphs reach every facility pair', () => {
