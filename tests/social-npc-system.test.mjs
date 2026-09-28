@@ -61,3 +61,89 @@ test('social NPC module loads before the game runtime', () => {
   assert.match(html, /social-npc-system\.js\?v=[^\"]+/);
   assert.ok(html.indexOf('social-npc-system.js') < html.indexOf('game.js'));
 });
+
+test('conversation changes with time, day, activity, and the last topic', () => {
+  const morning = socialNpc.getConversation({
+    npcId:'aoi', minute:9 * 60, day:1, activityId:'park', friendship:2,
+    relationships:{}, recentTopic:null, nearbySocialNpcIds:[]
+  });
+  assert.deepEqual(morning, socialNpc.getConversation({
+    npcId:'aoi', minute:9 * 60, day:1, activityId:'park', friendship:2,
+    relationships:{}, recentTopic:null, nearbySocialNpcIds:[]
+  }));
+  const evening = socialNpc.getConversation({
+    npcId:'aoi', minute:19 * 60, day:2, activityId:'home_idle', friendship:2,
+    relationships:{}, recentTopic:null, nearbySocialNpcIds:[]
+  });
+  const avoidingRepeat = socialNpc.getConversation({
+    npcId:'aoi', minute:9 * 60, day:1, activityId:'park', friendship:2,
+    relationships:{}, recentTopic:morning.topic, nearbySocialNpcIds:[]
+  });
+  assert.notEqual(morning.line, evening.line);
+  assert.notEqual(morning.topic, avoidingRepeat.topic);
+  assert.equal(morning.options.length, 3);
+  assert.deepEqual(morning.options.map((option) => option.id), ['greet','ask','invite']);
+});
+
+test('conversation reflects a nearby person with an authored mutual relationship', () => {
+  const result = socialNpc.getConversation({
+    npcId:'aoi', minute:12 * 60, day:1, activityId:'park', friendship:2,
+    relationships:{'aoi|sora':58}, recentTopic:null, nearbySocialNpcIds:['sora']
+  });
+  assert.match(result.line, /ソラ/);
+});
+
+test('busy and sleeping NPCs decline invitations without receiving an activity request', () => {
+  for (const activityId of ['work','sleep']) {
+    const result = socialNpc.resolveConversation({
+      npcId:'aoi', optionId:'invite', minute:10 * 60, day:1, activityId,
+      friendship:10, relationships:{}, nearbySocialNpcIds:[], needs:{ social:50, fun:50 }
+    });
+    assert.equal(result.activityRequest, null);
+    assert.equal(result.friendshipDelta, 0);
+    assert.match(result.response, /今は|あとで/);
+  }
+});
+
+test('authored work schedule changes invitation availability by weekday', () => {
+  const makeInvite = (day) => socialNpc.resolveConversation({
+    npcId:'aoi', optionId:'invite', minute:10 * 60, day, activityId:'park',
+    friendship:10, relationships:{}, nearbySocialNpcIds:[], needs:{ social:40, fun:40 }
+  });
+  assert.equal(makeInvite(1).activityRequest, null);
+  assert.ok(makeInvite(7).activityRequest);
+});
+
+test('accepted invitation requests a routed social activity with midnight-safe expiry', () => {
+  const result = socialNpc.resolveConversation({
+    npcId:'yuto', optionId:'invite', minute:23 * 60 + 30, day:3, activityId:'park',
+    friendship:10, relationships:{}, nearbySocialNpcIds:[], needs:{ social:45, fun:40 }
+  });
+  assert.ok(result.activityRequest);
+  assert.equal(result.activityRequest.actionId, 'socialize');
+  assert.equal(result.activityRequest.placeId, 'park');
+  assert.equal(result.activityRequest.expiresAt, (3 - 1) * 1440 + 23 * 60 + 30 + 90);
+  assert.ok(result.friendshipDelta > 0);
+});
+
+test('conversation changes mutual affinity only for known nearby pairs and keeps values bounded', () => {
+  const result = socialNpc.resolveConversation({
+    npcId:'aoi', optionId:'ask', minute:12 * 60, day:1, activityId:'park', friendship:100,
+    relationships:{'aoi|sora':100}, nearbySocialNpcIds:['sora','unknown'], needs:{ social:50, fun:50 }
+  });
+  assert.equal(result.friendshipDelta, 0);
+  assert.deepEqual(result.relationshipChanges, [{ pairKey:'aoi|sora', delta:0 }]);
+  const unrelated = socialNpc.resolveConversation({
+    npcId:'aoi', optionId:'ask', minute:12 * 60, day:1, activityId:'park', friendship:0,
+    relationships:{}, nearbySocialNpcIds:['sora'], needs:{ social:50, fun:50 }
+  });
+  assert.deepEqual(unrelated.relationshipChanges, [{ pairKey:'aoi|sora', delta:1 }]);
+});
+
+test('social action bias is bounded and only applies to the socialize candidate', () => {
+  const input = { npcId:'aoi', minute:12 * 60, day:1, relationships:{'aoi|sora':70}, nearbySocialNpcIds:['sora'] };
+  const socialBias = socialNpc.getSocialActionBias({ ...input, action:'socialize' });
+  assert.ok(socialBias > 0 && socialBias <= 30);
+  assert.equal(socialNpc.getSocialActionBias({ ...input, action:'work' }), 0);
+  assert.equal(socialNpc.getSocialActionBias({ ...input, action:'sleep' }), 0);
+});
