@@ -210,7 +210,7 @@ test('enterable home exterior matches surrounding detached-house scale', () => {
 
 test('all existing facilities and stations remain addressable', () => {
   const map = createMapModel();
-  assert.deepEqual(map.places.map((place) => place.id), ['home','cafe','store','park','gym','library','community-center','fuel-station']);
+  assert.deepEqual(map.places.map((place) => place.id), ['home','cafe','store','park','gym','library','community-center','fuel-station','delivery-depot']);
   assert.deepEqual(map.stations.map((station) => station.id), ['west','central','east']);
   for (const place of map.places) {
     assert.ok(map.getNode(place.entranceNodeId));
@@ -332,5 +332,17 @@ test('Wakaba fuel station is reachable on foot and by car without map collisions
   assert.equal(station.type, 'fuel-station');
   assert.ok(map.findRoute('home-entrance', station.entranceNodeId, { mode:'pedestrian' }));
   assert.ok(map.findRoute('home-road', station.roadNodeId, { mode:'vehicle' }));
+  assert.deepEqual(map.validate(), []);
+});
+
+test('Wakaba courier depot is walkable, connected to the home road, and collision-free', () => {
+  const map = createMapModel();
+  const depot = map.places.find((place) => place.id === 'delivery-depot');
+  assert.ok(depot);
+  assert.equal(depot.name, '若葉便 配達受付所');
+  assert.equal(depot.type, 'delivery-depot');
+  assert.ok(map.findRoute('home-entrance', depot.entranceNodeId, { mode:'pedestrian' }));
+  assert.ok(map.findRoute('home-road', depot.roadNodeId, { mode:'vehicle' }));
+  assert.equal(map.isWalkable(depot.x, depot.y, 14), true);
   assert.deepEqual(map.validate(), []);
 });

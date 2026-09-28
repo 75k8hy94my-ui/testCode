@@ -163,6 +163,47 @@ test('fuel station has a distinct illustrated pump canopy and Japanese signage',
   assert.match(renderer, /給油/);
 });
 
+test('delivery-work model loads before the game and progress survives snapshot round trips', () => {
+  assert.match(html, /delivery-work\.js[^\n]*<\/script>[\s\S]*game\.js/);
+  assert.match(source, /deliveryWork:\s*deliveryWorkModel\.normalizeProgress\(state\.deliveryWork\)/);
+  assert.match(source, /state\.deliveryWork\s*=\s*deliveryWorkModel\.normalizeProgress\(saved\.deliveryWork\)/);
+});
+
+test('delivery depot lists daily offers and can accept, navigate, and cancel an active job', () => {
+  const depotStart = source.indexOf('if (place.id === "delivery-depot")');
+  const depotEnd = source.indexOf('if (place.id === "cafe")', depotStart);
+  const depotAction = source.slice(depotStart, depotEnd);
+  assert.ok(depotStart >= 0 && depotEnd > depotStart);
+  assert.match(depotAction, /deliveryWorkModel\.listOffers\(state\.day, state\.deliveryWork\)/);
+  assert.match(depotAction, /deliveryWorkModel\.acceptDelivery\(/);
+  assert.match(depotAction, /deliveryWorkModel\.cancelDelivery\(/);
+  assert.match(depotAction, /state\.phone\.waypoint\s*=\s*offer\.destinationPlaceId/);
+});
+
+test('matching destination has a one-time parcel handoff with on-time and late payouts', () => {
+  assert.match(source, /deliveryWorkModel\.completeDelivery\(state\.deliveryWork, state\.day, Math\.floor\(state\.minute\), place\.id\)/);
+  assert.match(source, /state\.cash\s*\+=\s*result\.payout/);
+  assert.match(source, /state\.phone\.waypoint === result\.offer\.destinationPlaceId/);
+  assert.match(source, /result\.late\s*\?\s*"遅延配達/);
+});
+
+test('active delivery destination interaction outranks nearby NPC and parked-car prompts', () => {
+  const interaction = source.slice(source.indexOf('function nearestInteraction()'), source.indexOf('function enterCar()'));
+  const destinationPriority = interaction.indexOf('const deliveryDestination');
+  const depotPriority = interaction.indexOf('const deliveryDepot');
+  const carPriority = interaction.indexOf('if (distance(p.x, p.y, personalCar.x, personalCar.y) < 70)');
+  const npcPriority = interaction.indexOf('let nearestNpc = null');
+  assert.ok(destinationPriority >= 0 && destinationPriority < depotPriority && depotPriority < carPriority && carPriority < npcPriority);
+  assert.match(interaction, /target:deliveryDestination, label:"荷物を届ける"/);
+  assert.match(interaction, /target:deliveryDepot, label:"若葉便 配達受付所を利用"/);
+});
+
+test('delivery HUD shows the target and absolute-deadline countdown including overdue status', () => {
+  assert.match(source, /納品先/);
+  assert.match(source, /遅延中/);
+  assert.match(source, /deadlineAbsoluteMinute/);
+});
+
 test('player course progress is present in snapshots and older saves receive safe defaults', () => {
   assert.match(source, /communityCenter:\s*communityCenterModel\.normalizeProgress\(state\.communityCenter\)/);
   assert.match(source, /state\.communityCenter\s*=\s*communityCenterModel\.normalizeProgress\(saved\.communityCenter\)/);

@@ -62,6 +62,12 @@
     return;
   }
 
+  const deliveryWorkModel = globalThis.DeliveryWork;
+  if (!deliveryWorkModel?.normalizeProgress || !deliveryWorkModel?.listOffers || !deliveryWorkModel?.acceptDelivery || !deliveryWorkModel?.completeDelivery || !deliveryWorkModel?.cancelDelivery) {
+    showRuntimeError("DeliveryWork を読み込めません。");
+    return;
+  }
+
   const homeCookingModel = globalThis.CityDaysHomeCooking;
   if (!homeCookingModel?.listRecipes || !homeCookingModel?.cookMeal) {
     showRuntimeError("HomeCooking を読み込めません。");
@@ -1088,6 +1094,7 @@
     fitness: 0,
     libraryVisits: 0,
     communityCenter:communityCenterModel.normalizeProgress(null),
+    deliveryWork:deliveryWorkModel.createProgress(),
     shiftsWorked: 0,
     lastShiftDay: 0,
     needs: {
@@ -3641,6 +3648,28 @@
     actionChoices.appendChild(button);
   }
 
+  function getDeliveryTimeRemaining(active = state.deliveryWork?.active) {
+    if (!active) return null;
+    return active.deadlineAbsoluteMinute - ((state.day - 1) * 1440 + Math.floor(state.minute));
+  }
+
+  function completeActiveDelivery(place) {
+    const result = deliveryWorkModel.completeDelivery(state.deliveryWork, state.day, Math.floor(state.minute), place.id);
+    if (!result.ok) {
+      showToast(result.reason === "wrong-destination" ? "納品先が違います" : "配達中の荷物がありません");
+      return;
+    }
+    state.deliveryWork = result.progress;
+    state.cash += result.payout;
+    if (state.phone.waypoint === result.offer.destinationPlaceId) state.phone.waypoint = null;
+    advanceTime(2);
+    showToast((result.late ? "遅延配達 · " : "時間内に配達 · ") + result.offer.parcelName + " +¥" + result.payout.toLocaleString("ja-JP"));
+  }
+
+  function placeName(placeId) {
+    return PLACES.find((place) => place.id === placeId)?.name || "目的地";
+  }
+
   function canPay(amount) {
     if (state.cash < amount) {
       showToast("お金が足りません");
@@ -3838,6 +3867,42 @@
   function openPlace(place) {
     actionTitle.textContent = place.name;
     actionChoices.replaceChildren();
+
+    if (place.id === "delivery-depot") {
+      const active = state.deliveryWork.active;
+      if (active) {
+        const remaining = getDeliveryTimeRemaining(active);
+        const status = remaining < 0 ? "遅延中 " + Math.abs(remaining) + "分" : "残り " + remaining + "分";
+        actionDescription.textContent = active.parcelName + "を" + placeName(active.destinationPlaceId) + "へ配達中 · " + status;
+        addChoice("納品先を確認", active.parcelName + " → " + placeName(active.destinationPlaceId), () => {
+          state.phone.waypoint = active.destinationPlaceId;
+          showToast(placeName(active.destinationPlaceId) + "への案内を再開しました");
+        });
+        addChoice("配達をキャンセル", "この依頼は本日再受注できません", () => {
+          const result = deliveryWorkModel.cancelDelivery(state.deliveryWork);
+          if (!result.ok) return;
+          state.deliveryWork = result.progress;
+          if (state.phone.waypoint === active.destinationPlaceId) state.phone.waypoint = null;
+          showToast("配達をキャンセルしました");
+        });
+      } else {
+        actionDescription.textContent = "1日3件まで受注できます。徒歩でも車でも配達できます。";
+      }
+      for (const offer of deliveryWorkModel.listOffers(state.day, state.deliveryWork)) {
+        const destination = PLACES.find((candidate) => candidate.id === offer.destinationPlaceId);
+        addChoice(offer.parcelName, (destination?.name || "目的地") + " / " + offer.durationMinutes + "分 / ¥" + offer.reward.toLocaleString("ja-JP"), () => {
+          const result = deliveryWorkModel.acceptDelivery(state.deliveryWork, state.day, Math.floor(state.minute), offer.id);
+          if (!result.ok) {
+            showToast(result.reason === "active-delivery" ? "先に配達中の荷物を届けてください" : "この依頼は受注できません");
+            return;
+          }
+          state.deliveryWork = result.progress;
+          state.phone.waypoint = offer.destinationPlaceId;
+          state.phone.friendWaypointId = null;
+          showToast(offer.parcelName + "を受注 · " + (destination?.name || "目的地") + "へ向かいましょう");
+        }, Boolean(active));
+      }
+    }
 
     if (place.id === "home") {
       actionDescription.textContent = "自宅の中では家具を使って、料理・入浴・睡眠・休憩ができます。";
@@ -4106,6 +4171,11 @@
         " / 体操 " + state.communityCenter.skills.exercise + "（各100まで）";
     }
 
+    if (state.deliveryWork.active?.destinationPlaceId === place.id) {
+      actionDescription.textContent += "\n配達中: " + state.deliveryWork.active.parcelName + " · 荷物を届けて報酬を受け取れます。";
+      addChoice("荷物を届ける", state.deliveryWork.active.parcelName + " / 報酬 ¥" + state.deliveryWork.active.reward.toLocaleString("ja-JP"), () => completeActiveDelivery(place));
+    }
+
     actionSheet.hidden = false;
   }
 
@@ -4218,6 +4288,17 @@
 
     if (state.player.inVehicle) {
       return { type: "car-menu", label: state.drive.destination ? "ルート・降車メニュー" : "目的地を選ぶ" };
+    }
+
+    const deliveryDestination = state.deliveryWork?.active
+      ? PLACES.find((place) => place.id === state.deliveryWork.active.destinationPlaceId)
+      : null;
+    if (deliveryDestination && distance(p.x, p.y, deliveryDestination.x, deliveryDestination.y) < 105) {
+      return { type:"place", target:deliveryDestination, label:"荷物を届ける" };
+    }
+    const deliveryDepot = PLACES.find((place) => place.id === "delivery-depot");
+    if (deliveryDepot && distance(p.x, p.y, deliveryDepot.x, deliveryDepot.y) < 105) {
+      return { type:"place", target:deliveryDepot, label:"若葉便 配達受付所を利用" };
     }
 
     const railStation = nearestRailStationAccess(p.x, p.y);
@@ -4465,6 +4546,7 @@
         fitness: state.fitness,
         libraryVisits: state.libraryVisits,
         communityCenter:communityCenterModel.normalizeProgress(state.communityCenter),
+        deliveryWork:deliveryWorkModel.normalizeProgress(state.deliveryWork),
         shiftsWorked: state.shiftsWorked,
         lastShiftDay:state.lastShiftDay,
         needs: state.needs,
@@ -4706,6 +4788,7 @@
       state.fitness = Math.max(0, Math.floor(Number(saved.fitness) || 0));
       state.libraryVisits = Math.max(0, Math.floor(Number(saved.libraryVisits) || 0));
       state.communityCenter = communityCenterModel.normalizeProgress(saved.communityCenter);
+      state.deliveryWork = deliveryWorkModel.normalizeProgress(saved.deliveryWork);
       state.shiftsWorked = Math.max(0, Math.floor(Number(saved.shiftsWorked) || 0));
       state.lastShiftDay = Math.max(0, Math.floor(Number(saved.lastShiftDay) || 0));
       if (saved.phone && typeof saved.phone.waypoint === "string" && PLACES.some((place) => place.id === saved.phone.waypoint)) {
@@ -4713,6 +4796,7 @@
       } else {
         state.phone.waypoint = null;
       }
+      if (state.deliveryWork.active) state.phone.waypoint = state.deliveryWork.active.destinationPlaceId;
       if (saved.driving) {
         state.drive.rating = clamp(Math.round(Number(saved.driving.rating) || 100), 0, 100);
         state.drive.trips = Math.max(0, Math.floor(Number(saved.driving.trips) || 0));
@@ -8687,6 +8771,31 @@
       ctx.fillStyle = "#f6f3e8";
       ctx.font = "700 11px system-ui, sans-serif";
       ctx.fillText("給油", p.x, p.y + 177);
+    } else if (place.id === "delivery-depot") {
+      drawFacilityBuilding(p, building?.w || 320, building?.h || 270, "#d7c99f", "#665b46", "#9bb5b4");
+      ctx.fillStyle = "#f4ebd0";
+      roundedRectPath(ctx, p.x - 133, p.y - 76, 266, 40, 5);
+      ctx.fill();
+      ctx.fillStyle = "#4d5948";
+      ctx.font = "800 18px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("若葉便", p.x, p.y - 50);
+      ctx.fillStyle = "#78694c";
+      ctx.fillRect(p.x - 100, p.y + 4, 200, 6);
+      ctx.fillStyle = "#eee4cd";
+      ctx.fillRect(p.x - 72, p.y + 38, 144, 51);
+      ctx.strokeStyle = "#645c4b";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(p.x - 72, p.y + 38, 144, 51);
+      for (const parcelX of [-42, 0, 42]) {
+        ctx.fillStyle = parcelX === 0 ? "#c69a5c" : "#d5ad70";
+        ctx.fillRect(p.x + parcelX - 13, p.y + 51, 26, 25);
+        ctx.strokeStyle = "#8f7049";
+        ctx.strokeRect(p.x + parcelX - 13, p.y + 51, 26, 25);
+      }
+      ctx.fillStyle = "#f5f0df";
+      ctx.font = "700 11px system-ui, sans-serif";
+      ctx.fillText("配達受付", p.x, p.y + 111);
     }
 
     ctx.fillStyle = "rgba(18,24,21,.76)";
@@ -9508,6 +9617,15 @@
         else if (lead && lead.distance < 130) objectiveText.textContent = "前走車との車間を保つ";
         else objectiveText.textContent = "W / ↑・ACCELで加速、S / ↓・BRAKEで減速";
       }
+      return;
+    }
+
+    const activeDelivery = state.deliveryWork?.active;
+    if (activeDelivery) {
+      const remaining = getDeliveryTimeRemaining(activeDelivery);
+      objectiveTitle.textContent = "配達中: " + placeName(activeDelivery.destinationPlaceId);
+      objectiveText.textContent = "納品先 " + placeName(activeDelivery.destinationPlaceId) + " · " + activeDelivery.parcelName + " · " +
+        (remaining < 0 ? "遅延中 " + Math.abs(remaining) + "分" : "残り " + remaining + "分");
       return;
     }
 
