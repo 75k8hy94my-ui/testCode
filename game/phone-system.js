@@ -135,6 +135,7 @@
     }
     function mapsApp() {
       const places = model.places || [];
+      const activeTarget = model.friendWaypoint || model.waypoint;
       const rows = places.map(function(place){
         const active = model.waypoint && model.waypoint.id === place.id;
         return '<button class="ios-place-row ' + (active ? "active" : "") + '" type="button" data-phone-action="route" data-place-id="' +
@@ -142,9 +143,16 @@
           '</b><small>' + distText(place.distance) + ' · ' + esc(place.district || "") + '</small></div><em>' +
           (active ? "案内中" : "経路") + '</em></button>';
       }).join("");
-      return shell("マップ",'<div class="ios-map-card"><div class="ios-map-grid"></div><span class="map-user-dot"></span><div><b>' +
+      const targetStatus = model.friendWaypoint?.hidden
+        ? "屋内 · 現在地非表示"
+        : model.friendWaypoint
+          ? "友達の現在地 · " + distText(activeTarget.distance)
+          : activeTarget ? "案内中 · " + distText(activeTarget.distance) : "";
+      const targetCard = activeTarget ? '<div class="ios-live-card"><span>⌖</span><div><b>' + esc(activeTarget.name) +
+        '</b><small>' + targetStatus + '</small></div></div>' : '';
+      return shell("マップ",targetCard + '<div class="ios-map-card"><div class="ios-map-grid"></div><span class="map-user-dot"></span><div><b>' +
         esc(model.district || "若葉") + '</b><small>現在地</small></div></div><section class="ios-section"><h3>目的地</h3>' +
-        rows + '</section>' + (model.waypoint ? '<button class="ios-wide-button destructive" type="button" data-phone-action="clear-route">案内を終了</button>' : ''));
+        rows + '</section>' + (activeTarget ? '<button class="ios-wide-button destructive" type="button" data-phone-action="clear-route">案内を終了</button>' : ''));
     }
     function cameraApp() {
       return shell("カメラ",'<div class="ios-camera-view"><div class="camera-focus"></div><span>' + esc(model.district || "若葉") +
@@ -223,12 +231,58 @@
         (model.drivingRating || 100) + '</b></div><div><small>シフト</small><b>' + (model.shiftsWorked || 0) + '</b></div></section>');
     }
     function findApp() {
+      const canRouteToFriend = !model.inHome && !model.inVehicle && !model.inTrain;
       const friends = (model.npcs || []).map(function(npc){
-        return '<div class="ios-list-row"><span class="ios-avatar small" style="--avatar:' + (CONTACT_COLORS[npc.id] || "#8e8e93") + '">' +
+        const row = '<span class="ios-avatar small" style="--avatar:' + (CONTACT_COLORS[npc.id] || "#8e8e93") + '">' +
           esc((npc.name || "?").slice(0,1)) + '</span><div><b>' + esc(npc.name) + '</b><small>' +
-          (npc.hidden ? "屋内" : distText(npc.distance)) + ' · ' + esc(npc.activity || "") + '</small></div></div>';
+          (npc.hidden ? "屋内" : distText(npc.distance)) + ' · ' + esc(npc.activity || "") + '</small></div>';
+        if (npc.hidden) {
+          if (model.friendWaypoint && model.friendWaypoint.id === npc.id) {
+            return '<div class="ios-list-row">' + row + '<button class="ios-friend-route" type="button" data-phone-action="clear-route">案内解除</button></div>';
+          }
+          return '<div class="ios-list-row">' + row + '<em>位置非表示</em></div>';
+        }
+        if (model.friendWaypoint && model.friendWaypoint.id === npc.id) {
+          return '<div class="ios-list-row">' + row + '<button class="ios-friend-route active" type="button" data-phone-action="clear-route">案内解除</button></div>';
+        }
+        if (!canRouteToFriend) return '<div class="ios-list-row">' + row + '<em>徒歩で外出すると案内できます</em></div>';
+        return '<div class="ios-list-row">' + row + '<button class="ios-friend-route" type="button" data-phone-action="friend-route" data-contact-id="' +
+          esc(npc.id) + '">' + (model.friendWaypoint && model.friendWaypoint.id === npc.id ? "案内中" : "会いに行く") + '</button></div>';
       }).join("");
-      return shell("探す",'<div class="ios-find-map"><span class="find-me"></span><span class="find-car">●</span></div>' +
+      const visibleFriends = (model.npcs || []).filter(function(npc){
+        return !npc.hidden && Number.isFinite(npc.mapDX) && Number.isFinite(npc.mapDY);
+      });
+      const farthestFriend = Math.max(1100,...visibleFriends.map(function(npc){return Math.hypot(npc.mapDX,npc.mapDY);}));
+      const placedMarkers = [];
+      const offsets = [[0,0],[0,-15],[8,-8],[8,8],[0,15],[-8,8],[-8,-8],[0,-30],[16,0],[-16,0],[0,30]];
+      const friendMarkers = visibleFriends.map(function(npc){
+        const desiredX = 50 + npc.mapDX * 21 / farthestFriend;
+        const desiredY = 48 + npc.mapDY * 42 / farthestFriend;
+        let marker = null;
+        for (const [offsetX,offsetY] of offsets) {
+          const candidate = {
+            x:Math.max(8,Math.min(92,Math.round(desiredX + offsetX))),
+            y:Math.max(8,Math.min(88,Math.round(desiredY + offsetY)))
+          };
+          const crowded = placedMarkers.some(function(other){
+            return Math.hypot((candidate.x - other.x) * 3.46,(candidate.y - other.y) * 1.74) < 25;
+          });
+          if (!crowded) { marker = candidate; break; }
+        }
+        marker ||= { x:Math.round(desiredX),y:Math.round(desiredY) };
+        placedMarkers.push(marker);
+        const isActiveTarget = Boolean(model.friendWaypoint && model.friendWaypoint.id === npc.id);
+        const action = isActiveTarget ? "clear-route" : "friend-route";
+        const accessibleLabel = isActiveTarget
+          ? (npc.name || "友達") + "への案内中。タップして解除"
+          : (npc.name || "友達") + "に会いに行く";
+        return '<button class="find-friend-marker' + (isActiveTarget ? " active" : "") + '" type="button" data-phone-action="' + action + '"' +
+          (isActiveTarget ? "" : ' data-contact-id="' + esc(npc.id) + '"') + ' aria-label="' + esc(accessibleLabel) + '"' +
+          (!canRouteToFriend && !isActiveTarget ? " disabled" : "") +
+          ' style="left:' + marker.x + '%;top:' + marker.y + '%">' +
+          (isActiveTarget ? "✓" : esc((npc.name || "?").slice(0,1))) + '</button>';
+      }).join("");
+      return shell("探す",'<div class="ios-find-map"><span class="find-me"></span><span class="find-car">●</span>' + friendMarkers + '</div>' +
         '<section class="ios-section"><h3>持ち物</h3><div class="ios-list-row"><span>🚗</span><div><b>マイカー</b><small>' +
         distText(model.carDistance) + '</small></div></div></section><section class="ios-section"><h3>友達</h3>' + friends + '</section>');
     }
@@ -357,7 +411,8 @@
         nextRentDay:value.nextRentDay,
         waypoint:value.waypoint ? [value.waypoint.id,Math.round((value.waypoint.distance || 0) / 20)] : null,
         needs:["hunger","energy","hygiene","social","fun"].map(function(key){return Math.round(Number(needs[key]) || 0);}),
-        npcs:(value.npcs || []).map(function(n){return [n.id,n.friendship,n.hidden,n.activity,Math.round((n.distance || 0) / 25)];}),
+        npcs:(value.npcs || []).map(function(n){return [n.id,n.friendship,n.hidden,n.activity,Math.round((n.distance || 0) / 25),Math.round((n.mapDX || 0) / 20),Math.round((n.mapDY || 0) / 20)];}),
+        friendWaypoint:value.friendWaypoint ? [value.friendWaypoint.id,Math.round((value.friendWaypoint.distance || 0) / 20)] : null,
         trains:(value.trains || []).map(function(t){return [t.id,t.stationIndex,t.targetIndex,Math.round((t.dwell || 0) * 2)];})
       });
     }
@@ -433,6 +488,10 @@
         if (cb.call) cb.call(npc.id);
         render();
       } else if (action === "route") { if (cb.route) cb.route(button.dataset.placeId); }
+      else if (action === "friend-route") {
+        const npc = (model.npcs || []).find(function(n){return n.id === button.dataset.contactId && !n.hidden;});
+        if (npc && cb.friendRoute) cb.friendRoute(npc.id);
+      }
       else if (action === "clear-route") { if (cb.clearRoute) cb.clearRoute(); }
       else if (action === "take-photo") {
         const photo = cb.capturePhoto ? cb.capturePhoto() : null;

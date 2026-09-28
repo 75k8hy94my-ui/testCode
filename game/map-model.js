@@ -630,6 +630,74 @@
       return length;
     }
 
+    function pedestrianOffsetPose(edgeIdOrEdge, distanceAlong, directionSign = 1, lateralOffset = 0) {
+      const edge = typeof edgeIdOrEdge === "string" ? getEdge(edgeIdOrEdge) : edgeIdOrEdge;
+      if (!edge || !Array.isArray(edge.points) || edge.points.length < 2) return null;
+
+      const points = edge.points;
+      const totalLength = edgeLength(edge);
+      const along = Math.max(0, Math.min(totalLength, Number(distanceAlong) || 0));
+      let remaining = along;
+      let pointOnEdge = { ...points.at(-1) };
+      let tangent = { x:1, y:0 };
+      const segmentLengths = [];
+
+      for (let i = 1; i < points.length; i += 1) {
+        const from = points[i - 1];
+        const to = points[i];
+        const length = distance(from, to);
+        segmentLengths.push(length);
+        if (length > .001 && (remaining <= length || i === points.length - 1)) {
+          const progress = Math.max(0, Math.min(1, remaining / length));
+          pointOnEdge = {
+            x:from.x + (to.x - from.x) * progress,
+            y:from.y + (to.y - from.y) * progress
+          };
+          tangent = { x:(to.x - from.x) / length, y:(to.y - from.y) / length };
+          break;
+        }
+        remaining = Math.max(0, remaining - length);
+      }
+
+      let vertexAlong = 0;
+      for (let i = 1; i < points.length - 1; i += 1) {
+        const previousLength = segmentLengths[i - 1] ?? distance(points[i - 1], points[i]);
+        const nextLength = segmentLengths[i] ?? distance(points[i], points[i + 1]);
+        vertexAlong += previousLength;
+        const window = Math.min(28, previousLength * .49, nextLength * .49);
+        if (window <= .001) continue;
+        const progress = (along - vertexAlong + window) / (window * 2);
+        if (progress < 0 || progress > 1) continue;
+
+        const previous = {
+          x:(points[i].x - points[i - 1].x) / previousLength,
+          y:(points[i].y - points[i - 1].y) / previousLength
+        };
+        const next = {
+          x:(points[i + 1].x - points[i].x) / nextLength,
+          y:(points[i + 1].y - points[i].y) / nextLength
+        };
+        const turn = Math.atan2(
+          previous.x * next.y - previous.y * next.x,
+          previous.x * next.x + previous.y * next.y
+        );
+        const eased = progress * progress * (3 - 2 * progress);
+        const angle = Math.atan2(previous.y, previous.x) + turn * eased;
+        tangent = { x:Math.cos(angle), y:Math.sin(angle) };
+        break;
+      }
+
+      const sign = directionSign < 0 ? -1 : 1;
+      const tx = tangent.x * sign;
+      const ty = tangent.y * sign;
+      const offset = Number(lateralOffset) || 0;
+      return {
+        x:pointOnEdge.x + ty * offset,
+        y:pointOnEdge.y - tx * offset,
+        angle:Math.atan2(ty, tx)
+      };
+    }
+
     function edgeOutwardDirection(edge, nodeId) {
       const junctionNode = getNode(nodeId);
       if (!junctionNode || !edge) return null;
@@ -978,6 +1046,7 @@
       districtAt,
       findRoute,
       pedestrianCorridor,
+      pedestrianOffsetPose,
       junctionGeometry,
       validate
     });

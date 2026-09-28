@@ -79,7 +79,9 @@
   const pausedOverlay = document.getElementById("pausedOverlay");
   const smartphoneToggle = document.getElementById("smartphoneToggle");
   const smartphonePanel = document.getElementById("smartphonePanel");
+  const SMARTPHONE_REFRESH_INTERVAL = 0.25;
   let phoneSystem = null;
+  let smartphoneRefreshElapsed = 0;
   const joystick = document.getElementById("joystick");
   const joystickKnob = document.getElementById("joystickKnob");
   const actionButton = document.getElementById("actionButton");
@@ -1063,7 +1065,8 @@
       cameraLagY: 0
     },
     phone: {
-      waypoint: null
+      waypoint: null,
+      friendWaypointId: null
     },
     drive: {
       route: [],
@@ -2344,9 +2347,6 @@
   }
 
   function pedestrianEdgePose(edge, directionSign, along, sideSign = 1, avoidanceOffset = 0) {
-    const edgeLength = polylineLength(edge.points);
-    const hit = pointAndTangentOnPolyline(edge.points, clamp(along, 0, edgeLength));
-    const tangent = directionSign > 0 ? hit.tangent : { x:-hit.tangent.x, y:-hit.tangent.y };
     const layout = pedestrianSidewalkLayout(edge, directionSign);
     const avoidance = clamp(
       Math.max(0, Number(avoidanceOffset) || 0),
@@ -2354,11 +2354,7 @@
       layout.maxAvoidance
     );
     const lateralOffset = (layout.baseOffset + avoidance) * (sideSign || 1);
-    return {
-      x:hit.point.x + tangent.y * lateralOffset,
-      y:hit.point.y - tangent.x * lateralOffset,
-      angle:Math.atan2(tangent.y, tangent.x)
-    };
+    return mapModel.pedestrianOffsetPose(edge, along, directionSign, lateralOffset);
   }
 
   function pedestrianCornerControl(fromPose, toPose) {
@@ -4724,6 +4720,23 @@
     return car.routeEdgeIds?.[car.routeIndex] || null;
   }
 
+  function trafficIntersectionSignal(car, timeMs) {
+    const edge = mapModel.getEdge(car.edgeId);
+    if (!edge) return null;
+    const nodeId = car.directionSign > 0 ? edge.to : edge.from;
+    const next = mapModel.getEdge(trafficNextEdgeId(car));
+    if (!next || (next.from !== nodeId && next.to !== nodeId)) return null;
+    const nextDirectionSign = next.from === nodeId ? 1 : -1;
+    return trafficOvertake.turnSignalForRoute({
+      currentPoints:edge.points,
+      currentDirectionSign:car.directionSign,
+      nextPoints:next.points,
+      nextDirectionSign,
+      distanceToJunction:trafficDistanceToEndpoint(car, edge),
+      timeMs
+    });
+  }
+
   function trafficLeadInfo(car, maxDistance = 320) {
     const edge = mapModel.getEdge(car.edgeId);
     if (!edge) return null;
@@ -4784,7 +4797,7 @@
     return hit.distance <= Math.max(8, halfWidth - 3);
   }
 
-  function projectedObstacleDistance(car) {
+  function projectedObstacleDistance(car, ignorePersonalCar = false) {
     const hx = Math.cos(car.angle);
     const hy = Math.sin(car.angle);
     const dims = vehicleDimensions(car);
@@ -4815,14 +4828,16 @@
       considerPoint(ped.x, ped.y, NPC_COLLISION_RADIUS);
     }
 
-    const dx = personalCar.x - car.x;
-    const dy = personalCar.y - car.y;
-    const forward = dx * hx + dy * hy;
-    const lateral = Math.abs(dx * -hy + dy * hx);
-    const headingDot = Math.cos(personalCar.angle) * hx + Math.sin(personalCar.angle) * hy;
-    const otherDims = vehicleDimensions(personalCar, true);
-    if (forward > 0 && forward < 210 && lateral < (dims.width + otherDims.width) * .5 + 10 && headingDot > -.25) {
-      best = Math.min(best, Math.max(0, forward - dims.length * .5 - otherDims.length * .5));
+    if (!ignorePersonalCar) {
+      const dx = personalCar.x - car.x;
+      const dy = personalCar.y - car.y;
+      const forward = dx * hx + dy * hy;
+      const lateral = Math.abs(dx * -hy + dy * hx);
+      const headingDot = Math.cos(personalCar.angle) * hx + Math.sin(personalCar.angle) * hy;
+      const otherDims = vehicleDimensions(personalCar, true);
+      if (forward > 0 && forward < 210 && lateral < (dims.width + otherDims.width) * .5 + 10 && headingDot > -.25) {
+        best = Math.min(best, Math.max(0, forward - dims.length * .5 - otherDims.length * .5));
+      }
     }
 
     return best;
@@ -4863,7 +4878,7 @@
 
   function trafficParkedCarInfo(car) {
     const edge = mapModel.getEdge(car.edgeId);
-    if (!edge || !edge.vehicle || state.player.inVehicle || state.player.inHome || (personalCar.speed || 0) > 2) return null;
+    if (!edge || !edge.vehicle || state.player.inVehicle || (personalCar.speed || 0) > 2) return null;
     const parkedHit = mapModel.nearestRoad(personalCar.x, personalCar.y, { vehicleOnly:true });
     if (!parkedHit || parkedHit.edgeId !== edge.id || parkedHit.distance > edge.width / 2 + 36) return null;
     const parkedAlong = trafficAlongAtRoadHit(edge, parkedHit);
@@ -4886,45 +4901,53 @@
       obstacleLateral,
       obstacleHalfWidth
     });
-    if (!blocksLane) return null;
     const centerGap = actualDistance - vehicleDimensions(car).length * VEHICLE_COLLISION_SCALE / 2 - obstacleHalfLength;
-    return { edge, hit:parkedHit, actualDistance, centerGap, obstacleLateral, obstacleHalfWidth, carHalfWidth };
+    return { edge, hit:parkedHit, actualDistance, centerGap, obstacleLateral, obstacleHalfWidth, obstacleHalfLength, carHalfWidth, blocksLane };
   }
 
   function trafficOvertakePlan(car, obstacle) {
     if (!obstacle) return null;
-    const { edge, actualDistance, obstacleLateral, obstacleHalfWidth, carHalfWidth } = obstacle;
+    const { edge, actualDistance, obstacleLateral, obstacleHalfWidth, obstacleHalfLength, carHalfWidth } = obstacle;
 
     const endpointDistance = trafficDistanceToEndpoint(car, edge);
+    const vehicleHalfLength = vehicleDimensions(car).length * VEHICLE_COLLISION_SCALE / 2;
     const opposingVehicles = traffic.filter((other) =>
       other !== car && other.edgeId === edge.id && other.directionSign !== car.directionSign
     ).map((other) => ({
       distance:(other.along - car.along) * car.directionSign,
-      halfLength:vehicleDimensions(other).length / 2
+      halfLength:vehicleDimensions(other).length * VEHICLE_COLLISION_SCALE / 2,
+      speed:other.speed,
+      cruiseSpeed:other.cruise
     }));
-    const plan = trafficOvertake.plan({
+    return trafficOvertake.planForObstacle({
       roadWidth:edge.width,
       carHalfWidth,
+      vehicleHalfLength,
       currentOffset:car.laneOffset,
       obstacleDistance:actualDistance,
+      minimumDistance:car.speed < 5
+        ? trafficOvertake.minimumEmergencyDistance(vehicleHalfLength,obstacleHalfLength)
+        : 130,
       obstacleLateral,
       obstacleHalfWidth,
+      obstacleHalfLength,
+      endpointDistance,
+      currentAlong:car.along,
+      directionSign:car.directionSign,
+      planningSpeed:Math.max(car.speed, 85),
       opposingVehicles
     });
-    if (!plan || endpointDistance <= plan.endDistance + 100) return null;
-    return {
-      startAlong:car.along + car.directionSign * plan.startDistance,
-      endAlong:car.along + car.directionSign * plan.endDistance,
-      directionSign:car.directionSign,
-      fromOffset:car.laneOffset,
-      targetOffset:plan.targetOffset
-    };
+    if (!blocksLane) return null;
   }
 
-  function updateTrafficOvertake(car) {
+  function updateTrafficOvertake(car, dt, stationaryParkedBlock = false) {
     const plan = car.overtakePlan;
     if (!plan || plan.directionSign !== car.directionSign) return false;
-    const result = trafficOvertake.offsetAt(plan, car.along);
+    const result = trafficOvertake.offsetAt(plan, car.along, dt, { stationary:stationaryParkedBlock });
+    if (Number.isFinite(result.shiftProgress)) plan.shiftProgress = result.shiftProgress;
+    if (Number.isFinite(result.stationaryShiftStart)) plan.stationaryShiftStart = result.stationaryShiftStart;
+    if (Number.isFinite(result.stationaryShiftElapsed)) plan.stationaryShiftElapsed = result.stationaryShiftElapsed;
+    if (Number.isFinite(result.stationaryShiftProgress)) plan.stationaryShiftProgress = result.stationaryShiftProgress;
     car.laneOffset = result.offset;
     if (result.complete) car.overtakePlan = null;
     return result.complete;
@@ -5368,8 +5391,9 @@
       }
 
       const parkedObstacle = trafficParkedCarInfo(car);
-      const parkedGap = parkedObstacle?.centerGap ?? Infinity;
-      const obstacleGap = Math.min(projectedObstacleDistance(car), parkedGap);
+      const parkedGap = parkedObstacle?.blocksLane ? parkedObstacle.centerGap : Infinity;
+      const projectedGap = projectedObstacleDistance(car, Boolean(parkedObstacle));
+      const obstacleGap = Math.min(projectedGap, parkedGap);
       if (!car.overtakePlan && parkedGap < 180) {
         car.overtakePlan = trafficOvertakePlan(car, parkedObstacle);
       }
@@ -5432,7 +5456,9 @@
         transitions += 1;
       }
 
-      updateTrafficOvertake(car);
+      const stationaryParkedBlock = car.speed < 5 && blockReason === "obstacle" &&
+        parkedObstacle?.blocksLane && parkedGap <= projectedGap;
+      updateTrafficOvertake(car, dt, stationaryParkedBlock);
       const steeredPose = trafficPoseAt(car, car.along);
       car.x = steeredPose.x;
       car.y = steeredPose.y;
@@ -8413,6 +8439,10 @@
     const braking = owned
       ? (state.player.inVehicle && (touch.driveBrake || keys.has("s") || keys.has("arrowdown") || keys.has(" ")))
       : Boolean(car.brakeGlow > .15);
+    const turnSignalTime = performance.now();
+    const turnSignal = owned ? null : car.overtakePlan
+      ? trafficOvertake.signalFor(car.overtakePlan, turnSignalTime)
+      : trafficIntersectionSignal(car, turnSignalTime);
 
     const time = visualTime();
     ctx.save();
@@ -8537,6 +8567,8 @@
     ctx.fillStyle = "rgba(54,73,61,.7)";
     ctx.fillRect(length / 2 - 4.5, -2, 1.5, 4);
     ctx.fillRect(-length / 2 + 2.5, -2, 1.5, 4);
+
+    if (turnSignal) trafficOvertake.drawSignal(ctx, length, width, turnSignal);
 
     if (owned) {
       ctx.strokeStyle = "rgba(233,244,249,.82)";
@@ -8797,18 +8829,17 @@
       keys.has("arrowup") || keys.has("arrowdown") || keys.has("arrowleft") || keys.has("arrowright") ||
       Math.abs(touch.x) > .08 || Math.abs(touch.y) > .08;
     const phase = moving ? performance.now() * .009 : 0;
-    drawPersonSpriteAtScreen(
-      p.x,
-      p.y,
-      dir,
-      "#405c50",
-      "#313b42",
-      "#332a24",
-      "#edbea0",
+    characterRenderer.draw(ctx, {
+      x:p.x,
+      y:p.y,
+      direction:dir,
       phase,
-      1.08 * p.scale,
-      PLAYER_APPEARANCE
-    );
+      scale:1.08 * p.scale,
+      appearance:PLAYER_APPEARANCE,
+      state:moving ? "walk" : "idle",
+      lod:characterLodAtScreen(p, p.scale),
+      timeMs:performance.now()
+    });
   }
 
   function drawStreetLightsGlow() {
@@ -9010,6 +9041,31 @@
       mctx.restore();
     }
 
+    const friendWaypoint = phoneFriendWaypointTarget();
+    if (friendWaypoint && !friendWaypoint.hidden && !state.player.inVehicle && !state.player.inTrain && !state.player.inHome) {
+      const wx = w / 2 + (friendWaypoint.x - p.x) * scale;
+      const wy = h / 2 + (friendWaypoint.y - p.y) * scale;
+      mctx.save();
+      mctx.strokeStyle = "rgba(232,120,157,.9)";
+      mctx.setLineDash([4, 4]);
+      mctx.lineWidth = 1.8;
+      mctx.beginPath();
+      mctx.moveTo(w / 2, h / 2);
+      mctx.lineTo(wx, wy);
+      mctx.stroke();
+      mctx.setLineDash([]);
+      if (wx >= -8 && wy >= -8 && wx <= w + 8 && wy <= h + 8) {
+        mctx.fillStyle = "#e8789d";
+        mctx.beginPath();
+        mctx.arc(wx, wy, 5.5, 0, Math.PI * 2);
+        mctx.fill();
+        mctx.strokeStyle = "#fff";
+        mctx.lineWidth = 1.5;
+        mctx.stroke();
+      }
+      mctx.restore();
+    }
+
     mctx.strokeStyle = "rgba(155,190,174,.8)";
     mctx.lineWidth = 2;
     const railY = h / 2 + (RAIL_Y - p.y) * scale;
@@ -9085,6 +9141,29 @@
       }
     }
 
+    if (state.phone?.friendWaypointId) {
+      const friend = phoneFriendWaypointTarget();
+      if (!friend) {
+        state.phone.friendWaypointId = null;
+      } else if (friend.hidden) {
+        objectiveTitle.textContent = friend.name + "は屋内にいます";
+        objectiveText.textContent = "安全のため、屋内にいる間は現在地を表示しません";
+        return;
+      } else {
+        const p = actorPosition();
+        const remaining = distance(p.x, p.y, friend.x, friend.y);
+        if (remaining <= 52) {
+          state.phone.friendWaypointId = null;
+          objectiveTitle.textContent = friend.name + "の近くです";
+          objectiveText.textContent = "周囲を見渡して話しかけてみましょう";
+        } else {
+          objectiveTitle.textContent = friend.name + "に会いに行く";
+          objectiveText.textContent = "現在地まで約" + Math.max(1, Math.round(remaining / 10) * 10) + "m · スマホの『探す』で追跡中";
+          return;
+        }
+      }
+    }
+
     const n = state.needs;
     if (state.cash < 0) {
       objectiveTitle.textContent = "家計を立て直そう";
@@ -9125,10 +9204,19 @@
     objectiveText.textContent = "仕事・買い物・運動・読書・交流を自由に選べる";
   }
 
+  function phoneFriendWaypointTarget() {
+    const id = state.phone?.friendWaypointId;
+    if (!id) return null;
+    return NPCS.find((npc) => npc.id === id) || null;
+  }
+
   function phoneStatusMessage() {
     if (state.player.inHome) return "自宅で過ごしています。家具を利用できます。";
     if (state.player.inVehicle) return "運転中です。安全運転で目的地へ向かいましょう。";
     if (state.player.inTrain) return "若葉線で移動中です。";
+    const friend = phoneFriendWaypointTarget();
+    if (friend && !friend.hidden) return friend.name + "に会いに向かっています。";
+    if (friend?.hidden) return friend.name + "は屋内にいます。現在地は表示されません。";
     const waypoint = PLACES.find((place) => place.id === state.phone?.waypoint);
     if (waypoint) return waypoint.name + "へ徒歩で案内中です。";
     return "今日も若葉の街で、自由に過ごしましょう。";
@@ -9137,6 +9225,7 @@
   function phoneModelSnapshot() {
     const p = actorPosition();
     const waypointPlace = PLACES.find((place) => place.id === state.phone?.waypoint);
+    const friendWaypoint = phoneFriendWaypointTarget();
     return {
       day:state.day,
       minute:state.minute,
@@ -9164,6 +9253,14 @@
         name:waypointPlace.name,
         distance:distance(p.x, p.y, waypointPlace.x, waypointPlace.y)
       } : null,
+      friendWaypoint:friendWaypoint ? {
+        id:friendWaypoint.id,
+        name:friendWaypoint.name,
+        hidden:Boolean(friendWaypoint.hidden),
+        ...(friendWaypoint.hidden ? {} : {
+          distance:distance(p.x, p.y, friendWaypoint.x, friendWaypoint.y)
+        })
+      } : null,
       places:PLACES.map((place) => ({
         id:place.id,
         name:place.name,
@@ -9177,7 +9274,9 @@
         friendship:npc.friendship,
         hidden:Boolean(npc.hidden),
         activity:npc.activityLabel || "移動中",
-        distance:distance(p.x, p.y, npc.x, npc.y)
+        distance:npc.hidden ? null : distance(p.x, p.y, npc.x, npc.y),
+        mapDX:npc.hidden ? null : npc.x - p.x,
+        mapDY:npc.hidden ? null : npc.y - p.y
       })),
       stations:TRAIN_STATIONS.map((station) => ({
         id:station.id,
@@ -9198,6 +9297,7 @@
     const place = PLACES.find((value) => value.id === placeId);
     if (!place) return;
     state.phone.waypoint = place.id;
+    state.phone.friendWaypointId = null;
     if (state.player.inVehicle) {
       setDrivingDestination(place);
     } else {
@@ -9206,8 +9306,22 @@
     updateSmartphone();
   }
 
+  function setPhoneFriendWaypoint(npcId) {
+    const npc = NPCS.find((value) => value.id === npcId && !value.hidden);
+    if (!npc) return;
+    if (state.player.inHome || state.player.inVehicle || state.player.inTrain) {
+      showToast("徒歩で外にいるときに案内できます");
+      return;
+    }
+    state.phone.waypoint = null;
+    state.phone.friendWaypointId = npc.id;
+    showToast(npc.name + "に会いに行く案内を開始しました");
+    updateSmartphone();
+  }
+
   function clearPhoneWaypoint() {
     state.phone.waypoint = null;
+    state.phone.friendWaypointId = null;
     if (state.player.inVehicle) {
       state.drive.route = [];
       state.drive.routeIndex = 0;
@@ -9377,6 +9491,15 @@
     }
 
     update(dt);
+    if (smartphonePanel && !smartphonePanel.hidden) {
+      smartphoneRefreshElapsed += dt;
+      if (smartphoneRefreshElapsed >= SMARTPHONE_REFRESH_INTERVAL) {
+        smartphoneRefreshElapsed %= SMARTPHONE_REFRESH_INTERVAL;
+        updateSmartphone();
+      }
+    } else {
+      smartphoneRefreshElapsed = 0;
+    }
     updateGameAudio(dt);
 
     if (toastTimer > 0) {
@@ -9460,6 +9583,7 @@
       callbacks:{
         close:() => setSmartphoneOpen(false),
         route:(placeId) => setPhoneWaypoint(placeId),
+        friendRoute:(npcId) => setPhoneFriendWaypoint(npcId),
         clearRoute:() => clearPhoneWaypoint(),
         capturePhoto:() => capturePhonePhoto(),
         setSound:(enabled) => {

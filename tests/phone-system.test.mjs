@@ -67,6 +67,156 @@ test('phone waypoint persists in game snapshots', () => {
   assert.match(gameSource, /saved\.phone && typeof saved\.phone\.waypoint === "string"/);
 });
 
+test('friend finder only exposes visible NPC coordinates and tracks a temporary walking target', () => {
+  assert.match(gameSource, /distance:npc\.hidden \? null : distance\(p\.x, p\.y, npc\.x, npc\.y\)/);
+  assert.match(gameSource, /mapDX:npc\.hidden \? null/);
+  assert.match(gameSource, /mapDY:npc\.hidden \? null/);
+  assert.match(gameSource, /phoneFriendWaypointTarget\(\)/);
+  const snapshotSource = gameSource.slice(gameSource.indexOf('function phoneModelSnapshot()'),gameSource.indexOf('function setPhoneWaypoint('));
+  assert.match(snapshotSource, /friendWaypoint:\s*friendWaypoint\s*\? \{[\s\S]*hidden:Boolean\(friendWaypoint\.hidden\)[\s\S]*friendWaypoint\.hidden \? \{\} : \{[\s\S]*distance:distance\(p\.x, p\.y, friendWaypoint\.x, friendWaypoint\.y\)/);
+  assert.match(gameSource, /function setPhoneFriendWaypoint\(npcId\)/);
+  assert.match(gameSource, /if \(state\.player\.inHome \|\| state\.player\.inVehicle \|\| state\.player\.inTrain\)/);
+  assert.match(gameSource, /friendRoute:\(npcId\) => setPhoneFriendWaypoint\(npcId\)/);
+  assert.match(gameSource, /friendWaypointId: null/);
+  assert.match(phoneSource, /data-phone-action="friend-route"/);
+});
+
+test('Find shows live visible friends and starts a friend waypoint without exposing indoor locations', () => {
+  const handlers = new Map();
+  const root = {
+    hidden:false,
+    innerHTML:"",
+    classList:{ toggle() {} },
+    style:{ setProperty() {} },
+    addEventListener(type, handler) { handlers.set(type, handler); }
+  };
+  const routed = [];
+  const cleared = [];
+  const phone = phoneModule.createPhoneSystem({
+    root,
+    callbacks:{ friendRoute:(id) => routed.push(id),clearRoute:() => cleared.push(true) }
+  });
+  const clickAction = (phoneAction, extra = {}) => handlers.get("click")({
+    target:{ closest(selector) {
+      return selector === "[data-phone-action]" ? { dataset:{ phoneAction,...extra } } : null;
+    } }
+  });
+  const clickApp = (phoneApp) => handlers.get("click")({
+    target:{ closest(selector) {
+      return selector === "[data-phone-app]" ? { dataset:{ phoneApp } } : null;
+    } }
+  });
+  phone.update({
+    day:1,
+    minute:510,
+    npcs:[
+      { id:"aoi",name:"アオイ",hidden:false,distance:42,activity:"公園で休憩",mapDX:240,mapDY:-120 },
+      { id:"mei",name:"メイ",hidden:false,distance:45,activity:"読書・勉強",mapDX:250,mapDY:-115 },
+      { id:"sora",name:"ソラ",hidden:true,distance:null,activity:"勤務中",mapDX:null,mapDY:null }
+    ]
+  });
+  phone.openApp("find");
+
+  assert.match(root.innerHTML,/アオイ/);
+  assert.match(root.innerHTML,/data-phone-action="friend-route" data-contact-id="aoi"/);
+  const friendMarkerPositions = [...root.innerHTML.matchAll(/class="find-friend-marker"[^>]*style="left:(\d+)%;top:(\d+)%"/g)]
+    .map((match) => ({ x:Number(match[1]),y:Number(match[2]) }));
+  assert.equal(friendMarkerPositions.length,2);
+  assert.match(root.innerHTML,/<button class="find-friend-marker"[^>]*data-phone-action="friend-route"[^>]*data-contact-id="aoi"[^>]*aria-label="アオイに会いに行く"/);
+  assert.match(root.innerHTML,/<button class="find-friend-marker"[^>]*data-phone-action="friend-route"[^>]*data-contact-id="mei"[^>]*aria-label="メイに会いに行く"/);
+  assert.ok(Math.hypot(
+    (friendMarkerPositions[0].x - friendMarkerPositions[1].x) * 3.46,
+    (friendMarkerPositions[0].y - friendMarkerPositions[1].y) * 1.74
+  ) >= 23);
+  assert.match(root.innerHTML,/ソラ/);
+  assert.match(root.innerHTML,/屋内/);
+  assert.doesNotMatch(root.innerHTML,/data-contact-id="sora"/);
+
+  clickAction("friend-route",{contactId:"aoi"});
+  clickAction("friend-route",{contactId:"mei"});
+  assert.deepEqual(routed,["aoi","mei"]);
+
+  phone.update({
+    day:1,minute:510,
+    friendWaypoint:{id:"aoi",name:"アオイ",distance:45},
+    npcs:[{id:"aoi",name:"アオイ",hidden:false,distance:45,activity:"移動中",mapDX:400,mapDY:-250}]
+  });
+  assert.match(root.innerHTML,/left:58%;top:38%/);
+  assert.match(root.innerHTML,/<button class="find-friend-marker active"[^>]*data-phone-action="clear-route"[^>]*aria-label="アオイへの案内中。タップして解除"[^>]*>✓<\/button>/);
+  assert.match(root.innerHTML,/<button class="ios-friend-route active" type="button" data-phone-action="clear-route">案内解除<\/button>/);
+  assert.match(css,/\.find-friend-marker\.active\s*\{/);
+  clickAction("clear-route");
+  assert.deepEqual(cleared,[true]);
+  phone.update({
+    day:1,minute:510,
+    friendWaypoint:null,
+    npcs:[{id:"aoi",name:"アオイ",hidden:false,distance:45,activity:"移動中",mapDX:400,mapDY:-250}]
+  });
+  assert.match(root.innerHTML,/<button class="find-friend-marker"[^>]*data-phone-action="friend-route"[^>]*aria-label="アオイに会いに行く"/);
+  assert.match(root.innerHTML,/>会いに行く<\/button>/);
+  clickAction("friend-route",{contactId:"aoi"});
+  phone.update({
+    day:1,minute:510,
+    friendWaypoint:{id:"aoi",name:"アオイ",distance:45},
+    npcs:[{id:"aoi",name:"アオイ",hidden:false,distance:45,activity:"移動中",mapDX:400,mapDY:-250}]
+  });
+
+  clickAction("home-screen");
+  assert.match(root.innerHTML,/data-phone-app="maps"/);
+  clickApp("maps");
+  assert.match(root.innerHTML,/友達の現在地/);
+  assert.match(root.innerHTML,/<b>アオイ<\/b>/);
+  assert.match(root.innerHTML,/data-phone-action="clear-route"/);
+  clickAction("clear-route");
+  assert.deepEqual(cleared,[true,true]);
+
+  phone.update({
+    day:1,minute:511,inVehicle:true,
+    npcs:[{id:"aoi",name:"アオイ",hidden:false,distance:40,activity:"移動中",mapDX:380,mapDY:-230}]
+  });
+  phone.openApp("find");
+  assert.match(root.innerHTML,/<button class="find-friend-marker"[^>]*data-phone-action="friend-route"[^>]*aria-label="アオイに会いに行く"[^>]*disabled/);
+  assert.doesNotMatch(root.innerHTML,/class="ios-friend-route"/);
+  assert.match(root.innerHTML,/徒歩で外出すると案内できます/);
+});
+
+test('an indoor friend pauses live location while keeping the active route cancellable', () => {
+  const handlers = new Map();
+  const root = {
+    hidden:false,
+    innerHTML:"",
+    classList:{ toggle() {} },
+    style:{ setProperty() {} },
+    addEventListener(type, handler) { handlers.set(type, handler); }
+  };
+  const cleared = [];
+  const phone = phoneModule.createPhoneSystem({
+    root,
+    callbacks:{clearRoute:() => cleared.push(true)}
+  });
+  const click = (selector, dataset) => handlers.get("click")({
+    target:{closest:(value) => value === selector ? {dataset} : null}
+  });
+  phone.update({
+    day:1,minute:600,
+    friendWaypoint:{id:"aoi",name:"アオイ",hidden:true},
+    npcs:[{id:"aoi",name:"アオイ",hidden:true,distance:null,activity:"勤務中",mapDX:null,mapDY:null}]
+  });
+  phone.openApp("find");
+  assert.match(root.innerHTML,/アオイ/);
+  assert.match(root.innerHTML,/屋内/);
+  assert.doesNotMatch(root.innerHTML,/find-friend-marker/);
+  assert.match(root.innerHTML,/案内解除/);
+  assert.doesNotMatch(root.innerHTML,/data-phone-action="friend-route"/);
+
+  click("[data-phone-action]",{phoneAction:"home-screen"});
+  click("[data-phone-app]",{phoneApp:"maps"});
+  assert.match(root.innerHTML,/屋内 · 現在地非表示/);
+  assert.match(root.innerHTML,/data-phone-action="clear-route"/);
+  click("[data-phone-action]",{phoneAction:"clear-route"});
+  assert.deepEqual(cleared,[true]);
+});
+
 
 test('phone remains clickable inside the pointer-disabled HUD', () => {
   assert.match(css, /\.smartphone-panel\{[\s\S]*pointer-events:auto/);
@@ -78,4 +228,31 @@ test('live phone updates do not replace buttons during pointer interaction', () 
   assert.match(phoneSource, /root\.addEventListener\("pointerdown"[\s\S]*pointerActive = true/);
   assert.match(phoneSource, /if \(root\.hidden \|\| pointerActive\) return/);
   assert.match(phoneSource, /signature !== lastRenderedSignature/);
+});
+
+test('Find redraws a friend marker and activity when a newer world snapshot arrives', () => {
+  const handlers = new Map();
+  const root = {
+    hidden:false,
+    innerHTML:"",
+    classList:{toggle(){}},
+    style:{setProperty(){}},
+    addEventListener(type,handler){handlers.set(type,handler);}
+  };
+  const phone = phoneModule.createPhoneSystem({root});
+  phone.update({
+    minute:500,
+    npcs:[{id:"aoi",name:"アオイ",hidden:false,distance:300,activity:"公園で休憩",mapDX:300,mapDY:0}]
+  });
+  phone.openApp("find");
+  const before = root.innerHTML.match(/class="find-friend-marker"[^>]*style="left:(\d+)%/)[1];
+  phone.update({
+    minute:501,
+    npcs:[{id:"aoi",name:"アオイ",hidden:false,distance:700,activity:"図書館で勉強",mapDX:700,mapDY:0}]
+  });
+
+  const after = root.innerHTML.match(/class="find-friend-marker"[^>]*style="left:(\d+)%/)[1];
+  assert.notEqual(after,before);
+  assert.match(root.innerHTML,/図書館で勉強/);
+  assert.match(root.innerHTML,/700m/);
 });
