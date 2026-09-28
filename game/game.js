@@ -4287,6 +4287,10 @@
   }
 
   function enterCar() {
+    if (personalCar.fuelLiters <= 0) {
+      showToast("燃料切れです。携行缶で補給してください");
+      return;
+    }
     state.player.inTrain = false;
     state.player.trainId = null;
     state.player.inVehicle = true;

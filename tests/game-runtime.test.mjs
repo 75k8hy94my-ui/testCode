@@ -129,6 +129,13 @@ test('car fuel is consumed only for accepted movement and an empty tank cannot a
   assert.match(exhausted, /exitCar\(\)/);
 });
 
+test('an empty vehicle rejects boarding with recovery guidance instead of immediately ejecting the player', () => {
+  const enter = source.slice(source.indexOf('function enterCar()'), source.indexOf('function exitCar()'));
+  assert.match(enter, /personalCar\.fuelLiters\s*<=\s*0/);
+  assert.match(enter, /燃料切れ/);
+  assert.match(enter, /return/);
+});
+
 test('fuel HUD exposes a readable fuel level and a labeled visual meter', () => {
   assert.match(html, /id="driveFuelText"/);
   assert.match(html, /id="driveFuelBar"/);
