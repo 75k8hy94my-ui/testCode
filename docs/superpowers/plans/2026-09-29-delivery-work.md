@@ -84,4 +84,4 @@
 - [x] **Step 2:** Serve the game locally without disturbing the user's port 4173; launch/reuse headless Chromium via terminal and exercise depot → accept → destination → handoff, plus cancel. The pure model tests cover late payout.
 - [x] **Step 3:** Capture full-viewport desktop and mobile screenshots; collect console errors/warnings, `pageerror`, failed requests, relevant DOM/computed styles, and canvas state.
 - [x] **Step 4:** Fix the depot sign/minimap overlap and repeat screenshots/diagnostics.
-- [ ] **Step 5:** Review `git diff` and status, stage only this feature's tracked files, commit, fetch/rebase if required, push the current branch, and verify `HEAD` matches `origin/main`.
+- [x] **Step 5:** Review `git diff` and status, stage only this feature's tracked files, commit, fetch/rebase if required, push the current branch, and verify `HEAD` matches `origin/main`.
