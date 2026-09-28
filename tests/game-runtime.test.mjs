@@ -165,6 +165,7 @@ test('central park rendering identifies a pond and fishing spot separately from 
   assert.match(source, /function drawParkFishingPond\(parkPosition\)/);
   assert.match(source, /drawParkFishingPond\(p\)/);
   assert.match(source, /池で釣りをする/);
+  assert.match(source, /成功率 " \+ Math\.round\(currentChance \* 100\) \+ "%"/);
   assert.match(source, /今は魚が食いつきにくい時間です/);
   assert.match(source, /釣り餌がありません/);
 });

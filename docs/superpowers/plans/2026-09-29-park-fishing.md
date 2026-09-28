@@ -39,11 +39,11 @@
 - Produces `createProgress()`, `normalizeProgress(value)`, `getFishingWindow(minute)`, `biteChance(progress, minute)`, `buyBait(progress, cash)`, and `cast(progress, day, minute, roll)`.
 - Progress shape is `{ bait, fish, skill, casts, catches }`. `cast` returns `{ ok, progress, caught, fishType, chance, duration }`; rejected actions return `{ ok:false, reason, progress }`.
 
-- [ ] **Step 1: Write failing tests** for pack purchase, insufficient funds, window boundaries, catch probabilities, skill and chance caps, catch/miss state transitions, and invalid/no-bait immutability.
-- [ ] **Step 2: Run `node --test tests/park-fishing.test.mjs`**; expect module-not-found.
-- [ ] **Step 3: Implement the pure model** using exact spec values and fresh result objects.
-- [ ] **Step 4: Run the fishing model tests**; expect all to pass.
-- [ ] **Step 5: Commit** as `feat(game): add park fishing progression model`.
+- [x] **Step 1: Write failing tests** for pack purchase, insufficient funds, window boundaries, catch probabilities, skill and chance caps, catch/miss state transitions, and invalid/no-bait immutability.
+- [x] **Step 2: Run `node --test tests/park-fishing.test.mjs`**; confirmed the expected missing-module failure.
+- [x] **Step 3: Implement the pure model** using exact spec values and fresh result objects.
+- [x] **Step 4: Run the fishing model tests**; all passed.
+- [x] **Step 5: Commit** as `feat(game): add park fishing progression model`.
 
 ### Task 2: Fish ingredient recipes with backward-compatible APIs
 
@@ -55,11 +55,11 @@
 - Consumes optional fish inventory in `listRecipes(skill, groceries, fish = 0)` and `cookMeal(skill, groceries, recipeId, fish = 0)`.
 - Produces two fish recipes; only fish-consuming recipes return `fishRemaining`, so existing recipe result objects and three-argument calls remain unchanged.
 
-- [ ] **Step 1: Add failing tests** for grilled-fish availability/consumption, fish rice skill/fish/grocery gates and atomic costs, plus unchanged legacy results when fish argument is omitted.
-- [ ] **Step 2: Run focused cooking tests**; expect fish recipes/API support to be absent.
-- [ ] **Step 3: Extend the cooking model** with the two spec-defined recipes and explicit `insufficient-fish` / `insufficient-groceries` results.
-- [ ] **Step 4: Run cooking tests**; expect all legacy and new tests to pass.
-- [ ] **Step 5: Commit** as `feat(game): add fish meals to home cooking`.
+- [x] **Step 1: Add failing tests** for grilled-fish availability/consumption, fish rice skill/fish/grocery gates and atomic costs, plus unchanged legacy results when fish argument is omitted.
+- [x] **Step 2: Run focused cooking tests**; confirmed fish recipes/API support were absent.
+- [x] **Step 3: Extend the cooking model** with the two spec-defined recipes and explicit `insufficient-fish` / `insufficient-groceries` results.
+- [x] **Step 4: Run cooking tests**; all legacy and new tests passed.
+- [x] **Step 5: Commit** as `feat(game): add fish meals to home cooking`.
 
 ### Task 3: Store, park, kitchen, time progression, and snapshot migration
 
@@ -72,11 +72,11 @@
 - Consumes Task 1 fishing model and Task 2 cooking fish-inventory APIs.
 - Produces `state.fishing`, five-bait store purchase, park cast action, cooked-fish inventory integration, and a `fishing` snapshot field with empty legacy defaults.
 
-- [ ] **Step 1: Add failing runtime tests** for script ordering, store purchase, park cast timing and state update, snapshot default/round trip, and kitchen fish recipe availability/use.
-- [ ] **Step 2: Run focused runtime tests**; expect missing integration.
-- [ ] **Step 3: Integrate the fishing model** and atomically apply cast/cook results; revalidate before advancing time or consuming state.
-- [ ] **Step 4: Run fishing, cooking, and runtime tests**; expect all to pass.
-- [ ] **Step 5: Commit** as `feat(game): connect fishing to daily activity loop`.
+- [x] **Step 1: Add failing runtime tests** for script ordering, store purchase, park cast timing and state update, snapshot migration, and kitchen fish recipe availability/use.
+- [x] **Step 2: Run focused runtime tests**; confirmed integration was missing.
+- [x] **Step 3: Integrate the fishing model** and atomically apply cast/cook results; revalidate before advancing time or consuming state.
+- [x] **Step 4: Run fishing, cooking, and runtime tests**; all passed.
+- [x] **Step 5: Commit** as `feat(game): connect fishing to daily activity loop`.
 
 ### Task 4: Pond rendering and responsive presentation
 
@@ -86,11 +86,11 @@
 - Modify: `game/index.html`
 - Modify: `tests/game-runtime.test.mjs`
 
-- [ ] **Step 1: Add failing tests** for pond/fishing-spot rendering, current-window odds/species text, bait/fish/skill display, and mobile action-sheet fit.
-- [ ] **Step 2: Run focused tests**; expect rendering and copy assertions to fail.
-- [ ] **Step 3: Draw the pond and fishing spot** in the existing park renderer and keep action choices responsive.
-- [ ] **Step 4: Run focused runtime tests**; expect all to pass.
-- [ ] **Step 5: Commit** as `feat(game): show park fishing pond`.
+- [x] **Step 1: Add failing tests** for pond/fishing-spot rendering, current-window odds/species text, bait/fish/skill display, and mobile action-sheet fit.
+- [x] **Step 2: Run focused tests**; confirmed the pond and fishing UI were absent.
+- [x] **Step 3: Draw the pond and fishing spot** in the existing park renderer and keep action choices responsive.
+- [x] **Step 4: Run focused runtime tests**; all passed.
+- [x] **Step 5: Commit** as `feat(game): show park fishing pond`.
 
 ### Task 5: Full suite and headless gameplay verification
 
@@ -98,7 +98,7 @@
 - Modify as needed: files listed above only
 - Screenshots/logs: temporary directory, not committed
 
-- [ ] **Step 1: Run `npm test`, `npm run verify:static`, and `git diff --check`**; expect all to pass.
-- [ ] **Step 2: Run desktop/mobile CLI headless Chromium/CDP** and capture screenshots, errors/warnings, page errors, failed requests, DOM/computed action layout, and canvas state.
-- [ ] **Step 3: Exercise bait purchase → park cast → home fish cooking** in the browser and verify bait/fish/grocery/cash deltas.
-- [ ] **Step 4: Fix any issue test-first, repeat full checks/browser flow, and commit** as `test(game): verify park fishing flow` if changes are required.
+- [x] **Step 1: Run `npm test`, `npm run verify:static`, and `git diff --check`**; all passed.
+- [x] **Step 2: Run desktop/mobile CLI headless Chromium/CDP** and capture screenshots, errors/warnings, page errors, failed requests, DOM/computed action layout, and canvas state.
+- [x] **Step 3: Exercise bait purchase → park cast → home fish cooking** in the browser and verify bait/fish/grocery/cash deltas.
+- [x] **Step 4: Fix the success-rate percent label, repeat full checks/browser flow, and commit** as `test(game): verify park fishing flow`.

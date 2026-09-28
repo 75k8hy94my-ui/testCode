@@ -4145,7 +4145,7 @@
       const fishingSummary = fishingWindow
         ? "釣り餌 " + state.fishing.bait + "個 / 魚 " + state.fishing.fish + "匹 / 釣り技能 " + state.fishing.skill + " / 今は" + fishNames[fishingWindow.fishType] + "が狙えます（成功率 " + Math.round(currentChance * 100) + "%）"
         : "釣り餌 " + state.fishing.bait + "個 / 魚 " + state.fishing.fish + "匹 / 釣り技能 " + state.fishing.skill;
-      addChoice("池で釣りをする", fishingWindow ? fishNames[fishingWindow.fishType] + " / 25分 / 成功率 " + Math.round(currentChance * 100) + (state.fishing.bait < 1 ? " / 釣り餌がありません" : "") : "25分 / 今は魚が食いつきにくい時間です" + (state.fishing.bait < 1 ? " / 釣り餌がありません" : ""), () => {
+      addChoice("池で釣りをする", fishingWindow ? fishNames[fishingWindow.fishType] + " / 25分 / 成功率 " + Math.round(currentChance * 100) + "%" + (state.fishing.bait < 1 ? " / 釣り餌がありません" : "") : "25分 / 今は魚が食いつきにくい時間です" + (state.fishing.bait < 1 ? " / 釣り餌がありません" : ""), () => {
         const result = parkFishingModel.cast(state.fishing, state.day, Math.floor(state.minute), Math.random());
         if (!result.ok) {
           showToast(result.reason === "no-bait" ? "釣り餌がありません。スーパーで購入できます" : "今は釣りができません");
