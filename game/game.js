@@ -62,6 +62,12 @@
     return;
   }
 
+  const gymTrainingModel = globalThis.CityDaysGymTraining;
+  if (!gymTrainingModel?.listWorkouts || !gymTrainingModel?.completeWorkout) {
+    showRuntimeError("GymTraining を読み込めません。");
+    return;
+  }
+
   const characterRenderer = globalThis.CityDaysCharacterRenderer;
   if (!characterRenderer?.createAppearance || !characterRenderer?.draw) {
     showRuntimeError("CharacterRenderer を読み込めません。");
@@ -3903,23 +3909,49 @@
     }
 
     if (place.id === "gym") {
-      actionDescription.textContent = "運動で気分転換。利用料がかかります。";
-      addChoice("トレーニング", "¥600 / 90分 / 楽しさ+15", () => {
-        if (!canPay(600)) return;
-        if (state.needs.energy < 25 || state.needs.hunger < 20) {
-          showToast("まず食事か休息をとった方がよさそうです");
-          return;
-        }
-        state.cash -= 600;
-        advanceTime(90);
-        state.needs.energy -= 16;
-        state.needs.hunger -= 10;
-        state.needs.hygiene -= 24;
-        state.needs.fun += 15;
-        state.fitness += 1;
-        clampNeeds();
-        showToast("トレーニングを終えました");
-      });
+      actionDescription.textContent = "体調に合う運動を選べます。トレーニング経験 " + state.fitness +
+        "（5で筋力トレーニング解放）";
+      for (const status of gymTrainingModel.listWorkouts(
+        state.fitness,
+        state.cash,
+        state.needs.energy,
+        state.needs.hunger
+      )) {
+        const workout = status.workout;
+        const reason = status.reason === "fitness-required" ? "経験 " + workout.minimumFitness + "で解放 / 現在 " + state.fitness
+          : status.reason === "insufficient-funds" ? "所持金が足りません"
+            : status.reason === "too-tired" ? "体力 " + workout.minimumEnergy + "以上が必要"
+              : status.reason === "too-hungry" ? "空腹 " + workout.minimumHunger + "以上が必要"
+                : "¥" + workout.cost.toLocaleString("ja-JP") + " / " + workout.duration + "分 / 経験+" + workout.fitnessGain;
+        const detail = status.available
+          ? "¥" + workout.cost.toLocaleString("ja-JP") + " / " + workout.duration + "分 / 経験+" + workout.fitnessGain
+          : reason;
+        addChoice(workout.name, detail, () => {
+          const result = gymTrainingModel.completeWorkout(
+            state.fitness,
+            state.cash,
+            state.needs.energy,
+            state.needs.hunger,
+            workout.id
+          );
+          if (!result.ok) {
+            const message = result.reason === "fitness-required" ? "トレーニング経験が足りません"
+              : result.reason === "insufficient-funds" ? "所持金が足りません"
+                : result.reason === "too-tired" ? "体力を回復してから運動しましょう"
+                  : "先に食事をとってから運動しましょう";
+            showToast(message);
+            return;
+          }
+          state.cash = result.cashRemaining;
+          state.fitness = result.fitness;
+          advanceTime(workout.duration);
+          for (const [need, amount] of Object.entries(workout.effects)) {
+            state.needs[need] += amount;
+          }
+          clampNeeds();
+          showToast(workout.name + "を終えました");
+        }, !status.available);
+      }
       addChoice("ジムのシャワー", "¥300 / 15分 / 清潔+70", () => {
         if (!canPay(300)) return;
         state.cash -= 300;
