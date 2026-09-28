@@ -169,6 +169,33 @@ test('delivery-work model loads before the game and progress survives snapshot r
   assert.match(source, /state\.deliveryWork\s*=\s*deliveryWorkModel\.normalizeProgress\(saved\.deliveryWork\)/);
 });
 
+test('public bath rules load before runtime and the sento interaction applies its validated effects', () => {
+  assert.match(html, /<script src="\.\/public-bath\.js\?v=[^"]+"><\/script>/);
+  assert.ok(html.indexOf('public-bath.js') < html.indexOf('game.js'));
+  assert.match(source, /CityDaysPublicBath/);
+  const start = source.indexOf('if (place.id === "public-bath")');
+  const end = source.indexOf('if (place.id === "home")', start);
+  assert.ok(start >= 0 && end > start);
+  const action = source.slice(start, end);
+  assert.match(action, /publicBathModel\.listOptions\(/);
+  assert.match(action, /publicBathModel\.completeBath\(/);
+  assert.match(action, /state\.cash\s*-?=\s*result\.cost/);
+  assert.match(action, /advanceTime\(result\.duration\)/);
+  assert.match(action, /result\.effects/);
+  assert.match(action, /clampNeeds\(\)/);
+});
+
+test('public bath has a distinct Japanese sign, noren, and bathhouse roof in the city rendering', () => {
+  const renderer = source.slice(source.indexOf('function drawPlace(place)'), source.indexOf('function characterLodAtScreen'));
+  const start = renderer.indexOf('} else if (place.id === "public-bath")');
+  const end = renderer.indexOf('ctx.fillText(place.name', start);
+  assert.ok(start >= 0 && end > start);
+  const bathhouse = renderer.slice(start, end);
+  assert.match(bathhouse, /若葉湯/);
+  assert.match(bathhouse, /のれん|暖簾/);
+  assert.match(bathhouse, /ゆ/);
+});
+
 test('delivery depot lists daily offers and can accept, navigate, and cancel an active job', () => {
   const depotStart = source.indexOf('if (place.id === "delivery-depot")');
   const depotEnd = source.indexOf('if (place.id === "cafe")', depotStart);

@@ -44,6 +44,7 @@
     node("home-west", 4350, 6250, "south-residential"),
     node("home-road", 5050, 6420, "south-residential"),
     node("delivery-depot-entrance", 5150, 6290, "south-residential"),
+    node("public-bath-entrance", 5200, 6380, "south-residential"),
     node("home-entrance", 5050, 6600, "south-residential"),
     node("south-mid", 5850, 6650, "south-residential"),
     node("east-south", 7300, 6200, "east-residential"),
@@ -126,6 +127,7 @@
 
     ["ped-home-entry", "home-entrance", "home-road", [[5050,6600],[5050,6510],[5050,6420]], "sidewalk", 40, 5, false, true, false],
     ["ped-delivery-depot-entry", "delivery-depot-entrance", "home-entrance", [[5150,6290],[5110,6400],[5070,6510],[5050,6600]], "sidewalk", 40, 5, false, true, false],
+    ["ped-public-bath-entry", "home-entrance", "public-bath-entrance", [[5050,6600],[5100,6520],[5150,6450],[5200,6380]], "sidewalk", 42, 5, false, true, false],
     ["ped-cafe-entry", "cafe-entrance", "cafe-road", [[4230,5560],[4280,5520],[4350,5480]], "sidewalk", 42, 5, false, true, false],
     ["ped-store-entry", "store-entrance", "store-road", [[6630,5590],[6570,5550],[6500,5500]], "sidewalk", 42, 5, false, true, false],
     ["ped-gym-entry", "gym-entrance", "gym-road", [[7180,3920],[7120,3860],[7050,3800]], "sidewalk", 42, 5, false, true, false],
@@ -154,7 +156,8 @@
     { id:"library", name:"市立図書館", x:3420, y:3940, entranceNodeId:"library-entrance", roadNodeId:"library-road", building:{ x:3420, y:4110, w:310, h:275 }, color:"#9a8db9", symbol:"L" },
     { id:"community-center", name:"若葉コミュニティセンター", x:4540, y:4280, entranceNodeId:"community-center-entrance", roadNodeId:"civic-east", building:{ x:4740, y:4500, w:320, h:280 }, color:"#d3a66b", symbol:"W" },
     { id:"fuel-station", name:"若葉石油", type:"fuel-station", x:8000, y:3890, entranceNodeId:"fuel-station-entrance", roadNodeId:"fuel-station-road", building:{ x:8330, y:3650, w:340, h:290 }, color:"#d9d7c7", symbol:"GS" },
-    { id:"delivery-depot", name:"若葉便 配達受付所", type:"delivery-depot", x:5150, y:6290, entranceNodeId:"delivery-depot-entrance", roadNodeId:"home-road", building:{ x:5310, y:5980, w:320, h:270 }, color:"#d7c99f", symbol:"便" }
+    { id:"delivery-depot", name:"若葉便 配達受付所", type:"delivery-depot", x:5150, y:6290, entranceNodeId:"delivery-depot-entrance", roadNodeId:"home-road", building:{ x:5310, y:5980, w:320, h:270 }, color:"#d7c99f", symbol:"便" },
+    { id:"public-bath", name:"若葉湯", type:"public-bath", x:5200, y:6380, entranceNodeId:"public-bath-entrance", roadNodeId:"home-road", building:{ x:5410, y:6265, w:300, h:260 }, color:"#86aaa0", symbol:"ゆ" }
   ];
 
   const STATION_DEFINITIONS = [

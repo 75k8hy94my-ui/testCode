@@ -86,6 +86,12 @@
     return;
   }
 
+  const publicBathModel = globalThis.CityDaysPublicBath;
+  if (!publicBathModel?.listOptions || !publicBathModel?.completeBath) {
+    showRuntimeError("PublicBath を読み込めません。");
+    return;
+  }
+
   const characterRenderer = globalThis.CityDaysCharacterRenderer;
   if (!characterRenderer?.createAppearance || !characterRenderer?.draw) {
     showRuntimeError("CharacterRenderer を読み込めません。");
@@ -3901,6 +3907,47 @@
           state.phone.friendWaypointId = null;
           showToast(offer.parcelName + "を受注 · " + (destination?.name || "目的地") + "へ向かいましょう");
         }, Boolean(active));
+      }
+    }
+
+    if (place.id === "public-bath") {
+      actionDescription.textContent = "朝6時から夜11時まで営業。入浴で身支度を整え、サウナでは体調も確認します。";
+      const reasonText = (reason) => reason === "not-open" ? "営業時間外です（6:00〜23:00）"
+        : reason === "closing-time" ? "閉店までに利用を終えられません"
+          : reason === "insufficient-funds" ? "料金が足りません"
+            : reason === "too-tired" ? "サウナは体力35以上が必要です"
+              : reason === "too-hungry" ? "サウナは空腹20以上が必要です"
+                : "利用できません";
+      for (const option of publicBathModel.listOptions({
+        minute:Math.floor(state.minute),
+        cash:state.cash,
+        energy:state.needs.energy,
+        hunger:state.needs.hunger
+      })) {
+        const effectText = option.id === "bath" ? "清潔最大 / 体力+6 / 楽しさ+16 / 交流+6" : "清潔最大 / 体力+2 / 楽しさ+24 / 交流+10 / 空腹-5";
+        const detail = option.available
+          ? option.duration + "分 / ¥" + option.cost.toLocaleString("ja-JP") + " / " + effectText
+          : reasonText(option.reason);
+        addChoice(option.name, detail, () => {
+          const result = publicBathModel.completeBath({
+            minute:Math.floor(state.minute),
+            cash:state.cash,
+            energy:state.needs.energy,
+            hunger:state.needs.hunger
+          }, option.id);
+          if (!result.ok) {
+            showToast(reasonText(result.reason));
+            return;
+          }
+          state.cash -= result.cost;
+          advanceTime(result.duration);
+          for (const [need, change] of Object.entries(result.effects)) {
+            if (need === "hygiene") state.needs.hygiene = change;
+            else state.needs[need] += change;
+          }
+          clampNeeds();
+          showToast(option.name + "を利用しました −¥" + result.cost.toLocaleString("ja-JP"));
+        }, !option.available);
       }
     }
 
@@ -8796,6 +8843,54 @@
       ctx.fillStyle = "#f5f0df";
       ctx.font = "700 11px system-ui, sans-serif";
       ctx.fillText("配達受付", p.x, p.y + 111);
+    } else if (place.id === "public-bath") {
+      drawFacilityBuilding(p, building?.w || 340, building?.h || 290, "#91b3a6", "#4e5e55", "#a7c6c2");
+      ctx.fillStyle = "#5a5147";
+      ctx.beginPath();
+      ctx.moveTo(p.x - 150, p.y - 106);
+      ctx.lineTo(p.x - 112, p.y - 144);
+      ctx.lineTo(p.x + 112, p.y - 144);
+      ctx.lineTo(p.x + 150, p.y - 106);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "#85725d";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(p.x - 132, p.y - 116);
+      ctx.lineTo(p.x + 132, p.y - 116);
+      ctx.stroke();
+      ctx.fillStyle = "#f1e6cd";
+      roundedRectPath(ctx, p.x - 98, p.y - 88, 196, 34, 4);
+      ctx.fill();
+      ctx.fillStyle = "#314f49";
+      ctx.font = "800 19px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("若葉湯", p.x, p.y - 64);
+      // のれん panels hang above the entrance.
+      const norenColors = ["#315b5b", "#416b68", "#315b5b", "#416b68", "#315b5b"];
+      norenColors.forEach((color, index) => {
+        const panelX = p.x - 62 + index * 25;
+        ctx.fillStyle = color;
+        ctx.fillRect(panelX, p.y + 4, 24, 50);
+        ctx.fillStyle = "rgba(244,235,215,.75)";
+        ctx.fillRect(panelX + 3, p.y + 50, 18, 4);
+      });
+      ctx.fillStyle = "#f2e8d4";
+      ctx.font = "700 13px serif";
+      ctx.fillText("ゆ", p.x, p.y + 38);
+      ctx.fillStyle = "#45524d";
+      ctx.fillRect(p.x - 90, p.y + 83, 180, 8);
+      ctx.fillStyle = "#d7c39f";
+      ctx.fillRect(p.x - 130, p.y + 97, 260, 12);
+      for (let index = 0; index < 3; index += 1) {
+        const steamX = p.x + 98 + index * 13;
+        ctx.strokeStyle = "rgba(241,244,232,.7)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(steamX, p.y - 150);
+        ctx.bezierCurveTo(steamX - 8, p.y - 164, steamX + 8, p.y - 172, steamX, p.y - 184);
+        ctx.stroke();
+      }
     }
 
     ctx.fillStyle = "rgba(18,24,21,.76)";
