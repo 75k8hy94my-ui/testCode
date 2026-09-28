@@ -104,6 +104,31 @@ test('game loads the community center schedule model before the runtime', () => 
   assert.ok(html.indexOf('community-center.js') < html.indexOf('game.js'));
 });
 
+test('fuel model loads before runtime and the personal car starts with its migration-safe tank level', () => {
+  assert.match(html, /<script src="\.\/car-fuel\.js\?v=[^"]+"><\/script>/);
+  assert.ok(html.indexOf('car-fuel.js') < html.indexOf('game.js'));
+  assert.match(source, /const carFuelModel = globalThis\.CityDaysCarFuel/);
+  assert.match(source, /fuelLiters:\s*carFuelModel\.INITIAL_FUEL_LITERS/);
+  assert.match(source, /portableCanCount:\s*0/);
+});
+
+test('car fuel and emergency can round-trip while legacy saves receive safe defaults', () => {
+  assert.match(source, /fuelLiters:\s*personalCar\.fuelLiters/);
+  assert.match(source, /portableCanCount:\s*personalCar\.portableCanCount/);
+  assert.match(source, /personalCar\.fuelLiters\s*=\s*carFuelModel\.normalizeFuel\(saved\.car\.fuelLiters\)/);
+  assert.match(source, /personalCar\.portableCanCount\s*=\s*saved\.car\.portableCanCount\s*===\s*1\s*\?\s*1\s*:\s*0/);
+});
+
+test('car fuel is consumed only for accepted movement and an empty tank cannot accelerate', () => {
+  const update = source.slice(source.indexOf('function updateCar(dt)'), source.indexOf('function nextTrafficSignal'));
+  assert.match(update, /accelerating\s*=\s*\(touch\.driveAccel\s*\|\|\s*keys\.has\("w"\)\s*\|\|\s*keys\.has\("arrowup"\)\)\s*&&\s*personalCar\.fuelLiters\s*>\s*0/);
+  assert.match(update, /carFuelModel\.consumeFuel\(/);
+  assert.match(update, /Math\.hypot\(personalCar\.x\s*-\s*motionBefore\.x,\s*personalCar\.y\s*-\s*motionBefore\.y\)/);
+  const exhausted = source.slice(source.indexOf('function handleFuelExhaustion()'), source.indexOf('function performAction()'));
+  assert.match(exhausted, /personalCar\.fuelLiters\s*>\s*0[\s\S]*personalCar\.speed\s*>\s*8/);
+  assert.match(exhausted, /exitCar\(\)/);
+});
+
 test('player course progress is present in snapshots and older saves receive safe defaults', () => {
   assert.match(source, /communityCenter:\s*communityCenterModel\.normalizeProgress\(state\.communityCenter\)/);
   assert.match(source, /state\.communityCenter\s*=\s*communityCenterModel\.normalizeProgress\(saved\.communityCenter\)/);

@@ -44,6 +44,12 @@
     return;
   }
 
+  const carFuelModel = globalThis.CityDaysCarFuel;
+  if (!carFuelModel?.normalizeFuel || !carFuelModel?.consumeFuel) {
+    showRuntimeError("CarFuel を読み込めません。");
+    return;
+  }
+
   const communityCenterModel = globalThis.CityDaysCommunityCenter;
   if (
     !communityCenterModel?.getSession ||
@@ -1044,6 +1050,8 @@
     y: HOME.y,
     angle: Math.PI / 2,
     speed: 0,
+    fuelLiters: carFuelModel.INITIAL_FUEL_LITERS,
+    portableCanCount: 0,
     color: "#6f8fac"
   };
 
@@ -4301,6 +4309,13 @@
     document.body.classList.remove("driving");
   }
 
+  function handleFuelExhaustion() {
+    if (personalCar.fuelLiters > 0 || !state.player.inVehicle || personalCar.speed > 8) return false;
+    exitCar();
+    if (!state.player.inVehicle) showToast("燃料切れです。給油所へ向かい、携行缶で補給してください");
+    return true;
+  }
+
   function performAction() {
     if (!actionSheet.hidden) {
       closeActionSheet();
@@ -4359,7 +4374,9 @@
         car: {
           x: personalCar.x,
           y: personalCar.y,
-          angle: personalCar.angle
+          angle: personalCar.angle,
+          fuelLiters: personalCar.fuelLiters,
+          portableCanCount: personalCar.portableCanCount
         },
         trains: trains.map((train) => ({
           id: train.id,
@@ -4581,6 +4598,8 @@
           personalCar.y = y;
         }
         personalCar.angle = Number(saved.car.angle) || 0;
+        personalCar.fuelLiters = carFuelModel.normalizeFuel(saved.car.fuelLiters);
+        personalCar.portableCanCount = saved.car.portableCanCount === 1 ? 1 : 0;
       }
 
       migrateCarToCurrentRoadIfNeeded();
@@ -4716,6 +4735,7 @@
       if (personalCar.speed < 1) personalCar.speed = 0;
       state.player.x = personalCar.x;
       state.player.y = personalCar.y;
+      handleFuelExhaustion();
       return;
     }
 
@@ -4726,7 +4746,7 @@
       speed:personalCar.speed
     };
 
-    const accelerating = touch.driveAccel || keys.has("w") || keys.has("arrowup");
+    const accelerating = (touch.driveAccel || keys.has("w") || keys.has("arrowup")) && personalCar.fuelLiters > 0;
     const braking = touch.driveBrake || keys.has("s") || keys.has("arrowdown") || keys.has(" ");
 
     updateRouteProgress();
@@ -4814,6 +4834,12 @@
       }
     }
 
+    const fuelResult = carFuelModel.consumeFuel(
+      personalCar.fuelLiters,
+      Math.hypot(personalCar.x - motionBefore.x, personalCar.y - motionBefore.y)
+    );
+    personalCar.fuelLiters = fuelResult.fuel;
+
     state.player.x = personalCar.x;
     state.player.y = personalCar.y;
 
@@ -4824,6 +4850,7 @@
       const finalDistance = distance(personalCar.x, personalCar.y, finalPoint.x, finalPoint.y);
       if (finalDistance < 58 && personalCar.speed < 8) completeDrivingTrip();
     }
+    handleFuelExhaustion();
   }
 
   function nextTrafficSignal(car) {
