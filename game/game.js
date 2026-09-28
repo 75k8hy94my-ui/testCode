@@ -56,6 +56,12 @@
     return;
   }
 
+  const homeCookingModel = globalThis.CityDaysHomeCooking;
+  if (!homeCookingModel?.listRecipes || !homeCookingModel?.cookMeal) {
+    showRuntimeError("HomeCooking を読み込めません。");
+    return;
+  }
+
   const characterRenderer = globalThis.CityDaysCharacterRenderer;
   if (!characterRenderer?.createAppearance || !characterRenderer?.draw) {
     showRuntimeError("CharacterRenderer を読み込めません。");
@@ -3720,18 +3726,15 @@
     };
   }
 
-  function homeCook() {
-    if (state.groceries <= 0) {
-      showToast("食料がありません。スーパーで買えます");
-      return;
+  function applyHomeMeal(result) {
+    state.groceries = result.groceriesRemaining;
+    advanceTime(result.recipe.duration);
+    for (const [need, amount] of Object.entries(result.recipe.effects)) {
+      state.needs[need] += amount;
     }
-    state.groceries -= 1;
-    advanceTime(45);
-    state.needs.hunger += 52;
-    state.needs.fun += 4;
-    state.needs.hygiene -= 2;
+    state.communityCenter.skills.cooking = result.cookingSkill;
     clampNeeds();
-    showToast("料理して食事をとりました");
+    showToast(result.recipe.name + "を作り、料理技能が上がりました");
   }
 
   function homeShower() {
@@ -3775,8 +3778,26 @@
     actionTitle.textContent = fixture.label;
 
     if (fixture.id === "kitchen") {
-      actionDescription.textContent = "冷蔵庫の食料を使って料理できます。";
-      addChoice("料理する", "食料1個 / 45分 / 空腹を大きく回復", homeCook, state.groceries <= 0);
+      actionDescription.textContent = "料理技能を磨くと、食料を使った満足感の高い献立が解放されます。";
+      for (const status of homeCookingModel.listRecipes(state.communityCenter.skills.cooking, state.groceries)) {
+        const recipe = status.recipe;
+        const detail = !status.unlocked
+          ? "料理技能 " + recipe.minimumSkill + "で解放 / 現在 " + state.communityCenter.skills.cooking
+          : "食料 " + recipe.groceries + "個 / " + recipe.duration + "分 / 空腹+" + recipe.effects.hunger +
+            " / 料理技能+" + recipe.skillGain + (status.available ? "" : " / 食料が足りません");
+        addChoice(recipe.name, detail, () => {
+          const result = homeCookingModel.cookMeal(
+            state.communityCenter.skills.cooking,
+            state.groceries,
+            recipe.id
+          );
+          if (!result.ok) {
+            showToast(result.reason === "skill-required" ? "料理技能が足りません" : "食料がありません。スーパーで買えます");
+            return;
+          }
+          applyHomeMeal(result);
+        }, !status.available);
+      }
     } else if (fixture.id === "shower") {
       actionDescription.textContent = "浴室で身支度を整えます。";
       addChoice("シャワーを浴びる", "20分 / 清潔を最大まで回復", homeShower);
