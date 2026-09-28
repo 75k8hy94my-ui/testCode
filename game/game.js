@@ -3860,6 +3860,26 @@
     showToast("ソファでゆっくり過ごしました");
   }
 
+  function homeTelevisionProgramSummary(program) {
+    if (!program) return "現在の放送時間を確認できません。";
+    const labels = { fun:"楽しさ", social:"交流", energy:"体力" };
+    const changes = Object.entries(program.effects).map(([need, amount]) =>
+      (labels[need] || need) + (amount >= 0 ? "+" : "") + amount
+    );
+    if (program.cookingSkillGain) changes.push("料理技能+" + program.cookingSkillGain);
+    return "放送中: " + program.title + " / " + program.duration + "分 / " + changes.join(" / ");
+  }
+
+  function refreshHomeTelevisionAction() {
+    if (!state.player.inHome || actionSheet.hidden || actionTitle.textContent !== "テレビ") return;
+    const program = homeTelevisionModel.getProgram(Math.floor(state.minute));
+    actionDescription.textContent = homeTelevisionProgramSummary(program);
+    const button = actionChoices.querySelector("button");
+    const detail = button?.querySelector("span");
+    if (detail) detail.textContent = program ? program.title + " / " + program.duration + "分" : "放送はありません";
+    if (button) button.disabled = !program;
+  }
+
   function openHomeFixture(fixture) {
     if (!fixture) return;
     if (fixture.id === "exit") {
@@ -3897,12 +3917,7 @@
       if (!program) {
         actionDescription.textContent = "現在の放送時間を確認できません。";
       } else {
-        const changes = Object.entries(program.effects).map(([need, amount]) => {
-          const labels = { fun:"楽しさ", social:"交流", energy:"体力" };
-          return (labels[need] || need) + (amount >= 0 ? "+" : "") + amount;
-        });
-        if (program.cookingSkillGain) changes.push("料理技能+" + program.cookingSkillGain);
-        actionDescription.textContent = "放送中: " + program.title + " / " + program.duration + "分 / " + changes.join(" / ");
+        actionDescription.textContent = homeTelevisionProgramSummary(program);
         addChoice("現在の番組を見る", program.title + " / " + program.duration + "分", () => {
           const result = homeTelevisionModel.watch(Math.floor(state.minute));
           if (!result.ok) {
@@ -9665,9 +9680,25 @@
     ctx.fillStyle = "#263335";
     roundedRectPath(ctx, p.x, p.y, 99*s, 34*s, 5*s);
     ctx.fill();
-    ctx.fillStyle = "rgba(154,190,200,.22)";
+    const tvProgram = homeTelevisionModel.getProgram(Math.floor(state.minute));
+    const tvScreenColors = {
+      "overnight-nature":"#435b50",
+      "morning-news":"#567687",
+      "travel-variety":"#4d7c82",
+      "cooking-show":"#9b6947",
+      "prime-time-drama":"#5b516e"
+    };
+    ctx.fillStyle = tvScreenColors[tvProgram?.id] || "#334546";
     roundedRectPath(ctx, p.x + 4*s, p.y + 4*s, 91*s, 26*s, 3*s);
     ctx.fill();
+    if (tvProgram) {
+      ctx.fillStyle = "rgba(255,248,226,.92)";
+      ctx.font = "700 " + Math.max(5, 7*s) + "px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(tvProgram.screenTitle, p.x + 49.5*s, p.y + 17*s, 85*s);
+      ctx.textBaseline = "alphabetic";
+    }
 
     // Entrance / genkan.
     p = homeToScreen(338, 442);
@@ -10351,6 +10382,7 @@
   function render() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, viewWidth, viewHeight);
+    refreshHomeTelevisionAction();
 
     if (state.player.inHome) {
       drawHomeInterior();

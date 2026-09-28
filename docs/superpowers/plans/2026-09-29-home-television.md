@@ -69,8 +69,8 @@
 - Modify: `tests/game-runtime.test.mjs`
 - Screenshots/logs: temporary directory, not committed
 
-- [ ] **Step 1: Add failing tests** for time-dependent TV screen title and desktop/mobile action-sheet content.
-- [ ] **Step 2: Implement the screen indicator** within the existing television display and update any stale asset version query strings.
-- [ ] **Step 3: Run `npm test`, `npm run verify:static`, and `git diff --check`**; expect all to pass.
-- [ ] **Step 4: Run desktop/mobile CLI headless Chromium/CDP**, record screenshots, console errors/warnings, page errors, failed requests, DOM/computed layout and canvas state, and exercise at least the 16:00 cooking broadcast through the UI.
-- [ ] **Step 5: Commit** as `test(game): verify scheduled television activity`.
+- [x] **Step 1: Add failing tests** for time-dependent TV screen title, broadcast-boundary preview refresh, and desktop/mobile action-sheet content.
+- [x] **Step 2: Implement the screen indicator** within the existing television display and update runtime asset version query strings.
+- [x] **Step 3: Run `npm test`, `npm run verify:static`, and `git diff --check`**; all passed.
+- [x] **Step 4: Run desktop/mobile CLI headless Chromium/CDP**, record screenshots, console errors/warnings, page errors, failed requests, DOM/computed layout and canvas state, and exercise the 16:00 cooking broadcast through the UI.
+- [x] **Step 5: Commit** as `test(game): verify scheduled television activity`.

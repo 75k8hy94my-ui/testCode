@@ -189,6 +189,20 @@ test('watching TV uses normal time advancement and applies broadcast effects wit
   assert.match(source, /fixture\.id === "bed"[\s\S]*homeSleep/);
 });
 
+test('home TV screen reflects the active broadcast title without changing existing room rendering', () => {
+  const homeRenderer = source.slice(source.indexOf('function drawHomeInterior()'), source.indexOf('function drawHomePlayer()'));
+  assert.match(homeRenderer, /homeTelevisionModel\.getProgram\(Math\.floor\(state\.minute\)\)/);
+  assert.match(homeRenderer, /tvProgram\.screenTitle/);
+  assert.match(homeRenderer, /drawHomeFurnitureRect\(520, 438, 155, 24/);
+  assert.match(css, /\.action-sheet\{[^}]*max-height:\s*min\(72dvh,560px\)[^}]*overflow-y:\s*auto/);
+});
+
+test('open TV action sheet refreshes its program description when the broadcast changes', () => {
+  assert.match(source, /function refreshHomeTelevisionAction\(\)/);
+  const renderer = source.slice(source.indexOf('function render()'), source.indexOf('function frame('));
+  assert.match(renderer, /refreshHomeTelevisionAction\(\)/);
+});
+
 test('fuel model loads before runtime and the personal car starts with its migration-safe tank level', () => {
   assert.match(html, /<script src="\.\/car-fuel\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('car-fuel.js') < html.indexOf('game.js'));
