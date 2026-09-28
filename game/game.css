@@ -25,6 +25,7 @@ button{font:inherit;color:inherit}
 .need>div{height:6px;background:rgba(255,255,255,.09);border-radius:999px;overflow:hidden}
 .need i{display:block;height:100%;width:50%;background:#9fd4aa;transition:width .16s linear}
 .need b{text-align:right;color:var(--text);font-size:10px}
+.need:has(#healthBar)>span{color:#d8e8d4}
 .day-card{top:max(12px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);padding:9px 13px;text-align:center;min-width:190px}
 .eyebrow{display:block;font-size:9px;letter-spacing:.18em;color:var(--muted)}
 .day-card strong{display:block;margin:2px 0;font-size:15px}

@@ -185,9 +185,48 @@ test('public bath rules load before runtime and the sento interaction applies it
   assert.match(action, /clampNeeds\(\)/);
 });
 
-test('bathhouse map and runtime changes request fresh browser assets', () => {
-  assert.match(html, /map-model\.js\?v=20260929-wakaba-bath-1/);
-  assert.match(html, /game\.js\?v=20260929-wakaba-bath-1/);
+test('clinic map and runtime changes request fresh browser assets', () => {
+  assert.match(html, /map-model\.js\?v=20260929-wakaba-clinic-1/);
+  assert.match(html, /game\.js\?v=20260929-wakaba-clinic-1/);
+});
+
+test('health model loads before runtime and has a visible sixth needs meter', () => {
+  assert.match(html, /player-health\.js\?v=[^\"]+/);
+  assert.ok(html.indexOf('player-health.js') < html.indexOf('game.js'));
+  assert.match(html, /id="healthBar"/);
+  assert.match(html, /id="healthText"/);
+  assert.match(source, /CityDaysPlayerHealth/);
+  assert.match(source, /health:\s*100/);
+  assert.match(source, /health:\s*\[document\.getElementById\("healthBar"\),\s*document\.getElementById\("healthText"\)\]/);
+});
+
+test('health affects on-foot movement and health drift follows basic-care conditions', () => {
+  const walking = source.slice(source.indexOf('function updatePlayerOnFoot('), source.indexOf('function updateCar('));
+  assert.match(walking, /state\.needs\.health\s*<\s*30/);
+  assert.match(source, /state\.needs\.health\s*=\s*playerHealthModel\.advanceHealth\(/);
+});
+
+test('clinic choices revalidate treatment before changing money, time, and health', () => {
+  const start = source.indexOf('if (place.id === "clinic")');
+  const end = source.indexOf('if (place.id === "home")', start);
+  assert.ok(start >= 0 && end > start);
+  const clinic = source.slice(start, end);
+  assert.match(clinic, /playerHealthModel\.listTreatments\(/);
+  assert.match(clinic, /playerHealthModel\.completeTreatment\(/);
+  assert.match(clinic, /minute:\s*state\.minute/);
+  assert.match(clinic, /Math\.round\(option\.healthAfter\)/);
+  assert.match(clinic, /state\.cash\s*-=?\s*result\.cost/);
+  assert.match(clinic, /advanceTime\(result\.duration\)/);
+  assert.match(clinic, /state\.needs\.health\s*=\s*result\.health/);
+});
+
+test('old snapshots without health keep the safe initialized value and clinic has readable signage', () => {
+  assert.match(source, /health:\s*100/);
+  assert.match(source, /saved\.needs\[key\] != null && Number\.isFinite\(Number\(saved\.needs\[key\]\)\)/);
+  const renderer = source.slice(source.indexOf('function drawPlace(place)'), source.indexOf('function characterLodAtScreen'));
+  assert.match(renderer, /place\.id === "clinic"/);
+  assert.match(renderer, /若葉診療所/);
+  assert.match(renderer, /\+|十字|診/);
 });
 
 test('public bath has a distinct Japanese sign, noren, and bathhouse roof in the city rendering', () => {

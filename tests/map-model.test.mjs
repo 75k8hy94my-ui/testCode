@@ -210,7 +210,7 @@ test('enterable home exterior matches surrounding detached-house scale', () => {
 
 test('all existing facilities and stations remain addressable', () => {
   const map = createMapModel();
-  assert.deepEqual(map.places.map((place) => place.id), ['home','cafe','store','park','gym','library','community-center','fuel-station','delivery-depot','public-bath']);
+  assert.deepEqual(map.places.map((place) => place.id), ['home','cafe','store','park','gym','library','community-center','fuel-station','delivery-depot','public-bath','clinic']);
   assert.deepEqual(map.stations.map((station) => station.id), ['west','central','east']);
   for (const place of map.places) {
     assert.ok(map.getNode(place.entranceNodeId));
@@ -357,5 +357,16 @@ test('Wakaba bathhouse is reachable from home and does not collide with the map'
   const home = map.places.find((place) => place.id === 'home');
   assert.ok(Math.hypot(bathhouse.x - home.x, bathhouse.y - home.y) < 500);
   assert.ok(Math.hypot(bathhouse.building.x - bathhouse.x, bathhouse.building.y - bathhouse.y) < 275);
+  assert.deepEqual(map.validate(), []);
+});
+
+test('Wakaba clinic is reachable from home and clear of roads and generated buildings', () => {
+  const map = createMapModel();
+  const clinic = map.places.find((place) => place.id === 'clinic');
+  assert.ok(clinic);
+  assert.equal(clinic.name, '若葉診療所');
+  assert.ok(map.findRoute('home-entrance', clinic.entranceNodeId, { mode:'pedestrian' }));
+  assert.ok(map.findRoute('home-road', clinic.roadNodeId, { mode:'vehicle' }));
+  assert.equal(map.isWalkable(clinic.x, clinic.y, 14), true);
   assert.deepEqual(map.validate(), []);
 });

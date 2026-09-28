@@ -35,8 +35,11 @@
     return ["晴れ","☀"];
   }
   function avgNeeds(needs) {
-    const keys = ["hunger","energy","hygiene","social","fun"];
-    return Math.round(keys.reduce(function(sum,key){ return sum + Number(needs && needs[key] || 0); },0) / keys.length);
+    const keys = ["hunger","energy","hygiene","social","fun","health"];
+    return Math.round(keys.reduce(function(sum,key){
+      const value = Number(needs && needs[key]);
+      return sum + (Number.isFinite(value) ? value : key === "health" ? 100 : 0);
+    },0) / keys.length);
   }
 
   function createPhoneSystem(options) {
@@ -217,9 +220,10 @@
     }
     function healthApp() {
       const needs = model.needs || {};
-      const pairs = [["空腹","hunger"],["体力","energy"],["清潔","hygiene"],["交流","social"],["楽しさ","fun"]];
+      const pairs = [["空腹","hunger"],["体力","energy"],["清潔","hygiene"],["交流","social"],["楽しさ","fun"],["健康","health"]];
       const rows = pairs.map(function(pair){
-        const value = Math.round(Number(needs[pair[1]]) || 0);
+        const rawValue = Number(needs[pair[1]]);
+        const value = Math.round(Number.isFinite(rawValue) ? rawValue : pair[1] === "health" ? 100 : 0);
         const color = value < 25 ? "#ff453a" : value < 50 ? "#ff9f0a" : "#30d158";
         return '<div class="ios-health-row"><span>' + pair[0] + '</span><div><i style="width:' + value + '%;background:' + color +
           '"></i></div><b>' + value + '</b></div>';
@@ -365,6 +369,7 @@
 
     function notifications() {
       const rows = [];
+      if (Number((model.needs && model.needs.health) ?? 100) < 30) rows.push(["ヘルス","体調がかなり悪くなっています。8:00〜20:00に若葉診療所で治療を受けましょう。"]);
       if (Number(model.needs && model.needs.energy || 100) < 30) rows.push(["ヘルス","体力が低下しています。休息を取りましょう。"]);
       if (Number(model.needs && model.needs.hunger || 100) < 30) rows.push(["ヘルス","空腹です。食事をおすすめします。"]);
       if (Number(model.cash || 0) < Number(model.rent || 0)) rows.push(["ウォレット","次回家賃に対して所持金が不足しています。"]);
@@ -410,7 +415,10 @@
         drivingRating:value.drivingRating,
         nextRentDay:value.nextRentDay,
         waypoint:value.waypoint ? [value.waypoint.id,Math.round((value.waypoint.distance || 0) / 20)] : null,
-        needs:["hunger","energy","hygiene","social","fun"].map(function(key){return Math.round(Number(needs[key]) || 0);}),
+        needs:["hunger","energy","hygiene","social","fun","health"].map(function(key){
+          const value = Number(needs[key]);
+          return Math.round(Number.isFinite(value) ? value : key === "health" ? 100 : 0);
+        }),
         npcs:(value.npcs || []).map(function(n){return [n.id,n.friendship,n.hidden,n.activity,Math.round((n.distance || 0) / 25),Math.round((n.mapDX || 0) / 20),Math.round((n.mapDY || 0) / 20)];}),
         friendWaypoint:value.friendWaypoint ? [value.friendWaypoint.id,Math.round((value.friendWaypoint.distance || 0) / 20)] : null,
         trains:(value.trains || []).map(function(t){return [t.id,t.stationIndex,t.targetIndex,Math.round((t.dwell || 0) * 2)];})

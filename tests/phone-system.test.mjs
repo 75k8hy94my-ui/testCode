@@ -67,6 +67,41 @@ test('phone waypoint persists in game snapshots', () => {
   assert.match(gameSource, /saved\.phone && typeof saved\.phone\.waypoint === "string"/);
 });
 
+test('phone health app displays the sixth health need and includes it in its overall condition', () => {
+  const root = {
+    hidden:false,
+    innerHTML:"",
+    classList:{ toggle() {} },
+    style:{ setProperty() {} },
+    addEventListener() {}
+  };
+  const phone = phoneModule.createPhoneSystem({ root });
+  phone.update({ needs:{ hunger:80, energy:70, hygiene:60, social:50, fun:40, health:25 } });
+  phone.openApp('health');
+
+  assert.match(root.innerHTML, /健康/);
+  assert.match(root.innerHTML, /<strong>54%<\/strong>/);
+});
+
+test('phone health app refreshes when health falls all the way to zero', () => {
+  const root = {
+    hidden:false,
+    innerHTML:"",
+    classList:{ toggle() {} },
+    style:{ setProperty() {} },
+    addEventListener() {}
+  };
+  const phone = phoneModule.createPhoneSystem({ root });
+  const needs = { hunger:70, energy:70, hygiene:70, social:70, fun:70, health:100 };
+  phone.update({ needs });
+  phone.openApp('health');
+  needs.health = 0;
+  phone.update({ needs });
+
+  assert.match(root.innerHTML, /<b>0<\/b><\/div><\/section>/);
+  assert.match(root.innerHTML, /<strong>58%<\/strong>/);
+});
+
 test('friend finder only exposes visible NPC coordinates and tracks a temporary walking target', () => {
   assert.match(gameSource, /distance:npc\.hidden \? null : distance\(p\.x, p\.y, npc\.x, npc\.y\)/);
   assert.match(gameSource, /mapDX:npc\.hidden \? null/);

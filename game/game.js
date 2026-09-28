@@ -92,6 +92,12 @@
     return;
   }
 
+  const playerHealthModel = globalThis.CityDaysPlayerHealth;
+  if (!playerHealthModel?.advanceHealth || !playerHealthModel?.listTreatments || !playerHealthModel?.completeTreatment || !playerHealthModel?.conditionFor) {
+    showRuntimeError("PlayerHealth を読み込めません。");
+    return;
+  }
+
   const characterRenderer = globalThis.CityDaysCharacterRenderer;
   if (!characterRenderer?.createAppearance || !characterRenderer?.draw) {
     showRuntimeError("CharacterRenderer を読み込めません。");
@@ -153,7 +159,8 @@
     energy: [document.getElementById("energyBar"), document.getElementById("energyText")],
     hygiene: [document.getElementById("hygieneBar"), document.getElementById("hygieneText")],
     social: [document.getElementById("socialBar"), document.getElementById("socialText")],
-    fun: [document.getElementById("funBar"), document.getElementById("funText")]
+    fun: [document.getElementById("funBar"), document.getElementById("funText")],
+    health: [document.getElementById("healthBar"), document.getElementById("healthText")]
   };
 
   const WORLD_SIZE = 10800;
@@ -1108,7 +1115,8 @@
       energy: 85,
       hygiene: 80,
       social: 65,
-      fun: 70
+      fun: 70,
+      health: 100
     },
     visual: {
       weather: "clear",
@@ -3588,6 +3596,7 @@
     state.needs.hygiene -= minutes * 0.009;
     state.needs.social -= minutes * 0.004;
     state.needs.fun -= minutes * 0.006;
+    state.needs.health = playerHealthModel.advanceHealth(state.needs.health, state.needs, minutes);
     clampNeeds();
   }
 
@@ -3947,6 +3956,33 @@
           }
           clampNeeds();
           showToast(option.name + "を利用しました −¥" + result.cost.toLocaleString("ja-JP"));
+        }, !option.available);
+      }
+    }
+
+    if (place.id === "clinic") {
+      actionDescription.textContent = "南若葉住宅地の診療所です。受付時間は8:00〜20:00。治療を終えてから閉院時刻を過ぎないように利用してください。";
+      const reasonText = (reason) => reason === "not-open" ? "診療時間外です（8:00〜20:00）"
+        : reason === "closing-time" ? "診療終了までに治療を終えられません"
+          : reason === "insufficient-funds" ? "治療費が足りません"
+            : reason === "not-needed" ? "この治療を受けるほど体調は悪くありません"
+              : "治療を受けられません";
+      const treatmentState = () => ({ minute:state.minute, cash:state.cash, health:state.needs.health });
+      for (const option of playerHealthModel.listTreatments(treatmentState())) {
+        const detail = option.available
+          ? "¥" + option.cost.toLocaleString("ja-JP") + " / " + option.duration + "分 / 健康 " + Math.round(state.needs.health) + "→" + Math.round(option.healthAfter)
+          : reasonText(option.reason);
+        addChoice(option.name, detail, () => {
+          const result = playerHealthModel.completeTreatment(treatmentState(), option.id);
+          if (!result.ok) {
+            showToast(reasonText(result.reason));
+            return;
+          }
+          state.cash -= result.cost;
+          advanceTime(result.duration);
+          state.needs.health = result.health;
+          clampNeeds();
+          showToast(option.name + "を受けました −¥" + result.cost.toLocaleString("ja-JP"));
         }, !option.available);
       }
     }
@@ -4851,7 +4887,7 @@
 
       if (saved.needs) {
         for (const key of Object.keys(state.needs)) {
-          if (Number.isFinite(Number(saved.needs[key]))) state.needs[key] = Number(saved.needs[key]);
+          if (saved.needs[key] != null && Number.isFinite(Number(saved.needs[key]))) state.needs[key] = Number(saved.needs[key]);
         }
         clampNeeds();
       }
@@ -4915,6 +4951,7 @@
       let speed = running ? RUN_SPEED : WALK_SPEED;
       if (state.needs.energy < 15) speed *= 0.72;
       if (state.needs.hunger < 10) speed *= 0.8;
+      if (state.needs.health < 30) speed *= 0.8;
 
       const nx = state.player.x + x * speed * dt;
       const ny = state.player.y + y * speed * dt;
@@ -8891,6 +8928,29 @@
         ctx.bezierCurveTo(steamX - 8, p.y - 164, steamX + 8, p.y - 172, steamX, p.y - 184);
         ctx.stroke();
       }
+    } else if (place.id === "clinic") {
+      drawFacilityBuilding(p, building?.w || 300, building?.h || 260, "#dce6d9", "#657365", "#9ab8bd");
+      ctx.fillStyle = "#f4f3e8";
+      roundedRectPath(ctx, p.x - 121, p.y - 66, 242, 42, 5);
+      ctx.fill();
+      ctx.fillStyle = "#415e52";
+      ctx.font = "800 17px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("若葉診療所", p.x, p.y - 39);
+      ctx.fillStyle = "#b74b45";
+      roundedRectPath(ctx, p.x + 82, p.y - 111, 58, 48, 5);
+      ctx.fill();
+      ctx.fillStyle = "#fff8ec";
+      ctx.fillRect(p.x + 105, p.y - 102, 12, 30);
+      ctx.fillRect(p.x + 96, p.y - 93, 30, 12);
+      ctx.fillStyle = "#eaf0e9";
+      ctx.fillRect(p.x - 88, p.y + 23, 48, 61);
+      ctx.fillRect(p.x + 40, p.y + 23, 48, 61);
+      ctx.fillStyle = "#7e9da0";
+      ctx.fillRect(p.x - 82, p.y + 29, 36, 49);
+      ctx.fillRect(p.x + 46, p.y + 29, 36, 49);
+      ctx.fillStyle = "#4d6055";
+      ctx.fillRect(p.x - 19, p.y + 17, 38, 74);
     }
 
     ctx.fillStyle = "rgba(18,24,21,.76)";
@@ -10001,7 +10061,8 @@
     const values = Object.values(state.needs);
     const average = values.reduce((sum, value) => sum + value, 0) / values.length;
     const minimum = Math.min(...values);
-    lifeStatus.textContent = minimum < 20 ? "かなりつらい" : average > 75 ? "とても充実" : average > 55 ? "いい感じ" : "少し疲れ気味";
+    const generalStatus = minimum < 20 ? "かなりつらい" : average > 75 ? "とても充実" : average > 55 ? "いい感じ" : "少し疲れ気味";
+    lifeStatus.textContent = playerHealthModel.conditionFor(state.needs.health) + " · " + generalStatus;
     rentText.textContent = "次の家賃: Day " + nextRentDay() + " / ¥" + RENT.toLocaleString("ja-JP");
     updateObjective();
     updateSmartphone();

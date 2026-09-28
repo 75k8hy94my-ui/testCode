@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#18201d">
   <link rel="icon" href="data:,">
   <title>City Days - 2D Life Sim</title>
-  <link rel="stylesheet" href="./game.css?v=20260928-friend-finder-1">
+  <link rel="stylesheet" href="./game.css?v=20260929-wakaba-clinic-1">
 </head>
 <body>
   <main id="gameShell">
@@ -23,6 +23,7 @@
             <div class="need"><span>清潔</span><div><i id="hygieneBar"></i></div><b id="hygieneText">80</b></div>
             <div class="need"><span>交流</span><div><i id="socialBar"></i></div><b id="socialText">65</b></div>
             <div class="need"><span>楽しさ</span><div><i id="funBar"></i></div><b id="funText">70</b></div>
+            <div class="need"><span>健康</span><div><i id="healthBar"></i></div><b id="healthText">100</b></div>
           </div>
         </div>
 
@@ -77,6 +78,8 @@
         <p><b>自宅:</b> 玄関から室内へ入り、ベッド・キッチン・シャワー・ソファへ歩いて近づき、E / ACTIONで利用できます。</p>
         <p><b>コミュニティセンター:</b> 曜日ごとの料理・手芸・体操講座に参加できます。開催時刻に入口でE / ACTIONを押してください。</p>
         <p><b>ジム:</b> 体調に合う運動を選べます。通うとトレーニング経験が上がり、新しいメニューが解放されます。</p>
+        <p><b>健康:</b> 空腹・体力・清潔が長く危険な状態だと体調を崩します。生活を整えると少しずつ回復します。健康が30未満だと歩行速度が下がります。</p>
+        <p><b>若葉診療所:</b> 南若葉住宅地にあります。8:00〜20:00に診察・処置（¥1,200）または重い不調向けの集中治療（¥2,800）を受けられます。</p>
         <p><b>カフェの仕事:</b> 体調と営業時間に合わせてシフトを選べます。勤務経験でロングシフトと昇給が解放され、勤務は1日1回です。</p>
         <p><b>若葉便の配達:</b> 自宅前の「若葉便 配達受付所」で1日3件まで受注できます。納品先でE / ACTIONから届けると報酬を受け取れます。期限後も減額で配達でき、受付所でキャンセルできます。</p>
         <p><b>車:</b> 乗車後に目的地を選ぶとルートは自動設定。W / ↑ = 加速、S / ↓ / Space = 減速・停止、E = 行き先変更・降車。</p>
@@ -120,7 +123,7 @@
     </div>
   </main>
 
-  <script src="./map-model.js?v=20260929-wakaba-bath-1"></script>
+  <script src="./map-model.js?v=20260929-wakaba-clinic-1"></script>
   <script src="./car-fuel.js?v=20260929-vehicle-fuel-1"></script>
   <script src="./community-center.js?v=20260929-community-resident-2"></script>
   <script src="./delivery-work.js?v=20260929-neighborhood-delivery-1"></script>
@@ -128,10 +131,11 @@
   <script src="./gym-training.js?v=20260929-progressive-training-1"></script>
   <script src="./cafe-work.js?v=20260929-career-shifts-1"></script>
   <script src="./public-bath.js?v=20260929-wakaba-bath-1"></script>
+  <script src="./player-health.js?v=20260929-wakaba-clinic-1"></script>
   <script src="./character-renderer.js?v=20260927-character-v3-1"></script>
   <script src="./phone-system.js?v=20260928-friend-finder-1"></script>
   <script src="./traffic-overtake-safety.js?v=20260928-overtake-safety-1"></script>
   <script src="./traffic-overtake.js?v=20260928-overtake-plan-integration-1"></script>
-  <script src="./game.js?v=20260929-wakaba-bath-1"></script>
+  <script src="./game.js?v=20260929-wakaba-clinic-1"></script>
 </body>
 </html>
