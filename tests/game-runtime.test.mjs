@@ -1515,3 +1515,11 @@ test('world and minimap ignore unsafe legacy pedestrian-only blueprint edges', (
   assert.match(minimap, /if \(!edge\.vehicle\) continue/);
   assert.match(minimap, /for \(const segment of mapModel\.pedestrianNavigation\.segments\)/);
 });
+
+
+test('crosswalk rendering uses generated depth instead of road width as zebra depth', () => {
+  const markings = source.slice(source.indexOf('function drawMapModelIntersectionMarkings()'), source.indexOf('function drawMapModelRoads()'));
+  assert.match(markings, /const crossingDepth = Math\.max\(18, Number\(crosswalk\.depth\) \|\| 24\)/);
+  assert.match(markings, /const halfRoadSpan = Math\.max\(14, edge\.width \/ 2 - 7\)/);
+  assert.match(markings, /offset = -crossingDepth \/ 2 \+ 3/);
+});
