@@ -1420,7 +1420,7 @@
           errors.push("place node missing: " + place.id);
           continue;
         }
-        if (!findRoute(place.entranceNodeId, place.roadNodeId, { mode:"pedestrian" })) errors.push("place unreachable: " + place.id);
+        if (!pedestrianNavigation.findRoute(pedestrianGraph, "home-entrance", place.entranceNodeId)) errors.push("place unreachable on pedestrian graph: " + place.id);
         if (!neighbors(place.roadNodeId, { mode:"vehicle" }).length) errors.push("place road unreachable: " + place.id);
         if (!isWalkable(place.x, place.y, 14)) errors.push("place not walkable: " + place.id);
         const placeRoadHit = nearestRoad(place.x, place.y, { vehicleOnly:true });
@@ -1462,6 +1462,7 @@
       for (const station of stations) {
         if (!getNode(station.roadNodeId)) errors.push("station road node missing: " + station.id);
         if (!isWalkable(station.accessX, station.accessY, 14)) errors.push("station access not walkable: " + station.id);
+        if (!pedestrianNavigation.findRoute(pedestrianGraph, "home-entrance", station.roadNodeId)) errors.push("station unreachable on pedestrian graph: " + station.id);
         const stationRoadHit = nearestRoad(station.accessX, station.accessY, { vehicleOnly:true });
         if (stationRoadHit?.edge && stationRoadHit.distance < stationRoadHit.edge.width / 2 + 8) {
           errors.push("station access enters vehicle road: " + station.id);
