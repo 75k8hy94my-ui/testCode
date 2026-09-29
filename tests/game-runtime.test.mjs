@@ -71,7 +71,7 @@ test('citizen navigation uses typed map segments and persists a validated curren
   assert.match(source, /pedestrianNavigation\?\.findRoute\(mapModel\.pedestrianNavigation/);
   assert.match(source, /routeSegmentIds:Array\.isArray\(ped\.routeSegmentIds\)/);
   assert.match(source, /segmentId:ped\.segmentId/);
-  assert.match(source, /pedestrianSegmentPose\(segment, ped\.segmentDirection, ped\.segmentAlong\)/);
+  assert.match(source, /pedestrianSegmentPose\([\s\S]*pedestrianSegmentLaneOffset\(ped, segment\)/);
   assert.match(source, /mapModel\.pedestrianNavigation\.segmentsById\.get\(stored\.segmentId\)/);
 });
 
@@ -83,6 +83,26 @@ test('pedestrians, vehicles, and rendering consume the same map crosswalk record
   assert.match(source, /crossingControl\.vehicleYieldDecision\(crosswalk/);
   assert.match(source, /crosswalk\.stopLines \|\| \[\]/);
   assert.match(source, /updateCrossingClaims\(\);\s*updateTraffic\(dt\)/);
+});
+
+test('NPC junction trajectory keeps the actual incoming edge after the route index advances', () => {
+  assert.match(source, /car\.previousEdgeId = current\.id/);
+  assert.match(source, /car\.previousDirectionSign = car\.directionSign/);
+  assert.match(source, /distanceFromStart <= window && car\.previousEdgeId/);
+  assert.match(source, /mapModel\.getEdge\(car\.previousEdgeId\)/);
+});
+
+test('typed sidewalk pedestrians keep following gaps and can sidestep instead of deadlocking', () => {
+  assert.match(source, /other\.segmentId !== ped\.segmentId/);
+  assert.match(source, /other\.segmentDirection !== ped\.segmentDirection/);
+  assert.match(source, /ped\.segmentAvoidanceTarget/);
+  assert.match(source, /pedestrianSegmentLaneOffset\(ped, segment\)/);
+});
+
+test('home interaction selection ignores decorative fixtures and reads the shared interaction geometry', () => {
+  const interaction = source.slice(source.indexOf('function nearestHomeInteraction()'), source.indexOf('function preparePackedMeal('));
+  assert.match(interaction, /const interaction = fixture\.interaction/);
+  assert.match(interaction, /if \(!interaction\) continue/);
 });
 
 test('NPC cars commit physical junction curves and collision poses from one trajectory function', () => {
@@ -104,8 +124,8 @@ test('action and help panels lock only player input while the world update conti
   assert.match(update, /updateTraffic\(dt\);[\s\S]*advanceTime\(gameMinutes, true, false\);[\s\S]*updatePedestrians\(dt, gameMinutes\)/);
 });
 
-test('home walk and run share a modest named speed multiplier without changing street speeds', () => {
-  assert.match(source, /const HOME_MOVEMENT_SPEED_MULTIPLIER = 1\.2/);
+test('home walk and run use the requested two-times multiplier without changing street speeds', () => {
+  assert.match(source, /const HOME_MOVEMENT_SPEED_MULTIPLIER = 2/);
   const homeMovement = source.slice(source.indexOf('function updatePlayerAtHome('), source.indexOf('function nearestHomeInteraction('));
   assert.match(homeMovement, /\(running \? RUN_SPEED : WALK_SPEED\) \* HOME_MOVEMENT_SPEED_MULTIPLIER/);
   const streetMovement = source.slice(source.indexOf('function updatePlayerOnFoot('), source.indexOf('function updatePlayerInVehicle('));
@@ -1202,7 +1222,7 @@ test('vehicle roads render a visible pedestrian shoulder outside the curb', () =
 test('pedestrian generation places walkers on their first typed navigation segment', () => {
   assert.match(source, /const segment = mapModel\.pedestrianNavigation\.segmentsById\.get\(ped\.segmentId\)/);
   assert.match(source, /ped\.segmentAlong = ped\.segmentDirection > 0 \? initialAlong/);
-  assert.match(source, /pedestrianSegmentPose\(segment, ped\.segmentDirection, ped\.segmentAlong\)/);
+  assert.match(source, /pedestrianSegmentLaneOffset\(ped, segment\)/);
 });
 
 test('pedestrian route progress remains inside the active typed segment bounds', () => {
@@ -1318,13 +1338,14 @@ test('facility entrances and physical building footprints are rendered separatel
   assert.match(source, /const building = place\.building/);
   assert.match(source, /const entry = worldToScreen\(place\.x, place\.y\)/);
   assert.match(source, /ctx\.arc\(entry\.x, entry\.y, 15/);
-  assert.match(source, /ctx\.lineTo\(p\.x, p\.y\)/);
+  assert.match(source, /ctx\.lineTo\(facadeEntrance\.x, facadeEntrance\.y\)/);
 });
 
 test('facility buildings participate in player collision', () => {
   assert.match(source, /function placeBuildingRect\(place\)/);
   assert.match(source, /for \(const place of PLACES\)/);
   assert.match(source, /const facility = placeBuildingRect\(place\)/);
+  assert.match(source, /facility\.frontageGeometry[\s\S]*localX[\s\S]*localY/);
   assert.match(source, /circleRectCollision\(x, y, radius, facility\)/);
 });
 
@@ -1335,8 +1356,8 @@ test('home interior transitions preserve outdoor position and use a separate sce
   assert.match(source, /if \(place\.id === "home"\)[\s\S]*addChoice\("自宅に入る"[\s\S]*enterHome\(\)/);
 });
 
-test('home movement is slightly faster than normal walking', () => {
-  assert.match(source, /const HOME_MOVEMENT_SPEED_MULTIPLIER = 1\.2/);
+test('home movement is twice normal street movement', () => {
+  assert.match(source, /const HOME_MOVEMENT_SPEED_MULTIPLIER = 2/);
   assert.match(source, /const speed = \(running \? RUN_SPEED : WALK_SPEED\) \* HOME_MOVEMENT_SPEED_MULTIPLIER/);
 });
 
