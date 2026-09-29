@@ -562,11 +562,14 @@
     }
     if (!frontageGeometry) return place;
 
-    const roadGapAtEntrance = distance(frontageGeometry.entrance, frontageGeometry.roadAnchor) - preferredEdge.width / 2;
-    const accessOffset = Math.max(0, Math.min(14, roadGapAtEntrance - 18));
+    const sidewalkWidth = preferredEdge.sidewalkWidth || vehicleSidewalkWidthForType(preferredEdge.type);
+    const sidewalkCenterOffset = Math.min(
+      preferredEdge.width / 2 + sidewalkWidth - 10,
+      preferredEdge.width / 2 + 22
+    );
     const accessPoint = {
-      x:frontageGeometry.entrance.x + frontageGeometry.normal.x * accessOffset,
-      y:frontageGeometry.entrance.y + frontageGeometry.normal.y * accessOffset
+      x:frontageGeometry.roadAnchor.x - frontageGeometry.normal.x * sidewalkCenterOffset,
+      y:frontageGeometry.roadAnchor.y - frontageGeometry.normal.y * sidewalkCenterOffset
     };
 
     return {
