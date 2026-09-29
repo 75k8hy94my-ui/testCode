@@ -14,6 +14,7 @@
     const segments = [];
     const crosswalks = [];
     const adjacency = new Map();
+    const nodePositions = new Map();
     const endpointGroups = new Map();
     const publicPathEndpoints = [];
     const placeNodes = new Set([
@@ -22,7 +23,10 @@
     ]);
     const addSegment = (segment) => {
       if (!(segment.length > 0) || segment.points.length < 2) return;
-      segments.push(Object.freeze({ ...segment, points:Object.freeze(segment.points.map((point) => Object.freeze({ ...point }))) }));
+      const frozenPoints = Object.freeze(segment.points.map((point) => Object.freeze({ ...point })));
+      segments.push(Object.freeze({ ...segment, points:frozenPoints }));
+      if (!nodePositions.has(segment.from)) nodePositions.set(segment.from, Object.freeze({ ...frozenPoints[0] }));
+      if (!nodePositions.has(segment.to)) nodePositions.set(segment.to, Object.freeze({ ...frozenPoints.at(-1) }));
     };
     const addEndpoint = (junctionId, nodeId, point, sourceId) => {
       const list = endpointGroups.get(junctionId) || [];
@@ -56,12 +60,17 @@
       const crossings = [];
       const incident = (nodeId) => mapModel.neighbors?.(nodeId, { mode:"vehicle" }) || [];
       for (const nodeId of [edge.from, edge.to]) {
-        if (incident(nodeId).length < 3) continue;
+        const incidentEdges = incident(nodeId).map((link) => link.edge).filter(Boolean);
+        if (incidentEdges.length < 3) continue;
         const geometry = mapModel.junctionGeometry?.(nodeId, edge.id);
         const from = nodeId === edge.from;
         const along = from ? geometry?.crossingOffset : length - (geometry?.crossingOffset || 0);
         if (Number.isFinite(along) && along > 0 && along < length) {
-          crossings.push({ along, nodeId, signalized:Boolean(edge.signalized) });
+          crossings.push({
+            along,
+            nodeId,
+            signalized:incidentEdges.some((incidentEdge) => Boolean(incidentEdge.signalized))
+          });
         }
       }
       if (length >= 1150) {
@@ -103,6 +112,7 @@
         }));
         const crosswalkId = "crosswalk:" + edge.id + ":" + Math.round(crossing.along);
         const endpointNodeIds = [crosswalkId + ":a", crosswalkId + ":b"];
+        const crosswalkLength = distance(first, second);
         const record = Object.freeze({
           id:crosswalkId,
           x:roadPose.x,
@@ -110,6 +120,7 @@
           vector:Object.freeze(vector),
           roadEdgeId:edge.id,
           along:crossing.along,
+          length:crosswalkLength,
           endpoints:Object.freeze([Object.freeze({ x:first.x, y:first.y }), Object.freeze({ x:second.x, y:second.y })]),
           curbEndpoints:Object.freeze([Object.freeze({ x:curbA.x, y:curbA.y }), Object.freeze({ x:curbB.x, y:curbB.y })]),
           endpointNodeIds:Object.freeze(endpointNodeIds),
@@ -125,7 +136,7 @@
           from:endpointNodeIds[0],
           to:endpointNodeIds[1],
           points:record.endpoints,
-          length:distance(record.endpoints[0], record.endpoints[1]),
+          length:record.length,
           roadEdgeId:edge.id,
           crosswalkId
         });
@@ -218,6 +229,7 @@
       segments:Object.freeze(segments),
       segmentsById,
       adjacency,
+      nodePositions,
       crosswalks:Object.freeze(crosswalks)
     });
   }
@@ -256,7 +268,21 @@
     return { nodeIds, segmentIds, distance:best.get(endNodeId) };
   }
 
-  const api = Object.freeze({ buildGraph, findRoute });
+  function nearestNode(graph, x, y, options = {}) {
+    if (!graph?.nodePositions || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+    const maxDistance = Number.isFinite(options.maxDistance) ? Math.max(0, options.maxDistance) : Infinity;
+    let best = null;
+    for (const [nodeId, point] of graph.nodePositions) {
+      const candidateDistance = Math.hypot(point.x - x, point.y - y);
+      if (candidateDistance > maxDistance) continue;
+      if (!best || candidateDistance < best.distance || candidateDistance === best.distance && String(nodeId).localeCompare(String(best.nodeId)) < 0) {
+        best = { nodeId, point, distance:candidateDistance };
+      }
+    }
+    return best;
+  }
+
+  const api = Object.freeze({ buildGraph, findRoute, nearestNode });
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   global.CityDaysPedestrianNavigation = api;
 })(typeof globalThis !== "undefined" ? globalThis : window);
