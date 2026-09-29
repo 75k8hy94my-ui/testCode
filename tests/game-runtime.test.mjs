@@ -99,7 +99,7 @@ test('wardrobe model is loaded before runtime and is normalized in snapshots', (
   assert.match(source, /wardrobe:wardrobeModel\.createWardrobe\(\)/);
   assert.match(source, /wardrobe:wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
   assert.match(source, /state\.wardrobe = wardrobeModel\.normalizeWardrobe\(saved\.wardrobe\)/);
-  assert.match(html, /game\.js\?v=20260929-community-clubs-1/);
+  assert.match(html, /game\.js\?v=20260929-laundromat-1/);
 });
 
 test('arcade progress is loaded before the game and migrates safely through snapshots', () => {
@@ -687,7 +687,7 @@ test('public bath rules load before runtime and the sento interaction applies it
 });
 
 test('clinic map and runtime changes request fresh browser assets', () => {
-  assert.match(html, /map-model\.js\?v=20260929-pet-shelter-1/);
+  assert.match(html, /map-model\.js\?v=20260929-laundromat-1/);
   assert.match(html, /game\.js\?v=[^"]+/);
 });
 
@@ -802,6 +802,55 @@ test('community center actions revalidate entry, charge once, and award completi
   assert.match(action, /socialNpcState\.relationships\[pairId\]/);
 });
 
+test('home closet shows cleanliness percentage, a text condition and the equipped outfit', () => {
+  const closetStart = source.indexOf('} else if (fixture.id === "closet")');
+  const closetEnd = source.indexOf('fixture.id === "pet"', closetStart);
+  const closet = source.slice(closetStart, closetEnd);
+  assert.match(closet, /wardrobe\.cleanlinessByOutfitId\[outfit\.id\]/);
+  assert.match(closet, /wardrobeModel\.getCleanlinessLabel\(/);
+  assert.match(closet, /清潔度/);
+  assert.match(closet, /着用中/);
+});
+
+test('the outfit worn before changing clothes receives wear during dressing time', () => {
+  const equipStart = source.indexOf('function equipPlayerOutfit(');
+  const equipEnd = source.indexOf('\n  function ', equipStart + 10);
+  const equip = source.slice(equipStart, equipEnd);
+  assert.notEqual(equipStart, -1);
+  assert.ok(equip.indexOf('advanceTime(result.duration)') < equip.indexOf('state.wardrobe = wardrobeModel.normalizeWardrobe'));
+  assert.match(equip, /wardrobeModel\.normalizeWardrobe\(\{\s*\.\.\.state\.wardrobe,\s*equippedOutfitId:\s*result\.wardrobe\.equippedOutfitId\s*\}\)/);
+  assert.doesNotMatch(equip, /state\.wardrobe\s*=\s*result\.wardrobe\s*;/);
+});
+
+test('outfit cleanliness advances with game time and survives purchases, dressing and snapshots', () => {
+  assert.match(html, /wardrobe\.js\?v=[^\"]+/);
+  const advanceStart = source.indexOf('function advanceTime(');
+  const advanceEnd = source.indexOf('function ', advanceStart + 20);
+  const advanceTime = source.slice(advanceStart, advanceEnd);
+  assert.match(advanceTime, /state\.wardrobe\s*=\s*wardrobeModel\.advanceWear\(state\.wardrobe,\s*minutes\)/);
+  assert.match(source, /wardrobe:wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
+  assert.match(source, /state\.wardrobe = wardrobeModel\.normalizeWardrobe\(saved\.wardrobe\)/);
+  assert.match(source, /wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
+});
+
+test('laundromat is a loaded city facility and its action validates before changing cash or time', () => {
+  assert.match(html, /laundromat|wardrobe\.js/);
+  assert.match(source, /place\.id === "laundromat"/);
+  const actionStart = source.indexOf('function launderCurrentOutfit(');
+  const actionEnd = source.indexOf('\n  function ', actionStart + 10);
+  const action = source.slice(actionStart, actionEnd);
+  assert.notEqual(actionStart, -1);
+  assert.match(action, /wardrobeModel\.launder\(state\.wardrobe,\s*state\.cash,\s*Math\.floor\(state\.minute\)\)/);
+  assert.ok(action.indexOf('if (!result.ok)') < action.indexOf('state.cash = result.cashRemaining'));
+  assert.ok(action.indexOf('state.cash = result.cashRemaining') < action.indexOf('advanceTime(result.duration)'));
+  assert.match(action, /state\.wardrobe = result\.wardrobe/);
+  const placeStart = source.indexOf('if (place.id === "laundromat")');
+  const placeEnd = source.indexOf('if (place.id === "clinic")', placeStart);
+  assert.notEqual(placeStart, -1);
+  assert.match(source.slice(placeStart, placeEnd), /wardrobeModel\.launder/);
+  assert.match(source.slice(placeStart, placeEnd), /現在の服を洗う/);
+});
+
 test('citizens plan community classes through their normal pedestrian activity lifecycle', () => {
   const candidates = source.slice(source.indexOf('function citizenActionCandidates('), source.indexOf('function chooseCitizenAction('));
   const completion = source.slice(source.indexOf('function completeCitizenActivity('), source.indexOf('function planCitizenAction('));
@@ -830,7 +879,7 @@ test('club members travel through normal pedestrian routes and revalidate the se
 test('club runtime modules have fresh browser cache keys', () => {
   assert.match(html, /community-center\.js\?v=20260929-community-clubs-1/);
   assert.match(html, /social-npc-system\.js\?v=20260929-community-clubs-1/);
-  assert.match(html, /game\.js\?v=20260929-community-clubs-1/);
+  assert.match(html, /game\.js\?v=20260929-laundromat-1/);
 });
 
 test('game loads overtake safety before the overtake planner and runtime', () => {
@@ -1243,7 +1292,108 @@ test('visible smartphone refreshes world data at a bounded cadence and resets wh
 test('home map uses the street world scale and follows the player camera', () => {
   const viewport = source.slice(source.indexOf('function homeInteriorViewport'), source.indexOf('function homeToScreen'));
   assert.match(viewport, /const scale = Math\.max\(1, fitScale\)/);
-  assert.match(viewport, /state\.player\.homeX \* scale/);
-  assert.match(viewport, /state\.player\.homeY \* scale/);
+  assert.match(viewport, /: state\.player\.homeX/);
+  assert.match(viewport, /: state\.player\.homeY/);
+  assert.match(viewport, /furniturePlacementState[\s\S]*homeFurnitureCandidate\(\)/);
+  assert.match(viewport, /focusX/);
+  assert.match(viewport, /focusScreenX = preview && viewWidth <= 760 \? viewWidth - 64 : viewWidth \/ 2/);
+  assert.match(viewport, /x:\s*preview\s*\? centeredX/);
   assert.doesNotMatch(viewport, /1\.22/);
+});
+
+test('home furniture defaults into legacy saves and survives normalized snapshot round-trips', () => {
+  const furnitureScript = html.indexOf('home-furniture.js');
+  assert.notEqual(furnitureScript, -1);
+  assert.ok(furnitureScript < html.indexOf('game.js'));
+  assert.match(source, /const homeFurnitureModel = globalThis\.CityDaysHomeFurniture/);
+  assert.match(source, /homeFurniture:homeFurnitureModel\.createProgress\(\)/);
+  assert.match(source, /homeFurniture:homeFurnitureModel\.normalizeProgress\(state\.homeFurniture\)/);
+  assert.match(source, /state\.homeFurniture = sanitizeHomeFurnitureProgress\(saved\.homeFurniture\)/);
+  const hookStart = source.indexOf('function installSocialNpcTestHook()');
+  const hookEnd = source.indexOf('function togglePause()', hookStart);
+  const hook = source.slice(hookStart, hookEnd);
+  assert.match(hook, /homeFurniture:homeFurnitureModel\.normalizeProgress\(state\.homeFurniture\)/);
+});
+
+test('supermarket exposes catalog furniture and sends a selected purchase through the atomic handler', () => {
+  const storeStart = source.indexOf('if (place.id === "store")');
+  const storeEnd = source.indexOf('if (place.id === "fuel-station")', storeStart);
+  const store = source.slice(storeStart, storeEnd);
+  const furnitureStart = store.indexOf('for (const item of homeFurnitureModel.CATALOG');
+  const furnitureEnd = store.indexOf('addChoice("釣り餌を買う"', furnitureStart);
+  const listing = store.slice(furnitureStart, furnitureEnd);
+  const purchaseStart = source.indexOf('function buyHomeFurniture(');
+  const purchaseEnd = source.indexOf('\n  function ', purchaseStart + 10);
+  const purchase = source.slice(purchaseStart, purchaseEnd);
+  assert.notEqual(furnitureStart, -1);
+  assert.match(listing, /homeFurnitureModel\.buyFurniture\(state\.homeFurniture, state\.cash, item\.id\)/);
+  assert.match(listing, /addChoice\(item\.name,[\s\S]*buyHomeFurniture\(item\.id\)/);
+  assert.notEqual(purchaseStart, -1);
+  assert.match(purchase, /homeFurnitureModel\.buyFurniture\(state\.homeFurniture, state\.cash, furnitureId\)/);
+  assert.ok(purchase.indexOf('if (!result.ok)') < purchase.indexOf('state.homeFurniture = result.progress'));
+  assert.ok(purchase.indexOf('state.homeFurniture = result.progress') < purchase.indexOf('state.cash = result.cashRemaining'));
+  assert.ok(purchase.indexOf('state.cash = result.cashRemaining') < purchase.indexOf('advanceTime(result.duration)'));
+});
+
+test('home furniture use checks the home context and applies catalog results through existing time and need clamping', () => {
+  const start = source.indexOf('function useHomeFurniture(');
+  const end = source.indexOf('\n  function ', start + 10);
+  const use = source.slice(start, end);
+  assert.notEqual(start, -1);
+  assert.match(use, /if \(!state\.player\.inHome\)/);
+  assert.match(use, /homeFurnitureModel\.getUseAction\(/);
+  assert.ok(use.indexOf('if (!action)') < use.indexOf('advanceTime(action.duration)'));
+  assert.match(use, /clampNeeds\(\)/);
+});
+
+test('home exposes an in-room furniture manager plus dedicated touch placement controls', () => {
+  assert.match(html, /id="homeFurnitureButton"[^>]*hidden/);
+  assert.match(html, /id="furniturePlacementControls"[^>]*hidden/);
+  assert.match(html, /id="furnitureRotateButton"[^>]*>回転/);
+  assert.match(html, /id="furniturePlaceButton"[^>]*>配置/);
+  assert.match(html, /id="furnitureCancelButton"[^>]*>キャンセル/);
+  assert.match(css, /body\.furniture-placement/);
+  assert.match(css, /furniture-placement-controls/);
+  assert.match(css, /body\.furniture-placement \.toast/);
+});
+
+test('placement and movement share arrangement validation and migrate unsafe saved furniture back to inventory', () => {
+  assert.match(source, /homeFurnitureModel\.validateArrangement\(/);
+  assert.match(source, /function beginHomeFurniturePlacement\(/);
+  assert.match(source, /function confirmHomeFurniturePlacement\(/);
+  assert.match(source, /function sanitizeHomeFurnitureProgress\(/);
+  assert.match(source, /function pickupHomeFurniture\(/);
+  assert.match(source, /homeFurnitureModel\.getFootprint\(/);
+  const snapshotStart = source.indexOf('function applyGameSnapshot(saved)');
+  const snapshotEnd = source.indexOf('\n  function ', snapshotStart + 10);
+  const snapshot = source.slice(snapshotStart, snapshotEnd);
+  assert.match(snapshot, /sanitizeHomeFurnitureProgress\(saved\.homeFurniture\)/);
+});
+
+test('placement keyboard controls are isolated from walking and mobile buttons call the same state transitions', () => {
+  const keydownStart = source.indexOf('window.addEventListener("keydown"');
+  const keydownEnd = source.indexOf('window.addEventListener("keyup"', keydownStart);
+  const keydown = source.slice(keydownStart, keydownEnd);
+  assert.ok(keydown.indexOf('if (furniturePlacementState)') >= 0);
+  assert.ok(keydown.indexOf('if (furniturePlacementState)') < keydown.indexOf('keys.add(key)'));
+  assert.match(keydown, /key === "r"/);
+  assert.match(keydown, /key === "e"/);
+  assert.match(keydown, /key === "escape"/);
+  assert.match(keydown, /else if \(\["arrowleft", "a"\]\.includes\(key\)\) moveHomeFurniturePreview/);
+  for (const handler of ['furnitureRotateButton', 'furniturePlaceButton', 'furnitureCancelButton']) {
+    assert.match(source, new RegExp('document\\.getElementById\\("' + handler + '"\\)'));
+  }
+  assert.match(source, /function updateFurniturePlacement\(/);
+  assert.match(source, /function drawPlacedHomeFurniture\(/);
+});
+
+test('placement mode keeps the player stationary and pauses normal world-time advancement', () => {
+  const updateStart = source.indexOf('function update(dt)');
+  const updateEnd = source.indexOf('\n  function ', updateStart + 10);
+  const update = source.slice(updateStart, updateEnd);
+  const placement = update.indexOf('if (furniturePlacementState)');
+  const worldMinutes = update.indexOf('const gameMinutes = dt * .7');
+  assert.ok(placement >= 0 && placement < worldMinutes);
+  assert.match(update.slice(placement, worldMinutes), /updateFurniturePlacement\(dt\)/);
+  assert.match(update.slice(placement, worldMinutes), /return;/);
 });

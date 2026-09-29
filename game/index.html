@@ -98,7 +98,7 @@
       <div>
         <strong>操作</strong>
         <p><b>徒歩:</b> WASD / 矢印 = 移動、Shift = 走る、E = 施設・住民・自分の車を利用。一般住民にも近づいてEで話しかけると、その人の生活状況を確認できます。</p>
-        <p><b>自宅:</b> 玄関から室内へ入り、ベッド・キッチン・シャワー・ソファへ歩いて近づき、E / ACTIONで利用できます。</p>
+        <p><b>自宅:</b> 玄関から室内へ入り、家具ボタンで購入した家具を配置・移動できます。配置中は矢印／WASDまたは左スティックで動かし、R／回転で向きを変え、E／配置で確定、Esc／キャンセルで戻します。家具へ歩いて近づくと利用できます。</p>
         <p><b>コミュニティセンター:</b> 曜日ごとの料理・手芸・体操講座に参加できます。開催時刻に入口でE / ACTIONを押してください。</p>
         <p><b>ジム:</b> 体調に合う運動を選べます。通うとトレーニング経験が上がり、新しいメニューが解放されます。</p>
         <p><b>健康:</b> 空腹・体力・清潔が長く危険な状態だと体調を崩します。生活を整えると少しずつ回復します。健康が30未満だと歩行速度が下がります。</p>
@@ -116,6 +116,7 @@
     </section>
 
     <div class="top-actions">
+      <button id="homeFurnitureButton" type="button" hidden aria-label="自宅の家具を配置・移動する">家具</button>
       <button id="smartphoneToggle" type="button" aria-controls="smartphonePanel" aria-expanded="false" title="スマホを開く (P)">スマホ</button>
       <button id="soundButton" type="button" aria-pressed="true" title="音声をオフにする">音 ON</button>
       <button id="helpButton" type="button">操作</button>
@@ -128,6 +129,11 @@
         <div id="joystickKnob" class="joystick-knob"></div>
       </div>
       <div class="mobile-actions">
+        <div id="furniturePlacementControls" class="furniture-placement-controls" hidden aria-label="家具配置操作">
+          <button id="furnitureRotateButton" type="button">回転</button>
+          <button id="furniturePlaceButton" type="button">配置</button>
+          <button id="furnitureCancelButton" type="button">キャンセル</button>
+        </div>
         <button id="runButton" type="button">RUN</button>
         <button id="actionButton" type="button">ACTION</button>
       </div>
@@ -146,7 +152,7 @@
     </div>
   </main>
 
-  <script src="./map-model.js?v=20260929-pet-shelter-1"></script>
+  <script src="./map-model.js?v=20260929-laundromat-1"></script>
   <script src="./weather-system.js?v=20260929-deterministic-weather-1"></script>
   <script src="./car-fuel.js?v=20260929-vehicle-fuel-1"></script>
   <script src="./community-center.js?v=20260929-community-clubs-1"></script>
@@ -165,14 +171,15 @@
   <script src="./public-bath.js?v=20260929-wakaba-bath-1"></script>
   <script src="./player-health.js?v=20260929-wakaba-clinic-1"></script>
   <script src="./character-renderer.js?v=20260927-character-v3-1"></script>
-  <script src="./wardrobe.js?v=20260929-player-wardrobe-1"></script>
+  <script src="./wardrobe.js?v=20260929-laundromat-1"></script>
   <script src="./phone-system.js?v=20260929-packed-meals-1"></script>
   <script src="./social-npc-system.js?v=20260929-community-clubs-1"></script>
   <script src="./home-crafting.js?v=20260929-home-crafting-1"></script>
+  <script src="./home-furniture.js?v=20260929-home-furniture-1"></script>
   <script src="./traffic-overtake-safety.js?v=20260928-overtake-safety-1"></script>
   <script src="./traffic-overtake.js?v=20260928-overtake-plan-integration-1"></script>
   <script src="./arcade-games.js?v=20260929-arcade-rules-1"></script>
   <script src="./rail-transit.js?v=20260929-rail-fares-1"></script>
-  <script src="./game.js?v=20260929-community-clubs-1"></script>
+  <script src="./game.js?v=20260929-laundromat-1"></script>
 </body>
 </html>

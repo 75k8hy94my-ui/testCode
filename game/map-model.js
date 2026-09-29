@@ -1,7 +1,7 @@
 (function initCityDaysMapModel(global) {
   "use strict";
 
-  const MAP_VERSION = "japan-v2.6";
+  const MAP_VERSION = "japan-v2.7";
   const WORLD_SIZE = 10800;
   const COAST = 160;
   const RAIL_Y = 4700;
@@ -43,6 +43,7 @@
     node("res-west", 3600, 5950, "south-residential"),
     node("home-west", 4350, 6250, "south-residential"),
     node("home-road", 5050, 6420, "south-residential"),
+    node("laundromat-entrance", 4820, 6200, "south-residential"),
     node("delivery-depot-entrance", 5150, 6290, "south-residential"),
     node("public-bath-entrance", 5200, 6380, "south-residential"),
     node("home-entrance", 5050, 6600, "south-residential"),
@@ -132,6 +133,7 @@
 
     ["ped-home-entry", "home-entrance", "home-road", [[5050,6600],[5050,6510],[5050,6420]], "sidewalk", 40, 5, false, true, false],
     ["ped-delivery-depot-entry", "delivery-depot-entrance", "home-entrance", [[5150,6290],[5110,6400],[5070,6510],[5050,6600]], "sidewalk", 40, 5, false, true, false],
+    ["ped-laundromat-entry", "laundromat-entrance", "home-road", [[4820,6200],[4880,6260],[4950,6340],[5050,6420]], "sidewalk", 40, 5, false, true, false],
     ["ped-public-bath-entry", "home-entrance", "public-bath-entrance", [[5050,6600],[5100,6520],[5150,6450],[5200,6380]], "sidewalk", 42, 5, false, true, false],
     ["ped-clinic-entry", "clinic-entrance", "south-court-b", [[4630,7270],[4780,7260],[4930,7255],[5050,7250]], "sidewalk", 42, 5, false, true, false],
     ["ped-cafe-entry", "cafe-entrance", "cafe-road", [[4230,5560],[4280,5520],[4350,5480]], "sidewalk", 42, 5, false, true, false],
@@ -168,6 +170,7 @@
     { id:"fuel-station", name:"若葉石油", type:"fuel-station", x:8000, y:3890, entranceNodeId:"fuel-station-entrance", roadNodeId:"fuel-station-road", building:{ x:8330, y:3650, w:340, h:290 }, color:"#d9d7c7", symbol:"GS" },
     { id:"delivery-depot", name:"若葉便 配達受付所", type:"delivery-depot", x:5150, y:6290, entranceNodeId:"delivery-depot-entrance", roadNodeId:"home-road", building:{ x:5310, y:5980, w:320, h:270 }, color:"#d7c99f", symbol:"便" },
     { id:"public-bath", name:"若葉湯", type:"public-bath", x:5200, y:6380, entranceNodeId:"public-bath-entrance", roadNodeId:"home-road", building:{ x:5410, y:6265, w:300, h:260 }, color:"#86aaa0", symbol:"ゆ" },
+    { id:"laundromat", name:"若葉コインランドリー", type:"laundromat", x:4820, y:6200, entranceNodeId:"laundromat-entrance", roadNodeId:"home-road", building:{ x:4500, y:5900, w:300, h:260 }, color:"#88aeb0", symbol:"洗" },
     { id:"clinic", name:"若葉診療所", type:"clinic", x:4630, y:7270, entranceNodeId:"clinic-entrance", roadNodeId:"south-court-b", building:{ x:4380, y:7460, w:300, h:260 }, color:"#dce6d9", symbol:"診" }
   ];
 

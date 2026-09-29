@@ -47,7 +47,7 @@
     return;
   }
 
-  if (!wardrobeModel?.createWardrobe || !wardrobeModel?.normalizeWardrobe || !wardrobeModel?.buyOutfit || !wardrobeModel?.equipOutfit || !wardrobeModel?.getOutfit) {
+  if (!wardrobeModel?.createWardrobe || !wardrobeModel?.normalizeWardrobe || !wardrobeModel?.buyOutfit || !wardrobeModel?.equipOutfit || !wardrobeModel?.getOutfit || !wardrobeModel?.advanceWear || !wardrobeModel?.launder) {
     showRuntimeError("Wardrobe を読み込めません。");
     return;
   }
@@ -126,6 +126,12 @@
   const homeCraftingModel = globalThis.CityDaysHomeCrafting;
   if (!homeCraftingModel?.createProgress || !homeCraftingModel?.normalizeProgress || !homeCraftingModel?.buyKitPack || !homeCraftingModel?.craft || !homeCraftingModel?.giveGift) {
     showRuntimeError("HomeCrafting を読み込めません。");
+    return;
+  }
+
+  const homeFurnitureModel = globalThis.CityDaysHomeFurniture;
+  if (!homeFurnitureModel?.createProgress || !homeFurnitureModel?.normalizeProgress || !homeFurnitureModel?.buyFurniture || !homeFurnitureModel?.placeFurniture || !homeFurnitureModel?.getUseAction || !homeFurnitureModel?.getFootprint || !homeFurnitureModel?.validateArrangement) {
+    showRuntimeError("HomeFurniture を読み込めません。");
     return;
   }
 
@@ -217,6 +223,7 @@
   const toast = document.getElementById("toast");
   const pausedOverlay = document.getElementById("pausedOverlay");
   const smartphoneToggle = document.getElementById("smartphoneToggle");
+  const homeFurnitureButton = document.getElementById("homeFurnitureButton");
   const smartphonePanel = document.getElementById("smartphonePanel");
   const SMARTPHONE_REFRESH_INTERVAL = 0.25;
   let phoneSystem = null;
@@ -225,6 +232,10 @@
   const joystickKnob = document.getElementById("joystickKnob");
   const actionButton = document.getElementById("actionButton");
   const runButton = document.getElementById("runButton");
+  const furniturePlacementControls = document.getElementById("furniturePlacementControls");
+  const furnitureRotateButton = document.getElementById("furnitureRotateButton");
+  const furniturePlaceButton = document.getElementById("furniturePlaceButton");
+  const furnitureCancelButton = document.getElementById("furnitureCancelButton");
   const driveHud = document.getElementById("driveHud");
   const speedText = document.getElementById("speedText");
   const driveFuelText = document.getElementById("driveFuelText");
@@ -361,6 +372,7 @@
     home_idle:"自宅で休息"
   };
   const touch = { x: 0, y: 0, run: false, driveAccel: false, driveBrake: false, pointerId: null };
+  let furniturePlacementState = null;
 
   const audioState = {
     enabled:true,
@@ -818,6 +830,16 @@
     { x:326, y:88, w:128, h:78 },
     { x:294, y:276, w:168, h:82 }
   ];
+  const HOME_FURNITURE_LAYOUT = {
+    width:HOME_INTERIOR.width,
+    height:HOME_INTERIOR.height,
+    cellSize:20,
+    wallMargin:28,
+    playerRadius:PLAYER_RADIUS,
+    entry:{ x:HOME_INTERIOR.width / 2, y:HOME_INTERIOR.height - 76 },
+    entryCorridor:{ x:338, y:404, w:104, h:90 },
+    fixedObstacles:HOME_OBSTACLES
+  };
 
   const TRAIN_STATIONS = mapModel.stations.map((station) => ({ ...station }));
 
@@ -1220,6 +1242,7 @@
     packedMeals:packedMealsModel.createInventory(),
     storePreparedFood:storePreparedFoodModel.createInventory(),
     homeCrafting:homeCraftingModel.createProgress(),
+    homeFurniture:homeFurnitureModel.createProgress(),
     shiftsWorked: 0,
     lastShiftDay: 0,
     needs: {
@@ -3924,6 +3947,7 @@
 
   function advanceTime(minutes, decay = true, updateCitizens = true) {
     if (decay) decayNeeds(minutes);
+    state.wardrobe = wardrobeModel.advanceWear(state.wardrobe, minutes);
     state.petCompanion = petCompanionModel.advance(state.petCompanion, minutes);
     state.minute += minutes;
     while (state.minute >= 1440) {
@@ -4198,6 +4222,194 @@
     return HOME_FIXTURES.find((fixture) => fixture.id === id) || null;
   }
 
+  function validateHomeFurnitureArrangement(placements) {
+    const layout = state.player.inHome
+      ? { ...HOME_FURNITURE_LAYOUT, actorPosition:{ x:state.player.homeX, y:state.player.homeY, radius:PLAYER_RADIUS + 18 } }
+      : HOME_FURNITURE_LAYOUT;
+    return homeFurnitureModel.validateArrangement(placements, layout);
+  }
+
+  function sanitizeHomeFurnitureProgress(value) {
+    const source = homeFurnitureModel.normalizeProgress(value);
+    let safe = { ...source, placements:[] };
+    for (const placement of source.placements) {
+      const proposed = [...safe.placements, placement];
+      if (validateHomeFurnitureArrangement(proposed).ok) {
+        safe = { ...safe, placements:proposed };
+        continue;
+      }
+      const recovery = homeFurnitureModel.pickupFurniture({ ...safe, placements:proposed }, placement.placementId);
+      if (recovery.ok) safe = recovery.progress;
+    }
+    return homeFurnitureModel.normalizeProgress(safe);
+  }
+
+  function homeFurnitureCandidate() {
+    if (!furniturePlacementState) return null;
+    return {
+      placementId:furniturePlacementState.placementId || "furniture-preview",
+      furnitureId:furniturePlacementState.furnitureId,
+      gridX:furniturePlacementState.gridX,
+      gridY:furniturePlacementState.gridY,
+      rotation:furniturePlacementState.rotation
+    };
+  }
+
+  function evaluateHomeFurniturePreview() {
+    const candidate = homeFurnitureCandidate();
+    if (!candidate) return { ok:false, reason:"no-preview" };
+    const existing = state.homeFurniture.placements.filter((entry) => entry.placementId !== furniturePlacementState.placementId);
+    return validateHomeFurnitureArrangement([...existing, candidate]);
+  }
+
+  function refreshHomeFurniturePreview() {
+    if (!furniturePlacementState) return;
+    const result = evaluateHomeFurniturePreview();
+    furniturePlacementState.valid = result.ok;
+    furniturePlacementState.invalidReason = result.ok ? null : result.reason;
+  }
+
+  function beginHomeFurniturePlacement(furnitureId, placementId = null) {
+    if (!state.player.inHome || state.player.inVehicle || state.player.inTrain) {
+      showToast("家具の配置は自宅の中で行えます");
+      return false;
+    }
+    const progress = homeFurnitureModel.normalizeProgress(state.homeFurniture);
+    const existing = placementId ? progress.placements.find((entry) => entry.placementId === placementId) : null;
+    if (placementId && !existing) return false;
+    if (!existing && (!(progress.inventory[furnitureId] > 0) || progress.placements.length >= homeFurnitureModel.MAX_PLACEMENTS)) {
+      showToast(progress.placements.length >= homeFurnitureModel.MAX_PLACEMENTS ? "家具は12個まで配置できます" : "手持ちにありません");
+      return false;
+    }
+    const item = homeFurnitureModel.CATALOG.find((entry) => entry.id === (existing?.furnitureId || furnitureId));
+    if (!item) return false;
+    furniturePlacementState = {
+      source:existing ? "placed" : "inventory",
+      placementId:existing?.placementId || null,
+      furnitureId:item.id,
+      gridX:existing?.gridX ?? Math.floor(state.player.homeX / HOME_FURNITURE_LAYOUT.cellSize),
+      gridY:existing?.gridY ?? Math.floor(state.player.homeY / HOME_FURNITURE_LAYOUT.cellSize),
+      rotation:existing?.rotation || 0,
+      repeatElapsed:0,
+      valid:false
+    };
+    actionSheet.hidden = true;
+    actionChoices.replaceChildren();
+    refreshHomeFurniturePreview();
+    document.body.classList.add("furniture-placement");
+    showToast("スティック／矢印で移動、Rで回転、Eで配置。Escで取消");
+    return true;
+  }
+
+  function moveHomeFurniturePreview(dx, dy) {
+    if (!furniturePlacementState) return false;
+    furniturePlacementState.gridX = clamp(furniturePlacementState.gridX + dx, 0, 38);
+    furniturePlacementState.gridY = clamp(furniturePlacementState.gridY + dy, 0, 24);
+    refreshHomeFurniturePreview();
+    return true;
+  }
+
+  function rotateHomeFurniturePreview() {
+    if (!furniturePlacementState) return false;
+    furniturePlacementState.rotation = (furniturePlacementState.rotation + 90) % 360;
+    refreshHomeFurniturePreview();
+    return true;
+  }
+
+  function cancelHomeFurniturePlacement() {
+    if (!furniturePlacementState) return false;
+    furniturePlacementState = null;
+    document.body.classList.remove("furniture-placement");
+    showToast("家具の配置を取り消しました");
+    return true;
+  }
+
+  function confirmHomeFurniturePlacement() {
+    if (!furniturePlacementState) return false;
+    refreshHomeFurniturePreview();
+    if (!furniturePlacementState.valid) {
+      showToast("そこには置けません。壁・家具・玄関と通路を確認してください");
+      return false;
+    }
+    const preview = homeFurnitureCandidate();
+    const result = furniturePlacementState.source === "placed"
+      ? homeFurnitureModel.moveFurniture(state.homeFurniture, furniturePlacementState.placementId, preview.gridX, preview.gridY, preview.rotation)
+      : homeFurnitureModel.placeFurniture(state.homeFurniture, preview.furnitureId, preview.gridX, preview.gridY, preview.rotation);
+    if (!result.ok) {
+      showToast("家具を配置できませんでした");
+      return false;
+    }
+    state.homeFurniture = result.progress;
+    furniturePlacementState = null;
+    document.body.classList.remove("furniture-placement");
+    showToast("家具を配置しました");
+    return true;
+  }
+
+  function pickupHomeFurniture(placementId) {
+    const result = homeFurnitureModel.pickupFurniture(state.homeFurniture, placementId);
+    if (!result.ok) {
+      showToast("家具を収納できませんでした");
+      return false;
+    }
+    state.homeFurniture = result.progress;
+    showToast("家具を持ち物に戻しました");
+    return true;
+  }
+
+  function openHomeFurnitureManager() {
+    if (!state.player.inHome || furniturePlacementState) return;
+    const progress = homeFurnitureModel.normalizeProgress(state.homeFurniture);
+    actionChoices.replaceChildren();
+    actionTitle.textContent = "自宅の家具";
+    actionDescription.textContent = "家具を選び、歩行スティック／WASDで置き場所を調整できます。入口と家具の使う場所はふさげません。";
+    for (const item of homeFurnitureModel.CATALOG) {
+      const count = progress.inventory[item.id] || 0;
+      addChoice(item.name + "を配置", "持ち物 " + count + "個 / Rまたは回転ボタンで向きを変更", () => beginHomeFurniturePlacement(item.id), count === 0 || progress.placements.length >= homeFurnitureModel.MAX_PLACEMENTS);
+    }
+    for (const placement of progress.placements) {
+      const item = homeFurnitureModel.CATALOG.find((entry) => entry.id === placement.furnitureId);
+      if (!item) continue;
+      addChoice(item.name + "を移動", "設置済み / 配置場所を調整", () => beginHomeFurniturePlacement(item.id, placement.placementId));
+      addChoice(item.name + "を収納", "手持ちに戻す", () => pickupHomeFurniture(placement.placementId));
+    }
+    if (!progress.placements.length && !Object.values(progress.inventory).some((count) => count > 0)) {
+      actionDescription.textContent = "家具がありません。スーパーで本棚・こたつ・観葉植物を購入できます。";
+    }
+    actionSheet.hidden = false;
+  }
+
+  function openHomeFurniture(placement) {
+    if (!placement || !state.player.inHome) return;
+    const item = homeFurnitureModel.CATALOG.find((entry) => entry.id === placement.furnitureId);
+    const action = item && homeFurnitureModel.getUseAction(item.id);
+    if (!item || !action) return;
+    actionChoices.replaceChildren();
+    actionTitle.textContent = item.name;
+    actionDescription.textContent = action.duration + "分 / " + action.name + "。配置を変えたり、持ち物に戻すこともできます。";
+    addChoice(action.name, action.duration + "分", () => useHomeFurniture(placement.placementId));
+    addChoice("移動する", "配置モードを開始", () => beginHomeFurniturePlacement(item.id, placement.placementId));
+    addChoice("持ち物に戻す", "家具を収納", () => pickupHomeFurniture(placement.placementId));
+    actionSheet.hidden = false;
+  }
+
+  function updateFurniturePlacement(dt) {
+    if (!furniturePlacementState) return;
+    const x = Math.abs(touch.x) > .18 ? touch.x : 0;
+    const y = Math.abs(touch.y) > .18 ? touch.y : 0;
+    const dx = Math.abs(x) > .35 ? Math.sign(x) : 0;
+    const dy = Math.abs(y) > .35 ? Math.sign(y) : 0;
+    if (!dx && !dy) {
+      furniturePlacementState.repeatElapsed = 0;
+      return;
+    }
+    furniturePlacementState.repeatElapsed += dt;
+    if (furniturePlacementState.repeatElapsed >= .18) {
+      furniturePlacementState.repeatElapsed %= .18;
+      moveHomeFurniturePreview(dx, dy);
+    }
+  }
+
   function canHomeOccupy(x, y, radius = PLAYER_RADIUS) {
     const wall = 28;
     if (
@@ -4209,6 +4421,11 @@
 
     for (const obstacle of HOME_OBSTACLES) {
       if (circleRectCollision(x, y, radius, obstacle)) return false;
+    }
+    for (const placement of state.homeFurniture.placements) {
+      if (placement.placementId === furniturePlacementState?.placementId) continue;
+      const rect = homeFurnitureModel.getFootprint(placement, HOME_FURNITURE_LAYOUT);
+      if (rect && circleRectCollision(x, y, radius, rect)) return false;
     }
     return true;
   }
@@ -4288,6 +4505,10 @@
   }
 
   function updatePlayerAtHome(dt) {
+    if (furniturePlacementState) {
+      updateFurniturePlacement(dt);
+      return;
+    }
     let x = 0;
     let y = 0;
     const running = touch.run || keys.has("shift");
@@ -4330,7 +4551,25 @@
       }
     }
 
+    for (const placement of state.homeFurniture.placements) {
+      const rect = homeFurnitureModel.getFootprint(placement, HOME_FURNITURE_LAYOUT);
+      const item = homeFurnitureModel.CATALOG.find((entry) => entry.id === placement.furnitureId);
+      if (!rect || !item) continue;
+      const interactX = clamp(state.player.homeX, rect.x, rect.x + rect.width);
+      const interactY = clamp(state.player.homeY, rect.y, rect.y + rect.height);
+      const d = distance(state.player.homeX, state.player.homeY, interactX, interactY);
+      if (d <= 48 && d < nearestDistance) {
+        nearest = { id:placement.placementId, furnitureId:placement.furnitureId, label:item.name, interactX, interactY, range:48, placement };
+        nearestDistance = d;
+      }
+    }
+
     if (!nearest) return null;
+    if (nearest.furnitureId) return {
+      type:"home-furniture",
+      target:{ ...nearest.placement, id:nearest.id, label:nearest.label, interactX:nearest.interactX, interactY:nearest.interactY },
+      label:nearest.label + "を使う"
+    };
     return {
       type:"home-fixture",
       target:nearest,
@@ -4451,8 +4690,11 @@
       showToast(result.reason === "not-owned" ? "このコーデはまだ持っていません" : result.reason === "already-equipped" ? "すでに着ています" : "このコーデには着替えられません");
       return false;
     }
-    state.wardrobe = result.wardrobe;
     advanceTime(result.duration);
+    state.wardrobe = wardrobeModel.normalizeWardrobe({
+      ...state.wardrobe,
+      equippedOutfitId:result.wardrobe.equippedOutfitId
+    });
     queueMicrotask(() => openHomeFixture(HOME_FIXTURES.find((fixture) => fixture.id === "closet")));
     showToast(result.outfit.name + "に着替えました");
     return true;
@@ -4509,6 +4751,61 @@
     state.needs.social -= 2;
     clampNeeds();
     showToast("ソファでゆっくり過ごしました");
+  }
+
+  function useHomeFurniture(placementId) {
+    if (!state.player.inHome) {
+      showToast("家具は自宅の中で使えます");
+      return false;
+    }
+    const progress = homeFurnitureModel.normalizeProgress(state.homeFurniture);
+    const placement = progress.placements.find((entry) => entry.placementId === placementId);
+    const action = placement ? homeFurnitureModel.getUseAction(placement.furnitureId) : null;
+    if (!action) {
+      showToast("その家具は使えません");
+      return false;
+    }
+    advanceTime(action.duration);
+    for (const [need, amount] of Object.entries(action.needs)) {
+      if (Object.hasOwn(state.needs, need)) state.needs[need] += amount;
+    }
+    clampNeeds();
+    showToast(action.name + "をしました");
+    return true;
+  }
+
+  function launderCurrentOutfit() {
+    const result = wardrobeModel.launder(state.wardrobe, state.cash, Math.floor(state.minute));
+    if (!result.ok) {
+      const message = result.reason === "not-open" ? "営業時間外です（6:00〜23:00）"
+        : result.reason === "closing-time" ? "閉店までに洗濯が終わりません"
+          : result.reason === "insufficient-funds" ? "洗濯料金300円が足りません"
+            : result.reason === "already-clean" ? "着用中の服はすでにきれいです"
+              : "洗濯できません";
+      showToast(message);
+      return false;
+    }
+    state.cash = result.cashRemaining;
+    advanceTime(result.duration);
+    state.wardrobe = result.wardrobe;
+    queueMicrotask(() => openPlace(PLACES.find((place) => place.id === "laundromat")));
+    showToast("洗濯が終わりました −¥" + result.cost.toLocaleString("ja-JP"));
+    return true;
+  }
+
+  function buyHomeFurniture(furnitureId) {
+    const result = homeFurnitureModel.buyFurniture(state.homeFurniture, state.cash, furnitureId);
+    if (!result.ok) {
+      showToast(result.reason === "insufficient-funds" ? "家具を買うお金が足りません" : result.reason === "inventory-capacity" ? "その家具はこれ以上持てません" : "その家具は購入できません");
+      return false;
+    }
+    state.homeFurniture = result.progress;
+    state.cash = result.cashRemaining;
+    advanceTime(result.duration);
+    const item = homeFurnitureModel.CATALOG.find((entry) => entry.id === furnitureId);
+    queueMicrotask(() => openPlace(PLACES.find((place) => place.id === "store")));
+    showToast(item.name + "を購入しました。自宅で配置できます");
+    return true;
   }
 
   function homeTelevisionProgramSummary(program) {
@@ -4571,9 +4868,12 @@
     } else if (fixture.id === "closet") {
       const wardrobe = wardrobeModel.normalizeWardrobe(state.wardrobe);
       const equipped = wardrobeModel.getOutfit(wardrobe.equippedOutfitId);
-      actionDescription.textContent = "着用中: " + equipped.name + " / 手持ちのコーデに着替えられます。着替えは5分です。";
+      const equippedCleanliness = wardrobe.cleanlinessByOutfitId[wardrobe.equippedOutfitId];
+      actionDescription.textContent = "着用中: " + equipped.name + " / 清潔度 " + Math.round(equippedCleanliness) + "%（" + wardrobeModel.getCleanlinessLabel(equippedCleanliness) + "）。手持ちのコーデに着替えられます。着替えは5分です。";
       for (const outfit of wardrobeModel.CATALOG.filter((item) => wardrobe.ownedOutfitIds.includes(item.id))) {
-        addChoice(outfit.name, outfit.id === wardrobe.equippedOutfitId ? "着用中" : "5分 / 能力への影響なし", () => {
+        const cleanliness = wardrobe.cleanlinessByOutfitId[outfit.id];
+        const condition = "清潔度 " + Math.round(cleanliness) + "% / " + wardrobeModel.getCleanlinessLabel(cleanliness);
+        addChoice(outfit.name, outfit.id === wardrobe.equippedOutfitId ? "着用中 / " + condition : "5分 / " + condition + " / 能力への影響なし", () => {
           equipPlayerOutfit(outfit.id);
         }, outfit.id === wardrobe.equippedOutfitId);
       }
@@ -4807,6 +5107,20 @@
       }
     }
 
+    if (place.id === "laundromat") {
+      const wardrobe = wardrobeModel.normalizeWardrobe(state.wardrobe);
+      const outfit = wardrobeModel.getOutfit(wardrobe.equippedOutfitId);
+      const cleanliness = wardrobe.cleanlinessByOutfitId[wardrobe.equippedOutfitId];
+      const preview = wardrobeModel.launder(wardrobe, state.cash, Math.floor(state.minute));
+      const status = wardrobeModel.getCleanlinessLabel(cleanliness);
+      const reason = preview.reason === "not-open" ? "営業時間外です（6:00〜23:00）"
+        : preview.reason === "closing-time" ? "閉店までに洗濯が終わりません"
+          : preview.reason === "insufficient-funds" ? "洗濯料金300円が足りません"
+            : preview.reason === "already-clean" ? "洗濯の必要はありません" : "利用できません";
+      actionDescription.textContent = "着用中: " + outfit.name + " / 清潔度 " + Math.round(cleanliness) + "%（" + status + "）。洗濯機で約30分。営業時間 6:00〜23:00。";
+      addChoice("現在の服を洗う", preview.ok ? "30分 / ¥300 / 清潔度100%まで洗濯" : reason, () => launderCurrentOutfit(), !preview.ok);
+    }
+
     if (place.id === "clinic") {
       actionDescription.textContent = "南若葉住宅地の診療所です。受付時間は8:00〜20:00。治療を終えてから閉院時刻を過ぎないように利用してください。";
       const reasonText = (reason) => reason === "not-open" ? "診療時間外です（8:00〜20:00）"
@@ -4888,6 +5202,15 @@
           queueMicrotask(() => openPlace(PLACES.find((place) => place.id === "store")));
           showToast(outfit.name + "を購入しました。自宅で着替えられます");
         }, !preview.ok);
+      }
+      for (const item of homeFurnitureModel.CATALOG) {
+        const owned = state.homeFurniture.inventory[item.id] || 0;
+        const preview = homeFurnitureModel.buyFurniture(state.homeFurniture, state.cash, item.id);
+        const detail = preview.ok
+          ? "¥" + item.price.toLocaleString("ja-JP") + " / " + item.purchaseMinutes + "分 / 所持 " + owned + "個"
+          : preview.reason === "inventory-capacity" ? "所持上限 " + homeFurnitureModel.MAX_ITEM_COUNT + "個です"
+            : "¥" + item.price.toLocaleString("ja-JP") + " / 所持金が足りません";
+        addChoice(item.name, detail, () => buyHomeFurniture(item.id), !preview.ok);
       }
       addChoice("釣り餌を買う", state.cash < parkFishingModel.BAIT_PACK_COST ? "5回分 / ¥500 / 資金不足" : "5回分 / ¥500 / 所持 " + state.fishing.bait + "個", () => {
         const result = parkFishingModel.buyBait(state.fishing, state.cash);
@@ -5761,6 +6084,7 @@
     if (item.type === "train-wait") showToast("電車が到着したら E / ACTION で乗車できます");
     if (item.type === "place") openPlace(item.target);
     if (item.type === "home-fixture") openHomeFixture(item.target);
+    if (item.type === "home-furniture") openHomeFurniture(item.target);
     if (item.type === "npc") openNpc(item.target);
     if (item.type === "citizen") openCitizen(item.target);
   }
@@ -5827,6 +6151,7 @@
         packedMeals:packedMealsModel.normalizeInventory(state.packedMeals),
         storePreparedFood:storePreparedFoodModel.normalizeInventory(state.storePreparedFood, state.day),
         homeCrafting:homeCraftingModel.normalizeProgress(state.homeCrafting),
+        homeFurniture:homeFurnitureModel.normalizeProgress(state.homeFurniture),
         deliveryWork:deliveryWorkModel.normalizeProgress(state.deliveryWork),
         communityGarden:communityGardenModel.normalizeProgress(state.garden),
         petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
@@ -6093,6 +6418,9 @@
       state.packedMeals = packedMealsModel.normalizeInventory(saved.packedMeals);
       state.storePreparedFood = storePreparedFoodModel.normalizeInventory(saved.storePreparedFood, state.day);
       state.homeCrafting = homeCraftingModel.normalizeProgress(saved.homeCrafting);
+      state.homeFurniture = sanitizeHomeFurnitureProgress(saved.homeFurniture);
+      furniturePlacementState = null;
+      document.body.classList.remove("furniture-placement");
       state.deliveryWork = deliveryWorkModel.normalizeProgress(saved.deliveryWork);
       state.garden = communityGardenModel.normalizeProgress(saved.communityGarden);
       state.petCompanion = petCompanionModel.normalizeProgress(saved.petCompanion);
@@ -7653,6 +7981,11 @@
   function update(dt) {
     if (!arcadePanel.hidden) return;
     if (state.paused || !actionSheet.hidden || !helpPanel.hidden) return;
+    if (furniturePlacementState) {
+      updateFurniturePlacement(dt);
+      updateHUD();
+      return;
+    }
 
     const gameMinutes = dt * .7;
     updateTrainSystem(dt);
@@ -10291,6 +10624,36 @@
         ctx.bezierCurveTo(steamX - 8, p.y - 164, steamX + 8, p.y - 172, steamX, p.y - 184);
         ctx.stroke();
       }
+    } else if (place.id === "laundromat") {
+      drawFacilityBuilding(p, building?.w || 270, building?.h || 220, "#8baeb0", "#53696a", "#a9c5c6");
+      ctx.fillStyle = "#edf3ee";
+      roundedRectPath(ctx, p.x - 112, p.y - 67, 224, 34, 4);
+      ctx.fill();
+      ctx.fillStyle = "#42646a";
+      ctx.font = "800 16px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("COIN LAUNDRY", p.x, p.y - 44);
+      for (let index = 0; index < 3; index += 1) {
+        const washerX = p.x - 76 + index * 76;
+        ctx.fillStyle = "#e5e8e2";
+        roundedRectPath(ctx, washerX - 28, p.y + 3, 56, 76, 5);
+        ctx.fill();
+        ctx.strokeStyle = "#677c7d";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = "#829fa2";
+        ctx.beginPath();
+        ctx.arc(washerX, p.y + 45, 17, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#536f73";
+        ctx.stroke();
+        ctx.fillStyle = "#778783";
+        ctx.fillRect(washerX - 20, p.y + 12, 5, 4);
+        ctx.fillRect(washerX - 11, p.y + 12, 5, 4);
+      }
+      ctx.fillStyle = "#f3ead7";
+      ctx.font = "700 10px system-ui, sans-serif";
+      ctx.fillText("若葉コインランドリー", p.x, p.y + 105);
     } else if (place.id === "clinic") {
       drawFacilityBuilding(p, building?.w || 300, building?.h || 260, "#dce6d9", "#657365", "#9ab8bd");
       ctx.fillStyle = "#f4f3e8";
@@ -10708,14 +11071,23 @@
     const scale = Math.max(1, fitScale);
     const roomWidth = HOME_INTERIOR.width * scale;
     const roomHeight = HOME_INTERIOR.height * scale;
-    const centeredX = viewWidth / 2 - state.player.homeX * scale;
-    const centeredY = viewHeight / 2 - state.player.homeY * scale;
+    const preview = furniturePlacementState ? homeFurnitureModel.getFootprint(homeFurnitureCandidate(), HOME_FURNITURE_LAYOUT) : null;
+    const focusX = preview ? preview.x + preview.width / 2 : state.player.homeX;
+    const focusY = preview ? preview.y + preview.height / 2 : state.player.homeY;
+    const focusScreenX = preview && viewWidth <= 760 ? viewWidth - 64 : viewWidth / 2;
+    const focusScreenY = preview && viewWidth <= 760 ? viewHeight * .35 : viewHeight / 2;
+    const centeredX = focusScreenX - focusX * scale;
+    const centeredY = focusScreenY - focusY * scale;
     return {
       scale,
-      x:roomWidth <= viewWidth
+      x:preview
+        ? centeredX
+        : roomWidth <= viewWidth
         ? (viewWidth - roomWidth) / 2
         : clamp(centeredX, viewWidth - roomWidth, 0),
-      y:roomHeight <= viewHeight
+      y:preview
+        ? centeredY
+        : roomHeight <= viewHeight
         ? (viewHeight - roomHeight) / 2
         : clamp(centeredY, viewHeight - roomHeight, 0)
     };
@@ -10776,6 +11148,72 @@
     ctx.font = "700 " + Math.max(8,10*s) + "px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(String(pet.name || "ペット"),center.x,center.y+44*s);
+  }
+
+  function drawHomeFurnitureItem(placement, preview = false) {
+    const rect = homeFurnitureModel.getFootprint(placement, HOME_FURNITURE_LAYOUT);
+    if (!rect) return;
+    const item = homeFurnitureModel.CATALOG.find((entry) => entry.id === placement.furnitureId);
+    if (!item) return;
+    const a = homeToScreen(rect.x, rect.y);
+    const s = a.scale;
+    ctx.save();
+    if (preview) ctx.globalAlpha = .76;
+    const colors = { bookshelf:"#8b5d3f", kotatsu:"#9d7048", plant:"#688b61" };
+    drawHomeFurnitureRect(rect.x, rect.y, rect.width, rect.height, preview
+      ? (furniturePlacementState.valid ? "#4e9e73" : "#c45e58")
+      : (colors[item.id] || "#8b725b"), 6);
+    if (item.id === "bookshelf") {
+      ctx.strokeStyle = "rgba(245,225,190,.8)";
+      ctx.lineWidth = Math.max(1, 2*s);
+      for (let row = 1; row < 3; row += 1) {
+        ctx.beginPath(); ctx.moveTo(a.x + 5*s, a.y + rect.height*row/3*s); ctx.lineTo(a.x + (rect.width-5)*s, a.y + rect.height*row/3*s); ctx.stroke();
+      }
+      if (!preview) {
+        for (let row = 0; row < 3; row += 1) {
+          for (let column = 0; column < 3; column += 1) {
+            const x = a.x + (8 + column*9)*s;
+            const y = a.y + (5 + row*rect.height/3)*s;
+            ctx.fillStyle = ["#d9c18d", "#6f8e93", "#a97860"][(row+column)%3];
+            ctx.fillRect(x, y, 5*s, Math.max(7, rect.height/3-8)*s);
+          }
+        }
+      }
+    } else if (item.id === "kotatsu") {
+      const inset = 8*s;
+      ctx.fillStyle = preview ? "rgba(255,255,255,.26)" : "#bd9468";
+      roundedRectPath(ctx, a.x+inset, a.y+inset, (rect.width-16)*s, (rect.height-16)*s, 5*s);
+      ctx.fill();
+      if (!preview) {
+        ctx.fillStyle = "#f2dfbc";
+        ctx.beginPath(); ctx.arc(a.x+rect.width*.72*s, a.y+rect.height*.35*s, 3*s, 0, Math.PI*2); ctx.fill();
+      }
+    } else {
+      ctx.fillStyle = preview ? "rgba(255,255,255,.3)" : "#aa8057";
+      ctx.fillRect(a.x + (rect.width*.28)*s, a.y + rect.height*.58*s, rect.width*.44*s, rect.height*.32*s);
+      if (!preview) {
+        ctx.fillStyle = "#537c50";
+        ctx.beginPath();
+        ctx.arc(a.x+rect.width*.42*s,a.y+rect.height*.4*s,8*s,0,Math.PI*2);
+        ctx.arc(a.x+rect.width*.62*s,a.y+rect.height*.34*s,9*s,0,Math.PI*2);
+        ctx.fill();
+      }
+    }
+    if (preview) {
+      ctx.strokeStyle = furniturePlacementState.valid ? "#a4e2b7" : "#ffaaa3";
+      ctx.lineWidth = 2.5*s;
+      ctx.setLineDash([6*s, 4*s]);
+      ctx.strokeRect(a.x, a.y, rect.width*s, rect.height*s);
+    }
+    ctx.restore();
+  }
+
+  function drawPlacedHomeFurniture() {
+    for (const placement of state.homeFurniture.placements) {
+      if (furniturePlacementState?.source === "placed" && placement.placementId === furniturePlacementState.placementId) continue;
+      drawHomeFurnitureItem(placement);
+    }
+    if (furniturePlacementState) drawHomeFurnitureItem(homeFurnitureCandidate(), true);
   }
 
   function drawHomeInterior() {
@@ -10984,6 +11422,8 @@
       ctx.arc(q.x+5*s,q.y-10*s,9*s,0,Math.PI*2);
       ctx.fill();
     }
+
+    drawPlacedHomeFurniture();
 
     // Warm indoor lighting / night response.
     const time = visualTime();
@@ -11614,6 +12054,9 @@
   }
 
   function updateHUD() {
+    homeFurnitureButton.hidden = !state.player.inHome;
+    furniturePlacementControls.hidden = !furniturePlacementState;
+    document.body.classList.toggle("furniture-placement", Boolean(furniturePlacementState));
     const p = actorPosition();
     areaNameEl.textContent = state.player.inHome ? "自宅・室内" : currentDistrict(p.x, p.y);
     const hours = Math.floor(state.minute / 60);
@@ -11777,6 +12220,7 @@
         weather:state.visual.weather,
         umbrellaOwned:state.umbrellaOwned === true,
         wardrobe:wardrobeModel.normalizeWardrobe(state.wardrobe),
+        homeFurniture:homeFurnitureModel.normalizeProgress(state.homeFurniture),
         arcade:arcadeGamesModel.normalizeProgress(state.arcade),
         storePreparedFood:storePreparedFoodModel.normalizeInventory(state.storePreparedFood, state.day),
         arcadeUi:{ mode:arcadeGame.mode, position:arcadeGame.position, panelOpen:!arcadePanel.hidden },
@@ -11838,6 +12282,27 @@
         },
         buyUmbrellaForTest() { return buyUmbrella(); },
         buyPreparedFoodForTest(itemId) { return buyPreparedFood(itemId); },
+        buyHomeFurnitureForTest(furnitureId) { return buyHomeFurniture(furnitureId); },
+        useHomeFurnitureForTest(placementId) { return useHomeFurniture(placementId); },
+        setHomeFurnitureProgressForTest(progress) {
+          state.player.inHome = true;
+          state.homeFurniture = sanitizeHomeFurnitureProgress(progress);
+          return homeFurnitureModel.normalizeProgress(state.homeFurniture);
+        },
+        setHomePositionForTest(x, y) {
+          if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+          state.player.inHome = true;
+          state.player.homeX = x;
+          state.player.homeY = y;
+          return true;
+        },
+        beginHomeFurniturePlacementForTest(furnitureId, placementId = null) { return beginHomeFurniturePlacement(furnitureId, placementId); },
+        moveHomeFurniturePreviewForTest(dx, dy) { return moveHomeFurniturePreview(dx, dy); },
+        rotateHomeFurniturePreviewForTest() { return rotateHomeFurniturePreview(); },
+        confirmHomeFurniturePlacementForTest() { return confirmHomeFurniturePlacement(); },
+        cancelHomeFurniturePlacementForTest() { return cancelHomeFurniturePlacement(); },
+        homeFurniturePlacementStateForTest() { return furniturePlacementState ? { ...furniturePlacementState } : null; },
+        validateHomeFurnitureForTest(placements) { return validateHomeFurnitureArrangement(placements); },
         setCashForTest(amount) {
           if (!Number.isFinite(amount) || amount < 0) return false;
           state.cash = Math.floor(amount);
@@ -12143,6 +12608,17 @@
       else if (arcadeGame.mode === "aiming" && ["enter", " "].includes(key) && !event.repeat) finishArcadePlay();
       return;
     }
+    if (furniturePlacementState) {
+      event.preventDefault();
+      if (key === "escape" && !event.repeat) cancelHomeFurniturePlacement();
+      else if (key === "r" && !event.repeat) rotateHomeFurniturePreview();
+      else if (key === "e" && !event.repeat) confirmHomeFurniturePlacement();
+      else if (["arrowleft", "a"].includes(key)) moveHomeFurniturePreview(-1, 0);
+      else if (["arrowright", "d"].includes(key)) moveHomeFurniturePreview(1, 0);
+      else if (["arrowup", "w"].includes(key)) moveHomeFurniturePreview(0, -1);
+      else if (["arrowdown", "s"].includes(key)) moveHomeFurniturePreview(0, 1);
+      return;
+    }
     if (key === "p" && !event.repeat) {
       setSmartphoneOpen(smartphonePanel?.hidden ?? false);
       return;
@@ -12192,6 +12668,11 @@
     event.preventDefault();
     actionQueued = true;
   });
+
+  homeFurnitureButton.addEventListener("click", openHomeFurnitureManager);
+  furnitureRotateButton.addEventListener("click", rotateHomeFurniturePreview);
+  furniturePlaceButton.addEventListener("click", confirmHomeFurniturePlacement);
+  furnitureCancelButton.addEventListener("click", cancelHomeFurniturePlacement);
 
   runButton.addEventListener("pointerdown", (event) => {
     event.preventDefault();

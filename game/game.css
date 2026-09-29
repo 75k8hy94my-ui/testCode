@@ -174,6 +174,13 @@ button{font:inherit;color:inherit}
 .joystick-knob{position:absolute;width:58px;height:58px;border-radius:50%;left:34px;top:34px;background:rgba(245,248,246,.8);border:2px solid rgba(0,0,0,.18);transform:translate(0,0)}
 .mobile-actions{display:grid;grid-template-columns:62px 82px;gap:10px;align-items:end;pointer-events:auto}
 .mobile-actions button{border:1px solid rgba(255,255,255,.18);background:rgba(9,14,11,.74);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-size:10px;font-weight:800;letter-spacing:.05em}
+.furniture-placement-controls{display:none;grid-template-columns:repeat(3,minmax(66px,1fr));gap:7px;pointer-events:auto}
+.furniture-placement-controls button{min-height:48px;padding:7px 9px;border-radius:12px}
+body.furniture-placement .furniture-placement-controls{display:grid}
+body.furniture-placement #runButton,body.furniture-placement #actionButton{display:none}
+body.furniture-placement .mobile-actions{grid-template-columns:minmax(205px,1fr)}
+body.furniture-placement #interactionPrompt{display:none!important}
+body.furniture-placement .toast{left:max(12px,env(safe-area-inset-left));top:max(12px,env(safe-area-inset-top));transform:none}
 #runButton{width:60px;height:60px;border-radius:50%}
 #actionButton{width:82px;height:82px;border-radius:50%}
 .toast{position:absolute;left:50%;top:86px;transform:translateX(-50%);background:var(--panel-strong);border:1px solid var(--border);border-radius:999px;padding:8px 13px;font-size:13px;pointer-events:none;white-space:nowrap;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis}

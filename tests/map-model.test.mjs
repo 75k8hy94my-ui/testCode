@@ -7,7 +7,7 @@ const { createMapModel } = mapModule;
 test('v2 map validates as a connected Japanese urban fabric', () => {
   const map = createMapModel();
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2.6');
+  assert.equal(map.version, 'japan-v2.7');
   assert.equal(map.worldSize, 10800);
   assert.ok(map.nodes.length >= 45);
   assert.ok(map.edges.length >= 55);
@@ -15,6 +15,18 @@ test('v2 map validates as a connected Japanese urban fabric', () => {
   assert.ok(map.edges.some((edge) => edge.type === 'collector'));
   assert.ok(map.edges.some((edge) => edge.type === 'alley'));
   assert.ok(map.edges.some((edge) => edge.pedestrian && !edge.vehicle));
+});
+
+test('the laundromat is a named facility with a walkable route from the home entrance', () => {
+  const map = createMapModel();
+  const laundromat = map.places.find((place) => place.id === 'laundromat');
+  assert.ok(laundromat);
+  assert.equal(laundromat.name, '若葉コインランドリー');
+  assert.ok(laundromat.building);
+  assert.deepEqual(map.validate(), []);
+  const route = map.findRoute('home-entrance', laundromat.entranceNodeId, { mode:'pedestrian' });
+  assert.ok(route, 'home should connect to the laundromat by pedestrian paths');
+  assert.ok(route.edgeIds.length > 0);
 });
 
 test('street topology includes dead ends, T junctions, curves, and unequal street widths', () => {
@@ -210,7 +222,7 @@ test('enterable home exterior matches surrounding detached-house scale', () => {
 
 test('all current facilities and stations remain addressable', () => {
   const map = createMapModel();
-  assert.deepEqual(map.places.map((place) => place.id), ['home','arcade','cafe','store','park','gym','library','pet-shelter','community-center','fuel-station','delivery-depot','public-bath','clinic']);
+  assert.deepEqual(map.places.map((place) => place.id), ['home','arcade','cafe','store','park','gym','library','pet-shelter','community-center','fuel-station','delivery-depot','public-bath','laundromat','clinic']);
   assert.deepEqual(map.stations.map((station) => station.id), ['west','central','east']);
   for (const place of map.places) {
     assert.ok(map.getNode(place.entranceNodeId));
@@ -233,7 +245,7 @@ test('community center has a walkable entrance, civic-road access, and clear bui
   assert.ok(map.findRoute('central-station-entry', center.entranceNodeId, { mode:'pedestrian' }));
   assert.ok(map.neighbors(center.roadNodeId, { mode:'vehicle' }).length > 0);
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2.6');
+  assert.equal(map.version, 'japan-v2.7');
 });
 
 test('station arcade has a walkable plaza route, legible identity, and collision-free footprint', () => {
