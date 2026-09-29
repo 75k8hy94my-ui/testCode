@@ -182,7 +182,7 @@ test('wardrobe model is loaded before runtime and is normalized in snapshots', (
   assert.match(source, /wardrobe:wardrobeModel\.createWardrobe\(\)/);
   assert.match(source, /wardrobe:wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
   assert.match(source, /state\.wardrobe = wardrobeModel\.normalizeWardrobe\(saved\.wardrobe\)/);
-  assert.match(html, /game\.js\?v=20260930-simulation-overhaul-1/);
+  assert.match(html, /game\.js\?v=20260930-postmerge-debug-1/);
 });
 
 test('arcade progress is loaded before the game and migrates safely through snapshots', () => {
@@ -771,8 +771,8 @@ test('public bath rules load before runtime and the sento interaction applies it
 });
 
 test('clinic map and runtime changes request fresh browser assets', () => {
-  assert.match(html, /map-model\.js\?v=20260929-pedestrian-navigation-1/);
-  assert.match(html, /game\.js\?v=20260930-simulation-overhaul-1/);
+  assert.match(html, /map-model\.js\?v=20260930-postmerge-debug-1/);
+  assert.match(html, /game\.js\?v=20260930-postmerge-debug-1/);
 });
 
 test('health model loads before runtime and has a visible sixth needs meter', () => {
@@ -963,7 +963,7 @@ test('club members travel through normal pedestrian routes and revalidate the se
 test('club runtime modules have fresh browser cache keys', () => {
   assert.match(html, /community-center\.js\?v=20260929-community-clubs-1/);
   assert.match(html, /social-npc-system\.js\?v=20260929-community-clubs-1/);
-  assert.match(html, /game\.js\?v=20260930-simulation-overhaul-1/);
+  assert.match(html, /game\.js\?v=20260930-postmerge-debug-1/);
 });
 
 test('game loads overtake safety before the overtake planner and runtime', () => {
