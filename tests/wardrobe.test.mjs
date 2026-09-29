@@ -5,7 +5,8 @@ import wardrobe from '../game/wardrobe.js';
 test('a new wardrobe starts with only the everyday look owned and equipped', () => {
   assert.deepEqual(wardrobe.createWardrobe(), {
     ownedOutfitIds:['everyday'],
-    equippedOutfitId:'everyday'
+    equippedOutfitId:'everyday',
+    cleanlinessByOutfitId:{ everyday:100 }
   });
 });
 
@@ -15,10 +16,11 @@ test('wardrobe normalization removes unknown and repeated outfits and repairs an
     equippedOutfitId:'city-jacket'
   }), {
     ownedOutfitIds:['everyday','linen-weekend','active-set'],
-    equippedOutfitId:'everyday'
+    equippedOutfitId:'everyday',
+    cleanlinessByOutfitId:{ everyday:100, 'linen-weekend':100, 'active-set':100 }
   });
   assert.deepEqual(wardrobe.normalizeWardrobe({ ownedOutfitIds:[], equippedOutfitId:'everyday' }), {
-    ownedOutfitIds:['everyday'], equippedOutfitId:'everyday'
+    ownedOutfitIds:['everyday'], equippedOutfitId:'everyday', cleanlinessByOutfitId:{ everyday:100 }
   });
 });
 
@@ -44,7 +46,8 @@ test('buying an outfit spends its listed cost and adds it without changing the e
   assert.equal(bought.ok, true);
   assert.deepEqual(bought.wardrobe, {
     ownedOutfitIds:['everyday','linen-weekend'],
-    equippedOutfitId:'everyday'
+    equippedOutfitId:'everyday',
+    cleanlinessByOutfitId:{ everyday:100, 'linen-weekend':100 }
   });
   assert.equal(bought.cashRemaining, 600);
   assert.equal(bought.duration, 10);
@@ -59,7 +62,7 @@ test('duplicate, unknown, and unaffordable purchases preserve normalized ownersh
   assert.deepEqual([duplicate.reason, unknown.reason, poor.reason], ['already-owned','unknown-outfit','insufficient-funds']);
   for (const result of [duplicate, unknown, poor]) {
     assert.equal(result.ok, false);
-    assert.deepEqual(result.wardrobe, start);
+    assert.deepEqual(result.wardrobe, wardrobe.normalizeWardrobe(start));
     assert.equal(Object.hasOwn(result, 'cashRemaining'), false);
   }
   assert.deepEqual(start, { ownedOutfitIds:['everyday','active-set'], equippedOutfitId:'active-set' });
@@ -69,11 +72,46 @@ test('only owned catalog outfits can be equipped and successful changes take fiv
   const start = { ownedOutfitIds:['everyday','city-jacket'], equippedOutfitId:'everyday' };
   const equipped = wardrobe.equipOutfit(start, 'city-jacket');
   assert.equal(equipped.ok, true);
-  assert.deepEqual(equipped.wardrobe, { ownedOutfitIds:['everyday','city-jacket'], equippedOutfitId:'city-jacket' });
+  assert.deepEqual(equipped.wardrobe, { ownedOutfitIds:['everyday','city-jacket'], equippedOutfitId:'city-jacket', cleanlinessByOutfitId:{ everyday:100, 'city-jacket':100 } });
   assert.equal(equipped.duration, 5);
-  assert.deepEqual(wardrobe.equipOutfit(start, 'sakura-knit'), { ok:false, reason:'not-owned', wardrobe:start });
-  assert.deepEqual(wardrobe.equipOutfit(start, 'invented'), { ok:false, reason:'unknown-outfit', wardrobe:start });
-  assert.deepEqual(wardrobe.equipOutfit(start, 'everyday'), { ok:false, reason:'already-equipped', wardrobe:start });
+  assert.deepEqual(wardrobe.equipOutfit(start, 'sakura-knit'), { ok:false, reason:'not-owned', wardrobe:wardrobe.normalizeWardrobe(start) });
+  assert.deepEqual(wardrobe.equipOutfit(start, 'invented'), { ok:false, reason:'unknown-outfit', wardrobe:wardrobe.normalizeWardrobe(start) });
+  assert.deepEqual(wardrobe.equipOutfit(start, 'everyday'), { ok:false, reason:'already-equipped', wardrobe:wardrobe.normalizeWardrobe(start) });
+});
+
+test('elapsed wear soils only the equipped outfit and clamps at zero without mutation', () => {
+  const start = wardrobe.normalizeWardrobe({
+    ownedOutfitIds:['everyday','city-jacket'], equippedOutfitId:'city-jacket',
+    cleanlinessByOutfitId:{ everyday:63, 'city-jacket':50 }
+  });
+  const worn = wardrobe.advanceWear(start, 125);
+  assert.deepEqual(worn.cleanlinessByOutfitId, { everyday:63, 'city-jacket':40 });
+  assert.equal(wardrobe.advanceWear(start, 10000).cleanlinessByOutfitId['city-jacket'], 0);
+  assert.equal(start.cleanlinessByOutfitId['city-jacket'], 50);
+  assert.deepEqual(wardrobe.advanceWear(start, Infinity), start);
+});
+
+test('cleanliness normalization defaults legacy outfits and rejects invalid, unknown and unowned records', () => {
+  assert.deepEqual(wardrobe.normalizeWardrobe({
+    ownedOutfitIds:['everyday','active-set','linen-weekend'], equippedOutfitId:'active-set',
+    cleanlinessByOutfitId:{ everyday:Infinity, 'active-set':-4, 'linen-weekend':130, intruder:2 }
+  }), {
+    ownedOutfitIds:['everyday','linen-weekend','active-set'], equippedOutfitId:'active-set',
+    cleanlinessByOutfitId:{ everyday:100, 'linen-weekend':100, 'active-set':0 }
+  });
+});
+
+test('laundering validates business hours, closing time, balance and already-clean outfits', () => {
+  const dirty = wardrobe.normalizeWardrobe({ cleanlinessByOutfitId:{ everyday:72.25 } });
+  const success = wardrobe.launder(dirty, 500, 22 * 60 + 30);
+  assert.deepEqual(success, {
+    ok:true, wardrobe:{ ...dirty, cleanlinessByOutfitId:{ everyday:100 } }, cashRemaining:200, duration:30, cost:300
+  });
+  assert.equal(wardrobe.launder(dirty, 500, 22 * 60 + 31).reason, 'closing-time');
+  assert.equal(wardrobe.launder(dirty, 500, 5 * 60 + 59).reason, 'not-open');
+  assert.equal(wardrobe.launder(dirty, 299, 12 * 60).reason, 'insufficient-funds');
+  assert.equal(wardrobe.launder(wardrobe.createWardrobe(), 500, 12 * 60).reason, 'already-clean');
+  assert.equal(dirty.cleanlinessByOutfitId.everyday, 72.25);
 });
 
 test('wardrobe transitions return copies instead of mutating an existing save object', () => {
