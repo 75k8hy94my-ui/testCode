@@ -50,6 +50,24 @@ button{font:inherit;color:inherit}
 .action-choices button{text-align:left;display:grid;gap:2px}
 .action-choices button b{font-size:13px}
 .action-choices button span{font-size:11px;color:var(--muted)}
+.arcade-panel{position:absolute;inset:0;z-index:35;display:grid;place-items:center;padding:20px;background:rgba(8,13,12,.88);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#f7f3e8;overflow-y:auto}
+.arcade-panel[hidden]{display:none}
+.arcade-panel-card{width:min(900px,100%);max-height:100%;overflow-y:auto;padding:clamp(14px,3vw,26px);border:1px solid rgba(238,206,135,.46);border-radius:20px;background:linear-gradient(150deg,#252b29,#101615 72%);box-shadow:0 24px 80px #0009}
+.arcade-header{display:flex;justify-content:space-between;align-items:center;gap:14px}
+.arcade-header h1{margin:2px 0 0;font-size:clamp(21px,4vw,30px)}
+.arcade-header button,.arcade-controls button,.arcade-footer button{min-height:46px;padding:10px 16px;border:1px solid rgba(255,255,255,.2);border-radius:12px;background:#303a36;color:#fff;font:700 15px system-ui;touch-action:manipulation}
+.arcade-help{margin:12px 0;color:#c7d0c9;font-size:14px;line-height:1.5}
+#arcadeCanvas{display:block;width:100%;height:auto;max-height:44dvh;object-fit:contain;border:1px solid #73877b;border-radius:14px;background:#17201d;touch-action:none}
+.arcade-result{min-height:24px;margin:10px 2px;color:#f1d88e;font-weight:700}
+.arcade-controls{display:grid;grid-template-columns:1fr 1.3fr 1fr;gap:10px}
+.arcade-controls .arcade-grab{background:#bb7652;border-color:#e2ad73;font-size:17px}
+.arcade-footer{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 12px}
+.arcade-footer button{min-height:40px;padding:8px 13px;font-size:13px}
+.arcade-prizes{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}
+.arcade-prize{min-width:0;padding:8px 5px;border:1px solid rgba(255,255,255,.13);border-radius:10px;background:#ffffff0b;text-align:center}
+.arcade-prize b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+.arcade-prize span{display:block;margin-top:3px;color:#c7d0c9;font-size:10px}
+.arcade-prize i{display:block;width:15px;height:15px;margin:0 auto 5px;border:2px solid #fff9;border-radius:50%}
 .help-panel{position:absolute;inset:0;display:grid;place-items:center;padding:22px;background:rgba(0,0,0,.48);z-index:10}
 .help-panel>div{width:min(560px,100%);padding:20px;border:1px solid var(--border);background:var(--panel-strong);border-radius:14px;line-height:1.55}
 .help-panel p{color:var(--muted)}
@@ -165,6 +183,12 @@ button{font:inherit;color:inherit}
 [hidden]{display:none!important}
 body:has(#actionSheet:not([hidden])) .objective-card{visibility:hidden}
 @media(max-width:760px){
+  .arcade-panel{place-items:start center;padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
+  .arcade-panel-card{max-height:100%;padding:14px;border-radius:16px}
+  #arcadeCanvas{max-height:35dvh}
+  .arcade-prizes{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .arcade-controls{gap:7px}
+  .arcade-controls button{padding:8px 5px;font-size:13px}
   .status-card{min-width:186px;padding:8px 9px}
   .row.strong{font-size:12px}
   .row{font-size:10px}

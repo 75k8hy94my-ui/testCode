@@ -71,6 +71,29 @@
       <div id="actionChoices" class="action-choices"></div>
     </section>
 
+    <section id="arcadePanel" class="arcade-panel" hidden aria-labelledby="arcadeTitle" aria-modal="true" role="dialog">
+      <div class="arcade-panel-card">
+        <header class="arcade-header">
+          <div><span class="eyebrow">WAKABA ARCADE</span><h1 id="arcadeTitle">クレーンゲーム</h1></div>
+          <button id="arcadeClose" type="button" aria-label="ゲームを終えて戻る">戻る</button>
+        </header>
+        <p class="arcade-help">左右のボタンまたは A / D で狙いを合わせ、つかむを押そう。景品に近いほど成功しやすいよ。</p>
+        <canvas id="arcadeCanvas" width="800" height="400" aria-label="景品の位置を見ながらクレーンを操作するゲーム"></canvas>
+        <p id="arcadeResult" class="arcade-result" aria-live="polite">1プレイ ¥300 · ← → / A D で移動 · Enter / Space でつかむ</p>
+        <div class="arcade-controls" aria-label="クレーン操作">
+          <button id="arcadeLeft" type="button">← 左へ</button>
+          <button id="arcadeGrab" class="arcade-grab" type="button">つかむ</button>
+          <button id="arcadeRight" type="button">右へ →</button>
+        </div>
+        <div class="arcade-footer">
+          <button id="arcadeShowCollection" type="button">景品一覧</button>
+          <button id="arcadeReplay" type="button" hidden>もう1回（¥300）</button>
+          <button id="arcadeReturn" type="button">ゲームセンターに戻る</button>
+        </div>
+        <div id="arcadePrizeCollection" class="arcade-prizes" aria-label="景品コレクション"></div>
+      </div>
+    </section>
+
     <section id="helpPanel" class="help-panel" hidden>
       <div>
         <strong>操作</strong>
@@ -147,6 +170,7 @@
   <script src="./home-crafting.js?v=20260929-home-crafting-1"></script>
   <script src="./traffic-overtake-safety.js?v=20260928-overtake-safety-1"></script>
   <script src="./traffic-overtake.js?v=20260928-overtake-plan-integration-1"></script>
-  <script src="./game.js?v=20260929-dog-walk-2"></script>
+  <script src="./arcade-games.js?v=20260929-arcade-rules-1"></script>
+  <script src="./game.js?v=20260929-arcade-gameplay-1"></script>
 </body>
 </html>

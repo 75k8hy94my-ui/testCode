@@ -99,7 +99,31 @@ test('wardrobe model is loaded before runtime and is normalized in snapshots', (
   assert.match(source, /wardrobe:wardrobeModel\.createWardrobe\(\)/);
   assert.match(source, /wardrobe:wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
   assert.match(source, /state\.wardrobe = wardrobeModel\.normalizeWardrobe\(saved\.wardrobe\)/);
-  assert.match(html, /game\.js\?v=20260929-dog-walk-2/);
+  assert.match(html, /game\.js\?v=20260929-arcade-gameplay-1/);
+});
+
+test('arcade progress is loaded before the game and migrates safely through snapshots', () => {
+  const arcadeScript = html.indexOf('arcade-games.js');
+  assert.notEqual(arcadeScript, -1);
+  assert.ok(arcadeScript < html.indexOf('game.js'));
+  assert.match(source, /const arcadeGamesModel = globalThis\.CityDaysArcadeGames/);
+  assert.match(source, /arcade:arcadeGamesModel\.createProgress\(\)/);
+  assert.match(source, /arcade:arcadeGamesModel\.normalizeProgress\(state\.arcade\)/);
+  assert.match(source, /state\.arcade = arcadeGamesModel\.normalizeProgress\(\{ \.\.\.saved\.arcade, activePlay:false \}\)/);
+  assert.match(source, /place\.id === "arcade"/);
+  assert.match(source, /arcadeGamesModel\.startPlay\(state\.arcade, state\.cash\)/);
+});
+
+test('arcade play uses an accessible responsive dialog and freezes normal world simulation', () => {
+  const arcade = html.slice(html.indexOf('id="arcadePanel"'), html.indexOf('id="helpPanel"'));
+  assert.match(arcade, /aria-modal="true"[\s\S]*role="dialog"/);
+  for (const control of ['arcadeLeft','arcadeRight','arcadeGrab','arcadeReturn']) assert.match(arcade, new RegExp('id="' + control + '"'));
+  assert.match(source, /if \(!arcadePanel\.hidden\) return;\s*if \(state\.paused/);
+  assert.match(source, /arcadeGame\.mode === "aiming" && \["arrowleft", "a"\]/);
+  assert.match(source, /arcadeGame\.mode === "aiming" && \["arrowright", "d"\]/);
+  assert.match(source, /arcadeGame\.mode === "aiming" && \["enter", " "\]/);
+  assert.match(css, /\.arcade-header button,\.arcade-controls button[^}]*min-height:46px/);
+  assert.match(css, /\.arcade-prizes\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)\}/);
 });
 
 test('supermarket clothing purchases revalidate ownership and funds before charging or advancing time', () => {

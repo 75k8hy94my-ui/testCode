@@ -40,6 +40,7 @@
   const mapModel = globalThis.CityDaysMapModel?.createMapModel?.();
   const weatherSystem = globalThis.CityDaysWeatherSystem;
   const wardrobeModel = globalThis.CityDaysWardrobe;
+  const arcadeGamesModel = globalThis.CityDaysArcadeGames;
   const mapErrors = mapModel ? mapModel.validate() : ["MapModel を読み込めません。"];
   if (!mapModel || mapErrors.length) {
     showRuntimeError(mapErrors.join(" / "));
@@ -48,6 +49,11 @@
 
   if (!wardrobeModel?.createWardrobe || !wardrobeModel?.normalizeWardrobe || !wardrobeModel?.buyOutfit || !wardrobeModel?.equipOutfit || !wardrobeModel?.getOutfit) {
     showRuntimeError("Wardrobe を読み込めません。");
+    return;
+  }
+
+  if (!arcadeGamesModel?.createProgress || !arcadeGamesModel?.normalizeProgress || !arcadeGamesModel?.startPlay || !arcadeGamesModel?.resolvePlay || !arcadeGamesModel?.listCollection) {
+    showRuntimeError("ArcadeGames を読み込めません。");
     return;
   }
 
@@ -180,6 +186,18 @@
   const actionDescription = document.getElementById("actionDescription");
   const actionChoices = document.getElementById("actionChoices");
   const actionClose = document.getElementById("actionClose");
+  const arcadePanel = document.getElementById("arcadePanel");
+  const arcadeCanvas = document.getElementById("arcadeCanvas");
+  const arcadeCtx = arcadeCanvas?.getContext("2d");
+  const arcadeResult = document.getElementById("arcadeResult");
+  const arcadeLeft = document.getElementById("arcadeLeft");
+  const arcadeRight = document.getElementById("arcadeRight");
+  const arcadeGrab = document.getElementById("arcadeGrab");
+  const arcadeClose = document.getElementById("arcadeClose");
+  const arcadeReplay = document.getElementById("arcadeReplay");
+  const arcadeReturn = document.getElementById("arcadeReturn");
+  const arcadeShowCollection = document.getElementById("arcadeShowCollection");
+  const arcadePrizeCollection = document.getElementById("arcadePrizeCollection");
   const helpPanel = document.getElementById("helpPanel");
   const helpButton = document.getElementById("helpButton");
   const helpClose = document.getElementById("helpClose");
@@ -1174,6 +1192,7 @@
     minute: 8 * 60,
     cash: 8000,
     wardrobe:wardrobeModel.createWardrobe(),
+    arcade:arcadeGamesModel.createProgress(),
     umbrellaOwned:false,
     groceries: 2,
     fitness: 0,
@@ -1227,6 +1246,8 @@
     },
     paused: false
   };
+
+  const arcadeGame = { mode:"closed", position:50, lastResult:null, randomOverride:null };
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -3868,6 +3889,176 @@
     requestAnimationFrame(focusGameCanvas);
   }
 
+  function renderArcadeCollection() {
+    arcadePrizeCollection.replaceChildren();
+    for (const prize of arcadeGamesModel.listCollection(state.arcade)) {
+      const item = document.createElement("div");
+      item.className = "arcade-prize";
+      const swatch = document.createElement("i");
+      swatch.style.background = prize.color;
+      const name = document.createElement("b");
+      name.textContent = prize.name;
+      const count = document.createElement("span");
+      count.textContent = prize.count ? "所持 " + prize.count + "個" : "未獲得";
+      item.append(swatch, name, count);
+      arcadePrizeCollection.appendChild(item);
+    }
+  }
+
+  function openArcadeCollection() {
+    arcadeGame.mode = "collection";
+    arcadePanel.hidden = false;
+    arcadeReplay.hidden = true;
+    arcadeLeft.disabled = true;
+    arcadeRight.disabled = true;
+    arcadeGrab.disabled = true;
+    arcadeResult.textContent = "獲得した景品 " + state.arcade.wins + "個 · プレイ " + state.arcade.plays + "回";
+    keys.clear();
+    renderArcadeCollection();
+    requestAnimationFrame(() => arcadeReturn.focus({ preventScroll:true }));
+  }
+
+  function renderArcadeBoard() {
+    if (!arcadeCtx || arcadePanel.hidden) return;
+    const width = arcadeCanvas.width;
+    const height = arcadeCanvas.height;
+    arcadeCtx.clearRect(0, 0, width, height);
+    const background = arcadeCtx.createLinearGradient(0, 0, 0, height);
+    background.addColorStop(0, "#293a36");
+    background.addColorStop(1, "#111816");
+    arcadeCtx.fillStyle = background;
+    arcadeCtx.fillRect(0, 0, width, height);
+
+    arcadeCtx.fillStyle = "#e7c779";
+    arcadeCtx.font = "800 25px system-ui, sans-serif";
+    arcadeCtx.textAlign = "center";
+    arcadeCtx.fillText("わかばのぬいぐるみ", width / 2, 43);
+
+    const left = 64;
+    const span = width - left * 2;
+    const floorY = height - 54;
+    const clawX = left + span * arcadeGame.position / 100;
+    arcadeCtx.fillStyle = "#101715";
+    roundedRectPath(arcadeCtx, left - 22, 72, span + 44, floorY - 58, 14);
+    arcadeCtx.fill();
+    arcadeCtx.strokeStyle = "#586c62";
+    arcadeCtx.lineWidth = 3;
+    arcadeCtx.stroke();
+    arcadeCtx.fillStyle = "#d1b268";
+    arcadeCtx.fillRect(left, 97, span, 8);
+
+    for (const prize of arcadeGamesModel.PRIZE_CATALOG) {
+      const prizeX = left + span * prize.position / 100;
+      arcadeCtx.fillStyle = "rgba(112,190,176,.13)";
+      arcadeCtx.fillRect(prizeX - span * .1, 106, span * .2, floorY - 106);
+      arcadeCtx.fillStyle = prize.color;
+      arcadeCtx.beginPath();
+      arcadeCtx.arc(prizeX, floorY - 25, 23, 0, Math.PI * 2);
+      arcadeCtx.fill();
+      arcadeCtx.fillStyle = "#fff4dc";
+      arcadeCtx.font = "700 12px system-ui, sans-serif";
+      arcadeCtx.textAlign = "center";
+      arcadeCtx.fillText(prize.name, prizeX, floorY + 14);
+    }
+
+    arcadeCtx.strokeStyle = "#d8e1d9";
+    arcadeCtx.lineWidth = 4;
+    arcadeCtx.beginPath();
+    arcadeCtx.moveTo(clawX, 105);
+    arcadeCtx.lineTo(clawX, arcadeGame.mode === "result" ? floorY - 67 : 153);
+    arcadeCtx.stroke();
+    const clawY = arcadeGame.mode === "result" ? floorY - 67 : 153;
+    arcadeCtx.fillStyle = "#e9e3d0";
+    arcadeCtx.beginPath();
+    arcadeCtx.arc(clawX, clawY, 12, 0, Math.PI * 2);
+    arcadeCtx.fill();
+    arcadeCtx.strokeStyle = "#e9e3d0";
+    arcadeCtx.lineWidth = 6;
+    arcadeCtx.beginPath();
+    arcadeCtx.moveTo(clawX - 3, clawY + 8);
+    arcadeCtx.lineTo(clawX - 17, clawY + 24);
+    arcadeCtx.moveTo(clawX + 3, clawY + 8);
+    arcadeCtx.lineTo(clawX + 17, clawY + 24);
+    arcadeCtx.stroke();
+
+    arcadeCtx.fillStyle = "#e9e1cf";
+    arcadeCtx.font = "600 14px system-ui, sans-serif";
+    arcadeCtx.textAlign = "left";
+    arcadeCtx.fillText("狙い " + Math.round(arcadeGame.position), left - 18, height - 16);
+    arcadeCtx.textAlign = "right";
+    arcadeCtx.fillText("1プレイ ¥300", width - left + 18, height - 16);
+  }
+
+  function startArcadeGame() {
+    const started = arcadeGamesModel.startPlay(state.arcade, state.cash);
+    if (!started.ok) {
+      arcadeResult.textContent = started.reason === "insufficient-funds" ? "1プレイ¥300です。所持金が足りません。" : "プレイを開始できません。";
+      showToast(started.reason === "insufficient-funds" ? "クレーンゲームには¥300必要です" : "ゲームを開始できません");
+      return false;
+    }
+    state.arcade = started.progress;
+    state.cash = started.cashRemaining;
+    arcadeGame.mode = "aiming";
+    arcadeGame.position = 50;
+    arcadeGame.lastResult = null;
+    arcadePanel.hidden = false;
+    arcadeResult.textContent = "狙いを決めて「つかむ」！";
+    arcadeReplay.hidden = true;
+    arcadeLeft.disabled = false;
+    arcadeRight.disabled = false;
+    arcadeGrab.disabled = false;
+    keys.clear();
+    renderArcadeCollection();
+    requestAnimationFrame(() => requestAnimationFrame(() => arcadeLeft.focus({ preventScroll:true })));
+    return true;
+  }
+
+  function moveArcadeClaw(amount) {
+    if (arcadeGame.mode !== "aiming") return;
+    arcadeGame.position = clamp(arcadeGame.position + amount, 0, 100);
+    renderArcadeBoard();
+  }
+
+  function finishArcadePlay(forceMiss = false, randomOverride = null) {
+    if (arcadeGame.mode !== "aiming") return false;
+    const randomValue = forceMiss ? .999999 : Number.isFinite(randomOverride) ? randomOverride
+      : Number.isFinite(arcadeGame.randomOverride) ? arcadeGame.randomOverride : Math.random();
+    arcadeGame.randomOverride = null;
+    const outcome = arcadeGamesModel.resolvePlay(state.arcade, arcadeGame.position, randomValue);
+    if (!outcome.ok) return false;
+    state.arcade = outcome.progress;
+    advanceTime(arcadeGamesModel.PLAY_DURATION);
+    arcadeGame.mode = "result";
+    arcadeGame.lastResult = outcome;
+    arcadeResult.textContent = outcome.won
+      ? outcome.prize.name + "をゲット！おめでとう！"
+      : "惜しい！クレーンが届かなかった……もう一度挑戦してみよう。";
+    arcadeLeft.disabled = true;
+    arcadeRight.disabled = true;
+    arcadeGrab.disabled = true;
+    arcadeReplay.hidden = false;
+    renderArcadeCollection();
+    updateHUD();
+    return true;
+  }
+
+  function closeArcadeGame(returnToMenu = true) {
+    if (arcadeGame.mode === "aiming") finishArcadePlay(true);
+    arcadeGame.mode = "closed";
+    arcadePanel.hidden = true;
+    keys.clear();
+    if (returnToMenu) openPlace(PLACES.find((place) => place.id === "arcade"));
+    else requestAnimationFrame(focusGameCanvas);
+  }
+
+  arcadeLeft.addEventListener("click", () => moveArcadeClaw(-5));
+  arcadeRight.addEventListener("click", () => moveArcadeClaw(5));
+  arcadeGrab.addEventListener("click", () => finishArcadePlay());
+  arcadeClose.addEventListener("click", () => closeArcadeGame());
+  arcadeReturn.addEventListener("click", () => closeArcadeGame());
+  arcadeReplay.addEventListener("click", () => startArcadeGame());
+  arcadeShowCollection.addEventListener("click", () => arcadePrizeCollection.scrollIntoView({ block:"nearest", behavior:"smooth" }));
+
   function addChoice(title, detail, handler, disabled = false) {
     const button = document.createElement("button");
     button.type = "button";
@@ -4381,6 +4572,13 @@
   function openPlace(place) {
     actionTitle.textContent = place.name;
     actionChoices.replaceChildren();
+
+    if (place.id === "arcade") {
+      const ownedKinds = Object.values(state.arcade.prizes).filter((count) => count > 0).length;
+      actionDescription.textContent = "駅前のゲームコーナー。クレーンを操作して、6種類のぬいぐるみを集めよう。景品 " + ownedKinds + "種類 / " + state.arcade.wins + "個、プレイ " + state.arcade.plays + "回。";
+      addChoice("クレーンゲームに挑戦", "1プレイ ¥300 / 約5分 / 左右に動かして景品を狙います", () => startArcadeGame(), state.cash < arcadeGamesModel.PLAY_COST);
+      addChoice("景品コレクションを見る", "全6種類 · 持っている景品を確認", () => openArcadeCollection());
+    }
 
     if (place.id === "delivery-depot") {
       const active = state.deliveryWork.active;
@@ -5420,6 +5618,7 @@
         cash: state.cash,
         umbrellaOwned:state.umbrellaOwned === true,
         wardrobe:wardrobeModel.normalizeWardrobe(state.wardrobe),
+        arcade:arcadeGamesModel.normalizeProgress({ ...state.arcade, activePlay:false }),
         groceries: state.groceries,
         fitness: state.fitness,
         libraryVisits: state.libraryVisits,
@@ -5683,6 +5882,7 @@
       state.cash = Math.floor(Number(saved.cash) || 0);
       state.umbrellaOwned = saved.umbrellaOwned === true;
       state.wardrobe = wardrobeModel.normalizeWardrobe(saved.wardrobe);
+      state.arcade = arcadeGamesModel.normalizeProgress({ ...saved.arcade, activePlay:false });
       state.groceries = Math.max(0, Math.floor(Number(saved.groceries) || 0));
       state.fitness = Math.max(0, Math.floor(Number(saved.fitness) || 0));
       state.libraryVisits = Math.max(0, Math.floor(Number(saved.libraryVisits) || 0));
@@ -7248,6 +7448,7 @@
 
 
   function update(dt) {
+    if (!arcadePanel.hidden) return;
     if (state.paused || !actionSheet.hidden || !helpPanel.hidden) return;
 
     const gameMinutes = dt * .7;
@@ -9703,6 +9904,30 @@
       for (let i = -2; i <= 2; i += 1) {
         ctx.strokeRect(p.x + i * 45 - 16, p.y + 106, 32, 52);
       }
+    } else if (place.id === "arcade") {
+      drawFacilityBuilding(p, building?.w || 300, building?.h || 260, "#a76887", "#543e50", "#a6bec1");
+      ctx.save();
+      ctx.shadowColor = "#e8a8df";
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = "#f2d7e9";
+      roundedRectPath(ctx, p.x - 123, p.y - 75, 246, 42, 8);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#6c345d";
+      ctx.font = "900 19px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("若葉 GAME", p.x, p.y - 47);
+      ctx.fillStyle = "#392d35";
+      roundedRectPath(ctx, p.x - 82, p.y + 5, 164, 85, 7);
+      ctx.fill();
+      for (let index = 0; index < 3; index += 1) {
+        ctx.fillStyle = ["#eab573", "#82c3ab", "#a99ad2"][index];
+        roundedRectPath(ctx, p.x - 57 + index * 42, p.y + 24, 31, 50, 5);
+        ctx.fill();
+        ctx.fillStyle = "#fff3df";
+        ctx.fillRect(p.x - 53 + index * 42, p.y + 31, 23, 3);
+      }
+      ctx.restore();
     } else if (place.id === "gym") {
       drawFacilityBuilding(p, building?.w || 305, building?.h || 265, "#718ead", "#465b70", "#8faebb");
       ctx.fillStyle = "#e3ebee";
@@ -11295,6 +11520,7 @@
     }
 
     render();
+    renderArcadeBoard();
     requestFrame(frame);
   }
 
@@ -11328,6 +11554,8 @@
         weather:state.visual.weather,
         umbrellaOwned:state.umbrellaOwned === true,
         wardrobe:wardrobeModel.normalizeWardrobe(state.wardrobe),
+        arcade:arcadeGamesModel.normalizeProgress(state.arcade),
+        arcadeUi:{ mode:arcadeGame.mode, position:arcadeGame.position, panelOpen:!arcadePanel.hidden },
         skills:{ ...state.communityCenter.skills },
         npcFriendship:{ ...socialNpcState.friendship },
         relationships:{ ...socialNpcState.relationships },
@@ -11389,6 +11617,18 @@
           state.cash = Math.floor(amount);
           return true;
         },
+        openPlaceForTest(placeId) {
+          const place = PLACES.find((item) => item.id === placeId);
+          if (!place) return false;
+          openPlace(place);
+          return true;
+        },
+        setArcadeRandomForTest(value) {
+          if (!Number.isFinite(value) || value < 0 || value >= 1) return false;
+          arcadeGame.randomOverride = value;
+          return true;
+        },
+        finishArcadePlayForTest(randomValue) { return finishArcadePlay(false, randomValue); },
         isPlayerUsingUmbrella,
         getUmbrellaDrawCount() { return umbrellaDrawCount; },
         applyGameSnapshotForTest(saved) { return applyGameSnapshot(saved); },
@@ -11627,6 +11867,14 @@
   window.addEventListener("keydown", (event) => {
     void unlockGameAudio();
     const key = event.key.toLowerCase();
+    if (!arcadePanel.hidden) {
+      event.preventDefault();
+      if (key === "escape" && !event.repeat) closeArcadeGame();
+      else if (arcadeGame.mode === "aiming" && ["arrowleft", "a"].includes(key)) moveArcadeClaw(-2.5);
+      else if (arcadeGame.mode === "aiming" && ["arrowright", "d"].includes(key)) moveArcadeClaw(2.5);
+      else if (arcadeGame.mode === "aiming" && ["enter", " "].includes(key) && !event.repeat) finishArcadePlay();
+      return;
+    }
     if (key === "p" && !event.repeat) {
       setSmartphoneOpen(smartphonePanel?.hidden ?? false);
       return;

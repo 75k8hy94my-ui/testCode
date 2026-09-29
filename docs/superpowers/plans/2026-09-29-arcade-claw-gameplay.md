@@ -67,7 +67,7 @@
 - Modify: `game/index.html`
 - Modify: `game/game.js`
 - Modify: `game/game.css`
-- Modify: `tests/game-snapshot.test.mjs`（既存の該当スナップショットテスト）
+- Modify: `tests/game-runtime.test.mjs`（既存のランタイム/スナップショット検査）
 
 **Interfaces:**
 - HTMLは`arcade-games.js`を`game.js`より前に読み込む。

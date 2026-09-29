@@ -12,6 +12,7 @@ test('arcade play costs ¥300 once and rejects insufficient or invalid cash', ()
   assert.equal(started.progress.activePlay, true);
   assert.equal(arcade.startPlay(progress, 299).reason, 'insufficient-funds');
   assert.equal(arcade.startPlay(progress, NaN).reason, 'invalid-cash');
+  assert.equal(arcade.startPlay(progress, 300.5).reason, 'invalid-cash');
 });
 
 test('well-aimed play has higher odds than a miss and resolves only one active play', () => {
@@ -38,6 +39,13 @@ test('arcade progress migrates old or corrupt data and records duplicate prizes 
   assert.equal(progress.prizes[prize.id], 2);
   assert.equal(arcade.listCollection(progress).length, 6);
   assert.equal(arcade.listCollection(progress)[0].count, 2);
+});
+
+test('collection totals cannot exceed recorded wins when progress is normalized', () => {
+  const prize = arcade.PRIZE_CATALOG[2];
+  const normalized = arcade.normalizeProgress({ plays:2, wins:1, prizes:{ [prize.id]:99 } });
+  assert.equal(normalized.prizes[prize.id], 1);
+  assert.equal(Object.values(normalized.prizes).reduce((sum, count) => sum + count, 0), normalized.wins);
 });
 
 test('arcade rejects invalid positions and random values without changing progress', () => {

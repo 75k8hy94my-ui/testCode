@@ -27,14 +27,18 @@
     if (!value || typeof value !== 'object' || Array.isArray(value)) return result;
     result.plays = clampInteger(value.plays, 1000000);
     result.wins = Math.min(result.plays, clampInteger(value.wins, result.plays));
-    for (const { id } of PRIZE_CATALOG) result.prizes[id] = clampInteger(value.prizes?.[id], 100000);
+    let remainingPrizes = result.wins;
+    for (const { id } of PRIZE_CATALOG) {
+      result.prizes[id] = Math.min(remainingPrizes, clampInteger(value.prizes?.[id], 100000));
+      remainingPrizes -= result.prizes[id];
+    }
     result.activePlay = value.activePlay === true;
     return result;
   }
 
   function startPlay(progress, cash) {
     const normalized = normalizeProgress(progress);
-    if (!Number.isFinite(cash) || cash < 0) return { ok:false, reason:'invalid-cash' };
+    if (!Number.isSafeInteger(cash) || cash < 0) return { ok:false, reason:'invalid-cash' };
     if (normalized.activePlay) return { ok:false, reason:'play-in-progress' };
     if (cash < PLAY_COST) return { ok:false, reason:'insufficient-funds' };
     normalized.activePlay = true;
