@@ -13,6 +13,7 @@
     ["music","ミュージック","♫","#ef476f"],["calculator","計算機","＋","#ff9f0a"],
     ["pet","ペット","🐾","#b98255"],
     ["books","本棚","▤","#a77b54"],
+    ["meals","食事","🍱","#48a878"],
     ["home","ホーム","⌂","#ff9f0a"],["settings","設定","⚙","#8e8e93"]
   ];
   const NEUTRAL_CONTACT_COLOR = "#8e8e93";
@@ -274,6 +275,25 @@
       return shell("本棚",'<section class="ios-section ios-books-summary"><span>貸出中 ' + loans.length + ' / 3冊</span><b>読了 ' + completedCount + '冊</b></section>' +
         (list || empty) + '<p class="ios-books-hint">続きは図書館または自宅のソファで読めます</p>');
     }
+    function mealsApp() {
+      const inventory = model.packedMeals || {};
+      const batches = Array.isArray(inventory.batches) ? inventory.batches : [];
+      const portions = Math.max(0, Math.floor(Number(inventory.portions) || 0));
+      const capacity = Math.max(1, Math.floor(Number(inventory.capacity) || 6));
+      const blocked = Boolean(model.inVehicle || model.inTrain);
+      const rows = batches.map(function(batch){
+        const freshness = Math.max(0, Math.floor(Number(batch.freshnessMinutes) || 0));
+        const disabled = blocked || freshness <= 0 || !batch.mealId;
+        return '<article class="ios-meal-card"><div class="ios-meal-icon">🍱</div><div class="ios-meal-info"><b>' + esc(batch.name || "食事") +
+          '</b><small>' + Math.max(0,Math.floor(Number(batch.portions) || 0)) + '食 · 残り' + freshness + '分</small><div class="ios-meal-freshness"><i style="width:' +
+          Math.min(100,Math.round(freshness / 1440 * 100)) + '%"></i></div></div><button type="button" data-phone-action="eat-meal" data-meal-id="' +
+          esc(batch.mealId || "") + '"' + (disabled ? ' disabled title="' + (blocked ? '車や電車を降りてから食べられます' : '期限切れです') + '"' : '') +
+          '>食べる</button></article>';
+      }).join("");
+      return shell("食事", '<section class="ios-section ios-meals-summary"><span>持ち歩き ' + portions + ' / ' + capacity + '食</span><small>作ってから24時間で期限切れ</small></section>' +
+        (blocked ? '<p class="ios-meals-hint">車や電車を降りてから食べられます</p>' : '') +
+        (rows || '<div class="ios-meals-empty"><span>🍱</span><h3>持ち歩きの食事はありません</h3><p>自宅のキッチンで弁当を作ると、外出先で食べられます。</p></div>'));
+    }
     function findApp() {
       const canRouteToFriend = !model.inHome && !model.inVehicle && !model.inTrain;
       const friends = (model.npcs || []).map(function(npc){
@@ -398,6 +418,7 @@
       if (app === "health") return healthApp();
       if (app === "pet") return petApp();
       if (app === "books") return booksApp();
+      if (app === "meals") return mealsApp();
       if (app === "find") return findApp();
       if (app === "transit") return transitApp();
       if (app === "mail") return mailApp();
@@ -477,6 +498,7 @@
           value.libraryReading.completedCount,
           (value.libraryReading.loans || []).map(function(loan){return [loan.bookId,loan.title,loan.chaptersRead];})
         ] : null,
+        packedMeals:value.packedMeals ? [value.packedMeals.portions,(value.packedMeals.batches || []).map(function(batch){return [batch.mealId,batch.recipeId,batch.portions,batch.freshnessMinutes];})] : null,
         npcs:(value.npcs || []).map(function(n){return [n.id,n.friendship,n.hidden,n.activity,Math.round((n.distance || 0) / 25),Math.round((n.mapDX || 0) / 20),Math.round((n.mapDY || 0) / 20)];}),
         friendWaypoint:value.friendWaypoint ? [value.friendWaypoint.id,Math.round((value.friendWaypoint.distance || 0) / 20)] : null,
         trains:(value.trains || []).map(function(t){return [t.id,t.stationIndex,t.targetIndex,Math.round((t.dwell || 0) * 2)];})
@@ -559,6 +581,7 @@
         if (npc && cb.friendRoute) cb.friendRoute(npc.id);
       }
       else if (action === "clear-route") { if (cb.clearRoute) cb.clearRoute(); }
+      else if (action === "eat-meal") { if (!button.disabled && cb.eatMeal) cb.eatMeal(button.dataset.mealId); }
       else if (action === "take-photo") {
         const photo = cb.capturePhoto ? cb.capturePhoto() : null;
         if (photo && photo.dataUrl) { photos.unshift(photo); if (photos.length > 18) photos.pop(); if (cb.toast) cb.toast("写真を保存しました"); render(); }

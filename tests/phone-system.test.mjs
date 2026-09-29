@@ -9,12 +9,12 @@ const html = fs.readFileSync(new URL('../game/index.html', import.meta.url), 'ut
 const css = fs.readFileSync(new URL('../game/game.css', import.meta.url), 'utf8');
 
 test('phone system exposes a broad app catalog', () => {
-  assert.equal(phoneModule.appCount, 22);
+  assert.equal(phoneModule.appCount, 23);
   assert.equal(typeof phoneModule.createPhoneSystem, 'function');
   for (const id of [
     'phone','messages','maps','camera','photos','weather','calendar','clock',
     'notes','reminders','wallet','health','find','transit','mail','news',
-    'music','calculator','pet','books','home','settings'
+    'music','calculator','pet','books','meals','home','settings'
   ]) {
     assert.match(phoneSource, new RegExp('"' + id + '"'));
   }
@@ -66,6 +66,38 @@ test('phone receives live game data for health, contacts, transport and wallet',
 test('phone waypoint persists in game snapshots', () => {
   assert.match(gameSource, /phone:\s*\{[\s\S]*waypoint: state\.phone\?\.waypoint/);
   assert.match(gameSource, /saved\.phone && typeof saved\.phone\.waypoint === "string"/);
+});
+
+test('meal phone app displays safe live portions and disables eating in a vehicle or train', () => {
+  const listeners = {};
+  const root={hidden:false,innerHTML:'',classList:{toggle(){}},style:{setProperty(){}},addEventListener(name,handler){listeners[name]=handler;}};
+  const phone=phoneModule.createPhoneSystem({root});
+  phone.update({packedMeals:{batches:[],portions:0,capacity:6},inVehicle:false,inTrain:false});
+  phone.home();
+  assert.match(root.innerHTML,/data-phone-app="meals"/);
+  phone.openApp('meals');
+  assert.match(root.innerHTML,/持ち歩きの食事はありません/);
+  phone.update({packedMeals:{batches:[{mealId:'home-meal@480',recipeId:'home-meal',name:'<script>alert(1)</script>',portions:2,freshnessMinutes:95}],portions:2,capacity:6},inVehicle:false,inTrain:false});
+  assert.match(root.innerHTML,/2 \/ 6食/);
+  assert.match(root.innerHTML,/&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  assert.doesNotMatch(root.innerHTML,/<script>alert/);
+  assert.match(root.innerHTML,/残り95分/);
+  assert.match(root.innerHTML,/data-phone-action="eat-meal"/);
+  phone.update({packedMeals:{batches:[{mealId:'home-meal@480',name:'家庭料理',portions:2,freshnessMinutes:75}],portions:2,capacity:6},inVehicle:true,inTrain:false});
+  assert.match(root.innerHTML,/車や電車を降りてから/);
+  assert.match(root.innerHTML,/disabled/);
+});
+
+test('meal phone action calls the runtime callback with the selected batch ID', () => {
+  const listeners={};
+  const root={hidden:false,innerHTML:'',classList:{toggle(){}},style:{setProperty(){}},addEventListener(name,handler){listeners[name]=handler;}};
+  const consumed=[];
+  const phone=phoneModule.createPhoneSystem({root,callbacks:{eatMeal:(id)=>consumed.push(id)}});
+  phone.update({packedMeals:{batches:[{mealId:'fish-rice@700',name:'鯛めし',portions:1,freshnessMinutes:60}],portions:1,capacity:6},inVehicle:false,inTrain:false});
+  phone.openApp('meals');
+  const button={dataset:{phoneAction:'eat-meal',mealId:'fish-rice@700'},closest(selector){return selector==='[data-phone-action]'?this:null;}};
+  listeners.click({target:button});
+  assert.deepEqual(consumed,['fish-rice@700']);
 });
 
 test('pet phone app safely shows shelter guidance or live household pet care status', () => {
