@@ -1,7 +1,7 @@
 (function initCityDaysMapModel(global) {
   "use strict";
 
-  const MAP_VERSION = "japan-v2.4";
+  const MAP_VERSION = "japan-v2.5";
   const WORLD_SIZE = 10800;
   const COAST = 160;
   const RAIL_Y = 4700;
@@ -52,6 +52,7 @@
     node("south-east", 8150, 6600, "east-residential"),
     node("west-court", 2250, 5850, "west-residential"),
     node("west-dead", 1850, 6250, "west-residential"),
+    node("pet-shelter-entrance", 1840, 6400, "west-residential"),
     node("south-court-a", 3650, 7050, "south-residential"),
     node("south-dead-a", 3350, 7480, "south-residential"),
     node("south-court-b", 5050, 7250, "south-residential"),
@@ -111,6 +112,7 @@
     ["residential-court-southwest", "west-court", "south-west", [[2250,5850],[2400,6100],[2600,6370],[2850,6550]], "alley", 70, 15, true, true, false],
     ["residential-southwest-west", "south-west", "res-west", [[2850,6550],[3010,6360],[3260,6150],[3600,5950]], "residential", 78, 20, true, true, false],
     ["local-west-dead", "west-court", "west-dead", [[2250,5850],[2100,5960],[1970,6100],[1850,6250]], "alley", 60, 15, true, true, false],
+    ["ped-pet-shelter-entry", "west-dead", "pet-shelter-entrance", [[1850,6250],[1850,6300],[1850,6350],[1840,6400]], "sidewalk", 40, 5, false, true, false],
     ["local-south-court-a", "res-west", "south-court-a", [[3600,5950],[3600,6320],[3620,6700],[3650,7050]], "alley", 66, 15, true, true, false],
     ["local-south-dead-a", "south-court-a", "south-dead-a", [[3650,7050],[3530,7200],[3420,7360],[3350,7480]], "alley", 58, 15, true, true, false],
     ["local-south-court-b", "home-road", "south-court-b", [[5050,6420],[5020,6700],[5030,6980],[5050,7250]], "alley", 66, 15, true, true, false],
@@ -156,6 +158,7 @@
     { id:"park", name:"中央公園", x:5250, y:3150, entranceNodeId:"park-entrance", roadNodeId:"park-road", color:"#72a66d", symbol:"P" },
     { id:"gym", name:"CITY GYM", x:7180, y:3920, entranceNodeId:"gym-entrance", roadNodeId:"gym-road", building:{ x:7399, y:3701, w:305, h:265 }, color:"#7898bd", symbol:"G" },
     { id:"library", name:"市立図書館", x:3420, y:3940, entranceNodeId:"library-entrance", roadNodeId:"library-road", building:{ x:3420, y:4110, w:310, h:275 }, color:"#9a8db9", symbol:"L" },
+    { id:"pet-shelter", name:"わかば動物保護センター", type:"pet-shelter", x:1840, y:6400, entranceNodeId:"pet-shelter-entrance", roadNodeId:"west-dead", building:{ x:1580, y:6560, w:320, h:260 }, color:"#b9c8ad", symbol:"ペ" },
     { id:"community-center", name:"若葉コミュニティセンター", x:4540, y:4280, entranceNodeId:"community-center-entrance", roadNodeId:"civic-east", building:{ x:4740, y:4500, w:320, h:280 }, color:"#d3a66b", symbol:"W" },
     { id:"fuel-station", name:"若葉石油", type:"fuel-station", x:8000, y:3890, entranceNodeId:"fuel-station-entrance", roadNodeId:"fuel-station-road", building:{ x:8330, y:3650, w:340, h:290 }, color:"#d9d7c7", symbol:"GS" },
     { id:"delivery-depot", name:"若葉便 配達受付所", type:"delivery-depot", x:5150, y:6290, entranceNodeId:"delivery-depot-entrance", roadNodeId:"home-road", building:{ x:5310, y:5980, w:320, h:270 }, color:"#d7c99f", symbol:"便" },
