@@ -20,7 +20,7 @@
 
 ## Review Focus
 
-- 不正な景品ID・座標・乱数値をモデルが拒否する — `arcade-games.test.mjs`に不正入力テスト。
+- 不正な座標・乱数値をモデルが拒否する — `arcade-games.test.mjs`に不正入力テスト。
 - 連打・二重イベントで二重徴収/二重報酬しない — 統合テストで単一プレイ一回適用を検証。
 - 空資金・旧形式・破損コレクションでも安全 — 正規化・復元テスト。
 - 狭い画面でも操作ボタンが画面外に出ない — モバイルheadlessのDOM寸法検査。
@@ -36,7 +36,7 @@
 - Modify: `package.json`（既存テスト収集方式に沿って追加）
 
 **Interfaces:**
-- Produce `CityDaysArcadeGames`: `PRIZE_CATALOG`, `PLAY_COST`, `PLAY_DURATION`, `createProgress()`, `normalizeProgress(value)`, `startPlay(progress, cash)`, `resolvePlay(progress, prizeId, stopPosition, randomValue)`, `listCollection(progress)`。
+- Produce `CityDaysArcadeGames`: `PRIZE_CATALOG`, `PLAY_COST`, `PLAY_DURATION`, `createProgress()`, `normalizeProgress(value)`, `startPlay(progress, cash)`, `resolvePlay(progress, stopPosition, randomValue)`, `listCollection(progress)`。
 - 失敗結果は `{ok:false, reason}`、成功は更新済みprogressと差額/結果を返す。不正値は状態を変更しない。
 
 - [ ] **Step 1:** 開始費用・残高不足・正常化・不正値・操作位置依存・獲得/重複記録を網羅する失敗テストを書く。
@@ -52,7 +52,7 @@
 - Modify: `tests/map-model.test.mjs`
 
 **Interfaces:**
-- 施設ID `arcade`、入口ノード `arcade-entrance`、広場接続ノード `arcade-plaza`。入口座標は駅南口広場内に配置し、歩行者専用ルートで既存グラフへ接続する。
+- 施設ID `arcade`、入口ノード `arcade-entrance`、歩道接続ノード `arcade-walk`。入口は若葉駅北東の商店街に配置し、既存の歩道網へ接続する。
 - 施設表示名は「若葉ゲームコーナー」、記号は「遊」。
 
 - [ ] **Step 1:** 施設の存在、入口ルート、歩行者接続性、道路/建物との妥当性を検査する失敗テストを追加。

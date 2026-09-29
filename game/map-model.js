@@ -1,7 +1,7 @@
 (function initCityDaysMapModel(global) {
   "use strict";
 
-  const MAP_VERSION = "japan-v2.5";
+  const MAP_VERSION = "japan-v2.6";
   const WORLD_SIZE = 10800;
   const COAST = 160;
   const RAIL_Y = 4700;
@@ -69,7 +69,9 @@
     node("park-path-east", 5660, 2880, "park-shrine"),
     node("shrine-path", 4520, 2680, "park-shrine"),
     node("central-plaza-west", 4860, 4910, "station-commercial"),
-    node("central-plaza-east", 5540, 4910, "station-commercial")
+    node("central-plaza-east", 5540, 4910, "station-commercial"),
+    node("arcade-walk", 6100, 4450, "station-commercial"),
+    node("arcade-entrance", 6080, 4390, "station-commercial")
   ];
 
   const BLUEPRINT_EDGES = [
@@ -144,6 +146,8 @@
     ["ped-central-plaza-east", "central-station-entry", "central-plaza-east", [[5200,4840],[5360,4870],[5540,4910]], "plaza", 58, 5, false, true, false],
     ["ped-arcade-cafe", "central-plaza-west", "cafe-entrance", [[4860,4910],[4700,5100],[4510,5340],[4230,5560]], "shopping-walk", 54, 5, false, true, false],
     ["ped-arcade-market", "central-plaza-east", "market-lane", [[5540,4910],[5550,5100],[5550,5270],[5550,5420]], "shopping-walk", 54, 5, false, true, false],
+    ["ped-arcade-plaza", "north-market", "arcade-walk", [[6100,4470],[6100,4460],[6100,4450]], "shopping-walk", 46, 5, false, true, false],
+    ["ped-arcade-entry", "arcade-walk", "arcade-entrance", [[6100,4450],[6090,4420],[6080,4390]], "shopping-walk", 42, 5, false, true, false],
     ["ped-park-west", "park-entrance", "park-path-west", [[5250,3150],[5100,3040],[4860,2860]], "greenway", 44, 5, false, true, false],
     ["ped-park-shrine", "park-path-west", "shrine-path", [[4860,2860],[4700,2780],[4520,2680]], "greenway", 40, 5, false, true, false],
     ["ped-park-east", "park-path-west", "park-path-east", [[4860,2860],[5150,2820],[5420,2840],[5660,2880]], "greenway", 44, 5, false, true, false],
@@ -153,6 +157,7 @@
 
   const PLACE_DEFINITIONS = [
     { id:"home", name:"自宅", x:5050, y:6600, entranceNodeId:"home-entrance", roadNodeId:"home-road", building:{ x:5145, y:6695, w:118, h:96 }, color:"#d9b98b", symbol:"H" },
+    { id:"arcade", name:"若葉ゲームコーナー", type:"arcade", x:6080, y:4390, entranceNodeId:"arcade-entrance", roadNodeId:"north-market", building:{ x:6080, y:4200, w:300, h:260 }, color:"#c785b9", symbol:"遊" },
     { id:"cafe", name:"カフェ LUNE", x:4230, y:5560, entranceNodeId:"cafe-entrance", roadNodeId:"cafe-road", building:{ x:4380, y:5784, w:300, h:270 }, color:"#c88f72", symbol:"C" },
     { id:"store", name:"スーパー MARCHÉ", x:6630, y:5590, entranceNodeId:"store-entrance", roadNodeId:"store-road", building:{ x:6411, y:5809, w:320, h:260 }, color:"#74a88a", symbol:"S" },
     { id:"park", name:"中央公園", x:5250, y:3150, entranceNodeId:"park-entrance", roadNodeId:"park-road", color:"#72a66d", symbol:"P" },
