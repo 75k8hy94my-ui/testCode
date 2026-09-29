@@ -7,6 +7,10 @@
   const SAFE_FRONT_CLEARANCE = 14;
   const PASSED_REAR_CLEARANCE = 8;
 
+  function safeFrontClearance(crosswalk) {
+    return Math.max(SAFE_FRONT_CLEARANCE, Math.max(0, Number(crosswalk?.depth) || 0) / 2 + 8);
+  }
+
   function vehicleDistanceToCrossing(crosswalk, vehicle) {
     if (Number.isFinite(vehicle.distanceToCrossing)) return vehicle.distanceToCrossing;
     if (vehicle.edgeId !== crosswalk.roadEdgeId || !Number.isFinite(vehicle.along)) return null;
@@ -38,10 +42,10 @@
       const speed = Math.max(0, Number(vehicle.speed) || 0);
       const timeToArrival = speed < .1 ? Infinity : Math.max(0, frontClearance) / speed;
       const stoppingDistance = vehicleStoppingDistance(vehicle, options.deceleration);
-      const canStopBeforeCrossing = frontClearance >= SAFE_FRONT_CLEARANCE &&
+      const canStopBeforeCrossing = frontClearance >= safeFrontClearance(crosswalk) &&
         (speed < .1 || distance >= stoppingDistance);
-      const committed = frontClearance < SAFE_FRONT_CLEARANCE;
-      const safelyStopped = speed < .1 && frontClearance >= SAFE_FRONT_CLEARANCE;
+      const committed = frontClearance < safeFrontClearance(crosswalk);
+      const safelyStopped = speed < .1 && frontClearance >= safeFrontClearance(crosswalk);
       const gapSafe = !committed && (safelyStopped || timeToArrival >= crossingDuration + CLEARANCE_MARGIN);
       const candidate = {
         vehicle,
@@ -129,9 +133,9 @@
 
     const speed = Math.max(0, Number(vehicle.speed) || 0);
     const stoppingDistance = vehicleStoppingDistance(vehicle, options.deceleration);
-    const canStop = frontClearance >= SAFE_FRONT_CLEARANCE &&
+    const canStop = frontClearance >= safeFrontClearance(crosswalk) &&
       (speed < .1 || distance >= stoppingDistance);
-    const committed = frontClearance < SAFE_FRONT_CLEARANCE;
+    const committed = frontClearance < safeFrontClearance(crosswalk);
     const timeToArrival = speed < .1 ? Infinity : Math.max(0, frontClearance) / speed;
     const activeClearance = Math.max(0, Number(claim.clearanceTime) || (Number(crosswalk.length) || 120) / 28);
     const conflictImminent = timeToArrival <= activeClearance + CLEARANCE_MARGIN || distance <= stoppingDistance + 42;
@@ -177,7 +181,7 @@
       : { pedestrianId:null, phase:"clear", waitingPedestrianIds:[] };
   }
 
-  const api = Object.freeze({ assessPedestrian, updateClaim, vehicleYieldDecision, arbitrateClaims, vehicleStoppingDistance, SAFE_FRONT_CLEARANCE });
+  const api = Object.freeze({ assessPedestrian, updateClaim, vehicleYieldDecision, arbitrateClaims, vehicleStoppingDistance, safeFrontClearance, SAFE_FRONT_CLEARANCE });
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   global.CityDaysCrossingControl = api;
 })(typeof globalThis !== "undefined" ? globalThis : window);
