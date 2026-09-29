@@ -3947,6 +3947,7 @@
 
   function advanceTime(minutes, decay = true, updateCitizens = true) {
     if (decay) decayNeeds(minutes);
+    state.wardrobe = wardrobeModel.advanceWear(state.wardrobe, minutes);
     state.petCompanion = petCompanionModel.advance(state.petCompanion, minutes);
     state.minute += minutes;
     while (state.minute >= 1440) {

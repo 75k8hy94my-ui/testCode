@@ -802,6 +802,17 @@ test('community center actions revalidate entry, charge once, and award completi
   assert.match(action, /socialNpcState\.relationships\[pairId\]/);
 });
 
+test('outfit cleanliness advances with game time and survives purchases, dressing and snapshots', () => {
+  assert.match(html, /wardrobe\.js\?v=[^\"]+/);
+  const advanceStart = source.indexOf('function advanceTime(');
+  const advanceEnd = source.indexOf('function ', advanceStart + 20);
+  const advanceTime = source.slice(advanceStart, advanceEnd);
+  assert.match(advanceTime, /state\.wardrobe\s*=\s*wardrobeModel\.advanceWear\(state\.wardrobe,\s*minutes\)/);
+  assert.match(source, /wardrobe:wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
+  assert.match(source, /state\.wardrobe = wardrobeModel\.normalizeWardrobe\(saved\.wardrobe\)/);
+  assert.match(source, /wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
+});
+
 test('citizens plan community classes through their normal pedestrian activity lifecycle', () => {
   const candidates = source.slice(source.indexOf('function citizenActionCandidates('), source.indexOf('function chooseCitizenAction('));
   const completion = source.slice(source.indexOf('function completeCitizenActivity('), source.indexOf('function planCitizenAction('));
