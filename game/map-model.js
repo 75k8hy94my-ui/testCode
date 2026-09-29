@@ -8,7 +8,7 @@
     ? require("./building-frontage.js")
     : global.CityDaysBuildingFrontage;
 
-  const MAP_VERSION = "japan-v2.8";
+  const MAP_VERSION = "japan-v2.9";
   const WORLD_SIZE = 10800;
   const COAST = 160;
   const RAIL_Y = 4700;
@@ -562,8 +562,18 @@
     }
     if (!frontageGeometry) return place;
 
+    const roadGapAtEntrance = distance(frontageGeometry.entrance, frontageGeometry.roadAnchor) - preferredEdge.width / 2;
+    const accessOffset = Math.max(0, Math.min(14, roadGapAtEntrance - 18));
+    const accessPoint = {
+      x:frontageGeometry.entrance.x + frontageGeometry.normal.x * accessOffset,
+      y:frontageGeometry.entrance.y + frontageGeometry.normal.y * accessOffset
+    };
+
     return {
       ...place,
+      x:accessPoint.x,
+      y:accessPoint.y,
+      accessPoint:Object.freeze(accessPoint),
       building:{
         ...place.building,
         x:centerX,
@@ -576,6 +586,38 @@
         collisionBounds:frontageGeometry.bounds
       }
     };
+  }
+
+  function alignStationAccess(station, edges) {
+    const target = { x:station.accessX, y:station.accessY };
+    let nearest = null;
+    for (const edge of edges) {
+      if (!edge.vehicle) continue;
+      for (let index = 1; index < edge.points.length; index += 1) {
+        const hit = pointSegmentProjection(target, edge.points[index - 1], edge.points[index]);
+        if (!nearest || hit.distance < nearest.distance) nearest = { ...hit, edge, index:index - 1 };
+      }
+    }
+    if (!nearest?.edge) return station;
+    const clearance = nearest.edge.width / 2 + 24;
+    if (nearest.distance >= clearance) return station;
+    const a = nearest.edge.points[nearest.index];
+    const b = nearest.edge.points[nearest.index + 1];
+    const magnitude = distance(a, b) || 1;
+    const tangent = { x:(b.x - a.x) / magnitude, y:(b.y - a.y) / magnitude };
+    const normals = [
+      { x:-tangent.y, y:tangent.x },
+      { x:tangent.y, y:-tangent.x }
+    ];
+    const candidates = normals.map((normal) => ({
+      x:nearest.point.x + normal.x * clearance,
+      y:nearest.point.y + normal.y * clearance
+    })).sort((left, right) =>
+      distance(left, target) - distance(right, target) ||
+      left.x - right.x ||
+      left.y - right.y
+    );
+    return { ...station, accessX:candidates[0].x, accessY:candidates[0].y };
   }
 
   function createResidentialFrontageSites(zone, zoneIndex, edges, openSpaces, reserved, sites) {
@@ -826,7 +868,7 @@
       edges,
       openSpaces
     ));
-    const stations = STATION_DEFINITIONS.map((value) => ({ ...value }));
+    const stations = STATION_DEFINITIONS.map((value) => alignStationAccess({ ...value }, edges));
     const districts = DISTRICT_DEFINITIONS.map((value) => ({
       ...value,
       polygon:value.polygon.map(([x, y]) => [x, y]),
@@ -1325,6 +1367,9 @@
         if (segment.points.length < 2 || !(segment.length > 0)) errors.push("pedestrian segment geometry invalid: " + segment.id);
         if (segment.type === "crosswalk" && !pedestrianGraph.crosswalks.some((crossing) => crossing.id === segment.crosswalkId)) errors.push("crosswalk segment has no shared record: " + segment.id);
       }
+      for (const violation of pedestrianGraph.safetyViolations || []) {
+        errors.push("pedestrian segment enters vehicle road: " + violation.segmentId + "/" + violation.roadEdgeId);
+      }
 
       for (const place of places) {
         if (!getNode(place.entranceNodeId) || !getNode(place.roadNodeId)) {
@@ -1334,6 +1379,10 @@
         if (!findRoute(place.entranceNodeId, place.roadNodeId, { mode:"pedestrian" })) errors.push("place unreachable: " + place.id);
         if (!neighbors(place.roadNodeId, { mode:"vehicle" }).length) errors.push("place road unreachable: " + place.id);
         if (!isWalkable(place.x, place.y, 14)) errors.push("place not walkable: " + place.id);
+        const placeRoadHit = nearestRoad(place.x, place.y, { vehicleOnly:true });
+        if (placeRoadHit?.edge && placeRoadHit.distance < placeRoadHit.edge.width / 2 + 8) {
+          errors.push("place access enters vehicle road: " + place.id);
+        }
         const facility = facilityBuildingRect(place);
         if (facility) {
           // Fixed facility footprints predate the generated sidewalk shoulder.
@@ -1369,6 +1418,10 @@
       for (const station of stations) {
         if (!getNode(station.roadNodeId)) errors.push("station road node missing: " + station.id);
         if (!isWalkable(station.accessX, station.accessY, 14)) errors.push("station access not walkable: " + station.id);
+        const stationRoadHit = nearestRoad(station.accessX, station.accessY, { vehicleOnly:true });
+        if (stationRoadHit?.edge && stationRoadHit.distance < stationRoadHit.edge.width / 2 + 8) {
+          errors.push("station access enters vehicle road: " + station.id);
+        }
       }
 
       for (const site of buildingSites) {
