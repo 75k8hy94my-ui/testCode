@@ -403,23 +403,107 @@
     return best;
   }
 
+  function facilityRoadClearanceExtra(edge) {
+    if (!edge?.vehicle) return 10;
+    const originalHalfWidth = (edge.sourceWidth || edge.width) / 2;
+    const widenedHalfWidth = edge.width / 2;
+    return Math.max(8, originalHalfWidth + 18 - widenedHalfWidth);
+  }
+
+  function nearestPointOnEdge(edge, target) {
+    let best = null;
+    if (!edge || !target) return null;
+    for (let index = 1; index < edge.points.length; index += 1) {
+      const hit = pointSegmentProjection(target, edge.points[index - 1], edge.points[index]);
+      if (!best || hit.distance < best.distance) best = { ...hit, segmentIndex:index - 1 };
+    }
+    return best;
+  }
+
   function alignFacilityBuilding(place, edges) {
     if (!place?.building || !buildingFrontageModel?.resolve) return place;
-    const rect = facilityBuildingRect(place);
-    const roadHit = nearestEdgeToRectCenter(rect, edges.filter((edge) => edge.vehicle));
-    const roadA = roadHit?.edge?.points?.[roadHit.segmentIndex];
-    const roadB = roadHit?.edge?.points?.[roadHit.segmentIndex + 1];
-    if (!roadHit || !roadA || !roadB) return place;
-    let tangent = { x:roadB.x - roadA.x, y:roadB.y - roadA.y };
-    if (tangent.x < 0 || (Math.abs(tangent.x) < 1e-6 && tangent.y < 0)) {
-      tangent = { x:-tangent.x, y:-tangent.y };
+    const vehicleEdges = edges.filter((edge) => edge.vehicle);
+    const initialRect = facilityBuildingRect(place);
+    const initialHit = nearestEdgeToRectCenter(initialRect, vehicleEdges);
+    const preferredEdge = initialHit?.edge;
+    if (!preferredEdge) return place;
+
+    let centerX = place.building.x;
+    let centerY = place.building.y;
+    let frontageGeometry = null;
+
+    for (let attempt = 0; attempt < 24; attempt += 1) {
+      const rect = {
+        x:centerX - place.building.w / 2,
+        y:centerY - place.building.h / 2,
+        w:place.building.w,
+        h:place.building.h
+      };
+      const roadHit = nearestEdgeToRectCenter(rect, [preferredEdge]);
+      const roadA = roadHit?.edge?.points?.[roadHit.segmentIndex];
+      const roadB = roadHit?.edge?.points?.[roadHit.segmentIndex + 1];
+      if (!roadHit || !roadA || !roadB) break;
+
+      let tangent = { x:roadB.x - roadA.x, y:roadB.y - roadA.y };
+      if (tangent.x < 0 || (Math.abs(tangent.x) < 1e-6 && tangent.y < 0)) {
+        tangent = { x:-tangent.x, y:-tangent.y };
+      }
+      frontageGeometry = buildingFrontageModel.resolve(rect, roadHit.point, preferredEdge.id, tangent);
+      if (!frontageGeometry) break;
+
+      const candidate = { ...rect, frontageGeometry };
+      const blocker = vehicleEdges.find((edge) =>
+        orientedRectIntersectsEdge(candidate, edge, facilityRoadClearanceExtra(edge))
+      );
+      if (!blocker) break;
+
+      const center = { x:centerX, y:centerY };
+      const nearest = nearestPointOnEdge(blocker, center);
+      if (!nearest) break;
+
+      let away;
+      if (nearest.distance > .01) {
+        away = {
+          x:(center.x - nearest.point.x) / nearest.distance,
+          y:(center.y - nearest.point.y) / nearest.distance
+        };
+      } else {
+        away = { x:-frontageGeometry.normal.x, y:-frontageGeometry.normal.y };
+      }
+
+      const support =
+        Math.abs(frontageGeometry.tangent.x * away.x + frontageGeometry.tangent.y * away.y) * place.building.w / 2 +
+        Math.abs(frontageGeometry.normal.x * away.x + frontageGeometry.normal.y * away.y) * place.building.h / 2;
+      const requiredDistance = blocker.width / 2 + facilityRoadClearanceExtra(blocker) + support + 8;
+      const shift = Math.max(6, requiredDistance - nearest.distance);
+      centerX += away.x * shift;
+      centerY += away.y * shift;
     }
-    const frontageGeometry = buildingFrontageModel.resolve(rect, roadHit.point, roadHit.edge.id, tangent);
+
+    const finalRect = {
+      x:centerX - place.building.w / 2,
+      y:centerY - place.building.h / 2,
+      w:place.building.w,
+      h:place.building.h
+    };
+    const finalHit = nearestEdgeToRectCenter(finalRect, [preferredEdge]);
+    const finalA = finalHit?.edge?.points?.[finalHit.segmentIndex];
+    const finalB = finalHit?.edge?.points?.[finalHit.segmentIndex + 1];
+    if (finalHit && finalA && finalB) {
+      let tangent = { x:finalB.x - finalA.x, y:finalB.y - finalA.y };
+      if (tangent.x < 0 || (Math.abs(tangent.x) < 1e-6 && tangent.y < 0)) {
+        tangent = { x:-tangent.x, y:-tangent.y };
+      }
+      frontageGeometry = buildingFrontageModel.resolve(finalRect, finalHit.point, preferredEdge.id, tangent);
+    }
     if (!frontageGeometry) return place;
+
     return {
       ...place,
       building:{
         ...place.building,
+        x:centerX,
+        y:centerY,
         angle:frontageGeometry.angle,
         frontage:frontageGeometry.side,
         frontageEdgeId:frontageGeometry.roadEdgeId,
@@ -1196,7 +1280,14 @@
             const preservedExtra = edge.vehicle
               ? Math.max(0, originalHalfWidth + 18 - widenedHalfWidth)
               : 10;
-            return rectIntersectsEdge(facility, edge, preservedExtra);
+            const site = {
+              x:place.building.x - place.building.w / 2,
+              y:place.building.y - place.building.h / 2,
+              w:place.building.w,
+              h:place.building.h,
+              frontageGeometry:place.building.frontageGeometry || null
+            };
+            return orientedRectIntersectsEdge(site, edge, Math.max(preservedExtra, facilityRoadClearanceExtra(edge)));
           })) errors.push("facility intersects street: " + place.id);
           if (openSpaces.some((space) => rectsOverlap(facility, space.bounds, 0))) errors.push("facility intersects open space: " + place.id);
           if (buildingSites.some((site) => rectsOverlap(facility, site.collisionBounds || site, 10))) errors.push("facility intersects generated building: " + place.id);
