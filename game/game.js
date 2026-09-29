@@ -10839,7 +10839,10 @@
           tripCount:citizen.tripCount
         }));
       return JSON.parse(JSON.stringify({
+        minute:state.minute,
         player:{ x:state.player.x, y:state.player.y, inHome:state.player.inHome, inVehicle:state.player.inVehicle, inTrain:state.player.inTrain },
+        needs:{ ...state.needs },
+        skills:{ ...state.communityCenter.skills },
         petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
         libraryReading:libraryReadingModel.normalizeProgress(state.libraryReading),
         nearestInteraction:(() => {
@@ -10859,7 +10862,7 @@
           state.minute = Math.max(0, Math.min(1439, Math.floor(minute)));
           return true;
         },
-        movePlayerNearPlace(placeId) {
+        movePlayerNearPlace(placeId, avoidNearbyActors = false) {
           const place = PLACES.find((item) => item.id === placeId);
           if (!place) return false;
           state.player.inHome = false;
@@ -10870,6 +10873,31 @@
           state.player.y = place.y + 10;
           state.player.facingX = 1;
           state.player.facingY = 0;
+          if (avoidNearbyActors) {
+            const origin = { x:state.player.x, y:state.player.y };
+            const candidates = [];
+            for (const radius of [82, 92, 100]) {
+              for (let step = 0; step < 16; step += 1) {
+                const angle = step * Math.PI / 8;
+                candidates.push({ x:place.x + Math.cos(angle) * radius, y:place.y + Math.sin(angle) * radius });
+              }
+            }
+            candidates.sort((a, b) => distance(a.x, a.y, origin.x, origin.y) - distance(b.x, b.y, origin.x, origin.y));
+            const clearCandidate = candidates.find((candidate) => {
+              state.player.x = candidate.x;
+              state.player.y = candidate.y;
+              return nearestInteraction()?.type === "place" && nearestInteraction()?.target?.id === placeId;
+            });
+            if (!clearCandidate) {
+              state.player.x = origin.x;
+              state.player.y = origin.y;
+              return false;
+            }
+            state.player.x = clearCandidate.x;
+            state.player.y = clearCandidate.y;
+            state.player.facingX = place.x - clearCandidate.x;
+            state.player.facingY = place.y - clearCandidate.y;
+          }
           state.camera.x = clamp(state.player.x - viewWidth / 2, 0, Math.max(0, WORLD_SIZE - viewWidth));
           state.camera.y = clamp(state.player.y - viewHeight / 2, 0, Math.max(0, WORLD_SIZE - viewHeight));
           return true;

@@ -150,8 +150,10 @@ test('headless gameplay instrumentation is local-only and exposes test-only acto
   assert.match(source, /location\.hostname !== "localhost" && location\.hostname !== "127\.0\.0\.1"/);
   assert.match(source, /searchParams\.has\("socialNpcDebug"\)/);
   assert.match(source, /__CityDaysSocialNpcTest/);
+  assert.match(source, /minute:state\.minute/);
+  assert.match(source, /skills:\{ \.\.\.state\.communityCenter\.skills \}/);
   assert.match(source, /movePlayerNear\(npcId\)/);
-  assert.match(source, /movePlayerNearPlace\(placeId\)/);
+  assert.match(source, /movePlayerNearPlace\(placeId, avoidNearbyActors = false\)/);
   assert.match(source, /movePlayerToHomeFixture\(fixtureId\)/);
   assert.match(source, /setMinuteForTest\(minute\)/);
   assert.match(source, /routeEdgeIds:Array\.isArray\(citizen\.routeEdgeIds\)/);
