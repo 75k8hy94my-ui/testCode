@@ -32,6 +32,7 @@ test('crosswalk records are stable map geometry with endpoint, road, and signal 
     assert.ok(map.getEdge(crossing.roadEdgeId)?.vehicle);
     assert.ok(Number.isFinite(crossing.along));
     assert.ok(Number.isFinite(crossing.length) && crossing.length > 0);
+    assert.ok(Number.isFinite(crossing.depth) && crossing.depth >= 18);
     assert.ok(crossing.endpoints[0] && crossing.endpoints[1]);
     assert.ok(Math.abs(crossing.length - Math.hypot(
       crossing.endpoints[1].x - crossing.endpoints[0].x,
@@ -128,5 +129,19 @@ test('facility and station aliases resolve onto the safe pedestrian graph', () =
   for (const station of map.stations) {
     assert.ok(map.pedestrianNavigation.externalNodeAliases.has(station.roadNodeId), station.id);
     assert.ok(findRoute(map.pedestrianNavigation, 'home-entrance', station.roadNodeId), station.id);
+  }
+});
+
+
+test('non-arterial pedestrian roads receive sparse mid-block crossings before detours exceed the configured gap', () => {
+  const map = createMapModel();
+  for (const edge of map.edges.filter((value) => value.vehicle && value.pedestrian && !['arterial','highway'].includes(value.type))) {
+    let length = 0;
+    for (let i = 1; i < edge.points.length; i += 1) {
+      length += Math.hypot(edge.points[i].x - edge.points[i - 1].x, edge.points[i].y - edge.points[i - 1].y);
+    }
+    const marks = [0, ...map.crosswalks.filter((crossing) => crossing.roadEdgeId === edge.id).map((crossing) => crossing.along), length].sort((a, b) => a - b);
+    const maxGap = Math.max(...marks.slice(1).map((value, index) => value - marks[index]));
+    assert.ok(maxGap <= 850.5, edge.id + ' gap=' + maxGap);
   }
 });
