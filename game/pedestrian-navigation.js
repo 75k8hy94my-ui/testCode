@@ -394,50 +394,35 @@
       }
     }
 
-    // Keep only pedestrian-only blueprint paths that never enter a vehicle
-    // carriageway. Unsafe legacy paths are replaced below by generated access
-    // links, preventing invisible road crossings from re-entering the graph.
-    for (const edge of deferredPedestrianEdges) {
-      const ignored = new Set();
-      if (!polylineClearOfVehicleRoads(edge.points, mapModel, ignored, 2)) continue;
-      const facility = placeNodes.has(edge.from) || placeNodes.has(edge.to);
-      addSegment({
-        id:(facility ? "facility-access:" : "sidewalk:") + edge.id,
-        type:facility ? "facility-access" : "sidewalk",
-        from:edge.from,
-        to:edge.to,
-        points:edge.points,
-        length:edgeLength(edge),
-        sourceEdgeId:edge.id
-      });
-    }
+    // Do not reuse freehand legacy pedestrian paths as navigation edges. Several
+    // of them visibly cross vehicle roads without a crosswalk. The road sidewalk
+    // network above is the authoritative walking network; facilities and stations
+    // attach to it with generated road-safe links below.
+    const primaryCandidates = [...nodePositions].map(([nodeId, point]) => ({ nodeId, point }));
 
-    const currentCandidates = () => [...nodePositions].map(([nodeId, point]) => ({ nodeId, point }));
-
-    // Every enterable place gets a generated road-safe link to the closest
-    // pedestrian node if the legacy blueprint path was removed as unsafe.
     for (const place of mapModel.places || []) {
-      const entranceNode = mapModel.getNode?.(place.entranceNodeId);
-      if (!entranceNode || adjacency.has(place.entranceNodeId) || segments.some((segment) => segment.from === place.entranceNodeId || segment.to === place.entranceNodeId)) continue;
-      const target = chooseSafeAccessNode(entranceNode, currentCandidates(), mapModel);
+      const accessPoint = { x:place.x, y:place.y };
+      const accessNodeId = "place-access:" + place.id;
+      const target = chooseSafeAccessNode(accessPoint, primaryCandidates, mapModel, 1100);
       if (!target) continue;
       addSegment({
         id:"facility-access:auto:" + place.id,
         type:"facility-access",
-        from:place.entranceNodeId,
+        from:accessNodeId,
         to:target.nodeId,
-        points:[{ x:entranceNode.x, y:entranceNode.y }, { ...target.point }],
+        points:[accessPoint, { ...target.point }],
         length:target.distance,
         sourceEdgeId:null
       });
+      externalNodeAliases.set(place.entranceNodeId, accessNodeId);
     }
 
-    // Stations expose roadNodeId to older callers, but the physical pedestrian
-    // target is a safe access point, never the road center.
+    // Stations expose roadNodeId to older callers, but their physical pedestrian
+    // target is the generated safe access coordinate, never the road center.
     for (const station of mapModel.stations || []) {
       const accessPoint = { x:station.accessX, y:station.accessY };
       const accessNodeId = "station-access:" + station.id;
-      const target = chooseSafeAccessNode(accessPoint, currentCandidates(), mapModel);
+      const target = chooseSafeAccessNode(accessPoint, primaryCandidates, mapModel, 1100);
       if (!target) continue;
       addSegment({
         id:"facility-access:station:" + station.id,
