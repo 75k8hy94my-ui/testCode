@@ -7,7 +7,7 @@ const { createMapModel } = mapModule;
 test('v2 map validates as a connected Japanese urban fabric', () => {
   const map = createMapModel();
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2.8');
+  assert.equal(map.version, 'japan-v2.9');
   assert.equal(map.worldSize, 10800);
   assert.ok(map.nodes.length >= 45);
   assert.ok(map.edges.length >= 55);
@@ -264,7 +264,7 @@ test('community center has a walkable entrance, civic-road access, and clear bui
   assert.ok(map.findRoute('central-station-entry', center.entranceNodeId, { mode:'pedestrian' }));
   assert.ok(map.neighbors(center.roadNodeId, { mode:'vehicle' }).length > 0);
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2.8');
+  assert.equal(map.version, 'japan-v2.9');
 });
 
 test('station arcade has a walkable plaza route, legible identity, and collision-free footprint', () => {
@@ -366,12 +366,15 @@ test('facility entrances are separate from road-clear building footprints', () =
 test('cafe body is not centered on its street-side interaction entrance', () => {
   const map = createMapModel();
   const cafe = map.places.find((place) => place.id === 'cafe');
-  assert.deepEqual([cafe.x, cafe.y], [4230, 5560]);
+  assert.notDeepEqual([cafe.x, cafe.y], [cafe.building.x, cafe.building.y]);
   assert.deepEqual(
     { x:cafe.building.x, y:cafe.building.y, w:cafe.building.w, h:cafe.building.h },
     { x:4380, y:5784, w:300, h:270 }
   );
   assert.ok(cafe.building.frontageGeometry);
+  const hit = map.nearestRoad(cafe.x, cafe.y, { vehicleOnly:true });
+  assert.ok(hit);
+  assert.ok(hit.distance >= hit.edge.width / 2 + 18);
 });
 
 test('Wakaba fuel station is reachable on foot and by car without map collisions', () => {
@@ -473,4 +476,35 @@ test('enterable facility buildings share road-frontage orientation, entrance geo
     assert.ok(Math.abs(Math.sin(angleDelta)) < 1e-6, place.id + ' building must align with its frontage road');
   }
   assert.deepEqual(map.validate(), []);
+});
+
+
+test('all facility and station interaction points are outside the vehicle carriageway', () => {
+  const map = createMapModel();
+  for (const place of map.places) {
+    const hit = map.nearestRoad(place.x, place.y, { vehicleOnly:true });
+    assert.ok(!hit || hit.distance >= hit.edge.width / 2 + 8, place.id);
+    assert.equal(map.isWalkable(place.x, place.y, 14), true, place.id);
+  }
+  for (const station of map.stations) {
+    const hit = map.nearestRoad(station.accessX, station.accessY, { vehicleOnly:true });
+    assert.ok(!hit || hit.distance >= hit.edge.width / 2 + 8, station.id);
+    assert.equal(map.isWalkable(station.accessX, station.accessY, 14), true, station.id);
+  }
+});
+
+test('vehicle roads never cross or overlap without a shared junction node', () => {
+  const map = createMapModel();
+  assert.deepEqual(
+    map.validate().filter((error) => error.includes('vehicle roads cross without junction node') || error.includes('vehicle road surfaces overlap without junction node')),
+    []
+  );
+});
+
+test('public pedestrian routing delegates to the typed safe navigation graph', () => {
+  const map = createMapModel();
+  const route = map.findRoute('home-entrance', 'laundromat-entrance', { mode:'pedestrian' });
+  assert.ok(route);
+  assert.deepEqual(route.edgeIds, route.segmentIds);
+  assert.ok(route.edgeIds.every((id) => map.pedestrianNavigation.segmentsById.has(id)));
 });
