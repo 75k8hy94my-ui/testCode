@@ -151,6 +151,23 @@ test('supermarket sells validated handcraft kits and the new home worktable cons
   assert.doesNotMatch(craft, /state\.needs\[[^\]]+\]\s*[+\-]=/);
 });
 
+test('named NPC conversations offer owned handmade gifts and commit only validated same-day gifts', () => {
+  const npcStart=source.indexOf('function openNpc(npc)');
+  const npcEnd=source.indexOf('function nearestInteraction()',npcStart);
+  const npcFlow=source.slice(npcStart,npcEnd);
+  assert.match(npcFlow, /homeCraftingModel\.normalizeProgress\(state\.homeCrafting\)/);
+  assert.match(npcFlow, /贈る/);
+  assert.match(source, /function performNpcGift\(npcId, itemId\)/);
+  const gift=source.slice(source.indexOf('function performNpcGift('),npcStart);
+  assert.match(gift, /homeCraftingModel\.giveGift/);
+  assert.match(gift, /state\.player\.inVehicle\s*\|\|\s*state\.player\.inTrain\s*\|\|\s*state\.player\.inHome/);
+  assert.ok(gift.indexOf('homeCraftingModel.giveGift') < gift.indexOf('advanceTime(10)'));
+  assert.match(gift, /relationshipAffinityGain/);
+  assert.match(gift, /npc\.friendship = clamp/);
+  const rejected=gift.slice(gift.indexOf('if (!result.ok)'),gift.indexOf('state.homeCrafting = result.progress'));
+  assert.doesNotMatch(rejected, /advanceTime\(10\)/);
+});
+
 test('the authored catalog, not generated defaults, supplies the first ten citizen identities', () => {
   assert.match(source, /const socialNpcSystem = globalThis\.CityDaysSocialNpcSystem/);
   assert.match(source, /const socialProfile = index < socialNpcSystem\.catalog\.length \? socialNpcSystem\.catalog\[index\] : null/);

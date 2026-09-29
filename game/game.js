@@ -4845,6 +4845,37 @@
     return { ...definition, affinity:socialNpcState.relationships[pairId] };
   }
 
+  function performNpcGift(npcId, itemId) {
+    if (state.player.inVehicle || state.player.inTrain || state.player.inHome) {
+      showToast("贈り物は街で歩いているときに手渡せます");
+      return false;
+    }
+    const interaction = nearestInteraction();
+    const npc = NPCS.find((person) => person.id === npcId);
+    if (!npc || interaction?.type !== "npc" || interaction.target?.id !== npcId) {
+      showToast("相手の近くで贈り物を選んでください");
+      return false;
+    }
+    const result = homeCraftingModel.giveGift(state.homeCrafting, npcId, itemId, state.day);
+    if (!result.ok) {
+      showToast(result.reason === "already-gifted" ? "この人には今日はもう贈り物を渡しました" : result.reason === "no-item" ? "渡せる作品がありません" : "その贈り物は渡せません");
+      return false;
+    }
+    state.homeCrafting = result.progress;
+    advanceTime(10);
+    npc.friendship = clamp(npc.friendship + result.friendshipGain, 0, 100);
+    socialNpcState.friendship[npcId] = npc.friendship;
+    if (result.relationshipAffinityGain) {
+      const relationship = npcRelationshipContext(npcId);
+      if (relationship) {
+        const pairId = [relationship.aId, relationship.bId].sort().join("|");
+        socialNpcState.relationships[pairId] = clamp(socialNpcState.relationships[pairId] + result.relationshipAffinityGain, 0, 100);
+      }
+    }
+    showToast(npc.name + result.response);
+    return true;
+  }
+
   function performNpcConversation(npc, citizen, optionId) {
     const relationship = npcRelationshipContext(npc.id);
     const result = socialNpcSystem.resolveConversation({
@@ -4908,6 +4939,17 @@
     for (const option of conversation?.options || []) {
       const detail = option.id === "invite" ? "予定が合えば公園へ向かいます" : option.id === "ask" ? "話題や関係性に応じて会話します" : "30分 / 交流・楽しさが変化します";
       addChoice(labels[option.id] || option.label, detail, () => performNpcConversation(npc, citizen, option.id));
+    }
+    if (!state.player.inVehicle && !state.player.inTrain && !state.player.inHome) {
+      const crafting = homeCraftingModel.normalizeProgress(state.homeCrafting);
+      for (const recipe of homeCraftingModel.RECIPES) {
+        const count = crafting.items[recipe.id] || 0;
+        if (!count) continue;
+        const alreadyGifted = crafting.lastGiftDayByNpc[npc.id] === state.day;
+        addChoice(recipe.name + "を贈る", alreadyGifted ? "本日は贈り物を渡しました" : "所持 " + count + "個 / 手作り作品を贈る", () => {
+          performNpcGift(npc.id, recipe.id);
+        }, alreadyGifted);
+      }
     }
     if (npc.friendship >= 2) {
       addChoice("一緒に過ごす", "90分 / 交流+38 / 楽しさ+22", () => {
@@ -10984,10 +11026,14 @@
           tripCount:citizen.tripCount
         }));
       return JSON.parse(JSON.stringify({
+        day:state.day,
         minute:state.minute,
+        cash:state.cash,
         player:{ x:state.player.x, y:state.player.y, inHome:state.player.inHome, inVehicle:state.player.inVehicle, inTrain:state.player.inTrain },
         needs:{ ...state.needs },
         skills:{ ...state.communityCenter.skills },
+        npcFriendship:{ ...socialNpcState.friendship },
+        relationships:{ ...socialNpcState.relationships },
         petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
         homeCrafting:homeCraftingModel.normalizeProgress(state.homeCrafting),
         packedMeals:(() => {
