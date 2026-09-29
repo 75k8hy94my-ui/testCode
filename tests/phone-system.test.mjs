@@ -9,12 +9,12 @@ const html = fs.readFileSync(new URL('../game/index.html', import.meta.url), 'ut
 const css = fs.readFileSync(new URL('../game/game.css', import.meta.url), 'utf8');
 
 test('phone system exposes a broad app catalog', () => {
-  assert.equal(phoneModule.appCount, 20);
+  assert.equal(phoneModule.appCount, 21);
   assert.equal(typeof phoneModule.createPhoneSystem, 'function');
   for (const id of [
     'phone','messages','maps','camera','photos','weather','calendar','clock',
     'notes','reminders','wallet','health','find','transit','mail','news',
-    'music','calculator','home','settings'
+    'music','calculator','pet','home','settings'
   ]) {
     assert.match(phoneSource, new RegExp('"' + id + '"'));
   }
@@ -65,6 +65,27 @@ test('phone receives live game data for health, contacts, transport and wallet',
 test('phone waypoint persists in game snapshots', () => {
   assert.match(gameSource, /phone:\s*\{[\s\S]*waypoint: state\.phone\?\.waypoint/);
   assert.match(gameSource, /saved\.phone && typeof saved\.phone\.waypoint === "string"/);
+});
+
+test('pet phone app safely shows shelter guidance or live household pet care status', () => {
+  const root = { hidden:false, innerHTML:'', classList:{ toggle(){} }, style:{ setProperty(){} }, addEventListener(){} };
+  const phone = phoneModule.createPhoneSystem({ root });
+  phone.update({ day:1, minute:540, petCompanion:{ pet:null, food:0 } });
+  phone.home();
+  assert.match(root.innerHTML, /data-phone-app="pet"/);
+  phone.openApp('pet');
+  assert.match(root.innerHTML, /わかば動物保護センター/);
+  assert.match(root.innerHTML, /09:00〜19:00/);
+
+  phone.update({ petCompanion:{ pet:{ speciesId:'cat', name:'<ミケ>', hunger:22, happiness:47, bond:31, energy:65 }, food:2, condition:'お腹がすいています' } });
+  assert.match(root.innerHTML, /&lt;ミケ&gt;/);
+  assert.doesNotMatch(root.innerHTML, /<ミケ>/);
+  assert.match(root.innerHTML, /お腹がすいています/);
+  assert.match(root.innerHTML, />22</);
+  assert.match(root.innerHTML, /フード2個/);
+
+  phone.update({ petCompanion:{ pet:{ speciesId:'cat', name:'<ミケ>', hunger:9, happiness:47, bond:31, energy:65 }, food:2, condition:'お腹がすいています' } });
+  assert.match(root.innerHTML, />9</);
 });
 
 test('social contacts use their authored accent colors and escape profile text', () => {

@@ -9803,6 +9803,43 @@
     ctx.fill();
   }
 
+  function drawHomePet(pet) {
+    if (!pet) return;
+    const species = petCompanionModel.SPECIES[pet.speciesId] || petCompanionModel.SPECIES.dog;
+    const center = homeToScreen(585, 222);
+    const s = center.scale;
+    const fur = species.color || "#c99463";
+    // A soft mat and bowls make the pet's home position legible at every zoom.
+    ctx.fillStyle = "#bba78d";
+    ctx.beginPath(); ctx.ellipse(center.x, center.y + 17*s, 49*s, 22*s, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#e5ded0";
+    ctx.beginPath(); ctx.ellipse(center.x, center.y + 14*s, 43*s, 17*s, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = fur;
+    ctx.beginPath(); ctx.ellipse(center.x, center.y, 22*s, 18*s, 0, 0, Math.PI*2); ctx.fill();
+    if (pet.speciesId === "cat") {
+      ctx.beginPath(); ctx.moveTo(center.x-17*s,center.y-8*s); ctx.lineTo(center.x-14*s,center.y-28*s); ctx.lineTo(center.x-2*s,center.y-17*s);
+      ctx.moveTo(center.x+17*s,center.y-8*s); ctx.lineTo(center.x+14*s,center.y-28*s); ctx.lineTo(center.x+2*s,center.y-17*s); ctx.fill();
+    } else {
+      ctx.fillStyle = "#8b644e";
+      ctx.beginPath(); ctx.ellipse(center.x-20*s,center.y-3*s,7*s,13*s,-.35,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(center.x+20*s,center.y-3*s,7*s,13*s,.35,0,Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle = fur;
+    ctx.beginPath(); ctx.arc(center.x,center.y-7*s,15*s,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#232522";
+    for (const dx of [-5,5]) { ctx.beginPath(); ctx.arc(center.x+dx*s,center.y-9*s,1.6*s,0,Math.PI*2); ctx.fill(); }
+    ctx.fillStyle = "#6a5145";
+    ctx.beginPath(); ctx.arc(center.x,center.y-3*s,2*s,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#f0eee7";
+    ctx.beginPath(); ctx.ellipse(center.x+35*s,center.y+13*s,10*s,6*s,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#80a5a0";
+    ctx.beginPath(); ctx.ellipse(center.x+35*s,center.y+12*s,6*s,3*s,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#55483b";
+    ctx.font = "700 " + Math.max(8,10*s) + "px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(String(pet.name || "ペット"),center.x,center.y+44*s);
+  }
+
   function drawHomeInterior() {
     const viewport = homeInteriorViewport();
     const ox = viewport.x;
@@ -9998,6 +10035,7 @@
       ctx.fillText(fixture.id === "exit" ? "玄関" : fixture.label, q.x, q.y - 24*s);
     }
 
+    if (state.petCompanion.pet) drawHomePet(state.petCompanion.pet);
     drawHomePlayer();
   }
 
@@ -10423,6 +10461,7 @@
       libraryVisits:state.libraryVisits,
       shiftsWorked:state.shiftsWorked,
       needs:{ ...state.needs },
+      petCompanion:{ ...petCompanionModel.normalizeProgress(state.petCompanion), condition:petCompanionModel.getCondition(state.petCompanion).label },
       district:state.player.inHome ? "自宅・室内" : currentDistrict(p.x, p.y),
       weather:state.visual.weather,
       soundEnabled:audioState.enabled,
@@ -10728,6 +10767,7 @@
         }));
       return JSON.parse(JSON.stringify({
         player:{ x:state.player.x, y:state.player.y, inHome:state.player.inHome, inVehicle:state.player.inVehicle, inTrain:state.player.inTrain },
+        petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
         nearestInteraction:(() => {
           const interaction = nearestInteraction();
           return interaction ? { type:interaction.type, label:interaction.label, targetId:interaction.target?.id || null } : null;
@@ -10740,6 +10780,39 @@
       configurable:true,
       value:Object.freeze({
         snapshot,
+        setMinuteForTest(minute) {
+          if (!Number.isFinite(minute)) return false;
+          state.minute = Math.max(0, Math.min(1439, Math.floor(minute)));
+          return true;
+        },
+        movePlayerNearPlace(placeId) {
+          const place = PLACES.find((item) => item.id === placeId);
+          if (!place) return false;
+          state.player.inHome = false;
+          state.player.inVehicle = false;
+          state.player.inTrain = false;
+          state.player.trainId = null;
+          state.player.x = place.x - 22;
+          state.player.y = place.y + 10;
+          state.player.facingX = 1;
+          state.player.facingY = 0;
+          state.camera.x = clamp(state.player.x - viewWidth / 2, 0, Math.max(0, WORLD_SIZE - viewWidth));
+          state.camera.y = clamp(state.player.y - viewHeight / 2, 0, Math.max(0, WORLD_SIZE - viewHeight));
+          return true;
+        },
+        movePlayerToHomeFixture(fixtureId) {
+          const fixture = HOME_FIXTURES.find((item) => item.id === fixtureId);
+          if (!fixture) return false;
+          state.player.inHome = true;
+          state.player.inVehicle = false;
+          state.player.inTrain = false;
+          state.player.trainId = null;
+          state.player.homeX = fixture.interactX;
+          state.player.homeY = fixture.interactY;
+          state.player.facingX = 0;
+          state.player.facingY = -1;
+          return true;
+        },
         movePlayerNear(npcId) {
           const citizen = pedestrians.find((item) => item.specialNpcId === npcId);
           const profile = socialNpcSystem.getProfile(npcId);

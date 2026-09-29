@@ -11,6 +11,7 @@
     ["find","探す","⌾","#55c759"],["transit","交通","🚆","#4267d5"],
     ["mail","メール","✉","#3c8cf5"],["news","ニュース","N","#f5f5f7"],
     ["music","ミュージック","♫","#ef476f"],["calculator","計算機","＋","#ff9f0a"],
+    ["pet","ペット","🐾","#b98255"],
     ["home","ホーム","⌂","#ff9f0a"],["settings","設定","⚙","#8e8e93"]
   ];
   const NEUTRAL_CONTACT_COLOR = "#8e8e93";
@@ -239,6 +240,23 @@
         '</b></div><div><small>図書館</small><b>' + (model.libraryVisits || 0) + '回</b></div><div><small>運転評価</small><b>' +
         (model.drivingRating || 100) + '</b></div><div><small>シフト</small><b>' + (model.shiftsWorked || 0) + '</b></div></section>');
     }
+    function petApp() {
+      const progress = model.petCompanion || {};
+      const pet = progress.pet;
+      if (!pet) return shell("ペット",'<div class="ios-pet-empty"><span>🐾</span><h3>家族を迎えよう</h3><p>わかば動物保護センターで犬や猫と出会えます。</p><small>営業時間 09:00〜19:00</small><b>わかば動物保護センター</b></div>');
+      const species = pet.speciesId === "cat" ? "猫" : "犬";
+      const pairs = [["お腹","hunger"],["ごきげん","happiness"],["体力","energy"],["なかよし","bond"]];
+      const rows = pairs.map(function(pair){
+        const raw = Number(pet[pair[1]]);
+        const value = Math.max(0,Math.min(100,Math.round(Number.isFinite(raw) ? raw : 0)));
+        return '<div class="ios-pet-row"><span>' + pair[0] + '</span><div><i style="width:' + value + '%"></i></div><b>' + value + '</b></div>';
+      }).join("");
+      return shell("ペット",'<div class="ios-pet-card"><span class="ios-pet-emoji">' + (species === "猫" ? "🐈" : "🐕") +
+        '</span><div><strong>' + esc(pet.name || "ペット") + '</strong><small>' + species + ' · ' + esc(progress.condition || "おうちで過ごしています") +
+        '</small></div></div><section class="ios-section ios-pet-status"><h3>今日のようす</h3>' + rows +
+        '<div class="ios-pet-food">🍖 フード' + Math.max(0,Math.floor(Number(progress.food) || 0)) + '個</div></section>' +
+        '<p class="ios-pet-hint">お世話は自宅でできます</p>');
+    }
     function findApp() {
       const canRouteToFriend = !model.inHome && !model.inVehicle && !model.inTrain;
       const friends = (model.npcs || []).map(function(npc){
@@ -361,6 +379,7 @@
       if (app === "reminders") return remindersApp();
       if (app === "wallet") return walletApp();
       if (app === "health") return healthApp();
+      if (app === "pet") return petApp();
       if (app === "find") return findApp();
       if (app === "transit") return transitApp();
       if (app === "mail") return mailApp();
@@ -424,6 +443,18 @@
           const value = Number(needs[key]);
           return Math.round(Number.isFinite(value) ? value : key === "health" ? 100 : 0);
         }),
+        petCompanion:value.petCompanion ? [
+          value.petCompanion.food,
+          value.petCompanion.condition,
+          value.petCompanion.pet ? [
+            value.petCompanion.pet.speciesId,
+            value.petCompanion.pet.name,
+            Math.round(Number(value.petCompanion.pet.hunger) || 0),
+            Math.round(Number(value.petCompanion.pet.happiness) || 0),
+            Math.round(Number(value.petCompanion.pet.energy) || 0),
+            Math.round(Number(value.petCompanion.pet.bond) || 0)
+          ] : null
+        ] : null,
         npcs:(value.npcs || []).map(function(n){return [n.id,n.friendship,n.hidden,n.activity,Math.round((n.distance || 0) / 25),Math.round((n.mapDX || 0) / 20),Math.round((n.mapDY || 0) / 20)];}),
         friendWaypoint:value.friendWaypoint ? [value.friendWaypoint.id,Math.round((value.friendWaypoint.distance || 0) / 20)] : null,
         trains:(value.trains || []).map(function(t){return [t.id,t.stationIndex,t.targetIndex,Math.round((t.dwell || 0) * 2)];})

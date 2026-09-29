@@ -145,12 +145,15 @@ test('game snapshots persist canonical social state and still read legacy friend
   assert.match(source, /npc\.friendship = socialNpcState\.friendship\[npc\.id\]/);
 });
 
-test('social NPC headless instrumentation is local-only and exposes a read-only route snapshot', () => {
+test('headless gameplay instrumentation is local-only and exposes test-only actor controls', () => {
   assert.match(source, /function installSocialNpcTestHook\(\)/);
   assert.match(source, /location\.hostname !== "localhost" && location\.hostname !== "127\.0\.0\.1"/);
   assert.match(source, /searchParams\.has\("socialNpcDebug"\)/);
   assert.match(source, /__CityDaysSocialNpcTest/);
   assert.match(source, /movePlayerNear\(npcId\)/);
+  assert.match(source, /movePlayerNearPlace\(placeId\)/);
+  assert.match(source, /movePlayerToHomeFixture\(fixtureId\)/);
+  assert.match(source, /setMinuteForTest\(minute\)/);
   assert.match(source, /routeEdgeIds:Array\.isArray\(citizen\.routeEdgeIds\)/);
 });
 
@@ -180,6 +183,17 @@ test('home pet care is available only to an owner and uses validated model trans
   assert.match(care, /petCompanionModel\.play\(state\.petCompanion\)/);
   assert.match(care, /petCompanionModel\.cuddle\(state\.petCompanion\)/);
   assert.match(care, /空腹|お腹/);
+});
+
+test('pet is drawn in the home interior only and its read-only phone projection is connected', () => {
+  const interior = source.slice(source.indexOf('function drawHomeInterior()'), source.indexOf('function drawHomePlayer()'));
+  const cityRenderer = source.slice(source.indexOf('function render()'), source.indexOf('function frame('));
+  assert.match(interior, /drawHomePet\(state\.petCompanion\.pet\)/);
+  assert.match(source, /function drawHomePet\(pet\)/);
+  assert.doesNotMatch(cityRenderer, /drawHomePet\(/);
+  const phoneSnapshot = source.slice(source.indexOf('function phoneModelSnapshot()'), source.indexOf('function setPhoneWaypoint('));
+  assert.match(phoneSnapshot, /petCompanion\s*:/);
+  assert.match(phoneSnapshot, /petCompanionModel\.getCondition\(state\.petCompanion\)/);
 });
 
 test('game loads the community center schedule model before the runtime', () => {
