@@ -469,6 +469,25 @@
       pointInPolygon(secondPoint.x, secondPoint.y, firstArray);
   }
 
+  function properSegmentIntersection(a, b, c, d) {
+    const orient = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+    const o1 = orient(a, b, c);
+    const o2 = orient(a, b, d);
+    const o3 = orient(c, d, a);
+    const o4 = orient(c, d, b);
+    return ((o1 > 1e-6 && o2 < -1e-6) || (o1 < -1e-6 && o2 > 1e-6)) &&
+      ((o3 > 1e-6 && o4 < -1e-6) || (o3 < -1e-6 && o4 > 1e-6));
+  }
+
+  function segmentDistance(a, b, c, d) {
+    return Math.min(
+      pointSegmentProjection(a, c, d).distance,
+      pointSegmentProjection(b, c, d).distance,
+      pointSegmentProjection(c, a, b).distance,
+      pointSegmentProjection(d, a, b).distance
+    );
+  }
+
   function alignFacilityBuilding(place, edges, openSpaces = []) {
     if (!place?.building || !buildingFrontageModel?.resolve) return place;
     const vehicleEdges = edges.filter((edge) => edge.vehicle);
@@ -1363,6 +1382,28 @@
         if (edge.points[0].x !== getNode(edge.from)?.x || edge.points[0].y !== getNode(edge.from)?.y) errors.push("edge start mismatch: " + edge.id);
         const end = edge.points.at(-1);
         if (end.x !== getNode(edge.to)?.x || end.y !== getNode(edge.to)?.y) errors.push("edge end mismatch: " + edge.id);
+      }
+
+      const vehicleEdgesForValidation = edges.filter((edge) => edge.vehicle);
+      for (let firstIndex = 0; firstIndex < vehicleEdgesForValidation.length; firstIndex += 1) {
+        const first = vehicleEdgesForValidation[firstIndex];
+        for (let secondIndex = firstIndex + 1; secondIndex < vehicleEdgesForValidation.length; secondIndex += 1) {
+          const second = vehicleEdgesForValidation[secondIndex];
+          const sharesNode = first.from === second.from || first.from === second.to || first.to === second.from || first.to === second.to;
+          if (sharesNode) continue;
+          let minimumDistance = Infinity;
+          let centerlinesCross = false;
+          for (let a = 1; a < first.points.length; a += 1) {
+            for (let b = 1; b < second.points.length; b += 1) {
+              if (properSegmentIntersection(first.points[a - 1], first.points[a], second.points[b - 1], second.points[b])) centerlinesCross = true;
+              minimumDistance = Math.min(minimumDistance, segmentDistance(first.points[a - 1], first.points[a], second.points[b - 1], second.points[b]));
+            }
+          }
+          if (centerlinesCross) errors.push("vehicle roads cross without junction node: " + first.id + "/" + second.id);
+          if (minimumDistance < first.width / 2 + second.width / 2 - 2) {
+            errors.push("vehicle road surfaces overlap without junction node: " + first.id + "/" + second.id);
+          }
+        }
       }
 
       for (const segment of pedestrianGraph.segments) {
