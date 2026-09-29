@@ -296,16 +296,15 @@ test('nearest-road and surface membership distinguish vehicle and pedestrian str
   const map = createMapModel();
   const vehicleEdge = map.edges.find((edge) => edge.vehicle);
   const vehiclePoint = vehicleEdge.points[Math.floor(vehicleEdge.points.length / 2)];
-  const pedestrianSample = map.edges
-    .filter((edge) => edge.pedestrian && !edge.vehicle)
-    .flatMap((edge) => edge.points.slice(1).map((point, index) => ({ edge, point, start:edge.points[index] })))
-    .map(({ edge, start, point }) => ({
-      edge,
+  const pedestrianSample = map.pedestrianNavigation.segments
+    .filter((segment) => segment.type !== 'crosswalk')
+    .flatMap((segment) => segment.points.slice(1).map((point, index) => ({ segment, point, start:segment.points[index] })))
+    .map(({ segment, start, point }) => ({
+      segment,
       point:{ x:(start.x + point.x) / 2, y:(start.y + point.y) / 2 }
     }))
     .find(({ point }) => !map.isRoad(point.x, point.y, { vehicleOnly:true }));
   assert.ok(pedestrianSample);
-  const pedestrianEdge = pedestrianSample.edge;
   const pedestrianPoint = pedestrianSample.point;
 
   assert.equal(map.nearestRoad(vehiclePoint.x, vehiclePoint.y, { vehicleOnly:true }).edgeId, vehicleEdge.id);
