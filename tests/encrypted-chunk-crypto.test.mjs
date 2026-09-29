@@ -59,7 +59,8 @@ test('ciphertext is bound to its chunk id by key derivation and authenticated da
 test('wrong master key and tampered ciphertext fail closed', async () => {
   const envelope = await encryptChunk(masterKey, chunkA, plaintext);
   await assert.rejects(() => decryptChunk(otherKey, chunkA, envelope));
-  const tampered = { ...envelope, ciphertext: envelope.ciphertext.slice(0, -2) + 'AA' };
+  const changedFirstCharacter = envelope.ciphertext[0] === 'A' ? 'B' : 'A';
+  const tampered = { ...envelope, ciphertext: changedFirstCharacter + envelope.ciphertext.slice(1) };
   await assert.rejects(() => decryptChunk(masterKey, chunkA, tampered));
 });
 

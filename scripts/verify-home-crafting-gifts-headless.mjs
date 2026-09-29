@@ -10,7 +10,7 @@ const chromePath=process.env.CHROME_PATH||'C:\\Program Files\\Google\\Chrome\\Ap
 const out=process.env.HOME_CRAFTING_QA_DIR||path.join(os.tmpdir(),'testcode-home-crafting-qa');
 const profile=path.join(os.tmpdir(),`testcode-home-crafting-chrome-${Date.now()}`);
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.svg':'image/svg+xml'};
-const server=http.createServer(async(req,res)=>{try{const url=new URL(req.url,'http://localhost');const file=path.resolve(root,'.'+decodeURIComponent(url.pathname));if(!file.startsWith(root+path.sep))throw Error('bad path');res.writeHead(200,{'content-type':mime[path.extname(file)]||'application/octet-stream','cache-control':'no-store'});res.end(await fs.readFile(file));}catch{res.writeHead(404);res.end('not found');}});
+const server=http.createServer(async(req,res)=>{try{const url=new URL(req.url,'http://localhost');const file=path.resolve(root,'.'+decodeURIComponent(url.pathname));if(!file.startsWith(root+path.sep))throw Error('bad path');const body=await fs.readFile(file);res.writeHead(200,{'content-type':mime[path.extname(file)]||'application/octet-stream','cache-control':'no-store'});res.end(body);}catch{if(!res.headersSent){res.writeHead(404);res.end('not found');}}});
 await new Promise((resolve)=>server.listen(0,'127.0.0.1',resolve));
 const currentUrl=`http://localhost:${server.address().port}/game/index.html?socialNpcDebug=1`;
 const requestedUrl=process.env.HOME_CRAFTING_BASE_URL||'http://localhost:4173/game/index.html?socialNpcDebug=1';
@@ -37,7 +37,7 @@ try{
   const requested={url:requestedUrl,loaded:await evaluate('location.href'),hook:await evaluate('typeof window.__CityDaysSocialNpcTest?.movePlayerNear'),craftModel:await evaluate('!!window.CityDaysHomeCrafting'),error:await evaluate('document.querySelector(".game-runtime-error")?.textContent||null')};
   const requestedScreenshot=await shot('home-crafting-requested-4173.png');
   const fallback=!(requested.hook==='function'&&requested.craftModel&&!requested.error);
-  if(fallback)await navigate(currentUrl);
+  if(fallback){for(const entries of Object.values(diagnostics))entries.length=0;requestUrls.clear();await navigate(currentUrl);}
   const initial=JSON.parse(await evaluate(`JSON.stringify({url:location.href,hook:typeof window.__CityDaysSocialNpcTest?.movePlayerNear,canvas:(c=>({width:c.width,height:c.height,clientWidth:c.clientWidth,clientHeight:c.clientHeight}))(document.querySelector('#gameCanvas')),error:document.querySelector('.game-runtime-error')?.textContent||null})`));
   if(initial.error||initial.hook!=='function')throw Error(`Current game did not start cleanly: ${JSON.stringify(initial)}`);
   await evaluate('window.__HomeCraftTest=window.__CityDaysSocialNpcTest');
