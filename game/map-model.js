@@ -280,6 +280,7 @@
 
   function facilityBuildingRect(place) {
     if (!place?.building) return null;
+    if (place.building.collisionBounds) return { ...place.building.collisionBounds };
     return {
       x:place.building.x - place.building.w / 2,
       y:place.building.y - place.building.h / 2,
@@ -409,7 +410,10 @@
     const roadA = roadHit?.edge?.points?.[roadHit.segmentIndex];
     const roadB = roadHit?.edge?.points?.[roadHit.segmentIndex + 1];
     if (!roadHit || !roadA || !roadB) return place;
-    const tangent = { x:roadB.x - roadA.x, y:roadB.y - roadA.y };
+    let tangent = { x:roadB.x - roadA.x, y:roadB.y - roadA.y };
+    if (tangent.x < 0 || (Math.abs(tangent.x) < 1e-6 && tangent.y < 0)) {
+      tangent = { x:-tangent.x, y:-tangent.y };
+    }
     const frontageGeometry = buildingFrontageModel.resolve(rect, roadHit.point, roadHit.edge.id, tangent);
     if (!frontageGeometry) return place;
     return {
