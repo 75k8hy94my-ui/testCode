@@ -7,7 +7,7 @@ const { createMapModel } = mapModule;
 test('v2 map validates as a connected Japanese urban fabric', () => {
   const map = createMapModel();
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2.7');
+  assert.equal(map.version, 'japan-v2.8');
   assert.equal(map.worldSize, 10800);
   assert.ok(map.nodes.length >= 45);
   assert.ok(map.edges.length >= 55);
@@ -264,7 +264,7 @@ test('community center has a walkable entrance, civic-road access, and clear bui
   assert.ok(map.findRoute('central-station-entry', center.entranceNodeId, { mode:'pedestrian' }));
   assert.ok(map.neighbors(center.roadNodeId, { mode:'vehicle' }).length > 0);
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2.7');
+  assert.equal(map.version, 'japan-v2.8');
 });
 
 test('station arcade has a walkable plaza route, legible identity, and collision-free footprint', () => {
@@ -367,7 +367,11 @@ test('cafe body is not centered on its street-side interaction entrance', () => 
   const map = createMapModel();
   const cafe = map.places.find((place) => place.id === 'cafe');
   assert.deepEqual([cafe.x, cafe.y], [4230, 5560]);
-  assert.deepEqual(cafe.building, { x:4380, y:5784, w:300, h:270 });
+  assert.deepEqual(
+    { x:cafe.building.x, y:cafe.building.y, w:cafe.building.w, h:cafe.building.h },
+    { x:4380, y:5784, w:300, h:270 }
+  );
+  assert.ok(cafe.building.frontageGeometry);
 });
 
 test('Wakaba fuel station is reachable on foot and by car without map collisions', () => {
@@ -387,7 +391,11 @@ test('Wakaba animal shelter has a reachable pedestrian entrance and collision-sa
   assert.ok(shelter);
   assert.equal(shelter.name, 'わかば動物保護センター');
   assert.equal(shelter.entranceNodeId, 'pet-shelter-entrance');
-  assert.deepEqual(shelter.building, { x:1580, y:6560, w:320, h:260 });
+  assert.deepEqual(
+    { x:shelter.building.x, y:shelter.building.y, w:shelter.building.w, h:shelter.building.h },
+    { x:1580, y:6560, w:320, h:260 }
+  );
+  assert.ok(shelter.building.frontageGeometry);
   assert.ok(map.findRoute('home-entrance', shelter.entranceNodeId, { mode:'pedestrian' }));
   const entrance = map.getNode(shelter.entranceNodeId);
   assert.equal(map.isWalkable(entrance.x, entrance.y, 14), true);
@@ -430,5 +438,39 @@ test('Wakaba clinic is reachable from home and clear of roads and generated buil
   assert.ok(map.findRoute('home-entrance', clinic.entranceNodeId, { mode:'pedestrian' }));
   assert.ok(map.findRoute('home-road', clinic.roadNodeId, { mode:'vehicle' }));
   assert.equal(map.isWalkable(clinic.x, clinic.y, 14), true);
+  assert.deepEqual(map.validate(), []);
+});
+
+
+test('enterable facility buildings share road-frontage orientation, entrance geometry, and collision geometry', () => {
+  const map = createMapModel();
+  for (const place of map.places.filter((value) => value.building)) {
+    const building = place.building;
+    const frontage = building.frontageGeometry;
+    assert.ok(frontage, place.id + ' frontage record');
+    assert.equal(frontage.roadEdgeId, building.frontageEdgeId, place.id + ' frontage edge');
+    assert.ok(map.getEdge(frontage.roadEdgeId)?.vehicle, place.id + ' frontage road');
+    assert.equal(building.collisionFootprint.length, 4, place.id + ' oriented collision polygon');
+    assert.ok(Number.isFinite(frontage.entrance.x) && Number.isFinite(frontage.entrance.y), place.id + ' facade entrance');
+    const road = map.getEdge(frontage.roadEdgeId);
+    const roadHeading = (() => {
+      let nearest = null;
+      for (let i = 1; i < road.points.length; i += 1) {
+        const a = road.points[i - 1];
+        const b = road.points[i];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const l2 = dx * dx + dy * dy;
+        const t = Math.max(0, Math.min(1, ((building.x - a.x) * dx + (building.y - a.y) * dy) / l2));
+        const px = a.x + dx * t;
+        const py = a.y + dy * t;
+        const d = Math.hypot(building.x - px, building.y - py);
+        if (!nearest || d < nearest.distance) nearest = { distance:d, angle:Math.atan2(dy, dx) };
+      }
+      return nearest.angle;
+    })();
+    const angleDelta = Math.atan2(Math.sin(frontage.angle - roadHeading), Math.cos(frontage.angle - roadHeading));
+    assert.ok(Math.abs(Math.sin(angleDelta)) < 1e-6, place.id + ' building must align with its frontage road');
+  }
   assert.deepEqual(map.validate(), []);
 });

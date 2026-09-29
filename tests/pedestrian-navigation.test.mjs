@@ -4,7 +4,7 @@ import mapModule from '../game/map-model.js';
 import navigationModule from '../game/pedestrian-navigation.js';
 
 const { createMapModel } = mapModule;
-const { buildGraph, findRoute } = navigationModule;
+const { buildGraph, findRoute, nearestNode } = navigationModule;
 
 test('map model exposes deterministic typed sidewalk, crosswalk, and facility access segments', () => {
   const map = createMapModel();
@@ -31,7 +31,12 @@ test('crosswalk records are stable map geometry with endpoint, road, and signal 
     assert.ok(crossing.id);
     assert.ok(map.getEdge(crossing.roadEdgeId)?.vehicle);
     assert.ok(Number.isFinite(crossing.along));
+    assert.ok(Number.isFinite(crossing.length) && crossing.length > 0);
     assert.ok(crossing.endpoints[0] && crossing.endpoints[1]);
+    assert.ok(Math.abs(crossing.length - Math.hypot(
+      crossing.endpoints[1].x - crossing.endpoints[0].x,
+      crossing.endpoints[1].y - crossing.endpoints[0].y
+    )) < 1e-6);
     assert.ok(Math.abs(Math.hypot(crossing.vector.x, crossing.vector.y) - 1) < 1e-6);
     assert.ok(crossing.stopLine && Number.isFinite(crossing.stopLine.x) && Number.isFinite(crossing.stopLine.y));
   }
@@ -69,4 +74,24 @@ test('a pedestrian route crosses a vehicle corridor only through an explicit cro
   assert.ok(route);
   assert.ok(route.segmentIds.some((id) => graph.segmentsById.get(id).type === 'crosswalk'));
   assert.ok(route.segmentIds.every((id) => graph.segmentsById.get(id).type !== 'vehicle'));
+});
+
+
+test('generated homes and workplaces anchor to real typed pedestrian nodes instead of vehicle-road node ids', () => {
+  const map = createMapModel();
+  for (const site of map.buildingSites) {
+    const hit = nearestNode(map.pedestrianNavigation, site.x + site.w / 2, site.y + site.h / 2);
+    assert.ok(hit, site.id + ' should have a nearest pedestrian node');
+    assert.ok(map.pedestrianNavigation.adjacency.has(hit.nodeId), site.id + ' anchor should belong to the typed graph');
+    assert.ok(findRoute(map.pedestrianNavigation, 'home-entrance', hit.nodeId), site.id + ' anchor should be reachable');
+  }
+});
+
+test('junction crosswalk signal metadata follows the whole signalized junction, not only one road edge flag', () => {
+  const map = createMapModel();
+  for (const crossing of map.pedestrianNavigation.crosswalks.filter((value) => value.nodeId)) {
+    const incident = map.neighbors(crossing.nodeId, { mode:'vehicle' }).map((link) => link.edge);
+    const expected = incident.length >= 3 && incident.some((edge) => edge.signalized);
+    assert.equal(crossing.signalized, expected, crossing.id);
+  }
 });

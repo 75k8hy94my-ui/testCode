@@ -51,3 +51,17 @@ test('simultaneous crosswalk claims are resolved in stable order without recipro
   assert.equal(winner.pedestrianId, 'walker-a');
   assert.equal(winner.phase, 'crossing');
 });
+
+
+test('vehicles that already passed an unsignalized crossing do not keep the pedestrian claim blocked', () => {
+  const passed = { id:'past-car', edgeId:'street', distanceToCrossing:-50, speed:100, length:40 };
+  const assessment = crossingControl.assessPedestrian(crosswalk, { id:'walker', speed:30 }, [passed]);
+  assert.equal(assessment.decision, 'cross');
+  assert.equal(assessment.nearestVehicleId, null);
+  const yieldDecision = crossingControl.vehicleYieldDecision(
+    crosswalk,
+    { pedestrianId:'walker', phase:'waiting' },
+    passed
+  );
+  assert.equal(yieldDecision.shouldYield, false);
+});

@@ -33,3 +33,14 @@ test('decorative and entry floor visuals remain non-solid and the television app
   const tv = homeFixtures.FIXTURES.find((fixture) => fixture.id === 'tv');
   assert.equal(homeFixtures.collidesCircle(tv.interaction.x, tv.interaction.y, 10, homeFixtures.ALL_COLLIDERS), false);
 });
+
+
+test('decorative entry cannot shadow the actionable exit at the shared doorway', () => {
+  const entry = homeFixtures.FIXTURES.find((fixture) => fixture.id === 'entry');
+  const exit = homeFixtures.FIXTURES.find((fixture) => fixture.id === 'exit');
+  assert.equal(entry?.interaction, null);
+  assert.ok(exit?.interaction);
+  assert.equal(exit.interaction.x, 390);
+  assert.equal(exit.interaction.y, 438);
+  assert.equal(exit.interaction.range, 62);
+});

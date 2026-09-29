@@ -6,7 +6,7 @@
   const CLEARANCE_MARGIN = 1.5;
 
   function vehicleDistanceToCrossing(crosswalk, vehicle) {
-    if (Number.isFinite(vehicle.distanceToCrossing)) return Math.max(0, vehicle.distanceToCrossing);
+    if (Number.isFinite(vehicle.distanceToCrossing)) return vehicle.distanceToCrossing;
     if (vehicle.edgeId !== crosswalk.roadEdgeId || !Number.isFinite(vehicle.along)) return null;
     const direction = Number(vehicle.directionSign) < 0 ? -1 : 1;
     return (crosswalk.along - vehicle.along) * direction;
