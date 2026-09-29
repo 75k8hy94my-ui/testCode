@@ -5147,7 +5147,7 @@
     }
 
     if (place.id === "community-center") {
-      actionDescription.textContent = "曜日ごとに開かれる講座に参加できます。参加すると技能が上がり、街の人とも交流できます。";
+      actionDescription.textContent = "講座や定時サークルに参加できます。サークルでは街の人と交流し、関係を深められます。";
       for (const course of communityCenterModel.COURSES) {
         const availability = communityCenterModel.getCourseAvailability(
           course.id,
@@ -5202,6 +5202,56 @@
           }
           clampNeeds();
           showToast(course.name + "に参加し、" + course.skillName + "技能が上がりました");
+        }, !availability.available);
+      }
+      for (const club of communityCenterModel.getClubs()) {
+        const availability = communityCenterModel.getClubAvailability(
+          state.communityCenter, club.id, state.day, state.minute, state.cash
+        );
+        const nextSession = communityCenterModel.getNextClubSession(club.id, state.day, state.minute);
+        const sessionTime = nextSession
+          ? "Day " + nextSession.day + " " + String(Math.floor(club.startMinute / 60)).padStart(2, "0") + ":" + String(club.startMinute % 60).padStart(2, "0")
+          : "開催予定なし";
+        const memberNames = club.members.map((id) => socialNpcSystem.getProfile(id)?.name || id).join("・");
+        const reason = availability.reason === "not-open" ? "受付は開始10分前から"
+          : availability.reason === "insufficient-funds" ? "所持金が足りません"
+            : availability.reason === "already-attended" ? "本日は参加済み" : "";
+        const detail = (availability.available ? "受付中" : "次回 " + sessionTime) +
+          " / " + (club.cost ? "¥" + club.cost.toLocaleString("ja-JP") : "無料") + " / " + club.duration + "分 / " + memberNames + (reason ? " / " + reason : "");
+        addChoice(club.name, detail, () => {
+          const currentAvailability = communityCenterModel.getClubAvailability(
+            state.communityCenter, club.id, state.day, state.minute, state.cash
+          );
+          if (!currentAvailability.available) {
+            showToast(currentAvailability.reason === "insufficient-funds" ? "参加費が足りません"
+              : currentAvailability.reason === "already-attended" ? "このサークルには参加済みです"
+                : "サークルの受付時間外です");
+            return;
+          }
+          const scheduledSession = currentAvailability.session;
+          state.cash -= club.cost;
+          state.communityCenter = communityCenterModel.attendClub(state.communityCenter, scheduledSession);
+          advanceTime(club.duration);
+          state.needs.social += 12;
+          state.needs.fun += 12;
+          state.needs.energy -= 4;
+          for (const memberId of club.members) {
+            const member = NPCS.find((npc) => npc.id === memberId);
+            if (!member) continue;
+            member.friendship = clamp(member.friendship + 2, 0, 100);
+            socialNpcState.friendship[memberId] = member.friendship;
+          }
+          for (let first = 0; first < club.members.length; first += 1) {
+            for (let second = first + 1; second < club.members.length; second += 1) {
+              const pair = [club.members[first], club.members[second]].sort();
+              const relationship = socialNpcSystem.relationships.find((item) => item.aId === pair[0] && item.bId === pair[1]);
+              if (!relationship) continue;
+              const pairId = pair.join("|");
+              socialNpcState.relationships[pairId] = clamp((socialNpcState.relationships[pairId] || 0) + 1, 0, 100);
+            }
+          }
+          clampNeeds();
+          showToast(club.name + "に参加しました。みんなとの仲が深まりました");
         }, !availability.available);
       }
       actionDescription.textContent += "\n料理 " + state.communityCenter.skills.cooking +

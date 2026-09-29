@@ -792,6 +792,14 @@ test('community center actions revalidate entry, charge once, and award completi
   assert.match(action, /advanceTime\(course\.duration\)/);
   assert.match(action, /completeCourse\(/);
   assert.match(action, /clampNeeds\(\)/);
+  assert.match(action, /getClubs\(\)/);
+  assert.match(action, /getClubAvailability\(/);
+  assert.match(action, /attendClub\(/);
+  assert.match(action, /state\.needs\.social\s*\+=\s*12/);
+  assert.match(action, /state\.needs\.fun\s*\+=\s*12/);
+  assert.match(action, /state\.needs\.energy\s*-=?\s*4/);
+  assert.match(action, /socialNpcState\.friendship\[memberId\]/);
+  assert.match(action, /socialNpcState\.relationships\[pairId\]/);
 });
 
 test('citizens plan community classes through their normal pedestrian activity lifecycle', () => {

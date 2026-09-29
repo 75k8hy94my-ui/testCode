@@ -114,6 +114,22 @@
     };
   }
 
+  function getNextClubSession(clubId, day, minute) {
+    const club = CLUBS.find((value) => value.id === clubId);
+    if (!club) return null;
+    const currentDay = safeDay(day);
+    const currentMinute = safeMinute(minute);
+    const now = (currentDay - 1) * MINUTES_PER_DAY + currentMinute;
+    for (let offset = 0; offset <= 7; offset += 1) {
+      const sessionDay = currentDay + offset;
+      if ((sessionDay - 1) % 7 !== club.weekday) continue;
+      const session = getClubSession(clubId, sessionDay, offset === 0 ? currentMinute : 0);
+      if (session.startAbsoluteMinute + 10 < now) continue;
+      return session;
+    }
+    return null;
+  }
+
   function getClubAvailability(progress, clubId, day, minute, cash) {
     const session = getClubSession(clubId, day, minute);
     if (!session) return { session:null, available:false, reason:"unknown-club" };
@@ -247,6 +263,7 @@
     COURSES,
     getClubs,
     getClubSession,
+    getNextClubSession,
     getClubAvailability,
     attendClub,
     getCitizenClubOpportunity,
