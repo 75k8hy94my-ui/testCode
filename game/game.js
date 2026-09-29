@@ -7868,7 +7868,8 @@
       });
       if (!decision.shouldYield) continue;
       const halfVehicle = vehicleDimensions(car).length / 2;
-      const stopAlong = crosswalk.along - car.directionSign * (halfVehicle + 12);
+      const crossingClearance = Number(crossingControl.SAFE_FRONT_CLEARANCE) || 14;
+      const stopAlong = crosswalk.along - car.directionSign * (halfVehicle + crossingClearance);
       const centerStopOffset = car.directionSign > 0 ? polylineLength(edge.points) - stopAlong : stopAlong;
       const currentAlong = trafficAlongForPosition(edge, car.x, car.y).along;
       const distanceToCrossing = (crosswalk.along - currentAlong) * car.directionSign;
@@ -7910,7 +7911,16 @@
       if (endpoint && isSignalizedMapNode(endpoint.id)) {
         const geometry = approachGeometry || signalGeometryAtNode(endpoint.id, edge);
         const signal = signalStateAt(endpoint.x, endpoint.y, edgeOrientation(edge));
-        const centerStopOffset = geometry.stopOffset + vehicleFrontOverhang(car);
+        const approachCrosswalk = mapModel.crosswalks.find((crosswalk) =>
+          crosswalk.roadEdgeId === edge.id && crosswalk.nodeId === endpoint.id
+        );
+        const crossingClearance = Number(crossingControl.SAFE_FRONT_CLEARANCE) || 14;
+        const crosswalkDistanceFromEndpoint = approachCrosswalk
+          ? (car.directionSign > 0 ? edgeLength - approachCrosswalk.along : approachCrosswalk.along)
+          : null;
+        const centerStopOffset = Number.isFinite(crosswalkDistanceFromEndpoint)
+          ? crosswalkDistanceFromEndpoint + vehicleDimensions(car).length / 2 + crossingClearance
+          : geometry.stopOffset + vehicleFrontOverhang(car);
         const gapToStopLine = endpointDistance - centerStopOffset;
         const stillApproachingLine = gapToStopLine >= -2;
         junctionYieldOffset = centerStopOffset;
