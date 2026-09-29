@@ -121,6 +121,9 @@
   function vehicleYieldDecision(crosswalk, claim, vehicle, options = {}) {
     const ownsCrossing = claim?.pedestrianId && (claim.phase === "waiting" || claim.phase === "crossing");
     if (!ownsCrossing) return { shouldYield:false, stopOffset:0, canStop:false, stoppingDistance:0, committed:false };
+    if (crosswalk?.signalized && claim.phase === "waiting") {
+      return { shouldYield:false, stopOffset:0, canStop:false, stoppingDistance:0, committed:false, signalControlled:true };
+    }
     const distance = vehicleDistanceToCrossing(crosswalk, vehicle);
     if (distance == null) return { shouldYield:false, stopOffset:0, canStop:false, stoppingDistance:0, committed:false };
 
