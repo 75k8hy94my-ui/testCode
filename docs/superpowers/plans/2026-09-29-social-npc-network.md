@@ -80,12 +80,12 @@
 - Add social affinity to candidate scores only after ordinary candidates are built; leave non-social scores unchanged and cap the social adjustment so scheduled work/sleep precedence remains intact.
 - Apply a successful `activityRequest` as a temporary `pendingActivity` using existing route planning; remove it on expiry, arrival completion, invalid destination, or incompatible schedule and return to ordinary candidate selection.
 
-- [ ] **Step 1: Add failing game-runtime tests** asserting ten stable special IDs, 76 total citizens / 66 ordinary citizens, preservation of the first three identities, and use of social action policy without bypassing existing route planning.
-- [ ] **Step 2: Run `node --test tests/game-runtime.test.mjs`** and confirm failures describe the unimplemented roster/integration.
-- [ ] **Step 3: Integrate the catalog with `NPCS` and `citizenProfile`** while preserving existing NPC runtime fields and deterministic indices.
-- [ ] **Step 4: Apply bounded social action bias and invitation requests** in the existing candidate/plan flow; ensure expiration and schedule conflicts clear the request rather than leaving a citizen stuck.
-- [ ] **Step 5: Run `node --test tests/game-runtime.test.mjs tests/social-npc-system.test.mjs`** and verify existing pedestrian route tests remain green.
-- [ ] **Step 6: Commit only `game/game.js` and the named tests.**
+- [x] **Step 1: Add failing game-runtime tests** asserting ten stable special IDs, 76 total citizens / 66 ordinary citizens, preservation of the first three identities, and use of social action policy without bypassing existing route planning.
+- [x] **Step 2: Run `node --test tests/game-runtime.test.mjs`** and confirm failures describe the unimplemented roster/integration.
+- [x] **Step 3: Integrate the catalog with `NPCS` and `citizenProfile`** while preserving existing NPC runtime fields and deterministic indices.
+- [x] **Step 4: Apply bounded social action bias and invitation requests** in the existing candidate/plan flow; ensure expiration and schedule conflicts clear the request rather than leaving a citizen stuck.
+- [x] **Step 5: Run `node --test tests/game-runtime.test.mjs tests/social-npc-system.test.mjs`** and verify existing pedestrian route tests remain green.
+- [x] **Step 6: Commit only `game/game.js` and the named tests.**
 
 ### Task 4: Add conversation choices and backward-compatible save state
 

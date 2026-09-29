@@ -99,6 +99,34 @@ test('all person categories share the same character renderer', () => {
   assert.match(source, /npc\.state = citizen\.state/);
 });
 
+test('the authored catalog, not generated defaults, supplies the first ten citizen identities', () => {
+  assert.match(source, /const socialNpcSystem = globalThis\.CityDaysSocialNpcSystem/);
+  assert.match(source, /const socialProfile = index < socialNpcSystem\.catalog\.length \? socialNpcSystem\.catalog\[index\] : null/);
+  assert.match(source, /const specialNpcId = socialProfile\?\.id \|\| null/);
+  assert.match(source, /const gender = socialProfile\?\.gender \|\|/);
+  assert.match(source, /let age = socialProfile\?\.age \|\|/);
+  assert.match(source, /let jobType = socialProfile\?\.jobType \|\| null/);
+  assert.match(source, /const CITIZEN_COUNT = 76/);
+});
+
+test('all ten social NPC runtime records retain their citizen links and original three map anchors', () => {
+  assert.match(source, /const NPCS = socialNpcSystem\.catalog\.map\(\(profile, index\) =>/);
+  assert.match(source, /citizenId: "citizen-" \+ String\(index \+ 1\)\.padStart\(3, "0"\)/);
+  assert.match(source, /aoi: \{ x:PARK\.x - 60, y:PARK\.y \}/);
+  assert.match(source, /sora: \{ x:CAFE\.x \+ 72, y:CAFE\.y - 58 \}/);
+  assert.match(source, /mei: \{ x:LIBRARY\.x, y:LIBRARY\.y - 45 \}/);
+});
+
+test('social candidate bias is applied after ordinary choices and invitations use pedestrian routes', () => {
+  assert.match(source, /socialNpcSystem\.getSocialActionBias\(/);
+  assert.match(source, /action:"social:" \+ candidate\.id/);
+  assert.match(source, /function requestCitizenSocialActivity\(/);
+  assert.match(source, /ped\.socialActivityRequest = \{ \.\.\.request \}/);
+  assert.match(source, /buildPedestrianPlan\(ped, startNodeId, targetNodeId\)/);
+  assert.match(source, /expiresAt/);
+  assert.match(source, /ped\.socialActivityRequest = null/);
+});
+
 test('game loads the community center schedule model before the runtime', () => {
   assert.match(html, /<script src="\.\/community-center\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('community-center.js') < html.indexOf('game.js'));
@@ -479,18 +507,17 @@ test('ambient pedestrians have destination plans, route states, and signal-aware
 });
 
 test('citizens carry deterministic age and gender into appearance generation', () => {
-  assert.match(source, /const gender = specialGender \|\| \(hash2\(index, 81, 16025\) < \.5 \? "male" : "female"\)/);
+  assert.match(source, /const gender = socialProfile\?\.gender \|\| \(hash2\(index, 81, 16025\) < \.5 \? "male" : "female"\)/);
   assert.match(source, /ageGroup:citizenAgeGroup\(age\)/);
-  assert.match(source, /name:citizenName\(index, gender\)/);
+  assert.match(source, /name:socialProfile\?\.name \|\| citizenName\(index, gender\)/);
   assert.match(source, /appearance:personAppearanceFromSeed\(i, profile\)/);
   assert.match(source, /const ageSpeedFactor = profile\.ageGroup === "senior"/);
   assert.match(source, /baseSpeed,/);
   assert.match(source, /speed:baseSpeed/);
 });
 
-test('named citizens have authored gender presentation', () => {
-  assert.match(source, /specialNpcId === "sora" \? "male"/);
-  assert.match(source, /specialNpcId === "aoi" \|\| specialNpcId === "mei" \? "female"/);
+test('named citizens use authored gender while generated citizens keep deterministic gender', () => {
+  assert.match(source, /const gender = socialProfile\?\.gender \|\| \(hash2\(index, 81, 16025\) < \.5 \? "male" : "female"\)/);
 });
 
 test('persistent pedestrians are not teleported beside the player to seed crowds', () => {
@@ -728,10 +755,10 @@ test('traffic-light rendering includes every drivable approach at a signalized n
 });
 
 
-test('fresh player and fixed NPC positions follow current map anchors', () => {
+test('fresh player and the original three social NPCs use their current map anchors', () => {
   assert.match(source, /player:\s*\{\s*x: HOME\.x,\s*y: HOME\.y,/);
-  assert.match(source, /id: "aoi"[\s\S]*x: PARK\.x - 60, y: PARK\.y/);
-  assert.match(source, /id: "mei"[\s\S]*x: LIBRARY\.x, y: LIBRARY\.y - 45/);
+  assert.match(source, /aoi: \{ x:PARK\.x - 60, y:PARK\.y \}/);
+  assert.match(source, /mei: \{ x:LIBRARY\.x, y:LIBRARY\.y - 45 \}/);
   assert.match(source, /const fallback = migratePlayerToCurrentMap\(NaN, NaN\)/);
   assert.doesNotMatch(source, /state\.player\.x = HOME\.x \+ 55/);
 });

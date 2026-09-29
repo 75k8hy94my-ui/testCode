@@ -1079,11 +1079,21 @@
     };
   }
 
-  const NPCS = [
-    { id: "aoi", name: "アオイ", x: PARK.x - 60, y: PARK.y, color: "#e0a7b5", friendship: 0 },
-    { id: "sora", name: "ソラ", x: CAFE.x + 72, y: CAFE.y - 58, color: "#a9c9e3", friendship: 0 },
-    { id: "mei", name: "メイ", x: LIBRARY.x, y: LIBRARY.y - 45, color: "#c8b58f", friendship: 0 }
-  ];
+  const socialNpcSystem = globalThis.CityDaysSocialNpcSystem;
+  const socialNpcState = socialNpcSystem.createInitialState();
+  const SOCIAL_NPC_SPAWN_NODES = Object.freeze({ aoi:"park-entrance", sora:"cafe-entrance", mei:"library-entrance" });
+  const SOCIAL_NPC_SPAWN_ANCHORS = Object.freeze({
+    aoi: { x:PARK.x - 60, y:PARK.y },
+    sora: { x:CAFE.x + 72, y:CAFE.y - 58 },
+    mei: { x:LIBRARY.x, y:LIBRARY.y - 45 }
+  });
+  const NPCS = socialNpcSystem.catalog.map((profile, index) => ({
+    ...profile,
+    ...(SOCIAL_NPC_SPAWN_ANCHORS[profile.id] || { x:HOME.x, y:HOME.y }),
+    citizenId: "citizen-" + String(index + 1).padStart(3, "0"),
+    friendship:socialNpcState.friendship[profile.id],
+    hidden:false
+  }));
 
   const personalCar = {
     x: 9 * ROAD_GAP + LANE_OFFSET,
@@ -1961,28 +1971,17 @@
   const PLAYER_APPEARANCE = characterRenderer.createAppearance(9001, { role:"player" });
 
   function citizenProfile(index, home, workPool) {
-    const specialNpcId = index === 0 ? "aoi" : index === 1 ? "sora" : index === 2 ? "mei" : null;
-    const specialGender = specialNpcId === "sora" ? "male"
-      : specialNpcId === "aoi" || specialNpcId === "mei" ? "female"
-        : null;
-    const gender = specialGender || (hash2(index, 81, 16025) < .5 ? "male" : "female");
-    let age = 18 + Math.floor(hash2(index, 83, 1603) * 64);
-    let jobType;
+    const socialProfile = index < socialNpcSystem.catalog.length ? socialNpcSystem.catalog[index] : null;
+    const specialNpcId = socialProfile?.id || null;
+    const gender = socialProfile?.gender || (hash2(index, 81, 16025) < .5 ? "male" : "female");
+    let age = socialProfile?.age || 18 + Math.floor(hash2(index, 83, 1603) * 64);
+    let jobType = socialProfile?.jobType || null;
 
-    if (specialNpcId === "sora") {
-      age = 24;
-      jobType = "cafe";
-    } else if (specialNpcId === "mei") {
-      age = 22;
-      jobType = "student";
-    } else if (specialNpcId === "aoi") {
-      age = 28;
-      jobType = "freelance";
-    } else if (age >= 68) {
+    if (!jobType && age >= 68) {
       jobType = "retired";
-    } else if (age <= 22) {
+    } else if (!jobType && age <= 22) {
       jobType = "student";
-    } else {
+    } else if (!jobType) {
       const roll = hash2(index, 89, 1604);
       jobType = roll < .12 ? "cafe"
         : roll < .23 ? "retail"
@@ -2005,16 +2004,17 @@
       || (jobType === "office" || jobType === "freelance" ? genericWork?.nodeId : null)
       || null;
 
-    const workStart = jobType === "cafe" || jobType === "retail"
+    const workSchedule = socialProfile?.schedule.find((slot) => /work|shift|study/.test(slot.activity));
+    const workStart = workSchedule?.start ?? (jobType === "cafe" || jobType === "retail"
       ? 7 * 60 + Math.floor(hash2(index, 101, 1606) * 150)
-      : 8 * 60 + Math.floor(hash2(index, 103, 1607) * 120);
-    const workMinutes = jobType === "freelance"
+      : 8 * 60 + Math.floor(hash2(index, 103, 1607) * 120));
+    const workMinutes = workSchedule ? (workSchedule.end - workSchedule.start + 1440) % 1440 : jobType === "freelance"
       ? 300 + Math.floor(hash2(index, 107, 1608) * 180)
       : 420 + Math.floor(hash2(index, 109, 1609) * 100);
 
     return {
       id:"citizen-" + String(index + 1).padStart(3, "0"),
-      name:citizenName(index, gender),
+      name:socialProfile?.name || citizenName(index, gender),
       specialNpcId,
       gender,
       age,
@@ -2230,6 +2230,22 @@
       }
     );
 
+    if (ped.specialNpcId) {
+      const nearbySocialNpcIds = pedestrians
+        .filter((other) => other !== ped && other.visible && other.specialNpcId && distance(ped.x, ped.y, other.x, other.y) < 220)
+        .map((other) => other.specialNpcId);
+      for (const candidate of actions) {
+        if (candidate.id !== "socialize") continue;
+        candidate.score += socialNpcSystem.getSocialActionBias({
+          npcId:ped.specialNpcId,
+          action:"social:" + candidate.id,
+          minute,
+          day:state.day,
+          relationships:socialNpcState.relationships,
+          nearbySocialNpcIds
+        }) * 100;
+      }
+    }
     actions.sort((a, b) => b.score - a.score);
     return actions;
   }
@@ -2244,6 +2260,57 @@
       duration:90,
       indoor:true
     };
+  }
+
+  function citizenSocialRequestIsValid(ped, request) {
+    if (!ped?.specialNpcId || request?.actionId !== "social-meetup" || !Number.isFinite(request.expiresAt)) return false;
+    const place = PLACES.find((entry) => entry.id === request.placeId && entry.entranceNodeId);
+    const now = (state.day - 1) * 1440 + state.minute;
+    if (!place || request.expiresAt <= now || (request.expiresAt - now) > 1440) return false;
+    if (ped.currentActivityId === "sleep" || ped.currentActivityId === "work") return false;
+    const lateNight = state.minute >= ped.sleepMinute || state.minute < ped.wakeMinute - 30 || ped.needs.energy < 20;
+    if (lateNight) return false;
+    if (ped.workNodeId && citizenIsWorkday(ped) && ped.workedDay !== state.day) {
+      const endAbsolute = ped.workEnd > ped.workStart ? ped.workEnd : ped.workEnd + 1440;
+      const minuteAbsolute = state.minute < ped.workStart && ped.workEnd < ped.workStart ? state.minute + 1440 : state.minute;
+      const onShift = minuteAbsolute >= ped.workStart && minuteAbsolute < endAbsolute;
+      if (onShift || minuteUntil(ped.workStart) <= 90) return false;
+    }
+    return true;
+  }
+
+  function citizenSocialActivityFromRequest(ped) {
+    const request = ped.socialActivityRequest;
+    if (!request) return null;
+    if (!citizenSocialRequestIsValid(ped, request)) {
+      ped.socialActivityRequest = null;
+      return null;
+    }
+    const place = PLACES.find((entry) => entry.id === request.placeId);
+    return {
+      id:request.actionId,
+      label:"公園で待ち合わせ",
+      placeId:request.placeId,
+      nodeId:place.entranceNodeId,
+      duration:45,
+      indoor:false,
+      expiresAt:request.expiresAt
+    };
+  }
+
+  function requestCitizenSocialActivity(ped, request) {
+    if (!citizenSocialRequestIsValid(ped, request)) return false;
+    ped.socialActivityRequest = { ...request };
+    if (
+      !ped.currentActivityId &&
+      ped.state !== "walking" &&
+      ped.state !== "waiting" &&
+      ped.state !== "inside" &&
+      ped.state !== "staying"
+    ) {
+      planCitizenAction(ped, ped.currentNodeId || ped.homeNodeId);
+    }
+    return true;
   }
 
   function buildPedestrianPlan(ped, startNodeId, goalNodeId) {
@@ -2302,6 +2369,16 @@
     if (!action) {
       action = chooseCitizenAction(ped);
     }
+    if (action.id === "social-meetup" && !citizenSocialRequestIsValid(ped, ped.socialActivityRequest)) {
+      ped.socialActivityRequest = null;
+      ped.pendingActivity = null;
+      ped.targetPlaceId = null;
+      ped.state = "deciding";
+      ped.visible = true;
+      planCitizenAction(ped, ped.currentNodeId || ped.homeNodeId);
+      return;
+    }
+    if (action.id === "social-meetup") ped.socialActivityRequest = null;
     if (action.id === "community_class") {
       const course = communityCenterModel.COURSES.find((value) => value.id === action.courseId);
       const now = (state.day - 1) * 1440 + state.minute;
@@ -2408,6 +2485,11 @@
         ped.needs.fun += 18;
         ped.stress -= 16;
         break;
+      case "social-meetup":
+        ped.needs.social += 30 + Math.min(12, peers * 2);
+        ped.needs.fun += 18;
+        ped.stress -= 12;
+        break;
       case "community_class":
         ped.needs.social += 10 + Math.min(10, peers * 2);
         ped.needs.fun += 14 + Math.min(12, peers * 2);
@@ -2429,7 +2511,7 @@
   }
 
   function planCitizenAction(ped, startNodeId) {
-    const action = chooseCitizenAction(ped);
+    const action = citizenSocialActivityFromRequest(ped) || chooseCitizenAction(ped);
     const targetNodeId = citizenActivityNode(action, ped);
     action.nodeId = targetNodeId;
     ped.pendingActivity = action;
@@ -2446,6 +2528,12 @@
       ped.pendingActivity = action;
       ped.targetPlaceId = action.placeId || null;
       return true;
+    }
+
+    if (action.id === "social-meetup") {
+      ped.socialActivityRequest = null;
+      ped.pendingActivity = null;
+      return planCitizenAction(ped, startNodeId);
     }
 
     if (startNodeId !== ped.homeNodeId && buildPedestrianPlan(ped, startNodeId, ped.homeNodeId)) {
@@ -2699,6 +2787,10 @@
         ped.x = pose.x;
         ped.y = pose.y;
         ped.dir = pose.angle;
+        if (ped.socialActivityRequest && citizenSocialActivityFromRequest(ped)) {
+          planCitizenAction(ped, currentNodeId);
+          return true;
+        }
         beginCitizenActivity(ped, ped.pendingActivity);
         return true;
       }
@@ -2759,6 +2851,7 @@
       const householdIndex = Math.floor(i / 2);
       const home = homes.length ? homes[householdIndex % homes.length] : fallbackHome;
       const profile = citizenProfile(i, home, workPool);
+      const spawnNodeId = SOCIAL_NPC_SPAWN_NODES[profile.specialNpcId] || profile.homeNodeId;
       const ageSpeedFactor = profile.ageGroup === "senior" ? .80 + hash2(i, 82, 16026) * .10
         : profile.ageGroup === "mature" ? .92 + hash2(i, 82, 16026) * .08
           : profile.ageGroup === "young" ? 1.02 + hash2(i, 82, 16026) * .08
@@ -2766,8 +2859,8 @@
       const baseSpeed = (28 + hash2(i, 8, 96) * 14) * ageSpeedFactor;
       const ped = {
         ...profile,
-        x:mapModel.getNode(profile.homeNodeId)?.x || HOME.x,
-        y:mapModel.getNode(profile.homeNodeId)?.y || HOME.y,
+        x:mapModel.getNode(spawnNodeId)?.x || HOME.x,
+        y:mapModel.getNode(spawnNodeId)?.y || HOME.y,
         dir:hash2(i, 3, 90) * Math.PI * 2,
         timer:0,
         baseSpeed,
@@ -2810,17 +2903,20 @@
         currentActivityId:null,
         currentActivityLabel:null,
         currentPlaceId:null,
-        currentNodeId:profile.homeNodeId,
-        targetNodeId:profile.homeNodeId,
+        currentNodeId:spawnNodeId,
+        targetNodeId:spawnNodeId,
         targetPlaceId:null,
         pendingActivity:null,
+        socialActivityRequest:null,
         workedDay:0
       };
 
-      planCitizenAction(ped, profile.homeNodeId);
+      planCitizenAction(ped, spawnNodeId);
 
       if (ped.state === "walking") {
-        const initialAlong = Math.min(ped.edgeLength * (.04 + hash2(i, 197, 1720) * .28), Math.max(1, ped.edgeLength - 1));
+        const initialAlong = profile.specialNpcId
+          ? 0
+          : Math.min(ped.edgeLength * (.04 + hash2(i, 197, 1720) * .28), Math.max(1, ped.edgeLength - 1));
         ped.along = ped.directionSign > 0 ? initialAlong : Math.max(0, ped.edgeLength - initialAlong);
         ped.along = pedestrianSpawnSpacing(ped.edgeId, ped.edgeLength, ped.along);
         const pose = pedestrianPoseAt(ped);
@@ -6368,6 +6464,9 @@
     const minutes = Math.max(0, Number(gameMinutes) || 0);
 
     for (const ped of pedestrians) {
+      if (ped.socialActivityRequest && !citizenSocialRequestIsValid(ped, ped.socialActivityRequest)) {
+        ped.socialActivityRequest = null;
+      }
       const travelling = ped.state === "walking" || ped.state === "waiting";
       citizenUpdateNeeds(ped, minutes, travelling);
       ped.collisionWait = Math.max(0, (ped.collisionWait || 0) - dt);
