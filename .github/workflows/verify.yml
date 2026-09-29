@@ -19,5 +19,11 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm test
-      - run: PYTHONPATH=. python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Run Python tests when present
+        run: |
+          if find tests -type f -name 'test_*.py' -print -quit | grep -q .; then
+            PYTHONPATH=. python3 -m unittest discover -s tests -p 'test_*.py'
+          else
+            echo "No Python tests found; skipping Python test discovery."
+          fi
       - run: npm run verify:static
