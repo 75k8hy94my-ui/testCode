@@ -367,7 +367,11 @@ test('cafe body is not centered on its street-side interaction entrance', () => 
   const map = createMapModel();
   const cafe = map.places.find((place) => place.id === 'cafe');
   assert.deepEqual([cafe.x, cafe.y], [4230, 5560]);
-  assert.deepEqual(cafe.building, { x:4380, y:5784, w:300, h:270 });
+  assert.deepEqual(
+    { x:cafe.building.x, y:cafe.building.y, w:cafe.building.w, h:cafe.building.h },
+    { x:4380, y:5784, w:300, h:270 }
+  );
+  assert.ok(cafe.building.frontageGeometry);
 });
 
 test('Wakaba fuel station is reachable on foot and by car without map collisions', () => {
@@ -387,7 +391,11 @@ test('Wakaba animal shelter has a reachable pedestrian entrance and collision-sa
   assert.ok(shelter);
   assert.equal(shelter.name, 'わかば動物保護センター');
   assert.equal(shelter.entranceNodeId, 'pet-shelter-entrance');
-  assert.deepEqual(shelter.building, { x:1580, y:6560, w:320, h:260 });
+  assert.deepEqual(
+    { x:shelter.building.x, y:shelter.building.y, w:shelter.building.w, h:shelter.building.h },
+    { x:1580, y:6560, w:320, h:260 }
+  );
+  assert.ok(shelter.building.frontageGeometry);
   assert.ok(map.findRoute('home-entrance', shelter.entranceNodeId, { mode:'pedestrian' }));
   const entrance = map.getNode(shelter.entranceNodeId);
   assert.equal(map.isWalkable(entrance.x, entrance.y, 14), true);
