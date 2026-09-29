@@ -99,6 +99,31 @@ test('all person categories share the same character renderer', () => {
   assert.match(source, /npc\.state = citizen\.state/);
 });
 
+test('packed meals expire with game time and survive snapshot migration without trusting saved data', () => {
+  assert.match(source, /packedMeals:packedMealsModel\.createInventory\(\)/);
+  assert.match(source, /packedMealsModel\.expire\(state\.packedMeals,\s*communityGardenModel\.absoluteMinute\(state\.day, Math\.floor\(state\.minute\)\)\)/);
+  assert.match(source, /packedMeals:packedMealsModel\.normalizeInventory\(state\.packedMeals\)/);
+  assert.match(source, /state\.packedMeals\s*=\s*packedMealsModel\.normalizeInventory\(saved\.packedMeals\)/);
+});
+
+test('kitchen preparation revalidates recipe resources and capacity without granting meal effects early', () => {
+  const kitchen = source.slice(source.indexOf('if (fixture.id === "kitchen")'), source.indexOf('} else if (fixture.id === "pet")'));
+  assert.match(kitchen, /弁当を作る/);
+  assert.match(kitchen, /弁当を作る/);
+  assert.match(source, /function preparePackedMeal\(recipeId\)/);
+  assert.match(source, /function consumePackedMeal\(mealId\)/);
+  const prepare = source.slice(source.indexOf('function preparePackedMeal('), source.indexOf('function consumePackedMeal('));
+  assert.doesNotMatch(prepare, /state\.needs\[[^\]]+\]\s*\+/);
+});
+
+test('packed meal consumption is restricted to walking and applies authored effects after ordinary time decay', () => {
+  const consume = source.slice(source.indexOf('function consumePackedMeal('), source.indexOf('function applyLibraryRead('));
+  assert.match(consume, /state\.player\.inVehicle\s*\|\|\s*state\.player\.inTrain/);
+  assert.match(consume, /packedMealsModel\.eat/);
+  assert.ok(consume.indexOf('advanceTime(15)') < consume.indexOf('Object.entries(result.recipe.effects)'));
+  assert.match(consume, /updateSmartphone\(\)/);
+});
+
 test('the authored catalog, not generated defaults, supplies the first ten citizen identities', () => {
   assert.match(source, /const socialNpcSystem = globalThis\.CityDaysSocialNpcSystem/);
   assert.match(source, /const socialProfile = index < socialNpcSystem\.catalog\.length \? socialNpcSystem\.catalog\[index\] : null/);

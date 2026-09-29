@@ -92,6 +92,12 @@
     return;
   }
 
+  const packedMealsModel = globalThis.CityDaysPackedMeals;
+  if (!packedMealsModel?.createInventory || !packedMealsModel?.normalizeInventory || !packedMealsModel?.store || !packedMealsModel?.expire || !packedMealsModel?.eat) {
+    showRuntimeError("PackedMeals を読み込めません。");
+    return;
+  }
+
   const libraryReadingModel = globalThis.CityDaysLibraryReading;
   if (!libraryReadingModel?.BOOKS || !libraryReadingModel?.createProgress || !libraryReadingModel?.normalizeProgress || !libraryReadingModel?.borrow || !libraryReadingModel?.readChapter || !libraryReadingModel?.returnBook) {
     showRuntimeError("LibraryReading を読み込めません。");
@@ -1154,6 +1160,7 @@
     garden:communityGardenModel.createProgress(),
     petCompanion:petCompanionModel.createProgress(),
     fishing:parkFishingModel.createProgress(),
+    packedMeals:packedMealsModel.createInventory(),
     shiftsWorked: 0,
     lastShiftDay: 0,
     needs: {
@@ -3756,6 +3763,10 @@
       state.garden,
       communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute))
     );
+    state.packedMeals = packedMealsModel.expire(
+      state.packedMeals,
+      communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute))
+    );
     if (updateCitizens) fastForwardCitizens(minutes);
   }
 
@@ -3931,6 +3942,54 @@
     };
   }
 
+  function preparePackedMeal(recipeId) {
+    const currentCount = packedMealsModel.portionCount(state.packedMeals);
+    if (currentCount >= packedMealsModel.MAX_PORTIONS) {
+      showToast("持ち歩ける食事は6食までです");
+      return false;
+    }
+    const result = homeCookingModel.cookMeal(state.communityCenter.skills.cooking, state.groceries, recipeId, state.fishing.fish);
+    if (!result.ok) {
+      showToast(result.reason === "skill-required" ? "料理技能が足りません" : result.reason === "insufficient-fish" ? "魚がありません。公園で釣れます" : "食料がありません。スーパーで買えます");
+      return false;
+    }
+    state.groceries = result.groceriesRemaining;
+    if (Number.isFinite(result.fishRemaining)) state.fishing = { ...state.fishing, fish:result.fishRemaining };
+    state.communityCenter.skills.cooking = result.cookingSkill;
+    advanceTime(result.recipe.duration);
+    const now = communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute));
+    const stored = packedMealsModel.store(state.packedMeals, recipeId, now);
+    if (!stored.ok) {
+      showToast("食事をしまえませんでした");
+      return false;
+    }
+    state.packedMeals = stored.inventory;
+    updateSmartphone();
+    showToast(result.recipe.name + "を持ち歩き用に作りました");
+    return true;
+  }
+
+  function consumePackedMeal(mealId) {
+    if (state.player.inVehicle || state.player.inTrain) {
+      showToast("食事は車や電車を降りてから食べられます");
+      return false;
+    }
+    const now = communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute));
+    const result = packedMealsModel.eat(state.packedMeals, mealId, now);
+    state.packedMeals = result.inventory;
+    if (!result.ok) {
+      showToast(result.reason === "expired" ? "この食事は傷んでしまいました" : "その食事はもうありません");
+      updateSmartphone();
+      return false;
+    }
+    advanceTime(15);
+    for (const [need, amount] of Object.entries(result.recipe.effects)) state.needs[need] += amount;
+    clampNeeds();
+    updateSmartphone();
+    showToast(result.recipe.name + "を食べました");
+    return true;
+  }
+
   function applyHomeMeal(result) {
     state.groceries = result.groceriesRemaining;
     if (Number.isFinite(result.fishRemaining)) state.fishing = { ...state.fishing, fish:result.fishRemaining };
@@ -4047,6 +4106,11 @@
           }
           applyHomeMeal(result);
         }, !status.available);
+        const capacityFull = packedMealsModel.portionCount(state.packedMeals) >= packedMealsModel.MAX_PORTIONS;
+        addChoice("弁当を作る：" + recipe.name,
+          !status.available ? detail : capacityFull ? "持ち歩ける食事がいっぱいです / " + packedMealsModel.MAX_PORTIONS + "食まで" :
+            (recipe.fish ? "魚 " + recipe.fish + "匹 / " : "") + "食料 " + recipe.groceries + "個 / " + recipe.duration + "分 / 持ち歩いて後で食べる",
+          () => preparePackedMeal(recipe.id), !status.available || capacityFull);
       }
     } else if (fixture.id === "pet") {
       const pet = state.petCompanion.pet;
@@ -5092,6 +5156,7 @@
         libraryVisits: state.libraryVisits,
         communityCenter:communityCenterModel.normalizeProgress(state.communityCenter),
         libraryReading:libraryReadingModel.normalizeProgress(state.libraryReading),
+        packedMeals:packedMealsModel.normalizeInventory(state.packedMeals),
         deliveryWork:deliveryWorkModel.normalizeProgress(state.deliveryWork),
         communityGarden:communityGardenModel.normalizeProgress(state.garden),
         petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
@@ -5343,6 +5408,7 @@
       state.libraryVisits = Math.max(0, Math.floor(Number(saved.libraryVisits) || 0));
       state.communityCenter = communityCenterModel.normalizeProgress(saved.communityCenter);
       state.libraryReading = libraryReadingModel.normalizeProgress(saved.libraryReading);
+      state.packedMeals = packedMealsModel.normalizeInventory(saved.packedMeals);
       state.deliveryWork = deliveryWorkModel.normalizeProgress(saved.deliveryWork);
       state.garden = communityGardenModel.normalizeProgress(saved.communityGarden);
       state.petCompanion = petCompanionModel.normalizeProgress(saved.petCompanion);
@@ -10535,6 +10601,16 @@
         })),
         completedCount:libraryReading.completedBookIds.length
       },
+      packedMeals:{
+        batches:packedMealsModel.expire(state.packedMeals, communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute))).batches.map((batch) => ({
+          ...batch,
+          mealId:batch.recipeId + "@" + batch.preparedAt,
+          name:homeCookingModel.RECIPES.find((recipe) => recipe.id === batch.recipeId)?.name || "食事",
+          freshnessMinutes:Math.max(0, batch.preparedAt + packedMealsModel.FRESHNESS_MINUTES - communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute)))
+        })),
+        portions:packedMealsModel.portionCount(state.packedMeals),
+        capacity:packedMealsModel.MAX_PORTIONS
+      },
       district:state.player.inHome ? "自宅・室内" : currentDistrict(p.x, p.y),
       weather:state.visual.weather,
       soundEnabled:audioState.enabled,
@@ -10844,6 +10920,8 @@
         needs:{ ...state.needs },
         skills:{ ...state.communityCenter.skills },
         petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
+        packedMeals:packedMealsModel.normalizeInventory(state.packedMeals),
+        groceries:state.groceries,
         libraryReading:libraryReadingModel.normalizeProgress(state.libraryReading),
         nearestInteraction:(() => {
           const interaction = nearestInteraction();
@@ -11016,6 +11094,7 @@
           updateSmartphone();
         },
         homeAction:() => phoneHomeAction(),
+        eatMeal:(mealId) => consumePackedMeal(mealId),
         call:(npcId) => {
           const npc = NPCS.find((value) => value.id === npcId);
           showToast((npc?.name || "連絡先") + "に電話しました");
