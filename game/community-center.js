@@ -181,10 +181,13 @@
     return null;
   }
 
-  function isCitizenClubArrivalValid(clubId, expectedStartAbsoluteMinute, citizenId, day, minute, cash) {
+  function isCitizenClubArrivalValid(clubId, expectedStartAbsoluteMinute, citizenId, day, minute, cash, citizenStatus = {}) {
     const club = CLUBS.find((value) => value.id === clubId);
     const expectedStart = Number(expectedStartAbsoluteMinute);
     if (!club || !club.members.includes(String(citizenId)) || !Number.isFinite(expectedStart)) return false;
+    if (citizenStatus.onShift || citizenStatus.lateNight || citizenStatus.unwell) return false;
+    const needs = citizenStatus.needs && typeof citizenStatus.needs === "object" ? citizenStatus.needs : null;
+    if (needs && (Number(needs.energy) < 18 || Number(needs.hunger) < 15)) return false;
     const session = getClubSession(clubId, day, minute);
     if ((session.day - 1) % 7 !== club.weekday || session.startAbsoluteMinute !== expectedStart) return false;
     const now = (safeDay(day) - 1) * MINUTES_PER_DAY + safeMinute(minute);

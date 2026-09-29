@@ -208,6 +208,9 @@ test('only healthy club members can plan a nearby session and arrival rechecks t
   assert.equal(communityCenter.getCitizenClubOpportunity(3, 1070, { ...citizen, lateNight:true }), null);
   assert.equal(communityCenter.getCitizenClubOpportunity(3, 1070, { ...citizen, money:99 }), null);
   assert.equal(communityCenter.isCitizenClubArrivalValid('board-game', 3990, 'aoi', 3, 1100, 100), true);
+  assert.equal(communityCenter.isCitizenClubArrivalValid('board-game', 3990, 'aoi', 3, 1100, 100, { onShift:true }), false);
+  assert.equal(communityCenter.isCitizenClubArrivalValid('board-game', 3990, 'aoi', 3, 1100, 100, { lateNight:true }), false);
+  assert.equal(communityCenter.isCitizenClubArrivalValid('board-game', 3990, 'aoi', 3, 1100, 100, { needs:{ energy:10, hunger:70 } }), false);
   assert.equal(communityCenter.isCitizenClubArrivalValid('board-game', 3990, 'aoi', 3, 1121, 100), false);
   assert.equal(communityCenter.isCitizenClubArrivalValid('board-game', 3990, 'aoi', 3, 1100, 99), false);
   assert.equal(communityCenter.isCitizenClubArrivalValid('board-game', 3990, 'ren', 3, 1100, 100), false);

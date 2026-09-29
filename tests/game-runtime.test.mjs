@@ -823,6 +823,7 @@ test('club members travel through normal pedestrian routes and revalidate the se
   assert.match(begin, /isCitizenClubArrivalValid\(/);
   assert.match(begin, /ped\.money\s*-=?\s*club\.cost/);
   assert.match(begin, /sessionStart\s*\+\s*club\.duration\s*-\s*now/);
+  assert.match(begin, /isCitizenClubArrivalValid\([\s\S]*onShift, lateNight, needs:ped\.needs/);
   assert.match(source, /replanCitizenForTest\(npcId\)/);
 });
 

@@ -2535,10 +2535,16 @@
       const club = communityCenterModel.getClubs().find((value) => value.id === action.clubId);
       const now = (state.day - 1) * 1440 + state.minute;
       const sessionStart = Number(action.sessionStartAbsoluteMinute);
+      const lateNight = state.minute >= ped.sleepMinute || state.minute < ped.wakeMinute - 30;
+      const workday = citizenIsWorkday(ped);
+      const workEndAbsolute = ped.workEnd > ped.workStart ? ped.workEnd : ped.workEnd + 1440;
+      const minuteAbsolute = state.minute < ped.workStart && ped.workEnd < ped.workStart ? state.minute + 1440 : state.minute;
+      const onShift = workday && minuteAbsolute >= ped.workStart && minuteAbsolute < workEndAbsolute;
       if (
         !club ||
         !communityCenterModel.isCitizenClubArrivalValid(
-          club.id, sessionStart, ped.specialNpcId, state.day, state.minute, ped.money
+          club.id, sessionStart, ped.specialNpcId, state.day, state.minute, ped.money,
+          { onShift, lateNight, needs:ped.needs }
         )
       ) {
         ped.pendingActivity = null;
