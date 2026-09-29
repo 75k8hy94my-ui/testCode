@@ -397,6 +397,17 @@
     ctx.fill();
     ctx.stroke();
 
+    if (facing.y < -.36) {
+      ctx.strokeStyle = shade(ap.hair, -29);
+      ctx.lineWidth = 1.15;
+      ctx.beginPath();
+      ctx.moveTo(cx - rx * .42, cy - ry * .67);
+      ctx.bezierCurveTo(cx - rx * .64, cy - ry * .28, cx - rx * .48, cy + ry * .26, cx - rx * .56, lower - ry * .14);
+      ctx.moveTo(cx + rx * .32, cy - ry * .70);
+      ctx.bezierCurveTo(cx + rx * .54, cy - ry * .18, cx + rx * .30, cy + ry * .32, cx + rx * .50, lower - ry * .17);
+      ctx.stroke();
+    }
+
     if (style === 8 || style === 10) {
       const px = cx - side * rx * .95;
       const py = cy + ry * .42;
@@ -444,52 +455,38 @@
     const back = facing.y < -.36;
     if (back) return;
 
-    const part = ((style % 4) - 1.5) * rx * .10;
-    const topY = cy - ry * .77;
-    const bangBottom = cy - ry * .06;
+    const part = ((style % 3) - 1) * rx * .10;
+    const fringeY = cy - ry * (style % 4 === 0 ? .25 : .32);
 
     ctx.save();
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
+    ctx.fillStyle = ap.hair;
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 1.65;
+    ctx.beginPath();
+    ctx.moveTo(cx - rx * 1.00, cy - ry * .34);
+    ctx.bezierCurveTo(cx - rx * 1.12, cy - ry * .87, cx - rx * .56, cy - ry * 1.13, cx - rx * .14, cy - ry * 1.00);
+    ctx.bezierCurveTo(cx + rx * .39, cy - ry * 1.17, cx + rx * 1.08, cy - ry * .81, cx + rx * 1.00, cy - ry * .31);
+    ctx.quadraticCurveTo(cx + rx * .97, cy - ry * .17, cx + rx * .78, fringeY + ry * .06);
+    ctx.quadraticCurveTo(cx + rx * .69, fringeY + ry * .11, cx + rx * .52, fringeY - ry * .12);
+    ctx.quadraticCurveTo(cx + rx * .36 + part, fringeY - ry * .28, cx + rx * .13 + part, fringeY + ry * .07);
+    ctx.quadraticCurveTo(cx - rx * .05 + part, fringeY + ry * .13, cx - rx * .23 + part, fringeY - ry * .12);
+    ctx.quadraticCurveTo(cx - rx * .40 + part, fringeY - ry * .27, cx - rx * .59, fringeY + ry * .05);
+    ctx.quadraticCurveTo(cx - rx * .76, fringeY + ry * .13, cx - rx * 1.00, cy - ry * .34);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
 
-    const locks = [
-      [-.86, -.48, -.56],
-      [-.54, -.20, -.26],
-      [-.22,  .10,  .03],
-      [ .06,  .40,  .32],
-      [ .34,  .72,  .62],
-      [ .62,  .91,  .83]
-    ];
-
-    for (let i = 0; i < locks.length; i++) {
-      const [a,b,c] = locks[i];
-      const sx = cx + a * rx + part;
-      const mx = cx + b * rx + part;
-      const ex = cx + c * rx + part;
-      const depth = bangBottom + (i % 2 ? 1.6 : -.4);
-
-      ctx.fillStyle = ap.hair;
-      ctx.strokeStyle = OUTLINE;
-      ctx.lineWidth = 1.45;
+    // The long locks frame the cheeks without crossing the eyes.
+    if ([3,6,8,10].includes(style)) {
+      const lx = cx - side * rx * .91;
+      ctx.fillStyle = shade(ap.hair, -4);
+      ctx.lineWidth = 1.25;
       ctx.beginPath();
-      ctx.moveTo(sx, topY + (i % 3) * .55);
-      ctx.quadraticCurveTo(mx, cy - ry * .37, ex, depth);
-      ctx.quadraticCurveTo(ex - side * 1.5, cy - ry * .24, sx + 1.6, topY + 1.0);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    }
-
-    const sideLockStyles = [3,6,8,10];
-    if (sideLockStyles.includes(style)) {
-      const lx = cx - side * rx * .88;
-      ctx.fillStyle = ap.hair;
-      ctx.strokeStyle = OUTLINE;
-      ctx.lineWidth = 1.45;
-      ctx.beginPath();
-      ctx.moveTo(lx, cy - ry * .42);
-      ctx.bezierCurveTo(lx - side * rx * .10, cy - ry * .05, lx - side * rx * .06, cy + ry * .55, lx + side * rx * .05, cy + ry * .72);
-      ctx.bezierCurveTo(lx + side * rx * .22, cy + ry * .42, lx + side * rx * .20, cy - ry * .10, lx, cy - ry * .42);
+      ctx.moveTo(lx, cy - ry * .22);
+      ctx.bezierCurveTo(lx - side * rx * .20, cy + ry * .10, lx - side * rx * .18, cy + ry * .58, lx - side * rx * .05, cy + ry * .85);
+      ctx.quadraticCurveTo(lx + side * rx * .19, cy + ry * .73, lx + side * rx * .18, cy + ry * .24);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
@@ -497,91 +494,31 @@
 
     if (ap.hairAccent) {
       ctx.fillStyle = ap.hairAccent;
-      ctx.strokeStyle = OUTLINE;
-      ctx.lineWidth = .9;
       ctx.beginPath();
-      ctx.moveTo(cx + rx * .05, cy - ry * .76);
-      ctx.quadraticCurveTo(cx + rx * .08, cy - ry * .38, cx + rx * .39, cy + ry * .02);
-      ctx.quadraticCurveTo(cx + rx * .27, cy - ry * .06, cx + rx * .14, cy - ry * .77);
+      ctx.moveTo(cx + rx * .10, cy - ry * .94);
+      ctx.quadraticCurveTo(cx + rx * .14, cy - ry * .58, cx + rx * .47, fringeY - ry * .13);
+      ctx.quadraticCurveTo(cx + rx * .29, cy - ry * .45, cx + rx * .25, cy - ry * .96);
       ctx.closePath();
       ctx.fill();
-      ctx.stroke();
     }
 
     if (lod === "near") {
-      ctx.strokeStyle = "rgba(255,255,255,.48)";
-      ctx.lineWidth = 1.35;
+      ctx.strokeStyle = "rgba(255,255,255,.50)";
+      ctx.lineWidth = 1.25;
       ctx.beginPath();
-      ctx.moveTo(cx - rx * .54, cy - ry * .67);
-      ctx.quadraticCurveTo(cx - rx * .28, cy - ry * .92, cx + rx * .02, cy - ry * .75);
+      ctx.moveTo(cx - rx * .62, cy - ry * .78);
+      ctx.quadraticCurveTo(cx - rx * .39, cy - ry * .94, cx - rx * .15, cy - ry * .87);
       ctx.stroke();
 
       ctx.strokeStyle = "rgba(255,255,255,.25)";
-      ctx.lineWidth = .85;
+      ctx.lineWidth = .75;
       ctx.beginPath();
-      ctx.moveTo(cx + rx * .18, cy - ry * .78);
-      ctx.quadraticCurveTo(cx + rx * .36, cy - ry * .86, cx + rx * .53, cy - ry * .69);
+      ctx.moveTo(cx + rx * .50, cy - ry * .81);
+      ctx.quadraticCurveTo(cx + rx * .66, cy - ry * .84, cx + rx * .78, cy - ry * .70);
       ctx.stroke();
     }
 
     ctx.restore();
-  }
-
-  function drawHair(ctx, ap, cx, cy, rx, ry, facing, lod) {
-    drawHairFront(ctx, ap, cx, cy, rx, ry, facing, lod);
-  }
-
-  function drawHair(ctx, ap, cx, cy, rx, ry, facing, lod) {
-    const style = ap.hairStyle % 12;
-    const back = facing.y < -.28;
-    ctx.fillStyle = shade(ap.hair, -12);
-
-    if ([6,8,10].includes(style)) {
-      ctx.beginPath();
-      ctx.ellipse(cx, cy + ry * .24, rx * 1.08, ry * .98, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    ctx.fillStyle = ap.hair;
-    ctx.beginPath();
-    if (style === 0) {
-      ctx.ellipse(cx, cy - ry * .43, rx * 1.02, ry * .60, 0, Math.PI, Math.PI * 2);
-    } else if (style === 1) {
-      ctx.ellipse(cx - facing.x * .6, cy - ry * .34, rx * 1.10, ry * .68, -.08 * facing.x, Math.PI, Math.PI * 2);
-    } else if (style === 2) {
-      ctx.ellipse(cx, cy - ry * .36, rx * 1.08, ry * .72, 0, Math.PI, Math.PI * 2);
-    } else if (style === 3) {
-      ctx.ellipse(cx + facing.x * .8, cy - ry * .31, rx * 1.04, ry * .73, .12 * facing.x, Math.PI, Math.PI * 2);
-    } else if (style === 4) {
-      ctx.ellipse(cx, cy - ry * .38, rx * 1.16, ry * .70, 0, Math.PI, Math.PI * 2);
-    } else if (style === 5) {
-      ctx.ellipse(cx, cy - ry * .45, rx * 1.02, ry * .58, 0, Math.PI, Math.PI * 2);
-    } else {
-      ctx.ellipse(cx, cy - ry * .30, rx * 1.12, ry * .72, 0, Math.PI, Math.PI * 2);
-    }
-    ctx.fill();
-
-    if (style === 8 || style === 10) {
-      ctx.beginPath();
-      ctx.ellipse(cx - facing.x * rx * .95, cy + ry * .42, rx * .30, ry * .62, -.18 * facing.x, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (style === 6) {
-      ctx.beginPath();
-      ctx.ellipse(cx + facing.x * rx * .92, cy + ry * .36, rx * .27, ry * .52, .14 * facing.x, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (style === 11) {
-      ctx.beginPath();
-      ctx.arc(cx - facing.x * rx * .8, cy - ry * .26, rx * .35, 0, Math.PI * 2);
-      ctx.arc(cx + facing.x * rx * .8, cy - ry * .28, rx * .32, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    if (!back && lod === "near") {
-      ctx.fillStyle = "rgba(255,255,255,.10)";
-      ctx.beginPath();
-      ctx.ellipse(cx - rx * .28, cy - ry * .58, rx * .20, ry * .18, -.3, 0, Math.PI * 2);
-      ctx.fill();
-    }
   }
 
   function drawAccessoryBehind(ctx, ap, torso, facing, alpha = 1) {
@@ -736,7 +673,7 @@
 
   function drawFace(ctx, ap, cx, cy, rx, ry, facing, pose, lod) {
     const back = facing.y < -.36;
-    const jaw = rx * .69;
+    if (back) return;
 
     ctx.save();
     ctx.lineJoin = "round";
@@ -745,19 +682,16 @@
     ctx.lineWidth = 1.55;
 
     ctx.beginPath();
-    ctx.moveTo(cx, cy - ry * .84);
-    ctx.bezierCurveTo(cx + rx * .78, cy - ry * .82, cx + rx, cy - ry * .30, cx + rx * .91, cy + ry * .18);
-    ctx.bezierCurveTo(cx + rx * .84, cy + ry * .60, cx + jaw * .48, cy + ry * .91, cx, cy + ry * .95);
-    ctx.bezierCurveTo(cx - jaw * .48, cy + ry * .91, cx - rx * .84, cy + ry * .60, cx - rx * .91, cy + ry * .18);
-    ctx.bezierCurveTo(cx - rx, cy - ry * .30, cx - rx * .78, cy - ry * .82, cx, cy - ry * .84);
+    ctx.moveTo(cx, cy - ry * .86);
+    ctx.bezierCurveTo(cx + rx * .69, cy - ry * .91, cx + rx * .96, cy - ry * .54, cx + rx * .92, cy + ry * .08);
+    ctx.bezierCurveTo(cx + rx * 1.06, cy + ry * .42, cx + rx * .89, cy + ry * .60, cx + rx * .62, cy + ry * .72);
+    ctx.bezierCurveTo(cx + rx * .42, cy + ry * .89, cx + rx * .21, cy + ry * .95, cx, cy + ry * .96);
+    ctx.bezierCurveTo(cx - rx * .21, cy + ry * .95, cx - rx * .42, cy + ry * .89, cx - rx * .62, cy + ry * .72);
+    ctx.bezierCurveTo(cx - rx * .89, cy + ry * .60, cx - rx * 1.06, cy + ry * .42, cx - rx * .92, cy + ry * .08);
+    ctx.bezierCurveTo(cx - rx * .96, cy - ry * .54, cx - rx * .69, cy - ry * .91, cx, cy - ry * .86);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-
-    if (back) {
-      ctx.restore();
-      return;
-    }
 
     const turn = Math.max(-1, Math.min(1, facing.x));
     const absTurn = Math.abs(turn);
@@ -772,63 +706,68 @@
       ctx.scale(sx, 1);
 
       ctx.fillStyle = "#fffdf9";
-      ctx.strokeStyle = OUTLINE;
-      ctx.lineWidth = 1.35;
       ctx.beginPath();
-      ctx.moveTo(-3.45, -1.75);
-      ctx.bezierCurveTo(-2.2, -4.0, 1.95, -4.25, 3.45, -1.55);
-      ctx.bezierCurveTo(3.05, 1.85, 1.85, 3.80, 0, 4.22);
-      ctx.bezierCurveTo(-1.95, 3.76, -3.15, 1.70, -3.45, -1.75);
+      ctx.moveTo(-3.35, -1.35);
+      ctx.bezierCurveTo(-2.85, -3.95, 1.35, -4.15, 3.55, -1.45);
+      ctx.bezierCurveTo(3.20, 1.45, 2.15, 3.35, .15, 3.75);
+      ctx.bezierCurveTo(-1.75, 3.70, -3.20, 1.85, -3.35, -1.35);
       ctx.closePath();
       ctx.fill();
-      ctx.stroke();
 
       ctx.save();
+      ctx.clip();
+      ctx.fillStyle = "rgba(61,44,46,.14)";
       ctx.beginPath();
-      ctx.moveTo(-3.0, -1.25);
-      ctx.bezierCurveTo(-1.9, -3.4, 1.75, -3.55, 3.0, -1.15);
-      ctx.bezierCurveTo(2.75, 1.65, 1.60, 3.33, 0, 3.72);
-      ctx.bezierCurveTo(-1.68, 3.30, -2.72, 1.58, -3.0, -1.25);
-      ctx.closePath();
+      ctx.ellipse(0, -1.7, 3.4, 2.15, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.ellipse(.15, .65, 2.25, 2.95, 0, 0, Math.PI * 2);
       ctx.clip();
 
       ctx.fillStyle = shade(eyeColor, -20);
       ctx.beginPath();
-      ctx.ellipse(.08, .65, 2.48, 3.25, 0, 0, Math.PI * 2);
+      ctx.ellipse(.15, .65, 2.25, 2.95, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = eyeColor;
       ctx.beginPath();
-      ctx.ellipse(.08, 1.32, 2.20, 2.25, 0, 0, Math.PI * 2);
+      ctx.ellipse(.15, 1.45, 2.04, 2.10, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = "#2c2322";
       ctx.beginPath();
-      ctx.ellipse(.08, .28, 1.02, 1.58, 0, 0, Math.PI * 2);
+      ctx.ellipse(.15, .10, .90, 1.54, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = "#fff";
       ctx.beginPath();
-      ctx.arc(-.78, -1.17, 1.00, 0, Math.PI * 2);
-      ctx.arc(.92, .58, .47, 0, Math.PI * 2);
+      ctx.arc(-.75, -1.12, .93, 0, Math.PI * 2);
+      ctx.arc(.93, .84, .42, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
 
       ctx.strokeStyle = OUTLINE;
-      ctx.lineWidth = 1.45;
+      ctx.lineWidth = 1.90;
       ctx.lineCap = "round";
       ctx.beginPath();
-      ctx.moveTo(-3.45, -1.76);
-      ctx.bezierCurveTo(-1.7, -4.05, 1.92, -4.18, 3.48, -1.55);
+      ctx.moveTo(-3.45, -1.42);
+      ctx.bezierCurveTo(-2.62, -4.30, 1.12, -4.35, 3.62, -1.48);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(105,71,67,.50)";
+      ctx.lineWidth = .62;
+      ctx.beginPath();
+      ctx.moveTo(-2.75, 1.65);
+      ctx.quadraticCurveTo(-.18, 4.58, 2.66, 1.60);
       ctx.stroke();
 
       if (ap.gender === "female" || outer) {
-        ctx.lineWidth = 1.15;
+        ctx.strokeStyle = OUTLINE;
+        ctx.lineWidth = 1.05;
         ctx.beginPath();
-        ctx.moveTo(3.15, -2.0);
-        ctx.lineTo(4.05, -2.75);
-        ctx.moveTo(3.28, -1.42);
-        ctx.lineTo(4.22, -1.72);
+        ctx.moveTo(3.10, -2.05);
+        ctx.lineTo(4.00, -2.72);
         ctx.stroke();
       }
       ctx.restore();
@@ -856,10 +795,10 @@
       }
 
       if (ap.blush !== false && facing.y > -.04) {
-        ctx.fillStyle = "rgba(238,134,142,.18)";
+        ctx.fillStyle = "rgba(238,134,142,.30)";
         ctx.beginPath();
-        ctx.ellipse(cx - 8.3 + turn * .5, cy + ry * .43, 2.6, 1.2, -.05, 0, Math.PI * 2);
-        ctx.ellipse(cx + 8.3 + turn * .5, cy + ry * .43, 2.6, 1.2, .05, 0, Math.PI * 2);
+        ctx.ellipse(cx - 8.2 + turn * .5, cy + ry * .39, 3.05, 1.45, -.05, 0, Math.PI * 2);
+        ctx.ellipse(cx + 8.2 + turn * .5, cy + ry * .39, 3.05, 1.45, .05, 0, Math.PI * 2);
         ctx.fill();
       }
 
