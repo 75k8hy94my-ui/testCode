@@ -7868,7 +7868,9 @@
       });
       if (!decision.shouldYield) continue;
       const halfVehicle = vehicleDimensions(car).length / 2;
-      const crossingClearance = Number(crossingControl.SAFE_FRONT_CLEARANCE) || 14;
+      const crossingClearance = crossingControl.safeFrontClearance?.(crosswalk)
+        ?? Number(crossingControl.SAFE_FRONT_CLEARANCE)
+        ?? 14;
       const currentEndpointDistance = car.directionSign > 0
         ? polylineLength(edge.points) - trafficAlongForPosition(edge, car.x, car.y).along
         : trafficAlongForPosition(edge, car.x, car.y).along;
@@ -7920,7 +7922,9 @@
         const approachCrosswalk = mapModel.crosswalks.find((crosswalk) =>
           crosswalk.roadEdgeId === edge.id && crosswalk.nodeId === endpoint.id
         );
-        const crossingClearance = Number(crossingControl.SAFE_FRONT_CLEARANCE) || 14;
+        const crossingClearance = approachCrosswalk
+          ? crossingControl.safeFrontClearance?.(approachCrosswalk) ?? Number(crossingControl.SAFE_FRONT_CLEARANCE) ?? 14
+          : Number(crossingControl.SAFE_FRONT_CLEARANCE) || 14;
         const crosswalkDistanceFromEndpoint = approachCrosswalk
           ? (car.directionSign > 0 ? edgeLength - approachCrosswalk.along : approachCrosswalk.along)
           : null;
@@ -9211,14 +9215,15 @@
       if (center.x < -240 || center.y < -240 || center.x > viewWidth + 240 || center.y > viewHeight + 240) continue;
       const crossingVector = crosswalk.vector;
       const roadTangent = { x:crossingVector.y, y:-crossingVector.x };
-      const halfWidth = Math.max(14, edge.width / 2 - 12);
+      const crossingDepth = Math.max(18, Number(crosswalk.depth) || 24);
+      const halfRoadSpan = Math.max(14, edge.width / 2 - 7);
       ctx.strokeStyle = "rgba(244,245,240,.88)";
       ctx.lineWidth = 4.5;
-      for (let offset = -halfWidth; offset <= halfWidth; offset += 12) {
+      for (let offset = -crossingDepth / 2 + 3; offset <= crossingDepth / 2 - 3; offset += 8) {
         const cx = crosswalk.x + roadTangent.x * offset;
         const cy = crosswalk.y + roadTangent.y * offset;
-        const a = worldToScreen(cx - crossingVector.x * 10, cy - crossingVector.y * 10);
-        const b = worldToScreen(cx + crossingVector.x * 10, cy + crossingVector.y * 10);
+        const a = worldToScreen(cx - crossingVector.x * halfRoadSpan, cy - crossingVector.y * halfRoadSpan);
+        const b = worldToScreen(cx + crossingVector.x * halfRoadSpan, cy + crossingVector.y * halfRoadSpan);
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
