@@ -34,7 +34,7 @@
 
 **Files:** Create `game/pet-companion.js`; create `tests/pet-companion.test.mjs`.
 
-**Interfaces:** Export `SPECIES`, `FOOD_PACK_PRICE`, `createProgress()`, `normalizeProgress(value)`, `isShelterOpen(minute)`, `adopt(progress, cash, speciesId)`, `buyFoodPack(progress, cash)`, `advance(progress, minutes)`, `feed(progress)`, `play(progress)`, and `cuddle(progress)`. Successful commerce results include `cashRemaining`; every result returns a new `progress` and failures preserve normalized input values.
+**Interfaces:** Export `SPECIES`, `FOOD_PACK_PRICE`, `createProgress()`, `normalizeProgress(value)`, `isShelterOpen(minute)`, `getCondition(progress)`, `adopt(progress, cash, speciesId, minute)`, `buyFoodPack(progress, cash, minute)`, `advance(progress, minutes)`, `feed(progress)`, `play(progress)`, and `cuddle(progress)`. Successful commerce results include `cashRemaining`; every result returns a new `progress` and failures preserve normalized input values.
 
 - [ ] **Step 1:** Add failing tests for defaults, species/cost, one-pet restriction, opening hours, food-pack inventory, care effects, tired-play rejection, minute decay/recovery, bounds and malformed-state normalization.
 - [ ] **Step 2:** Run `node --test tests/pet-companion.test.mjs`; confirm failure is due to the missing module/API.
