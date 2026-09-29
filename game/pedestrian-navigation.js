@@ -60,8 +60,9 @@
       const crossings = [];
       const incident = (nodeId) => mapModel.neighbors?.(nodeId, { mode:"vehicle" }) || [];
       for (const nodeId of [edge.from, edge.to]) {
-        const incidentEdges = incident(nodeId).map((link) => link.edge).filter(Boolean);
-        if (incidentEdges.length < 3) continue;
+        const incidentLinks = incident(nodeId);
+        const incidentEdges = incidentLinks.map((link) => link.edge).filter(Boolean);
+        if (incidentLinks.length < 3) continue;
         const geometry = mapModel.junctionGeometry?.(nodeId, edge.id);
         const from = nodeId === edge.from;
         const along = from ? geometry?.crossingOffset : length - (geometry?.crossingOffset || 0);
