@@ -92,6 +92,12 @@
     return;
   }
 
+  const libraryReadingModel = globalThis.CityDaysLibraryReading;
+  if (!libraryReadingModel?.BOOKS || !libraryReadingModel?.createProgress || !libraryReadingModel?.normalizeProgress || !libraryReadingModel?.borrow || !libraryReadingModel?.readChapter || !libraryReadingModel?.returnBook) {
+    showRuntimeError("LibraryReading を読み込めません。");
+    return;
+  }
+
   const homeTelevisionModel = globalThis.CityDaysHomeTelevision;
   if (!homeTelevisionModel?.getProgram || !homeTelevisionModel?.watch) {
     showRuntimeError("HomeTelevision を読み込めません。");
@@ -1143,6 +1149,7 @@
     fitness: 0,
     libraryVisits: 0,
     communityCenter:communityCenterModel.normalizeProgress(null),
+    libraryReading:libraryReadingModel.createProgress(),
     deliveryWork:deliveryWorkModel.createProgress(),
     garden:communityGardenModel.createProgress(),
     petCompanion:petCompanionModel.createProgress(),
@@ -3936,6 +3943,29 @@
       showToast(result.recipe.name + "を作りました");
   }
 
+  function applyLibraryRead(bookId, atLibrary) {
+    const result = libraryReadingModel.readChapter(state.libraryReading, bookId);
+    if (!result.ok) {
+      showToast(result.reason === "book-complete" ? "この本は読み終えています" : "貸出中の本ではありません");
+      return false;
+    }
+    state.libraryReading = result.progress;
+    advanceTime(45);
+    state.needs.fun += 7;
+    if (atLibrary) state.libraryVisits += 1;
+    const reward = result.completionReward;
+    if (reward) {
+      if (reward.skill && Object.hasOwn(state.communityCenter.skills, reward.skill)) {
+        state.communityCenter.skills[reward.skill] = clamp(state.communityCenter.skills[reward.skill] + reward.skillGain, 0, 100);
+      }
+      state.needs.fun += reward.fun;
+    }
+    clampNeeds();
+    const book = libraryReadingModel.BOOKS.find((entry) => entry.id === bookId);
+    showToast(result.bookComplete ? "『" + book.title + "』を読み終えました" : "『" + book.title + "』第" + result.chapter + "章を読みました");
+    return true;
+  }
+
   function homeShower() {
     advanceTime(20);
     state.needs.hygiene = 100;
@@ -4084,7 +4114,18 @@
       actionDescription.textContent = "ベッドで翌朝まで眠れます。";
       addChoice("眠る", "翌朝7:00まで / 体力を最大まで回復", homeSleep);
     } else if (fixture.id === "sofa") {
-      actionDescription.textContent = "リビングで休息できます。";
+      const progress = libraryReadingModel.normalizeProgress(state.libraryReading);
+      actionDescription.textContent = progress.loans.length
+        ? "リビングで休息したり、借りている本を読んだりできます。"
+        : "リビングで休息できます。";
+      for (const loan of progress.loans) {
+        if (loan.chaptersRead >= 3) continue;
+        const book = libraryReadingModel.BOOKS.find((entry) => entry.id === loan.bookId);
+        if (!book) continue;
+        addChoice("『" + book.title + "』を読む", "第" + (loan.chaptersRead + 1) + "章 / 45分 / 楽しさ+7", () => {
+          applyLibraryRead(book.id, false);
+        });
+      }
       addChoice("のんびりする", "60分 / 体力+16 / 楽しさ+18", homeRelax);
     }
 
@@ -4524,15 +4565,37 @@
     }
 
     if (place.id === "library") {
-      actionDescription.textContent = "静かな場所で読書や勉強ができます。利用は無料です。";
-      addChoice("読書する", "75分 / 楽しさ+20 / 体力+5", () => {
-        advanceTime(75);
-        state.needs.fun += 20;
-        state.needs.energy += 5;
-        state.libraryVisits += 1;
-        clampNeeds();
-        showToast("読書に集中しました");
-      });
+      const progress = libraryReadingModel.normalizeProgress(state.libraryReading);
+      actionDescription.textContent = "本を3冊まで無料で借りられます。図書館や自宅のソファで読めます。貸出中 " + progress.loans.length + " / 3冊。";
+      for (const book of libraryReadingModel.BOOKS) {
+        const loan = progress.loans.find((entry) => entry.bookId === book.id);
+        if (loan) {
+          if (loan.chaptersRead < 3) {
+            addChoice("『" + book.title + "』を読む", "第" + (loan.chaptersRead + 1) + "章 / 45分 / 楽しさ+7", () => {
+              applyLibraryRead(book.id, true);
+            });
+          }
+          addChoice("『" + book.title + "』を返す", "読み進み " + loan.chaptersRead + " / 3章", () => {
+            const result = libraryReadingModel.returnBook(state.libraryReading, book.id);
+            if (!result.ok) {
+              showToast("この本は貸出中ではありません");
+              return;
+            }
+            state.libraryReading = result.progress;
+            showToast("『" + book.title + "』を返しました");
+          });
+        } else {
+          addChoice("『" + book.title + "』を借りる", "無料 / 3章 / 完読で報酬", () => {
+            const result = libraryReadingModel.borrow(state.libraryReading, book.id);
+            if (!result.ok) {
+              showToast(result.reason === "loan-limit" ? "貸出は3冊までです" : "この本を借りられません");
+              return;
+            }
+            state.libraryReading = result.progress;
+            showToast("『" + book.title + "』を借りました");
+          }, progress.loans.length >= 3);
+        }
+      }
       addChoice("勉強する", "120分 / 将来のための自己投資", () => {
         advanceTime(120);
         state.needs.energy -= 8;
@@ -5028,6 +5091,7 @@
         fitness: state.fitness,
         libraryVisits: state.libraryVisits,
         communityCenter:communityCenterModel.normalizeProgress(state.communityCenter),
+        libraryReading:libraryReadingModel.normalizeProgress(state.libraryReading),
         deliveryWork:deliveryWorkModel.normalizeProgress(state.deliveryWork),
         communityGarden:communityGardenModel.normalizeProgress(state.garden),
         petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
@@ -5278,6 +5342,7 @@
       state.fitness = Math.max(0, Math.floor(Number(saved.fitness) || 0));
       state.libraryVisits = Math.max(0, Math.floor(Number(saved.libraryVisits) || 0));
       state.communityCenter = communityCenterModel.normalizeProgress(saved.communityCenter);
+      state.libraryReading = libraryReadingModel.normalizeProgress(saved.libraryReading);
       state.deliveryWork = deliveryWorkModel.normalizeProgress(saved.deliveryWork);
       state.garden = communityGardenModel.normalizeProgress(saved.communityGarden);
       state.petCompanion = petCompanionModel.normalizeProgress(saved.petCompanion);
@@ -10768,6 +10833,7 @@
       return JSON.parse(JSON.stringify({
         player:{ x:state.player.x, y:state.player.y, inHome:state.player.inHome, inVehicle:state.player.inVehicle, inTrain:state.player.inTrain },
         petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
+        libraryReading:libraryReadingModel.normalizeProgress(state.libraryReading),
         nearestInteraction:(() => {
           const interaction = nearestInteraction();
           return interaction ? { type:interaction.type, label:interaction.label, targetId:interaction.target?.id || null } : null;

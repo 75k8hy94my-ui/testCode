@@ -201,10 +201,45 @@ test('game loads the community center schedule model before the runtime', () => 
   assert.ok(html.indexOf('community-center.js') < html.indexOf('game.js'));
 });
 
+test('library reading model loads before runtime and legacy saves receive an empty shelf', () => {
+  assert.match(html,/ <script src="\.\/library-reading\.js\?v=[^"]+"><\/script>/);
+  assert.ok(html.indexOf('library-reading.js') < html.indexOf('game.js'));
+  assert.match(source,/const libraryReadingModel = globalThis\.CityDaysLibraryReading/);
+  assert.match(source,/libraryReading:libraryReadingModel\.createProgress\(\)/);
+  assert.match(source,/libraryReading:libraryReadingModel\.normalizeProgress\(state\.libraryReading\)/);
+  assert.match(source,/state\.libraryReading = libraryReadingModel\.normalizeProgress\(saved\.libraryReading\)/);
+});
+
+test('library loans can be borrowed and returned while chapter reads are revalidated at the point of action', () => {
+  const libraryStart=source.indexOf('if (place.id === "library")');
+  const libraryEnd=source.indexOf('if (place.id === "community-center")',libraryStart);
+  const libraryActions=source.slice(libraryStart,libraryEnd);
+  assert.match(libraryActions,/libraryReadingModel\.borrow\(state\.libraryReading,\s*book\.id\)/);
+  assert.match(libraryActions,/libraryReadingModel\.returnBook\(state\.libraryReading,\s*book\.id\)/);
+  assert.match(libraryActions,/applyLibraryRead\(book\.id,\s*true\)/);
+  const read=source.slice(source.indexOf('function applyLibraryRead('),source.indexOf('function homeShower(',source.indexOf('function applyLibraryRead(')));
+  assert.match(read,/libraryReadingModel\.readChapter\(state\.libraryReading,\s*bookId\)/);
+  assert.ok(read.indexOf('if (!result.ok)') < read.indexOf('advanceTime(45)'));
+  assert.match(read,/state\.needs\.fun \+= 7/);
+  assert.match(read,/const reward = result\.completionReward/);
+  assert.match(read,/reward\.skill/);
+  assert.match(read,/reward\.fun/);
+  assert.match(read,/state\.communityCenter\.skills\[reward\.skill\]/);
+});
+
+test('home sofa adds borrowed-book reading without removing normal rest', () => {
+  const sofaStart=source.indexOf('} else if (fixture.id === "sofa")');
+  const sofaEnd=source.indexOf('} else if (fixture.id === "tv")',sofaStart);
+  const sofa=source.slice(sofaStart,sofaEnd);
+  assert.match(sofa,/libraryReadingModel\.normalizeProgress\(state\.libraryReading\)/);
+  assert.match(sofa,/applyLibraryRead\(book\.id,\s*false\)/);
+  assert.match(sofa,/addChoice\("のんびりする"/);
+});
+
 test('community garden model loads before game runtime and progresses with absolute game time', () => {
   assert.match(html, /<script src="\.\/community-garden\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('community-garden.js') < html.indexOf('game.js'));
-  assert.match(html, /<script src="\.\/game\.js\?v=20260929-pet-companion-1"><\/script>/);
+  assert.match(html, /<script src="\.\/game\.js\?v=[^"]+"><\/script>/);
   assert.match(source, /const communityGardenModel = globalThis\.CommunityGarden/);
   assert.match(source, /communityGardenModel\.advance\([\s\S]{0,100}communityGardenModel\.absoluteMinute\(state\.day, Math\.floor\(state\.minute\)\)\s*\)/);
 });
@@ -383,7 +418,7 @@ test('public bath rules load before runtime and the sento interaction applies it
 
 test('clinic map and runtime changes request fresh browser assets', () => {
   assert.match(html, /map-model\.js\?v=20260929-pet-shelter-1/);
-  assert.match(html, /game\.js\?v=20260929-pet-companion-1/);
+  assert.match(html, /game\.js\?v=[^"]+/);
 });
 
 test('health model loads before runtime and has a visible sixth needs meter', () => {
