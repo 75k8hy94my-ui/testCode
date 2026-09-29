@@ -129,6 +129,12 @@
     return;
   }
 
+  const homeFurnitureModel = globalThis.CityDaysHomeFurniture;
+  if (!homeFurnitureModel?.createProgress || !homeFurnitureModel?.normalizeProgress || !homeFurnitureModel?.buyFurniture || !homeFurnitureModel?.placeFurniture || !homeFurnitureModel?.getUseAction) {
+    showRuntimeError("HomeFurniture を読み込めません。");
+    return;
+  }
+
   const libraryReadingModel = globalThis.CityDaysLibraryReading;
   if (!libraryReadingModel?.BOOKS || !libraryReadingModel?.createProgress || !libraryReadingModel?.normalizeProgress || !libraryReadingModel?.borrow || !libraryReadingModel?.readChapter || !libraryReadingModel?.returnBook) {
     showRuntimeError("LibraryReading を読み込めません。");
@@ -1220,6 +1226,7 @@
     packedMeals:packedMealsModel.createInventory(),
     storePreparedFood:storePreparedFoodModel.createInventory(),
     homeCrafting:homeCraftingModel.createProgress(),
+    homeFurniture:homeFurnitureModel.createProgress(),
     shiftsWorked: 0,
     lastShiftDay: 0,
     needs: {
@@ -4511,6 +4518,42 @@
     showToast("ソファでゆっくり過ごしました");
   }
 
+  function useHomeFurniture(placementId) {
+    if (!state.player.inHome) {
+      showToast("家具は自宅の中で使えます");
+      return false;
+    }
+    const progress = homeFurnitureModel.normalizeProgress(state.homeFurniture);
+    const placement = progress.placements.find((entry) => entry.placementId === placementId);
+    const action = placement ? homeFurnitureModel.getUseAction(placement.furnitureId) : null;
+    if (!action) {
+      showToast("その家具は使えません");
+      return false;
+    }
+    advanceTime(action.duration);
+    for (const [need, amount] of Object.entries(action.needs)) {
+      if (Object.hasOwn(state.needs, need)) state.needs[need] += amount;
+    }
+    clampNeeds();
+    showToast(action.name + "をしました");
+    return true;
+  }
+
+  function buyHomeFurniture(furnitureId) {
+    const result = homeFurnitureModel.buyFurniture(state.homeFurniture, state.cash, furnitureId);
+    if (!result.ok) {
+      showToast(result.reason === "insufficient-funds" ? "家具を買うお金が足りません" : result.reason === "inventory-capacity" ? "その家具はこれ以上持てません" : "その家具は購入できません");
+      return false;
+    }
+    state.homeFurniture = result.progress;
+    state.cash = result.cashRemaining;
+    advanceTime(result.duration);
+    const item = homeFurnitureModel.CATALOG.find((entry) => entry.id === furnitureId);
+    queueMicrotask(() => openPlace(PLACES.find((place) => place.id === "store")));
+    showToast(item.name + "を購入しました。自宅で配置できます");
+    return true;
+  }
+
   function homeTelevisionProgramSummary(program) {
     if (!program) return "現在の放送時間を確認できません。";
     const labels = { fun:"楽しさ", social:"交流", energy:"体力" };
@@ -4888,6 +4931,15 @@
           queueMicrotask(() => openPlace(PLACES.find((place) => place.id === "store")));
           showToast(outfit.name + "を購入しました。自宅で着替えられます");
         }, !preview.ok);
+      }
+      for (const item of homeFurnitureModel.CATALOG) {
+        const owned = state.homeFurniture.inventory[item.id] || 0;
+        const preview = homeFurnitureModel.buyFurniture(state.homeFurniture, state.cash, item.id);
+        const detail = preview.ok
+          ? "¥" + item.price.toLocaleString("ja-JP") + " / " + item.purchaseMinutes + "分 / 所持 " + owned + "個"
+          : preview.reason === "inventory-capacity" ? "所持上限 " + homeFurnitureModel.MAX_ITEM_COUNT + "個です"
+            : "¥" + item.price.toLocaleString("ja-JP") + " / 所持金が足りません";
+        addChoice(item.name, detail, () => buyHomeFurniture(item.id), !preview.ok);
       }
       addChoice("釣り餌を買う", state.cash < parkFishingModel.BAIT_PACK_COST ? "5回分 / ¥500 / 資金不足" : "5回分 / ¥500 / 所持 " + state.fishing.bait + "個", () => {
         const result = parkFishingModel.buyBait(state.fishing, state.cash);
@@ -5827,6 +5879,7 @@
         packedMeals:packedMealsModel.normalizeInventory(state.packedMeals),
         storePreparedFood:storePreparedFoodModel.normalizeInventory(state.storePreparedFood, state.day),
         homeCrafting:homeCraftingModel.normalizeProgress(state.homeCrafting),
+        homeFurniture:homeFurnitureModel.normalizeProgress(state.homeFurniture),
         deliveryWork:deliveryWorkModel.normalizeProgress(state.deliveryWork),
         communityGarden:communityGardenModel.normalizeProgress(state.garden),
         petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
@@ -6093,6 +6146,7 @@
       state.packedMeals = packedMealsModel.normalizeInventory(saved.packedMeals);
       state.storePreparedFood = storePreparedFoodModel.normalizeInventory(saved.storePreparedFood, state.day);
       state.homeCrafting = homeCraftingModel.normalizeProgress(saved.homeCrafting);
+      state.homeFurniture = homeFurnitureModel.normalizeProgress(saved.homeFurniture);
       state.deliveryWork = deliveryWorkModel.normalizeProgress(saved.deliveryWork);
       state.garden = communityGardenModel.normalizeProgress(saved.communityGarden);
       state.petCompanion = petCompanionModel.normalizeProgress(saved.petCompanion);
@@ -11777,6 +11831,7 @@
         weather:state.visual.weather,
         umbrellaOwned:state.umbrellaOwned === true,
         wardrobe:wardrobeModel.normalizeWardrobe(state.wardrobe),
+        homeFurniture:homeFurnitureModel.normalizeProgress(state.homeFurniture),
         arcade:arcadeGamesModel.normalizeProgress(state.arcade),
         storePreparedFood:storePreparedFoodModel.normalizeInventory(state.storePreparedFood, state.day),
         arcadeUi:{ mode:arcadeGame.mode, position:arcadeGame.position, panelOpen:!arcadePanel.hidden },
@@ -11838,6 +11893,8 @@
         },
         buyUmbrellaForTest() { return buyUmbrella(); },
         buyPreparedFoodForTest(itemId) { return buyPreparedFood(itemId); },
+        buyHomeFurnitureForTest(furnitureId) { return buyHomeFurniture(furnitureId); },
+        useHomeFurnitureForTest(placementId) { return useHomeFurniture(placementId); },
         setCashForTest(amount) {
           if (!Number.isFinite(amount) || amount < 0) return false;
           state.cash = Math.floor(amount);

@@ -1247,3 +1247,48 @@ test('home map uses the street world scale and follows the player camera', () =>
   assert.match(viewport, /state\.player\.homeY \* scale/);
   assert.doesNotMatch(viewport, /1\.22/);
 });
+
+test('home furniture defaults into legacy saves and survives normalized snapshot round-trips', () => {
+  const furnitureScript = html.indexOf('home-furniture.js');
+  assert.notEqual(furnitureScript, -1);
+  assert.ok(furnitureScript < html.indexOf('game.js'));
+  assert.match(source, /const homeFurnitureModel = globalThis\.CityDaysHomeFurniture/);
+  assert.match(source, /homeFurniture:homeFurnitureModel\.createProgress\(\)/);
+  assert.match(source, /homeFurniture:homeFurnitureModel\.normalizeProgress\(state\.homeFurniture\)/);
+  assert.match(source, /state\.homeFurniture = homeFurnitureModel\.normalizeProgress\(saved\.homeFurniture\)/);
+  const hookStart = source.indexOf('function installSocialNpcTestHook()');
+  const hookEnd = source.indexOf('function togglePause()', hookStart);
+  const hook = source.slice(hookStart, hookEnd);
+  assert.match(hook, /homeFurniture:homeFurnitureModel\.normalizeProgress\(state\.homeFurniture\)/);
+});
+
+test('supermarket exposes catalog furniture and sends a selected purchase through the atomic handler', () => {
+  const storeStart = source.indexOf('if (place.id === "store")');
+  const storeEnd = source.indexOf('if (place.id === "fuel-station")', storeStart);
+  const store = source.slice(storeStart, storeEnd);
+  const furnitureStart = store.indexOf('for (const item of homeFurnitureModel.CATALOG');
+  const furnitureEnd = store.indexOf('addChoice("釣り餌を買う"', furnitureStart);
+  const listing = store.slice(furnitureStart, furnitureEnd);
+  const purchaseStart = source.indexOf('function buyHomeFurniture(');
+  const purchaseEnd = source.indexOf('\n  function ', purchaseStart + 10);
+  const purchase = source.slice(purchaseStart, purchaseEnd);
+  assert.notEqual(furnitureStart, -1);
+  assert.match(listing, /homeFurnitureModel\.buyFurniture\(state\.homeFurniture, state\.cash, item\.id\)/);
+  assert.match(listing, /addChoice\(item\.name,[\s\S]*buyHomeFurniture\(item\.id\)/);
+  assert.notEqual(purchaseStart, -1);
+  assert.match(purchase, /homeFurnitureModel\.buyFurniture\(state\.homeFurniture, state\.cash, furnitureId\)/);
+  assert.ok(purchase.indexOf('if (!result.ok)') < purchase.indexOf('state.homeFurniture = result.progress'));
+  assert.ok(purchase.indexOf('state.homeFurniture = result.progress') < purchase.indexOf('state.cash = result.cashRemaining'));
+  assert.ok(purchase.indexOf('state.cash = result.cashRemaining') < purchase.indexOf('advanceTime(result.duration)'));
+});
+
+test('home furniture use checks the home context and applies catalog results through existing time and need clamping', () => {
+  const start = source.indexOf('function useHomeFurniture(');
+  const end = source.indexOf('\n  function ', start + 10);
+  const use = source.slice(start, end);
+  assert.notEqual(start, -1);
+  assert.match(use, /if \(!state\.player\.inHome\)/);
+  assert.match(use, /homeFurnitureModel\.getUseAction\(/);
+  assert.ok(use.indexOf('if (!action)') < use.indexOf('advanceTime(action.duration)'));
+  assert.match(use, /clampNeeds\(\)/);
+});
