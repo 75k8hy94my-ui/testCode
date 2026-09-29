@@ -60,7 +60,7 @@
       { kind:"rect", role:"floor", x:338, y:442, w:104, h:43, radius:5, fill:"#aaa69a", solid:false },
       { kind:"rect", role:"sill", x:355, y:473, w:70, h:5, radius:0, fill:"#5c625e", solid:false }
     ], collisions:[] },
-    { id:"exit", label:"玄関", x:356, y:455, w:68, h:25, interactX:390, interactY:438, range:62, interaction:null, visuals:[], collisions:[] },
+    { id:"exit", label:"玄関", x:356, y:455, w:68, h:25, interactX:390, interactY:438, range:62, visuals:[], collisions:[] },
     { id:"divider-west", label:"壁", visuals:[
       { kind:"line", role:"divider", from:{ x:294, y:30 }, to:{ x:294, y:205 }, thickness:10, stroke:"#eee7da", solid:true }
     ], collisions:[{ kind:"segment", from:{ x:294, y:30 }, to:{ x:294, y:205 }, thickness:10 }] },
