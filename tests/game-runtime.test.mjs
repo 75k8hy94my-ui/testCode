@@ -1523,3 +1523,10 @@ test('crosswalk rendering uses generated depth instead of road width as zebra de
   assert.match(markings, /const halfRoadSpan = Math\.max\(14, edge\.width \/ 2 - 7\)/);
   assert.match(markings, /offset = -crossingDepth \/ 2 \+ 3/);
 });
+
+
+test('pedestrians request an unsignalized crossing only near the waiting area, not from far up the sidewalk', () => {
+  const claims = source.slice(source.indexOf('function updateCrossingClaims()'), source.indexOf('function trafficCrosswalkStop('));
+  assert.match(claims, /remaining <= Math\.max\(42, Math\.min\(64, ped\.speed \* 1\.2\)\)/);
+  assert.doesNotMatch(claims, /Math\.max\(180, ped\.speed \* 4 \+ 22\)/);
+});
