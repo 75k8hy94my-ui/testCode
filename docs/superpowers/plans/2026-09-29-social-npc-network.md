@@ -120,11 +120,11 @@
 - `phoneModelSnapshot()` continues providing all ten entries with profile `color`, `friendship`, activity and visibility-safe location fields; no independent phone roster is introduced.
 - Phone contact colors use each record's color with a neutral fallback; contact IDs/names are escaped through existing rendering helpers.
 
-- [ ] **Step 1: Add failing tests** for special-only map markers, ten phone contacts, unique color availability, phone escaping, and hidden indoor coordinates.
-- [ ] **Step 2: Run `node --test tests/game-runtime.test.mjs tests/phone-system.test.mjs`** to confirm expected failures.
-- [ ] **Step 3: Update map rendering and phone projection/rendering** using the same catalog-backed runtime records; preserve current mobile/desktop phone layouts and indoor privacy behavior.
-- [ ] **Step 4: Run both focused test files** and verify ordinary pedestrians and legacy phone actions remain unchanged.
-- [ ] **Step 5: Commit only the implementation and tests listed above.**
+- [x] **Step 1: Add failing tests** for special-only map markers, ten phone contacts, unique color availability, phone escaping, and hidden indoor coordinates.
+- [x] **Step 2: Run `node --test tests/game-runtime.test.mjs tests/phone-system.test.mjs`** to confirm expected failures.
+- [x] **Step 3: Update map rendering and phone projection/rendering** using the same catalog-backed runtime records; preserve current mobile/desktop phone layouts and indoor privacy behavior.
+- [x] **Step 4: Run both focused test files** and verify ordinary pedestrians and legacy phone actions remain unchanged.
+- [x] **Step 5: Commit only the implementation and tests listed above.**
 
 ### Task 6: End-to-end verification and visual review
 

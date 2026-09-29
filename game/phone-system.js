@@ -13,12 +13,17 @@
     ["music","ミュージック","♫","#ef476f"],["calculator","計算機","＋","#ff9f0a"],
     ["home","ホーム","⌂","#ff9f0a"],["settings","設定","⚙","#8e8e93"]
   ];
-  const CONTACT_COLORS = {aoi:"#d596aa",sora:"#7ca4c6",mei:"#b6a176"};
+  const NEUTRAL_CONTACT_COLOR = "#8e8e93";
 
   function esc(value) {
     return String(value == null ? "" : value)
       .replaceAll("&","&amp;").replaceAll("<","&lt;")
       .replaceAll(">","&gt;").replaceAll('"',"&quot;");
+  }
+  function contactColor(npc) {
+    return typeof npc.color === "string" && /^#[\da-f]{6}$/i.test(npc.color)
+      ? npc.color
+      : NEUTRAL_CONTACT_COLOR;
   }
   function yen(value) { return "¥" + Math.floor(Number(value) || 0).toLocaleString("ja-JP"); }
   function timeText(minute) {
@@ -89,7 +94,7 @@
         body + '</main>' + homeIndicator() + '</div>';
     }
     function contactRow(npc,action) {
-      const color = CONTACT_COLORS[npc.id] || "#8e8e93";
+      const color = contactColor(npc);
       return '<button class="ios-contact-row" type="button" data-phone-action="' + action + '" data-contact-id="' + esc(npc.id) + '">' +
         '<span class="ios-avatar" style="--avatar:' + color + '">' + esc((npc.name || "?").slice(0,1)) + '</span>' +
         '<span><b>' + esc(npc.name) + '</b><small>' + esc(npc.activity || "若葉にいます") + ' · 親密度 ' + (npc.friendship || 0) +
@@ -237,7 +242,7 @@
     function findApp() {
       const canRouteToFriend = !model.inHome && !model.inVehicle && !model.inTrain;
       const friends = (model.npcs || []).map(function(npc){
-        const row = '<span class="ios-avatar small" style="--avatar:' + (CONTACT_COLORS[npc.id] || "#8e8e93") + '">' +
+        const row = '<span class="ios-avatar small" style="--avatar:' + contactColor(npc) + '">' +
           esc((npc.name || "?").slice(0,1)) + '</span><div><b>' + esc(npc.name) + '</b><small>' +
           (npc.hidden ? "屋内" : distText(npc.distance)) + ' · ' + esc(npc.activity || "") + '</small></div>';
         if (npc.hidden) {
@@ -283,7 +288,7 @@
         return '<button class="find-friend-marker' + (isActiveTarget ? " active" : "") + '" type="button" data-phone-action="' + action + '"' +
           (isActiveTarget ? "" : ' data-contact-id="' + esc(npc.id) + '"') + ' aria-label="' + esc(accessibleLabel) + '"' +
           (!canRouteToFriend && !isActiveTarget ? " disabled" : "") +
-          ' style="left:' + marker.x + '%;top:' + marker.y + '%">' +
+          ' style="left:' + marker.x + '%;top:' + marker.y + '%;--friend-color:' + contactColor(npc) + '">' +
           (isActiveTarget ? "✓" : esc((npc.name || "?").slice(0,1))) + '</button>';
       }).join("");
       return shell("探す",'<div class="ios-find-map"><span class="find-me"></span><span class="find-car">●</span>' + friendMarkers + '</div>' +

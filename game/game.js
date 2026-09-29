@@ -9431,7 +9431,7 @@
       npc.x = citizen.x;
       npc.y = citizen.y;
       npc.dir = citizen.dir;
-      npc.hidden = !citizen.visible;
+      npc.hidden = citizen.state === "inside" || !citizen.visible;
       npc.activityLabel = citizen.currentActivityLabel
         || citizen.pendingActivity?.label
         || (citizen.state === "waiting" ? "信号待ち" : "移動中");
@@ -9464,12 +9464,18 @@
     const p = worldToScreen(npc.x, npc.y);
     if (p.x < -40 || p.y < -40 || p.x > viewWidth + 40 || p.y > viewHeight + 40) return;
     ctx.fillStyle = "rgba(12,18,15,.76)";
-    roundedRectPath(ctx, p.x - 27, p.y - 76, 54, 17, 6);
+    roundedRectPath(ctx, p.x - 39, p.y - 78, 78, 20, 8);
+    ctx.fill();
+    ctx.fillStyle = npc.color;
+    ctx.beginPath();
+    ctx.arc(p.x - 29, p.y - 68, 6, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = "#f4f6f5";
     ctx.font = "600 10px system-ui, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(npc.name, p.x, p.y - 64);
+    ctx.fillText("…", p.x - 29, p.y - 64.5);
+    ctx.textAlign = "left";
+    ctx.fillText(npc.name, p.x - 20, p.y - 64);
   }
 
   function drawPedestrians() {
@@ -10359,6 +10365,7 @@
       npcs:NPCS.map((npc) => ({
         id:npc.id,
         name:npc.name,
+        color:npc.color,
         friendship:npc.friendship,
         hidden:Boolean(npc.hidden),
         activity:npc.activityLabel || "移動中",

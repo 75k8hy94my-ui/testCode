@@ -67,6 +67,46 @@ test('phone waypoint persists in game snapshots', () => {
   assert.match(gameSource, /saved\.phone && typeof saved\.phone\.waypoint === "string"/);
 });
 
+test('social contacts use their authored accent colors and escape profile text', () => {
+  const root = {
+    hidden:false,
+    innerHTML:"",
+    classList:{ toggle() {} },
+    style:{ setProperty() {} },
+    addEventListener() {}
+  };
+  const phone = phoneModule.createPhoneSystem({ root });
+  const colors = ['#110001','#220002','#330003','#440004','#550005','#660006','#770007','#880008','#990009','#aa000a'];
+  phone.update({ npcs:colors.map((color,index) => ({
+    id:`social-${index}`, name:index === 0 ? '<img src=x onerror=alert(1)>' : `人物${index}`,
+    color, friendship:index, activity:'公園で休憩', hidden:false, mapDX:100 + index * 8, mapDY:-80 - index * 7
+  })) });
+  phone.openApp('phone');
+  for (const color of colors) assert.ok(root.innerHTML.includes(`--avatar:${color}`));
+  assert.match(root.innerHTML, /&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.doesNotMatch(root.innerHTML, /<img src=x/);
+  phone.openApp('find');
+  for (const color of colors) assert.ok(root.innerHTML.includes(`--friend-color:${color}`));
+  assert.match(css, /\.find-friend-marker\{[^}]*background:var\(--friend-color/);
+});
+
+test('game hides special NPC map markers and phone coordinates while they are indoors', () => {
+  assert.match(gameSource, /npc\.hidden = citizen\.state === "inside" \|\| !citizen\.visible/);
+  assert.match(gameSource, /color:npc\.color/);
+  assert.match(gameSource, /distance:npc\.hidden \? null : distance\(p\.x, p\.y, npc\.x, npc\.y\)/);
+  assert.match(gameSource, /mapDX:npc\.hidden \? null/);
+  assert.match(gameSource, /mapDY:npc\.hidden \? null/);
+});
+
+test('map labels give every authored social NPC a visible conversation cue', () => {
+  const drawNpcSource = gameSource.slice(gameSource.indexOf('function drawNpc('), gameSource.indexOf('function drawPedestrians(', gameSource.indexOf('function drawNpc(')));
+  assert.match(drawNpcSource, /if \(npc\.hidden\) return/);
+  assert.match(drawNpcSource, /npc\.color/);
+  assert.match(drawNpcSource, /fillText\("…"/);
+  assert.match(drawNpcSource, /fillText\(npc\.name/);
+  assert.match(gameSource, /if \(!ped\.visible \|\| ped\.specialNpcId\) continue/);
+});
+
 test('phone health app displays the sixth health need and includes it in its overall condition', () => {
   const root = {
     hidden:false,
@@ -154,7 +194,7 @@ test('Find shows live visible friends and starts a friend waypoint without expos
 
   assert.match(root.innerHTML,/アオイ/);
   assert.match(root.innerHTML,/data-phone-action="friend-route" data-contact-id="aoi"/);
-  const friendMarkerPositions = [...root.innerHTML.matchAll(/class="find-friend-marker"[^>]*style="left:(\d+)%;top:(\d+)%"/g)]
+  const friendMarkerPositions = [...root.innerHTML.matchAll(/class="find-friend-marker"[^>]*style="left:(\d+)%;top:(\d+)%[^"]*"/g)]
     .map((match) => ({ x:Number(match[1]),y:Number(match[2]) }));
   assert.equal(friendMarkerPositions.length,2);
   assert.match(root.innerHTML,/<button class="find-friend-marker"[^>]*data-phone-action="friend-route"[^>]*data-contact-id="aoi"[^>]*aria-label="アオイに会いに行く"/);
