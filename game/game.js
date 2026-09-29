@@ -74,6 +74,12 @@
     return;
   }
 
+  const petCompanionModel = globalThis.PetCompanion;
+  if (!petCompanionModel?.createProgress || !petCompanionModel?.normalizeProgress || !petCompanionModel?.isShelterOpen || !petCompanionModel?.getCondition || !petCompanionModel?.adopt || !petCompanionModel?.buyFoodPack || !petCompanionModel?.advance || !petCompanionModel?.feed || !petCompanionModel?.play || !petCompanionModel?.cuddle) {
+    showRuntimeError("PetCompanion を読み込めません。");
+    return;
+  }
+
   const parkFishingModel = globalThis.ParkFishingModel;
   if (!parkFishingModel?.createProgress || !parkFishingModel?.normalizeProgress || !parkFishingModel?.getFishingWindow || !parkFishingModel?.biteChance || !parkFishingModel?.buyBait || !parkFishingModel?.cast) {
     showRuntimeError("ParkFishing を読み込めません。");
@@ -734,6 +740,7 @@
     { id:"bed", label:"ベッド", x:62, y:60, w:190, h:112, interactX:260, interactY:125, range:72 },
     { id:"shower", label:"シャワー", x:70, y:318, w:118, h:118, interactX:208, interactY:372, range:68 },
     { id:"kitchen", label:"キッチン", x:510, y:55, w:205, h:82, interactX:505, interactY:153, range:78 },
+    { id:"pet", label:"ペット", x:530, y:188, w:132, h:74, interactX:474, interactY:232, range:72 },
     { id:"sofa", label:"ソファ", x:486, y:330, w:205, h:74, interactX:476, interactY:365, range:74 },
     { id:"tv", label:"テレビ", x:520, y:392, w:155, h:70, interactX:475, interactY:425, range:72 },
     { id:"exit", label:"玄関", x:356, y:455, w:68, h:25, interactX:390, interactY:438, range:62 }
@@ -1138,6 +1145,7 @@
     communityCenter:communityCenterModel.normalizeProgress(null),
     deliveryWork:deliveryWorkModel.createProgress(),
     garden:communityGardenModel.createProgress(),
+    petCompanion:petCompanionModel.createProgress(),
     fishing:parkFishingModel.createProgress(),
     shiftsWorked: 0,
     lastShiftDay: 0,
@@ -3726,6 +3734,7 @@
 
   function advanceTime(minutes, decay = true, updateCitizens = true) {
     if (decay) decayNeeds(minutes);
+    state.petCompanion = petCompanionModel.advance(state.petCompanion, minutes);
     state.minute += minutes;
     while (state.minute >= 1440) {
       state.minute -= 1440;
@@ -3899,6 +3908,7 @@
     let nearestDistance = Infinity;
 
     for (const fixture of HOME_FIXTURES) {
+      if (fixture.id === "pet" && !state.petCompanion.pet) continue;
       const d = distance(state.player.homeX, state.player.homeY, fixture.interactX, fixture.interactY);
       if (d <= fixture.range && d < nearestDistance) {
         nearest = fixture;
@@ -4008,6 +4018,46 @@
           applyHomeMeal(result);
         }, !status.available);
       }
+    } else if (fixture.id === "pet") {
+      const pet = state.petCompanion.pet;
+      if (!pet) return;
+      const condition = petCompanionModel.getCondition(state.petCompanion);
+      const species = petCompanionModel.SPECIES[pet.speciesId];
+      actionDescription.textContent = condition.label + " / お腹 " + Math.round(pet.hunger) + " / ごきげん " + Math.round(pet.happiness) +
+        " / 体力 " + Math.round(pet.energy) + " / なかよし " + Math.round(pet.bond) + " / フード " + state.petCompanion.food + "個";
+      const feedResult = petCompanionModel.feed(state.petCompanion);
+      addChoice("ごはんをあげる", "フード1個 / 5分" + (feedResult.ok ? " / お腹+40" : " / フードがありません"), () => {
+        const result = petCompanionModel.feed(state.petCompanion);
+        if (!result.ok) {
+          showToast(result.reason === "no-food" ? "フードがありません。保護施設で購入できます" : "ペットがいません");
+          return;
+        }
+        state.petCompanion = result.progress;
+        advanceTime(result.duration);
+        showToast(pet.name + "にごはんをあげました");
+      }, !feedResult.ok);
+      const playResult = petCompanionModel.play(state.petCompanion);
+      addChoice(species.playLabel, "25分 / ごきげん+26 / なかよし+5" + (playResult.ok ? "" : " / 体力が足りません"), () => {
+        const result = petCompanionModel.play(state.petCompanion);
+        if (!result.ok) {
+          showToast(result.reason === "too-tired" ? pet.name + "は休みたがっています" : "ペットがいません");
+          return;
+        }
+        state.petCompanion = result.progress;
+        advanceTime(result.duration);
+        showToast(pet.name + "と遊びました");
+      }, !playResult.ok);
+      const cuddleResult = petCompanionModel.cuddle(state.petCompanion);
+      addChoice("なでる", "10分 / ごきげん+10 / なかよし+2", () => {
+        const result = petCompanionModel.cuddle(state.petCompanion);
+        if (!result.ok) {
+          showToast("ペットがいません");
+          return;
+        }
+        state.petCompanion = result.progress;
+        advanceTime(result.duration);
+        showToast(pet.name + "をなでました");
+      }, !cuddleResult.ok);
     } else if (fixture.id === "tv") {
       const program = homeTelevisionModel.getProgram(Math.floor(state.minute));
       if (!program) {
@@ -4079,6 +4129,48 @@
           showToast(offer.parcelName + "を受注 · " + (destination?.name || "目的地") + "へ向かいましょう");
         }, Boolean(active));
       }
+    }
+
+    if (place.id === "pet-shelter") {
+      const open = petCompanionModel.isShelterOpen(Math.floor(state.minute));
+      actionDescription.textContent = "犬か猫を1匹迎えられる保護施設です。営業時間 09:00〜19:00。ペットは自宅で待っています。";
+      if (state.petCompanion.pet) {
+        actionDescription.textContent += "\n" + state.petCompanion.pet.name + "と暮らしています。フードの購入はこちら。";
+      }
+      const reasonText = (reason) => reason === "closed" ? "営業時間外です（09:00〜19:00）"
+        : reason === "already-owned" ? "すでにペットと暮らしています（1匹まで）"
+          : reason === "insufficient-funds" ? "所持金が足りません"
+            : reason === "inventory-limit" ? "フードをこれ以上持てません"
+              : "利用できません";
+      for (const species of Object.values(petCompanionModel.SPECIES)) {
+        const preview = petCompanionModel.adopt(state.petCompanion, state.cash, species.id, Math.floor(state.minute));
+        addChoice(species.label + "を迎える（" + species.name + "）", preview.ok
+          ? "¥" + species.adoptionCost.toLocaleString("ja-JP") + " / 20分 / お世話は自宅でできます"
+          : reasonText(preview.reason), () => {
+          const result = petCompanionModel.adopt(state.petCompanion, state.cash, species.id, Math.floor(state.minute));
+          if (!result.ok) {
+            showToast(reasonText(result.reason));
+            return;
+          }
+          state.petCompanion = result.progress;
+          state.cash = result.cashRemaining;
+          advanceTime(result.duration);
+          showToast(result.progress.pet.name + "を家族に迎えました");
+        }, !preview.ok);
+      }
+      const foodPreview = petCompanionModel.buyFoodPack(state.petCompanion, state.cash, Math.floor(state.minute));
+      addChoice("ペットフードを買う", foodPreview.ok
+        ? "3食分 / ¥450 / 所持 " + state.petCompanion.food + "個"
+        : reasonText(foodPreview.reason), () => {
+        const result = petCompanionModel.buyFoodPack(state.petCompanion, state.cash, Math.floor(state.minute));
+        if (!result.ok) {
+          showToast(reasonText(result.reason));
+          return;
+        }
+        state.petCompanion = result.progress;
+        state.cash = result.cashRemaining;
+        showToast("ペットフードを3食分買いました");
+      }, !foodPreview.ok);
     }
 
     if (place.id === "public-bath") {
@@ -4938,6 +5030,7 @@
         communityCenter:communityCenterModel.normalizeProgress(state.communityCenter),
         deliveryWork:deliveryWorkModel.normalizeProgress(state.deliveryWork),
         communityGarden:communityGardenModel.normalizeProgress(state.garden),
+        petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
         fishing:parkFishingModel.normalizeProgress(state.fishing),
         shiftsWorked: state.shiftsWorked,
         lastShiftDay:state.lastShiftDay,
@@ -5187,6 +5280,7 @@
       state.communityCenter = communityCenterModel.normalizeProgress(saved.communityCenter);
       state.deliveryWork = deliveryWorkModel.normalizeProgress(saved.deliveryWork);
       state.garden = communityGardenModel.normalizeProgress(saved.communityGarden);
+      state.petCompanion = petCompanionModel.normalizeProgress(saved.petCompanion);
       state.fishing = parkFishingModel.normalizeProgress(saved.fishing);
       state.shiftsWorked = Math.max(0, Math.floor(Number(saved.shiftsWorked) || 0));
       state.lastShiftDay = Math.max(0, Math.floor(Number(saved.lastShiftDay) || 0));

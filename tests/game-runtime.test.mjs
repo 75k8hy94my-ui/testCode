@@ -154,6 +154,34 @@ test('social NPC headless instrumentation is local-only and exposes a read-only 
   assert.match(source, /routeEdgeIds:Array\.isArray\(citizen\.routeEdgeIds\)/);
 });
 
+test('pet companion model loads before runtime and survives time and save migration', () => {
+  assert.match(html, /<script src="\.\/pet-companion\.js\?v=[^"]+"><\/script>/);
+  assert.ok(html.indexOf('pet-companion.js') < html.indexOf('game.js'));
+  assert.match(source, /petCompanionModel\.advance\(state\.petCompanion, minutes\)/);
+  assert.match(source, /petCompanion:s*petCompanionModel\.normalizeProgress\(state\.petCompanion\)/);
+  assert.match(source, /state\.petCompanion\s*=\s*petCompanionModel\.normalizeProgress\(saved\.petCompanion\)/);
+  assert.match(source, /petCompanion:petCompanionModel\.createProgress\(\)/);
+});
+
+test('animal shelter actions revalidate hours and atomic adoption or food results', () => {
+  const shelter = source.slice(source.indexOf('if (place.id === "pet-shelter")'), source.indexOf('if (place.id === "public-bath")'));
+  assert.match(shelter, /petCompanionModel\.isShelterOpen\(Math\.floor\(state\.minute\)\)/);
+  assert.match(shelter, /petCompanionModel\.adopt\(state\.petCompanion, state\.cash, species\.id, Math\.floor\(state\.minute\)\)/);
+  assert.match(shelter, /petCompanionModel\.buyFoodPack\(state\.petCompanion, state\.cash, Math\.floor\(state\.minute\)\)/);
+  assert.match(shelter, /state\.cash\s*=\s*result\.cashRemaining/);
+  assert.match(shelter, /state\.petCompanion\s*=\s*result\.progress/);
+  assert.match(shelter, /advanceTime\(result\.duration\)/);
+});
+
+test('home pet care is available only to an owner and uses validated model transitions', () => {
+  assert.match(source, /if \(fixture\.id === "pet" && !state\.petCompanion\.pet\) continue/);
+  const care = source.slice(source.indexOf('fixture.id === "pet"'), source.indexOf('fixture.id === "tv"'));
+  assert.match(care, /petCompanionModel\.feed\(state\.petCompanion\)/);
+  assert.match(care, /petCompanionModel\.play\(state\.petCompanion\)/);
+  assert.match(care, /petCompanionModel\.cuddle\(state\.petCompanion\)/);
+  assert.match(care, /空腹|お腹/);
+});
+
 test('game loads the community center schedule model before the runtime', () => {
   assert.match(html, /<script src="\.\/community-center\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('community-center.js') < html.indexOf('game.js'));
@@ -162,7 +190,7 @@ test('game loads the community center schedule model before the runtime', () => 
 test('community garden model loads before game runtime and progresses with absolute game time', () => {
   assert.match(html, /<script src="\.\/community-garden\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('community-garden.js') < html.indexOf('game.js'));
-  assert.match(html, /<script src="\.\/game\.js\?v=20260929-home-tv-1"><\/script>/);
+  assert.match(html, /<script src="\.\/game\.js\?v=20260929-pet-companion-1"><\/script>/);
   assert.match(source, /const communityGardenModel = globalThis\.CommunityGarden/);
   assert.match(source, /communityGardenModel\.advance\([\s\S]{0,100}communityGardenModel\.absoluteMinute\(state\.day, Math\.floor\(state\.minute\)\)\s*\)/);
 });
@@ -340,8 +368,8 @@ test('public bath rules load before runtime and the sento interaction applies it
 });
 
 test('clinic map and runtime changes request fresh browser assets', () => {
-  assert.match(html, /map-model\.js\?v=20260929-wakaba-clinic-1/);
-  assert.match(html, /game\.js\?v=20260929-home-tv-1/);
+  assert.match(html, /map-model\.js\?v=20260929-pet-shelter-1/);
+  assert.match(html, /game\.js\?v=20260929-pet-companion-1/);
 });
 
 test('health model loads before runtime and has a visible sixth needs meter', () => {
