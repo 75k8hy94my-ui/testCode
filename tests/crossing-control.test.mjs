@@ -65,3 +65,35 @@ test('vehicles that already passed an unsignalized crossing do not keep the pede
   );
   assert.equal(yieldDecision.shouldYield, false);
 });
+
+
+test('a vehicle already committed into the crossing clears first instead of mutually waiting with a pedestrian', () => {
+  const vehicle = { id:'committed', edgeId:'street', distanceToCrossing:30, speed:0, length:76 };
+  const assessment = crossingControl.assessPedestrian(crosswalk, { id:'walker', speed:30 }, [vehicle]);
+  assert.equal(assessment.decision, 'wait');
+  assert.equal(assessment.vehicleCommitted, true);
+  assert.equal(assessment.requestVehicleYield, false);
+
+  const yieldDecision = crossingControl.vehicleYieldDecision(
+    crosswalk,
+    { pedestrianId:'walker', phase:'waiting', clearanceTime:5 },
+    vehicle
+  );
+  assert.equal(yieldDecision.committed, true);
+  assert.equal(yieldDecision.shouldYield, false);
+});
+
+test('a vehicle stopped fully behind the crossing yields and lets the pedestrian enter', () => {
+  const vehicle = { id:'safe-stop', edgeId:'street', distanceToCrossing:70, speed:0, length:76 };
+  const assessment = crossingControl.assessPedestrian(crosswalk, { id:'walker', speed:30 }, [vehicle]);
+  assert.equal(assessment.decision, 'cross');
+  assert.equal(assessment.vehicleCommitted, false);
+
+  const yieldDecision = crossingControl.vehicleYieldDecision(
+    crosswalk,
+    { pedestrianId:'walker', phase:'waiting', clearanceTime:5 },
+    vehicle
+  );
+  assert.equal(yieldDecision.shouldYield, true);
+  assert.ok(yieldDecision.frontClearance >= crossingControl.SAFE_FRONT_CLEARANCE);
+});
