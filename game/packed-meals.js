@@ -55,6 +55,14 @@
     return normalizeInventory(value).batches.reduce((total, batch) => total + batch.portions, 0);
   }
 
+  function getMeal(recipeId) {
+    return mealFor(recipeId);
+  }
+
+  function freshnessMinutes(batch) {
+    return mealFor(batch?.recipeId)?.freshnessMinutes || FRESHNESS_MINUTES;
+  }
+
   function validTime(value) {
     return Number.isSafeInteger(value) && value >= 0;
   }
@@ -75,8 +83,7 @@
     const inventory = normalizeInventory(value);
     if (!validTime(now)) return inventory;
     return { batches:inventory.batches.filter((batch) => {
-      const meal = mealFor(batch.recipeId);
-      const freshness = meal?.freshnessMinutes || FRESHNESS_MINUTES;
+      const freshness = freshnessMinutes(batch);
       return batch.preparedAt <= now && now < batch.preparedAt + freshness;
     }).map((batch) => ({ ...batch })) };
   }
@@ -88,8 +95,7 @@
     if (index < 0) {
       const original = normalizeInventory(value);
       const wasExpired = original.batches.some((batch) => {
-        const meal = mealFor(batch.recipeId);
-        return `${batch.recipeId}@${batch.preparedAt}` === mealId && now >= batch.preparedAt + (meal?.freshnessMinutes || FRESHNESS_MINUTES);
+        return `${batch.recipeId}@${batch.preparedAt}` === mealId && now >= batch.preparedAt + freshnessMinutes(batch);
       });
       return { ok:false, reason:wasExpired ? "expired" : "not-found", inventory };
     }
@@ -101,5 +107,5 @@
     return { ok:true, inventory:{ batches }, recipe:mealFor(batch.recipeId), portionsRemaining };
   }
 
-  return Object.freeze({ MAX_PORTIONS, FRESHNESS_MINUTES, createInventory, normalizeInventory, portionCount, registerPreparedMeals, store, expire, eat });
+  return Object.freeze({ MAX_PORTIONS, FRESHNESS_MINUTES, createInventory, normalizeInventory, portionCount, registerPreparedMeals, getMeal, freshnessMinutes, store, expire, eat });
 });

@@ -294,14 +294,15 @@
       const blocked = Boolean(model.inVehicle || model.inTrain);
       const rows = batches.map(function(batch){
         const freshness = Math.max(0, Math.floor(Number(batch.freshnessMinutes) || 0));
+        const freshnessTotal = Math.max(1, Math.floor(Number(batch.freshnessTotalMinutes) || 1440));
         const disabled = blocked || freshness <= 0 || !batch.mealId;
         return '<article class="ios-meal-card"><div class="ios-meal-icon">🍱</div><div class="ios-meal-info"><b>' + esc(batch.name || "食事") +
           '</b><small>' + Math.max(0,Math.floor(Number(batch.portions) || 0)) + '食 · 残り' + freshness + '分</small><div class="ios-meal-freshness"><i style="width:' +
-          Math.min(100,Math.round(freshness / 1440 * 100)) + '%"></i></div></div><button type="button" data-phone-action="eat-meal" data-meal-id="' +
+          Math.min(100,Math.round(freshness / freshnessTotal * 100)) + '%"></i></div></div><button type="button" data-phone-action="eat-meal" data-meal-id="' +
           esc(batch.mealId || "") + '"' + (disabled ? ' disabled title="' + (blocked ? '車や電車を降りてから食べられます' : '期限切れです') + '"' : '') +
           '>食べる</button></article>';
       }).join("");
-      return shell("食事", '<section class="ios-section ios-meals-summary"><span>持ち歩き ' + portions + ' / ' + capacity + '食</span><small>作ってから24時間で期限切れ</small></section>' +
+      return shell("食事", '<section class="ios-section ios-meals-summary"><span>持ち歩き ' + portions + ' / ' + capacity + '食</span><small>食事ごとの期限にご注意ください</small></section>' +
         (blocked ? '<p class="ios-meals-hint">車や電車を降りてから食べられます</p>' : '') +
         (rows || '<div class="ios-meals-empty"><span>🍱</span><h3>持ち歩きの食事はありません</h3><p>自宅のキッチンで弁当を作ると、外出先で食べられます。</p></div>'));
     }

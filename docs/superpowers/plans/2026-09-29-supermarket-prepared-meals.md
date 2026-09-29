@@ -71,7 +71,7 @@
 
 **Interfaces:** consumes the game runtime’s existing localhost-only test hook, matching the arcade headless verification pattern.
 
-- [ ] Add a deterministic browser flow checking buying twice, exact cash/inventory changes, eating, sold-out or funds/capacity behavior, day refill, and reload persistence.
+- [ ] Add a deterministic browser flow checking buying twice, exact cash/inventory changes, eating, sold-out or funds/capacity behavior, day refill, and game-snapshot restoration.
 - [ ] Capture desktop and mobile screenshots and collect console error/warning, pageerror, failed request and bad response diagnostics.
 - [ ] Run verifier; expect all checks to pass and diagnostics empty.
 - [ ] Commit as `test: verify supermarket prepared meal loop headlessly`.

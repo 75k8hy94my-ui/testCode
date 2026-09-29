@@ -116,6 +116,12 @@
     showRuntimeError("PackedMeals を読み込めません。");
     return;
   }
+  const storePreparedFoodModel = globalThis.CityDaysStorePreparedFood;
+  if (!storePreparedFoodModel?.createInventory || !storePreparedFoodModel?.normalizeInventory || !storePreparedFoodModel?.listMenu || !storePreparedFoodModel?.purchase) {
+    showRuntimeError("StorePreparedFood を読み込めません。");
+    return;
+  }
+  packedMealsModel.registerPreparedMeals(storePreparedFoodModel.MENU);
 
   const homeCraftingModel = globalThis.CityDaysHomeCrafting;
   if (!homeCraftingModel?.createProgress || !homeCraftingModel?.normalizeProgress || !homeCraftingModel?.buyKitPack || !homeCraftingModel?.craft || !homeCraftingModel?.giveGift) {
@@ -1205,6 +1211,7 @@
     petWalk:petWalkModel.createWalkState(),
     fishing:parkFishingModel.createProgress(),
     packedMeals:packedMealsModel.createInventory(),
+    storePreparedFood:storePreparedFoodModel.createInventory(),
     homeCrafting:homeCraftingModel.createProgress(),
     shiftsWorked: 0,
     lastShiftDay: 0,
@@ -4304,6 +4311,32 @@
     return true;
   }
 
+  function buyPreparedFood(itemId) {
+    const absoluteMinute = communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute));
+    const result = storePreparedFoodModel.purchase(
+      state.storePreparedFood, state.day, state.cash, state.packedMeals, itemId, absoluteMinute, packedMealsModel
+    );
+    if (!result.ok) {
+      const messages = {
+        "unknown-item":"その商品はありません",
+        "invalid-time":"購入時刻を確認できません",
+        "insufficient-funds":"購入するお金が足りません",
+        "sold-out":"本日の分は売り切れました。明日またお越しください",
+        "meal-capacity":"持ち歩きの食事がいっぱいです。先に食べましょう"
+      };
+      showToast(messages[result.reason] || "購入できませんでした");
+      return false;
+    }
+    state.storePreparedFood = result.inventory;
+    state.packedMeals = result.mealInventory;
+    state.cash = result.cashRemaining;
+    advanceTime(result.duration);
+    updateSmartphone();
+    queueMicrotask(() => openPlace(PLACES.find((place) => place.id === "store")));
+    showToast(result.item.name + "を買いました。食事アプリに追加しました −¥" + result.cost.toLocaleString("ja-JP"));
+    return true;
+  }
+
   function craftHomeItem(recipeId) {
     if (!state.player.inHome || nearestHomeInteraction()?.target?.id !== "worktable") {
       showToast("自宅の作業机のそばで作れます");
@@ -4732,7 +4765,16 @@
     }
 
     if (place.id === "store") {
+      state.storePreparedFood = storePreparedFoodModel.normalizeInventory(state.storePreparedFood, state.day);
       actionDescription.textContent = "食料品、手芸用品とちょっとした食事を買えます。";
+      const packedCount = packedMealsModel.portionCount(state.packedMeals);
+      for (const item of storePreparedFoodModel.listMenu(state.storePreparedFood, state.day)) {
+        const unavailable = item.remaining < 1 ? "本日売り切れ"
+          : state.cash < item.price ? "所持金不足 · ¥" + item.price.toLocaleString("ja-JP")
+            : packedCount >= packedMealsModel.MAX_PORTIONS ? "持ち歩きの食事がいっぱいです"
+              : "¥" + item.price.toLocaleString("ja-JP") + " · 残り " + item.remaining + "個 · 購入5分 · 空腹+" + item.effects.hunger;
+        addChoice(item.name, unavailable, () => buyPreparedFood(item.id), item.remaining < 1 || state.cash < item.price || packedCount >= packedMealsModel.MAX_PORTIONS);
+      }
       const kitPurchase = homeCraftingModel.buyKitPack(state.homeCrafting, state.cash);
       addChoice("手芸キットを買う", "3回分 / ¥" + homeCraftingModel.KIT_PACK_COST.toLocaleString("ja-JP") + " / 10分 / 所持 " + state.homeCrafting.kits + "個", () => {
         const result = homeCraftingModel.buyKitPack(state.homeCrafting, state.cash);
@@ -5625,6 +5667,7 @@
         communityCenter:communityCenterModel.normalizeProgress(state.communityCenter),
         libraryReading:libraryReadingModel.normalizeProgress(state.libraryReading),
         packedMeals:packedMealsModel.normalizeInventory(state.packedMeals),
+        storePreparedFood:storePreparedFoodModel.normalizeInventory(state.storePreparedFood, state.day),
         homeCrafting:homeCraftingModel.normalizeProgress(state.homeCrafting),
         deliveryWork:deliveryWorkModel.normalizeProgress(state.deliveryWork),
         communityGarden:communityGardenModel.normalizeProgress(state.garden),
@@ -5889,6 +5932,7 @@
       state.communityCenter = communityCenterModel.normalizeProgress(saved.communityCenter);
       state.libraryReading = libraryReadingModel.normalizeProgress(saved.libraryReading);
       state.packedMeals = packedMealsModel.normalizeInventory(saved.packedMeals);
+      state.storePreparedFood = storePreparedFoodModel.normalizeInventory(saved.storePreparedFood, state.day);
       state.homeCrafting = homeCraftingModel.normalizeProgress(saved.homeCrafting);
       state.deliveryWork = deliveryWorkModel.normalizeProgress(saved.deliveryWork);
       state.garden = communityGardenModel.normalizeProgress(saved.communityGarden);
@@ -11231,8 +11275,9 @@
         batches:packedMealsModel.expire(state.packedMeals, communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute))).batches.map((batch) => ({
           ...batch,
           mealId:batch.recipeId + "@" + batch.preparedAt,
-          name:homeCookingModel.RECIPES.find((recipe) => recipe.id === batch.recipeId)?.name || "食事",
-          freshnessMinutes:Math.max(0, batch.preparedAt + packedMealsModel.FRESHNESS_MINUTES - communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute)))
+          name:packedMealsModel.getMeal(batch.recipeId)?.name || "食事",
+          freshnessMinutes:Math.max(0, batch.preparedAt + packedMealsModel.freshnessMinutes(batch) - communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute))),
+          freshnessTotalMinutes:packedMealsModel.freshnessMinutes(batch)
         })),
         portions:packedMealsModel.portionCount(state.packedMeals),
         capacity:packedMealsModel.MAX_PORTIONS
@@ -11555,6 +11600,7 @@
         umbrellaOwned:state.umbrellaOwned === true,
         wardrobe:wardrobeModel.normalizeWardrobe(state.wardrobe),
         arcade:arcadeGamesModel.normalizeProgress(state.arcade),
+        storePreparedFood:storePreparedFoodModel.normalizeInventory(state.storePreparedFood, state.day),
         arcadeUi:{ mode:arcadeGame.mode, position:arcadeGame.position, panelOpen:!arcadePanel.hidden },
         skills:{ ...state.communityCenter.skills },
         npcFriendship:{ ...socialNpcState.friendship },
@@ -11612,6 +11658,7 @@
           return isPlayerUsingUmbrella();
         },
         buyUmbrellaForTest() { return buyUmbrella(); },
+        buyPreparedFoodForTest(itemId) { return buyPreparedFood(itemId); },
         setCashForTest(amount) {
           if (!Number.isFinite(amount) || amount < 0) return false;
           state.cash = Math.floor(amount);

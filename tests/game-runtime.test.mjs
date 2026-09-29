@@ -99,7 +99,7 @@ test('wardrobe model is loaded before runtime and is normalized in snapshots', (
   assert.match(source, /wardrobe:wardrobeModel\.createWardrobe\(\)/);
   assert.match(source, /wardrobe:wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
   assert.match(source, /state\.wardrobe = wardrobeModel\.normalizeWardrobe\(saved\.wardrobe\)/);
-  assert.match(html, /game\.js\?v=20260929-arcade-gameplay-1/);
+  assert.match(html, /game\.js\?v=20260929-store-prepared-meals-1/);
 });
 
 test('arcade progress is loaded before the game and migrates safely through snapshots', () => {
@@ -416,6 +416,19 @@ test('pet is drawn in the home interior only and its read-only phone projection 
   const phoneSnapshot = source.slice(source.indexOf('function phoneModelSnapshot()'), source.indexOf('function setPhoneWaypoint('));
   assert.match(phoneSnapshot, /petCompanion\s*:/);
   assert.match(phoneSnapshot, /petCompanionModel\.getCondition\(state\.petCompanion\)/);
+});
+
+test('supermarket prepared meals load, persist daily stock, and join the existing carry-meal flow', () => {
+  assert.ok(html.indexOf('store-prepared-food.js') < html.indexOf('game.js'));
+  assert.match(source, /const storePreparedFoodModel = globalThis\.CityDaysStorePreparedFood/);
+  assert.match(source, /storePreparedFood:storePreparedFoodModel\.createInventory\(\)/);
+  assert.match(source, /storePreparedFood:storePreparedFoodModel\.normalizeInventory\(state\.storePreparedFood, state\.day\)/);
+  assert.match(source, /state\.storePreparedFood = storePreparedFoodModel\.normalizeInventory\(saved\.storePreparedFood, state\.day\)/);
+  const storeStart=source.indexOf('if (place.id === "store")');
+  const storeEnd=source.indexOf('if (place.id === "fuel-station")',storeStart);
+  assert.match(source.slice(storeStart,storeEnd), /storePreparedFoodModel\.listMenu/);
+  assert.match(source, /function buyPreparedFood\(itemId\)/);
+  assert.match(source, /buyPreparedFoodForTest\(itemId\)/);
 });
 
 test('dog walking is persisted, follows the outdoor trail, and has guarded start and home completion', () => {
