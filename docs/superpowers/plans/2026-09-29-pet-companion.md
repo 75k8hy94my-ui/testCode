@@ -72,18 +72,18 @@
 
 **Interfaces:** `phoneModelSnapshot()` provides `petCompanion` as a detached normalized projection. The phone's `pet` app is read-only and renders an empty adoption prompt or the current name/species, need values and food count. The home scene draws the adopted species only inside the interior and shows its care fixture/status.
 
-- [ ] **Step 1:** Add failing tests for phone app registration/render, escaped pet name, fresh updates, no-pet state, home-only species render and accessible fixture action labels.
-- [ ] **Step 2:** Run focused runtime/phone tests and observe missing UI assertions.
-- [ ] **Step 3:** Implement species-specific canvas art, the home fixture, and responsive read-only phone panel using existing rendering conventions.
-- [ ] **Step 4:** Run focused suites and verify layout at desktop/mobile widths.
-- [ ] **Step 5:** Commit presentation and tests.
+- [x] **Step 1:** Add failing tests for phone app registration/render, escaped pet name, fresh updates, no-pet state, home-only species render and accessible fixture action labels.
+- [x] **Step 2:** Run focused runtime/phone tests and observe missing UI assertions.
+- [x] **Step 3:** Implement species-specific canvas art, the home fixture, and responsive read-only phone panel using existing rendering conventions.
+- [x] **Step 4:** Run focused suites and verify layout at desktop/mobile widths.
+- [x] **Step 5:** Commit presentation and tests.
 
 ### Task 5: Full gameplay verification and visual QA
 
 **Files:** Create or modify `scripts/verify-pet-companion-headless.mjs`; temporary screenshots/reports stay outside the repository.
 
-- [ ] **Step 1:** Run `npm test`, `npm run verify:static`, and `git diff --check`.
-- [ ] **Step 2:** Start the project on an unused local port; use CLI headless Chromium/CDP only to capture desktop/mobile screenshots and console/warning/pageerror/failed-request/HTTP diagnostics.
-- [ ] **Step 3:** Exercise shelter adoption, food purchase, entry home, feed and play, then verify phone reflects the resulting pet state and the no-pet baseline remains safe.
-- [ ] **Step 4:** Inspect desktop/mobile home and phone screenshots, DOM/computed layout and canvas size; fix regressions test-first and rerun all checks.
-- [ ] **Step 5:** Commit only scoped verification assets/code; preserve pre-existing untracked files.
+- [x] **Step 1:** Run `npm test`, `npm run verify:static`, and `git diff --check`.
+- [x] **Step 2:** Start the project on an unused local port; use CLI headless Chromium/CDP only to capture desktop/mobile screenshots and console/warning/pageerror/failed-request/HTTP diagnostics.
+- [x] **Step 3:** Exercise shelter adoption, food purchase, entry home, feed and play, then verify phone reflects the resulting pet state and the no-pet baseline remains safe.
+- [x] **Step 4:** Inspect desktop/mobile home and phone screenshots, DOM/computed layout and canvas size; fix regressions test-first and rerun all checks.
+- [x] **Step 5:** Commit only scoped verification assets/code; preserve pre-existing untracked files.
