@@ -114,6 +114,12 @@ test('laundering validates business hours, closing time, balance and already-cle
   assert.equal(dirty.cleanlinessByOutfitId.everyday, 72.25);
 });
 
+test('cleanliness labels use readable text thresholds and reject corrupted values safely', () => {
+  assert.deepEqual([100,89.9,60,59.9,0,NaN].map((value) => wardrobe.getCleanlinessLabel(value)), [
+    '清潔','少し汚れています','少し汚れています','洗濯推奨','洗濯推奨','清潔'
+  ]);
+});
+
 test('wardrobe transitions return copies instead of mutating an existing save object', () => {
   const start = { ownedOutfitIds:['everyday'], equippedOutfitId:'everyday' };
   const serialized = JSON.stringify(start);

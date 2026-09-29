@@ -4865,9 +4865,12 @@
     } else if (fixture.id === "closet") {
       const wardrobe = wardrobeModel.normalizeWardrobe(state.wardrobe);
       const equipped = wardrobeModel.getOutfit(wardrobe.equippedOutfitId);
-      actionDescription.textContent = "着用中: " + equipped.name + " / 手持ちのコーデに着替えられます。着替えは5分です。";
+      const equippedCleanliness = wardrobe.cleanlinessByOutfitId[wardrobe.equippedOutfitId];
+      actionDescription.textContent = "着用中: " + equipped.name + " / 清潔度 " + Math.round(equippedCleanliness) + "%（" + wardrobeModel.getCleanlinessLabel(equippedCleanliness) + "）。手持ちのコーデに着替えられます。着替えは5分です。";
       for (const outfit of wardrobeModel.CATALOG.filter((item) => wardrobe.ownedOutfitIds.includes(item.id))) {
-        addChoice(outfit.name, outfit.id === wardrobe.equippedOutfitId ? "着用中" : "5分 / 能力への影響なし", () => {
+        const cleanliness = wardrobe.cleanlinessByOutfitId[outfit.id];
+        const condition = "清潔度 " + Math.round(cleanliness) + "% / " + wardrobeModel.getCleanlinessLabel(cleanliness);
+        addChoice(outfit.name, outfit.id === wardrobe.equippedOutfitId ? "着用中 / " + condition : "5分 / " + condition + " / 能力への影響なし", () => {
           equipPlayerOutfit(outfit.id);
         }, outfit.id === wardrobe.equippedOutfitId);
       }
@@ -5106,7 +5109,7 @@
       const outfit = wardrobeModel.getOutfit(wardrobe.equippedOutfitId);
       const cleanliness = wardrobe.cleanlinessByOutfitId[wardrobe.equippedOutfitId];
       const preview = wardrobeModel.launder(wardrobe, state.cash, Math.floor(state.minute));
-      const status = cleanliness >= 90 ? "清潔" : cleanliness >= 60 ? "少し汚れています" : "洗濯推奨";
+      const status = wardrobeModel.getCleanlinessLabel(cleanliness);
       const reason = preview.reason === "not-open" ? "営業時間外です（6:00〜23:00）"
         : preview.reason === "closing-time" ? "閉店までに洗濯が終わりません"
           : preview.reason === "insufficient-funds" ? "洗濯料金300円が足りません"

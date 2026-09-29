@@ -121,5 +121,10 @@
     };
   }
 
-  return Object.freeze({ DEFAULT_OUTFIT_ID, CATALOG, createWardrobe, normalizeWardrobe, getOutfit, buyOutfit, equipOutfit, advanceWear, launder });
+  function getCleanlinessLabel(value) {
+    if (!Number.isFinite(value) || value >= 90) return "清潔";
+    return value >= 60 ? "少し汚れています" : "洗濯推奨";
+  }
+
+  return Object.freeze({ DEFAULT_OUTFIT_ID, CATALOG, createWardrobe, normalizeWardrobe, getOutfit, buyOutfit, equipOutfit, advanceWear, launder, getCleanlinessLabel });
 });

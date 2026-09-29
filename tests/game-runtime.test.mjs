@@ -802,6 +802,16 @@ test('community center actions revalidate entry, charge once, and award completi
   assert.match(action, /socialNpcState\.relationships\[pairId\]/);
 });
 
+test('home closet shows cleanliness percentage, a text condition and the equipped outfit', () => {
+  const closetStart = source.indexOf('} else if (fixture.id === "closet")');
+  const closetEnd = source.indexOf('fixture.id === "pet"', closetStart);
+  const closet = source.slice(closetStart, closetEnd);
+  assert.match(closet, /wardrobe\.cleanlinessByOutfitId\[outfit\.id\]/);
+  assert.match(closet, /wardrobeModel\.getCleanlinessLabel\(/);
+  assert.match(closet, /清潔度/);
+  assert.match(closet, /着用中/);
+});
+
 test('outfit cleanliness advances with game time and survives purchases, dressing and snapshots', () => {
   assert.match(html, /wardrobe\.js\?v=[^\"]+/);
   const advanceStart = source.indexOf('function advanceTime(');
