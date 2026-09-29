@@ -103,3 +103,23 @@ test('crosswalk depth contributes to the safe front clearance shared with vehicl
   assert.equal(crossingControl.safeFrontClearance({ ...crosswalk, depth:30 }), 23);
   assert.equal(crossingControl.safeFrontClearance({ ...crosswalk, depth:0 }), crossingControl.SAFE_FRONT_CLEARANCE);
 });
+
+
+test('a pedestrian waiting on a red signal does not independently stop signal-controlled traffic', () => {
+  const signalized = { ...crosswalk, signalized:true, depth:24 };
+  const vehicle = { id:'green-car', edgeId:'street', distanceToCrossing:70, speed:0, length:76 };
+  const waiting = crossingControl.vehicleYieldDecision(
+    signalized,
+    { pedestrianId:'walker', phase:'waiting', clearanceTime:5 },
+    vehicle
+  );
+  assert.equal(waiting.shouldYield, false);
+  assert.equal(waiting.signalControlled, true);
+
+  const occupied = crossingControl.vehicleYieldDecision(
+    signalized,
+    { pedestrianId:'walker', phase:'crossing', clearanceTime:5 },
+    vehicle
+  );
+  assert.equal(occupied.shouldYield, true);
+});
