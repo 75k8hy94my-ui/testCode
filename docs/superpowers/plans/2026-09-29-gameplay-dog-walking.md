@@ -80,7 +80,7 @@
 - [x] Step 2: Run `node --test tests/game-runtime.test.mjs tests/pet-companion.test.mjs tests/pet-walk.test.mjs`; verify the new runtime paths fail for the intended missing behavior.
 - [x] Step 3: Integrate the model in the existing game loop, snapshot serializer/restorer, pet-fixture choices, home/vehicle/train transitions, and world draw order. Add localhost-only hook controls only when required for CDP observation.
 - [x] Step 4: Run `node --test tests/game-runtime.test.mjs tests/pet-companion.test.mjs tests/pet-walk.test.mjs`; all targeted tests pass.
-- [ ] Step 5: Commit the runtime integration.
+- [x] Step 5: Commit the runtime integration.
 
 ### Task 4: Headless route and responsive visual verification
 
