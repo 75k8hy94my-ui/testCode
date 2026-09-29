@@ -46,11 +46,11 @@
 - `clearWalkState() -> WalkState`
 - WalkState is `{ active, trail:[{x,y,distance}], distance, followerDistance, elapsedMinutes, petX, petY, facing }`.
 
-- [ ] Step 1: Write tests for inactive/default, begin, sampled turns, trail-bound pruning, follower speed budget/no overshoot, elapsed-time accumulation, hostile/missing-snapshot normalization, and incompatible player/pet contexts.
-- [ ] Step 2: Run `node --test tests/pet-walk.test.mjs`; confirm failures are caused by the missing API/behavior.
-- [ ] Step 3: Implement the pure UMD trail model with a 512-point bound and follower-aware pruning; load it before runtime.
-- [ ] Step 4: Run `node --test tests/pet-walk.test.mjs`; all trail-model cases pass.
-- [ ] Step 5: Commit the model and tests.
+- [x] Step 1: Write tests for inactive/default, begin, sampled turns, trail-bound pruning, follower speed budget/no overshoot, elapsed-time accumulation, hostile/missing-snapshot normalization, and incompatible player/pet contexts.
+- [x] Step 2: Run `node --test tests/pet-walk.test.mjs`; confirm failures are caused by the missing API/behavior.
+- [x] Step 3: Implement the pure UMD trail model with a 512-point bound and follower-aware pruning; load it before runtime.
+- [x] Step 4: Run `node --test tests/pet-walk.test.mjs`; all trail-model cases pass.
+- [x] Step 5: Commit the model and tests.
 
 ### Task 2: Pet walk outcome progression
 
