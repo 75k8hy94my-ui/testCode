@@ -194,8 +194,6 @@
     const nodePositions = new Map();
     const endpointGroups = new Map();
     const externalNodeAliases = new Map();
-    const deferredPedestrianEdges = [];
-    const placeNodes = new Set((mapModel.places || []).map((place) => place.entranceNodeId));
 
     const addSegment = (segment) => {
       if (!(segment.length > 0) || segment.points.length < 2) return;
@@ -218,10 +216,7 @@
       if (!edge.pedestrian) continue;
       const length = edgeLength(edge);
       if (length < 1) continue;
-      if (!edge.vehicle) {
-        deferredPedestrianEdges.push(edge);
-        continue;
-      }
+      if (!edge.vehicle) continue;
 
       const corridor = mapModel.pedestrianCorridor?.(edge);
       const offset = corridor?.centerOffset || edge.width / 2 + 22;
