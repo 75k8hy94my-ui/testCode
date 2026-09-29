@@ -95,3 +95,38 @@ test('junction crosswalk signal metadata follows the whole signalized junction, 
     assert.equal(crossing.signalized, expected, crossing.id);
   }
 });
+
+
+test('the generated pedestrian graph never enters a vehicle road except on its own explicit crosswalk', () => {
+  const map = createMapModel();
+  assert.deepEqual(map.pedestrianNavigation.safetyViolations, []);
+});
+
+test('the generated pedestrian graph is one connected component', () => {
+  const map = createMapModel();
+  const graph = map.pedestrianNavigation;
+  const start = graph.nodes[0];
+  const seen = new Set([start]);
+  const queue = [start];
+  while (queue.length) {
+    const nodeId = queue.shift();
+    for (const link of graph.adjacency.get(nodeId) || []) {
+      if (seen.has(link.nodeId)) continue;
+      seen.add(link.nodeId);
+      queue.push(link.nodeId);
+    }
+  }
+  assert.equal(seen.size, graph.nodes.length);
+});
+
+test('facility and station aliases resolve onto the safe pedestrian graph', () => {
+  const map = createMapModel();
+  for (const place of map.places) {
+    assert.ok(map.pedestrianNavigation.externalNodeAliases.has(place.entranceNodeId), place.id);
+    assert.ok(findRoute(map.pedestrianNavigation, 'home-entrance', place.entranceNodeId), place.id);
+  }
+  for (const station of map.stations) {
+    assert.ok(map.pedestrianNavigation.externalNodeAliases.has(station.roadNodeId), station.id);
+    assert.ok(findRoute(map.pedestrianNavigation, 'home-entrance', station.roadNodeId), station.id);
+  }
+});
