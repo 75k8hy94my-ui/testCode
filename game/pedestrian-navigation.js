@@ -2,6 +2,7 @@
   "use strict";
 
   const distance = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
+  const MIDBLOCK_CROSSWALK_MAX_GAP = 850;
 
   function edgeLength(edge) {
     let total = 0;
@@ -240,10 +241,31 @@
         }
       }
 
-      if (length >= 1150) {
-        const along = Math.round(length / 2);
-        if (crossings.every((crossing) => Math.abs(crossing.along - along) >= 250)) {
-          crossings.push({ along, nodeId:null, signalized:false });
+      // Add restrained unsignalized mid-block crossings on long non-arterial
+      // stretches. Repeatedly split only gaps above the threshold, so crossings
+      // remain sparse and never cluster around junction crossings.
+      if (edge.type !== "arterial" && edge.type !== "highway") {
+        let marks = [0, ...crossings.map((crossing) => crossing.along), length].sort((a, b) => a - b);
+        for (let guard = 0; guard < 8; guard += 1) {
+          let widest = null;
+          for (let index = 1; index < marks.length; index += 1) {
+            const gap = marks[index] - marks[index - 1];
+            if (gap <= MIDBLOCK_CROSSWALK_MAX_GAP) continue;
+            if (!widest || gap > widest.gap) widest = { from:marks[index - 1], to:marks[index], gap };
+          }
+          if (!widest) break;
+          const along = Math.round((widest.from + widest.to) / 2);
+          if (
+            along > 100 &&
+            along < length - 100 &&
+            crosswalkClearOfOtherRoads(mapModel, edge, along, offset)
+          ) {
+            crossings.push({ along, nodeId:null, signalized:false });
+            marks.push(along);
+            marks.sort((a, b) => a - b);
+          } else {
+            break;
+          }
         }
       }
 
@@ -267,7 +289,10 @@
         const tangent = { x:Math.cos(heading), y:Math.sin(heading) };
         const curbA = pedestrianPose(mapModel, edge, crossing.along, -edge.width / 2) || first;
         const curbB = pedestrianPose(mapModel, edge, crossing.along, edge.width / 2) || second;
-        const stopOffset = 38;
+        const crossingDepth = crossing.nodeId
+          ? Math.max(22, Math.min(30, Number(mapModel.junctionGeometry?.(crossing.nodeId, edge.id)?.crossingDepth) || edge.width * .18))
+          : Math.max(22, Math.min(30, edge.width * .18));
+        const stopOffset = crossingDepth / 2 + 8;
         const stopLines = [-1, 1].map((directionSign) => Object.freeze({
           x:roadPose.x - tangent.x * directionSign * stopOffset,
           y:roadPose.y - tangent.y * directionSign * stopOffset,
@@ -292,6 +317,7 @@
           roadEdgeId:edge.id,
           along:crossing.along,
           length:crosswalkLength,
+          depth:crossingDepth,
           endpoints:Object.freeze([Object.freeze({ x:first.x, y:first.y }), Object.freeze({ x:second.x, y:second.y })]),
           curbEndpoints:Object.freeze([Object.freeze({ x:curbA.x, y:curbA.y }), Object.freeze({ x:curbB.x, y:curbB.y })]),
           endpointNodeIds:Object.freeze(endpointNodeIds),
