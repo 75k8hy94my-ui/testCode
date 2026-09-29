@@ -37,11 +37,11 @@
 
 **Interfaces:** `createWardrobe()`, `normalizeWardrobe(value)`, `buyOutfit(value,cash,outfitId)`, `equipOutfit(value,outfitId)`, `getOutfit(outfitId)`, `CATALOG`, and `DEFAULT_OUTFIT_ID`.
 
-- [ ] Step 1: Write tests for default and hostile normalization, catalog identities/prices/visual fields, buy success without implicit equip, duplicate/invalid/insufficient-cash rejection, equip success, unowned/invalid equip rejection, and input immutability.
-- [ ] Step 2: Run `node --test tests/wardrobe.test.mjs`; confirm failure because the module is absent.
-- [ ] Step 3: Implement the pure model with frozen catalog entries and normalized copies.
-- [ ] Step 4: Run `node --test tests/wardrobe.test.mjs`; all cases pass.
-- [ ] Step 5: Commit the model and tests.
+- [x] Step 1: Write tests for default and hostile normalization, catalog identities/prices/visual fields, buy success without implicit equip, duplicate/invalid/insufficient-cash rejection, equip success, unowned/invalid equip rejection, and input immutability.
+- [x] Step 2: Run `node --test tests/wardrobe.test.mjs`; confirm failure because the module is absent.
+- [x] Step 3: Implement the pure model with frozen catalog entries and normalized copies.
+- [x] Step 4: Run `node --test tests/wardrobe.test.mjs`; all cases pass.
+- [x] Step 5: Commit the model and tests.
 
 ### Task 2: Runtime ownership, snapshots, and supermarket purchases
 
