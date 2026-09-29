@@ -145,6 +145,15 @@ test('game snapshots persist canonical social state and still read legacy friend
   assert.match(source, /npc\.friendship = socialNpcState\.friendship\[npc\.id\]/);
 });
 
+test('social NPC headless instrumentation is local-only and exposes a read-only route snapshot', () => {
+  assert.match(source, /function installSocialNpcTestHook\(\)/);
+  assert.match(source, /location\.hostname !== "localhost" && location\.hostname !== "127\.0\.0\.1"/);
+  assert.match(source, /searchParams\.has\("socialNpcDebug"\)/);
+  assert.match(source, /__CityDaysSocialNpcTest/);
+  assert.match(source, /movePlayerNear\(npcId\)/);
+  assert.match(source, /routeEdgeIds:Array\.isArray\(citizen\.routeEdgeIds\)/);
+});
+
 test('game loads the community center schedule model before the runtime', () => {
   assert.match(html, /<script src="\.\/community-center\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('community-center.js') < html.indexOf('game.js'));

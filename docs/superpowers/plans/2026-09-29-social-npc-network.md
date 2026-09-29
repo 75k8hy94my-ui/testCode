@@ -130,12 +130,13 @@
 
 **Files:**
 - Create or modify: `scripts/verify-social-npc-headless.mjs`
+- Modify: `game/game.js` (localhost-only, opt-in test instrumentation)
 - Create or modify: `tests/social-npc-system.test.mjs`, `tests/game-runtime.test.mjs`, `tests/phone-system.test.mjs` as verification reveals gaps
 - Runtime artifact: screenshot under the existing ignored/debug-artifact convention; do not add unrelated debug artifacts to a commit.
 
-- [ ] **Step 1: Run `npm test`** and review failures in context; do not mask unrelated baseline failures or alter unrelated Reader/Video tests.
-- [ ] **Step 2: Run `npm run verify:static`** and confirm all static HTML/JS references resolve.
-- [ ] **Step 3: Launch/use the existing localhost server and CLI headless Playwright/Chromium only** to open `/game/index.html`; capture full-page desktop and mobile screenshots, console errors/warnings, pageerrors and failed requests.
-- [ ] **Step 4: Verify in the rendered game** that all ten authored NPC markers and contacts are present, an interaction offers time-sensitive dialogue, a conversation changes relationship/action state, and routes proceed continuously without teleporting or stalling.
-- [ ] **Step 5: Review screenshots and browser diagnostics; fix any regression in its owning task, rerun its tests, then rerun both project checks.**
-- [ ] **Step 6: Commit only relevant verification script/tests and intended implementation files.**
+- [x] **Step 1: Run `npm test`** and review failures in context; do not mask unrelated baseline failures or alter unrelated Reader/Video tests.
+- [x] **Step 2: Run `npm run verify:static`** and confirm all static HTML/JS references resolve.
+- [x] **Step 3: Launch/use the existing localhost server and CLI headless Playwright/Chromium only** to open `/game/index.html`; capture full-page desktop and mobile screenshots, console errors/warnings, pageerrors and failed requests.
+- [x] **Step 4: Verify in the rendered game** that all ten authored NPC markers and contacts are present, an interaction offers time-sensitive dialogue, an invitation changes action intent, and an already-active pedestrian route continues smoothly without teleporting or stalling.
+- [x] **Step 5: Review screenshots and browser diagnostics; fix any regression in its owning task, rerun its tests, then rerun both project checks.**
+- [x] **Step 6: Commit only relevant verification script/tests and intended implementation files.**

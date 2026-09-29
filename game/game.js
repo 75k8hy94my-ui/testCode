@@ -10611,6 +10611,61 @@
     requestFrame(frame);
   }
 
+  function installSocialNpcTestHook() {
+    if (location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
+    if (!new URL(location.href).searchParams.has("socialNpcDebug")) return;
+
+    const snapshot = () => {
+      const citizens = pedestrians
+        .filter((citizen) => citizen.specialNpcId)
+        .map((citizen) => ({
+          id:citizen.specialNpcId,
+          name:socialNpcSystem.getProfile(citizen.specialNpcId)?.name || citizen.name,
+          x:citizen.x,
+          y:citizen.y,
+          state:citizen.state,
+          visible:citizen.visible !== false,
+          currentActivityId:citizen.currentActivityId,
+          pendingActivity:citizen.pendingActivity ? { ...citizen.pendingActivity } : null,
+          socialActivityRequest:citizen.socialActivityRequest ? { ...citizen.socialActivityRequest } : null,
+          routeEdgeIds:Array.isArray(citizen.routeEdgeIds) ? [...citizen.routeEdgeIds] : [],
+          routeIndex:citizen.routeIndex,
+          tripCount:citizen.tripCount
+        }));
+      return JSON.parse(JSON.stringify({
+        player:{ x:state.player.x, y:state.player.y, inHome:state.player.inHome, inVehicle:state.player.inVehicle, inTrain:state.player.inTrain },
+        nearestInteraction:(() => {
+          const interaction = nearestInteraction();
+          return interaction ? { type:interaction.type, label:interaction.label, targetId:interaction.target?.id || null } : null;
+        })(),
+        citizens
+      }));
+    };
+
+    Object.defineProperty(globalThis, "__CityDaysSocialNpcTest", {
+      configurable:true,
+      value:Object.freeze({
+        snapshot,
+        movePlayerNear(npcId) {
+          const citizen = pedestrians.find((item) => item.specialNpcId === npcId);
+          const profile = socialNpcSystem.getProfile(npcId);
+          if (!citizen || !profile || citizen.visible === false || citizen.state === "home") return false;
+          state.player.inHome = false;
+          state.player.inVehicle = false;
+          state.player.inTrain = false;
+          state.player.trainId = null;
+          state.player.x = citizen.x - Math.cos(citizen.dir || 0) * 28;
+          state.player.y = citizen.y - Math.sin(citizen.dir || 0) * 28;
+          state.player.facingX = Math.cos(citizen.dir || 0);
+          state.player.facingY = Math.sin(citizen.dir || 0);
+          state.camera.x = clamp(state.player.x - viewWidth / 2, 0, Math.max(0, WORLD_SIZE - viewWidth));
+          state.camera.y = clamp(state.player.y - viewHeight / 2, 0, Math.max(0, WORLD_SIZE - viewHeight));
+          return true;
+        }
+      })
+    });
+  }
+
   function togglePause() {
     if (smartphonePanel && !smartphonePanel.hidden) {
       setSmartphoneOpen(false);
@@ -10831,6 +10886,7 @@
   state.camera.x = clamp(state.player.x - viewWidth / 2, 0, Math.max(0, WORLD_SIZE - viewWidth));
   state.camera.y = clamp(state.player.y - viewHeight / 2, 0, Math.max(0, WORLD_SIZE - viewHeight));
 
+  installSocialNpcTestHook();
   showToast("CITY DAYSへようこそ。今日は自由に過ごせます");
   requestFrame(frame);
 })();
