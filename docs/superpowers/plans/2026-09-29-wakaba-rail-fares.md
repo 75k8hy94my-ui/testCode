@@ -71,4 +71,4 @@
 - [x] Verify next-day pass expiry, ticket retention, old-snapshot migration, UI state and mobile bounds; capture desktop/mobile screenshots.
 - [x] Capture console error/warning, pageerror, failed requests and bad responses; expect all empty.
 - [x] Run `npm test`, `npm run verify:static`, the headless verifier, syntax checks and `git diff --check`.
-- [ ] Commit as `test: verify Wakaba rail fare loop headlessly`.
+- [x] Commit as `test: verify Wakaba rail fare loop headlessly`.
