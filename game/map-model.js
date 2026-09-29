@@ -1,6 +1,13 @@
 (function initCityDaysMapModel(global) {
   "use strict";
 
+  const pedestrianNavigation = typeof module !== "undefined" && module.exports
+    ? require("./pedestrian-navigation.js")
+    : global.CityDaysPedestrianNavigation;
+  const buildingFrontageModel = typeof module !== "undefined" && module.exports
+    ? require("./building-frontage.js")
+    : global.CityDaysBuildingFrontage;
+
   const MAP_VERSION = "japan-v2.7";
   const WORLD_SIZE = 10800;
   const COAST = 160;
@@ -350,6 +357,23 @@
     return false;
   }
 
+  function orientedRectIntersectsEdge(site, edge, extra = 0) {
+    const frontage = site?.frontageGeometry;
+    if (!frontage) return rectIntersectsEdge(site, edge, extra);
+    const center = { x:site.x + site.w / 2, y:site.y + site.h / 2 };
+    const localPoint = (value) => {
+      const dx = value.x - center.x;
+      const dy = value.y - center.y;
+      return { x:dx * frontage.tangent.x + dy * frontage.tangent.y, y:dx * frontage.normal.x + dy * frontage.normal.y };
+    };
+    const localRect = { x:-site.w/2,y:-site.h/2,w:site.w,h:site.h };
+    const pad = edge.width / 2 + extra;
+    for (let index = 1; index < edge.points.length; index += 1) {
+      if (segmentIntersectsExpandedRect(localPoint(edge.points[index - 1]), localPoint(edge.points[index]), localRect, pad)) return true;
+    }
+    return false;
+  }
+
   function rectHitsOpenSpace(rect, openSpaces) {
     return openSpaces.some((space) => {
       const bounds = space.bounds;
@@ -372,7 +396,7 @@
       if (!edge.pedestrian) continue;
       for (let i = 1; i < edge.points.length; i += 1) {
         const hit = pointSegmentProjection(target, edge.points[i - 1], edge.points[i]);
-        if (!best || hit.distance < best.distance) best = { ...hit, edge };
+        if (!best || hit.distance < best.distance) best = { ...hit, edge, segmentIndex:i - 1 };
       }
     }
     return best;
@@ -629,9 +653,144 @@
       bounds:boundsForPolygon(value.polygon)
     }));
     const landmarks = LANDMARKS.map((value) => ({ ...value }));
-    const buildingSites = createBuildingSites(edges, openSpaces, places, stations);
+    const buildingSites = createBuildingSites(edges, openSpaces, places, stations).map((initialSite) => {
+      let site = { ...initialSite };
+      const preferredFrontageEdgeId = initialSite.frontageEdgeId || null;
+      const frontageRoadHit = (rect) => nearestEdgeToRectCenter(
+        rect,
+        edges.filter((edge) => edge.vehicle && (!preferredFrontageEdgeId || edge.id === preferredFrontageEdgeId))
+      );
+      for (let attempt = 0; attempt < 24; attempt += 1) {
+        const roadHit = frontageRoadHit(site);
+        const roadA = roadHit?.edge?.points[roadHit.segmentIndex];
+        const roadB = roadHit?.edge?.points[roadHit.segmentIndex + 1];
+        const roadTangent = roadA && roadB ? { x:roadB.x - roadA.x, y:roadB.y - roadA.y } : null;
+        const frontageGeometry = buildingFrontageModel?.resolve(site, roadHit?.point, roadHit?.edge?.id, roadTangent);
+        if (!frontageGeometry) break;
+        site = {
+          ...site,
+          frontage:frontageGeometry.side,
+          frontageEdgeId:frontageGeometry.roadEdgeId,
+          frontageGeometry,
+          collisionFootprint:frontageGeometry.polygon,
+          collisionBounds:frontageGeometry.bounds
+        };
+
+        const intersectingEdge = edges.find((edge) => orientedRectIntersectsEdge(
+          site,
+          edge,
+          edge.vehicle && edge.id === site.frontageEdgeId
+            ? 8
+            : edge.vehicle
+              ? (edge.sidewalkWidth || vehicleSidewalkWidthForType(edge.type)) + 8
+              : 4
+        ));
+        if (!intersectingEdge) break;
+
+        const center = { x:site.x + site.w/2,y:site.y + site.h/2 };
+        let nearest = null;
+        for (let index = 1; index < intersectingEdge.points.length; index += 1) {
+          const hit = pointSegmentProjection(center, intersectingEdge.points[index - 1], intersectingEdge.points[index]);
+          if (!nearest || hit.distance < nearest.distance) nearest = { ...hit, index:index - 1 };
+        }
+        if (!nearest) break;
+        const hitA = intersectingEdge.points[nearest.index];
+        const hitB = intersectingEdge.points[nearest.index + 1];
+        const magnitude = Math.hypot(hitB.x-hitA.x, hitB.y-hitA.y) || 1;
+        const tangent = { x:(hitB.x-hitA.x)/magnitude,y:(hitB.y-hitA.y)/magnitude };
+        const perpendicular = { x:-tangent.y,y:tangent.x };
+        if (perpendicular.x*frontageGeometry.normal.x + perpendicular.y*frontageGeometry.normal.y < 0) {
+          perpendicular.x *= -1;
+          perpendicular.y *= -1;
+        }
+        const away = nearest.distance > .01
+          ? { x:(center.x-nearest.point.x)/nearest.distance,y:(center.y-nearest.point.y)/nearest.distance }
+          : perpendicular;
+        const normal = { x:frontageGeometry.normal.x,y:frontageGeometry.normal.y };
+        const support = Math.abs(frontageGeometry.tangent.x*away.x + frontageGeometry.tangent.y*away.y) * site.w/2 + Math.abs(normal.x*away.x + normal.y*away.y) * site.h/2;
+        const extra = intersectingEdge.vehicle && intersectingEdge.id === site.frontageEdgeId
+          ? 8
+          : intersectingEdge.vehicle
+            ? (intersectingEdge.sidewalkWidth || vehicleSidewalkWidthForType(intersectingEdge.type)) + 8
+            : 4;
+        const shift = intersectingEdge.width/2 + extra + support + 6 - nearest.distance;
+        if (!(shift > 0)) break;
+        site.x = Math.round(site.x + away.x * shift);
+        site.y = Math.round(site.y + away.y * shift);
+      }
+      const finalHit = frontageRoadHit(site);
+      const finalA = finalHit?.edge?.points[finalHit.segmentIndex];
+      const finalB = finalHit?.edge?.points[finalHit.segmentIndex + 1];
+      let finalTangent = finalA && finalB ? { x:finalB.x-finalA.x,y:finalB.y-finalA.y } : null;
+      let finalFrontage = buildingFrontageModel?.resolve(site, finalHit?.point, finalHit?.edge?.id, finalTangent);
+      const collidesStreet = (candidate) => edges.some((edge) => orientedRectIntersectsEdge(
+        { ...site, frontageGeometry:candidate },
+        edge,
+        edge.vehicle && edge.id === candidate.roadEdgeId
+          ? 8
+          : edge.vehicle
+            ? (edge.sidewalkWidth || vehicleSidewalkWidthForType(edge.type)) + 8
+            : 4
+      ));
+      if (finalFrontage && collidesStreet(finalFrontage)) {
+        // Tight flag lots occasionally have no room for the road-aligned long
+        // axis. In that constrained case keep the authored cardinal parcel
+        // orientation, but derive its front face/entrance/collision together.
+        finalTangent = finalFrontage.side === "east" || finalFrontage.side === "west" ? { x:0,y:1 } : { x:1,y:0 };
+        finalFrontage = buildingFrontageModel.resolve(site, finalHit?.point, finalHit?.edge?.id, finalTangent);
+      }
+      for (let fit = 0; finalFrontage && collidesStreet(finalFrontage) && fit < 12; fit += 1) {
+        const blocker = edges.find((edge) => orientedRectIntersectsEdge(
+          { ...site, frontageGeometry:finalFrontage },
+          edge,
+          edge.vehicle && edge.id === finalFrontage.roadEdgeId ? 8 : edge.vehicle
+            ? (edge.sidewalkWidth || vehicleSidewalkWidthForType(edge.type)) + 8 : 4
+        ));
+        if (!blocker) break;
+        const center = { x:site.x+site.w/2,y:site.y+site.h/2 };
+        let nearest = null;
+        for (let index = 1; index < blocker.points.length; index += 1) {
+          const hit = pointSegmentProjection(center, blocker.points[index-1], blocker.points[index]);
+          if (!nearest || hit.distance < nearest.distance) nearest = { ...hit,index:index-1 };
+        }
+        if (!nearest) break;
+        const away = nearest.distance > .01
+          ? { x:(center.x-nearest.point.x)/nearest.distance,y:(center.y-nearest.point.y)/nearest.distance }
+          : { x:-finalFrontage.normal.x,y:-finalFrontage.normal.y };
+        site.x = Math.round(site.x + away.x * 28);
+        site.y = Math.round(site.y + away.y * 28);
+        const accessHit = frontageRoadHit(site);
+        const accessA = accessHit?.edge?.points[accessHit.segmentIndex];
+        const accessB = accessHit?.edge?.points[accessHit.segmentIndex + 1];
+        const accessTangent = accessA && accessB ? { x:accessB.x-accessA.x,y:accessB.y-accessA.y } : finalTangent;
+        finalFrontage = buildingFrontageModel.resolve(site, accessHit?.point, accessHit?.edge?.id, accessTangent);
+        finalTangent = accessTangent;
+        if (collidesStreet(finalFrontage)) {
+          finalTangent = finalFrontage.side === "east" || finalFrontage.side === "west" ? { x:0,y:1 } : { x:1,y:0 };
+          finalFrontage = buildingFrontageModel.resolve(site, accessHit?.point, accessHit?.edge?.id, finalTangent);
+        }
+      }
+      if (finalFrontage) {
+        site = {
+          ...site,
+          frontage:finalFrontage.side,
+          frontageEdgeId:finalFrontage.roadEdgeId,
+          frontageGeometry:finalFrontage,
+          collisionFootprint:finalFrontage.polygon,
+          collisionBounds:finalFrontage.bounds
+        };
+      }
+      return site;
+    });
     const vegetation = createVegetation(openSpaces, edges);
-    const parcels = buildingSites.map((site) => ({ id:"lot-" + site.id, x:site.x, y:site.y, w:site.w, h:site.h, use:site.use, district:site.district, walkable:false }));
+    const parcels = buildingSites.map((site) => ({
+      id:"lot-" + site.id,
+      ...(site.collisionBounds || { x:site.x,y:site.y,w:site.w,h:site.h }),
+      polygon:site.collisionFootprint || null,
+      use:site.use,
+      district:site.district,
+      walkable:false
+    }));
     const adjacency = new Map(nodes.map((value) => [value.id, []]));
 
     for (const edge of edges) {
@@ -981,6 +1140,12 @@
         if (end.x !== getNode(edge.to)?.x || end.y !== getNode(edge.to)?.y) errors.push("edge end mismatch: " + edge.id);
       }
 
+      for (const segment of pedestrianGraph.segments) {
+        if (!new Set(["sidewalk", "crosswalk", "facility-access"]).has(segment.type)) errors.push("pedestrian segment type invalid: " + segment.id);
+        if (segment.points.length < 2 || !(segment.length > 0)) errors.push("pedestrian segment geometry invalid: " + segment.id);
+        if (segment.type === "crosswalk" && !pedestrianGraph.crosswalks.some((crossing) => crossing.id === segment.crosswalkId)) errors.push("crosswalk segment has no shared record: " + segment.id);
+      }
+
       for (const place of places) {
         if (!getNode(place.entranceNodeId) || !getNode(place.roadNodeId)) {
           errors.push("place node missing: " + place.id);
@@ -1003,7 +1168,7 @@
             return rectIntersectsEdge(facility, edge, preservedExtra);
           })) errors.push("facility intersects street: " + place.id);
           if (openSpaces.some((space) => rectsOverlap(facility, space.bounds, 0))) errors.push("facility intersects open space: " + place.id);
-          if (buildingSites.some((site) => rectsOverlap(facility, site, 10))) errors.push("facility intersects generated building: " + place.id);
+          if (buildingSites.some((site) => rectsOverlap(facility, site.collisionBounds || site, 10))) errors.push("facility intersects generated building: " + place.id);
         }
       }
 
@@ -1013,7 +1178,15 @@
       }
 
       for (const site of buildingSites) {
-        if (edges.some((edge) => rectIntersectsEdge(
+        const frontage = site.frontageGeometry;
+        if (!frontage || frontage.side !== site.frontage || frontage.roadEdgeId !== site.frontageEdgeId && site.frontageEdgeId) {
+          errors.push("building frontage geometry is inconsistent: " + site.id);
+        }
+        if (frontage && (frontage.footprint.x !== site.x || frontage.footprint.y !== site.y || frontage.footprint.w !== site.w || frontage.footprint.h !== site.h)) {
+          errors.push("building collision footprint diverges from visual: " + site.id);
+        }
+        const collisionBounds = site.collisionBounds || site;
+        const intersectingEdge = edges.find((edge) => orientedRectIntersectsEdge(
           site,
           edge,
           edge.vehicle && edge.id === site.frontageEdgeId
@@ -1021,7 +1194,8 @@
             : edge.vehicle
               ? (edge.sidewalkWidth || vehicleSidewalkWidthForType(edge.type)) + 8
               : 4
-        ))) errors.push("building intersects street: " + site.id);
+        ));
+        if (intersectingEdge) errors.push("building intersects street: " + site.id + "/" + intersectingEdge.id);
       }
 
       for (const junctionNode of nodes) {
@@ -1051,6 +1225,11 @@
       return errors;
     }
 
+    const pedestrianGraph = pedestrianNavigation.buildGraph({
+      nodes, edges, places, stations, getNode, getEdge, neighbors, pedestrianCorridor,
+      pedestrianOffsetPose, junctionGeometry
+    });
+
     return Object.freeze({
       version:MAP_VERSION,
       worldSize:WORLD_SIZE,
@@ -1065,6 +1244,8 @@
       vegetation:Object.freeze(vegetation),
       places:Object.freeze(places),
       stations:Object.freeze(stations),
+      pedestrianNavigation:pedestrianGraph,
+      crosswalks:pedestrianGraph.crosswalks,
       getNode,
       getEdge,
       neighbors,

@@ -201,6 +201,25 @@ test('residential districts have connected local streets and street-fronting low
   assert.deepEqual(map.validate(), []);
 });
 
+test('every generated building shares frontage orientation, entrance anchor, and collision footprint', () => {
+  const map = createMapModel();
+  for (const site of map.buildingSites) {
+    const frontage = site.frontageGeometry;
+    assert.ok(frontage, site.id + ' frontage record');
+    assert.equal(frontage.side, site.frontage, site.id + ' facade side');
+    assert.equal(frontage.roadEdgeId, site.frontageEdgeId, site.id + ' access road');
+    assert.deepEqual(frontage.footprint, { x:site.x,y:site.y,w:site.w,h:site.h }, site.id + ' collision is visual footprint');
+    assert.ok(map.getEdge(frontage.roadEdgeId)?.vehicle, site.id + ' frontage must touch a vehicle street');
+    const entrance = frontage.entrance;
+    const center = { x:site.x + site.w / 2,y:site.y + site.h / 2 };
+    const entranceDepth = (entrance.x-center.x)*frontage.normal.x + (entrance.y-center.y)*frontage.normal.y;
+    assert.ok(Math.abs(entranceDepth - site.h / 2) < 1e-6, site.id + ' entrance lies on its road-facing facade');
+    assert.equal(site.collisionFootprint.length, 4, site.id + ' collision uses its oriented polygon');
+    assert.ok(site.collisionFootprint.every((point) => point.x >= site.collisionBounds.x - 1e-6 && point.x <= site.collisionBounds.x + site.collisionBounds.w + 1e-6), site.id + ' oriented bounds contain collision polygon');
+    assert.ok(site.collisionFootprint.every((point) => point.y >= site.collisionBounds.y - 1e-6 && point.y <= site.collisionBounds.y + site.collisionBounds.h + 1e-6), site.id + ' oriented bounds contain collision polygon');
+  }
+});
+
 test('enterable home exterior matches surrounding detached-house scale', () => {
   const map = createMapModel();
   const playerHome = map.places.find((place) => place.id === 'home');

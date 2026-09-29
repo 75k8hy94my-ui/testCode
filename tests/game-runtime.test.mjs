@@ -11,6 +11,7 @@ const html = fs.readFileSync(path.join(root, 'game', 'index.html'), 'utf8');
 const mapSource = fs.readFileSync(path.join(root, 'game', 'map-model.js'), 'utf8');
 const overtakeSource = fs.readFileSync(path.join(root, 'game', 'traffic-overtake.js'), 'utf8');
 const overtakeSafetySource = fs.readFileSync(path.join(root, 'game', 'traffic-overtake-safety.js'), 'utf8');
+const homeFixtureSource = fs.readFileSync(path.join(root, 'game', 'home-fixtures.js'), 'utf8');
 
 test('game keeps a timer fallback when requestAnimationFrame is unavailable', () => {
   assert.match(source, /const requestFrame = typeof window\.requestAnimationFrame === "function"/);
@@ -66,6 +67,68 @@ test('game defines the saved-car road migration helper', () => {
   assert.match(source, /mapModel\.nearestRoad\(personalCar\.x, personalCar\.y, \{ vehicleOnly: true \}\)/);
 });
 
+test('citizen navigation uses typed map segments and persists a validated current segment', () => {
+  assert.match(source, /pedestrianNavigation\?\.findRoute\(mapModel\.pedestrianNavigation/);
+  assert.match(source, /routeSegmentIds:Array\.isArray\(ped\.routeSegmentIds\)/);
+  assert.match(source, /segmentId:ped\.segmentId/);
+  assert.match(source, /pedestrianSegmentPose\(segment, ped\.segmentDirection, ped\.segmentAlong\)/);
+  assert.match(source, /mapModel\.pedestrianNavigation\.segmentsById\.get\(stored\.segmentId\)/);
+});
+
+test('pedestrians, vehicles, and rendering consume the same map crosswalk records', () => {
+  assert.match(html, /crossing-control\.js\?v=/);
+  assert.ok(html.indexOf('crossing-control.js') < html.indexOf('game.js'));
+  assert.match(source, /for \(const crosswalk of mapModel\.crosswalks\)/);
+  assert.match(source, /crossingControl\.assessPedestrian\(crosswalk/);
+  assert.match(source, /crossingControl\.vehicleYieldDecision\(crosswalk/);
+  assert.match(source, /crosswalk\.stopLines \|\| \[\]/);
+  assert.match(source, /updateCrossingClaims\(\);\s*updateTraffic\(dt\)/);
+});
+
+test('NPC cars commit physical junction curves and collision poses from one trajectory function', () => {
+  assert.match(html, /vehicle-trajectory\.js/);
+  assert.match(source, /function trafficTurnCurve\(car, along\)/);
+  assert.match(source, /vehicleTrajectory\.createJunctionCurve\(incomingTangent, outgoingTangent, window\)/);
+  assert.match(source, /vehicleTrajectory\.withLateralVelocity/);
+  assert.match(source, /car\.lateralVelocity = result\.complete \|\| dt <= 0 \? 0 : \(car\.laneOffset - previousOffset\) \/ dt/);
+  assert.match(source, /const turnPose = trafficTurnCurve\(car, along\)/);
+  assert.match(source, /car\.x = steeredPose\.x;[\s\S]{0,100}car\.y = steeredPose\.y/);
+  assert.match(source, /const hitVehicle = vehicleIntersectsAnyVehicle\(car\)/);
+});
+
+test('action and help panels lock only player input while the world update continues', () => {
+  const update = source.slice(source.indexOf('function update(dt)'), source.indexOf('function frame('));
+  assert.match(update, /if \(state\.paused\) return/);
+  assert.doesNotMatch(update, /state\.paused \|\| !actionSheet\.hidden \|\| !helpPanel\.hidden/);
+  assert.match(update, /const playerInputLocked = !actionSheet\.hidden \|\| !helpPanel\.hidden/);
+  assert.match(update, /updateTraffic\(dt\);[\s\S]*advanceTime\(gameMinutes, true, false\);[\s\S]*updatePedestrians\(dt, gameMinutes\)/);
+});
+
+test('home walk and run share a modest named speed multiplier without changing street speeds', () => {
+  assert.match(source, /const HOME_MOVEMENT_SPEED_MULTIPLIER = 1\.2/);
+  const homeMovement = source.slice(source.indexOf('function updatePlayerAtHome('), source.indexOf('function nearestHomeInteraction('));
+  assert.match(homeMovement, /\(running \? RUN_SPEED : WALK_SPEED\) \* HOME_MOVEMENT_SPEED_MULTIPLIER/);
+  const streetMovement = source.slice(source.indexOf('function updatePlayerOnFoot('), source.indexOf('function updatePlayerInVehicle('));
+  assert.match(streetMovement, /running \? RUN_SPEED : WALK_SPEED/);
+  assert.doesNotMatch(streetMovement, /HOME_MOVEMENT_SPEED_MULTIPLIER/);
+});
+
+test('conversation freezes only its citizen and always releases the lock when the sheet closes', () => {
+  assert.match(source, /let conversationCitizenId = null/);
+  assert.match(source, /conversationCitizenId = ped\?\.id \|\| null/);
+  assert.match(source, /conversationCitizenId = citizen\?\.id \|\| null/);
+  assert.match(source, /function closeActionSheet\(\)[\s\S]*conversationCitizenId = null/);
+  assert.match(source, /if \(ped\.id === conversationCitizenId\) continue/);
+  assert.match(source, /if \(ped\.id === conversationCitizenId\) continue/);
+});
+
+test('empty interaction is silent and player animation follows actual displacement', () => {
+  const action = source.slice(source.indexOf('function performAction()'), source.indexOf('function enterCar()'));
+  assert.doesNotMatch(action, /近くに利用できるものはありません/);
+  assert.match(source, /state\.player\.motion\?\.moving/);
+  assert.match(source, /moving \? "walk" : "idle"/);
+});
+
 test('game surfaces uncaught runtime errors on the game surface', () => {
   assert.match(source, /window\.addEventListener\("error"/);
   assert.match(source, /window\.addEventListener\("unhandledrejection"/);
@@ -99,7 +162,7 @@ test('wardrobe model is loaded before runtime and is normalized in snapshots', (
   assert.match(source, /wardrobe:wardrobeModel\.createWardrobe\(\)/);
   assert.match(source, /wardrobe:wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
   assert.match(source, /state\.wardrobe = wardrobeModel\.normalizeWardrobe\(saved\.wardrobe\)/);
-  assert.match(html, /game\.js\?v=20260929-laundromat-1/);
+  assert.match(html, /game\.js\?v=20260930-simulation-overhaul-1/);
 });
 
 test('arcade progress is loaded before the game and migrates safely through snapshots', () => {
@@ -141,8 +204,9 @@ test('supermarket clothing purchases revalidate ownership and funds before charg
 });
 
 test('home closet equips only owned outfits at home and both player scenes use the same active appearance', () => {
-  assert.match(source, /id:"closet", label:"クローゼット"/);
-  assert.match(source, /drawHomeFurnitureRect\(42, 182, 112, 78/);
+  assert.match(homeFixtureSource, /id:"closet", label:"クローゼット"/);
+  assert.match(source, /for \(const fixture of HOME_FIXTURES\)/);
+  assert.match(source, /homeFixturesModel\.collidesCircle\(x, y, radius\)/);
   const closetStart=source.indexOf('fixture.id === "closet"');
   const closetEnd=source.indexOf('fixture.id === "pet"',closetStart);
   const closet=source.slice(closetStart,closetEnd);
@@ -265,7 +329,7 @@ test('home handcraft progress defaults safely, persists in snapshots, and loads 
 });
 
 test('supermarket sells validated handcraft kits and the new home worktable consumes recipes without applying needs', () => {
-  assert.match(source, /id:"worktable",\s*label:"作業机"/);
+  assert.match(homeFixtureSource, /id:"worktable",\s*label:"作業机"/);
   const storeStart=source.indexOf('if (place.id === "store")');
   const storeEnd=source.indexOf('if (place.id === "fuel-station")',storeStart);
   assert.match(source.slice(storeStart,storeEnd), /手芸キットを買う/);
@@ -576,7 +640,7 @@ test('home television model loads before runtime and the TV is an enterable home
   assert.match(html, /<script src="\.\/home-television\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('home-television.js') < html.indexOf('game.js'));
   assert.match(source, /const homeTelevisionModel = globalThis\.CityDaysHomeTelevision/);
-  assert.match(source, /id:"tv", label:"テレビ", x:520, y:392, w:155, h:70, interactX:475, interactY:425/);
+  assert.match(homeFixtureSource, /id:"tv", label:"テレビ", x:520, y:392, w:155, h:70, interactX:475, interactY:425/);
   assert.match(source, /fixture\.id === "tv"[\s\S]{0,500}homeTelevisionModel\.getProgram\(Math\.floor\(state\.minute\)\)/);
   assert.match(source, /homeTelevisionModel\.watch\(Math\.floor\(state\.minute\)\)/);
 });
@@ -592,10 +656,10 @@ test('watching TV uses normal time advancement and applies broadcast effects wit
 });
 
 test('home TV screen reflects the active broadcast title without changing existing room rendering', () => {
-  const homeRenderer = source.slice(source.indexOf('function drawHomeInterior()'), source.indexOf('function drawHomePlayer()'));
+  const homeRenderer = source.slice(source.indexOf('function drawHomeFixtureVisual('), source.indexOf('function drawHomeInterior()'));
   assert.match(homeRenderer, /homeTelevisionModel\.getProgram\(Math\.floor\(state\.minute\)\)/);
-  assert.match(homeRenderer, /tvProgram\.screenTitle/);
-  assert.match(homeRenderer, /drawHomeFurnitureRect\(520, 438, 155, 24/);
+  assert.match(homeRenderer, /program\.screenTitle/);
+  assert.match(source, /for \(const visual of fixture\.visuals\) drawHomeFixtureVisual\(visual\)/);
   assert.match(css, /\.action-sheet\{[^}]*max-height:\s*min\(72dvh,560px\)[^}]*overflow-y:\s*auto/);
 });
 
@@ -687,8 +751,8 @@ test('public bath rules load before runtime and the sento interaction applies it
 });
 
 test('clinic map and runtime changes request fresh browser assets', () => {
-  assert.match(html, /map-model\.js\?v=20260929-laundromat-1/);
-  assert.match(html, /game\.js\?v=[^"]+/);
+  assert.match(html, /map-model\.js\?v=20260929-pedestrian-navigation-1/);
+  assert.match(html, /game\.js\?v=20260930-simulation-overhaul-1/);
 });
 
 test('health model loads before runtime and has a visible sixth needs meter', () => {
@@ -879,7 +943,7 @@ test('club members travel through normal pedestrian routes and revalidate the se
 test('club runtime modules have fresh browser cache keys', () => {
   assert.match(html, /community-center\.js\?v=20260929-community-clubs-1/);
   assert.match(html, /social-npc-system\.js\?v=20260929-community-clubs-1/);
-  assert.match(html, /game\.js\?v=20260929-laundromat-1/);
+  assert.match(html, /game\.js\?v=20260930-simulation-overhaul-1/);
 });
 
 test('game loads overtake safety before the overtake planner and runtime', () => {
@@ -1037,7 +1101,8 @@ test('building clearance follows the current map model rather than the retired g
 
 test('traffic lanes respect road width and parallel lanes do not brake for each other', () => {
   assert.match(source, /function trafficLaneOffsetForEdge\(edge, secondaryLane = false\)/);
-  assert.match(source, /Math\.abs\(\(other\.laneOffset \|\| 0\) - \(car\.laneOffset \|\| 0\)\) > 20/);
+  assert.match(source, /function trafficLeadInfo\(car, maxDistance = 320\)[\s\S]*const forward = dx \* Math\.cos\(car\.angle\)/);
+  assert.match(source, /const laneCorridor = \(vehicleDimensions\(car\)\.width \+ vehicleDimensions\(other\)\.width\) \* \.5 \+ 12/);
 });
 
 test('traffic checks passing clearance for a parked personal car and shifts back after passing', () => {
@@ -1066,8 +1131,8 @@ test('ambient traffic signals a planned intersection turn unless an overtake sig
 });
 
 test('reverse-direction pedestrians start from the correct edge end', () => {
-  assert.match(source, /ped\.along = ped\.directionSign > 0 \? 0 : ped\.edgeLength/);
-  assert.match(source, /ped\.along = ped\.directionSign > 0 \? initialAlong : Math\.max\(0, ped\.edgeLength - initialAlong\)/);
+  assert.match(source, /ped\.segmentAlong = ped\.segmentDirection > 0 \? 0 : firstSegment\.length/);
+  assert.match(source, /ped\.segmentAlong = ped\.segmentDirection > 0 \? initialAlong : Math\.max\(0, segment\.length - initialAlong\)/);
   assert.match(source, /const centerOffset = corridor\?\.centerOffset \?\? \(edge\.width \/ 2 \+ 22\)/);
   assert.match(source, /const flowBias = directionSign > 0 \? 7 : -7/);
 });
@@ -1134,13 +1199,15 @@ test('vehicle roads render a visible pedestrian shoulder outside the curb', () =
   assert.match(source, /Vehicle streets have a real pedestrian shoulder/);
 });
 
-test('pedestrian generation spaces walkers before the first frame', () => {
-  assert.match(source, /function pedestrianSpawnSpacing\(edgeId, edgeLength, along\)/);
-  assert.match(source, /pedestrianSpawnSpacing\(ped\.edgeId, ped\.edgeLength, ped\.along\)/);
+test('pedestrian generation places walkers on their first typed navigation segment', () => {
+  assert.match(source, /const segment = mapModel\.pedestrianNavigation\.segmentsById\.get\(ped\.segmentId\)/);
+  assert.match(source, /ped\.segmentAlong = ped\.segmentDirection > 0 \? initialAlong/);
+  assert.match(source, /pedestrianSegmentPose\(segment, ped\.segmentDirection, ped\.segmentAlong\)/);
 });
 
-test('pedestrian route progress remains inside the active edge bounds', () => {
-  assert.match(source, /ped\.along = clamp\(ped\.along, 0, edgeLength\);/);
+test('pedestrian route progress remains inside the active typed segment bounds', () => {
+  assert.match(source, /ped\.segmentAlong = clamp\(ped\.segmentAlong \+ ped\.segmentDirection \* remaining, 0, segment\.length\)/);
+  assert.match(source, /segmentDirection:ped\.segmentDirection/);
 });
 
 test('pedestrians traverse route starts and sidewalk corners continuously', () => {
@@ -1269,7 +1336,8 @@ test('home interior transitions preserve outdoor position and use a separate sce
 });
 
 test('home movement is slightly faster than normal walking', () => {
-  assert.match(source, /const speed = running \? RUN_SPEED \* 1\.08 : WALK_SPEED \* 1\.18/);
+  assert.match(source, /const HOME_MOVEMENT_SPEED_MULTIPLIER = 1\.2/);
+  assert.match(source, /const speed = \(running \? RUN_SPEED : WALK_SPEED\) \* HOME_MOVEMENT_SPEED_MULTIPLIER/);
 });
 
 test('smartphone has an always available responsive panel', () => {
@@ -1387,7 +1455,7 @@ test('placement keyboard controls are isolated from walking and mobile buttons c
   assert.match(source, /function drawPlacedHomeFurniture\(/);
 });
 
-test('placement mode keeps the player stationary and pauses normal world-time advancement', () => {
+test('placement mode locks player movement without stopping normal world-time advancement', () => {
   const updateStart = source.indexOf('function update(dt)');
   const updateEnd = source.indexOf('\n  function ', updateStart + 10);
   const update = source.slice(updateStart, updateEnd);
@@ -1395,5 +1463,6 @@ test('placement mode keeps the player stationary and pauses normal world-time ad
   const worldMinutes = update.indexOf('const gameMinutes = dt * .7');
   assert.ok(placement >= 0 && placement < worldMinutes);
   assert.match(update.slice(placement, worldMinutes), /updateFurniturePlacement\(dt\)/);
-  assert.match(update.slice(placement, worldMinutes), /return;/);
+  assert.doesNotMatch(update.slice(placement, worldMinutes), /return;/);
+  assert.match(update, /Boolean\(furniturePlacementState\)/);
 });
