@@ -290,7 +290,7 @@
   const VEHICLE_COLLISION_SCALE = 0.9;
   const WALK_SPEED = 34;
   const RUN_SPEED = 62;
-  const HOME_MOVEMENT_SPEED_MULTIPLIER = 1.2;
+  const HOME_MOVEMENT_SPEED_MULTIPLIER = 2;
   const SPEED_TO_KMH = 0.16;
   const SIGNAL_CYCLE = 20;
   const PEDESTRIAN_FLASH_SECONDS = 2;
@@ -1488,7 +1488,10 @@
       x:place.building.x - place.building.w / 2,
       y:place.building.y - place.building.h / 2,
       w:place.building.w,
-      h:place.building.h
+      h:place.building.h,
+      centerX:place.building.x,
+      centerY:place.building.y,
+      frontageGeometry:place.building.frontageGeometry || null
     };
   }
 
@@ -1517,12 +1520,23 @@
     for (const place of PLACES) {
       const facility = placeBuildingRect(place);
       if (!facility) continue;
+      const bounds = facility.frontageGeometry?.bounds || facility;
       if (
-        x + radius < facility.x ||
-        y + radius < facility.y ||
-        x - radius > facility.x + facility.w ||
-        y - radius > facility.y + facility.h
+        x + radius < bounds.x ||
+        y + radius < bounds.y ||
+        x - radius > bounds.x + bounds.w ||
+        y - radius > bounds.y + bounds.h
       ) continue;
+      if (facility.frontageGeometry) {
+        const dx = x - facility.centerX;
+        const dy = y - facility.centerY;
+        const localX = dx * facility.frontageGeometry.tangent.x + dy * facility.frontageGeometry.tangent.y;
+        const localY = dx * facility.frontageGeometry.normal.x + dy * facility.frontageGeometry.normal.y;
+        const nearestX = clamp(localX, -facility.w / 2, facility.w / 2);
+        const nearestY = clamp(localY, -facility.h / 2, facility.h / 2);
+        if (Math.hypot(localX - nearestX, localY - nearestY) < radius) return true;
+        continue;
+      }
       if (circleRectCollision(x, y, radius, facility)) return true;
     }
     return false;
@@ -1801,21 +1815,24 @@
       outgoingSign = next.from === nodeId ? 1 : -1;
       before = window - distanceToNode;
       after = 0;
-    } else if (distanceFromStart <= window && car.routeIndex > 0) {
-      const previous = mapModel.getEdge(car.routeEdgeIds?.[car.routeIndex - 1]);
-      const nodeId = car.directionSign > 0 ? edge.from : edge.to;
-      if (!previous || (previous.from !== nodeId && previous.to !== nodeId)) return null;
+    } else if (distanceFromStart <= window && car.previousEdgeId) {
+      const previous = mapModel.getEdge(car.previousEdgeId);
+      const nodeId = car.previousJunctionNodeId || (car.directionSign > 0 ? edge.from : edge.to);
+      if (!previous || (previous.from !== nodeId && previous.to !== nodeId) || (edge.from !== nodeId && edge.to !== nodeId)) return null;
       incoming = previous;
-      incomingSign = previous.to === nodeId ? 1 : -1;
+      incomingSign = Number(car.previousDirectionSign) < 0 ? -1 : 1;
       outgoing = edge;
       outgoingSign = car.directionSign;
       before = window;
       after = distanceFromStart;
     } else return null;
 
+    const incomingLaneOffset = incoming.id === car.previousEdgeId && Number.isFinite(car.previousLaneOffset)
+      ? car.previousLaneOffset
+      : trafficLaneOffsetForEdge(incoming, Boolean(car.secondaryLane));
     const incomingTangent = directedTrafficLanePose(incoming, incomingSign,
       polylineLength(incoming.points) - window,
-      trafficLaneOffsetForEdge(incoming, Boolean(car.secondaryLane)));
+      incomingLaneOffset);
     const outgoingTangent = directedTrafficLanePose(outgoing, outgoingSign,
       window,
       trafficLaneOffsetForEdge(outgoing, Boolean(car.secondaryLane)));
@@ -1982,6 +1999,10 @@
     // A dead-end is a valid route endpoint, not a reason to leave the car
     // frozen forever. Turn around at the endpoint while preserving the same
     // edge and world position; no teleport or arbitrary-node recovery occurs.
+    car.previousEdgeId = null;
+    car.previousDirectionSign = null;
+    car.previousLaneOffset = null;
+    car.previousJunctionNodeId = null;
     car.directionSign *= -1;
     car.along = car.directionSign > 0 ? 0 : (car.edgeLength || polylineLength(current.points));
     car.routeEdgeIds = [current.id];
@@ -2019,6 +2040,10 @@
       return reverseTrafficAtDeadEnd(car, current);
     }
 
+    car.previousEdgeId = current.id;
+    car.previousDirectionSign = car.directionSign;
+    car.previousLaneOffset = car.laneOffset;
+    car.previousJunctionNodeId = nodeId;
     car.edgeId = next.id;
     car.directionSign = next.from === nodeId ? 1 : -1;
     car.edgeLength = polylineLength(next.points);
@@ -2110,6 +2135,8 @@
 
 
   function nearestPedestrianNodeId(x, y) {
+    const graphHit = pedestrianNavigation?.nearestNode?.(mapModel.pedestrianNavigation, x, y);
+    if (graphHit?.nodeId) return graphHit.nodeId;
     const hit = mapModel.nearestRoad(x, y);
     const edge = hit?.edge;
     if (!edge) return HOME?.entranceNodeId || mapModel.nodes[0]?.id || null;
@@ -2577,7 +2604,14 @@
     ped.directionSign = ped.segmentDirection;
     ped.along = ped.segmentAlong;
 
-    const firstPose = pedestrianSegmentPose(firstSegment, ped.segmentDirection, ped.segmentAlong);
+    ped.segmentAvoidanceOffset = 0;
+    ped.segmentAvoidanceTarget = 0;
+    const firstPose = pedestrianSegmentPose(
+      firstSegment,
+      ped.segmentDirection,
+      ped.segmentAlong,
+      pedestrianSegmentLaneOffset(ped, firstSegment)
+    );
     ped.junctionTransition = previousPose
       ? makePedestrianTransition(previousPose, firstPose)
       : null;
@@ -2685,6 +2719,8 @@
     ped.junctionTransition = null;
     ped.avoidanceTarget = 0;
     ped.avoidanceHold = 0;
+    ped.segmentAvoidanceTarget = 0;
+    ped.segmentAvoidanceOffset = 0;
     ped.state = action.indoor ? "inside" : "staying";
     ped.visible = ped.specialNpcId ? true : !action.indoor;
     ped.speed = ped.baseSpeed;
@@ -2966,7 +3002,12 @@
   function pedestrianPoseAt(ped) {
     if (ped.migrationTransition && ped.junctionTransition) return pedestrianTransitionPose(ped.junctionTransition);
     const segment = ped.segmentId && mapModel.pedestrianNavigation.segmentsById.get(ped.segmentId);
-    if (segment) return pedestrianSegmentPose(segment, ped.segmentDirection, ped.segmentAlong);
+    if (segment) return pedestrianSegmentPose(
+      segment,
+      ped.segmentDirection,
+      ped.segmentAlong,
+      pedestrianSegmentLaneOffset(ped, segment)
+    );
     if (ped.junctionTransition) return pedestrianTransitionPose(ped.junctionTransition);
     const edge = mapModel.getEdge(ped.edgeId);
     if (!edge) return { x:ped.x, y:ped.y, angle:ped.dir };
@@ -2979,7 +3020,12 @@
     );
   }
 
-  function pedestrianSegmentPose(segment, directionSign = 1, along = 0) {
+  function pedestrianSegmentLaneOffset(ped, segment) {
+    if (segment?.type !== "sidewalk") return 0;
+    return 7 + clamp(Math.max(0, Number(ped?.segmentAvoidanceOffset) || 0), 0, 6);
+  }
+
+  function pedestrianSegmentPose(segment, directionSign = 1, along = 0, lateralOffset = 0) {
     if (!segment?.points?.length) return null;
     const length = Math.max(0, segment.length || 0);
     const distanceAlong = clamp(Number(along) || 0, 0, length);
@@ -3001,7 +3047,12 @@
       remaining -= span;
     }
     if (directionSign < 0) tangent = { x:-tangent.x, y:-tangent.y };
-    return { x:point.x, y:point.y, angle:Math.atan2(tangent.y, tangent.x) };
+    const offset = Number(lateralOffset) || 0;
+    return {
+      x:point.x + tangent.y * offset,
+      y:point.y - tangent.x * offset,
+      angle:Math.atan2(tangent.y, tangent.x)
+    };
   }
 
   function pedestrianSignalState(ped) {
@@ -3302,6 +3353,8 @@
         avoidanceOffset:0,
         avoidanceTarget:0,
         avoidanceHold:0,
+        segmentAvoidanceOffset:0,
+        segmentAvoidanceTarget:0,
         junctionTransition:null,
         stuckTimer:0,
         lastProgressX:null,
@@ -4779,9 +4832,16 @@
 
     for (const fixture of HOME_FIXTURES) {
       if (fixture.id === "pet" && !state.petCompanion.pet) continue;
-      const d = distance(state.player.homeX, state.player.homeY, fixture.interactX, fixture.interactY);
-      if (d <= fixture.range && d < nearestDistance) {
-        nearest = fixture;
+      const interaction = fixture.interaction;
+      if (!interaction) continue;
+      const d = distance(state.player.homeX, state.player.homeY, interaction.x, interaction.y);
+      if (d <= interaction.range && d < nearestDistance) {
+        nearest = {
+          ...fixture,
+          interactX:interaction.x,
+          interactY:interaction.y,
+          range:interaction.range
+        };
         nearestDistance = d;
       }
     }
@@ -7476,6 +7536,10 @@
       car.trafficStall = 0;
       car.routeEdgeIds = [];
       car.routeIndex = 0;
+      car.previousEdgeId = null;
+      car.previousDirectionSign = null;
+      car.previousLaneOffset = null;
+      car.previousJunctionNodeId = null;
 
       const edge = mapModel.getEdge(car.edgeId);
       if (edge) {
@@ -8076,6 +8140,13 @@
 
   function requestPedestrianAvoidance(ped, offset = 16, holdSeconds = .65) {
     if (!ped) return;
+    if (ped.segmentId) {
+      const segment = mapModel.pedestrianNavigation.segmentsById.get(ped.segmentId);
+      if (segment?.type !== "sidewalk") return;
+      ped.segmentAvoidanceTarget = Math.max(Number(ped.segmentAvoidanceTarget) || 0, Math.min(6, Math.max(0, offset)));
+      ped.avoidanceHold = Math.max(Number(ped.avoidanceHold) || 0, Math.max(0, holdSeconds));
+      return;
+    }
     const edge = mapModel.getEdge(ped.edgeId);
     const maxAvoidance = edge
       ? pedestrianSidewalkLayout(edge, ped.directionSign).maxAvoidance
@@ -8086,8 +8157,25 @@
   }
 
   function updatePedestrianAvoidance(ped, dt) {
-    if (ped?.segmentId) return;
-    if (!ped || ped.junctionTransition) return;
+    if (!ped) return;
+    if (ped.segmentId) {
+      const segment = mapModel.pedestrianNavigation.segmentsById.get(ped.segmentId);
+      ped.avoidanceHold = Math.max(0, (Number(ped.avoidanceHold) || 0) - dt);
+      if (ped.avoidanceHold <= 0) ped.segmentAvoidanceTarget = 0;
+      const maximum = segment?.type === "sidewalk" ? 6 : 0;
+      const current = clamp(Math.max(0, Number(ped.segmentAvoidanceOffset) || 0), 0, maximum);
+      const target = clamp(Math.max(0, Number(ped.segmentAvoidanceTarget) || 0), 0, maximum);
+      const rate = target > current ? 24 : 18;
+      ped.segmentAvoidanceOffset = clamp(current + clamp(target - current, -rate * dt, rate * dt), 0, maximum);
+      if (segment && (ped.state === "walking" || ped.state === "waiting")) {
+        const pose = pedestrianSegmentPose(segment, ped.segmentDirection, ped.segmentAlong, pedestrianSegmentLaneOffset(ped, segment));
+        ped.x = pose.x;
+        ped.y = pose.y;
+        ped.dir = pose.angle;
+      }
+      return;
+    }
+    if (ped.junctionTransition) return;
     ped.avoidanceHold = Math.max(0, (Number(ped.avoidanceHold) || 0) - dt);
     if (ped.avoidanceHold <= 0) ped.avoidanceTarget = 0;
 
@@ -8133,10 +8221,18 @@
 
   function pedestrianFollowingLimit(ped, distanceUnits) {
     const requested = Math.max(0, distanceUnits);
-    if (ped.segmentId) return requested;
-    if (ped.junctionTransition) return requested;
     const minimumGap = 24;
     let allowed = requested;
+    if (ped.segmentId) {
+      for (const other of visiblePedestrianColliders()) {
+        if (other === ped || other.segmentId !== ped.segmentId || other.segmentDirection !== ped.segmentDirection) continue;
+        const ahead = (other.segmentAlong - ped.segmentAlong) * ped.segmentDirection;
+        if (ahead <= 0 || ahead >= allowed + minimumGap) continue;
+        allowed = Math.min(allowed, Math.max(0, ahead - minimumGap));
+      }
+      return allowed;
+    }
+    if (ped.junctionTransition) return requested;
 
     // Reserve space on the route before moving. Collision rollback happens
     // after movement and makes a same-direction queue oscillate forever when
@@ -8207,7 +8303,8 @@
     if (!ped || (ped.state !== "walking" && ped.state !== "waiting")) return false;
 
     if (ped.segmentId) {
-      ped.collisionWait = .30 + ((ped.seed || 0) % 3) * .08;
+      requestPedestrianAvoidance(ped, 6, 1.05);
+      ped.collisionWait = .24 + ((ped.seed || 0) % 3) * .06;
       ped.stuckTimer = 0;
       ped.stuckRecoveryCount = (ped.stuckRecoveryCount || 0) + 1;
       return true;
@@ -10853,6 +10950,9 @@
     const visualY = building?.y ?? place.y;
     const p = worldToScreen(visualX, visualY);
     const entry = worldToScreen(place.x, place.y);
+    const facadeEntrance = building?.frontageGeometry?.entrance
+      ? worldToScreen(building.frontageGeometry.entrance.x, building.frontageGeometry.entrance.y)
+      : p;
     const visualOffscreen = p.x < -360 || p.y < -360 || p.x > viewWidth + 360 || p.y > viewHeight + 360;
     const entryOffscreen = entry.x < -80 || entry.y < -80 || entry.x > viewWidth + 80 || entry.y > viewHeight + 80;
     if (visualOffscreen && entryOffscreen) return;
@@ -10864,15 +10964,24 @@
       ctx.lineWidth = 24;
       ctx.beginPath();
       ctx.moveTo(entry.x, entry.y);
-      ctx.lineTo(p.x, p.y);
+      ctx.lineTo(facadeEntrance.x, facadeEntrance.y);
       ctx.stroke();
       ctx.strokeStyle = "#aaa9a1";
       ctx.lineWidth = 16;
       ctx.beginPath();
       ctx.moveTo(entry.x, entry.y);
-      ctx.lineTo(p.x, p.y);
+      ctx.lineTo(facadeEntrance.x, facadeEntrance.y);
       ctx.stroke();
       ctx.restore();
+    }
+
+    const buildingAngle = Number(building?.frontageGeometry?.angle ?? building?.angle) || 0;
+    const rotatedBuilding = Boolean(building && Math.abs(buildingAngle) > .001);
+    if (rotatedBuilding) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(buildingAngle);
+      ctx.translate(-p.x, -p.y);
     }
 
     if (place.id === "park") {
@@ -10897,7 +11006,8 @@
         h:homeH,
         floors:2,
         houseStyle:"detached",
-        frontage:"south",
+        frontage:building?.frontageGeometry?.side || "south",
+        frontageGeometry:building?.frontageGeometry || null,
         residentialSeed:7301
       };
       drawResidentialBuilding(
@@ -11163,6 +11273,8 @@
       ctx.fillStyle = "#4d6055";
       ctx.fillRect(p.x - 19, p.y + 17, 38, 74);
     }
+
+    if (rotatedBuilding) ctx.restore();
 
     ctx.fillStyle = "rgba(18,24,21,.76)";
     roundedRectPath(ctx, p.x - 72, p.y - 179, 144, 24, 8);
