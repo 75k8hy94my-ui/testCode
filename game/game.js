@@ -1159,6 +1159,7 @@
     day: 1,
     minute: 8 * 60,
     cash: 8000,
+    umbrellaOwned:false,
     groceries: 2,
     fitness: 0,
     libraryVisits: 0,
@@ -3761,6 +3762,21 @@
     clampNeeds();
   }
 
+  function isPlayerUsingUmbrella() {
+    return state.umbrellaOwned === true && state.visual.weather === "rain" &&
+      !state.player.inHome && !state.player.inVehicle && !state.player.inTrain;
+  }
+
+  function buyUmbrella() {
+    if (state.umbrellaOwned === true) return { ok:false, reason:"already-owned" };
+    if (state.cash < 600) return { ok:false, reason:"insufficient-funds" };
+    state.cash -= 600;
+    state.umbrellaOwned = true;
+    advanceTime(5);
+    updateSmartphone();
+    return { ok:true };
+  }
+
   function chargeRentIfNeeded() {
     if (state.day > 1 && (state.day - 1) % 7 === 0) {
       state.cash -= RENT;
@@ -4417,6 +4433,14 @@
         advanceTime(result.duration);
         showToast("手芸キットを3回分買いました");
       }, !kitPurchase.ok);
+      addChoice("傘を買う", state.umbrellaOwned ? "購入済み・何度でも使えます" : "¥600 / 5分 / 雨の日の屋外で自動使用", () => {
+        const result = buyUmbrella();
+        if (!result.ok) {
+          showToast(result.reason === "already-owned" ? "傘はすでに持っています" : "傘を買うには¥600必要です");
+          return;
+        }
+        showToast("傘を買いました。雨の日の屋外で自動的に使います");
+      }, state.umbrellaOwned || state.cash < 600);
       addChoice("釣り餌を買う", state.cash < parkFishingModel.BAIT_PACK_COST ? "5回分 / ¥500 / 資金不足" : "5回分 / ¥500 / 所持 " + state.fishing.bait + "個", () => {
         const result = parkFishingModel.buyBait(state.fishing, state.cash);
         if (!result.ok) {
@@ -5257,6 +5281,7 @@
         day: state.day,
         minute: state.minute,
         cash: state.cash,
+        umbrellaOwned:state.umbrellaOwned === true,
         groceries: state.groceries,
         fitness: state.fitness,
         libraryVisits: state.libraryVisits,
@@ -5509,7 +5534,9 @@
 
       state.day = Math.max(1, Math.floor(Number(saved.day) || 1));
       state.minute = clamp(Number(saved.minute) || 480, 0, 1439.99);
+      syncWeather();
       state.cash = Math.floor(Number(saved.cash) || 0);
+      state.umbrellaOwned = saved.umbrellaOwned === true;
       state.groceries = Math.max(0, Math.floor(Number(saved.groceries) || 0));
       state.fitness = Math.max(0, Math.floor(Number(saved.fitness) || 0));
       state.libraryVisits = Math.max(0, Math.floor(Number(saved.libraryVisits) || 0));
@@ -9991,6 +10018,28 @@
       PLAYER_APPEARANCE,
       moving ? "walk" : "idle"
     );
+    if (isPlayerUsingUmbrella()) drawPlayerUmbrella();
+  }
+
+  function drawPlayerUmbrella() {
+    ctx.save();
+    ctx.translate(state.player.x, state.player.y - 39);
+    ctx.fillStyle = "#4b93b8";
+    ctx.beginPath();
+    ctx.moveTo(-17, 1);
+    ctx.quadraticCurveTo(0, -19, 17, 1);
+    ctx.quadraticCurveTo(11, -1, 6, 2);
+    ctx.quadraticCurveTo(0, -1, -6, 2);
+    ctx.quadraticCurveTo(-11, -1, -17, 1);
+    ctx.fill();
+    ctx.strokeStyle = "#dcecf1";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, 17);
+    ctx.quadraticCurveTo(0, 21, 4, 19);
+    ctx.stroke();
+    ctx.restore();
   }
 
   function homeInteriorViewport() {
@@ -11039,6 +11088,7 @@
         player:{ x:state.player.x, y:state.player.y, inHome:state.player.inHome, inVehicle:state.player.inVehicle, inTrain:state.player.inTrain },
         needs:{ ...state.needs },
         weather:state.visual.weather,
+        umbrellaOwned:state.umbrellaOwned === true,
         skills:{ ...state.communityCenter.skills },
         npcFriendship:{ ...socialNpcState.friendship },
         relationships:{ ...socialNpcState.relationships },
@@ -11081,6 +11131,14 @@
           updateSmartphone();
           return true;
         },
+        setPlayerContextForTest(context) {
+          state.player.inHome = context === "home";
+          state.player.inVehicle = context === "car";
+          state.player.inTrain = context === "train";
+          return isPlayerUsingUmbrella();
+        },
+        buyUmbrellaForTest() { return buyUmbrella(); },
+        isPlayerUsingUmbrella,
         advanceTimeForTest(minutes) {
           if (!Number.isFinite(minutes) || minutes < 0) return false;
           advanceTime(minutes, false, false);

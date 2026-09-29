@@ -91,6 +91,22 @@ test('world weather follows the deterministic game clock and rain exposure respe
   assert.doesNotMatch(source, /Math\.floor\(performance\.now\(\) \/ 1000\)/);
 });
 
+test('umbrella purchase is one-time, snapshot-safe, and only protects an outdoor pedestrian', () => {
+  assert.match(source, /umbrellaOwned:false/);
+  assert.match(source, /state\.umbrellaOwned = saved\.umbrellaOwned === true/);
+  assert.match(source, /umbrellaOwned:state\.umbrellaOwned === true/);
+  assert.match(source, /function buyUmbrella\(\)/);
+  const purchase = source.slice(source.indexOf('function buyUmbrella()'), source.indexOf('function chargeRentIfNeeded()'));
+  assert.match(purchase, /state\.cash < 600/);
+  assert.match(purchase, /already-owned/);
+  assert.match(purchase, /state\.cash -= 600/);
+  assert.match(purchase, /advanceTime\(5\)/);
+  assert.match(source, /function isPlayerUsingUmbrella\(\)/);
+  assert.match(source, /!state\.player\.inHome && !state\.player\.inVehicle && !state\.player\.inTrain/);
+  assert.match(source, /if \(isPlayerUsingUmbrella\(\)\) drawPlayerUmbrella\(\)/);
+  assert.match(source, /buyUmbrellaForTest\(\)/);
+});
+
 
 test('game loads the sprite character renderer before the game runtime', () => {
   assert.match(html, /<script src="\.\/character-renderer\.js\?v=[^"]+"><\/script>/);

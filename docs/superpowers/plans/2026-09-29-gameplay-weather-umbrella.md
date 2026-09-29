@@ -65,11 +65,11 @@
 
 **Interfaces:** Runtime state adds boolean `umbrellaOwned`; snapshot restore maps only literal `true` to ownership. The store sells one umbrella at ¥600 / 5 minutes, atomically validating money and duplicate ownership. `isPlayerUsingUmbrella()` is true only for owned, rainy, on-foot outdoor state and the player renderer uses it for a small canopy.
 
-- [ ] **Step 1:** Add failing tests for snapshot round-trip/legacy defaults/malformed values, purchase cost/time, insufficient funds, no duplicate purchase, and all five visibility/protection contexts (clear, rainy walking, home, car, train).
-- [ ] **Step 2:** Run `node --test tests/game-runtime.test.mjs`; confirm state, purchase action, and canopy behavior are absent.
-- [ ] **Step 3:** Implement guarded purchase and snapshot integration, explicit `isPlayerUsingUmbrella()` state rules, and a compact drawn umbrella over the player's existing character.
-- [ ] **Step 4:** Run runtime and weather-model tests; demonstrate no mutation/time loss on a rejected purchase.
-- [ ] **Step 5:** Commit the umbrella gameplay integration.
+- [x] **Step 1:** Add failing tests for snapshot round-trip/legacy defaults/malformed values, purchase cost/time, insufficient funds, no duplicate purchase, and all five visibility/protection contexts (clear, rainy walking, home, car, train).
+- [x] **Step 2:** Run `node --test tests/game-runtime.test.mjs`; confirm state, purchase action, and canopy behavior are absent.
+- [x] **Step 3:** Implement guarded purchase and snapshot integration, explicit `isPlayerUsingUmbrella()` state rules, and a compact drawn umbrella over the player's existing character.
+- [x] **Step 4:** Run runtime and weather-model tests; demonstrate no mutation/time loss on a rejected purchase.
+- [x] **Step 5:** Commit the umbrella gameplay integration.
 
 ### Task 4: Render truthful weather forecasts on the smartphone
 
