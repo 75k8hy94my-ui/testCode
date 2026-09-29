@@ -323,10 +323,12 @@ test('all edge polylines stay attached to their declared nodes', () => {
   }
 });
 
-test('place validation detects a broken entrance connection', () => {
+test('place validation detects a broken typed pedestrian entrance connection', () => {
   const map = createMapModel();
-  map.edges.find((edge) => edge.id === 'ped-home-entry').pedestrian = false;
-  assert.ok(map.validate().includes('place unreachable: home'));
+  const homeAccess = map.pedestrianNavigation.externalNodeAliases.get('home-entrance');
+  assert.ok(homeAccess);
+  map.pedestrianNavigation.adjacency.delete(homeAccess);
+  assert.ok(map.validate().includes('place unreachable on pedestrian graph: home'));
 });
 
 test('facility road nodes are connected to the vehicle graph', () => {
@@ -400,8 +402,8 @@ test('Wakaba animal shelter has a reachable pedestrian entrance and collision-sa
   );
   assert.ok(shelter.building.frontageGeometry);
   assert.ok(map.findRoute('home-entrance', shelter.entranceNodeId, { mode:'pedestrian' }));
-  const entrance = map.getNode(shelter.entranceNodeId);
-  assert.equal(map.isWalkable(entrance.x, entrance.y, 14), true);
+  assert.equal(map.isWalkable(shelter.x, shelter.y, 14), true);
+  assert.ok(map.pedestrianNavigation.externalNodeAliases.has(shelter.entranceNodeId));
   const spur = map.getEdge('ped-pet-shelter-entry');
   assert.equal(spur.pedestrian, true);
   assert.equal(spur.vehicle, false);
