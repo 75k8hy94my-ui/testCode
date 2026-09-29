@@ -38,6 +38,7 @@
     : (callback) => window.setTimeout(() => callback(performance.now()), 16);
 
   const mapModel = globalThis.CityDaysMapModel?.createMapModel?.();
+  const weatherSystem = globalThis.CityDaysWeatherSystem;
   const mapErrors = mapModel ? mapModel.validate() : ["MapModel を読み込めません。"];
   if (!mapModel || mapErrors.length) {
     showRuntimeError(mapErrors.join(" / "));
@@ -3737,12 +3738,25 @@
     for (const key of Object.keys(state.needs)) state.needs[key] = clamp(state.needs[key], 0, 100);
   }
 
+  function syncWeather(announce = false) {
+    const previous = state.visual.weather;
+    state.visual.weather = weatherSystem.getWeatherAt(state.day, state.minute);
+    if (announce && previous !== state.visual.weather) {
+      if (state.visual.weather === "rain") showToast("雨が降ってきました");
+      if (state.visual.weather === "clear") showToast("空が晴れてきました");
+    }
+  }
+
   function decayNeeds(minutes) {
     state.needs.hunger -= minutes * 0.018;
     state.needs.energy -= minutes * 0.015;
     state.needs.hygiene -= minutes * 0.009;
     state.needs.social -= minutes * 0.004;
     state.needs.fun -= minutes * 0.006;
+    state.needs.hygiene -= weatherSystem.getOutdoorHygienePenalty(state.day, state.minute, minutes, {
+      sheltered:state.player.inHome || state.player.inVehicle || state.player.inTrain,
+      umbrellaOwned:state.umbrellaOwned === true
+    });
     state.needs.health = playerHealthModel.advanceHealth(state.needs.health, state.needs, minutes);
     clampNeeds();
   }
@@ -3767,6 +3781,7 @@
       state.minute += 1440;
       state.day = Math.max(1, state.day - 1);
     }
+    syncWeather(true);
     state.garden = communityGardenModel.advance(
       state.garden,
       communityGardenModel.absoluteMinute(state.day, Math.floor(state.minute))
@@ -7069,16 +7084,8 @@
     updatePedestrians(dt, gameMinutes);
     syncNamedNpcCitizens();
 
-    state.visual.weatherClock += dt;
     state.visual.rainPhase += dt;
-    if (state.visual.weatherClock >= state.visual.weatherDuration) {
-      state.visual.weatherClock = 0;
-      const roll = hash2(state.day, Math.floor(state.minute / 60), Math.floor(performance.now() / 1000));
-      state.visual.weather = roll < .54 ? "clear" : roll < .76 ? "cloudy" : "rain";
-      state.visual.weatherDuration = 45 + roll * 50;
-      if (state.visual.weather === "rain") showToast("雨が降ってきました");
-      if (state.visual.weather === "clear") showToast("空が晴れてきました");
-    }
+    state.visual.weatherClock += dt;
 
     autosaveTimer += dt;
     if (autosaveTimer >= 5) {
@@ -11031,6 +11038,7 @@
         cash:state.cash,
         player:{ x:state.player.x, y:state.player.y, inHome:state.player.inHome, inVehicle:state.player.inVehicle, inTrain:state.player.inTrain },
         needs:{ ...state.needs },
+        weather:state.visual.weather,
         skills:{ ...state.communityCenter.skills },
         npcFriendship:{ ...socialNpcState.friendship },
         relationships:{ ...socialNpcState.relationships },
@@ -11062,6 +11070,15 @@
         setMinuteForTest(minute) {
           if (!Number.isFinite(minute)) return false;
           state.minute = Math.max(0, Math.min(1439, Math.floor(minute)));
+          syncWeather();
+          return true;
+        },
+        setClockForTest(day, minute) {
+          if (!Number.isFinite(day) || !Number.isFinite(minute) || day < 1) return false;
+          state.day = Math.floor(day);
+          state.minute = Math.max(0, Math.min(1439, Math.floor(minute)));
+          syncWeather();
+          updateSmartphone();
           return true;
         },
         advanceTimeForTest(minutes) {

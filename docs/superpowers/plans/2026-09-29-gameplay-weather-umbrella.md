@@ -53,11 +53,11 @@
 
 **Interfaces:** Runtime reads `CityDaysWeatherSystem`; `syncWeather(announce)` updates `state.visual.weather` from `(state.day, state.minute)`. The test-only clock setter synchronizes weather. `decayNeeds(minutes)` asks the model to sum rainy minutes from the current `(day, minute)` across that duration, based on the player's shelter state and umbrella ownership.
 
-- [ ] **Step 1:** Add failing runtime tests for script ordering, initial clock-derived weather, crossing a three-hour boundary via `advanceTime`, transition announcement only on condition change, and sheltered/uncovered decay values.
-- [ ] **Step 2:** Run `node --test tests/game-runtime.test.mjs`; confirm the weather model is not loaded and realtime-random weather still controls runtime.
-- [ ] **Step 3:** Load `weather-system.js` before the game runtime, synchronize weather after game-time changes, remove realtime-random condition rolls, and apply only the model-defined outdoor hygiene penalty.
-- [ ] **Step 4:** Run `node --test tests/game-runtime.test.mjs tests/weather-system.test.mjs`.
-- [ ] **Step 5:** Commit clock-driven weather integration.
+- [x] **Step 1:** Add failing runtime tests for script ordering, initial clock-derived weather, crossing a three-hour boundary via `advanceTime`, transition announcement only on condition change, and sheltered/uncovered decay values.
+- [x] **Step 2:** Run `node --test tests/game-runtime.test.mjs`; confirm the weather model is not loaded and realtime-random weather still controls runtime.
+- [x] **Step 3:** Load `weather-system.js` before the game runtime, synchronize weather after game-time changes, remove realtime-random condition rolls, and apply only the model-defined outdoor hygiene penalty.
+- [x] **Step 4:** Run `node --test tests/game-runtime.test.mjs tests/weather-system.test.mjs`.
+- [x] **Step 5:** Commit clock-driven weather integration.
 
 ### Task 3: Buy, normalize, persist in snapshots, and show umbrella protection
 

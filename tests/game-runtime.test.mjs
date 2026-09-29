@@ -79,6 +79,18 @@ test('game loads and validates the shared Japanese map model before runtime star
   assert.match(source, /mapModel\.validate\(\)/);
 });
 
+test('world weather follows the deterministic game clock and rain exposure respects shelter', () => {
+  const weatherIndex = html.indexOf('weather-system.js');
+  assert.notEqual(weatherIndex, -1);
+  assert.ok(weatherIndex < html.indexOf('game.js'));
+  assert.match(source, /function syncWeather\(announce = false\)/);
+  assert.match(source, /weatherSystem\.getWeatherAt\(state\.day, state\.minute\)/);
+  assert.match(source, /weatherSystem\.getOutdoorHygienePenalty\(/);
+  assert.match(source, /umbrellaOwned:\s*state\.umbrellaOwned/);
+  assert.match(source, /syncWeather\(\);/);
+  assert.doesNotMatch(source, /Math\.floor\(performance\.now\(\) \/ 1000\)/);
+});
+
 
 test('game loads the sprite character renderer before the game runtime', () => {
   assert.match(html, /<script src="\.\/character-renderer\.js\?v=[^"]+"><\/script>/);
