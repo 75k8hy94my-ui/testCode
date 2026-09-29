@@ -78,6 +78,7 @@ test('weather app renders supplied clock-based forecast transitions and umbrella
   assert.match(root.innerHTML,/☂ 雨/);
   assert.match(root.innerHTML,/☁ くもり/);
   assert.match(root.innerHTML,/傘を使って雨を防いでいます/);
+  assert.doesNotMatch(root.innerHTML,/\d+°/);
   phone.update({day:2,minute:5,weather:'rain',inHome:true,inVehicle:false,inTrain:false,
     forecast:[{day:2,startMinute:0,offsetMinutes:0,condition:'rain'}],umbrellaOwned:true,umbrellaProtecting:false});
   assert.match(root.innerHTML,/Day 2 00:05/);

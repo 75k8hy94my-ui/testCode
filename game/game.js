@@ -1139,6 +1139,7 @@
   let actionQueued = false;
   let toastTimer = 0;
   let autosaveTimer = 0;
+  let umbrellaDrawCount = 0;
 
   const state = {
     player: {
@@ -5533,7 +5534,8 @@
       }
 
       state.day = Math.max(1, Math.floor(Number(saved.day) || 1));
-      state.minute = clamp(Number(saved.minute) || 480, 0, 1439.99);
+      const savedMinute = Number(saved.minute);
+      state.minute = saved.minute != null && Number.isFinite(savedMinute) ? clamp(savedMinute, 0, 1439.99) : 480;
       syncWeather();
       state.cash = Math.floor(Number(saved.cash) || 0);
       state.umbrellaOwned = saved.umbrellaOwned === true;
@@ -10022,6 +10024,7 @@
   }
 
   function drawPlayerUmbrella() {
+    umbrellaDrawCount += 1;
     const screen = worldToScreen(state.player.x, state.player.y);
     ctx.save();
     ctx.translate(screen.x, screen.y - 39);
@@ -11121,6 +11124,7 @@
       configurable:true,
       value:Object.freeze({
         snapshot,
+        setPausedForTest(value) { state.paused = Boolean(value); },
         setMinuteForTest(minute) {
           if (!Number.isFinite(minute)) return false;
           state.minute = Math.max(0, Math.min(1439, Math.floor(minute)));
@@ -11148,6 +11152,8 @@
           return true;
         },
         isPlayerUsingUmbrella,
+        getUmbrellaDrawCount() { return umbrellaDrawCount; },
+        applyGameSnapshotForTest(saved) { return applyGameSnapshot(saved); },
         decayNeedsForTest(minutes) {
           if (!Number.isFinite(minutes) || minutes < 0) return false;
           const hygieneBefore = state.needs.hygiene;

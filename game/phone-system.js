@@ -181,7 +181,6 @@
     }
     function weatherApp() {
       const w = weatherInfo(model.weather);
-      const temp = 18 + ((model.day || 1) * 3 + Math.floor((model.minute || 0) / 180)) % 11;
       const forecast = Array.isArray(model.forecast) ? model.forecast.slice(0, 8) : [];
       const rows = forecast.map(function(item,index){
         const condition = weatherInfo(item && item.condition);
@@ -190,17 +189,15 @@
         const lead = Math.max(0, Math.floor(Number(item && item.offsetMinutes) || 0));
         const label = index === 0 ? "現在 · Day " + Math.max(1, Math.floor(Number(model.day) || 1)) + " " + timeText(model.minute) : "Day " + day + " " + timeText(minute) + "（あと" +
           (lead >= 60 && lead % 60 === 0 ? Math.floor(lead / 60) + "時間" : lead + "分") + "）";
-        return '<div class="ios-forecast"><span>' + esc(label) + '</span><b>' + condition[1] + ' ' + condition[0] +
-          '</b><em>' + (temp + (index % 3) - 1) + '°</em></div>';
+        return '<div class="ios-forecast"><span>' + esc(label) + '</span><b>' + condition[1] + ' ' + condition[0] + '</b></div>';
       }).join("");
       const sheltered = model.inHome || model.inVehicle || model.inTrain;
       const umbrellaStatus = model.umbrellaOwned && !sheltered
         ? '<small class="ios-footnote">' + (model.umbrellaProtecting ? "傘を使って雨を防いでいます" : "傘を持っています") + '</small>'
         : "";
       return shell("天気",'<div class="ios-weather-hero"><small>' + esc(model.district || "若葉") + '</small><strong>' +
-        temp + '°</strong><span>' + w[1] + ' ' + w[0] + '</span><em>最高 ' + (temp+3) + '° / 最低 ' + (temp-5) +
-        '°</em></div><section class="ios-glass-card"><h3>時間ごとの予報</h3>' +
-        (rows || '<div class="ios-forecast"><span>現在</span><b>' + w[1] + ' ' + w[0] + '</b><em>' + temp + '°</em></div>') +
+        w[1] + '</strong><span>' + w[0] + '</span></div><section class="ios-glass-card"><h3>時間ごとの予報</h3>' +
+        (rows || '<div class="ios-forecast"><span>現在</span><b>' + w[1] + ' ' + w[0] + '</b></div>') +
         '</section>' + umbrellaStatus);
     }
     function calendarApp() {

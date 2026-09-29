@@ -40,6 +40,13 @@ try{
   const hook='window.__CityDaysSocialNpcTest';
   const initial=JSON.parse(await evaluate(`JSON.stringify({url:location.href,hook:typeof ${hook}?.setClockForTest,error:document.querySelector('.game-runtime-error')?.textContent||null,canvas:(c=>({width:c.width,height:c.height,clientWidth:c.clientWidth,clientHeight:c.clientHeight}))(document.querySelector('#gameCanvas'))})`));
   if(initial.error||initial.hook!=='function')throw Error(`Game did not start: ${JSON.stringify(initial)}`);
+  await evaluate(`${hook}.setPausedForTest(true)`);
+  await evaluate(`${hook}.applyGameSnapshotForTest({version:1,day:2,minute:0,cash:8000,player:{x:5000,y:5000}})`);
+  const midnight=JSON.parse(await evaluate(`JSON.stringify(${hook}.snapshot())`));
+  if(midnight.day!==2||midnight.minute!==0||midnight.umbrellaOwned)throw Error(`Legacy midnight snapshot migration failed: ${JSON.stringify(midnight)}`);
+  await evaluate(`${hook}.applyGameSnapshotForTest({version:1,day:1,minute:540,cash:8000,umbrellaOwned:'true',player:{x:5000,y:5000}})`);
+  const malformedOwnership=JSON.parse(await evaluate(`JSON.stringify(${hook}.snapshot())`));
+  if(malformedOwnership.umbrellaOwned)throw Error('Malformed umbrella ownership was trusted');
   await evaluate(`${hook}.setClockForTest(1,550)`);
   const beforeRain=JSON.parse(await evaluate(`JSON.stringify(${hook}.snapshot())`));
   const rainDecay=JSON.parse(await evaluate(`JSON.stringify(${hook}.decayNeedsForTest(10))`));
@@ -71,6 +78,26 @@ try{
   await evaluate(`${hook}.setPlayerContextForTest('walk')`);
   await evaluate("document.querySelector('#smartphoneToggle').click()");await delay(150);
   await evaluate("document.querySelector('[data-phone-app=weather]')?.click()");await delay(120);
+  const checkForecast=async(day,minute)=>{
+    await evaluate(`${hook}.setClockForTest(${day},${minute})`);await delay(80);
+    const expected=JSON.parse(await evaluate(`JSON.stringify(CityDaysWeatherSystem.getForecast(${day},${minute}))`));
+    const rows=await evaluate(`JSON.stringify([...document.querySelectorAll('#smartphonePanel .ios-forecast')].map(r=>({label:r.querySelector('span')?.textContent||'',condition:r.querySelector('b')?.textContent||''})))`);
+    const rendered=JSON.parse(rows);const glyph={clear:'☀ 晴れ',cloudy:'☁ くもり',rain:'☂ 雨'};
+    if(rendered.length!==expected.length)throw Error(`Forecast row count mismatch: ${JSON.stringify({expected,rendered})}`);
+    for(let i=0;i<expected.length;i++){
+      const item=expected[i];const hh=String(Math.floor(item.startMinute/60)).padStart(2,'0');const mm=String(item.startMinute%60).padStart(2,'0');
+      if(!rendered[i].condition.includes(glyph[item.condition]))throw Error(`Forecast condition mismatch at ${i}: ${JSON.stringify({item,row:rendered[i]})}`);
+      if(i>0&&(!rendered[i].label.includes(`Day ${item.day} ${hh}:${mm}`)||!rendered[i].label.includes(`あと${item.offsetMinutes}分`)&&item.offsetMinutes%60!==0))throw Error(`Forecast time mismatch at ${i}: ${JSON.stringify({item,row:rendered[i]})}`);
+    }
+    return {expected,rendered};
+  };
+  const rainForecast=await checkForecast(1,550);
+  const midnightForecast=await checkForecast(1,1435);
+  if(midnightForecast.expected[1].day!==2||midnightForecast.expected[1].startMinute!==0||!midnightForecast.rendered[1].label.includes('Day 2 00:00'))throw Error(`Forecast midnight rollover incorrect: ${JSON.stringify(midnightForecast)}`);
+  await evaluate(`${hook}.setClockForTest(1,550)`);
+  await delay(150);
+  const canopyDraws=await evaluate(`${hook}.getUmbrellaDrawCount()`);
+  if(canopyDraws<1)throw Error(`Umbrella canopy was not drawn: ${canopyDraws}`);
   const weatherPhone=await shot('weather-phone-desktop.png');
   const phoneText=await evaluate("document.querySelector('#smartphonePanel')?.innerText||''");
   if(!phoneText.includes('☂ 雨')||!phoneText.includes('傘を使って雨を防いでいます'))throw Error(`Phone forecast/protection missing: ${phoneText}`);
@@ -79,7 +106,7 @@ try{
   await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await call('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5});await delay(150);
   const mobileShot=await shot('weather-phone-mobile.png');
   const mobile=JSON.parse(await evaluate(`JSON.stringify({panel:(e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,scrollWidth:e.scrollWidth,scrollHeight:e.scrollHeight}})(document.querySelector('#smartphonePanel')),viewport:{width:innerWidth,height:innerHeight},overflow:document.documentElement.scrollWidth>innerWidth,error:document.querySelector('.game-runtime-error')?.textContent||null})`));
-  const report={requested,requestedShot,fallback,currentUrl,initial,rainDecay,umbrellaPurchase:{cash:bought.cash,minute:bought.minute,owned:bought.umbrellaOwned,duplicateRejected:!duplicate.ok,insufficientFundsRejected:!unaffordable.ok},coveredDecay:covered,contexts,phoneText,dom,mobile,screenshots:{desktopPhone:weatherPhone,world:worldShot,mobile:mobileShot},diagnostics};
+  const report={requested,requestedShot,fallback,currentUrl,initial,snapshotMigration:{midnightMinute:midnight.minute,legacyUmbrella:midnight.umbrellaOwned,malformedUmbrella:malformedOwnership.umbrellaOwned},rainDecay,umbrellaPurchase:{cash:bought.cash,minute:bought.minute,owned:bought.umbrellaOwned,duplicateRejected:!duplicate.ok,insufficientFundsRejected:!unaffordable.ok},coveredDecay:covered,contexts,forecasts:{rain:rainForecast,midnight:midnightForecast},canopyDraws,phoneText,dom,mobile,screenshots:{desktopPhone:weatherPhone,world:worldShot,mobile:mobileShot},diagnostics};
   const reportPath=path.join(out,'gameplay-weather-diagnostics.json');await fs.writeFile(reportPath,JSON.stringify(report,null,2));console.log(JSON.stringify({...report,reportPath},null,2));
   if(mobile.error||mobile.overflow||mobile.panel.x<0||mobile.panel.y<0||mobile.panel.x+mobile.panel.width>mobile.viewport.width+1||mobile.panel.y+mobile.panel.height>mobile.viewport.height+1)throw Error('Mobile phone layout out of bounds');
   if(diagnostics.console.length||diagnostics.pageErrors.length||diagnostics.failedRequests.length||diagnostics.badResponses.length)throw Error('Browser diagnostics contains warnings/errors or failed requests');

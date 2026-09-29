@@ -119,6 +119,12 @@ test('phone snapshot receives shared forecast rows and only claims active umbrel
   assert.doesNotMatch(phoneSource, /\+3時間[\s\S]*☀ 晴れ/);
 });
 
+test('snapshot clock restoration preserves midnight and debug restoration can exercise legacy ownership', () => {
+  assert.match(source, /saved\.minute != null && Number\.isFinite\(savedMinute\) \? clamp\(savedMinute, 0, 1439\.99\) : 480/);
+  const hook = source.slice(source.indexOf('function installSocialNpcTestHook()'), source.indexOf('function togglePause()'));
+  assert.match(hook, /applyGameSnapshotForTest\(saved\)/);
+});
+
 
 test('game loads the sprite character renderer before the game runtime', () => {
   assert.match(html, /<script src="\.\/character-renderer\.js\?v=[^"]+"><\/script>/);
