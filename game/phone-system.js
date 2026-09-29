@@ -365,12 +365,13 @@
     function transitApp() {
       const stations = model.stations || [];
       const trains = model.trains || [];
+      const fares = model.railTransit || {};
       const rows = stations.map(function(station,index){
         const stopped = trains.some(function(t){return t.stationIndex === index && t.dwell > .05;});
         return '<div class="ios-transit-row"><i>' + (index+1) + '</i><div><b>' + esc(station.name) + '</b><small>' +
           distText(station.distance) + '</small></div><em>' + (stopped ? "停車中" : "運行中") + '</em></div>';
       }).join("");
-      return shell("交通",'<div class="ios-transit-line"><span></span><b>若葉線</b><span></span></div><section class="ios-section"><h3>駅</h3>' + rows + '</section>');
+      return shell("交通",'<div class="ios-transit-line"><span></span><b>若葉線</b><span></span></div><section class="ios-section"><h3>きっぷ</h3><div class="ios-list-row"><span>🎫</span><div><b>片道きっぷ ' + Math.max(0,Math.floor(Number(fares.singleTickets) || 0)) + '枚</b><small>1回 ¥200 · 駅の券売機で購入</small></div></div><div class="ios-list-row"><span>🎟</span><div><b>一日乗車券 ' + (fares.dayPassActive ? "有効" : "なし") + '</b><small>当日乗り放題 · ¥500</small></div></div><div class="ios-list-row"><span>🚆</span><div><b>乗車 ' + Math.max(0,Math.floor(Number(fares.trips) || 0)) + '回</b><small>これまでの利用回数</small></div></div></section><section class="ios-section"><h3>駅</h3>' + rows + '</section>');
     }
     function mailApp() {
       return shell("メール",'<section class="ios-mail-list"><article><span>若</span><div><b>若葉不動産</b><strong>家賃のお知らせ</strong><p>次回は Day ' +
@@ -489,6 +490,7 @@
         inHome:value.inHome,
         inVehicle:value.inVehicle,
         inTrain:value.inTrain,
+        railTransit:value.railTransit ? [value.railTransit.singleTickets,value.railTransit.dayPassActive,value.railTransit.trips] : null,
         soundEnabled:value.soundEnabled,
         inHome:value.inHome,
         inVehicle:value.inVehicle,

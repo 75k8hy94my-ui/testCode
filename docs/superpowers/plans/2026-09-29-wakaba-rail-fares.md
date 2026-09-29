@@ -35,12 +35,12 @@
 
 **Interfaces:** `createProgress()`, `normalizeProgress(value, day)`, `listOptions(progress, day, minute, cash)`, `buySingle(progress, cash)`, `buyDayPass(progress, day, minute, cash)`, `board(progress, day)`。
 
-- [ ] Write tests for starting state, legacy/corrupt migration, max-five single tickets, current-day pass state, costs and purchase times.
-- [ ] Write tests for insufficient funds, full ticket inventory, pass already active, too-late pass purchase, no-fare boarding, single-ticket consumption and pass priority.
-- [ ] Run `node --test tests/rail-transit.test.mjs`; observe expected missing-module failure.
-- [ ] Implement the pure model with immutable progress transitions.
-- [ ] Run the focused tests; all pass.
-- [ ] Commit as `feat: model Wakaba rail fares`.
+- [x] Write tests for starting state, legacy/corrupt migration, max-five single tickets, current-day pass state, costs and purchase times.
+- [x] Write tests for insufficient funds, full ticket inventory, pass already active, too-late pass purchase, no-fare boarding, single-ticket consumption and pass priority.
+- [x] Run `node --test tests/rail-transit.test.mjs`; observe expected missing-module failure.
+- [x] Implement the pure model with immutable progress transitions.
+- [x] Run the focused tests; all pass.
+- [x] Commit as `feat: model Wakaba rail fares` (`7b69abc`).
 
 ### Task 2: Station interaction, train runtime and phone
 
@@ -53,22 +53,22 @@
 
 **Interfaces:** Consume Task 1 transit-model API.
 
-- [ ] Add failing runtime tests for station menu, ticket purchase, boarding validation, snapshot migration, and transit phone state.
-- [ ] Run the focused runtime/phone tests and observe the missing integration assertions fail.
-- [ ] Load the model before game runtime; add state initialization, snapshot round-trip and legacy defaults.
-- [ ] Route each station entrance to a ticket-machine menu; render current ticket options and disabled reasons; revalidate every purchase and board action.
-- [ ] Require valid fare before boarding, consuming an active day pass first and otherwise exactly one single ticket.
-- [ ] Show station kiosk landmarks and live ticket/pass/trip counts in the phone transit app.
-- [ ] Run runtime, phone and model test files; all pass.
-- [ ] Commit as `feat: add ticket machines to Wakaba Line stations`.
+- [x] Add failing runtime tests for station menu, ticket purchase, boarding validation, snapshot migration, and transit phone state.
+- [x] Run the focused runtime/phone tests and observe the missing integration assertions fail.
+- [x] Load the model before game runtime; add state initialization, snapshot round-trip and legacy defaults.
+- [x] Route each station entrance to a ticket-machine menu; render current ticket options and disabled reasons; revalidate every purchase and board action.
+- [x] Require valid fare before boarding, consuming an active day pass first and otherwise exactly one single ticket.
+- [x] Show station kiosk landmarks and live ticket/pass/trip counts in the phone transit app.
+- [x] Run runtime, phone and model test files; all pass.
+- [x] Commit as `feat: add ticket machines to Wakaba Line stations`.
 
 ### Task 3: Headless interaction verification
 
 **Files:**
 - Create: `scripts/verify-rail-fares-headless.mjs`
 
-- [ ] Verify no-fare boarding is rejected, buy one ticket, board and consume one ticket, then buy a day pass and make two rides without additional fare consumption.
-- [ ] Verify next-day pass expiry, ticket retention, old-snapshot migration, UI state and mobile bounds; capture desktop/mobile screenshots.
-- [ ] Capture console error/warning, pageerror, failed requests and bad responses; expect all empty.
-- [ ] Run `npm test`, `npm run verify:static`, the headless verifier, syntax checks and `git diff --check`.
+- [x] Verify no-fare boarding is rejected, buy one ticket, board and consume one ticket, then buy a day pass and make two rides without additional fare consumption.
+- [x] Verify next-day pass expiry, ticket retention, old-snapshot migration, UI state and mobile bounds; capture desktop/mobile screenshots.
+- [x] Capture console error/warning, pageerror, failed requests and bad responses; expect all empty.
+- [x] Run `npm test`, `npm run verify:static`, the headless verifier, syntax checks and `git diff --check`.
 - [ ] Commit as `test: verify Wakaba rail fare loop headlessly`.

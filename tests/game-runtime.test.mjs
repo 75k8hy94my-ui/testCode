@@ -99,7 +99,7 @@ test('wardrobe model is loaded before runtime and is normalized in snapshots', (
   assert.match(source, /wardrobe:wardrobeModel\.createWardrobe\(\)/);
   assert.match(source, /wardrobe:wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
   assert.match(source, /state\.wardrobe = wardrobeModel\.normalizeWardrobe\(saved\.wardrobe\)/);
-  assert.match(html, /game\.js\?v=20260929-store-prepared-meals-1/);
+  assert.match(html, /game\.js\?v=20260929-rail-fares-1/);
 });
 
 test('arcade progress is loaded before the game and migrates safely through snapshots', () => {
@@ -429,6 +429,20 @@ test('supermarket prepared meals load, persist daily stock, and join the existin
   assert.match(source.slice(storeStart,storeEnd), /storePreparedFoodModel\.listMenu/);
   assert.match(source, /function buyPreparedFood\(itemId\)/);
   assert.match(source, /buyPreparedFoodForTest\(itemId\)/);
+});
+
+test('rail fares load before the game, migrate snapshots, and gate station boarding through ticket machines', () => {
+  assert.ok(html.indexOf('rail-transit.js') < html.indexOf('game.js'));
+  assert.match(source, /const railTransitModel = globalThis\.CityDaysRailTransit/);
+  assert.match(source, /railTransit:railTransitModel\.createProgress\(\)/);
+  assert.match(source, /railTransit:railTransitModel\.normalizeProgress\(state\.railTransit, state\.day\)/);
+  assert.match(source, /state\.railTransit = railTransitModel\.normalizeProgress\(saved\.railTransit, state\.day\)/);
+  assert.match(source, /function openStation\(station, train\)/);
+  assert.match(source, /function buyRailFare\(kind\)/);
+  assert.match(source, /const fare = railTransitModel\.board\(state\.railTransit, state\.day\)/);
+  assert.match(source, /type:"station"/);
+  assert.match(source, /openStationForTest\(stationId\)/);
+  assert.match(source, /setTrainAtStationForTest\(stationId\)/);
 });
 
 test('dog walking is persisted, follows the outdoor trail, and has guarded start and home completion', () => {

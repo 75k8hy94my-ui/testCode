@@ -133,6 +133,21 @@ test('meal freshness denominator participates in phone rerender detection', () =
   assert.match(root.innerHTML,/width:25%/);
 });
 
+test('transit app shows remaining single tickets, a same-day pass, and trip count', () => {
+  const root={hidden:false,innerHTML:'',classList:{toggle(){}},style:{setProperty(){}},addEventListener(){}};
+  const phone=phoneModule.createPhoneSystem({root});
+  phone.update({stations:[],trains:[],railTransit:{singleTickets:2,dayPassActive:true,trips:3}});
+  phone.home();
+  phone.openApp('transit');
+  assert.match(root.innerHTML,/片道きっぷ 2枚/);
+  assert.match(root.innerHTML,/一日乗車券 有効/);
+  assert.match(root.innerHTML,/乗車 3回/);
+  phone.update({stations:[],trains:[],railTransit:{singleTickets:1,dayPassActive:false,trips:4}});
+  assert.match(root.innerHTML,/片道きっぷ 1枚/);
+  assert.match(root.innerHTML,/一日乗車券 なし/);
+  assert.match(root.innerHTML,/乗車 4回/);
+});
+
 test('pet phone app safely shows shelter guidance or live household pet care status', () => {
   const root = { hidden:false, innerHTML:'', classList:{ toggle(){} }, style:{ setProperty(){} }, addEventListener(){} };
   const phone = phoneModule.createPhoneSystem({ root });

@@ -177,6 +177,12 @@
     return;
   }
 
+  const railTransitModel = globalThis.CityDaysRailTransit;
+  if (!railTransitModel?.createProgress || !railTransitModel?.normalizeProgress || !railTransitModel?.listOptions || !railTransitModel?.buySingle || !railTransitModel?.buyDayPass || !railTransitModel?.board) {
+    showRuntimeError("RailTransit を読み込めません。");
+    return;
+  }
+
   const areaNameEl = document.getElementById("areaName");
   const worldClockEl = document.getElementById("worldClock");
   const cashText = document.getElementById("cashText");
@@ -1197,6 +1203,7 @@
     day: 1,
     minute: 8 * 60,
     cash: 8000,
+    railTransit:railTransitModel.createProgress(),
     wardrobe:wardrobeModel.createWardrobe(),
     arcade:arcadeGamesModel.createProgress(),
     umbrellaOwned:false,
@@ -3108,12 +3115,20 @@
       showToast("電車はまだ到着していません");
       return;
     }
+    const fare = railTransitModel.board(state.railTransit, state.day);
+    if (!fare.ok) {
+      showToast("乗車券がありません。駅の券売機で購入してください");
+      return false;
+    }
+    state.railTransit = fare.progress;
     state.player.inVehicle = false;
     state.player.inTrain = true;
     state.player.trainId = train.id;
     state.player.x = train.x;
     state.player.y = train.y;
     showToast(station.name + "から若葉線に乗車しました");
+    updateSmartphone();
+    return true;
   }
 
   function exitTrain() {
@@ -5386,6 +5401,39 @@
   }
 
 
+  function openStation(station, train) {
+    if (!station) return;
+    train = train || stoppedTrainAtStation(station);
+    actionTitle.textContent = station.name;
+    actionDescription.textContent = "券売機で乗車券を購入できます。片道きっぷは1回¥200・2分、一日乗車券は当日¥500・3分です。所持金 ¥" + state.cash.toLocaleString("ja-JP") + " / 片道きっぷ " + state.railTransit.singleTickets + "枚" + (state.railTransit.dayPassDay === state.day ? " / 一日券有効" : "");
+    actionChoices.replaceChildren();
+    const options = railTransitModel.listOptions(state.railTransit, state.day, Math.floor(state.minute), state.cash);
+    const reasonText = (reason) => ({"insufficient-funds":"所持金が足りません", "ticket-limit":"片道きっぷは5枚までです", "already-active":"一日乗車券は本日有効です", "too-late":"本日中に使い切れない時間です"})[reason] || "利用できません";
+    addChoice("片道きっぷを買う", options.singleTicket.available ? "¥200 / 2分 / 所持 " + options.singleTicket.remaining + "枚" : reasonText(options.singleTicket.reason), () => buyRailFare("single"), !options.singleTicket.available);
+    addChoice("一日乗車券を買う", options.dayPass.available ? "¥500 / 3分 / 本日中有効" : reasonText(options.dayPass.reason), () => buyRailFare("day-pass"), !options.dayPass.available);
+    if (train) {
+      const hasFare = state.railTransit.dayPassDay === state.day || state.railTransit.singleTickets > 0;
+      addChoice("若葉線に乗車", hasFare ? "停車中 · " + (state.railTransit.dayPassDay === state.day ? "一日券を使用" : "片道きっぷ1枚を使用") : "乗車券が必要です", () => boardTrain(train, station), !hasFare || state.petWalk.active);
+    } else addChoice("ホームで待つ", "電車が到着したら乗車できます", () => showToast("電車が到着したら駅の操作から乗車できます"));
+    actionSheet.hidden = false;
+  }
+
+  function buyRailFare(kind) {
+    const result = kind === "day-pass"
+      ? railTransitModel.buyDayPass(state.railTransit, state.day, Math.floor(state.minute), state.cash)
+      : railTransitModel.buySingle(state.railTransit, state.cash);
+    if (!result.ok) {
+      showToast(({"insufficient-funds":"所持金が足りません", "ticket-limit":"片道きっぷは5枚までです", "already-active":"一日乗車券は本日有効です", "too-late":"本日中に使い切れない時間です"})[result.reason] || "購入できません");
+      return false;
+    }
+    state.railTransit = result.progress;
+    state.cash = result.cashRemaining;
+    advanceTime(result.duration);
+    updateSmartphone();
+    showToast(kind === "day-pass" ? "一日乗車券を購入しました" : "片道きっぷを購入しました");
+    return true;
+  }
+
   function nearestInteraction() {
     if (state.player.inHome) return nearestHomeInteraction();
     const p = actorPosition();
@@ -5416,9 +5464,7 @@
     const railStation = nearestRailStationAccess(p.x, p.y);
     if (railStation) {
       const train = stoppedTrainAtStation(railStation);
-      return train
-        ? { type:"train-enter", target:train, station:railStation, label:railStation.name + "から電車に乗る" }
-        : { type:"train-wait", station:railStation, label:railStation.name + "で電車を待つ" };
+      return { type:"station", target:train, station:railStation, label:railStation.name + "駅の券売機・乗車" };
     }
 
     if (distance(p.x, p.y, personalCar.x, personalCar.y) < 70) {
@@ -5599,6 +5645,7 @@
     if (item.type === "car-enter") enterCar();
     if (item.type === "car-refuel") usePortableCan();
     if (item.type === "car-menu") openDrivingMenu();
+    if (item.type === "station") openStation(item.station, item.target);
     if (item.type === "train-enter") boardTrain(item.target, item.station);
     if (item.type === "train-exit") exitTrain();
     if (item.type === "train-wait") showToast("電車が到着したら E / ACTION で乗車できます");
@@ -5658,6 +5705,7 @@
         day: state.day,
         minute: state.minute,
         cash: state.cash,
+        railTransit:railTransitModel.normalizeProgress(state.railTransit, state.day),
         umbrellaOwned:state.umbrellaOwned === true,
         wardrobe:wardrobeModel.normalizeWardrobe(state.wardrobe),
         arcade:arcadeGamesModel.normalizeProgress({ ...state.arcade, activePlay:false }),
@@ -5921,6 +5969,7 @@
       state.day = Math.max(1, Math.floor(Number(saved.day) || 1));
       const savedMinute = Number(saved.minute);
       state.minute = saved.minute != null && Number.isFinite(savedMinute) ? clamp(savedMinute, 0, 1439.99) : 480;
+      state.railTransit = railTransitModel.normalizeProgress(saved.railTransit, state.day);
       syncWeather();
       state.cash = Math.floor(Number(saved.cash) || 0);
       state.umbrellaOwned = saved.umbrellaOwned === true;
@@ -8950,6 +8999,21 @@
         ctx.stroke();
       }
 
+      // Compact ticket machine beside the street-level station entrance.
+      const machineX = access.x + 33;
+      const machineY = access.y - 20;
+      ctx.fillStyle = "#3b4543";
+      roundedRectPath(ctx, machineX - 10, machineY - 17, 20, 34, 3);
+      ctx.fill();
+      ctx.fillStyle = "#a7d5c2";
+      ctx.fillRect(machineX - 6, machineY - 12, 12, 8);
+      ctx.fillStyle = "#dfb84a";
+      ctx.fillRect(machineX - 5, machineY + 1, 10, 3);
+      ctx.fillStyle = "#f4f0df";
+      ctx.font = "700 7px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("券", machineX, machineY + 12);
+
       ctx.fillStyle = "rgba(30,39,36,.78)";
       roundedRectPath(ctx, access.x - 42, access.y + 7, 84, 17, 5);
       ctx.fill();
@@ -11291,6 +11355,10 @@
       inHome:state.player.inHome,
       inVehicle:state.player.inVehicle,
       inTrain:state.player.inTrain,
+      railTransit:(() => {
+        const fare = railTransitModel.normalizeProgress(state.railTransit, state.day);
+        return { singleTickets:fare.singleTickets, dayPassActive:fare.dayPassDay === state.day, trips:fare.trips };
+      })(),
       drivingRating:state.drive.rating,
       drivingTrips:state.drive.trips,
       nextRentDay:nextRentDay(),
@@ -11623,6 +11691,7 @@
           const interaction = nearestInteraction();
           return interaction ? { type:interaction.type, label:interaction.label, targetId:interaction.target?.id || null } : null;
         })(),
+        railTransit:railTransitModel.normalizeProgress(state.railTransit, state.day),
         citizens
       }));
     };
@@ -11670,6 +11739,38 @@
           openPlace(place);
           return true;
         },
+        openStationForTest(stationId) {
+          const station = TRAIN_STATIONS.find((item) => item.id === stationId);
+          if (!station) return false;
+          openStation(station);
+          return true;
+        },
+        buyRailFareForTest(kind) { return buyRailFare(kind); },
+        setTrainAtStationForTest(stationId) {
+          const index = TRAIN_STATIONS.findIndex((item) => item.id === stationId);
+          if (index < 0) return false;
+          const train = trains[0];
+          train.stationIndex = index;
+          train.targetIndex = Math.min(TRAIN_STATIONS.length - 1, index + 1);
+          train.x = TRAIN_STATIONS[index].x;
+          train.dwell = 8;
+          train.speed = 0;
+          return true;
+        },
+        movePlayerNearStationForTest(stationId) {
+          const station = TRAIN_STATIONS.find((item) => item.id === stationId);
+          if (!station) return false;
+          state.player.inHome = false;
+          state.player.inVehicle = false;
+          state.player.inTrain = false;
+          state.player.trainId = null;
+          state.player.x = station.accessX - 32;
+          state.player.y = station.accessY;
+          state.camera.x = clamp(state.player.x - viewWidth / 2, 0, Math.max(0, WORLD_SIZE - viewWidth));
+          state.camera.y = clamp(state.player.y - viewHeight / 2, 0, Math.max(0, WORLD_SIZE - viewHeight));
+          return true;
+        },
+        exitTrainForTest() { exitTrain(); return !state.player.inTrain; },
         setArcadeRandomForTest(value) {
           if (!Number.isFinite(value) || value < 0 || value >= 1) return false;
           arcadeGame.randomOverride = value;
