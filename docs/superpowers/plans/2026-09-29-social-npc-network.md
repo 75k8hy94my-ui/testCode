@@ -43,12 +43,12 @@
 - Each relationship contains canonical `aId`, `bId`, `type`, and `initialAffinity`; `getRelationship` returns the same relationship when queried in either order and `null` for self/unknown pairs.
 - `createInitialState()` returns `{ friendship: { [npcId]: number }, relationships: { [canonicalPairId]: number }, recentTopics: { [npcId]: string|null } }` with validated catalog defaults.
 
-- [ ] **Step 1: Write failing catalog tests** asserting exactly ten unique stable IDs including `aoi`, `sora`, `mei`; valid profile fields; 76-population-compatible roster size; relationship endpoints are known; pair uniqueness; and symmetric lookup.
-- [ ] **Step 2: Run `node --test tests/social-npc-system.test.mjs`** and confirm it fails because the module/API is absent.
-- [ ] **Step 3: Implement the authored catalog and relationship data** in `game/social-npc-system.js`. Add seven fictional profiles with mutually consistent ties to the existing three; define schedules compatible with current game locations and weekdays. Export the API for browser and Node.
-- [ ] **Step 4: Load the module before `game.js`** from `game/index.html`, following the existing cache-version convention; add an HTML-order assertion to the test.
-- [ ] **Step 5: Run the focused test** and confirm catalog, pair symmetry, defaults and script order pass.
-- [ ] **Step 6: Commit only `game/social-npc-system.js`, `game/index.html`, and `tests/social-npc-system.test.mjs`.**
+- [x] **Step 1: Write failing catalog tests** asserting exactly ten unique stable IDs including `aoi`, `sora`, `mei`; valid profile fields; 76-population-compatible roster size; relationship endpoints are known; pair uniqueness; and symmetric lookup.
+- [x] **Step 2: Run `node --test tests/social-npc-system.test.mjs`** and confirm it fails because the module/API is absent.
+- [x] **Step 3: Implement the authored catalog and relationship data** in `game/social-npc-system.js`. Add seven fictional profiles with mutually consistent ties to the existing three; define schedules compatible with current game locations and weekdays. Export the API for browser and Node.
+- [x] **Step 4: Load the module before `game.js`** from `game/index.html`, following the existing cache-version convention; add an HTML-order assertion to the test.
+- [x] **Step 5: Run the focused test** and confirm catalog, pair symmetry, defaults and script order pass.
+- [x] **Step 6: Commit only `game/social-npc-system.js`, `game/index.html`, and `tests/social-npc-system.test.mjs`.**
 
 ### Task 2: Implement deterministic time-aware conversation policy
 
@@ -61,11 +61,11 @@
 - Add `resolveConversation({ npcId, optionId, minute, day, activityId, friendship, relationship, needs }) -> { response, friendshipDelta, relationshipDelta, needsDelta, activityRequest, topic }`. Supported option IDs: `greet`, `ask`, `invite`. `activityRequest` is `null` when unavailable/refused, otherwise `{ actionId, placeId, expiresAt }` in absolute game minutes (day-indexed).
 - Add `getSocialActionBias({ npcId, action, minute, day, relationships, nearbySocialNpcIds }) -> number`; bias is bounded and may not itself decide action selection.
 
-- [ ] **Step 1: Write tests** for time/day/activity-sensitive dialogue, personality-specific options, deterministic repeated queries, valid and refused invitations, affinity limits, midnight-aware request expiry, and social bias only applying to eligible social actions.
-- [ ] **Step 2: Run the focused test** and confirm each new policy behavior fails before implementation.
-- [ ] **Step 3: Implement deterministic policies and authored dialogue variants** without randomness or external services. Enforce bounded affinity deltas and invitation expiry; work/sleep activity rules must refuse or defer invitations.
-- [ ] **Step 4: Run the focused test** and confirm all policy cases pass.
-- [ ] **Step 5: Commit only the module and its test.**
+- [x] **Step 1: Write tests** for time/day/activity-sensitive dialogue, personality-specific options, deterministic repeated queries, valid and refused invitations, affinity limits, midnight-aware request expiry, and social bias only applying to eligible social actions.
+- [x] **Step 2: Run the focused test** and confirm each new policy behavior fails before implementation.
+- [x] **Step 3: Implement deterministic policies and authored dialogue variants** without randomness or external services. Enforce bounded affinity deltas and invitation expiry; work/sleep activity rules must refuse or defer invitations.
+- [x] **Step 4: Run the focused test** and confirm all policy cases pass.
+- [x] **Step 5: Commit only the module and its test.**
 
 ### Task 3: Connect ten profiles and social intent to citizen simulation
 
