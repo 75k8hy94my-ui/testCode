@@ -1036,6 +1036,7 @@
       walkable:false
     }));
     const adjacency = new Map(nodes.map((value) => [value.id, []]));
+    let pedestrianGraph = null;
 
     for (const edge of edges) {
       adjacency.get(edge.from).push({ edge, nodeId:edge.to });
@@ -1250,6 +1251,11 @@
     }
 
     function findRoute(startNodeId, endNodeId, options = {}) {
+      const mode = options.mode || "pedestrian";
+      if (mode === "pedestrian" && pedestrianGraph) {
+        const route = pedestrianNavigation.findRoute(pedestrianGraph, startNodeId, endNodeId);
+        return route ? { ...route, edgeIds:[...route.segmentIds] } : null;
+      }
       if (!getNode(startNodeId) || !getNode(endNodeId)) return null;
       if (startNodeId === endNodeId) return { nodeIds:[startNodeId], edgeIds:[], distance:0 };
       const frontier = [{ nodeId:startNodeId, cost:0 }];
@@ -1336,14 +1342,29 @@
       const target = point(x, y);
       const vehicleOnly = Boolean(options.vehicleOnly);
       for (const edge of edges) {
-        if (vehicleOnly && !edge.vehicle) continue;
-        if (!vehicleOnly && !edge.pedestrian) continue;
+        if (vehicleOnly) {
+          if (!edge.vehicle) continue;
+        } else {
+          // Raw pedestrian-only blueprint lines are not authoritative walking
+          // geometry because some of them cross carriageways without crosswalks.
+          if (!edge.vehicle || !edge.pedestrian) continue;
+        }
         const corridor = !vehicleOnly ? pedestrianCorridor(edge) : null;
         const threshold = corridor?.vehicle
           ? corridor.outerOffset + padding
           : edge.width / 2 + padding;
         for (let i = 1; i < edge.points.length; i += 1) {
           if (pointSegmentProjection(target, edge.points[i - 1], edge.points[i]).distance <= threshold) return true;
+        }
+      }
+
+      if (!vehicleOnly && pedestrianGraph) {
+        for (const segment of pedestrianGraph.segments) {
+          const baseWidth = segment.type === "crosswalk" ? 12 : segment.type === "facility-access" ? 14 : 10;
+          const threshold = baseWidth + padding;
+          for (let i = 1; i < segment.points.length; i += 1) {
+            if (pointSegmentProjection(target, segment.points[i - 1], segment.points[i]).distance <= threshold) return true;
+          }
         }
       }
       return false;
@@ -1517,7 +1538,7 @@
       return errors;
     }
 
-    const pedestrianGraph = pedestrianNavigation.buildGraph({
+    pedestrianGraph = pedestrianNavigation.buildGraph({
       nodes, edges, places, stations, getNode, getEdge, neighbors, pedestrianCorridor,
       pedestrianOffsetPose, junctionGeometry
     });
