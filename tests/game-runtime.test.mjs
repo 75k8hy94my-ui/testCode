@@ -127,6 +127,24 @@ test('social candidate bias is applied after ordinary choices and invitations us
   assert.match(source, /ped\.socialActivityRequest = null/);
 });
 
+test('special NPC conversations resolve through the shared policy and affect their linked citizen', () => {
+  assert.match(source, /socialNpcSystem\.getConversation\(/);
+  assert.match(source, /socialNpcSystem\.resolveConversation\(/);
+  assert.match(source, /requestCitizenSocialActivity\(citizen, result\.activityRequest\)/);
+  assert.match(source, /const friendshipDelta = result\.activityRequest && !accepted \? 0 : result\.friendshipDelta/);
+  assert.match(source, /npc\.friendship = clamp\(npc\.friendship \+ friendshipDelta, 0, 100\)/);
+  assert.match(source, /socialNpcState\.recentTopics\[npc\.id\] = result\.topic/);
+});
+
+test('game snapshots persist canonical social state and still read legacy friendship data', () => {
+  assert.match(source, /socialNpc:\s*\{/);
+  assert.match(source, /friendship:\s*\{ \.\.\.socialNpcState\.friendship \}/);
+  assert.match(source, /relationships:\s*\{ \.\.\.socialNpcState\.relationships \}/);
+  assert.match(source, /recentTopics:\s*\{ \.\.\.socialNpcState\.recentTopics \}/);
+  assert.match(source, /socialNpcSystem\.normalizeState\(saved\.socialNpc, saved\.friends\)/);
+  assert.match(source, /npc\.friendship = socialNpcState\.friendship\[npc\.id\]/);
+});
+
 test('game loads the community center schedule model before the runtime', () => {
   assert.match(html, /<script src="\.\/community-center\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('community-center.js') < html.indexOf('game.js'));

@@ -81,6 +81,14 @@ test('conversation topics reflect time, weekday and current activity determinist
   assert.ok(atWork.options.some(({ id }) => id === 'greet'));
 });
 
+test('recently repeated topics produce a distinct follow-up line', () => {
+  const { getConversation } = require(path.join(root, 'game', 'social-npc-system.js'));
+  const first = getConversation({ npcId:'aoi', minute:9 * 60, day:2, activityId:'walking', friendship:2, relationship:null, recentTopic:null });
+  const repeated = getConversation({ npcId:'aoi', minute:9 * 60, day:2, activityId:'walking', friendship:2, relationship:null, recentTopic:first.topic });
+  assert.equal(repeated.topic, `${first.topic}-followup`);
+  assert.notEqual(repeated.line, first.line);
+});
+
 test('conversation choices give bounded effects and invitations expire across midnight', () => {
   const { resolveConversation } = require(path.join(root, 'game', 'social-npc-system.js'));
   const greeting = resolveConversation({ npcId:'aoi', optionId:'greet', minute:21 * 60, day:3, activityId:'walking', friendship:99, relationship:null, needs:{ energy:50 } });
@@ -109,4 +117,27 @@ test('conversation effects respect affinity floor and sleep and social bias need
   assert.ok(connected > 0 && connected <= 0.15);
   assert.equal(unrelated, 0);
   assert.equal(nonsocial, 0);
+});
+
+test('new save state takes precedence while legacy friendship migrates and malformed fields clamp safely', () => {
+  const { normalizeState } = require(path.join(root, 'game', 'social-npc-system.js'));
+  const state = normalizeState({
+    friendship:{ aoi:12, sora:'broken', mei:Infinity, ren:250, yui:-4 },
+    relationships:{ 'aoi|sora':73, 'aoi|mei':-9 },
+    recentTopics:{ aoi:'morning', sora:42 }
+  }, { aoi:4, sora:7, mei:8 });
+  assert.deepEqual([state.friendship.aoi, state.friendship.sora, state.friendship.mei, state.friendship.ren, state.friendship.yui], [12, 7, 8, 100, 0]);
+  assert.equal(state.relationships['aoi|sora'], 73);
+  assert.ok(state.relationships['aoi|mei'] >= 0);
+  assert.equal(state.recentTopics.aoi, 'morning');
+  assert.equal(state.recentTopics.sora, null);
+});
+
+test('old friendship values are retained and absent social fields receive catalog defaults', () => {
+  const { normalizeState, createInitialState } = require(path.join(root, 'game', 'social-npc-system.js'));
+  const legacy = normalizeState(null, { aoi:2, sora:5, mei:1 });
+  assert.deepEqual([legacy.friendship.aoi, legacy.friendship.sora, legacy.friendship.mei], [2, 5, 1]);
+  const defaults = createInitialState();
+  const missing = normalizeState({}, {});
+  assert.deepEqual(missing, defaults);
 });

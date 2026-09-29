@@ -47,7 +47,7 @@
   const pairKey = (aId, bId) => [aId, bId].sort().join("|");
   const relationshipByPair = new Map(relationships.map((relationship) => [pairKey(relationship.aId, relationship.bId), relationship]));
 
-  function getConversation({ npcId, minute = 720, day = 1, activityId = "", friendship = 0, relationship = null } = {}) {
+  function getConversation({ npcId, minute = 720, day = 1, activityId = "", friendship = 0, relationship = null, recentTopic = null } = {}) {
     const profile = byId.get(npcId);
     if (!profile) return null;
     const time = Number.isFinite(minute) ? ((Math.floor(minute) % 1440) + 1440) % 1440 : 720;
@@ -57,7 +57,9 @@
     const sleeping = /sleep|bed/.test(activity);
     const weekend = ((dayNumber - 1) % 7) >= 5;
     const timeBand = time < 600 ? "morning" : time < 1020 ? "day" : "evening";
-    const topic = sleeping ? "rest" : busy ? "work" : weekend ? "weekend" : timeBand;
+    const baseTopic = sleeping ? "rest" : busy ? "work" : weekend ? "weekend" : timeBand;
+    const repeatedTopic = recentTopic === baseTopic;
+    const topic = repeatedTopic ? `${baseTopic}-followup` : baseTopic;
     const topicLines = {
       rest: `${profile.name}は少し眠そうだ。「ごめんね、そろそろ休ませて。」`,
       work: `${profile.name}は時計を気にした。「今は勤務の途中なんだ。またあとで話そう。」`,
@@ -67,7 +69,9 @@
       weekend: `${profile.name}は休日らしくのんびりしている。「今日は少しゆっくりできそう。」`
     };
     const relationLabel = relationship?.type === "family" ? "家族のことも" : relationship?.type === "coworker" ? "仕事仲間のことも" : null;
-    const line = relationLabel && !busy && !sleeping ? `${topicLines[topic]} ${relationLabel}気にかけているよ。` : topicLines[topic];
+    const line = repeatedTopic
+      ? `${profile.name}は少し考えてから話を続けた。「さっきの話だけど、もう少し聞いてくれる？」`
+      : relationLabel && !busy && !sleeping ? `${topicLines[topic]} ${relationLabel}気にかけているよ。` : topicLines[topic];
     const options = [
       { id:"greet", label:"挨拶する" },
       { id:"ask", label:Number(friendship) >= 3 ? "もっと話を聞く" : "近況を聞く" },
@@ -76,7 +80,7 @@
     return { topic, line, options };
   }
 
-  function resolveConversation({ npcId, optionId, minute = 720, day = 1, activityId = "", friendship = 0, relationship = null, needs = {} } = {}) {
+  function resolveConversation({ npcId, optionId, minute = 720, day = 1, activityId = "", friendship = 0, relationship = null, needs = {}, recentTopic = null } = {}) {
     const profile = byId.get(npcId);
     if (!profile) return null;
     const currentFriendship = Number.isFinite(Number(friendship)) ? Math.max(0, Math.min(100, Number(friendship))) : 0;
@@ -89,7 +93,7 @@
     let desiredDelta = 0;
     let activityRequest = null;
     let needsDelta = {};
-    let topic = getConversation({ npcId, minute:time, day:dayNumber, activityId, friendship:currentFriendship, relationship }).topic;
+    const topic = getConversation({ npcId, minute:time, day:dayNumber, activityId, friendship:currentFriendship, relationship, recentTopic }).topic;
 
     if (optionId === "greet") {
       response = sleeping ? "小さく会釈を返し、また休み始めた。" : busy ? "「声をかけてくれてありがとう。仕事に戻るね。」" : `${profile.name}は嬉しそうに挨拶を返した。`;
@@ -136,6 +140,25 @@
     return { friendship, relationships: relationshipState, recentTopics };
   }
 
+  function normalizeState(savedSocial, legacyFriends) {
+    const defaults = createInitialState();
+    const source = savedSocial && typeof savedSocial === "object" && !Array.isArray(savedSocial) ? savedSocial : {};
+    const legacy = legacyFriends && typeof legacyFriends === "object" && !Array.isArray(legacyFriends) ? legacyFriends : {};
+    const normalizeAffinity = (value, fallback) => {
+      if (value == null || !Number.isFinite(Number(value))) return fallback;
+      return Math.max(0, Math.min(100, Math.floor(Number(value))));
+    };
+    for (const { id } of catalog) {
+      defaults.friendship[id] = normalizeAffinity(source.friendship?.[id], normalizeAffinity(legacy[id], defaults.friendship[id]));
+      const topic = source.recentTopics?.[id];
+      defaults.recentTopics[id] = typeof topic === "string" && topic.length <= 64 ? topic : null;
+    }
+    for (const pairId of Object.keys(defaults.relationships)) {
+      defaults.relationships[pairId] = normalizeAffinity(source.relationships?.[pairId], defaults.relationships[pairId]);
+    }
+    return defaults;
+  }
+
   return Object.freeze({
     catalog,
     relationships,
@@ -147,6 +170,7 @@
     getConversation,
     resolveConversation,
     getSocialActionBias,
-    createInitialState
+    createInitialState,
+    normalizeState
   });
 });

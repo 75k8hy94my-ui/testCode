@@ -4570,38 +4570,85 @@
     actionSheet.hidden = false;
   }
 
+  function npcRelationshipContext(npcId) {
+    const definition = socialNpcSystem.relationships.find((item) => item.aId === npcId || item.bId === npcId);
+    if (!definition) return null;
+    const pairId = [definition.aId, definition.bId].sort().join("|");
+    return { ...definition, affinity:socialNpcState.relationships[pairId] };
+  }
+
+  function performNpcConversation(npc, citizen, optionId) {
+    const relationship = npcRelationshipContext(npc.id);
+    const result = socialNpcSystem.resolveConversation({
+      npcId:npc.id,
+      optionId,
+      minute:state.minute,
+      day:state.day,
+      activityId:citizen?.currentActivityId || citizen?.pendingActivity?.id || "",
+      friendship:npc.friendship,
+      relationship,
+      recentTopic:socialNpcState.recentTopics[npc.id],
+      needs:citizen?.needs || {}
+    });
+    if (!result) return;
+
+    const accepted = !result.activityRequest || requestCitizenSocialActivity(citizen, result.activityRequest);
+    const duration = optionId === "greet" ? 30 : optionId === "ask" ? 20 : 10;
+    advanceTime(duration);
+    state.needs.social += optionId === "greet" ? 24 : optionId === "ask" ? 18 : 10;
+    state.needs.fun += optionId === "greet" ? 7 : optionId === "ask" ? 9 : 5;
+    if (citizen) {
+      for (const [need, delta] of Object.entries(result.needsDelta || {})) {
+        if (Number.isFinite(citizen.needs[need])) citizen.needs[need] += delta;
+      }
+      citizen.stress -= optionId === "greet" ? 9 : optionId === "ask" ? 6 : 3;
+      citizenClampNeeds(citizen);
+    }
+
+    const friendshipDelta = result.activityRequest && !accepted ? 0 : result.friendshipDelta;
+    npc.friendship = clamp(npc.friendship + friendshipDelta, 0, 100);
+    socialNpcState.friendship[npc.id] = npc.friendship;
+    socialNpcState.recentTopics[npc.id] = result.topic;
+    if (accepted && relationship && result.relationshipDelta) {
+      const pairId = [relationship.aId, relationship.bId].sort().join("|");
+      socialNpcState.relationships[pairId] = clamp(
+        socialNpcState.relationships[pairId] + result.relationshipDelta,
+        0,
+        100
+      );
+    }
+    clampNeeds();
+    showToast(accepted ? result.response : "今は予定が合わないようです。いつもの行動を続けます。");
+  }
+
   function openNpc(npc) {
     const citizen = pedestrians.find((ped) => ped.id === npc.citizenId || ped.specialNpcId === npc.id);
-    actionTitle.textContent = npc.name;
-    actionDescription.textContent = citizen
-      ? citizenStatusText(citizen)
-      : (npc.id === "aoi"
-        ? "公園でよく会う近所の人。"
-        : npc.id === "sora"
-          ? "カフェの同僚。"
-          : "図書館でよく見かける学生。");
-    actionChoices.replaceChildren();
-    addChoice("少し話す", "30分 / 交流+24 / 楽しさ+7", () => {
-      advanceTime(30);
-      state.needs.social += 24;
-      state.needs.fun += 7;
-      npc.friendship += 1;
-      if (citizen) {
-        citizen.needs.social += 24;
-        citizen.needs.fun += 6;
-        citizen.stress -= 9;
-        citizenClampNeeds(citizen);
-      }
-      clampNeeds();
-      showToast(npc.name + "と話しました");
+    const relationship = npcRelationshipContext(npc.id);
+    const conversation = socialNpcSystem.getConversation({
+      npcId:npc.id,
+      minute:state.minute,
+      day:state.day,
+      activityId:citizen?.currentActivityId || citizen?.pendingActivity?.id || "",
+      friendship:npc.friendship,
+      relationship,
+      recentTopic:socialNpcState.recentTopics[npc.id]
     });
+    actionTitle.textContent = npc.name;
+    actionDescription.textContent = (citizen ? citizenStatusText(citizen) + "\n" : "") + (conversation?.line || "話題を探しているようだ。");
+    actionChoices.replaceChildren();
+    const labels = { greet:"少し話す", ask:"近況を聞く", invite:"公園に誘う" };
+    for (const option of conversation?.options || []) {
+      const detail = option.id === "invite" ? "予定が合えば公園へ向かいます" : option.id === "ask" ? "話題や関係性に応じて会話します" : "30分 / 交流・楽しさが変化します";
+      addChoice(labels[option.id] || option.label, detail, () => performNpcConversation(npc, citizen, option.id));
+    }
     if (npc.friendship >= 2) {
       addChoice("一緒に過ごす", "90分 / 交流+38 / 楽しさ+22", () => {
         advanceTime(90);
         state.needs.social += 38;
         state.needs.fun += 22;
         state.needs.hunger -= 5;
-        npc.friendship += 1;
+        npc.friendship = clamp(npc.friendship + 1, 0, 100);
+        socialNpcState.friendship[npc.id] = npc.friendship;
         if (citizen) {
           citizen.needs.social += 32;
           citizen.needs.fun += 18;
@@ -4902,7 +4949,12 @@
           rating: state.drive.rating,
           trips: state.drive.trips
         },
-        friends: Object.fromEntries(NPCS.map((npc) => [npc.id, npc.friendship])),
+        socialNpc: {
+          friendship:{ ...socialNpcState.friendship },
+          relationships:{ ...socialNpcState.relationships },
+          recentTopics:{ ...socialNpcState.recentTopics }
+        },
+        friends:{ ...socialNpcState.friendship },
         citizens: pedestrians.map((ped) => ({
           id:ped.id,
           money:ped.money,
@@ -5156,9 +5208,11 @@
         clampNeeds();
       }
 
-      if (saved.friends) {
-        for (const npc of NPCS) npc.friendship = Math.max(0, Math.floor(Number(saved.friends[npc.id]) || 0));
-      }
+      const restoredSocialState = socialNpcSystem.normalizeState(saved.socialNpc, saved.friends);
+      socialNpcState.friendship = restoredSocialState.friendship;
+      socialNpcState.relationships = restoredSocialState.relationships;
+      socialNpcState.recentTopics = restoredSocialState.recentTopics;
+      for (const npc of NPCS) npc.friendship = socialNpcState.friendship[npc.id];
 
       if (Array.isArray(saved.citizens)) {
         const savedCitizens = new Map(saved.citizens.map((value) => [value?.id, value]));

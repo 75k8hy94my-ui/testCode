@@ -99,12 +99,12 @@
 - Extend save snapshots with one canonical `socialNpc` object matching `createInitialState()`; retain legacy `friends` as a compatibility read path and continue emitting it for old builds if existing save tests depend on it.
 - On restore, normalize each value, prefer valid `socialNpc` state for new saves, fall back to `friends` for legacy friendship, then use catalog defaults. Do not let social-state errors abort restoration of citizen, vehicle, or player state.
 
-- [ ] **Step 1: Write failing tests** for each dialogue option, per-choice effects, persistent affinity, legacy `friends` restore, valid new-state restore, partial/malformed state, clamping and no-loss restoration of unrelated game state.
-- [ ] **Step 2: Run the focused tests** and verify they fail on absent conversation state and migration behavior.
-- [ ] **Step 3: Connect dialogue resolution to the existing action sheet and game-time advancement**; show availability/refusal explanations and apply only returned deltas.
-- [ ] **Step 4: Add canonical social-state snapshot/normalization** and precedence for new versus legacy saves, retaining old three friendship values exactly.
-- [ ] **Step 5: Run focused tests and the full existing runtime test file.**
-- [ ] **Step 6: Commit only `game/game.js` and the named tests.**
+- [x] **Step 1: Write failing tests** for each dialogue option, per-choice effects, persistent affinity, legacy `friends` restore, valid new-state restore, partial/malformed state, clamping and no-loss restoration of unrelated game state.
+- [x] **Step 2: Run the focused tests** and verify they fail on absent conversation state and migration behavior.
+- [x] **Step 3: Connect dialogue resolution to the existing action sheet and game-time advancement**; show availability/refusal explanations and apply only returned deltas.
+- [x] **Step 4: Add canonical social-state snapshot/normalization** and precedence for new versus legacy saves, retaining old three friendship values exactly.
+- [x] **Step 5: Run focused tests and the full existing runtime test file.**
+- [x] **Step 6: Commit only `game/game.js` and the named tests.**
 
 ### Task 5: Distinguish the authored cast in-world and on the phone
 
