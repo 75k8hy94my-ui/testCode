@@ -115,6 +115,41 @@ test('supermarket clothing purchases revalidate ownership and funds before charg
   assert.match(outfitPurchase, /購入済み/);
 });
 
+test('home closet equips only owned outfits at home and both player scenes use the same active appearance', () => {
+  assert.match(source, /id:"closet", label:"クローゼット"/);
+  assert.match(source, /drawHomeFurnitureRect\(42, 182, 112, 78/);
+  const closetStart=source.indexOf('fixture.id === "closet"');
+  const closetEnd=source.indexOf('fixture.id === "pet"',closetStart);
+  const closet=source.slice(closetStart,closetEnd);
+  assert.match(closet, /wardrobeModel\.CATALOG/);
+  assert.match(closet, /wardrobe\.ownedOutfitIds\.includes\(item\.id\)/);
+  assert.match(closet, /equipPlayerOutfit\(outfit\.id\)/);
+  const equipStart=source.indexOf('function equipPlayerOutfit(');
+  const equipEnd=source.indexOf('function openHomeFixture(',equipStart);
+  const equip=source.slice(equipStart,equipEnd);
+  assert.match(equip, /state\.player\.inHome/);
+  assert.match(equip, /nearestHomeInteraction\(\)\?\.target\?\.id !== "closet"/);
+  assert.match(equip, /wardrobeModel\.equipOutfit\(/);
+  assert.ok(equip.indexOf('if (!result.ok)') < equip.indexOf('advanceTime(result.duration)'));
+  assert.ok(equip.indexOf('advanceTime(result.duration)') < equip.indexOf('openHomeFixture(HOME_FIXTURES.find((fixture) => fixture.id === "closet"))'));
+  const storeStart=source.indexOf('for (const outfit of wardrobeModel.CATALOG.filter((item) => item.id !== wardrobeModel.DEFAULT_OUTFIT_ID))');
+  const storeEnd=source.indexOf('addChoice("釣り餌を買う"',storeStart);
+  const purchase=source.slice(storeStart,storeEnd);
+  assert.ok(purchase.indexOf('advanceTime(result.duration)') < purchase.indexOf('openPlace(PLACES.find((place) => place.id === "store"))'));
+  assert.match(source, /function playerAppearance\(\)/);
+  const street=source.slice(source.indexOf('function drawPlayer()'),source.indexOf('function drawPlayerUmbrella()'));
+  const home=source.slice(source.indexOf('function drawHomePlayer()'),source.indexOf('function drawStreetLightsGlow()'));
+  assert.match(street, /playerAppearance\(\)/);
+  assert.match(home, /playerAppearance\(\)/);
+  assert.doesNotMatch(street, /PLAYER_APPEARANCE/);
+  assert.doesNotMatch(home, /PLAYER_APPEARANCE/);
+  const npc=source.slice(source.indexOf('function drawNpc('),source.indexOf('function drawPedestrians('));
+  const pedestrians=source.slice(source.indexOf('function drawPedestrians('),source.indexOf('function drawPlayer('));
+  assert.match(npc, /npc\.appearance/);
+  assert.match(pedestrians, /ped\.appearance/);
+  assert.doesNotMatch(npc + pedestrians, /playerAppearance\(/);
+});
+
 test('umbrella purchase is one-time, snapshot-safe, and only protects an outdoor pedestrian', () => {
   assert.match(source, /umbrellaOwned:false/);
   assert.match(source, /state\.umbrellaOwned = saved\.umbrellaOwned === true/);

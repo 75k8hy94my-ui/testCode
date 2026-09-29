@@ -766,6 +766,7 @@
     { id:"shower", label:"シャワー", x:70, y:318, w:118, h:118, interactX:208, interactY:372, range:68 },
     { id:"kitchen", label:"キッチン", x:510, y:55, w:205, h:82, interactX:505, interactY:153, range:78 },
     { id:"worktable", label:"作業机", x:176, y:194, w:104, h:62, interactX:228, interactY:268, range:70 },
+    { id:"closet", label:"クローゼット", x:42, y:182, w:112, h:78, interactX:140, interactY:278, range:58 },
     { id:"pet", label:"ペット", x:530, y:188, w:132, h:74, interactX:474, interactY:232, range:72 },
     { id:"sofa", label:"ソファ", x:486, y:330, w:205, h:74, interactX:476, interactY:365, range:74 },
     { id:"tv", label:"テレビ", x:520, y:392, w:155, h:70, interactX:475, interactY:425, range:72 },
@@ -2009,6 +2010,21 @@
   }
 
   const PLAYER_APPEARANCE = characterRenderer.createAppearance(9001, { role:"player" });
+
+  function playerAppearance() {
+    const outfit = wardrobeModel.getOutfit(state.wardrobe.equippedOutfitId) || wardrobeModel.getOutfit(wardrobeModel.DEFAULT_OUTFIT_ID);
+    return {
+      ...PLAYER_APPEARANCE,
+      id:PLAYER_APPEARANCE.id + "-" + outfit.id,
+      top:outfit.top,
+      bottom:outfit.bottom,
+      accent:outfit.accent,
+      topStyle:outfit.topStyle,
+      bottomStyle:outfit.bottomStyle,
+      bottomGarment:outfit.bottomGarment,
+      accessory:outfit.accessory
+    };
+  }
 
   function citizenProfile(index, home, workPool) {
     const socialProfile = index < socialNpcSystem.catalog.length ? socialNpcSystem.catalog[index] : null;
@@ -4066,6 +4082,23 @@
       showToast(result.recipe.name + "を作りました");
   }
 
+  function equipPlayerOutfit(outfitId) {
+    if (!state.player.inHome || nearestHomeInteraction()?.target?.id !== "closet") {
+      showToast("自宅のクローゼットのそばで着替えられます");
+      return false;
+    }
+    const result = wardrobeModel.equipOutfit(state.wardrobe, outfitId);
+    if (!result.ok) {
+      showToast(result.reason === "not-owned" ? "このコーデはまだ持っていません" : result.reason === "already-equipped" ? "すでに着ています" : "このコーデには着替えられません");
+      return false;
+    }
+    state.wardrobe = result.wardrobe;
+    advanceTime(result.duration);
+    queueMicrotask(() => openHomeFixture(HOME_FIXTURES.find((fixture) => fixture.id === "closet")));
+    showToast(result.outfit.name + "に着替えました");
+    return true;
+  }
+
   function applyLibraryRead(bookId, atLibrary) {
     const result = libraryReadingModel.readChapter(state.libraryReading, bookId);
     if (!result.ok) {
@@ -4175,6 +4208,15 @@
           !status.available ? detail : capacityFull ? "持ち歩ける食事がいっぱいです / " + packedMealsModel.MAX_PORTIONS + "食まで" :
             (recipe.fish ? "魚 " + recipe.fish + "匹 / " : "") + "食料 " + recipe.groceries + "個 / " + recipe.duration + "分 / 持ち歩いて後で食べる",
           () => preparePackedMeal(recipe.id), !status.available || capacityFull);
+      }
+    } else if (fixture.id === "closet") {
+      const wardrobe = wardrobeModel.normalizeWardrobe(state.wardrobe);
+      const equipped = wardrobeModel.getOutfit(wardrobe.equippedOutfitId);
+      actionDescription.textContent = "着用中: " + equipped.name + " / 手持ちのコーデに着替えられます。着替えは5分です。";
+      for (const outfit of wardrobeModel.CATALOG.filter((item) => wardrobe.ownedOutfitIds.includes(item.id))) {
+        addChoice(outfit.name, outfit.id === wardrobe.equippedOutfitId ? "着用中" : "5分 / 能力への影響なし", () => {
+          equipPlayerOutfit(outfit.id);
+        }, outfit.id === wardrobe.equippedOutfitId);
       }
     } else if (fixture.id === "worktable") {
       const progress = homeCraftingModel.normalizeProgress(state.homeCrafting);
@@ -4464,6 +4506,7 @@
           state.wardrobe = result.wardrobe;
           state.cash = result.cashRemaining;
           advanceTime(result.duration);
+          queueMicrotask(() => openPlace(PLACES.find((place) => place.id === "store")));
           showToast(outfit.name + "を購入しました。自宅で着替えられます");
         }, !preview.ok);
       }
@@ -10044,7 +10087,7 @@
       "#edbea0",
       phase,
       1.08,
-      PLAYER_APPEARANCE,
+      playerAppearance(),
       moving ? "walk" : "idle"
     );
     if (isPlayerUsingUmbrella()) drawPlayerUmbrella();
@@ -10283,6 +10326,25 @@
     ctx.lineTo(p.x + 80*s, p.y + 12*s);
     ctx.stroke();
 
+    // Reachable double-door closet near the entry.
+    drawHomeFurnitureRect(42, 182, 112, 78, "#806044", 6);
+    p = homeToScreen(51, 190);
+    ctx.fillStyle = "#a88764";
+    roundedRectPath(ctx, p.x, p.y, 46*s, 61*s, 4*s);
+    ctx.fill();
+    ctx.fillStyle = "#72543c";
+    roundedRectPath(ctx, p.x + 50*s, p.y, 46*s, 61*s, 4*s);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(238,218,185,.6)";
+    ctx.lineWidth = 1.5*s;
+    ctx.strokeRect(p.x + 4*s, p.y + 4*s, 38*s, 53*s);
+    ctx.strokeRect(p.x + 54*s, p.y + 4*s, 38*s, 53*s);
+    ctx.fillStyle = "#dfc99d";
+    ctx.beginPath();
+    ctx.arc(p.x + 39*s, p.y + 32*s, 2*s, 0, Math.PI*2);
+    ctx.arc(p.x + 61*s, p.y + 32*s, 2*s, 0, Math.PI*2);
+    ctx.fill();
+
     // Low table.
     drawHomeFurnitureRect(294, 276, 168, 82, "#8f6c50", 12);
 
@@ -10381,7 +10443,7 @@
       direction:dir,
       phase,
       scale:1.08 * p.scale,
-      appearance:PLAYER_APPEARANCE,
+      appearance:playerAppearance(),
       state:moving ? "walk" : "idle",
       lod:characterLodAtScreen(p, p.scale),
       timeMs:performance.now()
@@ -11152,6 +11214,11 @@
       configurable:true,
       value:Object.freeze({
         snapshot,
+        equipOutfitForTest(outfitId) { return equipPlayerOutfit(outfitId); },
+        playerAppearanceForTest() {
+          const appearance = playerAppearance();
+          return { outfitId:state.wardrobe.equippedOutfitId, top:appearance.top, bottom:appearance.bottom, accent:appearance.accent, topStyle:appearance.topStyle, accessory:appearance.accessory };
+        },
         setPausedForTest(value) { state.paused = Boolean(value); },
         setMinuteForTest(minute) {
           if (!Number.isFinite(minute)) return false;

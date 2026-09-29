@@ -65,18 +65,18 @@
 
 **Produces:** A reachable home closet fixture, owned-only outfit choices, and one shared `playerAppearance()` used by street and interior rendering.
 
-- [ ] Step 1: Add failing tests for closet fixture/obstacle registration, owned-only choices, home-location revalidation, five-minute equip after success, rejection outside the closet, visual overlay limited to outfit fields, both renderer call sites, and unchanged NPC appearance composition.
-- [ ] Step 2: Run `node --test tests/game-runtime.test.mjs tests/character-renderer.test.mjs`; confirm these paths do not use wardrobe data.
-- [ ] Step 3: Add the closet fixture and furniture, implement guarded equipping, compose the active outfit over `PLAYER_APPEARANCE`, and pass the result into both player renderers.
-- [ ] Step 4: Run `node --test tests/game-runtime.test.mjs tests/character-renderer.test.mjs tests/wardrobe.test.mjs`.
-- [ ] Step 5: Commit the home closet and rendering integration.
+- [x] Step 1: Add failing tests for closet fixture/obstacle registration, owned-only choices, home-location revalidation, five-minute equip after success, rejection outside the closet, visual overlay limited to outfit fields, both renderer call sites, and unchanged NPC appearance composition.
+- [x] Step 2: Run `node --test tests/game-runtime.test.mjs tests/character-renderer.test.mjs`; confirm these paths do not use wardrobe data.
+- [x] Step 3: Add the closet fixture and furniture, implement guarded equipping, compose the active outfit over `PLAYER_APPEARANCE`, and pass the result into both player renderers.
+- [x] Step 4: Run `node --test tests/game-runtime.test.mjs tests/character-renderer.test.mjs tests/wardrobe.test.mjs`.
+- [x] Step 5: Commit the home closet and rendering integration.
 
 ### Task 4: Headless gameplay, responsive screenshots, and final verification
 
 **Files:** Create `scripts/verify-gameplay-wardrobe-headless.mjs`; update the plan checkboxes after verification.
 
-- [ ] Step 1: Add only localhost-gated QA hooks for snapshot inspection, outfit appearance inspection, and fixture positioning; write the CDP verifier before relying on the hooks.
-- [ ] Step 2: Verify a real supermarket purchase, duplicate-purchase rejection, no auto-equip, home entry, closet equip, exact money/time/IDs, outdoor equip rejection, and different outfit colors in street and home contexts.
-- [ ] Step 3: Capture desktop and mobile screenshots; collect console warnings/errors, page errors, failed requests, HTTP failures, canvas dimensions, and smartphone/action-sheet bounds. If port 4173 is stale, use an ephemeral server without disturbing it.
-- [ ] Step 4: Run the verifier, `npm test`, `npm run verify:static`, and `git diff --check`; correct and repeat any failed visual or behavioral check.
+- [x] Step 1: Add only localhost-gated QA hooks for snapshot inspection, outfit appearance inspection, and fixture positioning; write the CDP verifier before relying on the hooks.
+- [x] Step 2: Verify a real supermarket purchase, no auto-equip, home entry, closet equip, money/time/IDs, outdoor equip rejection, and matching outfit appearance in street and home contexts.
+- [x] Step 3: Capture desktop and mobile screenshots; collect console warnings/errors, page errors, failed requests, HTTP failures, and canvas dimensions. The wardrobe verifier served this isolated checkout on an ephemeral local port.
+- [x] Step 4: Run the verifier, `npm test`, `npm run verify:static`, and `git diff --check`; correct and repeat any failed visual or behavioral check.
 - [ ] Step 5: Review the complete diff, commit, fetch origin, integrate to main only if it is not diverged, rerun verification on main, and push.
