@@ -97,3 +97,9 @@ test('a vehicle stopped fully behind the crossing yields and lets the pedestrian
   assert.equal(yieldDecision.shouldYield, true);
   assert.ok(yieldDecision.frontClearance >= crossingControl.SAFE_FRONT_CLEARANCE);
 });
+
+
+test('crosswalk depth contributes to the safe front clearance shared with vehicle stops', () => {
+  assert.equal(crossingControl.safeFrontClearance({ ...crosswalk, depth:30 }), 23);
+  assert.equal(crossingControl.safeFrontClearance({ ...crosswalk, depth:0 }), crossingControl.SAFE_FRONT_CLEARANCE);
+});
