@@ -51,11 +51,11 @@
 
 **Produces:** Runtime `state.wardrobe`, snapshot field `wardrobe`, and real MARCHÉ purchase actions that revalidate at click time.
 
-- [ ] Step 1: Add failing tests for script ordering, default state, legacy/malformed snapshot normalization, live snapshot round-trip, store purchase cash/time/ownership, purchase-not-equip behavior, and unchanged state on rejected actions.
-- [ ] Step 2: Run `node --test tests/game-runtime.test.mjs`; confirm the module, state, snapshot, and purchase integration are absent.
-- [ ] Step 3: Load the model before `game.js`, normalize runtime/snapshot state, and connect catalog choices to the pure purchase transition and `advanceTime(10)` only after success.
-- [ ] Step 4: Run `node --test tests/game-runtime.test.mjs tests/wardrobe.test.mjs`.
-- [ ] Step 5: Commit the runtime purchase and snapshot integration.
+- [x] Step 1: Add failing tests for script ordering, default state, legacy/malformed snapshot normalization, live snapshot round-trip, store purchase cash/time/ownership, purchase-not-equip behavior, and unchanged state on rejected actions.
+- [x] Step 2: Run `node --test tests/game-runtime.test.mjs`; confirm the module, state, snapshot, and purchase integration are absent.
+- [x] Step 3: Load the model before `game.js`, normalize runtime/snapshot state, and connect catalog choices to the pure purchase transition and `advanceTime(10)` only after success.
+- [x] Step 4: Run `node --test tests/game-runtime.test.mjs tests/wardrobe.test.mjs`.
+- [x] Step 5: Commit the runtime purchase and snapshot integration.
 
 ### Task 3: Home closet and visible player outfits
 

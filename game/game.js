@@ -39,9 +39,15 @@
 
   const mapModel = globalThis.CityDaysMapModel?.createMapModel?.();
   const weatherSystem = globalThis.CityDaysWeatherSystem;
+  const wardrobeModel = globalThis.CityDaysWardrobe;
   const mapErrors = mapModel ? mapModel.validate() : ["MapModel を読み込めません。"];
   if (!mapModel || mapErrors.length) {
     showRuntimeError(mapErrors.join(" / "));
+    return;
+  }
+
+  if (!wardrobeModel?.createWardrobe || !wardrobeModel?.normalizeWardrobe || !wardrobeModel?.buyOutfit || !wardrobeModel?.equipOutfit || !wardrobeModel?.getOutfit) {
+    showRuntimeError("Wardrobe を読み込めません。");
     return;
   }
 
@@ -1160,6 +1166,7 @@
     day: 1,
     minute: 8 * 60,
     cash: 8000,
+    wardrobe:wardrobeModel.createWardrobe(),
     umbrellaOwned:false,
     groceries: 2,
     fitness: 0,
@@ -4442,6 +4449,24 @@
         }
         showToast("傘を買いました。雨の日の屋外で自動的に使います");
       }, state.umbrellaOwned || state.cash < 600);
+      for (const outfit of wardrobeModel.CATALOG.filter((item) => item.id !== wardrobeModel.DEFAULT_OUTFIT_ID)) {
+        const owned = state.wardrobe.ownedOutfitIds.includes(outfit.id);
+        const preview = wardrobeModel.buyOutfit(state.wardrobe, state.cash, outfit.id);
+        const detail = owned ? "購入済み · 自宅のクローゼットで着替えられます"
+          : preview.ok ? "¥" + outfit.price.toLocaleString("ja-JP") + " / 10分 / 自宅で着替え"
+            : "¥" + outfit.price.toLocaleString("ja-JP") + " / 所持金が足りません";
+        addChoice(outfit.name, detail, () => {
+          const result = wardrobeModel.buyOutfit(state.wardrobe, state.cash, outfit.id);
+          if (!result.ok) {
+            showToast(result.reason === "already-owned" ? "このコーデは購入済みです" : result.reason === "insufficient-funds" ? "衣類を買う資金が足りません" : "このコーデは購入できません");
+            return;
+          }
+          state.wardrobe = result.wardrobe;
+          state.cash = result.cashRemaining;
+          advanceTime(result.duration);
+          showToast(outfit.name + "を購入しました。自宅で着替えられます");
+        }, !preview.ok);
+      }
       addChoice("釣り餌を買う", state.cash < parkFishingModel.BAIT_PACK_COST ? "5回分 / ¥500 / 資金不足" : "5回分 / ¥500 / 所持 " + state.fishing.bait + "個", () => {
         const result = parkFishingModel.buyBait(state.fishing, state.cash);
         if (!result.ok) {
@@ -5283,6 +5308,7 @@
         minute: state.minute,
         cash: state.cash,
         umbrellaOwned:state.umbrellaOwned === true,
+        wardrobe:wardrobeModel.normalizeWardrobe(state.wardrobe),
         groceries: state.groceries,
         fitness: state.fitness,
         libraryVisits: state.libraryVisits,
@@ -5539,6 +5565,7 @@
       syncWeather();
       state.cash = Math.floor(Number(saved.cash) || 0);
       state.umbrellaOwned = saved.umbrellaOwned === true;
+      state.wardrobe = wardrobeModel.normalizeWardrobe(saved.wardrobe);
       state.groceries = Math.max(0, Math.floor(Number(saved.groceries) || 0));
       state.fitness = Math.max(0, Math.floor(Number(saved.fitness) || 0));
       state.libraryVisits = Math.max(0, Math.floor(Number(saved.libraryVisits) || 0));
@@ -11096,6 +11123,7 @@
         needs:{ ...state.needs },
         weather:state.visual.weather,
         umbrellaOwned:state.umbrellaOwned === true,
+        wardrobe:wardrobeModel.normalizeWardrobe(state.wardrobe),
         skills:{ ...state.communityCenter.skills },
         npcFriendship:{ ...socialNpcState.friendship },
         relationships:{ ...socialNpcState.relationships },

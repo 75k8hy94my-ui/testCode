@@ -91,6 +91,30 @@ test('world weather follows the deterministic game clock and rain exposure respe
   assert.doesNotMatch(source, /Math\.floor\(performance\.now\(\) \/ 1000\)/);
 });
 
+test('wardrobe model is loaded before runtime and is normalized in snapshots', () => {
+  const wardrobeScript = html.indexOf('wardrobe.js');
+  assert.notEqual(wardrobeScript, -1);
+  assert.ok(wardrobeScript < html.indexOf('game.js'));
+  assert.match(source, /const wardrobeModel = globalThis\.CityDaysWardrobe/);
+  assert.match(source, /wardrobe:wardrobeModel\.createWardrobe\(\)/);
+  assert.match(source, /wardrobe:wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
+  assert.match(source, /state\.wardrobe = wardrobeModel\.normalizeWardrobe\(saved\.wardrobe\)/);
+});
+
+test('supermarket clothing purchases revalidate ownership and funds before charging or advancing time', () => {
+  const storeStart=source.indexOf('if (place.id === "store")');
+  const storeEnd=source.indexOf('if (place.id === "fuel-station")',storeStart);
+  const store=source.slice(storeStart,storeEnd);
+  const purchaseStart=store.indexOf('for (const outfit of wardrobeModel.CATALOG');
+  const purchaseEnd=store.indexOf('addChoice("釣り餌を買う"',purchaseStart);
+  const outfitPurchase=store.slice(purchaseStart,purchaseEnd);
+  assert.notEqual(purchaseStart,-1);
+  assert.match(outfitPurchase, /wardrobeModel\.buyOutfit\(/);
+  assert.ok(outfitPurchase.indexOf('if (!result.ok)') < outfitPurchase.indexOf('state.cash = result.cashRemaining'));
+  assert.ok(outfitPurchase.indexOf('state.cash = result.cashRemaining') < outfitPurchase.indexOf('advanceTime(result.duration)'));
+  assert.match(outfitPurchase, /購入済み/);
+});
+
 test('umbrella purchase is one-time, snapshot-safe, and only protects an outdoor pedestrian', () => {
   assert.match(source, /umbrellaOwned:false/);
   assert.match(source, /state\.umbrellaOwned = saved\.umbrellaOwned === true/);
