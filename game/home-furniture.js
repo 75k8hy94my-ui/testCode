@@ -179,8 +179,132 @@
     return action ? { ...action, needs:{ ...action.needs } } : null;
   }
 
+  function getFootprint(placement, layout = {}) {
+    if (!placement || typeof placement !== "object") return null;
+    const item = catalogById.get(placement.furnitureId);
+    if (!item || !Number.isSafeInteger(placement.gridX) || !Number.isSafeInteger(placement.gridY) || !validRotation(placement.rotation)) return null;
+    const cellSize = Number.isFinite(layout.cellSize) && layout.cellSize > 0 ? layout.cellSize : 20;
+    const rotated = placement.rotation === 90 || placement.rotation === 270;
+    return {
+      x:placement.gridX * cellSize,
+      y:placement.gridY * cellSize,
+      width:(rotated ? item.heightCells : item.widthCells) * cellSize,
+      height:(rotated ? item.widthCells : item.heightCells) * cellSize
+    };
+  }
+
+  function normalizedRect(value) {
+    if (!value || typeof value !== "object") return null;
+    const x = Number(value.x);
+    const y = Number(value.y);
+    const width = Number(value.width ?? value.w);
+    const height = Number(value.height ?? value.h);
+    return [x, y, width, height].every(Number.isFinite) && width > 0 && height > 0
+      ? { x, y, width, height }
+      : null;
+  }
+
+  function rectanglesOverlap(first, second) {
+    return first.x < second.x + second.width && first.x + first.width > second.x &&
+      first.y < second.y + second.height && first.y + first.height > second.y;
+  }
+
+  function circleHitsRect(x, y, radius, rect) {
+    const nearestX = Math.max(rect.x, Math.min(x, rect.x + rect.width));
+    const nearestY = Math.max(rect.y, Math.min(y, rect.y + rect.height));
+    const dx = x - nearestX;
+    const dy = y - nearestY;
+    return dx * dx + dy * dy < radius * radius;
+  }
+
+  function validateArrangement(placements, layout) {
+    if (!Array.isArray(placements) || !layout || typeof layout !== "object") return { ok:false, reason:"invalid-layout" };
+    const width = Number(layout.width);
+    const height = Number(layout.height);
+    const cellSize = Number(layout.cellSize);
+    const wallMargin = Number(layout.wallMargin);
+    const playerRadius = Number(layout.playerRadius);
+    const entry = layout.entry;
+    const actorPosition = layout.actorPosition;
+    if (![width, height, cellSize, wallMargin, playerRadius].every(Number.isFinite) || width <= 0 || height <= 0 || cellSize <= 0 ||
+        wallMargin < 0 || playerRadius < 0 || !entry || !Number.isFinite(entry.x) || !Number.isFinite(entry.y) ||
+        (actorPosition && (!Number.isFinite(actorPosition.x) || !Number.isFinite(actorPosition.y) ||
+          (actorPosition.radius != null && (!Number.isFinite(actorPosition.radius) || actorPosition.radius < 0))))) {
+      return { ok:false, reason:"invalid-layout" };
+    }
+    const fixedObstacles = (Array.isArray(layout.fixedObstacles) ? layout.fixedObstacles : []).map(normalizedRect);
+    if (fixedObstacles.some((rect) => !rect)) return { ok:false, reason:"invalid-layout" };
+    const corridor = layout.entryCorridor ? normalizedRect(layout.entryCorridor) : null;
+    if (layout.entryCorridor && !corridor) return { ok:false, reason:"invalid-layout" };
+
+    const rects = [];
+    const seen = new Set();
+    for (const placement of placements) {
+      if (!placement || typeof placement.placementId !== "string" || seen.has(placement.placementId)) return { ok:false, reason:"invalid-placement" };
+      seen.add(placement.placementId);
+      const rect = getFootprint(placement, { cellSize });
+      if (!rect) return { ok:false, reason:"invalid-placement" };
+      if (rect.x < wallMargin || rect.y < wallMargin || rect.x + rect.width > width - wallMargin || rect.y + rect.height > height - wallMargin) {
+        return { ok:false, reason:"outside-room", placementId:placement.placementId };
+      }
+      if (fixedObstacles.some((obstacle) => rectanglesOverlap(rect, obstacle))) return { ok:false, reason:"overlap-fixture", placementId:placement.placementId };
+      if (corridor && rectanglesOverlap(rect, corridor)) return { ok:false, reason:"blocks-entry", placementId:placement.placementId };
+      if (actorPosition && circleHitsRect(actorPosition.x, actorPosition.y, actorPosition.radius ?? playerRadius, rect)) return { ok:false, reason:"overlaps-player", placementId:placement.placementId };
+      if (rects.some((other) => rectanglesOverlap(rect, other.rect))) return { ok:false, reason:"overlap-furniture", placementId:placement.placementId };
+      rects.push({ placement, rect });
+    }
+
+    const obstacles = [...fixedObstacles, ...rects.map((entryValue) => entryValue.rect)];
+    const navigationStep = Math.max(5, cellSize / 2);
+    const columns = Math.ceil(width / navigationStep);
+    const rows = Math.ceil(height / navigationStep);
+    const canWalk = (column, row) => {
+      if (column < 0 || row < 0 || column >= columns || row >= rows) return false;
+      const x = (column + 0.5) * navigationStep;
+      const y = (row + 0.5) * navigationStep;
+      if (x < wallMargin + playerRadius || y < wallMargin + playerRadius ||
+          x > width - wallMargin - playerRadius || y > height - wallMargin - playerRadius) return false;
+      return !obstacles.some((obstacle) => circleHitsRect(x, y, playerRadius, obstacle));
+    };
+    const startColumn = Math.floor(entry.x / navigationStep);
+    const startRow = Math.floor(entry.y / navigationStep);
+    if (!canWalk(startColumn, startRow)) return { ok:false, reason:"inaccessible" };
+    const queue = [[startColumn, startRow]];
+    const reached = new Set([startRow * columns + startColumn]);
+    for (let index = 0; index < queue.length; index += 1) {
+      const [column, row] = queue[index];
+      for (const [nextColumn, nextRow] of [[column + 1, row], [column - 1, row], [column, row + 1], [column, row - 1]]) {
+        const key = nextRow * columns + nextColumn;
+        if (reached.has(key) || !canWalk(nextColumn, nextRow)) continue;
+        reached.add(key);
+        queue.push([nextColumn, nextRow]);
+      }
+    }
+
+    if (actorPosition) {
+      const actorColumn = Math.floor(actorPosition.x / navigationStep);
+      const actorRow = Math.floor(actorPosition.y / navigationStep);
+      if (!canWalk(actorColumn, actorRow) || !reached.has(actorRow * columns + actorColumn)) return { ok:false, reason:"inaccessible" };
+    }
+
+    for (const { placement, rect } of rects) {
+      const left = Math.floor(rect.x / navigationStep);
+      const right = Math.ceil((rect.x + rect.width) / navigationStep) - 1;
+      const top = Math.floor(rect.y / navigationStep);
+      const bottom = Math.ceil((rect.y + rect.height) / navigationStep) - 1;
+      const approaches = [];
+      for (let column = left; column <= right; column += 1) approaches.push([column, top - 2], [column, bottom + 2]);
+      for (let row = top; row <= bottom; row += 1) approaches.push([left - 2, row], [right + 2, row]);
+      if (!approaches.some(([column, row]) => canWalk(column, row) && reached.has(row * columns + column))) {
+        return { ok:false, reason:"inaccessible", placementId:placement.placementId };
+      }
+    }
+    return { ok:true };
+  }
+
   return Object.freeze({
     MAX_ITEM_COUNT, MAX_PLACEMENTS, CATALOG, createProgress, normalizeProgress,
-    buyFurniture, placeFurniture, moveFurniture, rotateFurniture, pickupFurniture, getUseAction
+    buyFurniture, placeFurniture, moveFurniture, rotateFurniture, pickupFurniture, getUseAction,
+    getFootprint, validateArrangement
   });
 });

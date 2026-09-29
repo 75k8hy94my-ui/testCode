@@ -1243,8 +1243,12 @@ test('visible smartphone refreshes world data at a bounded cadence and resets wh
 test('home map uses the street world scale and follows the player camera', () => {
   const viewport = source.slice(source.indexOf('function homeInteriorViewport'), source.indexOf('function homeToScreen'));
   assert.match(viewport, /const scale = Math\.max\(1, fitScale\)/);
-  assert.match(viewport, /state\.player\.homeX \* scale/);
-  assert.match(viewport, /state\.player\.homeY \* scale/);
+  assert.match(viewport, /: state\.player\.homeX/);
+  assert.match(viewport, /: state\.player\.homeY/);
+  assert.match(viewport, /furniturePlacementState[\s\S]*homeFurnitureCandidate\(\)/);
+  assert.match(viewport, /focusX/);
+  assert.match(viewport, /focusScreenX = preview && viewWidth <= 760 \? viewWidth - 64 : viewWidth \/ 2/);
+  assert.match(viewport, /x:\s*preview\s*\? centeredX/);
   assert.doesNotMatch(viewport, /1\.22/);
 });
 
@@ -1255,7 +1259,7 @@ test('home furniture defaults into legacy saves and survives normalized snapshot
   assert.match(source, /const homeFurnitureModel = globalThis\.CityDaysHomeFurniture/);
   assert.match(source, /homeFurniture:homeFurnitureModel\.createProgress\(\)/);
   assert.match(source, /homeFurniture:homeFurnitureModel\.normalizeProgress\(state\.homeFurniture\)/);
-  assert.match(source, /state\.homeFurniture = homeFurnitureModel\.normalizeProgress\(saved\.homeFurniture\)/);
+  assert.match(source, /state\.homeFurniture = sanitizeHomeFurnitureProgress\(saved\.homeFurniture\)/);
   const hookStart = source.indexOf('function installSocialNpcTestHook()');
   const hookEnd = source.indexOf('function togglePause()', hookStart);
   const hook = source.slice(hookStart, hookEnd);
@@ -1291,4 +1295,56 @@ test('home furniture use checks the home context and applies catalog results thr
   assert.match(use, /homeFurnitureModel\.getUseAction\(/);
   assert.ok(use.indexOf('if (!action)') < use.indexOf('advanceTime(action.duration)'));
   assert.match(use, /clampNeeds\(\)/);
+});
+
+test('home exposes an in-room furniture manager plus dedicated touch placement controls', () => {
+  assert.match(html, /id="homeFurnitureButton"[^>]*hidden/);
+  assert.match(html, /id="furniturePlacementControls"[^>]*hidden/);
+  assert.match(html, /id="furnitureRotateButton"[^>]*>回転/);
+  assert.match(html, /id="furniturePlaceButton"[^>]*>配置/);
+  assert.match(html, /id="furnitureCancelButton"[^>]*>キャンセル/);
+  assert.match(css, /body\.furniture-placement/);
+  assert.match(css, /furniture-placement-controls/);
+  assert.match(css, /body\.furniture-placement \.toast/);
+});
+
+test('placement and movement share arrangement validation and migrate unsafe saved furniture back to inventory', () => {
+  assert.match(source, /homeFurnitureModel\.validateArrangement\(/);
+  assert.match(source, /function beginHomeFurniturePlacement\(/);
+  assert.match(source, /function confirmHomeFurniturePlacement\(/);
+  assert.match(source, /function sanitizeHomeFurnitureProgress\(/);
+  assert.match(source, /function pickupHomeFurniture\(/);
+  assert.match(source, /homeFurnitureModel\.getFootprint\(/);
+  const snapshotStart = source.indexOf('function applyGameSnapshot(saved)');
+  const snapshotEnd = source.indexOf('\n  function ', snapshotStart + 10);
+  const snapshot = source.slice(snapshotStart, snapshotEnd);
+  assert.match(snapshot, /sanitizeHomeFurnitureProgress\(saved\.homeFurniture\)/);
+});
+
+test('placement keyboard controls are isolated from walking and mobile buttons call the same state transitions', () => {
+  const keydownStart = source.indexOf('window.addEventListener("keydown"');
+  const keydownEnd = source.indexOf('window.addEventListener("keyup"', keydownStart);
+  const keydown = source.slice(keydownStart, keydownEnd);
+  assert.ok(keydown.indexOf('if (furniturePlacementState)') >= 0);
+  assert.ok(keydown.indexOf('if (furniturePlacementState)') < keydown.indexOf('keys.add(key)'));
+  assert.match(keydown, /key === "r"/);
+  assert.match(keydown, /key === "e"/);
+  assert.match(keydown, /key === "escape"/);
+  assert.match(keydown, /else if \(\["arrowleft", "a"\]\.includes\(key\)\) moveHomeFurniturePreview/);
+  for (const handler of ['furnitureRotateButton', 'furniturePlaceButton', 'furnitureCancelButton']) {
+    assert.match(source, new RegExp('document\\.getElementById\\("' + handler + '"\\)'));
+  }
+  assert.match(source, /function updateFurniturePlacement\(/);
+  assert.match(source, /function drawPlacedHomeFurniture\(/);
+});
+
+test('placement mode keeps the player stationary and pauses normal world-time advancement', () => {
+  const updateStart = source.indexOf('function update(dt)');
+  const updateEnd = source.indexOf('\n  function ', updateStart + 10);
+  const update = source.slice(updateStart, updateEnd);
+  const placement = update.indexOf('if (furniturePlacementState)');
+  const worldMinutes = update.indexOf('const gameMinutes = dt * .7');
+  assert.ok(placement >= 0 && placement < worldMinutes);
+  assert.match(update.slice(placement, worldMinutes), /updateFurniturePlacement\(dt\)/);
+  assert.match(update.slice(placement, worldMinutes), /return;/);
 });

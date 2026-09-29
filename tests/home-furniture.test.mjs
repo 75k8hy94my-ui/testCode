@@ -118,3 +118,75 @@ test('the furniture model loads before the game runtime', async () => {
   assert.ok(html.indexOf('home-furniture.js') >= 0);
   assert.ok(html.indexOf('home-furniture.js') < html.indexOf('game.js'));
 });
+
+function testLayout(overrides = {}) {
+  return {
+    width:240,
+    height:200,
+    cellSize:20,
+    wallMargin:10,
+    playerRadius:5,
+    entry:{ x:120, y:180 },
+    entryCorridor:{ x:80, y:160, w:80, h:40 },
+    fixedObstacles:[{ x:20, y:20, w:40, h:40 }],
+    ...overrides
+  };
+}
+
+test('arrangement validation returns rotated footprints and rejects walls, fixtures, overlap, and the entry corridor', () => {
+  assert.deepEqual(furniture.getFootprint({ furnitureId:'kotatsu', gridX:2, gridY:2, rotation:0 }), {
+    x:40, y:40, width:60, height:40
+  });
+  assert.deepEqual(furniture.getFootprint({ furnitureId:'kotatsu', gridX:2, gridY:2, rotation:90 }), {
+    x:40, y:40, width:40, height:60
+  });
+
+  const wall = furniture.validateArrangement([{ placementId:'furniture-1', furnitureId:'plant', gridX:0, gridY:0, rotation:0 }], testLayout());
+  assert.equal(wall.reason, 'outside-room');
+  const fixture = furniture.validateArrangement([{ placementId:'furniture-1', furnitureId:'bookshelf', gridX:1, gridY:1, rotation:0 }], testLayout());
+  assert.equal(fixture.reason, 'overlap-fixture');
+  const overlap = furniture.validateArrangement([
+    { placementId:'furniture-1', furnitureId:'plant', gridX:4, gridY:4, rotation:0 },
+    { placementId:'furniture-2', furnitureId:'plant', gridX:4, gridY:4, rotation:0 }
+  ], testLayout());
+  assert.equal(overlap.reason, 'overlap-furniture');
+  const door = furniture.validateArrangement([{ placementId:'furniture-1', furnitureId:'plant', gridX:5, gridY:8, rotation:0 }], testLayout());
+  assert.equal(door.reason, 'blocks-entry');
+});
+
+test('arrangement validation checks rotated collisions and keeps all furniture interaction cells reachable', () => {
+  const rotatedCollisionLayout = testLayout({
+    fixedObstacles:[{ x:60, y:80, w:20, h:20 }],
+    entryCorridor:{ x:0, y:180, w:20, h:20 }
+  });
+  const kotatsu = [{ placementId:'furniture-1', furnitureId:'kotatsu', gridX:2, gridY:2, rotation:0 }];
+  assert.equal(furniture.validateArrangement(kotatsu, rotatedCollisionLayout).ok, true);
+  assert.equal(furniture.validateArrangement([{ ...kotatsu[0], rotation:90 }], rotatedCollisionLayout).reason, 'overlap-fixture');
+
+  const unreachable = furniture.validateArrangement([
+    { placementId:'furniture-1', furnitureId:'plant', gridX:8, gridY:4, rotation:0 }
+  ], testLayout({
+    fixedObstacles:[{ x:100, y:10, w:40, h:180 }],
+    entry:{ x:40, y:180 },
+    entryCorridor:{ x:0, y:180, w:20, h:20 }
+  }));
+  assert.equal(unreachable.reason, 'inaccessible');
+});
+
+test('arrangement validation prevents placing furniture on the player or isolating them from the entrance', () => {
+  const plant = { placementId:'furniture-1', furnitureId:'plant', gridX:4, gridY:4, rotation:0 };
+  const underPlayer = furniture.validateArrangement([plant], testLayout({ actorPosition:{ x:90, y:90 } }));
+  assert.equal(underPlayer.reason, 'overlaps-player');
+  const overlapsAvatar = furniture.validateArrangement([plant], testLayout({ actorPosition:{ x:90, y:65, radius:20 } }));
+  assert.equal(overlapsAvatar.reason, 'overlaps-player');
+
+  const isolatedPlayer = furniture.validateArrangement([
+    { placementId:'furniture-2', furnitureId:'plant', gridX:8, gridY:7, rotation:0 }
+  ], testLayout({
+    fixedObstacles:[{ x:100, y:10, w:40, h:180 }],
+    entry:{ x:40, y:180 },
+    actorPosition:{ x:180, y:100 },
+    entryCorridor:{ x:0, y:180, w:20, h:20 }
+  }));
+  assert.equal(isolatedPlayer.reason, 'inaccessible');
+});
