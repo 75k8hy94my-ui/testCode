@@ -7860,10 +7860,6 @@
       if (crosswalk.roadEdgeId !== edge.id) continue;
       const claim = crossingClaims.get(crosswalk.id);
       if (!claim) continue;
-      // At signalized crossings, a pedestrian merely waiting for WALK must not
-      // stop green traffic. The traffic signal handles the approach; the shared
-      // crosswalk claim becomes an emergency safety guard only after entry.
-      if (crosswalk.signalized && claim.phase !== "crossing") continue;
       const decision = crossingControl.vehicleYieldDecision(crosswalk, claim, {
         id:car.id,
         edgeId:car.edgeId,
