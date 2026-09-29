@@ -107,6 +107,16 @@ test('umbrella purchase is one-time, snapshot-safe, and only protects an outdoor
   assert.match(source, /buyUmbrellaForTest\(\)/);
 });
 
+test('phone snapshot receives shared forecast rows and only claims active umbrella protection outdoors', () => {
+  const snapshot = source.slice(source.indexOf('function phoneModelSnapshot()'), source.indexOf('function updateSmartphone()'));
+  assert.match(snapshot, /forecast:weatherSystem\.getForecast\(state\.day, state\.minute\)/);
+  assert.match(snapshot, /umbrellaProtecting:isPlayerUsingUmbrella\(\)/);
+  assert.match(snapshot, /umbrellaOwned:state\.umbrellaOwned === true/);
+  const phoneSource = fs.readFileSync(path.join(root, 'game', 'phone-system.js'), 'utf8');
+  assert.match(phoneSource, /model\.forecast/);
+  assert.doesNotMatch(phoneSource, /\+3時間[\s\S]*☀ 晴れ/);
+});
+
 
 test('game loads the sprite character renderer before the game runtime', () => {
   assert.match(html, /<script src="\.\/character-renderer\.js\?v=[^"]+"><\/script>/);

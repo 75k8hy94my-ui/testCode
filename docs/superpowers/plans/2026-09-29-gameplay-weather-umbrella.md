@@ -77,11 +77,11 @@
 
 **Interfaces:** The runtime passes the weather model's forecast records and umbrella protection/status in the phone snapshot. The weather app maps each record to its day/time label and existing condition glyph; upcoming rows are never hard-coded.
 
-- [ ] **Step 1:** Add failing phone tests for rainy/cloudy/clear glyphs, forecast times and day rollover, and sheltered/umbrella status text.
-- [ ] **Step 2:** Run `node --test tests/phone-system.test.mjs`; confirm the current fixed forecast cannot reflect supplied records.
-- [ ] **Step 3:** Pass shared forecast data from the runtime and render the model records plus accurate umbrella status in the existing app.
-- [ ] **Step 4:** Run `node --test tests/phone-system.test.mjs tests/game-runtime.test.mjs tests/weather-system.test.mjs`.
-- [ ] **Step 5:** Commit phone forecast integration.
+- [x] **Step 1:** Add failing phone tests for rainy/cloudy/clear glyphs, forecast times and day rollover, and sheltered/umbrella status text.
+- [x] **Step 2:** Run `node --test tests/phone-system.test.mjs`; confirm the current fixed forecast cannot reflect supplied records.
+- [x] **Step 3:** Pass shared forecast data from the runtime and render the model records plus accurate umbrella status in the existing app.
+- [x] **Step 4:** Run `node --test tests/phone-system.test.mjs tests/game-runtime.test.mjs tests/weather-system.test.mjs`.
+- [x] **Step 5:** Commit phone forecast integration.
 
 ### Task 5: Headless end-to-end weather and umbrella verification
 

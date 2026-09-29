@@ -63,6 +63,27 @@ test('phone receives live game data for health, contacts, transport and wallet',
   assert.match(gameSource, /nextRentDay:nextRentDay\(\)/);
 });
 
+test('weather app renders supplied clock-based forecast transitions and umbrella status', () => {
+  const root={hidden:false,innerHTML:'',classList:{toggle(){}},style:{setProperty(){}},addEventListener(){}};
+  const phone=phoneModule.createPhoneSystem({root});
+  phone.update({day:1,minute:530,weather:'clear',district:'若葉',inHome:false,inVehicle:false,inTrain:false,
+    forecast:[
+      {day:1,startMinute:360,offsetMinutes:0,condition:'clear'},
+      {day:1,startMinute:540,offsetMinutes:10,condition:'rain'},
+      {day:1,startMinute:720,offsetMinutes:190,condition:'cloudy'},
+      {day:1,startMinute:900,offsetMinutes:370,condition:'clear'}
+    ],umbrellaOwned:true,umbrellaProtecting:true});
+  phone.openApp('weather');
+  assert.match(root.innerHTML,/Day 1 09:00/);
+  assert.match(root.innerHTML,/☂ 雨/);
+  assert.match(root.innerHTML,/☁ くもり/);
+  assert.match(root.innerHTML,/傘を使って雨を防いでいます/);
+  phone.update({day:2,minute:5,weather:'rain',inHome:true,inVehicle:false,inTrain:false,
+    forecast:[{day:2,startMinute:0,offsetMinutes:0,condition:'rain'}],umbrellaOwned:true,umbrellaProtecting:false});
+  assert.match(root.innerHTML,/Day 2 00:05/);
+  assert.doesNotMatch(root.innerHTML,/傘を使って雨を防いでいます/);
+});
+
 test('phone waypoint persists in game snapshots', () => {
   assert.match(gameSource, /phone:\s*\{[\s\S]*waypoint: state\.phone\?\.waypoint/);
   assert.match(gameSource, /saved\.phone && typeof saved\.phone\.waypoint === "string"/);
