@@ -99,7 +99,7 @@ test('wardrobe model is loaded before runtime and is normalized in snapshots', (
   assert.match(source, /wardrobe:wardrobeModel\.createWardrobe\(\)/);
   assert.match(source, /wardrobe:wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
   assert.match(source, /state\.wardrobe = wardrobeModel\.normalizeWardrobe\(saved\.wardrobe\)/);
-  assert.match(html, /game\.js\?v=20260929-dog-walk-1/);
+  assert.match(html, /game\.js\?v=20260929-dog-walk-2/);
 });
 
 test('supermarket clothing purchases revalidate ownership and funds before charging or advancing time', () => {
@@ -395,9 +395,10 @@ test('pet is drawn in the home interior only and its read-only phone projection 
 });
 
 test('dog walking is persisted, follows the outdoor trail, and has guarded start and home completion', () => {
-  assert.match(html, /<script src="\.\/pet-walk\.js\?v=[^"]+"><\/script>/);
+  assert.match(html, /<script src="\.\/pet-walk\.js\?v=20260929-pet-walk-2"><\/script>/);
   assert.ok(html.indexOf('pet-walk.js') < html.indexOf('game.js'));
   assert.match(source, /petWalkModel\.normalizeWalkState\(saved\.petWalk/);
+  assert.match(source, /playerPosition:\{ x:state\.player\.x, y:state\.player\.y \}/);
   assert.match(source, /petWalk:petWalkModel\.normalizeWalkState\(state\.petWalk/);
   assert.match(source, /addChoice\("犬の散歩へ出る"/);
   assert.match(source, /function startDogWalk\(/);
@@ -406,6 +407,10 @@ test('dog walking is persisted, follows the outdoor trail, and has guarded start
   assert.match(source, /function updatePetWalk\(/);
   assert.match(source, /petWalkModel\.recordPlayerPosition\(/);
   assert.match(source, /petWalkModel\.advanceFollower\(/);
+  assert.match(source, /function enterCar\(\) \{[\s\S]*?if \(state\.petWalk\.active\)/);
+  assert.match(source, /function boardTrain\(train, station\) \{[\s\S]*?if \(state\.petWalk\.active\)/);
+  assert.match(source, /function drawPetFollower\(\)[\s\S]*?worldToScreen\(state\.petWalk\.petX, state\.petWalk\.petY\)/);
+  assert.match(source, /drawPetFollower\(\);\s*drawPlayer\(\);/);
   assert.match(source, /__CityDaysSocialNpcTest/);
   assert.match(source, /petWalk:/);
 });

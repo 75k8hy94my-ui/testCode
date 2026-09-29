@@ -774,7 +774,7 @@
     { id:"worktable", label:"作業机", x:176, y:194, w:104, h:62, interactX:228, interactY:268, range:70 },
     { id:"closet", label:"クローゼット", x:42, y:182, w:112, h:78, interactX:140, interactY:278, range:58 },
     { id:"pet", label:"ペット", x:530, y:188, w:132, h:74, interactX:474, interactY:232, range:72 },
-    { id:"sofa", label:"ソファ", x:486, y:330, w:205, h:74, interactX:476, interactY:365, range:74 },
+    { id:"sofa", label:"ソファ", x:510, y:330, w:205, h:74, interactX:500, interactY:365, range:74 },
     { id:"tv", label:"テレビ", x:520, y:392, w:155, h:70, interactX:475, interactY:425, range:72 },
     { id:"exit", label:"玄関", x:356, y:455, w:68, h:25, interactX:390, interactY:438, range:62 }
   ];
@@ -5430,7 +5430,7 @@
         deliveryWork:deliveryWorkModel.normalizeProgress(state.deliveryWork),
         communityGarden:communityGardenModel.normalizeProgress(state.garden),
         petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
-        petWalk:petWalkModel.normalizeWalkState(state.petWalk, { worldSize:WORLD_SIZE, hasDog:state.petCompanion.pet?.speciesId === "dog", playerCanWalk:!state.player.inHome && !state.player.inVehicle && !state.player.inTrain }),
+        petWalk:petWalkModel.normalizeWalkState(state.petWalk, { worldSize:WORLD_SIZE, hasDog:state.petCompanion.pet?.speciesId === "dog", playerCanWalk:!state.player.inHome && !state.player.inVehicle && !state.player.inTrain, playerPosition:{ x:state.player.x, y:state.player.y } }),
         fishing:parkFishingModel.normalizeProgress(state.fishing),
         shiftsWorked: state.shiftsWorked,
         lastShiftDay:state.lastShiftDay,
@@ -5696,7 +5696,8 @@
       state.petWalk = petWalkModel.normalizeWalkState(saved.petWalk, {
         worldSize:WORLD_SIZE,
         hasDog:state.petCompanion.pet?.speciesId === "dog",
-        playerCanWalk:!state.player.inHome && !state.player.inVehicle && !state.player.inTrain
+        playerCanWalk:!state.player.inHome && !state.player.inVehicle && !state.player.inTrain,
+        playerPosition:{ x:state.player.x, y:state.player.y }
       });
       state.fishing = parkFishingModel.normalizeProgress(saved.fishing);
       state.shiftsWorked = Math.max(0, Math.floor(Number(saved.shiftsWorked) || 0));
@@ -11322,7 +11323,7 @@
         day:state.day,
         minute:state.minute,
         cash:state.cash,
-        player:{ x:state.player.x, y:state.player.y, inHome:state.player.inHome, inVehicle:state.player.inVehicle, inTrain:state.player.inTrain },
+        player:{ x:state.player.x, y:state.player.y, homeX:state.player.homeX, homeY:state.player.homeY, inHome:state.player.inHome, inVehicle:state.player.inVehicle, inTrain:state.player.inTrain },
         needs:{ ...state.needs },
         weather:state.visual.weather,
         umbrellaOwned:state.umbrellaOwned === true,
@@ -11332,7 +11333,7 @@
         relationships:{ ...socialNpcState.relationships },
         npcPositions:Object.fromEntries(NPCS.map((npc) => [npc.id,{ x:npc.x, y:npc.y }])),
         petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
-        petWalk:petWalkModel.normalizeWalkState(state.petWalk, { worldSize:WORLD_SIZE, hasDog:state.petCompanion.pet?.speciesId === "dog", playerCanWalk:!state.player.inHome && !state.player.inVehicle && !state.player.inTrain }),
+        petWalk:petWalkModel.normalizeWalkState(state.petWalk, { worldSize:WORLD_SIZE, hasDog:state.petCompanion.pet?.speciesId === "dog", playerCanWalk:!state.player.inHome && !state.player.inVehicle && !state.player.inTrain, playerPosition:{ x:state.player.x, y:state.player.y } }),
         homeCrafting:homeCraftingModel.normalizeProgress(state.homeCrafting),
         packedMeals:(() => {
           const packedMeals = packedMealsModel.normalizeInventory(state.packedMeals);

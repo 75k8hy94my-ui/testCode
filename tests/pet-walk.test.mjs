@@ -134,6 +134,26 @@ test('legacy, incompatible, malformed, and overlong walk snapshots fail closed',
   }
 });
 
+test('a trail snapshot cannot resume from a different player position', () => {
+  const active = petWalk.beginWalk(petWalk.createWalkState(), { x:100, y:120 }).state;
+  const advanced = petWalk.recordPlayerPosition(active, { x:124, y:120 });
+  const follower = petWalk.advanceFollower(advanced, .2, 110);
+  assert.equal(petWalk.normalizeWalkState(follower, { hasDog:true, playerCanWalk:true, playerPosition:{ x:124, y:120 } }).active, true);
+  assert.equal(petWalk.normalizeWalkState(follower, { hasDog:true, playerCanWalk:true, playerPosition:{ x:900, y:900 } }).active, false);
+});
+
+test('a full bounded trail pauses safely, prunes as the dog catches up, then accepts movement again', () => {
+  let state = petWalk.beginWalk(petWalk.createWalkState(), { x:100, y:120 }).state;
+  for (let i=1;i<=511;i+=1) state=petWalk.recordPlayerPosition(state,{ x:100+i*8,y:120 });
+  assert.equal(state.trail.length, petWalk.MAX_TRAIL_POINTS);
+  const rejected = petWalk.recordPlayerPosition(state,{ x:100+512*8,y:120 });
+  assert.equal(rejected.distance,state.distance);
+  const caughtUp = petWalk.advanceFollower(rejected,60,110);
+  assert.ok(caughtUp.trail.length < 12);
+  const resumed = petWalk.recordPlayerPosition(caughtUp,{ x:100+512*8,y:120 });
+  assert.equal(resumed.distance,caughtUp.distance+8);
+});
+
 test('clearing a walk produces a fresh inactive value without mutating its input', () => {
   const active = petWalk.beginWalk(petWalk.createWalkState(), { x:10, y:20 }).state;
   const before = structuredClone(active);

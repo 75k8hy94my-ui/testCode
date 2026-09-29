@@ -54,12 +54,21 @@ try {
   const key=async(key,code,down)=>call('Input.dispatchKeyEvent',{type:down?'keyDown':'keyUp',key,code,windowsVirtualKeyCode:key==='e'?69:0});
   const tapE=async()=>{await key('e','KeyE',true);await key('e','KeyE',false);await delay(100);};
   const snap=async()=>JSON.parse(await evaluate('JSON.stringify(window.__CityDaysSocialNpcTest.snapshot())'));
+  const waitUntil=async(predicate,timeoutMs=12000)=>{const end=Date.now()+timeoutMs;while(Date.now()<end){if(await evaluate(predicate))return true;await delay(100);}return false;};
+  const moveUntil=async({keyName,code,predicate,timeoutMs=18000,run=true})=>{
+    if(run)await key('Shift','ShiftLeft',true);
+    await key(keyName,code,true);
+    const reached=await waitUntil(predicate,timeoutMs);
+    await key(keyName,code,false);
+    if(run)await key('Shift','ShiftLeft',false);
+    if(!reached)throw new Error(`Movement target was not reached with ${keyName}: ${await evaluate('JSON.stringify(window.__CityDaysSocialNpcTest.snapshot().player)')}`);
+  };
   await call('Runtime.enable');await call('Page.enable');await call('Network.enable');await call('Log.enable');
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
-  await call('Page.navigate',{url});await delay(1400);
+  await call('Page.navigate',{url});
   let activeUrl=url;
-  let status=await evaluate('document.readyState');
-  if(status!=='complete'||!await evaluate('window.__CityDaysSocialNpcTest')){activeUrl=localUrl;await call('Page.navigate',{url:localUrl});await delay(1400);}
+  if(!await waitUntil("document.readyState==='complete'&&!!window.__CityDaysSocialNpcTest",8000)){activeUrl=localUrl;await call('Page.navigate',{url:localUrl});}
+  if(!await waitUntil("document.readyState==='complete'&&!!window.__CityDaysSocialNpcTest",12000))throw new Error('Game and local debug hook did not become ready');
   const initial=JSON.parse(await evaluate(`JSON.stringify({ready:document.readyState,runtimeError:document.querySelector('.game-runtime-error')?.textContent||null,canvas:(c=>({width:c.width,height:c.height,rect:(r=>({x:r.x,y:r.y,width:r.width,height:r.height}))(c.getBoundingClientRect())}))(document.querySelector('#gameCanvas'))})`));
   if(!await evaluate('window.__CityDaysSocialNpcTest'))throw new Error(`Local-only test hook unavailable at either localhost endpoint: ${JSON.stringify({activeUrl,initial,logs})}`);
 
@@ -71,7 +80,11 @@ try {
 
   await evaluate("window.__CityDaysSocialNpcTest.movePlayerNearPlace('home')");await tapE();
   await evaluate("[...document.querySelectorAll('#actionChoices button')].find(b=>b.textContent.includes('自宅に入る'))?.click()");await delay(250);
-  await evaluate("window.__CityDaysSocialNpcTest.movePlayerToHomeFixture('pet')");await tapE();
+  await moveUntil({keyName:'d',code:'KeyD',predicate:'window.__CityDaysSocialNpcTest.snapshot().player.homeX>490',run:false});
+  await moveUntil({keyName:'w',code:'KeyW',predicate:'Math.hypot(window.__CityDaysSocialNpcTest.snapshot().player.homeX-474,window.__CityDaysSocialNpcTest.snapshot().player.homeY-232)<50',run:false});
+  const fixturePosition=await evaluate('window.__CityDaysSocialNpcTest.snapshot().player');
+  if(!fixturePosition.inHome||Math.hypot(fixturePosition.homeX-474,fixturePosition.homeY-232)>=50)throw new Error(`Could not walk to pet fixture: ${JSON.stringify(fixturePosition)}`);
+  await tapE();
   const choices=await evaluate("[...document.querySelectorAll('#actionChoices button')].map(b=>b.textContent.trim())");
   if(!choices.some(text=>text.includes('犬の散歩へ出る')))throw new Error(`Walk action missing at pet fixture: ${JSON.stringify(choices)}`);
   await evaluate("[...document.querySelectorAll('#actionChoices button')].find(b=>b.textContent.includes('犬の散歩へ出る'))?.click()");await delay(180);
@@ -80,7 +93,8 @@ try {
   const startX=started.player.x;
   const startY=started.player.y;
 
-  await key('Shift','ShiftLeft',true);await key('w','KeyW',true);await delay(5000);await key('w','KeyW',false);await key('Shift','ShiftLeft',false);await delay(900);
+  await moveUntil({keyName:'w',code:'KeyW',predicate:'window.__CityDaysSocialNpcTest.snapshot().petWalk.distance>=150'});
+  await delay(700);
   const outbound=await snap();
   const routePoints=outbound.petWalk.trail.length;
   const followerDistance=outbound.petWalk.followerDistance;
@@ -97,10 +111,11 @@ try {
   if(restoreOk!==true||!restored.petWalk.active||Math.abs(restored.petWalk.distance-outbound.petWalk.distance)>.01)throw new Error('Active dog walk did not survive snapshot round-trip');
 
   const guards=JSON.parse(await evaluate('JSON.stringify({car:window.__CityDaysSocialNpcTest.attemptCarBoardForTest(),train:window.__CityDaysSocialNpcTest.attemptTrainBoardForTest()})'));
-  await key('Shift','ShiftLeft',true);await key('s','KeyS',true);await delay(6000);await key('s','KeyS',false);await key('Shift','ShiftLeft',false);await delay(1800);
+  await moveUntil({keyName:'s',code:'KeyS',predicate:`Math.hypot(window.__CityDaysSocialNpcTest.snapshot().player.x-${startX},window.__CityDaysSocialNpcTest.snapshot().player.y-${startY})<60`});
+  if(!await waitUntil('Math.hypot(window.__CityDaysSocialNpcTest.snapshot().player.x-window.__CityDaysSocialNpcTest.snapshot().petWalk.petX,window.__CityDaysSocialNpcTest.snapshot().player.y-window.__CityDaysSocialNpcTest.snapshot().petWalk.petY)<=90',5000))throw new Error('Dog did not catch up at home');
   const nearHome=await snap();
   const returnSeparation=Math.hypot(nearHome.player.x-nearHome.petWalk.petX,nearHome.player.y-nearHome.petWalk.petY);
-  if(Math.hypot(nearHome.player.x-startX,nearHome.player.y-startY)>130)throw new Error(`Player failed to walk back near home: ${JSON.stringify(nearHome.player)}`);
+  if(Math.hypot(nearHome.player.x-startX,nearHome.player.y-startY)>60)throw new Error(`Player failed to walk back near home: ${JSON.stringify(nearHome.player)}`);
   if(returnSeparation>90)throw new Error(`Dog did not catch up near home: ${returnSeparation}`);
   await tapE();
   const returnChoices=await evaluate("[...document.querySelectorAll('#actionChoices button')].map(b=>b.textContent.trim())");

@@ -176,6 +176,9 @@
 
     const firstDistance = trail[0].distance;
     const lastDistance = trail[trail.length - 1].distance;
+    const last = trail[trail.length - 1];
+    if (options.playerPosition != null && (!validPoint(options.playerPosition) || options.playerPosition.x > worldSize || options.playerPosition.y > worldSize ||
+        Math.hypot(last.x - options.playerPosition.x, last.y - options.playerPosition.y) > SAMPLE_SPACING + .05)) return createWalkState();
     if (value.followerDistance < firstDistance - .02 || value.followerDistance > lastDistance + .02 ||
         Math.abs(value.distance - lastDistance) > .02) return createWalkState();
     const expectedPet = pointAtDistance(trail, value.followerDistance);
