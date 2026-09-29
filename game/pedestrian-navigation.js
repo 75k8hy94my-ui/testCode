@@ -137,15 +137,53 @@
     return Math.max(0, Math.min(length, along));
   }
 
-  function chooseSafeAccessNode(point, candidateNodes, mapModel, maxDistance = 720) {
-    const ordered = candidateNodes
-      .map((candidate) => ({ ...candidate, distance:distance(point, candidate.point) }))
-      .filter((candidate) => candidate.distance <= maxDistance)
-      .sort((a, b) => a.distance - b.distance || String(a.nodeId).localeCompare(String(b.nodeId)));
-    for (const candidate of ordered) {
-      if (polylineClearOfVehicleRoads([point, candidate.point], mapModel, null, 2)) return candidate;
+  function accessPathToSegment(point, segment, mapModel) {
+    let best = null;
+    let accumulated = 0;
+    for (let index = 1; index < segment.points.length; index += 1) {
+      const a = segment.points[index - 1];
+      const b = segment.points[index];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const lengthSquared = dx * dx + dy * dy;
+      const t = lengthSquared <= 1e-9
+        ? 0
+        : Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared));
+      const projection = { x:a.x + dx * t, y:a.y + dy * t };
+      const d = distance(point, projection);
+      if (!best || d < best.distance) {
+        best = { distance:d, projection, segmentIndex:index - 1, t, along:accumulated + distance(a, projection) };
+      }
+      accumulated += distance(a, b);
+    }
+    if (!best) return null;
+
+    const prefix = segment.points.slice(0, best.segmentIndex + 1).reverse();
+    const suffix = segment.points.slice(best.segmentIndex + 1);
+    const toFrom = [point, best.projection, ...prefix];
+    const toTo = [point, best.projection, ...suffix];
+    const candidates = [
+      { nodeId:segment.from, points:toFrom, length:edgeLength({ points:toFrom }) },
+      { nodeId:segment.to, points:toTo, length:edgeLength({ points:toTo }) }
+    ].sort((a, b) => a.length - b.length || String(a.nodeId).localeCompare(String(b.nodeId)));
+
+    for (const candidate of candidates) {
+      if (polylineClearOfVehicleRoads(candidate.points, mapModel, null, 2)) {
+        return { ...candidate, distanceToSegment:best.distance };
+      }
     }
     return null;
+  }
+
+  function chooseSafeAccessPath(point, candidateSegments, mapModel, maxDistance = 1100) {
+    const candidates = [];
+    for (const segment of candidateSegments) {
+      const access = accessPathToSegment(point, segment, mapModel);
+      if (!access || access.distanceToSegment > maxDistance) continue;
+      candidates.push({ ...access, score:access.distanceToSegment * 4 + access.length });
+    }
+    candidates.sort((a, b) => a.score - b.score || a.length - b.length || String(a.nodeId).localeCompare(String(b.nodeId)));
+    return candidates[0] || null;
   }
 
   function buildGraph(mapModel) {
@@ -398,20 +436,20 @@
     // of them visibly cross vehicle roads without a crosswalk. The road sidewalk
     // network above is the authoritative walking network; facilities and stations
     // attach to it with generated road-safe links below.
-    const primaryCandidates = [...nodePositions].map(([nodeId, point]) => ({ nodeId, point }));
+    const primarySegments = segments.filter((segment) => segment.type === "sidewalk");
 
     for (const place of mapModel.places || []) {
       const accessPoint = { x:place.x, y:place.y };
       const accessNodeId = "place-access:" + place.id;
-      const target = chooseSafeAccessNode(accessPoint, primaryCandidates, mapModel, 1100);
+      const target = chooseSafeAccessPath(accessPoint, primarySegments, mapModel, 1100);
       if (!target) continue;
       addSegment({
         id:"facility-access:auto:" + place.id,
         type:"facility-access",
         from:accessNodeId,
         to:target.nodeId,
-        points:[accessPoint, { ...target.point }],
-        length:target.distance,
+        points:target.points,
+        length:target.length,
         sourceEdgeId:null
       });
       externalNodeAliases.set(place.entranceNodeId, accessNodeId);
@@ -422,15 +460,15 @@
     for (const station of mapModel.stations || []) {
       const accessPoint = { x:station.accessX, y:station.accessY };
       const accessNodeId = "station-access:" + station.id;
-      const target = chooseSafeAccessNode(accessPoint, primaryCandidates, mapModel, 1100);
+      const target = chooseSafeAccessPath(accessPoint, primarySegments, mapModel, 1100);
       if (!target) continue;
       addSegment({
         id:"facility-access:station:" + station.id,
         type:"facility-access",
         from:accessNodeId,
         to:target.nodeId,
-        points:[accessPoint, { ...target.point }],
-        length:target.distance,
+        points:target.points,
+        length:target.length,
         sourceEdgeId:null
       });
       externalNodeAliases.set(station.roadNodeId, accessNodeId);
