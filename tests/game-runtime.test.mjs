@@ -99,7 +99,7 @@ test('wardrobe model is loaded before runtime and is normalized in snapshots', (
   assert.match(source, /wardrobe:wardrobeModel\.createWardrobe\(\)/);
   assert.match(source, /wardrobe:wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
   assert.match(source, /state\.wardrobe = wardrobeModel\.normalizeWardrobe\(saved\.wardrobe\)/);
-  assert.match(html, /game\.js\?v=20260929-rail-fares-1/);
+  assert.match(html, /game\.js\?v=20260929-community-clubs-1/);
 });
 
 test('arcade progress is loaded before the game and migrates safely through snapshots', () => {
@@ -823,6 +823,13 @@ test('club members travel through normal pedestrian routes and revalidate the se
   assert.match(begin, /isCitizenClubArrivalValid\(/);
   assert.match(begin, /ped\.money\s*-=?\s*club\.cost/);
   assert.match(begin, /sessionStart\s*\+\s*club\.duration\s*-\s*now/);
+  assert.match(source, /replanCitizenForTest\(npcId\)/);
+});
+
+test('club runtime modules have fresh browser cache keys', () => {
+  assert.match(html, /community-center\.js\?v=20260929-community-clubs-1/);
+  assert.match(html, /social-npc-system\.js\?v=20260929-community-clubs-1/);
+  assert.match(html, /game\.js\?v=20260929-community-clubs-1/);
 });
 
 test('game loads overtake safety before the overtake planner and runtime', () => {

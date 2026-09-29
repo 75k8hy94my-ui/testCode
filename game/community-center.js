@@ -133,11 +133,11 @@
   function getClubAvailability(progress, clubId, day, minute, cash) {
     const session = getClubSession(clubId, day, minute);
     if (!session) return { session:null, available:false, reason:"unknown-club" };
-    if ((session.day - 1) % 7 !== session.club.weekday || !session.accepting) return { session, available:false, reason:"not-open" };
     const normalized = normalizeProgress(progress);
     if (normalized.clubAttendance.some((record) => record.clubId === clubId && record.day === session.day)) {
       return { session, available:false, reason:"already-attended" };
     }
+    if ((session.day - 1) % 7 !== session.club.weekday || !session.accepting) return { session, available:false, reason:"not-open" };
     if (!Number.isFinite(Number(cash)) || Number(cash) < session.club.cost) return { session, available:false, reason:"insufficient-funds" };
     return { session, available:true, reason:null };
   }

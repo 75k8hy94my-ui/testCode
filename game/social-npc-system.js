@@ -46,6 +46,11 @@
   const byId = new Map(catalog.map((profile) => [profile.id, profile]));
   const pairKey = (aId, bId) => [aId, bId].sort().join("|");
   const relationshipByPair = new Map(relationships.map((relationship) => [pairKey(relationship.aId, relationship.bId), relationship]));
+  const clubByMember = new Map([
+    ["aoi", "放課後ボードゲーム会"], ["mei", "放課後ボードゲーム会"], ["haru", "放課後ボードゲーム会"],
+    ["sora", "手しごととお茶の会"], ["yui", "手しごととお茶の会"], ["nana", "手しごととお茶の会"], ["toma", "手しごととお茶の会"],
+    ["ren", "夕方のまち交流会"], ["kaori", "夕方のまち交流会"], ["daichi", "夕方のまち交流会"]
+  ]);
 
   function getConversation({ npcId, minute = 720, day = 1, activityId = "", friendship = 0, relationship = null, recentTopic = null } = {}) {
     const profile = byId.get(npcId);
@@ -53,13 +58,7 @@
     const time = Number.isFinite(minute) ? ((Math.floor(minute) % 1440) + 1440) % 1440 : 720;
     const dayNumber = Number.isFinite(day) ? Math.max(1, Math.floor(day)) : 1;
     const activity = String(activityId || "").toLowerCase();
-    const clubName = activity === "community_club"
-      ? (new Map([
-        ["aoi", "放課後ボードゲーム会"], ["mei", "放課後ボードゲーム会"], ["haru", "放課後ボードゲーム会"],
-        ["sora", "手しごととお茶の会"], ["yui", "手しごととお茶の会"], ["nana", "手しごととお茶の会"], ["toma", "手しごととお茶の会"],
-        ["ren", "夕方のまち交流会"], ["kaori", "夕方のまち交流会"], ["daichi", "夕方のまち交流会"]
-      ])).get(npcId) || "地域サークル"
-      : null;
+    const clubName = activity === "community_club" ? clubByMember.get(npcId) || "地域サークル" : null;
     const busy = /work|shift|study|commute|class/.test(activity);
     const sleeping = /sleep|bed/.test(activity);
     const weekend = ((dayNumber - 1) % 7) >= 5;

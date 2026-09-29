@@ -11912,6 +11912,16 @@
           syncNamedNpcCitizens();
           return true;
         },
+        replanCitizenForTest(npcId) {
+          const citizen = pedestrians.find((item) => item.specialNpcId === npcId);
+          if (!citizen) return false;
+          citizen.currentActivityId = null;
+          citizen.currentActivityLabel = null;
+          citizen.activityMinutesRemaining = 0;
+          citizen.state = "deciding";
+          planCitizenAction(citizen, citizen.currentNodeId || citizen.homeNodeId);
+          return true;
+        },
         eatMealForTest(mealId) {
           return consumePackedMeal(mealId);
         },

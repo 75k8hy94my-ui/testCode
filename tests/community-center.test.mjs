@@ -162,18 +162,33 @@ test('club attendance window includes ten minutes before and after start only', 
   assert.equal(closed.accepting, false);
 });
 
+test('all three weekly clubs use the same exact ten-minute arrival boundary', () => {
+  for (const session of [
+    { id:'board-game', day:3, minute:1110 },
+    { id:'handcraft-tea', day:5, minute:1200 },
+    { id:'neighborhood-mixer', day:1, minute:990 }
+  ]) {
+    assert.equal(communityCenter.getClubSession(session.id, session.day, session.minute - 10).accepting, true);
+    assert.equal(communityCenter.getClubSession(session.id, session.day, session.minute + 10).accepting, true);
+    assert.equal(communityCenter.getClubSession(session.id, session.day, session.minute - 11).accepting, false);
+    assert.equal(communityCenter.getClubSession(session.id, session.day, session.minute + 11).accepting, false);
+  }
+});
+
 test('club fee is checked and attendance is recorded once without changing course records', () => {
   const progress = communityCenter.normalizeProgress({ attendance:[{ courseId:'cooking', day:2 }] });
   const denied = communityCenter.getClubAvailability(progress, 'board-game', 3, 1110, 99);
   const accepted = communityCenter.getClubAvailability(progress, 'board-game', 3, 1110, 100);
   const once = communityCenter.attendClub(progress, accepted.session);
   const twice = communityCenter.attendClub(once, accepted.session);
+  const repeated = communityCenter.getClubAvailability(once, 'board-game', 3, 1170, 1000);
 
   assert.equal(denied.reason, 'insufficient-funds');
   assert.equal(accepted.available, true);
   assert.deepEqual(once.attendance, [{ courseId:'cooking', day:2 }]);
   assert.deepEqual(once.clubAttendance, [{ clubId:'board-game', day:3 }]);
   assert.deepEqual(twice, once);
+  assert.equal(repeated.reason, 'already-attended');
 });
 
 test('only healthy club members can plan a nearby session and arrival rechecks the roster, time and fee', () => {
@@ -190,6 +205,7 @@ test('only healthy club members can plan a nearby session and arrival rechecks t
   assert.equal(communityCenter.getCitizenClubOpportunity(3, 1070, { ...citizen, id:'ren' }), null);
   assert.equal(communityCenter.getCitizenClubOpportunity(3, 1070, { ...citizen, unwell:true }), null);
   assert.equal(communityCenter.getCitizenClubOpportunity(3, 1070, { ...citizen, onShift:true }), null);
+  assert.equal(communityCenter.getCitizenClubOpportunity(3, 1070, { ...citizen, lateNight:true }), null);
   assert.equal(communityCenter.getCitizenClubOpportunity(3, 1070, { ...citizen, money:99 }), null);
   assert.equal(communityCenter.isCitizenClubArrivalValid('board-game', 3990, 'aoi', 3, 1100, 100), true);
   assert.equal(communityCenter.isCitizenClubArrivalValid('board-game', 3990, 'aoi', 3, 1121, 100), false);
