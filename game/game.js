@@ -7819,7 +7819,10 @@
       const requests = pedestrians
         .filter((ped) => ped.state === "walking" || ped.state === "waiting")
         .map((ped) => ({ ped, distance:pedestrianDistanceToCrosswalk(ped, crosswalk.id) }))
-        .filter(({ ped, distance:remaining }) => Number.isFinite(remaining) && remaining <= Math.max(180, ped.speed * 4 + 22))
+        .filter(({ ped, distance:remaining }) =>
+          Number.isFinite(remaining) &&
+          remaining <= Math.max(42, Math.min(64, ped.speed * 1.2))
+        )
         .map(({ ped }) => {
           if (!Number.isFinite(ped.crossingWaitSince)) ped.crossingWaitSince = trafficSimulationClock;
           return { pedestrianId:String(ped.id), requestedAt:ped.crossingWaitSince, ped };
@@ -7857,6 +7860,10 @@
       if (crosswalk.roadEdgeId !== edge.id) continue;
       const claim = crossingClaims.get(crosswalk.id);
       if (!claim) continue;
+      // At signalized crossings, a pedestrian merely waiting for WALK must not
+      // stop green traffic. The traffic signal handles the approach; the shared
+      // crosswalk claim becomes an emergency safety guard only after entry.
+      if (crosswalk.signalized && claim.phase !== "crossing") continue;
       const decision = crossingControl.vehicleYieldDecision(crosswalk, claim, {
         id:car.id,
         edgeId:car.edgeId,
