@@ -38,6 +38,7 @@
     : (callback) => window.setTimeout(() => callback(performance.now()), 16);
 
   const mapModel = globalThis.CityDaysMapModel?.createMapModel?.();
+  const pedestrianNavigation = globalThis.CityDaysPedestrianNavigation;
   const weatherSystem = globalThis.CityDaysWeatherSystem;
   const wardrobeModel = globalThis.CityDaysWardrobe;
   const arcadeGamesModel = globalThis.CityDaysArcadeGames;
@@ -183,6 +184,16 @@
     return;
   }
 
+  const crossingControl = globalThis.CityDaysCrossingControl;
+  const vehicleTrajectory = globalThis.CityDaysVehicleTrajectory;
+  if (!vehicleTrajectory?.createJunctionCurve || !vehicleTrajectory?.poseAt || !vehicleTrajectory?.withLateralVelocity || !vehicleTrajectory?.smoothstep) {
+    throw new Error("Vehicle trajectory model must load before game.js");
+  }
+  if (!crossingControl?.assessPedestrian || !crossingControl?.vehicleYieldDecision || !crossingControl?.arbitrateClaims) {
+    showRuntimeError("CrossingControl を読み込めません。");
+    return;
+  }
+
   const railTransitModel = globalThis.CityDaysRailTransit;
   if (!railTransitModel?.createProgress || !railTransitModel?.normalizeProgress || !railTransitModel?.listOptions || !railTransitModel?.buySingle || !railTransitModel?.buyDayPass || !railTransitModel?.board) {
     showRuntimeError("RailTransit を読み込めません。");
@@ -204,6 +215,7 @@
   const actionDescription = document.getElementById("actionDescription");
   const actionChoices = document.getElementById("actionChoices");
   const actionClose = document.getElementById("actionClose");
+  let conversationCitizenId = null;
   const arcadePanel = document.getElementById("arcadePanel");
   const arcadeCanvas = document.getElementById("arcadeCanvas");
   const arcadeCtx = arcadeCanvas?.getContext("2d");
@@ -278,6 +290,7 @@
   const VEHICLE_COLLISION_SCALE = 0.9;
   const WALK_SPEED = 34;
   const RUN_SPEED = 62;
+  const HOME_MOVEMENT_SPEED_MULTIPLIER = 1.2;
   const SPEED_TO_KMH = 0.16;
   const SIGNAL_CYCLE = 20;
   const PEDESTRIAN_FLASH_SECONDS = 2;
@@ -331,6 +344,7 @@
   const keys = new Set();
   const buildings = [];
   const traffic = [];
+  const crossingClaims = new Map();
   const junctionReservations = new Map();
   let trafficSimulationClock = 0;
   const pedestrians = [];
@@ -808,33 +822,18 @@
   const LIBRARY = PLACES.find((place) => place.id === "library");
   const SPECIAL_BLOCKS = new Set(PLACES.map((place) => place.gx + "," + place.gy));
 
-  const HOME_INTERIOR = { width:780, height:500 };
-  const HOME_FIXTURES = [
-    { id:"bed", label:"ベッド", x:62, y:60, w:190, h:112, interactX:260, interactY:125, range:72 },
-    { id:"shower", label:"シャワー", x:70, y:318, w:118, h:118, interactX:208, interactY:372, range:68 },
-    { id:"kitchen", label:"キッチン", x:510, y:55, w:205, h:82, interactX:505, interactY:153, range:78 },
-    { id:"worktable", label:"作業机", x:176, y:194, w:104, h:62, interactX:228, interactY:268, range:70 },
-    { id:"closet", label:"クローゼット", x:42, y:182, w:112, h:78, interactX:140, interactY:278, range:58 },
-    { id:"pet", label:"ペット", x:530, y:188, w:132, h:74, interactX:474, interactY:232, range:72 },
-    { id:"sofa", label:"ソファ", x:510, y:330, w:205, h:74, interactX:500, interactY:365, range:74 },
-    { id:"tv", label:"テレビ", x:520, y:392, w:155, h:70, interactX:475, interactY:425, range:72 },
-    { id:"exit", label:"玄関", x:356, y:455, w:68, h:25, interactX:390, interactY:438, range:62 }
-  ];
-  const HOME_OBSTACLES = [
-    ...HOME_FIXTURES.filter((fixture) => fixture.id !== "exit").map((fixture) => ({
-      x:fixture.x,
-      y:fixture.y,
-      w:fixture.w,
-      h:fixture.h
-    })),
-    { x:326, y:88, w:128, h:78 },
-    { x:294, y:276, w:168, h:82 }
-  ];
+  const homeFixturesModel = globalThis.CityDaysHomeFixtures;
+  if (!homeFixturesModel?.ROOM || !homeFixturesModel?.FIXTURES || !homeFixturesModel?.collidesCircle) {
+    throw new Error("Home fixture geometry must load before game.js");
+  }
+  const HOME_INTERIOR = homeFixturesModel.ROOM;
+  const HOME_FIXTURES = homeFixturesModel.FIXTURES;
+  const HOME_OBSTACLES = homeFixturesModel.ALL_COLLIDERS.map(homeFixturesModel.collisionBounds);
   const HOME_FURNITURE_LAYOUT = {
     width:HOME_INTERIOR.width,
     height:HOME_INTERIOR.height,
     cellSize:20,
-    wallMargin:28,
+    wallMargin:HOME_INTERIOR.playerMargin,
     playerRadius:PLAYER_RADIUS,
     entry:{ x:HOME_INTERIOR.width / 2, y:HOME_INTERIOR.height - 76 },
     entryCorridor:{ x:338, y:404, w:104, h:90 },
@@ -1216,6 +1215,7 @@
       inTrain: false,
       trainId: null,
       inHome: false,
+      motion:{ moving:false, running:false },
       homeX: HOME_INTERIOR.width / 2,
       homeY: HOME_INTERIOR.height - 76,
       outdoorHomeX: HOME.x,
@@ -1494,13 +1494,25 @@
 
   function collidesBuilding(x, y, radius) {
     for (const building of buildings) {
+      const frontage = building.frontageGeometry;
+      if (frontage) {
+        const dx = x - (building.x + building.w / 2);
+        const dy = y - (building.y + building.h / 2);
+        const localX = dx * frontage.tangent.x + dy * frontage.tangent.y;
+        const localY = dx * frontage.normal.x + dy * frontage.normal.y;
+        const nearestX = clamp(localX, -building.w / 2, building.w / 2);
+        const nearestY = clamp(localY, -building.h / 2, building.h / 2);
+        if (Math.hypot(localX - nearestX, localY - nearestY) < radius) return true;
+        continue;
+      }
+      const bounds = building.collisionBounds || building;
       if (
-        x + radius < building.x ||
-        y + radius < building.y ||
-        x - radius > building.x + building.w ||
-        y - radius > building.y + building.h
+        x + radius < bounds.x ||
+        y + radius < bounds.y ||
+        x - radius > bounds.x + bounds.w ||
+        y - radius > bounds.y + bounds.h
       ) continue;
-      if (circleRectCollision(x, y, radius, building)) return true;
+      if (circleRectCollision(x, y, radius, bounds)) return true;
     }
     for (const place of PLACES) {
       const facility = placeBuildingRect(place);
@@ -1713,6 +1725,7 @@
     for (const site of mapModel.buildingSites || []) {
       buildings.push({
         ...site,
+        collisionBounds:site.collisionBounds || { x:site.x,y:site.y,w:site.w,h:site.h },
         tint:.76 + hash2(Math.floor(site.x), Math.floor(site.y), 91) * .18,
         palette:Number.isFinite(site.palette) ? site.palette : Math.floor(hash2(Math.floor(site.x), Math.floor(site.y), 407) * VISUAL_PALETTES.length),
         floors:Math.max(1, Math.floor(site.floors || 1)),
@@ -1751,19 +1764,93 @@
     return { point: { ...last }, tangent: { x: (last.x - before.x) / magnitude, y: (last.y - before.y) / magnitude } };
   }
 
+  const junctionTrajectoryCache = new Map();
+
+  function directedTrafficLanePose(edge, directionSign, distanceFromStart, laneOffset) {
+    const edgeLength = polylineLength(edge.points);
+    const forwardDistance = directionSign > 0 ? distanceFromStart : edgeLength - distanceFromStart;
+    const hit = pointAndTangentOnPolyline(edge.points, forwardDistance);
+    const tangent = directionSign > 0 ? hit.tangent : { x:-hit.tangent.x, y:-hit.tangent.y };
+    return {
+      point:{ x:hit.point.x + tangent.y * laneOffset, y:hit.point.y - tangent.x * laneOffset },
+      tangent
+    };
+  }
+
+  function trafficTurnCurve(car, along) {
+    const edge = mapModel.getEdge(car.edgeId);
+    if (!edge) return null;
+    const edgeLength = car.edgeLength || polylineLength(edge.points);
+    const distanceToNode = car.directionSign > 0 ? edgeLength - along : along;
+    const distanceFromStart = car.directionSign > 0 ? along : edgeLength - along;
+    let incoming;
+    let incomingSign;
+    let outgoing;
+    let outgoingSign;
+    let before;
+    let after;
+    const window = 76;
+
+    if (distanceToNode <= window) {
+      const next = mapModel.getEdge(car.routeEdgeIds?.[car.routeIndex]);
+      const nodeId = car.directionSign > 0 ? edge.to : edge.from;
+      if (!next || (next.from !== nodeId && next.to !== nodeId)) return null;
+      incoming = edge;
+      incomingSign = car.directionSign;
+      outgoing = next;
+      outgoingSign = next.from === nodeId ? 1 : -1;
+      before = window - distanceToNode;
+      after = 0;
+    } else if (distanceFromStart <= window && car.routeIndex > 0) {
+      const previous = mapModel.getEdge(car.routeEdgeIds?.[car.routeIndex - 1]);
+      const nodeId = car.directionSign > 0 ? edge.from : edge.to;
+      if (!previous || (previous.from !== nodeId && previous.to !== nodeId)) return null;
+      incoming = previous;
+      incomingSign = previous.to === nodeId ? 1 : -1;
+      outgoing = edge;
+      outgoingSign = car.directionSign;
+      before = window;
+      after = distanceFromStart;
+    } else return null;
+
+    const incomingTangent = directedTrafficLanePose(incoming, incomingSign,
+      polylineLength(incoming.points) - window,
+      trafficLaneOffsetForEdge(incoming, Boolean(car.secondaryLane)));
+    const outgoingTangent = directedTrafficLanePose(outgoing, outgoingSign,
+      window,
+      trafficLaneOffsetForEdge(outgoing, Boolean(car.secondaryLane)));
+    const key = [incoming.id,incomingSign,outgoing.id,outgoingSign,
+      Math.round(incomingTangent.point.x),Math.round(incomingTangent.point.y),
+      Math.round(outgoingTangent.point.x),Math.round(outgoingTangent.point.y)].join(":");
+    let curve = junctionTrajectoryCache.get(key);
+    if (!curve) {
+      curve = vehicleTrajectory.createJunctionCurve(incomingTangent, outgoingTangent, window);
+      junctionTrajectoryCache.set(key, curve);
+      if (junctionTrajectoryCache.size > 96) junctionTrajectoryCache.delete(junctionTrajectoryCache.keys().next().value);
+    }
+    const progress = clamp((before + after) / (window * 2), 0, 1);
+    return vehicleTrajectory.poseAt(curve, progress);
+  }
+
   function trafficPoseAt(car, along = car.along) {
     if (car.edgeId) {
       const edge = mapModel.getEdge(car.edgeId);
       if (edge) {
+        const turnPose = trafficTurnCurve(car, along);
+        if (turnPose) {
+          const physical = vehicleTrajectory.withLateralVelocity(turnPose, car.speed, car.directionSign > 0 ? car.lateralVelocity : -car.lateralVelocity);
+          return { x:physical.x, y:physical.y, angle:Math.atan2(physical.tangent.y, physical.tangent.x) };
+        }
         const hit = pointAndTangentOnPolyline(edge.points, along);
         const directionSign = car.directionSign || 1;
         const tangent = directionSign > 0 ? hit.tangent : { x: -hit.tangent.x, y: -hit.tangent.y };
         const nx = tangent.y;
         const ny = -tangent.x;
+        const pose = vehicleTrajectory.withLateralVelocity({ x:hit.point.x + nx * car.laneOffset, y:hit.point.y + ny * car.laneOffset, tangent }, car.speed, car.directionSign > 0 ? car.lateralVelocity : -car.lateralVelocity);
         return {
-          x: hit.point.x + nx * car.laneOffset,
-          y: hit.point.y + ny * car.laneOffset,
-          angle: Math.atan2(tangent.y, tangent.x)
+          x:pose.x,
+          y:pose.y,
+          angle:Math.atan2(pose.tangent.y, pose.tangent.x)
         };
       }
     }
@@ -1785,10 +1872,12 @@
     const ny = -tx;
     const baseAngle = Math.atan2(ty, tx);
 
+    const tangent = car.directionSign > 0 ? { x:tx,y:ty } : { x:-tx,y:-ty };
+    const pose = vehicleTrajectory.withLateralVelocity({ x:center.x + nx * car.laneOffset, y:center.y + ny * car.laneOffset, tangent }, car.speed, car.directionSign > 0 ? car.lateralVelocity : -car.lateralVelocity);
     return {
-      x:center.x + nx * car.laneOffset,
-      y:center.y + ny * car.laneOffset,
-      angle:car.directionSign > 0 ? baseAngle : angleWrap(baseAngle + Math.PI)
+      x:pose.x,
+      y:pose.y,
+      angle:Math.atan2(pose.tangent.y, pose.tangent.x)
     };
   }
 
@@ -2458,8 +2547,8 @@
   }
 
   function buildPedestrianPlan(ped, startNodeId, goalNodeId) {
-    const route = mapModel.findRoute(startNodeId, goalNodeId, { mode:"pedestrian" });
-    if (!route || !route.edgeIds.length) return false;
+    const route = pedestrianNavigation?.findRoute(mapModel.pedestrianNavigation, startNodeId, goalNodeId);
+    if (!route || !route.segmentIds.length) return false;
 
     const previousState = ped.state;
     const previousPose = (
@@ -2471,23 +2560,24 @@
       ? { x:ped.x, y:ped.y, angle:Number.isFinite(ped.dir) ? ped.dir : 0 }
       : null;
 
-    ped.routeEdgeIds = route.edgeIds;
+    ped.routeSegmentIds = route.segmentIds;
+    ped.routeEdgeIds = route.segmentIds
+      .map((id) => mapModel.pedestrianNavigation.segmentsById.get(id)?.sourceEdgeId)
+      .filter(Boolean);
     ped.routeIndex = 0;
     ped.targetNodeId = goalNodeId;
-    ped.edgeId = route.edgeIds[0];
-    const firstEdge = mapModel.getEdge(ped.edgeId);
-    if (!firstEdge) return false;
-    ped.directionSign = firstEdge.from === startNodeId ? 1 : -1;
-    ped.edgeLength = polylineLength(firstEdge.points);
-    ped.along = ped.directionSign > 0 ? 0 : ped.edgeLength;
+    ped.segmentId = route.segmentIds[0];
+    const firstSegment = mapModel.pedestrianNavigation.segmentsById.get(ped.segmentId);
+    if (!firstSegment) return false;
+    ped.segmentDirection = firstSegment.from === startNodeId ? 1 : -1;
+    ped.segmentAlong = ped.segmentDirection > 0 ? 0 : firstSegment.length;
+    ped.segmentType = firstSegment.type;
+    ped.edgeId = firstSegment.sourceEdgeId || null;
+    ped.edgeLength = firstSegment.length;
+    ped.directionSign = ped.segmentDirection;
+    ped.along = ped.segmentAlong;
 
-    const firstPose = pedestrianEdgePose(
-      firstEdge,
-      ped.directionSign,
-      ped.along,
-      ped.sideSign,
-      ped.avoidanceOffset
-    );
+    const firstPose = pedestrianSegmentPose(firstSegment, ped.segmentDirection, ped.segmentAlong);
     ped.junctionTransition = previousPose
       ? makePedestrianTransition(previousPose, firstPose)
       : null;
@@ -2874,6 +2964,9 @@
   }
 
   function pedestrianPoseAt(ped) {
+    if (ped.migrationTransition && ped.junctionTransition) return pedestrianTransitionPose(ped.junctionTransition);
+    const segment = ped.segmentId && mapModel.pedestrianNavigation.segmentsById.get(ped.segmentId);
+    if (segment) return pedestrianSegmentPose(segment, ped.segmentDirection, ped.segmentAlong);
     if (ped.junctionTransition) return pedestrianTransitionPose(ped.junctionTransition);
     const edge = mapModel.getEdge(ped.edgeId);
     if (!edge) return { x:ped.x, y:ped.y, angle:ped.dir };
@@ -2886,7 +2979,33 @@
     );
   }
 
+  function pedestrianSegmentPose(segment, directionSign = 1, along = 0) {
+    if (!segment?.points?.length) return null;
+    const length = Math.max(0, segment.length || 0);
+    const distanceAlong = clamp(Number(along) || 0, 0, length);
+    const points = segment.points;
+    const sampleDistance = directionSign < 0 ? length - distanceAlong : distanceAlong;
+    let remaining = sampleDistance;
+    let point = points.at(-1);
+    let tangent = { x:1, y:0 };
+    for (let index = 1; index < points.length; index += 1) {
+      const from = points[index - 1];
+      const to = points[index];
+      const span = distance(from.x, from.y, to.x, to.y);
+      if (remaining <= span || index === points.length - 1) {
+        const progress = span > .001 ? clamp(remaining / span, 0, 1) : 1;
+        point = { x:from.x + (to.x - from.x) * progress, y:from.y + (to.y - from.y) * progress };
+        tangent = span > .001 ? { x:(to.x - from.x) / span, y:(to.y - from.y) / span } : tangent;
+        break;
+      }
+      remaining -= span;
+    }
+    if (directionSign < 0) tangent = { x:-tangent.x, y:-tangent.y };
+    return { x:point.x, y:point.y, angle:Math.atan2(tangent.y, tangent.x) };
+  }
+
   function pedestrianSignalState(ped) {
+    if (ped.segmentId) return null;
     // Once a pedestrian has entered the junction connector, never stop them
     // mid-corner because the signal changed for the next edge.
     if (ped.junctionTransition) return null;
@@ -2913,6 +3032,16 @@
   }
 
   function citizenRemainingRouteDistance(ped) {
+    if (Array.isArray(ped.routeSegmentIds) && ped.routeSegmentIds.length) {
+      let remaining = 0;
+      const current = mapModel.pedestrianNavigation.segmentsById.get(ped.segmentId);
+      if (current) remaining += ped.segmentDirection > 0 ? current.length - ped.segmentAlong : ped.segmentAlong;
+      for (let index = ped.routeIndex + 1; index < ped.routeSegmentIds.length; index += 1) {
+        const segment = mapModel.pedestrianNavigation.segmentsById.get(ped.routeSegmentIds[index]);
+        if (segment) remaining += segment.length;
+      }
+      return Math.max(0, remaining);
+    }
     const edge = mapModel.getEdge(ped.edgeId);
     if (!edge) return 0;
     let remaining = ped.directionSign > 0 ? ped.edgeLength - ped.along : ped.along;
@@ -2927,6 +3056,100 @@
   }
 
   function moveCitizenAlongRoute(ped, distanceUnits) {
+    if (Array.isArray(ped.routeSegmentIds) && ped.routeSegmentIds.length) {
+      let remaining = Math.max(0, distanceUnits);
+      let transitions = 0;
+      if (ped.migrationTransition && ped.junctionTransition && remaining > .001) {
+        const transition = ped.junctionTransition;
+        const step = Math.min(remaining, Math.max(0, transition.length - transition.progress));
+        transition.progress += step;
+        remaining -= step;
+        if (transition.progress < transition.length - .001) {
+          const pose = pedestrianTransitionPose(transition);
+          ped.x = pose.x;
+          ped.y = pose.y;
+          ped.dir = pose.angle;
+          return false;
+        }
+        ped.junctionTransition = null;
+        ped.migrationTransition = false;
+      }
+      while (remaining > .001 && transitions < 40) {
+        const segment = mapModel.pedestrianNavigation.segmentsById.get(ped.segmentId);
+        if (!segment) {
+          ped.state = "waiting";
+          return false;
+        }
+        const segmentDistance = ped.segmentDirection > 0 ? segment.length - ped.segmentAlong : ped.segmentAlong;
+        if (segmentDistance > .001 && remaining < segmentDistance) {
+          ped.segmentAlong = clamp(ped.segmentAlong + ped.segmentDirection * remaining, 0, segment.length);
+          remaining = 0;
+          break;
+        }
+        remaining = Math.max(0, remaining - segmentDistance);
+        ped.segmentAlong = ped.segmentDirection > 0 ? segment.length : 0;
+        const currentNodeId = ped.segmentDirection > 0 ? segment.to : segment.from;
+        ped.currentNodeId = currentNodeId;
+        const nextId = ped.routeSegmentIds[ped.routeIndex + 1];
+        if (!nextId) {
+          const pose = pedestrianPoseAt(ped);
+          ped.x = pose.x;
+          ped.y = pose.y;
+          ped.dir = pose.angle;
+          if (ped.socialActivityRequest && citizenSocialActivityFromRequest(ped)) {
+            planCitizenAction(ped, currentNodeId);
+            return true;
+          }
+          beginCitizenActivity(ped, ped.pendingActivity);
+          return true;
+        }
+
+        const next = mapModel.pedestrianNavigation.segmentsById.get(nextId);
+        if (!next || (next.from !== currentNodeId && next.to !== currentNodeId)) {
+          ped.routeSegmentIds = [];
+          ped.segmentId = null;
+          ped.state = "waiting";
+          return false;
+        }
+        if (next.type === "crosswalk") {
+          const claim = crossingClaims.get(next.crosswalkId || next.id);
+          if (claim?.phase !== "crossing" || !claim.pedestrianIds?.includes(String(ped.id))) {
+            ped.state = "waiting";
+            ped.waitTimer = Math.min(1.2, (ped.waitTimer || 0) + .08);
+            const pose = pedestrianPoseAt(ped);
+            ped.x = pose.x;
+            ped.y = pose.y;
+            ped.dir = pose.angle;
+            return false;
+          }
+          ped.activeCrossingId = next.crosswalkId || next.id;
+        } else if (segment.type === "crosswalk") {
+          ped.activeCrossingId = null;
+          ped.crossingWaitSince = null;
+        }
+        ped.routeIndex += 1;
+        ped.segmentId = next.id;
+        ped.segmentDirection = next.from === currentNodeId ? 1 : -1;
+        ped.segmentAlong = ped.segmentDirection > 0 ? 0 : next.length;
+        ped.segmentType = next.type;
+        ped.edgeId = next.sourceEdgeId || null;
+        ped.edgeLength = next.length;
+        ped.directionSign = ped.segmentDirection;
+        ped.along = ped.segmentAlong;
+        ped.junctionTransition = null;
+        transitions += 1;
+      }
+      if (ped.state === "walking" || ped.state === "waiting") {
+        const pose = pedestrianPoseAt(ped);
+        if (pose) {
+          ped.x = pose.x;
+          ped.y = pose.y;
+          ped.dir = pose.angle;
+        }
+      }
+      return false;
+    }
+
     let remaining = Math.max(0, distanceUnits);
     let transitions = 0;
     while (remaining > .001 && transitions < 20) {
@@ -3064,6 +3287,11 @@
         },
         stress:8 + hash2(i, 193, 1719) * 48,
         routeEdgeIds:[],
+        routeSegmentIds:[],
+        segmentId:null,
+        segmentDirection:1,
+        segmentAlong:0,
+        segmentType:null,
         routeIndex:0,
         tripCount:0,
         decisionCount:0,
@@ -3095,11 +3323,13 @@
       planCitizenAction(ped, spawnNodeId);
 
       if (ped.state === "walking") {
+        const segment = mapModel.pedestrianNavigation.segmentsById.get(ped.segmentId);
         const initialAlong = profile.specialNpcId
           ? 0
-          : Math.min(ped.edgeLength * (.04 + hash2(i, 197, 1720) * .28), Math.max(1, ped.edgeLength - 1));
-        ped.along = ped.directionSign > 0 ? initialAlong : Math.max(0, ped.edgeLength - initialAlong);
-        ped.along = pedestrianSpawnSpacing(ped.edgeId, ped.edgeLength, ped.along);
+          : Math.min(segment.length * (.04 + hash2(i, 197, 1720) * .28), Math.max(1, segment.length - 1));
+        ped.segmentAlong = ped.segmentDirection > 0 ? initialAlong : Math.max(0, segment.length - initialAlong);
+        ped.along = ped.segmentAlong;
+        ped.edgeLength = segment.length;
         const pose = pedestrianPoseAt(ped);
         ped.x = pose.x;
         ped.y = pose.y;
@@ -3875,6 +4105,7 @@
   }
 
   function openDrivingMenu() {
+    conversationCitizenId = null;
     actionTitle.textContent = "カーナビ";
     actionDescription.textContent = "目的地を選ぶとルートは自動で設定されます。運転中は速度だけを操作します。";
     actionChoices.replaceChildren();
@@ -3991,6 +4222,7 @@
 
   function closeActionSheet() {
     actionSheet.hidden = true;
+    conversationCitizenId = null;
     actionChoices.replaceChildren();
     requestAnimationFrame(focusGameCanvas);
   }
@@ -4411,7 +4643,7 @@
   }
 
   function canHomeOccupy(x, y, radius = PLAYER_RADIUS) {
-    const wall = 28;
+    const wall = HOME_INTERIOR.playerMargin;
     if (
       x - radius < wall ||
       y - radius < wall ||
@@ -4419,9 +4651,7 @@
       y + radius > HOME_INTERIOR.height - wall
     ) return false;
 
-    for (const obstacle of HOME_OBSTACLES) {
-      if (circleRectCollision(x, y, radius, obstacle)) return false;
-    }
+    if (homeFixturesModel.collidesCircle(x, y, radius)) return false;
     for (const placement of state.homeFurniture.placements) {
       if (placement.placementId === furniturePlacementState?.placementId) continue;
       const rect = homeFurnitureModel.getFootprint(placement, HOME_FURNITURE_LAYOUT);
@@ -4431,6 +4661,7 @@
   }
 
   function enterHome() {
+    conversationCitizenId = null;
     if (state.player.inVehicle || state.player.inTrain) return;
     if (state.petWalk.active) {
       if (distance(state.player.x, state.player.y, state.petWalk.petX, state.petWalk.petY) > 90) {
@@ -4505,10 +4736,9 @@
   }
 
   function updatePlayerAtHome(dt) {
-    if (furniturePlacementState) {
-      updateFurniturePlacement(dt);
-      return;
-    }
+    if (furniturePlacementState) return;
+    const previousX = state.player.homeX;
+    const previousY = state.player.homeY;
     let x = 0;
     let y = 0;
     const running = touch.run || keys.has("shift");
@@ -4524,17 +4754,22 @@
     }
 
     const mag = Math.hypot(x, y);
-    if (mag <= .02) return;
+    if (mag <= .02) {
+      state.player.motion = { moving:false, running:false };
+      return;
+    }
     x /= Math.max(1, mag);
     y /= Math.max(1, mag);
     state.player.facingX = x;
     state.player.facingY = y;
 
-    const speed = running ? RUN_SPEED * 1.08 : WALK_SPEED * 1.18;
+    const speed = (running ? RUN_SPEED : WALK_SPEED) * HOME_MOVEMENT_SPEED_MULTIPLIER;
     const nx = state.player.homeX + x * speed * dt;
     const ny = state.player.homeY + y * speed * dt;
     if (canHomeOccupy(nx, state.player.homeY)) state.player.homeX = nx;
     if (canHomeOccupy(state.player.homeX, ny)) state.player.homeY = ny;
+    const moved = distance(previousX, previousY, state.player.homeX, state.player.homeY) > .02;
+    state.player.motion = { moving:moved, running:moved && running };
   }
 
   function nearestHomeInteraction() {
@@ -4829,6 +5064,7 @@
   }
 
   function openHomeFixture(fixture) {
+    conversationCitizenId = null;
     if (!fixture) return;
     if (fixture.id === "exit") {
       exitHome();
@@ -4978,6 +5214,7 @@
   }
 
   function openPlace(place) {
+    conversationCitizenId = null;
     actionTitle.textContent = place.name;
     actionChoices.replaceChildren();
 
@@ -5671,6 +5908,7 @@
   }
 
   function openCitizen(ped) {
+    conversationCitizenId = ped?.id || null;
     actionTitle.textContent = ped.name;
     actionDescription.textContent =
       citizenStatusText(ped) +
@@ -5782,6 +6020,7 @@
 
   function openNpc(npc) {
     const citizen = pedestrians.find((ped) => ped.id === npc.citizenId || ped.specialNpcId === npc.id);
+    conversationCitizenId = citizen?.id || null;
     const relationship = npcRelationshipContext(npc.id);
     const conversation = socialNpcSystem.getConversation({
       npcId:npc.id,
@@ -5835,6 +6074,7 @@
 
 
   function openStation(station, train) {
+    conversationCitizenId = null;
     if (!station) return;
     train = train || stoppedTrainAtStation(station);
     actionTitle.textContent = station.name;
@@ -5959,6 +6199,7 @@
   }
 
   function enterCar() {
+    conversationCitizenId = null;
     if (state.petWalk.active) {
       showToast("散歩中は犬と一緒に帰宅してから乗車してください");
       return;
@@ -6071,7 +6312,6 @@
     const item = nearestInteraction();
     if (!item) {
       if (state.player.inTrain) showToast("駅に停車してから降りられます");
-      else showToast("近くに利用できるものはありません");
       return;
     }
 
@@ -6193,6 +6433,11 @@
           targetNodeId:ped.targetNodeId,
           targetPlaceId:ped.targetPlaceId,
           pendingActivity:ped.pendingActivity ? { ...ped.pendingActivity } : null,
+          routeSegmentIds:Array.isArray(ped.routeSegmentIds) ? [...ped.routeSegmentIds] : [],
+          segmentId:ped.segmentId || null,
+          segmentType:ped.segmentType || null,
+          segmentDirection:ped.segmentDirection,
+          segmentAlong:ped.segmentAlong,
           edgeId:ped.edgeId,
           edgeLength:ped.edgeLength,
           directionSign:ped.directionSign,
@@ -6313,6 +6558,40 @@
       return;
     }
 
+    const currentSegment = typeof stored.segmentId === "string"
+      ? mapModel.pedestrianNavigation.segmentsById.get(stored.segmentId)
+      : null;
+    const routeSegmentIds = Array.isArray(stored.routeSegmentIds)
+      ? stored.routeSegmentIds.filter((id) => mapModel.pedestrianNavigation.segmentsById.has(id))
+      : [];
+    const savedRouteIndex = clamp(Math.floor(Number(stored.routeIndex) || 0), 0, Math.max(0, routeSegmentIds.length - 1));
+    const routeIsConnected = routeSegmentIds.every((id, index) => {
+      const segment = mapModel.pedestrianNavigation.segmentsById.get(id);
+      const next = mapModel.pedestrianNavigation.segmentsById.get(routeSegmentIds[index + 1]);
+      return segment && (!next || segment.from === next.from || segment.from === next.to || segment.to === next.from || segment.to === next.to);
+    });
+    const routeSegmentsValid = currentSegment && routeSegmentIds[savedRouteIndex] === currentSegment.id &&
+      routeSegmentIds.length > 0 && routeSegmentIds.length === (stored.routeSegmentIds?.length || 0) && routeIsConnected;
+    if (routeSegmentsValid) {
+      ped.state = savedState === "waiting" ? "waiting" : "walking";
+      ped.visible = true;
+      ped.routeSegmentIds = routeSegmentIds;
+      ped.routeIndex = savedRouteIndex;
+      ped.segmentId = currentSegment.id;
+      ped.segmentType = currentSegment.type;
+      ped.segmentDirection = Number(stored.segmentDirection) < 0 ? -1 : 1;
+      ped.segmentAlong = clamp(Number(stored.segmentAlong) || 0, 0, currentSegment.length);
+      ped.edgeId = currentSegment.sourceEdgeId || null;
+      ped.edgeLength = currentSegment.length;
+      ped.directionSign = ped.segmentDirection;
+      ped.along = ped.segmentAlong;
+      const pose = pedestrianPoseAt(ped);
+      ped.x = pose.x;
+      ped.y = pose.y;
+      ped.dir = pose.angle;
+      return;
+    }
+
     const edge = typeof stored.edgeId === "string" ? mapModel.getEdge(stored.edgeId) : null;
     const routeEdgeIds = Array.isArray(stored.routeEdgeIds)
       ? stored.routeEdgeIds.filter((edgeId) => typeof edgeId === "string" && mapModel.getEdge(edgeId))
@@ -6320,19 +6599,33 @@
     const routeValid = edge && routeEdgeIds.length && routeEdgeIds.length === (stored.routeEdgeIds?.length || 0);
 
     if (routeValid) {
-      ped.state = savedState === "waiting" ? "waiting" : "walking";
-      ped.visible = true;
-      ped.routeEdgeIds = routeEdgeIds;
-      ped.routeIndex = clamp(Math.floor(Number(stored.routeIndex) || 0), 0, routeEdgeIds.length - 1);
-      ped.edgeId = edge.id;
-      ped.edgeLength = polylineLength(edge.points);
-      ped.directionSign = Number(stored.directionSign) < 0 ? -1 : 1;
-      ped.along = clamp(Number(stored.along) || 0, 0, ped.edgeLength);
-      const pose = pedestrianPoseAt(ped);
-      ped.x = pose.x;
-      ped.y = pose.y;
-      ped.dir = pose.angle;
-      return;
+      const savedX = Number(stored.x);
+      const savedY = Number(stored.y);
+      if (Number.isFinite(savedX) && Number.isFinite(savedY) && canStand(savedX, savedY, NPC_COLLISION_RADIUS)) {
+        // Legacy saves keep their exact world pose, then replan onto the typed
+        // graph through a short animated connector instead of snapping to a
+        // vehicle-edge centerline or trusting stale edge IDs.
+        ped.x = savedX;
+        ped.y = savedY;
+        ped.dir = Number.isFinite(Number(stored.dir)) ? Number(stored.dir) : 0;
+        ped.state = "walking";
+        ped.visible = true;
+        ped.segmentId = null;
+        ped.routeSegmentIds = [];
+        ped.migrationTransition = false;
+        ped.edgeId = edge.id;
+        if (buildPedestrianPlan(ped, savedCurrentNode, savedTargetNode)) {
+          ped.migrationTransition = Boolean(ped.junctionTransition);
+          return;
+        }
+        ped.segmentId = null;
+        ped.routeSegmentIds = [];
+        ped.state = "waiting";
+        ped.x = savedX;
+        ped.y = savedY;
+        ped.dir = Number.isFinite(Number(stored.dir)) ? Number(stored.dir) : 0;
+        return;
+      }
     }
 
     ped.state = "deciding";
@@ -6488,6 +6781,8 @@
   }
 
   function updatePlayerOnFoot(dt) {
+    const previousX = state.player.x;
+    const previousY = state.player.y;
     let x = 0;
     let y = 0;
     let running = touch.run || keys.has("shift");
@@ -6524,6 +6819,8 @@
         state.needs.hygiene -= dt * 0.12;
       }
     }
+    const moved = distance(previousX, previousY, state.player.x, state.player.y) > .02;
+    state.player.motion = { moving:moved, running:moved && running };
   }
 
   function updateCar(dt) {
@@ -6752,6 +7049,7 @@
       edgeLength:car.edgeLength,
       directionSign:car.directionSign,
       laneOffset:car.laneOffset,
+      lateralVelocity:car.lateralVelocity || 0,
       overtakePlan:car.overtakePlan ? { ...car.overtakePlan } : null,
       along:car.along,
       routeEdgeIds:Array.isArray(car.routeEdgeIds) ? [...car.routeEdgeIds] : [],
@@ -6769,6 +7067,7 @@
     car.edgeLength = snapshot.edgeLength;
     car.directionSign = snapshot.directionSign;
     car.laneOffset = snapshot.laneOffset;
+    car.lateralVelocity = snapshot.lateralVelocity;
     car.overtakePlan = snapshot.overtakePlan ? { ...snapshot.overtakePlan } : null;
     car.along = snapshot.along;
     car.routeEdgeIds = [...snapshot.routeEdgeIds];
@@ -6814,11 +7113,17 @@
       if (!best || centerDistance < best.distance) best = { car:other, distance:centerDistance };
     };
 
-    // Same edge first.
+    // Same-edge following is projected from the cars' physical poses, so a
+    // vehicle changing lanes or traversing a junction curve stays in the
+    // correct collision/following corridor.
     for (const other of traffic) {
       if (other === car || other.edgeId !== car.edgeId || other.directionSign !== car.directionSign) continue;
-      if (Math.abs((other.laneOffset || 0) - (car.laneOffset || 0)) > 20) continue;
-      choose(other, (other.along - car.along) * car.directionSign);
+      const dx = other.x - car.x;
+      const dy = other.y - car.y;
+      const forward = dx * Math.cos(car.angle) + dy * Math.sin(car.angle);
+      const lateral = Math.abs(dx * -Math.sin(car.angle) + dy * Math.cos(car.angle));
+      const laneCorridor = (vehicleDimensions(car).width + vehicleDimensions(other).width) * .5 + 12;
+      if (lateral <= laneCorridor) choose(other, forward);
     }
 
     // Then follow the actual route across several short/curved edges. The old
@@ -6921,6 +7226,26 @@
     return null;
   }
 
+  function trafficAlongForPosition(edge, x, y) {
+    if (!edge) return { along:0, distance:Infinity };
+    let accumulated = 0;
+    let best = { along:0, distance:Infinity };
+    for (let index = 1; index < edge.points.length; index += 1) {
+      const a = edge.points[index - 1];
+      const b = edge.points[index];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const segmentLength = Math.hypot(dx, dy);
+      const t = segmentLength ? clamp(((x - a.x) * dx + (y - a.y) * dy) / (segmentLength * segmentLength), 0, 1) : 0;
+      const px = a.x + dx * t;
+      const py = a.y + dy * t;
+      const gap = distance(x, y, px, py);
+      if (gap < best.distance) best = { along:accumulated + segmentLength * t, distance:gap };
+      accumulated += segmentLength;
+    }
+    return best;
+  }
+
   function parkedVehicleExtentOnRoad(edge, hit, directionSign, axis = "normal") {
     const a = edge.points[hit.segmentIndex];
     const b = edge.points[hit.segmentIndex + 1];
@@ -7009,13 +7334,18 @@
 
   function updateTrafficOvertake(car, dt, stationaryParkedBlock = false) {
     const plan = car.overtakePlan;
-    if (!plan || plan.directionSign !== car.directionSign) return false;
+    if (!plan || plan.directionSign !== car.directionSign) {
+      car.lateralVelocity = 0;
+      return false;
+    }
+    const previousOffset = car.laneOffset;
     const result = trafficOvertake.offsetAt(plan, car.along, dt, { stationary:stationaryParkedBlock });
     if (Number.isFinite(result.shiftProgress)) plan.shiftProgress = result.shiftProgress;
     if (Number.isFinite(result.stationaryShiftStart)) plan.stationaryShiftStart = result.stationaryShiftStart;
     if (Number.isFinite(result.stationaryShiftElapsed)) plan.stationaryShiftElapsed = result.stationaryShiftElapsed;
     if (Number.isFinite(result.stationaryShiftProgress)) plan.stationaryShiftProgress = result.stationaryShiftProgress;
     car.laneOffset = result.offset;
+    car.lateralVelocity = result.complete || dt <= 0 ? 0 : (car.laneOffset - previousOffset) / dt;
     if (result.complete) car.overtakePlan = null;
     return result.complete;
   }
@@ -7371,6 +7701,118 @@
     return gapToStopLine > stoppingDistance;
   }
 
+  function pedestrianCrossingVehicles(crosswalk) {
+    const edge = mapModel.getEdge(crosswalk.roadEdgeId);
+    if (!edge) return [];
+    return traffic.concat([personalCar]).map((vehicle) => {
+      const hit = mapModel.nearestRoad(vehicle.x, vehicle.y, { vehicleOnly:true });
+      if (hit?.edgeId !== crosswalk.roadEdgeId) return null;
+      const along = trafficAlongForPosition(edge, vehicle.x, vehicle.y).along;
+      const sign = vehicle.directionSign || (Math.cos(vehicle.angle) * (edge.points.at(-1).x - edge.points[0].x) + Math.sin(vehicle.angle) * (edge.points.at(-1).y - edge.points[0].y) >= 0 ? 1 : -1);
+      return {
+        id:vehicle.id || (vehicle === personalCar ? "player-car" : "traffic"),
+        edgeId:crosswalk.roadEdgeId,
+        along,
+        directionSign:sign,
+        distanceToCrossing:(crosswalk.along - along) * sign,
+        speed:vehicle.speed || 0,
+        length:vehicleDimensions(vehicle).length
+      };
+    }).filter(Boolean);
+  }
+
+  function pedestrianDistanceToCrosswalk(ped, crosswalkId) {
+    let total = 0;
+    for (let index = ped.routeIndex; index < (ped.routeSegmentIds?.length || 0); index += 1) {
+      const segment = mapModel.pedestrianNavigation.segmentsById.get(ped.routeSegmentIds[index]);
+      if (!segment) return Infinity;
+      if (segment.crosswalkId === crosswalkId || segment.id === crosswalkId) return total;
+      if (index === ped.routeIndex) total += ped.segmentDirection > 0 ? segment.length - ped.segmentAlong : ped.segmentAlong;
+      else total += segment.length;
+    }
+    return Infinity;
+  }
+
+  function updateCrossingClaims() {
+    const nextClaims = new Map();
+    for (const crosswalk of mapModel.crosswalks) {
+      const occupants = pedestrians
+        .filter((ped) => ped.state === "walking" && ped.segmentId === crosswalk.id)
+        .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+      if (occupants.length) {
+        const lead = occupants[0];
+        const claim = {
+          pedestrianId:String(lead.id),
+          pedestrianIds:occupants.map((ped) => String(ped.id)),
+          phase:"crossing",
+          clearanceTime:Math.max(...occupants.map((ped) => Math.max(0, crosswalk.length - ped.segmentAlong) / Math.max(8, ped.speed)))
+        };
+        nextClaims.set(crosswalk.id, claim);
+        continue;
+      }
+
+      const requests = pedestrians
+        .filter((ped) => ped.state === "walking" || ped.state === "waiting")
+        .map((ped) => ({ ped, distance:pedestrianDistanceToCrosswalk(ped, crosswalk.id) }))
+        .filter(({ ped, distance:remaining }) => Number.isFinite(remaining) && remaining <= Math.max(180, ped.speed * 4 + 22))
+        .map(({ ped }) => {
+          if (!Number.isFinite(ped.crossingWaitSince)) ped.crossingWaitSince = trafficSimulationClock;
+          return { pedestrianId:String(ped.id), requestedAt:ped.crossingWaitSince, ped };
+        });
+      if (!requests.length) continue;
+
+      const winner = crossingControl.arbitrateClaims(requests);
+      const request = requests.find((item) => item.pedestrianId === winner.pedestrianId);
+      if (!request) continue;
+      const signalAllows = !crosswalk.signalized || !crosswalk.nodeId || (() => {
+        const node = mapModel.getNode(crosswalk.nodeId);
+        const edge = mapModel.getEdge(crosswalk.roadEdgeId);
+        return node && edge && pedestrianSignalAt(node.x, node.y, edgeOrientation(edge)).state === "walk";
+      })();
+      const assessment = signalAllows
+        ? crossingControl.assessPedestrian(crosswalk, request.ped, pedestrianCrossingVehicles(crosswalk))
+        : { safeToEnter:false, decision:"wait", nearestVehicleId:null, timeToArrival:Infinity, crossingDuration:crosswalk.length / Math.max(8, request.ped.speed), requestVehicleYield:false };
+      nextClaims.set(crosswalk.id, {
+        pedestrianId:request.pedestrianId,
+        pedestrianIds:[request.pedestrianId],
+        phase:assessment.safeToEnter ? "crossing" : "waiting",
+        clearanceTime:assessment.crossingDuration,
+        nearestVehicleId:assessment.nearestVehicleId,
+        timeToArrival:assessment.timeToArrival,
+        waitingPedestrianIds:winner.waitingPedestrianIds
+      });
+    }
+    crossingClaims.clear();
+    for (const [id, claim] of nextClaims) crossingClaims.set(id, claim);
+  }
+
+  function trafficCrosswalkStop(car, edge, endpointDistance) {
+    let best = null;
+    for (const crosswalk of mapModel.crosswalks) {
+      if (crosswalk.roadEdgeId !== edge.id) continue;
+      const claim = crossingClaims.get(crosswalk.id);
+      if (!claim) continue;
+      const decision = crossingControl.vehicleYieldDecision(crosswalk, claim, {
+        id:car.id,
+        edgeId:car.edgeId,
+        along:trafficAlongForPosition(edge, car.x, car.y).along,
+        directionSign:car.directionSign,
+        distanceToCrossing:(crosswalk.along - trafficAlongForPosition(edge, car.x, car.y).along) * car.directionSign,
+        speed:car.speed,
+        length:vehicleDimensions(car).length
+      });
+      if (!decision.shouldYield) continue;
+      const halfVehicle = vehicleDimensions(car).length / 2;
+      const stopAlong = crosswalk.along - car.directionSign * (halfVehicle + 12);
+      const centerStopOffset = car.directionSign > 0 ? polylineLength(edge.points) - stopAlong : stopAlong;
+      const currentAlong = trafficAlongForPosition(edge, car.x, car.y).along;
+      const distanceToCrossing = (crosswalk.along - currentAlong) * car.directionSign;
+      if (distanceToCrossing < -halfVehicle || distanceToCrossing > endpointDistance + 1) continue;
+      if (!best || distanceToCrossing < best.distance) best = { distance:distanceToCrossing, centerStopOffset, crosswalkId:crosswalk.id };
+    }
+    return best;
+  }
+
   function updateTraffic(dt) {
     trafficSimulationClock += dt;
     refreshJunctionReservations();
@@ -7399,6 +7841,7 @@
       // yielding vehicle from blocking cross traffic at unsignalized T-junctions.
       let junctionYieldOffset = yieldLineOffset + vehicleFrontOverhang(car);
 
+      const crossingStop = trafficCrosswalkStop(car, edge, endpointDistance);
       if (endpoint && isSignalizedMapNode(endpoint.id)) {
         const geometry = approachGeometry || signalGeometryAtNode(endpoint.id, edge);
         const signal = signalStateAt(endpoint.x, endpoint.y, edgeOrientation(edge));
@@ -7415,6 +7858,12 @@
             targetSpeed = Math.min(targetSpeed, Math.max(0, gapToStopLine * 2.2));
           }
         }
+      }
+
+      if (crossingStop && (!activeStop || crossingStop.centerStopOffset > activeStop.centerStopOffset)) {
+        activeStop = { centerStopOffset:crossingStop.centerStopOffset, endpointId:endpoint?.id || null, reason:"crosswalk", crosswalkId:crossingStop.crosswalkId };
+        blockReason = "crosswalk";
+        targetSpeed = Math.min(targetSpeed, Math.max(0, crossingStop.distance * 1.8));
       }
 
       if (endpoint && !activeStop && endpointDistance < junctionYieldOffset + 150) {
@@ -7573,6 +8022,11 @@
 
   function capturePedestrianMotion(ped) {
     return {
+      segmentId:ped.segmentId,
+      segmentDirection:ped.segmentDirection,
+      segmentAlong:ped.segmentAlong,
+      segmentType:ped.segmentType,
+      routeSegmentIds:Array.isArray(ped.routeSegmentIds) ? [...ped.routeSegmentIds] : [],
       edgeId:ped.edgeId,
       edgeLength:ped.edgeLength,
       directionSign:ped.directionSign,
@@ -7590,6 +8044,11 @@
   }
 
   function restorePedestrianMotion(ped, snapshot) {
+    ped.segmentId = snapshot.segmentId;
+    ped.segmentDirection = snapshot.segmentDirection;
+    ped.segmentAlong = snapshot.segmentAlong;
+    ped.segmentType = snapshot.segmentType;
+    ped.routeSegmentIds = [...snapshot.routeSegmentIds];
     ped.edgeId = snapshot.edgeId;
     ped.edgeLength = snapshot.edgeLength;
     ped.directionSign = snapshot.directionSign;
@@ -7627,6 +8086,7 @@
   }
 
   function updatePedestrianAvoidance(ped, dt) {
+    if (ped?.segmentId) return;
     if (!ped || ped.junctionTransition) return;
     ped.avoidanceHold = Math.max(0, (Number(ped.avoidanceHold) || 0) - dt);
     if (ped.avoidanceHold <= 0) ped.avoidanceTarget = 0;
@@ -7673,6 +8133,7 @@
 
   function pedestrianFollowingLimit(ped, distanceUnits) {
     const requested = Math.max(0, distanceUnits);
+    if (ped.segmentId) return requested;
     if (ped.junctionTransition) return requested;
     const minimumGap = 24;
     let allowed = requested;
@@ -7745,6 +8206,13 @@
   function recoverStuckPedestrian(ped) {
     if (!ped || (ped.state !== "walking" && ped.state !== "waiting")) return false;
 
+    if (ped.segmentId) {
+      ped.collisionWait = .30 + ((ped.seed || 0) % 3) * .08;
+      ped.stuckTimer = 0;
+      ped.stuckRecoveryCount = (ped.stuckRecoveryCount || 0) + 1;
+      return true;
+    }
+
     // Recovery must never switch sidewalks or rebuild from an arbitrary node.
     // Ask for a larger continuous sidestep on the current sidewalk and wait for
     // nearby traffic to clear. The sidestep itself is rate-limited per frame.
@@ -7761,6 +8229,7 @@
     const minutes = Math.max(0, Number(gameMinutes) || 0);
 
     for (const ped of pedestrians) {
+      if (ped.id === conversationCitizenId) continue;
       if (ped.socialActivityRequest && !citizenSocialRequestIsValid(ped, ped.socialActivityRequest)) {
         ped.socialActivityRequest = null;
       }
@@ -7879,6 +8348,7 @@
     // than moving the player's controlled character.
     if (!state.player.inVehicle && !state.player.inTrain) {
       for (const ped of visible) {
+        if (ped.id === conversationCitizenId) continue;
         if (ped.state !== "staying") continue;
         const dx = ped.x - state.player.x;
         const dy = ped.y - state.player.y;
@@ -7912,6 +8382,19 @@
           uy = Math.sin(angle);
         }
 
+        if (a.id === conversationCitizenId || b.id === conversationCitizenId) {
+          const targetIsA = a.id === conversationCitizenId;
+          const movable = targetIsA ? b : a;
+          if (movable.state === "staying") {
+            const sign = targetIsA ? 1 : -1;
+            tryNudgeStandingPedestrian(movable, ux * sign * (minimum - d + 2), uy * sign * (minimum - d + 2));
+          } else {
+            requestPedestrianAvoidance(movable, 18, .7);
+            movable.collisionWait = Math.max(movable.collisionWait || 0, .10);
+          }
+          continue;
+        }
+
         const overlap = minimum - d + 1;
         if (a.state === "staying" && b.state === "staying") {
           tryNudgeStandingPedestrian(a, -ux * overlap * .5, -uy * overlap * .5);
@@ -7934,6 +8417,7 @@
     if (total <= .001 || !pedestrians.length) return;
 
     for (const ped of pedestrians) {
+      if (ped.id === conversationCitizenId) continue;
       let remaining = total;
       let loops = 0;
 
@@ -7980,23 +8464,24 @@
 
   function update(dt) {
     if (!arcadePanel.hidden) return;
-    if (state.paused || !actionSheet.hidden || !helpPanel.hidden) return;
-    if (furniturePlacementState) {
-      updateFurniturePlacement(dt);
-      updateHUD();
-      return;
-    }
+    if (state.paused) return;
+    const playerInputLocked = !actionSheet.hidden || !helpPanel.hidden || Boolean(furniturePlacementState);
+    if (furniturePlacementState) updateFurniturePlacement(dt);
+    state.player.motion = { moving:false, running:false };
 
     const gameMinutes = dt * .7;
     updateTrainSystem(dt);
 
     if (!state.player.inVehicle) state.drive.signalClock += dt;
-    if (state.player.inHome) updatePlayerAtHome(dt);
-    else if (state.player.inVehicle) updateCar(dt);
-    else if (!state.player.inTrain) updatePlayerOnFoot(dt);
+    if (!playerInputLocked) {
+      if (state.player.inHome) updatePlayerAtHome(dt);
+      else if (state.player.inVehicle) updateCar(dt);
+      else if (!state.player.inTrain) updatePlayerOnFoot(dt);
+    }
 
     updatePetWalk(dt, gameMinutes);
 
+    updateCrossingClaims();
     updateTraffic(dt);
     advanceTime(gameMinutes, true, false);
     updatePedestrians(dt, gameMinutes);
@@ -8605,47 +9090,34 @@
   function drawMapModelIntersectionMarkings() {
     ctx.save();
     ctx.lineCap = "butt";
-    for (const node of mapModel.nodes) {
-      if (!isSignalizedMapNode(node.id)) continue;
-      const incidentEdges = vehicleEdgesAtNode(node.id);
-      for (const edge of incidentEdges) {
-        const adjacent = edge.from === node.id ? edge.points[1] : edge.points.at(-2);
-        if (!adjacent) continue;
-        let dx = adjacent.x - node.x;
-        let dy = adjacent.y - node.y;
-        const magnitude = Math.hypot(dx, dy) || 1;
-        dx /= magnitude;
-        dy /= magnitude;
-        const nx = -dy;
-        const ny = dx;
-        const geometry = signalGeometryAtNode(node.id, edge);
-        const crossingSpan = Math.max(34, edge.width - 34);
-        const stripeStep = 12;
-        ctx.strokeStyle = "rgba(244,245,240,.88)";
-        ctx.lineWidth = 5;
-        for (let offset = -crossingSpan / 2; offset <= crossingSpan / 2; offset += stripeStep) {
-          const cx = node.x + dx * geometry.crossingOffset + nx * offset;
-          const cy = node.y + dy * geometry.crossingOffset + ny * offset;
-          const halfDepth = geometry.crossingDepth / 2;
-          const a = worldToScreen(cx - dx * halfDepth, cy - dy * halfDepth);
-          const b = worldToScreen(cx + dx * halfDepth, cy + dy * halfDepth);
-          ctx.beginPath();
-          ctx.moveTo(a.x, a.y);
-          ctx.lineTo(b.x, b.y);
-          ctx.stroke();
-        }
-
-        const stopCenterX = node.x + dx * geometry.stopOffset;
-        const stopCenterY = node.y + dy * geometry.stopOffset;
-        const laneStart = 5;
-        const laneEnd = Math.max(laneStart + 18, edge.width / 2 - 8);
-        const stopA = worldToScreen(stopCenterX + nx * laneStart, stopCenterY + ny * laneStart);
-        const stopB = worldToScreen(stopCenterX + nx * laneEnd, stopCenterY + ny * laneEnd);
-        ctx.strokeStyle = "rgba(248,248,244,.94)";
-        ctx.lineWidth = 4;
+    for (const crosswalk of mapModel.crosswalks) {
+      const edge = mapModel.getEdge(crosswalk.roadEdgeId);
+      if (!edge) continue;
+      const center = worldToScreen(crosswalk.x, crosswalk.y);
+      if (center.x < -240 || center.y < -240 || center.x > viewWidth + 240 || center.y > viewHeight + 240) continue;
+      const crossingVector = crosswalk.vector;
+      const roadTangent = { x:crossingVector.y, y:-crossingVector.x };
+      const halfWidth = Math.max(14, edge.width / 2 - 12);
+      ctx.strokeStyle = "rgba(244,245,240,.88)";
+      ctx.lineWidth = 4.5;
+      for (let offset = -halfWidth; offset <= halfWidth; offset += 12) {
+        const cx = crosswalk.x + roadTangent.x * offset;
+        const cy = crosswalk.y + roadTangent.y * offset;
+        const a = worldToScreen(cx - crossingVector.x * 10, cy - crossingVector.y * 10);
+        const b = worldToScreen(cx + crossingVector.x * 10, cy + crossingVector.y * 10);
         ctx.beginPath();
-        ctx.moveTo(stopA.x, stopA.y);
-        ctx.lineTo(stopB.x, stopB.y);
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = "rgba(248,248,244,.94)";
+      ctx.lineWidth = 3.5;
+      for (const stopLine of crosswalk.stopLines || []) {
+        const a = worldToScreen(stopLine.a.x, stopLine.a.y);
+        const b = worldToScreen(stopLine.b.x, stopLine.b.y);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
         ctx.stroke();
       }
     }
@@ -9966,9 +10438,12 @@
 
     // Small entrance cue on the facade closest to the access road when visible.
     ctx.fillStyle = "#39413e";
-    if (building.frontage === "south" || building.frontage === "east") {
-      const doorX = building.frontage === "east" ? x + building.w - 13 : x + building.w * .5 - 5;
-      ctx.fillRect(doorX, y + building.h - Math.min(16, elevation * .7), 10, Math.min(16, elevation * .7));
+    const entrance = building.frontageGeometry?.entranceLocal;
+    if (entrance) {
+      const doorHeight = Math.min(16, elevation * .7);
+      const doorX = x + entrance.x - 5;
+      const doorY = y + entrance.y - doorHeight;
+      ctx.fillRect(doorX, doorY, 10, doorHeight);
     }
 
     // Eaves, rain gutter and the ubiquitous outdoor AC unit add residential scale.
@@ -10091,12 +10566,20 @@
       .sort((a, b) => (a.y + a.h) - (b.y + b.h));
 
     for (const building of visible) {
-      const x = building.x - state.camera.x;
-      const y = building.y - state.camera.y;
+      const screenX = building.x - state.camera.x;
+      const screenY = building.y - state.camera.y;
+      const centerX = screenX + building.w / 2;
+      const centerY = screenY + building.h / 2;
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.rotate(building.frontageGeometry?.angle || 0);
+      const x = -building.w / 2;
+      const y = -building.h / 2;
       const palette = VISUAL_PALETTES[building.palette % VISUAL_PALETTES.length];
 
       if (building.style === "residential") {
         drawResidentialBuilding(building, x, y, palette, time);
+        ctx.restore();
         continue;
       }
 
@@ -10174,10 +10657,11 @@
 
       const doorW = Math.min(34, building.w * .14);
       const doorH = Math.min(22, elevation * .72);
+      const entrance = building.frontageGeometry?.entranceLocal || { x:building.w * .5, y:building.h };
       ctx.fillStyle = "#35403e";
-      ctx.fillRect(x + building.w * .5 - doorW / 2, y + building.h - doorH, doorW, doorH);
+      ctx.fillRect(x + entrance.x - doorW / 2, y + entrance.y - doorH, doorW, doorH);
       ctx.fillStyle = "rgba(177,205,211,.5)";
-      ctx.fillRect(x + building.w * .5 - doorW * .36, y + building.h - doorH + 3, doorW * .72, 7);
+      ctx.fillRect(x + entrance.x - doorW * .36, y + entrance.y - doorH + 3, doorW * .72, 7);
 
       ctx.fillStyle = palette.roof;
       roundedRectPath(ctx, rx, ry, building.w, building.h, 5);
@@ -10218,6 +10702,7 @@
       }
 
       drawBuildingMicroDetails(building, x, y, rx, ry, elevation, palette, time);
+      ctx.restore();
     }
   }
 
@@ -10963,7 +11448,7 @@
   function drawPlayer() {
     if (state.player.inVehicle || state.player.inTrain) return;
     const dir = Math.atan2(state.player.facingY, state.player.facingX);
-    const moving = keys.has("w") || keys.has("a") || keys.has("s") || keys.has("d") || Math.abs(touch.x) > .08 || Math.abs(touch.y) > .08;
+    const moving = state.player.motion?.moving === true;
     const phase = moving ? performance.now() * .009 : 0;
     drawPerson(
       state.player.x,
@@ -11216,6 +11701,49 @@
     if (furniturePlacementState) drawHomeFurnitureItem(homeFurnitureCandidate(), true);
   }
 
+  function drawHomeFixtureVisual(visual) {
+    const scale = homeInteriorViewport().scale;
+    const point = (x, y) => homeToScreen(x, y);
+    ctx.save();
+    ctx.lineWidth = Math.max(1, (visual.thickness || 1) * scale);
+    ctx.strokeStyle = visual.stroke || "transparent";
+    ctx.fillStyle = visual.fill || "transparent";
+    if (visual.kind === "rect") {
+      const p = point(visual.x, visual.y);
+      roundedRectPath(ctx, p.x, p.y, visual.w * scale, visual.h * scale, (visual.radius || 0) * scale);
+      if (visual.fill && visual.fill !== "transparent") ctx.fill();
+      if (visual.stroke) ctx.stroke();
+      if (visual.role === "screen") {
+        const program = homeTelevisionModel.getProgram(Math.floor(state.minute));
+        const colors = { "overnight-nature":"#435b50", "morning-news":"#567687", "travel-variety":"#4d7c82", "cooking-show":"#9b6947", "prime-time-drama":"#5b516e" };
+        ctx.fillStyle = colors[program?.id] || visual.fill;
+        roundedRectPath(ctx, p.x, p.y, visual.w * scale, visual.h * scale, (visual.radius || 0) * scale);
+        ctx.fill();
+        if (program) {
+          ctx.fillStyle = "rgba(255,248,226,.92)";
+          ctx.font = "700 " + Math.max(5, 7 * scale) + "px system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(program.screenTitle, p.x + visual.w * scale / 2, p.y + visual.h * scale / 2, visual.w * scale - 8);
+        }
+      }
+    } else if (visual.kind === "circle") {
+      const p = point(visual.x, visual.y);
+      ctx.beginPath(); ctx.arc(p.x, p.y, visual.radius * scale, 0, Math.PI * 2);
+      if (visual.fill && visual.fill !== "transparent") ctx.fill();
+      if (visual.stroke) ctx.stroke();
+    } else if (visual.kind === "ellipse") {
+      const p = point(visual.x, visual.y);
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, visual.rx * scale, visual.ry * scale, 0, 0, Math.PI * 2);
+      if (visual.fill && visual.fill !== "transparent") ctx.fill();
+      if (visual.stroke) ctx.stroke();
+    } else if (visual.kind === "line") {
+      const a = point(visual.from.x, visual.from.y); const b = point(visual.to.x, visual.to.y);
+      ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function drawHomeInterior() {
     const viewport = homeInteriorViewport();
     const ox = viewport.x;
@@ -11252,27 +11780,16 @@
       ctx.stroke();
     }
 
-    // Walls and room dividers, with generous openings for movement.
+    // The room boundary is derived from the same dimensions as its collision limits.
     ctx.strokeStyle = "#eee7da";
     ctx.lineWidth = 18 * s;
     ctx.lineCap = "square";
     roundedRectPath(ctx, ox + 9 * s, oy + 9 * s, w - 18 * s, h - 18 * s, 10 * s);
     ctx.stroke();
 
-    ctx.lineWidth = 10 * s;
-    const dividerA1 = homeToScreen(294, 30);
-    const dividerA2 = homeToScreen(294, 205);
-    ctx.beginPath();
-    ctx.moveTo(dividerA1.x, dividerA1.y);
-    ctx.lineTo(dividerA2.x, dividerA2.y);
-    ctx.stroke();
-
-    const dividerB1 = homeToScreen(250, 268);
-    const dividerB2 = homeToScreen(250, 445);
-    ctx.beginPath();
-    ctx.moveTo(dividerB1.x, dividerB1.y);
-    ctx.lineTo(dividerB2.x, dividerB2.y);
-    ctx.stroke();
+    for (const fixture of HOME_FIXTURES.filter((item) => item.id.startsWith("divider-"))) {
+      for (const visual of fixture.visuals) drawHomeFixtureVisual(visual);
+    }
 
     // Rugs define living/dining zones.
     const rug = homeToScreen(454, 265);
@@ -11284,132 +11801,11 @@
     roundedRectPath(ctx, rug.x + 8*s, rug.y + 8*s, 250*s, 149*s, 11*s);
     ctx.stroke();
 
-    // Bed.
-    drawHomeFurnitureRect(62, 60, 190, 112, "#d8ddd7", 12);
-    let p = homeToScreen(70, 68);
-    ctx.fillStyle = "#f0eee7";
-    roundedRectPath(ctx, p.x, p.y, 174*s, 38*s, 8*s);
-    ctx.fill();
-    ctx.fillStyle = "#7891a2";
-    roundedRectPath(ctx, p.x, p.y + 42*s, 174*s, 58*s, 7*s);
-    ctx.fill();
-
-    // Shower / bathroom.
-    drawHomeFurnitureRect(70, 318, 118, 118, "#d9e1df", 10);
-    p = homeToScreen(84, 332);
-    ctx.fillStyle = "#9fbfc5";
-    roundedRectPath(ctx, p.x, p.y, 90*s, 90*s, 8*s);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,.55)";
-    ctx.lineWidth = 2*s;
-    ctx.beginPath();
-    ctx.arc(p.x + 45*s, p.y + 45*s, 18*s, 0, Math.PI*2);
-    ctx.stroke();
-
-    // Kitchen counter, sink and cooktop.
-    drawHomeFurnitureRect(510, 55, 205, 82, "#9b8b74", 8);
-    p = homeToScreen(525, 67);
-    ctx.fillStyle = "#d6d8d2";
-    roundedRectPath(ctx, p.x, p.y, 58*s, 42*s, 5*s);
-    ctx.fill();
-    ctx.strokeStyle = "#6c7472";
-    ctx.lineWidth = 2*s;
-    ctx.stroke();
-    ctx.fillStyle = "#333837";
-    for (const dx of [104,143]) {
-      ctx.beginPath();
-      ctx.arc(p.x + dx*s, p.y + 20*s, 11*s, 0, Math.PI*2);
-      ctx.fill();
+    // Fixture visuals are painted from the same definitions used by collisions.
+    for (const fixture of HOME_FIXTURES) {
+      if (fixture.id.startsWith("divider-") || fixture.id === "exit") continue;
+      for (const visual of fixture.visuals) drawHomeFixtureVisual(visual);
     }
-
-    // Dining table.
-    drawHomeFurnitureRect(326, 88, 128, 78, "#9b7657", 10);
-    p = homeToScreen(348, 106);
-    ctx.fillStyle = "rgba(255,245,224,.72)";
-    ctx.beginPath();
-    ctx.arc(p.x + 42*s, p.y + 21*s, 13*s, 0, Math.PI*2);
-    ctx.fill();
-
-    // Small home worktable and sewing machine.
-    drawHomeFurnitureRect(176, 194, 104, 62, "#8d6749", 7);
-    p = homeToScreen(191, 207);
-    ctx.fillStyle = "#d7ddd7";
-    roundedRectPath(ctx, p.x, p.y, 40*s, 29*s, 4*s);
-    ctx.fill();
-    ctx.fillStyle = "#5a655f";
-    ctx.fillRect(p.x + 26*s, p.y + 4*s, 3*s, 22*s);
-    ctx.fillRect(p.x + 18*s, p.y + 25*s, 28*s, 3*s);
-    ctx.strokeStyle = "#eee4cd";
-    ctx.lineWidth = 2*s;
-    ctx.strokeRect(p.x + 58*s, p.y + 10*s, 25*s, 17*s);
-    ctx.strokeStyle = "#a64d62";
-    ctx.beginPath();
-    ctx.moveTo(p.x + 60*s, p.y + 24*s);
-    ctx.lineTo(p.x + 80*s, p.y + 12*s);
-    ctx.stroke();
-
-    // Reachable double-door closet near the entry.
-    drawHomeFurnitureRect(42, 182, 112, 78, "#806044", 6);
-    p = homeToScreen(51, 190);
-    ctx.fillStyle = "#a88764";
-    roundedRectPath(ctx, p.x, p.y, 46*s, 61*s, 4*s);
-    ctx.fill();
-    ctx.fillStyle = "#72543c";
-    roundedRectPath(ctx, p.x + 50*s, p.y, 46*s, 61*s, 4*s);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(238,218,185,.6)";
-    ctx.lineWidth = 1.5*s;
-    ctx.strokeRect(p.x + 4*s, p.y + 4*s, 38*s, 53*s);
-    ctx.strokeRect(p.x + 54*s, p.y + 4*s, 38*s, 53*s);
-    ctx.fillStyle = "#dfc99d";
-    ctx.beginPath();
-    ctx.arc(p.x + 39*s, p.y + 32*s, 2*s, 0, Math.PI*2);
-    ctx.arc(p.x + 61*s, p.y + 32*s, 2*s, 0, Math.PI*2);
-    ctx.fill();
-
-    // Low table.
-    drawHomeFurnitureRect(294, 276, 168, 82, "#8f6c50", 12);
-
-    // Sofa.
-    drawHomeFurnitureRect(486, 330, 205, 74, "#657f75", 16);
-    p = homeToScreen(500, 340);
-    ctx.fillStyle = "#78968a";
-    roundedRectPath(ctx, p.x, p.y, 177*s, 21*s, 8*s);
-    ctx.fill();
-
-    // TV / media unit.
-    drawHomeFurnitureRect(520, 438, 155, 24, "#4d504d", 4);
-    p = homeToScreen(548, 403);
-    ctx.fillStyle = "#263335";
-    roundedRectPath(ctx, p.x, p.y, 99*s, 34*s, 5*s);
-    ctx.fill();
-    const tvProgram = homeTelevisionModel.getProgram(Math.floor(state.minute));
-    const tvScreenColors = {
-      "overnight-nature":"#435b50",
-      "morning-news":"#567687",
-      "travel-variety":"#4d7c82",
-      "cooking-show":"#9b6947",
-      "prime-time-drama":"#5b516e"
-    };
-    ctx.fillStyle = tvScreenColors[tvProgram?.id] || "#334546";
-    roundedRectPath(ctx, p.x + 4*s, p.y + 4*s, 91*s, 26*s, 3*s);
-    ctx.fill();
-    if (tvProgram) {
-      ctx.fillStyle = "rgba(255,248,226,.92)";
-      ctx.font = "700 " + Math.max(5, 7*s) + "px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(tvProgram.screenTitle, p.x + 49.5*s, p.y + 17*s, 85*s);
-      ctx.textBaseline = "alphabetic";
-    }
-
-    // Entrance / genkan.
-    p = homeToScreen(338, 442);
-    ctx.fillStyle = "#aaa69a";
-    roundedRectPath(ctx, p.x, p.y, 104*s, 43*s, 5*s);
-    ctx.fill();
-    ctx.fillStyle = "#5c625e";
-    ctx.fillRect(p.x + 17*s, p.y + 31*s, 70*s, 5*s);
 
     // Small plants/decor.
     for (const plant of [[455,78],[224,397],[713,270]]) {
@@ -11457,9 +11853,7 @@
   function drawHomePlayer() {
     const p = homeToScreen(state.player.homeX, state.player.homeY);
     const dir = Math.atan2(state.player.facingY, state.player.facingX);
-    const moving = keys.has("w") || keys.has("a") || keys.has("s") || keys.has("d") ||
-      keys.has("arrowup") || keys.has("arrowdown") || keys.has("arrowleft") || keys.has("arrowright") ||
-      Math.abs(touch.x) > .08 || Math.abs(touch.y) > .08;
+    const moving = state.player.motion?.moving === true;
     const phase = moving ? performance.now() * .009 : 0;
     characterRenderer.draw(ctx, {
       x:p.x,
@@ -11579,35 +11973,69 @@
   }
 
   function drawMapModelMinimap(w, h, p, scale) {
+    const screen = (x, y) => ({ x:w / 2 + (x - p.x) * scale, y:h / 2 + (y - p.y) * scale });
     for (const space of mapModel.openSpaces || []) {
       if (!space.polygon?.length) continue;
       mctx.fillStyle =
-        space.type === "park" || space.type === "pocket-park" ? "rgba(93,145,91,.42)" :
-        space.type === "shrine" ? "rgba(91,122,79,.4)" :
-        space.type === "plaza" ? "rgba(181,181,168,.26)" :
-        "rgba(143,137,116,.22)";
+        space.type === "park" || space.type === "pocket-park" ? "#c9dfc6" :
+        space.type === "shrine" ? "#d5dfc8" :
+        space.type === "plaza" || space.type === "schoolyard" ? "#e2e2d8" :
+        space.type === "parking" ? "#d9ddd7" : "#e4e3d9";
       mctx.beginPath();
-      mctx.moveTo(w / 2 + (space.polygon[0][0] - p.x) * scale, h / 2 + (space.polygon[0][1] - p.y) * scale);
+      const first = screen(space.polygon[0][0], space.polygon[0][1]);
+      mctx.moveTo(first.x, first.y);
       for (let i = 1; i < space.polygon.length; i += 1) {
-        mctx.lineTo(w / 2 + (space.polygon[i][0] - p.x) * scale, h / 2 + (space.polygon[i][1] - p.y) * scale);
+        const next = screen(space.polygon[i][0], space.polygon[i][1]);
+        mctx.lineTo(next.x, next.y);
       }
       mctx.closePath();
       mctx.fill();
     }
 
+    // Building footprints make the map read like a neighborhood plan, not a road overlay.
+    mctx.fillStyle = "#d8dcd5";
+    for (const site of mapModel.buildingSites || []) {
+      if (site.collisionFootprint?.length) {
+        const vertices = site.collisionFootprint.map((point) => screen(point.x, point.y));
+        if (vertices.every((point) => point.x < 0 || point.y < 0 || point.x > w || point.y > h)) continue;
+        mctx.beginPath();
+        mctx.moveTo(vertices[0].x, vertices[0].y);
+        for (let i = 1; i < vertices.length; i += 1) mctx.lineTo(vertices[i].x, vertices[i].y);
+        mctx.closePath();
+        mctx.fill();
+        continue;
+      }
+      const topLeft = screen(site.x, site.y);
+      const width = site.w * scale;
+      const height = site.h * scale;
+      if (topLeft.x > w || topLeft.y > h || topLeft.x + width < 0 || topLeft.y + height < 0) continue;
+      mctx.fillRect(topLeft.x, topLeft.y, Math.max(.8, width), Math.max(.8, height));
+    }
+
+    const roadStyle = (edge) => {
+      if (!edge.vehicle) return { casing:"#d0d7d0", fill:"#f5f4ec", width:1.4 };
+      if (edge.type === "arterial" || edge.type === "highway") return { casing:"#b9c2c2", fill:"#fffdf7", width:5.2 };
+      if (edge.type === "collector" || edge.type === "civic") return { casing:"#c4cdca", fill:"#fffdf8", width:3.5 };
+      return { casing:"#cbd3cf", fill:"#faf9f2", width:2.2 };
+    };
     for (const edge of mapModel.edges) {
-      mctx.strokeStyle = edge.vehicle ? "#747d77" : "#6fa078";
-      mctx.lineWidth = Math.max(1.5, edge.width * scale * .75);
       mctx.lineCap = "round";
       mctx.lineJoin = "round";
-      mctx.beginPath();
-      const first = edge.points[0];
-      mctx.moveTo(w / 2 + (first.x - p.x) * scale, h / 2 + (first.y - p.y) * scale);
-      for (let i = 1; i < edge.points.length; i += 1) {
-        const point = edge.points[i];
-        mctx.lineTo(w / 2 + (point.x - p.x) * scale, h / 2 + (point.y - p.y) * scale);
-      }
-      mctx.stroke();
+      const style = roadStyle(edge);
+      const paint = (color, width) => {
+        mctx.strokeStyle = color;
+        mctx.lineWidth = width;
+        mctx.beginPath();
+        const first = screen(edge.points[0].x, edge.points[0].y);
+        mctx.moveTo(first.x, first.y);
+        for (let i = 1; i < edge.points.length; i += 1) {
+          const point = screen(edge.points[i].x, edge.points[i].y);
+          mctx.lineTo(point.x, point.y);
+        }
+        mctx.stroke();
+      };
+      paint(style.casing, style.width + 1.4);
+      paint(style.fill, style.width);
     }
   }
 
@@ -11615,11 +12043,11 @@
     const w = minimap.width;
     const h = minimap.height;
     const p = actorPosition();
-    const range = 1500;
-    const scale = w / (range * 2);
+    const range = 1450;
+    const scale = Math.min(w, h) / (range * 2);
 
     mctx.clearRect(0, 0, w, h);
-    mctx.fillStyle = "#101613";
+    mctx.fillStyle = "#edf0e9";
     mctx.fillRect(0, 0, w, h);
 
     drawMapModelMinimap(w, h, p, scale);
@@ -11698,26 +12126,40 @@
       mctx.restore();
     }
 
-    mctx.strokeStyle = "rgba(155,190,174,.8)";
-    mctx.lineWidth = 2;
+    mctx.strokeStyle = "#a8b4b0";
+    mctx.lineWidth = 2.6;
     const railY = h / 2 + (RAIL_Y - p.y) * scale;
     mctx.beginPath();
     mctx.moveTo(w / 2 + (RAIL_MIN_X - p.x) * scale, railY);
     mctx.lineTo(w / 2 + (RAIL_MAX_X - p.x) * scale, railY);
     mctx.stroke();
 
-    for (const station of TRAIN_STATIONS) dot(station.x, station.y, "#77c49b", 3.2);
-    for (const train of trains) dot(train.x, train.y, "#e6eee9", 2.4);
-    for (const place of PLACES) dot(place.x, place.y, place.color, 4.2);
-    dot(personalCar.x, personalCar.y, "#e8edf0", 2.7);
+    for (const station of TRAIN_STATIONS) dot(station.x, station.y, "#27865f", 3.2);
+    for (const train of trains) dot(train.x, train.y, "#343f3b", 2.4);
+    for (const place of PLACES) dot(place.x, place.y, place.id === "home" ? "#536e59" : "#bb7650", 3.6);
+    if (state.player.inVehicle) dot(personalCar.x, personalCar.y, "#344e6d", 2.5);
 
-    mctx.fillStyle = "#ffffff";
+    const heading = state.player.inVehicle ? personalCar.angle
+      : state.player.inTrain ? (trainById(state.player.trainId)?.angle || 0)
+      : Math.atan2(state.player.facingY || 0, state.player.facingX || 1);
+    mctx.save();
+    mctx.translate(w / 2, h / 2);
+    mctx.rotate(heading);
+    mctx.fillStyle = "#2467a8";
+    mctx.strokeStyle = "#fff";
+    mctx.lineWidth = 1.4;
     mctx.beginPath();
-    mctx.arc(w / 2, h / 2, 4.5, 0, Math.PI * 2);
+    mctx.moveTo(0, -7);
+    mctx.lineTo(5.5, 5);
+    mctx.lineTo(0, 3);
+    mctx.lineTo(-5.5, 5);
+    mctx.closePath();
     mctx.fill();
-    mctx.strokeStyle = "rgba(255,255,255,.24)";
-    mctx.lineWidth = 2;
-    mctx.strokeRect(4, 4, w - 8, h - 8);
+    mctx.stroke();
+    mctx.restore();
+    mctx.strokeStyle = "rgba(58,75,66,.28)";
+    mctx.lineWidth = 1;
+    mctx.strokeRect(.5, .5, w - 1, h - 1);
   }
 
   function needStatusColor(value) {
@@ -12206,6 +12648,9 @@
           visible:citizen.visible !== false,
           currentActivityId:citizen.currentActivityId,
           pendingActivity:citizen.pendingActivity ? { ...citizen.pendingActivity } : null,
+          segmentId:citizen.segmentId || null,
+          segmentType:citizen.segmentType || null,
+          routeSegmentIds:Array.isArray(citizen.routeSegmentIds) ? [...citizen.routeSegmentIds] : [],
           socialActivityRequest:citizen.socialActivityRequest ? { ...citizen.socialActivityRequest } : null,
           routeEdgeIds:Array.isArray(citizen.routeEdgeIds) ? [...citizen.routeEdgeIds] : [],
           routeIndex:citizen.routeIndex,
@@ -12246,7 +12691,33 @@
           return interaction ? { type:interaction.type, label:interaction.label, targetId:interaction.target?.id || null } : null;
         })(),
         railTransit:railTransitModel.normalizeProgress(state.railTransit, state.day),
-        citizens
+        citizens,
+        pedestrians:pedestrians.map((ped) => ({
+          id:ped.id,
+          state:ped.state,
+          x:ped.x,
+          y:ped.y,
+          segmentId:ped.segmentId || null,
+          segmentType:ped.segmentType || null,
+          segmentAlong:ped.segmentAlong,
+          routeSegmentIds:Array.isArray(ped.routeSegmentIds) ? [...ped.routeSegmentIds] : [],
+          routeIndex:ped.routeIndex,
+          currentNodeId:ped.currentNodeId,
+          targetNodeId:ped.targetNodeId
+        })),
+        traffic:traffic.map((car) => ({
+          id:car.id,
+          edgeId:car.edgeId,
+          along:car.along,
+          x:car.x,
+          y:car.y,
+          angle:car.angle,
+          laneOffset:car.laneOffset,
+          junctionTrajectoryActive:Boolean(trafficTurnCurve(car, car.along)),
+          overtakeActive:Boolean(car.overtakePlan)
+        })),
+        crossingClaims:Array.from(crossingClaims, ([crosswalkId, claim]) => ({ crosswalkId, ...claim })),
+        homeFixtureCount:HOME_FIXTURES.length
       }));
     };
 
@@ -12254,6 +12725,19 @@
       configurable:true,
       value:Object.freeze({
         snapshot,
+        setPanelsForTest({ action = false, help = false } = {}) {
+          actionSheet.hidden = !action;
+          helpPanel.hidden = !help;
+          if (!action) conversationCitizenId = null;
+          return { actionOpen:!actionSheet.hidden, helpOpen:!helpPanel.hidden };
+        },
+        openConversationForTest(npcId) {
+          const npc = NPCS.find((value) => value.id === npcId);
+          if (!npc) return false;
+          openNpc(npc);
+          return conversationCitizenId;
+        },
+        conversationTargetForTest() { return conversationCitizenId; },
         equipOutfitForTest(outfitId) { return equipPlayerOutfit(outfitId); },
         playerAppearanceForTest() {
           const appearance = playerAppearance();
@@ -12296,6 +12780,7 @@
           state.player.homeY = y;
           return true;
         },
+        canHomeOccupyForTest(x, y, radius = PLAYER_RADIUS) { return canHomeOccupy(x, y, radius); },
         beginHomeFurniturePlacementForTest(furnitureId, placementId = null) { return beginHomeFurniturePlacement(furnitureId, placementId); },
         moveHomeFurniturePreviewForTest(dx, dy) { return moveHomeFurniturePreview(dx, dy); },
         rotateHomeFurniturePreviewForTest() { return rotateHomeFurniturePreview(); },

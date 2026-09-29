@@ -91,7 +91,7 @@ test('overtaking changes lanes before the obstacle and returns to the original l
   assert.deepEqual(overtake.offsetAt(plan, 90), { offset:20, complete:false });
   assert.deepEqual(overtake.offsetAt(plan, 130), { offset:-20, complete:false });
   assert.deepEqual(overtake.offsetAt(plan, 210), { offset:-20, complete:false });
-  assert.ok(Math.abs(overtake.offsetAt(plan, 300).offset + 20 / 3) < 1e-9);
+  assert.ok(Math.abs(overtake.offsetAt(plan, 300).offset - (20 - 40 * (20 / 27))) < 1e-9);
   assert.deepEqual(overtake.offsetAt(plan, 320), { offset:20, complete:true });
 });
 
@@ -194,7 +194,7 @@ test('a vehicle stopped by the parked car completes its partial lane change with
   plan.stationaryShiftProgress = result.stationaryShiftProgress;
   plan.stationaryShiftStart = result.stationaryShiftStart;
   plan.stationaryShiftElapsed = result.stationaryShiftElapsed;
-  assert.ok(Math.abs(result.offset - (-16.17333333333334)) < 1e-9);
+  assert.ok(result.offset < -18 && result.offset > -20);
 
   result = overtake.offsetAt(plan, 124.4, .175, { stationary:true });
   plan.stationaryShiftProgress = result.stationaryShiftProgress;

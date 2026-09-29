@@ -97,8 +97,13 @@
   }
 
   function offsetAt(planState, along, elapsed = 0, { stationary = false } = {}) {
+    const smoothstep = (value) => {
+      const t = Math.max(0,Math.min(1,value));
+      return t * t * (3 - 2 * t);
+    };
     if (planState.emergency) {
-      const shiftProgress = Math.min(1, (planState.shiftProgress || 0) + elapsed / .35);
+      const linearProgress = Math.min(1, (planState.shiftProgress || 0) + elapsed / .35);
+      const shiftProgress = smoothstep(linearProgress);
       if (shiftProgress < 1) {
         return {
           offset:planState.fromOffset + (planState.targetOffset - planState.fromOffset) * shiftProgress,
@@ -108,7 +113,7 @@
       }
       const passedDistance = (along - planState.holdUntilAlong) * planState.directionSign;
       if (passedDistance < 0) return { offset:planState.targetOffset, shiftProgress, complete:false };
-      const returnProgress = Math.min(1, passedDistance / 30);
+      const returnProgress = smoothstep(Math.min(1, passedDistance / 30));
       return {
         offset:planState.targetOffset + (planState.fromOffset - planState.targetOffset) * returnProgress,
         shiftProgress,
@@ -133,7 +138,7 @@
         (1 - stationaryShiftStart) * Math.min(1, stationaryShiftElapsed / .35);
       ratio = Math.max(ratio, stationaryShiftProgress);
       return {
-        offset:planState.fromOffset + (planState.targetOffset - planState.fromOffset) * Math.max(0, Math.min(1, ratio)),
+        offset:planState.fromOffset + (planState.targetOffset - planState.fromOffset) * smoothstep(Math.max(0, Math.min(1, ratio))),
         stationaryShiftStart,
         stationaryShiftElapsed,
         stationaryShiftProgress,
@@ -141,7 +146,7 @@
       };
     }
     return {
-      offset:planState.fromOffset + (planState.targetOffset - planState.fromOffset) * Math.max(0, Math.min(1, ratio)),
+      offset:planState.fromOffset + (planState.targetOffset - planState.fromOffset) * smoothstep(Math.max(0, Math.min(1, ratio))),
       complete:false
     };
   }
