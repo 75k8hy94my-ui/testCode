@@ -99,6 +99,7 @@ test('wardrobe model is loaded before runtime and is normalized in snapshots', (
   assert.match(source, /wardrobe:wardrobeModel\.createWardrobe\(\)/);
   assert.match(source, /wardrobe:wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
   assert.match(source, /state\.wardrobe = wardrobeModel\.normalizeWardrobe\(saved\.wardrobe\)/);
+  assert.match(html, /game\.js\?v=20260929-player-wardrobe-2/);
 });
 
 test('supermarket clothing purchases revalidate ownership and funds before charging or advancing time', () => {
