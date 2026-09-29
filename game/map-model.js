@@ -420,7 +420,56 @@
     return best;
   }
 
-  function alignFacilityBuilding(place, edges) {
+  function polygonPoint(value) {
+    return Array.isArray(value) ? { x:value[0], y:value[1] } : value;
+  }
+
+  function polygonSegmentIntersects(aRaw, bRaw, cRaw, dRaw) {
+    const a = polygonPoint(aRaw);
+    const b = polygonPoint(bRaw);
+    const c = polygonPoint(cRaw);
+    const d = polygonPoint(dRaw);
+    const orient = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+    const onSegment = (p, q, r) =>
+      q.x >= Math.min(p.x, r.x) - 1e-6 && q.x <= Math.max(p.x, r.x) + 1e-6 &&
+      q.y >= Math.min(p.y, r.y) - 1e-6 && q.y <= Math.max(p.y, r.y) + 1e-6;
+    const o1 = orient(a, b, c);
+    const o2 = orient(a, b, d);
+    const o3 = orient(c, d, a);
+    const o4 = orient(c, d, b);
+    if ((o1 > 1e-6 && o2 < -1e-6 || o1 < -1e-6 && o2 > 1e-6) &&
+        (o3 > 1e-6 && o4 < -1e-6 || o3 < -1e-6 && o4 > 1e-6)) return true;
+    if (Math.abs(o1) <= 1e-6 && onSegment(a, c, b)) return true;
+    if (Math.abs(o2) <= 1e-6 && onSegment(a, d, b)) return true;
+    if (Math.abs(o3) <= 1e-6 && onSegment(c, a, d)) return true;
+    if (Math.abs(o4) <= 1e-6 && onSegment(c, b, d)) return true;
+    return false;
+  }
+
+  function polygonsOverlap(first, second) {
+    if (!Array.isArray(first) || first.length < 3 || !Array.isArray(second) || second.length < 3) return false;
+    for (let a = 0; a < first.length; a += 1) {
+      const aNext = (a + 1) % first.length;
+      for (let b = 0; b < second.length; b += 1) {
+        const bNext = (b + 1) % second.length;
+        if (polygonSegmentIntersects(first[a], first[aNext], second[b], second[bNext])) return true;
+      }
+    }
+    const firstPoint = polygonPoint(first[0]);
+    const secondPoint = polygonPoint(second[0]);
+    const secondArray = second.map((value) => {
+      const pointValue = polygonPoint(value);
+      return [pointValue.x, pointValue.y];
+    });
+    const firstArray = first.map((value) => {
+      const pointValue = polygonPoint(value);
+      return [pointValue.x, pointValue.y];
+    });
+    return pointInPolygon(firstPoint.x, firstPoint.y, secondArray) ||
+      pointInPolygon(secondPoint.x, secondPoint.y, firstArray);
+  }
+
+  function alignFacilityBuilding(place, edges, openSpaces = []) {
     if (!place?.building || !buildingFrontageModel?.resolve) return place;
     const vehicleEdges = edges.filter((edge) => edge.vehicle);
     const initialRect = facilityBuildingRect(place);
@@ -455,29 +504,44 @@
       const blocker = vehicleEdges.find((edge) =>
         orientedRectIntersectsEdge(candidate, edge, facilityRoadClearanceExtra(edge))
       );
-      if (!blocker) break;
 
       const center = { x:centerX, y:centerY };
-      const nearest = nearestPointOnEdge(blocker, center);
-      if (!nearest) break;
+      if (blocker) {
+        const nearest = nearestPointOnEdge(blocker, center);
+        if (!nearest) break;
 
-      let away;
-      if (nearest.distance > .01) {
-        away = {
-          x:(center.x - nearest.point.x) / nearest.distance,
-          y:(center.y - nearest.point.y) / nearest.distance
-        };
-      } else {
-        away = { x:-frontageGeometry.normal.x, y:-frontageGeometry.normal.y };
+        let away;
+        if (nearest.distance > .01) {
+          away = {
+            x:(center.x - nearest.point.x) / nearest.distance,
+            y:(center.y - nearest.point.y) / nearest.distance
+          };
+        } else {
+          away = { x:-frontageGeometry.normal.x, y:-frontageGeometry.normal.y };
+        }
+
+        const support =
+          Math.abs(frontageGeometry.tangent.x * away.x + frontageGeometry.tangent.y * away.y) * place.building.w / 2 +
+          Math.abs(frontageGeometry.normal.x * away.x + frontageGeometry.normal.y * away.y) * place.building.h / 2;
+        const requiredDistance = blocker.width / 2 + facilityRoadClearanceExtra(blocker) + support + 8;
+        const shift = Math.max(6, requiredDistance - nearest.distance);
+        centerX += away.x * shift;
+        centerY += away.y * shift;
+        continue;
       }
 
-      const support =
-        Math.abs(frontageGeometry.tangent.x * away.x + frontageGeometry.tangent.y * away.y) * place.building.w / 2 +
-        Math.abs(frontageGeometry.normal.x * away.x + frontageGeometry.normal.y * away.y) * place.building.h / 2;
-      const requiredDistance = blocker.width / 2 + facilityRoadClearanceExtra(blocker) + support + 8;
-      const shift = Math.max(6, requiredDistance - nearest.distance);
-      centerX += away.x * shift;
-      centerY += away.y * shift;
+      const overlappingSpace = openSpaces.find((space) => polygonsOverlap(frontageGeometry.polygon, space.polygon));
+      if (!overlappingSpace) break;
+
+      const spaceCenter = {
+        x:overlappingSpace.bounds.x + overlappingSpace.bounds.w / 2,
+        y:overlappingSpace.bounds.y + overlappingSpace.bounds.h / 2
+      };
+      const rawAway = { x:center.x - spaceCenter.x, y:center.y - spaceCenter.y };
+      const tangentProjection = rawAway.x * frontageGeometry.tangent.x + rawAway.y * frontageGeometry.tangent.y;
+      const tangentSign = Math.abs(tangentProjection) > .01 ? Math.sign(tangentProjection) : 1;
+      centerX += frontageGeometry.tangent.x * tangentSign * 28;
+      centerY += frontageGeometry.tangent.y * tangentSign * 28;
     }
 
     const finalRect = {
@@ -752,17 +816,18 @@
     const nodes = BLUEPRINT_NODES.map((value) => ({ ...value }));
     const nodeMap = new Map(nodes.map((value) => [value.id, value]));
     const edges = BLUEPRINT_EDGES.map((value) => edgeFromDefinition(value, nodeMap));
-    const places = PLACE_DEFINITIONS.map((value) => alignFacilityBuilding(
-      { ...value, building:value.building ? { ...value.building } : null },
-      edges
-    ));
-    const stations = STATION_DEFINITIONS.map((value) => ({ ...value }));
-    const districts = DISTRICT_DEFINITIONS.map((value) => ({
+    const openSpaces = OPEN_SPACES.map((value) => ({
       ...value,
       polygon:value.polygon.map(([x, y]) => [x, y]),
       bounds:boundsForPolygon(value.polygon)
     }));
-    const openSpaces = OPEN_SPACES.map((value) => ({
+    const places = PLACE_DEFINITIONS.map((value) => alignFacilityBuilding(
+      { ...value, building:value.building ? { ...value.building } : null },
+      edges,
+      openSpaces
+    ));
+    const stations = STATION_DEFINITIONS.map((value) => ({ ...value }));
+    const districts = DISTRICT_DEFINITIONS.map((value) => ({
       ...value,
       polygon:value.polygon.map(([x, y]) => [x, y]),
       bounds:boundsForPolygon(value.polygon)
@@ -1275,6 +1340,7 @@
           // They may intentionally sit close to one side of a street entrance;
           // runtime building collision still prevents pedestrians entering them.
           if (edges.some((edge) => {
+            if (!edge.vehicle) return false;
             const originalHalfWidth = (edge.sourceWidth || edge.width) / 2;
             const widenedHalfWidth = edge.width / 2;
             const preservedExtra = edge.vehicle
@@ -1289,7 +1355,13 @@
             };
             return orientedRectIntersectsEdge(site, edge, Math.max(preservedExtra, facilityRoadClearanceExtra(edge)));
           })) errors.push("facility intersects street: " + place.id);
-          if (openSpaces.some((space) => rectsOverlap(facility, space.bounds, 0))) errors.push("facility intersects open space: " + place.id);
+          const facilityPolygon = place.building.frontageGeometry?.polygon || [
+            { x:facility.x, y:facility.y },
+            { x:facility.x + facility.w, y:facility.y },
+            { x:facility.x + facility.w, y:facility.y + facility.h },
+            { x:facility.x, y:facility.y + facility.h }
+          ];
+          if (openSpaces.some((space) => polygonsOverlap(facilityPolygon, space.polygon))) errors.push("facility intersects open space: " + place.id);
           if (buildingSites.some((site) => rectsOverlap(facility, site.collisionBounds || site, 10))) errors.push("facility intersects generated building: " + place.id);
         }
       }
