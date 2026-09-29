@@ -10517,6 +10517,7 @@
     const p = actorPosition();
     const waypointPlace = PLACES.find((place) => place.id === state.phone?.waypoint);
     const friendWaypoint = phoneFriendWaypointTarget();
+    const libraryReading = libraryReadingModel.normalizeProgress(state.libraryReading);
     return {
       day:state.day,
       minute:state.minute,
@@ -10527,6 +10528,13 @@
       shiftsWorked:state.shiftsWorked,
       needs:{ ...state.needs },
       petCompanion:{ ...petCompanionModel.normalizeProgress(state.petCompanion), condition:petCompanionModel.getCondition(state.petCompanion).label },
+      libraryReading:{
+        loans:libraryReading.loans.map((loan) => ({
+          ...loan,
+          title:libraryReadingModel.BOOKS.find((book) => book.id === loan.bookId)?.title || "図書館の本"
+        })),
+        completedCount:libraryReading.completedBookIds.length
+      },
       district:state.player.inHome ? "自宅・室内" : currentDistrict(p.x, p.y),
       weather:state.visual.weather,
       soundEnabled:audioState.enabled,

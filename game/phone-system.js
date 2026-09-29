@@ -12,6 +12,7 @@
     ["mail","メール","✉","#3c8cf5"],["news","ニュース","N","#f5f5f7"],
     ["music","ミュージック","♫","#ef476f"],["calculator","計算機","＋","#ff9f0a"],
     ["pet","ペット","🐾","#b98255"],
+    ["books","本棚","▤","#a77b54"],
     ["home","ホーム","⌂","#ff9f0a"],["settings","設定","⚙","#8e8e93"]
   ];
   const NEUTRAL_CONTACT_COLOR = "#8e8e93";
@@ -257,6 +258,22 @@
         '<div class="ios-pet-food">🍖 フード' + Math.max(0,Math.floor(Number(progress.food) || 0)) + '個</div></section>' +
         '<p class="ios-pet-hint">お世話は自宅でできます</p>');
     }
+    function booksApp() {
+      const shelf = model.libraryReading || {};
+      const loans = Array.isArray(shelf.loans) ? shelf.loans : [];
+      const completedCount = Math.max(0,Math.floor(Number(shelf.completedCount) || 0));
+      const list = loans.map(function(loan){
+        const rawChapters = Number(loan.chaptersRead);
+        const chapters = Math.max(0,Math.min(3,Math.floor(Number.isFinite(rawChapters) ? rawChapters : 0)));
+        const percent = Math.round(chapters / 3 * 100);
+        return '<article class="ios-book-card"><span class="ios-book-cover">▤</span><div><b>' + esc(loan.title || "図書館の本") +
+          '</b><small>第' + chapters + '章まで / 3章</small><div class="ios-book-progress"><i style="width:' + percent + '%"></i></div></div>' +
+          (chapters === 3 ? '<em>読了</em>' : '') + '</article>';
+      }).join("");
+      const empty = '<div class="ios-books-empty"><span>▤</span><h3>貸出中の本はありません</h3><p>市立図書館で本を無料で借りられます。</p></div>';
+      return shell("本棚",'<section class="ios-section ios-books-summary"><span>貸出中 ' + loans.length + ' / 3冊</span><b>読了 ' + completedCount + '冊</b></section>' +
+        (list || empty) + '<p class="ios-books-hint">続きは図書館または自宅のソファで読めます</p>');
+    }
     function findApp() {
       const canRouteToFriend = !model.inHome && !model.inVehicle && !model.inTrain;
       const friends = (model.npcs || []).map(function(npc){
@@ -380,6 +397,7 @@
       if (app === "wallet") return walletApp();
       if (app === "health") return healthApp();
       if (app === "pet") return petApp();
+      if (app === "books") return booksApp();
       if (app === "find") return findApp();
       if (app === "transit") return transitApp();
       if (app === "mail") return mailApp();
@@ -454,6 +472,10 @@
             Math.round(Number(value.petCompanion.pet.energy) || 0),
             Math.round(Number(value.petCompanion.pet.bond) || 0)
           ] : null
+        ] : null,
+        libraryReading:value.libraryReading ? [
+          value.libraryReading.completedCount,
+          (value.libraryReading.loans || []).map(function(loan){return [loan.bookId,loan.title,loan.chaptersRead];})
         ] : null,
         npcs:(value.npcs || []).map(function(n){return [n.id,n.friendship,n.hidden,n.activity,Math.round((n.distance || 0) / 25),Math.round((n.mapDX || 0) / 20),Math.round((n.mapDY || 0) / 20)];}),
         friendWaypoint:value.friendWaypoint ? [value.friendWaypoint.id,Math.round((value.friendWaypoint.distance || 0) / 20)] : null,

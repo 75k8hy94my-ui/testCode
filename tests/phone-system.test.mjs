@@ -9,12 +9,12 @@ const html = fs.readFileSync(new URL('../game/index.html', import.meta.url), 'ut
 const css = fs.readFileSync(new URL('../game/game.css', import.meta.url), 'utf8');
 
 test('phone system exposes a broad app catalog', () => {
-  assert.equal(phoneModule.appCount, 21);
+  assert.equal(phoneModule.appCount, 22);
   assert.equal(typeof phoneModule.createPhoneSystem, 'function');
   for (const id of [
     'phone','messages','maps','camera','photos','weather','calendar','clock',
     'notes','reminders','wallet','health','find','transit','mail','news',
-    'music','calculator','pet','home','settings'
+    'music','calculator','pet','books','home','settings'
   ]) {
     assert.match(phoneSource, new RegExp('"' + id + '"'));
   }
@@ -56,6 +56,7 @@ test('phone camera stores actual game canvas captures', () => {
 test('phone receives live game data for health, contacts, transport and wallet', () => {
   assert.match(gameSource, /function phoneModelSnapshot\(\)/);
   assert.match(gameSource, /needs:\{ \.\.\.state\.needs \}/);
+  assert.match(gameSource, /libraryReading:\{[\s\S]*loans:libraryReading\.loans\.map/);
   assert.match(gameSource, /npcs:NPCS\.map/);
   assert.match(gameSource, /stations:TRAIN_STATIONS\.map/);
   assert.match(gameSource, /trains:trains\.map/);
@@ -86,6 +87,29 @@ test('pet phone app safely shows shelter guidance or live household pet care sta
 
   phone.update({ petCompanion:{ pet:{ speciesId:'cat', name:'<ミケ>', hunger:9, happiness:47, bond:31, energy:65 }, food:2, condition:'お腹がすいています' } });
   assert.match(root.innerHTML, />9</);
+});
+
+test('bookshelf phone app shows empty guidance, escaped loan progress and updates while open', () => {
+  const root={hidden:false,innerHTML:'',classList:{toggle(){}},style:{setProperty(){}},addEventListener(){}};
+  const phone=phoneModule.createPhoneSystem({root});
+  phone.update({libraryReading:{loans:[],completedCount:2}});
+  phone.home();
+  assert.match(root.innerHTML,/data-phone-app="books"/);
+  phone.openApp('books');
+  assert.match(root.innerHTML,/本棚/);
+  assert.match(root.innerHTML,/市立図書館/);
+  assert.match(root.innerHTML,/貸出中の本はありません/);
+
+  phone.update({libraryReading:{loans:[{bookId:'home-sewing',title:'<img src=x onerror=alert(1)>',chaptersRead:1}],completedCount:2}});
+  assert.match(root.innerHTML,/&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.doesNotMatch(root.innerHTML,/<img src=x/);
+  assert.match(root.innerHTML,/第1章まで/);
+  assert.match(root.innerHTML,/読了 2冊/);
+
+  phone.update({libraryReading:{loans:[{bookId:'home-sewing',title:'暮らしの手芸',chaptersRead:2}],completedCount:2}});
+  assert.match(root.innerHTML,/第2章まで/);
+  assert.match(root.innerHTML,/暮らしの手芸/);
+  assert.match(css,/\.ios-book-progress/);
 });
 
 test('social contacts use their authored accent colors and escape profile text', () => {
