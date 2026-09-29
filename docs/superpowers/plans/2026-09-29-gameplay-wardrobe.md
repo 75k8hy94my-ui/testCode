@@ -79,4 +79,4 @@
 - [x] Step 2: Verify a real supermarket purchase, no auto-equip, home entry, closet equip, money/time/IDs, outdoor equip rejection, and matching outfit appearance in street and home contexts.
 - [x] Step 3: Capture desktop and mobile screenshots; collect console warnings/errors, page errors, failed requests, HTTP failures, canvas dimensions, and mobile document/canvas bounds. The wardrobe verifier first opened localhost:4173, identified its HTTP 200 content as stale (no wardrobe module), captured it, and served this isolated checkout on an ephemeral local port.
 - [x] Step 4: Run the verifier, `npm test`, `npm run verify:static`, and `git diff --check`; correct and repeat any failed visual or behavioral check.
-- [ ] Step 5: Review the complete diff, commit, fetch origin, integrate to main only if it is not diverged, rerun verification on main, and push.
+- [x] Step 5: Review the complete diff, commit, fetch origin, integrate to main only if it is not diverged, rerun verification on main, and push. Reviewer findings were fixed and approved; wardrobe commits are on `origin/main`.
