@@ -461,8 +461,10 @@
       const accessNodeId = "station-access:" + station.id;
       const target = chooseSafeAccessPath(accessPoint, primarySegments, mapModel, 1100);
       if (!target) continue;
+      const legacyStationEntryId = station.id + "-station-entry";
       if (target.length <= 1) {
         externalNodeAliases.set(station.roadNodeId, target.nodeId);
+        if (mapModel.getNode?.(legacyStationEntryId)) externalNodeAliases.set(legacyStationEntryId, target.nodeId);
         continue;
       }
       addSegment({
@@ -475,6 +477,7 @@
         sourceEdgeId:null
       });
       externalNodeAliases.set(station.roadNodeId, accessNodeId);
+      if (mapModel.getNode?.(legacyStationEntryId)) externalNodeAliases.set(legacyStationEntryId, accessNodeId);
     }
 
     for (const segment of segments) {
