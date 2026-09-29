@@ -28,8 +28,10 @@
     for (const entry of Array.isArray(source.loans) ? source.loans : []) {
       if (!entry || typeof entry !== "object" || !BOOK_BY_ID.has(entry.bookId) || seenLoans.has(entry.bookId)) continue;
       if (loans.length >= MAX_LOANS) break;
-      const rawChapters = Number(entry.chaptersRead);
-      const chaptersRead = Number.isFinite(rawChapters) ? Math.max(0, Math.min(CHAPTERS_PER_BOOK, Math.floor(rawChapters))) : 0;
+      const rawChapters = entry.chaptersRead;
+      const chaptersRead = Number.isInteger(rawChapters) && rawChapters >= 0 && rawChapters <= CHAPTERS_PER_BOOK
+        ? rawChapters
+        : 0;
       loans.push({ bookId:entry.bookId, chaptersRead });
       seenLoans.add(entry.bookId);
     }

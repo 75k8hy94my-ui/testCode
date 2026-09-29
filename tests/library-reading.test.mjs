@@ -21,11 +21,17 @@ test('new, legacy and malformed shelves normalize to unique known loans and comp
     {bookId:'rainy-platform',chaptersRead:9},{bookId:'wakaba-kitchen-basics',chaptersRead:1}
   ],completedBookIds:['home-sewing','unknown','home-sewing','rainy-platform']}),{
     loans:[
-      {bookId:'home-sewing',chaptersRead:2},
+      {bookId:'home-sewing',chaptersRead:0},
       {bookId:'gentle-walking',chaptersRead:0},
-      {bookId:'rainy-platform',chaptersRead:3}
+      {bookId:'rainy-platform',chaptersRead:0}
     ],completedBookIds:['home-sewing','rainy-platform']
   });
+  assert.deepEqual(library.normalizeProgress({loans:[
+    {bookId:'wakaba-kitchen-basics',chaptersRead:'2'}
+  ]}),{loans:[{bookId:'wakaba-kitchen-basics',chaptersRead:0}],completedBookIds:[]});
+  assert.deepEqual(library.normalizeProgress({loans:[
+    {bookId:'wakaba-kitchen-basics',chaptersRead:Symbol('invalid')}
+  ]}),{loans:[{bookId:'wakaba-kitchen-basics',chaptersRead:0}],completedBookIds:[]});
   assert.deepEqual(library.normalizeProgress(undefined),library.createProgress());
   assert.deepEqual(library.normalizeProgress({}),library.createProgress());
 });

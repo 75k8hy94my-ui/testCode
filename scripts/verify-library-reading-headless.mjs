@@ -102,6 +102,10 @@ try {
     await delay(180);
   };
   const state = async () => JSON.parse(await evaluate('JSON.stringify(window.__LibraryReadingTestHook.snapshot())'));
+  const moveNearPlace = async (placeId, avoidNearbyActors = false) => {
+    const moved = await evaluate(`window.__LibraryReadingTestHook.movePlayerNearPlace(${JSON.stringify(placeId)},${avoidNearbyActors})`);
+    if (!moved) throw new Error(`Could not place test actor at ${placeId} (avoidNearbyActors=${avoidNearbyActors})`);
+  };
 
   await call('Runtime.enable'); await call('Page.enable'); await call('Network.enable'); await call('Log.enable');
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
@@ -142,7 +146,7 @@ try {
   }
   await evaluate("window.__LibraryReadingTestHook.setMinuteForTest(480)"); await delay(120);
   const baseline = await state();
-  await evaluate("window.__LibraryReadingTestHook.movePlayerNearPlace('library', true)");
+  await moveNearPlace('library',true);
   const atLibrary = await state();
   await pressE();
   const libraryMenu = JSON.parse(await evaluate(`JSON.stringify({title:document.querySelector('#actionTitle')?.textContent,
@@ -155,7 +159,7 @@ try {
   let borrowed = await state();
   if (borrowed.libraryReading.loans.length !== 1) throw new Error('Borrow action did not create a loan');
 
-  await evaluate("window.__LibraryReadingTestHook.movePlayerNearPlace('home')"); await pressE();
+  await moveNearPlace('home'); await pressE();
   await clickChoice('自宅に入る'); await delay(350);
   const home = await state();
   if (!home.player.inHome) throw new Error('Could not enter home through the home interaction');
@@ -203,16 +207,16 @@ try {
   await evaluate("document.querySelector('#smartphoneToggle')?.click()"); await delay(100);
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false}); await delay(100);
   await evaluate("window.__LibraryReadingTestHook.setMinuteForTest(480)"); await delay(250);
-  await evaluate("window.__LibraryReadingTestHook.movePlayerNearPlace('library', true)"); await pressE();
+  await moveNearPlace('library',true); await pressE();
   await clickChoice('『はじめての家庭料理』を返す');
   const returned = await state();
   if (returned.libraryReading.loans.length !== 0 || returned.libraryReading.completedBookIds.length !== 1) {
     throw new Error(`Return did not preserve completed history: ${JSON.stringify(returned.libraryReading)}`);
   }
 
-  await evaluate("window.__LibraryReadingTestHook.movePlayerNearPlace('library', true)"); await pressE();
+  await moveNearPlace('library',true); await pressE();
   await clickChoice('『はじめての家庭料理』を借りる');
-  await evaluate("window.__LibraryReadingTestHook.movePlayerNearPlace('home')"); await pressE(); await clickChoice('自宅に入る'); await delay(250);
+  await moveNearPlace('home'); await pressE(); await clickChoice('自宅に入る'); await delay(250);
   for (let chapter=1;chapter<=3;chapter+=1) {
     await evaluate("window.__LibraryReadingTestHook.movePlayerToHomeFixture('sofa')"); await pressE();
     await clickChoice('『はじめての家庭料理』を読む');
@@ -221,7 +225,7 @@ try {
   if (reread.skills.cooking !== complete.skills.cooking || reread.libraryReading.completedBookIds.length !== 1) {
     throw new Error(`Re-reading a completed title must not farm skill: ${complete.skills.cooking} -> ${reread.skills.cooking}`);
   }
-  await evaluate("window.__LibraryReadingTestHook.movePlayerNearPlace('library', true)"); await pressE();
+  await moveNearPlace('library',true); await pressE();
   await clickChoice('『はじめての家庭料理』を返す');
   const finalShelfState = await state();
 

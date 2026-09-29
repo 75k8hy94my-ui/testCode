@@ -24,7 +24,7 @@ Turn the existing library's one-shot reading option into a persistent everyday l
 ## Architecture and State
 
 - Add pure `game/library-reading.js` exporting `BOOKS`, `createProgress()`, `normalizeProgress(value)`, `borrow(progress, bookId)`, `readChapter(progress, bookId)`, and `returnBook(progress, bookId)`.
-- Progress shape is `{ loans:[{ bookId, chaptersRead }], completedBookIds:[] }`; only known IDs, unique loans, unique completions, integer chapter counts in `[0,3]`, and the three-book limit survive normalization.
+- Progress shape is `{ loans:[{ bookId, chaptersRead }], completedBookIds:[] }`; only known IDs, unique loans, unique completions, integer chapter counts in `[0,3]`, and the three-book limit survive normalization. A missing or malformed chapter count resets to zero rather than being rounded or clamped into earned progress.
 - Runtime owns `state.libraryReading`, integrates validated model results with game time, fun, and existing `communityCenter.skills`, and adds the state to existing snapshot restore/save migration. Missing/invalid legacy values become an empty shelf without interrupting other state restoration.
 - Library place actions offer borrow, read, and return choices. Home sofa actions keep resting and add chapter reading for each loan with unread chapters. No new map facility or collision footprint is required.
 - Add the `books` phone app as a read-only projection of current loans and completion totals. The no-loan screen points to 市立図書館. Escape all authored or saved book text before HTML rendering.
