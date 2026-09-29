@@ -7869,8 +7869,14 @@
       if (!decision.shouldYield) continue;
       const halfVehicle = vehicleDimensions(car).length / 2;
       const crossingClearance = Number(crossingControl.SAFE_FRONT_CLEARANCE) || 14;
+      const currentEndpointDistance = car.directionSign > 0
+        ? polylineLength(edge.points) - trafficAlongForPosition(edge, car.x, car.y).along
+        : trafficAlongForPosition(edge, car.x, car.y).along;
       const stopAlong = crosswalk.along - car.directionSign * (halfVehicle + crossingClearance);
-      const centerStopOffset = car.directionSign > 0 ? polylineLength(edge.points) - stopAlong : stopAlong;
+      const plannedCenterStopOffset = car.directionSign > 0 ? polylineLength(edge.points) - stopAlong : stopAlong;
+      const centerStopOffset = decision.committed && claim.phase === "crossing"
+        ? currentEndpointDistance
+        : plannedCenterStopOffset;
       const currentAlong = trafficAlongForPosition(edge, car.x, car.y).along;
       const distanceToCrossing = (crosswalk.along - currentAlong) * car.directionSign;
       if (distanceToCrossing < -halfVehicle || distanceToCrossing > endpointDistance + 1) continue;
@@ -9234,6 +9240,7 @@
 
   function drawMapModelRoads() {
     const visibleEdges = mapModel.edges.filter((edge) => {
+      if (!edge.vehicle) return false;
       const points = edge.points.map((point) => worldToScreen(point.x, point.y));
       const minX = Math.min(...points.map((point) => point.x));
       const maxX = Math.max(...points.map((point) => point.x));
@@ -9386,9 +9393,23 @@
     drawJunctionPads("curb");
 
     for (const edge of visibleEdges) {
-      strokeEdge(edge, edge.width, edge.vehicle ? vehicleSurface(edge) : pedestrianSurface(edge));
+      strokeEdge(edge, edge.width, vehicleSurface(edge));
     }
     drawJunctionPads("surface");
+
+    // Freehand pedestrian-only blueprint edges are not authoritative navigation
+    // geometry. Draw only generated pedestrian paths that are verified clear of
+    // vehicle carriageways, so the visual map matches the actual walking graph.
+    for (const segment of mapModel.pedestrianNavigation.segments) {
+      if (segment.type === "crosswalk" || segment.sourceEdgeId && mapModel.getEdge(segment.sourceEdgeId)?.vehicle) continue;
+      const points = segment.points.map((point) => worldToScreen(point.x, point.y));
+      const minX = Math.min(...points.map((point) => point.x));
+      const maxX = Math.max(...points.map((point) => point.x));
+      const minY = Math.min(...points.map((point) => point.y));
+      const maxY = Math.max(...points.map((point) => point.y));
+      if (maxX < -120 || minX > viewWidth + 120 || maxY < -120 || minY > viewHeight + 120) continue;
+      strokePoints(points, segment.type === "facility-access" ? 12 : 10, "#aaa9a1");
+    }
 
     // A fine inner curb highlight and asphalt variation give the roadway depth
     // without reintroducing different pavement colors between connected edges.
@@ -12142,6 +12163,7 @@
       return { casing:"#cbd3cf", fill:"#faf9f2", width:2.2 };
     };
     for (const edge of mapModel.edges) {
+      if (!edge.vehicle) continue;
       mctx.lineCap = "round";
       mctx.lineJoin = "round";
       const style = roadStyle(edge);
@@ -12159,6 +12181,20 @@
       };
       paint(style.casing, style.width + 1.4);
       paint(style.fill, style.width);
+    }
+
+    mctx.strokeStyle = "#d7dbd2";
+    mctx.lineWidth = 1.15;
+    mctx.lineCap = "round";
+    mctx.lineJoin = "round";
+    for (const segment of mapModel.pedestrianNavigation.segments) {
+      if (segment.type === "crosswalk" || segment.sourceEdgeId && mapModel.getEdge(segment.sourceEdgeId)?.vehicle) continue;
+      const points = segment.points.map((point) => screen(point.x, point.y));
+      if (!points.length || points.every((point) => point.x < -8 || point.y < -8 || point.x > w + 8 || point.y > h + 8)) continue;
+      mctx.beginPath();
+      mctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i += 1) mctx.lineTo(points[i].x, points[i].y);
+      mctx.stroke();
     }
   }
 
