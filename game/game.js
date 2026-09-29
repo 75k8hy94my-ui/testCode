@@ -87,6 +87,12 @@
     return;
   }
 
+  const petWalkModel = globalThis.CityDaysPetWalk;
+  if (!petWalkModel?.createWalkState || !petWalkModel?.beginWalk || !petWalkModel?.recordPlayerPosition || !petWalkModel?.advanceFollower || !petWalkModel?.normalizeWalkState) {
+    showRuntimeError("PetWalk を読み込めません。");
+    return;
+  }
+
   const parkFishingModel = globalThis.ParkFishingModel;
   if (!parkFishingModel?.createProgress || !parkFishingModel?.normalizeProgress || !parkFishingModel?.getFishingWindow || !parkFishingModel?.biteChance || !parkFishingModel?.buyBait || !parkFishingModel?.cast) {
     showRuntimeError("ParkFishing を読み込めません。");
@@ -1177,6 +1183,7 @@
     deliveryWork:deliveryWorkModel.createProgress(),
     garden:communityGardenModel.createProgress(),
     petCompanion:petCompanionModel.createProgress(),
+    petWalk:petWalkModel.createWalkState(),
     fishing:parkFishingModel.createProgress(),
     packedMeals:packedMealsModel.createInventory(),
     homeCrafting:homeCraftingModel.createProgress(),
@@ -3065,6 +3072,10 @@
   }
 
   function boardTrain(train, station) {
+    if (state.petWalk.active) {
+      showToast("散歩中は犬と一緒に帰宅してから乗車してください");
+      return;
+    }
     if (!train || !station || train.dwell <= .05) {
       showToast("電車はまだ到着していません");
       return;
@@ -3931,6 +3942,20 @@
 
   function enterHome() {
     if (state.player.inVehicle || state.player.inTrain) return;
+    if (state.petWalk.active) {
+      if (distance(state.player.x, state.player.y, state.petWalk.petX, state.petWalk.petY) > 90) {
+        showToast((state.petCompanion.pet?.name || "犬") + "が追いつくまで少し待ってください");
+        return false;
+      }
+      const result = petCompanionModel.completeWalk(state.petCompanion, state.petWalk.elapsedMinutes, state.petWalk.distance);
+      if (!result.ok) {
+        showToast("散歩を完了できません。犬と一緒に帰宅してください");
+        return false;
+      }
+      state.petCompanion = result.progress;
+      state.petWalk = petWalkModel.clearWalkState();
+      showToast(state.petCompanion.pet.name + (result.quality === "regular" ? "との散歩を終えました" : "と短い散歩を終えました"));
+    }
     state.player.outdoorHomeX = state.player.x;
     state.player.outdoorHomeY = state.player.y;
     state.player.inHome = true;
@@ -3941,6 +3966,41 @@
     touch.x = 0;
     touch.y = 0;
     showToast("自宅に入りました");
+    return true;
+  }
+
+  function startDogWalk() {
+    const pet = state.petCompanion.pet;
+    if (!state.player.inHome || !pet || pet.speciesId !== "dog" || pet.energy < 15 || state.petWalk.active) {
+      showToast(pet?.speciesId === "cat" ? "猫は家の中で遊んであげましょう" : pet?.energy < 15 ? pet.name + "は散歩するには疲れています" : "今は散歩に出られません");
+      return false;
+    }
+    exitHome();
+    const result = petWalkModel.beginWalk(state.petWalk, { x:state.player.x, y:state.player.y });
+    if (!result.ok) {
+      state.player.inHome = true;
+      showToast("散歩を始められませんでした");
+      return false;
+    }
+    state.petWalk = result.state;
+    showToast(pet.name + "と散歩に出ました。帰宅すると散歩を終えます");
+    return true;
+  }
+
+  function updatePetWalk(dt, gameMinutes) {
+    if (!state.petWalk.active) return;
+    if (!state.player.inHome && !state.player.inVehicle && !state.player.inTrain) {
+      const lastPoint = state.petWalk.trail[state.petWalk.trail.length - 1];
+      const recorded = petWalkModel.recordPlayerPosition(state.petWalk, { x:state.player.x, y:state.player.y });
+      if (recorded.distance === state.petWalk.distance && distance(state.player.x, state.player.y, lastPoint.x, lastPoint.y) > petWalkModel.SAMPLE_SPACING) {
+        state.player.x = lastPoint.x;
+        state.player.y = lastPoint.y;
+      } else {
+        state.petWalk = recorded;
+      }
+      state.petWalk = petWalkModel.advanceElapsed(state.petWalk, gameMinutes);
+    }
+    state.petWalk = petWalkModel.advanceFollower(state.petWalk, dt, 110);
   }
 
   function exitHome() {
@@ -4237,6 +4297,10 @@
       const species = petCompanionModel.SPECIES[pet.speciesId];
       actionDescription.textContent = condition.label + " / お腹 " + Math.round(pet.hunger) + " / ごきげん " + Math.round(pet.happiness) +
         " / 体力 " + Math.round(pet.energy) + " / なかよし " + Math.round(pet.bond) + " / フード " + state.petCompanion.food + "個";
+      if (pet.speciesId === "dog") {
+        const canWalk = pet.energy >= 15 && !state.petWalk.active;
+        addChoice("犬の散歩へ出る", canWalk ? "街を歩いて一緒に散歩します" : "体力15以上で散歩できます", () => startDogWalk(), !canWalk);
+      }
       const feedResult = petCompanionModel.feed(state.petCompanion);
       addChoice("ごはんをあげる", "フード1個 / 5分" + (feedResult.ok ? " / お腹+40" : " / フードがありません"), () => {
         const result = petCompanionModel.feed(state.petCompanion);
@@ -5176,6 +5240,10 @@
   }
 
   function enterCar() {
+    if (state.petWalk.active) {
+      showToast("散歩中は犬と一緒に帰宅してから乗車してください");
+      return;
+    }
     if (personalCar.fuelLiters <= 0) {
       showToast("燃料切れです。携行缶で補給してください");
       return;
@@ -5362,6 +5430,7 @@
         deliveryWork:deliveryWorkModel.normalizeProgress(state.deliveryWork),
         communityGarden:communityGardenModel.normalizeProgress(state.garden),
         petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
+        petWalk:petWalkModel.normalizeWalkState(state.petWalk, { worldSize:WORLD_SIZE, hasDog:state.petCompanion.pet?.speciesId === "dog", playerCanWalk:!state.player.inHome && !state.player.inVehicle && !state.player.inTrain }),
         fishing:parkFishingModel.normalizeProgress(state.fishing),
         shiftsWorked: state.shiftsWorked,
         lastShiftDay:state.lastShiftDay,
@@ -5562,6 +5631,11 @@
         state.player.inTrain = Boolean(saved.player.inTrain);
         state.player.trainId = typeof saved.player.trainId === "string" ? saved.player.trainId : null;
         state.player.inVehicle = Boolean(saved.player.inVehicle) && !state.player.inTrain;
+        state.player.inHome = Boolean(saved.player.inHome) && !state.player.inVehicle && !state.player.inTrain;
+        state.player.homeX = Number.isFinite(Number(saved.player.homeX)) ? Number(saved.player.homeX) : state.player.homeX;
+        state.player.homeY = Number.isFinite(Number(saved.player.homeY)) ? Number(saved.player.homeY) : state.player.homeY;
+        state.player.outdoorHomeX = Number.isFinite(Number(saved.player.outdoorHomeX)) ? Number(saved.player.outdoorHomeX) : state.player.outdoorHomeX;
+        state.player.outdoorHomeY = Number.isFinite(Number(saved.player.outdoorHomeY)) ? Number(saved.player.outdoorHomeY) : state.player.outdoorHomeY;
       }
 
       if (saved.car) {
@@ -5619,6 +5693,11 @@
       state.deliveryWork = deliveryWorkModel.normalizeProgress(saved.deliveryWork);
       state.garden = communityGardenModel.normalizeProgress(saved.communityGarden);
       state.petCompanion = petCompanionModel.normalizeProgress(saved.petCompanion);
+      state.petWalk = petWalkModel.normalizeWalkState(saved.petWalk, {
+        worldSize:WORLD_SIZE,
+        hasDog:state.petCompanion.pet?.speciesId === "dog",
+        playerCanWalk:!state.player.inHome && !state.player.inVehicle && !state.player.inTrain
+      });
       state.fishing = parkFishingModel.normalizeProgress(saved.fishing);
       state.shiftsWorked = Math.max(0, Math.floor(Number(saved.shiftsWorked) || 0));
       state.lastShiftDay = Math.max(0, Math.floor(Number(saved.lastShiftDay) || 0));
@@ -7177,6 +7256,8 @@
     if (state.player.inHome) updatePlayerAtHome(dt);
     else if (state.player.inVehicle) updateCar(dt);
     else if (!state.player.inTrain) updatePlayerOnFoot(dt);
+
+    updatePetWalk(dt, gameMinutes);
 
     updateTraffic(dt);
     advanceTime(gameMinutes, true, false);
@@ -10093,6 +10174,65 @@
     if (isPlayerUsingUmbrella()) drawPlayerUmbrella();
   }
 
+  function drawPetFollower() {
+    if (!state.petWalk.active || state.player.inHome || state.player.inVehicle || state.player.inTrain) return;
+    const dogScreen = worldToScreen(state.petWalk.petX, state.petWalk.petY);
+    const playerScreen = worldToScreen(state.player.x, state.player.y);
+    const x = dogScreen.x;
+    const y = dogScreen.y;
+    const leashX = playerScreen.x - x;
+    const leashY = playerScreen.y - y;
+    ctx.save();
+    ctx.strokeStyle = "rgba(238,224,193,.88)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, y - 4);
+    ctx.lineTo(x + leashX * .55, y + leashY * .55 - 2);
+    ctx.lineTo(playerScreen.x, playerScreen.y - 24);
+    ctx.stroke();
+    ctx.translate(x, y);
+    ctx.rotate(state.petWalk.facing);
+    ctx.fillStyle = "#74533a";
+    ctx.beginPath();
+    ctx.ellipse(-1, 1, 13, 7.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#513a2b";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-9, 4); ctx.lineTo(-10, 10);
+    ctx.moveTo(-2, 5); ctx.lineTo(-2, 11);
+    ctx.moveTo(7, 4); ctx.lineTo(8, 10);
+    ctx.stroke();
+    ctx.strokeStyle = "#74533a";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-12, -1); ctx.quadraticCurveTo(-18, -7, -17, -10);
+    ctx.stroke();
+    ctx.strokeStyle = "#67aeb0";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(5, -4); ctx.lineTo(11, -4);
+    ctx.stroke();
+    ctx.fillStyle = "#c99466";
+    ctx.beginPath();
+    ctx.arc(11, -3, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#74533a";
+    ctx.beginPath();
+    ctx.ellipse(8, -8, 2.3, 4, -.35, 0, Math.PI * 2);
+    ctx.ellipse(14, -8, 2.3, 4, .35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ead6bd";
+    ctx.beginPath();
+    ctx.ellipse(16, -1, 3.5, 2.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#332a24";
+    ctx.beginPath();
+    ctx.arc(17, -2, 1.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   function drawPlayerUmbrella() {
     umbrellaDrawCount += 1;
     const screen = worldToScreen(state.player.x, state.player.y);
@@ -11112,6 +11252,7 @@
     for (const npc of NPCS) drawNpc(npc);
     for (const car of traffic) drawCar(car, false);
     drawCar(personalCar, true);
+    drawPetFollower();
     drawPlayer();
     drawTrafficLights();
     drawRailDeck();
@@ -11191,6 +11332,7 @@
         relationships:{ ...socialNpcState.relationships },
         npcPositions:Object.fromEntries(NPCS.map((npc) => [npc.id,{ x:npc.x, y:npc.y }])),
         petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
+        petWalk:petWalkModel.normalizeWalkState(state.petWalk, { worldSize:WORLD_SIZE, hasDog:state.petCompanion.pet?.speciesId === "dog", playerCanWalk:!state.player.inHome && !state.player.inVehicle && !state.player.inTrain }),
         homeCrafting:homeCraftingModel.normalizeProgress(state.homeCrafting),
         packedMeals:(() => {
           const packedMeals = packedMealsModel.normalizeInventory(state.packedMeals);
@@ -11249,6 +11391,15 @@
         isPlayerUsingUmbrella,
         getUmbrellaDrawCount() { return umbrellaDrawCount; },
         applyGameSnapshotForTest(saved) { return applyGameSnapshot(saved); },
+        captureGameSnapshotForTest() { return buildGameSnapshot(); },
+        attemptCarBoardForTest() {
+          enterCar();
+          return { inVehicle:state.player.inVehicle, inTrain:state.player.inTrain, walkActive:state.petWalk.active };
+        },
+        attemptTrainBoardForTest() {
+          boardTrain(trains[0], TRAIN_STATIONS[0]);
+          return { inVehicle:state.player.inVehicle, inTrain:state.player.inTrain, walkActive:state.petWalk.active };
+        },
         decayNeedsForTest(minutes) {
           if (!Number.isFinite(minutes) || minutes < 0) return false;
           const hygieneBefore = state.needs.hygiene;

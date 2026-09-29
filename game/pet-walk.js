@@ -1,7 +1,10 @@
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
-  else root.PetWalk = api;
+  else {
+    root.PetWalk = api;
+    root.CityDaysPetWalk = api;
+  }
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   const MAX_TRAIL_POINTS = 512;
   const SAMPLE_SPACING = 8;

@@ -76,18 +76,18 @@
 
 **Produces:** A home fixture action to begin a dog walk, continuous world follower rendering, real-time trail/time updates, return-home completion, and `petWalk` snapshot migration/round-trip.
 
-- [ ] Step 1: Add failing runtime tests for dog-only home start, rejected starts with no state/location change, follower updates only on foot, car/train blocking, home return distance guard, exactly-once completion, snapshot restore/migration, and dog-only world rendering.
-- [ ] Step 2: Run `node --test tests/game-runtime.test.mjs tests/pet-companion.test.mjs tests/pet-walk.test.mjs`; verify the new runtime paths fail for the intended missing behavior.
-- [ ] Step 3: Integrate the model in the existing game loop, snapshot serializer/restorer, pet-fixture choices, home/vehicle/train transitions, and world draw order. Add localhost-only hook controls only when required for CDP observation.
-- [ ] Step 4: Run `node --test tests/game-runtime.test.mjs tests/pet-companion.test.mjs tests/pet-walk.test.mjs`; all targeted tests pass.
+- [x] Step 1: Add failing runtime tests for dog-only home start, rejected starts with no state/location change, follower updates only on foot, car/train blocking, home return distance guard, exactly-once completion, snapshot restore/migration, and dog-only world rendering.
+- [x] Step 2: Run `node --test tests/game-runtime.test.mjs tests/pet-companion.test.mjs tests/pet-walk.test.mjs`; verify the new runtime paths fail for the intended missing behavior.
+- [x] Step 3: Integrate the model in the existing game loop, snapshot serializer/restorer, pet-fixture choices, home/vehicle/train transitions, and world draw order. Add localhost-only hook controls only when required for CDP observation.
+- [x] Step 4: Run `node --test tests/game-runtime.test.mjs tests/pet-companion.test.mjs tests/pet-walk.test.mjs`; all targeted tests pass.
 - [ ] Step 5: Commit the runtime integration.
 
 ### Task 4: Headless route and responsive visual verification
 
 **Files:** Create `scripts/verify-gameplay-dog-walk-headless.mjs`.
 
-- [ ] Step 1: Write the CLI/CDP verifier to exercise the real home fixture and actual player movement before relying on test hooks.
-- [ ] Step 2: Verify a dog can begin at home, follows a multi-segment route continuously, survives a snapshot round-trip, rejects vehicle/train boarding, and completes by returning close to home; verify actual elapsed game time and route-distance outcomes.
-- [ ] Step 3: Capture desktop and mobile screenshots, record canvas/document bounds, and collect console warnings/errors, page errors, failed requests, and bad responses. Try `localhost:4173` first and fall back to a private ephemeral server if it is stale.
-- [ ] Step 4: Run the headless verifier, full `npm test`, `npm run verify:static`, and `git diff --check`; fix and repeat all failures.
+- [x] Step 1: Write the CLI/CDP verifier to exercise the real home fixture and actual player movement before relying on test hooks.
+- [x] Step 2: Verify a dog can begin at home, follows a multi-segment route continuously, survives a snapshot round-trip, rejects vehicle/train boarding, and completes by returning close to home; verify actual elapsed game time and route-distance outcomes.
+- [x] Step 3: Capture desktop and mobile screenshots, record canvas/document bounds, and collect console warnings/errors, page errors, failed requests, and bad responses. Try `localhost:4173` first and fall back to a private ephemeral server if it is stale.
+- [x] Step 4: Run the headless verifier, full `npm test`, `npm run verify:static`, and `git diff --check`; fix and repeat all failures.
 - [ ] Step 5: Review the complete diff, integrate by fast-forward only if main is not diverged, rerun verification on main, and push only this feature's committed files.
