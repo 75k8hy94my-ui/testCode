@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import cooking from '../game/home-cooking.js';
 import packedMeals from '../game/packed-meals.js';
+import store from '../game/store-prepared-food.js';
+
+packedMeals.registerPreparedMeals(store.MENU);
 
 test('stores authored recipes in immutable same-minute batches and enforces six portions', () => {
   const empty = packedMeals.createInventory();
@@ -59,4 +62,15 @@ test('eats exactly one fresh portion and rejects stale or unknown batch actions'
   assert.deepEqual(inventory.batches, [{ recipeId:'home-meal', preparedAt:480, portions:2 }]);
   assert.deepEqual(packedMeals.eat(inventory, 'home-meal@480', 1920), { ok:false, reason:'expired', inventory:{ batches:[] } });
   assert.deepEqual(packedMeals.eat(inventory, 'home-meal@481', 500), { ok:false, reason:'not-found', inventory });
+});
+
+test('prepared food keeps its own freshness deadline and product effects', () => {
+  const stored = packedMeals.store(packedMeals.createInventory(), 'onigiri-set', 100);
+  assert.equal(stored.ok, true);
+  assert.equal(packedMeals.expire(stored.inventory, 819).batches.length, 1);
+  assert.equal(packedMeals.expire(stored.inventory, 820).batches.length, 0);
+  const eaten = packedMeals.eat(stored.inventory, 'onigiri-set@100', 101);
+  assert.equal(eaten.ok, true);
+  assert.deepEqual(eaten.recipe.effects, { hunger:28, fun:3 });
+  assert.equal(packedMeals.eat(stored.inventory, 'onigiri-set@100', 820).reason, 'expired');
 });
