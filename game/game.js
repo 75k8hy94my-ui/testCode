@@ -10022,8 +10022,9 @@
   }
 
   function drawPlayerUmbrella() {
+    const screen = worldToScreen(state.player.x, state.player.y);
     ctx.save();
-    ctx.translate(state.player.x, state.player.y - 39);
+    ctx.translate(screen.x, screen.y - 39);
     ctx.fillStyle = "#4b93b8";
     ctx.beginPath();
     ctx.moveTo(-17, 1);
@@ -11141,7 +11142,18 @@
           return isPlayerUsingUmbrella();
         },
         buyUmbrellaForTest() { return buyUmbrella(); },
+        setCashForTest(amount) {
+          if (!Number.isFinite(amount) || amount < 0) return false;
+          state.cash = Math.floor(amount);
+          return true;
+        },
         isPlayerUsingUmbrella,
+        decayNeedsForTest(minutes) {
+          if (!Number.isFinite(minutes) || minutes < 0) return false;
+          const hygieneBefore = state.needs.hygiene;
+          decayNeeds(minutes);
+          return { ...state.needs, hygieneBefore, hygieneDelta:hygieneBefore - state.needs.hygiene };
+        },
         advanceTimeForTest(minutes) {
           if (!Number.isFinite(minutes) || minutes < 0) return false;
           advanceTime(minutes, false, false);

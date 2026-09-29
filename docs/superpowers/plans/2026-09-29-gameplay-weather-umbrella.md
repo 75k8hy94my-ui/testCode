@@ -87,8 +87,8 @@
 
 **Files:** Create `scripts/verify-gameplay-weather-headless.mjs`; write screenshots/reports only under the OS temp directory.
 
-- [ ] **Step 1:** Use the localhost-only hook to select a deterministic rainy game-time slot; verify current weather and the matching phone forecast in desktop and mobile layouts.
-- [ ] **Step 2:** Exercise supermarket umbrella purchase and confirm exact cash/time/ownership; demonstrate its player canopy and no extra rain hygiene loss. Separately confirm uncovered outdoor loss from the model/runtime.
-- [ ] **Step 3:** Capture screenshots and collect console warnings/errors, page errors, failed requests, bad HTTP responses, DOM bounds, and canvas state. If `:4173` is stale, fall back to an ephemeral current-checkout server without touching that port.
-- [ ] **Step 4:** Run `npm test`, `npm run verify:static`, and `git diff --check`; repeat headless flow after any correction.
-- [ ] **Step 5:** Review changes, commit verifier/docs, fetch origin, and push only when main is not diverged.
+- [x] **Step 1:** Use the localhost-only hook to select a deterministic rainy game-time slot; verify current weather and the matching phone forecast in desktop and mobile layouts.
+- [x] **Step 2:** Exercise supermarket umbrella purchase and confirm exact cash/time/ownership; demonstrate its player canopy and no extra rain hygiene loss. Separately confirm uncovered outdoor loss from the model/runtime.
+- [x] **Step 3:** Capture screenshots and collect console warnings/errors, page errors, failed requests, bad HTTP responses, DOM bounds, and canvas state. If `:4173` is stale, fall back to an ephemeral current-checkout server without touching that port.
+- [x] **Step 4:** Run `npm test`, `npm run verify:static`, and `git diff --check`; repeat headless flow after any correction.
+- [x] **Step 5:** Review changes, commit verifier/docs, fetch origin, and push only when main is not diverged.

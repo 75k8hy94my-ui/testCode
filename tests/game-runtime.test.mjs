@@ -104,7 +104,9 @@ test('umbrella purchase is one-time, snapshot-safe, and only protects an outdoor
   assert.match(source, /function isPlayerUsingUmbrella\(\)/);
   assert.match(source, /!state\.player\.inHome && !state\.player\.inVehicle && !state\.player\.inTrain/);
   assert.match(source, /if \(isPlayerUsingUmbrella\(\)\) drawPlayerUmbrella\(\)/);
+  assert.match(source, /const screen = worldToScreen\(state\.player\.x, state\.player\.y\)/);
   assert.match(source, /buyUmbrellaForTest\(\)/);
+  assert.match(source, /decayNeedsForTest\(minutes\)/);
 });
 
 test('phone snapshot receives shared forecast rows and only claims active umbrella protection outdoors', () => {
