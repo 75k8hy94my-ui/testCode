@@ -2596,7 +2596,8 @@
     ped.segmentId = route.segmentIds[0];
     const firstSegment = mapModel.pedestrianNavigation.segmentsById.get(ped.segmentId);
     if (!firstSegment) return false;
-    ped.segmentDirection = firstSegment.from === startNodeId ? 1 : -1;
+    const resolvedStartNodeId = route.nodeIds?.[0] || startNodeId;
+    ped.segmentDirection = firstSegment.from === resolvedStartNodeId ? 1 : -1;
     ped.segmentAlong = ped.segmentDirection > 0 ? 0 : firstSegment.length;
     ped.segmentType = firstSegment.type;
     ped.edgeId = firstSegment.sourceEdgeId || null;
@@ -2620,7 +2621,7 @@
     ped.visible = true;
     ped.waitTimer = 0;
     ped.tripCount = (ped.tripCount || 0) + 1;
-    ped.currentNodeId = startNodeId;
+    ped.currentNodeId = resolvedStartNodeId;
     return true;
   }
 
