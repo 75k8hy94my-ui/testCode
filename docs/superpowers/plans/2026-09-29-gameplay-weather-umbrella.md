@@ -41,11 +41,11 @@
 - `getForecast(day, minute, count = 4) -> Array<{ day, startMinute, offsetMinutes, condition }>`
 - `getOutdoorHygienePenalty(day, minute, durationMinutes, { sheltered, umbrellaOwned }) -> number`; it sums only rainy minutes over all crossed slots before applying `0.012` per minute.
 
-- [ ] **Step 1:** Write failing tests for deterministic same-day results; all eight exact slot starts and just-before edges; next-day forecast rollover and exact lead-minute offsets; count clamping; invalid day/minute inputs; rain penalty, shelter, umbrella protection, and mixed-weather long-action exposure.
-- [ ] **Step 2:** Run `node --test tests/weather-system.test.mjs` and confirm the absent module/API fails.
-- [ ] **Step 3:** Implement a pure stable integer hash keyed by normalized day/slot, the exact thresholds, normalized rolling forecast, and a slot-by-slot `0.012 * rainyMinutes` exposure sum.
-- [ ] **Step 4:** Run `node --test tests/weather-system.test.mjs`; all cases pass without relying on wall clock or `Math.random()`.
-- [ ] **Step 5:** Commit model and tests.
+- [x] **Step 1:** Write failing tests for deterministic same-day results; all eight exact slot starts and just-before edges; next-day forecast rollover and exact lead-minute offsets; count clamping; invalid day/minute inputs; rain penalty, shelter, umbrella protection, and mixed-weather long-action exposure.
+- [x] **Step 2:** Run `node --test tests/weather-system.test.mjs` and confirm the absent module/API fails.
+- [x] **Step 3:** Implement a pure stable integer hash keyed by normalized day/slot, the exact thresholds, normalized rolling forecast, and a slot-by-slot `0.012 * rainyMinutes` exposure sum.
+- [x] **Step 4:** Run `node --test tests/weather-system.test.mjs`; all cases pass without relying on wall clock or `Math.random()`.
+- [x] **Step 5:** Commit model and tests.
 
 ### Task 2: Drive world weather and outdoor hygiene from game time
 
