@@ -99,7 +99,7 @@ test('wardrobe model is loaded before runtime and is normalized in snapshots', (
   assert.match(source, /wardrobe:wardrobeModel\.createWardrobe\(\)/);
   assert.match(source, /wardrobe:wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
   assert.match(source, /state\.wardrobe = wardrobeModel\.normalizeWardrobe\(saved\.wardrobe\)/);
-  assert.match(html, /game\.js\?v=20260929-community-clubs-1/);
+  assert.match(html, /game\.js\?v=20260929-laundromat-1/);
 });
 
 test('arcade progress is loaded before the game and migrates safely through snapshots', () => {
@@ -687,7 +687,7 @@ test('public bath rules load before runtime and the sento interaction applies it
 });
 
 test('clinic map and runtime changes request fresh browser assets', () => {
-  assert.match(html, /map-model\.js\?v=20260929-pet-shelter-1/);
+  assert.match(html, /map-model\.js\?v=20260929-laundromat-1/);
   assert.match(html, /game\.js\?v=[^"]+/);
 });
 
@@ -813,6 +813,24 @@ test('outfit cleanliness advances with game time and survives purchases, dressin
   assert.match(source, /wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
 });
 
+test('laundromat is a loaded city facility and its action validates before changing cash or time', () => {
+  assert.match(html, /laundromat|wardrobe\.js/);
+  assert.match(source, /place\.id === "laundromat"/);
+  const actionStart = source.indexOf('function launderCurrentOutfit(');
+  const actionEnd = source.indexOf('\n  function ', actionStart + 10);
+  const action = source.slice(actionStart, actionEnd);
+  assert.notEqual(actionStart, -1);
+  assert.match(action, /wardrobeModel\.launder\(state\.wardrobe,\s*state\.cash,\s*Math\.floor\(state\.minute\)\)/);
+  assert.ok(action.indexOf('if (!result.ok)') < action.indexOf('state.cash = result.cashRemaining'));
+  assert.ok(action.indexOf('state.cash = result.cashRemaining') < action.indexOf('advanceTime(result.duration)'));
+  assert.match(action, /state\.wardrobe = result\.wardrobe/);
+  const placeStart = source.indexOf('if (place.id === "laundromat")');
+  const placeEnd = source.indexOf('if (place.id === "clinic")', placeStart);
+  assert.notEqual(placeStart, -1);
+  assert.match(source.slice(placeStart, placeEnd), /wardrobeModel\.launder/);
+  assert.match(source.slice(placeStart, placeEnd), /現在の服を洗う/);
+});
+
 test('citizens plan community classes through their normal pedestrian activity lifecycle', () => {
   const candidates = source.slice(source.indexOf('function citizenActionCandidates('), source.indexOf('function chooseCitizenAction('));
   const completion = source.slice(source.indexOf('function completeCitizenActivity('), source.indexOf('function planCitizenAction('));
@@ -841,7 +859,7 @@ test('club members travel through normal pedestrian routes and revalidate the se
 test('club runtime modules have fresh browser cache keys', () => {
   assert.match(html, /community-center\.js\?v=20260929-community-clubs-1/);
   assert.match(html, /social-npc-system\.js\?v=20260929-community-clubs-1/);
-  assert.match(html, /game\.js\?v=20260929-community-clubs-1/);
+  assert.match(html, /game\.js\?v=20260929-laundromat-1/);
 });
 
 test('game loads overtake safety before the overtake planner and runtime', () => {

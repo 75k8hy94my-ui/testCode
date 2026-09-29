@@ -47,7 +47,7 @@
     return;
   }
 
-  if (!wardrobeModel?.createWardrobe || !wardrobeModel?.normalizeWardrobe || !wardrobeModel?.buyOutfit || !wardrobeModel?.equipOutfit || !wardrobeModel?.getOutfit) {
+  if (!wardrobeModel?.createWardrobe || !wardrobeModel?.normalizeWardrobe || !wardrobeModel?.buyOutfit || !wardrobeModel?.equipOutfit || !wardrobeModel?.getOutfit || !wardrobeModel?.advanceWear || !wardrobeModel?.launder) {
     showRuntimeError("Wardrobe を読み込めません。");
     return;
   }
@@ -4771,6 +4771,25 @@
     return true;
   }
 
+  function launderCurrentOutfit() {
+    const result = wardrobeModel.launder(state.wardrobe, state.cash, Math.floor(state.minute));
+    if (!result.ok) {
+      const message = result.reason === "not-open" ? "営業時間外です（6:00〜23:00）"
+        : result.reason === "closing-time" ? "閉店までに洗濯が終わりません"
+          : result.reason === "insufficient-funds" ? "洗濯料金300円が足りません"
+            : result.reason === "already-clean" ? "着用中の服はすでにきれいです"
+              : "洗濯できません";
+      showToast(message);
+      return false;
+    }
+    state.cash = result.cashRemaining;
+    advanceTime(result.duration);
+    state.wardrobe = result.wardrobe;
+    queueMicrotask(() => openPlace(PLACES.find((place) => place.id === "laundromat")));
+    showToast("洗濯が終わりました −¥" + result.cost.toLocaleString("ja-JP"));
+    return true;
+  }
+
   function buyHomeFurniture(furnitureId) {
     const result = homeFurnitureModel.buyFurniture(state.homeFurniture, state.cash, furnitureId);
     if (!result.ok) {
@@ -5080,6 +5099,20 @@
           showToast(option.name + "を利用しました −¥" + result.cost.toLocaleString("ja-JP"));
         }, !option.available);
       }
+    }
+
+    if (place.id === "laundromat") {
+      const wardrobe = wardrobeModel.normalizeWardrobe(state.wardrobe);
+      const outfit = wardrobeModel.getOutfit(wardrobe.equippedOutfitId);
+      const cleanliness = wardrobe.cleanlinessByOutfitId[wardrobe.equippedOutfitId];
+      const preview = wardrobeModel.launder(wardrobe, state.cash, Math.floor(state.minute));
+      const status = cleanliness >= 90 ? "清潔" : cleanliness >= 60 ? "少し汚れています" : "洗濯推奨";
+      const reason = preview.reason === "not-open" ? "営業時間外です（6:00〜23:00）"
+        : preview.reason === "closing-time" ? "閉店までに洗濯が終わりません"
+          : preview.reason === "insufficient-funds" ? "洗濯料金300円が足りません"
+            : preview.reason === "already-clean" ? "洗濯の必要はありません" : "利用できません";
+      actionDescription.textContent = "着用中: " + outfit.name + " / 清潔度 " + Math.round(cleanliness) + "%（" + status + "）。洗濯機で約30分。営業時間 6:00〜23:00。";
+      addChoice("現在の服を洗う", preview.ok ? "30分 / ¥300 / 清潔度100%まで洗濯" : reason, () => launderCurrentOutfit(), !preview.ok);
     }
 
     if (place.id === "clinic") {
@@ -10585,6 +10618,36 @@
         ctx.bezierCurveTo(steamX - 8, p.y - 164, steamX + 8, p.y - 172, steamX, p.y - 184);
         ctx.stroke();
       }
+    } else if (place.id === "laundromat") {
+      drawFacilityBuilding(p, building?.w || 270, building?.h || 220, "#8baeb0", "#53696a", "#a9c5c6");
+      ctx.fillStyle = "#edf3ee";
+      roundedRectPath(ctx, p.x - 112, p.y - 67, 224, 34, 4);
+      ctx.fill();
+      ctx.fillStyle = "#42646a";
+      ctx.font = "800 16px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("COIN LAUNDRY", p.x, p.y - 44);
+      for (let index = 0; index < 3; index += 1) {
+        const washerX = p.x - 76 + index * 76;
+        ctx.fillStyle = "#e5e8e2";
+        roundedRectPath(ctx, washerX - 28, p.y + 3, 56, 76, 5);
+        ctx.fill();
+        ctx.strokeStyle = "#677c7d";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = "#829fa2";
+        ctx.beginPath();
+        ctx.arc(washerX, p.y + 45, 17, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#536f73";
+        ctx.stroke();
+        ctx.fillStyle = "#778783";
+        ctx.fillRect(washerX - 20, p.y + 12, 5, 4);
+        ctx.fillRect(washerX - 11, p.y + 12, 5, 4);
+      }
+      ctx.fillStyle = "#f3ead7";
+      ctx.font = "700 10px system-ui, sans-serif";
+      ctx.fillText("若葉コインランドリー", p.x, p.y + 105);
     } else if (place.id === "clinic") {
       drawFacilityBuilding(p, building?.w || 300, building?.h || 260, "#dce6d9", "#657365", "#9ab8bd");
       ctx.fillStyle = "#f4f3e8";
