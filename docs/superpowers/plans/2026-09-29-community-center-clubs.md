@@ -90,4 +90,4 @@
 - [x] **Step 2: Use CLI headless Chromium/Playwright/CDP already available** to attend a club, inspect NPC movement and mobile layout, save a full-page screenshot, and collect console errors/warnings, `pageerror`, failed requests, and relevant DOM/computed styles. Do not use browser tools.
 - [x] **Step 3: Inspect screenshot and diagnostics**, fix only feature defects, then repeat both verifications and capture a final screenshot.
 - [x] **Step 4: Commit** any narrowly scoped verification-driven fix with explicit paths; do not stage unrelated dirty files.
-- [ ] **Step 5: Before Push, verify** `git diff --name-only origin/main...HEAD` excludes showcase/debug assets and user changes; Push only the feature commits with a normal fast-forward push and confirm the remote commit.
+- [x] **Step 5: Before Push, verify** `git diff --name-only origin/main...HEAD` excludes showcase/debug assets and user changes; Push only the feature commits with a normal fast-forward push and confirm the remote commit.
