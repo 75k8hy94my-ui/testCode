@@ -4690,8 +4690,11 @@
       showToast(result.reason === "not-owned" ? "このコーデはまだ持っていません" : result.reason === "already-equipped" ? "すでに着ています" : "このコーデには着替えられません");
       return false;
     }
-    state.wardrobe = result.wardrobe;
     advanceTime(result.duration);
+    state.wardrobe = wardrobeModel.normalizeWardrobe({
+      ...state.wardrobe,
+      equippedOutfitId:result.wardrobe.equippedOutfitId
+    });
     queueMicrotask(() => openHomeFixture(HOME_FIXTURES.find((fixture) => fixture.id === "closet")));
     showToast(result.outfit.name + "に着替えました");
     return true;

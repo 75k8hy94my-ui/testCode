@@ -812,6 +812,16 @@ test('home closet shows cleanliness percentage, a text condition and the equippe
   assert.match(closet, /着用中/);
 });
 
+test('the outfit worn before changing clothes receives wear during dressing time', () => {
+  const equipStart = source.indexOf('function equipPlayerOutfit(');
+  const equipEnd = source.indexOf('\n  function ', equipStart + 10);
+  const equip = source.slice(equipStart, equipEnd);
+  assert.notEqual(equipStart, -1);
+  assert.ok(equip.indexOf('advanceTime(result.duration)') < equip.indexOf('state.wardrobe = wardrobeModel.normalizeWardrobe'));
+  assert.match(equip, /wardrobeModel\.normalizeWardrobe\(\{\s*\.\.\.state\.wardrobe,\s*equippedOutfitId:\s*result\.wardrobe\.equippedOutfitId\s*\}\)/);
+  assert.doesNotMatch(equip, /state\.wardrobe\s*=\s*result\.wardrobe\s*;/);
+});
+
 test('outfit cleanliness advances with game time and survives purchases, dressing and snapshots', () => {
   assert.match(html, /wardrobe\.js\?v=[^\"]+/);
   const advanceStart = source.indexOf('function advanceTime(');
