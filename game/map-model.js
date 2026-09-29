@@ -8,7 +8,7 @@
     ? require("./building-frontage.js")
     : global.CityDaysBuildingFrontage;
 
-  const MAP_VERSION = "japan-v2.7";
+  const MAP_VERSION = "japan-v2.8";
   const WORLD_SIZE = 10800;
   const COAST = 160;
   const RAIL_Y = 4700;
@@ -402,6 +402,30 @@
     return best;
   }
 
+  function alignFacilityBuilding(place, edges) {
+    if (!place?.building || !buildingFrontageModel?.resolve) return place;
+    const rect = facilityBuildingRect(place);
+    const roadHit = nearestEdgeToRectCenter(rect, edges.filter((edge) => edge.vehicle));
+    const roadA = roadHit?.edge?.points?.[roadHit.segmentIndex];
+    const roadB = roadHit?.edge?.points?.[roadHit.segmentIndex + 1];
+    if (!roadHit || !roadA || !roadB) return place;
+    const tangent = { x:roadB.x - roadA.x, y:roadB.y - roadA.y };
+    const frontageGeometry = buildingFrontageModel.resolve(rect, roadHit.point, roadHit.edge.id, tangent);
+    if (!frontageGeometry) return place;
+    return {
+      ...place,
+      building:{
+        ...place.building,
+        angle:frontageGeometry.angle,
+        frontage:frontageGeometry.side,
+        frontageEdgeId:frontageGeometry.roadEdgeId,
+        frontageGeometry,
+        collisionFootprint:frontageGeometry.polygon,
+        collisionBounds:frontageGeometry.bounds
+      }
+    };
+  }
+
   function createResidentialFrontageSites(zone, zoneIndex, edges, openSpaces, reserved, sites) {
     const district = DISTRICT_DEFINITIONS.find((value) => value.id === zone.district);
     const candidates = [];
@@ -640,7 +664,10 @@
     const nodes = BLUEPRINT_NODES.map((value) => ({ ...value }));
     const nodeMap = new Map(nodes.map((value) => [value.id, value]));
     const edges = BLUEPRINT_EDGES.map((value) => edgeFromDefinition(value, nodeMap));
-    const places = PLACE_DEFINITIONS.map((value) => ({ ...value, building:value.building ? { ...value.building } : null }));
+    const places = PLACE_DEFINITIONS.map((value) => alignFacilityBuilding(
+      { ...value, building:value.building ? { ...value.building } : null },
+      edges
+    ));
     const stations = STATION_DEFINITIONS.map((value) => ({ ...value }));
     const districts = DISTRICT_DEFINITIONS.map((value) => ({
       ...value,
