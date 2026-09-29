@@ -168,6 +168,27 @@ test('named NPC conversations offer owned handmade gifts and commit only validat
   assert.doesNotMatch(rejected, /advanceTime\(10\)/);
 });
 
+test('localhost-only test hook exposes crafted inventory, relationship outcomes, and validated repeat-gift action', () => {
+  const hook=source.slice(source.indexOf('function installSocialNpcTestHook()'),source.indexOf('function togglePause()'));
+  assert.match(hook, /homeCrafting:homeCraftingModel\.normalizeProgress\(state\.homeCrafting\)/);
+  assert.match(hook, /npcFriendship:\{ \.\.\.socialNpcState\.friendship \}/);
+  assert.match(hook, /relationships:\{ \.\.\.socialNpcState\.relationships \}/);
+  assert.match(hook, /giveGiftForTest\(npcId, itemId\)/);
+  assert.match(hook, /return performNpcGift\(npcId, itemId\)/);
+});
+
+test('localhost-only test hook can advance game time together with citizen schedules', () => {
+  const hook=source.slice(source.indexOf('function installSocialNpcTestHook()'),source.indexOf('function togglePause()'));
+  assert.match(hook, /advanceWorldTimeForTest\(minutes\)/);
+  assert.match(hook, /advanceTime\(minutes, false, true\)/);
+});
+
+test('localhost-only NPC positioning leaves room for moving pedestrians before interaction input', () => {
+  const hook=source.slice(source.indexOf('movePlayerNear(npcId)'),source.indexOf('giveGiftForTest',source.indexOf('movePlayerNear(npcId)')));
+  assert.match(hook, /for \(const radius of \[18, 24, 32, 40\]\)/);
+  assert.match(hook, /citizen\.state === "inside"\) return false/);
+});
+
 test('the authored catalog, not generated defaults, supplies the first ten citizen identities', () => {
   assert.match(source, /const socialNpcSystem = globalThis\.CityDaysSocialNpcSystem/);
   assert.match(source, /const socialProfile = index < socialNpcSystem\.catalog\.length \? socialNpcSystem\.catalog\[index\] : null/);

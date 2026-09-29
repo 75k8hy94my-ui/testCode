@@ -11034,6 +11034,7 @@
         skills:{ ...state.communityCenter.skills },
         npcFriendship:{ ...socialNpcState.friendship },
         relationships:{ ...socialNpcState.relationships },
+        npcPositions:Object.fromEntries(NPCS.map((npc) => [npc.id,{ x:npc.x, y:npc.y }])),
         petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
         homeCrafting:homeCraftingModel.normalizeProgress(state.homeCrafting),
         packedMeals:(() => {
@@ -11067,6 +11068,13 @@
           if (!Number.isFinite(minutes) || minutes < 0) return false;
           advanceTime(minutes, false, false);
           updateSmartphone();
+          return true;
+        },
+        advanceWorldTimeForTest(minutes) {
+          if (!Number.isFinite(minutes) || minutes < 0) return false;
+          advanceTime(minutes, false, true);
+          updateSmartphone();
+          syncNamedNpcCitizens();
           return true;
         },
         eatMealForTest(mealId) {
@@ -11128,18 +11136,42 @@
         movePlayerNear(npcId) {
           const citizen = pedestrians.find((item) => item.specialNpcId === npcId);
           const profile = socialNpcSystem.getProfile(npcId);
-          if (!citizen || !profile || citizen.visible === false || citizen.state === "home") return false;
+          const person = NPCS.find((item) => item.id === npcId);
+          if (!citizen || !profile || !person || citizen.visible === false || citizen.state === "home" || citizen.state === "inside") return false;
           state.player.inHome = false;
           state.player.inVehicle = false;
           state.player.inTrain = false;
           state.player.trainId = null;
-          state.player.x = citizen.x - Math.cos(citizen.dir || 0) * 28;
-          state.player.y = citizen.y - Math.sin(citizen.dir || 0) * 28;
-          state.player.facingX = Math.cos(citizen.dir || 0);
-          state.player.facingY = Math.sin(citizen.dir || 0);
+          const origin = { x:state.player.x, y:state.player.y };
+          const candidates = [];
+          for (const radius of [18, 24, 32, 40]) {
+            for (let step = 0; step < 32; step += 1) {
+              const angle = step * Math.PI / 16;
+              candidates.push({ x:person.x + Math.cos(angle) * radius, y:person.y + Math.sin(angle) * radius, angle });
+            }
+          }
+          candidates.sort((a, b) => distance(a.x, a.y, origin.x, origin.y) - distance(b.x, b.y, origin.x, origin.y));
+          const candidate = candidates.find((point) => {
+            state.player.x = point.x;
+            state.player.y = point.y;
+            const interaction = nearestInteraction();
+            return interaction?.type === "npc" && interaction.target?.id === npcId;
+          });
+          if (!candidate) {
+            state.player.x = origin.x;
+            state.player.y = origin.y;
+            return false;
+          }
+          state.player.x = candidate.x;
+          state.player.y = candidate.y;
+          state.player.facingX = -Math.cos(candidate.angle);
+          state.player.facingY = -Math.sin(candidate.angle);
           state.camera.x = clamp(state.player.x - viewWidth / 2, 0, Math.max(0, WORLD_SIZE - viewWidth));
           state.camera.y = clamp(state.player.y - viewHeight / 2, 0, Math.max(0, WORLD_SIZE - viewHeight));
           return true;
+        },
+        giveGiftForTest(npcId, itemId) {
+          return performNpcGift(npcId, itemId);
         }
       })
     });

@@ -59,18 +59,18 @@
 
 **Interfaces:** Named NPC conversations list one gift action per owned item type. Gifting is only enabled while the player is present on foot in the street scene. The action revalidates inventory, NPC identity, and same-day limit, consumes exactly one item, advances 10 minutes, adjusts friendship (capped at 100), and adjusts only an existing authored relationship pair when the model returns a delta. Toast text comes from the model's preference reaction.
 
-- [ ] **Step 1:** Add failing runtime tests for favorite/non-favorite response routing, friendship caps, optional relationship affinity, one-gift daily restriction, and no side effects on vehicle/train/home or invalid inventory.
-- [ ] **Step 2:** Run `node --test tests/game-runtime.test.mjs`; confirm the gift interaction is absent.
-- [ ] **Step 3:** Add validated gift choices to `openNpc`, atomic `performNpcGift`, relationship state update, and gift history to the localhost-only test snapshot.
-- [ ] **Step 4:** Run `node --test tests/game-runtime.test.mjs tests/home-crafting.test.mjs`.
-- [ ] **Step 5:** Commit the NPC gifting integration and tests.
+- [x] **Step 1:** Add failing runtime tests for favorite/non-favorite response routing, friendship caps, optional relationship affinity, one-gift daily restriction, and no side effects on vehicle/train/home or invalid inventory.
+- [x] **Step 2:** Run `node --test tests/game-runtime.test.mjs`; confirm the gift interaction is absent.
+- [x] **Step 3:** Add validated gift choices to `openNpc`, atomic `performNpcGift`, relationship state update, and gift history to the localhost-only test snapshot.
+- [x] **Step 4:** Run `node --test tests/game-runtime.test.mjs tests/home-crafting.test.mjs`.
+- [x] **Step 5:** Commit the NPC gifting integration and tests (`cfcd29a`).
 
 ### Task 4: End-to-end desktop/mobile verification
 
 **Files:** Create `scripts/verify-home-crafting-gifts-headless.mjs`; reports and screenshots remain in the OS temp directory.
 
-- [ ] **Step 1:** Run `npm test`, `npm run verify:static`, and `git diff --check`.
-- [ ] **Step 2:** Open `http://localhost:4173/game/index.html` via CLI/CDP, capture it and diagnostics; if stale, continue on an ephemeral server of the current checkout without touching port 4173.
-- [ ] **Step 3:** Use actual interactions for supermarket kit purchase → home worktable craft → named favorite NPC gift → friendship/relationship change → same-day second gift rejection.
-- [ ] **Step 4:** Capture desktop/mobile screenshots, inspect DOM/canvas bounds and phone/interaction layout, and require zero console warnings/errors, page errors, failed requests, or HTTP failures.
-- [ ] **Step 5:** Commit verifier/docs, fetch `origin`, ensure `main` is not diverged, and push the implementation.
+- [x] **Step 1:** Run `npm test`, `npm run verify:static`, and `git diff --check`.
+- [x] **Step 2:** Open `http://localhost:4173/game/index.html` via CLI/CDP, capture it and diagnostics; when its build is stale, continue on an ephemeral server of the current checkout without touching port 4173.
+- [x] **Step 3:** Use actual interactions for supermarket kit purchase → home worktable craft → outdoor named NPC gift → friendship change → same-day second gift rejection. Favorite-gift preference and affinity outcomes are covered by the model tests; the runtime flow selects an NPC who is actually outdoors.
+- [x] **Step 4:** Capture desktop/mobile screenshots, inspect DOM/canvas bounds and phone/interaction layout, and require zero console warnings/errors, page errors, failed requests, or HTTP failures.
+- [x] **Step 5:** Commit verifier/docs, fetch `origin`, ensure `main` is not diverged, and push the implementation.
