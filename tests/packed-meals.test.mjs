@@ -36,14 +36,16 @@ test('normalizes malformed, future-dated, duplicate, and over-capacity data safe
     { recipeId:'grilled-fish', preparedAt:101, portions:0 }
   ] }), { batches:[{ recipeId:'home-meal', preparedAt:100, portions:3 }] });
   assert.deepEqual(packedMeals.normalizeInventory(null), { batches:[] });
-  assert.equal(packedMeals.portionCount({ batches:[{ recipeId:'home-meal', preparedAt:1, portions:999 }] }), 6);
+  assert.equal(packedMeals.portionCount({ batches:[{ recipeId:'home-meal', preparedAt:1, portions:999 }] }), 0);
   assert.ok(cooking.RECIPES.some((recipe) => recipe.id === 'grilled-fish'));
 });
 
-test('expires portions exactly at 24 hours and preserves them one minute before', () => {
-  const inventory = { batches:[{ recipeId:'home-meal', preparedAt:480, portions:2 }] };
+test('expires portions exactly at 24 hours, preserves them one minute before, and rejects future preparation times', () => {
+  const inventory = { batches:[{ recipeId:'home-meal', preparedAt:480, portions:2 }, { recipeId:'grilled-fish', preparedAt:600, portions:1 }] };
   assert.deepEqual(packedMeals.expire(inventory, 1919), inventory);
-  assert.deepEqual(packedMeals.expire(inventory, 1920), { batches:[] });
+  assert.deepEqual(packedMeals.expire(inventory, 1920), { batches:[{ recipeId:'grilled-fish', preparedAt:600, portions:1 }] });
+  assert.deepEqual(packedMeals.expire(inventory, 500), { batches:[{ recipeId:'home-meal', preparedAt:480, portions:2 }] });
+  assert.deepEqual(packedMeals.eat(inventory, 'grilled-fish@600', 500), { ok:false, reason:'not-found', inventory:{ batches:[{ recipeId:'home-meal', preparedAt:480, portions:2 }] } });
   assert.deepEqual(inventory.batches[0], { recipeId:'home-meal', preparedAt:480, portions:2 });
 });
 

@@ -10920,7 +10920,14 @@
         needs:{ ...state.needs },
         skills:{ ...state.communityCenter.skills },
         petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
-        packedMeals:packedMealsModel.normalizeInventory(state.packedMeals),
+        packedMeals:(() => {
+          const packedMeals = packedMealsModel.normalizeInventory(state.packedMeals);
+          return {
+            ...packedMeals,
+            portions:packedMealsModel.portionCount(packedMeals),
+            batches:packedMeals.batches.map((batch) => ({ ...batch, mealId:batch.recipeId + "@" + batch.preparedAt }))
+          };
+        })(),
         groceries:state.groceries,
         libraryReading:libraryReadingModel.normalizeProgress(state.libraryReading),
         nearestInteraction:(() => {
@@ -10939,6 +10946,15 @@
           if (!Number.isFinite(minute)) return false;
           state.minute = Math.max(0, Math.min(1439, Math.floor(minute)));
           return true;
+        },
+        advanceTimeForTest(minutes) {
+          if (!Number.isFinite(minutes) || minutes < 0) return false;
+          advanceTime(minutes, false, false);
+          updateSmartphone();
+          return true;
+        },
+        eatMealForTest(mealId) {
+          return consumePackedMeal(mealId);
         },
         movePlayerNearPlace(placeId, avoidNearbyActors = false) {
           const place = PLACES.find((item) => item.id === placeId);

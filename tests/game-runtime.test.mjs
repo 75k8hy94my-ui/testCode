@@ -112,6 +112,7 @@ test('kitchen preparation revalidates recipe resources and capacity without gran
   assert.match(kitchen, /弁当を作る/);
   assert.match(source, /function preparePackedMeal\(recipeId\)/);
   assert.match(source, /function consumePackedMeal\(mealId\)/);
+  assert.match(source, /advanceTimeForTest\(minutes\)/);
   const prepare = source.slice(source.indexOf('function preparePackedMeal('), source.indexOf('function consumePackedMeal('));
   assert.doesNotMatch(prepare, /state\.needs\[[^\]]+\]\s*\+/);
 });

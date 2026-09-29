@@ -10,7 +10,6 @@
 
   const MAX_PORTIONS = 6;
   const FRESHNESS_MINUTES = 1440;
-  const EMPTY = Object.freeze({ batches:Object.freeze([]) });
   const recipes = new Map((Array.isArray(cooking?.RECIPES) ? cooking.RECIPES : []).map((recipe) => [recipe.id, recipe]));
 
   function createInventory() {
@@ -25,7 +24,7 @@
     for (const batch of value.batches) {
       if (!batch || typeof batch !== "object" || !recipes.has(batch.recipeId)) continue;
       const { recipeId, preparedAt, portions } = batch;
-      if (!Number.isSafeInteger(preparedAt) || preparedAt < 0 || !Number.isSafeInteger(portions) || portions < 1) continue;
+      if (!Number.isSafeInteger(preparedAt) || preparedAt < 0 || !Number.isSafeInteger(portions) || portions < 1 || portions > MAX_PORTIONS) continue;
       const key = `${recipeId}@${preparedAt}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -61,7 +60,7 @@
   function expire(value, now) {
     const inventory = normalizeInventory(value);
     if (!validTime(now)) return inventory;
-    return { batches:inventory.batches.filter((batch) => now < batch.preparedAt + FRESHNESS_MINUTES).map((batch) => ({ ...batch })) };
+    return { batches:inventory.batches.filter((batch) => batch.preparedAt <= now && now < batch.preparedAt + FRESHNESS_MINUTES).map((batch) => ({ ...batch })) };
   }
 
   function eat(value, mealId, now) {
