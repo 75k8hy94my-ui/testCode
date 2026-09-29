@@ -175,7 +175,7 @@
         club,
         session,
         duration:Math.max(8, club.duration + minutesUntilStart),
-        score:48 + social * 16 + curious * 12 + active * 8 - Math.max(0, minutesUntilStart) * .35
+        score:108 + social * 16 + curious * 12 + active * 8 - Math.max(0, minutesUntilStart) * .3
       };
     }
     return null;

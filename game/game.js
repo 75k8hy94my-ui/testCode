@@ -2318,6 +2318,29 @@
       });
     }
 
+    const clubOpportunity = communityCenterModel.getCitizenClubOpportunity(state.day, minute, {
+      id:ped.specialNpcId,
+      money:ped.money,
+      onShift,
+      lateNight,
+      needs:ped.needs,
+      personality:ped.personality
+    });
+    if (clubOpportunity) {
+      add("community_club", clubOpportunity.score, {
+        placeId:"community-center",
+        duration:clubOpportunity.duration,
+        indoor:false,
+        clubId:clubOpportunity.club.id,
+        sessionDay:clubOpportunity.session.day,
+        sessionStartAbsoluteMinute:clubOpportunity.session.startAbsoluteMinute,
+        label:clubOpportunity.session.startAbsoluteMinute > (state.day - 1) * 1440 + minute
+          ? clubOpportunity.club.name + "の開始待ち"
+          : clubOpportunity.club.name + "に参加中",
+        noiseSeed:1723
+      });
+    }
+
     add("home_idle",
       32 + energyDeficit * .42 + ped.stress * .34 + (minute >= 20 * 60 ? 38 : 0),
       {
@@ -2508,6 +2531,31 @@
           : course.name + "に参加中"
       };
     }
+    if (action.id === "community_club") {
+      const club = communityCenterModel.getClubs().find((value) => value.id === action.clubId);
+      const now = (state.day - 1) * 1440 + state.minute;
+      const sessionStart = Number(action.sessionStartAbsoluteMinute);
+      if (
+        !club ||
+        !communityCenterModel.isCitizenClubArrivalValid(
+          club.id, sessionStart, ped.specialNpcId, state.day, state.minute, ped.money
+        )
+      ) {
+        ped.pendingActivity = null;
+        ped.targetPlaceId = null;
+        ped.state = "deciding";
+        ped.visible = true;
+        planCitizenAction(ped, ped.currentNodeId || ped.homeNodeId);
+        return;
+      }
+      ped.money -= club.cost;
+      action = {
+        ...action,
+        duration:Math.max(8, sessionStart + club.duration - now),
+        indoor:false,
+        label:now < sessionStart ? club.name + "の開始待ち" : club.name + "に参加中"
+      };
+    }
     ped.pendingActivity = null;
     ped.currentActivityId = action.id;
     ped.currentActivityLabel = action.label || CITIZEN_ACTIVITY_LABELS[action.id] || action.id;
@@ -2593,6 +2641,12 @@
         ped.needs.fun += 14 + Math.min(12, peers * 2);
         ped.needs.energy -= 4;
         ped.stress -= 16;
+        break;
+      case "community_club":
+        ped.needs.social += 18 + Math.min(10, peers * 2);
+        ped.needs.fun += 18;
+        ped.needs.energy -= 4;
+        ped.stress -= 18;
         break;
       case "home_idle":
         ped.needs.energy += 12;

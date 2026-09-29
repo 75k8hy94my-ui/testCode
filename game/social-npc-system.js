@@ -53,11 +53,18 @@
     const time = Number.isFinite(minute) ? ((Math.floor(minute) % 1440) + 1440) % 1440 : 720;
     const dayNumber = Number.isFinite(day) ? Math.max(1, Math.floor(day)) : 1;
     const activity = String(activityId || "").toLowerCase();
+    const clubName = activity === "community_club"
+      ? (new Map([
+        ["aoi", "放課後ボードゲーム会"], ["mei", "放課後ボードゲーム会"], ["haru", "放課後ボードゲーム会"],
+        ["sora", "手しごととお茶の会"], ["yui", "手しごととお茶の会"], ["nana", "手しごととお茶の会"], ["toma", "手しごととお茶の会"],
+        ["ren", "夕方のまち交流会"], ["kaori", "夕方のまち交流会"], ["daichi", "夕方のまち交流会"]
+      ])).get(npcId) || "地域サークル"
+      : null;
     const busy = /work|shift|study|commute|class/.test(activity);
     const sleeping = /sleep|bed/.test(activity);
     const weekend = ((dayNumber - 1) % 7) >= 5;
     const timeBand = time < 600 ? "morning" : time < 1020 ? "day" : "evening";
-    const baseTopic = sleeping ? "rest" : busy ? "work" : weekend ? "weekend" : timeBand;
+    const baseTopic = clubName ? "community-club" : sleeping ? "rest" : busy ? "work" : weekend ? "weekend" : timeBand;
     const repeatedTopic = recentTopic === baseTopic;
     const topic = repeatedTopic ? `${baseTopic}-followup` : baseTopic;
     const topicLines = {
@@ -66,7 +73,8 @@
       morning: `${profile.name}は笑顔で朝の挨拶をした。「朝の空気って気持ちいいね。」`,
       day: `${profile.name}は${profile.dialogueStyle.split("。")[0]}様子で話しかけた。「今日はこのあと${profile.schedule.find((slot) => time < slot.end)?.activity || "ゆっくり"}をする予定だよ。」`,
       evening: `${profile.name}はほっとした表情を見せた。「一日おつかれさま。${profile.dialogueStyle.split("。")[0]}の話をしよう。」`,
-      weekend: `${profile.name}は休日らしくのんびりしている。「今日は少しゆっくりできそう。」`
+      weekend: `${profile.name}は休日らしくのんびりしている。「今日は少しゆっくりできそう。」`,
+      "community-club": `${profile.name}は楽しそうに話した。「${clubName}、みんなで集まるとやっぱりいいね。」`
     };
     const relationLabel = relationship?.type === "family" ? "家族のことも" : relationship?.type === "coworker" ? "仕事仲間のことも" : null;
     const line = repeatedTopic

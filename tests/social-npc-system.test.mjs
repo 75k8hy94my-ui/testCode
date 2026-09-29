@@ -81,6 +81,14 @@ test('conversation topics reflect time, weekday and current activity determinist
   assert.ok(atWork.options.some(({ id }) => id === 'greet'));
 });
 
+test('NPC conversation while attending a club talks about the shared community activity', () => {
+  const { getConversation } = require(path.join(root, 'game', 'social-npc-system.js'));
+  const clubTalk = getConversation({ npcId:'aoi', minute:18 * 60 + 30, day:3, activityId:'community_club' });
+
+  assert.equal(clubTalk.topic, 'community-club');
+  assert.match(clubTalk.line, /サークル|ボードゲーム/);
+});
+
 test('recently repeated topics produce a distinct follow-up line', () => {
   const { getConversation } = require(path.join(root, 'game', 'social-npc-system.js'));
   const first = getConversation({ npcId:'aoi', minute:9 * 60, day:2, activityId:'walking', friendship:2, relationship:null, recentTopic:null });

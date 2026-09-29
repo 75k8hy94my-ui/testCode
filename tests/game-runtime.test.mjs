@@ -815,6 +815,16 @@ test('citizens plan community classes through their normal pedestrian activity l
   assert.match(begin, /isCitizenCourseArrivalValid\(/);
 });
 
+test('club members travel through normal pedestrian routes and revalidate the session at arrival', () => {
+  const candidates = source.slice(source.indexOf('function citizenActionCandidates('), source.indexOf('function chooseCitizenAction('));
+  const begin = source.slice(source.indexOf('function beginCitizenActivity('), source.indexOf('function completeCitizenActivity('));
+  assert.match(candidates, /getCitizenClubOpportunity\(state\.day,\s*minute,/);
+  assert.match(candidates, /add\("community_club"/);
+  assert.match(begin, /isCitizenClubArrivalValid\(/);
+  assert.match(begin, /ped\.money\s*-=?\s*club\.cost/);
+  assert.match(begin, /sessionStart\s*\+\s*club\.duration\s*-\s*now/);
+});
+
 test('game loads overtake safety before the overtake planner and runtime', () => {
   assert.match(html, /<script src="\.\/traffic-overtake-safety\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('traffic-overtake-safety.js') < html.indexOf('traffic-overtake.js'));
