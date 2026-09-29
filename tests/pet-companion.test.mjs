@@ -8,15 +8,20 @@ const ownedDog = () => ({
 });
 
 test('new households have no pet and legacy or malformed values normalize safely', () => {
-  assert.deepEqual(pets.createProgress(), { pet:null, food:0 });
+  assert.deepEqual(pets.createProgress(), { pet:null, food:0, walksCompleted:0 });
   assert.deepEqual(pets.normalizeProgress({ pet:{ speciesId:'fox', name:'<img>', hunger:-3, happiness:120, bond:6.7, energy:NaN }, food:101 }), {
     pet:null,
-    food:99
+    food:99,
+    walksCompleted:0
   });
   assert.deepEqual(pets.normalizeProgress({ pet:{ speciesId:'cat', name:'ミケ', hunger:40, happiness:30, bond:22, energy:70 }, food:-4 }), {
     pet:{ speciesId:'cat', name:'ミケ', hunger:40, happiness:30, bond:22, energy:70 },
-    food:0
+    food:0,
+    walksCompleted:0
   });
+  assert.equal(pets.normalizeProgress({ pet:null, food:0, walksCompleted:3.9 }).walksCompleted, 3);
+  assert.equal(pets.normalizeProgress({ pet:null, food:0, walksCompleted:-9 }).walksCompleted, 0);
+  assert.equal(pets.normalizeProgress({ pet:null, food:0, walksCompleted:2_000_000 }).walksCompleted, 1_000_000);
 });
 
 test('the shelter is open from 09:00 inclusive to 19:00 exclusive', () => {
@@ -44,7 +49,7 @@ test('adopting a cat charges its fee, assigns its name and refuses a second pet'
 test('a ¥450 pet-food pack provides three portions only while the shelter is open', () => {
   const empty = pets.createProgress();
   const purchase = pets.buyFoodPack(empty, 500, 540);
-  assert.deepEqual(purchase, { ok:true, progress:{ pet:null, food:3 }, cashRemaining:50 });
+  assert.deepEqual(purchase, { ok:true, progress:{ pet:null, food:3, walksCompleted:0 }, cashRemaining:50 });
   assert.equal(pets.buyFoodPack(empty, 449, 540).reason, 'insufficient-funds');
   assert.equal(pets.buyFoodPack(empty, 450, 1140).reason, 'closed');
   assert.equal(empty.food, 0);
@@ -54,7 +59,7 @@ test('a ¥450 pet-food pack provides three portions only while the shelter is op
 test('feeding consumes one portion and improves hunger, happiness and bond', () => {
   assert.deepEqual(pets.feed({ ...ownedDog(), food:2 }), {
     ok:true,
-    progress:{ pet:{ speciesId:'dog', name:'コロ', hunger:100, happiness:79, bond:11, energy:85 }, food:1 },
+    progress:{ pet:{ speciesId:'dog', name:'コロ', hunger:100, happiness:79, bond:11, energy:85 }, food:1, walksCompleted:0 },
     duration:5
   });
   const actual = pets.feed({ pet:{ ...ownedDog().pet, hunger:70, happiness:40, bond:9 }, food:1 });
@@ -76,7 +81,7 @@ test('cuddling raises happiness and bond without spending food', () => {
   const result = pets.cuddle(ownedDog());
   assert.deepEqual(result, {
     ok:true,
-    progress:{ pet:{ ...ownedDog().pet, happiness:86, bond:12 }, food:0 },
+    progress:{ pet:{ ...ownedDog().pet, happiness:86, bond:12 }, food:0, walksCompleted:0 },
     duration:10
   });
 });
@@ -100,4 +105,58 @@ test('all rejected pet actions preserve the caller progress and invalid commerce
   assert.deepEqual(source, before);
   assert.equal(pets.adopt(pets.createProgress(), Number.NaN, 'dog', 600).reason, 'insufficient-funds');
   assert.equal(pets.buyFoodPack(pets.createProgress(), -1, 600).reason, 'insufficient-funds');
+});
+
+test('a short walk scales down companionship and energy effects without counting as a regular walk', () => {
+  const source = ownedDog();
+  const before = structuredClone(source);
+  const result = pets.completeWalk(source, 4, 320);
+  assert.deepEqual(result, {
+    ok:true,
+    progress:{
+      pet:{ speciesId:'dog', name:'コロ', hunger:77, happiness:80, bond:11, energy:82 },
+      food:0,
+      walksCompleted:0
+    },
+    quality:'short'
+  });
+  assert.deepEqual(source, before);
+});
+
+test('a regular walk increases the regular-walk count and applies independently derived effects', () => {
+  const result = pets.completeWalk(ownedDog(), 6, 400);
+  assert.deepEqual(result, {
+    ok:true,
+    progress:{
+      pet:{ speciesId:'dog', name:'コロ', hunger:76, happiness:82, bond:12, energy:80 },
+      food:0,
+      walksCompleted:1
+    },
+    quality:'regular'
+  });
+});
+
+test('walk scoring caps duration and route distance before applying maximum effects', () => {
+  const atCap = pets.completeWalk(ownedDog(), 24, 1600);
+  const beyondCap = pets.completeWalk(ownedDog(), 360, 10000);
+  assert.deepEqual(beyondCap, atCap);
+  assert.equal(atCap.quality, 'regular');
+  assert.equal(atCap.progress.walksCompleted, 1);
+  assert.deepEqual(atCap.progress.pet, { speciesId:'dog', name:'コロ', hunger:72, happiness:100, bond:16, energy:65 });
+});
+
+test('walk completion rejects cats, missing pets, and invalid duration or distance without changing progress', () => {
+  const cat = { pet:{ speciesId:'cat', name:'ミケ', hunger:70, happiness:60, bond:20, energy:50 }, food:2 };
+  const beforeCat = structuredClone(cat);
+  assert.equal(pets.completeWalk(cat, 30, 2000).reason, 'wrong-species');
+  assert.deepEqual(cat, beforeCat);
+  assert.equal(pets.completeWalk({ pet:null, food:3 }, 30, 2000).reason, 'no-pet');
+
+  const source = ownedDog();
+  const before = structuredClone(source);
+  assert.equal(pets.completeWalk(source, -1, 500).reason, 'invalid-duration');
+  assert.equal(pets.completeWalk(source, Number.NaN, 500).reason, 'invalid-duration');
+  assert.equal(pets.completeWalk(source, 5, Number.POSITIVE_INFINITY).reason, 'invalid-distance');
+  assert.equal(pets.completeWalk(source, 5, -1).reason, 'invalid-distance');
+  assert.deepEqual(source, before);
 });

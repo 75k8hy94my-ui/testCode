@@ -6,6 +6,9 @@
   const FOOD_PACK_PRICE = 450;
   const FOOD_PACK_SIZE = 3;
   const MAX_FOOD = 99;
+  const MAX_WALKS_COMPLETED = 1_000_000;
+  const MAX_WALK_MINUTES = 360;
+  const MAX_WALK_DISTANCE = 10_000;
   const SPECIES = Object.freeze({
     dog:Object.freeze({ id:'dog', label:'犬', name:'コロ', adoptionCost:6000, playLabel:'おもちゃで遊ぶ', color:'#c99466' }),
     cat:Object.freeze({ id:'cat', label:'猫', name:'ミケ', adoptionCost:4000, playLabel:'ねこじゃらしで遊ぶ', color:'#d18b73' })
@@ -17,7 +20,7 @@
   }
 
   function createProgress() {
-    return { pet:null, food:0 };
+    return { pet:null, food:0, walksCompleted:0 };
   }
 
   function normalizeProgress(value) {
@@ -37,7 +40,10 @@
       };
     }
     const food = Number.isFinite(source.food) ? Math.max(0, Math.min(MAX_FOOD, Math.floor(source.food))) : 0;
-    return { pet, food };
+    const walksCompleted = Number.isFinite(source.walksCompleted)
+      ? Math.max(0, Math.min(MAX_WALKS_COMPLETED, Math.floor(source.walksCompleted)))
+      : 0;
+    return { pet, food, walksCompleted };
   }
 
   function isShelterOpen(minute) {
@@ -145,5 +151,30 @@
     };
   }
 
-  return { FOOD_PACK_PRICE, FOOD_PACK_SIZE, SPECIES, createProgress, normalizeProgress, isShelterOpen, getCondition, adopt, buyFoodPack, advance, feed, play, cuddle };
+  function completeWalk(progress, durationMinutes, distance) {
+    const current = normalizeProgress(progress);
+    if (!current.pet) return failed(current, 'no-pet');
+    if (current.pet.speciesId !== 'dog') return failed(current, 'wrong-species');
+    if (!Number.isFinite(durationMinutes) || durationMinutes < 0) return failed(current, 'invalid-duration');
+    if (!Number.isFinite(distance) || distance < 0) return failed(current, 'invalid-distance');
+
+    const duration = Math.min(MAX_WALK_MINUTES, durationMinutes);
+    const routeDistance = Math.min(MAX_WALK_DISTANCE, distance);
+    const score = Math.min(1, duration / 24, routeDistance / 1600);
+    const regular = distance >= 400 && durationMinutes >= 6;
+    const result = normalizeProgress({
+      ...current,
+      pet:{
+        ...current.pet,
+        happiness:current.pet.happiness + Math.round(24 * score),
+        bond:current.pet.bond + Math.round(6 * score),
+        energy:current.pet.energy - Math.round(20 * score),
+        hunger:current.pet.hunger - Math.round(6 * score)
+      },
+      walksCompleted:current.walksCompleted + (regular ? 1 : 0)
+    });
+    return { ok:true, progress:result, quality:regular ? 'regular' : 'short' };
+  }
+
+  return { FOOD_PACK_PRICE, FOOD_PACK_SIZE, SPECIES, createProgress, normalizeProgress, isShelterOpen, getCondition, adopt, buyFoodPack, advance, feed, play, cuddle, completeWalk };
 });

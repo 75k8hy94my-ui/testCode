@@ -60,11 +60,13 @@
 - Add `walksCompleted` to normalized top-level pet progress, defaulting/clamping safely for old saves.
 - Add `completeWalk(progress, durationMinutes, distance) -> { ok:false, reason, progress } | { ok:true, progress, quality }` using the exact score/effect formula from the spec.
 
-- [ ] Step 1: Write tests for short/regular scaling, score caps, dog/cat/no-pet behavior, invalid negative/non-finite input, normalization of lifetime counts, and immutability.
-- [ ] Step 2: Run `node --test tests/pet-companion.test.mjs`; confirm the new transition is absent.
-- [ ] Step 3: Implement the pure outcome transition and safe legacy migration.
-- [ ] Step 4: Run `node --test tests/pet-companion.test.mjs tests/pet-walk.test.mjs`; all cases pass.
-- [ ] Step 5: Commit the pet progression transition.
+- [x] Step 1: Write tests for short/regular scaling, score caps, dog/cat/no-pet behavior, invalid negative/non-finite input, normalization of lifetime counts, and immutability.
+- [x] Step 2: Run `node --test tests/pet-companion.test.mjs`; confirm the new transition is absent.
+- [x] Step 3: Implement the pure outcome transition and safe legacy migration.
+- [x] Step 4: Run `node --test tests/pet-companion.test.mjs tests/pet-walk.test.mjs`; all cases pass.
+- [x] Step 5: Commit the pet progression transition.
+
+- [x] Task 2 complete: outcome scoring, regression tests, and commit.
 
 ### Task 3: Home-to-street walk runtime and snapshots
 
