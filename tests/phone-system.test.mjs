@@ -122,6 +122,17 @@ test('meal phone action calls the runtime callback with the selected batch ID', 
   assert.deepEqual(consumed,['fish-rice@700']);
 });
 
+test('meal freshness denominator participates in phone rerender detection', () => {
+  const root={hidden:false,innerHTML:'',classList:{toggle(){}},style:{setProperty(){}},addEventListener(){}};
+  const phone=phoneModule.createPhoneSystem({root});
+  phone.update({packedMeals:{batches:[{mealId:'onigiri-set@100',recipeId:'onigiri-set',name:'おにぎり',portions:1,freshnessMinutes:360,freshnessTotalMinutes:720}],portions:1,capacity:6},inVehicle:false,inTrain:false});
+  phone.home();
+  phone.openApp('meals');
+  assert.match(root.innerHTML,/width:50%/);
+  phone.update({packedMeals:{batches:[{mealId:'onigiri-set@100',recipeId:'onigiri-set',name:'おにぎり',portions:1,freshnessMinutes:360,freshnessTotalMinutes:1440}],portions:1,capacity:6},inVehicle:false,inTrain:false});
+  assert.match(root.innerHTML,/width:25%/);
+});
+
 test('pet phone app safely shows shelter guidance or live household pet care status', () => {
   const root = { hidden:false, innerHTML:'', classList:{ toggle(){} }, style:{ setProperty(){} }, addEventListener(){} };
   const phone = phoneModule.createPhoneSystem({ root });

@@ -40,12 +40,12 @@
 - `purchase` returns `ok`, price/duration/cash remainder, next inventory, packed-meals inventory and meal ID on success; failures preserve both states.
 - `packed-meals` adds recognized prepared-food metadata while keeping old `{recipeId, preparedAt, portions}` batches readable.
 
-- [ ] Add tests for catalog values, fresh daily stock, same-day decrement, next-day replenishment and malformed inventory normalization.
-- [ ] Add tests for successful purchase, invalid item/time, insufficient cash, sold out and six-portion capacity without state mutation on failure.
-- [ ] Run `node --test tests/arcade-prepared-food.test.mjs tests/packed-meals.test.mjs` and observe expected missing-model failures.
-- [ ] Implement model and packed-meal recognition/expiry/eat behavior.
-- [ ] Rerun the two test files; all pass.
-- [ ] Commit as `feat: model daily prepared food stock`.
+- [x] Add tests for catalog values, fresh daily stock, same-day decrement, next-day replenishment and malformed inventory normalization.
+- [x] Add tests for successful purchase, invalid item/time, insufficient cash, sold out and six-portion capacity without state mutation on failure.
+- [x] Run `node --test tests/store-prepared-food.test.mjs tests/packed-meals.test.mjs` and observe expected missing-model failures.
+- [x] Implement model and packed-meal recognition/expiry/eat behavior.
+- [x] Rerun the two test files; all pass.
+- [x] Commit as `feat: model daily prepared food stock`.
 
 ### Task 2: Supermarket, consumption, and persistence integration
 
@@ -56,13 +56,13 @@
 
 **Interfaces:** consume Task 1 model methods and prepared meal metadata.
 
-- [ ] Add a runtime test asserting supermarket catalog, current stock and prepared-food inventory state are observable.
-- [ ] Run focused test and observe it fail before UI integration.
-- [ ] Load the model and initialize/persist/restore day inventory with backward-compatible defaults.
-- [ ] Render purchase choices with price, stock, funds and capacity; apply model results exactly once.
-- [ ] Show prepared foods in the existing carry-meal list and apply their effect/time/freshness when eaten.
-- [ ] Run `node --test tests/game-runtime.test.mjs tests/store-prepared-food.test.mjs tests/packed-meals.test.mjs`; all pass.
-- [ ] Commit as `feat: sell and consume supermarket prepared meals`.
+- [x] Add a runtime test asserting supermarket catalog, current stock and prepared-food inventory state are observable.
+- [x] Run focused test and observe it fail before UI integration.
+- [x] Load the model and initialize/persist/restore day inventory with backward-compatible defaults.
+- [x] Render purchase choices with price, stock, funds and capacity; apply model results exactly once.
+- [x] Show prepared foods in the existing carry-meal list and apply their effect/time/freshness when eaten.
+- [x] Run `node --test tests/game-runtime.test.mjs tests/store-prepared-food.test.mjs tests/packed-meals.test.mjs`; all pass.
+- [x] Commit as `feat: sell and consume supermarket prepared meals`.
 
 ### Task 3: Headless gameplay verification
 
@@ -71,9 +71,9 @@
 
 **Interfaces:** consumes the game runtime’s existing localhost-only test hook, matching the arcade headless verification pattern.
 
-- [ ] Add a deterministic browser flow checking buying twice, exact cash/inventory changes, eating, sold-out or funds/capacity behavior, day refill, and game-snapshot restoration.
-- [ ] Capture desktop and mobile screenshots and collect console error/warning, pageerror, failed request and bad response diagnostics.
-- [ ] Run verifier; expect all checks to pass and diagnostics empty.
-- [ ] Commit as `test: verify supermarket prepared meal loop headlessly`.
+- [x] Add a deterministic browser flow checking buying twice, exact cash/inventory changes, eating, sold-out or funds/capacity behavior, day refill, and game-snapshot restoration.
+- [x] Capture desktop and mobile screenshots and collect console error/warning, pageerror, failed request and bad response diagnostics.
+- [x] Run verifier; all checks pass and diagnostics are empty.
+- [x] Commit as `test: verify supermarket prepared meal loop headlessly`.
 
 **Final verification:** run `npm test`, `npm run verify:static`, the prepared-food headless verifier, `git diff --check`, and confirm `git diff --name-only` excludes `game/character-showcase.html`.

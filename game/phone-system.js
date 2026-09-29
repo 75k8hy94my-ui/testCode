@@ -516,7 +516,7 @@
           value.libraryReading.completedCount,
           (value.libraryReading.loans || []).map(function(loan){return [loan.bookId,loan.title,loan.chaptersRead];})
         ] : null,
-        packedMeals:value.packedMeals ? [value.packedMeals.portions,(value.packedMeals.batches || []).map(function(batch){return [batch.mealId,batch.recipeId,batch.portions,batch.freshnessMinutes];})] : null,
+        packedMeals:value.packedMeals ? [value.packedMeals.portions,(value.packedMeals.batches || []).map(function(batch){return [batch.mealId,batch.recipeId,batch.portions,batch.freshnessMinutes,batch.freshnessTotalMinutes];})] : null,
         npcs:(value.npcs || []).map(function(n){return [n.id,n.friendship,n.hidden,n.activity,Math.round((n.distance || 0) / 25),Math.round((n.mapDX || 0) / 20),Math.round((n.mapDY || 0) / 20)];}),
         friendWaypoint:value.friendWaypoint ? [value.friendWaypoint.id,Math.round((value.friendWaypoint.distance || 0) / 20)] : null,
         trains:(value.trains || []).map(function(t){return [t.id,t.stationIndex,t.targetIndex,Math.round((t.dwell || 0) * 2)];})
