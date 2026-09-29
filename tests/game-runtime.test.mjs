@@ -125,6 +125,32 @@ test('packed meal consumption is restricted to walking and applies authored effe
   assert.match(consume, /updateSmartphone\(\)/);
 });
 
+test('home handcraft progress defaults safely, persists in snapshots, and loads its model before runtime', () => {
+  assert.match(html, /home-crafting\.js\?v=[^"]+/);
+  assert.ok(html.indexOf('social-npc-system.js') < html.indexOf('home-crafting.js'));
+  assert.ok(html.indexOf('home-crafting.js') < html.indexOf('game.js'));
+  assert.match(source, /homeCrafting:homeCraftingModel\.createProgress\(\)/);
+  assert.match(source, /homeCrafting:homeCraftingModel\.normalizeProgress\(state\.homeCrafting\)/);
+  assert.match(source, /state\.homeCrafting\s*=\s*homeCraftingModel\.normalizeProgress\(saved\.homeCrafting\)/);
+});
+
+test('supermarket sells validated handcraft kits and the new home worktable consumes recipes without applying needs', () => {
+  assert.match(source, /id:"worktable",\s*label:"作業机"/);
+  const storeStart=source.indexOf('if (place.id === "store")');
+  const storeEnd=source.indexOf('if (place.id === "fuel-station")',storeStart);
+  assert.match(source.slice(storeStart,storeEnd), /手芸キットを買う/);
+  assert.match(source.slice(storeStart,storeEnd), /homeCraftingModel\.buyKitPack/);
+  const fixtureStart=source.indexOf('function openHomeFixture(');
+  const fixtureEnd=source.indexOf('function openPlace(',fixtureStart);
+  const fixtureSource=source.slice(fixtureStart,fixtureEnd);
+  assert.match(fixtureSource, /fixture\.id === "worktable"/);
+  assert.match(fixtureSource, /craftHomeItem\(recipe\.id\)/);
+  assert.match(source, /function craftHomeItem\(recipeId\)/);
+  const craft=source.slice(source.indexOf('function craftHomeItem('),source.indexOf('function applyHomeMeal('));
+  assert.match(craft, /homeCraftingModel\.craft/);
+  assert.doesNotMatch(craft, /state\.needs\[[^\]]+\]\s*[+\-]=/);
+});
+
 test('the authored catalog, not generated defaults, supplies the first ten citizen identities', () => {
   assert.match(source, /const socialNpcSystem = globalThis\.CityDaysSocialNpcSystem/);
   assert.match(source, /const socialProfile = index < socialNpcSystem\.catalog\.length \? socialNpcSystem\.catalog\[index\] : null/);

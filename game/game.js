@@ -98,6 +98,12 @@
     return;
   }
 
+  const homeCraftingModel = globalThis.CityDaysHomeCrafting;
+  if (!homeCraftingModel?.createProgress || !homeCraftingModel?.normalizeProgress || !homeCraftingModel?.buyKitPack || !homeCraftingModel?.craft || !homeCraftingModel?.giveGift) {
+    showRuntimeError("HomeCrafting を読み込めません。");
+    return;
+  }
+
   const libraryReadingModel = globalThis.CityDaysLibraryReading;
   if (!libraryReadingModel?.BOOKS || !libraryReadingModel?.createProgress || !libraryReadingModel?.normalizeProgress || !libraryReadingModel?.borrow || !libraryReadingModel?.readChapter || !libraryReadingModel?.returnBook) {
     showRuntimeError("LibraryReading を読み込めません。");
@@ -752,6 +758,7 @@
     { id:"bed", label:"ベッド", x:62, y:60, w:190, h:112, interactX:260, interactY:125, range:72 },
     { id:"shower", label:"シャワー", x:70, y:318, w:118, h:118, interactX:208, interactY:372, range:68 },
     { id:"kitchen", label:"キッチン", x:510, y:55, w:205, h:82, interactX:505, interactY:153, range:78 },
+    { id:"worktable", label:"作業机", x:176, y:194, w:104, h:62, interactX:228, interactY:268, range:70 },
     { id:"pet", label:"ペット", x:530, y:188, w:132, h:74, interactX:474, interactY:232, range:72 },
     { id:"sofa", label:"ソファ", x:486, y:330, w:205, h:74, interactX:476, interactY:365, range:74 },
     { id:"tv", label:"テレビ", x:520, y:392, w:155, h:70, interactX:475, interactY:425, range:72 },
@@ -1161,6 +1168,7 @@
     petCompanion:petCompanionModel.createProgress(),
     fishing:parkFishingModel.createProgress(),
     packedMeals:packedMealsModel.createInventory(),
+    homeCrafting:homeCraftingModel.createProgress(),
     shiftsWorked: 0,
     lastShiftDay: 0,
     needs: {
@@ -3990,6 +3998,23 @@
     return true;
   }
 
+  function craftHomeItem(recipeId) {
+    if (!state.player.inHome || nearestHomeInteraction()?.target?.id !== "worktable") {
+      showToast("自宅の作業机のそばで作れます");
+      return false;
+    }
+    const result = homeCraftingModel.craft(state.homeCrafting, recipeId, state.communityCenter.skills.craft);
+    if (!result.ok) {
+      showToast(result.reason === "skill-required" ? "手芸スキルが足りません" : result.reason === "insufficient-kits" ? "手芸キットが足りません" : result.reason === "item-capacity" ? "持ち物がいっぱいです" : "その作品は作れません");
+      return false;
+    }
+    state.homeCrafting = result.progress;
+    advanceTime(result.recipe.duration);
+    state.communityCenter.skills.craft = result.craftSkill;
+    showToast(result.recipe.name + "を作りました");
+    return true;
+  }
+
   function applyHomeMeal(result) {
     state.groceries = result.groceriesRemaining;
     if (Number.isFinite(result.fishRemaining)) state.fishing = { ...state.fishing, fish:result.fishRemaining };
@@ -4111,6 +4136,18 @@
           !status.available ? detail : capacityFull ? "持ち歩ける食事がいっぱいです / " + packedMealsModel.MAX_PORTIONS + "食まで" :
             (recipe.fish ? "魚 " + recipe.fish + "匹 / " : "") + "食料 " + recipe.groceries + "個 / " + recipe.duration + "分 / 持ち歩いて後で食べる",
           () => preparePackedMeal(recipe.id), !status.available || capacityFull);
+      }
+    } else if (fixture.id === "worktable") {
+      const progress = homeCraftingModel.normalizeProgress(state.homeCrafting);
+      actionDescription.textContent = "手芸スキル " + state.communityCenter.skills.craft + " / キット " + progress.kits + "個 / 作品 " + homeCraftingModel.itemCount(progress) + " / " + homeCraftingModel.MAX_FINISHED_ITEMS + "個";
+      for (const recipe of homeCraftingModel.RECIPES) {
+        const locked = state.communityCenter.skills.craft < recipe.minimumSkill;
+        const lacksKits = progress.kits < recipe.kits;
+        const full = homeCraftingModel.itemCount(progress) >= homeCraftingModel.MAX_FINISHED_ITEMS;
+        const detail = locked ? "手芸スキル " + recipe.minimumSkill + "で解放 / 現在 " + state.communityCenter.skills.craft
+          : "キット " + recipe.kits + "個 / " + recipe.duration + "分 / 手芸スキル+" + recipe.skillGain +
+            (full ? " / 持ち物がいっぱいです" : lacksKits ? " / キットが足りません" : " / 贈り物にできます");
+        addChoice(recipe.name, detail, () => craftHomeItem(recipe.id), locked || lacksKits || full);
       }
     } else if (fixture.id === "pet") {
       const pet = state.petCompanion.pet;
@@ -4352,7 +4389,19 @@
     }
 
     if (place.id === "store") {
-      actionDescription.textContent = "食料品とちょっとした食事を買えます。";
+      actionDescription.textContent = "食料品、手芸用品とちょっとした食事を買えます。";
+      const kitPurchase = homeCraftingModel.buyKitPack(state.homeCrafting, state.cash);
+      addChoice("手芸キットを買う", "3回分 / ¥" + homeCraftingModel.KIT_PACK_COST.toLocaleString("ja-JP") + " / 10分 / 所持 " + state.homeCrafting.kits + "個", () => {
+        const result = homeCraftingModel.buyKitPack(state.homeCrafting, state.cash);
+        if (!result.ok) {
+          showToast(result.reason === "insufficient-funds" ? "手芸キットの購入資金が足りません" : "手芸キットをこれ以上持てません");
+          return;
+        }
+        state.homeCrafting = result.progress;
+        state.cash = result.cashRemaining;
+        advanceTime(result.duration);
+        showToast("手芸キットを3回分買いました");
+      }, !kitPurchase.ok);
       addChoice("釣り餌を買う", state.cash < parkFishingModel.BAIT_PACK_COST ? "5回分 / ¥500 / 資金不足" : "5回分 / ¥500 / 所持 " + state.fishing.bait + "個", () => {
         const result = parkFishingModel.buyBait(state.fishing, state.cash);
         if (!result.ok) {
@@ -5157,6 +5206,7 @@
         communityCenter:communityCenterModel.normalizeProgress(state.communityCenter),
         libraryReading:libraryReadingModel.normalizeProgress(state.libraryReading),
         packedMeals:packedMealsModel.normalizeInventory(state.packedMeals),
+        homeCrafting:homeCraftingModel.normalizeProgress(state.homeCrafting),
         deliveryWork:deliveryWorkModel.normalizeProgress(state.deliveryWork),
         communityGarden:communityGardenModel.normalizeProgress(state.garden),
         petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
@@ -5409,6 +5459,7 @@
       state.communityCenter = communityCenterModel.normalizeProgress(saved.communityCenter);
       state.libraryReading = libraryReadingModel.normalizeProgress(saved.libraryReading);
       state.packedMeals = packedMealsModel.normalizeInventory(saved.packedMeals);
+      state.homeCrafting = homeCraftingModel.normalizeProgress(saved.homeCrafting);
       state.deliveryWork = deliveryWorkModel.normalizeProgress(saved.deliveryWork);
       state.garden = communityGardenModel.normalizeProgress(saved.communityGarden);
       state.petCompanion = petCompanionModel.normalizeProgress(saved.petCompanion);
@@ -10085,6 +10136,24 @@
     ctx.arc(p.x + 42*s, p.y + 21*s, 13*s, 0, Math.PI*2);
     ctx.fill();
 
+    // Small home worktable and sewing machine.
+    drawHomeFurnitureRect(176, 194, 104, 62, "#8d6749", 7);
+    p = homeToScreen(191, 207);
+    ctx.fillStyle = "#d7ddd7";
+    roundedRectPath(ctx, p.x, p.y, 40*s, 29*s, 4*s);
+    ctx.fill();
+    ctx.fillStyle = "#5a655f";
+    ctx.fillRect(p.x + 26*s, p.y + 4*s, 3*s, 22*s);
+    ctx.fillRect(p.x + 18*s, p.y + 25*s, 28*s, 3*s);
+    ctx.strokeStyle = "#eee4cd";
+    ctx.lineWidth = 2*s;
+    ctx.strokeRect(p.x + 58*s, p.y + 10*s, 25*s, 17*s);
+    ctx.strokeStyle = "#a64d62";
+    ctx.beginPath();
+    ctx.moveTo(p.x + 60*s, p.y + 24*s);
+    ctx.lineTo(p.x + 80*s, p.y + 12*s);
+    ctx.stroke();
+
     // Low table.
     drawHomeFurnitureRect(294, 276, 168, 82, "#8f6c50", 12);
 
@@ -10920,6 +10989,7 @@
         needs:{ ...state.needs },
         skills:{ ...state.communityCenter.skills },
         petCompanion:petCompanionModel.normalizeProgress(state.petCompanion),
+        homeCrafting:homeCraftingModel.normalizeProgress(state.homeCrafting),
         packedMeals:(() => {
           const packedMeals = packedMealsModel.normalizeInventory(state.packedMeals);
           return {
