@@ -443,6 +443,10 @@
       const accessNodeId = "place-access:" + place.id;
       const target = chooseSafeAccessPath(accessPoint, primarySegments, mapModel, 1100);
       if (!target) continue;
+      if (target.length <= 1) {
+        externalNodeAliases.set(place.entranceNodeId, target.nodeId);
+        continue;
+      }
       addSegment({
         id:"facility-access:auto:" + place.id,
         type:"facility-access",
@@ -462,6 +466,10 @@
       const accessNodeId = "station-access:" + station.id;
       const target = chooseSafeAccessPath(accessPoint, primarySegments, mapModel, 1100);
       if (!target) continue;
+      if (target.length <= 1) {
+        externalNodeAliases.set(station.roadNodeId, target.nodeId);
+        continue;
+      }
       addSegment({
         id:"facility-access:station:" + station.id,
         type:"facility-access",
