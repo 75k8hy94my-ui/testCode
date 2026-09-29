@@ -15,6 +15,12 @@
     Object.freeze({ id:"exercise", name:"ゆったり体操", weekdays:Object.freeze([0, 3]), startMinute:1080, cost:0, duration:45, skill:"exercise", skillName:"体操" })
   ]);
   const COURSE_IDS = new Set(COURSES.map((course) => course.id));
+  const CLUBS = Object.freeze([
+    Object.freeze({ id:"board-game", name:"放課後ボードゲーム会", weekday:2, startMinute:1110, cost:100, duration:60, members:Object.freeze(["aoi", "mei", "haru"]) }),
+    Object.freeze({ id:"handcraft-tea", name:"手しごととお茶の会", weekday:4, startMinute:1200, cost:200, duration:75, members:Object.freeze(["sora", "yui", "nana", "toma"]) }),
+    Object.freeze({ id:"neighborhood-mixer", name:"夕方のまち交流会", weekday:0, startMinute:990, cost:0, duration:45, members:Object.freeze(["ren", "kaori", "daichi"]) })
+  ]);
+  const CLUB_IDS = new Set(CLUBS.map((club) => club.id));
 
   function safeDay(value) {
     const day = Math.floor(Number(value));
@@ -72,10 +78,101 @@
       seen.add(key);
       attendance.push({ courseId:record.courseId, day });
     }
+    const clubAttendance = [];
+    const seenClubs = new Set();
+    for (const record of Array.isArray(source.clubAttendance) ? source.clubAttendance : []) {
+      if (!record || typeof record !== "object" || !CLUB_IDS.has(record.clubId)) continue;
+      const day = Number(record.day);
+      if (!Number.isInteger(day) || day < 1) continue;
+      const key = record.clubId + ":" + day;
+      if (seenClubs.has(key)) continue;
+      seenClubs.add(key);
+      clubAttendance.push({ clubId:record.clubId, day });
+    }
     return {
       skills:{ cooking:normalizeSkill("cooking"), craft:normalizeSkill("craft"), exercise:normalizeSkill("exercise") },
-      attendance
+      attendance,
+      clubAttendance
     };
+  }
+
+  function getClubs() {
+    return CLUBS;
+  }
+
+  function getClubSession(clubId, day, minute) {
+    const club = CLUBS.find((value) => value.id === clubId);
+    if (!club) return null;
+    const sessionDay = safeDay(day);
+    const startAbsoluteMinute = (sessionDay - 1) * MINUTES_PER_DAY + club.startMinute;
+    const now = (sessionDay - 1) * MINUTES_PER_DAY + safeMinute(minute);
+    return {
+      club,
+      day:sessionDay,
+      startAbsoluteMinute,
+      accepting:(sessionDay - 1) % 7 === club.weekday && now >= startAbsoluteMinute - 10 && now <= startAbsoluteMinute + 10
+    };
+  }
+
+  function getClubAvailability(progress, clubId, day, minute, cash) {
+    const session = getClubSession(clubId, day, minute);
+    if (!session) return { session:null, available:false, reason:"unknown-club" };
+    if ((session.day - 1) % 7 !== session.club.weekday || !session.accepting) return { session, available:false, reason:"not-open" };
+    const normalized = normalizeProgress(progress);
+    if (normalized.clubAttendance.some((record) => record.clubId === clubId && record.day === session.day)) {
+      return { session, available:false, reason:"already-attended" };
+    }
+    if (!Number.isFinite(Number(cash)) || Number(cash) < session.club.cost) return { session, available:false, reason:"insufficient-funds" };
+    return { session, available:true, reason:null };
+  }
+
+  function attendClub(progress, session) {
+    const normalized = normalizeProgress(progress);
+    const clubId = session?.club?.id;
+    const day = Number(session?.day);
+    if (!CLUB_IDS.has(clubId) || !Number.isInteger(day) || day < 1) return normalized;
+    if (!normalized.clubAttendance.some((record) => record.clubId === clubId && record.day === day)) {
+      normalized.clubAttendance.push({ clubId, day });
+    }
+    return normalized;
+  }
+
+  function getCitizenClubOpportunity(day, minute, citizen) {
+    if (!citizen || typeof citizen !== "object" || citizen.onShift || citizen.lateNight || citizen.unwell) return null;
+    const citizenId = String(citizen.id || citizen.citizenId || "");
+    const needs = citizen.needs && typeof citizen.needs === "object" ? citizen.needs : {};
+    const energy = Number(needs.energy);
+    const hunger = Number(needs.hunger);
+    const money = Number(citizen.money);
+    if (!Number.isFinite(energy) || energy < 18 || !Number.isFinite(hunger) || hunger < 15 || !Number.isFinite(money)) return null;
+    const now = (safeDay(day) - 1) * MINUTES_PER_DAY + safeMinute(minute);
+    const social = Number(citizen.personality?.social) || 0;
+    const curious = Number(citizen.personality?.curious) || 0;
+    const active = Number(citizen.personality?.active) || 0;
+    for (const club of CLUBS) {
+      if (!club.members.includes(citizenId) || money < club.cost) continue;
+      const session = getClubSession(club.id, day, minute);
+      const minutesUntilStart = session.startAbsoluteMinute - now;
+      if ((session.day - 1) % 7 !== club.weekday || minutesUntilStart < -10 || minutesUntilStart > 45) continue;
+      return {
+        id:"community_club",
+        club,
+        session,
+        duration:Math.max(8, club.duration + minutesUntilStart),
+        score:48 + social * 16 + curious * 12 + active * 8 - Math.max(0, minutesUntilStart) * .35
+      };
+    }
+    return null;
+  }
+
+  function isCitizenClubArrivalValid(clubId, expectedStartAbsoluteMinute, citizenId, day, minute, cash) {
+    const club = CLUBS.find((value) => value.id === clubId);
+    const expectedStart = Number(expectedStartAbsoluteMinute);
+    if (!club || !club.members.includes(String(citizenId)) || !Number.isFinite(expectedStart)) return false;
+    const session = getClubSession(clubId, day, minute);
+    if ((session.day - 1) % 7 !== club.weekday || session.startAbsoluteMinute !== expectedStart) return false;
+    const now = (safeDay(day) - 1) * MINUTES_PER_DAY + safeMinute(minute);
+    return expectedStart - now <= 45 && now <= expectedStart + 10 && Number(cash) >= club.cost;
   }
 
   function getCourseAvailability(courseId, day, minute, cash, progress) {
@@ -148,6 +245,12 @@
 
   return Object.freeze({
     COURSES,
+    getClubs,
+    getClubSession,
+    getClubAvailability,
+    attendClub,
+    getCitizenClubOpportunity,
+    isCitizenClubArrivalValid,
     getSession,
     listSessions,
     normalizeProgress,

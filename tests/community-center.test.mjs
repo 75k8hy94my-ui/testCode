@@ -67,7 +67,8 @@ test('completing a class awards skill once and records the scheduled day', () =>
 
   assert.deepEqual(once, {
     skills:{ cooking:100, craft:0, exercise:0 },
-    attendance:[{ courseId:'cooking', day:2 }]
+    attendance:[{ courseId:'cooking', day:2 }],
+    clubAttendance:[]
   });
   assert.deepEqual(twice, once);
 });
@@ -120,7 +121,8 @@ test('citizen arrival revalidates the planned session, travel deadline, and fare
 test('progress migration defaults, clamps, and filters attendance records', () => {
   assert.deepEqual(communityCenter.normalizeProgress(undefined), {
     skills:{ cooking:0, craft:0, exercise:0 },
-    attendance:[]
+    attendance:[],
+    clubAttendance:[]
   });
   assert.deepEqual(communityCenter.normalizeProgress({
     skills:{ cooking:135, craft:-5, exercise:'42' },
@@ -129,9 +131,68 @@ test('progress migration defaults, clamps, and filters attendance records', () =
       { courseId:'unknown', day:2 },
       { courseId:'craft', day:0 },
       null
-    ]
+    ],
+    clubAttendance:[{ clubId:'board-game', day:3 }, { clubId:'board-game', day:3 }, { clubId:'invalid', day:4 }]
   }), {
     skills:{ cooking:100, craft:0, exercise:42 },
-    attendance:[{ courseId:'cooking', day:2 }]
+    attendance:[{ courseId:'cooking', day:2 }],
+    clubAttendance:[{ clubId:'board-game', day:3 }]
   });
+});
+
+test('weekly clubs expose their scheduled time, fee, duration and roster', () => {
+  assert.deepEqual(communityCenter.getClubs().map(({ id, weekday, startMinute, cost, duration, members }) => ({
+    id, weekday, startMinute, cost, duration, members
+  })), [
+    { id:'board-game', weekday:2, startMinute:1110, cost:100, duration:60, members:['aoi', 'mei', 'haru'] },
+    { id:'handcraft-tea', weekday:4, startMinute:1200, cost:200, duration:75, members:['sora', 'yui', 'nana', 'toma'] },
+    { id:'neighborhood-mixer', weekday:0, startMinute:990, cost:0, duration:45, members:['ren', 'kaori', 'daichi'] }
+  ]);
+});
+
+test('club attendance window includes ten minutes before and after start only', () => {
+  const before = communityCenter.getClubSession('board-game', 3, 1100);
+  const starts = communityCenter.getClubSession('board-game', 3, 1110);
+  const after = communityCenter.getClubSession('board-game', 3, 1120);
+  const closed = communityCenter.getClubSession('board-game', 3, 1121);
+
+  assert.equal(before.accepting, true);
+  assert.equal(starts.accepting, true);
+  assert.equal(after.accepting, true);
+  assert.equal(closed.accepting, false);
+});
+
+test('club fee is checked and attendance is recorded once without changing course records', () => {
+  const progress = communityCenter.normalizeProgress({ attendance:[{ courseId:'cooking', day:2 }] });
+  const denied = communityCenter.getClubAvailability(progress, 'board-game', 3, 1110, 99);
+  const accepted = communityCenter.getClubAvailability(progress, 'board-game', 3, 1110, 100);
+  const once = communityCenter.attendClub(progress, accepted.session);
+  const twice = communityCenter.attendClub(once, accepted.session);
+
+  assert.equal(denied.reason, 'insufficient-funds');
+  assert.equal(accepted.available, true);
+  assert.deepEqual(once.attendance, [{ courseId:'cooking', day:2 }]);
+  assert.deepEqual(once.clubAttendance, [{ clubId:'board-game', day:3 }]);
+  assert.deepEqual(twice, once);
+});
+
+test('only healthy club members can plan a nearby session and arrival rechecks the roster, time and fee', () => {
+  const citizen = {
+    id:'aoi', money:100, onShift:false, lateNight:false, unwell:false,
+    needs:{ hunger:70, energy:75, social:35, fun:40 },
+    personality:{ social:0.8, curious:0.7, active:0.6 }
+  };
+  const opportunity = communityCenter.getCitizenClubOpportunity(3, 1070, citizen);
+
+  assert.equal(opportunity.id, 'community_club');
+  assert.equal(opportunity.club.id, 'board-game');
+  assert.equal(opportunity.session.startAbsoluteMinute, 3990);
+  assert.equal(communityCenter.getCitizenClubOpportunity(3, 1070, { ...citizen, id:'ren' }), null);
+  assert.equal(communityCenter.getCitizenClubOpportunity(3, 1070, { ...citizen, unwell:true }), null);
+  assert.equal(communityCenter.getCitizenClubOpportunity(3, 1070, { ...citizen, onShift:true }), null);
+  assert.equal(communityCenter.getCitizenClubOpportunity(3, 1070, { ...citizen, money:99 }), null);
+  assert.equal(communityCenter.isCitizenClubArrivalValid('board-game', 3990, 'aoi', 3, 1100, 100), true);
+  assert.equal(communityCenter.isCitizenClubArrivalValid('board-game', 3990, 'aoi', 3, 1121, 100), false);
+  assert.equal(communityCenter.isCitizenClubArrivalValid('board-game', 3990, 'aoi', 3, 1100, 99), false);
+  assert.equal(communityCenter.isCitizenClubArrivalValid('board-game', 3990, 'ren', 3, 1100, 100), false);
 });
