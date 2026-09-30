@@ -162,3 +162,27 @@ test('generated residences and workplaces use frontage doorway nodes rather than
     assert.ok(findRoute(map.pedestrianNavigation, 'home-entrance', nodeId), site.id + ' doorway reachable');
   }
 });
+
+
+test('indoor facilities route citizens to their actual road-facing doorway before they disappear indoors', () => {
+  const map = createMapModel();
+  for (const place of map.places.filter((entry) => entry.building?.frontageGeometry)) {
+    const resolved = (() => {
+      let nodeId = place.entranceNodeId;
+      const seen = new Set();
+      while (map.pedestrianNavigation.externalNodeAliases.has(nodeId) && !seen.has(nodeId)) {
+        seen.add(nodeId);
+        nodeId = map.pedestrianNavigation.externalNodeAliases.get(nodeId);
+      }
+      return nodeId;
+    })();
+    const point = map.pedestrianNavigation.nodePositions.get(resolved);
+    assert.ok(point, place.id + ' resolved doorway position');
+    const frontage = place.building.frontageGeometry;
+    const expected = {
+      x:frontage.entrance.x + frontage.normal.x * 10,
+      y:frontage.entrance.y + frontage.normal.y * 10
+    };
+    assert.ok(Math.hypot(point.x - expected.x, point.y - expected.y) < 1e-6, place.id + ' route must end at doorway');
+  }
+});
