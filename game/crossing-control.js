@@ -4,6 +4,12 @@
   const DEFAULT_DECELERATION = 36;
   const STOP_MARGIN = 26;
   const CLEARANCE_MARGIN = 1.5;
+  const SAFE_FRONT_CLEARANCE = 14;
+  const PASSED_REAR_CLEARANCE = 8;
+
+  function safeFrontClearance(crosswalk) {
+    return Math.max(SAFE_FRONT_CLEARANCE, Math.max(0, Number(crosswalk?.depth) || 0) / 2 + 8);
+  }
 
   function vehicleDistanceToCrossing(crosswalk, vehicle) {
     if (Number.isFinite(vehicle.distanceToCrossing)) return vehicle.distanceToCrossing;
@@ -21,25 +27,62 @@
     const walkSpeed = Math.max(8, Number(pedestrian?.speed) || 28);
     const crossingDuration = (Math.max(1, Number(crosswalk?.length) || 120) / walkSpeed) + CLEARANCE_MARGIN;
     let nearest = null;
+    let blockingCommitted = null;
+    let unsafeApproach = null;
+    let requestVehicleYield = false;
+
     for (const vehicle of vehicles) {
       const distance = vehicleDistanceToCrossing(crosswalk, vehicle);
-      if (distance == null || distance < -8) continue;
+      if (distance == null) continue;
+      const halfLength = Math.max(8, (Number(vehicle.length) || 34) / 2);
+      const frontClearance = distance - halfLength;
+      const rearClearance = distance + halfLength;
+      if (rearClearance < -PASSED_REAR_CLEARANCE) continue;
+
       const speed = Math.max(0, Number(vehicle.speed) || 0);
-      const timeToArrival = speed < .1 ? Infinity : Math.max(0, distance - (Number(vehicle.length) || 34) / 2) / speed;
-      const canStop = distance >= vehicleStoppingDistance(vehicle, options.deceleration);
-      const candidate = { vehicle, distance:Math.max(0, distance), speed, timeToArrival, canStop };
-      if (!nearest || candidate.timeToArrival < nearest.timeToArrival || (candidate.timeToArrival === nearest.timeToArrival && String(vehicle.id).localeCompare(String(nearest.vehicle.id)) < 0)) nearest = candidate;
+      const timeToArrival = speed < .1 ? Infinity : Math.max(0, frontClearance) / speed;
+      const stoppingDistance = vehicleStoppingDistance(vehicle, options.deceleration);
+      const canStopBeforeCrossing = frontClearance >= safeFrontClearance(crosswalk) &&
+        (speed < .1 || distance >= stoppingDistance);
+      const committed = frontClearance < safeFrontClearance(crosswalk);
+      const safelyStopped = speed < .1 && frontClearance >= safeFrontClearance(crosswalk);
+      const gapSafe = !committed && (safelyStopped || timeToArrival >= crossingDuration + CLEARANCE_MARGIN);
+      const candidate = {
+        vehicle,
+        distance,
+        frontClearance,
+        rearClearance,
+        speed,
+        timeToArrival,
+        canStop:canStopBeforeCrossing,
+        committed,
+        gapSafe
+      };
+
+      if (!nearest || candidate.timeToArrival < nearest.timeToArrival ||
+          (candidate.timeToArrival === nearest.timeToArrival && String(vehicle.id).localeCompare(String(nearest.vehicle.id)) < 0)) {
+        nearest = candidate;
+      }
+      if (committed && (!blockingCommitted || rearClearance > blockingCommitted.rearClearance)) {
+        blockingCommitted = candidate;
+      }
+      if (!gapSafe && !committed && (!unsafeApproach || timeToArrival < unsafeApproach.timeToArrival)) {
+        unsafeApproach = candidate;
+      }
+      if (!gapSafe && !committed && canStopBeforeCrossing) requestVehicleYield = true;
     }
-    const safeGap = !nearest || nearest.speed < .1 || nearest.timeToArrival >= crossingDuration;
-    const vehicleStopped = !nearest || nearest.speed < .1;
-    const safeToEnter = safeGap && vehicleStopped || Boolean(nearest && nearest.timeToArrival >= crossingDuration + CLEARANCE_MARGIN);
+
+    const safeToEnter = !blockingCommitted && !unsafeApproach;
+    const blocker = blockingCommitted || unsafeApproach || nearest;
     return {
       decision:safeToEnter ? "cross" : "wait",
-      nearestVehicleId:nearest?.vehicle.id ?? null,
-      timeToArrival:nearest?.timeToArrival ?? Infinity,
+      nearestVehicleId:blocker?.vehicle.id ?? null,
+      timeToArrival:blocker?.timeToArrival ?? Infinity,
       safeToEnter,
       crossingDuration,
-      requestVehicleYield:Boolean(nearest && nearest.canStop && !safeToEnter)
+      requestVehicleYield,
+      vehicleCommitted:Boolean(blockingCommitted),
+      frontClearance:blocker?.frontClearance ?? Infinity
     };
   }
 
@@ -77,23 +120,57 @@
 
   function vehicleYieldDecision(crosswalk, claim, vehicle, options = {}) {
     const ownsCrossing = claim?.pedestrianId && (claim.phase === "waiting" || claim.phase === "crossing");
-    if (!ownsCrossing) return { shouldYield:false, stopOffset:0, canStop:false, stoppingDistance:0 };
+    if (!ownsCrossing) return { shouldYield:false, stopOffset:0, canStop:false, stoppingDistance:0, committed:false };
+    if (crosswalk?.signalized && claim.phase === "waiting") {
+      return { shouldYield:false, stopOffset:0, canStop:false, stoppingDistance:0, committed:false, signalControlled:true };
+    }
     const distance = vehicleDistanceToCrossing(crosswalk, vehicle);
-    if (distance == null || distance < -8) return { shouldYield:false, stopOffset:0, canStop:false, stoppingDistance:0 };
+    if (distance == null) return { shouldYield:false, stopOffset:0, canStop:false, stoppingDistance:0, committed:false };
+
+    const halfLength = Math.max(8, (Number(vehicle.length) || 34) / 2);
+    const frontClearance = distance - halfLength;
+    const rearClearance = distance + halfLength;
+    if (rearClearance < -PASSED_REAR_CLEARANCE) {
+      return { shouldYield:false, stopOffset:0, canStop:false, stoppingDistance:0, committed:false, cleared:true };
+    }
+
     const speed = Math.max(0, Number(vehicle.speed) || 0);
     const stoppingDistance = vehicleStoppingDistance(vehicle, options.deceleration);
-    const canStop = speed < .1 || distance >= stoppingDistance;
-    const timeToArrival = speed < .1 ? Infinity : Math.max(0, distance - (Number(vehicle.length) || 34) / 2) / speed;
+    const canStop = frontClearance >= safeFrontClearance(crosswalk) &&
+      (speed < .1 || distance >= stoppingDistance);
+    const committed = frontClearance < safeFrontClearance(crosswalk);
+    const timeToArrival = speed < .1 ? Infinity : Math.max(0, frontClearance) / speed;
     const activeClearance = Math.max(0, Number(claim.clearanceTime) || (Number(crosswalk.length) || 120) / 28);
     const conflictImminent = timeToArrival <= activeClearance + CLEARANCE_MARGIN || distance <= stoppingDistance + 42;
-    const shouldYield = speed < .1 || canStop && conflictImminent;
+
+    // A vehicle whose nose has already entered the pedestrian conflict envelope
+    // must clear the crossing when the pedestrian is still waiting. Asking both
+    // actors to stop is the reciprocal-yield deadlock this module is meant to avoid.
+    if (claim.phase === "waiting" && committed) {
+      return {
+        shouldYield:false,
+        stopOffset:0,
+        canStop:false,
+        stoppingDistance,
+        timeToArrival,
+        emergencyBrake:false,
+        committed:true,
+        frontClearance
+      };
+    }
+
+    const shouldYield = claim.phase === "crossing"
+      ? (committed || canStop && conflictImminent || speed < .1)
+      : (canStop && conflictImminent || speed < .1 && !committed);
     return {
       shouldYield,
-      stopOffset:Math.max(0, distance - (Number(options.stopOffset) || 18)),
+      stopOffset:Math.max(0, frontClearance - SAFE_FRONT_CLEARANCE),
       canStop,
       stoppingDistance,
       timeToArrival,
-      emergencyBrake:claim.phase === "crossing" && !canStop
+      emergencyBrake:claim.phase === "crossing" && committed && !canStop,
+      committed,
+      frontClearance
     };
   }
 
@@ -107,7 +184,7 @@
       : { pedestrianId:null, phase:"clear", waitingPedestrianIds:[] };
   }
 
-  const api = Object.freeze({ assessPedestrian, updateClaim, vehicleYieldDecision, arbitrateClaims, vehicleStoppingDistance });
+  const api = Object.freeze({ assessPedestrian, updateClaim, vehicleYieldDecision, arbitrateClaims, vehicleStoppingDistance, safeFrontClearance, SAFE_FRONT_CLEARANCE });
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   global.CityDaysCrossingControl = api;
 })(typeof globalThis !== "undefined" ? globalThis : window);

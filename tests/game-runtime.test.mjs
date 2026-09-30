@@ -182,7 +182,7 @@ test('wardrobe model is loaded before runtime and is normalized in snapshots', (
   assert.match(source, /wardrobe:wardrobeModel\.createWardrobe\(\)/);
   assert.match(source, /wardrobe:wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
   assert.match(source, /state\.wardrobe = wardrobeModel\.normalizeWardrobe\(saved\.wardrobe\)/);
-  assert.match(html, /game\.js\?v=20260930-postmerge-debug-1/);
+  assert.match(html, /game\.js\?v=20260930-pedestrian-vehicle-deadlock-1/);
 });
 
 test('arcade progress is loaded before the game and migrates safely through snapshots', () => {
@@ -771,8 +771,8 @@ test('public bath rules load before runtime and the sento interaction applies it
 });
 
 test('clinic map and runtime changes request fresh browser assets', () => {
-  assert.match(html, /map-model\.js\?v=20260930-postmerge-debug-1/);
-  assert.match(html, /game\.js\?v=20260930-postmerge-debug-1/);
+  assert.match(html, /map-model\.js\?v=20260930-pedestrian-vehicle-deadlock-1/);
+  assert.match(html, /game\.js\?v=20260930-pedestrian-vehicle-deadlock-1/);
 });
 
 test('health model loads before runtime and has a visible sixth needs meter', () => {
@@ -963,7 +963,7 @@ test('club members travel through normal pedestrian routes and revalidate the se
 test('club runtime modules have fresh browser cache keys', () => {
   assert.match(html, /community-center\.js\?v=20260929-community-clubs-1/);
   assert.match(html, /social-npc-system\.js\?v=20260929-community-clubs-1/);
-  assert.match(html, /game\.js\?v=20260930-postmerge-debug-1/);
+  assert.match(html, /game\.js\?v=20260930-pedestrian-vehicle-deadlock-1/);
 });
 
 test('game loads overtake safety before the overtake planner and runtime', () => {
@@ -1486,4 +1486,47 @@ test('placement mode locks player movement without stopping normal world-time ad
   assert.match(update.slice(placement, worldMinutes), /updateFurniturePlacement\(dt\)/);
   assert.doesNotMatch(update.slice(placement, worldMinutes), /return;/);
   assert.match(update, /Boolean\(furniturePlacementState\)/);
+});
+
+
+test('pedestrian route starts honor map aliases instead of reversing the first safe segment', () => {
+  assert.match(source, /const resolvedStartNodeId = route\.nodeIds\?\.\[0\] \|\| startNodeId/);
+  assert.match(source, /firstSegment\.from === resolvedStartNodeId/);
+  assert.match(source, /ped\.currentNodeId = resolvedStartNodeId/);
+});
+
+test('crosswalk stops use front-clearance ownership and never rewind a committed vehicle', () => {
+  assert.match(source, /crossingControl\.SAFE_FRONT_CLEARANCE/);
+  assert.match(source, /decision\.committed && claim\.phase === "crossing"/);
+  assert.match(source, /\? currentEndpointDistance\s*:\s*plannedCenterStopOffset/);
+});
+
+test('signal stops follow the actual generated crosswalk instead of stale junction offsets', () => {
+  assert.match(source, /const approachCrosswalk = mapModel\.crosswalks\.find/);
+  assert.match(source, /crosswalkDistanceFromEndpoint/);
+  assert.match(source, /vehicleDimensions\(car\)\.length \/ 2 \+ crossingClearance/);
+});
+
+test('world and minimap ignore unsafe legacy pedestrian-only blueprint edges', () => {
+  const worldRoads = source.slice(source.indexOf('function drawMapModelRoads()'), source.indexOf('function drawMapModelJunctions()'));
+  assert.match(worldRoads, /if \(!edge\.vehicle\) return false/);
+  assert.match(worldRoads, /for \(const segment of mapModel\.pedestrianNavigation\.segments\)/);
+  const minimap = source.slice(source.indexOf('function drawMapModelMinimap('), source.indexOf('function drawMinimap()'));
+  assert.match(minimap, /if \(!edge\.vehicle\) continue/);
+  assert.match(minimap, /for \(const segment of mapModel\.pedestrianNavigation\.segments\)/);
+});
+
+
+test('crosswalk rendering uses generated depth instead of road width as zebra depth', () => {
+  const markings = source.slice(source.indexOf('function drawMapModelIntersectionMarkings()'), source.indexOf('function drawMapModelRoads()'));
+  assert.match(markings, /const crossingDepth = Math\.max\(18, Number\(crosswalk\.depth\) \|\| 24\)/);
+  assert.match(markings, /const halfRoadSpan = Math\.max\(14, edge\.width \/ 2 - 7\)/);
+  assert.match(markings, /offset = -crossingDepth \/ 2 \+ 3/);
+});
+
+
+test('pedestrians request an unsignalized crossing only near the waiting area, not from far up the sidewalk', () => {
+  const claims = source.slice(source.indexOf('function updateCrossingClaims()'), source.indexOf('function trafficCrosswalkStop('));
+  assert.match(claims, /remaining <= Math\.max\(42, Math\.min\(64, ped\.speed \* 1\.2\)\)/);
+  assert.doesNotMatch(claims, /Math\.max\(180, ped\.speed \* 4 \+ 22\)/);
 });

@@ -7,7 +7,7 @@ const { createMapModel } = mapModule;
 test('v2 map validates as a connected Japanese urban fabric', () => {
   const map = createMapModel();
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2.8');
+  assert.equal(map.version, 'japan-v2.9');
   assert.equal(map.worldSize, 10800);
   assert.ok(map.nodes.length >= 45);
   assert.ok(map.edges.length >= 55);
@@ -264,7 +264,7 @@ test('community center has a walkable entrance, civic-road access, and clear bui
   assert.ok(map.findRoute('central-station-entry', center.entranceNodeId, { mode:'pedestrian' }));
   assert.ok(map.neighbors(center.roadNodeId, { mode:'vehicle' }).length > 0);
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2.8');
+  assert.equal(map.version, 'japan-v2.9');
 });
 
 test('station arcade has a walkable plaza route, legible identity, and collision-free footprint', () => {
@@ -296,16 +296,15 @@ test('nearest-road and surface membership distinguish vehicle and pedestrian str
   const map = createMapModel();
   const vehicleEdge = map.edges.find((edge) => edge.vehicle);
   const vehiclePoint = vehicleEdge.points[Math.floor(vehicleEdge.points.length / 2)];
-  const pedestrianSample = map.edges
-    .filter((edge) => edge.pedestrian && !edge.vehicle)
-    .flatMap((edge) => edge.points.slice(1).map((point, index) => ({ edge, point, start:edge.points[index] })))
-    .map(({ edge, start, point }) => ({
-      edge,
+  const pedestrianSample = map.pedestrianNavigation.segments
+    .filter((segment) => segment.type !== 'crosswalk')
+    .flatMap((segment) => segment.points.slice(1).map((point, index) => ({ segment, point, start:segment.points[index] })))
+    .map(({ segment, start, point }) => ({
+      segment,
       point:{ x:(start.x + point.x) / 2, y:(start.y + point.y) / 2 }
     }))
     .find(({ point }) => !map.isRoad(point.x, point.y, { vehicleOnly:true }));
   assert.ok(pedestrianSample);
-  const pedestrianEdge = pedestrianSample.edge;
   const pedestrianPoint = pedestrianSample.point;
 
   assert.equal(map.nearestRoad(vehiclePoint.x, vehiclePoint.y, { vehicleOnly:true }).edgeId, vehicleEdge.id);
@@ -323,10 +322,12 @@ test('all edge polylines stay attached to their declared nodes', () => {
   }
 });
 
-test('place validation detects a broken entrance connection', () => {
+test('place validation detects a broken typed pedestrian entrance connection', () => {
   const map = createMapModel();
-  map.edges.find((edge) => edge.id === 'ped-home-entry').pedestrian = false;
-  assert.ok(map.validate().includes('place unreachable: home'));
+  const homeAccess = map.pedestrianNavigation.externalNodeAliases.get('home-entrance');
+  assert.ok(homeAccess);
+  map.pedestrianNavigation.adjacency.delete(homeAccess);
+  assert.ok(map.validate().includes('place unreachable on pedestrian graph: home'));
 });
 
 test('facility road nodes are connected to the vehicle graph', () => {
@@ -366,12 +367,15 @@ test('facility entrances are separate from road-clear building footprints', () =
 test('cafe body is not centered on its street-side interaction entrance', () => {
   const map = createMapModel();
   const cafe = map.places.find((place) => place.id === 'cafe');
-  assert.deepEqual([cafe.x, cafe.y], [4230, 5560]);
+  assert.notDeepEqual([cafe.x, cafe.y], [cafe.building.x, cafe.building.y]);
   assert.deepEqual(
     { x:cafe.building.x, y:cafe.building.y, w:cafe.building.w, h:cafe.building.h },
     { x:4380, y:5784, w:300, h:270 }
   );
   assert.ok(cafe.building.frontageGeometry);
+  const hit = map.nearestRoad(cafe.x, cafe.y, { vehicleOnly:true });
+  assert.ok(hit);
+  assert.ok(hit.distance >= hit.edge.width / 2 + 18);
 });
 
 test('Wakaba fuel station is reachable on foot and by car without map collisions', () => {
@@ -397,8 +401,8 @@ test('Wakaba animal shelter has a reachable pedestrian entrance and collision-sa
   );
   assert.ok(shelter.building.frontageGeometry);
   assert.ok(map.findRoute('home-entrance', shelter.entranceNodeId, { mode:'pedestrian' }));
-  const entrance = map.getNode(shelter.entranceNodeId);
-  assert.equal(map.isWalkable(entrance.x, entrance.y, 14), true);
+  assert.equal(map.isWalkable(shelter.x, shelter.y, 14), true);
+  assert.ok(map.pedestrianNavigation.externalNodeAliases.has(shelter.entranceNodeId));
   const spur = map.getEdge('ped-pet-shelter-entry');
   assert.equal(spur.pedestrian, true);
   assert.equal(spur.vehicle, false);
@@ -473,4 +477,35 @@ test('enterable facility buildings share road-frontage orientation, entrance geo
     assert.ok(Math.abs(Math.sin(angleDelta)) < 1e-6, place.id + ' building must align with its frontage road');
   }
   assert.deepEqual(map.validate(), []);
+});
+
+
+test('all facility and station interaction points are outside the vehicle carriageway', () => {
+  const map = createMapModel();
+  for (const place of map.places) {
+    const hit = map.nearestRoad(place.x, place.y, { vehicleOnly:true });
+    assert.ok(!hit || hit.distance >= hit.edge.width / 2 + 8, place.id);
+    assert.equal(map.isWalkable(place.x, place.y, 14), true, place.id);
+  }
+  for (const station of map.stations) {
+    const hit = map.nearestRoad(station.accessX, station.accessY, { vehicleOnly:true });
+    assert.ok(!hit || hit.distance >= hit.edge.width / 2 + 8, station.id);
+    assert.equal(map.isWalkable(station.accessX, station.accessY, 14), true, station.id);
+  }
+});
+
+test('vehicle roads never cross or overlap without a shared junction node', () => {
+  const map = createMapModel();
+  assert.deepEqual(
+    map.validate().filter((error) => error.includes('vehicle roads cross without junction node') || error.includes('vehicle road surfaces overlap without junction node')),
+    []
+  );
+});
+
+test('public pedestrian routing delegates to the typed safe navigation graph', () => {
+  const map = createMapModel();
+  const route = map.findRoute('home-entrance', 'laundromat-entrance', { mode:'pedestrian' });
+  assert.ok(route);
+  assert.deepEqual(route.edgeIds, route.segmentIds);
+  assert.ok(route.edgeIds.every((id) => map.pedestrianNavigation.segmentsById.has(id)));
 });

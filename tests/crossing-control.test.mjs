@@ -65,3 +65,61 @@ test('vehicles that already passed an unsignalized crossing do not keep the pede
   );
   assert.equal(yieldDecision.shouldYield, false);
 });
+
+
+test('a vehicle already committed into the crossing clears first instead of mutually waiting with a pedestrian', () => {
+  const vehicle = { id:'committed', edgeId:'street', distanceToCrossing:30, speed:0, length:76 };
+  const assessment = crossingControl.assessPedestrian(crosswalk, { id:'walker', speed:30 }, [vehicle]);
+  assert.equal(assessment.decision, 'wait');
+  assert.equal(assessment.vehicleCommitted, true);
+  assert.equal(assessment.requestVehicleYield, false);
+
+  const yieldDecision = crossingControl.vehicleYieldDecision(
+    crosswalk,
+    { pedestrianId:'walker', phase:'waiting', clearanceTime:5 },
+    vehicle
+  );
+  assert.equal(yieldDecision.committed, true);
+  assert.equal(yieldDecision.shouldYield, false);
+});
+
+test('a vehicle stopped fully behind the crossing yields and lets the pedestrian enter', () => {
+  const vehicle = { id:'safe-stop', edgeId:'street', distanceToCrossing:70, speed:0, length:76 };
+  const assessment = crossingControl.assessPedestrian(crosswalk, { id:'walker', speed:30 }, [vehicle]);
+  assert.equal(assessment.decision, 'cross');
+  assert.equal(assessment.vehicleCommitted, false);
+
+  const yieldDecision = crossingControl.vehicleYieldDecision(
+    crosswalk,
+    { pedestrianId:'walker', phase:'waiting', clearanceTime:5 },
+    vehicle
+  );
+  assert.equal(yieldDecision.shouldYield, true);
+  assert.ok(yieldDecision.frontClearance >= crossingControl.SAFE_FRONT_CLEARANCE);
+});
+
+
+test('crosswalk depth contributes to the safe front clearance shared with vehicle stops', () => {
+  assert.equal(crossingControl.safeFrontClearance({ ...crosswalk, depth:30 }), 23);
+  assert.equal(crossingControl.safeFrontClearance({ ...crosswalk, depth:0 }), crossingControl.SAFE_FRONT_CLEARANCE);
+});
+
+
+test('a pedestrian waiting on a red signal does not independently stop signal-controlled traffic', () => {
+  const signalized = { ...crosswalk, signalized:true, depth:24 };
+  const vehicle = { id:'green-car', edgeId:'street', distanceToCrossing:70, speed:0, length:76 };
+  const waiting = crossingControl.vehicleYieldDecision(
+    signalized,
+    { pedestrianId:'walker', phase:'waiting', clearanceTime:5 },
+    vehicle
+  );
+  assert.equal(waiting.shouldYield, false);
+  assert.equal(waiting.signalControlled, true);
+
+  const occupied = crossingControl.vehicleYieldDecision(
+    signalized,
+    { pedestrianId:'walker', phase:'crossing', clearanceTime:5 },
+    vehicle
+  );
+  assert.equal(occupied.shouldYield, true);
+});
