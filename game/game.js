@@ -2890,14 +2890,20 @@
       return true;
     }
 
-    ped.currentNodeId = startNodeId || ped.homeNodeId;
-    beginCitizenActivity(ped, {
-      id:"home_idle",
-      label:CITIZEN_ACTIVITY_LABELS.home_idle,
-      nodeId:ped.currentNodeId,
-      duration:60,
-      indoor:true
-    });
+    // Route failure must never make a visible walking citizen disappear.
+    // Keep the current world pose visible, wait briefly, then let the normal
+    // activity planner retry from the same logical node.
+    ped.currentNodeId = startNodeId || ped.currentNodeId || ped.homeNodeId;
+    ped.pendingActivity = null;
+    ped.targetNodeId = ped.currentNodeId;
+    ped.targetPlaceId = null;
+    ped.currentActivityId = "route_retry";
+    ped.currentActivityLabel = "経路を確認中";
+    ped.currentPlaceId = null;
+    ped.activityMinutesRemaining = 4;
+    ped.state = "staying";
+    ped.visible = true;
+    ped.speed = ped.baseSpeed;
     return false;
   }
 
