@@ -2134,6 +2134,38 @@
   }
 
 
+  function resolvePedestrianNodeId(nodeId) {
+    if (typeof nodeId !== "string" || !nodeId) return null;
+    let current = nodeId;
+    const visited = new Set();
+    while (mapModel.pedestrianNavigation.externalNodeAliases?.has(current) && !visited.has(current)) {
+      visited.add(current);
+      current = mapModel.pedestrianNavigation.externalNodeAliases.get(current);
+    }
+    return current;
+  }
+
+  function pedestrianNodePosition(nodeId) {
+    const resolved = resolvePedestrianNodeId(nodeId);
+    if (!resolved) return null;
+    return mapModel.pedestrianNavigation.nodePositions?.get(resolved)
+      || mapModel.getNode(resolved)
+      || mapModel.getNode(nodeId)
+      || null;
+  }
+
+  function pedestrianNodeExists(nodeId) {
+    const resolved = resolvePedestrianNodeId(nodeId);
+    return Boolean(
+      resolved &&
+      (
+        mapModel.pedestrianNavigation.adjacency?.has(resolved) ||
+        mapModel.pedestrianNavigation.nodePositions?.has(resolved) ||
+        mapModel.getNode(resolved)
+      )
+    );
+  }
+
   function nearestPedestrianNodeId(x, y) {
     const graphHit = pedestrianNavigation?.nearestNode?.(mapModel.pedestrianNavigation, x, y);
     if (graphHit?.nodeId) return graphHit.nodeId;
@@ -2155,7 +2187,8 @@
     const source = preferred.length ? preferred : fallback;
     return source.map((site) => ({
       site,
-      nodeId:nearestPedestrianNodeId(site.x + site.w / 2, site.y + site.h / 2)
+      nodeId:mapModel.pedestrianNavigation.buildingAccessNodeIds?.get(site.id)
+        || nearestPedestrianNodeId(site.x + site.w / 2, site.y + site.h / 2)
     })).filter((value) => value.nodeId);
   }
 
@@ -2164,7 +2197,8 @@
       .filter((site) => site.use === "commercial" || site.use === "mixed")
       .map((site) => ({
         site,
-        nodeId:nearestPedestrianNodeId(site.x + site.w / 2, site.y + site.h / 2)
+        nodeId:mapModel.pedestrianNavigation.buildingAccessNodeIds?.get(site.id)
+          || nearestPedestrianNodeId(site.x + site.w / 2, site.y + site.h / 2)
       }))
       .filter((value) => value.nodeId);
   }
@@ -3315,8 +3349,8 @@
       const baseSpeed = (28 + hash2(i, 8, 96) * 14) * ageSpeedFactor;
       const ped = {
         ...profile,
-        x:mapModel.getNode(spawnNodeId)?.x || HOME.x,
-        y:mapModel.getNode(spawnNodeId)?.y || HOME.y,
+        x:pedestrianNodePosition(spawnNodeId)?.x ?? HOME.x,
+        y:pedestrianNodePosition(spawnNodeId)?.y ?? HOME.y,
         dir:hash2(i, 3, 90) * Math.PI * 2,
         timer:0,
         baseSpeed,
@@ -6585,10 +6619,10 @@
 
     const allowedStates = new Set(["walking","waiting","inside","staying"]);
     const savedState = allowedStates.has(stored.state) ? stored.state : "deciding";
-    const savedCurrentNode = typeof stored.currentNodeId === "string" && mapModel.getNode(stored.currentNodeId)
+    const savedCurrentNode = typeof stored.currentNodeId === "string" && pedestrianNodeExists(stored.currentNodeId)
       ? stored.currentNodeId
       : ped.homeNodeId;
-    const savedTargetNode = typeof stored.targetNodeId === "string" && mapModel.getNode(stored.targetNodeId)
+    const savedTargetNode = typeof stored.targetNodeId === "string" && pedestrianNodeExists(stored.targetNodeId)
       ? stored.targetNodeId
       : savedCurrentNode;
 
@@ -6604,13 +6638,13 @@
     const pending = stored.pendingActivity && typeof stored.pendingActivity === "object"
       ? { ...stored.pendingActivity }
       : null;
-    if (pending?.nodeId && !mapModel.getNode(pending.nodeId)) pending.nodeId = ped.homeNodeId;
+    if (pending?.nodeId && !pedestrianNodeExists(pending.nodeId)) pending.nodeId = ped.homeNodeId;
     ped.pendingActivity = pending;
 
     if (savedState === "inside" || savedState === "staying") {
       ped.state = savedState;
       ped.visible = ped.specialNpcId ? true : savedState === "staying";
-      const node = mapModel.getNode(savedCurrentNode);
+      const node = pedestrianNodePosition(savedCurrentNode);
       if (node) {
         ped.x = node.x;
         ped.y = node.y;
@@ -9222,11 +9256,14 @@
       const halfRoadSpan = Math.max(14, edge.width / 2 - 7);
       ctx.strokeStyle = "rgba(244,245,240,.88)";
       ctx.lineWidth = 4.5;
-      for (let offset = -crossingDepth / 2 + 3; offset <= crossingDepth / 2 - 3; offset += 8) {
-        const cx = crosswalk.x + roadTangent.x * offset;
-        const cy = crosswalk.y + roadTangent.y * offset;
-        const a = worldToScreen(cx - crossingVector.x * halfRoadSpan, cy - crossingVector.y * halfRoadSpan);
-        const b = worldToScreen(cx + crossingVector.x * halfRoadSpan, cy + crossingVector.y * halfRoadSpan);
+      // Zebra bars run parallel to the roadside/road tangent. Their centers
+      // step across the carriageway in the pedestrian crossing direction.
+      for (let offset = -halfRoadSpan; offset <= halfRoadSpan; offset += 11) {
+        const cx = crosswalk.x + crossingVector.x * offset;
+        const cy = crosswalk.y + crossingVector.y * offset;
+        const halfBar = Math.max(7, crossingDepth / 2 - 3);
+        const a = worldToScreen(cx - roadTangent.x * halfBar, cy - roadTangent.y * halfBar);
+        const b = worldToScreen(cx + roadTangent.x * halfBar, cy + roadTangent.y * halfBar);
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
@@ -11427,23 +11464,25 @@
     ctx.fillText(npc.name, p.x - 20, p.y - 64);
   }
 
+  function drawPedestrian(ped) {
+    if (!ped?.visible || ped.specialNpcId) return;
+    drawPerson(
+      ped.x,
+      ped.y,
+      ped.dir,
+      ped.color,
+      ped.pants,
+      ped.hair,
+      ped.skin,
+      ped.phase,
+      .98,
+      ped.appearance,
+      ped.state
+    );
+  }
+
   function drawPedestrians() {
-    for (const ped of pedestrians) {
-      if (!ped.visible || ped.specialNpcId) continue;
-      drawPerson(
-        ped.x,
-        ped.y,
-        ped.dir,
-        ped.color,
-        ped.pants,
-        ped.hair,
-        ped.skin,
-        ped.phase,
-        .98,
-        ped.appearance,
-        ped.state
-      );
-    }
+    for (const ped of pedestrians) drawPedestrian(ped);
   }
 
   function drawCar(car, owned = false) {
@@ -12725,6 +12764,36 @@
     }
   }
 
+  function drawDepthSortedActors() {
+    const actors = [];
+    let sequence = 0;
+    const push = (y, key, draw) => {
+      if (!Number.isFinite(Number(y))) return;
+      actors.push({ y:Number(y), key:String(key), sequence:sequence++, draw });
+    };
+
+    for (const ped of pedestrians) {
+      if (!ped.visible || ped.specialNpcId) continue;
+      push(ped.y, "ped:" + ped.id, () => drawPedestrian(ped));
+    }
+    for (const npc of NPCS) {
+      if (npc.hidden) continue;
+      push(npc.y, "npc:" + npc.id, () => drawNpc(npc));
+    }
+    for (const car of traffic) push(car.y, "traffic:" + car.id, () => drawCar(car, false));
+    push(personalCar.y, "personal-car", () => drawCar(personalCar, true));
+
+    if (state.petWalk.active && !state.player.inHome && !state.player.inVehicle && !state.player.inTrain) {
+      push(state.petWalk.petY, "pet", () => drawPetFollower());
+    }
+    if (!state.player.inVehicle && !state.player.inTrain) {
+      push(state.player.y, "player", () => drawPlayer());
+    }
+
+    actors.sort((a, b) => a.y - b.y || a.sequence - b.sequence || a.key.localeCompare(b.key));
+    for (const actor of actors) actor.draw();
+  }
+
   function render() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, viewWidth, viewHeight);
@@ -12749,12 +12818,7 @@
     for (const place of PLACES) drawPlace(place);
     drawRailUnderstructure();
     drawCityLandmarks();
-    drawPedestrians();
-    for (const npc of NPCS) drawNpc(npc);
-    for (const car of traffic) drawCar(car, false);
-    drawCar(personalCar, true);
-    drawPetFollower();
-    drawPlayer();
+    drawDepthSortedActors();
     drawTrafficLights();
     drawRailDeck();
     for (const train of trains) drawTrain(train);
