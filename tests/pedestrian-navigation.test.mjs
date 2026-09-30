@@ -145,3 +145,20 @@ test('non-arterial pedestrian roads receive sparse mid-block crossings before de
     assert.ok(maxGap <= 850.5, edge.id + ' gap=' + maxGap);
   }
 });
+
+
+test('generated residences and workplaces use frontage doorway nodes rather than arbitrary nearest sidewalk nodes', () => {
+  const map = createMapModel();
+  assert.equal(map.pedestrianNavigation.buildingAccessNodeIds.size, map.buildingSites.length);
+  for (const site of map.buildingSites) {
+    const nodeId = map.pedestrianNavigation.buildingAccessNodeIds.get(site.id);
+    const point = map.pedestrianNavigation.nodePositions.get(nodeId);
+    assert.ok(point, site.id);
+    const expected = {
+      x:site.frontageGeometry.entrance.x + site.frontageGeometry.normal.x * 10,
+      y:site.frontageGeometry.entrance.y + site.frontageGeometry.normal.y * 10
+    };
+    assert.ok(Math.hypot(point.x - expected.x, point.y - expected.y) < 1e-6, site.id + ' doorway coordinate');
+    assert.ok(findRoute(map.pedestrianNavigation, 'home-entrance', nodeId), site.id + ' doorway reachable');
+  }
+});
