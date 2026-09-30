@@ -8,7 +8,7 @@
     ? require("./building-frontage.js")
     : global.CityDaysBuildingFrontage;
 
-  const MAP_VERSION = "japan-v2.9";
+  const MAP_VERSION = "japan-v2.10";
   const WORLD_SIZE = 10800;
   const COAST = 160;
   const RAIL_Y = 4700;
@@ -1491,6 +1491,11 @@
       }
 
       for (const site of buildingSites) {
+        const accessNodeId = pedestrianGraph.buildingAccessNodeIds?.get(site.id);
+        if (!accessNodeId) errors.push("generated building pedestrian access missing: " + site.id);
+        else if (!pedestrianNavigation.findRoute(pedestrianGraph, "home-entrance", accessNodeId)) {
+          errors.push("generated building pedestrian access unreachable: " + site.id);
+        }
         const frontage = site.frontageGeometry;
         if (!frontage || frontage.side !== site.frontage || frontage.roadEdgeId !== site.frontageEdgeId && site.frontageEdgeId) {
           errors.push("building frontage geometry is inconsistent: " + site.id);
@@ -1539,7 +1544,7 @@
     }
 
     pedestrianGraph = pedestrianNavigation.buildGraph({
-      nodes, edges, places, stations, getNode, getEdge, neighbors, pedestrianCorridor,
+      nodes, edges, places, stations, buildingSites, getNode, getEdge, neighbors, pedestrianCorridor,
       pedestrianOffsetPose, junctionGeometry
     });
 
