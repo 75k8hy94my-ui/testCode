@@ -492,7 +492,13 @@
     }
 
     for (const place of mapModel.places || []) {
-      const accessPoint = { x:place.x, y:place.y };
+      const frontage = place.building?.frontageGeometry;
+      const accessPoint = frontage?.entrance && frontage?.normal
+        ? {
+            x:frontage.entrance.x + frontage.normal.x * 10,
+            y:frontage.entrance.y + frontage.normal.y * 10
+          }
+        : { x:place.x, y:place.y };
       const accessNodeId = "place-access:" + place.id;
       const target = chooseSafeAccessPath(accessPoint, primarySegments, mapModel, 1100);
       if (!target) continue;
