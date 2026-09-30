@@ -182,7 +182,7 @@ test('wardrobe model is loaded before runtime and is normalized in snapshots', (
   assert.match(source, /wardrobe:wardrobeModel\.createWardrobe\(\)/);
   assert.match(source, /wardrobe:wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
   assert.match(source, /state\.wardrobe = wardrobeModel\.normalizeWardrobe\(saved\.wardrobe\)/);
-  assert.match(html, /game\.js\?v=20260930-pedestrian-vehicle-deadlock-1/);
+  assert.match(html, /game\.js\?v=20260930-depth-continuity-1/);
 });
 
 test('arcade progress is loaded before the game and migrates safely through snapshots', () => {
@@ -771,8 +771,8 @@ test('public bath rules load before runtime and the sento interaction applies it
 });
 
 test('clinic map and runtime changes request fresh browser assets', () => {
-  assert.match(html, /map-model\.js\?v=20260930-pedestrian-vehicle-deadlock-1/);
-  assert.match(html, /game\.js\?v=20260930-pedestrian-vehicle-deadlock-1/);
+  assert.match(html, /map-model\.js\?v=20260930-depth-continuity-1/);
+  assert.match(html, /game\.js\?v=20260930-depth-continuity-1/);
 });
 
 test('health model loads before runtime and has a visible sixth needs meter', () => {
@@ -963,7 +963,7 @@ test('club members travel through normal pedestrian routes and revalidate the se
 test('club runtime modules have fresh browser cache keys', () => {
   assert.match(html, /community-center\.js\?v=20260929-community-clubs-1/);
   assert.match(html, /social-npc-system\.js\?v=20260929-community-clubs-1/);
-  assert.match(html, /game\.js\?v=20260930-pedestrian-vehicle-deadlock-1/);
+  assert.match(html, /game\.js\?v=20260930-depth-continuity-1/);
 });
 
 test('game loads overtake safety before the overtake planner and runtime', () => {
@@ -1517,11 +1517,15 @@ test('world and minimap ignore unsafe legacy pedestrian-only blueprint edges', (
 });
 
 
-test('crosswalk rendering uses generated depth instead of road width as zebra depth', () => {
+test('crosswalk zebra bars are parallel to the roadside while spanning the crossing width', () => {
   const markings = source.slice(source.indexOf('function drawMapModelIntersectionMarkings()'), source.indexOf('function drawMapModelRoads()'));
   assert.match(markings, /const crossingDepth = Math\.max\(18, Number\(crosswalk\.depth\) \|\| 24\)/);
   assert.match(markings, /const halfRoadSpan = Math\.max\(14, edge\.width \/ 2 - 7\)/);
-  assert.match(markings, /offset = -crossingDepth \/ 2 \+ 3/);
+  assert.match(markings, /offset = -halfRoadSpan/);
+  assert.match(markings, /cx = crosswalk\.x \+ crossingVector\.x \* offset/);
+  assert.match(markings, /cy = crosswalk\.y \+ crossingVector\.y \* offset/);
+  assert.match(markings, /cx - roadTangent\.x \* halfBar/);
+  assert.match(markings, /cy - roadTangent\.y \* halfBar/);
 });
 
 
@@ -1529,4 +1533,32 @@ test('pedestrians request an unsignalized crossing only near the waiting area, n
   const claims = source.slice(source.indexOf('function updateCrossingClaims()'), source.indexOf('function trafficCrosswalkStop('));
   assert.match(claims, /remaining <= Math\.max\(42, Math\.min\(64, ped\.speed \* 1\.2\)\)/);
   assert.doesNotMatch(claims, /Math\.max\(180, ped\.speed \* 4 \+ 22\)/);
+});
+
+
+test('dynamic road actors share one north-to-south y-depth render queue', () => {
+  const draw = source.slice(source.indexOf('function drawDepthSortedActors()'), source.indexOf('function render()'));
+  assert.match(draw, /push\(ped\.y, "ped:"/);
+  assert.match(draw, /push\(npc\.y, "npc:"/);
+  assert.match(draw, /push\(car\.y, "traffic:"/);
+  assert.match(draw, /push\(personalCar\.y, "personal-car"/);
+  assert.match(draw, /actors\.sort\(\(a, b\) => a\.y - b\.y/);
+  const render = source.slice(source.indexOf('function render()'), source.indexOf('function frame('));
+  assert.match(render, /drawDepthSortedActors\(\)/);
+  assert.doesNotMatch(render, /drawPedestrians\(\);[\s\S]*for \(const car of traffic\) drawCar/);
+});
+
+test('citizen home and work assignments prefer generated building doorway nodes', () => {
+  const homes = source.slice(source.indexOf('function citizenHomeCandidates()'), source.indexOf('function citizenName('));
+  assert.match(homes, /buildingAccessNodeIds\?\.get\(site\.id\)/);
+  assert.match(source, /pedestrianNodePosition\(spawnNodeId\)\?\.x/);
+  assert.match(source, /pedestrianNodePosition\(spawnNodeId\)\?\.y/);
+});
+
+test('snapshot restore preserves typed pedestrian nodes instead of falling back to a citizen home', () => {
+  const restore = source.slice(source.indexOf('function restoreCitizenFromSave('), source.indexOf('function applyGameSnapshot('));
+  assert.match(restore, /pedestrianNodeExists\(stored\.currentNodeId\)/);
+  assert.match(restore, /pedestrianNodeExists\(stored\.targetNodeId\)/);
+  assert.match(restore, /pedestrianNodePosition\(savedCurrentNode\)/);
+  assert.doesNotMatch(restore, /typeof stored\.currentNodeId === "string" && mapModel\.getNode\(stored\.currentNodeId\)/);
 });
