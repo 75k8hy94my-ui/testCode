@@ -545,7 +545,10 @@ test('dog walking is persisted, follows the outdoor trail, and has guarded start
   assert.match(source, /function enterCar\(\) \{[\s\S]*?if \(state\.petWalk\.active\)/);
   assert.match(source, /function boardTrain\(train, station\) \{[\s\S]*?if \(state\.petWalk\.active\)/);
   assert.match(source, /function drawPetFollower\(\)[\s\S]*?worldToScreen\(state\.petWalk\.petX, state\.petWalk\.petY\)/);
-  assert.match(source, /drawPetFollower\(\);\s*drawPlayer\(\);/);
+  const depthDraw = source.slice(source.indexOf('function drawDepthSortedActors()'), source.indexOf('function render()'));
+  assert.match(depthDraw, /push\(state\.petWalk\.petY, "pet", \(\) => drawPetFollower\(\)\)/);
+  assert.match(depthDraw, /push\(state\.player\.y, "player", \(\) => drawPlayer\(\)\)/);
+  assert.match(depthDraw, /actors\.sort\(\(a, b\) => a\.y - b\.y/);
   assert.match(source, /__CityDaysSocialNpcTest/);
   assert.match(source, /petWalk:/);
 });
