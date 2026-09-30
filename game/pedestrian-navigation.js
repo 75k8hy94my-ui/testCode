@@ -472,7 +472,13 @@
         y:frontage.entrance.y + frontage.normal.y * 10
       };
       const accessNodeId = "building-access:" + site.id;
-      const target = chooseSafeAccessPath(accessPoint, primarySegments, mapModel, 1100);
+      const frontageSegments = primarySegments.filter((segment) => segment.sourceEdgeId === site.frontageEdgeId);
+      const target = chooseSafeAccessPath(
+        accessPoint,
+        frontageSegments.length ? frontageSegments : primarySegments,
+        mapModel,
+        1100
+      );
       if (!target) continue;
       if (target.length <= 1) {
         buildingAccessNodeIds.set(site.id, target.nodeId);
@@ -500,7 +506,16 @@
           }
         : { x:place.x, y:place.y };
       const accessNodeId = "place-access:" + place.id;
-      const target = chooseSafeAccessPath(accessPoint, primarySegments, mapModel, 1100);
+      const frontageEdgeId = place.building?.frontageEdgeId || place.building?.frontageGeometry?.roadEdgeId || null;
+      const frontageSegments = frontageEdgeId
+        ? primarySegments.filter((segment) => segment.sourceEdgeId === frontageEdgeId)
+        : [];
+      const target = chooseSafeAccessPath(
+        accessPoint,
+        frontageSegments.length ? frontageSegments : primarySegments,
+        mapModel,
+        1100
+      );
       if (!target) continue;
       if (target.length <= 1) {
         externalNodeAliases.set(place.entranceNodeId, target.nodeId);
