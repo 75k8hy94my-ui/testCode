@@ -7,7 +7,7 @@ const { createMapModel } = mapModule;
 test('v2 map validates as a connected Japanese urban fabric', () => {
   const map = createMapModel();
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2.9');
+  assert.equal(map.version, 'japan-v2.10');
   assert.equal(map.worldSize, 10800);
   assert.ok(map.nodes.length >= 45);
   assert.ok(map.edges.length >= 55);
@@ -264,7 +264,7 @@ test('community center has a walkable entrance, civic-road access, and clear bui
   assert.ok(map.findRoute('central-station-entry', center.entranceNodeId, { mode:'pedestrian' }));
   assert.ok(map.neighbors(center.roadNodeId, { mode:'vehicle' }).length > 0);
   assert.deepEqual(map.validate(), []);
-  assert.equal(map.version, 'japan-v2.9');
+  assert.equal(map.version, 'japan-v2.10');
 });
 
 test('station arcade has a walkable plaza route, legible identity, and collision-free footprint', () => {
@@ -508,4 +508,19 @@ test('public pedestrian routing delegates to the typed safe navigation graph', (
   assert.ok(route);
   assert.deepEqual(route.edgeIds, route.segmentIds);
   assert.ok(route.edgeIds.every((id) => map.pedestrianNavigation.segmentsById.has(id)));
+});
+
+
+test('every generated building has a reachable doorway node on the typed pedestrian graph', () => {
+  const map = createMapModel();
+  for (const site of map.buildingSites) {
+    const nodeId = map.pedestrianNavigation.buildingAccessNodeIds.get(site.id);
+    assert.ok(nodeId, site.id + ' doorway node');
+    assert.ok(map.pedestrianNavigation.nodePositions.has(nodeId), site.id + ' doorway position');
+    assert.ok(map.findRoute('home-entrance', nodeId, { mode:'pedestrian' }), site.id + ' doorway route');
+    const point = map.pedestrianNavigation.nodePositions.get(nodeId);
+    const hit = map.nearestRoad(point.x, point.y, { vehicleOnly:true });
+    assert.ok(!hit || hit.distance > hit.edge.width / 2 + 4, site.id + ' doorway stays out of carriageway');
+  }
+  assert.deepEqual(map.validate(), []);
 });
