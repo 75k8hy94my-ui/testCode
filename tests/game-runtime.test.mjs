@@ -1562,3 +1562,12 @@ test('snapshot restore preserves typed pedestrian nodes instead of falling back 
   assert.match(restore, /pedestrianNodePosition\(savedCurrentNode\)/);
   assert.doesNotMatch(restore, /typeof stored\.currentNodeId === "string" && mapModel\.getNode\(stored\.currentNodeId\)/);
 });
+
+
+test('route planning failure keeps a walking citizen visible instead of hiding and respawning them', () => {
+  const planner = source.slice(source.indexOf('function planCitizenAction('), source.indexOf('function pedestrianSidewalkLayout('));
+  assert.match(planner, /ped\.currentActivityId = "route_retry"/);
+  assert.match(planner, /ped\.state = "staying"/);
+  assert.match(planner, /ped\.visible = true/);
+  assert.doesNotMatch(planner, /beginCitizenActivity\(ped, \{[\s\S]*id:"home_idle"[\s\S]*indoor:true/);
+});
