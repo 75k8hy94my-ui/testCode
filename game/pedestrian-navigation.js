@@ -195,6 +195,7 @@
     const nodePositions = new Map();
     const endpointGroups = new Map();
     const externalNodeAliases = new Map();
+    const buildingAccessNodeIds = new Map();
 
     const addSegment = (segment) => {
       if (!(segment.length > 0) || segment.points.length < 2) return;
@@ -459,6 +460,37 @@
     // attach to it with generated road-safe links below.
     const primarySegments = segments.filter((segment) => segment.type === "sidewalk");
 
+    // Generated residences and workplaces need real doorway nodes. Using the
+    // nearest pre-existing sidewalk node makes citizens disappear in the middle
+    // of a pavement when an indoor activity starts, then reappear at that logical
+    // node. Attach every generated building frontage to the safe sidewalk graph.
+    for (const site of mapModel.buildingSites || []) {
+      const frontage = site.frontageGeometry;
+      if (!frontage?.entrance || !frontage?.normal) continue;
+      const accessPoint = {
+        x:frontage.entrance.x + frontage.normal.x * 10,
+        y:frontage.entrance.y + frontage.normal.y * 10
+      };
+      const accessNodeId = "building-access:" + site.id;
+      const target = chooseSafeAccessPath(accessPoint, primarySegments, mapModel, 1100);
+      if (!target) continue;
+      if (target.length <= 1) {
+        buildingAccessNodeIds.set(site.id, target.nodeId);
+        continue;
+      }
+      addSegment({
+        id:"building-access-path:" + site.id,
+        type:"facility-access",
+        from:accessNodeId,
+        to:target.nodeId,
+        points:target.points,
+        length:target.length,
+        sourceEdgeId:null,
+        buildingSiteId:site.id
+      });
+      buildingAccessNodeIds.set(site.id, accessNodeId);
+    }
+
     for (const place of mapModel.places || []) {
       const accessPoint = { x:place.x, y:place.y };
       const accessNodeId = "place-access:" + place.id;
@@ -541,6 +573,7 @@
       adjacency,
       nodePositions,
       externalNodeAliases,
+      buildingAccessNodeIds,
       crosswalks:Object.freeze(crosswalks),
       safetyViolations:Object.freeze(safetyViolations)
     });
