@@ -252,8 +252,8 @@ test('home closet equips only owned outfits at home and both player scenes use t
   assert.match(home, /playerAppearance\(\)/);
   assert.doesNotMatch(street, /PLAYER_APPEARANCE/);
   assert.doesNotMatch(home, /PLAYER_APPEARANCE/);
-  const npc=source.slice(source.indexOf('function drawNpc('),source.indexOf('function drawPedestrians('));
-  const pedestrians=source.slice(source.indexOf('function drawPedestrians('),source.indexOf('function drawPlayer('));
+  const npc=source.slice(source.indexOf('function drawNpc('),source.indexOf('function drawPedestrian('));
+  const pedestrians=source.slice(source.indexOf('function drawPedestrian('),source.indexOf('function drawPlayer('));
   assert.match(npc, /npc\.appearance/);
   assert.match(pedestrians, /ped\.appearance/);
   assert.doesNotMatch(npc + pedestrians, /playerAppearance\(/);
