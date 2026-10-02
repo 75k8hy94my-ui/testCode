@@ -1,0 +1,52 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const vault = fs.readFileSync('./vault-session.js', 'utf8');
+const profileMenu = fs.readFileSync('./profile-menu.js', 'utf8');
+const profileSpa = fs.readFileSync('./home-profile-spa.js', 'utf8');
+const sync = fs.readFileSync('./sync.html', 'utf8');
+const index = fs.readFileSync('./index.html', 'utf8');
+
+test('saved Supabase sessions are reused until the access token nears expiry', () => {
+  assert.match(vault, /function sessionIsFresh\(session, skewSeconds = 60\)/);
+  assert.match(vault, /async function ensureSession\(\)/);
+  assert.match(vault, /if \(sessionIsFresh\(current\)\) return current;/);
+  assert.match(vault, /return refreshSession\(\);/);
+  assert.match(index, /MangaVault\.ensureSession\(\)/);
+  assert.match(profileSpa, /MangaVault\.ensureSession\(\)/);
+  assert.match(sync, /MangaVault\.ensureSession\(\)/);
+});
+
+test('vault lock clears only the active vault key and keeps account session intact', () => {
+  const start = profileMenu.indexOf('function lock(button)');
+  const end = profileMenu.indexOf('function openProfile()', start);
+  const body = profileMenu.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.match(body, /MangaVault\.lockVault\(\)|MangaVault\.clearActive\(\)/);
+  assert.match(body, /sync\.html/);
+  assert.doesNotMatch(body, /saveSession\(null\)/);
+  assert.doesNotMatch(body, /localStorage\.removeItem/);
+});
+
+test('full logout still clears auth session and device-local protected data', () => {
+  const start = profileMenu.indexOf('async function logout(button)');
+  const end = profileMenu.indexOf('function lock(button)', start);
+  const body = profileMenu.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.match(body, /MangaVault\.clearActive\(\)/);
+  assert.match(body, /MangaVault\.saveSession\(null\)/);
+  assert.match(body, /EncryptedChunkCache\.clearAll/);
+  assert.match(body, /DEVICE_DATA_KEYS\(\)\.forEach/);
+});
+
+test('profile UI distinguishes lock from complete logout', () => {
+  assert.match(profileMenu, /data-lock>ロック</);
+  assert.match(profileMenu, /アカウントからログアウト/);
+  assert.match(profileSpa, /id="profileLockBtn"/);
+  assert.match(profileSpa, /ロックは保管庫の復号鍵だけを破棄し、ログイン状態は維持します/);
+});
+
+test('unlock page does not ask for passkey again when vault is already active', () => {
+  assert.match(sync, /if \(MangaVault\.loadActive\(\)\) \{ goReader\(\); return; \}/);
+});

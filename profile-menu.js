@@ -16,6 +16,15 @@
     window.location.replace('index.html');
   }
 
+  function lock(button) {
+    if (button) button.disabled = true;
+    if (window.MangaVault) {
+      if (typeof MangaVault.lockVault === 'function') MangaVault.lockVault();
+      else MangaVault.clearActive();
+    }
+    window.location.replace('sync.html');
+  }
+
   function openProfile() {
     if (window.HomeProfileSPA && typeof window.HomeProfileSPA.navigate === 'function') {
       window.HomeProfileSPA.navigate('profile.html');
@@ -41,10 +50,11 @@
       menu.id='desktopProfileMenu';
       menu.hidden=true;
       menu.setAttribute('role','menu');
-      menu.innerHTML='<button type="button" role="menuitem" data-profile-route>プロフィール設定</button><button type="button" role="menuitem" data-logout>ログアウト</button>';
+      menu.innerHTML='<button type="button" role="menuitem" data-profile-route>プロフィール設定</button><button type="button" role="menuitem" data-lock>ロック</button><button type="button" role="menuitem" data-logout>アカウントからログアウト</button>';
       document.body.appendChild(menu);
       menu.addEventListener('click',(event)=>event.stopPropagation());
       menu.querySelector('[data-profile-route]').addEventListener('click',()=>{close();openProfile();});
+      menu.querySelector('[data-lock]').addEventListener('click',()=>{close();lock(menu.querySelector('[data-lock]'));});
       menu.querySelector('[data-logout]').addEventListener('click',()=>logout(menu.querySelector('[data-logout]')));
     }
     return menu;
@@ -85,7 +95,7 @@
     document.querySelectorAll('[data-profile-menu-trigger], #desktopProfileButton').forEach(installTrigger);
   }
 
-  window.ProfileMenu={logout,openProfile,install};
+  window.ProfileMenu={logout,lock,openProfile,install};
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install,{once:true}); else install();
   document.addEventListener('manga-reader-desktop-nav-ready',install);
   document.addEventListener('home-profile-routechange',()=>{close();install();});
