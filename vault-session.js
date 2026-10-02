@@ -86,6 +86,7 @@
   function channelPost(message) { try { if (vaultChannel) vaultChannel.postMessage(message); } catch (_) {} }
   function saveActive(vault) { const saved = serializeVault(vault); sessionStorage.setItem(ACTIVE_KEY, JSON.stringify(saved)); channelPost({ type: 'vault-response', vault: saved }); }
   function clearActive() { sessionStorage.removeItem(ACTIVE_KEY); channelPost({ type: 'vault-cleared' }); }
+  function lockVault() { clearActive(); }
   function setupVaultChannel() {
     if (typeof BroadcastChannel !== 'function') return;
     try {
@@ -158,11 +159,30 @@
     if (options.token) headers.Authorization = 'Bearer ' + options.token;
     if (options.body) headers['Content-Type'] = 'application/json';
     const response = await fetch(config.url + path, Object.assign({}, options, { headers }));
-    if (!response.ok) { const detail = await response.text().catch(() => ''); throw new Error('通信に失敗しました (' + response.status + ')' + (detail ? '。' + detail.slice(0, 140) : '')); }
+    if (!response.ok) { const detail = await response.text().catch(() => ''); const error = new Error('通信に失敗しました (' + response.status + ')' + (detail ? '。' + detail.slice(0, 140) : '')); error.status = response.status; throw error; }
     return response.status === 204 ? null : response.json();
   }
   async function refreshSession() { const current = loadSession(); if (!current || !current.refresh_token) throw new Error('ログインしてください。'); const next = await api('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: JSON.stringify({ refresh_token: current.refresh_token }) }); saveSession(next); return next; }
-  async function withSession(work) { let session = loadSession(); if (!session) throw new Error('ログインしてください。'); try { return await work(session.access_token, session.user); } catch (error) { if (!String(error.message || '').includes('(401)')) throw error; session = await refreshSession(); return work(session.access_token, session.user); } }
+  function sessionIsFresh(session, skewSeconds = 60) {
+    const expiresAt = Number(session && session.expires_at);
+    return Boolean(session && session.access_token && Number.isFinite(expiresAt) && expiresAt > (Date.now() / 1000) + Math.max(0, Number(skewSeconds) || 0));
+  }
+  function isSessionAuthError(error) { return [400, 401, 403].includes(Number(error && error.status)); }
+  async function ensureSession() {
+    const current = loadSession();
+    if (!current || !current.refresh_token) throw new Error('ログインしてください。');
+    if (sessionIsFresh(current)) return current;
+    return refreshSession();
+  }
+  async function withSession(work) {
+    let session = await ensureSession();
+    try { return await work(session.access_token, session.user); }
+    catch (error) {
+      if (Number(error && error.status) !== 401 && !String(error && error.message || '').includes('(401)')) throw error;
+      session = await refreshSession();
+      return work(session.access_token, session.user);
+    }
+  }
   async function fetchRecord(token, user) {
     let rows; let legacyRevision = false;
     try { rows = await api('/rest/v1/manga_reader_vaults?select=payload,revision,updated_at&user_id=eq.' + encodeURIComponent(user.id) + '&limit=2', { token }); }
@@ -246,5 +266,5 @@
       if (!passkeys || !passkeys.length) throw new Error('このアカウントには保管庫パスキーが登録されていません。'); const rawKey = await unlockByPasskey(passkeys); const vault = { rawKey, keyWraps: record.payload.keyWraps }; saveActive(vault); await applyPayload(await decryptPayload(record.payload)); setMeta(user.id, { revision: record.revision || 1, updatedAt: record.updated_at }); return { created: false };
     });
   }
-  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, loadActive, waitForActive, refreshSession, api, withSession, fetchRecordForUi, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload };
+  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, refreshSession, ensureSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload };
 })();
