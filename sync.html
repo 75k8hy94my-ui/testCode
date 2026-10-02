@@ -59,7 +59,7 @@
       <div id="accountControl">
         <button id="accountMenuButton" type="button" aria-haspopup="menu" aria-expanded="false"><span id="accountEmail"></span> でログイン中</button>
         <div id="accountMenu" role="menu" hidden>
-          <button id="vaultLogoutBtn" type="button" role="menuitem">ログアウト</button>
+          <button id="vaultLogoutBtn" type="button" role="menuitem">アカウントからログアウト</button>
           <button id="passkeyRegisterBtn" type="button" role="menuitem">パスキー登録</button>
           <button id="passkeyUseBtn" type="button" role="menuitem">パスキーを使う</button>
         </div>
@@ -107,16 +107,17 @@
     };
     function setStatus(text) { ui.status.textContent=text || ''; }
     function goReader() { window.location.replace('home.html'); }
-    const session = MangaVault.loadSession();
+    let session = MangaVault.loadSession();
     if (!session || !session.user || !session.user.email) { window.location.replace('index.html'); return; }
     try {
-      await MangaVault.refreshSession();
-    } catch (_) {
-      MangaVault.saveSession(null);
+      session = await MangaVault.ensureSession();
+    } catch (error) {
+      if (typeof MangaVault.isSessionAuthError === 'function' && MangaVault.isSessionAuthError(error)) MangaVault.saveSession(null);
       window.location.replace('index.html');
       return;
     }
     ui.email.textContent=session.user.email;
+    if (MangaVault.loadActive()) { goReader(); return; }
     const DEVICE_DATA_KEYS=[...Object.values(MangaVaultPayload.DATA_KEYS||{}),'mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
     let opening=false;
     let passkeyOpening=false;
