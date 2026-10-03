@@ -16,7 +16,7 @@ test('sync unlock screen matches the minimal single-field layout', () => {
 test('account control opens the requested three-item dropdown only', () => {
   const menu = sync.match(/<div id="accountMenu"[\s\S]*?<\/div>/);
   assert.ok(menu, 'accountMenu must exist');
-  assert.match(menu[0], /id="vaultLogoutBtn"[^>]*>ログアウト<\/button>/);
+  assert.match(menu[0], /id="vaultLogoutBtn"[^>]*>アカウントからログアウト<\/button>/);
   assert.match(menu[0], /id="passkeyRegisterBtn"[^>]*>パスキー登録<\/button>/);
   assert.match(menu[0], /id="passkeyUseBtn"[^>]*>パスキーを使う<\/button>/);
 });

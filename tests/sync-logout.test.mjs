@@ -7,7 +7,7 @@ const html = fs.readFileSync(new URL('../sync.html', import.meta.url), 'utf8');
 test('vault passphrase screen exposes logout in the account dropdown', () => {
   assert.match(html, /id="accountMenuButton"/);
   assert.match(html, /id="accountMenu"/);
-  assert.match(html, /id="vaultLogoutBtn"[^>]*>ログアウト<\/button>/);
+  assert.match(html, /id="vaultLogoutBtn"[^>]*>アカウントからログアウト<\/button>/);
   assert.match(html, /vaultLogout\.addEventListener\('click',logout\)/);
 });
 

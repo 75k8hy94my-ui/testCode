@@ -26,7 +26,7 @@ function scriptSources(html) {
 
 test('current entry pages keep their static bootstrap script baselines', () => {
   assert.deepEqual(scriptSources(pages.manga), [
-    'supabase-config.js', 'vault-session.js?v=20260813-vault-state', 'browser-storage.js',
+    'supabase-config.js', 'vault-session.js?v=20261003-session-lock', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20260924-theme-unified', 'app-desktop-rail.js',
     'profile-menu.js?v=20260924-theme-unified', 'feature-flags.js',
@@ -35,7 +35,7 @@ test('current entry pages keep their static bootstrap script baselines', () => {
     'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20260926-reader-shell-root-fix',
   ]);
   assert.deepEqual(scriptSources(pages.video), [
-    'supabase-config.js', 'vault-session.js?v=20260813-vault-state', 'browser-storage.js',
+    'supabase-config.js', 'vault-session.js?v=20261003-session-lock', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20260924-theme-unified', 'app-desktop-rail.js',
     'profile-menu.js?v=20260924-theme-unified', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20260926-reader-shell-root-fix',
@@ -50,7 +50,7 @@ test('manga and video are app-shell routes while reader remains an independent d
   assert.doesNotMatch(spa, /renderReader\(/);
   assert.match(spa, /if\(!SPA_PAGES\.includes\(name\)\)\{location\.href=target\.href;return;\}/);
   assert.match(reader, /class="auth-pending reader-shell-page"/);
-  assert.match(reader, /reader-target\.js\?v=20260926-item-identity/);
+  assert.match(reader, /reader-target\.js\?v=20261003-reader-launch-contract/);
 });
 
 test('manga and video mount through their own route runtimes', () => {
@@ -72,8 +72,8 @@ test('manga and video route startup failures render visible recovery messages', 
 test('authentication branches remain explicit in the current SPA bootstrap', () => {
   assert.match(spa, /if\(!session\|\|!session\.refresh_token\|\|!config\.url\|\|!config\.publishableKey\)\{showLogin\(\);return;\}/);
   assert.match(spa, /if\(!MangaVault\.loadActive\(\)\)\{showVault\(\);return;\}/);
-  assert.match(spa, /await MangaVault\.refreshSession\(\)/);
-  assert.match(spa, /catch\(_\)\{MangaVault\.saveSession\(null\);showLogin\(\);return;\}/);
+  assert.match(spa, /await MangaVault\.ensureSession\(\)/);
+  assert.match(spa, /catch\(error\)\{if\(typeof MangaVault\.isSessionAuthError==='function'&&MangaVault\.isSessionAuthError\(error\)\)MangaVault\.saveSession\(null\);showLogin\(\);return;\}/);
 });
 
 test('vault saves use the existing payload builder and savePayload boundary', () => {

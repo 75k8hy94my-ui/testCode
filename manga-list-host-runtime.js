@@ -30,7 +30,7 @@
     'setTimer',
     'clearTimer',
   ];
-  const NAVIGATION_FUNCTION_NAMES = ['writeStorage', 'navigate', 'buildReaderUrl'];
+  const NAVIGATION_FUNCTION_NAMES = ['writeStorage', 'navigate', 'buildReaderUrl', 'prepareLaunch'];
 
   function create(deps) {
     if (!deps || typeof deps !== 'object' || Array.isArray(deps)) {
@@ -198,6 +198,18 @@
     function navigateToReader(item) {
       if (!item || !item.id) throw new Error('saved manga item id is required');
       const itemId = String(item.id);
+
+      // Crossing from the bookshelf SPA into reader.html is a document
+      // boundary. Checkpoint the current in-memory shelf before navigation so
+      // reader.html never has to guess whether localStorage is one render
+      // behind the card the user actually tapped.
+      const checkpointed = deps.safeWriteJson(deps.keys.savedItems, deps.getState().savedItems);
+      if (checkpointed === false) throw new Error('本棚の状態を保存できませんでした。');
+
+      // A short-lived sessionStorage handoff gives the destination document a
+      // recovery copy of the exact item selected. The URL still carries only
+      // the stable item id; the handoff is never a durable identity source.
+      deps.navigation.prepareLaunch(item);
       deps.navigation.writeStorage(
         deps.navigation.lastUrlKey,
         JSON.stringify({ kind: 'item', itemId }),

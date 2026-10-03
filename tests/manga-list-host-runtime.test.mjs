@@ -43,6 +43,7 @@ function deps(calls) {
         calls.push(['build-reader-url', itemId, base]);
         return `${base}?item=${encodeURIComponent(itemId)}`;
       },
+      prepareLaunch(item) { calls.push(['prepare-launch', item.id]); return true; },
     },
   };
 }
@@ -81,9 +82,11 @@ test('host factory exposes the shared persistence callbacks and rejects missing 
     delete missing[key];
     assert.throws(() => factory.create(missing), (error) => error.name === 'TypeError' && error.message.includes(key === 'keys' ? 'keys' : key));
   }
-  const missingReaderUrlBuilder = deps([]);
-  delete missingReaderUrlBuilder.navigation.buildReaderUrl;
-  assert.throws(() => factory.create(missingReaderUrlBuilder), (error) => error.name === 'TypeError' && error.message.includes('buildReaderUrl'));
+  for (const name of ['buildReaderUrl', 'prepareLaunch']) {
+    const missingNavigationDependency = deps([]);
+    delete missingNavigationDependency.navigation[name];
+    assert.throws(() => factory.create(missingNavigationDependency), (error) => error.name === 'TypeError' && error.message.includes(name));
+  }
   for (const name of [
     'hasActiveVault', 'clearTimer', 'setTimer', 'savePayload', 'buildBasePayload',
     'getSavedVideos', 'readStorageItem', 'getMangaInfo', 'getToc', 'getTheme',
@@ -171,6 +174,9 @@ test('host preserves manga item payload and reader navigation order', () => {
 
   host.navigateToReader({ id: 'item-1' });
   assert.deepEqual(calls, [
+    'state',
+    ['write', 'items-key', ['items']],
+    ['prepare-launch', 'item-1'],
     ['navigation-write', 'last-url-key', JSON.stringify({ kind: 'item', itemId: 'item-1' })],
     ['build-reader-url', 'item-1', 'reader.html'],
     ['navigate', 'reader.html?item=item-1'],

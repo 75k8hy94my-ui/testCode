@@ -18,6 +18,7 @@ test('reader startup honors explicit item and screen routes before legacy resume
   const startup = reader.slice(reader.indexOf('const requestedScreenOnLoad = getReaderScreenFromLocation();'));
   assert.match(startup, /const routeItemId = window\.MangaReaderTarget \? MangaReaderTarget\.itemIdFromLocation\(location\) : '';/);
   assert.match(startup, /if \(routeItemId\) \{[\s\S]*savedItems\.find\(\(entry\) => entry && String\(entry\.id\) === routeItemId\)/);
+  assert.match(startup, /MangaReaderTarget\.consumeLaunch\(routeItemId, sessionStorage\)/);
   assert.match(startup, /\} else if \(!requestedScreenOnLoad\) \{[\s\S]*MangaReaderTarget\.readLegacyTarget\(localStorage\)/);
   assert.match(startup, /if \(!requestedScreenOnLoad && !resumedOnLoad\) location\.replace\('manga\.html'\);/);
   assert.match(reader, /renderReaderScreen\(getReaderScreenFromLocation\(\)\);/);
