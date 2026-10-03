@@ -3,7 +3,7 @@
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
   if (location.pathname.endsWith('/index.html') || location.pathname === '/index.html') return;
 
-  const SPA_PAGES = Object.freeze(['home.html', 'profile.html', 'manga.html', 'video.html']);
+  const SPA_PAGES = Object.freeze(['home.html', 'profile.html', 'manga.html', 'video.html', 'reader.html']);
   const labels = {
     'home.html': 'ホーム',
     'profile.html': 'プロフィール設定',

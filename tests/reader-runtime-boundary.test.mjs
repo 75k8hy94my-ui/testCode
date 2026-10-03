@@ -49,6 +49,26 @@ test('reader runtime rejects missing item ids without URL fallback and closes to
   assert.deepEqual(redirects, ['manga.html', 'manga.html']);
 });
 
+test('embedded Reader close asks the verified host shell to return to manga without navigating the frame', () => {
+  const messages = [];
+  const redirects = [];
+  const window = {
+    location: { href: 'https://reader.test/reader.html?item=book-1&spa=1', origin: 'https://reader.test' },
+    parent: { postMessage(message, origin) { messages.push([message, origin]); } },
+  };
+  const runtime = factory.create({
+    repository: { loadItem() { return null; }, saveItem() {}, updateItem() { return null; } },
+    target: { consumeLaunch() { return null; } },
+    location: { replace(value) { redirects.push(value); } },
+    window,
+  });
+  runtime.close();
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0][0].type, 'manga-reader:close');
+  assert.equal(messages[0][1], 'https://reader.test');
+  assert.equal(redirects.length, 0);
+});
+
 test('reader html no longer loads or initializes bookshelf runtime', () => {
   const html = fs.readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
   assert.doesNotMatch(html, /<script[^>]+src=["'][^"']*manga-list-/i);
@@ -78,7 +98,7 @@ test('reader opens a saved page at its restored position, updates favorite, and 
     replaceChildren(...children) { this.children = children; }
     querySelectorAll(selector) { return this.children.filter((child) => selector === '.readerPageImage' ? child.className === 'readerPageImage' : false); }
   }
-  const ids = ['readerStatus', 'pageSlider', 'pageLabel', 'currentTitle', 'pageStage', 'viewer', 'tocBtn', 'favToggleBtn', 'closeBtn', 'firstBtn', 'prevBtn', 'nextBtn', 'lastBtn', 'tocAddBtn', 'safeModeBtn', 'enhanceBtn', 'verticalBtn', 'nextVolumeBanner', 'nextVolumeText', 'nextVolumeBtn', 'nextVolumeDismissBtn'];
+  const ids = ['readerStatus', 'pageSlider', 'pageLabel', 'currentTitle', 'pageStage', 'viewer', 'topbar', 'controls', 'tocBtn', 'favToggleBtn', 'closeBtn', 'firstBtn', 'prevBtn', 'nextBtn', 'lastBtn', 'tocAddBtn', 'safeModeBtn', 'enhanceBtn', 'verticalBtn', 'nextVolumeBanner', 'nextVolumeText', 'nextVolumeBtn', 'nextVolumeDismissBtn'];
   const elements = Object.fromEntries(ids.map((id) => [id, new Element()]));
   const body = new Element();
   const store = new Map([['mangaReaderLastPage', JSON.stringify({ 'item:book-2': { page: 2, wasLast: false }})]]);
@@ -93,13 +113,20 @@ test('reader opens a saved page at its restored position, updates favorite, and 
     findNextVolume() { return null; }, scheduleSync() {},
   };
   const redirects = [];
-  const window = { localStorage, location: { href: 'https://reader.test/reader.html?item=book-2' }, Image: class {}, addEventListener() {}, prompt() {}, URL };
+  const window = { localStorage, location: { href: 'https://reader.test/reader.html?item=book-2' }, innerWidth: 300, Image: class {}, addEventListener() {}, prompt() {}, URL };
   const runtime = factory.create({ repository: repo, target: { consumeLaunch() { return null; }, itemResumeKey: (id) => `item:${id}`, buildReaderUrl: (id) => `reader.html?item=${id}` }, sessionStorage: memoryStorage(), location: { replace(url) { redirects.push(url); } }, document, window });
   await runtime.start('book-2');
 
   assert.equal(elements.pageSlider.value, '2');
   assert.equal(elements.pageStage.children[0].src, 'https://same.test/2.jpg');
   assert.equal(item.readingProgress.page, 2);
+  let contextMenuPrevented = false;
+  elements.viewer.dispatch('contextmenu', { target: { closest() { return {}; } }, preventDefault() { contextMenuPrevented = true; } });
+  assert.equal(contextMenuPrevented, true, 'image context menus must not expose a save-image action');
+  elements.viewer.dispatch('click', { clientX: 150 });
+  assert.equal(body.classList.contains('reader-chrome-hidden'), true, 'a center tap hides the reader header and footer');
+  elements.viewer.dispatch('click', { clientX: 150 });
+  assert.equal(body.classList.contains('reader-chrome-hidden'), false, 'a second center tap restores the reader header and footer');
   elements.favToggleBtn.dispatch('click');
   assert.equal(item.favorite, true);
   elements.closeBtn.dispatch('click');

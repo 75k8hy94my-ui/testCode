@@ -27,7 +27,7 @@
   function activeKey() {
     const page = pageName();
     if (page === 'home.html') return 'home';
-    if (page === 'manga.html') return 'manga';
+    if (page === 'manga.html' || page === 'reader.html') return 'manga';
     if (page === 'video.html') return 'video';
     if (page === 'sync.html') return 'backup';
     if (page === 'profile.html') return 'settings';

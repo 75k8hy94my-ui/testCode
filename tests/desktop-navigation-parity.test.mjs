@@ -4,7 +4,7 @@ import fs from 'node:fs';
 
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 
-test('desktop navigation reaches app destinations without depending on Reader screens', () => {
+test('desktop navigation keeps the manga destination active while the Reader SPA route is open', () => {
   const rail = read('app-desktop-rail.js');
   for (const [id, href] of [
     ['desktopNavHome', 'home.html'], ['desktopNavManga', 'manga.html'],
@@ -14,7 +14,7 @@ test('desktop navigation reaches app destinations without depending on Reader sc
     assert.ok(rail.includes(id));
     assert.ok(rail.includes(href));
   }
-  assert.doesNotMatch(rail, /reader\.html|currentReaderScreen/);
+  assert.match(rail, /page === 'manga\.html' \|\| page === 'reader\.html'/);
 });
 
 test('desktop navigation keeps its shared Liquid Glass rail and mobile breakpoint', () => {

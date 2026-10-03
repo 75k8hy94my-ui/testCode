@@ -53,7 +53,7 @@ test('mobile bottom navigation stays visible on manga and video routes', () => {
   assert.doesNotMatch(css, /html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav[^{}]*\{display:none!important\}/);
   assert.match(css, /@media\(max-width:899px\)\{html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav\{display:flex!important\}\}/);
   for (const page of ['manga.html', 'video.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20260926-reader-shell-root-fix/);
+    assert.match(read(page), /home-profile-shell\.css\?v=20261003-reader-spa-shell/);
   }
 });
 
@@ -91,7 +91,7 @@ test('VPN gate keeps readable contrast on dark manga/video routes', () => {
   assert.match(css, /color:#f8fafc/);
   assert.match(css, /vpnStatusButton\[data-vpn-state="blocked"\][\s\S]*color:#ffb4b4/);
   for (const page of ['home.html','profile.html','manga.html','video.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20260926-reader-shell-root-fix/);
+    assert.match(read(page), /home-profile-shell\.css\?v=20261003-reader-spa-shell/);
   }
 });
 
@@ -123,8 +123,8 @@ test('saved theme drives home profile manga video and header colors', () => {
   assert.match(css, /reader-entry-video body[\s\S]*background:#0a0c11!important/);
   assert.match(globalCss, /--shell-header-bg/);
   for (const page of ['home.html','profile.html','manga.html','video.html','video-player.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20260926-reader-shell-root-fix/);
-    assert.match(read(page), /app-global-shell\.js\?v=20260924-theme-unified/);
+    assert.match(read(page), /home-profile-shell\.css\?v=20261003-reader-spa-shell/);
+    assert.match(read(page), /app-global-shell\.js\?v=20261003-reader-spa/);
     assert.match(read(page), /profile-menu\.js\?v=20260924-theme-unified/);
   }
 });
@@ -174,7 +174,7 @@ test('all authenticated mobile destinations load the shared Liquid Glass assets'
     assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-drag-lock/, page);
   }
   for (const page of ['home.html','profile.html','manga.html','video.html']) {
-    assert.match(read(page), /home-profile-spa\.js\?v=20260926-reader-shell-root-fix/, page);
+    assert.match(read(page), /home-profile-spa\.js\?v=20261003-reader-shell-spa/, page);
   }
 });
 
@@ -182,4 +182,17 @@ test('all authenticated mobile destinations load the shared Liquid Glass assets'
 test('reader is excluded from the app navigation shells', () => {
   const reader = read('reader.html');
   assert.doesNotMatch(reader, /home-profile-shell|home-profile-spa|mobile-bottom-nav|app-desktop-rail/);
+});
+
+test('the manga shell hosts the dedicated Reader document as a history-managed SPA route', () => {
+  const shell = read('app-global-shell.js');
+  const spa = read('home-profile-spa.js');
+  const route = read('manga-list-route.js');
+  assert.match(shell, /'reader\.html'/);
+  assert.match(spa, /function renderReader\(\)/);
+  assert.match(spa, /frame\.src=readerUrl\.href/);
+  assert.match(spa, /history\.pushState/);
+  assert.match(spa, /event\.source!==frame\.contentWindow/);
+  assert.match(route, /HomeProfileSPA\.navigate\(url\)/);
+  assert.doesNotMatch(read('reader.html'), /home-profile-spa|manga-list-route|MangaListHostRuntimeFactory/);
 });

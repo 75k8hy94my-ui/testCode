@@ -64,7 +64,16 @@
     }
 
     function close() {
+      if (isEmbeddedInShell()) {
+        win.parent.postMessage({ type: 'manga-reader:close' }, win.location.origin);
+        return;
+      }
       location.replace('manga.html');
+    }
+
+    function isEmbeddedInShell() {
+      try { return new URL(win.location.href).searchParams.get('spa') === '1' && win.parent !== win && typeof win.parent.postMessage === 'function'; }
+      catch (_) { return false; }
     }
 
     async function start(itemId) {
@@ -188,7 +197,15 @@
       banner.hidden = !next || page !== displayCount();
       if (!next) return;
       const text = byId('nextVolumeText'); if (text) text.textContent = `次の巻: ${next.title || next.volume}`;
-      const button = byId('nextVolumeBtn'); if (button) button.onclick = () => { location.replace(target.buildReaderUrl(next.id, 'reader.html')); };
+      const button = byId('nextVolumeBtn'); if (button) button.onclick = () => {
+        if (isEmbeddedInShell()) {
+          win.parent.postMessage({ type: 'manga-reader:open-item', itemId: String(next.id) }, win.location.origin);
+          return;
+        }
+        let nextUrl = target.buildReaderUrl(next.id, 'reader.html');
+        try { if (new URL(win.location.href).searchParams.get('spa') === '1') { const url = new URL(nextUrl, win.location.href); url.searchParams.set('spa', '1'); nextUrl = url.href; } } catch (_) {}
+        location.replace(nextUrl);
+      };
     }
     function createPageImage(url, pageNumber = page) {
       const image = doc.createElement('img');
@@ -288,7 +305,27 @@
       bind('safeModeBtn', 'click', () => { const active = doc.body.classList.toggle('safe-mode'); win.localStorage.setItem('mangaReaderSafeMode', active ? '1' : '0'); if (active) restorePageEnhancements(); else applyPageEnhancements(); });
       bind('enhanceBtn', 'click', (event) => { imageEnhanceEnabled = !imageEnhanceEnabled; doc.body.classList.toggle('image-enhance', imageEnhanceEnabled); event.currentTarget.setAttribute('aria-pressed', imageEnhanceEnabled ? 'true' : 'false'); win.localStorage.setItem('mangaReaderImageEnhance', imageEnhanceEnabled ? '1' : '0'); if (imageEnhanceEnabled) applyPageEnhancements(); else restorePageEnhancements(); });
       bind('verticalBtn', 'click', () => { vertical = !vertical; doc.body.classList.toggle('vertical-scroll', vertical); win.localStorage.setItem('mangaReaderVerticalScroll', vertical ? '1' : '0'); renderPage(); });
-      bind('viewer', 'click', (event) => { if (vertical) return; if (event.clientX < win.innerWidth * 0.35) previous(); else if (event.clientX > win.innerWidth * 0.65) next(); });
+      bind('viewer', 'contextmenu', (event) => {
+        const targetElement = event.target;
+        if (targetElement?.closest?.('img,canvas,.encryptedAssetHost')) event.preventDefault();
+      });
+      bind('viewer', 'dragstart', (event) => {
+        if (event.target?.closest?.('img,canvas,.encryptedAssetHost')) event.preventDefault();
+      });
+      bind('viewer', 'click', (event) => {
+        const x = Number(event.clientX);
+        if (x >= win.innerWidth * 0.35 && x <= win.innerWidth * 0.65) {
+          const hidden = doc.body.classList.toggle('reader-chrome-hidden');
+          ['topbar', 'controls'].forEach((id) => {
+            const chrome = byId(id); if (!chrome) return;
+            chrome.setAttribute('aria-hidden', hidden ? 'true' : 'false'); chrome.inert = hidden;
+          });
+          if (isEmbeddedInShell()) win.parent.postMessage({ type: 'manga-reader:chrome', hidden }, win.location.origin);
+          return;
+        }
+        if (vertical) return;
+        if (x < win.innerWidth * 0.35) previous(); else if (x > win.innerWidth * 0.65) next();
+      });
       bind('viewer', 'scroll', () => {
         if (!vertical) return;
         const images = Array.from(byId('pageStage')?.querySelectorAll('[data-page]') || []);
