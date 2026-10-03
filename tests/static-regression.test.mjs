@@ -528,8 +528,10 @@ test('image requests stop after a short timeout instead of retrying indefinitely
 test('auth refresh cannot leave the whole reader hidden indefinitely', () => {
   const source = read('reader.html');
   assert.match(source, /const AUTH_REFRESH_TIMEOUT_MS = 5000/);
-  assert.match(source, /signal: controller\.signal/);
-  assert.match(source, /finally\(\(\) => clearTimeout\(timer\)\)/);
+  assert.match(source, /Promise\.race\(\[/);
+  assert.match(source, /MangaVault\.ensureSession\(\)/);
+  assert.match(source, /timer = setTimeout\(\(\) => reject\(new Error\('session check timed out'\)\), AUTH_REFRESH_TIMEOUT_MS\)/);
+  assert.match(source, /finally \{[\s\S]*clearTimeout\(timer\)/);
 });
 
 test('mobile Liquid Glass navigation does not span nearly the full viewport', () => {
