@@ -81,6 +81,6 @@
 
 - [x] Run `npm test` and inspect failures by ownership; repair production regressions and remove only tests that solely asserted deleted internals.
 - [x] Run `npm run verify:static`.
-- [ ] Inspect GitHub Actions Verify for the branch/PR and resolve failures.
-- [ ] Self-review the full diff for launch, Vault, and encrypted asset contract changes.
-- [ ] Create PR, inspect the PR diff/checks, merge to `main`, and push as requested.
+- [x] Inspect GitHub Actions Verify for the branch/PR and resolve failures.
+- [x] Self-review the full diff for launch, Vault, and encrypted asset contract changes.
+- [x] Create PR and inspect its diff/checks; merge to `main` and push as requested.
