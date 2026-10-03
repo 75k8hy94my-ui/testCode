@@ -53,6 +53,20 @@ test('manga list template contains each required id once and no non-manga surfac
   }
 });
 
+test('individual add opens the encrypted image import form and connects the encrypted processing pipeline', () => {
+  const template = fs.readFileSync(new URL('../manga-list-template.js', import.meta.url), 'utf8');
+  const route = fs.readFileSync(new URL('../manga-list-route.js', import.meta.url), 'utf8');
+  for (const id of ['encryptedImageAddDialog', 'encryptedImageAddForm', 'encryptedImageTitleInput', 'encryptedImageFilesInput', 'encryptedImageImportStatus']) {
+    assert.match(template, new RegExp(`id="${id}"`));
+  }
+  assert.match(template, /type="file" accept="image\/\*" multiple/);
+  assert.match(route, /bind\(addEncryptedImages, 'click'/);
+  assert.match(route, /EncryptedAssetSync\.stageProcessedRevision/);
+  assert.match(route, /EncryptedAssetSync\.publishPendingRevision/);
+  assert.match(route, /service\.importFiles/);
+  assert.match(route, /host\.persistItems\(\)/);
+});
+
 test('manga route mounts the manga template and Reader has no shelf template dependency', () => {
   assert.match(route, /manga-list-template\.js\?v=/);
   assert.doesNotMatch(fs.readFileSync('reader.html', 'utf8'), /manga-list-template|reader-saved-list-template/);
