@@ -25,8 +25,8 @@
     ['manga-list-controller.js?v=20260922-controller', 'mangaRouteController'],
     ['manga-list-runtime-context.js?v=20260922-runtime-context', 'mangaRouteContext'],
     ['manga-list-image-cache.js?v=20260922-image-cache', 'mangaRouteImageCache'],
-    ['reader-target.js?v=20260926-item-identity', 'mangaReaderTarget'],
-    ['manga-list-host-runtime.js?v=20260926-item-reader-route-v2', 'mangaRouteHost'],
+    ['reader-target.js?v=20261003-reader-launch-contract', 'mangaReaderTarget'],
+    ['manga-list-host-runtime.js?v=20261003-reader-launch-contract', 'mangaRouteHost'],
     ['manga-list-runtime.js?v=20260926-item-cover-identity', 'mangaRouteRuntime'],
     ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
   ];
@@ -281,6 +281,7 @@
           lastUrlKey: 'mangaReaderLastUrl', readerUrl: 'reader.html',
           writeStorage: (key, value) => storage.setItem(key, value),
           buildReaderUrl: (itemId, base) => windowRef.MangaReaderTarget.buildReaderUrl(itemId, base),
+          prepareLaunch: (item) => windowRef.MangaReaderTarget.prepareLaunch(item, windowRef.sessionStorage),
           // reader.html is deliberately outside the home/manga/video SPA.
           // Crossing this boundary reloads a dedicated reader document instead
           // of transplanting reader.html into the bookshelf shell.
