@@ -8,6 +8,18 @@
         <button class="textActionBtn" id="addCustomBtn">個別追加</button>
         <button class="textActionBtn" id="bulkDetectBtn">一括読み込み</button>
       </div>
+      <div id="encryptedImageAddDialog" role="dialog" aria-modal="true" aria-labelledby="encryptedImageAddTitle" hidden style="position:fixed;inset:0;z-index:1200;background:#0009;place-items:center;padding:16px;">
+        <form id="encryptedImageAddForm" style="width:min(540px,100%);background:var(--panel,#fff);color:inherit;border-radius:14px;padding:20px;display:grid;gap:12px;box-shadow:0 16px 48px #0005;">
+          <h2 id="encryptedImageAddTitle" style="margin:0;">暗号化画像を追加</h2>
+          <label>作品名<input id="encryptedImageTitleInput" type="text" required maxlength="200" autocomplete="off" style="display:block;width:100%;margin-top:6px;"></label>
+          <label>ページ画像（複数選択可。選択順に登録）<input id="encryptedImageFilesInput" type="file" accept="image/*" multiple required style="display:block;width:100%;margin-top:6px;"></label>
+          <p id="encryptedImageImportStatus" role="status" aria-live="polite" style="margin:0;min-height:1.5em;"></p>
+          <div style="display:flex;justify-content:flex-end;gap:8px;">
+            <button id="encryptedImageCancelButton" class="ctrlBtn" type="button">キャンセル</button>
+            <button id="encryptedImageSubmitButton" class="ctrlBtn" type="submit">暗号化して追加</button>
+          </div>
+        </form>
+      </div>
       <div id="smartListRow">
         <button class="smartListBtn" id="historyListBtn" type="button">履歴</button>
         <button class="smartListBtn" id="unreadListBtn" type="button">読んでいない順</button>

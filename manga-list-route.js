@@ -4,6 +4,19 @@
   const STYLESHEET_URL = 'manga-list.css?v=20260926-route-owned';
   const SCRIPT_URLS = [
     ['manga-list-template.js?v=20260922-vpn-tools', 'mangaRouteTemplate'],
+    ['image-transfer-settings.js?v=20261004-encrypted-image-import', 'encryptedImageImportSettings'],
+    ['image-remote-access.js?v=20261004-encrypted-image-import', 'encryptedImageImportRemoteAccess'],
+    ['encrypted-asset-crypto.js?v=20261004-encrypted-image-import', 'encryptedImageImportCrypto'],
+    ['encrypted-asset-cache.js?v=20261004-encrypted-image-import', 'encryptedImageImportCache'],
+    ['encrypted-asset-backend.js?v=20261004-encrypted-image-import', 'encryptedImageImportBackend'],
+    ['encrypted-asset-storage.js?v=20261004-encrypted-image-import', 'encryptedImageImportStorage'],
+    ['encrypted-asset-sync.js?v=20261004-encrypted-image-import', 'encryptedImageImportSync'],
+    ['image-compression-profile.js?v=20261004-encrypted-image-import', 'encryptedImageImportProfile'],
+    ['image-pyramid-builder.js?v=20261004-encrypted-image-import', 'encryptedImageImportPyramid'],
+    ['image-photo-processor.js?v=20261004-encrypted-image-import', 'encryptedImageImportProcessor'],
+    ['encrypted-asset-reader.js?v=20261004-encrypted-image-import', 'encryptedImageImportReader'],
+    ['encrypted-asset-item.js?v=20261004-encrypted-image-import', 'encryptedImageImportItem'],
+    ['encrypted-asset-import.js?v=20261004-import-ui', 'encryptedImageImport'],
     ['manga-list-search-events.js?v=20260922-search-events', 'mangaRouteSearchEvents'],
     ['manga-list-sort-events.js?v=20260922-sort-events', 'mangaRouteSortEvents'],
     ['manga-list-filter-events.js?v=20260922-filter-events', 'mangaRouteFilterEvents'],
@@ -301,7 +314,9 @@
       const title = (item) => item.title || item.url || '無題';
       const itemSubtext = (item) => item.url || '';
       const readingRecordText = (item) => item.lastReadAt ? '既読' : '未読';
-      const pageCount = (item) => Array.isArray(item.pages) ? item.pages.length + 'ページ' : '';
+      const pageCount = (item) => Array.isArray(item.encryptedAssets?.pages)
+        ? item.encryptedAssets.pages.length + 'ページ'
+        : Array.isArray(item.pages) ? item.pages.length + 'ページ' : '';
       const visibleItems = () => {
         return state().savedItems.filter((item) => !item.localSync).slice();
       };
@@ -392,6 +407,66 @@
         const back = elements.listBackBtn;
         const prev = elements.bookshelfPrevBtn;
         const next = elements.bookshelfNextBtn;
+        const addEncryptedImages = rootElement.querySelector('#addCustomBtn');
+        const importDialog = rootElement.querySelector('#encryptedImageAddDialog');
+        const importForm = rootElement.querySelector('#encryptedImageAddForm');
+        const importTitle = rootElement.querySelector('#encryptedImageTitleInput');
+        const importFiles = rootElement.querySelector('#encryptedImageFilesInput');
+        const importStatus = rootElement.querySelector('#encryptedImageImportStatus');
+        const importSubmit = rootElement.querySelector('#encryptedImageSubmitButton');
+        const closeImport = () => { importDialog.hidden = true; importDialog.style.display = ''; };
+        bind(addEncryptedImages, 'click', () => {
+          if (!windowRef.MangaVault?.loadActive?.()?.rawKey) {
+            importStatus.textContent = '画像の追加には、ログインして保管庫を開いてください。';
+          } else {
+            importStatus.textContent = '';
+          }
+          importDialog.hidden = false;
+          importDialog.style.display = 'grid';
+          importTitle.focus();
+        });
+        bind(rootElement.querySelector('#encryptedImageCancelButton'), 'click', closeImport);
+        bind(importForm, 'submit', async (event) => {
+          event.preventDefault();
+          const activeVault = windowRef.MangaVault?.loadActive?.();
+          if (!activeVault?.rawKey) { importStatus.textContent = 'ログインして保管庫を開いてから追加してください。'; return; }
+          const selectedFiles = Array.from(importFiles.files || []);
+          if (!selectedFiles.length) { importStatus.textContent = 'ページ画像を選択してください。'; return; }
+          const config = windowRef.MANGA_READER_SUPABASE || {};
+          importSubmit.disabled = true;
+          importFiles.disabled = true;
+          importTitle.disabled = true;
+          importStatus.textContent = `画像を準備しています（0/${selectedFiles.length}）`;
+          try {
+            const cache = await windowRef.EncryptedAssetCache.createCache();
+            const storageTransport = windowRef.EncryptedAssetStorage.createStorageTransport({ baseUrl: config.url, publishableKey: config.publishableKey });
+            const service = windowRef.EncryptedAssetImport.create({
+              processPhoto: (file, options) => windowRef.ImagePhotoProcessor.processPhoto(file, { ...options, preferWorker: true, onProgress: (progress) => {
+                importStatus.textContent = `${file.name || '画像'}を処理中：${progress.phase}`;
+              } }),
+              stage: ({ assetId, targetRevision, processed }) => windowRef.EncryptedAssetSync.stageProcessedRevision({ cache, masterKey: activeVault.rawKey, assetId, targetRevision, processed }),
+              publish: ({ assetId, targetRevision, staged, signal }) => windowRef.EncryptedAssetSync.publishPendingRevision({ vault: windowRef.MangaVault, storage: storageTransport, cache, assetId, targetRevision, objectIds: staged.objectIds, signal, transferStorage: windowRef.localStorage, mediaAccess: windowRef.MangaReaderMediaAccess }),
+              tombstone: (assetId, revision) => windowRef.EncryptedAssetSync.tombstoneAsset({ vault: windowRef.MangaVault, assetId, expectedRevision: revision }),
+            });
+            const item = await service.importFiles({ files: selectedFiles, title: importTitle.value, onProgress: (progress) => {
+              importStatus.textContent = `${progress.index}/${progress.total} ページを同期しました`;
+            } });
+            const currentItems = state().savedItems.slice();
+            currentItems.unshift(item);
+            setState({ savedItems: currentItems, bookshelfPage: 1 });
+            host.persistItems();
+            renderList();
+            importStatus.textContent = '追加しました。暗号化画像は本棚と保管庫に同期されました。';
+            importForm.reset();
+            windowRef.setTimeout(closeImport, 900);
+          } catch (error) {
+            importStatus.textContent = error?.message || '暗号化画像を追加できませんでした。';
+          } finally {
+            importSubmit.disabled = false;
+            importFiles.disabled = false;
+            importTitle.disabled = false;
+          }
+        });
         bindFactory(MangaListSearchEventsFactory, { onSearchChange: (value) => { setState({ shelfSearchQuery: value, bookshelfPage: 1 }); renderList(); } }, { searchInput: search });
         bindFactory(MangaListSortEventsFactory, { onSortChange: (value) => { setState({ shelfSort: value, bookshelfPage: 1 }); renderList(); } }, { sortSelect: sort });
         bindFactory(MangaListFilterEventsFactory, {
