@@ -17,11 +17,14 @@
     #readerMeta { display:flex; flex-direction:column; min-width:0; margin-left:auto; text-align:right; }
     #currentTitle { overflow:hidden; max-width:min(45vw,560px); text-overflow:ellipsis; white-space:nowrap; }
     #readerStatus { color:var(--sub); font-size:12px; }
+    #retryPageBtn[hidden] { display:none; }
     .ctrlBtn { min-height:36px; padding:6px 10px; border:1px solid #424754; border-radius:9px; background:rgba(255,255,255,.08); color:var(--text); cursor:pointer; }
     .ctrlBtn[hidden],#nextVolumeBanner[hidden] { display:none; }
     #viewer { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#000; }
     #pageStage { display:flex; align-items:center; justify-content:center; width:100%; height:100%; overflow:hidden; }
+    .readerPageFrame { display:flex; align-items:center; justify-content:center; width:100%; height:100%; }
     .readerPageImage { display:block; max-width:100%; max-height:100%; object-fit:contain; user-select:none; -webkit-user-drag:none; -webkit-touch-callout:none; }
+    .readerVerticalSlot { width:100%; min-height:40vh; display:flex; justify-content:center; }
     .spreadCrop { position:relative; width:50%; height:100%; overflow:hidden; }
     .spreadCrop .readerPageImage { position:absolute; top:0; width:200%; height:100%; max-width:none; max-height:none; }
     .spreadRight .readerPageImage { left:0; }
@@ -52,7 +55,7 @@
       <button class="ctrlBtn" id="verticalBtn" type="button">縦スクロール</button>
       <button class="ctrlBtn" id="tocAddBtn" type="button">目次追加</button>
       <button class="ctrlBtn" id="tocBtn" type="button" hidden>目次</button>
-      <div id="readerMeta"><span id="currentTitle">読み込み中…</span><span id="readerStatus"></span></div>
+      <div id="readerMeta"><span id="currentTitle">読み込み中…</span><span id="readerStatus"></span><button class="ctrlBtn" id="retryPageBtn" type="button" hidden>再試行</button></div>
     </header>
     <section id="viewer" aria-label="ページ表示"><div id="pageStage"></div></section>
     <div id="readerMessage" role="status" aria-live="polite"></div>
@@ -85,6 +88,7 @@
   <script src="encrypted-asset-reader.js"></script>
   <script src="encrypted-asset-item.js"></script>
   <script src="reader-image-enhancement.js"></script>
+  <script src="reader-image-loader.js?v=20261004-reader-image-pipeline"></script>
   <script src="reader-item-repository.js"></script>
   <script src="reader-runtime.js?v=20261003-reader-ui-spa"></script>
   <script>

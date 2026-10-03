@@ -7,6 +7,9 @@ const runtimeUrl = new URL('../reader-runtime.js', import.meta.url);
 const context = { self: {}, console, URL };
 if (fs.existsSync(runtimeUrl)) vm.runInNewContext(fs.readFileSync(runtimeUrl, 'utf8'), context);
 const factory = context.self.ReaderRuntimeFactory;
+const imageLoaderContext = { self: {}, setTimeout, clearTimeout, Promise, Map, Set, Date, Error, URL };
+vm.runInNewContext(fs.readFileSync(new URL('../reader-image-loader.js', import.meta.url), 'utf8'), imageLoaderContext);
+const imageLoaderFactory = imageLoaderContext.self.ReaderImageLoaderFactory;
 
 function memoryStorage() {
   const values = new Map();
@@ -98,7 +101,7 @@ test('reader opens a saved page at its restored position, updates favorite, and 
     replaceChildren(...children) { this.children = children; }
     querySelectorAll(selector) { return this.children.filter((child) => selector === '.readerPageImage' ? child.className === 'readerPageImage' : false); }
   }
-  const ids = ['readerStatus', 'pageSlider', 'pageLabel', 'currentTitle', 'pageStage', 'viewer', 'topbar', 'controls', 'tocBtn', 'favToggleBtn', 'closeBtn', 'firstBtn', 'prevBtn', 'nextBtn', 'lastBtn', 'tocAddBtn', 'safeModeBtn', 'enhanceBtn', 'verticalBtn', 'nextVolumeBanner', 'nextVolumeText', 'nextVolumeBtn', 'nextVolumeDismissBtn'];
+  const ids = ['readerStatus', 'retryPageBtn', 'pageSlider', 'pageLabel', 'currentTitle', 'pageStage', 'viewer', 'topbar', 'controls', 'tocBtn', 'favToggleBtn', 'closeBtn', 'firstBtn', 'prevBtn', 'nextBtn', 'lastBtn', 'tocAddBtn', 'safeModeBtn', 'enhanceBtn', 'verticalBtn', 'nextVolumeBanner', 'nextVolumeText', 'nextVolumeBtn', 'nextVolumeDismissBtn'];
   const elements = Object.fromEntries(ids.map((id) => [id, new Element()]));
   const body = new Element();
   const store = new Map([['mangaReaderLastPage', JSON.stringify({ 'item:book-2': { page: 2, wasLast: false }})]]);
@@ -113,12 +116,20 @@ test('reader opens a saved page at its restored position, updates favorite, and 
     findNextVolume() { return null; }, scheduleSync() {},
   };
   const redirects = [];
-  const window = { localStorage, location: { href: 'https://reader.test/reader.html?item=book-2' }, innerWidth: 300, Image: class {}, addEventListener() {}, prompt() {}, URL };
+  class Image {
+    constructor() { this.listeners = new Map(); this.dataset = {}; this.naturalWidth = 600; this.naturalHeight = 900; }
+    addEventListener(type, callback) { this.listeners.set(type, callback); }
+    removeEventListener(type) { this.listeners.delete(type); }
+    set src(value) { this._src = value; queueMicrotask(() => this.listeners.get('load')?.()); }
+    get src() { return this._src || ''; }
+    decode() { return Promise.resolve(); }
+  }
+  const window = { localStorage, location: { href: 'https://reader.test/reader.html?item=book-2' }, innerWidth: 300, Image, ReaderImageLoaderFactory: imageLoaderFactory, addEventListener() {}, prompt() {}, URL };
   const runtime = factory.create({ repository: repo, target: { consumeLaunch() { return null; }, itemResumeKey: (id) => `item:${id}`, buildReaderUrl: (id) => `reader.html?item=${id}` }, sessionStorage: memoryStorage(), location: { replace(url) { redirects.push(url); } }, document, window });
   await runtime.start('book-2');
 
   assert.equal(elements.pageSlider.value, '2');
-  assert.equal(elements.pageStage.children[0].src, 'https://same.test/2.jpg');
+  assert.equal(elements.pageStage.children[0].children[0].src, 'https://same.test/2.jpg');
   assert.equal(item.readingProgress.page, 2);
   let contextMenuPrevented = false;
   elements.viewer.dispatch('contextmenu', { target: { closest() { return {}; } }, preventDefault() { contextMenuPrevented = true; } });
