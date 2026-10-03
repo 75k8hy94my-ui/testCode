@@ -27,5 +27,6 @@ test('reader boot is serialized before the main runtime initializes shelf state'
   assert.ok(promiseIndex >= 0, 'reader must publish a boot promise');
   assert.ok(waitIndex > promiseIndex, 'main runtime must await the published boot promise');
   assert.ok(initIndex > waitIndex, 'shelf state must initialize only after auth/vault boot completes');
-  assert.match(reader, /MangaVault\.ensureSession\(\)/);\n  assert.match(reader, /await ensureReaderSession\(\)/);
+  assert.match(reader, /MangaVault\.ensureSession\(\)/);
+  assert.match(reader, /await ensureReaderSession\(\)/);
 });
