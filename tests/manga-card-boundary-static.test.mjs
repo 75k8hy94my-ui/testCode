@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
-const reader = read('reader.html');
+const route = read('manga-list-route.js');
 const card = fs.existsSync(new URL('../manga-list-card.js', import.meta.url)) ? read('manga-list-card.js') : '';
 const runtime = read('manga-list-runtime.js');
 
-test('reader loads the manga card boundary before its inline card consumer', () => {
-  const script = 'manga-list-card.js?v=20260921-card-boundary';
-  assert.equal((reader.match(/manga-list-card\.js\?v=[^"']+/g) || []).length, 1);
-  assert.ok(reader.indexOf(`<script src="${script}"></script>`) < reader.indexOf('function buildBookCard('));
+test('manga route loads the card boundary as a shelf dependency', () => {
+  assert.match(route, /manga-list-card\.js\?v=/);
+  assert.match(route, /MangaListRuntimeFactory\.create\(/);
+  assert.doesNotMatch(read('reader.html'), /manga-list-card|MangaListRuntime/);
 });
 
 test('manga card boundary exposes only stateless static card creation', () => {
@@ -19,7 +19,7 @@ test('manga card boundary exposes only stateless static card creation', () => {
   assert.doesNotMatch(card, /localStorage|MangaVault|supabase|location\.(assign|href)/i);
 });
 
-test('buildBookCard delegates static DOM creation and keeps interaction logic in reader', () => {
+test('buildBookCard delegates static DOM creation and keeps shelf interaction in its runtime', () => {
   assert.match(runtime, /context\.createStaticCard\(/);
   assert.match(runtime, /state\.bulkSelectedIds\.add\(item\.id\)/);
   assert.match(runtime, /context\.updateBulkEditButton\(\)/);
@@ -28,8 +28,7 @@ test('buildBookCard delegates static DOM creation and keeps interaction logic in
   assert.match(runtime, /context\.setupFeedImage\(img, item\.url, item\.numberWidth, item\.pagePattern, item\.id\)/);
 });
 
-test('normal manga card clicks use one reader interaction boundary in the original order', () => {
-  assert.equal((reader.match(/function handleMangaCardOpen\(/g) || []).length, 1);
+test('normal manga card clicks use one shelf interaction boundary', () => {
   assert.match(runtime, /function handleMangaCardOpen\(item, list\) \{\s*return context\.openReader\(item, list\);/);
   const buildStart = runtime.indexOf('function buildBookCard(');
   const buildEnd = runtime.indexOf('\n    function renderSavedList(', buildStart);
@@ -39,14 +38,9 @@ test('normal manga card clicks use one reader interaction boundary in the origin
 });
 
 test('buildBookCard uses one private cover dependency boundary without changing image branches', () => {
-  assert.equal((reader.match(/const mangaListCoverDeps = Object\.freeze\(/g) || []).length, 1);
-  const start = reader.indexOf('const mangaListCoverDeps = Object.freeze(');
-  const end = reader.indexOf('\n  function handleMangaCardOpen(', start);
-  const deps = reader.slice(start, end);
-  assert.match(deps, /loadLocalCover/);
-  assert.match(deps, /setupFeedImage/);
-  assert.match(deps, /coverSourceCache/);
-  assert.doesNotMatch(deps, /checkVpn|media-access-gate|MangaVault|localStorage|new Map|new Set/);
+  assert.match(route, /loadLocalCover: host\.loadLocalCover/);
+  assert.match(route, /setupFeedImage: host\.setupFeedImage/);
+  assert.match(route, /getCoverSourceCache: \(\) => coverSourceCache/);
 
   const build = runtime;
   assert.match(build, /context\.loadLocalCover\(item, img\)/);

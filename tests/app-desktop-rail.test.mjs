@@ -5,7 +5,7 @@ import fs from 'node:fs';
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 
 test('desktop Liquid Glass rail appears only after the vault is unlocked', () => {
-  for (const page of ['home.html','reader.html','manga.html','video.html']) {
+  for (const page of ['home.html','manga.html','video.html','profile.html']) {
     assert.match(read(page), /app-desktop-rail\.js/, `${page} should load the shared rail`);
   }
   for (const page of ['index.html','sync.html']) {
@@ -34,20 +34,21 @@ test('shared rail provides global destinations and page-aware active state', () 
     ['desktopNavHome','home.html'],
     ['desktopNavManga','manga.html'],
     ['desktopNavVideo','video.html'],
-    ['desktopNavAuthor','reader.html#screen=author-cards'],
-    ['desktopNavBackup','reader.html#screen=backup'],
-    ['desktopNavSettings','reader.html#screen=settings'],
+    ['desktopNavBackup','sync.html'],
+    ['desktopNavSettings','profile.html'],
   ];
   for (const [id, href] of destinations) {
     assert.ok(rail.includes(id));
     assert.ok(rail.includes(href));
   }
-  assert.match(rail, /screen === 'video-list'/);
-  assert.match(rail, /screen === 'author-cards'/);
-  assert.match(rail, /screen === 'backup'/);
-  assert.match(rail, /screen === 'settings'/);
+  assert.doesNotMatch(rail, /reader\.html#screen=/);
+  assert.match(rail, /page === 'sync\.html'/);
+  assert.match(rail, /page === 'profile\.html'/);
+  assert.doesNotMatch(rail, /currentReaderScreen|page === 'reader\.html'/);
+  assert.match(rail, /page === 'sync\.html'/);
   assert.match(rail, /aria-current/);
   assert.doesNotMatch(rail, /desktopNavVault/);
+  assert.doesNotMatch(rail, /desktopNavAuthor/);
   assert.doesNotMatch(rail, /label: '保管庫'/);
 });
 

@@ -12,21 +12,19 @@ test('vault session exposes an async wait for cross-tab active vault', () => {
   assert.match(vault, /window\.MangaVault\s*=\s*\{[\s\S]*waitForActive/);
 });
 
-test('reader waits for cross-tab vault handoff before redirecting to sync', () => {
-  const waitIndex = reader.indexOf('await MangaVault.waitForActive(2500)');
-  const lockedRedirectIndex = reader.indexOf('if (!activeVault) {\n      showVault();\n      return false;\n    }');
-  assert.ok(waitIndex >= 0, 'reader must await cross-tab vault handoff');
-  assert.ok(lockedRedirectIndex > waitIndex, 'reader must wait before deciding the vault is locked');
+test('reader waits for cross-tab active Vault and refreshes the login session before its runtime', () => {
+  const promiseIndex = reader.indexOf('window.MangaReaderBootPromise = (async () => {');
+  const waitIndex = reader.indexOf('MangaVault.waitForActive(2500)');
+  const sessionIndex = reader.indexOf('MangaVault.ensureSession()');
+  const runtimeIndex = reader.indexOf('ReaderRuntimeFactory.create');
+  assert.ok(promiseIndex >= 0 && waitIndex > promiseIndex);
+  assert.ok(sessionIndex > waitIndex);
+  assert.ok(runtimeIndex > sessionIndex);
+  assert.match(reader, /setTimeout\(\(\) => reject\(new Error\('session check timed out'\)\), 5000\)/);
 });
 
-
-test('reader boot is serialized before the main runtime initializes shelf state', () => {
-  const promiseIndex = reader.indexOf('window.MangaReaderBootPromise = (async () => {');
-  const waitIndex = reader.indexOf('const readerBootReady = await (window.MangaReaderBootPromise || Promise.resolve(true));');
-  const initIndex = reader.indexOf('initMangaList();');
-  assert.ok(promiseIndex >= 0, 'reader must publish a boot promise');
-  assert.ok(waitIndex > promiseIndex, 'main runtime must await the published boot promise');
-  assert.ok(initIndex > waitIndex, 'shelf state must initialize only after auth/vault boot completes');
-  assert.match(reader, /MangaVault\.ensureSession\(\)/);
-  assert.match(reader, /await ensureReaderSession\(\)/);
+test('reader boot does not initialize or load bookshelf runtime modules', () => {
+  assert.doesNotMatch(reader, /MangaList(?:HostRuntime|Runtime|RuntimeContext|Controller)Factory|manga-list-[\w-]+\.js/);
+  assert.match(reader, /await window\.MangaReaderBootPromise/);
+  assert.match(reader, /ReaderItemRepositoryFactory\.create/);
 });

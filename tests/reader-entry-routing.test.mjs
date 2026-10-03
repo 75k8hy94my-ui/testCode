@@ -2,47 +2,29 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const readFile = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
-const read = (name) => name === 'reader.html' ? ['reader.html', 'reader-saved-list-template.js', 'reader-author-list-template.js', 'reader-toc-template.js', 'reader-mobile-nav-template.js', 'reader-feature-overlays-template.js'].map(readFile).join('\n') : readFile(name);
-const readReader = () => read('reader.html');
+const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
+const reader = read('reader.html');
 
-test('desktop video destination deep-links directly to the video list', () => {
-  const rail = read('app-desktop-rail.js');
-  assert.match(rail, /desktopNavVideo/);
-  assert.match(rail, /video\.html/);
+test("the bookshelf launches a reader using the saved item's stable id", () => {
+  assert.match(read('manga-list-host-runtime.js'), /buildReaderUrl\(itemId, deps\.navigation\.readerUrl\)/);
+  assert.match(read('manga-list-host-runtime.js'), /prepareLaunch\(item\)/);
+  assert.match(read('reader-target.js'), /function buildReaderUrl\(itemId/);
+  assert.match(read('reader-target.js'), /itemIdFromLocation/);
 });
 
-test('reader startup honors explicit item and screen routes before legacy resume and shelf fallback', () => {
-  const reader = readReader();
-  assert.match(reader, /const requestedScreenOnLoad = getReaderScreenFromLocation\(\);/);
-  const startup = reader.slice(reader.indexOf('const requestedScreenOnLoad = getReaderScreenFromLocation();'));
-  assert.match(startup, /const routeItemId = window\.MangaReaderTarget \? MangaReaderTarget\.itemIdFromLocation\(location\) : '';/);
-  assert.match(startup, /if \(routeItemId\) \{[\s\S]*savedItems\.find\(\(entry\) => entry && String\(entry\.id\) === routeItemId\)/);
-  assert.match(startup, /MangaReaderTarget\.consumeLaunch\(routeItemId, sessionStorage\)/);
-  assert.match(startup, /\} else if \(!requestedScreenOnLoad\) \{[\s\S]*MangaReaderTarget\.readLegacyTarget\(localStorage\)/);
-  assert.match(startup, /if \(!requestedScreenOnLoad && !resumedOnLoad\) location\.replace\('manga\.html'\);/);
-  assert.match(reader, /renderReaderScreen\(getReaderScreenFromLocation\(\)\);/);
+test('reader requires an explicit item route and has no legacy URL or shelf screen fallback', () => {
+  assert.match(reader, /itemIdFromLocation\(location\)/);
+  assert.match(reader, /if \(!itemId\) \{ runtime\.close\(\); return; \}/);
+  assert.doesNotMatch(reader, /readLegacyTarget|mangaReaderLastUrl|renderSavedList|saved-list|video-list|author-cards/);
 });
 
-test('reader location parser recognizes the video-list route', () => {
-  const reader = readReader();
-  assert.match(reader, /'video-list': els\.savedListOverlay/);
-  assert.match(reader, /if \(currentReaderScreen === 'video-list'\)\s*\{\s*switchListTab\('video'\);/);
+test('closing the reader returns to the sole manga bookshelf entry', () => {
+  assert.match(read('reader-runtime.js'), /function close\(\) \{\s*location\.replace\('manga\.html'\);/);
+  assert.match(reader, /aria-label="本棚に戻る"/);
 });
 
-test('direct saved-list routes hydrate the bookshelf before showing the manga tab', () => {
-  const reader = read('reader.html');
-  assert.match(reader, /else if \(currentReaderScreen === 'saved-list'\)\s*\{\s*renderSavedList\(\);\s*switchListTab\('manga'\);/);
-});
-
-test('direct author-card routes hydrate author cards and derived authors', () => {
-  const reader = read('reader.html');
-  assert.match(reader, /else if \(currentReaderScreen === 'author-cards'\)\s*\{[\s\S]*syncAuthorCardsFromSavedItems\(\);[\s\S]*renderAuthorCards\(\);/);
-});
-
-test('author cards no longer expose a redundant close button', () => {
-  const reader = read('reader.html');
-  assert.doesNotMatch(reader, /id=['"]closeAuthorCardBtn['"]/);
-  assert.doesNotMatch(reader, /closeAuthorCardBtn:/);
-  assert.doesNotMatch(reader, /els\.closeAuthorCardBtn\.addEventListener/);
+test('reader markup has no bookshelf, folder, list editing, video, settings, or backup UI', () => {
+  for (const id of ['savedListOverlay', 'mangaListSection', 'folderList', 'bulkEditOverlay', 'videoListSection', 'settingsOverlay', 'backupOverlay']) {
+    assert.doesNotMatch(reader, new RegExp(`id=["']${id}["']`), id);
+  }
 });

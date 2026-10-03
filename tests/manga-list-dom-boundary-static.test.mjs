@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
-const reader = read('reader.html');
+const route = read('manga-list-route.js');
 const runtime = read('manga-list-runtime.js');
 const mangaListTemplate = read('manga-list-template.js');
 const savedListTemplate = read('reader-saved-list-template.js');
@@ -24,19 +24,15 @@ const expectedIds = [
   'unreadListBtn', 'groupAuthorBtn', 'dashboard',
 ];
 
-test('manga list DOM references are centralized without video or reader-view elements', () => {
-  const match = reader.match(/function getMangaListElements\(\)\s*\{([\s\S]*?)\n\s*\}/);
-  assert.ok(match, 'getMangaListElements must exist');
-  const boundary = match[1];
-  assert.match(boundary, /const source = MangaListDomResolver\.createSource\(els\.mangaListSection\);/);
-  assert.match(boundary, /return MangaListElementsFactory\.create\(source\);/);
-  assert.doesNotMatch(boundary, /videoListItems|videoListEmpty|viewer|pageStage|settingsOverlay|backupOverlay|tocOverlay|authorCardOverlay/);
+test('manga list DOM references are centralized in the manga route and exclude Reader elements', () => {
+  assert.match(route, /manga-list-dom-resolver\.js/);
+  assert.match(route, /manga-list-elements\.js/);
+  assert.match(route, /resolver: MangaListDomResolver, elementsFactory: MangaListElementsFactory/);
+  assert.doesNotMatch(read('reader.html'), /manga-list-dom-resolver|manga-list-elements|manga-list-template/);
 });
 
 test('renderSavedList uses the centralized manga list DOM object', () => {
-  const start = reader.indexOf('function renderSavedList()');
-  assert.notEqual(start, -1, 'renderSavedList must exist');
-  assert.match(reader, /const mangaListEls = getMangaListElements\(\);/);
+  assert.match(route, /runtime\.renderSavedList\(\)/);
   assert.match(runtime, /function renderSavedList\(\)/);
   assert.match(runtime, /const elements = context\.getElements\(\)/);
 });
@@ -46,13 +42,9 @@ test('manga list DOM boundary ids belong to the manga template and does not crea
     const idPattern = new RegExp(`id=["']${id}["']`, 'g');
     assert.equal((mangaListTemplate.match(idPattern) || []).length, 1, id);
   }
-  assert.match(reader, /manga-list-template\.js/);
-  assert.equal((reader.match(/manga-list-elements\.js\?v=[^"']+/g) || []).length, 1);
-  assert.equal((reader.match(/manga-list-dom-resolver\.js\?v=[^"']+/g) || []).length, 1);
-  assert.ok(reader.indexOf('manga-list-elements.js?v=') < reader.indexOf('function getMangaListElements()'));
-  assert.ok(reader.indexOf('manga-list-dom-resolver.js?v=') < reader.indexOf('function getMangaListElements()'));
-  assert.match(reader, /reader-saved-list-template\.js/);
-  assert.ok(reader.indexOf('manga-list-template.js') < reader.indexOf('reader-saved-list-template.js'));
+  assert.match(route, /manga-list-template\.js/);
+  assert.match(route, /manga-list-elements\.js/);
+  assert.match(route, /manga-list-dom-resolver\.js/);
   assert.equal((savedListTemplate.match(/MangaListTemplate\.createMarkup\(\)/g) || []).length, 1);
   assert.doesNotMatch(savedListTemplate, /id=["']mangaListSection["']/);
   assert.match(savedListTemplate, /id=["']savedListOverlay["']/);
@@ -61,6 +53,5 @@ test('manga list DOM boundary ids belong to the manga template and does not crea
   for (const forbidden of ['videoListItems', 'videoListEmpty', 'videoLibraryApp', 'viewer', 'pageStage', 'tocOverlay', 'customAddOverlay', 'editItemOverlay', 'bulkEditOverlay', 'bulkDetectOverlay', 'authorCardOverlay']) {
     assert.doesNotMatch(mangaListTemplate, new RegExp(`\\b${forbidden}\\b`), forbidden);
   }
-  const boundary = reader.match(/function getMangaListElements\(\)\s*\{([\s\S]*?)\n\s*\}/)?.[1] || '';
-  assert.doesNotMatch(boundary, /createElement|catch|setTimeout|return\s*;\s*\}/);
+  assert.doesNotMatch(route, /reader-saved-list-template/);
 });

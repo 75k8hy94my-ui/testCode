@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const source = fs.readFileSync(new URL('../manga-list-state.js', import.meta.url), 'utf8');
-const reader = fs.readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
+const route = fs.readFileSync(new URL('../manga-list-route.js', import.meta.url), 'utf8');
 const context = {};
 vm.runInNewContext(source, context);
 const api = context.MangaListState;
@@ -24,8 +24,8 @@ test('manga list state exposes one read-only loading API without browser service
   assert.equal(typeof api?.load, 'function');
   assert.equal((source.match(/root\.MangaListState\s*=/g) || []).length, 1);
   assert.doesNotMatch(source, /document|localStorage|sessionStorage|MangaVault|MangaVaultPayload|Supabase|fetch|addEventListener|setTimeout|setItem|removeItem|clear\s*\(/);
-  assert.equal((reader.match(/manga-list-state\.js\?v=20260921-state-loader/g) || []).length, 1);
-  assert.ok(reader.indexOf('manga-list-state.js') < reader.indexOf('function loadSaved'));
+  assert.match(route, /manga-list-state\.js\?v=/);
+  assert.doesNotMatch(fs.readFileSync(new URL('../reader.html', import.meta.url), 'utf8'), /manga-list-state\.js/);
 });
 
 test('manga list state preserves stored arrays, order, and item fields without mutation', () => {
@@ -48,11 +48,10 @@ test('manga list state keeps existing empty and malformed JSON behavior', () => 
   assert.equal(malformed.authorCards, 'not-an-array');
 });
 
-test('loadSaved keeps migration, video loading, and later side effects in reader.html', () => {
-  assert.match(reader, /MangaListState\.load\(\{[\s\S]*?storage:\s*localStorage/);
-  assert.match(reader, /LEGACY_SAVED_URLS_KEY/);
-  assert.match(reader, /removeHistoryFolderRecord\(\)/);
-  assert.match(reader, /SAVED_VIDEOS_KEY/);
-  assert.match(reader, /persistItems\(\)/);
-  assert.match(reader, /persistFolders\(\)/);
+test('manga route owns list initialization and delegates data loading to state runtime', () => {
+  assert.match(route, /stateRuntimeFactory: MangaListStateRuntimeFactory/);
+  assert.match(route, /createStateDeps: \(\) => \(\{ load: data\.load/);
+  assert.match(route, /removeHistoryFolder: \(loaded\) =>/);
+  assert.match(route, /synchronizeAuthors/);
+  assert.doesNotMatch(fs.readFileSync(new URL('../reader.html', import.meta.url), 'utf8'), /MangaListState|manga-list-state\.js/);
 });

@@ -10,10 +10,6 @@ const pages = {
 };
 const spa = read('home-profile-spa.js');
 const reader = read('reader.html');
-const readerTemplates = [
-  'reader-saved-list-template.js', 'reader-author-list-template.js', 'reader-toc-template.js',
-  'reader-mobile-nav-template.js', 'reader-feature-overlays-template.js',
-].map(read).join('\n');
 const vault = read('vault-session.js');
 const payload = read('vault-payload.js');
 const vpn = read('media-access-gate.js');
@@ -104,31 +100,30 @@ test('VPN guard installation appears before automatic initial check and covers p
   assert.match(vpn, /else\s*\{[\s\S]*blockExistingExternalMedia\(\)/);
 });
 
-test('VPN diagnostics and manual designation controls remain part of the existing surface', () => {
-  assert.match(readerTemplates, /data-vpn-status-button/);
-  assert.match(readerTemplates, /data-vpn-diagnostics-button/);
+test('VPN checks and manual designations remain available to protected reader media', () => {
+  assert.match(reader, /media-access-gate\.js/);
   assert.match(vpn, /MANUAL_VPN_IPS_KEY/);
   assert.match(vpn, /MANUAL_NON_VPN_IPS_KEY/);
   assert.match(vpn, /function checkVpn\(/);
 });
 
-test('video bootstrap has one owner per page and keeps direct reader loading', () => {
+test('video bootstrap has one owner per page and does not load on the Reader document', () => {
   assert.match(spa, /video-data\.js\?v=20260918-video-data-no-window/);
   assert.match(spa, /video-library\.js\?v=20260918-video-library-no-window/);
   assert.match(spa, /video-routing-fix\.js\?v=20260918-video-routing-no-window/);
   assert.match(spa, /video-thumbnail-time\.js\?v=20260916-video-thumbnail/);
   assert.match(recommendations, /const page = String\(\(root\.location && root\.location\.pathname\) \|\| ''\)\.split\('\/'\)\.pop\(\);/);
-  assert.match(recommendations, /if \(page !== 'reader\.html'\) return;/);
+  assert.doesNotMatch(reader, /recommendations\.js|video-data\.js|video-library\.js/);
   assert.match(recommendations, /loadBrowserScript\('video-data\.js'\)/);
   assert.match(recommendations, /loadBrowserScript\('video-library\.js'\)/);
   assert.match(videoLibrary, /function init\(\)/);
   assert.match(videoLibrary, /DOMContentLoaded/);
 });
 
-test('current event registration points are recorded for later comparison', () => {
+test('Reader stays independent from the SPA history router', () => {
   assert.match(spa, /addEventListener\('click',intercept\)/);
   assert.match(spa, /addEventListener\('popstate',renderRoute\)/);
-  assert.match(reader, /(?:addEventListener\(['"]popstate['"]|bindReaderGlobal\(\s*window,\s*['"]popstate['"])/);
+  assert.doesNotMatch(reader, /popstate|hashchange|ReaderShell/);
   assert.match(videoLibrary, /addEventListener\(['"]popstate['"]/);
   assert.match(videoLibrary, /DOMContentLoaded/);
 });

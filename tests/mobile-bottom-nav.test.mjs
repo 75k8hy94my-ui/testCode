@@ -53,20 +53,14 @@ test('glass is theme-aware, safe-area-aware, and constrained on phones', () => {
   assert.match(css, /inset 0 1px 0 var\(--glass-highlight\)/);
 });
 
-test('reader keeps its special controls while using the shared glass engine', () => {
+test('reader owns reading controls and does not load bookshelf navigation chrome', () => {
   const reader = read('reader.html');
-  const template = read('reader-mobile-nav-template.js');
-  assert.match(template, /mobileNavManga/);
-  assert.match(template, /mobileNavVideo/);
-  assert.match(template, /mobileNavMore/);
-  assert.ok(reader.indexOf('reader-mobile-nav-template.js') < reader.indexOf('mobile-bottom-nav.js?v=20260925-instagram-drag-lock'));
-  assert.match(js, /readerFallbackTarget/);
-  assert.match(js, /nav\.classList\.contains\('reader-mode'\)/);
-  assert.match(js, /querySelector\('#mobileNavMore'\)/);
+  for (const id of ['closeBtn', 'prevBtn', 'nextBtn', 'pageSlider', 'favToggleBtn']) assert.match(reader, new RegExp(`id="${id}"`));
+  assert.doesNotMatch(reader, /mobileNavManga|mobileNavVideo|mobileNavMore|reader-mobile-nav-template|mobile-bottom-nav/);
 });
 
 test('shared nav is loaded by all target mobile pages', () => {
-  for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
+  for (const page of ['home.html','profile.html','manga.html','video.html','video-player.html']) {
     const source = read(page);
     assert.match(source, /mobile-bottom-nav\.css\?v=20260925-instagram-drag-lock/, page);
     assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-drag-lock/, page);

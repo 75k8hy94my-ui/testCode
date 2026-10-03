@@ -8,7 +8,7 @@ const source = fs.existsSync(new URL('../manga-list-view-model.js', import.meta.
 const context = {};
 if (source) vm.runInNewContext(source, context);
 const derive = context.MangaListViewModel?.derive;
-const reader = read('reader.html');
+const route = read('manga-list-route.js');
 
 const ids = { favorites: 'favorites', unread: 'unread', synced: 'synced', history: 'history', series: 'series' };
 const items = [
@@ -48,9 +48,9 @@ test('view model filters folders, search, and pages without duplication', () => 
   assert.equal(new Set(result.visibleItems.map((item) => item.id)).size, result.visibleItems.length);
 });
 
-test('view model is pure and loaded once before the reader inline script', () => {
-  assert.equal((reader.match(/manga-list-view-model\.js\?v=20260921-view-model-self/g) || []).length, 1);
-  assert.ok(reader.indexOf('manga-list-view-model.js') < reader.indexOf('function renderSavedList'));
+test('view model is pure and loaded by the manga route runtime', () => {
+  assert.match(route, /manga-list-view-model\.js\?v=/);
+  assert.doesNotMatch(read('reader.html'), /manga-list-view-model|MangaListViewModel/);
   assert.doesNotMatch(source, /\b(document|window|localStorage|sessionStorage|MangaVault|Supabase|fetch|setTimeout|addEventListener)\b/);
   assert.equal((source.match(/root\.MangaListViewModel\s*=/g) || []).length, 1);
 });

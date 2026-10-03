@@ -219,33 +219,15 @@ test('host setupFeedImage preserves extension fallback and shared cover cache up
   assert.equal(img.src, 'https://example.test/manga/base/1-1-3');
 });
 
-test('reader delegates persistence to the host boundary without duplicating implementations', () => {
+test('manga route owns shelf persistence and Reader uses its narrow item repository', () => {
   const reader = fs.readFileSync(path.join(root, 'reader.html'), 'utf8');
-  assert.match(reader, /manga-list-host-runtime\.js\?v=/);
-  assert.match(reader, /MangaListHostRuntimeFactory\.create\(/);
-  assert.match(reader, /persistItems:\s*mangaListHostRuntime\.persistItems/);
-  assert.match(reader, /persistFolders:\s*mangaListHostRuntime\.persistFolders/);
-  assert.match(reader, /persistAuthorCards:\s*mangaListHostRuntime\.persistAuthorCards/);
-  assert.match(reader, /persistAll:\s*mangaListHostRuntime\.persistAll/);
-  assert.equal((reader.match(/function persistItems\s*\(/g) || []).length, 0);
-  assert.equal((reader.match(/function persistFolders\s*\(/g) || []).length, 0);
-  assert.equal((reader.match(/function persistAuthorCards\s*\(/g) || []).length, 0);
-  assert.equal((reader.match(/function persistAll\s*\(/g) || []).length, 0);
-  assert.equal((reader.match(/function scheduleCloudSync\s*\(/g) || []).length, 0);
-  assert.equal((reader.match(/function runCloudSync\s*\(/g) || []).length, 0);
-  assert.equal((reader.match(/function buildSyncPayload\s*\(/g) || []).length, 0);
-  assert.equal((reader.match(/function setupFeedImage\s*\(/g) || []).length, 0);
-  assert.equal((reader.match(/function loadLocalCover\s*\(/g) || []).length, 0);
-  assert.match(reader, /const persistItems = \(\) => mangaListHostRuntime\.persistItems\(\);/);
-  assert.match(reader, /const scheduleCloudSync = \(\) => mangaListHostRuntime\.scheduleCloudSync\(\);/);
-  assert.match(reader, /const runCloudSync = \(\) => mangaListHostRuntime\.runCloudSync\(\);/);
-  assert.match(reader, /const buildSyncPayload = \(\) => mangaListHostRuntime\.buildSyncPayload\(\);/);
-  assert.match(reader, /const setupFeedImage = \(\.\.\.args\) => mangaListHostRuntime\.setupFeedImage\(\.\.\.args\);/);
-  assert.match(reader, /const loadLocalCover = \(\.\.\.args\) => mangaListHostRuntime\.loadLocalCover\(\.\.\.args\);/);
-  const openItemMatch = reader.match(/async function openItem\(item, addToHistoryFlag, switchDirection\) \{([\s\S]*?)\n  \}/);
-  assert.ok(openItemMatch);
-  assert.match(openItemMatch[1], /mangaListHostRuntime\.navigateToReader\(item\);/);
-  assert.doesNotMatch(openItemMatch[1], /localStorage\.setItem\(LAST_URL_KEY/);
-  assert.doesNotMatch(openItemMatch[1], /HomeProfileSPA\.navigate/);
-  assert.doesNotMatch(openItemMatch[1], /location\.href\s*=\s*'reader\.html'/);
+  const route = fs.readFileSync(path.join(root, 'manga-list-route.js'), 'utf8');
+  assert.match(route, /manga-list-host-runtime\.js\?v=/);
+  assert.match(route, /MangaListHostRuntimeFactory\.create\(/);
+  assert.match(route, /persistAll: host\.persistAll/);
+  assert.doesNotMatch(reader, /manga-list-host-runtime|MangaListHostRuntimeFactory|persistFolders|persistAuthorCards/);
+  assert.match(reader, /reader-item-repository\.js/);
+  assert.match(reader, /ReaderItemRepositoryFactory\.create\(/);
+  assert.match(reader, /MangaVault\.savePayload\(payload\)/);
+  assert.match(fs.readFileSync(path.join(root, 'reader-item-repository.js'), 'utf8'), /dependencies\.scheduleSync\(\)/);
 });
