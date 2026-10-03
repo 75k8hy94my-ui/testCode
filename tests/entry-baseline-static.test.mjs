@@ -72,8 +72,8 @@ test('manga and video route startup failures render visible recovery messages', 
 test('authentication branches remain explicit in the current SPA bootstrap', () => {
   assert.match(spa, /if\(!session\|\|!session\.refresh_token\|\|!config\.url\|\|!config\.publishableKey\)\{showLogin\(\);return;\}/);
   assert.match(spa, /if\(!MangaVault\.loadActive\(\)\)\{showVault\(\);return;\}/);
-  assert.match(spa, /await MangaVault\.refreshSession\(\)/);
-  assert.match(spa, /catch\(_\)\{MangaVault\.saveSession\(null\);showLogin\(\);return;\}/);
+  assert.match(spa, /await MangaVault\.ensureSession\(\)/);
+  assert.match(spa, /catch\(error\)\{if\(typeof MangaVault\.isSessionAuthError==='function'&&MangaVault\.isSessionAuthError\(error\)\)MangaVault\.saveSession\(null\);showLogin\(\);return;\}/);
 });
 
 test('vault saves use the existing payload builder and savePayload boundary', () => {
