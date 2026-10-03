@@ -44,7 +44,7 @@ test('shared rail provides global destinations and page-aware active state', () 
   assert.doesNotMatch(rail, /reader\.html#screen=/);
   assert.match(rail, /page === 'sync\.html'/);
   assert.match(rail, /page === 'profile\.html'/);
-  assert.doesNotMatch(rail, /currentReaderScreen|page === 'reader\.html'/);
+  assert.match(rail, /page === 'manga\.html' \|\| page === 'reader\.html'/);
   assert.match(rail, /page === 'sync\.html'/);
   assert.match(rail, /aria-current/);
   assert.doesNotMatch(rail, /desktopNavVault/);

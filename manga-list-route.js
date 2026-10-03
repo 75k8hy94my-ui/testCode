@@ -282,10 +282,14 @@
           writeStorage: (key, value) => storage.setItem(key, value),
           buildReaderUrl: (itemId, base) => windowRef.MangaReaderTarget.buildReaderUrl(itemId, base),
           prepareLaunch: (item) => windowRef.MangaReaderTarget.prepareLaunch(item, windowRef.sessionStorage),
-          // reader.html is deliberately outside the home/manga/video SPA.
-          // Crossing this boundary reloads a dedicated reader document instead
-          // of transplanting reader.html into the bookshelf shell.
+          // The shared shell owns Reader routing. Its route keeps the outer app
+          // alive and hosts the dedicated reader.html document in an iframe;
+          // direct reader.html entry remains independent of bookshelf code.
           navigate: (url) => {
+            if (windowRef.HomeProfileSPA && typeof windowRef.HomeProfileSPA.navigate === 'function') {
+              windowRef.HomeProfileSPA.navigate(url);
+              return;
+            }
             if (windowRef.location && typeof windowRef.location.assign === 'function') windowRef.location.assign(url);
             else windowRef.location.href = url;
           },

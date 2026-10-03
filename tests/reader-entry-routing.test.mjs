@@ -19,7 +19,7 @@ test('reader requires an explicit item route and has no legacy URL or shelf scre
 });
 
 test('closing the reader returns to the sole manga bookshelf entry', () => {
-  assert.match(read('reader-runtime.js'), /function close\(\) \{\s*location\.replace\('manga\.html'\);/);
+  assert.match(read('reader-runtime.js'), /function close\(\) \{[\s\S]*location\.replace\('manga\.html'\);/);
   assert.match(reader, /aria-label="本棚に戻る"/);
 });
 
@@ -27,4 +27,20 @@ test('reader markup has no bookshelf, folder, list editing, video, settings, or 
   for (const id of ['savedListOverlay', 'mangaListSection', 'folderList', 'bulkEditOverlay', 'videoListSection', 'settingsOverlay', 'backupOverlay']) {
     assert.doesNotMatch(reader, new RegExp(`id=["']${id}["']`), id);
   }
+});
+
+test('reader UI blocks media context menus, keeps vertical pages readable, and supports center-tap chrome toggling', () => {
+  assert.match(reader, /body\.vertical-scroll \.readerPageImage\s*\{[^}]*width:min\(100%,\s*960px\)/);
+  assert.match(reader, /body\.reader-chrome-hidden #topbar/);
+  assert.match(reader, /body\.reader-chrome-hidden #controls/);
+  assert.match(read('reader-runtime.js'), /bind\('viewer', 'contextmenu'/);
+  assert.match(read('reader-runtime.js'), /reader-chrome-hidden/);
+});
+
+test('embedded Reader close returns to the shared SPA shell without a top-level document navigation', () => {
+  assert.match(read('reader-runtime.js'), /manga-reader:close/);
+  assert.match(read('reader-runtime.js'), /manga-reader:open-item/);
+  assert.match(read('home-profile-spa.js'), /function handleReaderShellMessage\(event\)/);
+  assert.match(read('home-profile-spa.js'), /navigate\('manga\.html',\{replace:true\}\)/);
+  assert.match(read('home-profile-spa.js'), /readerUrl\.searchParams\.set\('item',event\.data\.itemId\.trim\(\)\);navigate\(readerUrl\.href\)/);
 });

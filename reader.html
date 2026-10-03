@@ -12,32 +12,34 @@
     html,body { margin:0; width:100%; height:100%; overflow:hidden; background:var(--bg); color:var(--text); font:15px system-ui,"Yu Gothic",sans-serif; }
     html.auth-pending body { visibility:hidden; }
     #readerApp { position:relative; width:100%; height:100dvh; background:#000; }
-    #topbar,#controls { position:absolute; z-index:4; display:flex; align-items:center; gap:8px; padding:8px; background:rgba(15,17,23,.82); backdrop-filter:blur(16px); }
-    #topbar { inset:0 0 auto; min-height:48px; }
+    #topbar,#controls { position:absolute; z-index:4; display:flex; align-items:center; gap:8px; padding:8px; background:rgba(20,24,32,.92); border-color:rgba(255,255,255,.12); backdrop-filter:blur(24px) saturate(150%); -webkit-backdrop-filter:blur(24px) saturate(150%); box-shadow:0 6px 20px rgba(0,0,0,.18); transition:transform .18s ease,opacity .18s ease; }
+    #topbar { inset:0 0 auto; min-height:54px; border-bottom:1px solid rgba(255,255,255,.12); }
     #readerMeta { display:flex; flex-direction:column; min-width:0; margin-left:auto; text-align:right; }
     #currentTitle { overflow:hidden; max-width:min(45vw,560px); text-overflow:ellipsis; white-space:nowrap; }
     #readerStatus { color:var(--sub); font-size:12px; }
-    .ctrlBtn { min-height:36px; padding:6px 10px; border:1px solid #424754; border-radius:9px; background:var(--panel); color:var(--text); cursor:pointer; }
+    .ctrlBtn { min-height:36px; padding:6px 10px; border:1px solid #424754; border-radius:9px; background:rgba(255,255,255,.08); color:var(--text); cursor:pointer; }
     .ctrlBtn[hidden],#nextVolumeBanner[hidden] { display:none; }
     #viewer { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#000; }
     #pageStage { display:flex; align-items:center; justify-content:center; width:100%; height:100%; overflow:hidden; }
-    .readerPageImage { display:block; max-width:100%; max-height:100%; object-fit:contain; user-select:none; }
+    .readerPageImage { display:block; max-width:100%; max-height:100%; object-fit:contain; user-select:none; -webkit-user-drag:none; -webkit-touch-callout:none; }
     .spreadCrop { position:relative; width:50%; height:100%; overflow:hidden; }
     .spreadCrop .readerPageImage { position:absolute; top:0; width:200%; height:100%; max-width:none; max-height:none; }
     .spreadRight .readerPageImage { left:0; }
     .spreadLeft .readerPageImage { left:-100%; }
     body.vertical-scroll #viewer { align-items:flex-start; overflow-y:auto; }
-    body.vertical-scroll #pageStage { height:auto; min-height:100%; flex-direction:column; overflow:visible; }
-    body.vertical-scroll .readerPageImage { width:100%; height:auto; max-height:none; }
+    body.vertical-scroll #pageStage { height:auto; min-height:100%; flex-direction:column; align-items:center; overflow:visible; }
+    body.vertical-scroll .readerPageImage { width:min(100%, 960px); height:auto; max-height:none; margin-inline:auto; }
     body.safe-mode .readerPageImage,body.safe-mode .encryptedAssetHost img { filter:blur(12px); transform:scale(1.08); }
     body.image-enhance .readerPageImage:not([data-local-enhanced="true"]) { filter:contrast(1.12) brightness(1.04) saturate(.96); }
-    #controls { inset:auto 0 0; min-height:52px; }
+    #controls { inset:auto 0 0; min-height:52px; border-top:1px solid rgba(255,255,255,.12); }
+    body.reader-chrome-hidden #topbar { transform:translateY(-105%); opacity:0; pointer-events:none; }
+    body.reader-chrome-hidden #controls { transform:translateY(105%); opacity:0; pointer-events:none; }
     #pageSlider { flex:1; min-width:50px; accent-color:var(--accent); }
     #nextVolumeBanner { position:absolute; z-index:5; right:14px; bottom:68px; display:flex; gap:10px; align-items:center; padding:10px; border-radius:12px; background:rgba(23,27,36,.94); }
     #nextVolumeText { max-width:45vw; }
     #readerMessage { position:absolute; z-index:3; left:50%; top:50%; transform:translate(-50%,-50%); max-width:90vw; color:var(--sub); text-align:center; }
     @media(max-width:700px) { #topbar { gap:4px; padding:6px; } .ctrlBtn { padding:5px 7px; font-size:12px; } #readerMeta { max-width:35vw; } #nextVolumeBanner { left:8px; right:8px; bottom:64px; } }
-    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { #topbar,#controls { background:rgba(15,17,23,.98); } }
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { #topbar,#controls { background:rgba(20,24,32,.98); } }
   </style>
 </head>
 <body>
@@ -84,7 +86,7 @@
   <script src="encrypted-asset-item.js"></script>
   <script src="reader-image-enhancement.js"></script>
   <script src="reader-item-repository.js"></script>
-  <script src="reader-runtime.js"></script>
+  <script src="reader-runtime.js?v=20261003-reader-ui-spa"></script>
   <script>
     window.MangaReaderBootPromise = (async () => {
       const sessionKey = 'mangaReaderSupabaseSession';

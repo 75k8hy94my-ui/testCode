@@ -24,26 +24,28 @@ test('current entry pages keep their static bootstrap script baselines', () => {
   assert.deepEqual(scriptSources(pages.manga), [
     'supabase-config.js', 'vault-session.js?v=20261003-session-lock', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
-    'app-global-shell.js?v=20260924-theme-unified', 'app-desktop-rail.js',
+    'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js',
     'profile-menu.js?v=20260924-theme-unified', 'feature-flags.js',
     'media-access-gate.js?v=20260926-non-jp-vpn',
-    'manga-list-route.js?v=20260926-route-owned-v3',
-    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20260926-reader-shell-root-fix',
+    'manga-list-route.js?v=20261003-reader-spa-route',
+    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261003-reader-shell-spa',
   ]);
   assert.deepEqual(scriptSources(pages.video), [
     'supabase-config.js', 'vault-session.js?v=20261003-session-lock', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
-    'app-global-shell.js?v=20260924-theme-unified', 'app-desktop-rail.js',
-    'profile-menu.js?v=20260924-theme-unified', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20260926-reader-shell-root-fix',
+    'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js',
+    'profile-menu.js?v=20260924-theme-unified', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261003-reader-shell-spa',
   ]);
 });
 
-test('manga and video are app-shell routes while reader remains an independent document', () => {
+test('manga and video use app-shell routes and the dedicated Reader document is hosted by an SPA route', () => {
   assert.match(spa, /if\(name==='manga\.html'\)return'manga'/);
   assert.match(spa, /if\(name==='video\.html'\)return'video'/);
   assert.match(spa, /else if\(route==='manga'\)renderManga\(generation\)/);
   assert.match(spa, /else if\(route==='video'\)renderVideo\(generation\)/);
-  assert.doesNotMatch(spa, /renderReader\(/);
+  assert.match(spa, /if\(name==='reader\.html'\)return'reader'/);
+  assert.match(spa, /else if\(route==='reader'\)renderReader\(\)/);
+  assert.match(spa, /frame\.src=readerUrl\.href/);
   assert.match(spa, /if\(!SPA_PAGES\.includes\(name\)\)\{location\.href=target\.href;return;\}/);
   assert.match(reader, /class="auth-pending reader-shell-page"/);
   assert.match(reader, /reader-target\.js\?v=20261003-reader-launch-contract/);
