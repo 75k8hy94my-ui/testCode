@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import fs from 'node:fs';
 
 const source = fs.readFileSync('manga-list-template.js', 'utf8');
-const reader = fs.readFileSync('reader.html', 'utf8');
+const route = fs.readFileSync('manga-list-route.js', 'utf8');
 const sharedTemplate = fs.readFileSync('reader-saved-list-template.js', 'utf8');
 
 function loadTemplate() {
@@ -53,9 +53,9 @@ test('manga list template contains each required id once and no non-manga surfac
   }
 });
 
-test('reader integrates the manga template before the shared saved-list template', () => {
-  assert.equal((reader.match(/manga-list-template\.js\?v=[^"']+/g) || []).length, 1);
-  assert.ok(reader.indexOf('manga-list-template.js?v=') < reader.indexOf('reader-saved-list-template.js'));
+test('manga route mounts the manga template and Reader has no shelf template dependency', () => {
+  assert.match(route, /manga-list-template\.js\?v=/);
+  assert.doesNotMatch(fs.readFileSync('reader.html', 'utf8'), /manga-list-template|reader-saved-list-template/);
   assert.equal((sharedTemplate.match(/MangaListTemplate\.createMarkup\(\)/g) || []).length, 1);
   assert.equal((sharedTemplate.match(/id="mangaListSection"/g) || []).length, 0);
   assert.match(sharedTemplate, /id="videoListSection"/);

@@ -21,14 +21,12 @@ test('manga list runtime module exposes the four context-aware operations', () =
   assert.equal(Object.isFrozen(runtime), true);
 });
 
-test('reader loads and delegates the four runtime implementations', () => {
+test('manga route loads the list runtime while Reader has no shelf runtime dependency', () => {
+  const route = read('manga-list-route.js');
   const reader = read('reader.html');
-  assert.equal((reader.match(/manga-list-runtime\.js\?v=[^"']+/g) || []).length, 1);
-  assert.match(reader, /MangaListRuntimeFactory\.create\(/);
-  assert.doesNotMatch(reader, /function renderSavedListWithContext\(context\)/);
-  assert.doesNotMatch(reader, /function buildBookCardWithContext\(context,/);
-  assert.doesNotMatch(reader, /function buildFolderCardWithContext\(context,/);
-  assert.doesNotMatch(reader, /function handleMangaCardOpenWithContext\(context,/);
+  assert.match(route, /manga-list-runtime\.js\?v=/);
+  assert.match(route, /MangaListRuntimeFactory\.create\(/);
+  assert.doesNotMatch(reader, /manga-list-runtime|MangaListRuntimeFactory/);
 });
 
 test('shared runtime has no direct reader or global DOM dependency', () => {

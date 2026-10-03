@@ -53,13 +53,11 @@ test('video add sheet only closes from explicit controls and accepts ordinary ht
   assert.doesNotMatch(library, /invokeLegacyAdd|confirmVideoAddBtn|既存の動画追加機能を利用できません/);
 });
 
-test('reader sync payload reads the current video records after enhanced additions', () => {
-  const reader = read('reader.html');
-  const host = read('manga-list-host-runtime.js');
-  assert.match(reader, /buildBasePayload:\s*\(\) => window\.MangaVaultPayload\.buildFromLocalStorage\(\)/);
-  assert.match(reader, /readStorageItem:\s*\(key\) => localStorage\.getItem\(key\)/);
-  assert.match(host, /const storedVideos = JSON\.parse\(deps\.sync\.readStorageItem\(deps\.keys\.savedVideos\)/);
-  assert.match(host, /payload\.videos\s*=\s*latestVideos/);
+test('video library saves enhanced records through its own Vault boundary', () => {
+  const library = read('video-library.js');
+  assert.match(library, /MangaVaultPayload\.buildFromLocalStorage\(\)/);
+  assert.match(library, /MangaVault\.savePayload\(MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
+  assert.doesNotMatch(read('reader.html'), /video-data\.js|video-library\.js|mangaReaderVideos/);
 });
 
 test('video URL additions reject an exact duplicate without writing another record', () => {

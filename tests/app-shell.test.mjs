@@ -122,19 +122,18 @@ test('saved theme drives home profile manga video and header colors', () => {
   assert.match(css, /reader-entry-manga body[\s\S]*background:#f4f6f8!important/);
   assert.match(css, /reader-entry-video body[\s\S]*background:#0a0c11!important/);
   assert.match(globalCss, /--shell-header-bg/);
-  for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
-    assert.match(read(page), page === 'reader.html' || page === 'video-player.html' ? /home-profile-shell\.css\?v=20260926-reader-shell-root-fix/ : /home-profile-shell\.css\?v=20260926-reader-shell-root-fix/);
+  for (const page of ['home.html','profile.html','manga.html','video.html','video-player.html']) {
+    assert.match(read(page), /home-profile-shell\.css\?v=20260926-reader-shell-root-fix/);
     assert.match(read(page), /app-global-shell\.js\?v=20260924-theme-unified/);
     assert.match(read(page), /profile-menu\.js\?v=20260924-theme-unified/);
   }
 });
 
-test('reader header inherits theme tokens outside homeShell', () => {
-  const css = read('home-profile-shell.css');
-  assert.match(css, /html\[data-theme="light"\]\{[^}]*--header-bg:/);
-  assert.match(css, /html\[data-theme="dark"\]\{[^}]*--header-bg:/);
-  assert.match(css, /\.homeHeader[\s\S]*background:var\(--header-bg\)!important/);
-  assert.match(css, /headerProfileButton:hover\{background:var\(--header-hover\)!important/);
+test('reader owns a dedicated reading surface instead of home navigation chrome', () => {
+  const reader = read('reader.html');
+  assert.match(reader, /reader-shell-page/);
+  assert.match(reader, /#readerApp/);
+  assert.doesNotMatch(reader, /home-profile-shell|home-profile-spa|mobile-bottom-nav|app-desktop-rail/);
 });
 
 test('profile theme uses an iOS-style switch', () => {
@@ -169,7 +168,7 @@ test('shared mobile nav provides a moving Liquid Glass lens and adaptive interac
 });
 
 test('all authenticated mobile destinations load the shared Liquid Glass assets', () => {
-  for (const page of ['home.html','profile.html','manga.html','video.html','reader.html','video-player.html']) {
+  for (const page of ['home.html','profile.html','manga.html','video.html','video-player.html']) {
     const source = read(page);
     assert.match(source, /mobile-bottom-nav\.css\?v=20260925-instagram-drag-lock/, page);
     assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-drag-lock/, page);
@@ -180,12 +179,7 @@ test('all authenticated mobile destinations load the shared Liquid Glass assets'
 });
 
 
-test('mobile reader route owns the remaining viewport instead of inheriting the desktop route offset', () => {
-  const css = read('home-profile-shell.css');
-  assert.match(css, /\.homeShell\.reader-route\[data-reader-route="reader"\]\{/);
-  assert.match(css, /\.homeShell\.reader-route\[data-reader-route="reader"\] > #routeContent\{/);
-  assert.match(css, /padding-top:0 !important/);
-  assert.match(css, /padding-bottom:0 !important/);
-  assert.match(css, /flex:1 1 auto/);
-  assert.match(css, /#routeContent > #app\{[\s\S]*position:absolute[\s\S]*inset:0[\s\S]*height:100% !important/);
+test('reader is excluded from the app navigation shells', () => {
+  const reader = read('reader.html');
+  assert.doesNotMatch(reader, /home-profile-shell|home-profile-spa|mobile-bottom-nav|app-desktop-rail/);
 });

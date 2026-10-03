@@ -1,20 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import vm from 'node:vm';
 
-const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
+const source = fs.readFileSync(new URL('../reader-runtime.js', import.meta.url), 'utf8');
 
-test('reader runtime owns and releases its global listeners during SPA cleanup', () => {
-  const reader = read('reader.html');
-  const spa = read('home-profile-spa.js');
-  assert.match(reader, /const readerGlobalListeners = \[\];/);
-  assert.match(reader, /function bindReaderGlobal\(/);
-  assert.match(reader, /window\.MangaReaderRuntimeCleanup = cleanupReaderGlobalListeners/);
-  assert.match(reader, /bindReaderGlobal\(window,\s*'visibilitychange'/);
-  assert.match(reader, /bindReaderGlobal\(window,\s*'pagehide'/);
-  assert.match(reader, /bindReaderGlobal\(window,\s*'popstate'/);
-  assert.match(reader, /bindReaderGlobal\(window,\s*'hashchange'/);
-  assert.match(reader, /bindReaderGlobal\(document,\s*'click'/);
-  assert.match(reader, /bindReaderGlobal\(document,\s*'keydown'/);
-  assert.match(spa, /if\(typeof window\.MangaReaderRuntimeCleanup==='function'\)window\.MangaReaderRuntimeCleanup\(\);/);
+test('reader runtime exposes a frozen item-scoped lifecycle and closes without shelf runtime state', () => {
+  const context = { self: {}, console };
+  vm.runInNewContext(source, context);
+  const factory = context.self.ReaderRuntimeFactory;
+  assert.ok(Object.isFrozen(factory));
+  assert.deepEqual(Object.keys(factory), ['create', 'parseSequentialSource', 'numberedPageUrl']);
+  assert.match(source, /function close\(\)[\s\S]*location\.replace\('manga\.html'\)/);
+  assert.doesNotMatch(source, /MangaList|savedFolders|bookshelfPage|shelfSearchQuery/);
 });

@@ -2,23 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const reader = fs.readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
+const route = fs.readFileSync(new URL('../manga-list-route.js', import.meta.url), 'utf8');
 const card = fs.readFileSync(new URL('../manga-list-card.js', import.meta.url), 'utf8');
 const viewModel = fs.readFileSync(new URL('../manga-list-view-model.js', import.meta.url), 'utf8');
 const runtime = fs.readFileSync(new URL('../manga-list-runtime.js', import.meta.url), 'utf8');
 
 test('reorder mode preserves the savedItems-derived display order instead of re-sorting it', () => {
   assert.match(viewModel, /if \(!reorderMode\)\s*\{\s*if \(sort === 'title-asc'\)/);
-  assert.match(reader, /MangaListViewModel\.derive\(/);
+  assert.match(route, /deriveViewModel: \(input\) => MangaListViewModel\.derive\(input\)/);
 });
 
 test('moveItemInList swaps only adjacent saved items and persists the result', () => {
-  assert.match(reader, /function moveItemInList\(item, list, direction\)/);
-  assert.match(reader, /const idx = list\.indexOf\(item\);/);
-  assert.match(reader, /const swapIdx = idx \+ direction;/);
-  assert.match(reader, /savedItems\[realIdxA\] = other;/);
-  assert.match(reader, /savedItems\[realIdxB\] = item;/);
-  assert.match(reader, /persistAll\(\);\s*renderSavedList\(\);/);
+  assert.match(route, /const moveItemInList = \(item, list, direction\)/);
+  assert.match(route, /const index = list\.indexOf\(item\)/);
+  assert.match(route, /host\.persistAll\(\); renderList\(\);/);
 });
 
 test('reorder controls and manga card boundary remain unchanged', () => {
@@ -28,9 +25,10 @@ test('reorder controls and manga card boundary remain unchanged', () => {
 });
 
 test('manual ordering fix does not change storage or video ownership boundaries', () => {
-  assert.match(reader, /const SAVED_ITEMS_KEY\s*=\s*['"]mangaReaderSavedItems['"]/);
-  assert.match(reader, /savePayload:\s*\(payload\) => MangaVault\.savePayload\(payload\)/);
-  assert.match(reader, /const buildSyncPayload = \(\) => mangaListHostRuntime\.buildSyncPayload\(\);/);
-  assert.match(reader, /scheduleCloudSync\(\)/);
-  assert.match(reader, /persistItems\(\)/);
+  assert.match(route, /savedItems: 'mangaReaderSavedItems'/);
+  assert.match(route, /savePayload: \(payload\) => windowRef\.MangaVault\.savePayload\(payload\)/);
+  assert.match(route, /host\.persistAll\(\)/);
+  assert.match(route, /scheduleCloudSync: host\.scheduleCloudSync/);
+  assert.match(route, /persistItems: host\.persistItems/);
+  assert.doesNotMatch(fs.readFileSync(new URL('../reader.html', import.meta.url), 'utf8'), /manga-list-runtime|MangaListViewModel/);
 });
