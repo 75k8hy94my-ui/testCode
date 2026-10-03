@@ -1303,8 +1303,22 @@ window.MangaReaderBootPromise = (async () => {
   const sessionKey = 'mangaReaderSupabaseSession';
   const loginUrl = 'index.html';
   const vaultUrl = 'sync.html';
+  const AUTH_REFRESH_TIMEOUT_MS = 5000;
   const showLogin = () => window.location.replace(loginUrl);
   const showVault = () => window.location.replace(vaultUrl);
+  async function ensureReaderSession() {
+    let timer = null;
+    try {
+      return await Promise.race([
+        MangaVault.ensureSession(),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('session check timed out')), AUTH_REFRESH_TIMEOUT_MS);
+        }),
+      ]);
+    } finally {
+      if (timer !== null) clearTimeout(timer);
+    }
+  }
   try {
     const session = JSON.parse(localStorage.getItem(sessionKey) || 'null');
     const config = window.MANGA_READER_SUPABASE || {};
@@ -1325,7 +1339,7 @@ window.MangaReaderBootPromise = (async () => {
       return false;
     }
     try {
-      await MangaVault.ensureSession();
+      await ensureReaderSession();
     } catch (error) {
       if (typeof MangaVault.isSessionAuthError === 'function' && MangaVault.isSessionAuthError(error)) {
         MangaVault.saveSession(null);
