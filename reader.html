@@ -1273,7 +1273,7 @@
 <script src="supabase-config.js"></script>
 <script src="vault-session.js?v=20261003-session-lock"></script>
 <script src="browser-storage.js"></script>
-<script src="reader-target.js?v=20260926-item-identity"></script>
+<script src="reader-target.js?v=20261003-reader-launch-contract"></script>
 <script src="vault-payload.js"></script>
 <script src="image-compression-profile.js"></script>
 <script src="image-pyramid-builder.js"></script>
@@ -1299,34 +1299,50 @@
 <script src="feature-flags.js"></script>
 <script src="recommendations.js?v=20260916-vpn-loader"></script>
 <script>
-(async () => {
+window.MangaReaderBootPromise = (async () => {
   const sessionKey = 'mangaReaderSupabaseSession';
   const loginUrl = 'index.html';
   const vaultUrl = 'sync.html';
-  const AUTH_REFRESH_TIMEOUT_MS = 5000;
   const showLogin = () => window.location.replace(loginUrl);
+  const showVault = () => window.location.replace(vaultUrl);
   try {
     const session = JSON.parse(localStorage.getItem(sessionKey) || 'null');
     const config = window.MANGA_READER_SUPABASE || {};
-    if (!session || !session.refresh_token || !config.url || !config.publishableKey) { showLogin(); return; }
-    if (!window.MangaVault) { window.location.replace(vaultUrl); return; }
+    if (!session || !session.refresh_token || !config.url || !config.publishableKey) {
+      showLogin();
+      return false;
+    }
+    if (!window.MangaVault) {
+      showVault();
+      return false;
+    }
     let activeVault = MangaVault.loadActive();
-    if (!activeVault && typeof MangaVault.waitForActive === 'function') activeVault = await MangaVault.waitForActive(2500);
-    if (!activeVault) { window.location.replace(vaultUrl); return; }
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), AUTH_REFRESH_TIMEOUT_MS);
-    fetch(config.url + '/auth/v1/token?grant_type=refresh_token', {
-      method: 'POST', headers: { apikey: config.publishableKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: session.refresh_token }),
-      signal: controller.signal
-    }).then(async (response) => {
-      if (!response.ok) throw new Error('session expired');
-      localStorage.setItem(sessionKey, JSON.stringify(await response.json()));
-      document.documentElement.classList.remove('auth-pending');
-    }).catch(() => { localStorage.removeItem(sessionKey); showLogin(); }).finally(() => clearTimeout(timer));
-  } catch (_) { localStorage.removeItem(sessionKey); showLogin(); }
+    if (!activeVault && typeof MangaVault.waitForActive === 'function') {
+      activeVault = await MangaVault.waitForActive(2500);
+    }
+    if (!activeVault) {
+      showVault();
+      return false;
+    }
+    try {
+      await MangaVault.ensureSession();
+    } catch (error) {
+      if (typeof MangaVault.isSessionAuthError === 'function' && MangaVault.isSessionAuthError(error)) {
+        MangaVault.saveSession(null);
+      }
+      showLogin();
+      return false;
+    }
+    document.documentElement.classList.remove('auth-pending');
+    return true;
+  } catch (_) {
+    try { localStorage.removeItem(sessionKey); } catch (_) {}
+    showLogin();
+    return false;
+  }
 })();
 </script>
+
 <div id="app">
   <div id="readProgressBar"></div>
   <div id="topbar">
@@ -1575,7 +1591,7 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="manga-list-view-model.js?v=20260921-view-model-self"></script>
 <script src="manga-list-renderer.js?v=20260921-renderer"></script>
 <script src="manga-list-runtime-context.js?v=20260922-runtime-context"></script>
-<script src="manga-list-host-runtime.js?v=20260926-item-reader-route-v2"></script>
+<script src="manga-list-host-runtime.js?v=20261003-reader-launch-contract"></script>
 <script src="manga-list-runtime.js?v=20260926-item-cover-identity"></script>
 <script src="manga-list-controller.js?v=20260921-controller-factory"></script>
 <script src="manga-surface-activation.js?v=20260921-surface-activation"></script>
@@ -1591,7 +1607,9 @@ https://cdn.example.org/c/003.webp"></textarea>
 <script src="manga-list-bulk-events.js?v=20260921-bulk-events"></script>
 
 <script>
-(function () {
+(async function () {
+  const readerBootReady = await (window.MangaReaderBootPromise || Promise.resolve(true));
+  if (!readerBootReady) return;
   const readerGlobalListeners = [];
   function bindReaderGlobal(target, type, handler, options) {
     target.addEventListener(type, handler, options);
@@ -2278,6 +2296,7 @@ https://cdn.example.org/c/003.webp"></textarea>
       readerUrl: 'reader.html',
       writeStorage: (key, value) => localStorage.setItem(key, value),
       buildReaderUrl: (itemId, base) => MangaReaderTarget.buildReaderUrl(itemId, base),
+      prepareLaunch: (item) => MangaReaderTarget.prepareLaunch(item, sessionStorage),
       navigate: (url) => location.assign(url),
     },
   });
@@ -7044,7 +7063,18 @@ https://cdn.example.org/c/003.webp"></textarea>
   const routeItemId = window.MangaReaderTarget ? MangaReaderTarget.itemIdFromLocation(location) : '';
 
   if (routeItemId) {
-    const item = savedItems.find((entry) => entry && String(entry.id) === routeItemId);
+    let item = savedItems.find((entry) => entry && String(entry.id) === routeItemId);
+    if (window.MangaReaderTarget) {
+      const launchItem = MangaReaderTarget.consumeLaunch(routeItemId, sessionStorage);
+      if (!item && launchItem) {
+        // The bookshelf checkpoints savedItems before navigation, so this is a
+        // recovery path only. Keep the recovered item in the live array so
+        // reader-side metadata updates remain persistable.
+        item = launchItem;
+        savedItems.push(item);
+        MangaReaderStorage.safeWriteJson(SAVED_ITEMS_KEY, savedItems);
+      }
+    }
     if (item) {
       if (window.MangaReaderTarget) MangaReaderTarget.persistItemTarget(item.id, localStorage);
       openItem(item, false);
