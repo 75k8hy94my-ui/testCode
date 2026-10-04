@@ -56,11 +56,11 @@ class FakeElement {
 }
 
 function fakeDom() {
-  const revoked = []; let serial = 0;
+  const revoked = []; const created = []; let serial = 0;
   const listeners = new Map();
-  globalThis.document = { createElement: (tag) => new FakeElement(tag), addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: (name) => listeners.delete(name), dispatchEvent: (event) => listeners.get(event.type)?.(event) };
+  globalThis.document = { createElement: (tag) => { const element = new FakeElement(tag); created.push(element); return element; }, addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: (name) => listeners.delete(name), dispatchEvent: (event) => listeners.get(event.type)?.(event) };
   globalThis.URL = { createObjectURL: () => `blob:test-${++serial}`, revokeObjectURL: (url) => revoked.push(url) };
-  return { revoked };
+  return { revoked, created };
 }
 
 test('renderer loads preview, keeps it during tile failures, and revokes URLs on destroy', async () => {
@@ -73,6 +73,65 @@ test('renderer loads preview, keeps it during tile failures, and revokes URLs on
   reader.setScale(2); await new Promise((resolve) => setTimeout(resolve, 220));
   assert.ok(reader.getState().scale > 1); assert.ok(reader.getState());
   const previewUrl = 'blob:test-1'; reader.destroy(); assert.ok(urls.revoked.includes(previewUrl));
+});
+
+test('encrypted renderer exposes ready only after preview load and decode complete', async () => {
+  fakeDom();
+  const container = new FakeElement('section');
+  const reader = createEncryptedAssetReader({ container, sync: { loadDecryptedObject: async () => new Uint8Array([1]), loadEncryptedObject: async () => new Uint8Array([1]) }, settings: { load: () => ({ networkMode: 'data-saver' }), SAVER_NETWORK_MODE: 'data-saver', STANDARD_NETWORK_MODE: 'standard' }, remoteAccess: { recordPartialSavings() {} }, crypto: { encryptedAssetByteLength: (n) => n, tileObjectId: () => 'tile' }, assetId: 'a', revision: 1, manifest: manifest() });
+  reader.mount();
+  const viewport = container.children[0]; const preview = viewport.children[0].children[0];
+  let ready = false; reader.readyPromise.then(() => { ready = true; });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(ready, false);
+  preview.naturalWidth = 1024; preview.naturalHeight = 768; preview.decode = () => Promise.resolve();
+  preview.listeners.get('load')();
+  await reader.readyPromise;
+  assert.equal(ready, true);
+  reader.destroy();
+});
+
+test('encrypted preview decode failure rejects readiness', async () => {
+  fakeDom();
+  const container = new FakeElement('section');
+  const reader = createEncryptedAssetReader({ container, sync: { loadDecryptedObject: async () => new Uint8Array([1]), loadEncryptedObject: async () => new Uint8Array([1]) }, settings: { load: () => ({ networkMode: 'data-saver' }), SAVER_NETWORK_MODE: 'data-saver', STANDARD_NETWORK_MODE: 'standard' }, remoteAccess: { recordPartialSavings() {} }, crypto: { encryptedAssetByteLength: (n) => n, tileObjectId: () => 'tile' }, assetId: 'a', revision: 1, manifest: manifest() });
+  reader.mount();
+  await new Promise((resolve) => setImmediate(resolve));
+  const preview = container.children[0].children[0].children[0];
+  preview.naturalWidth = 1024; preview.naturalHeight = 768; preview.decode = () => Promise.reject(new Error('bad decode'));
+  preview.listeners.get('load')();
+  await assert.rejects(reader.readyPromise, /bad decode/);
+  reader.destroy();
+});
+
+test('encrypted preview loader deduplicates decrypt/decode, caches ready resources, retries failure, and evicts old previews', async () => {
+  const urls = fakeDom(); const loader = readerApi.createPreviewLoader({ maxEntries: 2 }); let fetches = 0;
+  const options = (assetId) => ({ assetId, revision: 1, manifest: manifest(), sync: { loadDecryptedObject: async () => { fetches++; return new Uint8Array([1]); } }, crypto: { encryptedAssetByteLength: (n) => n } });
+  async function ready(optionsValue, decode = () => Promise.resolve()) {
+    const first = loader.load(optionsValue); const duplicate = loader.load(optionsValue);
+    assert.equal(first, duplicate);
+    await new Promise((resolve) => setImmediate(resolve));
+    const image = urls.created.at(-1); image.naturalWidth = 1024; image.naturalHeight = 768; image.decode = decode;
+    image.listeners.get('load')();
+    return first;
+  }
+  const a = await ready(options('a'));
+  const aUrl = a.url;
+  assert.equal((await loader.load(options('a'))).url, a.url);
+  assert.equal(fetches, 1);
+  await assert.rejects(ready(options('bad'), () => Promise.reject(new Error('decode failed'))), /decode failed/);
+  const retryOptions = options('bad');
+  const retried = loader.retry(retryOptions);
+  await new Promise((resolve) => setImmediate(resolve));
+  const retryImage = urls.created.at(-1); retryImage.naturalWidth = 1024; retryImage.naturalHeight = 768; retryImage.decode = () => Promise.resolve(); retryImage.listeners.get('load')();
+  await retried;
+  const c = await ready(options('c'));
+  const cUrl = c.url;
+  assert.equal(loader.snapshot().length, 2);
+  assert.equal(loader.snapshot().some((entry) => entry.key === 'a:1'), false);
+  assert.ok(urls.revoked.includes(aUrl));
+  loader.destroy();
+  assert.ok(urls.revoked.includes(cUrl));
 });
 
 test('renderer uses injected estimated bytes and does not request HQ at scale one', async () => {

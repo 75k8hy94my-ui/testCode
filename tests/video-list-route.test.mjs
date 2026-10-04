@@ -25,7 +25,7 @@ test('video route loads its existing video modules without fetching reader.html'
   assert.match(spa, /video-routing-fix\.js\?v=20260918-video-routing-no-window/);
   assert.match(spa, /video-thumbnail-time\.js\?v=20260916-video-thumbnail/);
   assert.match(spa, /else if\(route==='video'\)renderVideo\(generation\)/);
-  assert.match(spa, /else if\(route==='reader'\)renderReader\(\)/);
+  assert.doesNotMatch(spa, /route==='reader'|renderReader|reader\.html|iframe/);
   assert.match(spa, /if\(!SPA_PAGES\.includes\(name\)\)\{location\.href=target\.href;return;\}/);
   const renderVideo = spa.slice(spa.indexOf('async function renderVideo'), spa.indexOf('async function renderManga'));
   assert.doesNotMatch(renderVideo, /fetch\('reader\.html/);

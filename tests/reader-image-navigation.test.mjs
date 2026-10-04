@@ -6,6 +6,10 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const imageLoaderFactory = require('../reader-image-loader.js');
+const lifecycleFactory = require('../reader-lifecycle.js');
+const transitionFactory = require('../reader-page-transition.js');
+const pageSourceFactory = require('../reader-page-source.js');
+const progressRepositoryFactory = require('../reader-progress-repository.js');
 const runtimeContext = { self: {}, console, URL };
 vm.runInNewContext(fs.readFileSync(new URL('../reader-runtime.js', import.meta.url), 'utf8'), runtimeContext);
 const runtimeFactory = runtimeContext.self.ReaderRuntimeFactory;
@@ -69,7 +73,17 @@ function fixture({ item = null, vertical = false } = {}) {
   const document = { body, getElementById(id) { return elements[id] || null; }, createElement(tag) { return new FakeElement(tag); }, createDocumentFragment() { return new FakeFragment(); } };
   const values = new Map(vertical ? [['mangaReaderVerticalScroll', '1']] : []);
   const localStorage = { getItem(key) { return values.get(key) ?? null; }, setItem(key, value) { values.set(key, String(value)); } };
-  const window = { Image: ControlledImage, ReaderImageLoaderFactory: imageLoaderFactory, localStorage, location: { href: 'https://reader.test/reader.html?item=book' }, innerWidth: 1200, addEventListener() {}, prompt() {}, URL };
+  const encryptedReadiness = [];
+  const window = { Image: ControlledImage, ReaderImageLoaderFactory: imageLoaderFactory, ReaderLifecycleFactory: lifecycleFactory, ReaderPageTransitionFactory: transitionFactory, ReaderPageSourceFactory: pageSourceFactory, ReaderProgressRepositoryFactory: progressRepositoryFactory, localStorage, location: { href: 'https://reader.test/reader.html?item=book' }, innerWidth: 1200, addEventListener() {}, prompt() {}, URL,
+    MangaVault: { loadActive: () => ({ rawKey: 'vault-key' }) }, MANGA_READER_SUPABASE: {},
+    EncryptedAssetItem: { encryptedAssetPagesForItem: (value) => value.encryptedAssets.pages },
+    EncryptedAssetStorage: { createStorageTransport: () => ({}) }, EncryptedAssetCache: { createCache: () => Promise.resolve({}) },
+    EncryptedAssetReader: {
+      createPreviewLoader() { const values = new Map(); return { keyFor: (options) => `${options.assetId}:${options.revision}`, retain() {}, load: async (options) => { const key = `${options.assetId}:${options.revision}`; if (!values.has(key)) values.set(key, { url: `blob:${key}` }); return values.get(key); }, retry: async (options) => { const key = `${options.assetId}:${options.revision}`; values.set(key, { url: `blob:${key}` }); return values.get(key); }, destroy() { values.clear(); }, snapshot() { return []; } }; },
+      createEncryptedAssetReader(options) { let resolve, reject; const readyPromise = new Promise((a, b) => { resolve = a; reject = b; }); const state = { assetId: options.assetId, host: options.container, readyPromise, resolve, reject, destroyed: 0, mount() { return this; }, destroy() { this.destroyed++; } }; encryptedReadiness.push(state); return state; },
+    },
+    EncryptedAssetSync: {}, ImageTransferSettings: {}, ImageRemoteAccess: {}, EncryptedAssetCrypto: {}, MangaReaderMediaAccess: {},
+  };
   const storedItem = item || { id: 'book', title: 'Test book', pages: Array.from({ length: 6 }, (_, index) => `https://img.test/${index + 1}.jpg`) };
   const repository = {
     loadItem(id) { return id === storedItem.id ? storedItem : null; },
@@ -78,7 +92,7 @@ function fixture({ item = null, vertical = false } = {}) {
     findNextVolume() { return null; }, scheduleSync() {},
   };
   const runtime = runtimeFactory.create({ repository, target: { consumeLaunch() { return null; }, itemResumeKey: (id) => `item:${id}`, buildReaderUrl: (id) => `reader.html?item=${id}` }, sessionStorage: { getItem() { return null; }, setItem() {} }, location: { replace() {} }, document, window });
-  return { runtime, elements, storedItem, window };
+  return { runtime, elements, storedItem, window, values, encryptedReadiness };
 }
 
 async function findImage(suffix) {
@@ -203,4 +217,61 @@ test('vertical mode shares decoded resources while keeping a scroll-list page mo
   assert.equal(elements.pageLabel.textContent, '2 / 6');
   assert.equal(elements.pageStage.children[1].firstChild, second);
   runtime.close();
+});
+
+test('encrypted pages preserve the old frame, page and progress until preview ready; stale previews cannot commit', async () => {
+  const pages = Array.from({ length: 5 }, (_, index) => ({ assetId: `encrypted-${index + 1}`, revision: 1, manifest: { schemaVersion: 1 } }));
+  const { runtime, elements, values, encryptedReadiness } = fixture({ item: { id: 'encrypted-book', title: 'Encrypted', encryptedAssets: { pages } } });
+  const opening = runtime.start('encrypted-book');
+  while (encryptedReadiness.length < 1) await new Promise((resolve) => setImmediate(resolve));
+  const first = encryptedReadiness[0];
+  assert.equal(elements.pageStage.children.length, 0);
+  first.resolve();
+  await opening;
+  const firstFrame = elements.pageStage.children[0];
+  assert.equal(runtime.getPageState().displayedPage, 1);
+
+  const secondRequest = runtime.goTo(2);
+  while (encryptedReadiness.length < 2) await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(elements.pageStage.children[0], firstFrame);
+  assert.equal(elements.pageLabel.textContent, '1 / 5');
+  assert.equal(JSON.parse(values.get('mangaReaderLastPage'))['item:encrypted-book'].page, 1);
+  encryptedReadiness[1].resolve();
+  assert.equal(await secondRequest, true);
+  assert.equal(elements.pageLabel.textContent, '2 / 5');
+  assert.equal(JSON.parse(values.get('mangaReaderLastPage'))['item:encrypted-book'].page, 2);
+
+  const olderRequest = runtime.goTo(3);
+  while (encryptedReadiness.length < 3) await new Promise((resolve) => setImmediate(resolve));
+  const latestRequest = runtime.goTo(5);
+  while (encryptedReadiness.length < 4) await new Promise((resolve) => setImmediate(resolve));
+  encryptedReadiness[3].resolve();
+  assert.equal(await latestRequest, true);
+  encryptedReadiness[2].resolve();
+  assert.equal(await olderRequest, false);
+  assert.equal(runtime.getPageState().displayedPage, 5);
+  assert.equal(elements.pageLabel.textContent, '5 / 5');
+  assert.equal(JSON.parse(values.get('mangaReaderLastPage'))['item:encrypted-book'].page, 5);
+});
+
+test('encrypted failure keeps progress and frame, and the retry control can commit after readiness', async () => {
+  const pages = Array.from({ length: 3 }, (_, index) => ({ assetId: `failed-${index + 1}`, revision: 1, manifest: { schemaVersion: 1 } }));
+  const { runtime, elements, values, encryptedReadiness } = fixture({ item: { id: 'retry-encrypted', encryptedAssets: { pages } } });
+  const opening = runtime.start('retry-encrypted');
+  while (encryptedReadiness.length < 1) await new Promise((resolve) => setImmediate(resolve));
+  encryptedReadiness[0].resolve(); await opening;
+  const visible = elements.pageStage.children[0];
+  const request = runtime.goTo(2);
+  while (encryptedReadiness.length < 2) await new Promise((resolve) => setImmediate(resolve));
+  encryptedReadiness[1].reject(new Error('preview failed'));
+  assert.equal(await request, false);
+  assert.equal(elements.pageStage.children[0], visible);
+  assert.equal(elements.pageLabel.textContent, '1 / 3');
+  assert.equal(JSON.parse(values.get('mangaReaderLastPage'))['item:retry-encrypted'].page, 1);
+  elements.retryPageBtn.dispatch('click');
+  while (encryptedReadiness.length < 3) await new Promise((resolve) => setImmediate(resolve));
+  encryptedReadiness[2].resolve();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(elements.pageLabel.textContent, '2 / 3');
+  assert.equal(JSON.parse(values.get('mangaReaderLastPage'))['item:retry-encrypted'].page, 2);
 });

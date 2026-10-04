@@ -5,7 +5,6 @@ import fs from 'node:fs';
 
 const source = fs.readFileSync('manga-list-template.js', 'utf8');
 const route = fs.readFileSync('manga-list-route.js', 'utf8');
-const sharedTemplate = fs.readFileSync('reader-saved-list-template.js', 'utf8');
 
 function loadTemplate() {
   const context = {};
@@ -70,8 +69,4 @@ test('individual add opens the encrypted image import form and connects the encr
 test('manga route mounts the manga template and Reader has no shelf template dependency', () => {
   assert.match(route, /manga-list-template\.js\?v=/);
   assert.doesNotMatch(fs.readFileSync('reader.html', 'utf8'), /manga-list-template|reader-saved-list-template/);
-  assert.equal((sharedTemplate.match(/MangaListTemplate\.createMarkup\(\)/g) || []).length, 1);
-  assert.equal((sharedTemplate.match(/id="mangaListSection"/g) || []).length, 0);
-  assert.match(sharedTemplate, /id="videoListSection"/);
-  assert.match(sharedTemplate, /document\.body\.insertAdjacentHTML/);
 });

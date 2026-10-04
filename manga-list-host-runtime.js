@@ -30,7 +30,7 @@
     'setTimer',
     'clearTimer',
   ];
-  const NAVIGATION_FUNCTION_NAMES = ['writeStorage', 'navigate', 'buildReaderUrl', 'prepareLaunch'];
+  const NAVIGATION_FUNCTION_NAMES = ['navigate', 'buildReaderUrl'];
 
   function create(deps) {
     if (!deps || typeof deps !== 'object' || Array.isArray(deps)) {
@@ -77,7 +77,7 @@
         throw new TypeError('MangaListHostRuntimeFactory requires navigation function: ' + name);
       }
     }
-    for (const name of ['lastUrlKey', 'readerUrl']) {
+    for (const name of ['readerUrl']) {
       if (typeof deps.navigation[name] !== 'string' || !deps.navigation[name]) {
         throw new TypeError('MangaListHostRuntimeFactory requires navigation value: ' + name);
       }
@@ -206,14 +206,6 @@
       const checkpointed = deps.safeWriteJson(deps.keys.savedItems, deps.getState().savedItems);
       if (checkpointed === false) throw new Error('本棚の状態を保存できませんでした。');
 
-      // A short-lived sessionStorage handoff gives the destination document a
-      // recovery copy of the exact item selected. The URL still carries only
-      // the stable item id; the handoff is never a durable identity source.
-      deps.navigation.prepareLaunch(item);
-      deps.navigation.writeStorage(
-        deps.navigation.lastUrlKey,
-        JSON.stringify({ kind: 'item', itemId }),
-      );
       // The saved-item id is the canonical reader identity. Page/base URLs are
       // source locations and may be shared, replaced, or reordered; they must
       // never be used as the route identity for a saved manga.

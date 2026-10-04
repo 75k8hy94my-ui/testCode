@@ -1,46 +1,12 @@
 (() => {
   'use strict';
 
-  function parseSequentialSource(url, item = {}, baseHref = 'https://reader.invalid/') {
-    const source = String(url || '').trim();
-    if (!source) return null;
-    try {
-      const parsed = new URL(source, baseHref);
-      if (!['http:', 'https:'].includes(parsed.protocol)) return null;
-      const match = parsed.pathname.match(/^(.*\/)([^/]*?)(\d+)([^/]*)\.([a-z0-9]+)$/i);
-      let width = Math.max(1, Number(item.numberWidth) || Number(item.pagePattern?.width) || 1);
-      let pattern = item.pagePattern || null;
-      if (match) {
-        width = Math.max(width, match[3].length);
-        let prefix = match[2];
-        if (!match[4] && match[3].length >= 7 && /[^0-9]/.test(prefix)) {
-          prefix += match[3].slice(0, -3);
-          width = 3;
-        }
-        if (!pattern && (prefix || match[4])) pattern = { prefix, suffix: match[4], width };
-        parsed.pathname = match[1];
-      } else {
-        parsed.pathname = parsed.pathname.endsWith('/') ? parsed.pathname : `${parsed.pathname}/`;
-      }
-      parsed.search = '';
-      parsed.hash = '';
-      return { base: parsed.href, pattern, width };
-    } catch (_) { return null; }
-  }
-
-  function numberedPageUrl(source, number, extension) {
-    const formatted = String(number).padStart(source.width, '0');
-    return source.pattern
-      ? `${source.base}${source.pattern.prefix || ''}${formatted}${source.pattern.suffix || ''}.${extension}`
-      : `${source.base}${formatted}.${extension}`;
-  }
-
   function create(dependencies = {}) {
-    const { repository, target, sessionStorage, location } = dependencies;
+    const { repository, target, location } = dependencies;
     for (const [name, value] of Object.entries({ repository, target, location })) {
       if (!value) throw new TypeError(`reader runtime requires ${name}`);
     }
-    if (typeof repository.loadItem !== 'function' || typeof repository.saveItem !== 'function' || typeof target.consumeLaunch !== 'function' || typeof location.replace !== 'function') {
+    if (typeof repository.loadItem !== 'function' || typeof repository.saveItem !== 'function' || typeof location.replace !== 'function') {
       throw new TypeError('reader runtime dependencies are incomplete');
     }
 
@@ -53,29 +19,26 @@
       const savedItem = repository.loadItem(id);
       if (savedItem && String(savedItem.id) === id) return { item: savedItem, source: 'saved-items' };
 
-      const launchItem = target.consumeLaunch(id, sessionStorage);
-      if (launchItem && String(launchItem.id) === id) {
-        repository.saveItem(launchItem);
-        return { item: launchItem, source: 'launch-handoff' };
-      }
-
       location.replace('manga.html');
       return null;
     }
 
     function close() {
-      navigationGeneration++;
-      try { imageLoader?.destroy?.(); } catch (_) {}
-      if (isEmbeddedInShell()) {
-        win.parent.postMessage({ type: 'manga-reader:close' }, win.location.origin);
-        return;
-      }
+      persistPage();
+      destroy();
       location.replace('manga.html');
     }
 
-    function isEmbeddedInShell() {
-      try { return new URL(win.location.href).searchParams.get('spa') === '1' && win.parent !== win && typeof win.parent.postMessage === 'function'; }
-      catch (_) { return false; }
+    function destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      navigationGeneration += 1;
+      verticalWindowGeneration += 1;
+      pageTransition?.destroy();
+      try { encryptedRenderer?.destroy?.(); } catch (_) {}
+      encryptedRenderer = null;
+      lifecycle?.destroy();
+      try { dependencies.onDestroy?.(); } catch (_) {}
     }
 
     async function start(itemId) {
@@ -101,16 +64,42 @@
     let generation = 0;
     let encryptedRenderer = null;
     let encryptedAssetCachePromise = null;
+    let encryptedPreviewLoader = null;
     let vertical = false;
     let split = false;
     let imageEnhanceEnabled = true;
-    const extensionCandidates = ['jpg', 'jpeg', 'png', 'webp'];
+    let destroyed = false;
+    let lifecycle = null;
+    let pageTransition = null;
+    let progressRepository = dependencies.progressRepository || null;
+    let pageSource = dependencies.pageSource || null;
     const keyFor = (id) => target.itemResumeKey ? target.itemResumeKey(id) : `item:${id}`;
     const byId = (id) => doc.getElementById(id);
+    lifecycle = win?.ReaderLifecycleFactory?.create ? win.ReaderLifecycleFactory.create() : { listen: (node, event, fn, opts) => node?.addEventListener?.(event, fn, opts), cleanup: () => {}, own: (resource) => resource, timer: (id) => id, destroy() {} };
+    for (const resource of dependencies.lifecycleResources || []) lifecycle.own(resource);
+    if (!pageSource && win?.ReaderPageSourceFactory?.create) {
+      const legacyResolver = win.ReaderPageSourceFactory.createLegacyResolver({ probe: (url, { signal } = {}) => new Promise((resolve) => {
+        const image = new win.Image(); let timer;
+        const finish = (value) => { clearTimeout(timer); signal?.removeEventListener?.('abort', onAbort); image.onload = null; image.onerror = null; image.src = ''; resolve(value); };
+        const onAbort = () => finish(false);
+        if (signal?.aborted) { finish(false); return; }
+        signal?.addEventListener?.('abort', onAbort, { once: true });
+        image.onload = () => finish(image.naturalWidth > 0 && image.naturalHeight > 0);
+        image.onerror = () => finish(false);
+        timer = win.setTimeout(() => finish(false), 5000);
+        image.src = url;
+      }), baseHref: win.location?.href });
+      pageSource = win.ReaderPageSourceFactory.create({ legacyResolver });
+    }
+    pageTransition = win?.ReaderPageTransitionFactory?.create
+      ? win.ReaderPageTransitionFactory.create({ initialPage: page, commit: commitPreparedPage })
+      : null;
 
     function getImageLoader() {
+      if (imageLoader) lifecycle.own(imageLoader);
       if (!imageLoader && win?.ReaderImageLoaderFactory?.create && typeof win.Image === 'function') {
         imageLoader = win.ReaderImageLoaderFactory.create({ Image: win.Image, baseUrl: win.location?.href, maxEntries: 8, maxConcurrent: 3, timeoutMs: 15000 });
+        lifecycle.own(imageLoader);
       }
       if (!imageLoader) throw new Error('Reader画像ローダーを利用できません');
       return imageLoader;
@@ -130,43 +119,16 @@
       catch (_) { return {}; }
     }
     function resumePage(item) {
-      const key = keyFor(item.id);
-      const itemProgress = Number(item.readingProgress?.page);
-      const record = readMap('mangaReaderLastPage')[key];
-      const saved = Number(record?.page || itemProgress);
-      return Number.isInteger(saved) && saved > 0 && !record?.wasLast ? saved : 1;
+      if (!progressRepository && win.ReaderProgressRepositoryFactory?.create) progressRepository = win.ReaderProgressRepositoryFactory.create({ storage: win.localStorage, scheduleSync: () => repository.scheduleSync?.() });
+      const saved = progressRepository?.load(item.id, item);
+      return saved && !saved.wasLast ? saved.page : 1;
     }
     function persistPage(pageToPersist = page) {
-      if (!currentItem || !displayCount()) return;
-      const key = keyFor(currentItem.id);
-      const map = readMap('mangaReaderLastPage');
-      map[key] = { page: pageToPersist, wasLast: pageToPersist === displayCount(), savedAt: Date.now() };
-      try { win.localStorage.setItem('mangaReaderLastPage', JSON.stringify(map)); } catch (_) {}
-      const updated = repository.updateItem(currentItem.id, { readingProgress: { page: pageToPersist, updatedAt: Date.now() } });
-      if (updated) currentItem = updated;
+      if (currentItem && displayCount()) progressRepository?.commit(currentItem.id, pageToPersist, displayCount());
     }
     function revokeEncryptedRenderer() {
       if (encryptedRenderer) { try { encryptedRenderer.destroy(); } catch (_) {} }
       encryptedRenderer = null;
-    }
-    function numberedUrl(source, number, extension) {
-      return numberedPageUrl(source, number, extension);
-    }
-    async function imageLoads(url, timeout = 12000) {
-      const gate = win.MangaReaderMediaAccess;
-      if (gate?.getStatus && ['pending', 'checking'].includes(gate.getStatus()) && gate.checkVpn) {
-        try { await gate.checkVpn({ external: false }); } catch (_) {}
-      }
-      try { await getImageLoader().load(url, 20, timeout); return true; }
-      catch (_) { return false; }
-    }
-    async function resolvePage(number, source) {
-      const ordered = extensionCandidates;
-      for (const extension of ordered) {
-        const url = numberedUrl(source, number, extension);
-        if (await imageLoads(url, 5000)) return url;
-      }
-      return null;
     }
     function updateTocButton() {
       const list = readMap('mangaReaderToc')[keyFor(currentItem.id)] || [];
@@ -204,23 +166,15 @@
       const banner = byId('nextVolumeBanner');
       if (!banner) return;
       banner.hidden = !next || page !== displayCount();
+      const button = byId('nextVolumeBtn');
+      if (button) button.dataset.nextItemId = next ? String(next.id) : '';
       if (!next) return;
       const text = byId('nextVolumeText'); if (text) text.textContent = `次の巻: ${next.title || next.volume}`;
-      const button = byId('nextVolumeBtn'); if (button) button.onclick = () => {
-        if (isEmbeddedInShell()) {
-          win.parent.postMessage({ type: 'manga-reader:open-item', itemId: String(next.id) }, win.location.origin);
-          return;
-        }
-        let nextUrl = target.buildReaderUrl(next.id, 'reader.html');
-        try { if (new URL(win.location.href).searchParams.get('spa') === '1') { const url = new URL(nextUrl, win.location.href); url.searchParams.set('spa', '1'); nextUrl = url.href; } } catch (_) {}
-        location.replace(nextUrl);
-      };
     }
     function preparePageImage(image, pageNumber = page) {
       image.className = 'readerPageImage';
       image.alt = `ページ ${pageNumber}`;
       image.draggable = false;
-      image.onload = () => { if (imageEnhanceEnabled && !doc.body.classList.contains('safe-mode')) win.ReaderImageEnhancement?.enhanceElement(image, { documentRef: doc, windowRef: win }); };
       return image;
     }
     function restorePageEnhancements() {
@@ -237,15 +191,13 @@
       if (displayedUrl && !urls.includes(displayedUrl)) urls.push(displayedUrl);
       return urls;
     }
-    function renderOrdinaryPage(targetPage = requestedPage, navId = navigationGeneration, retry = false) {
-      revokeEncryptedRenderer();
+    function prepareOrdinaryPage(targetPage, retry = false) {
       const stage = byId('pageStage');
       const viewer = byId('viewer');
-      if (!stage || !viewer) return Promise.resolve(false);
-      if (vertical && !split) return renderVerticalPages(targetPage, navId);
+      if (!stage || !viewer) return Promise.reject(new Error('ページ表示領域がありません'));
       const sourceIndex = split ? Math.floor((targetPage - 1) / 2) : targetPage - 1;
       const url = pageUrls[sourceIndex];
-      if (!url) return Promise.resolve(false);
+      if (!url) return Promise.reject(new Error('ページ画像がありません'));
       const loader = getImageLoader();
       const displayedUrl = pageUrls[split ? Math.floor((page - 1) / 2) : page - 1];
       loader.retain([displayedUrl, url]);
@@ -253,41 +205,49 @@
       status(targetPage === page ? '' : 'ページを読み込み中…');
       const retryButton = byId('retryPageBtn'); if (retryButton) retryButton.hidden = true;
       const pendingImage = retry ? loader.retry(url, 1000) : loader.load(url, 1000);
-      return pendingImage.then((image) => {
-        if (navId !== navigationGeneration) return false;
-        const newFrame = doc.createElement('div');
-        newFrame.className = 'readerPageFrame';
+      return pendingImage.then(async (cachedImage) => {
+        // A split spread can request the second half of the same still-visible
+        // source image. Keep the old node in place until a decoded display node
+        // is ready for the next frame.
+        const image = cachedImage.isConnected ? cachedImage.cloneNode(false) : cachedImage;
+        if (image !== cachedImage) {
+          image.decoding = 'async';
+          if (typeof image.decode === 'function') await image.decode();
+          if (!(image.naturalWidth > 0) || !(image.naturalHeight > 0)) throw new Error('cached split image is not display-ready');
+        }
+        const frame = doc.createElement('div');
+        frame.className = 'readerPageFrame';
         const readyImage = preparePageImage(image, targetPage);
         if (split) {
           const crop = doc.createElement('div');
           crop.className = `spreadCrop ${targetPage % 2 ? 'spreadRight' : 'spreadLeft'}`;
           crop.appendChild(readyImage);
-          newFrame.appendChild(crop);
-        } else newFrame.appendChild(readyImage);
-        // One synchronous DOM replacement: the previous frame remains visible
-        // until this exact loader-owned, decoded image is ready to display.
-        restorePageEnhancements();
-        stage.replaceChildren(newFrame);
-        stage.classList.remove('vertical-scroll');
-        viewer.classList.remove('vertical-scroll');
-        page = targetPage;
-        requestedPage = targetPage;
-        lastFailedRequest = null;
-        if (retryButton) retryButton.hidden = true;
-        status('');
-        updateControls();
-        persistPage();
-        updateTocButton();
-        showNextVolume();
-        if (imageEnhanceEnabled && !doc.body.classList.contains('safe-mode')) win.ReaderImageEnhancement?.enhanceElement(readyImage, { documentRef: doc, windowRef: win });
-        return true;
-      }).catch((error) => {
-        if (navId !== navigationGeneration || error?.name === 'AbortError') return false;
-        lastFailedRequest = { page: targetPage, url };
-        status('画像を読み込めませんでした。表示中のページは維持されています。');
-        if (retryButton) retryButton.hidden = false;
-        return false;
+          frame.appendChild(crop);
+        } else frame.appendChild(readyImage);
+        return { ready: true, frame, image: readyImage, kind: 'ordinary' };
       });
+    }
+    function commitPreparedPage(targetPage, candidate) {
+      const stage = byId('pageStage');
+      const viewer = byId('viewer');
+      if (!stage || !viewer || !candidate?.frame) throw new Error('ページ表示領域がありません');
+      const previousRenderer = encryptedRenderer;
+      restorePageEnhancements();
+      stage.replaceChildren(candidate.frame);
+      stage.classList.remove('vertical-scroll');
+      viewer.classList.remove('vertical-scroll');
+      encryptedRenderer = candidate.renderer || null;
+      page = targetPage;
+      requestedPage = targetPage;
+      lastFailedRequest = null;
+      const retryButton = byId('retryPageBtn'); if (retryButton) retryButton.hidden = true;
+      status('');
+      updateControls();
+      persistPage();
+      updateTocButton();
+      showNextVolume();
+      if (candidate.image && imageEnhanceEnabled && !doc.body.classList.contains('safe-mode')) win.ReaderImageEnhancement?.enhanceElement(candidate.image, { documentRef: doc, windowRef: win });
+      if (previousRenderer && previousRenderer !== encryptedRenderer) previousRenderer.destroy();
     }
     function ensureVerticalWindow(centerPage, navId) {
       if (!verticalSlots.length || !vertical) return;
@@ -382,42 +342,84 @@
         return false;
       });
     }
-    function renderEncryptedPage() {
-      revokeEncryptedRenderer();
-      const stage = byId('pageStage');
-      if (!stage) return;
-      stage.replaceChildren();
-      const entry = encryptedPages[page - 1];
-      const host = doc.createElement('div'); host.className = 'encryptedAssetHost'; stage.appendChild(host);
+    function getEncryptedPreviewLoader() {
+      if (!encryptedPreviewLoader) {
+        encryptedPreviewLoader = win.EncryptedAssetReader.createPreviewLoader({ maxEntries: 4 });
+        lifecycle.own(encryptedPreviewLoader);
+      }
+      return encryptedPreviewLoader;
+    }
+    function encryptedPreviewOptions(entry) {
       const active = win.MangaVault?.loadActive?.();
-      if (!active?.rawKey) { status('保管庫を開いてください。'); return; }
+      if (!active?.rawKey) throw new Error('保管庫を開いてください。');
       const config = win.MANGA_READER_SUPABASE || {};
       const storage = win.EncryptedAssetStorage.createStorageTransport({ baseUrl: config.url, publishableKey: config.publishableKey });
-      const renderer = win.EncryptedAssetReader.createEncryptedAssetReader({
-        container: host, manifest: entry.manifest, assetId: entry.assetId, revision: entry.revision,
+      return {
+        manifest: entry.manifest, assetId: entry.assetId, revision: entry.revision,
         masterKey: active.rawKey, vault: win.MangaVault, storage, cache: (encryptedAssetCachePromise ||= win.EncryptedAssetCache.createCache()),
         mediaAccess: win.MangaReaderMediaAccess, sync: win.EncryptedAssetSync, settings: win.ImageTransferSettings,
         remoteAccess: win.ImageRemoteAccess, crypto: win.EncryptedAssetCrypto,
-        onPreviewError: (error) => status(error?.message || '暗号化ページを読み込めません。'),
+      };
+    }
+    async function prepareEncryptedPage(targetPage, retry = false) {
+      const entry = encryptedPages[targetPage - 1];
+      if (!entry) throw new Error('暗号化ページがありません');
+      const previewLoader = getEncryptedPreviewLoader();
+      const factory = win.ReaderImageLoaderFactory;
+      const direction = targetPage < page ? 'prev' : 'next';
+      const pagesToPreload = factory?.preloadWindow ? factory.preloadWindow(targetPage, encryptedPages.length, direction).slice(0, 3) : [targetPage, targetPage + (direction === 'prev' ? -1 : 1), targetPage - (direction === 'prev' ? -1 : 1)];
+      const retainedEntries = [...new Set([page, ...pagesToPreload])].map((number) => encryptedPages[number - 1]).filter(Boolean);
+      const optionsFor = (candidate) => encryptedPreviewOptions(candidate);
+      previewLoader.retain(retainedEntries.map((candidate) => previewLoader.keyFor(optionsFor(candidate))));
+      const previewOptions = optionsFor(entry);
+      const previewRequest = retry ? previewLoader.retry(previewOptions) : previewLoader.load(previewOptions);
+      for (const number of pagesToPreload) {
+        if (number === targetPage) continue;
+        const candidate = encryptedPages[number - 1];
+        if (candidate) previewLoader.load(optionsFor(candidate)).catch(() => {});
+      }
+      const previewResource = await previewRequest;
+      const host = doc.createElement('div'); host.className = 'encryptedAssetHost';
+      const options = optionsFor(entry);
+      const renderer = win.EncryptedAssetReader.createEncryptedAssetReader({
+        container: host, ...options, previewResource, previewResourceLoader: { load: async () => previewResource },
+        onPreviewError: () => {},
       });
-      encryptedRenderer = renderer;
       renderer.mount();
-      updateControls();
+      try { await renderer.readyPromise; }
+      catch (error) { renderer.destroy(); throw error; }
+      return { ready: true, frame: host, renderer, kind: 'encrypted', destroy: () => renderer.destroy() };
     }
     function renderPage(number = requestedPage, retry = false) {
-      if (encryptedPages.length) {
-        page = Math.max(1, Math.min(displayCount() || 1, Math.floor(Number(number) || 1)));
-        requestedPage = page;
-        navigationGeneration++;
-        renderEncryptedPage();
-        persistPage(); updateControls(); showNextVolume();
+      const targetPage = Math.max(1, Math.min(displayCount() || 1, Math.floor(Number(number) || 1)));
+      if (!retry && targetPage === page && !lastFailedRequest && byId('pageStage')?.firstChild) {
+        pageTransition?.invalidate();
+        navigationGeneration += 1;
+        requestedPage = targetPage;
+        status('');
         return Promise.resolve(true);
       }
-      const targetPage = Math.max(1, Math.min(displayCount() || 1, Math.floor(Number(number) || 1)));
       requestedPage = targetPage;
-      const navId = ++navigationGeneration;
       if (!retry) lastFailedRequest = null;
-      return renderOrdinaryPage(targetPage, navId, retry);
+      if (vertical && !split && !encryptedPages.length) {
+        pageTransition?.invalidate();
+        const navId = ++navigationGeneration;
+        return renderVerticalPages(targetPage, navId);
+      }
+      status(targetPage === page ? '' : 'ページを読み込み中…');
+      return pageTransition.request(targetPage, () => encryptedPages.length
+        ? prepareEncryptedPage(targetPage, retry)
+        : prepareOrdinaryPage(targetPage, retry))
+        .then((ready) => {
+          if (ready) return true;
+          if (pageTransition.getState().status === 'failed') {
+            const url = encryptedPages.length ? null : pageUrls[split ? Math.floor((targetPage - 1) / 2) : targetPage - 1];
+            lastFailedRequest = { page: targetPage, url };
+            status('画像を読み込めませんでした。表示中のページは維持されています。');
+            const retryButton = byId('retryPageBtn'); if (retryButton) retryButton.hidden = false;
+          }
+          return false;
+        });
     }
     function goTo(number) {
       if (!Number.isFinite(Number(number))) return;
@@ -425,8 +427,9 @@
     }
     function next() { if (requestedPage < displayCount()) goTo(requestedPage + 1); }
     function previous() { if (requestedPage > 1) goTo(requestedPage - 1); }
-    function bind(id, event, callback) { const node = byId(id); if (node) node.addEventListener(event, callback); }
+    function bind(id, event, callback, options) { const node = byId(id); if (node) lifecycle.listen(node, event, callback, options); }
     function bindControls() {
+      lifecycle.listen(win, 'pagehide', destroy);
       bind('closeBtn', 'click', close);
       bind('prevBtn', 'click', previous); bind('nextBtn', 'click', next);
       bind('firstBtn', 'click', () => goTo(1)); bind('lastBtn', 'click', () => goTo(displayCount()));
@@ -455,7 +458,6 @@
             const chrome = byId(id); if (!chrome) return;
             chrome.setAttribute('aria-hidden', hidden ? 'true' : 'false'); chrome.inert = hidden;
           });
-          if (isEmbeddedInShell()) win.parent.postMessage({ type: 'manga-reader:chrome', hidden }, win.location.origin);
           return;
         }
         if (vertical) return;
@@ -474,7 +476,7 @@
           .sort((a, b) => b.rect.top - a.rect.top)[0] || visibleSlots[0];
         if (!currentSlot) return;
         const nextPage = Number(currentSlot.slot.dataset.page);
-        if (Number.isInteger(nextPage) && nextPage !== page) {
+        if (Number.isInteger(nextPage) && nextPage !== page && currentSlot.slot.firstChild) {
           page = nextPage;
           requestedPage = nextPage;
           navigationGeneration++;
@@ -485,7 +487,11 @@
         }
       }, { passive: true });
       bind('nextVolumeDismissBtn', 'click', () => { const banner = byId('nextVolumeBanner'); if (banner) banner.hidden = true; });
-      win.addEventListener('keydown', (event) => { if (event.key === 'ArrowRight' || event.key === ' ') next(); else if (event.key === 'ArrowLeft') previous(); });
+      bind('nextVolumeBtn', 'click', (event) => {
+        const itemId = event.currentTarget?.dataset?.nextItemId;
+        if (itemId) location.assign(target.buildReaderUrl(itemId, 'reader.html'));
+      });
+      lifecycle.listen(win, 'keydown', (event) => { if (event.key === 'ArrowRight' || event.key === ' ') next(); else if (event.key === 'ArrowLeft') previous(); });
       if (vertical) doc.body.classList.add('vertical-scroll');
       if (win.localStorage.getItem('mangaReaderSafeMode') === '1') doc.body.classList.add('safe-mode');
       imageEnhanceEnabled = win.localStorage.getItem('mangaReaderImageEnhance') !== '0';
@@ -515,43 +521,36 @@
         if (!encryptedPages.length) { status('暗号化ページがありません。'); return; }
         page = Math.min(page, encryptedPages.length);
         requestedPage = page;
-        await renderPage(page); showNextVolume(); return;
+        await renderPage(page); if (!destroyed) showNextVolume(); return;
       }
-      if (Array.isArray(item.pages) && item.pages.length) {
-        pageUrls = item.pages.slice();
-      } else {
-        const source = parseSequentialSource(item.url, item, win.location.href);
-        if (!source) { status('作品のページURLがありません。'); return; }
-        page = 1;
-        requestedPage = 1;
-        status('1ページ目を確認しています…');
-        for (let index = 1; index <= 2000; index += 1) {
-          if (generation !== generationAtStart) return;
-          const url = await resolvePage(index, source);
-          if (!url) break;
-          pageUrls.push(url);
-          updateControls();
-          if (index === 1) renderPage(1);
-          status(`${index}ページを確認しました`);
-        }
-      }
+      if (!pageSource) { status('ページ一覧を解決できません。'); return; }
+      status(Array.isArray(item.pages) || item.pageManifest ? 'ページを準備しています…' : 'ページ一覧を初回確認しています…');
+      const AbortControllerRef = win.AbortController || globalThis.AbortController;
+      const discoveryController = typeof AbortControllerRef === 'function' ? new AbortControllerRef() : null;
+      if (discoveryController) lifecycle.own({ destroy: () => discoveryController.abort() });
+      const resolved = await pageSource.resolve(item, { signal: discoveryController?.signal });
+      if (destroyed || generationAtStart !== generation) return;
+      pageUrls = resolved.urls;
       if (!pageUrls.length) { status('画像を見つけられませんでした。'); return; }
-      if (!Array.isArray(item.pages)) page = resume;
-      page = Math.min(page, displayCount());
+      if (resolved.migrated || !item.pageManifest) {
+        currentItem = repository.saveItem(resolved.item) || resolved.item;
+      }
+      page = Math.min(resume, displayCount());
       requestedPage = page;
       const ready = await renderPage(page);
+      if (destroyed) return;
       showNextVolume();
       if (ready) status(`${pageUrls.length}ページ`);
     }
 
     return Object.freeze({
-      resolve, start, close,
-      getPageState() { return Object.freeze({ displayedPage: page, requestedPage, status: lastFailedRequest ? 'failed' : requestedPage === page ? 'ready' : 'loading', failedPage: lastFailedRequest?.page || null }); },
+      resolve, start, close, destroy, goTo, next, previous,
+      getPageState() { const state = pageTransition?.getState(); return Object.freeze({ displayedPage: page, requestedPage, status: lastFailedRequest ? 'failed' : state?.status || (requestedPage === page ? 'ready' : 'loading'), failedPage: lastFailedRequest?.page || null }); },
       getImageCacheSnapshot() { return imageLoader?.snapshot?.() || { activeCount: 0, queuedCount: 0, entries: [] }; },
     });
   }
 
-  const api = Object.freeze({ create, parseSequentialSource, numberedPageUrl });
+  const api = Object.freeze({ create });
   if (typeof self !== 'undefined') self.ReaderRuntimeFactory = api;
   if (typeof window !== 'undefined') window.ReaderRuntimeFactory = api;
   if (typeof module !== 'undefined') module.exports = api;

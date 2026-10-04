@@ -17,6 +17,76 @@
     const levels = new Set(); for (const level of z.levels) { if (!Number.isInteger(level.level) || level.level < 0) throw new TypeError('level must be a non-negative integer'); finitePositive(level.width, 'level width'); finitePositive(level.height, 'level height'); if (levels.has(level.level) || !Number.isInteger(level.columns) || !Number.isInteger(level.rows) || level.columns < 1 || level.rows < 1 || !Array.isArray(level.tiles)) throw new TypeError('level metadata is invalid'); levels.add(level.level); const tiles = new Set(); for (const tile of level.tiles) { if (!Number.isInteger(tile.x) || !Number.isInteger(tile.y) || tile.x < 0 || tile.y < 0 || tile.x >= level.columns || tile.y >= level.rows || !Number.isInteger(tile.pixelX) || !Number.isInteger(tile.pixelY) || !Number.isInteger(tile.width) || tile.width < 1 || !Number.isInteger(tile.height) || tile.height < 1 || tile.pixelX < 0 || tile.pixelY < 0 || tile.pixelX + tile.width > level.width || tile.pixelY + tile.height > level.height || !Number.isInteger(tile.bytes) || tile.bytes < 1 || typeof tile.mimeType !== 'string') throw new TypeError('tile metadata is invalid'); const key = `${tile.x}:${tile.y}`; if (tiles.has(key)) throw new TypeError('duplicate tile coordinate'); tiles.add(key); } }
     return manifest;
   }
+  function createPreviewLoader({ maxEntries = 4 } = {}) {
+    const entries = new Map(); const retained = new Set(); let order = 0; let destroyed = false;
+    const keyFor = (options) => `${String(options.assetId)}:${Number(options.revision)}`;
+    function release(entry) {
+      if (!entry) return;
+      try { entry.controller?.abort(); } catch (_) {}
+      if (entry.url) root.URL?.revokeObjectURL?.(entry.url);
+      entry.url = null; entry.image = null;
+    }
+    function trim() {
+      while (entries.size > Math.max(1, maxEntries)) {
+        const candidate = [...entries.values()].filter((entry) => !retained.has(entry.key) && entry.status !== 'loading').sort((a, b) => a.lastUsed - b.lastUsed)[0];
+        if (!candidate) return;
+        entries.delete(candidate.key); release(candidate);
+      }
+    }
+    async function decode(image) {
+      if (!(image.naturalWidth > 0) || !(image.naturalHeight > 0)) throw new Error('preview image dimensions unavailable');
+      if (typeof image.decode === 'function') await image.decode();
+      else if (typeof root.requestAnimationFrame === 'function') await new Promise((resolve) => root.requestAnimationFrame(() => root.requestAnimationFrame(resolve)));
+      return image;
+    }
+    function load(options, { retry = false } = {}) {
+      if (destroyed) return Promise.reject(new Error('encrypted preview loader is destroyed'));
+      const key = keyFor(options);
+      let entry = entries.get(key);
+      if (entry?.status === 'ready') { entry.lastUsed = ++order; return Promise.resolve(entry); }
+      if (entry?.status === 'loading' && !retry) return entry.promise;
+      if (entry?.status === 'failed' && !retry) return Promise.reject(entry.error);
+      if (entry) { entries.delete(key); release(entry); }
+      const AbortControllerRef = root.AbortController || globalThis.AbortController;
+      const controller = typeof AbortControllerRef === 'function' ? new AbortControllerRef() : null;
+      entry = { key, status: 'loading', lastUsed: ++order, controller, promise: null, error: null, image: null, url: null };
+      entries.set(key, entry);
+      entry.promise = (async () => {
+        const syncImpl = options.sync || sync;
+        const cryptoImpl = options.crypto || cryptoApi;
+        const bytes = await syncImpl.loadDecryptedObject({ ...options, objectId: 'preview', estimatedBytes: cryptoImpl.encryptedAssetByteLength(options.manifest.preview.bytes), signal: controller?.signal });
+        if (destroyed || controller?.signal?.aborted || !bytes || (bytes.byteLength ?? 0) < 1) throw new Error('preview unavailable');
+        entry.url = root.URL?.createObjectURL?.(new Blob([bytes], { type: options.manifest.preview.mimeType }));
+        if (!entry.url) throw new Error('preview URL unavailable');
+        entry.image = root.document.createElement('img');
+        entry.image.decoding = 'async';
+        const ready = new Promise((resolve, reject) => {
+          const cleanup = () => { entry.image.removeEventListener?.('load', onLoad); entry.image.removeEventListener?.('error', onError); };
+          const onError = () => { cleanup(); reject(new Error('preview image load failed')); };
+          const onLoad = async () => { try { await decode(entry.image); cleanup(); resolve(); } catch (error) { cleanup(); reject(error); } };
+          entry.image.addEventListener?.('load', onLoad, { once: true });
+          entry.image.addEventListener?.('error', onError, { once: true });
+          entry.image.src = entry.url;
+          if (entry.image.complete && entry.image.naturalWidth > 0) Promise.resolve().then(onLoad);
+        });
+        await ready;
+        if (destroyed || controller?.signal?.aborted) throw new Error('preview load cancelled');
+        entry.status = 'ready'; entry.lastUsed = ++order; trim();
+        return entry;
+      })().catch((error) => {
+        entry.status = 'failed'; entry.error = error;
+        if (destroyed || controller?.signal?.aborted) { entries.delete(key); release(entry); }
+        throw error;
+      });
+      entry.promise.catch(() => {});
+      trim();
+      return entry.promise;
+    }
+    function retain(keys = []) { retained.clear(); for (const key of keys) if (key) retained.add(String(key)); trim(); }
+    function snapshot() { return [...entries.values()].map((entry) => ({ key: entry.key, status: entry.status })); }
+    function destroy() { if (destroyed) return; destroyed = true; for (const entry of entries.values()) release(entry); entries.clear(); retained.clear(); }
+    return Object.freeze({ keyFor, load, retry: (options) => load(options, { retry: true }), retain, snapshot, destroy });
+  }
   function calculateContainRect({ containerWidth, containerHeight, imageWidth, imageHeight }) { finitePositive(containerWidth, 'containerWidth'); finitePositive(containerHeight, 'containerHeight'); finitePositive(imageWidth, 'imageWidth'); finitePositive(imageHeight, 'imageHeight'); const scale = Math.min(containerWidth / imageWidth, containerHeight / imageHeight); const width = imageWidth * scale; const height = imageHeight * scale; return { width, height, left: (containerWidth - width) / 2, top: (containerHeight - height) / 2 }; }
   function clampTransform({ scale, translateX, translateY, containerWidth, containerHeight, imageWidth, imageHeight }) { const s = Math.max(MIN_SCALE, Math.min(MAX_SCALE, Number(scale) || MIN_SCALE)); if (s === 1) return { scale: 1, translateX: 0, translateY: 0 }; const x = Math.max(0, imageWidth * s - containerWidth) / 2; const y = Math.max(0, imageHeight * s - containerHeight) / 2; return { scale: s, translateX: Math.max(-x, Math.min(x, Number(translateX) || 0)), translateY: Math.max(-y, Math.min(y, Number(translateY) || 0)) }; }
   function calculateVisibleRect({ scale, translateX, translateY, containerWidth, containerHeight, imageWidth, imageHeight }) { const x0 = (0 - (containerWidth - imageWidth * scale) / 2 - translateX) / (imageWidth * scale); const y0 = (0 - (containerHeight - imageHeight * scale) / 2 - translateY) / (imageHeight * scale); const x1 = (containerWidth - (containerWidth - imageWidth * scale) / 2 - translateX) / (imageWidth * scale); const y1 = (containerHeight - (containerHeight - imageHeight * scale) / 2 - translateY) / (imageHeight * scale); return { x0: Math.max(0, Math.min(1, x0)), y0: Math.max(0, Math.min(1, y0)), x1: Math.max(0, Math.min(1, x1)), y1: Math.max(0, Math.min(1, y1)) }; }
@@ -41,11 +111,40 @@
     function refresh() { if (!mounted || destroyed) return; layout(); if (state.scale <= 1 || !manifest.zoom.levels.length) { selectedLevel = null; desiredVisible = new Set(); desiredPrefetch = new Set(); abortObsolete(); clearTiles(); return; } const s = size(); const r = rect(); const next = selectZoomLevel({ manifest, scale: state.scale, renderedWidth: r.width, renderedHeight: r.height, devicePixelRatio: options.devicePixelRatio || root.devicePixelRatio || 1 }); const changed = selectedLevel?.level !== next?.level; selectedLevel = next; if (changed) { generation += 1; clearTiles(); } const visible = selectVisibleTiles(selectedLevel, calculateVisibleRect({ scale: state.scale, translateX: state.translateX, translateY: state.translateY, containerWidth: s.width, containerHeight: s.height, imageWidth: r.width, imageHeight: r.height })); desiredVisible = new Set(visible.map((tile) => idFor(selectedLevel, tile))); const mode = settingsImpl.load(options.transferStorage).networkMode; const ringCandidates = selectTileRing(selectedLevel, visible, 1); const ring = mode === settingsImpl.STANDARD_NETWORK_MODE ? ringCandidates : []; desiredPrefetch = new Set(ring.map((tile) => idFor(selectedLevel, tile))); if (mode !== settingsImpl.STANDARD_NETWORK_MODE) for (const tile of ringCandidates) { const id = idFor(selectedLevel, tile); const request = requests.get(id); if (!renderedTiles.has(id) && !prefetchedTiles.has(id) && !request?.started && !savedPrefetch.has(id)) { savedPrefetch.add(id); remoteImpl.recordPartialSavings(cryptoImpl.encryptedAssetByteLength(tile.bytes), { storage: options.transferStorage }); } } abortObsolete(); visible.forEach((tile) => enqueue(selectedLevel, tile, false, generation)); ring.forEach((tile) => enqueue(selectedLevel, tile, true, generation)); }
     function schedule() { if (timer) root.clearTimeout?.(timer); if (settingsImpl.load(options.transferStorage).networkMode === settingsImpl.SAVER_NETWORK_MODE) timer = root.setTimeout(() => { timer = null; refresh(); }, ZOOM_SETTLE_MS); else refresh(); } function setScale(scale) { const s = size(); const r = rect(); state = clampTransform({ ...state, scale, containerWidth: s.width, containerHeight: s.height, imageWidth: r.width, imageHeight: r.height }); layout(); schedule(); } function setTransform(transform = {}) { const s = size(); const r = rect(); state = clampTransform({ ...state, ...transform, containerWidth: s.width, containerHeight: s.height, imageWidth: r.width, imageHeight: r.height }); layout(); schedule(); }
     let pointers = new Map(); let pinch = null; let drag = null; function pointerDown(event) { pointers.set(event.pointerId, { x: event.clientX, y: event.clientY }); viewport.setPointerCapture?.(event.pointerId); if (pointers.size === 2) { const a = [...pointers.values()]; const c = { x: (a[0].x + a[1].x) / 2, y: (a[0].y + a[1].y) / 2 }; const r = rect(); pinch = { distance: Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y), scale: state.scale, center: c, anchorX: (c.x - size().width / 2 - state.translateX) / (r.width * state.scale) + 0.5, anchorY: (c.y - size().height / 2 - state.translateY) / (r.height * state.scale) + 0.5 }; } else if (state.scale > 1) drag = { x: event.clientX, y: event.clientY, tx: state.translateX, ty: state.translateY }; } function pointerMove(event) { if (!pointers.has(event.pointerId)) return; pointers.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (pinch && pointers.size === 2) { const a = [...pointers.values()]; const c = { x: (a[0].x + a[1].x) / 2, y: (a[0].y + a[1].y) / 2 }; const scale = pinch.scale * Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) / pinch.distance; const r = rect(); setTransform({ scale, translateX: c.x - size().width / 2 - (pinch.anchorX - 0.5) * r.width * scale, translateY: c.y - size().height / 2 - (pinch.anchorY - 0.5) * r.height * scale }); } else if (drag && state.scale > 1) setTransform({ translateX: drag.tx + event.clientX - drag.x, translateY: drag.ty + event.clientY - drag.y }); } function pointerUp(event) { pointers.delete(event.pointerId); if (pointers.size < 2) pinch = null; if (!pointers.size) drag = null; } function wheel(event) { if (!(event.ctrlKey || event.metaKey)) return; event.preventDefault(); setScale(state.scale * (event.deltaY < 0 ? 1.15 : 1 / 1.15)); }
-    async function loadPreview() { const bytes = await syncImpl.loadDecryptedObject({ ...options, objectId: 'preview', estimatedBytes: cryptoImpl.encryptedAssetByteLength(manifest.preview.bytes) }); if (destroyed || !bytes || (bytes.byteLength ?? 0) < 1) throw new Error('preview unavailable'); previewUrl = root.URL?.createObjectURL?.(new Blob([bytes], { type: manifest.preview.mimeType })); if (previewUrl) { urls.add(previewUrl); preview.src = previewUrl; options.onPreviewReady?.(preview); } }
+    async function loadPreview() {
+      const previewResource = options.previewResourceLoader
+        ? await options.previewResourceLoader.load(options)
+        : null;
+      const bytes = previewResource ? null : await syncImpl.loadDecryptedObject({ ...options, objectId: 'preview', estimatedBytes: cryptoImpl.encryptedAssetByteLength(manifest.preview.bytes) });
+      if (destroyed || (!previewResource && (!bytes || (bytes.byteLength ?? 0) < 1))) throw new Error('preview unavailable');
+      previewUrl = previewResource?.url || root.URL?.createObjectURL?.(new Blob([bytes], { type: manifest.preview.mimeType }));
+      if (!previewUrl) throw new Error('preview URL unavailable');
+      if (!previewResource) urls.add(previewUrl);
+      const decoded = new Promise((resolve, reject) => {
+        const cleanup = () => { preview.removeEventListener?.('load', onLoad); preview.removeEventListener?.('error', onError); };
+        const onError = () => { cleanup(); reject(new Error('preview image load failed')); };
+        const onLoad = async () => {
+          if (!(preview.naturalWidth > 0) || !(preview.naturalHeight > 0)) { cleanup(); reject(new Error('preview image dimensions unavailable')); return; }
+          try { if (typeof preview.decode === 'function') await preview.decode(); else if (typeof root.requestAnimationFrame === 'function') await new Promise((resolveFrame) => root.requestAnimationFrame(() => root.requestAnimationFrame(resolveFrame))); }
+          catch (error) { cleanup(); reject(error instanceof Error ? error : new Error('preview image decode failed')); return; }
+          cleanup(); resolve();
+        };
+        preview.addEventListener?.('load', onLoad, { once: true });
+        preview.addEventListener?.('error', onError, { once: true });
+        preview.src = previewUrl;
+      });
+      await decoded;
+      if (destroyed) throw new Error('encrypted renderer destroyed while decoding preview');
+      options.onPreviewReady?.(preview);
+      return preview;
+    }
     const settingsEvent = settingsImpl.EVENT_NAME || 'manga-reader-image-transfer-settings-changed'; const statsEvent = settingsImpl.STATS_EVENT_NAME || 'manga-reader-image-transfer-stats-changed'; const onTransferChange = () => refresh();
-    function mount() { if (mounted || destroyed) return api; mounted = true; container.appendChild(viewport); viewport.addEventListener('pointerdown', pointerDown); viewport.addEventListener('pointermove', pointerMove); viewport.addEventListener('pointerup', pointerUp); viewport.addEventListener('pointercancel', pointerUp); viewport.addEventListener('wheel', wheel, { passive: false }); root.document?.addEventListener?.(settingsEvent, onTransferChange); root.document?.addEventListener?.(statsEvent, onTransferChange); if (root.ResizeObserver) { observer = new root.ResizeObserver(refresh); observer.observe(container); } layout(); loadPreview().catch((error) => options.onPreviewError?.(error)); return api; }
+    function mount() { if (mounted || destroyed) return api; mounted = true; container.appendChild(viewport); viewport.addEventListener('pointerdown', pointerDown); viewport.addEventListener('pointermove', pointerMove); viewport.addEventListener('pointerup', pointerUp); viewport.addEventListener('pointercancel', pointerUp); viewport.addEventListener('wheel', wheel, { passive: false }); root.document?.addEventListener?.(settingsEvent, onTransferChange); root.document?.addEventListener?.(statsEvent, onTransferChange); if (root.ResizeObserver) { observer = new root.ResizeObserver(refresh); observer.observe(container); } layout(); readyPromise = loadPreview().catch((error) => { options.onPreviewError?.(error); throw error; }); readyPromise.catch(() => {}); return api; }
     function destroy() { if (destroyed) return; destroyed = true; if (timer) root.clearTimeout?.(timer); for (const request of requests.values()) abort(request); requests.clear(); visibleQueue.length = 0; prefetchQueue.length = 0; observer?.disconnect(); root.document?.removeEventListener?.(settingsEvent, onTransferChange); root.document?.removeEventListener?.(statsEvent, onTransferChange); for (const [name, fn] of [['pointerdown', pointerDown], ['pointermove', pointerMove], ['pointerup', pointerUp], ['pointercancel', pointerUp], ['wheel', wheel]]) viewport.removeEventListener(name, fn); for (const url of [...urls]) release(url); if (viewport.parentNode) viewport.parentNode.removeChild(viewport); }
-    const api = { mount, setScale, setTransform, refresh, getState: () => ({ ...state }), destroy }; return api;
+    const api = { mount, setScale, setTransform, refresh, getState: () => ({ ...state }), get readyPromise() { return readyPromise; }, destroy };
+    let readyPromise = Promise.reject(new Error('encrypted renderer has not been mounted'));
+    readyPromise.catch(() => {});
+    return api;
   }
-  return { MIN_SCALE, MAX_SCALE, ZOOM_SETTLE_MS, MAX_TILE_CONCURRENCY, validateManifest, calculateContainRect, clampTransform, calculateVisibleRect, selectZoomLevel, selectVisibleTiles, selectTileRing, createEncryptedAssetReader };
+  return { MIN_SCALE, MAX_SCALE, ZOOM_SETTLE_MS, MAX_TILE_CONCURRENCY, validateManifest, calculateContainRect, clampTransform, calculateVisibleRect, selectZoomLevel, selectVisibleTiles, selectTileRing, createPreviewLoader, createEncryptedAssetReader };
 }));

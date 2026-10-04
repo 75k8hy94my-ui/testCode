@@ -29,7 +29,7 @@
   function pageKey(pathname = location.pathname) {
     const name = pathname.split('/').pop() || 'home.html';
     if (name === 'profile.html') return 'profile';
-    if (name === 'manga.html' || name === 'reader.html') return 'manga';
+    if (name === 'manga.html') return 'manga';
     if (name === 'video.html' || name === 'video-player.html') return 'video';
     return 'home';
   }

@@ -82,7 +82,7 @@ test('host factory exposes the shared persistence callbacks and rejects missing 
     delete missing[key];
     assert.throws(() => factory.create(missing), (error) => error.name === 'TypeError' && error.message.includes(key === 'keys' ? 'keys' : key));
   }
-  for (const name of ['buildReaderUrl', 'prepareLaunch']) {
+  for (const name of ['buildReaderUrl', 'navigate']) {
     const missingNavigationDependency = deps([]);
     delete missingNavigationDependency.navigation[name];
     assert.throws(() => factory.create(missingNavigationDependency), (error) => error.name === 'TypeError' && error.message.includes(name));
@@ -168,7 +168,7 @@ test('host rejects missing image dependencies and exposes image callbacks', asyn
   ]);
 });
 
-test('host preserves manga item payload and reader navigation order', () => {
+test('host checkpoints the shelf then performs standalone Reader document navigation', () => {
   const calls = [];
   const host = loadFactory().create(deps(calls));
 
@@ -176,8 +176,6 @@ test('host preserves manga item payload and reader navigation order', () => {
   assert.deepEqual(calls, [
     'state',
     ['write', 'items-key', ['items']],
-    ['prepare-launch', 'item-1'],
-    ['navigation-write', 'last-url-key', JSON.stringify({ kind: 'item', itemId: 'item-1' })],
     ['build-reader-url', 'item-1', 'reader.html'],
     ['navigate', 'reader.html?item=item-1'],
   ]);

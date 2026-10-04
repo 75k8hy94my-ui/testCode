@@ -2,6 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const Lifecycle = require('../reader-lifecycle.js');
+const Transition = require('../reader-page-transition.js');
+const ProgressRepository = require('../reader-progress-repository.js');
+const PageSource = require('../reader-page-source.js');
 
 const runtimeUrl = new URL('../reader-runtime.js', import.meta.url);
 const context = { self: {}, console, URL };
@@ -16,25 +22,21 @@ function memoryStorage() {
   return { getItem(key) { return values.get(key) ?? null; }, setItem(key, value) { values.set(key, String(value)); }, removeItem(key) { values.delete(key); } };
 }
 
-test('reader runtime resolves the exact requested item and only then consumes its launch snapshot', async () => {
+test('reader runtime resolves the exact requested item id from saved items only', async () => {
   assert.ok(factory, 'ReaderRuntimeFactory must exist');
   const items = [{ id: 'first', url: 'https://same.test/book' }, { id: 'second', url: 'https://same.test/book' }];
-  const storage = memoryStorage();
-  let consumed = 0;
   const runtime = factory.create({
     repository: {
       loadItem(id) { return items.find((item) => item.id === id) || null; },
       saveItem(item) { items.push(item); },
       updateItem(id, patch) { const current = items.find((item) => item.id === id); if (!current) return null; Object.assign(current, patch); return current; },
     },
-    target: { consumeLaunch(id) { consumed += 1; return id === 'second' ? { id, title: 'handoff' } : null; } },
-    sessionStorage: storage,
+    target: {},
     location: { replace() {} },
   });
   const opened = await runtime.resolve('second');
   assert.equal(opened.item, items[1]);
   assert.equal(opened.source, 'saved-items');
-  assert.equal(consumed, 0);
 });
 
 test('reader runtime rejects missing item ids without URL fallback and closes to the bookshelf', async () => {
@@ -42,7 +44,7 @@ test('reader runtime rejects missing item ids without URL fallback and closes to
   const redirects = [];
   const runtime = factory.create({
     repository: { loadItem() { return null; }, saveItem() {}, updateItem() { return null; } },
-    target: { consumeLaunch() { return null; } },
+    target: {},
     sessionStorage: memoryStorage(),
     location: { replace(value) { redirects.push(value); } },
   });
@@ -52,24 +54,15 @@ test('reader runtime rejects missing item ids without URL fallback and closes to
   assert.deepEqual(redirects, ['manga.html', 'manga.html']);
 });
 
-test('embedded Reader close asks the verified host shell to return to manga without navigating the frame', () => {
-  const messages = [];
+test('standalone Reader close destroys and returns to the bookshelf document', () => {
   const redirects = [];
-  const window = {
-    location: { href: 'https://reader.test/reader.html?item=book-1&spa=1', origin: 'https://reader.test' },
-    parent: { postMessage(message, origin) { messages.push([message, origin]); } },
-  };
   const runtime = factory.create({
     repository: { loadItem() { return null; }, saveItem() {}, updateItem() { return null; } },
-    target: { consumeLaunch() { return null; } },
+    target: {},
     location: { replace(value) { redirects.push(value); } },
-    window,
   });
-  runtime.close();
-  assert.equal(messages.length, 1);
-  assert.equal(messages[0][0].type, 'manga-reader:close');
-  assert.equal(messages[0][1], 'https://reader.test');
-  assert.equal(redirects.length, 0);
+  runtime.close(); runtime.destroy();
+  assert.deepEqual(redirects, ['manga.html']);
 });
 
 test('reader html no longer loads or initializes bookshelf runtime', () => {
@@ -80,15 +73,14 @@ test('reader html no longer loads or initializes bookshelf runtime', () => {
   assert.match(html, /reader-item-repository\.js/);
 });
 
-test('numbered source URLs retain their directory, filename prefix, suffix, and zero padding', () => {
-  assert.ok(factory, 'ReaderRuntimeFactory must exist');
-  const source = factory.parseSequentialSource('https://images.test/series/chapter-001a.jpg');
+test('PageSource owns legacy numbered URL parsing and zero padding', () => {
+  const source = PageSource.parseSequentialSource('https://images.test/series/chapter-001a.jpg');
   assert.deepEqual(JSON.parse(JSON.stringify(source)), {
     base: 'https://images.test/series/',
     pattern: { prefix: 'chapter-', suffix: 'a', width: 3 },
     width: 3,
   });
-  assert.equal(factory.numberedPageUrl(source, 2, 'jpg'), 'https://images.test/series/chapter-002a.jpg');
+  assert.equal(PageSource.numberedPageUrl(source, 2, 'jpg'), 'https://images.test/series/chapter-002a.jpg');
 });
 
 test('reader opens a saved page at its restored position, updates favorite, and persists the active item progress', async () => {
@@ -104,7 +96,7 @@ test('reader opens a saved page at its restored position, updates favorite, and 
   const ids = ['readerStatus', 'retryPageBtn', 'pageSlider', 'pageLabel', 'currentTitle', 'pageStage', 'viewer', 'topbar', 'controls', 'tocBtn', 'favToggleBtn', 'closeBtn', 'firstBtn', 'prevBtn', 'nextBtn', 'lastBtn', 'tocAddBtn', 'safeModeBtn', 'enhanceBtn', 'verticalBtn', 'nextVolumeBanner', 'nextVolumeText', 'nextVolumeBtn', 'nextVolumeDismissBtn'];
   const elements = Object.fromEntries(ids.map((id) => [id, new Element()]));
   const body = new Element();
-  const store = new Map([['mangaReaderLastPage', JSON.stringify({ 'item:book-2': { page: 2, wasLast: false }})]]);
+  const store = new Map([['mangaReaderLastPage', JSON.stringify({ 'item:book-2': { page: 2, wasLast: false, updatedAt: 1 }})]]);
   const localStorage = { getItem(key) { return store.get(key) ?? null; }, setItem(key, value) { store.set(key, String(value)); } };
   const document = { body, getElementById(id) { return elements[id] || null; }, createElement() { return new Element(); }, createDocumentFragment() { return new Element(); } };
   const item = { id: 'book-2', title: 'Same URL, second item', url: 'https://same.test/book', pages: ['https://same.test/1.jpg', 'https://same.test/2.jpg'], favorite: false };
@@ -124,13 +116,16 @@ test('reader opens a saved page at its restored position, updates favorite, and 
     get src() { return this._src || ''; }
     decode() { return Promise.resolve(); }
   }
-  const window = { localStorage, location: { href: 'https://reader.test/reader.html?item=book-2' }, innerWidth: 300, Image, ReaderImageLoaderFactory: imageLoaderFactory, addEventListener() {}, prompt() {}, URL };
-  const runtime = factory.create({ repository: repo, target: { consumeLaunch() { return null; }, itemResumeKey: (id) => `item:${id}`, buildReaderUrl: (id) => `reader.html?item=${id}` }, sessionStorage: memoryStorage(), location: { replace(url) { redirects.push(url); } }, document, window });
+  const window = { localStorage, location: { href: 'https://reader.test/reader.html?item=book-2' }, innerWidth: 300, Image, ReaderImageLoaderFactory: imageLoaderFactory, ReaderLifecycleFactory: Lifecycle, ReaderPageTransitionFactory: Transition, addEventListener() {}, prompt() {}, URL };
+  window.ReaderLifecycleFactory = Lifecycle; window.ReaderPageTransitionFactory = Transition;
+  const progressRepository = ProgressRepository.create({ storage: localStorage });
+  const runtime = factory.create({ repository: repo, target: { itemResumeKey: (id) => `item:${id}`, buildReaderUrl: (id) => `reader.html?item=${id}` }, progressRepository, pageSource: { resolve: async (value) => ({ item: value, urls: value.pages }) }, location: { replace(url) { redirects.push(url); } }, document, window });
   await runtime.start('book-2');
 
   assert.equal(elements.pageSlider.value, '2');
   assert.equal(elements.pageStage.children[0].children[0].src, 'https://same.test/2.jpg');
-  assert.equal(item.readingProgress.page, 2);
+  assert.equal(item.readingProgress, undefined);
+  assert.equal(JSON.parse(localStorage.getItem('mangaReaderLastPage'))['item:book-2'].page, 2);
   let contextMenuPrevented = false;
   elements.viewer.dispatch('contextmenu', { target: { closest() { return {}; } }, preventDefault() { contextMenuPrevented = true; } });
   assert.equal(contextMenuPrevented, true, 'image context menus must not expose a save-image action');
