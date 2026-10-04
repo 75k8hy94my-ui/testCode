@@ -220,7 +220,8 @@ test('host setupFeedImage preserves extension fallback and shared cover cache up
 test('manga route owns shelf persistence and Reader uses its narrow item repository', () => {
   const reader = fs.readFileSync(path.join(root, 'reader.html'), 'utf8');
   const route = fs.readFileSync(path.join(root, 'manga-list-route.js'), 'utf8');
-  assert.match(route, /manga-list-host-runtime\.js\?v=/);
+  const dependencies = fs.readFileSync(path.join(root, 'manga-list-dependency-loader.js'), 'utf8');
+  assert.match(dependencies, /manga-list-host-runtime\.js\?v=/);
   assert.match(route, /MangaListHostRuntimeFactory\.create\(/);
   assert.match(route, /persistAll: host\.persistAll/);
   assert.doesNotMatch(reader, /manga-list-host-runtime|MangaListHostRuntimeFactory|persistFolders|persistAuthorCards/);

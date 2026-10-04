@@ -126,6 +126,7 @@
           context.loadLocalCover(item, img);
         } else {
           const coverSourceCache = context.getCoverSourceCache();
+          context.markCoverLoadStart?.();
           img.src = coverSourceCache.get(source) || source; // exact URL already known; no extension cascade needed
           img.addEventListener('load', () => coverSourceCache.set(source, img.currentSrc || img.src), { once: true });
         }

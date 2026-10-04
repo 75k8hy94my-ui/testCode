@@ -7,6 +7,8 @@ const manga = read('manga.html');
 const sandbox = read('manga-sandbox.html');
 const spa = read('home-profile-spa.js');
 const gate = read('media-access-gate.js');
+const route = read('manga-list-route.js');
+const dependencies = read('manga-list-dependency-loader.js');
 
 test('manga shells load the standalone bookshelf stylesheet', () => {
   assert.match(manga, /manga-list\.css\?v=/);
@@ -25,10 +27,40 @@ test('manga and video routes wait for an allowed VPN verdict before starting lis
   const mangaRoute = spa.slice(spa.indexOf('async function renderManga'), spa.indexOf('let lastVpnRouteStatus'));
   const videoRoute = spa.slice(spa.indexOf('async function renderVideo'), spa.indexOf('async function renderManga'));
   assert.ok(mangaRoute.indexOf('canLoadExternalMedia') < mangaRoute.indexOf('MangaListRouteFactory.create'));
+  assert.ok(mangaRoute.indexOf('manga-list-dependency-loader.js') < mangaRoute.indexOf('ensureVpnGate()'));
   assert.ok(videoRoute.indexOf('canLoadExternalMedia') < videoRoute.indexOf('VideoListRouteFactory.create'));
   assert.doesNotMatch(mangaRoute.slice(0, mangaRoute.indexOf('MangaListRouteFactory.create')), /savedListItems|book-card|renderSavedList/);
   assert.doesNotMatch(videoRoute.slice(0, videoRoute.indexOf('VideoListRouteFactory.create')), /savedListItems|book-card|renderVideoList/);
   assert.match(spa, /manga-reader-vpn-status/);
+});
+
+test('same-origin shelf code preloads during VPN checking without running or exposing shelf data', () => {
+  assert.ok(manga.indexOf('manga-list-dependency-loader.js') < manga.indexOf('media-access-gate.js'));
+  const spaMangaRoute = spa.slice(spa.indexOf('async function renderManga'), spa.indexOf('let lastVpnRouteStatus'));
+  assert.ok(spaMangaRoute.indexOf('manga-list-dependency-loader.js') < spaMangaRoute.indexOf('ensureVpnGate()'));
+  assert.ok(spaMangaRoute.indexOf('canLoadExternalMedia') < spaMangaRoute.indexOf('MangaListRouteFactory.create'));
+  assert.match(dependencies, /link\.rel = 'preload'/);
+  assert.match(dependencies, /link\.as = 'script'/);
+  assert.doesNotMatch(dependencies, /localStorage|fetch\(|MangaVault|HTMLImageElement|encrypted-asset-import\.js.*CORE/);
+  assert.match(route, /dependencyLoader\.loadCore\(\)/);
+  assert.ok(route.indexOf('dependencyLoader.loadCore()') > route.indexOf('async function start(input)'));
+  assert.match(gate, /performance\?\.mark\?\.\('manga:vpn-allowed'\)/);
+});
+
+test('encrypted image import dependencies are lazy and loaded once from individual add', () => {
+  const importNames = [
+    'image-transfer-settings.js', 'image-remote-access.js', 'encrypted-asset-crypto.js',
+    'encrypted-asset-cache.js', 'encrypted-asset-backend.js', 'encrypted-asset-storage.js',
+    'encrypted-asset-sync.js', 'image-compression-profile.js', 'image-pyramid-builder.js',
+    'image-photo-processor.js', 'encrypted-asset-reader.js', 'encrypted-asset-item.js',
+    'encrypted-asset-import.js',
+  ];
+  const core = dependencies.slice(dependencies.indexOf('const coreGroup'), dependencies.indexOf('const encryptedImageImportGroups'));
+  for (const name of importNames) assert.doesNotMatch(core, new RegExp(name.replace('.', '\\.')), name);
+  for (const name of importNames) assert.match(dependencies, new RegExp(name.replace('.', '\\.')), name);
+  assert.match(route, /void dependencyLoader\.ensureEncryptedImageImportDependencies\(\)/);
+  const submit = route.slice(route.indexOf("bind(importForm, 'submit'"), route.indexOf("bindFactory(MangaListSearchEventsFactory"));
+  assert.ok(submit.indexOf('await dependencyLoader.ensureEncryptedImageImportDependencies()') < submit.indexOf('EncryptedAssetCache.createCache()'));
 });
 
 test('VPN gate exposes status changes without changing its verdict contract', () => {

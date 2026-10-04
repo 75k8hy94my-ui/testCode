@@ -49,6 +49,7 @@
       loadLocalCover: deps.loadLocalCover,
       getCoverSourceCache: deps.getCoverSourceCache,
       setupFeedImage: deps.setupFeedImage,
+      markCoverLoadStart: deps.markCoverLoadStart,
       makeHeartIcon: deps.makeHeartIcon,
       moveItemInList: deps.moveItemInList,
       moveFolderInList: deps.moveFolderInList,

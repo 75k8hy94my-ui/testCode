@@ -156,10 +156,15 @@ async function renderManga(generation){
   target.replaceChildren();
   let routeRuntime=null;
   try{
+    // This entry point uses the same-origin loader only to preload shelf code.
+    // It does not read saved data or request protected media; those remain
+    // behind the VPN verdict in routeRuntime.start().
+    if(!window.MangaListDependencyLoaderFactory) await loadScript('manga-list-dependency-loader.js?v=20261005-shelf-startup','spaMangaDependencyLoader');
+    if(generation!==renderGeneration)return;
     const gate=await ensureVpnGate();
     if(generation!==renderGeneration)return;
     if(!gate||!gate.canLoadExternalMedia()){renderVpnGate(target,'manga');if(gate&&typeof gate.syncUi==='function')gate.syncUi();setTitle('manga');syncHeaderRoute();return;}
-    if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20260926-route-owned-v3','spaMangaListRoute');
+    if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20261005-shelf-startup','spaMangaListRoute');
     if(generation!==renderGeneration)return;
     routeRuntime=window.MangaListRouteFactory.create({documentRef:document,windowRef:window});
     mangaRouteRuntime=routeRuntime;

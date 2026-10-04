@@ -9,6 +9,7 @@ const context = {};
 if (source) vm.runInNewContext(source, context);
 const derive = context.MangaListViewModel?.derive;
 const route = read('manga-list-route.js');
+const dependencies = read('manga-list-dependency-loader.js');
 
 const ids = { favorites: 'favorites', unread: 'unread', synced: 'synced', history: 'history', series: 'series' };
 const items = [
@@ -49,7 +50,7 @@ test('view model filters folders, search, and pages without duplication', () => 
 });
 
 test('view model is pure and loaded by the manga route runtime', () => {
-  assert.match(route, /manga-list-view-model\.js\?v=/);
+  assert.match(dependencies, /manga-list-view-model\.js\?v=/);
   assert.doesNotMatch(read('reader.html'), /manga-list-view-model|MangaListViewModel/);
   assert.doesNotMatch(source, /\b(document|window|localStorage|sessionStorage|MangaVault|Supabase|fetch|setTimeout|addEventListener)\b/);
   assert.equal((source.match(/root\.MangaListViewModel\s*=/g) || []).length, 1);

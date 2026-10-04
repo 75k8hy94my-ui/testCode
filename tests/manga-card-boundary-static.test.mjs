@@ -4,11 +4,12 @@ import fs from 'node:fs';
 
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 const route = read('manga-list-route.js');
+const dependencies = read('manga-list-dependency-loader.js');
 const card = fs.existsSync(new URL('../manga-list-card.js', import.meta.url)) ? read('manga-list-card.js') : '';
 const runtime = read('manga-list-runtime.js');
 
 test('manga route loads the card boundary as a shelf dependency', () => {
-  assert.match(route, /manga-list-card\.js\?v=/);
+  assert.match(dependencies, /manga-list-card\.js\?v=/);
   assert.match(route, /MangaListRuntimeFactory\.create\(/);
   assert.doesNotMatch(read('reader.html'), /manga-list-card|MangaListRuntime/);
 });
@@ -38,8 +39,8 @@ test('normal manga card clicks use one shelf interaction boundary', () => {
 });
 
 test('buildBookCard uses one private cover dependency boundary without changing image branches', () => {
-  assert.match(route, /loadLocalCover: host\.loadLocalCover/);
-  assert.match(route, /setupFeedImage: host\.setupFeedImage/);
+  assert.match(route, /loadLocalCover: \(\.\.\.args\) => .*host\.loadLocalCover\(\.\.\.args\)/);
+  assert.match(route, /setupFeedImage: \(\.\.\.args\) => \{ markCoverLoadStart\(\); return host\.setupFeedImage\(\.\.\.args\); \}/);
   assert.match(route, /getCoverSourceCache: \(\) => coverSourceCache/);
 
   const build = runtime;

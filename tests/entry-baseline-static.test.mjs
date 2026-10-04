@@ -22,19 +22,20 @@ function scriptSources(html) {
 
 test('current entry pages keep their static bootstrap script baselines', () => {
   assert.deepEqual(scriptSources(pages.manga), [
+    'manga-list-dependency-loader.js?v=20261005-shelf-startup',
     'supabase-config.js', 'vault-session.js?v=20261003-session-lock', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js',
     'profile-menu.js?v=20260924-theme-unified', 'feature-flags.js',
-    'media-access-gate.js?v=20260926-non-jp-vpn',
-    'manga-list-route.js?v=20261003-reader-spa-route',
-    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261003-reader-shell-spa',
+    'media-access-gate.js?v=20261005-shelf-startup',
+    'manga-list-route.js?v=20261005-shelf-startup',
+    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261005-shelf-startup',
   ]);
   assert.deepEqual(scriptSources(pages.video), [
     'supabase-config.js', 'vault-session.js?v=20261003-session-lock', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js',
-    'profile-menu.js?v=20260924-theme-unified', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261003-reader-shell-spa',
+    'profile-menu.js?v=20260924-theme-unified', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261005-shelf-startup',
   ]);
 });
 

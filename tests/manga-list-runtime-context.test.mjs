@@ -15,7 +15,7 @@ const names = [
   'persistItems', 'persistFolders', 'persistAuthorCards', 'persistAll', 'scheduleCloudSync',
   'openReader', 'accessMedia', 'renderDashboard', 'renderAuthorDashboard',
   'getVisibleItems', 'appendFolderPreview', 'createStaticCard', 'loadLocalCover',
-  'getCoverSourceCache', 'setupFeedImage', 'makeHeartIcon', 'moveItemInList',
+  'getCoverSourceCache', 'setupFeedImage', 'markCoverLoadStart', 'makeHeartIcon', 'moveItemInList',
   'moveFolderInList', 'renderList', 'updateBulkEditButton', 'shelfVisibleItems',
   'unreadOrderItems', 'itemDisplayTitle', 'itemSubtext', 'readingRecordText',
   'itemPageCountText', 'buildFavoritesFolderCard', 'buildSeriesFolderCard',

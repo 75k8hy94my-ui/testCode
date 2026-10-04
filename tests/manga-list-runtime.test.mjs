@@ -22,10 +22,10 @@ test('manga list runtime module exposes the four context-aware operations', () =
 });
 
 test('manga route loads the list runtime while Reader has no shelf runtime dependency', () => {
-  const route = read('manga-list-route.js');
+  const loader = read('manga-list-dependency-loader.js');
   const reader = read('reader.html');
-  assert.match(route, /manga-list-runtime\.js\?v=/);
-  assert.match(route, /MangaListRuntimeFactory\.create\(/);
+  assert.match(loader, /manga-list-runtime\.js\?v=/);
+  assert.match(read('manga-list-route.js'), /MangaListRuntimeFactory\.create\(/);
   assert.doesNotMatch(reader, /manga-list-runtime|MangaListRuntimeFactory/);
 });
 

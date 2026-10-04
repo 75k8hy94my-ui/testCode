@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const cache = fs.readFileSync('manga-list-image-cache.js', 'utf8');
 const route = fs.readFileSync('manga-list-route.js', 'utf8');
+const dependencies = fs.readFileSync('manga-list-dependency-loader.js', 'utf8');
 
 test('manga image cache exposes only the local-cover cache boundary', () => {
   assert.match(cache, /MangaListImageCacheFactory/);
@@ -16,7 +17,7 @@ test('manga image cache exposes only the local-cover cache boundary', () => {
 });
 
 test('manga route loads and injects the shared local-cover cache', () => {
-  assert.match(route, /manga-list-image-cache\.js\?v=/);
+  assert.match(dependencies, /manga-list-image-cache\.js\?v=/);
   assert.match(route, /MangaListImageCacheFactory\.create\(/);
   assert.match(route, /loadCachedLocalImage/);
   assert.match(route, /mangaReaderStorageTransferLimitDaily/);

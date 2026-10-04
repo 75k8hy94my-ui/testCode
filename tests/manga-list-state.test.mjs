@@ -5,6 +5,7 @@ import vm from 'node:vm';
 
 const source = fs.readFileSync(new URL('../manga-list-state.js', import.meta.url), 'utf8');
 const route = fs.readFileSync(new URL('../manga-list-route.js', import.meta.url), 'utf8');
+const dependencies = fs.readFileSync(new URL('../manga-list-dependency-loader.js', import.meta.url), 'utf8');
 const context = {};
 vm.runInNewContext(source, context);
 const api = context.MangaListState;
@@ -24,7 +25,7 @@ test('manga list state exposes one read-only loading API without browser service
   assert.equal(typeof api?.load, 'function');
   assert.equal((source.match(/root\.MangaListState\s*=/g) || []).length, 1);
   assert.doesNotMatch(source, /document|localStorage|sessionStorage|MangaVault|MangaVaultPayload|Supabase|fetch|addEventListener|setTimeout|setItem|removeItem|clear\s*\(/);
-  assert.match(route, /manga-list-state\.js\?v=/);
+  assert.match(dependencies, /manga-list-state\.js\?v=/);
   assert.doesNotMatch(fs.readFileSync(new URL('../reader.html', import.meta.url), 'utf8'), /manga-list-state\.js/);
 });
 
@@ -50,7 +51,8 @@ test('manga list state keeps existing empty and malformed JSON behavior', () => 
 
 test('manga route owns list initialization and delegates data loading to state runtime', () => {
   assert.match(route, /stateRuntimeFactory: MangaListStateRuntimeFactory/);
-  assert.match(route, /createStateDeps: \(\) => \(\{ load: data\.load/);
+  assert.match(route, /const data = createState\(storage, keys\)/);
+  assert.match(route, /load: \(\) => \{ const loaded = data\.load\(\); markStartup\('state-loaded'\); return loaded; \}/);
   assert.match(route, /removeHistoryFolder: \(loaded\) =>/);
   assert.match(route, /synchronizeAuthors/);
   assert.doesNotMatch(fs.readFileSync(new URL('../reader.html', import.meta.url), 'utf8'), /MangaListState|manga-list-state\.js/);

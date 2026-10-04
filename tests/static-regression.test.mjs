@@ -19,9 +19,10 @@ test('bookshelf cover cache remains item-specific and recovers stale sources', (
 
 test('manga route still owns the shelf list, migrations, ordering, and item navigation', () => {
   const route = read('manga-list-route.js');
+  const dependencies = read('manga-list-dependency-loader.js');
   const runtime = read('manga-list-runtime.js');
   for (const feature of ['manga-list-template.js', 'manga-list-folder-events.js', 'manga-list-bulk-events.js', 'manga-list-state.js', 'manga-list-view-model.js']) {
-    assert.ok(route.includes(feature), feature);
+    assert.ok(dependencies.includes(feature), feature);
   }
   assert.match(route, /host\.navigateToReader\(item\)/);
   assert.match(route, /mangaReaderSavedItems/);

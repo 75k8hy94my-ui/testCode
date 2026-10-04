@@ -578,6 +578,7 @@
 
   function applyFinalStatus(allowed) {
     status = allowed ? 'allowed' : 'blocked';
+    if (status === 'allowed') { try { root.performance?.mark?.('manga:vpn-allowed'); } catch (_) {} }
     emitStatus();
     updateStatusButtons(status);
     if (status === 'allowed') diagnostics.error = null;

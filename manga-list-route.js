@@ -2,49 +2,6 @@
   'use strict';
 
   const STYLESHEET_URL = 'manga-list.css?v=20260926-route-owned';
-  const SCRIPT_URLS = [
-    ['manga-list-template.js?v=20260922-vpn-tools', 'mangaRouteTemplate'],
-    ['image-transfer-settings.js?v=20261004-encrypted-image-import', 'encryptedImageImportSettings'],
-    ['image-remote-access.js?v=20261004-encrypted-image-import', 'encryptedImageImportRemoteAccess'],
-    ['encrypted-asset-crypto.js?v=20261004-encrypted-image-import', 'encryptedImageImportCrypto'],
-    ['encrypted-asset-cache.js?v=20261004-encrypted-image-import', 'encryptedImageImportCache'],
-    ['encrypted-asset-backend.js?v=20261004-encrypted-image-import', 'encryptedImageImportBackend'],
-    ['encrypted-asset-storage.js?v=20261004-encrypted-image-import', 'encryptedImageImportStorage'],
-    ['encrypted-asset-sync.js?v=20261004-encrypted-image-import', 'encryptedImageImportSync'],
-    ['image-compression-profile.js?v=20261004-encrypted-image-import', 'encryptedImageImportProfile'],
-    ['image-pyramid-builder.js?v=20261004-encrypted-image-import', 'encryptedImageImportPyramid'],
-    ['image-photo-processor.js?v=20261004-encrypted-image-import', 'encryptedImageImportProcessor'],
-    ['encrypted-asset-reader.js?v=20261004-encrypted-image-import', 'encryptedImageImportReader'],
-    ['encrypted-asset-item.js?v=20261004-encrypted-image-import', 'encryptedImageImportItem'],
-    ['encrypted-asset-import.js?v=20261004-import-ui', 'encryptedImageImport'],
-    ['manga-list-search-events.js?v=20260922-search-events', 'mangaRouteSearchEvents'],
-    ['manga-list-sort-events.js?v=20260922-sort-events', 'mangaRouteSortEvents'],
-    ['manga-list-filter-events.js?v=20260922-filter-events', 'mangaRouteFilterEvents'],
-    ['manga-list-folder-events.js?v=20260922-folder-events', 'mangaRouteFolderEvents'],
-    ['manga-list-smart-list-events.js?v=20260922-smart-events', 'mangaRouteSmartEvents'],
-    ['manga-list-pagination-events.js?v=20260922-pagination-events', 'mangaRoutePaginationEvents'],
-    ['manga-list-navigation-events.js?v=20260922-navigation-events', 'mangaRouteNavigationEvents'],
-    ['manga-list-bulk-events.js?v=20260922-bulk-events', 'mangaRouteBulkEvents'],
-    ['manga-list-dom-resolver.js?v=20260922-dom-resolver', 'mangaRouteResolver'],
-    ['manga-list-elements.js?v=20260922-elements', 'mangaRouteElements'],
-    ['manga-list-mount.js?v=20260922-mount', 'mangaRouteMount'],
-    ['manga-list-card.js?v=20260922-card', 'mangaRouteCard'],
-    ['manga-list-state.js?v=20260922-state', 'mangaRouteState'],
-    ['manga-list-view-model.js?v=20260922-view-model', 'mangaRouteViewModel'],
-    ['manga-list-renderer.js?v=20260922-renderer', 'mangaRouteRenderer'],
-    ['manga-list-state-runtime.js?v=20260922-state-runtime', 'mangaRouteStateRuntime'],
-    ['manga-list-render-runtime.js?v=20260922-render-runtime', 'mangaRouteRenderRuntime'],
-    ['manga-list-bootstrap.js?v=20260922-bootstrap', 'mangaRouteBootstrap'],
-    ['manga-list-controller.js?v=20260922-controller', 'mangaRouteController'],
-    ['manga-list-runtime-context.js?v=20260922-runtime-context', 'mangaRouteContext'],
-    ['manga-list-image-cache.js?v=20260922-image-cache', 'mangaRouteImageCache'],
-    ['reader-target.js?v=20261003-reader-launch-contract', 'mangaReaderTarget'],
-    ['manga-list-host-runtime.js?v=20261003-reader-launch-contract', 'mangaRouteHost'],
-    ['manga-list-runtime.js?v=20260926-item-cover-identity', 'mangaRouteRuntime'],
-    ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
-  ];
-
-  let dependencyPromise = null;
   let stylesheetPromise = null;
 
   function ensureStylesheet(documentRef) {
@@ -72,33 +29,8 @@
     return stylesheetPromise;
   }
 
-  function loadScript(src, id, documentRef) {
-    const existing = documentRef.getElementById(id);
-    if (existing) {
-      if (existing.dataset.loaded === '1') return Promise.resolve();
-      return new Promise((resolve, reject) => {
-        existing.addEventListener('load', resolve, { once: true });
-        existing.addEventListener('error', reject, { once: true });
-      });
-    }
-    return new Promise((resolve, reject) => {
-      const script = documentRef.createElement('script');
-      script.id = id;
-      script.src = src;
-      script.addEventListener('load', () => { script.dataset.loaded = '1'; resolve(); }, { once: true });
-      script.addEventListener('error', reject, { once: true });
-      documentRef.body.appendChild(script);
-    });
-  }
-
-  function loadDependencies(documentRef) {
-    if (!dependencyPromise) {
-      dependencyPromise = SCRIPT_URLS.reduce(
-        (promise, [src, id]) => promise.then(() => loadScript(src, id, documentRef)),
-        Promise.resolve(),
-      );
-    }
-    return dependencyPromise;
+  function markStartup(name) {
+    try { root.performance?.mark?.('manga:' + name); } catch (_) {}
   }
 
   function createState(storage, keys) {
@@ -171,18 +103,24 @@
     }
     const documentRef = deps.documentRef;
     const windowRef = deps.windowRef;
+    const dependencyLoaderFactory = windowRef.MangaListDependencyLoaderFactory || root.MangaListDependencyLoaderFactory;
+    if (!dependencyLoaderFactory) throw new Error('MangaListDependencyLoaderFactory is required');
+    const dependencyLoader = dependencyLoaderFactory.create({ documentRef });
+    dependencyLoader.preloadCore();
     let activeEntry = null;
     let lifecycle = 0;
 
     async function start(input) {
       if (!input || !input.mountElement) throw new TypeError('MangaListRouteFactory requires mountElement');
+      markStartup('route-start');
       const token = ++lifecycle;
       if (activeEntry) {
         activeEntry.cleanup();
         activeEntry = null;
       }
-      await Promise.all([ensureStylesheet(documentRef), loadDependencies(documentRef)]);
+      await Promise.all([ensureStylesheet(documentRef), dependencyLoader.loadCore()]);
       if (token !== lifecycle) return null;
+      markStartup('core-ready');
       const storage = windowRef.localStorage;
       const keys = {
         savedItems: 'mangaReaderSavedItems',
@@ -196,6 +134,12 @@
       const coverSourceCache = new Map();
       const coverFailedCache = new Set();
       const coverObjectUrls = [];
+      let coverLoadMarked = false;
+      const markCoverLoadStart = () => {
+        if (coverLoadMarked) return;
+        coverLoadMarked = true;
+        markStartup('cover-load-start');
+      };
       const extCandidates = ['jpg', 'jpeg', 'png', 'webp'];
       const iconFolder = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath d="M3 6a2 2 0 0 1 2-2h4.5a2 2 0 0 1 1.6.8L12.5 6H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6z" fill="%238d93a3"/%3E%3C/svg%3E';
       const iconBooks = iconFolder;
@@ -315,7 +259,7 @@
       const appendFolderPreview = (cover, items, emptyIcon, emptyAlt, kindLabel) => {
         const preview = items.slice(0, 4); if (!preview.length) { const img = documentRef.createElement('img'); img.src = emptyIcon; img.alt = emptyAlt; cover.appendChild(img); return; }
         const box = documentRef.createElement('div'); box.className = 'folder-preview preview-count-' + preview.length;
-        preview.forEach((item) => { const img = documentRef.createElement('img'); img.alt = title(item); if (item.pages && item.pages[0]) img.src = item.pages[0]; else host.setupFeedImage(img, item.url, item.numberWidth, item.pagePattern, item.id); box.appendChild(img); });
+        preview.forEach((item) => { const img = documentRef.createElement('img'); img.alt = title(item); markCoverLoadStart(); if (item.pages && item.pages[0]) img.src = item.pages[0]; else host.setupFeedImage(img, item.url, item.numberWidth, item.pagePattern, item.id); box.appendChild(img); });
         cover.appendChild(box); const badge = documentRef.createElement('span'); badge.className = 'folder-kind-badge'; badge.textContent = kindLabel || 'フォルダ'; cover.appendChild(badge);
       };
       const makeHeartIcon = () => { const img = documentRef.createElement('img'); img.alt = ''; return img; };
@@ -352,9 +296,9 @@
         getSavedVideos: () => state().savedVideos, clearLocalCoverObjectUrls: () => { while (coverObjectUrls.length) { const url = coverObjectUrls.pop(); if (windowRef.URL && windowRef.URL.revokeObjectURL) windowRef.URL.revokeObjectURL(url); } },
         confirmAction: (message) => windowRef.confirm(message), setTimeout: windowRef.setTimeout.bind(windowRef),
         persistItems: host.persistItems, persistFolders: host.persistFolders, persistAuthorCards: host.persistAuthorCards, persistAll: host.persistAll, scheduleCloudSync: host.scheduleCloudSync,
-        openReader: (item) => host.navigateToReader(item), accessMedia: host.setupFeedImage,
+        openReader: (item) => host.navigateToReader(item), accessMedia: (...args) => { markCoverLoadStart(); return host.setupFeedImage(...args); },
         renderDashboard, renderAuthorDashboard,
-        getVisibleItems: visibleItems, appendFolderPreview, createStaticCard: (input) => MangaListCardBoundary.createStaticCard(input), loadLocalCover: host.loadLocalCover, getCoverSourceCache: () => coverSourceCache, setupFeedImage: host.setupFeedImage,
+        getVisibleItems: visibleItems, appendFolderPreview, markCoverLoadStart, createStaticCard: (input) => MangaListCardBoundary.createStaticCard(input), loadLocalCover: (...args) => { markCoverLoadStart(); return host.loadLocalCover(...args); }, getCoverSourceCache: () => coverSourceCache, setupFeedImage: (...args) => { markCoverLoadStart(); return host.setupFeedImage(...args); },
         makeHeartIcon, moveItemInList, moveFolderInList, renderList,
         updateBulkEditButton, shelfVisibleItems: visibleItems, unreadOrderItems: () => visibleItems().filter((item) => !item.lastReadAt), itemDisplayTitle: title, itemSubtext, readingRecordText, itemPageCountText: pageCount,
         buildFavoritesFolderCard, buildSeriesFolderCard, buildSeriesGroupCard, buildAuthorGroupCard, buildSearchText,
@@ -411,11 +355,16 @@
           if (!windowRef.MangaVault?.loadActive?.()?.rawKey) {
             importStatus.textContent = '画像の追加には、ログインして保管庫を開いてください。';
           } else {
-            importStatus.textContent = '';
+            importStatus.textContent = '画像追加機能を準備しています…';
           }
           importDialog.hidden = false;
           importDialog.style.display = 'grid';
           importTitle.focus();
+          void dependencyLoader.ensureEncryptedImageImportDependencies().then(() => {
+            if (!importDialog.hidden && importStatus.textContent === '画像追加機能を準備しています…') importStatus.textContent = '';
+          }).catch((error) => {
+            if (!importDialog.hidden) importStatus.textContent = error?.message || '画像追加機能を読み込めませんでした。もう一度お試しください。';
+          });
         });
         bind(rootElement.querySelector('#encryptedImageCancelButton'), 'click', closeImport);
         bind(importForm, 'submit', async (event) => {
@@ -430,6 +379,7 @@
           importTitle.disabled = true;
           importStatus.textContent = `画像を準備しています（0/${selectedFiles.length}）`;
           try {
+            await dependencyLoader.ensureEncryptedImageImportDependencies();
             const cache = await windowRef.EncryptedAssetCache.createCache();
             const storageTransport = windowRef.EncryptedAssetStorage.createStorageTransport({ baseUrl: config.url, publishableKey: config.publishableKey });
             const service = windowRef.EncryptedAssetImport.create({
@@ -450,7 +400,6 @@
             renderList();
             importStatus.textContent = '追加しました。暗号化画像は本棚と保管庫に同期されました。';
             importForm.reset();
-            windowRef.setTimeout(closeImport, 900);
           } catch (error) {
             importStatus.textContent = error?.message || '暗号化画像を追加できませんでした。';
           } finally {
@@ -502,13 +451,20 @@
         runtimeFactory: MangaListRuntimeFactory,
         contextFactory: MangaListRuntimeContextFactory,
         createContextDeps: ({ elements: mountedElements }) => { elements = mountedElements; return contextDeps; },
-        createStateDeps: () => ({ load: data.load, migrate: (loaded) => Object.assign(state(), loaded), removeHistoryFolder: (loaded) => { loaded.savedFolders = loaded.savedFolders.filter((folder) => folder.id !== config.HISTORY_FOLDER_ID); return loaded; }, synchronizeAuthors }),
+        createStateDeps: () => ({ load: () => { const loaded = data.load(); markStartup('state-loaded'); return loaded; }, migrate: (loaded) => Object.assign(state(), loaded), removeHistoryFolder: (loaded) => { loaded.savedFolders = loaded.savedFolders.filter((folder) => folder.id !== config.HISTORY_FOLDER_ID); return loaded; }, synchronizeAuthors }),
         createRenderDeps: () => ({ getState: state, getElements: () => elements, deriveViewModel: (value) => value, render: () => runtime.renderSavedList() }),
         createControllerDeps: ({ stateRuntime: entryStateRuntime, renderRuntime: entryRenderRuntime }) => ({ init: entryStateRuntime.initialize, render: entryRenderRuntime.render, open: () => entryRenderRuntime.render(), activate: () => {}, getElements: () => elements }),
         createEventBindings: eventBindings,
         createActivation: () => () => {},
       });
       const result = entry.start({ mountElement: input.mountElement });
+      markStartup('dom-rendered');
+      const markCardsVisible = () => {
+        markStartup('cards-visible');
+        try { windowRef.performance?.measure?.('manga:allowed-to-cards-visible', { start: 'manga:vpn-allowed', end: 'manga:cards-visible' }); } catch (_) {}
+      };
+      if (typeof windowRef.requestAnimationFrame === 'function') windowRef.requestAnimationFrame(() => windowRef.requestAnimationFrame(markCardsVisible));
+      else markCardsVisible();
       if (token !== lifecycle) {
         entry.cleanup();
         return null;

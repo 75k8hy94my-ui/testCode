@@ -67,6 +67,6 @@ test('individual add opens the encrypted image import form and connects the encr
 });
 
 test('manga route mounts the manga template and Reader has no shelf template dependency', () => {
-  assert.match(route, /manga-list-template\.js\?v=/);
+  assert.match(fs.readFileSync(new URL('../manga-list-dependency-loader.js', import.meta.url), 'utf8'), /manga-list-template\.js\?v=/);
   assert.doesNotMatch(fs.readFileSync('reader.html', 'utf8'), /manga-list-template|reader-saved-list-template/);
 });
