@@ -1,73 +1,90 @@
-# Current implementation notes
+# AGENTS.md
 
-- The application remains static HTML/CSS/JavaScript with no build step or production dependencies.
-- Vault payload keys are defined in `vault-payload.js`; `authorCards`, `study`, `videoFolders`, `videoMeta`, and `indexSearchSettings` are included in sync and logout clearing.
-- Video bookmark enhancements preserve the legacy `mangaReaderVideos` base records and store folders/extended metadata in `mangaReaderVideoFolders` / `mangaReaderVideoMeta`; both sidecars are included in encrypted vault sync and version-3 backups.
-- Backups use `manga-reader-backup` version 3 and accept version-2 and legacy raw payloads. Version 3 adds portable `indexBooks`; device chunk IDs, revisions, ciphertext, and vault key material are never exported. Missing `indexBooks` migrates to an empty list.
-- `mangaReaderSavedVaultPassphrase:<userId>` is a legacy key only; passphrases are not persisted by current UI and the legacy key is removed on logout.
-- Supabase vault rows use `revision` and `update_manga_reader_vault(expected_revision, new_payload)` for atomic conflict detection.
-- Study sync keeps local `pendingSyncOps` and may rebase them onto the newest remote study state after a CAS conflict only when non-study local data has not changed from the recorded baseline.
-- `links.html` data remains independent and is not included in the vault.
-- Private local-manga items write `storagePaths` as the canonical image location. Legacy `pages` URLs remain readable.
-- Local manga UI is temporarily disabled by `feature-flags.js` (`localReader: false`); set it to `true` to restore the existing implementation.
+This file contains repository-wide instructions for Codex and other coding agents.
+Keep it focused on durable rules. Do not use it as a changelog or as a snapshot of temporary feature state.
+If the implementation and this file disagree, inspect the current code first and update this file when the architectural rule itself has changed.
 
-## Legal index search
+## Project baseline
 
-- `index-search.html` is authenticated and also requires an unlocked Vault key. It searches decrypted data in memory; searches do not call Supabase.
-- One imported textbook is one `index-book` chunk. Book titles, subjects, index terms, case citations, statute citations, and page references must never be stored as plaintext in Supabase or IndexedDB.
-- `encrypted-chunk-crypto.js` derives an independent AES-256-GCM key for each chunk with HKDF-SHA-256 from the active Vault master key. Chunk IDs are bound as authenticated context and each encryption uses a fresh IV.
-- `encrypted-chunk-cache.js` persists only encrypted envelopes plus `chunkId`, `revision`, timestamps/tombstone state, and pending sync action. Do not add plaintext book/index metadata to its records.
-- `manga_reader_encrypted_chunks` is owner-scoped by RLS. Anonymous access is revoked. Updates and deletions use per-chunk revision CAS; deletion is a tombstone so a stale client cannot silently resurrect a deleted book.
-- Search settings remain in the existing encrypted monolithic Vault. The large index corpus does not: it syncs in separate encrypted chunks and is cached per signed-in user for offline search.
-- A full backup downloaded by the user intentionally contains normalized plaintext `indexBooks`; treat the downloaded JSON as sensitive. Restore validates the complete package, creates fresh book/chunk IDs, and re-encrypts each book before persistent cache storage.
-- Logging out clears that user's encrypted index IndexedDB cache before active Vault material and session state are cleared.
-- Same-book sync conflicts are never automatically merged. Conflict comparison decrypts both versions only in memory while the Vault is unlocked; the user must explicitly adopt the cloud version, save the local version as a separate freshly encrypted book, or explicitly discard a stale remote-missing copy.
-- Worker-backed search may hold decrypted index data only ephemerally while the protected page is open. Worker failure must fall back to the same `legal-index-search.js` semantics on the main thread; neither route persists plaintext search indexes.
-- Old encrypted-chunk tombstones may be physically removed only for the authenticated owner after at least 90 days, through an owner-scoped `security invoker` RPC. The client attempts cleanup at most once every seven days and only after an ordinary sync succeeds.
-- If a tombstone has already been physically removed, a stale nonzero-revision local copy remains a `remote-missing` conflict and must never be auto-inserted/resurrected.
-- AI conversion support only generates/copies the static schema instructions. It must not send registered book content or provider credentials to an external AI service.
-- Run `npm test` and `npm run verify:static` before merging legal-index changes.
+- testCode is a static HTML/CSS/JavaScript application. There is no production build step.
+- Before changing an area, inspect the current implementation and its tests. Do not assume old plans, docs, comments, or previous task reports still describe the live architecture.
+- Prefer root-cause fixes over timing workarounds, CSS masking, duplicated state, or compatibility layers that preserve a broken design.
+- Keep changes scoped to the requested work. Do not rewrite unrelated files or absorb unrelated local/user changes into a commit.
 
-## 判例百選 / Google Drive
+## Required verification
 
-- `hyakusen.html` is authenticated and requires an unlocked Vault, just like `index-search.html`.
-- `hyakusen-catalog.js` is the single authoritative mapping from a case identity to Hyakusen collection/edition/number. `DEFAULT_ENTRIES` intentionally remains empty until the user supplies an authoritative contents list; never infer or fabricate Hyakusen contents.
-- A Hyakusen case match requires all six structured case identity fields: court, decision date, reporter, volume, issue, and reporter page. Never attach a Hyakusen label from the decision date alone or from the `case-text|...` fallback identity.
-- When the same case appears in multiple editions of one Hyakusen collection, the latest edition is the default listing. Latest labels omit the edition (`民法Ⅱ14`); old-edition-only fallback labels include it (`民法Ⅱ8版37`).
-- `legal-index-search.js` adds Hyakusen labels only after ordinary search ranking is complete, so Hyakusen metadata must not change search scoring/order. Worker search imports the same catalog before `legal-index-search.js`.
-- Drive integration uses Google Identity Services token model and only the scope `https://www.googleapis.com/auth/drive.metadata.readonly`.
-- Drive availability is based only on exact filename equality with an expected catalog filename, `mimeType === 'application/pdf'`, and `trashed === false`. Similar filenames do not count.
-- Never download or inspect Drive PDF bodies for availability checking. Only metadata fields `id`, `name`, `mimeType`, `trashed`, and `webViewLink` are requested.
-- The Google OAuth Client ID may be stored in localStorage because it is public configuration. The Google access token is held only in page memory and must never be written to localStorage, sessionStorage, IndexedDB, the Vault, Supabase, or backups. Do not introduce a client secret into browser code or the repository.
-- To configure Google Cloud: enable Google Drive API; create an OAuth 2.0 **Web application** client; add `https://75k8hy94my-ui.github.io` as an Authorized JavaScript origin; then paste that client ID into the Hyakusen page. No client secret is used by testCode.
-- Google Identity Services does not automatically refresh access tokens. When a token expires or authorization is lost, the user reconnects from the Hyakusen page.
-- Run `npm test` and `npm run verify:static` before merging Hyakusen or Drive changes.
+For repository changes, run the checks relevant to the modified area. Before considering a general code change complete, normally run:
 
-## Manual CAS verification
+```bash
+npm test
+npm run verify:static
+git diff --check
+```
 
-Open the same account in two authenticated browser contexts, unlock the same vault revision, change data in both, and save both. Exactly one save must succeed; the other must show a conflict while retaining its local data. Apply `supabase-schema.sql` in the Supabase SQL editor before testing.
+For UI or browser-behavior changes, also exercise the affected flow in a real browser or browser automation. Unit tests alone are not sufficient for visual lifecycle, navigation, loading, focus, or rendering behavior.
 
-## Definition quiz AI
+If a required check cannot be run, report the exact blocker and what was verified instead.
 
-- Browser study state key: `mangaReaderStudy`; encrypted vault/backup field: `study`.
-- Edge Function source: `supabase/functions/study-ai/`.
-- Required Edge secret: `OPENAI_API_KEY`.
-- Optional model setting: `OPENAI_STUDY_MODEL`; default `gpt-5-mini`.
-- Keep Supabase Edge JWT verification enabled; do not deploy this function with `--no-verify-jwt`.
-- Browser code never stores or sends the OpenAI provider API key.
-- Deploy the function with `supabase functions deploy study-ai`.
-- Set secrets from an already-populated shell environment, for example: `supabase secrets set OPENAI_API_KEY="$OPENAI_API_KEY" OPENAI_STUDY_MODEL="gpt-5-mini"`.
-- Run `npm test` and `npm run verify:static` before merging changes to the study subsystem.
+## Reader architecture
 
-## Git / GitHub push workflow
+The current Reader boundary is intentional and must not be regressed.
 
-- Do not conclude that pushing is impossible merely because terminal Git credentials are missing. First inspect the actual repository state with `git status`, `git branch --show-current`, `git rev-parse HEAD`, `git remote -v`, and, when useful, `git branch -vv`.
-- If the requested work should be pushed, first try the normal Git path: `git push` when an upstream exists, otherwise `git push -u origin <current-branch>`.
-- If push fails, classify the real error before stopping. Distinguish at least: missing upstream, non-fast-forward, authentication failure, permission denial, protected branch, detached HEAD, and network failure.
-- For non-fast-forward failures, fetch and inspect the divergence before integrating remote work. Do not use `git push --force` or `git push --force-with-lease` merely to make the push succeed.
-- If HTTPS/SSH credentials are unavailable in the shell but an authenticated GitHub integration/tool with write access to this repository is available, use that integration to publish the same commit/tree to the intended remote branch instead of declaring the task blocked.
-- When publishing through a GitHub integration, preserve Git history: create/update the intended branch from the correct parent commit and apply the same repository tree/changes without force-moving unrelated history.
-- After any push or integration-based publish, verify the remote result. Record the local commit/tree when available and compare it with the remote branch/commit. At minimum, confirm that the intended branch exists remotely and points to the expected content.
-- A shell error such as `could not read Username for 'https://github.com': Device not configured` proves that the shell credential path failed; it does not by itself prove that repository publishing is impossible.
-- Only report that pushing is impossible after actually attempting the available path(s) and identifying a concrete blocker that cannot be resolved from the current environment.
-- Never discard unrelated local/user work in order to push. Avoid `git reset --hard`, `git clean -fd`, and force-push unless the user explicitly requests destructive history rewriting and the consequences have been checked.
+- `manga.html` owns bookshelf/list responsibilities.
+- `reader.html?item=<itemId>` is the standalone work Reader route. The URL `item` value is the route identity.
+- The Reader must not depend on or initialize the bookshelf runtime, nor be re-embedded into the Home SPA through an iframe/navigation shell.
+- Reader page discovery belongs to `reader-page-source.js`. Do not reuse the display image cache as a page-enumeration mechanism.
+- Reader progress belongs to `reader-progress-repository.js`; `mangaReaderLastPage` is the canonical progress map. Legacy item progress may be read only for migration.
+- Page navigation distinguishes the requested page from the displayed page. Do not advance displayed state or page UI before the requested frame is display-ready.
+- Prepared frames commit atomically. The old frame remains visible until the replacement frame is ready; spreads commit as one frame.
+- Only the latest navigation generation may commit to the screen. Older asynchronous loads may populate cache, but must not overwrite a newer request.
+- Display image loading should deduplicate in-flight work, decode before ready state, retain a bounded window around the current page, and avoid unbounded decoded-image retention.
+- Reader-owned listeners, timers, observers, pending work, renderers, and object URLs must be disposed on close/destroy.
+- Closing Reader saves already-committed progress, destroys Reader-owned resources, and returns to `manga.html`.
+
+When changing Reader behavior, preserve these invariants unless the task explicitly requires an architectural redesign. If redesigning them, update this section in the same change.
+
+## State, encryption, and persistence
+
+- `vault-payload.js` is the authority for Vault-backed local data keys and normalization. Do not duplicate its key list in new code when it can be imported/reused.
+- Never persist credentials, Vault key material, provider secrets, decrypted protected content, or access tokens merely for convenience.
+- Encrypted chunk persistence may contain encrypted envelopes and the minimum synchronization metadata needed to manage them. Do not add plaintext protected corpus metadata/content to `encrypted-chunk-cache.js`.
+- Conflict/revision handling must not silently overwrite a newer remote revision or resurrect deleted encrypted data.
+- Treat logout/lock cleanup as part of the security boundary: newly introduced protected caches or sensitive in-memory resources must have an explicit cleanup path.
+- Browser code must not contain server/provider secret keys. Public client identifiers are not secrets, but access tokens and provider credentials are.
+
+When security-sensitive storage or sync behavior changes, add or update tests for persistence, migration, conflict handling, and cleanup.
+
+## Compatibility and migrations
+
+- Prefer one canonical representation and an explicit one-time migration over indefinite dual writes.
+- Legacy formats may be read when needed for migration, but new writes should target the canonical representation.
+- Do not remove a legacy read path until existing persisted user data has a safe migration path.
+- Avoid speculative backwards-compatibility code for formats that never existed in production.
+
+## Git and GitHub workflow
+
+Do not report that publishing is impossible merely because the shell credential path fails.
+
+1. Inspect the repository state:
+   ```bash
+   git status
+   git branch --show-current
+   git rev-parse HEAD
+   git remote -v
+   git branch -vv
+   ```
+2. If the requested work should be published, try the normal path: `git push` when an upstream exists, otherwise `git push -u origin <current-branch>`.
+3. If push fails, classify the actual error: missing upstream, non-fast-forward, authentication failure, permission denial, protected branch, detached HEAD, or network failure.
+4. For non-fast-forward failures, fetch and inspect divergence before integrating remote work. Do not force-push simply to make the command succeed.
+5. If terminal HTTPS/SSH credentials are unavailable but an authenticated GitHub integration/tool has write access to this repository, use that integration to publish the same intended change to the remote branch instead of declaring the task blocked.
+6. After publishing, verify the remote branch and resulting commit/content. When possible compare the local and remote commit/tree.
+7. A message such as `could not read Username for 'https://github.com': Device not configured` means the shell credential path failed; it does not prove that GitHub publishing itself is unavailable.
+
+Never discard unrelated work to make Git operations easier. Avoid `git reset --hard`, `git clean -fd`, `git push --force`, and `git push --force-with-lease` unless destructive history rewriting is explicitly required and its consequences have been checked.
+
+## Maintaining this file
+
+- Keep only cross-cutting, durable repository rules here.
+- Put feature-specific implementation detail in code, tests, or dedicated docs near that feature.
+- Remove instructions that refer to deleted files, temporary feature flags, one-off rollout state, or obsolete version numbers.
+- When a task changes a durable architecture or workflow described here, update `AGENTS.md` as part of the same change.
