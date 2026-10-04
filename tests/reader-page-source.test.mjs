@@ -26,4 +26,3 @@ test('legacy discovery is isolated and stores a versioned manifest once', async 
   assert.deepEqual(second.urls, first.urls);
   assert.deepEqual(calls, []);
 });
-

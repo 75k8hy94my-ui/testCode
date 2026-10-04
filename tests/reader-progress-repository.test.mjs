@@ -23,4 +23,3 @@ test('older commit cannot overwrite newer stored progress', () => {
   assert.equal(repo.commit('x', 3, 9, 40), false);
   assert.equal(JSON.parse(local.getItem('mangaReaderLastPage'))['item:x'].page, 9);
 });
-
