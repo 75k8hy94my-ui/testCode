@@ -6,15 +6,14 @@ const route = fs.readFileSync('manga-list-route.js', 'utf8');
 const spa = fs.readFileSync('home-profile-spa.js', 'utf8');
 const manga = fs.readFileSync('manga.html', 'utf8');
 
-test('manga shelf launches the standalone reader through its shared SPA shell without evaluating reader.html', () => {
+test('manga shelf launches the standalone Reader document from its document boundary', () => {
   assert.match(route, /MangaListEntryFactory\.create\(/);
   assert.doesNotMatch(route, /fetch\(\s*['"]reader\.html/);
   assert.doesNotMatch(route, /fetch\s*\(/);
   assert.match(spa, /renderManga\(/);
   assert.match(spa, /route === 'manga'|route==='manga'/);
-  assert.match(spa, /else if\(route==='reader'\)renderReader\(/);
-  assert.match(spa, /frame\.src=readerUrl\.href/);
-  assert.match(route, /HomeProfileSPA\.navigate\(url\)/);
+  assert.doesNotMatch(spa, /reader\.html|renderReader|iframe/);
+  assert.match(route, /location\.assign\(url\)/);
   assert.match(manga, /manga-list-route\.js\?v=/);
 });
 

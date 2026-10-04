@@ -5,9 +5,10 @@ import fs from 'node:fs';
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 const reader = read('reader.html');
 
-test("the bookshelf launches a reader using the saved item's stable id", () => {
+test("the bookshelf launches a standalone reader document using the saved item's stable id", () => {
   assert.match(read('manga-list-host-runtime.js'), /buildReaderUrl\(itemId, deps\.navigation\.readerUrl\)/);
-  assert.match(read('manga-list-host-runtime.js'), /prepareLaunch\(item\)/);
+  assert.doesNotMatch(read('manga-list-host-runtime.js'), /prepareLaunch|lastUrlKey|mangaReaderLastUrl/);
+  assert.match(read('manga-list-host-runtime.js'), /navigate\(deps\.navigation\.buildReaderUrl/);
   assert.match(read('reader-target.js'), /function buildReaderUrl\(itemId/);
   assert.match(read('reader-target.js'), /itemIdFromLocation/);
 });
@@ -37,10 +38,15 @@ test('reader UI blocks media context menus, keeps vertical pages readable, and s
   assert.match(read('reader-runtime.js'), /reader-chrome-hidden/);
 });
 
-test('embedded Reader close returns to the shared SPA shell without a top-level document navigation', () => {
-  assert.match(read('reader-runtime.js'), /manga-reader:close/);
-  assert.match(read('reader-runtime.js'), /manga-reader:open-item/);
-  assert.match(read('home-profile-spa.js'), /function handleReaderShellMessage\(event\)/);
-  assert.match(read('home-profile-spa.js'), /navigate\('manga\.html',\{replace:true\}\)/);
-  assert.match(read('home-profile-spa.js'), /readerUrl\.searchParams\.set\('item',event\.data\.itemId\.trim\(\)\);navigate\(readerUrl\.href\)/);
+test('Home SPA leaves reader.html to standalone document navigation', () => {
+  const spa = read('home-profile-spa.js');
+  const shell = read('app-global-shell.js');
+  assert.doesNotMatch(spa, /reader\.html|renderReader|readerSpaFrame|manga-reader:/);
+  assert.doesNotMatch(shell, /reader\.html/);
+  assert.doesNotMatch(read('reader-runtime.js'), /spa=1|manga-reader:(close|open-item|chrome)/);
+  assert.doesNotMatch(reader, /home-profile-spa\.js|manga-list-route\.js|spa=1/);
+});
+
+test('Reader module graph excludes bookshelf runtime and its route dependencies', () => {
+  assert.doesNotMatch(reader, /manga-list-route\.js|manga-list-host-runtime\.js/);
 });

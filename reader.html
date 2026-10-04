@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja" class="auth-pending reader-shell-page">
+<html lang="ja" class="auth-pending">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -73,7 +73,7 @@
   <script src="supabase-config.js"></script>
   <script src="vault-session.js?v=20261003-session-lock"></script>
   <script src="browser-storage.js"></script>
-  <script src="reader-target.js?v=20261003-reader-launch-contract"></script>
+  <script src="reader-target.js?v=20261004-reader-item-route"></script>
   <script src="vault-payload.js"></script>
   <script src="feature-flags.js"></script>
   <script src="media-access-gate.js?v=20260926-non-jp-vpn"></script>
@@ -89,8 +89,12 @@
   <script src="encrypted-asset-item.js"></script>
   <script src="reader-image-enhancement.js"></script>
   <script src="reader-image-loader.js?v=20261004-reader-image-pipeline"></script>
+  <script src="reader-lifecycle.js?v=20261004-reader-lifecycle"></script>
+  <script src="reader-page-transition.js?v=20261004-reader-lifecycle"></script>
+  <script src="reader-page-source.js?v=20261004-reader-lifecycle"></script>
+  <script src="reader-progress-repository.js?v=20261004-reader-lifecycle"></script>
   <script src="reader-item-repository.js"></script>
-  <script src="reader-runtime.js?v=20261003-reader-ui-spa"></script>
+  <script src="reader-runtime.js?v=20261004-reader-lifecycle"></script>
   <script>
     window.MangaReaderBootPromise = (async () => {
       const sessionKey = 'mangaReaderSupabaseSession';
@@ -117,20 +121,25 @@
   <script>
     (async () => {
       if (!await window.MangaReaderBootPromise) return;
+      MangaReaderTarget.clearLegacyTarget(localStorage);
       const itemId = window.MangaReaderTarget.itemIdFromLocation(location);
-      const repository = ReaderItemRepositoryFactory.create({
-        readItems() { try { const values = JSON.parse(localStorage.getItem('mangaReaderSavedItems') || '[]'); return Array.isArray(values) ? values : []; } catch (_) { return []; } },
-        writeItems(items) { return MangaReaderStorage.safeWriteJson('mangaReaderSavedItems', items); },
-        scheduleSync() {
-          clearTimeout(window.__readerVaultSyncTimer);
-          window.__readerVaultSyncTimer = setTimeout(() => {
+      let syncTimer = null;
+      const syncScheduler = {
+        schedule() {
+          clearTimeout(syncTimer);
+          syncTimer = setTimeout(() => {
+            syncTimer = null;
             try { const payload = MangaVaultPayload.buildFromLocalStorage(); MangaVault.savePayload(payload).catch((error) => { document.getElementById('readerStatus').textContent = error?.message || '同期に失敗しました'; }); } catch (error) { document.getElementById('readerStatus').textContent = error?.message || '同期に失敗しました'; }
           }, 5000);
         },
+        destroy() { clearTimeout(syncTimer); syncTimer = null; },
+      };
+      const repository = ReaderItemRepositoryFactory.create({
+        readItems() { try { const values = JSON.parse(localStorage.getItem('mangaReaderSavedItems') || '[]'); return Array.isArray(values) ? values : []; } catch (_) { return []; } },
+        writeItems(items) { return MangaReaderStorage.safeWriteJson('mangaReaderSavedItems', items); },
+        scheduleSync: () => syncScheduler.schedule(),
       });
-      let launchStorage = null;
-      try { launchStorage = window.sessionStorage; } catch (_) {}
-      const runtime = ReaderRuntimeFactory.create({ repository, target: MangaReaderTarget, sessionStorage: launchStorage, location, document, window });
+      const runtime = ReaderRuntimeFactory.create({ repository, target: MangaReaderTarget, lifecycleResources: [syncScheduler], location, document, window });
       window.MangaReaderRuntime = runtime;
       if (!itemId) { runtime.close(); return; }
       const item = await runtime.start(itemId);

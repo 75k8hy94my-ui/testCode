@@ -6,7 +6,6 @@ const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), '
 const route = read('manga-list-route.js');
 const runtime = read('manga-list-runtime.js');
 const mangaListTemplate = read('manga-list-template.js');
-const savedListTemplate = read('reader-saved-list-template.js');
 
 const expectedKeys = [
   'listBackBtn', 'listFolderTitle', 'listNewFolderBtn', 'listNewFolderRow',
@@ -45,11 +44,7 @@ test('manga list DOM boundary ids belong to the manga template and does not crea
   assert.match(route, /manga-list-template\.js/);
   assert.match(route, /manga-list-elements\.js/);
   assert.match(route, /manga-list-dom-resolver\.js/);
-  assert.equal((savedListTemplate.match(/MangaListTemplate\.createMarkup\(\)/g) || []).length, 1);
-  assert.doesNotMatch(savedListTemplate, /id=["']mangaListSection["']/);
-  assert.match(savedListTemplate, /id=["']savedListOverlay["']/);
-  assert.match(savedListTemplate, /id=["']savedListPanel["']/);
-  assert.match(savedListTemplate, /id=["']videoListSection["']/);
+  assert.doesNotMatch(read('reader.html'), /savedListOverlay|videoListSection|authorCardOverlay|settingsOverlay|backupOverlay/);
   for (const forbidden of ['videoListItems', 'videoListEmpty', 'videoLibraryApp', 'viewer', 'pageStage', 'tocOverlay', 'customAddOverlay', 'editItemOverlay', 'bulkEditOverlay', 'bulkDetectOverlay', 'authorCardOverlay']) {
     assert.doesNotMatch(mangaListTemplate, new RegExp(`\\b${forbidden}\\b`), forbidden);
   }

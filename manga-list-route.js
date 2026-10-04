@@ -291,18 +291,10 @@
           clearTimer: (timer) => windowRef.clearTimeout(timer),
         },
         navigation: {
-          lastUrlKey: 'mangaReaderLastUrl', readerUrl: 'reader.html',
-          writeStorage: (key, value) => storage.setItem(key, value),
+          readerUrl: 'reader.html',
           buildReaderUrl: (itemId, base) => windowRef.MangaReaderTarget.buildReaderUrl(itemId, base),
-          prepareLaunch: (item) => windowRef.MangaReaderTarget.prepareLaunch(item, windowRef.sessionStorage),
-          // The shared shell owns Reader routing. Its route keeps the outer app
-          // alive and hosts the dedicated reader.html document in an iframe;
-          // direct reader.html entry remains independent of bookshelf code.
+          // Reader is a separate document; the URL item id is its only route identity.
           navigate: (url) => {
-            if (windowRef.HomeProfileSPA && typeof windowRef.HomeProfileSPA.navigate === 'function') {
-              windowRef.HomeProfileSPA.navigate(url);
-              return;
-            }
             if (windowRef.location && typeof windowRef.location.assign === 'function') windowRef.location.assign(url);
             else windowRef.location.href = url;
           },

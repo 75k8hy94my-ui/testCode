@@ -12,9 +12,11 @@
       const page = index + 1;
       const options = new URLSearchParams({ delay: page === 1 ? '0' : String(delay), cache: String(Date.now()) });
       if (page === 30) options.set('large', '1');
+      if (page === 39) options.set('failOnce', '1');
       return `${location.origin}/__reader-test/image/${page}.svg?${options.toString()}`;
     }),
   };
+  item.pageManifest = { version: 1, pages: item.pages.slice() };
   const repository = {
     loadItem(id) { return id === item.id ? item : null; },
     saveItem() {},
@@ -22,12 +24,11 @@
     findNextVolume() { return null; },
   };
   const target = {
-    consumeLaunch() { return null; },
     itemResumeKey: (id) => `item:${id}`,
     buildReaderUrl: (id) => `reader.html?item=${encodeURIComponent(id)}`,
   };
   const memoryStorage = { getItem() { return null; }, setItem() {}, removeItem() {} };
-  const runtime = ReaderRuntimeFactory.create({ repository, target, sessionStorage: memoryStorage, location, document, window });
+  const runtime = ReaderRuntimeFactory.create({ repository, target, location, document, window });
   const samples = { frames: 0, empty: 0, pageMismatch: 0 };
   const report = document.getElementById('testReport');
   function sample() {

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const port = Number(process.env.READER_IMAGE_TEST_PORT) || 4173;
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml' };
+const failedOnce = new Set();
 
 function escape(value) { return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[char]); }
 
@@ -15,6 +16,12 @@ http.createServer((request, response) => {
     const page = Math.max(1, Number(url.pathname.match(/(\d+)\.svg$/)?.[1]) || 1);
     const delay = Math.min(5000, Math.max(0, Number(url.searchParams.get('delay')) || 0));
     const large = url.searchParams.get('large') === '1';
+    const failOnce = url.searchParams.get('failOnce') === '1';
+    if (failOnce && !failedOnce.has(url.pathname)) {
+      failedOnce.add(url.pathname);
+      response.writeHead(503, { 'Cache-Control': 'no-store' }).end('Temporary test failure');
+      return;
+    }
     const width = large ? 2200 : 900;
     const height = large ? 3200 : 1300;
     const color = `hsl(${(page * 47) % 360} 72% 50%)`;

@@ -38,17 +38,15 @@ test('current entry pages keep their static bootstrap script baselines', () => {
   ]);
 });
 
-test('manga and video use app-shell routes and the dedicated Reader document is hosted by an SPA route', () => {
+test('manga and video use app-shell routes while Reader stays a standalone document', () => {
   assert.match(spa, /if\(name==='manga\.html'\)return'manga'/);
   assert.match(spa, /if\(name==='video\.html'\)return'video'/);
   assert.match(spa, /else if\(route==='manga'\)renderManga\(generation\)/);
   assert.match(spa, /else if\(route==='video'\)renderVideo\(generation\)/);
-  assert.match(spa, /if\(name==='reader\.html'\)return'reader'/);
-  assert.match(spa, /else if\(route==='reader'\)renderReader\(\)/);
-  assert.match(spa, /frame\.src=readerUrl\.href/);
+  assert.doesNotMatch(spa, /reader\.html|renderReader|iframe/);
   assert.match(spa, /if\(!SPA_PAGES\.includes\(name\)\)\{location\.href=target\.href;return;\}/);
-  assert.match(reader, /class="auth-pending reader-shell-page"/);
-  assert.match(reader, /reader-target\.js\?v=20261003-reader-launch-contract/);
+  assert.match(reader, /class="auth-pending"/);
+  assert.match(reader, /reader-target\.js\?v=20261004-reader-item-route/);
 });
 
 test('manga and video mount through their own route runtimes', () => {

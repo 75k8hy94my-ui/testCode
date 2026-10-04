@@ -39,14 +39,25 @@ test('encrypted rendering keeps Vault key, encrypted cache, and remote media gat
   assert.match(html, /reader-image-enhancement\.js/);
 });
 
-test('ordinary URL and explicit page-list items use the ordinary image reader path', () => {
-  assert.match(runtime, /if \(Array\.isArray\(item\.pages\) && item\.pages\.length\)/);
-  assert.match(runtime, /parseSequentialSource\(item\.url, item, win\.location\.href\)/);
-  assert.match(runtime, /resolvePage\(index, source\)/);
+test('ordinary and legacy page manifests are resolved by the separate PageSource layer', () => {
+  const source = read('reader-page-source.js');
+  assert.match(runtime, /pageSource\.resolve\(item/);
+  assert.match(source, /item\.pageManifest/);
+  assert.match(source, /createLegacyResolver/);
+  assert.doesNotMatch(runtime, /resolvePage\(index|for \(let index = 1; index <= 2000/);
 });
 
-test('reader uses item-scoped resume keys for encrypted and ordinary pages', () => {
+test('reader routes progress through the item-scoped progress repository', () => {
   assert.match(runtime, /target\.itemResumeKey/);
-  assert.match(runtime, /mangaReaderLastPage/);
-  assert.match(runtime, /repository\.updateItem\(currentItem\.id, \{ readingProgress:/);
+  assert.match(runtime, /progressRepository\?\.commit/);
+  assert.doesNotMatch(runtime, /repository\.updateItem\(currentItem\.id, \{ readingProgress:/);
+  assert.match(read('reader-progress-repository.js'), /mangaReaderLastPage/);
+});
+
+test('ordinary and encrypted render candidates use the same atomic page transition', () => {
+  assert.match(runtime, /pageTransition\.request\(targetPage/);
+  assert.match(runtime, /prepareOrdinaryPage\(targetPage/);
+  assert.match(runtime, /prepareEncryptedPage\(targetPage/);
+  assert.match(runtime, /await renderer\.readyPromise/);
+  assert.match(runtime, /stage\.replaceChildren\(candidate\.frame\)/);
 });

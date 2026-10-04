@@ -59,10 +59,11 @@ test('Reader uses itemId identity and returns to the bookshelf', () => {
 
 test('Reader stores progress and favorite updates through its focused repository', () => {
   const runtime = read('reader-runtime.js');
+  const progress = read('reader-progress-repository.js');
   const repository = read('reader-item-repository.js');
   assert.match(runtime, /favorite: !currentItem\.favorite/);
-  assert.match(runtime, /readingProgress/);
-  assert.match(runtime, /mangaReaderLastPage/);
+  assert.match(runtime, /progressRepository\?\.commit/);
+  assert.match(progress, /mangaReaderLastPage/);
   assert.match(repository, /updateItem\(itemId/);
   assert.match(repository, /dependencies\.scheduleSync\(\)/);
   assert.match(read('reader.html'), /MangaVault\.savePayload\(payload\)/);

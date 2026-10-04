@@ -66,9 +66,9 @@ test('authenticated top bars keep only the shared profile action', () => {
     assert.match(header, /<circle cx=["']12["'] cy=["']8["'] r=["']3\.2["']/);
     assert.doesNotMatch(header, /topActions|headerActions|>保管庫<|>設定<|>本棚</);
   }
-  const readerShell = read('reader-shell.js');
-  assert.match(readerShell, /data-profile-menu-trigger/);
-  assert.doesNotMatch(readerShell.match(/function shellMarkup\(\)[\s\S]*?function install\(\)/)?.[0] || '', /topActions|headerActions/);
+  const reader = read('reader.html');
+  assert.doesNotMatch(reader, /app-global-shell\.js|home-profile-spa\.js|reader-shell\.js/);
+  assert.match(reader, /aria-label="本棚に戻る"/);
   const globalShell = read('app-global-shell.js');
   assert.match(globalShell, /data-profile-menu-trigger/);
   assert.doesNotMatch(globalShell.match(/function markup\(\)[\s\S]*?function install\(\)/)?.[0] || '', /globalShellAccount|topActions|headerActions/);
@@ -131,7 +131,7 @@ test('saved theme drives home profile manga video and header colors', () => {
 
 test('reader owns a dedicated reading surface instead of home navigation chrome', () => {
   const reader = read('reader.html');
-  assert.match(reader, /reader-shell-page/);
+  assert.doesNotMatch(reader, /reader-shell-page/);
   assert.match(reader, /#readerApp/);
   assert.doesNotMatch(reader, /home-profile-shell|home-profile-spa|mobile-bottom-nav|app-desktop-rail/);
 });
@@ -184,15 +184,13 @@ test('reader is excluded from the app navigation shells', () => {
   assert.doesNotMatch(reader, /home-profile-shell|home-profile-spa|mobile-bottom-nav|app-desktop-rail/);
 });
 
-test('the manga shell hosts the dedicated Reader document as a history-managed SPA route', () => {
+test('the manga shell opens Reader through standalone document navigation', () => {
   const shell = read('app-global-shell.js');
   const spa = read('home-profile-spa.js');
   const route = read('manga-list-route.js');
-  assert.match(shell, /'reader\.html'/);
-  assert.match(spa, /function renderReader\(\)/);
-  assert.match(spa, /frame\.src=readerUrl\.href/);
+  assert.doesNotMatch(shell, /reader\.html/);
+  assert.doesNotMatch(spa, /renderReader|reader\.html|iframe/);
   assert.match(spa, /history\.pushState/);
-  assert.match(spa, /event\.source!==frame\.contentWindow/);
-  assert.match(route, /HomeProfileSPA\.navigate\(url\)/);
+  assert.match(route, /location\.assign\(url\)/);
   assert.doesNotMatch(read('reader.html'), /home-profile-spa|manga-list-route|MangaListHostRuntimeFactory/);
 });
