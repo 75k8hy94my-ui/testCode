@@ -58,3 +58,16 @@ Open the same account in two authenticated browser contexts, unlock the same vau
 - Deploy the function with `supabase functions deploy study-ai`.
 - Set secrets from an already-populated shell environment, for example: `supabase secrets set OPENAI_API_KEY="$OPENAI_API_KEY" OPENAI_STUDY_MODEL="gpt-5-mini"`.
 - Run `npm test` and `npm run verify:static` before merging changes to the study subsystem.
+
+## Git / GitHub push workflow
+
+- Do not conclude that pushing is impossible merely because terminal Git credentials are missing. First inspect the actual repository state with `git status`, `git branch --show-current`, `git rev-parse HEAD`, `git remote -v`, and, when useful, `git branch -vv`.
+- If the requested work should be pushed, first try the normal Git path: `git push` when an upstream exists, otherwise `git push -u origin <current-branch>`.
+- If push fails, classify the real error before stopping. Distinguish at least: missing upstream, non-fast-forward, authentication failure, permission denial, protected branch, detached HEAD, and network failure.
+- For non-fast-forward failures, fetch and inspect the divergence before integrating remote work. Do not use `git push --force` or `git push --force-with-lease` merely to make the push succeed.
+- If HTTPS/SSH credentials are unavailable in the shell but an authenticated GitHub integration/tool with write access to this repository is available, use that integration to publish the same commit/tree to the intended remote branch instead of declaring the task blocked.
+- When publishing through a GitHub integration, preserve Git history: create/update the intended branch from the correct parent commit and apply the same repository tree/changes without force-moving unrelated history.
+- After any push or integration-based publish, verify the remote result. Record the local commit/tree when available and compare it with the remote branch/commit. At minimum, confirm that the intended branch exists remotely and points to the expected content.
+- A shell error such as `could not read Username for 'https://github.com': Device not configured` proves that the shell credential path failed; it does not by itself prove that repository publishing is impossible.
+- Only report that pushing is impossible after actually attempting the available path(s) and identifying a concrete blocker that cannot be resolved from the current environment.
+- Never discard unrelated local/user work in order to push. Avoid `git reset --hard`, `git clean -fd`, and force-push unless the user explicitly requests destructive history rewriting and the consequences have been checked.
