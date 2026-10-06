@@ -57,7 +57,7 @@
     const key = await passkeyKey(new Uint8Array(prfOutput));
     return { id: b64url(new Uint8Array(credential.rawId)), salt: b64url(salt), encryptedKey: await encrypt(key, loadActive().rawKey) };
   }
-  async function unlockByPasskey(wrappers) {
+  async function unlockByPasskey(wrappers, signal) {
     if (!passkeySupported()) throw new Error('このブラウザはパスキーに対応していません。');
     const rpId = passkeyRpId();
     const entries = Array.isArray(wrappers) ? wrappers : [wrappers];
@@ -67,7 +67,7 @@
     const credential = await navigator.credentials.get({ publicKey: {
       challenge: toArrayBuffer(randomBytes(32)), rpId, allowCredentials, userVerification: 'required', timeout: 60000,
       extensions: { prf: { evalByCredential } }
-    }});
+    }, signal });
     const result = credential && credential.getClientExtensionResults && credential.getClientExtensionResults();
     const first = result && result.prf && result.prf.results && result.prf.results.first;
     if (!first) throw new Error('パスキーから保管庫解除情報を取得できませんでした。');
@@ -260,10 +260,10 @@
       catch (error) { if (previous) saveActive(previous); throw error; }
     });
   }
-  async function initializeWithPasskey(applyPayload) {
+  async function initializeWithPasskey(applyPayload, options = {}) {
     return withSession(async (token, user) => {
       const record = await fetchRecord(token, user); const keyWraps = record && record.payload && record.payload.keyWraps; const passkeys = keyWraps && (Array.isArray(keyWraps.passkeys) ? keyWraps.passkeys : (keyWraps.passkey ? [keyWraps.passkey] : []));
-      if (!passkeys || !passkeys.length) throw new Error('このアカウントには保管庫パスキーが登録されていません。'); const rawKey = await unlockByPasskey(passkeys); const vault = { rawKey, keyWraps: record.payload.keyWraps }; saveActive(vault); await applyPayload(await decryptPayload(record.payload)); setMeta(user.id, { revision: record.revision || 1, updatedAt: record.updated_at }); return { created: false };
+      if (!passkeys || !passkeys.length) throw new Error('このアカウントには保管庫パスキーが登録されていません。'); const rawKey = await unlockByPasskey(passkeys, options.signal); const vault = { rawKey, keyWraps: record.payload.keyWraps }; saveActive(vault); await applyPayload(await decryptPayload(record.payload)); setMeta(user.id, { revision: record.revision || 1, updatedAt: record.updated_at }); return { created: false };
     });
   }
   window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, refreshSession, ensureSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload };

@@ -27,8 +27,8 @@
     #vaultCredential { display:block; width:100%; height:clamp(54px,6vw,78px); border:1.5px solid var(--line); border-radius:3px; background:#fff; color:var(--text); padding:0 18px; font:inherit; font-size:clamp(18px,2vw,26px); box-shadow:none; outline:none; }
     #vaultCredential:focus { border-color:var(--focus); box-shadow:0 0 0 2px rgba(37,99,235,.12); }
     #vaultCredential.error { border-color:var(--danger); box-shadow:0 0 0 2px rgba(220,38,38,.10); }
-    #passkeyLoginBtn { display:block; width:100%; min-height:44px; margin-top:12px; border:1px solid var(--line); border-radius:3px; background:#fff; color:var(--text); font:inherit; cursor:pointer; }
-    #passkeyLoginBtn:hover, #passkeyLoginBtn:focus-visible { border-color:var(--focus); outline:none; }
+    #passkeyLoginBtn, #passphraseLoginBtn { display:block; width:100%; min-height:44px; margin-top:12px; border:1px solid var(--line); border-radius:3px; background:#fff; color:var(--text); font:inherit; cursor:pointer; }
+    #passkeyLoginBtn:hover, #passkeyLoginBtn:focus-visible, #passphraseLoginBtn:hover, #passphraseLoginBtn:focus-visible { border-color:var(--focus); outline:none; }
     .sr-only { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
     #recoveryBox { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(88vw,680px); padding:22px; border:1px solid #d1d5db; background:#fff; }
     #recoveryBox code { display:block; margin:12px 0; padding:12px; border:1px solid #d1d5db; overflow-wrap:anywhere; user-select:all; }
@@ -68,8 +68,8 @@
     <div id="unlockView">
       <form id="unlockForm" novalidate>
         <input id="vaultCredential" name="vault-unlock-key" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" autofocus>
+        <button id="passphraseLoginBtn" type="submit">パスフレーズでログイン</button>
         <button id="passkeyLoginBtn" type="button">パスキーでログイン</button>
-        <button type="submit" hidden aria-hidden="true"></button>
         <p id="status" class="sr-only" aria-live="polite"></p>
       </form>
     </div>
@@ -121,6 +121,8 @@
     const DEVICE_DATA_KEYS=[...Object.values(MangaVaultPayload.DATA_KEYS||{}),'mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
     let opening=false;
     let passkeyOpening=false;
+    let passkeyAbortController=null;
+    let passkeyAttempt=null;
 
     function closeAccountMenu() {
       ui.accountMenu.hidden=true;
@@ -156,14 +158,18 @@
       event.preventDefault();
       const credential=ui.credential.value;
       const isRecovery=credential.trim().startsWith('mrk1_');
-      if (!credential.trim() || (!isRecovery && credential.length < 12) || opening || passkeyOpening) {
-        if (!opening && !passkeyOpening) markError('入力内容を確認してください。');
+      if (!credential.trim() || (!isRecovery && credential.length < 12) || opening) {
+        if (!opening) markError('入力内容を確認してください。');
         return;
       }
       opening=true;
       ui.credential.classList.remove('error');
       setStatus('');
       try {
+        if (passkeyOpening) {
+          if (passkeyAbortController) passkeyAbortController.abort();
+          if (passkeyAttempt) await passkeyAttempt;
+        }
         const result=await MangaVault.initialize(isRecovery ? '' : credential,isRecovery ? credential.trim() : '',buildPayload,applyPayload);
         ui.credential.value='';
         if (result.created) {
@@ -186,21 +192,28 @@
       closeAccountMenu();
       if (opening || passkeyOpening) return false;
       passkeyOpening=true;
+      const controller=new AbortController();
+      passkeyAbortController=controller;
       ui.credential.classList.remove('error');
       setStatus('');
-      try {
-        await MangaVault.initializeWithPasskey(applyPayload);
-        goReader();
-        return true;
-      } catch (error) {
-        if (!options.silentFailure) {
-          markError(error && error.message ? error.message : '入力内容を確認してください。');
-          ui.credential.focus();
+      const attempt=(async()=>{
+        try {
+          await MangaVault.initializeWithPasskey(applyPayload,{signal:controller.signal});
+          goReader();
+          return true;
+        } catch (error) {
+          if (!options.silentFailure && !controller.signal.aborted) {
+            markError(error && error.message ? error.message : '入力内容を確認してください。');
+            ui.credential.focus();
+          }
+          return false;
+        } finally {
+          passkeyOpening=false;
+          if (passkeyAbortController===controller) passkeyAbortController=null;
         }
-        return false;
-      } finally {
-        passkeyOpening=false;
-      }
+      })();
+      passkeyAttempt=attempt;
+      return attempt;
     }
 
     async function registerPasskey() {
@@ -238,7 +251,11 @@
       } catch (_) {}
     }
 
-    ui.credential.addEventListener('input',()=>{ ui.credential.classList.remove('error'); setStatus(''); });
+    ui.credential.addEventListener('input',()=>{
+      ui.credential.classList.remove('error');
+      setStatus('');
+      if (ui.credential.value && passkeyOpening && passkeyAbortController) passkeyAbortController.abort();
+    });
     ui.unlockForm.addEventListener('submit',unlockFromCredential);
     ui.accountMenuButton.addEventListener('click',(event)=>{ event.stopPropagation(); toggleAccountMenu(); });
     ui.accountMenu.addEventListener('click',(event)=>event.stopPropagation());

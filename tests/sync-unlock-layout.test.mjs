@@ -43,8 +43,24 @@ test('single credential field accepts recovery keys through the existing unlock 
   assert.match(sync, /ui\.unlockForm\.addEventListener\('submit',unlockFromCredential\)/);
 });
 
+test('passphrase can be submitted with an explicit visible unlock button', () => {
+  const form = sync.match(/<form id="unlockForm"[\s\S]*?<\/form>/);
+  assert.ok(form, 'unlock form must exist');
+  assert.match(form[0], /<button[^>]*type="submit"[^>]*>パスフレーズでログイン<\/button>/);
+  assert.doesNotMatch(form[0], /<button[^>]*type="submit"[^>]*hidden/);
+});
+
+test('typing a passphrase cancels an automatic passkey prompt before starting vault unlock', () => {
+  assert.match(sync, /let passkeyAbortController=null/);
+  assert.match(sync, /if \(ui\.credential\.value && passkeyOpening && passkeyAbortController\) passkeyAbortController\.abort\(\)/);
+  assert.match(sync, /if \(passkeyOpening\) \{[\s\S]*?passkeyAbortController\.abort\(\)[\s\S]*?await passkeyAttempt/);
+  assert.match(sync, /initializeWithPasskey\(applyPayload,\{signal:controller\.signal\}\)/);
+  const vault = fs.readFileSync(new URL('../vault-session.js', import.meta.url), 'utf8');
+  assert.match(vault, /navigator\.credentials\.get\(\{ publicKey: \{[\s\S]*?\}, signal \}\)/);
+});
+
 test('passkey can be invoked manually and automatically when a registered wrapper exists', () => {
-  assert.match(sync, /MangaVault\.initializeWithPasskey\(applyPayload\)/);
+  assert.match(sync, /MangaVault\.initializeWithPasskey\(applyPayload,\{signal:controller\.signal\}\)/);
   assert.match(sync, /passkeyUseBtn\.addEventListener\('click',usePasskey\)/);
   assert.match(sync, /id="passkeyLoginBtn"[^>]*>パスキーでログイン<\/button>/);
   assert.doesNotMatch(sync, /id="passkeyLoginBtn"[^>]*hidden/);
