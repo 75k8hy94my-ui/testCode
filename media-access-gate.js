@@ -7,6 +7,7 @@
 
   const IP_URL = 'https://api.ipify.org?format=json';
   const CHECK_URL = 'https://ip-api.dev/api';
+  const COUNTRY_FALLBACK_URL = 'https://api.ipapi.is';
   const PROTON_EXIT_IPS_URL = 'https://raw.githubusercontent.com/tn3w/ProtonVPN-IPs/master/protonvpn_ips.json';
   const PROTON_ASNS = new Set([209103, 62371, 208172]);
   const PROTON_OWNED_IPV4_CIDRS = [
@@ -53,6 +54,7 @@
       ip: '',
       countryCode: '',
       countryName: '',
+      countrySource: null,
       countryPolicy: 'pending',
       generic: { status: 'pending', httpStatus: null, verdict: null },
       protonOwnedNetworkMatch: null,
@@ -69,6 +71,7 @@
       ip: diagnostics.ip,
       countryCode: diagnostics.countryCode,
       countryName: diagnostics.countryName,
+      countrySource: diagnostics.countrySource,
       countryPolicy: diagnostics.countryPolicy,
       generic: { ...diagnostics.generic },
       protonOwnedNetworkMatch: diagnostics.protonOwnedNetworkMatch,
@@ -273,6 +276,8 @@
       ? (d.generic.verdict ? 'VPN判定: YES' : 'VPN判定: NO')
       : d.generic.status === 'country-only'
         ? '国判定のみ実施'
+        : d.generic.status === 'country-fallback'
+          ? '国判定のみ実施（予備API）'
         : d.generic.status === 'unavailable'
           ? '判定不能' + (d.generic.httpStatus ? ' (HTTP ' + d.generic.httpStatus + ')' : '')
           : d.generic.status === 'error'
@@ -283,7 +288,7 @@
     const manual = d.manualDesignation === 'vpn' ? 'VPNとして手動指定' : d.manualDesignation === 'non-vpn' ? 'VPNではないと固定' : 'なし';
     const country = d.countryCode
       ? (d.countryName ? d.countryCode + ' (' + d.countryName + ')' : d.countryCode)
-      : '未確認';
+      : d.countryName || '未確認';
     const countryPolicy = d.countryPolicy === 'non-jp-vpn'
       ? '日本国外IPのためVPNとして扱う'
       : d.countryPolicy === 'jp'
@@ -295,6 +300,7 @@
     return [
       '現在IP: ' + (d.ip || '取得前'),
       '国判定: ' + country,
+      d.countrySource === 'fallback' ? '国情報の取得元: 予備API' : '',
       '国判定ルール: 日本以外のIPはVPNとして扱う',
       '国判定結果: ' + countryPolicy,
       '手動指定: ' + manual,
@@ -533,9 +539,15 @@
 
   function countryInfoFromPayload(payload) {
     const location = payload && payload.location && typeof payload.location === 'object' ? payload.location : {};
-    const countryCode = String(location.country_code || '').trim().toUpperCase();
-    const countryName = String(location.country || '').trim();
+    const countryCode = String(location.country_code || payload && payload.country_code || '').trim().toUpperCase();
+    const countryName = String(location.country || payload && payload.country || '').trim();
     return { countryCode, countryName };
+  }
+
+  function countryPolicyFor(country) {
+    if (country.countryCode) return country.countryCode === 'JP' ? 'jp' : 'non-jp-vpn';
+    if (country.countryName) return /^japan$/i.test(country.countryName) ? 'jp' : 'non-jp-vpn';
+    return 'unavailable';
   }
 
   async function lookupIpAssessment(ip, signal, includeVpnVerdict) {
@@ -546,9 +558,8 @@
       const country = countryInfoFromPayload(payload);
       diagnostics.countryCode = country.countryCode;
       diagnostics.countryName = country.countryName;
-      diagnostics.countryPolicy = country.countryCode
-        ? (country.countryCode === 'JP' ? 'jp' : 'non-jp-vpn')
-        : 'unavailable';
+      diagnostics.countrySource = 'primary';
+      diagnostics.countryPolicy = countryPolicyFor(country);
       const verdict = includeVpnVerdict ? isVpnVerdict(payload) : null;
       diagnostics.generic = {
         status: includeVpnVerdict ? 'success' : 'country-only',
@@ -559,15 +570,41 @@
       return {
         countryCode: country.countryCode,
         countryName: country.countryName,
-        nonJapanVpn: !!country.countryCode && country.countryCode !== 'JP',
+        nonJapanVpn: diagnostics.countryPolicy === 'non-jp-vpn',
         vpnVerdict: verdict === true,
       };
     } catch (error) {
-      diagnostics.countryPolicy = 'unavailable';
-      diagnostics.generic = { status: 'unavailable', httpStatus: error && error.httpStatus || null, verdict: null };
-      diagnostics.error = 'IP国・一般VPN判定APIを利用できません' + (error && error.httpStatus ? ' (HTTP ' + error.httpStatus + ')' : '');
-      renderDiagnostics();
-      return { countryCode: '', countryName: '', nonJapanVpn: false, vpnVerdict: false };
+      try {
+        const fallbackPayload = await fetchJson(COUNTRY_FALLBACK_URL + '?q=' + encodeURIComponent(ip), signal);
+        const country = countryInfoFromPayload(fallbackPayload);
+        const fallbackPolicy = countryPolicyFor(country);
+        if (fallbackPolicy === 'unavailable') throw new Error('Country fallback returned no country');
+        diagnostics.countryCode = country.countryCode;
+        diagnostics.countryName = country.countryName;
+        diagnostics.countrySource = 'fallback';
+        diagnostics.countryPolicy = fallbackPolicy;
+        diagnostics.generic = {
+          status: includeVpnVerdict ? 'unavailable' : 'country-fallback',
+          httpStatus: error && error.httpStatus || null,
+          verdict: null,
+        };
+        diagnostics.error = includeVpnVerdict
+          ? '一般VPN判定APIを利用できません' + (error && error.httpStatus ? ' (HTTP ' + error.httpStatus + ')' : '') + '。国情報は予備APIから取得しました'
+          : null;
+        renderDiagnostics();
+        return {
+          countryCode: country.countryCode,
+          countryName: country.countryName,
+          nonJapanVpn: diagnostics.countryPolicy === 'non-jp-vpn',
+          vpnVerdict: false,
+        };
+      } catch (_) {
+        diagnostics.countryPolicy = 'unavailable';
+        diagnostics.generic = { status: 'unavailable', httpStatus: error && error.httpStatus || null, verdict: null };
+        diagnostics.error = 'IP国・一般VPN判定APIを利用できません' + (error && error.httpStatus ? ' (HTTP ' + error.httpStatus + ')' : '');
+        renderDiagnostics();
+        return { countryCode: '', countryName: '', nonJapanVpn: false, vpnVerdict: false };
+      }
     }
   }
 
@@ -701,6 +738,7 @@
   return {
     IP_URL,
     CHECK_URL,
+    COUNTRY_FALLBACK_URL,
     PROTON_EXIT_IPS_URL,
     PROTON_OWNED_IPV4_CIDRS,
     KNOWN_VPN_IPV4S,
