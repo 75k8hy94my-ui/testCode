@@ -28,3 +28,13 @@ test('reader boot does not initialize or load bookshelf runtime modules', () => 
   assert.match(reader, /await window\.MangaReaderBootPromise/);
   assert.match(reader, /ReaderItemRepositoryFactory\.create/);
 });
+
+test('reader waits for its own media gate verdict before starting image loading', () => {
+  const gateWait = reader.indexOf("document.addEventListener('manga-reader-vpn-status', finish)");
+  const itemResolution = reader.indexOf('MangaReaderTarget.itemIdFromLocation(location)');
+  const runtimeStart = reader.indexOf('runtime.start(itemId)');
+  assert.ok(gateWait >= 0 && gateWait < itemResolution);
+  assert.ok(itemResolution < runtimeStart);
+  assert.match(reader, /mediaAccess\?\.getStatus\?\.\(\) === 'pending' \|\| mediaAccess\?\.getStatus\?\.\(\) === 'checking'/);
+  assert.match(reader, /status === 'allowed' \|\| status === 'blocked'/);
+});

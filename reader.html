@@ -121,6 +121,23 @@
   <script>
     (async () => {
       if (!await window.MangaReaderBootPromise) return;
+      // The VPN media guard can suppress image assignments while its
+      // startup verdict is still pending. Wait for the Reader document's own
+      // gate check before constructing the image loader or starting a book.
+      const mediaAccess = window.MangaReaderMediaAccess;
+      if (mediaAccess?.getStatus?.() === 'pending' || mediaAccess?.getStatus?.() === 'checking') {
+        await new Promise((resolve) => {
+          const finish = () => {
+            const status = mediaAccess.getStatus?.();
+            if (status === 'allowed' || status === 'blocked') {
+              document.removeEventListener('manga-reader-vpn-status', finish);
+              resolve();
+            }
+          };
+          document.addEventListener('manga-reader-vpn-status', finish);
+          finish();
+        });
+      }
       MangaReaderTarget.clearLegacyTarget(localStorage);
       const itemId = window.MangaReaderTarget.itemIdFromLocation(location);
       let syncTimer = null;
