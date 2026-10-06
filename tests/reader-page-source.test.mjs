@@ -12,6 +12,27 @@ test('saved page manifest is used directly without image loader discovery', asyn
   assert.equal(probes, 0);
 });
 
+test('imported manifest remains canonical and never invokes legacy discovery', async () => {
+  let probes = 0;
+  const pages = [
+    'https://z2.momon-ga.me/galleries/1277143/1.webp',
+    'https://z2.momon-ga.me/galleries/1277143/2.webp',
+  ];
+  const source = create({ legacyResolver: { resolve: async () => { probes += 1; throw new Error('legacy probe must not run'); } } });
+  const result = await source.resolve({ id: 'imported', url: pages[0], pages: [...pages], pageManifest: { version: 1, pages: [...pages], splitSpreads: false } });
+  assert.deepEqual(result.urls, pages);
+  assert.equal(probes, 0);
+});
+
+test('pages-only legacy records remain readable without discovery', async () => {
+  let probes = 0;
+  const pages = ['https://example.test/book/1.jpg', 'https://example.test/book/2.jpg'];
+  const source = create({ legacyResolver: { resolve: async () => { probes += 1; throw new Error('legacy probe must not run'); } } });
+  const result = await source.resolve({ id: 'legacy-pages', pages });
+  assert.deepEqual(result.urls, pages);
+  assert.equal(probes, 0);
+});
+
 test('legacy discovery is isolated and stores a versioned manifest once', async () => {
   const calls = [];
   const resolver = createLegacyResolver({ probe: async (url) => url.endsWith('/01.jpg') || url.endsWith('/02.jpg'), extensions: ['jpg'] });
