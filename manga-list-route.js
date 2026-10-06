@@ -4,6 +4,12 @@
   const STYLESHEET_URL = 'manga-list.css?v=20260926-route-owned';
   const SCRIPT_URLS = [
     ['manga-list-template.js?v=20260922-vpn-tools', 'mangaRouteTemplate'],
+    ['manga-import-validator.js?v=20261007-momon-import', 'mangaImportValidator'],
+    ['manga-import-candidate.js?v=20261007-momon-import', 'mangaImportCandidate'],
+    ['manga-import-author-sync.js?v=20261007-momon-import', 'mangaImportAuthorSync'],
+    ['manga-import-batch.js?v=20261007-momon-import', 'mangaImportBatch'],
+    ['manga-import-bridge.js?v=20261007-momon-import', 'mangaImportBridge'],
+    ['manga-import-dialog.js?v=20261007-momon-import', 'mangaImportDialog'],
     ['image-transfer-settings.js?v=20261004-encrypted-image-import', 'encryptedImageImportSettings'],
     ['image-remote-access.js?v=20261004-encrypted-image-import', 'encryptedImageImportRemoteAccess'],
     ['encrypted-asset-crypto.js?v=20261004-encrypted-image-import', 'encryptedImageImportCrypto'],
@@ -363,16 +369,19 @@
       const context = MangaListRuntimeContextFactory.create(contextDeps);
       runtime = MangaListRuntimeFactory.create(context);
       const synchronizeAuthors = (loaded) => {
-        let changed = false;
-        loaded.savedItems.forEach((item) => {
-          const name = String(item.author || '').trim();
-          if (!name || loaded.authorCards.some((card) => card.name === name || card.circleName === name)) return;
-          loaded.authorCards.unshift({ id: 'a-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name, circleName: '', links: [], createdAt: Date.now() });
-          changed = true;
+        const existingCount = loaded.authorCards.length;
+        const synced = windowRef.MangaImportAuthorSync.synchronize({
+          savedItems: loaded.savedItems,
+          authorCards: loaded.authorCards,
+          createId: () => 'a-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+          now: () => Date.now(),
         });
+        // Preserve the previous route's newest-first order for newly discovered authors.
+        const added = synced.authorCards.slice(existingCount).reverse();
+        loaded.authorCards = [...added, ...synced.authorCards.slice(0, existingCount)];
         Object.assign(state(), loaded);
         if (data.wasLegacyMigrated()) host.persistItems();
-        if (changed) host.persistAuthorCards();
+        if (synced.changed) host.persistAuthorCards();
         return loaded;
       };
       const eventBindings = () => {
@@ -406,6 +415,64 @@
         const importFiles = rootElement.querySelector('#encryptedImageFilesInput');
         const importStatus = rootElement.querySelector('#encryptedImageImportStatus');
         const importSubmit = rootElement.querySelector('#encryptedImageSubmitButton');
+        const bulkDetect = rootElement.querySelector('#bulkDetectBtn');
+        const mangaImportRegister = rootElement.querySelector('#mangaImportRegisterButton');
+        const mangaImportCancel = rootElement.querySelector('#mangaImportCancelButton');
+        const importBridge = windowRef.MangaImportBridge.create({ windowRef, origin: windowRef.location.origin });
+        const mangaImportController = windowRef.MangaImportDialog.create({ documentRef, validator: windowRef.MangaImportValidator, candidateFactory: windowRef.MangaImportCandidate });
+        const importBatch = windowRef.MangaImportBatch.create({
+          getState: state,
+          setState,
+          validator: windowRef.MangaImportValidator,
+          candidateFactory: windowRef.MangaImportCandidate,
+          authorSync: windowRef.MangaImportAuthorSync,
+          persistItems: host.persistItems,
+          persistAuthorCards: host.persistAuthorCards,
+          render: renderList,
+          createId: () => 'i-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10),
+          now: () => Date.now(),
+        });
+        bind(mangaImportCancel, 'click', () => mangaImportController.close());
+        bind(bulkDetect, 'click', async () => {
+          bulkDetect.disabled = true;
+          try {
+            const queued = await importBridge.requestQueuedCandidates();
+            if (!queued.length) { windowRef.alert('拡張機能のキューに作品がありません。'); return; }
+            mangaImportController.open(queued, state().savedItems, state().authorCards);
+          } catch (error) {
+            windowRef.alert(error?.message || '拡張機能からキューを読み込めませんでした。');
+          } finally {
+            bulkDetect.disabled = false;
+          }
+        });
+        bind(mangaImportRegister, 'click', async () => {
+          const selection = mangaImportController.getSelection();
+          if (!selection.items.length) { mangaImportController.setStatus('登録する作品を選択してください。'); return; }
+          const checked = windowRef.MangaImportValidator.validateBatch(selection.items.map((item) => item.candidate));
+          if (!checked.ok) {
+            mangaImportController.setStatus('入力内容を確認してください：' + checked.errors.map((error) => error.message).join('、'));
+            return;
+          }
+          mangaImportRegister.disabled = true;
+          try {
+            const result = importBatch.register(selection);
+            if (!result.ok) { mangaImportController.setStatus('登録を中止しました：' + result.errors.map((error) => error.message || error).join('、')); return; }
+            if (!result.registeredQueueIds.length) { mangaImportController.setStatus('新しい作品はありません。重複作品は登録されませんでした。'); return; }
+            mangaImportController.setStatus(`${result.registeredQueueIds.length}作品を本棚へ登録しました。`);
+            if (windowRef.confirm(`${result.registeredQueueIds.length}作品を登録しました。登録済みの拡張機能キューから削除しますか？`)) {
+              try {
+                const removed = await importBridge.removeQueuedCandidates(result.registeredQueueIds);
+                mangaImportController.setStatus(`${result.registeredQueueIds.length}作品を登録し、キューから${removed.length}件を削除しました。`);
+              } catch (error) {
+                mangaImportController.setStatus(`作品は登録済みですが、キュー削除に失敗しました：${error?.message || '不明なエラー'}`);
+              }
+            }
+          } catch (error) {
+            mangaImportController.setStatus(error?.message || '登録できませんでした。');
+          } finally {
+            mangaImportRegister.disabled = false;
+          }
+        });
         const closeImport = () => { importDialog.hidden = true; importDialog.style.display = ''; };
         bind(addEncryptedImages, 'click', () => {
           if (!windowRef.MangaVault?.loadActive?.()?.rawKey) {
