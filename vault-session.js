@@ -248,15 +248,21 @@
       catch (error) { if (previous) saveActive(previous); throw error; }
     });
   }
-  async function changePassphrase(passphrase, nextPassphrase) {
+  async function changePassphrase(nextPassphrase) {
     return withSession(async (token, user) => {
       if (!nextPassphrase || nextPassphrase.length < 12) throw new Error('新しいパスフレーズは12文字以上にしてください。');
       const record = await fetchRecord(token, user); if (!record) throw new Error('保管庫が見つかりません。');
-      const previous = loadActive(); await unlock(record.payload, passphrase, ''); const vault = loadActive();
+      const previous = loadActive(); if (!previous) throw new Error('先に保管庫を開いてください。');
+      const keyWraps = record.payload && record.payload.keyWraps;
+      const passkeys = keyWraps && (Array.isArray(keyWraps.passkeys) ? keyWraps.passkeys : (keyWraps.passkey ? [keyWraps.passkey] : []));
+      if (!passkeys || !passkeys.length) throw new Error('パスフレーズを再設定するには、保管庫パスキーが必要です。');
+      const rawKey = await unlockByPasskey(passkeys);
+      if (rawKey.length !== previous.rawKey.length || rawKey.some((byte, index) => byte !== previous.rawKey[index])) throw new Error('パスキーが現在開いている保管庫と一致しません。保管庫を再読込してください。');
+      const payload = JSON.parse(new TextDecoder().decode(await decrypt(await importAes(rawKey), record.payload.data)));
       const salt = randomBytes(16); const passphraseKey = await derivePassphrase(nextPassphrase, salt);
-      const nextKeyWraps = Object.assign({}, vault.keyWraps, { passphrase: { kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations: ITERATIONS, salt: b64url(salt) }, encryptedKey: await encrypt(passphraseKey, vault.rawKey) } });
-      saveActive({ rawKey: vault.rawKey, keyWraps: nextKeyWraps });
-      try { const payload = await decryptPayload(record.payload); await savePayload(payload); return true; }
+      const nextKeyWraps = Object.assign({}, keyWraps, { passphrase: { kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations: ITERATIONS, salt: b64url(salt) }, encryptedKey: await encrypt(passphraseKey, rawKey) } });
+      saveActive({ rawKey, keyWraps: nextKeyWraps });
+      try { await savePayload(payload); return true; }
       catch (error) { if (previous) saveActive(previous); throw error; }
     });
   }
