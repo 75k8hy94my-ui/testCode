@@ -80,7 +80,8 @@ test('non-Japan IP is treated as VPN even when the provider VPN flag is false', 
   assert.equal(diagnostics.countryName, 'United States');
   assert.equal(diagnostics.countryPolicy, 'non-jp-vpn');
   assert.equal(diagnostics.final, 'allowed');
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
+  assert.ok(calls.some((url) => url.startsWith(Gate.PROTON_EXIT_IPS_URL)));
 });
 
 test('Japan IP is not treated as VPN by country rule alone', async () => {

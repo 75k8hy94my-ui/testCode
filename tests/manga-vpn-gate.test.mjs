@@ -21,7 +21,6 @@ test('manga and video routes wait for an allowed VPN verdict before starting lis
   assert.match(spa, /className='glassBtn vpnDiagnosticsButton'/);
   assert.doesNotMatch(spa.slice(spa.indexOf('function renderVpnGate'), spa.indexOf('async function ensureVpnGate')), /button\.dataset\.vpnStatusButton='1'.*button\.dataset\.vpnDiagnosticsButton='1'/s);
   assert.match(spa, /canLoadExternalMedia\(\)/);
-  assert.match(spa, /if\(!gate\|\|!gate\.canLoadExternalMedia\(\)\)\{renderVpnGate/);
   const mangaRoute = spa.slice(spa.indexOf('async function renderManga'), spa.indexOf('let lastVpnRouteStatus'));
   const videoRoute = spa.slice(spa.indexOf('async function renderVideo'), spa.indexOf('async function renderManga'));
   assert.ok(mangaRoute.indexOf('canLoadExternalMedia') < mangaRoute.indexOf('MangaListRouteFactory.create'));
@@ -29,6 +28,21 @@ test('manga and video routes wait for an allowed VPN verdict before starting lis
   assert.doesNotMatch(mangaRoute.slice(0, mangaRoute.indexOf('MangaListRouteFactory.create')), /savedListItems|book-card|renderSavedList/);
   assert.doesNotMatch(videoRoute.slice(0, videoRoute.indexOf('VideoListRouteFactory.create')), /savedListItems|book-card|renderVideoList/);
   assert.match(spa, /manga-reader-vpn-status/);
+  assert.match(mangaRoute, /gate\.getStatus\(\)==='pending'\|\|gate\.getStatus\(\)==='checking'/);
+  assert.match(mangaRoute, /renderVpnGate\(target,'manga'\)/);
+});
+
+test('VPN verification renders a lightweight checking state before the bookshelf is mounted', () => {
+  const renderGate = spa.slice(spa.indexOf('function renderVpnGate'), spa.indexOf('async function ensureVpnGate'));
+  assert.match(renderGate, /本棚を読み込んでいます/);
+  assert.match(renderGate, /section\.classList\.add\('vpnRouteChecking'\)/);
+  assert.match(renderGate, /button\.disabled=checking/);
+});
+
+test('bookshelf scripts are fetched concurrently with ordered classic-script execution', () => {
+  const route = read('manga-list-route.js');
+  assert.match(route, /script\.async = false/);
+  assert.match(route, /Promise\.all\(SCRIPT_URLS\.map\(\(\[src, id\]\) => loadScript\(src, id, documentRef\)\)\)/);
 });
 
 test('VPN gate exposes status changes without changing its verdict contract', () => {

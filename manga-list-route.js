@@ -91,6 +91,9 @@
       const script = documentRef.createElement('script');
       script.id = id;
       script.src = src;
+      // Ordered dynamic classic scripts download in parallel but execute in
+      // insertion order, preserving the module graph without serial RTTs.
+      script.async = false;
       script.addEventListener('load', () => { script.dataset.loaded = '1'; resolve(); }, { once: true });
       script.addEventListener('error', reject, { once: true });
       documentRef.body.appendChild(script);
@@ -99,10 +102,7 @@
 
   function loadDependencies(documentRef) {
     if (!dependencyPromise) {
-      dependencyPromise = SCRIPT_URLS.reduce(
-        (promise, [src, id]) => promise.then(() => loadScript(src, id, documentRef)),
-        Promise.resolve(),
-      );
+      dependencyPromise = Promise.all(SCRIPT_URLS.map(([src, id]) => loadScript(src, id, documentRef)));
     }
     return dependencyPromise;
   }

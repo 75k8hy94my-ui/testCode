@@ -672,16 +672,14 @@
         diagnostics.generic = { status: 'skipped-known-ip', httpStatus: null, verdict: true };
         renderDiagnostics();
       } else {
-        const assessment = await lookupIpAssessment(ip, signal, useExternalApi);
-        if (assessment.nonJapanVpn) {
-          allowed = true;
-        } else if (useExternalApi) {
-          allowed = assessment.vpnVerdict;
-        }
-      }
-      if (!allowed) {
-        diagnostics.protonExitMatch = await isKnownProtonExitIp(ip, signal);
-        allowed = diagnostics.protonExitMatch;
+        const [assessment, protonExitMatch] = await Promise.all([
+          lookupIpAssessment(ip, signal, useExternalApi),
+          isKnownProtonExitIp(ip, signal),
+        ]);
+        diagnostics.protonExitMatch = protonExitMatch;
+        if (assessment.nonJapanVpn) allowed = true;
+        else if (useExternalApi) allowed = assessment.vpnVerdict;
+        if (!allowed) allowed = protonExitMatch;
       }
       if (!allowed && manualDesignation === 'vpn') {
         if (allowManualVpn(ip)) return applyFinalStatus(true);
@@ -694,6 +692,7 @@
         diagnostics.error = 'VPNを確認できなかったため手動指定を適用しませんでした';
       }
       status = 'blocked';
+      emitStatus();
       updateStatusButtons(status);
       diagnostics.final = 'blocked';
       diagnostics.checkedAt = new Date().toISOString();
