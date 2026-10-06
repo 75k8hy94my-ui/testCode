@@ -235,7 +235,7 @@ test('VPN check still uses Proton exit IP list when generic detection API errors
   };
   const Gate = loadGate({ fetch, setTimeout, clearTimeout });
   assert.equal(await Gate.checkVpn(), true);
-  assert.match(calls[2], /ProtonVPN-IPs/);
+  assert.equal(calls.some((url) => /ProtonVPN-IPs/.test(url)), true);
 });
 
 test('generic API outage is reported as unavailable rather than a VPN verdict', async () => {
@@ -254,6 +254,53 @@ test('generic API outage is reported as unavailable rather than a VPN verdict', 
   assert.equal(diagnostics.generic.status, 'unavailable');
   assert.equal(diagnostics.generic.httpStatus, 429);
   assert.equal(diagnostics.error, 'IP国・一般VPN判定APIを利用できません (HTTP 429)');
+});
+
+test('country lookup falls back to ipapi.is when the primary VPN API is unavailable', async () => {
+  const currentIp = '198.51.100.79';
+  const calls = [];
+  const Gate = loadGate({
+    fetch: async (url) => {
+      calls.push(String(url));
+      if (url === Gate.IP_URL) return { ok: true, json: async () => ({ ip: currentIp }) };
+      if (String(url).startsWith(Gate.CHECK_URL)) return { ok: false, status: 429, json: async () => ({}) };
+      if (String(url).startsWith(Gate.COUNTRY_FALLBACK_URL)) return { ok: true, json: async () => ({ country: 'Japan' }) };
+      if (String(url).startsWith(Gate.PROTON_EXIT_IPS_URL)) return { ok: true, json: async () => [] };
+      throw new Error('Unexpected request: ' + url);
+    },
+    setTimeout,
+    clearTimeout,
+  });
+
+  assert.equal(await Gate.checkVpn({ external: false }), false);
+  const diagnostics = Gate.getDiagnostics();
+  assert.equal(diagnostics.countryName, 'Japan');
+  assert.equal(diagnostics.countryPolicy, 'jp');
+  assert.equal(diagnostics.generic.status, 'country-fallback');
+  assert.equal(diagnostics.error, null);
+  assert.equal(calls.some((url) => url.startsWith(Gate.COUNTRY_FALLBACK_URL + '?q=' + currentIp)), true);
+});
+
+test('country-only fallback never fabricates a successful general VPN verdict', async () => {
+  const currentIp = '198.51.100.80';
+  const Gate = loadGate({
+    fetch: async (url) => {
+      if (url === Gate.IP_URL) return { ok: true, json: async () => ({ ip: currentIp }) };
+      if (String(url).startsWith(Gate.CHECK_URL)) return { ok: false, status: 503, json: async () => ({}) };
+      if (String(url).startsWith(Gate.COUNTRY_FALLBACK_URL)) return { ok: true, json: async () => ({ country: 'Japan' }) };
+      if (String(url).startsWith(Gate.PROTON_EXIT_IPS_URL)) return { ok: true, json: async () => [] };
+      throw new Error('Unexpected request: ' + url);
+    },
+    setTimeout,
+    clearTimeout,
+  });
+
+  assert.equal(await Gate.checkVpn(), false);
+  const diagnostics = Gate.getDiagnostics();
+  assert.equal(diagnostics.generic.status, 'unavailable');
+  assert.equal(diagnostics.generic.httpStatus, 503);
+  assert.equal(diagnostics.generic.verdict, null);
+  assert.equal(diagnostics.final, 'blocked');
 });
 
 test('VPN check accepts an IP in a Proton-listed /24 exit block', async () => {

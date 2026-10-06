@@ -112,7 +112,7 @@ function renderVpnGate(target,route){
 }
 async function ensureVpnGate(){
   if(window.MangaReaderMediaAccess)return window.MangaReaderMediaAccess;
-  await loadScript('media-access-gate.js?v=20260926-non-jp-vpn','spaMediaGate');
+  await loadScript('media-access-gate.js?v=20261006-country-fallback','spaMediaGate');
   return window.MangaReaderMediaAccess;
 }
 function cleanupMangaShell(){cleanupMangaRoute();document.querySelectorAll('#metadataSuggestions,#saveDialogOverlay,#customAddOverlay,#editItemOverlay,#bulkEditOverlay,#bulkDetectOverlay,#savedListOverlay,#tocOverlay').forEach((node)=>node.remove());}
@@ -139,7 +139,7 @@ async function renderVideo(generation){
     if(!videoRouteRuntime)videoRouteRuntime=window.VideoListRouteFactory.create({
       documentRef:document,
       loadScript,
-      loadMediaGate:()=>window.MangaReaderMediaAccess?Promise.resolve():loadScript('media-access-gate.js?v=20260926-non-jp-vpn','spaMediaGate'),
+      loadMediaGate:()=>window.MangaReaderMediaAccess?Promise.resolve():loadScript('media-access-gate.js?v=20261006-country-fallback','spaMediaGate'),
     });
     await videoRouteRuntime.start({mountElement:target});
     if(gate&&typeof gate.syncUi==='function')gate.syncUi();
