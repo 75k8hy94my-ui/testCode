@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "momon:GA Shelf Importer",
+  "version": "1.0.0",
+  "description": "Queue momon:GA works for review in testCode.",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": ["https://momon-ga.com/*", "https://75k8hy94my-ui.github.io/*"],
+  "background": { "service_worker": "service-worker.js" },
+  "action": { "default_popup": "popup.html" },
+  "content_scripts": [
+    { "matches": ["https://momon-ga.com/fanzine/*"], "js": ["extractor.js", "content-momon.js"] },
+    { "matches": ["https://75k8hy94my-ui.github.io/testCode/manga.html"], "js": ["content-testcode.js"] }
+  ]
+}
