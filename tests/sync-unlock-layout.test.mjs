@@ -50,6 +50,12 @@ test('passphrase can be submitted with an explicit visible unlock button', () =>
   assert.doesNotMatch(form[0], /<button[^>]*type="submit"[^>]*hidden/);
 });
 
+test('vault unlock errors are visible next to the credential field', () => {
+  assert.match(sync, /#status:not\(:empty\)\s*\{[^}]*color:\s*var\(--danger\)/);
+  assert.match(sync, /<p id="status"[^>]*aria-live="polite"[^>]*><\/p>/);
+  assert.doesNotMatch(sync, /<p id="status"[^>]*class="sr-only"/);
+});
+
 test('typing a passphrase cancels an automatic passkey prompt before starting vault unlock', () => {
   assert.match(sync, /let passkeyAbortController=null/);
   assert.match(sync, /if \(ui\.credential\.value && passkeyOpening && passkeyAbortController\) passkeyAbortController\.abort\(\)/);
