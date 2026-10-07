@@ -11,6 +11,16 @@ test('video player page uses the normalized saved title and renders marker list'
   assert.match(page, /videoMarker/);
 });
 
+test('video player page exposes quick editing for saved video details and syncs Vault payload', () => {
+  assert.match(page, /動画情報を編集/);
+  assert.match(page, /videoEditForm/);
+  assert.match(page, /name="title"/);
+  assert.match(page, /name="tags"/);
+  assert.match(page, /name="memo"/);
+  assert.match(page, /localStorage\.setItem\(META_KEY, JSON\.stringify\(nextMeta\)\)/);
+  assert.match(page, /MangaVault\.savePayload\(window\.MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
+});
+
 test('marker registration defaults to the current playback position', () => {
   assert.match(controls, /video\.currentTime/);
   assert.match(controls, /secondsInput\.value/);

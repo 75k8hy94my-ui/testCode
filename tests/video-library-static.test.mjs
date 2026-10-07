@@ -25,6 +25,14 @@ test('video library provides search filters sorting view modes folders and edito
   assert.match(source, /history\.pushState/);
 });
 
+test('video add and edit fields use stronger contrast, spacing, and visible focus treatment', () => {
+  const library = read('video-library.js');
+  assert.match(library, /\.vl-field\{padding:10px 11px 11px/);
+  assert.match(library, /\.vl-field label\{display:block;color:var\(--text\)/);
+  assert.match(library, /\.vl-field:focus-within/);
+  assert.match(library, /font-size:16px;min-height:46px/);
+});
+
 test('enhanced editor presents URL as the only playback locator while legacy fields stay internal', () => {
   const library = read('video-library.js');
   const bridge = read('video-routing-fix.js');
