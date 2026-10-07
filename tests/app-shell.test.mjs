@@ -123,7 +123,8 @@ test('saved theme drives home profile manga video and header colors', () => {
   assert.match(css, /reader-entry-video body[\s\S]*background:#0a0c11!important/);
   assert.match(globalCss, /--shell-header-bg/);
   for (const page of ['home.html','profile.html','manga.html','video.html','video-player.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20261003-reader-spa-shell/);
+    const shellVersion = page === 'video-player.html' ? '20261007-video-watch-layout' : '20261003-reader-spa-shell';
+    assert.match(read(page), new RegExp(`home-profile-shell\\.css\\?v=${shellVersion}`));
     assert.match(read(page), /app-global-shell\.js\?v=20261003-reader-spa/);
     assert.match(read(page), /profile-menu\.js\?v=20260924-theme-unified/);
   }

@@ -19,12 +19,48 @@
   const words = new Set(title.toLocaleLowerCase('ja').split(/[\s/・、,._-]+/).filter((word) => word.length >= 2));
   const related = baseVideos.filter((item) => String(item.id) !== id).map((item) => { const itemMeta = allMeta[item.id] || {}; const itemTitle = itemMeta.title || item.title || [item.a, item.b].filter(Boolean).join(' / ') || '動画'; const itemTags = Array.isArray(itemMeta.tags) ? itemMeta.tags : (Array.isArray(item.tags) ? item.tags : []); const sharedTags = itemTags.filter((tag) => tags.includes(tag)).length; const sharedWords = [...words].filter((word) => itemTitle.toLocaleLowerCase('ja').includes(word)).length; return { item, itemTitle, itemTags, score: sharedTags * 100 + sharedWords }; }).sort((a, b) => b.score - a.score).slice(0, 12);
 
-  const heading = document.createElement('h2'); heading.textContent = title;
+  const heading = document.createElement('h2'); heading.className = 'videoPlayerTitle'; heading.textContent = title; heading.contentEditable = 'false'; heading.setAttribute('role', 'button'); heading.setAttribute('tabindex', '0'); heading.setAttribute('aria-label', 'タイトルをクリックして編集'); heading.title = 'クリックしてタイトルを編集';
   const info = document.createElement('div'); info.className = 'videoPlayerInfo'; info.textContent = [base.a, base.b].filter(Boolean).join(' / ') || '動画';
-  const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'videoPlayerEdit'; edit.textContent = '動画情報を編集'; edit.setAttribute('aria-haspopup', 'dialog');
+  const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'videoPlayerEdit'; edit.textContent = '詳細を編集'; edit.setAttribute('aria-haspopup', 'dialog');
+  const actionBar = document.createElement('div'); actionBar.className = 'videoPlayerActionBar'; actionBar.setAttribute('aria-label', '動画の操作'); actionBar.append(edit);
   const tagLine = document.createElement('div'); tagLine.className = 'videoPlayerTags';
   const renderTags = (nextTags) => { tagLine.textContent = nextTags.map((tag) => '#' + tag).join(' '); tagLine.hidden = !nextTags.length; };
   renderTags(tags); info.append(tagLine);
+  const saveMetaPatch = async (patch) => {
+    const nextMeta = read(META_KEY, {});
+    const current = nextMeta[id] && typeof nextMeta[id] === 'object' ? nextMeta[id] : {};
+    nextMeta[id] = { ...current, ...patch, updatedAt: Date.now() };
+    localStorage.setItem(META_KEY, JSON.stringify(nextMeta));
+    if (window.MangaVault && window.MangaVaultPayload && typeof window.MangaVault.savePayload === 'function' && window.MangaVault.loadActive && window.MangaVault.loadActive()) {
+      await window.MangaVault.savePayload(window.MangaVaultPayload.buildFromLocalStorage());
+    }
+    Object.assign(allMeta, nextMeta);
+    return nextMeta[id];
+  };
+  const beginTitleEdit = () => {
+    if (heading.contentEditable === 'true') return;
+    heading.dataset.previousTitle = heading.textContent;
+    heading.contentEditable = 'true'; heading.setAttribute('role', 'textbox'); heading.setAttribute('aria-label', '動画タイトル'); heading.setAttribute('aria-multiline', 'false'); heading.focus();
+    const range = document.createRange(); range.selectNodeContents(heading); const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+  };
+  const saveTitle = async () => {
+    if (heading.contentEditable !== 'true') return;
+    const previous = heading.dataset.previousTitle || title;
+    const next = heading.textContent.replace(/[\r\n]+/g, ' ').trim();
+    heading.contentEditable = 'false'; heading.removeAttribute('aria-multiline'); heading.setAttribute('role', 'button'); heading.setAttribute('aria-label', 'タイトルをクリックして編集');
+    if (!next || next === previous) { heading.textContent = previous; return; }
+    try {
+      const saved = await saveMetaPatch({ title: next });
+      heading.textContent = saved.title; document.title = saved.title || '動画';
+    } catch (_) { heading.textContent = previous; info.dataset.saveError = 'タイトルを保存できませんでした'; setTimeout(() => { delete info.dataset.saveError; }, 3500); }
+  };
+  heading.addEventListener('click', beginTitleEdit);
+  heading.addEventListener('keydown', (event) => {
+    if (heading.contentEditable !== 'true') { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); beginTitleEdit(); } return; }
+    if (event.key === 'Enter') { event.preventDefault(); heading.blur(); }
+    if (event.key === 'Escape') { event.preventDefault(); heading.textContent = heading.dataset.previousTitle || title; heading.contentEditable = 'false'; heading.removeAttribute('aria-multiline'); heading.setAttribute('role', 'button'); heading.setAttribute('aria-label', 'タイトルをクリックして編集'); }
+  });
+  heading.addEventListener('blur', saveTitle);
   const frame = document.createElement('div'); frame.className = 'videoPlayerFrame'; frame.style.height = 'min(540px, calc(100svh - 150px))'; frame.style.minHeight = '240px';
   const sourceUrl = normalized.url || base.url || '';
   const directVideo = /\.(?:mp4|webm|ogg|ogv|m4v|mov)(?:[?#].*)?$/i.test(sourceUrl);
@@ -75,5 +111,8 @@
   const back = document.createElement('a'); back.className = 'glassBtn videoBack'; back.href = 'video.html'; back.textContent = '動画一覧へ戻る';
   const relatedBox = document.createElement('aside'); relatedBox.className = 'videoRelated'; const relatedHeading = document.createElement('h3'); relatedHeading.textContent = '関連動画'; relatedBox.append(relatedHeading);
   related.forEach(({ item, itemTitle, itemTags }) => { const link = document.createElement('a'); link.className = 'videoRelatedItem'; link.href = 'video-player.html?id=' + encodeURIComponent(item.id); const thumb = document.createElement('span'); thumb.className = 'videoRelatedThumb'; thumb.textContent = '▶'; const text = document.createElement('span'); text.className = 'videoRelatedText'; text.textContent = itemTitle; const tagsText = document.createElement('small'); tagsText.textContent = itemTags.slice(0, 3).map((tag) => '#' + tag).join(' '); text.append(tagsText); link.append(thumb, text); relatedBox.append(link); });
-  const main = document.createElement('section'); main.className = 'videoPlayerMain'; main.append(heading, info, edit, frame, markerList, back); const layout = document.createElement('div'); layout.className = 'videoPlayerLayout'; layout.append(main, relatedBox); page.replaceChildren(layout); document.body.append(dialog);
+  const description = document.createElement('details'); description.className = 'videoPlayerDescription';
+  const descriptionSummary = document.createElement('summary'); descriptionSummary.textContent = normalized.memo ? '動画のメモ' : '動画情報';
+  const descriptionText = document.createElement('p'); descriptionText.textContent = normalized.memo || [base.a, base.b].filter(Boolean).join(' / ') || '動画'; description.append(descriptionSummary, descriptionText);
+  const main = document.createElement('section'); main.className = 'videoPlayerMain'; main.append(frame, heading, info, actionBar, description, markerList, back); const layout = document.createElement('div'); layout.className = 'videoPlayerLayout'; layout.append(main, relatedBox); page.replaceChildren(layout); document.body.append(dialog);
 })();
