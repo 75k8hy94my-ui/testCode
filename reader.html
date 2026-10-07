@@ -41,6 +41,12 @@
     #nextVolumeBanner { position:absolute; z-index:5; right:14px; bottom:68px; display:flex; gap:10px; align-items:center; padding:10px; border-radius:12px; background:rgba(23,27,36,.94); }
     #nextVolumeText { max-width:45vw; }
     #readerMessage { position:absolute; z-index:3; left:50%; top:50%; transform:translate(-50%,-50%); max-width:90vw; color:var(--sub); text-align:center; }
+    html.vpn-protected-blocked #topbar,html.vpn-protected-blocked #viewer,html.vpn-protected-blocked #controls,html.vpn-protected-blocked #nextVolumeBanner { visibility:hidden; }
+    html.vpn-protected-blocked #readerMessage { inset:0; z-index:10; display:grid; place-content:center; width:100%; max-width:none; padding:24px; transform:none; background:var(--bg); }
+    .vpnReaderGate { display:grid; gap:14px; justify-items:center; max-width:480px; text-align:center; }
+    .vpnReaderGate h1 { margin:0; color:var(--text); font-size:22px; }
+    .vpnReaderGate p { margin:0; line-height:1.7; }
+    .vpnReaderGateActions { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
     @media(max-width:700px) { #topbar { gap:4px; padding:6px; } .ctrlBtn { padding:5px 7px; font-size:12px; } #readerMeta { max-width:35vw; } #nextVolumeBanner { left:8px; right:8px; bottom:64px; } }
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { #topbar,#controls { background:rgba(20,24,32,.98); } }
   </style>
@@ -76,7 +82,7 @@
   <script src="reader-target.js?v=20261004-reader-item-route"></script>
   <script src="vault-payload.js"></script>
   <script src="feature-flags.js"></script>
-  <script src="media-access-gate.js?v=20261006-country-fallback"></script>
+  <script src="media-access-gate.js?v=20261008-vpn-data"></script>
   <script src="encrypted-asset-crypto.js"></script>
   <script src="encrypted-asset-cache.js"></script>
   <script src="encrypted-asset-backend.js"></script>
@@ -121,46 +127,80 @@
   <script>
     (async () => {
       if (!await window.MangaReaderBootPromise) return;
-      // The VPN media guard can suppress image assignments while its
-      // startup verdict is still pending. Wait for the Reader document's own
-      // gate check before constructing the image loader or starting a book.
       const mediaAccess = window.MangaReaderMediaAccess;
-      if (mediaAccess?.getStatus?.() === 'pending' || mediaAccess?.getStatus?.() === 'checking') {
-        await new Promise((resolve) => {
-          const finish = () => {
-            const status = mediaAccess.getStatus?.();
-            if (status === 'allowed' || status === 'blocked') {
-              document.removeEventListener('manga-reader-vpn-status', finish);
-              resolve();
-            }
-          };
-          document.addEventListener('manga-reader-vpn-status', finish);
-          finish();
-        });
-      }
-      MangaReaderTarget.clearLegacyTarget(localStorage);
-      const itemId = window.MangaReaderTarget.itemIdFromLocation(location);
-      let syncTimer = null;
-      const syncScheduler = {
-        schedule() {
-          clearTimeout(syncTimer);
-          syncTimer = setTimeout(() => {
-            syncTimer = null;
-            try { const payload = MangaVaultPayload.buildFromLocalStorage(); MangaVault.savePayload(payload).catch((error) => { document.getElementById('readerStatus').textContent = error?.message || '同期に失敗しました'; }); } catch (error) { document.getElementById('readerStatus').textContent = error?.message || '同期に失敗しました'; }
-          }, 5000);
-        },
-        destroy() { clearTimeout(syncTimer); syncTimer = null; },
+      let runtime = null;
+      let startPromise = null;
+      let generation = 0;
+      const canReadProtectedData = () => !!mediaAccess && mediaAccess.canReadProtectedData?.() === true;
+      const showBlocked = () => {
+        document.documentElement.classList.add('vpn-protected-blocked');
+        const message = document.getElementById('readerMessage');
+        const section = document.createElement('section'); section.className = 'vpnReaderGate';
+        const heading = document.createElement('h1'); heading.textContent = 'VPN接続が必要です';
+        const detail = document.createElement('p'); detail.textContent = 'VPN接続を確認できるまで、作品情報とページを読み込みません。';
+        const actions = document.createElement('div'); actions.className = 'vpnReaderGateActions';
+        const recheck = document.createElement('button'); recheck.type = 'button'; recheck.className = 'ctrlBtn vpnStatusButton'; recheck.dataset.vpnStatusButton = '1'; recheck.dataset.vpnRecheckButton = '1'; recheck.textContent = 'VPN接続を再確認';
+        const diagnostics = document.createElement('button'); diagnostics.type = 'button'; diagnostics.className = 'ctrlBtn vpnDiagnosticsButton'; diagnostics.dataset.vpnDiagnosticsButton = '1'; diagnostics.textContent = 'VPN診断';
+        const back = document.createElement('a'); back.className = 'ctrlBtn'; back.href = 'manga.html'; back.textContent = '本棚へ戻る';
+        actions.append(recheck, diagnostics, back); section.append(heading, detail, actions); message.replaceChildren(section);
+        document.getElementById('currentTitle').textContent = '';
+        document.getElementById('readerStatus').textContent = '';
+        document.getElementById('pageStage').replaceChildren();
+        document.getElementById('pageLabel').textContent = '';
+        mediaAccess?.syncUi?.();
       };
-      const repository = ReaderItemRepositoryFactory.create({
-        readItems() { try { const values = JSON.parse(localStorage.getItem('mangaReaderSavedItems') || '[]'); return Array.isArray(values) ? values : []; } catch (_) { return []; } },
-        writeItems(items) { return MangaReaderStorage.safeWriteJson('mangaReaderSavedItems', items); },
-        scheduleSync: () => syncScheduler.schedule(),
-      });
-      const runtime = ReaderRuntimeFactory.create({ repository, target: MangaReaderTarget, lifecycleResources: [syncScheduler], location, document, window });
-      window.MangaReaderRuntime = runtime;
-      if (!itemId) { runtime.close(); return; }
-      const item = await runtime.start(itemId);
-      if (item) document.getElementById('readerMessage').textContent = '';
+      async function startReader() {
+        if (!canReadProtectedData()) return;
+        if (startPromise) return startPromise;
+        const currentGeneration = generation;
+        document.documentElement.classList.remove('vpn-protected-blocked');
+        const message = document.getElementById('readerMessage'); message.textContent = '';
+        const itemId = MangaReaderTarget.itemIdFromLocation(location);
+        if (!itemId) { location.replace('manga.html'); return; }
+        MangaReaderTarget.clearLegacyTarget(localStorage);
+        let syncTimer = null;
+        const syncScheduler = {
+          schedule() {
+            if (!canReadProtectedData()) return;
+            clearTimeout(syncTimer);
+            syncTimer = setTimeout(() => {
+              syncTimer = null;
+              if (!canReadProtectedData()) return;
+              try { const payload = MangaVaultPayload.buildFromLocalStorage(); MangaVault.savePayload(payload).catch((error) => { if (canReadProtectedData()) document.getElementById('readerStatus').textContent = error?.message || '同期に失敗しました'; }); } catch (error) { if (canReadProtectedData()) document.getElementById('readerStatus').textContent = error?.message || '同期に失敗しました'; }
+            }, 5000);
+          },
+          destroy() { clearTimeout(syncTimer); syncTimer = null; },
+        };
+        const repository = ReaderItemRepositoryFactory.create({
+          readItems() { if (!canReadProtectedData()) return []; try { const values = JSON.parse(localStorage.getItem('mangaReaderSavedItems') || '[]'); return Array.isArray(values) ? values : []; } catch (_) { return []; } },
+          writeItems(items) { if (!canReadProtectedData()) return false; return MangaReaderStorage.safeWriteJson('mangaReaderSavedItems', items); },
+          scheduleSync: () => syncScheduler.schedule(),
+        });
+        const currentRuntime = ReaderRuntimeFactory.create({ repository, target: MangaReaderTarget, lifecycleResources: [syncScheduler], location, document, window });
+        runtime = currentRuntime; window.MangaReaderRuntime = currentRuntime;
+        startPromise = currentRuntime.start(itemId).then((item) => {
+          if (currentGeneration !== generation || !canReadProtectedData()) {
+            currentRuntime.destroy();
+            if (runtime === currentRuntime) runtime = null;
+            return null;
+          }
+          if (item) message.textContent = '';
+          return item;
+        }).finally(() => { if (runtime === currentRuntime) startPromise = null; });
+        return startPromise;
+      }
+      function handleAccessChange() {
+        if (canReadProtectedData()) {
+          if (!runtime) startReader().catch((error) => { if (canReadProtectedData()) document.getElementById('readerMessage').textContent = error?.message || 'Readerを起動できませんでした'; });
+          return;
+        }
+        generation += 1;
+        runtime?.destroy(); runtime = null; startPromise = null;
+        window.MangaReaderRuntime = null;
+        showBlocked();
+      }
+      document.addEventListener('manga-reader-vpn-status', handleAccessChange);
+      handleAccessChange();
     })().catch((error) => { const message = document.getElementById('readerMessage'); if (message) message.textContent = error?.message || 'Readerを起動できませんでした'; });
   </script>
 </body>

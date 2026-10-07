@@ -9,6 +9,7 @@
   const FOLDER_KEY = 'mangaReaderVideoFolders';
   const META_KEY = 'mangaReaderVideoMeta';
   const PREF_KEY = 'mangaReaderVideoLibraryView';
+  const PROTECTED_DATA_KEYS = new Set([VIDEO_KEY, FOLDER_KEY, META_KEY]);
   const STATUS_LABELS = { '': '', later: 'あとで見る', watching: '視聴中', watched: '視聴済み' };
   const SORT_LABELS = {
     'recent-added': '最近追加', oldest: '古い順', 'recent-opened': '最近開いた', 'most-opened': 'よく開く', title: 'タイトル'
@@ -20,12 +21,24 @@
   };
   const dom = {};
   let eventsBound = false;
+  let mediaAccess = window.MangaReaderMediaAccess || null;
+
+  function canReadProtectedData() {
+    return !!mediaAccess && typeof mediaAccess.canReadProtectedData === 'function' && mediaAccess.canReadProtectedData() === true;
+  }
+
+  function isProtectedDataKey(key) { return PROTECTED_DATA_KEYS.has(key); }
 
   function readJson(key, fallback) {
+    if (isProtectedDataKey(key) && !canReadProtectedData()) return fallback;
     try { const value = JSON.parse(localStorage.getItem(key) || 'null'); return value == null ? fallback : value; }
     catch (_) { return fallback; }
   }
-  function writeJson(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+  function writeJson(key, value) {
+    if (isProtectedDataKey(key) && !canReadProtectedData()) return false;
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  }
   function id(prefix) { return prefix + '-' + (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now()); }
   function text(value) { return String(value == null ? '' : value).trim(); }
 
@@ -38,6 +51,12 @@
   function savePrefs() { writeJson(PREF_KEY, { sort: state.sort, view: state.view, quick: state.quick }); }
 
   function loadLibraryState() {
+    if (!canReadProtectedData()) {
+      state.baseVideos = [];
+      state.folders = [];
+      state.meta = {};
+      return;
+    }
     const rawVideos = readJson(VIDEO_KEY, []);
     state.baseVideos = Array.isArray(rawVideos) ? rawVideos : [];
     state.folders = Data.normalizeFolders(readJson(FOLDER_KEY, []));
@@ -60,6 +79,7 @@
   }
 
   async function runVaultSync() {
+    if (!canReadProtectedData()) return;
     if (!window.MangaVault || !window.MangaVaultPayload || !MangaVault.loadActive || !MangaVault.loadActive()) return;
     if (state.syncRunning) { state.syncDirty = true; return; }
     state.syncRunning = true;
@@ -76,18 +96,23 @@
     }
   }
   function scheduleVaultSync() {
+    if (!canReadProtectedData()) return;
     clearTimeout(state.syncTimer);
     state.syncTimer = setTimeout(runVaultSync, 450);
   }
   function persistAux({ sync = true } = {}) {
+    if (!canReadProtectedData()) return false;
     writeJson(FOLDER_KEY, state.folders);
     writeJson(META_KEY, state.meta);
     if (sync) scheduleVaultSync();
+    return true;
   }
   function updateMeta(videoId, patch, options) {
+    if (!canReadProtectedData()) return false;
     const current = state.meta[videoId] && typeof state.meta[videoId] === 'object' ? state.meta[videoId] : {};
     state.meta[videoId] = { ...current, ...patch, updatedAt: Date.now() };
     persistAux(options);
+    return true;
   }
 
   function injectStyles() {
@@ -102,6 +127,7 @@
       #videoLibraryResults{overflow:auto;min-height:0;flex:1;padding:1px 1px 18px}.vl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:11px}.vl-grid.compact{display:flex;flex-direction:column;gap:6px}.vl-card{position:relative;min-width:0;border:1px solid var(--border);border-radius:16px;background:var(--bg-soft);overflow:visible;box-shadow:0 5px 18px rgba(0,0,0,.08)}.vl-open{display:block;width:100%;border:0;background:transparent;color:inherit;padding:0;text-align:left;cursor:pointer}.vl-thumb{position:relative;aspect-ratio:16/9;display:grid;place-items:center;border-radius:15px 15px 0 0;overflow:hidden;background:linear-gradient(135deg,var(--panel-2),var(--bg));color:var(--sub)}.vl-thumb img{width:100%;height:100%;object-fit:cover}.vl-thumb-fallback{display:grid;place-items:center;text-align:center;gap:5px;font-size:11px}.vl-thumb-fallback b{font-size:27px;color:var(--text)}.vl-body{padding:11px 12px 12px}.vl-title{font-weight:750;font-size:14px;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.vl-meta{margin-top:6px;color:var(--sub);font-size:11px;display:flex;gap:6px;flex-wrap:wrap}.vl-tags{margin-top:7px;display:flex;gap:5px;flex-wrap:wrap}.vl-tag{font-size:10px;border:1px solid var(--border);border-radius:999px;padding:3px 6px;color:var(--sub)}.vl-card-actions{position:absolute;right:8px;top:8px;display:flex;gap:4px;z-index:3}.vl-round{width:34px;height:34px;border:1px solid rgba(255,255,255,.24);border-radius:50%;display:grid;place-items:center;background:rgba(10,12,17,.76);color:#fff;backdrop-filter:blur(14px);cursor:pointer}.vl-round.active{color:#ffd35a}.vl-menu{position:relative}.vl-menu summary{list-style:none}.vl-menu summary::-webkit-details-marker{display:none}.vl-menu-panel{position:absolute;right:0;top:38px;width:170px;padding:6px;border:1px solid var(--border);border-radius:12px;background:var(--panel);box-shadow:var(--shadow-md);z-index:20}.vl-menu-panel button{display:block;width:100%;border:0;background:transparent;color:var(--text);text-align:left;padding:9px;border-radius:8px;cursor:pointer}.vl-menu-panel button:hover{background:var(--panel-2)}.vl-menu-panel .danger{color:#ff7777}.vl-progress{height:3px;background:var(--panel-2);margin-top:9px;border-radius:99px;overflow:hidden}.vl-progress i{display:block;height:100%;background:var(--accent)}
       .vl-grid.compact .vl-card{display:grid;grid-template-columns:116px minmax(0,1fr);min-height:76px;overflow:visible}.vl-grid.compact .vl-open{display:contents}.vl-grid.compact .vl-thumb{aspect-ratio:auto;height:76px;border-radius:15px 0 0 15px}.vl-grid.compact .vl-body{padding:10px 70px 8px 10px}.vl-grid.compact .vl-title{-webkit-line-clamp:1}.vl-grid.compact .vl-card-actions{top:50%;transform:translateY(-50%)}.vl-empty{padding:48px 18px;text-align:center;color:var(--sub);border:1px dashed var(--border);border-radius:16px}.vl-empty strong{display:block;color:var(--text);font-size:17px;margin-bottom:6px}
       #videoLibrarySheet{position:fixed;inset:0;z-index:180;background:rgba(0,0,0,.58);display:grid;align-items:end;padding:12px;backdrop-filter:blur(10px)}#videoLibrarySheet[hidden]{display:none!important}.vl-sheet-panel{width:min(680px,100%);max-height:min(90dvh,820px);margin:0 auto;overflow:auto;border:1px solid color-mix(in srgb,var(--accent) 30%,var(--border));border-radius:24px;background:var(--panel);color:var(--text);box-shadow:0 24px 70px rgba(0,0,0,.55);padding:18px}.vl-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:var(--panel);padding:16px 0 12px;z-index:2;border-bottom:1px solid var(--border);margin-bottom:4px}.vl-sheet-head h2{margin:0;font-size:20px}.vl-close{border:1px solid var(--border);border-radius:999px;background:var(--panel-2);color:var(--text);width:38px;height:38px}.vl-form{display:grid;gap:14px}.vl-field{padding:10px 11px 11px;border:1px solid var(--border);border-radius:14px;background:color-mix(in srgb,var(--bg-soft) 72%,var(--panel))}.vl-field:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 22%,transparent)}.vl-field label{display:block;color:var(--text);font-size:13px;font-weight:750;margin:0 0 7px}.vl-field input,.vl-field select,.vl-field textarea{width:100%;border:1px solid color-mix(in srgb,var(--sub) 48%,var(--border));border-radius:10px;background:var(--panel);color:var(--text);padding:12px;font-size:16px;min-height:46px}.vl-field input::placeholder,.vl-field textarea::placeholder{color:var(--sub);opacity:.9}.vl-field input:focus,.vl-field select:focus,.vl-field textarea:focus{outline:2px solid color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:1px}.vl-field textarea{min-height:90px;resize:vertical}.vl-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.vl-check{display:flex;gap:10px;align-items:center;min-height:46px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-soft);font-weight:700}.vl-sheet-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px;padding-top:12px;border-top:1px solid var(--border)}.vl-sheet-actions button{min-height:44px;border-radius:12px;padding:0 14px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-weight:700}.vl-sheet-actions .save{border:0;background:var(--accent);color:#fff}.vl-sheet-actions .danger{margin-right:auto;color:#ff7777}.vl-advanced{border:1px solid var(--border);border-radius:12px;padding:0 11px;background:var(--bg-soft)}.vl-advanced summary{padding:13px 0;cursor:pointer;color:var(--text);font-size:13px;font-weight:700}.vl-help{margin:-4px 0 2px;color:var(--sub);font-size:11px;line-height:1.5}.vl-folder-create{display:flex;gap:8px}.vl-folder-create input{flex:1}.vl-folder-list{display:grid;gap:7px;margin-top:12px}.vl-folder-row{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:12px;padding:9px 10px}.vl-folder-row span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}.vl-folder-row button{border:0;background:var(--panel-2);color:var(--text);border-radius:8px;padding:7px 9px}.vl-folder-row .danger{color:#ff7777}
+      .vl-access-notice{margin:10px 0;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--bg-soft);color:var(--text);font-size:13px;line-height:1.6}
       @media(max-width:700px){.vl-filters{grid-template-columns:1fr 1fr 1fr}.vl-filters #videoLibrarySort{grid-column:span 1}.vl-grid{grid-template-columns:1fr 1fr}.vl-sheet-panel{border-radius:24px 24px 18px 18px}.vl-two{grid-template-columns:1fr}}
       @media(max-width:480px){.vl-top{align-items:stretch}.vl-primary{padding:0 12px}.vl-filters{grid-template-columns:1fr 1fr}.vl-grid{grid-template-columns:1fr}.vl-grid.compact .vl-card{grid-template-columns:104px minmax(0,1fr)}.vl-grid.compact .vl-thumb{height:72px}.vl-grid.compact .vl-body{padding-right:66px}.vl-summary{padding:0 2px}}
     `;
@@ -144,6 +170,7 @@
         <button id="videoLibraryFolders" class="vl-icon-btn" type="button">フォルダ</button>
       </div>
       <div class="vl-summary"><span id="videoLibraryCount"></span><span id="videoLibraryStatus" aria-live="polite"></span></div>
+      <p id="videoLibraryAccessNotice" class="vl-access-notice" aria-live="polite" hidden>VPN接続を確認できるまで、動画データの読み込みと追加・編集を停止しています。</p>
       <div id="videoLibraryResults"></div>`;
     section.prepend(app);
 
@@ -195,6 +222,7 @@
       deleteBtn: document.getElementById('videoLibraryDelete'), cancel: document.getElementById('videoLibraryCancel'), folderManager: document.getElementById('videoLibraryFolderManager'),
       newFolder: document.getElementById('videoLibraryNewFolder'), createFolder: document.getElementById('videoLibraryCreateFolder'), folderList: document.getElementById('videoLibraryFolderList'),
       legacyItems,
+      accessNotice: document.getElementById('videoLibraryAccessNotice'),
     });
     return true;
   }
@@ -280,6 +308,7 @@
 
   function render() {
     loadLibraryState();
+    syncAccessUi();
     const all = effectiveVideos();
     const scoped = all.filter((video) => video.hidden === state.showHidden);
     renderFilterOptions(scoped);
@@ -296,6 +325,7 @@
   }
 
   function invokeUrlAdd({ title, url }) {
+    if (!canReadProtectedData()) throw new Error('VPN接続を確認できるまで動画を追加できません。');
     const fields = Data.storageFieldsForVideoUrl(url);
     if (!fields) throw new Error('動画URLを確認してください。');
     const videos = readJson(VIDEO_KEY, []);
@@ -379,6 +409,7 @@
   }
 
   function openEditor(videoId) {
+    if (!canReadProtectedData()) return;
     state.sheetMode = videoId ? 'edit' : 'add'; state.editorId = videoId || null;
     dom.folderManager.hidden = true; dom.form.hidden = false; dom.sheetTitle.textContent = videoId ? '動画を編集' : '動画を追加'; dom.deleteBtn.hidden = !videoId;
     const video = videoId ? effectiveFieldsForEditor(videoId) : Data.normalizeVideo({ id: 'draft', addedAt: Date.now() });
@@ -401,6 +432,7 @@
   }
 
   function openFolderManager() {
+    if (!canReadProtectedData()) return;
     state.sheetMode = 'folders'; state.editorId = null; dom.form.hidden = true; dom.folderManager.hidden = false; dom.sheetTitle.textContent = '動画フォルダ'; dom.newFolder.value = ''; renderFolderManager(); setSheetVisible(true); pushSheetState(); setTimeout(() => dom.newFolder.focus(), 30);
   }
 
@@ -409,13 +441,14 @@
     if (!state.folders.length) { const empty = document.createElement('div'); empty.className = 'vl-empty'; empty.textContent = 'フォルダはまだありません'; dom.folderList.append(empty); return; }
     state.folders.forEach((folder) => {
       const row = document.createElement('div'); row.className = 'vl-folder-row'; const name = document.createElement('span'); name.textContent = folder.name;
-      const rename = document.createElement('button'); rename.type = 'button'; rename.textContent = '名前変更'; rename.addEventListener('click', () => { const next = prompt('フォルダ名', folder.name); if (next == null || !text(next)) return; folder.name = text(next); persistAux(); renderFolderManager(); render(); });
-      const del = document.createElement('button'); del.type = 'button'; del.className = 'danger'; del.textContent = '削除'; del.addEventListener('click', () => { if (!confirm('「' + folder.name + '」を削除しますか？動画自体は削除されません。')) return; state.folders = state.folders.filter((entry) => entry.id !== folder.id); Object.keys(state.meta).forEach((videoId) => { if (state.meta[videoId] && state.meta[videoId].folderId === folder.id) state.meta[videoId] = { ...state.meta[videoId], folderId: null, updatedAt: Date.now() }; }); persistAux(); state.folderId = state.folderId === folder.id ? '' : state.folderId; renderFolderManager(); render(); });
+      const rename = document.createElement('button'); rename.type = 'button'; rename.textContent = '名前変更'; rename.disabled = !canReadProtectedData(); rename.addEventListener('click', () => { if (!canReadProtectedData()) return; const next = prompt('フォルダ名', folder.name); if (next == null || !text(next)) return; folder.name = text(next); persistAux(); renderFolderManager(); render(); });
+      const del = document.createElement('button'); del.type = 'button'; del.className = 'danger'; del.textContent = '削除'; del.disabled = !canReadProtectedData(); del.addEventListener('click', () => { if (!canReadProtectedData() || !confirm('「' + folder.name + '」を削除しますか？動画自体は削除されません。')) return; state.folders = state.folders.filter((entry) => entry.id !== folder.id); Object.keys(state.meta).forEach((videoId) => { if (state.meta[videoId] && state.meta[videoId].folderId === folder.id) state.meta[videoId] = { ...state.meta[videoId], folderId: null, updatedAt: Date.now() }; }); persistAux(); state.folderId = state.folderId === folder.id ? '' : state.folderId; renderFolderManager(); render(); });
       row.append(name, rename, del); dom.folderList.append(row);
     });
   }
 
   function createFolder() {
+    if (!canReadProtectedData()) return;
     const name = text(dom.newFolder.value); if (!name) return;
     if (state.folders.some((folder) => folder.name.toLocaleLowerCase('ja') === name.toLocaleLowerCase('ja'))) { setStatus('同名のフォルダがあります', true); return; }
     state.folders.push({ id: id('vf'), name, createdAt: Date.now() }); dom.newFolder.value = ''; persistAux(); renderFolderManager(); render();
@@ -423,6 +456,7 @@
 
   function saveEditor(event) {
     event.preventDefault(); dom.formError.textContent = '';
+    if (!canReadProtectedData()) return;
     const existingBase = state.editorId ? baseById(state.editorId) : null;
     const rawUrl = text(dom.url.value);
     const classified = Data.classifyVideoUrl(rawUrl);
@@ -451,6 +485,7 @@
   }
 
   function deleteVideoFromLibrary(videoId) {
+    if (!canReadProtectedData()) return;
     const base = baseById(videoId); if (!base) return;
     const video = effectiveVideo(base); if (!confirm('「' + (video.title || 'この動画') + '」を削除しますか？')) return;
     if (!invokeLegacyDelete(base)) { setStatus('削除できませんでした。ページを再読み込みして再試行してください。', true); return; }
@@ -459,6 +494,7 @@
   }
 
   function openVideo(videoId) {
+    if (!canReadProtectedData()) return;
     const base = baseById(videoId); if (!base) return; const video = effectiveVideo(base);
     updateMeta(videoId, { openCount: (video.openCount || 0) + 1, lastOpenedAt: Date.now() });
     const target = new URL('video-player.html', location.href);
@@ -485,12 +521,24 @@
     window.addEventListener('popstate', () => { if (!(history.state && history.state.videoLibrarySheet)) setSheetVisible(false); });
   }
 
-  function init() {
+  function syncAccessUi() {
+    const allowed = canReadProtectedData();
+    if (dom.accessNotice) dom.accessNotice.hidden = allowed;
+    if (dom.add) dom.add.disabled = !allowed;
+    if (dom.foldersBtn) dom.foldersBtn.disabled = !allowed;
+    if (dom.deleteBtn) dom.deleteBtn.disabled = !allowed;
+    if (dom.createFolder) dom.createFolder.disabled = !allowed;
+    if (dom.form) dom.form.querySelectorAll('button[type="submit"]').forEach((button) => { button.disabled = !allowed; });
+    if (!allowed && dom.sheet) setSheetVisible(false);
+  }
+
+  function init(access) {
+    if (access) mediaAccess = access;
     if (!document.getElementById('videoListSection')) return;
     injectStyles(); loadPrefs(); loadLibraryState(); if (!setupMarkup()) return; bindEvents(); if (dom.search) dom.search.value = state.query; render();
   }
 
-  window.MangaReaderVideoLibrary = Object.freeze({ init });
+  window.MangaReaderVideoLibrary = Object.freeze({ init, syncAccessUi });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(init, 0), { once: true });
   else setTimeout(init, 0);
 })();

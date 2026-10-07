@@ -36,7 +36,7 @@
     if (!deps || typeof deps !== 'object' || Array.isArray(deps)) {
       throw new TypeError('MangaListHostRuntimeFactory requires dependency object');
     }
-    for (const name of ['safeWriteJson', 'getState', 'persistVideos']) {
+    for (const name of ['safeWriteJson', 'getState', 'persistVideos', 'canReadProtectedData']) {
       if (typeof deps[name] !== 'function') {
         throw new TypeError('MangaListHostRuntimeFactory requires function: ' + name);
       }
@@ -87,13 +87,19 @@
     let cloudSyncRunning = false;
     let cloudSyncDirty = false;
 
+    function canReadProtectedData() {
+      return deps.canReadProtectedData() === true;
+    }
+
     function scheduleCloudSync() {
+      if (!canReadProtectedData()) return;
       if (!deps.sync.hasActiveVault()) return;
       deps.sync.clearTimer(cloudSyncTimer);
       cloudSyncTimer = deps.sync.setTimer(runCloudSync, 5000);
     }
 
     function buildSyncPayload() {
+      if (!canReadProtectedData()) return null;
       const payload = deps.sync.buildBasePayload();
       let latestVideos = deps.sync.getSavedVideos();
       try {
@@ -113,10 +119,12 @@
     }
 
     async function runCloudSync() {
+      if (!canReadProtectedData()) return;
       if (cloudSyncRunning) { cloudSyncDirty = true; return; }
       cloudSyncRunning = true;
       try {
-        await deps.sync.savePayload(buildSyncPayload());
+        const payload = buildSyncPayload();
+        if (payload && canReadProtectedData()) await deps.sync.savePayload(payload);
       } catch (error) {
         deps.sync.onSyncError(error && error.message ? error.message : 'クラウド同期に失敗しました', 'cloud-sync-error');
       } finally {
@@ -126,6 +134,7 @@
     }
 
     async function loadLocalCover(item, img) {
+      if (!canReadProtectedData()) return;
       try {
         const session = JSON.parse(deps.images.readStorageItem(deps.images.sessionKey) || 'null');
         const config = deps.images.getSupabaseConfig() || {};
@@ -140,6 +149,7 @@
     }
 
     function setupFeedImage(imgEl, baseUrlForItem, numberWidth, itemPattern, itemId) {
+      if (!canReadProtectedData()) return;
       const parsed = deps.images.parseInputUrl(baseUrlForItem);
       const folderUrl = parsed ? parsed.baseUrl : baseUrlForItem;
       const identityKey = itemId ? 'item:' + String(itemId) : folderUrl;
@@ -196,6 +206,7 @@
     }
 
     function navigateToReader(item) {
+      if (!canReadProtectedData()) return false;
       if (!item || !item.id) throw new Error('saved manga item id is required');
       const itemId = String(item.id);
 
@@ -210,28 +221,37 @@
       // source locations and may be shared, replaced, or reordered; they must
       // never be used as the route identity for a saved manga.
       deps.navigation.navigate(deps.navigation.buildReaderUrl(itemId, deps.navigation.readerUrl));
+      return true;
     }
 
     function persistFolders() {
+      if (!canReadProtectedData()) return false;
       deps.safeWriteJson(deps.keys.savedFolders, deps.getState().savedFolders);
       scheduleCloudSync();
+      return true;
     }
 
     function persistItems() {
+      if (!canReadProtectedData()) return false;
       deps.safeWriteJson(deps.keys.savedItems, deps.getState().savedItems);
       scheduleCloudSync();
+      return true;
     }
 
     function persistAuthorCards() {
+      if (!canReadProtectedData()) return false;
       deps.safeWriteJson(deps.keys.authorCards, deps.getState().authorCards);
       scheduleCloudSync();
+      return true;
     }
 
     function persistAll() {
+      if (!canReadProtectedData()) return false;
       persistFolders();
       persistItems();
       persistAuthorCards();
       deps.persistVideos();
+      return true;
     }
 
     return Object.freeze({

@@ -11,6 +11,19 @@ test('video player page uses the normalized saved title and renders marker list'
   assert.match(page, /videoMarker/);
 });
 
+test('video player waits for protected-data access before reading records or rendering metadata', () => {
+  const accessCheck = page.indexOf('function canReadProtectedData()');
+  const initialize = page.indexOf('function initializePlayer()');
+  assert.ok(accessCheck >= 0 && initialize > accessCheck);
+  assert.ok(page.indexOf('const baseVideos = read(VIDEO_KEY, [])') > initialize);
+  assert.match(page, /manga-reader-vpn-status/);
+  assert.match(page, /function disposePlayer\(\)/);
+  assert.match(page, /page\.replaceChildren\(\)/);
+  assert.match(controls, /manga-reader-vpn-status/);
+  assert.match(controls, /function initializeControls\(\)/);
+  assert.match(controls, /canReadProtectedData\(\)/);
+});
+
 test('video player page exposes quick editing for saved video details and syncs Vault payload', () => {
   assert.match(page, /動画情報を編集/);
   assert.match(page, /videoEditForm/);
@@ -33,7 +46,7 @@ test('video title edits in place and player details follow the video in a watch-
 test('video player document cache keys identify the current watch-page design', () => {
   const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
   assert.match(html, /home-profile-shell\.css\?v=20261007-video-watch-layout/);
-  assert.match(html, /video-player-page\.js\?v=20261007-video-watch-layout/);
+  assert.match(html, /video-player-page\.js\?v=20261008-vpn-data/);
 });
 
 test('marker registration defaults to the current playback position', () => {

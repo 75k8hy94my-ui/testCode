@@ -68,6 +68,28 @@ test('video library saves enhanced records through its own Vault boundary', () =
   assert.doesNotMatch(read('reader.html'), /video-data\.js|video-library\.js|mangaReaderVideos/);
 });
 
+test('video library never reads or mutates protected records without VPN access', () => {
+  const library = read('video-library.js');
+  const load = library.slice(library.indexOf('function loadLibraryState'), library.indexOf('function effectiveVideo'));
+  assert.match(library, /function canReadProtectedData\(\)/);
+  assert.ok(load.indexOf('if (!canReadProtectedData())') < load.indexOf('readJson(VIDEO_KEY'));
+  assert.match(library, /if \(isProtectedDataKey\(key\) && !canReadProtectedData\(\)\) return fallback/);
+  assert.match(library, /if \(isProtectedDataKey\(key\) && !canReadProtectedData\(\)\) return false/);
+  assert.match(library, /if \(!canReadProtectedData\(\)\) return;[\s\S]*MangaVaultPayload\.buildFromLocalStorage/);
+});
+
+test('video playback and thumbnail helpers honor access loss before protected reads, media work, writes, and sync', () => {
+  const routing = read('video-routing-fix.js');
+  const thumbnail = read('video-thumbnail-time.js');
+  assert.match(routing, /function readJson\(key, fallback\)\s*\{\s*if \(PROTECTED_KEYS\.has\(key\) && !canReadProtectedData\(\)\) return fallback/);
+  assert.match(routing, /function scanDirectVideoThumbnails\(\)\s*\{\s*if \(!canReadProtectedData\(\)\) return false/);
+  assert.match(routing, /function persistPlaybackProgress\(base, video, options\)\s*\{\s*if \(!canReadProtectedData\(\)/);
+  assert.match(routing, /if \(!canReadProtectedData\(\)\) return;[\s\S]*MangaVaultPayload\.buildFromLocalStorage/);
+  const persistThumbnail = thumbnail.slice(thumbnail.indexOf('function persistThumbnailTimeAfterSave'), thumbnail.indexOf('function installEditor'));
+  assert.match(persistThumbnail, /if \(!canReadProtectedData\(\)\) return/);
+  assert.match(thumbnail, /setTimeout\(async \(\) => \{\s*if \(!canReadProtectedData\(\)\) return/);
+});
+
 test('video URL additions reject an exact duplicate without writing another record', () => {
   const library = read('video-library.js');
   assert.match(library, /list\.some\(\(item\)\s*=>\s*Data\.normalizeVideo\(item\)\.url\s*===\s*url\)/);

@@ -107,7 +107,7 @@
     return dependencyPromise;
   }
 
-  function createState(storage, keys) {
+  function createState(storage, keys, canReadProtectedData) {
     let legacyMigrated = false;
     let state = {
       savedItems: [], savedFolders: [], authorCards: [], savedVideos: [],
@@ -121,6 +121,11 @@
       get() { return state; },
       set(next) { state = Object.assign(state, next); return state; },
       load() {
+        if (!canReadProtectedData()) {
+          state = Object.assign(state, { savedItems: [], savedFolders: [], authorCards: [], savedVideos: [] });
+          legacyMigrated = false;
+          return state;
+        }
         const loaded = MangaListState.load({ storage, keys });
         if (!loaded.savedItems.length) {
           try {
@@ -177,6 +182,8 @@
     }
     const documentRef = deps.documentRef;
     const windowRef = deps.windowRef;
+    const mediaAccess = deps.mediaAccess || windowRef.MangaReaderMediaAccess;
+    const canReadProtectedData = () => !!mediaAccess && typeof mediaAccess.canReadProtectedData === 'function' && mediaAccess.canReadProtectedData() === true;
     let activeEntry = null;
     let lifecycle = 0;
 
@@ -196,7 +203,7 @@
         authorCards: 'mangaReaderAuthorCards',
         savedVideos: 'mangaReaderVideos',
       };
-      const data = createState(storage, keys);
+      const data = createState(storage, keys, canReadProtectedData);
       let runtime = null;
       let elements = null;
       const coverSourceCache = new Map();
@@ -272,7 +279,7 @@
         recordTransferEstimate,
       });
       const host = MangaListHostRuntimeFactory.create({
-        safeWriteJson, getState: data.get, persistVideos() { safeWriteJson(keys.savedVideos, data.get().savedVideos); }, keys,
+        safeWriteJson, getState: data.get, persistVideos() { if (canReadProtectedData()) safeWriteJson(keys.savedVideos, data.get().savedVideos); }, canReadProtectedData, keys,
         sync: {
           hasActiveVault: () => !!(windowRef.MangaVault && windowRef.MangaVault.loadActive()),
           clearTimer: (timer) => { if (timer) windowRef.clearTimeout(timer); },
@@ -415,6 +422,11 @@
         const importFiles = rootElement.querySelector('#encryptedImageFilesInput');
         const importStatus = rootElement.querySelector('#encryptedImageImportStatus');
         const importSubmit = rootElement.querySelector('#encryptedImageSubmitButton');
+        let activeEncryptedImport = null;
+        bind(documentRef, 'manga-reader-vpn-status', (event) => {
+          if (event && event.detail && event.detail.status === 'allowed') return;
+          if (activeEncryptedImport) activeEncryptedImport.abort();
+        });
         const bulkDetect = rootElement.querySelector('#bulkDetectBtn');
         const mangaImportRegister = rootElement.querySelector('#mangaImportRegisterButton');
         const mangaImportCancel = rootElement.querySelector('#mangaImportCancelButton');
@@ -434,18 +446,21 @@
         });
         bind(mangaImportCancel, 'click', () => mangaImportController.close());
         bind(bulkDetect, 'click', async () => {
+          if (!canReadProtectedData()) return;
           bulkDetect.disabled = true;
           try {
             const queued = await importBridge.requestQueuedCandidates();
+            if (!canReadProtectedData()) return;
             if (!queued.length) { windowRef.alert('拡張機能のキューに作品がありません。'); return; }
             mangaImportController.open(queued, state().savedItems, state().authorCards);
           } catch (error) {
             windowRef.alert(error?.message || '拡張機能からキューを読み込めませんでした。');
           } finally {
-            bulkDetect.disabled = false;
+            bulkDetect.disabled = !canReadProtectedData();
           }
         });
         bind(mangaImportRegister, 'click', async () => {
+          if (!canReadProtectedData()) return;
           const selection = mangaImportController.getSelection();
           if (!selection.items.length) { mangaImportController.setStatus('登録する作品を選択してください。'); return; }
           const checked = windowRef.MangaImportValidator.validateBatch(selection.items.map((item) => item.candidate));
@@ -455,14 +470,15 @@
           }
           mangaImportRegister.disabled = true;
           try {
+            if (!canReadProtectedData()) return;
             const result = importBatch.register(selection);
             if (!result.ok) { mangaImportController.setStatus('登録を中止しました：' + result.errors.map((error) => error.message || error).join('、')); return; }
             if (!result.registeredQueueIds.length) { mangaImportController.setStatus('新しい作品はありません。重複作品は登録されませんでした。'); return; }
             mangaImportController.setStatus(`${result.registeredQueueIds.length}作品を本棚へ登録しました。`);
-            if (windowRef.confirm(`${result.registeredQueueIds.length}作品を登録しました。登録済みの拡張機能キューから削除しますか？`)) {
+            if (canReadProtectedData() && windowRef.confirm(`${result.registeredQueueIds.length}作品を登録しました。登録済みの拡張機能キューから削除しますか？`)) {
               try {
                 const removed = await importBridge.removeQueuedCandidates(result.registeredQueueIds);
-                mangaImportController.setStatus(`${result.registeredQueueIds.length}作品を登録し、キューから${removed.length}件を削除しました。`);
+                if (canReadProtectedData()) mangaImportController.setStatus(`${result.registeredQueueIds.length}作品を登録し、キューから${removed.length}件を削除しました。`);
               } catch (error) {
                 mangaImportController.setStatus(`作品は登録済みですが、キュー削除に失敗しました：${error?.message || '不明なエラー'}`);
               }
@@ -470,11 +486,12 @@
           } catch (error) {
             mangaImportController.setStatus(error?.message || '登録できませんでした。');
           } finally {
-            mangaImportRegister.disabled = false;
+            mangaImportRegister.disabled = !canReadProtectedData();
           }
         });
         const closeImport = () => { importDialog.hidden = true; importDialog.style.display = ''; };
         bind(addEncryptedImages, 'click', () => {
+          if (!canReadProtectedData()) return;
           if (!windowRef.MangaVault?.loadActive?.()?.rawKey) {
             importStatus.textContent = '画像の追加には、ログインして保管庫を開いてください。';
           } else {
@@ -487,6 +504,7 @@
         bind(rootElement.querySelector('#encryptedImageCancelButton'), 'click', closeImport);
         bind(importForm, 'submit', async (event) => {
           event.preventDefault();
+          if (!canReadProtectedData()) return;
           const activeVault = windowRef.MangaVault?.loadActive?.();
           if (!activeVault?.rawKey) { importStatus.textContent = 'ログインして保管庫を開いてから追加してください。'; return; }
           const selectedFiles = Array.from(importFiles.files || []);
@@ -496,8 +514,11 @@
           importFiles.disabled = true;
           importTitle.disabled = true;
           importStatus.textContent = `画像を準備しています（0/${selectedFiles.length}）`;
+          const importController = new AbortController();
+          activeEncryptedImport = importController;
           try {
             const cache = await windowRef.EncryptedAssetCache.createCache();
+            if (!canReadProtectedData()) throw Object.assign(new Error('VPN接続を確認できるまで画像を追加できません。'), { name: 'AbortError' });
             const storageTransport = windowRef.EncryptedAssetStorage.createStorageTransport({ baseUrl: config.url, publishableKey: config.publishableKey });
             const service = windowRef.EncryptedAssetImport.create({
               processPhoto: (file, options) => windowRef.ImagePhotoProcessor.processPhoto(file, { ...options, preferWorker: true, onProgress: (progress) => {
@@ -505,11 +526,13 @@
               } }),
               stage: ({ assetId, targetRevision, processed }) => windowRef.EncryptedAssetSync.stageProcessedRevision({ cache, masterKey: activeVault.rawKey, assetId, targetRevision, processed }),
               publish: ({ assetId, targetRevision, staged, signal }) => windowRef.EncryptedAssetSync.publishPendingRevision({ vault: windowRef.MangaVault, storage: storageTransport, cache, assetId, targetRevision, objectIds: staged.objectIds, signal, transferStorage: windowRef.localStorage, mediaAccess: windowRef.MangaReaderMediaAccess }),
-              tombstone: (assetId, revision) => windowRef.EncryptedAssetSync.tombstoneAsset({ vault: windowRef.MangaVault, assetId, expectedRevision: revision }),
+              tombstone: (assetId, revision) => canReadProtectedData() ? windowRef.EncryptedAssetSync.tombstoneAsset({ vault: windowRef.MangaVault, assetId, expectedRevision: revision }) : Promise.resolve(),
             });
-            const item = await service.importFiles({ files: selectedFiles, title: importTitle.value, onProgress: (progress) => {
+            const item = await service.importFiles({ files: selectedFiles, title: importTitle.value, signal: importController.signal, onProgress: (progress) => {
+              if (!canReadProtectedData()) { importController.abort(); return; }
               importStatus.textContent = `${progress.index}/${progress.total} ページを同期しました`;
             } });
+            if (!canReadProtectedData()) return;
             const currentItems = state().savedItems.slice();
             currentItems.unshift(item);
             setState({ savedItems: currentItems, bookshelfPage: 1 });
@@ -519,11 +542,12 @@
             importForm.reset();
             windowRef.setTimeout(closeImport, 900);
           } catch (error) {
-            importStatus.textContent = error?.message || '暗号化画像を追加できませんでした。';
+            if (canReadProtectedData()) importStatus.textContent = error?.message || '暗号化画像を追加できませんでした。';
           } finally {
-            importSubmit.disabled = false;
-            importFiles.disabled = false;
-            importTitle.disabled = false;
+            if (activeEncryptedImport === importController) activeEncryptedImport = null;
+            importSubmit.disabled = !canReadProtectedData();
+            importFiles.disabled = !canReadProtectedData();
+            importTitle.disabled = !canReadProtectedData();
           }
         });
         bindFactory(MangaListSearchEventsFactory, { onSearchChange: (value) => { setState({ shelfSearchQuery: value, bookshelfPage: 1 }); renderList(); } }, { searchInput: search });
@@ -536,6 +560,7 @@
         bindFactory(MangaListFolderEventsFactory, {
           onCreateStart: () => { newFolderRow.style.display = ''; if (newFolderInput) newFolderInput.focus(); },
           onCreateConfirm: () => {
+            if (!canReadProtectedData()) return;
             const name = newFolderInput && newFolderInput.value.trim();
             if (!name) return;
             const folders = state().savedFolders.slice();
@@ -581,6 +606,26 @@
         return null;
       }
       installVpnControls(result.root, documentRef);
+      const notice = documentRef.createElement('p');
+      notice.className = 'vpnProtectedDataNotice';
+      notice.setAttribute('aria-live', 'polite');
+      notice.textContent = 'VPN接続を確認できるまで、同期データと追加・編集機能を停止しています。';
+      notice.hidden = canReadProtectedData();
+      result.root.insertBefore(notice, result.root.firstChild);
+      result.root.dataset.protectedDataAccess = canReadProtectedData() ? 'allowed' : 'blocked';
+      result.root.querySelectorAll('button, input, select, textarea, a[href*="reader.html"]').forEach((control) => {
+        if (control.hasAttribute('data-vpn-status-button') || control.hasAttribute('data-vpn-diagnostics-button')) return;
+        if ('disabled' in control) control.disabled = !canReadProtectedData();
+        if (control.matches('a[href*="reader.html"]')) {
+          if (canReadProtectedData()) {
+            control.removeAttribute('aria-disabled');
+            control.removeAttribute('tabindex');
+          } else {
+            control.setAttribute('aria-disabled', 'true');
+            control.setAttribute('tabindex', '-1');
+          }
+        }
+      });
       if (windowRef.MangaReaderMediaAccess && typeof windowRef.MangaReaderMediaAccess.syncUi === 'function') {
         windowRef.MangaReaderMediaAccess.syncUi();
       }

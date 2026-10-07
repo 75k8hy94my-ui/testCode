@@ -13,30 +13,29 @@ test('manga shells load the standalone bookshelf stylesheet', () => {
   assert.match(sandbox, /manga-list\.css\?v=/);
 });
 
-test('manga and video routes wait for an allowed VPN verdict before starting list runtimes', () => {
+test('manga and video route shells mount regardless of VPN verdict', () => {
   assert.match(spa, /function renderVpnGate\(/);
   assert.match(spa, /dataset\.vpnStatusButton='1'/);
   assert.match(spa, /dataset\.vpnRecheckButton='1'/);
   assert.match(spa, /dataset\.vpnDiagnosticsButton='1'/);
   assert.match(spa, /className='glassBtn vpnDiagnosticsButton'/);
   assert.doesNotMatch(spa.slice(spa.indexOf('function renderVpnGate'), spa.indexOf('async function ensureVpnGate')), /button\.dataset\.vpnStatusButton='1'.*button\.dataset\.vpnDiagnosticsButton='1'/s);
-  assert.match(spa, /canLoadExternalMedia\(\)/);
   const mangaRoute = spa.slice(spa.indexOf('async function renderManga'), spa.indexOf('let lastVpnRouteStatus'));
   const videoRoute = spa.slice(spa.indexOf('async function renderVideo'), spa.indexOf('async function renderManga'));
-  assert.ok(mangaRoute.indexOf('canLoadExternalMedia') < mangaRoute.indexOf('MangaListRouteFactory.create'));
-  assert.ok(videoRoute.indexOf('canLoadExternalMedia') < videoRoute.indexOf('VideoListRouteFactory.create'));
-  assert.doesNotMatch(mangaRoute.slice(0, mangaRoute.indexOf('MangaListRouteFactory.create')), /savedListItems|book-card|renderSavedList/);
-  assert.doesNotMatch(videoRoute.slice(0, videoRoute.indexOf('VideoListRouteFactory.create')), /savedListItems|book-card|renderVideoList/);
+  assert.match(mangaRoute, /MangaListRouteFactory\.create/);
+  assert.match(videoRoute, /VideoListRouteFactory\.create/);
+  assert.doesNotMatch(mangaRoute, /gate\.getStatus\(\)==='pending'\|\|gate\.getStatus\(\)==='checking'|!gate\.canLoadExternalMedia\(\)/);
+  assert.doesNotMatch(videoRoute, /gate\.getStatus\(\)==='pending'\|\|gate\.getStatus\(\)==='checking'|!gate\.canLoadExternalMedia\(\)/);
   assert.match(spa, /manga-reader-vpn-status/);
-  assert.match(mangaRoute, /gate\.getStatus\(\)==='pending'\|\|gate\.getStatus\(\)==='checking'/);
-  assert.match(mangaRoute, /renderVpnGate\(target,'manga'\)/);
+  assert.match(mangaRoute, /MangaReaderMediaAccess\.syncUi|gate\.syncUi/);
 });
 
-test('VPN verification renders a lightweight checking state before the bookshelf is mounted', () => {
-  const renderGate = spa.slice(spa.indexOf('function renderVpnGate'), spa.indexOf('async function ensureVpnGate'));
-  assert.match(renderGate, /本棚を読み込んでいます/);
-  assert.match(renderGate, /section\.classList\.add\('vpnRouteChecking'\)/);
-  assert.match(renderGate, /button\.disabled=checking/);
+test('VPN status changes refresh a mounted manga or video shell', () => {
+  assert.match(spa, /document\.addEventListener\('manga-reader-vpn-status',handleVpnStatusChange\)/);
+  assert.match(spa, /if\(route!=='manga'&&route!=='video'\)return/);
+  assert.match(spa, /next==='pending'\|\|next==='checking'[\s\S]*lastVpnRouteAccess!==route\+':allowed'/);
+  assert.match(spa, /if\(marker===lastVpnRouteAccess\)return/);
+  assert.match(spa, /renderRoute\(\)/);
 });
 
 test('bookshelf scripts are fetched concurrently with ordered classic-script execution', () => {
@@ -51,6 +50,7 @@ test('VPN gate exposes status changes without changing its verdict contract', ()
   assert.match(gate, /getStatus/);
   assert.match(gate, /applyFinalStatus\(allowed\)/);
   assert.match(gate, /setAllowedForTesting\(allowed\)/);
+  assert.match(gate, /canReadProtectedData/);
 });
 
 test('standalone bookshelf CSS covers the primary manga surfaces', () => {

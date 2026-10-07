@@ -175,7 +175,7 @@ test('all authenticated mobile destinations load the shared Liquid Glass assets'
     assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-drag-lock/, page);
   }
   for (const page of ['home.html','profile.html','manga.html','video.html']) {
-    assert.match(read(page), /home-profile-spa\.js\?v=20261006-passkey-reset/, page);
+    assert.match(read(page), /home-profile-spa\.js\?v=20261008-vpn-data/, page);
   }
 });
 
@@ -194,4 +194,11 @@ test('the manga shell opens Reader through standalone document navigation', () =
   assert.match(spa, /history\.pushState/);
   assert.match(route, /location\.assign\(url\)/);
   assert.doesNotMatch(read('reader.html'), /home-profile-spa|manga-list-route|MangaListHostRuntimeFactory/);
+});
+
+test('global Vault sync does not build a payload without protected-data access', () => {
+  const spa = read('home-profile-spa.js');
+  const sync = spa.slice(spa.indexOf('async function runHomeSync'), spa.indexOf('function commitLayout'));
+  assert.match(spa, /function canSyncProtectedData\(\)[\s\S]*canReadProtectedData\(\)===true/);
+  assert.ok(sync.indexOf('canSyncProtectedData') < sync.indexOf('MangaVaultPayload.buildFromLocalStorage'));
 });

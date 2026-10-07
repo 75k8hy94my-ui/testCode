@@ -1,11 +1,20 @@
 (() => {
   'use strict';
+  const mediaAccess = window.MangaReaderMediaAccess;
+  let disposeCurrent = () => {};
+  function canReadProtectedData() {
+    return !!mediaAccess && typeof mediaAccess.canReadProtectedData === 'function' && mediaAccess.canReadProtectedData() === true;
+  }
+  function destroy() { disposeCurrent(); disposeCurrent = () => {}; }
+  function initializeControls() {
+  if (!canReadProtectedData()) return;
   const video = document.querySelector('#videoPlayerPage video');
-  if (!video) return;
+  if (!video || video.dataset.customControlsReady === '1') return;
+  video.dataset.customControlsReady = '1';
   const id = new URLSearchParams(location.search).get('id') || 'unknown';
   const key = 'mangaReaderVideoMarkers';
   const read = () => { try { const value = JSON.parse(localStorage.getItem(key) || '{}'); return value && typeof value === 'object' ? value : {}; } catch (_) { return {}; } };
-  const save = (markers) => { try { const all = read(); all[id] = markers; localStorage.setItem(key, JSON.stringify(all)); } catch (_) {} };
+  const save = (markers) => { if (!canReadProtectedData()) return; try { const all = read(); all[id] = markers; localStorage.setItem(key, JSON.stringify(all)); } catch (_) {} };
   const markers = Array.isArray(read()[id]) ? read()[id] : [];
   video.controls = false;
   const frame = video.closest('.videoPlayerFrame');
@@ -31,4 +40,10 @@
   markerToggle.addEventListener('click', () => { markerPanel.hidden = !markerPanel.hidden; if (!markerPanel.hidden) secondsInput.value = (Number(video.currentTime) || 0).toFixed(1); renderMarkers(); }); add.addEventListener('click', () => { const seconds = Number(secondsInput.value); const label = labelInput.value.trim() || '現在位置'; if (!Number.isFinite(seconds) || seconds < 0) return; markers.push({ seconds, label }); save(markers); secondsInput.value = ''; labelInput.value = ''; renderMarkers(); window.dispatchEvent(new CustomEvent('manga-video-markers-changed')); });
   let lastTap = 0; let hideTimer; const showControls = () => { frame.classList.add('controlsVisible'); clearTimeout(hideTimer); hideTimer = setTimeout(() => { if (!video.paused && markerPanel.hidden) frame.classList.remove('controlsVisible'); }, 2500); }; video.addEventListener('click', (event) => { const now = Date.now(); const double = now - lastTap < 350; lastTap = now; if (double && window.matchMedia('(max-width: 800px)').matches) { const amount = event.offsetX < video.clientWidth / 2 ? -10 : 10; video.currentTime = Math.max(0, Math.min(video.duration || Infinity, video.currentTime + amount)); showControls(); return; } video.paused ? video.play() : video.pause(); showControls(); }); frame.addEventListener('mousemove', showControls); frame.addEventListener('touchstart', showControls, { passive: true });
   renderMarkers(); update();
+  disposeCurrent = () => { clearTimeout(hideTimer); try { video.pause(); } catch (_) {} controls.remove(); markerPanel.remove(); notice.remove(); delete video.dataset.customControlsReady; };
+  }
+  function handleAccessChange() { if (canReadProtectedData()) initializeControls(); else destroy(); }
+  window.MangaReaderVideoPlayerControls = Object.freeze({ destroy, initialize: initializeControls });
+  document.addEventListener('manga-reader-vpn-status', handleAccessChange);
+  initializeControls();
 })();

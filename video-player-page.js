@@ -1,6 +1,46 @@
 (() => {
   'use strict';
   const page = document.getElementById('videoPlayerPage');
+  const mediaAccess = window.MangaReaderMediaAccess;
+  let initialized = false;
+  const windowCleanups = [];
+  function canReadProtectedData() {
+    return !!mediaAccess && typeof mediaAccess.canReadProtectedData === 'function' && mediaAccess.canReadProtectedData() === true;
+  }
+  function showProtectedDataGate() {
+    if (!page) return;
+    const section = document.createElement('section'); section.className = 'profileContent vpnRouteGate';
+    const heading = document.createElement('h2'); heading.textContent = 'VPN接続が必要です';
+    const message = document.createElement('p'); message.className = 'profileLead'; message.textContent = 'VPN接続を確認できるまで、動画情報を読み込みません。';
+    const status = document.createElement('button'); status.type = 'button'; status.className = 'glassBtn vpnStatusButton'; status.dataset.vpnStatusButton = '1'; status.dataset.vpnRecheckButton = '1'; status.textContent = 'VPN接続を再確認';
+    const diagnostics = document.createElement('button'); diagnostics.type = 'button'; diagnostics.className = 'glassBtn vpnDiagnosticsButton'; diagnostics.dataset.vpnDiagnosticsButton = '1'; diagnostics.textContent = 'VPN診断';
+    const back = document.createElement('a'); back.className = 'glassBtn'; back.href = 'video.html'; back.textContent = '動画一覧へ戻る';
+    section.append(heading, message, status, diagnostics, back); page.replaceChildren(section);
+    if (mediaAccess && typeof mediaAccess.syncUi === 'function') mediaAccess.syncUi();
+  }
+  function disposePlayer() {
+    while (windowCleanups.length) windowCleanups.pop()();
+    if (window.MangaReaderVideoPlayerControls && typeof window.MangaReaderVideoPlayerControls.destroy === 'function') window.MangaReaderVideoPlayerControls.destroy();
+    page.querySelectorAll('video').forEach((video) => { try { video.pause(); video.removeAttribute('src'); video.load(); } catch (_) {} });
+    document.querySelectorAll('.videoEditDialog').forEach((dialog) => dialog.remove());
+    page.replaceChildren(); document.title = '動画'; initialized = false;
+  }
+  function handleAccessStatus() {
+    if (canReadProtectedData()) {
+      if (!initialized) initializePlayer();
+      return;
+    }
+    if (initialized) disposePlayer();
+    showProtectedDataGate();
+  }
+  function listenWindow(type, handler) {
+    window.addEventListener(type, handler);
+    windowCleanups.push(() => window.removeEventListener(type, handler));
+  }
+  document.addEventListener('manga-reader-vpn-status', handleAccessStatus);
+  function initializePlayer() {
+    if (initialized || !canReadProtectedData()) return;
+    initialized = true;
   const id = new URLSearchParams(location.search).get('id') || '';
   const VIDEO_KEY = 'mangaReaderVideos';
   const META_KEY = 'mangaReaderVideoMeta';
@@ -27,6 +67,7 @@
   const renderTags = (nextTags) => { tagLine.textContent = nextTags.map((tag) => '#' + tag).join(' '); tagLine.hidden = !nextTags.length; };
   renderTags(tags); info.append(tagLine);
   const saveMetaPatch = async (patch) => {
+    if (!canReadProtectedData()) throw new Error('VPN接続を確認できるまで動画を編集できません。');
     const nextMeta = read(META_KEY, {});
     const current = nextMeta[id] && typeof nextMeta[id] === 'object' ? nextMeta[id] : {};
     nextMeta[id] = { ...current, ...patch, updatedAt: Date.now() };
@@ -34,10 +75,12 @@
     if (window.MangaVault && window.MangaVaultPayload && typeof window.MangaVault.savePayload === 'function' && window.MangaVault.loadActive && window.MangaVault.loadActive()) {
       await window.MangaVault.savePayload(window.MangaVaultPayload.buildFromLocalStorage());
     }
+    if (!canReadProtectedData()) throw new Error('VPN接続を確認できるまで動画を編集できません。');
     Object.assign(allMeta, nextMeta);
     return nextMeta[id];
   };
   const beginTitleEdit = () => {
+    if (!canReadProtectedData()) return;
     if (heading.contentEditable === 'true') return;
     heading.dataset.previousTitle = heading.textContent;
     heading.contentEditable = 'true'; heading.setAttribute('role', 'textbox'); heading.setAttribute('aria-label', '動画タイトル'); heading.setAttribute('aria-multiline', 'false'); heading.focus();
@@ -51,6 +94,7 @@
     if (!next || next === previous) { heading.textContent = previous; return; }
     try {
       const saved = await saveMetaPatch({ title: next });
+      if (!canReadProtectedData()) return;
       heading.textContent = saved.title; document.title = saved.title || '動画';
     } catch (_) { heading.textContent = previous; info.dataset.saveError = 'タイトルを保存できませんでした'; setTimeout(() => { delete info.dataset.saveError; }, 3500); }
   };
@@ -74,7 +118,7 @@
   const formatMarker = (seconds) => Math.floor(seconds / 60) + ':' + String(Math.floor(seconds % 60)).padStart(2, '0');
   const renderPageMarkers = () => { markerItems.replaceChildren(); markerStore().slice().sort((a, b) => a.seconds - b.seconds).forEach((marker) => { const button = document.createElement('button'); button.type = 'button'; button.textContent = formatMarker(Number(marker.seconds) || 0) + ' ' + String(marker.label || '現在位置'); button.addEventListener('click', () => { const target = frame.querySelector('video'); if (target) { target.currentTime = marker.seconds; target.play(); } }); markerItems.append(button); }); markerList.hidden = !markerItems.children.length; };
   renderPageMarkers();
-  window.addEventListener('manga-video-markers-changed', renderPageMarkers);
+  listenWindow('manga-video-markers-changed', renderPageMarkers);
 
   const dialog = document.createElement('section'); dialog.className = 'videoEditDialog'; dialog.hidden = true; dialog.setAttribute('aria-hidden', 'true');
   dialog.innerHTML = '<div class="videoEditPanel" role="dialog" aria-modal="true" aria-labelledby="videoEditTitle"><header><h2 id="videoEditTitle">動画情報を編集</h2><button type="button" class="videoEditClose" aria-label="閉じる">×</button></header><form class="videoEditForm"><label>タイトル<input name="title" type="text" maxlength="240" autocomplete="off"></label><label>フォルダ<select name="folder"></select></label><label>状態<select name="status"><option value="">未設定</option><option value="later">あとで見る</option><option value="watching">視聴中</option><option value="watched">視聴済み</option></select></label><label>タグ（カンマ区切り）<input name="tags" type="text" autocomplete="off"></label><label>メモ<textarea name="memo" rows="3"></textarea></label><label class="videoEditCheck"><input name="favorite" type="checkbox"> お気に入り</label><p class="videoEditError" aria-live="polite"></p><footer><button type="button" class="videoEditCancel">キャンセル</button><button type="submit" class="videoEditSave">保存</button></footer></form></div>';
@@ -89,9 +133,10 @@
   dialog.querySelector('.videoEditClose').addEventListener('click', closeEditor);
   dialog.querySelector('.videoEditCancel').addEventListener('click', closeEditor);
   dialog.addEventListener('click', (event) => { if (event.target === dialog) closeEditor(); });
-  window.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !dialog.hidden) closeEditor(); });
+  listenWindow('keydown', (event) => { if (event.key === 'Escape' && !dialog.hidden) closeEditor(); });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (!canReadProtectedData()) return;
     const error = dialog.querySelector('.videoEditError'); error.textContent = '';
     const nextMeta = read(META_KEY, {});
     const current = nextMeta[id] && typeof nextMeta[id] === 'object' ? nextMeta[id] : {};
@@ -102,6 +147,7 @@
       if (window.MangaVault && window.MangaVaultPayload && typeof window.MangaVault.savePayload === 'function' && window.MangaVault.loadActive && window.MangaVault.loadActive()) {
         await window.MangaVault.savePayload(window.MangaVaultPayload.buildFromLocalStorage());
       }
+      if (!canReadProtectedData()) return;
       Object.assign(allMeta, nextMeta);
       const savedTitle = next.title || [base.a, base.b].filter(Boolean).join(' / ') || '動画';
       heading.textContent = savedTitle; document.title = savedTitle; renderTags(next.tags); closeEditor();
@@ -115,4 +161,6 @@
   const descriptionSummary = document.createElement('summary'); descriptionSummary.textContent = normalized.memo ? '動画のメモ' : '動画情報';
   const descriptionText = document.createElement('p'); descriptionText.textContent = normalized.memo || [base.a, base.b].filter(Boolean).join(' / ') || '動画'; description.append(descriptionSummary, descriptionText);
   const main = document.createElement('section'); main.className = 'videoPlayerMain'; main.append(frame, heading, info, actionBar, description, markerList, back); const layout = document.createElement('div'); layout.className = 'videoPlayerLayout'; layout.append(main, relatedBox); page.replaceChildren(layout); document.body.append(dialog);
+  }
+  handleAccessStatus();
 })();

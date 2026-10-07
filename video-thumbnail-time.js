@@ -7,6 +7,7 @@
 
   const VIDEO_KEY = 'mangaReaderVideos';
   const META_KEY = 'mangaReaderVideoMeta';
+  const PROTECTED_KEYS = new Set([VIDEO_KEY, META_KEY]);
   const DEFAULT_THUMBNAIL_TIME = 0.1;
 
   let currentEditorId = null;
@@ -16,11 +17,17 @@
   let observer = null;
   let syncTimer = null;
 
+  function canReadProtectedData() {
+    const gate = window.MangaReaderMediaAccess;
+    return !!gate && typeof gate.canReadProtectedData === 'function' && gate.canReadProtectedData() === true;
+  }
+
   function text(value) {
     return String(value == null ? '' : value).trim();
   }
 
   function readJson(key, fallback) {
+    if (PROTECTED_KEYS.has(key) && !canReadProtectedData()) return fallback;
     try {
       const value = JSON.parse(localStorage.getItem(key) || 'null');
       return value == null ? fallback : value;
@@ -34,7 +41,7 @@
     if (!proto || typeof proto.setItem !== 'function' || proto.setItem.__videoThumbnailTimeWrapped) return;
     const original = proto.setItem;
     const wrapped = function (key, value) {
-      if (this === window.localStorage && String(key) === META_KEY && typeof Data.mergeVideoMetaPreservingThumbnailTime === 'function') {
+      if (this === window.localStorage && String(key) === META_KEY && canReadProtectedData() && typeof Data.mergeVideoMetaPreservingThumbnailTime === 'function') {
         try {
           const existing = JSON.parse(this.getItem(META_KEY) || '{}');
           const incoming = JSON.parse(String(value));
@@ -60,8 +67,10 @@
   }
 
   function scheduleVaultSync() {
+    if (!canReadProtectedData()) return;
     clearTimeout(syncTimer);
     syncTimer = setTimeout(async () => {
+      if (!canReadProtectedData()) return;
       if (!window.MangaVault || !window.MangaVaultPayload || typeof MangaVault.loadActive !== 'function' || !MangaVault.loadActive()) return;
       try {
         await MangaVault.savePayload(MangaVaultPayload.buildFromLocalStorage());
@@ -139,6 +148,7 @@
   }
 
   function seekEditorPreview(seconds) {
+    if (!canReadProtectedData()) return;
     const { thumbnailPreview, thumbnailRange, thumbnailTime } = editorElements();
     if (!thumbnailPreview || !thumbnailRange || !thumbnailTime) return;
     selectedTimeSeconds = clampThumbnailTime(seconds, previewDuration);
@@ -172,6 +182,16 @@
   }
 
   function refreshEditorPreview() {
+    if (!canReadProtectedData()) {
+      const { wrapper, thumbnailPreview } = editorElements();
+      if (wrapper) wrapper.hidden = true;
+      if (thumbnailPreview) {
+        thumbnailPreview.pause();
+        thumbnailPreview.removeAttribute('src');
+        try { thumbnailPreview.load(); } catch (_) {}
+      }
+      return;
+    }
     const { wrapper, url, thumbnailPreview, thumbnailRange, thumbnailTime, duration } = editorElements();
     if (!wrapper || !url || !thumbnailPreview || !thumbnailRange || !thumbnailTime || !duration) return;
     const classified = Data.classifyVideoUrl(text(url.value));
@@ -207,6 +227,7 @@
   }
 
   function persistThumbnailTimeAfterSave(urlValue, titleValue, selectedValue) {
+    if (!canReadProtectedData()) return;
     const error = document.getElementById('videoLibraryFormError');
     if (error && text(error.textContent)) return;
     const targetId = resolveSavedVideoId(urlValue, titleValue);
@@ -298,6 +319,7 @@
     });
     url.addEventListener('input', () => setTimeout(refreshEditorPreview, 0));
     form.addEventListener('submit', () => {
+      if (!canReadProtectedData()) return;
       const urlValue = text(url.value);
       const title = document.getElementById('videoLibraryTitle');
       const titleValue = title ? text(title.value) : '';
@@ -350,6 +372,7 @@
   }
 
   function handleEditorOpenClick(event) {
+    if (!canReadProtectedData()) return;
     const target = event.target && typeof event.target.closest === 'function' ? event.target : null;
     if (!target) return;
     if (target.closest('#videoLibraryAdd')) {
@@ -379,6 +402,21 @@
   }
 
   document.addEventListener('click', handleEditorOpenClick, true);
+  document.addEventListener('manga-reader-vpn-status', (event) => {
+    if (event && event.detail && event.detail.status === 'allowed') {
+      setTimeout(ensureFeature, 0);
+      return;
+    }
+    if (syncTimer) clearTimeout(syncTimer);
+    syncTimer = null;
+    const { wrapper, thumbnailPreview } = editorElements();
+    if (wrapper) wrapper.hidden = true;
+    if (thumbnailPreview) {
+      thumbnailPreview.pause();
+      thumbnailPreview.removeAttribute('src');
+      try { thumbnailPreview.load(); } catch (_) {}
+    }
+  });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensureFeature, { once: true });
   else setTimeout(ensureFeature, 0);
 })();

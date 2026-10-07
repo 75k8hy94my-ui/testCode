@@ -29,12 +29,29 @@ test('reader boot does not initialize or load bookshelf runtime modules', () => 
   assert.match(reader, /ReaderItemRepositoryFactory\.create/);
 });
 
-test('reader waits for its own media gate verdict before starting image loading', () => {
-  const gateWait = reader.indexOf("document.addEventListener('manga-reader-vpn-status', finish)");
+test('reader waits for an allowed protected-data verdict before starting image loading', () => {
+  const startReader = reader.indexOf('async function startReader()');
+  const gateGuard = reader.indexOf('if (!canReadProtectedData()) return;', startReader);
   const itemResolution = reader.indexOf('MangaReaderTarget.itemIdFromLocation(location)');
-  const runtimeStart = reader.indexOf('runtime.start(itemId)');
-  assert.ok(gateWait >= 0 && gateWait < itemResolution);
+  const runtimeStart = reader.indexOf('currentRuntime.start(itemId)');
+  assert.ok(startReader >= 0 && gateGuard > startReader && gateGuard < itemResolution);
   assert.ok(itemResolution < runtimeStart);
-  assert.match(reader, /mediaAccess\?\.getStatus\?\.\(\) === 'pending' \|\| mediaAccess\?\.getStatus\?\.\(\) === 'checking'/);
-  assert.match(reader, /status === 'allowed' \|\| status === 'blocked'/);
+  assert.match(reader, /document\.addEventListener\('manga-reader-vpn-status', handleAccessChange\)/);
+  assert.match(reader, /if \(canReadProtectedData\(\)\)/);
+});
+
+test('standalone Reader does not read a work until protected-data access is allowed', () => {
+  assert.match(reader, /canReadProtectedData/);
+  const startReader = reader.indexOf('async function startReader()');
+  const blockedGuard = reader.indexOf('if (!canReadProtectedData()) return;', startReader);
+  const itemRead = reader.indexOf('MangaReaderTarget.clearLegacyTarget(localStorage)');
+  const repository = reader.indexOf('ReaderItemRepositoryFactory.create');
+  assert.ok(blockedGuard >= 0 && blockedGuard < itemRead && itemRead < repository);
+  assert.match(reader, /if \(!canReadProtectedData\(\)\) return \[\]/);
+});
+
+test('Reader destroys protected presentation and runtime on VPN access loss', () => {
+  assert.match(reader, /runtime\?\.destroy\(\)/);
+  assert.match(reader, /vpn-protected-blocked/);
+  assert.match(reader, /pageStage'\)\.replaceChildren\(\)/);
 });

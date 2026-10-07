@@ -25,6 +25,7 @@
   const status = document.getElementById('virtualSync');
   const sandboxWindow = {
     ['local' + 'Storage']: storage,
+    MangaReaderMediaAccess: { canReadProtectedData: () => true },
     indexedDB: { open() { throw new Error('sandbox image cache disabled'); } },
     URL,
     fetch: () => Promise.reject(new Error('sandbox network disabled')),

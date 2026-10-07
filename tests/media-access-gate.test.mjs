@@ -42,6 +42,16 @@ test('blocked state never returns an external media URL for assignment', () => {
   assert.equal(Gate.mediaUrl('https://example.com/page.jpg', 'https://75k8hy94my-ui.github.io/testCode/reader.html'), 'https://example.com/page.jpg');
 });
 
+test('protected-data access is granted only after an allowed VPN verdict', () => {
+  const Gate = loadGate();
+  assert.equal(Gate.getStatus(), 'pending');
+  assert.equal(Gate.canReadProtectedData(), false);
+  Gate.setAllowedForTesting(false);
+  assert.equal(Gate.canReadProtectedData(), false);
+  Gate.setAllowedForTesting(true);
+  assert.equal(Gate.canReadProtectedData(), true);
+});
+
 test('VPN check discovers the current public IP before querying the VPN verdict API', async () => {
   const calls = [];
   const fetch = async (url) => {

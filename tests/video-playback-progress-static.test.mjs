@@ -15,7 +15,7 @@ test('direct video playback persists progress while playing and on pause or end'
   assert.match(source, /timeupdate/);
   assert.match(source, /pause/);
   assert.match(source, /ended/);
-  assert.match(source, /localStorage\.setItem\(META_KEY/);
+  assert.match(source, /writeJson\(META_KEY/);
 });
 
 test('closing or leaving flushes the active direct video progress', () => {

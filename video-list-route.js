@@ -17,21 +17,32 @@
     let rootElement = null;
     let scriptsLoaded = false;
     let bootPromise = null;
+    let helperPromise = null;
+    const canReadProtectedData = () => !!deps.mediaAccess && typeof deps.mediaAccess.canReadProtectedData === 'function' && deps.mediaAccess.canReadProtectedData() === true;
 
     async function loadFeatureScripts() {
-      if (bootPromise) return bootPromise;
-      bootPromise = (async () => {
-        await deps.loadMediaGate();
-        await deps.loadScript('video-data.js?v=20260918-video-data-no-window', 'spaVideoData');
-        await deps.loadScript('video-library.js?v=20260918-video-library-no-window', 'spaVideoLibrary');
-        await deps.loadScript('video-routing-fix.js?v=20260918-video-routing-no-window', 'spaVideoRouting');
-        await deps.loadScript('video-thumbnail-time.js?v=20260916-video-thumbnail', 'spaVideoThumbnailTime');
-        scriptsLoaded = true;
-      })().catch((error) => {
-        bootPromise = null;
-        throw error;
-      });
-      return bootPromise;
+      if (!bootPromise) {
+        bootPromise = (async () => {
+          await deps.loadMediaGate();
+          await deps.loadScript('video-data.js?v=20260918-video-data-no-window', 'spaVideoData');
+          await deps.loadScript('video-library.js?v=20261008-vpn-data', 'spaVideoLibrary');
+        })().catch((error) => {
+          bootPromise = null;
+          throw error;
+        });
+      }
+      await bootPromise;
+      if (canReadProtectedData() && !helperPromise) {
+        helperPromise = (async () => {
+          await deps.loadScript('video-routing-fix.js?v=20261008-vpn-data', 'spaVideoRouting');
+          await deps.loadScript('video-thumbnail-time.js?v=20261008-vpn-data', 'spaVideoThumbnailTime');
+        })().catch((error) => {
+          helperPromise = null;
+          throw error;
+        });
+      }
+      if (helperPromise) await helperPromise;
+      scriptsLoaded = true;
     }
 
     async function start(options) {
@@ -47,7 +58,7 @@
       }
       await loadFeatureScripts();
       if (!root.MangaReaderVideoLibrary || typeof root.MangaReaderVideoLibrary.init !== 'function') throw new Error('video library runtime is unavailable');
-      root.MangaReaderVideoLibrary.init();
+      root.MangaReaderVideoLibrary.init(deps.mediaAccess);
       if (!scriptsLoaded || !documentRef.getElementById('videoLibraryApp')) {
         await new Promise((resolve) => setTimeout(resolve, 0));
       }

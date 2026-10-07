@@ -7,6 +7,7 @@
 
   const VIDEO_KEY = 'mangaReaderVideos';
   const META_KEY = 'mangaReaderVideoMeta';
+  const PROTECTED_KEYS = new Set([VIDEO_KEY, META_KEY]);
   let syncTimer = null;
   let activeVideoId = '';
   let activePlayer = null;
@@ -14,13 +15,25 @@
   let editorObserver = null;
   let thumbnailObserver = null;
 
+  function canReadProtectedData() {
+    const gate = window.MangaReaderMediaAccess;
+    return !!gate && typeof gate.canReadProtectedData === 'function' && gate.canReadProtectedData() === true;
+  }
+
   function readJson(key, fallback) {
+    if (PROTECTED_KEYS.has(key) && !canReadProtectedData()) return fallback;
     try {
       const value = JSON.parse(localStorage.getItem(key) || 'null');
       return value == null ? fallback : value;
     } catch (_) {
       return fallback;
     }
+  }
+
+  function writeJson(key, value) {
+    if (PROTECTED_KEYS.has(key) && !canReadProtectedData()) return false;
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
   }
 
   function text(value) {
@@ -61,8 +74,10 @@
   }
 
   function scheduleVaultSync() {
+    if (!canReadProtectedData()) return;
     clearTimeout(syncTimer);
     syncTimer = setTimeout(async () => {
+      if (!canReadProtectedData()) return;
       if (!window.MangaVault || !window.MangaVaultPayload || typeof MangaVault.loadActive !== 'function' || !MangaVault.loadActive()) return;
       try {
         await MangaVault.savePayload(MangaVaultPayload.buildFromLocalStorage());
@@ -73,19 +88,20 @@
   }
 
   function recordOpen(base) {
+    if (!canReadProtectedData()) return null;
     const rawMeta = readJson(META_KEY, {});
     const meta = rawMeta && typeof rawMeta === 'object' && !Array.isArray(rawMeta) ? rawMeta : {};
     const current = meta[base.id] && typeof meta[base.id] === 'object' ? meta[base.id] : {};
     const previousCount = Number(current.openCount != null ? current.openCount : base.openCount) || 0;
     const now = Date.now();
     meta[base.id] = { ...current, openCount: Math.max(0, Math.trunc(previousCount)) + 1, lastOpenedAt: now, updatedAt: now };
-    localStorage.setItem(META_KEY, JSON.stringify(meta));
+    if (!writeJson(META_KEY, meta)) return null;
     scheduleVaultSync();
     return meta[base.id];
   }
 
   function persistPlaybackProgress(base, video, options) {
-    if (!base || !video) return;
+    if (!canReadProtectedData() || !base || !video) return;
     const config = options || {};
     const now = Date.now();
     if (!config.force && activePlayback && now - activePlayback.lastLocalSaveAt < 5000) return;
@@ -103,7 +119,7 @@
     };
     if (Number.isFinite(duration) && duration > 0) next.durationSeconds = Math.round(duration);
     meta[base.id] = next;
-    localStorage.setItem(META_KEY, JSON.stringify(meta));
+    if (!writeJson(META_KEY, meta)) return;
     if (activePlayback) activePlayback.lastLocalSaveAt = now;
     if (config.sync) scheduleVaultSync();
   }
@@ -269,6 +285,7 @@
   }
 
   function createInlinePlayer(base, meta) {
+    if (!canReadProtectedData()) return null;
     const player = document.createElement('div');
     player.className = 'vl-inline-player';
     const storedUrl = text(meta && meta.url);
@@ -357,6 +374,7 @@
   }
 
   function attachDirectVideoThumbnail(card, base, meta) {
+    if (!canReadProtectedData()) return;
     const thumb = card && card.querySelector('.vl-thumb');
     if (!thumb || thumb.querySelector('.vl-thumb-direct-video')) return;
 
@@ -420,6 +438,7 @@
   }
 
   function scanDirectVideoThumbnails() {
+    if (!canReadProtectedData()) return false;
     const results = document.getElementById('videoLibraryResults');
     if (!results) return false;
     const rawVideos = readJson(VIDEO_KEY, []);
@@ -438,6 +457,7 @@
 
   function ensureDirectVideoThumbnails() {
     ensureStyles();
+    if (!canReadProtectedData()) return;
     const results = document.getElementById('videoLibraryResults');
     if (!results) {
       if (thumbnailObserver || typeof MutationObserver === 'undefined') return;
@@ -506,6 +526,7 @@
   }
 
   function handleEnhancedOpen(event) {
+    if (!canReadProtectedData()) return;
     const target = event.target && typeof event.target.closest === 'function' ? event.target : null;
     const openButton = target && target.closest('#videoLibraryResults .vl-open');
     if (!openButton) return;
@@ -531,6 +552,23 @@
     if (document.visibilityState === 'hidden') persistActivePlayback(true);
   });
   window.addEventListener('pagehide', () => persistActivePlayback(false));
+  document.addEventListener('manga-reader-vpn-status', (event) => {
+    if (event && event.detail && event.detail.status === 'allowed') {
+      setTimeout(ensureDirectVideoThumbnails, 0);
+      return;
+    }
+    if (syncTimer) clearTimeout(syncTimer);
+    syncTimer = null;
+    if (thumbnailObserver) thumbnailObserver.disconnect();
+    thumbnailObserver = null;
+    closeActivePlayer();
+    document.querySelectorAll('#videoLibraryResults .vl-thumb-direct-video').forEach((video) => {
+      try { video.pause(); } catch (_) {}
+      video.removeAttribute('src');
+      try { video.load(); } catch (_) {}
+      video.remove();
+    });
+  });
   setTimeout(() => {
     ensureDirectVideoThumbnails();
     ensureUrlOnlyEditor();

@@ -15,7 +15,8 @@ test("the bookshelf launches a standalone reader document using the saved item's
 
 test('reader requires an explicit item route and has no legacy URL or shelf screen fallback', () => {
   assert.match(reader, /itemIdFromLocation\(location\)/);
-  assert.match(reader, /if \(!itemId\) \{ runtime\.close\(\); return; \}/);
+  assert.match(reader, /if \(!itemId\) \{ location\.replace\('manga\.html'\); return; \}/);
+  assert.ok(reader.indexOf('if (!canReadProtectedData()) return;') < reader.indexOf('ReaderItemRepositoryFactory.create'));
   assert.doesNotMatch(reader, /readLegacyTarget|mangaReaderLastUrl|renderSavedList|saved-list|video-list|author-cards/);
 });
 

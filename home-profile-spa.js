@@ -28,7 +28,7 @@ const session=window.MangaVault&&MangaVault.loadSession();
 const SPA_PAGES=(window.AppShell&&Array.isArray(AppShell.SPA_PAGES)?AppShell.SPA_PAGES:['home.html','profile.html','manga.html','video.html']);
 let layout=Home?Home.loadLayout():[];
 let editing=false,syncRunning=false,syncDirty=false,syncDirtyMessage='',syncClearTimer=null,profileSecurityBusy=false;
-let mount=null,renderGeneration=0,mangaRouteRuntime=null,mangaRouteBootPromise=null,videoRouteRuntime=null;
+let mount=null,renderGeneration=0,mangaRouteRuntime=null,mangaRouteBootPromise=null,videoRouteRuntime=null,lastVpnRouteAccess='';
 
 function ensureAppShell(){
   const app=document.getElementById('homeApp')||document.querySelector('.homeShell');
@@ -56,7 +56,8 @@ function getMount(){
 function routeName(path=location.pathname){const name=path.split('/').pop();if(name==='profile.html')return'profile';if(name==='manga.html')return'manga';if(name==='video.html')return'video';return'home';}
 function setTitle(route){const titles={home:'ホーム',profile:'プロフィール設定',manga:'漫画',video:'動画'};const title=titles[route]||titles.home;document.title=title;const h1=document.getElementById('shellTitle');if(h1)h1.textContent=title;}
 function setSyncStatus(text){const node=$('homeSyncStatus');if(!node)return;clearTimeout(syncClearTimer);node.textContent=text||'';if(text&&text!=='同期中…')syncClearTimer=setTimeout(()=>{if(node.isConnected)node.textContent='';},3500);}
-async function runHomeSync(okMessage){if(syncRunning){syncDirty=true;syncDirtyMessage=okMessage||syncDirtyMessage;return;}syncRunning=true;setSyncStatus('同期中…');try{await MangaVault.savePayload(MangaVaultPayload.buildFromLocalStorage());setSyncStatus(okMessage||'保存しました');}catch(error){setSyncStatus('端末には保存済みです。クラウド同期: '+(error&&error.message?error.message:'失敗'));}finally{syncRunning=false;if(syncDirty){syncDirty=false;const queued=syncDirtyMessage;syncDirtyMessage='';runHomeSync(queued);}}}
+function canSyncProtectedData(){const gate=window.MangaReaderMediaAccess;return !!gate&&typeof gate.canReadProtectedData==='function'&&gate.canReadProtectedData()===true;}
+async function runHomeSync(okMessage){if(!canSyncProtectedData()){syncDirty=false;syncDirtyMessage='';setSyncStatus('VPN接続を確認できるまでクラウド同期を停止しています。');return;}if(syncRunning){syncDirty=true;syncDirtyMessage=okMessage||syncDirtyMessage;return;}syncRunning=true;setSyncStatus('同期中…');try{if(!canSyncProtectedData())return;const payload=MangaVaultPayload.buildFromLocalStorage();if(!canSyncProtectedData())return;await MangaVault.savePayload(payload);setSyncStatus(okMessage||'保存しました');}catch(error){setSyncStatus('端末には保存済みです。クラウド同期: '+(error&&error.message?error.message:'失敗'));}finally{syncRunning=false;if(syncDirty){syncDirty=false;const queued=syncDirtyMessage;syncDirtyMessage='';runHomeSync(queued);}}}
 function commitLayout(next){layout=Home.saveLayout(next);renderHome();runHomeSync('ホームの並びを保存しました');}
 function cardTop(card){const top=document.createElement('div');top.className='cardTop';const mark=document.createElement('span');mark.className='cardMark';mark.textContent=marks[card.id]||'・';const badge=document.createElement('span');badge.className='cardBadge';badge.textContent=card.badge||'';top.append(mark,badge);return top;}
 function addCardText(root,card){root.append(cardTop(card));const title=document.createElement('h2');title.textContent=card.title;root.append(title);}
@@ -115,18 +116,10 @@ function renderVpnGate(target,route){
 }
 async function ensureVpnGate(){
   if(window.MangaReaderMediaAccess)return window.MangaReaderMediaAccess;
-  await loadScript('media-access-gate.js?v=20261006-country-fallback','spaMediaGate');
+  await loadScript('media-access-gate.js?v=20261008-vpn-data','spaMediaGate');
   return window.MangaReaderMediaAccess;
 }
 function cleanupMangaShell(){cleanupMangaRoute();document.querySelectorAll('#metadataSuggestions,#saveDialogOverlay,#customAddOverlay,#editItemOverlay,#bulkEditOverlay,#bulkDetectOverlay,#savedListOverlay,#tocOverlay').forEach((node)=>node.remove());}
-async function ensureVideoEntryEnhancement(){
-  await loadScript('video-data.js?v=20260918-video-data-no-window','spaVideoData');
-  await loadScript('video-library.js?v=20260918-video-library-no-window','spaVideoLibrary');
-  await loadScript('video-routing-fix.js?v=20260918-video-routing-no-window','spaVideoRouting');
-  await loadScript('video-thumbnail-time.js?v=20260916-video-thumbnail','spaVideoThumbnailTime');
-  const deadline=Date.now()+3000;
-  while(!document.getElementById('videoLibraryApp')&&Date.now()<deadline) await new Promise((resolve)=>setTimeout(resolve,25));
-}
 async function renderVideo(generation){
   const target=getMount();
   if(!target)return;
@@ -136,19 +129,18 @@ async function renderVideo(generation){
     const gate=await ensureVpnGate();
     if(generation!==renderGeneration)return;
     if(!gate){renderVpnGate(target,'video');setTitle('video');syncHeaderRoute();return;}
-    if(gate.getStatus()==='pending'||gate.getStatus()==='checking'){renderVpnGate(target,'video');setTitle('video');syncHeaderRoute();return;}
-    if(!gate.canLoadExternalMedia()){renderVpnGate(target,'video');if(typeof gate.syncUi==='function')gate.syncUi();setTitle('video');syncHeaderRoute();return;}
-    if(!window.VideoListRouteFactory)await loadScript('video-list-route.js?v=20260922-video-route','spaVideoListRoute');
+    if(!window.VideoListRouteFactory)await loadScript('video-list-route.js?v=20261008-vpn-data','spaVideoListRoute');
     if(!window.MangaReaderVideoTemplate)await loadScript('video-list-template.js?v=20260922-vpn-tools','spaVideoListTemplate');
     if(generation!==renderGeneration)return;
     if(!videoRouteRuntime)videoRouteRuntime=window.VideoListRouteFactory.create({
       documentRef:document,
       loadScript,
-      loadMediaGate:()=>window.MangaReaderMediaAccess?Promise.resolve():loadScript('media-access-gate.js?v=20261006-country-fallback','spaMediaGate'),
+      loadMediaGate:()=>window.MangaReaderMediaAccess?Promise.resolve():loadScript('media-access-gate.js?v=20261008-vpn-data','spaMediaGate'),
+      mediaAccess:gate,
     });
     await videoRouteRuntime.start({mountElement:target});
     if(gate&&typeof gate.syncUi==='function')gate.syncUi();
-    if(generation!==renderGeneration){videoRouteRuntime.detach();return;}
+    if(generation!==renderGeneration)return;
     setTitle('video');syncHeaderRoute();
   }catch(_){
     if(generation===renderGeneration)target.innerHTML='<section class="profileContent"><h2>動画一覧を読み込めませんでした</h2><p>ホームへ戻って再試行してください。</p><a class="glassBtn" href="home.html">ホームへ戻る</a></section>';
@@ -164,11 +156,9 @@ async function renderManga(generation){
     const gate=await ensureVpnGate();
     if(generation!==renderGeneration)return;
     if(!gate){renderVpnGate(target,'manga');setTitle('manga');syncHeaderRoute();return;}
-    if(gate.getStatus()==='pending'||gate.getStatus()==='checking'){renderVpnGate(target,'manga');setTitle('manga');syncHeaderRoute();return;}
-    if(!gate.canLoadExternalMedia()){renderVpnGate(target,'manga');if(typeof gate.syncUi==='function')gate.syncUi();setTitle('manga');syncHeaderRoute();return;}
-    if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20260926-route-owned-v3','spaMangaListRoute');
+    if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20261008-vpn-data','spaMangaListRoute');
     if(generation!==renderGeneration)return;
-    routeRuntime=window.MangaListRouteFactory.create({documentRef:document,windowRef:window});
+    routeRuntime=window.MangaListRouteFactory.create({documentRef:document,windowRef:window,mediaAccess:gate});
     mangaRouteRuntime=routeRuntime;
     const mounted=await routeRuntime.start({mountElement:target});
     if(generation!==renderGeneration||mangaRouteRuntime!==routeRuntime){cleanupMangaRoute(routeRuntime);return;}
@@ -180,16 +170,22 @@ async function renderManga(generation){
     if(generation===renderGeneration)target.innerHTML='<section class="profileContent"><h2>漫画一覧を読み込めませんでした</h2><p>ホームへ戻って再試行してください。</p><a class="glassBtn" href="home.html">ホームへ戻る</a></section>';
   }
 }
-function renderRoute(){ensureAppShell();const route=routeName(),generation=++renderGeneration,app=document.getElementById('homeApp');document.documentElement.classList.toggle('reader-entry-manga',route==='manga');document.documentElement.classList.toggle('reader-entry-video',route==='video');if(app){app.classList.toggle('reader-route',['manga','video'].includes(route));app.dataset.readerRoute=route;}if(route!=='video')cleanupVideoRoute();if(route!=='manga')cleanupMangaShell();if(route==='profile')renderProfile();else if(route==='manga')renderManga(generation);else if(route==='video')renderVideo(generation);else renderHome();document.dispatchEvent(new CustomEvent('home-profile-routechange',{detail:{route}}));}
-let lastVpnRouteStatus='';
+function renderRoute(){ensureAppShell();const route=routeName(),generation=++renderGeneration,app=document.getElementById('homeApp');if(route==='manga'||route==='video'){const gate=window.MangaReaderMediaAccess;lastVpnRouteAccess=route+':'+(gate&&gate.canReadProtectedData&&gate.canReadProtectedData()?'allowed':'blocked');}else lastVpnRouteAccess='';document.documentElement.classList.toggle('reader-entry-manga',route==='manga');document.documentElement.classList.toggle('reader-entry-video',route==='video');if(app){app.classList.toggle('reader-route',['manga','video'].includes(route));app.dataset.readerRoute=route;}if(route!=='video')cleanupVideoRoute();if(route!=='manga')cleanupMangaShell();if(route==='profile')renderProfile();else if(route==='manga')renderManga(generation);else if(route==='video')renderVideo(generation);else renderHome();document.dispatchEvent(new CustomEvent('home-profile-routechange',{detail:{route}}));}
 function handleVpnStatusChange(event){
   const route=routeName();
-  if(route!=='manga'&&route!=='video')return;
   const next=String(event&&event.detail&&event.detail.status||'');
+  if(next!=='allowed'){syncDirty=false;syncDirtyMessage='';}
+  if(route!=='manga'&&route!=='video')return;
+  if(next==='pending'||next==='checking'){
+    if(lastVpnRouteAccess!==route+':allowed')return;
+    lastVpnRouteAccess=route+':blocked';
+    renderRoute();
+    return;
+  }
   if(next!=='allowed'&&next!=='blocked')return;
-  const marker=route+':'+next;
-  if(marker===lastVpnRouteStatus)return;
-  lastVpnRouteStatus=marker;
+  const marker=route+':'+(next==='allowed'?'allowed':'blocked');
+  if(marker===lastVpnRouteAccess)return;
+  lastVpnRouteAccess=marker;
   renderRoute();
 }
 function navigate(path,{replace=false}={}){const target=new URL(path,location.href),name=target.pathname.split('/').pop();if(!SPA_PAGES.includes(name)){location.href=target.href;return;}if(replace)history.replaceState({appShellSPA:true},'',target.href);else history.pushState({appShellSPA:true},'',target.href);renderRoute();}

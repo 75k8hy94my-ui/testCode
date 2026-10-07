@@ -15,6 +15,7 @@ function loadFactory() {
 function deps(calls) {
   let state = { savedItems: ['items'], savedFolders: ['folders'], authorCards: ['authors'] };
   return {
+    canReadProtectedData() { return true; },
     safeWriteJson(key, value) { calls.push(['write', key, value]); },
     getState() { calls.push('state'); return state; },
     persistVideos() { calls.push('videos'); },
@@ -47,6 +48,17 @@ function deps(calls) {
     },
   };
 }
+
+test('protected persistence and sync do nothing when protected-data access is blocked', async () => {
+  const calls = [];
+  const access = deps(calls);
+  access.canReadProtectedData = () => false;
+  const host = loadFactory().create(access);
+  host.persistAll();
+  host.scheduleCloudSync();
+  await host.runCloudSync();
+  assert.deepEqual(calls, []);
+});
 
 function imageDeps(calls) {
   return {
@@ -182,6 +194,15 @@ test('host checkpoints the shelf then performs standalone Reader document naviga
 
   calls.length = 0;
   assert.throws(() => host.navigateToReader({}), /saved manga item id is required/);
+  assert.deepEqual(calls, []);
+});
+
+test('host rejects Reader navigation while protected-data access is blocked', async () => {
+  const calls = [];
+  const access = deps(calls);
+  access.canReadProtectedData = () => false;
+  const host = loadFactory().create(access);
+  assert.equal(await host.navigateToReader({ id: 'secret-id' }), false);
   assert.deepEqual(calls, []);
 });
 

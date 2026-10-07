@@ -17,6 +17,27 @@ test('manga shelf launches the standalone Reader document from its document boun
   assert.match(manga, /manga-list-route\.js\?v=/);
 });
 
+test('manga route skips protected store reads and legacy migration without VPN access', () => {
+  const load = route.slice(route.indexOf('load() {'), route.indexOf('wasLegacyMigrated()'));
+  assert.ok(load.indexOf('if (!canReadProtectedData())') < load.indexOf('MangaListState.load'));
+  assert.match(route, /persistVideos\(\) \{ if \(canReadProtectedData\(\)\) safeWriteJson\(keys\.savedVideos/);
+  assert.match(route, /vpnProtectedDataNotice/);
+  assert.match(route, /control\.disabled = !canReadProtectedData\(\)/);
+});
+
+test('manga mutation callbacks stop before protected work when access is blocked', () => {
+  const extensionImport = route.slice(route.indexOf("bind(bulkDetect, 'click'"), route.indexOf("bind(mangaImportRegister, 'click'"));
+  const registerImport = route.slice(route.indexOf("bind(mangaImportRegister, 'click'"), route.indexOf('const closeImport'));
+  const encryptedImport = route.slice(route.indexOf("bind(importForm, 'submit'"), route.indexOf('bindFactory(MangaListSearchEventsFactory'));
+  const createFolder = route.slice(route.indexOf('onCreateConfirm: () =>'), route.indexOf('}, { createButton: newFolder'));
+
+  assert.match(extensionImport, /if \(!canReadProtectedData\(\)\)/);
+  assert.match(registerImport, /if \(!canReadProtectedData\(\)\)/);
+  assert.match(encryptedImport, /if \(!canReadProtectedData\(\)\)/);
+  assert.match(encryptedImport, /await service\.importFiles[\s\S]*if \(!canReadProtectedData\(\)\) return/);
+  assert.match(createFolder, /if \(!canReadProtectedData\(\)\) return/);
+});
+
 test('manga route loads the shared runtime pieces without reader or video entry assets', () => {
   for (const name of [
     'manga-list-entry.js',
@@ -53,7 +74,7 @@ test('manga shell keeps the existing shared authentication and vault bootstrap',
   assert.match(manga, /browser-storage\.js/);
   assert.match(manga, /vault-payload\.js/);
   assert.match(manga, /feature-flags\.js/);
-  assert.match(manga, /media-access-gate\.js\?v=20261006-country-fallback/);
+  assert.match(manga, /media-access-gate\.js\?v=20261008-vpn-data/);
   assert.match(manga, /home-profile-spa\.js\?v=/);
 });
 
@@ -75,14 +96,15 @@ test('manga route owns its stylesheet so SPA entry path cannot change shelf layo
 
 test('manga route lifecycle is instance-local and cancellation-safe', () => {
   assert.doesNotMatch(route, /let dependencyPromise = null;\s*let activeEntry = null;/);
-  assert.match(route, /const windowRef = deps\.windowRef;\s*let activeEntry = null;\s*let lifecycle = 0;/);
+  assert.match(route, /const windowRef = deps\.windowRef;\s*const mediaAccess = deps\.mediaAccess \|\| windowRef\.MangaReaderMediaAccess;\s*const canReadProtectedData/);
+  assert.match(route, /let activeEntry = null;\s*let lifecycle = 0;/);
   assert.match(route, /const token = \+\+lifecycle;/);
   assert.match(route, /if \(token !== lifecycle\) return null;/);
   assert.match(route, /function cleanup\(\) \{\s*lifecycle \+= 1;/);
 });
 
-test('transient VPN checking events do not recursively remount the manga shelf', () => {
+test('VPN recheck hides protected records immediately when an allowed route becomes checking', () => {
   assert.match(spa, /function handleVpnStatusChange\(event\)/);
-  assert.match(spa, /if\(next!=='allowed'&&next!=='blocked'\)return;/);
-  assert.match(spa, /if\(marker===lastVpnRouteStatus\)return;/);
+  assert.match(spa, /lastVpnRouteAccess=route\+':blocked'[\s\S]*renderRoute\(\)/);
+  assert.match(spa, /lastVpnRouteAccess=route\+':'\+\(gate&&gate\.canReadProtectedData/);
 });

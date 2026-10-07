@@ -246,6 +246,10 @@
     return status === 'allowed';
   }
 
+  function canReadProtectedData() {
+    return status === 'allowed';
+  }
+
   function mediaUrl(value, baseUrl) {
     const raw = String(value == null ? '' : value);
     return isProtectedMediaUrl(raw, baseUrl) && !canLoadExternalMedia() ? '' : raw;
@@ -749,6 +753,7 @@
     isKnownVpnIp,
     isProtectedMediaUrl,
     canLoadExternalMedia,
+    canReadProtectedData,
     mediaUrl,
     getStatus: () => status,
     checkVpn,

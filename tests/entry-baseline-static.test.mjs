@@ -26,15 +26,15 @@ test('current entry pages keep their static bootstrap script baselines', () => {
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js',
     'profile-menu.js?v=20260924-theme-unified', 'feature-flags.js',
-    'media-access-gate.js?v=20261006-country-fallback',
-    'manga-list-route.js?v=20261003-reader-spa-route',
-    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261006-passkey-reset',
+    'media-access-gate.js?v=20261008-vpn-data',
+    'manga-list-route.js?v=20261008-vpn-data',
+    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261008-vpn-data',
   ]);
   assert.deepEqual(scriptSources(pages.video), [
     'supabase-config.js', 'vault-session.js?v=20261006-passkey-reset', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js',
-    'profile-menu.js?v=20260924-theme-unified', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261006-passkey-reset',
+    'profile-menu.js?v=20260924-theme-unified', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261008-vpn-data',
   ]);
 });
 
@@ -73,7 +73,7 @@ test('authentication branches remain explicit in the current SPA bootstrap', () 
 });
 
 test('vault saves use the existing payload builder and savePayload boundary', () => {
-  assert.match(spa, /MangaVault\.savePayload\(MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
+  assert.match(spa, /const payload=MangaVaultPayload\.buildFromLocalStorage\(\);if\(!canSyncProtectedData\(\)\)return;await MangaVault\.savePayload\(payload\)/);
   assert.match(videoLibrary, /MangaVault\.savePayload\(MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
   assert.match(reader, /MangaVault\.savePayload\(/);
   assert.match(vault, /rpc\/update_manga_reader_vault/);
@@ -108,15 +108,13 @@ test('VPN checks and manual designations remain available to protected reader me
 });
 
 test('video bootstrap has one owner per page and does not load on the Reader document', () => {
-  assert.match(spa, /video-data\.js\?v=20260918-video-data-no-window/);
-  assert.match(spa, /video-library\.js\?v=20260918-video-library-no-window/);
-  assert.match(spa, /video-routing-fix\.js\?v=20260918-video-routing-no-window/);
-  assert.match(spa, /video-thumbnail-time\.js\?v=20260916-video-thumbnail/);
+  assert.match(spa, /video-list-route\.js\?v=20261008-vpn-data/);
+  assert.match(fs.readFileSync(new URL('../video-list-route.js', import.meta.url), 'utf8'), /video-library\.js\?v=20261008-vpn-data/);
   assert.match(recommendations, /const page = String\(\(root\.location && root\.location\.pathname\) \|\| ''\)\.split\('\/'\)\.pop\(\);/);
   assert.doesNotMatch(reader, /recommendations\.js|video-data\.js|video-library\.js/);
   assert.match(recommendations, /loadBrowserScript\('video-data\.js'\)/);
   assert.match(recommendations, /loadBrowserScript\('video-library\.js'\)/);
-  assert.match(videoLibrary, /function init\(\)/);
+  assert.match(videoLibrary, /function init\(access\)/);
   assert.match(videoLibrary, /DOMContentLoaded/);
 });
 
