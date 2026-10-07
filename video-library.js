@@ -410,6 +410,13 @@
 
   function openEditor(videoId) {
     if (!canReadProtectedData()) return;
+    if (videoId) {
+      const target = new URL('video-edit.html', location.href);
+      target.searchParams.set('id', videoId);
+      target.searchParams.set('return', 'list');
+      window.location.href = target.href;
+      return;
+    }
     state.sheetMode = videoId ? 'edit' : 'add'; state.editorId = videoId || null;
     dom.folderManager.hidden = true; dom.form.hidden = false; dom.sheetTitle.textContent = videoId ? '動画を編集' : '動画を追加'; dom.deleteBtn.hidden = !videoId;
     const video = videoId ? effectiveFieldsForEditor(videoId) : Data.normalizeVideo({ id: 'draft', addedAt: Date.now() });

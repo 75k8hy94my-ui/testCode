@@ -28,7 +28,7 @@
     const page = pageName();
     if (page === 'home.html') return 'home';
     if (page === 'manga.html') return 'manga';
-    if (page === 'video.html') return 'video';
+    if (page === 'video.html' || page === 'video-player.html' || page === 'video-edit.html') return 'video';
     if (page === 'sync.html') return 'backup';
     if (page === 'profile.html') return 'settings';
     return '';

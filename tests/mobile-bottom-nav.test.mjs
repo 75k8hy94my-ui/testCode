@@ -60,7 +60,7 @@ test('reader owns reading controls and does not load bookshelf navigation chrome
 });
 
 test('shared nav is loaded by all target mobile pages', () => {
-  for (const page of ['home.html','profile.html','manga.html','video.html','video-player.html']) {
+  for (const page of ['home.html','profile.html','manga.html','video.html','video-player.html','video-edit.html']) {
     const source = read(page);
     assert.match(source, /mobile-bottom-nav\.css\?v=20260925-instagram-drag-lock/, page);
     assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-drag-lock/, page);

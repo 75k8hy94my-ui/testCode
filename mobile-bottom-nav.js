@@ -30,7 +30,7 @@
     const name = pathname.split('/').pop() || 'home.html';
     if (name === 'profile.html') return 'profile';
     if (name === 'manga.html') return 'manga';
-    if (name === 'video.html' || name === 'video-player.html') return 'video';
+    if (name === 'video.html' || name === 'video-player.html' || name === 'video-edit.html') return 'video';
     return 'home';
   }
 
@@ -640,7 +640,7 @@
       return;
     }
     const name = location.pathname.split('/').pop() || 'home.html';
-    if (['home.html','profile.html','manga.html','video.html','video-player.html'].includes(name)) ensureSpaNav();
+    if (['home.html','profile.html','manga.html','video.html','video-player.html','video-edit.html'].includes(name)) ensureSpaNav();
   }
 
   function scheduleAttach() {

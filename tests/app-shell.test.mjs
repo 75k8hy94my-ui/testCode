@@ -58,7 +58,7 @@ test('mobile bottom navigation stays visible on manga and video routes', () => {
 });
 
 test('authenticated top bars keep only the shared profile action', () => {
-  const iconPages = ['home.html', 'profile.html', 'manga.html', 'video.html', 'video-player.html'];
+  const iconPages = ['home.html', 'profile.html', 'manga.html', 'video.html', 'video-player.html', 'video-edit.html'];
   for (const page of iconPages) {
     const source = read(page);
     const header = source.match(/<header class=["']homeHeader["'][\s\S]*?<\/header>/)?.[0] || '';

@@ -22,7 +22,6 @@
     while (windowCleanups.length) windowCleanups.pop()();
     if (window.MangaReaderVideoPlayerControls && typeof window.MangaReaderVideoPlayerControls.destroy === 'function') window.MangaReaderVideoPlayerControls.destroy();
     page.querySelectorAll('video').forEach((video) => { try { video.pause(); video.removeAttribute('src'); video.load(); } catch (_) {} });
-    document.querySelectorAll('.videoEditDialog').forEach((dialog) => dialog.remove());
     page.replaceChildren(); document.title = '動画'; initialized = false;
   }
   function handleAccessStatus() {
@@ -61,7 +60,7 @@
 
   const heading = document.createElement('h2'); heading.className = 'videoPlayerTitle'; heading.textContent = title; heading.contentEditable = 'false'; heading.setAttribute('role', 'button'); heading.setAttribute('tabindex', '0'); heading.setAttribute('aria-label', 'タイトルをクリックして編集'); heading.title = 'クリックしてタイトルを編集';
   const info = document.createElement('div'); info.className = 'videoPlayerInfo'; info.textContent = [base.a, base.b].filter(Boolean).join(' / ') || '動画';
-  const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'videoPlayerEdit'; edit.textContent = '詳細を編集'; edit.setAttribute('aria-haspopup', 'dialog');
+  const edit = document.createElement('a'); edit.className = 'videoPlayerEdit'; edit.textContent = '詳細を編集'; edit.href = 'video-edit.html?id=' + encodeURIComponent(id) + '&return=player';
   const actionBar = document.createElement('div'); actionBar.className = 'videoPlayerActionBar'; actionBar.setAttribute('aria-label', '動画の操作'); actionBar.append(edit);
   const tagLine = document.createElement('div'); tagLine.className = 'videoPlayerTags';
   const renderTags = (nextTags) => { tagLine.textContent = nextTags.map((tag) => '#' + tag).join(' '); tagLine.hidden = !nextTags.length; };
@@ -120,47 +119,13 @@
   renderPageMarkers();
   listenWindow('manga-video-markers-changed', renderPageMarkers);
 
-  const dialog = document.createElement('section'); dialog.className = 'videoEditDialog'; dialog.hidden = true; dialog.setAttribute('aria-hidden', 'true');
-  dialog.innerHTML = '<div class="videoEditPanel" role="dialog" aria-modal="true" aria-labelledby="videoEditTitle"><header><h2 id="videoEditTitle">動画情報を編集</h2><button type="button" class="videoEditClose" aria-label="閉じる">×</button></header><form class="videoEditForm"><label>タイトル<input name="title" type="text" maxlength="240" autocomplete="off"></label><label>フォルダ<select name="folder"></select></label><label>状態<select name="status"><option value="">未設定</option><option value="later">あとで見る</option><option value="watching">視聴中</option><option value="watched">視聴済み</option></select></label><label>タグ（カンマ区切り）<input name="tags" type="text" autocomplete="off"></label><label>メモ<textarea name="memo" rows="3"></textarea></label><label class="videoEditCheck"><input name="favorite" type="checkbox"> お気に入り</label><p class="videoEditError" aria-live="polite"></p><footer><button type="button" class="videoEditCancel">キャンセル</button><button type="submit" class="videoEditSave">保存</button></footer></form></div>';
-  const form = dialog.querySelector('form');
-  const folderSelect = form.elements.folder;
-  const folders = read('mangaReaderVideoFolders', []);
-  const noneOption = document.createElement('option'); noneOption.value = ''; noneOption.textContent = '未分類'; folderSelect.append(noneOption);
-  (Array.isArray(folders) ? folders : []).forEach((folder) => { if (!folder || !folder.id || !folder.name) return; const option = document.createElement('option'); option.value = String(folder.id); option.textContent = String(folder.name); folderSelect.append(option); });
-  const openEditor = () => { const current = videos ? videos.normalizeVideo({ ...base, ...(read(META_KEY, {})[id] || {}), id: base.id, a: base.a, b: base.b, addedAt: base.addedAt }) : normalized; form.elements.title.value = current.title || ''; folderSelect.value = current.folderId || ''; form.elements.status.value = current.watchStatus || ''; form.elements.tags.value = current.tags.join(', '); form.elements.memo.value = current.memo || ''; form.elements.favorite.checked = !!current.favorite; dialog.hidden = false; dialog.setAttribute('aria-hidden', 'false'); form.elements.title.focus(); };
-  const closeEditor = () => { dialog.hidden = true; dialog.setAttribute('aria-hidden', 'true'); edit.focus(); };
-  edit.addEventListener('click', openEditor);
-  dialog.querySelector('.videoEditClose').addEventListener('click', closeEditor);
-  dialog.querySelector('.videoEditCancel').addEventListener('click', closeEditor);
-  dialog.addEventListener('click', (event) => { if (event.target === dialog) closeEditor(); });
-  listenWindow('keydown', (event) => { if (event.key === 'Escape' && !dialog.hidden) closeEditor(); });
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (!canReadProtectedData()) return;
-    const error = dialog.querySelector('.videoEditError'); error.textContent = '';
-    const nextMeta = read(META_KEY, {});
-    const current = nextMeta[id] && typeof nextMeta[id] === 'object' ? nextMeta[id] : {};
-    const next = { ...current, title: form.elements.title.value.trim(), folderId: folderSelect.value || null, watchStatus: form.elements.status.value, tags: videos ? videos.parseTags(form.elements.tags.value) : form.elements.tags.value.split(/[,、]/).map((tag) => tag.trim()).filter(Boolean), memo: form.elements.memo.value.trim(), favorite: form.elements.favorite.checked, updatedAt: Date.now() };
-    nextMeta[id] = next;
-    try {
-      localStorage.setItem(META_KEY, JSON.stringify(nextMeta));
-      if (window.MangaVault && window.MangaVaultPayload && typeof window.MangaVault.savePayload === 'function' && window.MangaVault.loadActive && window.MangaVault.loadActive()) {
-        await window.MangaVault.savePayload(window.MangaVaultPayload.buildFromLocalStorage());
-      }
-      if (!canReadProtectedData()) return;
-      Object.assign(allMeta, nextMeta);
-      const savedTitle = next.title || [base.a, base.b].filter(Boolean).join(' / ') || '動画';
-      heading.textContent = savedTitle; document.title = savedTitle; renderTags(next.tags); closeEditor();
-    } catch (saveError) { error.textContent = '保存できませんでした。端末の保存状態を確認してください。'; }
-  });
-
   const back = document.createElement('a'); back.className = 'glassBtn videoBack'; back.href = 'video.html'; back.textContent = '動画一覧へ戻る';
   const relatedBox = document.createElement('aside'); relatedBox.className = 'videoRelated'; const relatedHeading = document.createElement('h3'); relatedHeading.textContent = '関連動画'; relatedBox.append(relatedHeading);
   related.forEach(({ item, itemTitle, itemTags }) => { const link = document.createElement('a'); link.className = 'videoRelatedItem'; link.href = 'video-player.html?id=' + encodeURIComponent(item.id); const thumb = document.createElement('span'); thumb.className = 'videoRelatedThumb'; thumb.textContent = '▶'; const text = document.createElement('span'); text.className = 'videoRelatedText'; text.textContent = itemTitle; const tagsText = document.createElement('small'); tagsText.textContent = itemTags.slice(0, 3).map((tag) => '#' + tag).join(' '); text.append(tagsText); link.append(thumb, text); relatedBox.append(link); });
   const description = document.createElement('details'); description.className = 'videoPlayerDescription';
   const descriptionSummary = document.createElement('summary'); descriptionSummary.textContent = normalized.memo ? '動画のメモ' : '動画情報';
   const descriptionText = document.createElement('p'); descriptionText.textContent = normalized.memo || [base.a, base.b].filter(Boolean).join(' / ') || '動画'; description.append(descriptionSummary, descriptionText);
-  const main = document.createElement('section'); main.className = 'videoPlayerMain'; main.append(frame, heading, info, actionBar, description, markerList, back); const layout = document.createElement('div'); layout.className = 'videoPlayerLayout'; layout.append(main, relatedBox); page.replaceChildren(layout); document.body.append(dialog);
+  const main = document.createElement('section'); main.className = 'videoPlayerMain'; main.append(frame, heading, info, actionBar, description, markerList, back); const layout = document.createElement('div'); layout.className = 'videoPlayerLayout'; layout.append(main, relatedBox); page.replaceChildren(layout);
   }
   handleAccessStatus();
 })();

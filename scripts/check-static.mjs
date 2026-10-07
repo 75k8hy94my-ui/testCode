@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const pages = ['index.html', 'sync.html', 'home.html', 'profile.html', 'manga.html', 'manga-sandbox.html', 'video.html', 'reader.html', 'video-player.html'];
+const pages = ['index.html', 'sync.html', 'home.html', 'profile.html', 'manga.html', 'manga-sandbox.html', 'video.html', 'reader.html', 'video-player.html', 'video-edit.html'];
 const standalone = [
   'app-desktop-rail.js', 'app-global-shell.js', 'author-summary.js', 'backup-format.js', 'browser-storage.js', 'desktop-navigation.js',
   'encrypted-asset-backend.js', 'encrypted-asset-cache.js', 'encrypted-asset-crypto.js', 'encrypted-asset-import.js', 'encrypted-asset-item.js', 'encrypted-asset-reader.js', 'encrypted-asset-storage.js', 'encrypted-asset-sync.js',
@@ -12,7 +12,7 @@ const standalone = [
   'home-profile-spa.js', 'mobile-bottom-nav.js', 'manga-sandbox.js', 'media-access-gate.js', 'profile-menu.js', 'shelf-search.js',
   'manga-import-validator.js', 'manga-import-candidate.js', 'manga-import-author-sync.js', 'manga-import-batch.js', 'manga-import-bridge.js', 'manga-import-dialog.js',
   'reader-target.js', 'reader-item-repository.js', 'reader-image-loader.js', 'reader-lifecycle.js', 'reader-page-transition.js', 'reader-page-source.js', 'reader-progress-repository.js', 'reader-runtime.js',
-  'status-message.js',
+  'status-message.js', 'video-edit-page.js',
   'supabase-config.js', 'url-parser.js', 'vault-payload.js', 'vault-session.js', 'video-data.js', 'video-library.js', 'video-routing-fix.js', 'video-thumbnail-time.js', 'video-list-route.js', 'video-list-template.js'
 ];
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
