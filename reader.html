@@ -11,6 +11,7 @@
     * { box-sizing:border-box; }
     html,body { margin:0; width:100%; height:100%; overflow:hidden; background:var(--bg); color:var(--text); font:15px system-ui,"Yu Gothic",sans-serif; }
     html.auth-pending body { visibility:hidden; }
+    html.auth-pending #readerMessage { visibility:visible; }
     #readerApp { position:relative; width:100%; height:100dvh; background:#000; }
     #topbar,#controls { position:absolute; z-index:4; display:flex; align-items:center; gap:8px; padding:8px; background:rgba(20,24,32,.92); border-color:rgba(255,255,255,.12); backdrop-filter:blur(24px) saturate(150%); -webkit-backdrop-filter:blur(24px) saturate(150%); box-shadow:0 6px 20px rgba(0,0,0,.18); transition:transform .18s ease,opacity .18s ease; }
     #topbar { inset:0 0 auto; min-height:54px; border-bottom:1px solid rgba(255,255,255,.12); }
@@ -64,7 +65,7 @@
       <div id="readerMeta"><span id="currentTitle">読み込み中…</span><span id="readerStatus"></span><button class="ctrlBtn" id="retryPageBtn" type="button" hidden>再試行</button></div>
     </header>
     <section id="viewer" aria-label="ページ表示"><div id="pageStage"></div></section>
-    <div id="readerMessage" role="status" aria-live="polite"></div>
+    <div id="readerMessage" role="status" aria-live="polite">リーダーを起動しています…</div>
     <nav id="controls" aria-label="ページ操作">
       <button class="ctrlBtn" id="firstBtn" type="button" aria-label="最初のページ">|◀</button>
       <button class="ctrlBtn" id="prevBtn" type="button" aria-label="前のページ">◀</button>
@@ -97,7 +98,7 @@
   <script src="reader-image-loader.js?v=20261004-reader-image-pipeline"></script>
   <script src="reader-lifecycle.js?v=20261004-reader-lifecycle"></script>
   <script src="reader-page-transition.js?v=20261004-reader-lifecycle"></script>
-  <script src="reader-page-source.js?v=20261004-reader-lifecycle"></script>
+  <script src="reader-page-source.js?v=20261009-reader-source-repair"></script>
   <script src="reader-progress-repository.js?v=20261004-reader-lifecycle"></script>
   <script src="reader-item-repository.js"></script>
   <script src="reader-sync-scheduler.js?v=20261008-reader-close-sync"></script>
@@ -178,7 +179,7 @@
         if (startPromise) return startPromise;
         const currentGeneration = generation;
         document.documentElement.classList.remove('vpn-protected-blocked');
-        const message = document.getElementById('readerMessage'); message.textContent = '';
+        const message = document.getElementById('readerMessage'); message.textContent = '画像を準備しています…';
         const itemId = MangaReaderTarget.itemIdFromLocation(location);
         if (!itemId) { location.replace('manga.html'); return; }
         MangaReaderTarget.clearLegacyTarget(localStorage);
@@ -208,9 +209,39 @@
         }).finally(() => { if (runtime === currentRuntime) startPromise = null; });
         return startPromise;
       }
+      function showStartFailure(error) {
+        if (!canReadProtectedData()) return;
+        const message = document.getElementById('readerMessage');
+        if (!message) return;
+        const section = document.createElement('section');
+        section.className = 'vpnReaderGate';
+        const detail = document.createElement('p');
+        detail.textContent = error?.message || '作品を開けませんでした。';
+        const actions = document.createElement('div');
+        actions.className = 'vpnReaderGateActions';
+        const retry = document.createElement('button');
+        retry.type = 'button';
+        retry.className = 'ctrlBtn';
+        retry.textContent = 'もう一度読み込む';
+        retry.addEventListener('click', () => {
+          retry.disabled = true;
+          runtime?.destroy();
+          runtime = null;
+          window.MangaReaderRuntime = null;
+          startPromise = null;
+          startReader().catch(showStartFailure);
+        });
+        const back = document.createElement('a');
+        back.href = 'manga.html';
+        back.className = 'ctrlBtn';
+        back.textContent = '本棚へ戻る';
+        actions.append(retry, back);
+        section.append(detail, actions);
+        message.replaceChildren(section);
+      }
       function handleAccessChange() {
         if (canReadProtectedData()) {
-          if (!runtime) startReader().catch((error) => { if (canReadProtectedData()) document.getElementById('readerMessage').textContent = error?.message || 'Readerを起動できませんでした'; });
+          if (!runtime) startReader().catch(showStartFailure);
           return;
         }
         generation += 1;
