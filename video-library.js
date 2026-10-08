@@ -192,7 +192,7 @@
           <div class="vl-field"><label for="videoLibraryTags">タグ（カンマ区切り）</label><input id="videoLibraryTags" type="text" autocomplete="off"></div><div id="videoLibrarySuggestedTags" class="vl-suggested-tags" aria-label="既存のタグ"></div>
           <div class="vl-field"><label for="videoLibraryMemo">メモ</label><textarea id="videoLibraryMemo"></textarea></div>
           <label class="vl-check"><input id="videoLibraryFavorite" type="checkbox"> お気に入り</label>
-          <div class="vl-field"><label for="videoLibraryRotate90Direction">再生時の回転</label><select id="videoLibraryRotate90Direction"><option value="none">回転なし</option><option value="left">常に左90°回転</option><option value="right">常に右90°回転</option></select><p class="vl-help">回転設定は直接再生する動画ファイルに適用されます。外部サービスの埋め込み動画には適用できません。</p></div>
+          <div class="vl-field"><label for="videoLibraryRotate90Direction">再生時の回転</label><select id="videoLibraryRotate90Direction"><option value="none">回転なし</option><option value="left">常に左90°回転</option><option value="right">常に右90°回転</option></select></div>
           <details class="vl-advanced"><summary>再生情報・サムネイル</summary>
             <div class="vl-two">
               <div class="vl-field"><label for="videoLibraryLegacyService">サービス名</label><input id="videoLibraryLegacyService" type="text" autocomplete="off"></div>
