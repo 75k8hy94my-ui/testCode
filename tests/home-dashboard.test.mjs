@@ -69,7 +69,7 @@ test('home page is vault-gated and the shared routes remain intact', () => {
   assert.match(spa, /window\.location\.replace\(['"]sync\.html['"]\)/);
   assert.match(spa, /window\.location\.replace\(['"]index\.html['"]\)/);
   assert.match(home, /home-dashboard\.js\?v=20260924-home-media-cards/);
-  assert.match(spa, /漫画・動画・作者カードなどのデータ/);
+  assert.match(spa, /MangaVault\.savePayload/);
   assert.match(read('sync.html'), /\['images\.html','drive-gallery\.html'\]\.includes\(next\) \? next : 'home\.html'/);
 });
 
