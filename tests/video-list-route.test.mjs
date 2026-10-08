@@ -22,7 +22,8 @@ test('video route loads its existing video modules without fetching reader.html'
   assert.match(spa, /video-list-template\.js\?v=20260922-vpn-tools/);
   assert.match(spa, /VideoListRouteFactory\.create\(/);
   assert.match(route, /video-data\.js\?v=20260918-video-data-no-window/);
-  assert.match(route, /video-library\.js\?v=20261008-vpn-data/);
+  assert.match(route, /video-thumbnail-renderer\.js\?v=20261008-shared-thumbnails/);
+  assert.match(route, /video-library\.js\?v=20261008-shared-thumbnails/);
   assert.match(route, /video-routing-fix\.js\?v=20261008-vpn-data/);
   assert.match(route, /video-thumbnail-time\.js\?v=20261008-vpn-data/);
   assert.match(spa, /else if\(route==='video'\)renderVideo\(generation\)/);
@@ -37,9 +38,10 @@ test('video route mounts while gated and passes the gate into its protected-data
   const route = read('video-list-route.js');
   const gate = route.indexOf("deps.loadMediaGate()");
   const data = route.indexOf("deps.loadScript('video-data.js?v=20260918-video-data-no-window'");
-  const library = route.indexOf("deps.loadScript('video-library.js?v=20261008-vpn-data'");
+  const renderer = route.indexOf("deps.loadScript('video-thumbnail-renderer.js?v=20261008-shared-thumbnails'");
+  const library = route.indexOf("deps.loadScript('video-library.js?v=20261008-shared-thumbnails'");
   assert.ok(gate >= 0 && gate < data);
-  assert.ok(data < library);
+  assert.ok(data < renderer && renderer < library);
   assert.match(route, /MangaReaderVideoLibrary\.init\(deps\.mediaAccess\)/);
   assert.doesNotMatch(spa.slice(spa.indexOf('async function renderVideo'), spa.indexOf('async function renderManga')), /gate\.getStatus\(\)|gate\.canLoadExternalMedia/);
 });
@@ -125,7 +127,8 @@ test('video thumbnail helper does not inspect protected metadata during storage 
 
 test('video feature helpers are deferred until the route has protected-data access', () => {
   const baseScripts = route.slice(route.indexOf('async function loadFeatureScripts'), route.indexOf('async function start'));
-  assert.match(baseScripts, /await deps\.loadScript\('video-library\.js\?v=20261008-vpn-data'/);
+  assert.match(baseScripts, /await deps\.loadScript\('video-thumbnail-renderer\.js\?v=20261008-shared-thumbnails'/);
+  assert.match(baseScripts, /await deps\.loadScript\('video-library\.js\?v=20261008-shared-thumbnails'/);
   assert.match(baseScripts, /canReadProtectedData\(\)[\s\S]*video-routing-fix\.js/);
 });
 

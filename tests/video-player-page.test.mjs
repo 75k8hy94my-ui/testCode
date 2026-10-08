@@ -11,6 +11,12 @@ test('video player page uses the normalized saved title and renders marker list'
   assert.match(page, /videoMarker/);
 });
 
+test('related videos use normalized thumbnail metadata and the shared renderer', () => {
+  assert.match(page, /itemVideo/);
+  assert.match(page, /MangaReaderVideoThumbnailRenderer\.render\(thumb, itemVideo/);
+  assert.match(fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8'), /video-thumbnail-renderer\.js/);
+});
+
 test('video player waits for protected-data access before reading records or rendering metadata', () => {
   const accessCheck = page.indexOf('function canReadProtectedData()');
   const initialize = page.indexOf('function initializePlayer()');
@@ -24,28 +30,14 @@ test('video player waits for protected-data access before reading records or ren
   assert.match(controls, /canReadProtectedData\(\)/);
 });
 
-test('video detail editing navigates to the standalone editor without opening a dialog', () => {
-  assert.match(page, /video-edit\.html\?id=/);
-  assert.match(page, /return=player/);
-  assert.doesNotMatch(page, /videoEditDialog|role="dialog"/);
-  const library = fs.readFileSync(new URL('../video-library.js', import.meta.url), 'utf8');
-  assert.match(library, /video-edit\.html/);
-  assert.match(library, /return', 'list'/);
-});
-
-test('standalone video editor guards protected reads and saves through Vault sync', () => {
-  const editor = fs.readFileSync(new URL('../video-edit-page.js', import.meta.url), 'utf8');
-  assert.match(editor, /function canReadProtectedData\(\)/);
-  assert.match(editor, /if \(!canReadProtectedData\(\)\) return fallback/);
-  assert.match(editor, /manga-reader-vpn-status/);
-  assert.match(editor, /localStorage\.setItem\(VIDEO_KEY/);
-  assert.match(editor, /localStorage\.setItem\(META_KEY/);
-  assert.match(editor, /MangaVault\.savePayload\(window\.MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
-  assert.match(editor, /title: elements\.title\.value\.trim\(\)/);
-  assert.match(editor, /rotate90Direction: elements\.rotate\.value/);
-  const html = fs.readFileSync(new URL('../video-edit.html', import.meta.url), 'utf8');
-  assert.match(html, /media-access-gate\.js/);
-  assert.match(html, /video-edit-page\.js\?v=20261008-video-edit-page/);
+test('video player page exposes quick editing for saved video details and syncs Vault payload', () => {
+  assert.match(page, /動画情報を編集/);
+  assert.match(page, /videoEditForm/);
+  assert.match(page, /name="title"/);
+  assert.match(page, /name="tags"/);
+  assert.match(page, /name="memo"/);
+  assert.match(page, /localStorage\.setItem\(META_KEY, JSON\.stringify\(nextMeta\)\)/);
+  assert.match(page, /MangaVault\.savePayload\(window\.MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
 });
 
 test('video title edits in place and player details follow the video in a watch-page layout', () => {
@@ -60,7 +52,7 @@ test('video title edits in place and player details follow the video in a watch-
 test('video player document cache keys identify the current watch-page design', () => {
   const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
   assert.match(html, /home-profile-shell\.css\?v=20261007-video-watch-layout/);
-  assert.match(html, /video-player-page\.js\?v=20261008-vpn-data/);
+  assert.match(html, /video-player-page\.js\?v=20261008-shared-thumbnails/);
 });
 
 test('marker registration defaults to the current playback position', () => {

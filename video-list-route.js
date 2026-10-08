@@ -25,7 +25,8 @@
         bootPromise = (async () => {
           await deps.loadMediaGate();
           await deps.loadScript('video-data.js?v=20260918-video-data-no-window', 'spaVideoData');
-          await deps.loadScript('video-library.js?v=20261008-vpn-data', 'spaVideoLibrary');
+          await deps.loadScript('video-thumbnail-renderer.js?v=20261008-shared-thumbnails', 'spaVideoThumbnailRenderer');
+          await deps.loadScript('video-library.js?v=20261008-shared-thumbnails', 'spaVideoLibrary');
         })().catch((error) => {
           bootPromise = null;
           throw error;

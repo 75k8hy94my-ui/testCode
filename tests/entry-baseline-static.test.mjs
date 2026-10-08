@@ -109,7 +109,9 @@ test('VPN checks and manual designations remain available to protected reader me
 
 test('video bootstrap has one owner per page and does not load on the Reader document', () => {
   assert.match(spa, /video-list-route\.js\?v=20261008-vpn-data/);
-  assert.match(fs.readFileSync(new URL('../video-list-route.js', import.meta.url), 'utf8'), /video-library\.js\?v=20261008-vpn-data/);
+  const videoRoute = fs.readFileSync(new URL('../video-list-route.js', import.meta.url), 'utf8');
+  assert.match(videoRoute, /video-thumbnail-renderer\.js\?v=20261008-shared-thumbnails/);
+  assert.match(videoRoute, /video-library\.js\?v=20261008-shared-thumbnails/);
   assert.match(recommendations, /const page = String\(\(root\.location && root\.location\.pathname\) \|\| ''\)\.split\('\/'\)\.pop\(\);/);
   assert.doesNotMatch(reader, /recommendations\.js|video-data\.js|video-library\.js/);
   assert.match(recommendations, /loadBrowserScript\('video-data\.js'\)/);

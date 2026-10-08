@@ -25,6 +25,14 @@ test('video library provides search filters sorting view modes folders and edito
   assert.match(source, /history\.pushState/);
 });
 
+test('video cards delegate thumbnail rendering to the shared renderer', () => {
+  const library = read('video-library.js');
+  const route = read('video-list-route.js');
+  assert.match(library, /MangaReaderVideoThumbnailRenderer/);
+  assert.match(library, /render\(thumb, video/);
+  assert.match(route, /video-thumbnail-renderer\.js/);
+});
+
 test('video add and edit fields use stronger contrast, spacing, and visible focus treatment', () => {
   const library = read('video-library.js');
   assert.match(library, /\.vl-field\{padding:10px 11px 11px/);
