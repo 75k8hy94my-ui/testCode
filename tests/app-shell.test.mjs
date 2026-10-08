@@ -28,6 +28,10 @@ test('home-family pages share one History API controller', () => {
   assert.match(spa, /id="profileLogoutBtn"/);
   assert.match(spa, /id="profileThemeLight"/);
   assert.match(spa, /保管庫を開く/);
+  assert.match(spa, /id="profileAvatarInput"/);
+  assert.match(spa, /avatarApi\.fromFile\(file\)/);
+  assert.match(read('profile-menu.js'), /refreshAvatar/);
+  for(const page of ['home.html','profile.html','manga.html','video.html']) assert.match(read(page), /profile-avatar\.js/);
 });
 
 test('mobile home shell delegates navigation to the shared Liquid Glass component', () => {

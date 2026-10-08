@@ -76,8 +76,48 @@ function renderProfile(){
   const target=getMount();if(!target)return;setTitle('profile');editing=false;
   const email=(session&&session.user&&session.user.email)||'';
   const light=currentTheme()==='light';
-  target.innerHTML=`<section class="profileContent"><p id="homeSyncStatus" class="syncStatus profileToastStatus" aria-live="polite"></p><h2>プロフィール設定</h2><p class="profileLead">アカウントと、端末／クラウドに残るデータの扱いです。</p><dl class="profileMeta"><div><dt>ログイン中</dt><dd id="profileEmail"></dd></div></dl><section class="profileCard"><h3>保管庫</h3><p>漫画・動画・作者カードなどのデータはブラウザ内で暗号化して同期します。</p><a class="glassBtn profileAction" href="sync.html">保管庫を開く</a></section><section class="profileCard profileSecurityCard"><h3>認証方法</h3><p>パスキーの設定・解除には現在のパスフレーズが必要です。保管庫を開いているときは、パスキーで本人確認してパスフレーズを再設定できます。</p><div class="profileSecurityFields"><label class="profileField">現在のパスフレーズ<input id="profileCurrentPassphrase" type="password" autocomplete="current-password"></label><div class="profileSecurityActions"><button class="glassBtn profileAction" id="profilePasskeyRegisterBtn" type="button" data-profile-security-action>パスキーを設定</button><button class="glassBtn profileDanger" id="profilePasskeyRemoveBtn" type="button" data-profile-security-action>登録済みパスキーを解除</button></div><label class="profileField">新しいパスフレーズ<input id="profileNewPassphrase" type="password" autocomplete="new-password"></label><label class="profileField">新しいパスフレーズ（確認）<input id="profileNewPassphraseConfirm" type="password" autocomplete="new-password"></label><button class="glassBtn profileAction" id="profilePassphraseResetBtn" type="button" data-profile-security-action>パスキーで本人確認して再設定</button></div><p id="profileSecurityStatus" class="profileSecurityStatus" role="status" aria-live="polite"></p></section><section class="profileCard"><h3>VPN診断</h3><p>「VPNではない」と固定したIPアドレスを管理します。</p><div id="profileNonVpnIps"></div></section><section class="profileCard"><h3>表示</h3><label class="profileThemeRow"><span>ライトテーマ</span><span class="iosSwitch"><input id="profileThemeLight" type="checkbox" role="switch" aria-label="ライトテーマ"><span class="iosSwitchTrack" aria-hidden="true"></span></span></label></section><section class="profileCard"><h3>セッション</h3><p>ロックは保管庫の復号鍵だけを破棄し、ログイン状態は維持します。アカウントからログアウトすると、この端末の保管庫データとログイン状態を消します。</p><div class="profileSecurityActions"><button class="glassBtn profileAction" id="profileLockBtn" type="button">ロック</button><button class="glassBtn profileDanger" id="profileLogoutBtn" type="button">アカウントからログアウト</button></div></section></section>`;
+  target.innerHTML=`<section class="profileContent"><p id="homeSyncStatus" class="syncStatus profileToastStatus" aria-live="polite"></p><h2>プロフィール設定</h2><p class="profileLead">アカウントと、端末／クラウドに残るデータの扱いです。</p><section class="profileCard profileAvatarCard"><h3>プロフィール画像</h3><div class="profileAvatarRow"><div class="profileAvatarPreview" aria-hidden="true"><img id="profileAvatarPreview" alt="" hidden><span id="profileAvatarPlaceholder">アカウント</span></div><div class="profileAvatarSettings"><p>画像を選択すると、中央を正方形に切り抜いて保存します。クラウド同期にも対応します。</p><input id="profileAvatarInput" type="file" accept="image/jpeg,image/png,image/webp" hidden><div class="profileSecurityActions"><button class="glassBtn profileAction" id="profileAvatarChooseBtn" type="button">画像を選択</button><button class="glassBtn" id="profileAvatarRemoveBtn" type="button">画像を削除</button></div><p id="profileAvatarStatus" class="profileAvatarStatus" role="status" aria-live="polite"></p></div></div></section><dl class="profileMeta"><div><dt>ログイン中</dt><dd id="profileEmail"></dd></div></dl><section class="profileCard"><h3>保管庫</h3><p>漫画・動画・作者カードなどのデータはブラウザ内で暗号化して同期します。</p><a class="glassBtn profileAction" href="sync.html">保管庫を開く</a></section><section class="profileCard profileSecurityCard"><h3>認証方法</h3><p>パスキーの設定・解除には現在のパスフレーズが必要です。保管庫を開いているときは、パスキーで本人確認してパスフレーズを再設定できます。</p><div class="profileSecurityFields"><label class="profileField">現在のパスフレーズ<input id="profileCurrentPassphrase" type="password" autocomplete="current-password"></label><div class="profileSecurityActions"><button class="glassBtn profileAction" id="profilePasskeyRegisterBtn" type="button" data-profile-security-action>パスキーを設定</button><button class="glassBtn profileDanger" id="profilePasskeyRemoveBtn" type="button" data-profile-security-action>登録済みパスキーを解除</button></div><label class="profileField">新しいパスフレーズ<input id="profileNewPassphrase" type="password" autocomplete="new-password"></label><label class="profileField">新しいパスフレーズ（確認）<input id="profileNewPassphraseConfirm" type="password" autocomplete="new-password"></label><button class="glassBtn profileAction" id="profilePassphraseResetBtn" type="button" data-profile-security-action>パスキーで本人確認して再設定</button></div><p id="profileSecurityStatus" class="profileSecurityStatus" role="status" aria-live="polite"></p></section><section class="profileCard"><h3>VPN診断</h3><p>「VPNではない」と固定したIPアドレスを管理します。</p><div id="profileNonVpnIps"></div></section><section class="profileCard"><h3>表示</h3><label class="profileThemeRow"><span>ライトテーマ</span><span class="iosSwitch"><input id="profileThemeLight" type="checkbox" role="switch" aria-label="ライトテーマ"><span class="iosSwitchTrack" aria-hidden="true"></span></span></label></section><section class="profileCard"><h3>セッション</h3><p>ロックは保管庫の復号鍵だけを破棄し、ログイン状態は維持します。アカウントからログアウトすると、この端末の保管庫データとログイン状態を消します。</p><div class="profileSecurityActions"><button class="glassBtn profileAction" id="profileLockBtn" type="button">ロック</button><button class="glassBtn profileDanger" id="profileLogoutBtn" type="button">アカウントからログアウト</button></div></section></section>`;
   const mail=$('profileEmail');if(mail)mail.textContent=email||'（メール未取得）';
+  const avatarApi=window.ProfileAvatar;
+  const avatarInput=$('profileAvatarInput'),avatarChoose=$('profileAvatarChooseBtn'),avatarRemove=$('profileAvatarRemoveBtn');
+  const avatarStatus=$('profileAvatarStatus'),avatarPreview=$('profileAvatarPreview'),avatarPlaceholder=$('profileAvatarPlaceholder');
+  const refreshProfileAvatar=()=>{
+    const source=avatarApi?.read()||'';
+    if(avatarPreview){avatarPreview.hidden=!source;avatarPreview.removeAttribute('src');if(source)avatarPreview.src=source;}
+    if(avatarPlaceholder)avatarPlaceholder.hidden=!!source;
+    if(avatarRemove)avatarRemove.disabled=!source;
+    window.ProfileMenu?.refreshAvatar?.();
+  };
+  const setAvatarStatus=(message,error=false)=>{if(avatarStatus){avatarStatus.textContent=message;avatarStatus.dataset.state=error?'error':'ok';}};
+  const setAvatarBusy=(busy)=>{if(avatarChoose)avatarChoose.disabled=busy;if(avatarRemove)avatarRemove.disabled=busy||!avatarApi?.read();};
+  refreshProfileAvatar();
+  avatarChoose?.addEventListener('click',()=>avatarInput?.click());
+  avatarInput?.addEventListener('change',async()=>{
+    const file=avatarInput.files?.[0];
+    if(!file)return;
+    setAvatarBusy(true);
+    setAvatarStatus('画像を処理しています…');
+    try{
+      const encoded=await avatarApi.fromFile(file);
+      avatarApi.write(encoded);
+      refreshProfileAvatar();
+      document.dispatchEvent(new Event('testcode-profile-avatar-change'));
+      setAvatarStatus('端末に保存しました。クラウド同期を実行します。');
+      await runHomeSync('プロフィール画像を同期しました');
+    }catch(error){setAvatarStatus(error?.message||'画像の設定に失敗しました。',true);}
+    finally{avatarInput.value='';setAvatarBusy(false);}
+  });
+  avatarRemove?.addEventListener('click',async()=>{
+    setAvatarBusy(true);
+    try{
+      avatarApi.write('');
+      refreshProfileAvatar();
+      document.dispatchEvent(new Event('testcode-profile-avatar-change'));
+      setAvatarStatus('画像を削除しました。クラウド同期を実行します。');
+      await runHomeSync('プロフィール画像の削除を同期しました');
+    }catch(error){setAvatarStatus(error?.message||'画像を削除できませんでした。',true);}
+    finally{setAvatarBusy(false);}
+  });
   const theme=$('profileThemeLight');if(theme){theme.checked=light;theme.addEventListener('change',()=>{applyTheme(theme.checked?'light':'dark');runHomeSync('保存しました')});}
   const currentPassphrase=$('profileCurrentPassphrase');
   const registerPasskey=$('profilePasskeyRegisterBtn');if(registerPasskey)registerPasskey.addEventListener('click',()=>{const value=currentPassphrase&&currentPassphrase.value;if(!value){setProfileSecurityStatus('現在のパスフレーズを入力してください。',true);return;}runProfileSecurity(()=>MangaVault.registerPasskey(value),'パスキーを設定しました。');});

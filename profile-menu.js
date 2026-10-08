@@ -3,6 +3,23 @@
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
   const DEVICE_DATA_KEYS = () => [...Object.values((window.MangaVaultPayload && MangaVaultPayload.DATA_KEYS) || {}),'mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
   let menu=null, activeTrigger=null;
+  const AVATAR_KEY='mangaReaderProfileAvatar';
+  function refreshAvatar(){
+    let avatar='';
+    try{
+      const source=localStorage.getItem(AVATAR_KEY)||'';
+      if(window.MangaVault?.loadActive?.()&&typeof source==='string'&&source.length<=100000&&/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(source))avatar=source;
+    }catch(_){}
+    document.querySelectorAll('[data-profile-menu-trigger], #desktopProfileButton').forEach((button)=>{
+      const previous=button.querySelector('.profileAvatarButtonImage');
+      if(!avatar){previous?.remove();return;}
+      const image=previous||document.createElement('img');
+      image.className='profileAvatarButtonImage';
+      image.alt='';
+      if(image.getAttribute('src')!==avatar)image.src=avatar;
+      if(!previous)button.appendChild(image);
+    });
+  }
 
   async function logout(button) {
     if (!confirm('ログアウトしますか？')) return;
@@ -93,11 +110,13 @@
   function install() {
     ensureStyle();
     document.querySelectorAll('[data-profile-menu-trigger], #desktopProfileButton').forEach(installTrigger);
+    refreshAvatar();
   }
 
-  window.ProfileMenu={logout,lock,openProfile,install};
+  window.ProfileMenu={logout,lock,openProfile,install,refreshAvatar};
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install,{once:true}); else install();
   document.addEventListener('manga-reader-desktop-nav-ready',install);
+  document.addEventListener('testcode-profile-avatar-change',refreshAvatar);
   document.addEventListener('home-profile-routechange',()=>{close();install();});
   document.addEventListener('click',close);
   document.addEventListener('keydown',(event)=>{if(event.key==='Escape')close();});
