@@ -48,6 +48,17 @@ test('video player edit action navigates to the dedicated editor instead of open
   assert.match(editor, /if \(kind === 'player'\) return 'video-player\.html\?id='/);
 });
 
+test('dedicated video editor renders its loading and VPN gate instead of leaving the body hidden', () => {
+  const html = fs.readFileSync(new URL('../video-edit.html', import.meta.url), 'utf8');
+  const editor = fs.readFileSync(new URL('../video-edit-page.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /<html[^>]*\bauth-pending\b/);
+  assert.match(html, /<main id="videoEditPage"/);
+  assert.match(html, /video-edit-page\.js/);
+  assert.match(editor, /function handleAccess\(\)/);
+  assert.match(editor, /if \(canReadProtectedData\(\)\) initialize\(\)/);
+  assert.match(editor, /page\.replaceChildren\(heading, lead, form\)/);
+});
+
 test('watch page applies and cleans up the saved rotation direction for direct video', () => {
   assert.match(page, /MangaReaderVideoRotation\.install\(frame, video, normalized\.rotate90Direction/);
   assert.match(page, /windowCleanups\.push\(cleanupRotation\)/);
