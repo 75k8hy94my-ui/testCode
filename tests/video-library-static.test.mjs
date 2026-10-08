@@ -126,6 +126,9 @@ test('video editor exposes a persistent 90-degree rotation setting', () => {
   assert.match(library, /rotate90/);
   assert.match(library, /videoLibraryRotate90Direction/);
   assert.doesNotMatch(library, /videoLibraryRotateLeftStart|videoLibraryRotateLeftEnd|左90°回転 開始秒|左90°回転 終了秒/);
+  assert.match(library, /rotate90Direction\.disabled = !Data\.isDirectVideoUrl\(video\.url\)/);
+  assert.match(library, /外部サービスの埋め込み動画には適用できません/);
+  assert.match(library, /rotate90Direction: Data\.isDirectVideoUrl\(url\) \? dom\.rotate90Direction\.value : 'none'/);
 });
 
 test('video routing bridge plays direct video URLs with a video element and keeps legacy iframe playback', () => {

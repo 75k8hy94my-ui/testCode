@@ -40,6 +40,14 @@ test('video player page exposes quick editing for saved video details and syncs 
   assert.match(page, /MangaVault\.savePayload\(window\.MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
 });
 
+test('watch page applies and cleans up the saved rotation direction for direct video', () => {
+  assert.match(page, /MangaReaderVideoRotation\.install\(frame, video, normalized\.rotate90Direction/);
+  assert.match(page, /windowCleanups\.push\(cleanupRotation\)/);
+  const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
+  assert.ok(html.indexOf('video-player-rotation.js') < html.indexOf('video-player-page.js'));
+  assert.match(fs.readFileSync(new URL('../home-profile-shell.css', import.meta.url), 'utf8'), /videoPlayerFrame video\.videoPlayerRotatedLeft/);
+});
+
 test('video title edits in place and player details follow the video in a watch-page layout', () => {
   assert.match(page, /heading\.contentEditable\s*=\s*['"]true['"]/);
   assert.match(page, /heading\.addEventListener\(['"]keydown['"]/);
@@ -62,7 +70,7 @@ test('custom player defers single taps and maps double-tap zones to seek or full
 test('video player document cache keys identify the current watch-page design', () => {
   const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
   assert.match(html, /home-profile-shell\.css\?v=20261007-video-watch-layout/);
-  assert.match(html, /video-player-page\.js\?v=20261008-shared-thumbnails/);
+  assert.match(html, /video-player-page\.js\?v=20261008-video-rotation/);
 });
 
 test('marker registration defaults to the current playback position', () => {

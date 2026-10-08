@@ -192,7 +192,7 @@
           <div class="vl-field"><label for="videoLibraryTags">タグ（カンマ区切り）</label><input id="videoLibraryTags" type="text" autocomplete="off"></div><div id="videoLibrarySuggestedTags" class="vl-suggested-tags" aria-label="既存のタグ"></div>
           <div class="vl-field"><label for="videoLibraryMemo">メモ</label><textarea id="videoLibraryMemo"></textarea></div>
           <label class="vl-check"><input id="videoLibraryFavorite" type="checkbox"> お気に入り</label>
-          <div class="vl-field"><label for="videoLibraryRotate90Direction">再生時の回転</label><select id="videoLibraryRotate90Direction"><option value="none">回転なし</option><option value="left">常に左90°回転</option><option value="right">常に右90°回転</option></select></div>
+          <div class="vl-field"><label for="videoLibraryRotate90Direction">再生時の回転</label><select id="videoLibraryRotate90Direction"><option value="none">回転なし</option><option value="left">常に左90°回転</option><option value="right">常に右90°回転</option></select><p class="vl-help">回転設定は直接再生する動画ファイルに適用されます。外部サービスの埋め込み動画には適用できません。</p></div>
           <details class="vl-advanced"><summary>再生情報・サムネイル</summary>
             <div class="vl-two">
               <div class="vl-field"><label for="videoLibraryLegacyService">サービス名</label><input id="videoLibraryLegacyService" type="text" autocomplete="off"></div>
@@ -419,6 +419,7 @@
     dom.legacyId.value = base ? text(base.b) : '';
     dom.thumbnail.value = videoId ? video.thumbnailUrl : '';
     dom.rotate90Direction.value = videoId ? (video.rotate90Direction || (video.rotate90 ? 'left' : 'none')) : 'none';
+    dom.rotate90Direction.disabled = !Data.isDirectVideoUrl(video.url);
     dom.formError.textContent = '';
     setSheetVisible(true); pushSheetState(); setTimeout(() => dom.url.focus(), 30);
   }
@@ -460,7 +461,7 @@
     const patch = {
       title, url, folderId: text(dom.editFolder.value) || null, tags: Data.parseTags(dom.tags.value), memo: text(dom.memo.value), favorite: !!dom.favorite.checked,
       watchStatus: text(dom.statusSelect.value), thumbnailUrl: text(dom.thumbnail.value),
-      rotate90: dom.rotate90Direction.value !== 'none', rotate90Direction: dom.rotate90Direction.value,
+      rotate90: Data.isDirectVideoUrl(url) && dom.rotate90Direction.value !== 'none', rotate90Direction: Data.isDirectVideoUrl(url) ? dom.rotate90Direction.value : 'none',
     };
     try {
       let targetId = state.editorId;
@@ -508,6 +509,7 @@
     dom.add.addEventListener('click', () => openEditor(null)); dom.foldersBtn.addEventListener('click', openFolderManager);
     dom.cancel.addEventListener('click', closeSheet); dom.form.addEventListener('submit', saveEditor); dom.deleteBtn.addEventListener('click', () => state.editorId && deleteVideoFromLibrary(state.editorId));
     dom.urlEdit.addEventListener('click', () => setUrlEditing(true));
+    dom.url.addEventListener('input', () => { dom.rotate90Direction.disabled = !Data.isDirectVideoUrl(dom.url.value); });
     dom.createFolder.addEventListener('click', createFolder); dom.newFolder.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); createFolder(); } });
     dom.sheet.addEventListener('click', (event) => { if (event.target === dom.sheet) return; });
     window.addEventListener('popstate', () => { if (!(history.state && history.state.videoLibrarySheet)) setSheetVisible(false); });
