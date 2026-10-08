@@ -6,20 +6,27 @@
   const INFO = new TextEncoder().encode('drive-gallery-settings');
   const FOLDER_ID_PATTERN = /^[A-Za-z0-9_-]{10,}$/;
   const API_KEY_PATTERN = /^[A-Za-z0-9_-]{16,256}$/;
+  const MAX_ENVELOPE_BASE64_LENGTH = 2100000;
   function base64url(bytes) {
     let value = '';
     for (const byte of bytes) value += String.fromCharCode(byte);
     return btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
   }
   function fromBase64url(value) {
-    if (typeof value !== 'string' || !/^[A-Za-z0-9_-]+$/.test(value) || value.length > 25000) throw new Error('暗号化設定の形式が不正です。');
+    if (typeof value !== 'string' || !/^[A-Za-z0-9_-]+$/.test(value) || value.length > MAX_ENVELOPE_BASE64_LENGTH) throw new Error('暗号化設定の形式が不正です。');
     const value64 = value.replace(/-/g, '+').replace(/_/g, '/');
     return Uint8Array.from(atob(value64 + '='.repeat((4 - value64.length % 4) % 4)), c => c.charCodeAt(0));
   }
   function validateSettings(input) {
     if (!input || !FOLDER_ID_PATTERN.test(String(input.folderId || ''))) throw new Error('フォルダIDが正しくありません。');
     if (!API_KEY_PATTERN.test(String(input.apiKey || ''))) throw new Error('Google Drive APIキーを確認してください。');
-    return { folderId: input.folderId, apiKey: input.apiKey };
+    const settings = { folderId: input.folderId, apiKey: input.apiKey };
+    if (input.cache != null) {
+      const cache = root.PublicDriveGallery?.normalizeCache?.(input.cache, input.folderId);
+      if (!cache) throw new Error('画像URLキャッシュの内容が不正です。');
+      settings.cache = cache;
+    }
+    return settings;
   }
   async function deriveKey(rawKey) {
     if (!(rawKey instanceof Uint8Array) || rawKey.byteLength !== 32) throw new Error('保管庫を解錠してください。');

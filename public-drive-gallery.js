@@ -7,12 +7,14 @@
   const settingsStorageKey = vaultPayload.DATA_KEYS.driveGalleryEncrypted;
   const syncStatus = document.getElementById('driveSyncStatus');
   let saving = false;
+  let savedSettings = null;
   const byId = (id) => document.getElementById(id);
   const form = byId('driveGalleryForm');
   const folderInput = byId('driveFolder');
   const keyInput = byId('driveApiKey');
   const loadButton = byId('driveLoad');
   const cancelButton = byId('driveCancel');
+  const refreshButton = byId('driveRefresh');
   const status = byId('driveGalleryStatus');
   const count = byId('driveGalleryCount');
   const grid = byId('driveGalleryGrid');
@@ -31,7 +33,8 @@
   function loading(value) {
     loadButton.disabled = value;
     cancelButton.hidden = !value;
-    loadButton.textContent = value ? '取得中…' : '設定を暗号化・同期して読み込む';
+    loadButton.textContent = value ? '取得中…' : '設定を保存して表示';
+    refreshButton.disabled = value || !savedSettings;
   }
   function setSyncStatus(message, error = false) {
     syncStatus.textContent = message;
@@ -47,6 +50,8 @@
     const encrypted = await cryptoSettings.encryptSettings(vaultKey(), settings);
     if (!vaultApi.loadActive()) throw new Error('保管庫がロックされています。再度解錠してください。');
     localStorage.setItem(settingsStorageKey, JSON.stringify(encrypted));
+    savedSettings = settings;
+    refreshButton.disabled = false;
     setSyncStatus('暗号化した設定をクラウドへ同期しています…');
     try {
       await vaultApi.savePayload(vaultPayload.buildFromLocalStorage());
@@ -57,8 +62,8 @@
         (error?.message ? ' ' + error.message : ''), true);
     }
   }
-  function attachImageFallback(img, id, failureCallback) {
-    const urls = api.imageUrls(id);
+  function attachImageFallback(img, file, failureCallback) {
+    const urls = api.imageUrls(file.id);
     let triedFallback = false;
     img.onerror = () => {
       if (!triedFallback) {
@@ -69,7 +74,7 @@
         if (failureCallback) failureCallback();
       }
     };
-    img.src = urls.direct;
+    img.src = file.directUrl || urls.direct;
   }
   function displayImages(images) {
     const fragment = document.createDocumentFragment();
@@ -83,7 +88,7 @@
       img.alt = file.name;
       img.loading = 'lazy';
       img.decoding = 'async';
-      attachImageFallback(img, file.id, () => {
+      attachImageFallback(img, file, () => {
         img.remove();
         const placeholder = document.createElement('span');
         placeholder.className = 'driveImageUnavailable';
@@ -111,7 +116,7 @@
     const message = byId('driveViewerMessage');
     message.textContent = '';
     viewerImage.alt = file.name;
-    attachImageFallback(viewerImage, file.id, () => {
+    attachImageFallback(viewerImage, file, () => {
       viewerImage.removeAttribute('src');
       message.textContent = '直接表示できません。必要なら「Driveで開く」を使用してください。';
     });
@@ -140,16 +145,23 @@
     updateViewer();
   }
 
+  function showCachedImages(settings) {
+    const cache = api.normalizeCache(settings?.cache, settings?.folderId);
+    if (!cache) return false;
+    if (!viewer.hidden) closeViewer();
+    files = cache.images;
+    displayImages(files);
+    const refreshed = new Date(cache.updatedAt).toLocaleString('ja-JP');
+    setStatus('同期済みの画像URL一覧から表示中（' + refreshed + ' 更新）。Drive APIは呼び出していません。');
+    return true;
+  }
+
   async function loadImages(folderId, apiKey) {
     if (controller) controller.abort();
     controller = new AbortController();
     const current = controller;
     loading(true);
-    files = [];
-    grid.replaceChildren();
-    empty.hidden = true;
-    count.textContent = '';
-    setStatus('Google Driveに接続しています…');
+    setStatus('Google Driveの画像一覧を取得しています…（保存済みの一覧は更新成功まで維持します）');
     try {
       const result = await api.listPublicImages({
         folderId, apiKey, signal: current.signal,
@@ -157,21 +169,37 @@
           if (controller === current) setStatus(pageCount + 'ページ取得：' + imageCount + '枚の画像を検出しました。続きの確認中…');
         }
       });
-      if (controller !== current) return;
-      files = result;
+      if (controller !== current || !vaultApi.loadActive()) return;
+      // No partial cache writes: commit only after every Drive page succeeded.
+      const imageList = result.map(file => ({ id: file.id, name: file.name, directUrl: api.imageUrls(file.id).direct }));
+      let cache = null;
+      try {
+        cache = api.createCache(folderId, imageList);
+      } catch (error) {
+        setSyncStatus(error?.message || '画像一覧を同期キャッシュに保存できません。', true);
+      }
+      if (!viewer.hidden) closeViewer();
+      files = imageList;
       displayImages(files);
-      setStatus(files.length ? '画像一覧を読み込みました。画像を選択すると拡大表示します。' : '画像が見つかりませんでした。');
-      const url = new URL(window.location.href);
-      url.searchParams.set('folder', folderId);
-      history.replaceState(null, '', url.pathname + url.search + url.hash);
+      setStatus(files.length ? 'Driveから最新の一覧を取得しました。次回は保存済みURLから表示します。' : '画像はありません。空の一覧もキャッシュ対象です。');
+      if (cache) {
+        // Cache and API key are one authenticated, encrypted Vault item; folder change
+        // cannot accidentally carry another folder's URLs across.
+        try {
+          await persistSettings({ folderId, apiKey, cache });
+        } catch (error) {
+          setSyncStatus('一覧を表示できましたが、暗号化キャッシュの保存に失敗しました。 ' + (error?.message || ''), true);
+        }
+      }
     } catch (error) {
       if (controller !== current) return;
-      if (error.name === 'AbortError') setStatus('読み込みを中止しました。');
-      else setStatus(error.message || '画像一覧を取得できませんでした。', true);
+      if (error.name === 'AbortError') setStatus('更新を中止しました。保存済みの画像一覧はそのままです。');
+      else setStatus('Driveの一覧を更新できませんでした。以前の一覧は維持しています。 ' + (error.message || ''), true);
     } finally {
       if (controller === current) { controller = null; loading(false); }
     }
   }
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (saving || controller) return;
@@ -183,13 +211,38 @@
       cryptoSettings.validateSettings({ folderId, apiKey });
       saving = true;
       loadButton.disabled = true;
-      await persistSettings({ folderId, apiKey });
+      refreshButton.disabled = true;
+      const cache = savedSettings?.folderId === folderId ?
+        api.normalizeCache(savedSettings.cache, folderId) : null;
+      if (savedSettings?.folderId !== folderId) {
+        if (!viewer.hidden) closeViewer();
+        files = [];
+        grid.replaceChildren();
+        count.textContent = '';
+        empty.hidden = true;
+      }
+      await persistSettings({ folderId, apiKey, ...(cache ? { cache } : {}) });
     } catch (error) {
       setSyncStatus(error?.message || '設定を暗号化して保存できませんでした。', true);
       return;
     } finally {
       saving = false;
       loadButton.disabled = false;
+      refreshButton.disabled = !savedSettings;
+    }
+    // Pressing Save never incurs another Drive API request when a matching
+    // synchronized cache is present. Only an explicit Refresh bypasses it.
+    if (showCachedImages(savedSettings)) return;
+    await loadImages(folderId, apiKey);
+  });
+
+  refreshButton.addEventListener('click', async () => {
+    if (saving || controller || !savedSettings) return;
+    const folderId = api.folderIdFromInput(folderInput.value);
+    const apiKey = keyInput.value.trim();
+    if (folderId !== savedSettings.folderId || apiKey !== savedSettings.apiKey) {
+      setStatus('先に「設定を保存して表示」で変更内容を保存してください。', true);
+      return;
     }
     await loadImages(folderId, apiKey);
   });
@@ -217,6 +270,8 @@
       controller?.abort();
       controller = null;
       files = [];
+      savedSettings = null;
+      refreshButton.disabled = true;
       grid.replaceChildren();
       keyInput.value = '';
       folderInput.value = '';
@@ -232,10 +287,12 @@
     }
     try {
       const settings = await cryptoSettings.decryptSettings(vaultKey(), saved);
+      savedSettings = settings;
       folderInput.value = settings.folderId;
       keyInput.value = settings.apiKey;
-      setSyncStatus('保管庫から保存済み設定を復元しました。');
-      await loadImages(settings.folderId, settings.apiKey);
+      refreshButton.disabled = false;
+      setSyncStatus('保管庫から暗号化した設定を復元しました。');
+      if (!showCachedImages(settings)) await loadImages(settings.folderId, settings.apiKey);
     } catch (error) {
       keyInput.value = '';
       setSyncStatus(error?.message || '保存済み設定を読み込めませんでした。', true);

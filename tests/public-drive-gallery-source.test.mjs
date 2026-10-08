@@ -67,3 +67,45 @@ test('reports API errors and does not produce an incomplete gallery', async () =
     /不完全/
   );
 });
+
+test('cached direct URLs avoid Drive API calls on reopen, including an empty folder', async () => {
+  const { createCache, loadGallery, normalizeCache } = require('../public-drive-gallery-source.js');
+  const manifest = createCache(folder, [
+    { id: 'image_000000001', name: '写真 1.jpg' },
+    { id: 'image_000000002', name: '写真 2.jpg' }
+  ], '2026-10-08T00:00:00.000Z');
+  assert.equal(manifest.images[0].directUrl, 'https://lh3.googleusercontent.com/d/image_000000001');
+  const bomb = async () => { throw new Error('Drive API MUST NOT be called'); };
+  const result = await loadGallery({ folderId: folder, cache: manifest, apiKey: 'unused', fetcher: bomb });
+  assert.equal(result.source, 'cache');
+  assert.equal(result.images.length, 2);
+  assert.equal(normalizeCache(manifest, folder).images[1].name, '写真 2.jpg');
+  const empty = await loadGallery({ folderId: folder, cache: createCache(folder, []), fetcher: bomb });
+  assert.equal(empty.source, 'cache');
+  assert.equal(empty.images.length, 0);
+});
+test('explicit refresh makes a Drive API call and cached URLs never mix between folders', async () => {
+  const { createCache, loadGallery } = require('../public-drive-gallery-source.js');
+  const manifest = createCache(folder, [{ id: 'image_000000001', name: 'old.jpg' }]);
+  let calls = 0;
+  const fetcher = async () => { calls++; return { ok: true, json: async () => ({
+    files: [{ id: 'image_000000002', name: 'new.jpg', mimeType: 'image/jpeg' }]
+  }) }; };
+  const fresh = await loadGallery({ folderId: folder, cache: manifest, apiKey: 'key', forceRefresh: true, fetcher });
+  assert.equal(fresh.source, 'drive');
+  assert.equal(fresh.images[0].name, 'new.jpg');
+  assert.equal(calls, 1);
+  const newFolder = '1DifferentFolderIdentifier';
+  const mismatch = await loadGallery({ folderId: newFolder, cache: manifest, apiKey: 'key', fetcher });
+  assert.equal(mismatch.source, 'drive');
+  assert.equal(calls, 2);
+});
+test('rejects corrupted, duplicate, oversized or non-Google URL caches', () => {
+  const { createCache, normalizeCache } = require('../public-drive-gallery-source.js');
+  const valid = createCache(folder, [{ id: 'image_000000001', name: 'safe.jpg' }]);
+  assert.equal(normalizeCache({ ...valid, images: [{...valid.images[0], directUrl:'https://evil.example/photo.jpg'}] },folder),null);
+  assert.equal(normalizeCache({ ...valid, images: [valid.images[0], valid.images[0]] },folder),null);
+  assert.equal(normalizeCache({ ...valid, updatedAt:'not-a-date' },folder),null);
+  const largeName = '長'.repeat(501);
+  assert.throws(() => createCache(folder, [{ id:'image_000000001',name:largeName }]),/画像名/);
+});
