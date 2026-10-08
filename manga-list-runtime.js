@@ -27,10 +27,10 @@
     let activeAnimation = null;
 
     function slideBetweenPages(doc, frame, outgoing, incoming, direction) {
-      const media = doc.defaultView?.matchMedia;
-      if (!outgoing || !direction || typeof media !== 'function' ||
-        !media('(max-width: 899px)').matches ||
-        media('(prefers-reduced-motion: reduce)').matches) return;
+      const view = doc.defaultView;
+      if (!outgoing || !direction || typeof view?.matchMedia !== 'function' ||
+        !view.matchMedia('(max-width: 899px)').matches ||
+        view.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
       const track = doc.createElement('div');
       track.className = 'bookshelf-slide-track';
