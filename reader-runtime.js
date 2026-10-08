@@ -60,6 +60,7 @@
     let navigationGeneration = 0;
     let verticalWindowGeneration = 0;
     let verticalSlots = [];
+    let pendingVerticalScrollPage = null;
     let lastFailedRequest = null;
     let generation = 0;
     let encryptedRenderer = null;
@@ -267,11 +268,11 @@
           slot.replaceChildren();
         }
       }
-      urls.forEach((url) => {
-        const pageNumber = pageUrls.indexOf(url) + 1;
+      pageWindow.forEach((pageNumber, index) => {
+        const url = pageUrls[pageNumber - 1];
         const slot = verticalSlots[pageNumber - 1];
-        if (!slot || slot.firstChild) return;
-        loader.load(url, pageWindow.length - pageWindow.indexOf(pageNumber)).then((image) => {
+        if (!url || !slot || slot.firstChild) return;
+        loader.load(url, pageWindow.length - index).then((image) => {
           if (windowId !== verticalWindowGeneration || navId !== navigationGeneration || !vertical) return;
           const targetSlot = verticalSlots[pageNumber - 1];
           if (!targetSlot || targetSlot.firstChild) return;
@@ -283,7 +284,7 @@
         }).catch(() => {});
       });
     }
-    function renderVerticalPages(targetPage, navId) {
+    function renderVerticalPages(targetPage, navId, scrollToPage = true) {
       const stage = byId('pageStage');
       const viewer = byId('viewer');
       if (!stage || !viewer) return Promise.resolve(false);
@@ -299,7 +300,7 @@
         ? loader.retry(targetUrl, 1000)
         : loader.load(targetUrl, 1000);
       return targetPromise.then((image) => {
-        if (navId !== navigationGeneration) return false;
+        if (navId !== navigationGeneration || !vertical || destroyed) return false;
         if (!verticalSlots.length || verticalSlots.length !== pageUrls.length || !stage.classList.contains('vertical-scroll')) {
           const fragment = doc.createDocumentFragment();
           verticalSlots = pageUrls.map((_, index) => {
@@ -331,7 +332,7 @@
         persistPage();
         updateTocButton();
         showNextVolume();
-        targetSlot?.scrollIntoView?.({ block: 'start' });
+        if (scrollToPage) targetSlot?.scrollIntoView?.({ block: 'start' });
         ensureVerticalWindow(targetPage, navId);
         return true;
       }).catch((error) => {
@@ -392,7 +393,10 @@
     }
     function renderPage(number = requestedPage, retry = false) {
       const targetPage = Math.max(1, Math.min(displayCount() || 1, Math.floor(Number(number) || 1)));
-      if (!retry && targetPage === page && !lastFailedRequest && byId('pageStage')?.firstChild) {
+      const stage = byId('pageStage');
+      const wantsVertical = vertical && !split && !encryptedPages.length;
+      const layoutMatches = !!stage?.firstChild && stage.classList.contains('vertical-scroll') === wantsVertical;
+      if (!retry && targetPage === page && !lastFailedRequest && layoutMatches) {
         pageTransition?.invalidate();
         navigationGeneration += 1;
         requestedPage = targetPage;
@@ -401,7 +405,7 @@
       }
       requestedPage = targetPage;
       if (!retry) lastFailedRequest = null;
-      if (vertical && !split && !encryptedPages.length) {
+      if (wantsVertical) {
         pageTransition?.invalidate();
         const navId = ++navigationGeneration;
         return renderVerticalPages(targetPage, navId);
@@ -442,7 +446,17 @@
       bind('tocAddBtn', 'click', saveTocEntry); bind('tocBtn', 'click', renderToc);
       bind('safeModeBtn', 'click', () => { const active = doc.body.classList.toggle('safe-mode'); win.localStorage.setItem('mangaReaderSafeMode', active ? '1' : '0'); if (active) restorePageEnhancements(); else applyPageEnhancements(); });
       bind('enhanceBtn', 'click', (event) => { imageEnhanceEnabled = !imageEnhanceEnabled; doc.body.classList.toggle('image-enhance', imageEnhanceEnabled); event.currentTarget.setAttribute('aria-pressed', imageEnhanceEnabled ? 'true' : 'false'); win.localStorage.setItem('mangaReaderImageEnhance', imageEnhanceEnabled ? '1' : '0'); if (imageEnhanceEnabled) applyPageEnhancements(); else restorePageEnhancements(); });
-      bind('verticalBtn', 'click', () => { vertical = !vertical; verticalSlots = []; verticalWindowGeneration++; doc.body.classList.toggle('vertical-scroll', vertical); win.localStorage.setItem('mangaReaderVerticalScroll', vertical ? '1' : '0'); renderPage(page); });
+      bind('verticalBtn', 'click', () => {
+        if (split || encryptedPages.length) return;
+        vertical = !vertical;
+        verticalSlots = [];
+        pendingVerticalScrollPage = null;
+        navigationGeneration++;
+        verticalWindowGeneration++;
+        doc.body.classList.toggle('vertical-scroll', vertical);
+        win.localStorage.setItem('mangaReaderVerticalScroll', vertical ? '1' : '0');
+        renderPage(page);
+      });
       bind('viewer', 'contextmenu', (event) => {
         const targetElement = event.target;
         if (targetElement?.closest?.('img,canvas,.encryptedAssetHost')) event.preventDefault();
@@ -476,7 +490,21 @@
           .sort((a, b) => b.rect.top - a.rect.top)[0] || visibleSlots[0];
         if (!currentSlot) return;
         const nextPage = Number(currentSlot.slot.dataset.page);
-        if (Number.isInteger(nextPage) && nextPage !== page && currentSlot.slot.firstChild) {
+        if (!Number.isInteger(nextPage) || nextPage < 1 || nextPage > pageUrls.length) return;
+        if (!currentSlot.slot.firstChild) {
+          if (pendingVerticalScrollPage === nextPage) return;
+          pendingVerticalScrollPage = nextPage;
+          const navId = ++navigationGeneration;
+          renderVerticalPages(nextPage, navId, false).finally(() => {
+            if (pendingVerticalScrollPage === nextPage) pendingVerticalScrollPage = null;
+          });
+          return;
+        }
+        if (pendingVerticalScrollPage !== null) {
+          pendingVerticalScrollPage = null;
+          navigationGeneration++;
+        }
+        if (nextPage !== page) {
           page = nextPage;
           requestedPage = nextPage;
           navigationGeneration++;
@@ -509,7 +537,10 @@
       requestedPage = page;
       lastFailedRequest = null;
       verticalSlots = [];
-      vertical = win.localStorage.getItem('mangaReaderVerticalScroll') === '1';
+      pendingVerticalScrollPage = null;
+      vertical = !split && !item.encryptedAssets && win.localStorage.getItem('mangaReaderVerticalScroll') === '1';
+      const verticalButton = byId('verticalBtn');
+      if (verticalButton) verticalButton.hidden = split || Boolean(item.encryptedAssets);
       doc.body.classList.toggle('vertical-scroll', vertical);
       const closeButton = byId('closeBtn'); if (closeButton) closeButton.hidden = false;
       const favoriteButton = byId('favToggleBtn'); if (favoriteButton) favoriteButton.hidden = false;
