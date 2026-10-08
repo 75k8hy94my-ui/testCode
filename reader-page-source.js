@@ -35,15 +35,18 @@
       const initialUrl = String(item?.url || '').trim();
       const initialPath = (() => { try { return new URL(initialUrl, baseHref).pathname; } catch (_) { return ''; } })();
       const initialMatch = initialPath.match(/(\d+)(?:[^/]*)\.(jpe?g|png|webp|avif)$/i);
-      const primaryExtension = initialMatch?.[2]?.toLowerCase();
-      const formats = [...new Set([primaryExtension, ...extensions].filter(Boolean))];
+      const initialFormat = initialPath.match(/\.(jpe?g|png|webp|avif)$/i)?.[1]?.toLowerCase();
+      const formats = [...new Set([initialFormat, ...extensions].filter(Boolean))];
       for (let number = 1; number <= maxPages; number += 1) {
         if (signal?.aborted) throw Object.assign(new Error('Page discovery cancelled'), { name: 'AbortError' });
         let found = '';
         // The original link is the strongest candidate only when it names page 1.
-        const candidates = number === 1 && initialMatch && Number(initialMatch[1]) === 1
-          ? [initialUrl, ...formats.map((ext) => numbered(source, number, ext))]
-          : formats.map((ext) => numbered(source, number, ext));
+        const numberedCandidates = formats.map((ext) => numbered(source, number, ext));
+        const candidates = number === 1 && initialFormat
+          ? initialMatch && Number(initialMatch[1]) !== 1
+            ? [...numberedCandidates, initialUrl]
+            : [initialUrl, ...numberedCandidates]
+          : numberedCandidates;
         for (const candidate of new Set(candidates)) {
           if (await probe(candidate, { signal })) { found = candidate; break; }
           if (signal?.aborted) throw Object.assign(new Error('Page discovery cancelled'), { name: 'AbortError' });
