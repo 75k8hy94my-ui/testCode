@@ -22,3 +22,15 @@ test('Drive gallery settings persist only as encrypted envelope and clear on dev
   assert.equal(fromCloud.has(DATA_KEYS.driveGalleryEncrypted),false);
   assert.equal(normalize({driveGalleryEncrypted:{apiKey:'AIzaDangerous'}}).driveGalleryEncrypted,null);
 });
+
+test('large encrypted Drive image URL cache survives sync round trip and clears on logout', () => {
+  const blob={type:'testcode-drive-gallery-settings',version:1,iv:'AAAAAAAAAAAAAAAA',ciphertext:'A'.repeat(70000)};
+  const storage=new Map();
+  applyToStorage({...normalize({}),driveGalleryEncrypted:blob},storage);
+  assert.deepEqual(buildFromStorage(storage).driveGalleryEncrypted,blob);
+  const synced=new Map();
+  applyToStorage(buildFromStorage(storage),synced);
+  assert.deepEqual(buildFromStorage(synced).driveGalleryEncrypted,blob);
+  payload.clearDeviceData(synced);
+  assert.equal(synced.has(DATA_KEYS.driveGalleryEncrypted),false);
+});
