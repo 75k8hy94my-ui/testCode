@@ -8,3 +8,17 @@ test('index search settings sanitize modes, kind and selection arrays',()=>{cons
 test('clearDeviceData removes video library metadata, home, study, index search, and roppo preferences',()=>{const storage=new Map([['mangaReaderVideoFolders','[]'],['mangaReaderVideoMeta','{}'],['mangaReaderHomeCards',JSON.stringify(defaultHomeCards)],['mangaReaderStudy',JSON.stringify(emptyStudy)],['mangaReaderIndexSearchSettings',JSON.stringify(defaultIndexSearchSettings)],['mangaReaderRoppoState',JSON.stringify(emptyRoppoState)],['mangaReaderSavedFolders','[]']]);payload.clearDeviceData(storage);for(const key of ['mangaReaderVideoFolders','mangaReaderVideoMeta','mangaReaderHomeCards','mangaReaderStudy','mangaReaderIndexSearchSettings','mangaReaderRoppoState','mangaReaderSavedFolders'])assert.equal(storage.has(key),false)});
 test('apply rolls back all device keys when storage fails partway through',()=>{const values=new Map([['mangaReaderSavedFolders',JSON.stringify([{id:'old-folder'}])],['mangaReaderSavedItems',JSON.stringify([{id:'old-item'}])]]);let writes=0;const storage={getItem:key=>values.get(key)??null,setItem(key,value){writes+=1;if(writes===2)throw new Error('quota');values.set(key,value)},removeItem:key=>values.delete(key)};assert.throws(()=>payload.applyToLocalStorage({folders:[{id:'new-folder'}],items:[{id:'new-item'}]},storage),/quota/);assert.deepEqual(JSON.parse(values.get('mangaReaderSavedFolders')),[{id:'old-folder'}]);assert.deepEqual(JSON.parse(values.get('mangaReaderSavedItems')),[{id:'old-item'}])});
 test('encryptedAssets manifest survives Vault payload round-trip without binary fields',()=>{const encryptedAssets={schemaVersion:1,pages:[{assetId:'6dc3773a-a3ef-4bb8-9cbf-15096098db20',revision:1,manifest:{schemaVersion:1,compressionProfileVersion:1,preview:{width:1440,height:960,mimeType:'image/webp',bytes:100,quality:0.6,longEdge:1440},zoom:{tileSize:512,levels:[]}}}]};const input={items:[{id:'encrypted-1',title:'暗号化',encryptedAssets,pages:['legacy-must-remain']}],folders:[]};const storage=new Map();applyToStorage(input,storage);const roundTrip=buildFromStorage(storage);assert.deepEqual(roundTrip.items[0].encryptedAssets,encryptedAssets);assert.deepEqual(roundTrip.items[0].pages,['legacy-must-remain']);});
+
+test('Drive gallery settings persist only as encrypted envelope and clear on device logout',()=>{
+  const blob={type:'testcode-drive-gallery-settings',version:1,iv:'AAAAAAAAAAAAAAAA',ciphertext:'AAAAAAAAAAAAAAAAAAAAAA'};
+  const storage=new Map();
+  applyToStorage({...normalize({}),driveGalleryEncrypted:blob},storage);
+  assert.deepEqual(buildFromStorage(storage).driveGalleryEncrypted,blob);
+  assert.equal(storage.get(DATA_KEYS.driveGalleryEncrypted).includes('AIza'),false);
+  const fromCloud=new Map();
+  applyToStorage(buildFromStorage(storage),fromCloud);
+  assert.deepEqual(buildFromStorage(fromCloud).driveGalleryEncrypted,blob);
+  payload.clearDeviceData(fromCloud);
+  assert.equal(fromCloud.has(DATA_KEYS.driveGalleryEncrypted),false);
+  assert.equal(normalize({driveGalleryEncrypted:{apiKey:'AIzaDangerous'}}).driveGalleryEncrypted,null);
+});
