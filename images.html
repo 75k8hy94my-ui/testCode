@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ja" class="auth-pending">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive,nosnippet">
+<title>画像</title>
+<link rel="icon" href="icon-152.png" type="image/png">
+<link rel="stylesheet" href="home-profile-shell.css?v=20261008-profile-avatar">
+<link rel="stylesheet" href="app-global-shell.css?v=20260924-theme-unified">
+<link rel="stylesheet" href="mobile-bottom-nav.css?v=20260925-instagram-drag-lock">
+<link rel="stylesheet" href="images.css?v=20261008-standalone">
+<style>html.auth-pending body{visibility:hidden}</style>
+</head>
+<body>
+<main class="homeShell" id="homeApp">
+<header class="homeHeader" data-profile-only-header="1"><div><span class="eyebrow">LIBRARY</span><h1 id="shellTitle">画像</h1></div><button class="headerProfileButton" type="button" data-profile-menu-trigger aria-label="アカウント" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg></button></header>
+<div id="routeContent">
+<section class="imageLibrary" aria-label="暗号化画像">
+  <div class="imageLibraryHead"><div><h2>暗号化画像</h2><p>画像の保存・表示にVPNは必要ありません。ログインと保管庫の解錠が必要です。</p></div></div>
+  <form id="imageUploadForm" class="imageUploadForm">
+    <label>作品名<input id="imageTitle" name="title" type="text" required maxlength="200" autocomplete="off"></label>
+    <label>画像ファイル（複数選択可）<input id="imageFiles" name="files" type="file" accept="image/*" multiple required></label>
+    <div class="imageUploadActions"><button id="imageUploadButton" type="submit">暗号化して追加</button><button id="imageCancelButton" type="button" hidden>キャンセル</button><button id="imageRetrySync" type="button" hidden>クラウド同期を再試行</button></div>
+  </form>
+  <p id="imageStatus" class="imageStatus" role="status" aria-live="polite"></p>
+  <div id="imageGrid" class="imageGrid" aria-label="画像一覧"></div>
+  <p id="imageEmpty" class="imageEmpty" hidden>保存した画像はまだありません。</p>
+</section>
+</div>
+</main>
+<section id="imageViewer" class="imageViewer" role="dialog" aria-modal="true" aria-label="暗号化画像を表示" hidden>
+ <div class="imageViewerHeader"><strong id="imageViewerTitle"></strong><button id="imageViewerClose" type="button">閉じる</button></div>
+ <div id="imageViewerStage" class="imageViewerStage"></div>
+ <div class="imageViewerControls"><button id="imageViewerPrevious" type="button">前へ</button><span id="imageViewerPage">1 / 1</span><button id="imageViewerNext" type="button">次へ</button><button id="imageViewerZoomOut" type="button" aria-label="縮小">－</button><button id="imageViewerZoomIn" type="button" aria-label="拡大">＋</button></div>
+ <p id="imageViewerStatus" class="imageStatus" role="status" aria-live="polite"></p>
+</section>
+<script src="supabase-config.js"></script>
+<script src="vault-session.js?v=20261006-passkey-reset"></script>
+<script src="vault-payload.js"></script>
+<script src="app-global-shell.js?v=20261003-reader-spa"></script>
+<script src="app-desktop-rail.js"></script>
+<script src="profile-avatar.js?v=20261008-profile-avatar"></script>
+<script src="profile-menu.js?v=20261008-profile-avatar"></script>
+<script src="mobile-bottom-nav.js?v=20260925-instagram-drag-lock"></script>
+<script src="encrypted-asset-crypto.js"></script>
+<script src="encrypted-asset-cache.js"></script>
+<script src="encrypted-asset-backend.js"></script>
+<script src="encrypted-asset-storage.js"></script>
+<script src="image-transfer-settings.js"></script>
+<script src="image-transfer-ledger.js"></script>
+<script src="image-remote-access.js"></script>
+<script src="encrypted-asset-sync.js"></script>
+<script src="image-compression-profile.js"></script>
+<script src="image-pyramid-builder.js"></script>
+<script src="image-photo-processor.js"></script>
+<script src="encrypted-asset-reader.js"></script>
+<script src="encrypted-asset-item.js"></script>
+<script src="encrypted-asset-import.js"></script>
+<script src="images.js?v=20261008-standalone"></script>
+</body></html>
