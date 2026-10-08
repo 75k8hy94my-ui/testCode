@@ -13,7 +13,7 @@ const standalone = [
   'manga-import-validator.js', 'manga-import-candidate.js', 'manga-import-author-sync.js', 'manga-import-batch.js', 'manga-import-bridge.js', 'manga-import-dialog.js',
   'reader-target.js', 'reader-item-repository.js', 'reader-image-loader.js', 'reader-lifecycle.js', 'reader-page-transition.js', 'reader-page-source.js', 'reader-progress-repository.js', 'reader-runtime.js',
   'status-message.js',
-  'supabase-config.js', 'url-parser.js', 'vault-payload.js', 'vault-session.js', 'video-data.js', 'video-thumbnail-renderer.js', 'video-library.js', 'video-routing-fix.js', 'video-thumbnail-time.js', 'video-list-route.js', 'video-list-template.js'
+  'supabase-config.js', 'url-parser.js', 'vault-payload.js', 'vault-session.js', 'video-data.js', 'video-thumbnail-renderer.js', 'video-player-gestures.js', 'video-library.js', 'video-routing-fix.js', 'video-thumbnail-time.js', 'video-list-route.js', 'video-list-template.js'
 ];
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 

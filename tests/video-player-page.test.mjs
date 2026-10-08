@@ -49,6 +49,16 @@ test('video title edits in place and player details follow the video in a watch-
   assert.match(fs.readFileSync(new URL('../home-profile-shell.css', import.meta.url), 'utf8'), /\.videoPlayerActionBar/);
 });
 
+test('custom player defers single taps and maps double-tap zones to seek or fullscreen', () => {
+  assert.match(controls, /Gestures\.create\(/);
+  assert.match(controls, /onSingleTap: \(\) => \{ video\.paused \? video\.play\(\) : video\.pause\(\); \}/);
+  assert.match(controls, /Gestures\.actionAt\(event\.clientX, video\.getBoundingClientRect\(\)\)/);
+  assert.match(controls, /else toggleFullscreen\(\)/);
+  assert.match(controls, /gestureController\.destroy\(\)/);
+  const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
+  assert.ok(html.indexOf('video-player-gestures.js') < html.indexOf('video-player-controls.js'));
+});
+
 test('video player document cache keys identify the current watch-page design', () => {
   const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
   assert.match(html, /home-profile-shell\.css\?v=20261007-video-watch-layout/);

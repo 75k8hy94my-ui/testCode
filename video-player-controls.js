@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   const mediaAccess = window.MangaReaderMediaAccess;
+  const Gestures = window.MangaReaderVideoGestures;
   let disposeCurrent = () => {};
   function canReadProtectedData() {
     return !!mediaAccess && typeof mediaAccess.canReadProtectedData === 'function' && mediaAccess.canReadProtectedData() === true;
@@ -36,11 +37,36 @@
   const update = () => { seek.max = String(Number.isFinite(video.duration) ? video.duration : 0); seek.value = String(video.currentTime || 0); time.textContent = format(video.currentTime) + ' / ' + format(video.duration); const current = markers.find((marker) => Math.abs(marker.seconds - video.currentTime) < 1); notice.textContent = current ? current.label : ''; notice.classList.toggle('visible', Boolean(current)); };
   const renderMarkers = () => { list.replaceChildren(); markers.slice().sort((a, b) => a.seconds - b.seconds).forEach((marker, index) => { const button = document.createElement('button'); button.type = 'button'; button.textContent = format(marker.seconds) + ' ' + marker.label; button.addEventListener('click', () => { video.currentTime = marker.seconds; video.play(); }); const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '×'; remove.addEventListener('click', () => { markers.splice(index, 1); save(markers); renderMarkers(); window.dispatchEvent(new CustomEvent('manga-video-markers-changed')); }); const row = document.createElement('span'); row.append(button, remove); list.append(row); }); };
   play.addEventListener('click', () => video.paused ? video.play() : video.pause()); video.addEventListener('play', () => { play.textContent = '❚❚'; }); video.addEventListener('pause', () => { play.textContent = '▶'; }); video.addEventListener('loadedmetadata', update); video.addEventListener('timeupdate', update); seek.addEventListener('input', () => { video.currentTime = Number(seek.value); });
-  full.addEventListener('click', () => { if (document.fullscreenElement) document.exitFullscreen(); else if (frame.requestFullscreen) frame.requestFullscreen(); });
+  const toggleFullscreen = () => {
+    const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fullscreenElement || video.webkitDisplayingFullscreen) {
+      const exitVideo = video.webkitDisplayingFullscreen && video.webkitExitFullscreen;
+      const exit = exitVideo ? video.webkitExitFullscreen : (document.exitFullscreen || document.webkitExitFullscreen);
+      if (exit) { const result = exitVideo ? exit.call(video) : exit.call(document); if (result && typeof result.catch === 'function') result.catch(() => {}); }
+      return;
+    }
+    let result;
+    if (frame.requestFullscreen) result = frame.requestFullscreen();
+    else if (frame.webkitRequestFullscreen) result = frame.webkitRequestFullscreen();
+    else if (video.webkitEnterFullscreen) result = video.webkitEnterFullscreen();
+    if (result && typeof result.catch === 'function') result.catch(() => {});
+  };
+  full.addEventListener('click', toggleFullscreen);
   markerToggle.addEventListener('click', () => { markerPanel.hidden = !markerPanel.hidden; if (!markerPanel.hidden) secondsInput.value = (Number(video.currentTime) || 0).toFixed(1); renderMarkers(); }); add.addEventListener('click', () => { const seconds = Number(secondsInput.value); const label = labelInput.value.trim() || '現在位置'; if (!Number.isFinite(seconds) || seconds < 0) return; markers.push({ seconds, label }); save(markers); secondsInput.value = ''; labelInput.value = ''; renderMarkers(); window.dispatchEvent(new CustomEvent('manga-video-markers-changed')); });
-  let lastTap = 0; let hideTimer; const showControls = () => { frame.classList.add('controlsVisible'); clearTimeout(hideTimer); hideTimer = setTimeout(() => { if (!video.paused && markerPanel.hidden) frame.classList.remove('controlsVisible'); }, 2500); }; video.addEventListener('click', (event) => { const now = Date.now(); const double = now - lastTap < 350; lastTap = now; if (double && window.matchMedia('(max-width: 800px)').matches) { const amount = event.offsetX < video.clientWidth / 2 ? -10 : 10; video.currentTime = Math.max(0, Math.min(video.duration || Infinity, video.currentTime + amount)); showControls(); return; } video.paused ? video.play() : video.pause(); showControls(); }); frame.addEventListener('mousemove', showControls); frame.addEventListener('touchstart', showControls, { passive: true });
+  let hideTimer; const showControls = () => { frame.classList.add('controlsVisible'); clearTimeout(hideTimer); hideTimer = setTimeout(() => { if (!video.paused && markerPanel.hidden) frame.classList.remove('controlsVisible'); }, 2500); };
+  const gestureController = Gestures && Gestures.create({
+    onSingleTap: () => { video.paused ? video.play() : video.pause(); },
+    onDoubleTap: (event) => {
+      const action = Gestures.actionAt(event.clientX, video.getBoundingClientRect());
+      if (action === 'seekBackward') video.currentTime = Math.max(0, video.currentTime - 10);
+      else if (action === 'seekForward') video.currentTime = Math.min(Number.isFinite(video.duration) ? video.duration : Infinity, video.currentTime + 10);
+      else toggleFullscreen();
+    },
+  });
+  video.addEventListener('click', (event) => { showControls(); if (gestureController) gestureController.tap(event); });
+  frame.addEventListener('mousemove', showControls); frame.addEventListener('touchstart', showControls, { passive: true });
   renderMarkers(); update();
-  disposeCurrent = () => { clearTimeout(hideTimer); try { video.pause(); } catch (_) {} controls.remove(); markerPanel.remove(); notice.remove(); delete video.dataset.customControlsReady; };
+  disposeCurrent = () => { clearTimeout(hideTimer); if (gestureController) gestureController.destroy(); try { video.pause(); } catch (_) {} controls.remove(); markerPanel.remove(); notice.remove(); delete video.dataset.customControlsReady; };
   }
   function handleAccessChange() { if (canReadProtectedData()) initializeControls(); else destroy(); }
   window.MangaReaderVideoPlayerControls = Object.freeze({ destroy, initialize: initializeControls });
