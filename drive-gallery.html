@@ -13,7 +13,7 @@
 <body>
 <main class="drivePage">
   <header class="driveHeader">
-    <div><a class="back" href="images.html">← 画像に戻る</a><h1>Google Drive画像</h1><p>公開フォルダの画像を直接読み込みます。VPNは不要です。</p></div>
+    <div><a class="back" href="images.html">← 画像に戻る</a><h1>Google Drive画像</h1></div>
     <a class="homeLink" href="home.html">ホーム</a>
   </header>
   <form id="driveGalleryForm" class="driveSettings" autocomplete="off">
@@ -28,7 +28,6 @@
       <button type="button" id="driveRefresh" disabled>Driveから一覧を更新</button>
       <button type="button" id="driveCancel" hidden>中止</button>
     </div>
-    <p class="driveHelp">フォルダを「リンクを知っている全員・閲覧者」にし、Google CloudでDrive APIを有効化してください。APIキー・フォルダIDと画像の直リンク一覧は暗号化してクラウド同期します。通常は保存済み一覧を表示し、Drive APIへのアクセスは初回または「Driveから一覧を更新」の操作時だけです。キーにはHTTPリファラー制限とDrive API制限を設定してください。画像データ自体は保存されません。</p>
     <p id="driveSyncStatus" class="driveSyncStatus" role="status" aria-live="polite"></p>
   </form>
   <div class="driveResultHeader">
