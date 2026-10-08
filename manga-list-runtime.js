@@ -120,20 +120,35 @@
         });
       }
 
-      if (item.encryptedAssets?.pages?.length) {
-        context.loadLocalCover(item, img);
-      } else if (Array.isArray(item.pages) && item.pages.length) {
-        const source = item.pages[0];
-        if (item.localSync) {
-          context.loadLocalCover(item, img);
+      const requiresLocalCover = Boolean(item.encryptedAssets?.pages?.length || item.localSync);
+      const originalPage = item.pageManifest?.version === 1 && item.pageManifest.pages?.[0]
+        || item.pages?.[0] || '';
+      const loadCover = () => {
+        if (img.dataset) img.dataset.coverState = 'loading';
+        if (requiresLocalCover) {
+          void context.loadLocalCover(item, img);
         } else {
-          const coverSourceCache = context.getCoverSourceCache();
-          img.src = coverSourceCache.get(source) || source; // exact URL already known; no extension cascade needed
-          img.addEventListener('load', () => coverSourceCache.set(source, img.currentSrc || img.src), { once: true });
+          context.setupFeedImage(img, item.url, item.numberWidth, item.pagePattern, item.id, originalPage);
         }
-      } else {
-        context.setupFeedImage(img, item.url, item.numberWidth, item.pagePattern, item.id);
+      };
+      if (requiresLocalCover) {
+        img.addEventListener('load', () => { if (img.dataset) img.dataset.coverState = 'loaded'; });
+        img.addEventListener('error', () => { if (img.dataset) img.dataset.coverState = 'failed'; });
       }
+      const loadingLabel = doc.createElement('span');
+      loadingLabel.className = 'book-cover-loading';
+      loadingLabel.textContent = '読み込み中…';
+      cover.appendChild(loadingLabel);
+      const retryButton = doc.createElement('button');
+      retryButton.className = 'book-cover-retry';
+      retryButton.type = 'button';
+      retryButton.textContent = '画像を再読み込み';
+      retryButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        loadCover();
+      });
+      cover.appendChild(retryButton);
+      loadCover();
       if (reorderMode) {
         const idx = list.indexOf(item);
         const upBtn = doc.createElement('button');
