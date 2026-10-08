@@ -116,7 +116,17 @@
         image.onerror = () => finish(false);
         timer = win.setTimeout(() => finish(false), 5000);
         image.src = url;
-      }), baseHref: win.location?.href });
+      }), baseHref: win.location?.href, getCachedInfo: (item, source) => {
+        // Older books stored their numbering width and extension in the
+        // metadata map rather than on each saved work. Without these hints a
+        // book containing 001.webp is mistakenly probed as 1.jpg.
+        try {
+          const records = JSON.parse(win.localStorage?.getItem('mangaReaderInfoCache') || '{}');
+          if (!records || typeof records !== 'object' || Array.isArray(records)) return null;
+          const keys = [item?.id ? 'item:' + String(item.id) : '', source?.base, item?.url].filter(Boolean);
+          return keys.map((key) => records[key]).find((value) => value && typeof value === 'object' && !Array.isArray(value)) || null;
+        } catch (_) { return null; }
+      } });
       pageSource = win.ReaderPageSourceFactory.create({ legacyResolver });
     }
     pageTransition = win?.ReaderPageTransitionFactory?.create
