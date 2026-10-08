@@ -187,6 +187,8 @@
     const canReadProtectedData = () => !!mediaAccess && typeof mediaAccess.canReadProtectedData === 'function' && mediaAccess.canReadProtectedData() === true;
     let activeEntry = null;
     let lifecycle = 0;
+    let encryptedCoverLoader = null;
+    let encryptedCoverCache = null;
 
     async function start(input) {
       if (!input || !input.mountElement) throw new TypeError('MangaListRouteFactory requires mountElement');
@@ -209,8 +211,6 @@
       let elements = null;
       const coverCache = windowRef.MangaListCoverCache;
       if (!coverCache) throw new Error('manga cover cache failed to load');
-      let encryptedCoverLoader = null;
-      let encryptedCoverCache = null;
       const loadEncryptedCover = (item, img) => {
         const first = item?.encryptedAssets?.pages?.[0];
         const active = windowRef.MangaVault?.loadActive?.();
