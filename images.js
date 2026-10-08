@@ -141,6 +141,7 @@
   function closeViewer() {
     ++pageGeneration;
     destroyRenderer();
+    previewLoader?.retain([]);
     selected = null;
     $('imageViewer').hidden = true;
     $('imageViewerStage').replaceChildren();
@@ -165,6 +166,7 @@
     let candidate = null;
     try {
       const options = accessOptions(pages[target]);
+      previewLoader.retain([previewLoader.keyFor(options)]);
       const previewResource = await previewLoader.load(options);
       if (generation !== pageGeneration || !selected) return;
       candidate = window.EncryptedAssetReader.createEncryptedAssetReader({
