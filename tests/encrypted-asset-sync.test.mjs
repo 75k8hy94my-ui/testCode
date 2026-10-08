@@ -263,3 +263,35 @@ test('aborted staging does not leave a new ciphertext record', async () => {
   await assert.rejects(sync.stageProcessedRevision({ cache, masterKey:key, assetId, targetRevision:1, processed:makeProcessed(), signal:controller.signal }), {name:'AbortError'});
   assert.equal(cache.records.size,0);
 });
+
+
+test('progress notifications distinguish acknowledged encrypted bytes, uploads and metadata registration', async () => {
+  const cache=makeCache();
+  const stageProgress=[];
+  const staged=await sync.stageProcessedRevision({
+    cache, masterKey:key,assetId,targetRevision:1,processed:makeProcessed(),
+    onProgress:e=>stageProgress.push(e)
+  });
+  assert.equal(stageProgress[0].completed,0);
+  assert.deepEqual(stageProgress.map(e=>e.completed),[0,1,2,3,4]);
+  assert.ok(stageProgress.every(e=>e.phase==='encrypt'&&e.total===4));
+  const events=[];
+  const storage=makeStorage();
+  const vault={
+    withSession: async fn=>fn('token',{id:userId}),
+    api: async path=>path.includes('/rpc/create_manga_reader_encrypted_asset')
+      ? [{asset_id:assetId,revision:1,deleted_at:null,updated_at:'now'}] : []
+  };
+  const result=await sync.publishPendingRevision({
+    vault,storage,cache,assetId,targetRevision:1,objectIds:staged.objectIds,
+    onProgress:e=>events.push(e)
+  });
+  assert.equal(result.ok,true);
+  const uploads=events.filter(e=>e.phase==='upload');
+  assert.deepEqual(uploads.map(e=>e.completed),[0,1,1,2,2,3,3,4]);
+  assert.equal(uploads[0].confirmedBytes,0);
+  assert.equal(uploads.at(-1).confirmedBytes,uploads.at(-1).totalBytes);
+  assert.ok(uploads.at(-1).confirmedBytes>0);
+  assert.ok(events.findIndex(e=>e.phase==='register')>events.findIndex(e=>e.phase==='upload'));
+  assert.equal(events.at(-1).phase,'registered');
+});
