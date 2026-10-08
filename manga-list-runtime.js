@@ -223,16 +223,10 @@
           context.persistAll();
           updateFavoriteButton();
           if (context.getState().currentFolderView === context.getConfig().FAVORITES_FOLDER_ID && !item.favorite) {
-            card.style.transition = 'opacity .16s ease, transform .16s ease';
-            card.style.opacity = '0';
-            card.style.transform = 'scale(.94)';
-            context.setTimeout(() => {
-              card.remove();
-              if (!elements.savedListItems.children.length) {
-                elements.savedListEmpty.textContent = 'お気に入りはまだ追加されていません';
-                elements.savedListEmpty.style.display = 'block';
-              }
-            }, 160);
+            // Recompute the list rather than detaching only this card.
+            // The shelf now contains a frame and pager even when no works
+            // remain, so checking root children never detects emptiness.
+            context.renderList();
           }
         });
         cover.appendChild(favBtn);
