@@ -8,7 +8,7 @@
   const PREFIX_SESSION = 'testCode.guest.v1.session.';
   const rawLocal = window.localStorage;
   const rawSession = window.sessionStorage;
-  const active = rawSession.getItem(FLAG) === '1';
+  const active = rawSession.getItem(FLAG) === '1' && window.location.pathname.split('/').pop() !== 'index.html';
   function scopedStorage(raw, prefix) {
     const keys = () => {
       const out = [];
@@ -20,12 +20,12 @@
     };
     const methods = Object.create(null);
     Object.defineProperties(methods, {
-      getItem: { value: (key) => raw.getItem(prefix + String(key)) },
-      setItem: { value: (key, value) => raw.setItem(prefix + String(key), String(value)) },
-      removeItem: { value: (key) => raw.removeItem(prefix + String(key)) },
-      clear: { value: () => { for (const key of keys()) raw.removeItem(prefix + key); } },
-      key: { value: (index) => keys()[Number(index)] ?? null },
-      length: { get: () => keys().length },
+      getItem: { configurable: true, value: (key) => raw.getItem(prefix + String(key)) },
+      setItem: { configurable: true, value: (key, value) => raw.setItem(prefix + String(key), String(value)) },
+      removeItem: { configurable: true, value: (key) => raw.removeItem(prefix + String(key)) },
+      clear: { configurable: true, value: () => { for (const key of keys()) raw.removeItem(prefix + key); } },
+      key: { configurable: true, value: (index) => keys()[Number(index)] ?? null },
+      length: { configurable: true, get: () => keys().length },
     });
     return new Proxy(methods, {
       get(target, prop) {
