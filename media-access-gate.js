@@ -43,6 +43,7 @@
   let diagnostics = freshDiagnostics();
   let checkGeneration = 0;
   let activeController = null;
+  let checkInFlight = false;
   let lastCompletedCheckAt = 0;
   const VPN_REFRESH_MS = 120000;
 
@@ -658,6 +659,7 @@
     activeController?.abort();
     const controller = typeof root.AbortController === 'function' ? new root.AbortController() : null;
     activeController = controller;
+    checkInFlight = true;
     const isCurrent = () => ownGeneration === checkGeneration;
     const background = options.background === true && status === 'allowed';
     if (!background) {
@@ -724,7 +726,7 @@
       showNotice('VPN接続を確認できません。接続後に「再確認」を押してください。');
       return false;
     } finally {
-      if (isCurrent()) activeController = null;
+      if (isCurrent()) { activeController = null; checkInFlight = false; }
       if (timer && root.clearTimeout) root.clearTimeout(timer);
     }
   }
@@ -733,6 +735,7 @@
     checkGeneration++;
     activeController?.abort();
     activeController = null;
+    checkInFlight = false;
     status = allowed ? 'allowed' : 'blocked';
     emitStatus();
     updateStatusButtons(status);
@@ -754,7 +757,7 @@
   }
 
   function refreshVpn() {
-    if (activeController || status === 'checking') return;
+    if (checkInFlight || status === 'checking') return;
     if (root.document?.visibilityState === 'hidden') return;
     return checkVpn({ external: true, background: true });
   }
@@ -776,6 +779,7 @@
       checkGeneration++;
       activeController?.abort();
       activeController = null;
+      checkInFlight = false;
       status = 'blocked';
       diagnostics.final = 'blocked';
       diagnostics.error = 'ネットワーク接続が切断されました';

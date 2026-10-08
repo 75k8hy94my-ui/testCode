@@ -12,6 +12,12 @@ test('vault session exposes an async wait for cross-tab active vault', () => {
   assert.match(vault, /window\.MangaVault\s*=\s*\{[\s\S]*waitForActive/);
 });
 
+test('reader loads its close-time synchronization scheduler', () => {
+  assert.match(reader, /reader-sync-scheduler\.js/);
+  assert.match(reader, /ReaderSyncSchedulerFactory\.create/);
+  assert.match(reader, /flushSync:\s*\(\) => syncScheduler\.flush\(\)/);
+});
+
 test('reader waits for cross-tab active Vault and refreshes the login session before its runtime', () => {
   const promiseIndex = reader.indexOf('window.MangaReaderBootPromise = (async () => {');
   const waitIndex = reader.indexOf('MangaVault.waitForActive(2500)');

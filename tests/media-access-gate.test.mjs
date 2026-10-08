@@ -389,3 +389,64 @@ test('explicit VPN recheck uses the full external verdict path', () => {
 test('VPN UI can be resynchronized after route controls mount', () => {
   assert.match(source, /syncUi:\s*\(\) => updateStatusButtons\(status\)/);
 });
+
+test('a slow older VPN check cannot overwrite a newer allowed result', async () => {
+  let completeOld;
+  let ipCalls = 0;
+  const Gate = loadGate({
+    fetch: async (url) => {
+      if (url.includes('api.ipify.org')) {
+        ipCalls++;
+        return ipCalls === 1
+          ? new Promise((resolve) => { completeOld = resolve; })
+          : { ok: true, json: async () => ({ ip: '37.19.205.223' }) };
+      }
+      return { ok: true, json: async () => ({ location: { country_code: 'JP' }, is_vpn: false }) };
+    },
+    setTimeout, clearTimeout,
+  });
+  const older = Gate.checkVpn();
+  assert.equal(await Gate.checkVpn(), true);
+  completeOld({ ok: true, json: async () => ({ ip: '198.51.100.200' }) });
+  assert.equal(await older, false);
+  assert.equal(Gate.getStatus(), 'allowed');
+  assert.equal(Gate.getDiagnostics().ip, '37.19.205.223');
+});
+
+test('periodic VPN refresh detects lost access without resetting a verified Reader during the request', async () => {
+  const intervals = [];
+  const windowEvents = new Map();
+  const docEvents = new Map();
+  const doc = {
+    readyState: 'loading', visibilityState: 'visible', body: null,
+    addEventListener(name, fn) { docEvents.set(name, fn); },
+    querySelectorAll() { return []; },
+    getElementById() { return null; },
+  };
+  let release;
+  const Gate = loadGate({
+    document: doc,
+    setInterval(fn, ms) { intervals.push({ fn, ms }); return intervals.length; },
+    addEventListener(name, fn) { windowEvents.set(name, fn); },
+    fetch: async (url) => {
+      if (url === Gate.IP_URL) return new Promise((resolve) => { release = resolve; });
+      if (url.startsWith(Gate.CHECK_URL)) return { ok: true, json: async () => ({ location: { country_code: 'JP' }, is_vpn: false }) };
+      return { ok: true, json: async () => [] };
+    },
+    setTimeout, clearTimeout,
+  });
+  assert.equal(intervals.length, 1);
+  assert.equal(intervals[0].ms, Gate.VPN_REFRESH_MS);
+  Gate.setAllowedForTesting(true);
+  const check = intervals[0].fn();
+  assert.equal(Gate.canReadProtectedData(), true);
+  release({ ok: true, json: async () => ({ ip: '198.51.100.203' }) });
+  assert.equal(await check, false);
+  assert.equal(Gate.canReadProtectedData(), false);
+  Gate.setAllowedForTesting(true);
+  windowEvents.get('offline')();
+  assert.equal(Gate.canReadProtectedData(), false);
+  assert.equal(Gate.getDiagnostics().final, 'blocked');
+  doc.visibilityState = 'hidden';
+  assert.equal(intervals[0].fn(), undefined);
+});

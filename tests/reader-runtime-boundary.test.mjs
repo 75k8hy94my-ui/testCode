@@ -22,6 +22,41 @@ function memoryStorage() {
   return { getItem(key) { return values.get(key) ?? null; }, setItem(key, value) { values.set(key, String(value)); }, removeItem(key) { values.delete(key); } };
 }
 
+test('Reader close waits for cloud flush and stays open on failure for retry', async () => {
+  const redirects = [];
+  let finish;
+  const runtime = factory.create({
+    repository: {
+      loadItem() { return null; },
+      saveItem() {},
+      flushSync() { return new Promise((resolve) => { finish = resolve; }); },
+    },
+    target: {},
+    location: { replace(url) { redirects.push(url); } },
+  });
+  const first = runtime.close();
+  assert.deepEqual(redirects, []);
+  finish();
+  assert.equal(await first, true);
+  assert.deepEqual(redirects, ['manga.html']);
+
+  const retryRedirects = [];
+  let failures = 0;
+  const second = factory.create({
+    repository: {
+      loadItem() { return null; },
+      saveItem() {},
+      flushSync() { return ++failures === 1 ? Promise.reject(new Error('offline')) : Promise.resolve(); },
+    },
+    target: {},
+    location: { replace(url) { retryRedirects.push(url); } },
+  });
+  assert.equal(await second.close(), false);
+  assert.deepEqual(retryRedirects, []);
+  assert.equal(await second.close(), true);
+  assert.deepEqual(retryRedirects, ['manga.html']);
+});
+
 test('reader runtime resolves the exact requested item id from saved items only', async () => {
   assert.ok(factory, 'ReaderRuntimeFactory must exist');
   const items = [{ id: 'first', url: 'https://same.test/book' }, { id: 'second', url: 'https://same.test/book' }];
