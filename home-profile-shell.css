@@ -296,3 +296,17 @@ html[data-theme="dark"] .iosSwitch input:checked + .iosSwitchTrack{background:#3
 .videoPlayerFrame video.videoPlayerRotatedLeft,.videoPlayerFrame video.videoPlayerRotatedRight{position:absolute;top:50%;left:50%;max-width:none;max-height:none;transform-origin:center center}
 .videoPlayerFrame video.videoPlayerRotatedLeft{transform:translate(-50%,-50%) rotate(-90deg)}
 .videoPlayerFrame video.videoPlayerRotatedRight{transform:translate(-50%,-50%) rotate(90deg)}
+
+.profileAvatarRow{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.profileAvatarPreview{width:104px;height:104px;flex:0 0 104px;border-radius:50%;background:var(--bg);border:1px solid var(--line);display:grid;place-items:center;overflow:hidden}
+.profileAvatarPreview img{width:100%;height:100%;object-fit:cover}
+.profileAvatarPreview span{font-size:11px;color:var(--sub)}
+.profileAvatarSettings{flex:1 1 220px;min-width:0}
+.profileAvatarSettings .glassBtn{border:1px solid var(--line)}
+.profileAvatarStatus{margin:8px 0 0!important;min-height:1.2em;color:var(--sub)}
+.profileAvatarStatus[data-state="error"]{color:var(--danger)!important}
+.headerProfileButton{position:relative;overflow:hidden}
+.headerProfileButton .profileAvatarButtonImage{position:absolute!important;inset:0;width:100%!important;height:100%!important;object-fit:cover;border-radius:50%;display:block}
+
+#desktopProfileButton.hasProfileAvatar>svg{display:none!important}
+#desktopProfileButton .profileAvatarButtonImage{width:28px!important;height:28px!important;min-width:28px;object-fit:cover;border-radius:50%}
