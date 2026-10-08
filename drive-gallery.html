@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive,nosnippet">
+<meta name="theme-color" content="#0a0c11">
+<title>Google Drive画像 | testCode</title>
+<link rel="icon" href="icon-152.png" type="image/png">
+<link rel="stylesheet" href="drive-gallery.css">
+</head>
+<body>
+<main class="drivePage">
+  <header class="driveHeader">
+    <div><a class="back" href="images.html">← 画像に戻る</a><h1>Google Drive画像</h1><p>公開フォルダの画像を直接読み込みます。VPNは不要です。</p></div>
+    <a class="homeLink" href="home.html">ホーム</a>
+  </header>
+  <form id="driveGalleryForm" class="driveSettings" autocomplete="off">
+    <label for="driveFolder">Google DriveのフォルダURL / ID
+      <input id="driveFolder" name="folder" type="text" placeholder="https://drive.google.com/drive/folders/..." required spellcheck="false">
+    </label>
+    <label for="driveApiKey">Google Drive APIキー
+      <input id="driveApiKey" name="apiKey" type="password" placeholder="AIza..." required spellcheck="false" autocomplete="off">
+    </label>
+    <div class="driveActions">
+      <button type="submit" id="driveLoad">画像を読み込む</button>
+      <button type="button" id="driveCancel" hidden>中止</button>
+    </div>
+    <p class="driveHelp">フォルダを「リンクを知っている全員・閲覧者」にし、Google CloudでDrive APIを有効化してください。APIキーはこのページ内でのみ使用し、保存しません。公開ページのため、キーにはHTTPリファラー制限とDrive APIへのAPI制限を設定してください。</p>
+  </form>
+  <div class="driveResultHeader">
+    <p id="driveGalleryStatus" role="status" aria-live="polite">フォルダURLとAPIキーを入力してください。</p>
+    <span id="driveGalleryCount"></span>
+  </div>
+  <section id="driveGalleryGrid" class="driveGrid" aria-label="Google Driveの画像一覧"></section>
+  <p id="driveGalleryEmpty" class="driveEmpty" hidden>このフォルダには画像がありません。</p>
+</main>
+<div class="driveViewer" id="driveViewer" role="dialog" aria-modal="true" aria-label="画像を拡大表示" hidden>
+  <header class="driveViewerHeader">
+    <strong id="driveViewerTitle"></strong>
+    <button type="button" id="driveViewerClose" aria-label="画像を閉じる">閉じる ×</button>
+  </header>
+  <div class="driveViewerStage"><img id="driveViewerImage" alt=""></div>
+  <footer class="driveViewerFooter">
+    <button type="button" id="driveViewerPrev">前へ</button>
+    <span id="driveViewerPosition"></span>
+    <button type="button" id="driveViewerNext">次へ</button>
+    <a id="driveViewerOriginal" href="#" target="_blank" rel="noopener noreferrer">Driveで開く <span aria-hidden="true">↗</span></a>
+  </footer>
+  <p class="driveViewerMessage" id="driveViewerMessage" role="status"></p>
+</div>
+<script src="public-drive-gallery-source.js"></script>
+<script src="public-drive-gallery.js"></script>
+</body>
+</html>
