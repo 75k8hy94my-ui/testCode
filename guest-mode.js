@@ -8,7 +8,9 @@
   const PREFIX_SESSION = 'testCode.guest.v1.session.';
   const rawLocal = window.localStorage;
   const rawSession = window.sessionStorage;
-  const active = rawSession.getItem(FLAG) === '1' && window.location.pathname.split('/').pop() !== 'index.html';
+  const onLoginPage = (window.location.pathname.split('/').pop() || 'index.html') === 'index.html';
+  if (onLoginPage) rawSession.removeItem(FLAG);
+  const active = !onLoginPage && rawSession.getItem(FLAG) === '1';
   function scopedStorage(raw, prefix) {
     const keys = () => {
       const out = [];
