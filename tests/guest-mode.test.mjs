@@ -110,7 +110,7 @@ test('guest bootstrap comes before account/vault scripts and sync calls have exp
   assert.match(spa, /if\(guestMode\)\{[\s\S]*document\.documentElement\.classList\.remove\('auth-pending'\)/);
   assert.match(spa, /function canSyncProtectedData\(\)\{if\(guestMode\)return false/);
   assert.match(read('reader.html'), /canSync: \(\) => !window\.TestCodeGuest\?\.isActive\(\)/);
-  assert.match(read('video-library.js'), /window\.TestCodeGuest\?\.isActive\(\) \|\| !canReadProtectedData\(\)/);
+  assert.match(read('video-library.js'), /if \(window\.TestCodeGuest\?\.isActive\(\)\) return;/);
   assert.match(read('vault-session.js'), /if \(window\.TestCodeGuest\?\.isActive\(\)\) return;/);
   assert.match(read('public-drive-gallery.js'), /Keep external API credentials in memory only/);
   assert.match(read('images.js'), /window\.GuestPhotoLibrary\.start\(\)/);
