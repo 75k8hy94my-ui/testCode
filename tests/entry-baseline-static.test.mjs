@@ -25,7 +25,7 @@ test('current entry pages keep their static bootstrap script baselines', () => {
     'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-session.js?v=20261009-guest-mode', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js',
-    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261008-profile-avatar', 'feature-flags.js',
+    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261009-guest-mode', 'feature-flags.js',
     'media-access-gate.js?v=20261009-guest-mode',
     'manga-list-route.js?v=20261009-guest-mode',
     'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261009-guest-mode',
@@ -34,7 +34,7 @@ test('current entry pages keep their static bootstrap script baselines', () => {
     'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-session.js?v=20261009-guest-mode', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js',
-    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261008-profile-avatar', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261009-guest-mode',
+    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261009-guest-mode', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261009-guest-mode',
   ]);
 });
 
