@@ -244,7 +244,6 @@
 
       elements.savedListItems.innerHTML = '';
       elements.savedListItems.classList.add('bookshelf');
-      elements.savedListItems.appendChild(elements.bookshelfPagination);
 
       const viewModel = context.deriveViewModel({
         items: context.shelfVisibleItems(),
@@ -273,11 +272,9 @@
         title: context.itemDisplayTitle,
         unreadItems: context.unreadOrderItems()
       });
-      const { itemsList, folderCards, seriesGroupCards, authorGroupCards, showFavoritesCard, showSeriesCard,
-        visibleEntries, visibleFolderEntries, visibleAuthorGroups, visibleItems, totalPages } = viewModel;
+      const { itemsList, folderCards, visibleEntries, totalPages } = viewModel;
       context.setState({ bookshelfPage: viewModel.normalizedPage });
-      const isEmpty = folderCards.length === 0 && itemsList.length === 0 && seriesGroupCards.length === 0 &&
-        !showFavoritesCard && !showSeriesCard;
+      const isEmpty = viewModel.totalEntries === 0;
       const emptyText = state.currentFolderView === config.FAVORITES_FOLDER_ID
         ? 'お気に入りはまだ追加されていません'
         : state.currentFolderView === config.UNREAD_FOLDER_ID
@@ -287,17 +284,8 @@
         : inSeriesRoot
           ? 'シリーズはまだ設定されていません'
           : (state.currentFolderView ? 'このフォルダにはまだ何もありません' : '保存されたURLはまだありません');
-      if (!isEmpty) {
-        const frag = context.createDocumentFragment();
-        if (showFavoritesCard) frag.appendChild(context.buildFavoritesFolderCard());
-        if (showSeriesCard) frag.appendChild(context.buildSeriesFolderCard());
-        visibleFolderEntries.forEach((entry) => frag.appendChild(buildFolderCard(entry.folder, folderCards, showOrganizeControls)));
-        seriesGroupCards.forEach((group) => frag.appendChild(context.buildSeriesGroupCard(group)));
-        if (state.groupByAuthorEnabled && !state.bulkEditMode && authorGroupCards.length) {
-          visibleAuthorGroups.forEach((group) => frag.appendChild(context.buildAuthorGroupCard(group)));
-        }
-        elements.savedListItems.appendChild(frag);
-      }
+      // Render the same page slice that determines page count. Do not append
+      // series or pinned folders independently of the page model.
       context.renderCards({
         elements: {
           savedListItems: elements.savedListItems,
@@ -307,8 +295,15 @@
           bookshelfNextBtn: elements.bookshelfNextBtn,
           bookshelfPageLabel: elements.bookshelfPageLabel
         },
-        items: visibleItems,
-        createCard: (item, list, organizeMode) => buildBookCard(item, list, organizeMode),
+        items: visibleEntries,
+        createCard: (entry, list, organizeMode) => {
+          if (entry.type === 'favorites') return context.buildFavoritesFolderCard();
+          if (entry.type === 'series') return context.buildSeriesFolderCard();
+          if (entry.type === 'folder') return buildFolderCard(entry.folder, folderCards, organizeMode);
+          if (entry.type === 'series-group') return context.buildSeriesGroupCard(entry.group);
+          if (entry.type === 'author-group') return context.buildAuthorGroupCard(entry.group);
+          return buildBookCard(entry.item, list, organizeMode);
+        },
         list: itemsList,
         reorderMode: showOrganizeControls,
         empty: isEmpty,
@@ -316,6 +311,8 @@
         page: viewModel.normalizedPage,
         totalPages
       });
+      // Pager belongs after the current page in both DOM and visual order.
+      elements.savedListItems.appendChild(elements.bookshelfPagination);
 
       elements.smartListRow.style.display = atRoot ? 'flex' : 'none';
       if (atRoot) {

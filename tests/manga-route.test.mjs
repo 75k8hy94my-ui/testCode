@@ -84,7 +84,7 @@ test('manga route startup failure and stale renders clean only their own runtime
 });
 
 test('manga route owns its stylesheet so SPA entry path cannot change shelf layout', () => {
-  assert.match(route, /const STYLESHEET_URL = 'manga-list\.css\?v=20261009-cover-status'/);
+  assert.match(route, /const STYLESHEET_URL = 'manga-list\.css\?v=20261009-shelf-pagination'/);
   assert.match(route, /function ensureStylesheet\(documentRef\)/);
   assert.match(route, /Promise\.all\(\[ensureStylesheet\(documentRef\), loadDependencies\(documentRef\)\]\)/);
   assert.match(route, /dataset\.mangaListRouteStyle = '1'/);

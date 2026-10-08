@@ -55,16 +55,6 @@
         itemsList = visibleShelfItems.filter((it) => it.folderId === folderView);
       }
 
-      if (groupByAuthor && !bulkEditMode && !inAuthorView && !inSeriesRoot && itemsList.length) {
-        const groups = new Map();
-        itemsList.forEach((item) => {
-          const name = String(item.author || '').trim();
-          if (!name) return;
-          if (!groups.has(name)) groups.set(name, []);
-          groups.get(name).push(item);
-        });
-        authorGroupCards = Array.from(groups.entries()).map(([name, groupItems]) => ({ name, items: groupItems }));
-      }
       const normalizedFilter = (value) => String(value || '').trim().toLocaleLowerCase('ja');
       itemsList = itemsList.filter((item) => {
         const tags = Array.isArray(item.tags) ? item.tags.join(' ') : '';
@@ -92,25 +82,40 @@
         });
         authorGroupCards = Array.from(groups.entries()).map(([name, groupItems]) => ({ name, items: groupItems }));
       }
+      // Paginate the cards that are actually rendered. Previous versions
+      // counted folders and loose works, but omitted the pinned virtual
+      // folders and series groups while rendering them on every page.
       const ungroupedItems = itemsList.filter((item) => !String(item.author || '').trim());
-      const folderEntries = folderCards.map((folder) => ({ type: 'folder', folder }));
+      const fixedEntries = [
+        ...(showFavoritesCard ? [{ type: 'favorites' }] : []),
+        ...(showSeriesCard ? [{ type: 'series' }] : []),
+        ...folderCards.map((folder) => ({ type: 'folder', folder })),
+        ...seriesGroupCards.map((group) => ({ type: 'series-group', group })),
+      ];
       const contentEntries = groupByAuthor && !bulkEditMode && !inAuthorView && !inSeriesRoot
-        ? authorGroupCards.concat(ungroupedItems)
-        : itemsList;
-      const pagedEntries = folderEntries.concat(contentEntries);
-      const totalPages = Math.max(1, Math.ceil(pagedEntries.length / pageSize));
-      const normalizedPage = Math.min(Math.max(1, page), totalPages);
-      const pageStart = (normalizedPage - 1) * pageSize;
-      const visibleEntries = pagedEntries.slice(pageStart, pageStart + pageSize);
+        ? [
+          ...authorGroupCards.map((group) => ({ type: 'author-group', group })),
+          ...ungroupedItems.map((item) => ({ type: 'item', item })),
+        ]
+        : itemsList.map((item) => ({ type: 'item', item }));
+      const pagedEntries = fixedEntries.concat(contentEntries);
+      const perPage = Number.isInteger(pageSize) && pageSize > 0 ? pageSize : 25;
+      const requestedPage = Number.isFinite(Number(page)) ? Math.floor(Number(page)) : 1;
+      const totalPages = Math.max(1, Math.ceil(pagedEntries.length / perPage));
+      const normalizedPage = Math.min(Math.max(1, requestedPage), totalPages);
+      const pageStart = (normalizedPage - 1) * perPage;
+      const visibleEntries = pagedEntries.slice(pageStart, pageStart + perPage);
       return {
         atRoot, inSeriesGroup, inSeriesRoot, inAuthorView, canOrganize,
         itemsList, folderCards, seriesGroupCards, authorGroupCards,
         showFavoritesCard, showSeriesCard, visibleEntries,
-        visibleFolderEntries: visibleEntries.filter((entry) => entry && entry.type === 'folder'),
-        visibleAuthorGroups: visibleEntries.filter((entry) => entry && entry.type !== 'folder' && Array.isArray(entry.items)),
-        visibleItems: visibleEntries.filter((entry) => entry && entry.type !== 'folder' && !Array.isArray(entry.items)),
-        totalPages, normalizedPage
+        visibleFolderEntries: visibleEntries.filter((entry) => entry.type === 'folder'),
+        visibleSeriesGroups: visibleEntries.filter((entry) => entry.type === 'series-group').map((entry) => entry.group),
+        visibleAuthorGroups: visibleEntries.filter((entry) => entry.type === 'author-group').map((entry) => entry.group),
+        visibleItems: visibleEntries.filter((entry) => entry.type === 'item').map((entry) => entry.item),
+        totalPages, normalizedPage, totalEntries: pagedEntries.length
       };
+
     }
   });
 })(typeof self !== 'undefined' ? self : this);
