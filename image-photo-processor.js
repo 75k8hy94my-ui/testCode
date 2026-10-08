@@ -230,7 +230,7 @@
     if (typeof WorkerObject !== 'function') return null;
     const documentObject = getGlobal('document');
     const base = documentObject?.baseURI || getGlobal('location')?.href || '';
-    const workerUrl = new URL('image-processing-worker.js?v=20261008-safari-jpeg', base || undefined);
+    const workerUrl = new URL('image-processing-worker.js?v=20261008-native-zoom', base || undefined);
     return () => new WorkerObject(workerUrl, { type: 'classic' });
   }
 
