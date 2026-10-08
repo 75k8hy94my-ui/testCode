@@ -197,7 +197,7 @@ test('photo-only modes provide content-dependent size limits and bounded quality
   }
   assert.equal(api.createPhotoOptimization('unknown').maxZoomBytes,caps.balanced.max);
   const html=read('images.html');
-  assert.match(html,/写真専用です/);
+  assert.match(html,/id="imageQualityMode"/);
   assert.doesNotMatch(html,/細かい文字を読む画像/);
   assert.match(read('images.js'),/profile, photoOptimization, preferWorker: true/);
 });
