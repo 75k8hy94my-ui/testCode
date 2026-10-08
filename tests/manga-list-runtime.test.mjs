@@ -64,6 +64,6 @@ test('encrypted works use their encrypted-cover route rather than URL guessing',
   const route = read('manga-list-route.js');
   assert.match(route, /loadEncryptedCover/);
   assert.match(route, /EncryptedAssetReader\.createPreviewLoader/);
-  assert.match(route, /host\.flushCloudSync\(\)/);
-  assert.match(route, /activeEncryptedImport\.abort\(\)/);
+  assert.match(route, /!item\.encryptedAssets\?\.pages\?\.length/);
+  assert.doesNotMatch(route, /activeEncryptedImport\.abort\(\)/);
 });
