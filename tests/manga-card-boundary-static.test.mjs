@@ -47,7 +47,7 @@ test('buildBookCard uses one private cover dependency boundary without changing 
   assert.match(build, /coverSourceCache\.get\(source\)/);
   assert.match(build, /coverSourceCache\.set\(source, img\.currentSrc \|\| img\.src\)/);
   assert.match(build, /context\.setupFeedImage\(img, item\.url, item\.numberWidth, item\.pagePattern, item\.id\)/);
-  assert.equal((build.match(/context\.loadLocalCover\(item, img\)/g) || []).length, 1);
+  assert.equal((build.match(/context\.loadLocalCover\(item, img\)/g) || []).length, 2);
   assert.equal((build.match(/context\.setupFeedImage\(/g) || []).length, 1);
 });
 

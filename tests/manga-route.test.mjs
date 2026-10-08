@@ -34,7 +34,7 @@ test('manga mutation callbacks stop before protected work when access is blocked
   assert.match(extensionImport, /if \(!canReadProtectedData\(\)\)/);
   assert.match(registerImport, /if \(!canReadProtectedData\(\)\)/);
   assert.match(encryptedImport, /if \(!canReadProtectedData\(\)\)/);
-  assert.match(encryptedImport, /await service\.importFiles[\s\S]*if \(!canReadProtectedData\(\)\) return/);
+  assert.match(encryptedImport, /await service\.importFiles[\s\S]*importController\.signal\.aborted \|\| !canReadProtectedData\(\)/);
   assert.match(createFolder, /if \(!canReadProtectedData\(\)\) return/);
 });
 
@@ -107,4 +107,12 @@ test('VPN recheck hides protected records immediately when an allowed route beco
   assert.match(spa, /function handleVpnStatusChange\(event\)/);
   assert.match(spa, /lastVpnRouteAccess=route\+':blocked'[\s\S]*renderRoute\(\)/);
   assert.match(spa, /lastVpnRouteAccess=route\+':'\+\(gate&&gate\.canReadProtectedData/);
+});
+
+
+test('failed-image rollback can be retried after VPN access returns', () => {
+  assert.match(route, /mangaReaderPendingEncryptedAssetCleanup/);
+  assert.match(route, /const discardOrQueue = async/);
+  assert.match(route, /void retryPendingCleanup/);
+  assert.match(route, /EncryptedAssetSync.discardImportedAsset/);
 });

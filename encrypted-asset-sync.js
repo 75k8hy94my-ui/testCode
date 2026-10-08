@@ -38,7 +38,7 @@
     return { ok: false, conflict: { assetId, reason, targetRevision, remoteRevision: remote?.revision ?? null, remoteDeletedAt: remote?.deletedAt ?? null } };
   }
 
-  async function stageProcessedRevision({ cache, masterKey, assetId, targetRevision, processed }) {
+  async function stageProcessedRevision({ cache, masterKey, assetId, targetRevision, processed, signal }) {
     const target = positiveRevision(targetRevision);
     const ids = objectPlan(processed);
     const expectedTiles = ids.length - 1;
@@ -46,6 +46,7 @@
     const encryptedBytes = {};
     const inputs = [processed.previewBlob, ...processed.tileBlobs];
     for (let index = 0; index < ids.length; index += 1) {
+      throwIfAborted(signal);
       const objectId = ids[index];
       const existing = await cache.get(assetId, target, objectId);
       if (existing) {
@@ -54,6 +55,7 @@
         continue;
       }
       const encrypted = await cryptoApi.encryptAssetObject(masterKey, assetId, objectId, inputs[index]);
+      throwIfAborted(signal);
       await cache.put({ assetId, revision: target, objectId, encryptedBytes: encrypted, retention: 'pending' });
       encryptedBytes[objectId] = encrypted;
     }
@@ -203,7 +205,30 @@
     return backendApi.tombstoneRemoteAsset(vault, assetId, expectedRevision);
   }
 
-  const api = { equalBytes, stageProcessedRevision, publishPendingRevision, loadEncryptedObject, loadDecryptedObject, tombstoneAsset };
+  // Roll back every object of a newly-created page, including files uploaded before
+  // metadata creation. Keep local records if remote cleanup fails so a retry is possible.
+  async function discardImportedAsset({ vault, storage, cache, assetId, expectedRevision = 1 }) {
+    if (!cache || typeof cache.list !== 'function' || typeof cache.removeAsset !== 'function' || typeof storage?.remove !== 'function') {
+      throw new TypeError('encrypted asset cleanup dependencies are missing');
+    }
+    const remote = await backendApi.fetchRemoteAsset(vault, assetId);
+    if (remote && !remote.deletedAt) {
+      if (remote.revision !== expectedRevision) throw new Error('cleanup revision conflict');
+      const tombstone = await backendApi.tombstoneRemoteAsset(vault, assetId, expectedRevision);
+      if (!tombstone?.deletedAt) throw new Error('encrypted asset tombstone failed');
+    }
+    const records = (await cache.list()).filter((record) => record.assetId === assetId && record.revision === expectedRevision);
+    await session(vault, async (token, user) => {
+      for (const record of records) {
+        const path = backendApi.buildStorageObjectPath(user.id, assetId, expectedRevision, record.objectId);
+        await storage.remove(path, token);
+      }
+    });
+    await cache.removeAsset(assetId);
+    return { ok: true, removedObjects: records.length };
+  }
+
+  const api = { equalBytes, stageProcessedRevision, publishPendingRevision, loadEncryptedObject, loadDecryptedObject, tombstoneAsset, discardImportedAsset };
   if (typeof window !== 'undefined') window.EncryptedAssetSync = api;
   if (typeof module !== 'undefined') module.exports = api;
 })();

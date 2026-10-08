@@ -46,18 +46,28 @@ test('authenticated download returns bytes and maps 404 to null', async () => {
   assert.equal(await transport(async () => response(404)).download('u/a/1/preview.mrae', 't'), null);
 });
 
-test('AbortSignal propagates and no delete or signed URL API exists', async () => {
+test('AbortSignal propagates and no signed URL API exists', async () => {
   const controller = new AbortController();
   let received;
   const storage = transport(async (_url, options) => { received = options.signal; return response(201); });
   await storage.upload('u/a/1/preview.mrae', 't', new Uint8Array(), controller.signal);
   assert.equal(received, controller.signal);
-  assert.equal(typeof storage.delete, 'undefined');
   assert.equal(typeof storage.signedUrl, 'undefined');
-  assert.doesNotMatch(fs.readFileSync(new URL('../encrypted-asset-storage.js', import.meta.url), 'utf8'), /service_role|signed.?url|DELETE|x-upsert\s*:\s*true|PUT/i);
+  assert.doesNotMatch(fs.readFileSync(new URL('../encrypted-asset-storage.js', import.meta.url), 'utf8'), /service_role|signed.?url|x-upsert\s*:\s*true|PUT/i);
 });
 
 test('classic script parse and required constructor validation', () => {
   assert.throws(() => storageApi.createStorageTransport({ baseUrl: '', publishableKey: 'x' }));
   assert.doesNotThrow(() => new vm.Script(fs.readFileSync(new URL('../encrypted-asset-storage.js', import.meta.url), 'utf8')));
+});
+
+
+test('rollback deletes only an exact authenticated object path', async () => {
+  const store = transport(async (url, options) => { calls.push({url,options}); return response(200); });
+  assert.equal(await store.remove('u/a/1/L0_0_0.mrae', 'token'), true);
+  assert.equal(calls[0].url, 'https://example.test/storage/v1/object/vault-assets/u/a/1/L0_0_0.mrae');
+  assert.equal(calls[0].options.method, 'DELETE');
+  assert.equal(calls[0].options.headers.Authorization, 'Bearer token');
+  assert.equal(await transport(async () => response(404)).remove('u/a/1/preview.mrae','token'),true);
+  await assert.rejects(transport(async () => response(403)).remove('u/a/1/preview.mrae','token'), {status:403});
 });

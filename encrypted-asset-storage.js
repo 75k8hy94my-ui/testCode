@@ -60,7 +60,19 @@
       return new Uint8Array(await response.arrayBuffer());
     }
 
-    return { upload, download };
+    // This path is a newly imported asset's exact, owner-scoped object key.
+    // Deletion is reserved for failed/cancelled imports; published assets are tombstoned first.
+    async function remove(path, token) {
+      const response = await fetchImpl(`${root}/storage/v1/object/${BUCKET}/${encodedPath(path)}`, {
+        method: 'DELETE',
+        headers: { apikey: publishableKey, Authorization: `Bearer ${token}` }
+      });
+      if (response.status === 404) return true;
+      if (!response.ok) throw httpError(response, 'storage cleanup');
+      return true;
+    }
+
+    return { upload, download, remove };
   }
 
   const api = { BUCKET, encodedPath, createStorageTransport };

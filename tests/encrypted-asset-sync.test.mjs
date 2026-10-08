@@ -220,3 +220,46 @@ test('tombstone wrapper delegates metadata only and module is classic', async ()
   assert.doesNotMatch(source, /localStorage|sessionStorage|MangaVault|upload\s*\(.*File/i);
   assert.doesNotThrow(() => new vm.Script(source));
 });
+
+
+test('cancel cleanup tombstones a published asset then removes its Storage objects', async () => {
+  const cache = makeCache();
+  const staged = await sync.stageProcessedRevision({ cache, masterKey:key, assetId, targetRevision:1, processed:makeProcessed() });
+  cache.list = async () => [...cache.records.values()];
+  cache.removeAsset = async () => cache.records.clear();
+  const calls = [];
+  const original = {asset_id:assetId,revision:1,deleted_at:null,updated_at:'today'};
+  const vault = {
+    withSession: async callback => callback('token',{id:userId}),
+    api: async path => {
+      calls.push(path);
+      return path.includes('/rpc/tombstone') ? [{...original,revision:2,deleted_at:'now'}] : [original];
+    }
+  };
+  const deleted = [];
+  const storage = {remove: async path => {deleted.push(path);return true;}};
+  const result = await sync.discardImportedAsset({vault,storage,cache,assetId});
+  assert.equal(result.ok,true);
+  assert.equal(deleted.length,staged.objectIds.length);
+  assert.equal(cache.records.size,0);
+  assert.ok(calls.some(path => path.includes('/rpc/tombstone')));
+});
+
+test('cleanup error preserves pending encrypted cache', async () => {
+  const cache = makeCache();
+  await sync.stageProcessedRevision({ cache, masterKey:key, assetId, targetRevision:1, processed:makeProcessed() });
+  cache.list = async () => [...cache.records.values()];
+  cache.removeAsset = async () => assert.fail('cache cannot be cleared on cleanup failure');
+  const vault = {withSession: async fn => fn('token',{id:userId}),api:async()=>[]};
+  await assert.rejects(sync.discardImportedAsset({vault,cache,storage:{remove:async()=>{throw new Error('cleanup failed');}},assetId}),/cleanup failed/);
+  assert.ok(cache.records.size>0);
+});
+
+
+test('aborted staging does not leave a new ciphertext record', async () => {
+  const cache = makeCache();
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(sync.stageProcessedRevision({ cache, masterKey:key, assetId, targetRevision:1, processed:makeProcessed(), signal:controller.signal }), {name:'AbortError'});
+  assert.equal(cache.records.size,0);
+});

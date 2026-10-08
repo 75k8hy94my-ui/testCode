@@ -34,3 +34,34 @@ test('tombstones already-published pages when a later page fails', async () => {
   await assert.rejects(api.importFiles({ files: [{ name: 'p1.png' }, { name: 'bad', bad: true }], title: 'Secret book' }), /invalid image/);
   assert.deepEqual(calls, [['6dc3773a-a3ef-4bb8-9cbf-15096098db10', 1]]);
 });
+
+
+test('cancel after publication cleans the newly created encrypted page', async () => {
+  const controller = new AbortController();
+  const rolledBack = [];
+  const api = importer.create({
+    processPhoto: async () => ({ manifest }),
+    stage: async () => ({ objectIds: ['preview'] }),
+    publish: async () => { controller.abort(); return { ok: true, metadata: { revision: 1 } }; },
+    tombstone: async () => {},
+    cleanupAsset: async attempt => rolledBack.push(attempt),
+    createAssetId: () => '6dc3773a-a3ef-4bb8-9cbf-15096098db10'
+  });
+  await assert.rejects(api.importFiles({ files: [{name:'one'}], title:'book', signal:controller.signal }), {name:'AbortError'});
+  assert.equal(rolledBack.length, 1);
+  assert.equal(rolledBack[0].published, true);
+});
+
+test('staging failure also invokes cleanup, and cleanup errors are surfaced', async () => {
+  const rolledBack = [];
+  const api = importer.create({
+    processPhoto: async () => ({ manifest }),
+    stage: async () => { throw new Error('stage-failed'); },
+    publish: async () => ({ok:true}),
+    tombstone: async () => {},
+    cleanupAsset: async attempt => { rolledBack.push(attempt.assetId); throw new Error('cleanup-failed'); },
+    createAssetId: () => '6dc3773a-a3ef-4bb8-9cbf-15096098db10'
+  });
+  await assert.rejects(api.importFiles({files:[{name:'one'}],title:'book'}), /後始末に失敗/);
+  assert.equal(rolledBack.length, 1);
+});

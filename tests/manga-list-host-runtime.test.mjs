@@ -116,7 +116,7 @@ test('host persistence preserves write and sync order', () => {
   const host = loadFactory().create(deps(calls));
   assert.deepEqual(Object.keys(host), [
     'persistItems', 'persistFolders', 'persistAuthorCards', 'persistAll',
-    'buildSyncPayload', 'runCloudSync', 'scheduleCloudSync', 'setupFeedImage', 'loadLocalCover',
+    'buildSyncPayload', 'runCloudSync', 'flushCloudSync', 'scheduleCloudSync', 'setupFeedImage', 'loadLocalCover',
     'navigateToReader',
   ]);
   assert.ok(Object.isFrozen(host));
@@ -269,4 +269,36 @@ test('manga route owns shelf persistence and Reader uses its narrow item reposit
   assert.match(reader, /flushSync:\s*\(\) => syncScheduler\.flush\(\)/);
   assert.match(fs.readFileSync(path.join(root, 'reader-sync-scheduler.js'), 'utf8'), /return save\(\)/);
   assert.match(fs.readFileSync(path.join(root, 'reader-item-repository.js'), 'utf8'), /dependencies\.scheduleSync\(\)/);
+});
+
+
+test('strict cloud flush waits for server save and propagates failure', async () => {
+  const calls = [];
+  const input = deps(calls);
+  let release;
+  input.sync.savePayload = () => new Promise(resolve => { release = resolve; });
+  const host = loadFactory().create(input);
+  let complete = false;
+  const pending = host.flushCloudSync().then(() => { complete = true; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(complete, false);
+  release();
+  await pending;
+  assert.equal(complete, true);
+  input.sync.savePayload = async () => { throw new Error('offline'); };
+  await assert.rejects(host.flushCloudSync(), /offline/);
+});
+
+test('encrypted covers take the dedicated loader path', async () => {
+  const input = deps([]);
+  let invoked = false;
+  input.images.loadEncryptedCover = async (item,img) => {
+    invoked = item.encryptedAssets.pages.length === 1;
+    img.src = 'blob:encrypted';
+  };
+  const host = loadFactory().create(input);
+  const img = { src: '', isConnected:true };
+  await host.loadLocalCover({ encryptedAssets:{ pages:[{}] } },img);
+  assert.equal(invoked, true);
+  assert.equal(img.src, 'blob:encrypted');
 });
