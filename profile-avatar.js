@@ -11,13 +11,16 @@
     return typeof value === 'string' && value.length <= MAX_DATA_URL_BYTES && AVATAR_PATTERN.test(value) ? value : '';
   }
   function read(storage = globalThis.localStorage) {
-    try { return normalize(storage.getItem(STORAGE_KEY) || ''); } catch (_) { return ''; }
+    try { return normalize((typeof storage.getItem === 'function' ? storage.getItem(STORAGE_KEY) : storage.get?.(STORAGE_KEY)) || ''); } catch (_) { return ''; }
   }
   function write(value, storage = globalThis.localStorage) {
     const avatar = normalize(value);
     if (value && !avatar) throw new Error('プロフィール画像の形式が正しくありません。');
-    if (avatar) storage.setItem(STORAGE_KEY, avatar);
-    else storage.removeItem(STORAGE_KEY);
+    if (avatar) {
+      if (typeof storage.setItem === 'function') storage.setItem(STORAGE_KEY, avatar);
+      else storage.set(STORAGE_KEY, avatar);
+    } else if (typeof storage.removeItem === 'function') storage.removeItem(STORAGE_KEY);
+    else storage.delete(STORAGE_KEY);
     return avatar;
   }
   function fromFile(file, options = {}) {
