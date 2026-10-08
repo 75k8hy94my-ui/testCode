@@ -473,7 +473,7 @@
         status('画像は保存されています。クラウド同期を再試行してください：' +
           (error?.message || '通信エラー'), true);
       } else {
-        const canceled = error?.name === 'AbortError' || controller.signal.aborted;
+        const canceled = !error?.cleanupFailed && (error?.name === 'AbortError' || controller.signal.aborted);
         finishUploadProgress(canceled ? 'canceled' : 'error',
           canceled ? '処理を中断しました。未完了の画像は保存済み作品に追加していません' :
           '処理を完了できませんでした：' + (error?.message || '不明なエラー'));
