@@ -184,12 +184,12 @@ test('mobile shelf moves both real page grids together and releases the old page
   assert.deepEqual(Array.from(animations[1].frames, x => x.transform), ['translateX(-50%)', 'translateX(0%)']);
 });
 
-test('non-page rerender, desktop and reduced motion avoid shelf animation', () => {
+test('non-page rerender and reduced motion stay instant, desktop buttons slide pages', () => {
   const harness = createSlidingShelfHarness();
   harness.runtime.renderSavedList();
   harness.runtime.renderSavedList();
   assert.equal(harness.animations.length, 0);
-  for (const settings of [{ mobile: false }, { reducedMotion: true }]) {
+  for (const settings of [{ reducedMotion: true }, { mobile: false, reducedMotion: true }]) {
     const h = createSlidingShelfHarness(settings);
     h.runtime.renderSavedList();
     h.state.bookshelfPage = 2;
@@ -197,6 +197,12 @@ test('non-page rerender, desktop and reduced motion avoid shelf animation', () =
     assert.equal(h.animations.length, 0);
     assert.equal(h.elements.savedListItems.children[0].children[0].className, 'bookshelf-page');
   }
+  const desktop = createSlidingShelfHarness({ mobile: false });
+  desktop.runtime.renderSavedList();
+  desktop.state.bookshelfPage = 2;
+  desktop.runtime.renderSavedList(1);
+  assert.equal(desktop.animations.length, 1, 'PC navigation should slide the list just like on mobile');
+  assert.deepEqual(Array.from(desktop.animations[0].frames, x => x.transform), ['translateX(0%)', 'translateX(-50%)']);
 });
 
 test('sliding pages are clipped, preserve mobile grid density, and do not change Reader', () => {
@@ -207,6 +213,6 @@ test('sliding pages are clipped, preserve mobile grid density, and do not change
   assert.match(css, /\.bookshelf-slide-track > \.bookshelf-page\s*\{[^}]*flex:\s*0 0 50%/);
   assert.match(css, /#mangaListSection \.bookshelf-page\s*\{[^}]*grid-template-columns:\s*repeat\(3,/);
   assert.match(route, /runtime\.renderSavedList\(delta\)/);
-  assert.match(route, /manga-list-runtime\.js\?v=20261009-cover-controls/);
+  assert.match(route, /manga-list-runtime\.js\?v=20261009-desktop-liquid-pager/);
   assert.doesNotMatch(read('reader.html'), /bookshelf-slide-track|bookshelf-page-frame/);
 });

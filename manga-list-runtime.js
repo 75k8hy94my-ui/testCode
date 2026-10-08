@@ -28,9 +28,9 @@
 
     function slideBetweenPages(doc, frame, outgoing, incoming, direction) {
       const view = doc.defaultView;
-      if (!outgoing || !direction || typeof view?.matchMedia !== 'function' ||
-        !view.matchMedia('(max-width: 899px)').matches ||
-        view.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (!outgoing || !direction ||
+        (typeof view?.matchMedia === 'function' &&
+          view.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
 
       const track = doc.createElement('div');
       track.className = 'bookshelf-slide-track';
@@ -358,7 +358,8 @@
         empty: isEmpty,
         emptyText,
         page: viewModel.normalizedPage,
-        totalPages
+        totalPages,
+        desktopPersistentPager: !!doc.defaultView?.matchMedia?.('(min-width: 900px)').matches
       });
       // Pager belongs after the current page in both DOM and visual order.
       elements.savedListItems.appendChild(elements.bookshelfPagination);

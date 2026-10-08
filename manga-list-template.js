@@ -54,9 +54,15 @@
       </div>
       <div id="savedListItems">
         <div id="bookshelfPagination" style="display:none;" class="bookshelf-pagination">
-          <button class="ctrlBtn bookshelfPagerButton" id="bookshelfPrevBtn" type="button">前へ</button>
-          <span id="bookshelfPageLabel"></span>
-          <button class="ctrlBtn bookshelfPagerButton" id="bookshelfNextBtn" type="button">次へ</button>
+          <button class="ctrlBtn bookshelfPagerButton" id="bookshelfPrevBtn" type="button" aria-label="前のページ" title="前のページ">
+            <svg class="bookshelfPagerGlyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m14.5 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="bookshelfPagerText">前へ</span>
+          </button>
+          <span id="bookshelfPageLabel" role="status" aria-live="polite" aria-atomic="true">1 / 1</span>
+          <button class="ctrlBtn bookshelfPagerButton" id="bookshelfNextBtn" type="button" aria-label="次のページ" title="次のページ">
+            <svg class="bookshelfPagerGlyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9.5 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="bookshelfPagerText">次へ</span>
+          </button>
         </div>
       </div>
       <div id="savedListEmpty" style="display:none;">保存されたURLはまだありません</div>

@@ -59,3 +59,20 @@ test('renderer handles empty and final-page states without creating cards', () =
   assert.equal(els.bookshelfNextBtn.disabled, true);
   assert.equal(els.bookshelfPageLabel.textContent, '1 / 1');
 });
+
+test('nonempty one-page desktop shelf retains a disabled fixed navigation bar', () => {
+  const els = elements();
+  render({ elements: els, items: [{ id: 'only' }], list: [], reorderMode: false,
+    createCard: () => ({ id: 'only' }), empty: false, emptyText: '',
+    page: 1, totalPages: 1, desktopPersistentPager: true });
+  assert.equal(els.bookshelfPagination.style.display, 'flex');
+  assert.equal(els.bookshelfPrevBtn.disabled, true);
+  assert.equal(els.bookshelfNextBtn.disabled, true);
+  assert.equal(els.bookshelfPageLabel.textContent, '1 / 1');
+
+  const empty = elements();
+  render({ elements: empty, items: [], list: [], reorderMode: false,
+    createCard() { throw new Error('Unexpected card'); }, empty: true, emptyText: '空',
+    page: 1, totalPages: 1, desktopPersistentPager: true });
+  assert.equal(empty.bookshelfPagination.style.display, 'none');
+});

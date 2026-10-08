@@ -2,14 +2,14 @@
   'use strict';
 
   root.MangaListRenderer = Object.freeze({
-    render({ elements, items, createCard, list, reorderMode, empty, emptyText, page, totalPages }) {
+    render({ elements, items, createCard, list, reorderMode, empty, emptyText, page, totalPages, desktopPersistentPager = false }) {
       const {
         savedListItems, savedListEmpty, bookshelfPagination,
         bookshelfPrevBtn, bookshelfNextBtn, bookshelfPageLabel
       } = elements;
       const safeTotalPages = Math.max(1, totalPages);
       const safePage = Math.min(Math.max(1, page), safeTotalPages);
-      bookshelfPagination.style.display = safeTotalPages > 1 ? 'flex' : 'none';
+      bookshelfPagination.style.display = safeTotalPages > 1 || (desktopPersistentPager && !empty) ? 'flex' : 'none';
       bookshelfPrevBtn.disabled = safePage <= 1;
       bookshelfNextBtn.disabled = safePage >= safeTotalPages;
       bookshelfPageLabel.textContent = safePage + ' / ' + safeTotalPages;
