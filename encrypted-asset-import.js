@@ -30,7 +30,7 @@
           const assetId = createAssetId();
           const attempt = { assetId, revision: 1, published: false };
           attemptedAssets.push(attempt);
-          const staged = await stage({ assetId, targetRevision: 1, processed });
+          const staged = await stage({ assetId, targetRevision: 1, processed, signal });
           if (signal?.aborted) throw aborted();
           const result = await publish({ assetId, targetRevision: 1, staged, signal });
           if (!result || result.ok === false) throw new Error('暗号化画像を同期できませんでした。');
