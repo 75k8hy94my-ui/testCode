@@ -1,7 +1,7 @@
 (function (root) {
   'use strict';
 
-  const STYLESHEET_URL = 'manga-list.css?v=20261009-cover-status';
+  const STYLESHEET_URL = 'manga-list.css?v=20261009-shelf-pagination';
   const SCRIPT_URLS = [
     ['manga-list-template.js?v=20260922-vpn-tools', 'mangaRouteTemplate'],
     ['manga-import-validator.js?v=20261007-momon-import', 'mangaImportValidator'],
@@ -36,7 +36,7 @@
     ['manga-list-mount.js?v=20260922-mount', 'mangaRouteMount'],
     ['manga-list-card.js?v=20261009-cover-priority', 'mangaRouteCard'],
     ['manga-list-state.js?v=20260922-state', 'mangaRouteState'],
-    ['manga-list-view-model.js?v=20260922-view-model', 'mangaRouteViewModel'],
+    ['manga-list-view-model.js?v=20261009-shelf-pagination', 'mangaRouteViewModel'],
     ['manga-list-renderer.js?v=20260922-renderer', 'mangaRouteRenderer'],
     ['manga-list-state-runtime.js?v=20260922-state-runtime', 'mangaRouteStateRuntime'],
     ['manga-list-render-runtime.js?v=20260922-render-runtime', 'mangaRouteRenderRuntime'],
@@ -47,7 +47,7 @@
     ['manga-list-image-cache.js?v=20260922-image-cache', 'mangaRouteImageCache'],
     ['reader-target.js?v=20261003-reader-launch-contract', 'mangaReaderTarget'],
     ['manga-list-host-runtime.js?v=20261009-cover-retry', 'mangaRouteHost'],
-    ['manga-list-runtime.js?v=20261009-cover-retry', 'mangaRouteRuntime'],
+    ['manga-list-runtime.js?v=20261009-shelf-pagination', 'mangaRouteRuntime'],
     ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
   ];
 
@@ -600,7 +600,17 @@
           onHistory: () => { setState({ currentFolderView: config.HISTORY_FOLDER_ID, currentSeriesView: null, currentAuthorView: null, bookshelfPage: 1 }); renderList(); },
           onUnread: () => { setState({ currentFolderView: config.UNREAD_FOLDER_ID, currentSeriesView: null, currentAuthorView: null, bookshelfPage: 1 }); renderList(); },
         }, { historyButton: history, unreadButton: unread });
-        bindFactory(MangaListPaginationEventsFactory, { onPageChange: (delta) => { setState({ bookshelfPage: state().bookshelfPage + delta }); renderList(); } }, { prevButton: prev, nextButton: next });
+        bindFactory(MangaListPaginationEventsFactory, {
+          onPageChange: (delta) => {
+            const previousPage = state().bookshelfPage;
+            setState({ bookshelfPage: previousPage + delta });
+            renderList();
+            if (state().bookshelfPage !== previousPage) {
+              const target = rootElement.querySelector('#listToolbar') || elements.savedListItems;
+              if (typeof target?.scrollIntoView === 'function') target.scrollIntoView({ block: 'start', behavior: 'auto' });
+            }
+          }
+        }, { prevButton: prev, nextButton: next });
         bindFactory(MangaListNavigationEventsFactory, { onBack: () => { setState({ currentFolderView: null, currentSeriesView: null, currentAuthorView: null, bookshelfPage: 1 }); renderList(); } }, { backButton: back });
         bindFactory(MangaListBulkEventsFactory, {
           onEdit: () => { setState({ bulkEditMode: !state().bulkEditMode, bookshelfPage: 1 }); updateBulkEditButton(); renderList(); },
