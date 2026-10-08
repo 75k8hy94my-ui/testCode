@@ -293,11 +293,7 @@
     duration.className = 'vl-thumbnail-time-duration';
     controls.append(thumbnailRange, thumbnailTime, duration);
 
-    const note = document.createElement('p');
-    note.className = 'vl-thumbnail-time-note';
-    note.textContent = 'スライダーまたは mm:ss で指定できます。サムネイルURLを設定している場合は画像URLが優先されます。';
-
-    wrapper.append(label, frame, controls, note);
+    wrapper.append(label, frame, controls);
     const field = thumbnail.closest('.vl-field');
     if (field) field.after(wrapper); else thumbnail.after(wrapper);
 

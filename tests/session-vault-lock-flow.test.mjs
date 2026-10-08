@@ -44,7 +44,7 @@ test('profile UI distinguishes lock from complete logout', () => {
   assert.match(profileMenu, /data-lock>ロック</);
   assert.match(profileMenu, /アカウントからログアウト/);
   assert.match(profileSpa, /id="profileLockBtn"/);
-  assert.match(profileSpa, /ロックは保管庫の復号鍵だけを破棄し、ログイン状態は維持します/);
+  assert.match(profileSpa, /id="profileLogoutBtn"/);
 });
 
 test('unlock page does not ask for passkey again when vault is already active', () => {
