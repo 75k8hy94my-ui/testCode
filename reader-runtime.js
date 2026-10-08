@@ -23,10 +23,29 @@
       return null;
     }
 
+    let closing = false;
     function close() {
+      if (closing || destroyed) return;
       persistPage();
-      destroy();
-      location.replace('manga.html');
+      const navigate = () => { if (!destroyed) { destroy(); location.replace('manga.html'); } };
+      let pending;
+      try { pending = repository.flushSync?.(); }
+      catch (error) { status('クラウド同期に失敗しました。再度「閉じる」で試してください。' + (error?.message || '')); return false; }
+      if (!pending || typeof pending.then !== 'function') { navigate(); return true; }
+      closing = true;
+      const button = byId('closeBtn');
+      if (button) button.disabled = true;
+      status('クラウドに同期しています…');
+      return Promise.resolve(pending).then(() => {
+        navigate();
+        return true;
+      }, (error) => {
+        if (!destroyed) status('クラウド同期に失敗しました。再度「閉じる」で試してください。' + (error?.message || ''));
+        return false;
+      }).finally(() => {
+        closing = false;
+        if (button) button.disabled = false;
+      });
     }
 
     function destroy() {
@@ -75,7 +94,7 @@
     let progressRepository = dependencies.progressRepository || null;
     let pageSource = dependencies.pageSource || null;
     const keyFor = (id) => target.itemResumeKey ? target.itemResumeKey(id) : `item:${id}`;
-    const byId = (id) => doc.getElementById(id);
+    const byId = (id) => doc?.getElementById?.(id) || null;
     lifecycle = win?.ReaderLifecycleFactory?.create ? win.ReaderLifecycleFactory.create() : { listen: (node, event, fn, opts) => node?.addEventListener?.(event, fn, opts), cleanup: () => {}, own: (resource) => resource, timer: (id) => id, destroy() {} };
     for (const resource of dependencies.lifecycleResources || []) lifecycle.own(resource);
     if (!pageSource && win?.ReaderPageSourceFactory?.create) {

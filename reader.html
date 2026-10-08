@@ -82,7 +82,7 @@
   <script src="reader-target.js?v=20261004-reader-item-route"></script>
   <script src="vault-payload.js"></script>
   <script src="feature-flags.js"></script>
-  <script src="media-access-gate.js?v=20261008-vpn-data"></script>
+  <script src="media-access-gate.js?v=20261008-vpn-refresh"></script>
   <script src="encrypted-asset-crypto.js"></script>
   <script src="encrypted-asset-cache.js"></script>
   <script src="encrypted-asset-backend.js"></script>
@@ -100,7 +100,8 @@
   <script src="reader-page-source.js?v=20261004-reader-lifecycle"></script>
   <script src="reader-progress-repository.js?v=20261004-reader-lifecycle"></script>
   <script src="reader-item-repository.js"></script>
-  <script src="reader-runtime.js?v=20261008-vertical-scroll-fix"></script>
+  <script src="reader-sync-scheduler.js?v=20261008-reader-close-sync"></script>
+  <script src="reader-runtime.js?v=20261008-reader-close-sync"></script>
   <script>
     window.MangaReaderBootPromise = (async () => {
       const sessionKey = 'mangaReaderSupabaseSession';
@@ -158,23 +159,18 @@
         const itemId = MangaReaderTarget.itemIdFromLocation(location);
         if (!itemId) { location.replace('manga.html'); return; }
         MangaReaderTarget.clearLegacyTarget(localStorage);
-        let syncTimer = null;
-        const syncScheduler = {
-          schedule() {
-            if (!canReadProtectedData()) return;
-            clearTimeout(syncTimer);
-            syncTimer = setTimeout(() => {
-              syncTimer = null;
-              if (!canReadProtectedData()) return;
-              try { const payload = MangaVaultPayload.buildFromLocalStorage(); MangaVault.savePayload(payload).catch((error) => { if (canReadProtectedData()) document.getElementById('readerStatus').textContent = error?.message || '同期に失敗しました'; }); } catch (error) { if (canReadProtectedData()) document.getElementById('readerStatus').textContent = error?.message || '同期に失敗しました'; }
-            }, 5000);
+        const syncScheduler = ReaderSyncSchedulerFactory.create({
+          canSync: canReadProtectedData,
+          save: () => MangaVault.savePayload(MangaVaultPayload.buildFromLocalStorage()),
+          onError: (error) => {
+            if (canReadProtectedData()) document.getElementById('readerStatus').textContent = error?.message || '同期に失敗しました';
           },
-          destroy() { clearTimeout(syncTimer); syncTimer = null; },
-        };
+        });
         const repository = ReaderItemRepositoryFactory.create({
           readItems() { if (!canReadProtectedData()) return []; try { const values = JSON.parse(localStorage.getItem('mangaReaderSavedItems') || '[]'); return Array.isArray(values) ? values : []; } catch (_) { return []; } },
           writeItems(items) { if (!canReadProtectedData()) return false; return MangaReaderStorage.safeWriteJson('mangaReaderSavedItems', items); },
           scheduleSync: () => syncScheduler.schedule(),
+          flushSync: () => syncScheduler.flush(),
         });
         const currentRuntime = ReaderRuntimeFactory.create({ repository, target: MangaReaderTarget, lifecycleResources: [syncScheduler], location, document, window });
         runtime = currentRuntime; window.MangaReaderRuntime = currentRuntime;

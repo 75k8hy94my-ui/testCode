@@ -41,6 +41,11 @@
   let installed = false;
   let diagnosticsUiInstalled = false;
   let diagnostics = freshDiagnostics();
+  let checkGeneration = 0;
+  let activeController = null;
+  let checkInFlight = false;
+  let lastCompletedCheckAt = 0;
+  const VPN_REFRESH_MS = 120000;
 
   function emitStatus() {
     if (!root.document || typeof root.document.dispatchEvent !== 'function') return;
@@ -554,27 +559,27 @@
     return 'unavailable';
   }
 
-  async function lookupIpAssessment(ip, signal, includeVpnVerdict) {
-    diagnostics.generic = { status: 'checking', httpStatus: null, verdict: null };
-    renderDiagnostics();
+  async function lookupIpAssessment(ip, signal, includeVpnVerdict, result = diagnostics, notify = renderDiagnostics) {
+    result.generic = { status: 'checking', httpStatus: null, verdict: null };
+    notify();
     try {
       const payload = await fetchJson(CHECK_URL + '?q=' + encodeURIComponent(ip) + '&format=json', signal);
       const country = countryInfoFromPayload(payload);
-      diagnostics.countryCode = country.countryCode;
-      diagnostics.countryName = country.countryName;
-      diagnostics.countrySource = 'primary';
-      diagnostics.countryPolicy = countryPolicyFor(country);
+      result.countryCode = country.countryCode;
+      result.countryName = country.countryName;
+      result.countrySource = 'primary';
+      result.countryPolicy = countryPolicyFor(country);
       const verdict = includeVpnVerdict ? isVpnVerdict(payload) : null;
-      diagnostics.generic = {
+      result.generic = {
         status: includeVpnVerdict ? 'success' : 'country-only',
         httpStatus: 200,
         verdict,
       };
-      renderDiagnostics();
+      notify();
       return {
         countryCode: country.countryCode,
         countryName: country.countryName,
-        nonJapanVpn: diagnostics.countryPolicy === 'non-jp-vpn',
+        nonJapanVpn: result.countryPolicy === 'non-jp-vpn',
         vpnVerdict: verdict === true,
       };
     } catch (error) {
@@ -583,30 +588,30 @@
         const country = countryInfoFromPayload(fallbackPayload);
         const fallbackPolicy = countryPolicyFor(country);
         if (fallbackPolicy === 'unavailable') throw new Error('Country fallback returned no country');
-        diagnostics.countryCode = country.countryCode;
-        diagnostics.countryName = country.countryName;
-        diagnostics.countrySource = 'fallback';
-        diagnostics.countryPolicy = fallbackPolicy;
-        diagnostics.generic = {
+        result.countryCode = country.countryCode;
+        result.countryName = country.countryName;
+        result.countrySource = 'fallback';
+        result.countryPolicy = fallbackPolicy;
+        result.generic = {
           status: includeVpnVerdict ? 'unavailable' : 'country-fallback',
           httpStatus: error && error.httpStatus || null,
           verdict: null,
         };
-        diagnostics.error = includeVpnVerdict
+        result.error = includeVpnVerdict
           ? '一般VPN判定APIを利用できません' + (error && error.httpStatus ? ' (HTTP ' + error.httpStatus + ')' : '') + '。国情報は予備APIから取得しました'
           : null;
-        renderDiagnostics();
+        notify();
         return {
           countryCode: country.countryCode,
           countryName: country.countryName,
-          nonJapanVpn: diagnostics.countryPolicy === 'non-jp-vpn',
+          nonJapanVpn: result.countryPolicy === 'non-jp-vpn',
           vpnVerdict: false,
         };
       } catch (_) {
-        diagnostics.countryPolicy = 'unavailable';
-        diagnostics.generic = { status: 'unavailable', httpStatus: error && error.httpStatus || null, verdict: null };
-        diagnostics.error = 'IP国・一般VPN判定APIを利用できません' + (error && error.httpStatus ? ' (HTTP ' + error.httpStatus + ')' : '');
-        renderDiagnostics();
+        result.countryPolicy = 'unavailable';
+        result.generic = { status: 'unavailable', httpStatus: error && error.httpStatus || null, verdict: null };
+        result.error = 'IP国・一般VPN判定APIを利用できません' + (error && error.httpStatus ? ' (HTTP ' + error.httpStatus + ')' : '');
+        notify();
         return { countryCode: '', countryName: '', nonJapanVpn: false, vpnVerdict: false };
       }
     }
@@ -624,6 +629,7 @@
     if (status === 'allowed') diagnostics.error = null;
     diagnostics.final = status;
     diagnostics.checkedAt = new Date().toISOString();
+    lastCompletedCheckAt = Date.now();
     renderDiagnostics();
     if (status === 'allowed') {
       removeNotice();
@@ -649,67 +655,87 @@
 
   async function checkVpn(options = {}) {
     const useExternalApi = options.external !== false;
-    status = 'checking';
-    emitStatus();
-    updateStatusButtons(status);
-    diagnostics = freshDiagnostics();
-    diagnostics.final = 'checking';
-    renderDiagnostics();
+    const ownGeneration = ++checkGeneration;
+    activeController?.abort();
     const controller = typeof root.AbortController === 'function' ? new root.AbortController() : null;
+    activeController = controller;
+    checkInFlight = true;
+    const isCurrent = () => ownGeneration === checkGeneration;
+    const background = options.background === true && status === 'allowed';
+    if (!background) {
+      status = 'checking';
+      emitStatus();
+      updateStatusButtons(status);
+    }
+    const result = freshDiagnostics();
+    result.final = 'checking';
+    diagnostics = result;
+    const notify = () => { if (isCurrent()) renderDiagnostics(); };
+    notify();
     const timer = root.setTimeout && controller ? root.setTimeout(() => controller.abort(), 15000) : null;
     try {
       if (typeof root.fetch !== 'function') throw new Error('fetch unavailable');
       const ipPayload = await fetchJson(IP_URL, controller ? controller.signal : undefined);
+      if (!isCurrent()) return false;
       const ip = String(ipPayload && ipPayload.ip || '').trim();
       if (!ip) throw new Error('public IP unavailable');
-      diagnostics.ip = ip;
+      result.ip = ip;
 
       const manualDesignation = getManualIpDesignation(ip);
-      diagnostics.manualDesignation = manualDesignation;
+      result.manualDesignation = manualDesignation;
       if (manualDesignation === 'non-vpn') return applyFinalStatus(false);
 
-      diagnostics.protonOwnedNetworkMatch = isKnownProtonOwnedIp(ip);
-      renderDiagnostics();
+      result.protonOwnedNetworkMatch = isKnownProtonOwnedIp(ip);
+      notify();
       const signal = controller ? controller.signal : undefined;
       let allowed = isKnownVpnIp(ip);
       if (allowed) {
-        diagnostics.generic = { status: 'skipped-known-ip', httpStatus: null, verdict: true };
-        renderDiagnostics();
+        result.generic = { status: 'skipped-known-ip', httpStatus: null, verdict: true };
+        notify();
       } else {
         const [assessment, protonExitMatch] = await Promise.all([
-          lookupIpAssessment(ip, signal, useExternalApi),
+          lookupIpAssessment(ip, signal, useExternalApi, result, notify),
           isKnownProtonExitIp(ip, signal),
         ]);
-        diagnostics.protonExitMatch = protonExitMatch;
+        if (!isCurrent()) return false;
+        result.protonExitMatch = protonExitMatch;
         if (assessment.nonJapanVpn) allowed = true;
         else if (useExternalApi) allowed = assessment.vpnVerdict;
         if (!allowed) allowed = protonExitMatch;
       }
+      if (!isCurrent()) return false;
       if (!allowed && manualDesignation === 'vpn') {
         if (allowManualVpn(ip)) return applyFinalStatus(true);
-        diagnostics.error = 'VPNと確認できなかったため手動指定を適用しませんでした';
+        result.error = 'VPNと確認できなかったため手動指定を適用しませんでした';
       }
       return applyFinalStatus(allowed);
     } catch (error) {
-      if (diagnostics.manualDesignation === 'vpn' || getManualIpDesignation(diagnostics.ip) === 'vpn') {
-        if (allowManualVpn(diagnostics.ip)) return applyFinalStatus(true);
-        diagnostics.error = 'VPNを確認できなかったため手動指定を適用しませんでした';
+      if (!isCurrent()) return false;
+      if (result.manualDesignation === 'vpn' || getManualIpDesignation(result.ip) === 'vpn') {
+        if (allowManualVpn(result.ip)) return applyFinalStatus(true);
+        result.error = 'VPNを確認できなかったため手動指定を適用しませんでした';
       }
       status = 'blocked';
       emitStatus();
       updateStatusButtons(status);
-      diagnostics.final = 'blocked';
-      diagnostics.checkedAt = new Date().toISOString();
-      diagnostics.error = diagnostics.error || (error && error.message ? error.message : 'VPN接続を確認できません');
-      renderDiagnostics();
+      result.final = 'blocked';
+      result.checkedAt = new Date().toISOString();
+      lastCompletedCheckAt = Date.now();
+      result.error = result.error || (error && error.message ? error.message : 'VPN接続を確認できません');
+      notify();
       showNotice('VPN接続を確認できません。接続後に「再確認」を押してください。');
       return false;
     } finally {
+      if (isCurrent()) { activeController = null; checkInFlight = false; }
       if (timer && root.clearTimeout) root.clearTimeout(timer);
     }
   }
 
   function setAllowedForTesting(allowed) {
+    checkGeneration++;
+    activeController?.abort();
+    activeController = null;
+    checkInFlight = false;
     status = allowed ? 'allowed' : 'blocked';
     emitStatus();
     updateStatusButtons(status);
@@ -730,12 +756,39 @@
     });
   }
 
+  function refreshVpn() {
+    if (checkInFlight || status === 'checking') return;
+    if (root.document?.visibilityState === 'hidden') return;
+    return checkVpn({ external: true, background: true });
+  }
+
   installGuards();
   installDiagnosticsUi();
   updateStatusButtons(status);
   if (root.document) {
     if (root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded', () => checkVpn({ external: false }), { once: true });
     else if (root.setTimeout) root.setTimeout(() => checkVpn({ external: false }), 0);
+    if (typeof root.setInterval === 'function') root.setInterval(refreshVpn, VPN_REFRESH_MS);
+    root.document.addEventListener?.('visibilitychange', () => {
+      if (root.document.visibilityState === 'visible' && Date.now() - lastCompletedCheckAt >= VPN_REFRESH_MS) refreshVpn();
+    });
+  }
+  if (typeof root.addEventListener === 'function') {
+    root.addEventListener('online', refreshVpn);
+    root.addEventListener('offline', () => {
+      checkGeneration++;
+      activeController?.abort();
+      activeController = null;
+      checkInFlight = false;
+      status = 'blocked';
+      diagnostics.final = 'blocked';
+      diagnostics.error = 'ネットワーク接続が切断されました';
+      emitStatus();
+      updateStatusButtons(status);
+      blockExistingExternalMedia();
+      showNotice('VPN接続を確認できません。');
+      renderDiagnostics();
+    });
   }
 
   return {
@@ -747,6 +800,7 @@
     KNOWN_VPN_IPV4S,
     MANUAL_VPN_IPS_KEY,
     MANUAL_NON_VPN_IPS_KEY,
+    VPN_REFRESH_MS,
     isVpnVerdict,
     countryInfoFromPayload,
     isKnownProtonOwnedIp,
