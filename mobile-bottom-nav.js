@@ -5,6 +5,7 @@
   const ICONS = Object.freeze({
     home: '<svg class="mobileNavGlyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5v8A1.5 1.5 0 0 1 18.5 20h-13A1.5 1.5 0 0 1 4 18.5z"/><path d="M9 20v-6h6v6"/></svg>',
     manga: '<svg class="mobileNavGlyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5c3-1.5 5.5-1.2 8 .7v13c-2.2-1.7-4.8-2-8-.6z"/><path d="M20 5.5c-3-1.5-5.5-1.2-8 .7v13c2.2-1.7 4.8-2 8-.6z"/></svg>',
+    images: '<svg class="mobileNavGlyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.5"/><path d="m4 18 5.5-5.5 3.5 3.5 2.4-2.4L20 18"/></svg>',
     video: '<svg class="mobileNavGlyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></svg>',
     profile: '<svg class="mobileNavGlyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg>'
   });
@@ -12,6 +13,7 @@
   const SPA_ITEMS = Object.freeze([
     { key:'home', label:'ホーム', href:'home.html', id:'mobileNavHome' },
     { key:'manga', label:'漫画', href:'manga.html', id:'mobileNavManga' },
+    { key:'images', label:'画像', href:'images.html', id:'mobileNavImages' },
     { key:'video', label:'動画', href:'video.html', id:'mobileNavVideo' },
     { key:'profile', label:'プロフィール', href:'profile.html', id:'mobileNavProfile' },
   ]);
@@ -30,6 +32,7 @@
     const name = pathname.split('/').pop() || 'home.html';
     if (name === 'profile.html') return 'profile';
     if (name === 'manga.html') return 'manga';
+    if (name === 'images.html') return 'images';
     if (name === 'video.html' || name === 'video-player.html' || name === 'video-edit.html') return 'video';
     return 'home';
   }
@@ -640,7 +643,7 @@
       return;
     }
     const name = location.pathname.split('/').pop() || 'home.html';
-    if (['home.html','profile.html','manga.html','video.html','video-player.html','video-edit.html'].includes(name)) ensureSpaNav();
+    if (['home.html','profile.html','manga.html','images.html','video.html','video-player.html','video-edit.html'].includes(name)) ensureSpaNav();
   }
 
   function scheduleAttach() {

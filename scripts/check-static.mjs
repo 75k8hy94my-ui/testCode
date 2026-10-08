@@ -4,12 +4,12 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const pages = ['index.html', 'sync.html', 'home.html', 'profile.html', 'manga.html', 'manga-sandbox.html', 'video.html', 'reader.html', 'video-player.html'];
+const pages = ['index.html', 'sync.html', 'home.html', 'profile.html', 'manga.html', 'manga-sandbox.html', 'images.html', 'video.html', 'reader.html', 'video-player.html'];
 const standalone = [
   'app-desktop-rail.js', 'app-global-shell.js', 'author-summary.js', 'backup-format.js', 'browser-storage.js', 'desktop-navigation.js',
   'encrypted-asset-backend.js', 'encrypted-asset-cache.js', 'encrypted-asset-crypto.js', 'encrypted-asset-import.js', 'encrypted-asset-item.js', 'encrypted-asset-reader.js', 'encrypted-asset-storage.js', 'encrypted-asset-sync.js',
   'encrypted-chunk-cache.js', 'encrypted-chunk-crypto.js', 'encrypted-chunk-sync.js', 'image-compression-profile.js', 'image-photo-processor.js', 'image-processing-worker.js', 'image-pyramid-builder.js', 'image-remote-access.js', 'image-transfer-ledger.js', 'image-transfer-settings.js', 'feature-flags.js', 'home-dashboard.js',
-  'home-profile-spa.js', 'mobile-bottom-nav.js', 'manga-sandbox.js', 'media-access-gate.js', 'profile-avatar.js', 'profile-menu.js', 'shelf-search.js',
+  'home-profile-spa.js', 'images.js', 'mobile-bottom-nav.js', 'manga-sandbox.js', 'media-access-gate.js', 'profile-avatar.js', 'profile-menu.js', 'shelf-search.js',
   'manga-import-validator.js', 'manga-import-candidate.js', 'manga-import-author-sync.js', 'manga-import-batch.js', 'manga-import-bridge.js', 'manga-import-dialog.js', 'manga-list-cover-cache.js',
   'reader-target.js', 'reader-item-repository.js', 'reader-image-loader.js', 'reader-lifecycle.js', 'reader-page-transition.js', 'reader-page-source.js', 'reader-progress-repository.js', 'reader-runtime.js',
   'status-message.js',

@@ -25,17 +25,13 @@ test('manga route skips protected store reads and legacy migration without VPN a
   assert.match(route, /control\.disabled = !canReadProtectedData\(\)/);
 });
 
-test('manga mutation callbacks stop before protected work when access is blocked', () => {
+test('manga mutation callbacks remain protected while image uploads move out', () => {
   const extensionImport = route.slice(route.indexOf("bind(bulkDetect, 'click'"), route.indexOf("bind(mangaImportRegister, 'click'"));
-  const registerImport = route.slice(route.indexOf("bind(mangaImportRegister, 'click'"), route.indexOf('const closeImport'));
-  const encryptedImport = route.slice(route.indexOf("bind(importForm, 'submit'"), route.indexOf('bindFactory(MangaListSearchEventsFactory'));
-  const createFolder = route.slice(route.indexOf('onCreateConfirm: () =>'), route.indexOf('}, { createButton: newFolder'));
-
+  const registerImport = route.slice(route.indexOf("bind(mangaImportRegister, 'click'"), route.indexOf('bindFactory(MangaListSearchEventsFactory'));
   assert.match(extensionImport, /if \(!canReadProtectedData\(\)\)/);
   assert.match(registerImport, /if \(!canReadProtectedData\(\)\)/);
-  assert.match(encryptedImport, /if \(!canReadProtectedData\(\)\)/);
-  assert.match(encryptedImport, /await service\.importFiles[\s\S]*importController\.signal\.aborted \|\| !canReadProtectedData\(\)/);
-  assert.match(createFolder, /if \(!canReadProtectedData\(\)\) return/);
+  assert.doesNotMatch(route, /bind\(importForm, 'submit'/);
+  assert.match(route, /!item\.encryptedAssets\?\.pages\?\.length/);
 });
 
 test('manga route loads the shared runtime pieces without reader or video entry assets', () => {

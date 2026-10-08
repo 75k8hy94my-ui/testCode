@@ -42,7 +42,7 @@ function ensureAppShell(){
   if(window.MobileBottomNav&&typeof MobileBottomNav.ensureSpaNav==='function'){
     MobileBottomNav.ensureSpaNav(app);
   }else if(!document.getElementById('mobileBottomNav')){
-    const nav=document.createElement('nav');nav.id='mobileBottomNav';nav.className='mobileBottomNav';nav.setAttribute('aria-label','モバイルメニュー');nav.innerHTML='<a href="home.html">ホーム</a><a href="manga.html">漫画</a><a href="video.html">動画</a><a href="profile.html">プロフィール</a>';app.append(nav);
+    const nav=document.createElement('nav');nav.id='mobileBottomNav';nav.className='mobileBottomNav';nav.setAttribute('aria-label','モバイルメニュー');nav.innerHTML='<a href="home.html">ホーム</a><a href="manga.html">漫画</a><a href="images.html">画像</a><a href="video.html">動画</a><a href="profile.html">プロフィール</a>';app.append(nav);
   }
   mount=document.getElementById('routeContent');
   return mount;

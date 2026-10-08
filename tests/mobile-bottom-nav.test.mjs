@@ -6,10 +6,11 @@ const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), '
 const js = read('mobile-bottom-nav.js');
 const css = read('mobile-bottom-nav.css');
 
-test('SPA Liquid Glass nav has four icon-and-label destinations', () => {
+test('SPA Liquid Glass nav has five icon-and-label destinations', () => {
   for (const [id, href, label] of [
     ['mobileNavHome','home.html','ホーム'],
     ['mobileNavManga','manga.html','漫画'],
+    ['mobileNavImages','images.html','画像'],
     ['mobileNavVideo','video.html','動画'],
     ['mobileNavProfile','profile.html','プロフィール'],
   ]) {
