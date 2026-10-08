@@ -555,6 +555,14 @@
     }
   }
   async function initialize() {
+    if (window.TestCodeGuest?.isActive()) {
+      document.documentElement.classList.remove('auth-pending');
+      window.MobileBottomNav?.ensureSpaNav?.($('homeApp'));
+      window.AppDesktopRail?.syncActive?.();
+      try { await window.GuestPhotoLibrary.start(); }
+      catch (error) { status('ゲスト画像を開けません：' + (error?.message || '保存領域を確認してください'), true); }
+      return;
+    }
     const config = window.MANGA_READER_SUPABASE || {};
     const session = api?.loadSession?.();
     if (!session?.refresh_token || !config.url || !config.publishableKey) {

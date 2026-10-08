@@ -656,7 +656,7 @@
         entry.cleanup();
         return null;
       }
-      installVpnControls(result.root, documentRef);
+      if (!windowRef.TestCodeGuest?.isActive()) installVpnControls(result.root, documentRef);
       const notice = documentRef.createElement('p');
       notice.className = 'vpnProtectedDataNotice';
       notice.setAttribute('aria-live', 'polite');
