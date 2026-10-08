@@ -139,6 +139,79 @@
   let busy = false;
   const transferStorage = vpnFreeTransferStorage(window.localStorage);
 
+  let uploadProgress = null;
+  let uploadProgressInterval = null;
+  function formatSeconds(seconds) {
+    const total = Math.max(0, Math.floor(Number(seconds) || 0));
+    if (total < 60) return total + '秒';
+    return Math.floor(total / 60) + '分' + String(total % 60).padStart(2, '0') + '秒';
+  }
+  function renderUploadProgress() {
+    const info = uploadProgress?.snapshot();
+    const panel = $('imageUploadProgress');
+    if (!panel || !info) return;
+    panel.hidden = false;
+    panel.dataset.status = info.state === 'running' ? 'running' : info.state;
+    $('imageProgressState').textContent = info.label;
+    $('imageProgressElapsed').textContent = '経過 ' + formatSeconds(info.elapsedSeconds);
+    $('imageProgressFile').textContent = info.fileName
+      ? '処理対象：' + info.fileName + '（' + Math.min(info.fileIndex + 1, info.totalPages) + ' / ' + info.totalPages + 'ページ目）'
+      : (info.totalPages === 0 ? '画像本体の再送信はありません' : '全' + info.totalPages + 'ページ');
+    const bar = $('imagePageProgress');
+    bar.hidden = info.totalPages === 0;
+    bar.max = Math.max(1, info.totalPages);
+    bar.value = Math.min(info.completedPages, bar.max);
+    $('imageProgressCount').textContent = info.totalPages
+      ? 'サーバー登録確認済み：' + info.completedPages + ' / ' + info.totalPages + 'ページ'
+      : '画像本体は保存済み（再送信なし）';
+    $('imageProgressActivity').textContent = info.state === 'running'
+      ? '最終進捗更新：' + formatSeconds(info.idleSeconds) + '前'
+      : (info.state === 'done' ? 'すべての保存完了を確認' : '処理は終了しています');
+    $('imageProgressDetail').textContent = info.detail;
+    $('imageProgressSteps').querySelectorAll('li[data-upload-stage]').forEach((item,index) => {
+      const state = info.state === 'done' ? 'complete'
+        : info.state === 'running' && info.stageIndex >= 0
+          ? (index < info.stageIndex ? 'complete' : index === info.stageIndex ? 'active' : 'pending')
+          : 'pending';
+      item.dataset.state = state;
+      if (state === 'active') item.setAttribute('aria-current', 'step');
+      else item.removeAttribute('aria-current');
+    });
+    $('imageProgressHint').textContent = info.waiting
+      ? '30秒以上進捗更新がありません。現在の段階で通信の応答または画像処理を待機している可能性があります。処理が完了したとは限りません。'
+      : info.state === 'done' ? '画像のサーバー登録と作品一覧のクラウド同期が完了しました。'
+      : info.state === 'error' ? '処理は正常完了していません。エラー内容と再試行ボタンを確認してください。'
+      : info.state === 'canceled' ? 'アップロードを中止しました。新しい操作を開始できます。'
+      : '画像加工の「complete」はアップロード完了ではありません。ページ登録・一覧同期まで確認します。';
+  }
+  function startUploadProgress(totalPages) {
+    if (uploadProgressInterval != null) {
+      window.clearInterval(uploadProgressInterval);
+      uploadProgressInterval = null;
+    }
+    uploadProgress = createUploadProgressTracker();
+    uploadProgress.start(totalPages);
+    renderUploadProgress();
+    uploadProgressInterval = window.setInterval(renderUploadProgress, 1000);
+  }
+  function reportUploadProgress(event) {
+    if (!uploadProgress) return;
+    if (activeController?.signal?.aborted && !['cleanup','canceled','error'].includes(event?.phase)) return;
+    uploadProgress.update(event);
+    renderUploadProgress();
+    updateButtons();
+  }
+  function finishUploadProgress(phase, message) {
+    if (!uploadProgress) return;
+    uploadProgress.update({ phase, message });
+    if (uploadProgressInterval != null) {
+      window.clearInterval(uploadProgressInterval);
+      uploadProgressInterval = null;
+    }
+    renderUploadProgress();
+  }
+
+
   function currentUserId() {
     return String(api.loadSession()?.user?.id || '');
   }
@@ -209,7 +282,8 @@
     $('imageUploadButton').disabled = busy || pendingSync;
     $('imageFiles').disabled = busy || pendingSync;
     $('imageTitle').disabled = busy || pendingSync;
-    $('imageCancelButton').hidden = !busy;
+    $('imageCancelButton').hidden = !busy || !activeController || pendingSync ||
+      ['sync', 'cleanup', 'done', 'error'].includes(uploadProgress?.snapshot()?.phase);
     $('imageRetrySync').hidden = !pendingSync;
     $('imageRetrySync').disabled = busy;
   }
