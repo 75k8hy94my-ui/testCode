@@ -135,14 +135,55 @@
 .book-author, .book-reading { color: var(--manga-sub); font-size: 10px; }
 .book-tags { display: flex; flex-wrap: wrap; gap: 3px; }
 .book-tag { max-width: 100%; padding: 2px 5px; border-radius: 6px; background: #edf2ff; color: #3657a7; font-size: 9px; }
+/* Controls stay above the cover image, its loading badge and retry overlay. */
 .book-delBtn, .book-favBtn {
-  position: absolute; width: 24px; height: 24px; padding: 0; border-radius: 50%;
-  border: 1px solid rgba(255,255,255,.12); background: rgba(10,12,17,.82); color: var(--manga-text); cursor: pointer;
+  position: absolute;
+  z-index: 4;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.38);
+  background: rgba(10,12,17,.88);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  appearance: none;
 }
-.book-delBtn { top: 4px; right: 4px; }
-.book-favBtn { right: 4px; bottom: 4px; display: flex; align-items: center; justify-content: center; }
-.book-favBtn img { width: 13px; height: 13px; }
-.book-moveBtn { position: absolute; top: 50%; width: 34px; height: 38px; padding: 0; transform: translateY(-50%); border: 1px solid rgba(0,0,0,.14); border-radius: 10px; background: #fff; color: #1d1d1f; cursor: pointer; }
+.book-delBtn { top: 5px; right: 5px; }
+.book-favBtn { right: 5px; bottom: 5px; }
+.book-favBtn img {
+  display: block;
+  width: 18px;
+  height: 18px;
+  max-width: 18px;
+  object-fit: contain;
+  pointer-events: none;
+}
+.book-favBtn.is-favorite {
+  border-color: rgba(255,107,74,.95);
+  background: rgba(34,18,20,.94);
+}
+.book-favBtn:focus-visible, .book-delBtn:focus-visible, .book-moveBtn:focus-visible {
+  outline: 2px solid var(--manga-accent);
+  outline-offset: 2px;
+}
+.book-moveBtn { position: absolute; z-index: 4; top: 50%; width: 34px; height: 38px; padding: 0; transform: translateY(-50%); border: 1px solid rgba(0,0,0,.14); border-radius: 10px; background: #fff; color: #1d1d1f; cursor: pointer; }
+.book-cover > .bulk-select {
+  position: absolute;
+  z-index: 4;
+  top: 7px;
+  left: 7px;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--manga-accent);
+  cursor: pointer;
+  outline: 2px solid rgba(10,12,17,.55);
+  border-radius: 3px;
+}
 .book-moveUpBtn { left: 5px; }
 .book-moveDownBtn { right: 5px; }
 .book-moveBtn:disabled { opacity: .3; cursor: not-allowed; }
@@ -375,3 +416,9 @@ html[data-theme="light"] .folder-cover { background: linear-gradient(145deg, #ee
 .book-cover-retry { border: 1px solid rgba(255,255,255,.35); cursor: pointer; }
 .book-cover > img[data-cover-state="loading"] ~ .book-cover-loading { display: flex; }
 .book-cover > img[data-cover-state="failed"] ~ .book-cover-retry { display: flex; }
+/* The retry button and favorite button occupy different corners. */
+.book-cover-loading, .book-cover-retry {
+  left: 5px;
+  right: 5px;
+  bottom: 43px;
+}
