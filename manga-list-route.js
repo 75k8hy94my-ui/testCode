@@ -209,6 +209,25 @@
       let elements = null;
       const coverCache = windowRef.MangaListCoverCache;
       if (!coverCache) throw new Error('manga cover cache failed to load');
+      let encryptedCoverLoader = null;
+      let encryptedCoverCache = null;
+      const loadEncryptedCover = (item, img) => {
+        const first = item?.encryptedAssets?.pages?.[0];
+        const active = windowRef.MangaVault?.loadActive?.();
+        if (!first || !active?.rawKey || !canReadProtectedData()) return Promise.resolve();
+        const config = windowRef.MANGA_READER_SUPABASE || {};
+        const cache = (encryptedCoverCache ||= windowRef.EncryptedAssetCache.createCache());
+        const loader = (encryptedCoverLoader ||= windowRef.EncryptedAssetReader.createPreviewLoader({ maxEntries: 64 }));
+        const storageTransport = windowRef.EncryptedAssetStorage.createStorageTransport({ baseUrl: config.url, publishableKey: config.publishableKey });
+        return loader.load({
+          manifest: first.manifest, assetId: first.assetId, revision: first.revision,
+          masterKey: active.rawKey, vault: windowRef.MangaVault, storage: storageTransport,
+          cache, transferStorage: windowRef.localStorage, mediaAccess: windowRef.MangaReaderMediaAccess,
+          sync: windowRef.EncryptedAssetSync, crypto: windowRef.EncryptedAssetCrypto,
+        }).then(({ url }) => {
+          if (img.isConnected && canReadProtectedData()) img.src = url;
+        }).catch(() => { /* Keep the blank cover; never fall back to an unauthenticated image URL. */ });
+      };
       const coverFailedCache = new Set();
       const extCandidates = ['jpg', 'jpeg', 'png', 'webp'];
       const iconFolder = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath d="M3 6a2 2 0 0 1 2-2h4.5a2 2 0 0 1 1.6.8L12.5 6H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6z" fill="%238d93a3"/%3E%3C/svg%3E';
@@ -299,7 +318,7 @@
           parseInputUrl, getCachedMangaInfo, getCoverSourceCache: coverCache.getSourceCache,
           getCoverFailedCache: () => coverFailedCache, pageUrlFor, extCandidates, loadTimeoutMs: 60000,
           sessionKey: 'mangaReaderSupabaseSession', readStorageItem: (key) => storage.getItem(key),
-          getSupabaseConfig: () => windowRef.MANGA_READER_SUPABASE || {}, getLocalStoragePathFromUrl,
+          getSupabaseConfig: () => windowRef.MANGA_READER_SUPABASE || {}, getLocalStoragePathFromUrl, loadEncryptedCover,
           loadCachedLocalImage: imageCache.loadCachedLocalImage,
           getLocalCoverObjectUrl: coverCache.getLocalCover, rememberLocalCoverObjectUrl: coverCache.rememberLocalCover,
           setTimer: (callback, delay) => windowRef.setTimeout(callback, delay),
@@ -330,7 +349,7 @@
       const appendFolderPreview = (cover, items, emptyIcon, emptyAlt, kindLabel) => {
         const preview = items.slice(0, 4); if (!preview.length) { const img = documentRef.createElement('img'); img.src = emptyIcon; img.alt = emptyAlt; cover.appendChild(img); return; }
         const box = documentRef.createElement('div'); box.className = 'folder-preview preview-count-' + preview.length;
-        preview.forEach((item) => { const img = documentRef.createElement('img'); img.alt = title(item); if (item.pages && item.pages[0]) img.src = item.pages[0]; else host.setupFeedImage(img, item.url, item.numberWidth, item.pagePattern, item.id); box.appendChild(img); });
+        preview.forEach((item) => { const img = documentRef.createElement('img'); img.alt = title(item); if (item.encryptedAssets?.pages?.length) host.loadLocalCover(item, img); else if (item.pages && item.pages[0]) img.src = item.pages[0]; else host.setupFeedImage(img, item.url, item.numberWidth, item.pagePattern, item.id); box.appendChild(img); });
         cover.appendChild(box); const badge = documentRef.createElement('span'); badge.className = 'folder-kind-badge'; badge.textContent = kindLabel || 'フォルダ'; cover.appendChild(badge);
       };
       const makeHeartIcon = () => { const img = documentRef.createElement('img'); img.alt = ''; return img; };
@@ -425,9 +444,13 @@
         const importStatus = rootElement.querySelector('#encryptedImageImportStatus');
         const importSubmit = rootElement.querySelector('#encryptedImageSubmitButton');
         let activeEncryptedImport = null;
+        let pendingShelfSync = false;
+        cleanups.push(() => activeEncryptedImport?.abort());
         bind(documentRef, 'manga-reader-vpn-status', (event) => {
           if (event && event.detail && event.detail.status === 'allowed') return;
           if (activeEncryptedImport) activeEncryptedImport.abort();
+          encryptedCoverLoader?.destroy();
+          encryptedCoverLoader = null;
         });
         const bulkDetect = rootElement.querySelector('#bulkDetectBtn');
         const mangaImportRegister = rootElement.querySelector('#mangaImportRegisterButton');
@@ -491,7 +514,15 @@
             mangaImportRegister.disabled = !canReadProtectedData();
           }
         });
-        const closeImport = () => { importDialog.hidden = true; importDialog.style.display = ''; };
+        const closeImport = () => {
+          if (activeEncryptedImport) {
+            activeEncryptedImport.abort();
+            importStatus.textContent = '処理を中止し、保存済み画像を整理しています…';
+            return;
+          }
+          importDialog.hidden = true;
+          importDialog.style.display = '';
+        };
         bind(addEncryptedImages, 'click', () => {
           if (!canReadProtectedData()) return;
           if (!windowRef.MangaVault?.loadActive?.()?.rawKey) {
@@ -510,7 +541,23 @@
           const activeVault = windowRef.MangaVault?.loadActive?.();
           if (!activeVault?.rawKey) { importStatus.textContent = 'ログインして保管庫を開いてから追加してください。'; return; }
           const selectedFiles = Array.from(importFiles.files || []);
-          if (!selectedFiles.length) { importStatus.textContent = 'ページ画像を選択してください。'; return; }
+          if (!pendingShelfSync && !selectedFiles.length) { importStatus.textContent = 'ページ画像を選択してください。'; return; }
+          if (pendingShelfSync) {
+            importSubmit.disabled = true;
+            try {
+              await host.flushCloudSync();
+              pendingShelfSync = false;
+              importSubmit.textContent = '暗号化して追加';
+              importStatus.textContent = '画像と本棚のクラウド同期が完了しました。';
+              importForm.reset();
+              windowRef.setTimeout(closeImport, 900);
+            } catch (error) {
+              importStatus.textContent = '本棚のクラウド同期に失敗しました。再試行してください：' + (error?.message || '不明なエラー');
+            } finally {
+              importSubmit.disabled = !canReadProtectedData();
+            }
+            return;
+          }
           const config = windowRef.MANGA_READER_SUPABASE || {};
           importSubmit.disabled = true;
           importFiles.disabled = true;
@@ -528,23 +575,38 @@
               } }),
               stage: ({ assetId, targetRevision, processed }) => windowRef.EncryptedAssetSync.stageProcessedRevision({ cache, masterKey: activeVault.rawKey, assetId, targetRevision, processed }),
               publish: ({ assetId, targetRevision, staged, signal }) => windowRef.EncryptedAssetSync.publishPendingRevision({ vault: windowRef.MangaVault, storage: storageTransport, cache, assetId, targetRevision, objectIds: staged.objectIds, signal, transferStorage: windowRef.localStorage, mediaAccess: windowRef.MangaReaderMediaAccess }),
-              tombstone: (assetId, revision) => canReadProtectedData() ? windowRef.EncryptedAssetSync.tombstoneAsset({ vault: windowRef.MangaVault, assetId, expectedRevision: revision }) : Promise.resolve(),
+              tombstone: (assetId, revision) => windowRef.EncryptedAssetSync.tombstoneAsset({ vault: windowRef.MangaVault, assetId, expectedRevision: revision }),
+              cleanupAsset: ({ assetId, revision }) => windowRef.EncryptedAssetSync.discardImportedAsset({ vault: windowRef.MangaVault, storage: storageTransport, cache, assetId, expectedRevision: revision }),
             });
             const item = await service.importFiles({ files: selectedFiles, title: importTitle.value, signal: importController.signal, onProgress: (progress) => {
               if (!canReadProtectedData()) { importController.abort(); return; }
               importStatus.textContent = `${progress.index}/${progress.total} ページを同期しました`;
             } });
-            if (!canReadProtectedData()) return;
+            if (importController.signal.aborted || !canReadProtectedData()) {
+              for (const page of item.encryptedAssets.pages) {
+                await windowRef.EncryptedAssetSync.discardImportedAsset({ vault: windowRef.MangaVault, storage: storageTransport, cache, assetId: page.assetId, expectedRevision: page.revision });
+              }
+              throw new Error('処理を中止しました。');
+            }
             const currentItems = state().savedItems.slice();
             currentItems.unshift(item);
             setState({ savedItems: currentItems, bookshelfPage: 1 });
-            host.persistItems();
+            if (host.persistItems() === false) throw new Error('本棚データを端末に保存できませんでした。');
             renderList();
-            importStatus.textContent = '追加しました。暗号化画像は本棚と保管庫に同期されました。';
+            pendingShelfSync = true;
+            importStatus.textContent = '画像を暗号化保存しました。本棚をクラウド同期中…';
+            await host.flushCloudSync();
+            pendingShelfSync = false;
+            importStatus.textContent = '画像と本棚のクラウド同期が完了しました。';
             importForm.reset();
             windowRef.setTimeout(closeImport, 900);
           } catch (error) {
-            if (canReadProtectedData()) importStatus.textContent = error?.message || '暗号化画像を追加できませんでした。';
+            if (canReadProtectedData()) {
+              importStatus.textContent = pendingShelfSync
+                ? '画像は保存されましたが、本棚のクラウド同期に失敗しました。「同期を再試行」を押してください：' + (error?.message || '不明なエラー')
+                : (error?.message || '暗号化画像を追加できませんでした。');
+              if (pendingShelfSync) importSubmit.textContent = '同期を再試行';
+            }
           } finally {
             if (activeEncryptedImport === importController) activeEncryptedImport = null;
             importSubmit.disabled = !canReadProtectedData();
@@ -637,6 +699,10 @@
     }
     function cleanup() {
       lifecycle += 1;
+      if (encryptedCoverLoader) {
+        encryptedCoverLoader.destroy();
+        encryptedCoverLoader = null;
+      }
       if (activeEntry) {
         activeEntry.cleanup();
         activeEntry = null;
