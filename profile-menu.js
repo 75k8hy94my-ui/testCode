@@ -13,10 +13,15 @@
     document.querySelectorAll('[data-profile-menu-trigger], #desktopProfileButton').forEach((button)=>{
       const previous=button.querySelector('.profileAvatarButtonImage');
       button.classList.toggle('hasProfileAvatar',!!avatar);
+      const symbol=button.querySelector('svg');
+      if(symbol)symbol.style.display=avatar?'none':'';
       if(!avatar){previous?.remove();return;}
       const image=previous||document.createElement('img');
       image.className='profileAvatarButtonImage';
       image.alt='';
+      image.style.cssText=button.id==='desktopProfileButton'
+        ? 'width:28px;height:28px;min-width:28px;object-fit:cover;border-radius:50%'
+        : 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%';
       if(image.getAttribute('src')!==avatar)image.src=avatar;
       if(!previous)button.appendChild(image);
     });
