@@ -30,7 +30,12 @@
     const sourceLongEdge = Math.max(sourceWidth, sourceHeight);
     if (sourceLongEdge <= normalized.preview.maxLongEdge) return [];
     const maximumLongEdge = Math.min(sourceLongEdge, normalized.zoom.maximumLongEdge);
-    const targets = [normalized.zoom.intermediateLongEdge, maximumLongEdge]
+    // Single-level image-library profiles use a shared intermediate/maximum cap.
+    // Preserve the source resolution when it is below that cap rather than
+    // accidentally producing *no* zoom level (and dropping detail to preview).
+    const targets = normalized.zoom.intermediateLongEdge === normalized.zoom.maximumLongEdge
+      ? [maximumLongEdge]
+      : [normalized.zoom.intermediateLongEdge, maximumLongEdge]
       .filter(target => target <= sourceLongEdge)
       .filter((target, index, all) => all.indexOf(target) === index)
       .sort((a, b) => a - b);
