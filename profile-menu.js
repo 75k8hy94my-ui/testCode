@@ -8,7 +8,7 @@
     let avatar='';
     try{
       const source=localStorage.getItem(AVATAR_KEY)||'';
-      if(window.MangaVault?.loadActive?.()&&typeof source==='string'&&source.length<=100000&&/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(source))avatar=source;
+      if((window.TestCodeGuest?.isActive()||window.MangaVault?.loadActive?.())&&typeof source==='string'&&source.length<=100000&&/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(source))avatar=source;
     }catch(_){}
     document.querySelectorAll('[data-profile-menu-trigger], #desktopProfileButton').forEach((button)=>{
       const previous=button.querySelector('.profileAvatarButtonImage');
