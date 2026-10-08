@@ -196,11 +196,9 @@
         // Queue all reads while the IDB transaction is active.
         const reads = keys.map(key => requestResult(store.get(key)));
         const found = await Promise.all(reads);
-        const accessedAt = nowValue(now);
-        const touched = found.map(value => value ? sanitizeRecord({ ...value, lastAccessedAt: accessedAt }) : null);
-        const toTouch = touched.filter(Boolean);
-        if (toTouch.length) await replaceRecords(toTouch);
-        return touched;
+        // Bulk reads happen during import/finalization and do not need LRU
+        // touch writes. Reader's individual get() still updates access time.
+        return found.map(value => value ? sanitizeRecord(value) : null);
       },
       async setRetentionMany(assetId, revision, objectIds, retention) {
         if (!VALID_RETENTION.has(retention)) throw new TypeError('retention is invalid');
