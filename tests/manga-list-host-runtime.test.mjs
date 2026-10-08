@@ -348,6 +348,9 @@ test('each cover fallback candidate has its own timeout; slow URLs remain retrya
   const input = deps([]);
   const timers = [];
   input.images.extCandidates = ['jpg', 'png'];
+  input.images.parseInputUrl = (value) => ({ baseUrl: value, pattern: null });
+  input.images.pageUrlFor = (base, page, index, width) =>
+    base + String(page).padStart(width, '0') + '.' + input.images.extCandidates[index];
   input.images.setTimer = (callback, delay) => { timers.push({ callback, delay }); return timers.length; };
   const host = loadFactory().create(input);
   const handlers = {};
