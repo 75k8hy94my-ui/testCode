@@ -85,3 +85,54 @@ test('manga keeps normal works; encrypted image UI is isolated to images.html', 
   assert.match(read('mobile-bottom-nav.js'),/mobileNavImages/);
   assert.match(read('sync.html'),/next === 'images\.html'/);
 });
+
+test('processing complete is never confused with upload success, and inactivity is visible', () => {
+  const {api} = loadImagesModule();
+  let time = 100000;
+  const tracker = api.createUploadProgressTracker(() => time);
+  tracker.start(2);
+  let s = tracker.update({ phase:'processing', total:2, fileIndex:0, fileName:'page1.png', detail:{phase:'complete',completed:1,total:1} });
+  assert.equal(s.completedPages,0);
+  assert.equal(s.state,'running');
+  assert.match(s.detail,/暗号化・アップロードはこれから/);
+  s = tracker.update({ phase:'encrypt', fileIndex:0, detail:{completed:2,total:8} });
+  assert.equal(s.stageIndex,1);
+  assert.match(s.detail,/2 \/ 8/);
+  s = tracker.update({ phase:'upload', fileIndex:0, detail:{completed:0,total:8,confirmedBytes:0,totalBytes:500000} });
+  assert.equal(s.completedPages,0);
+  assert.match(s.detail,/送信を確認したファイル 0 \/ 8/);
+  time += 31000;
+  assert.equal(tracker.snapshot().waiting,true);
+  assert.equal(tracker.snapshot().idleSeconds,31);
+  s = tracker.update({ phase:'upload', detail:{completed:1,total:8,confirmedBytes:123456,totalBytes:500000} });
+  assert.equal(s.waiting,false);
+  assert.match(s.detail,/120\.6 KB/);
+  s = tracker.update({ phase:'register' });
+  assert.equal(s.completedPages,0);
+  assert.match(s.detail,/登録完了を待って/);
+  s = tracker.update({ phase:'uploaded', fileIndex:0, completedPages:1, total:2 });
+  assert.equal(s.completedPages,1);
+  tracker.update({ phase:'processing', fileIndex:1, fileName:'page2.png', total:2 });
+  tracker.update({ phase:'uploaded', fileIndex:1, completedPages:2, total:2 });
+  s = tracker.update({ phase:'sync' });
+  assert.equal(s.state,'running');
+  assert.equal(s.completedPages,2);
+  assert.equal(s.stageIndex,4);
+  s = tracker.update({ phase:'done' });
+  assert.equal(s.state,'done');
+  assert.equal(s.waiting,false);
+  assert.equal(s.completedPages,2);
+});
+
+test('upload progress panel exposes confirmed-page counts, server steps and time since last response', () => {
+  const html = read('images.html');
+  for (const id of ['imageUploadProgress','imageProgressState','imageProgressElapsed',
+    'imageProgressFile','imagePageProgress','imageProgressCount','imageProgressActivity',
+    'imageProgressDetail','imageProgressSteps','imageProgressHint']) {
+    assert.match(html,new RegExp('id="' + id + '"'));
+  }
+  assert.match(read('images.js'),/startUploadProgress\(files\.length\)/);
+  assert.match(read('images.js'),/onProgress: progress => reportUploadProgress\(progress\)/);
+  assert.match(read('images.js'),/finishUploadProgress\('done'\)/);
+  assert.match(read('images.js'),/window\.setInterval\(renderUploadProgress, 1000\)/);
+});
