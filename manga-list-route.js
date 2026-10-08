@@ -425,7 +425,22 @@
         });
         cover.appendChild(box); const badge = documentRef.createElement('span'); badge.className = 'folder-kind-badge'; badge.textContent = kindLabel || 'フォルダ'; cover.appendChild(badge);
       };
-      const makeHeartIcon = () => { const img = documentRef.createElement('img'); img.alt = ''; return img; };
+      const makeHeartIcon = (active) => {
+        // The previous icon was an <img> without a src, so every favorite
+        // control rendered a broken image. Use a self-contained SVG with an
+        // explicit filled/outline state and no extra asset request.
+        const img = documentRef.createElement('img');
+        const fill = active ? '#ff6b4a' : 'none';
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' +
+          '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78Z" ' +
+          'fill="' + fill + '" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        img.src = 'data:image/svg+xml,' + encodeURIComponent(svg);
+        img.alt = '';
+        img.setAttribute('aria-hidden', 'true');
+        img.width = 18;
+        img.height = 18;
+        return img;
+      };
       const moveItemInList = (item, list, direction) => { const index = list.indexOf(item); const other = list[index + direction]; if (!other) return; const items = state().savedItems; const a = items.indexOf(item); const b = items.indexOf(other); if (a < 0 || b < 0) return; [items[a], items[b]] = [items[b], items[a]]; host.persistAll(); renderList(); };
       const moveFolderInList = (folder, list, direction) => { const index = list.indexOf(folder); const other = list[index + direction]; if (!other) return; const folders = state().savedFolders; const a = folders.indexOf(folder); const b = folders.indexOf(other); if (a < 0 || b < 0) return; [folders[a], folders[b]] = [folders[b], folders[a]]; host.persistFolders(); renderList(); };
       const updateBulkEditButton = () => {
