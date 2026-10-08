@@ -56,3 +56,14 @@ test('runtime no longer names reader-viewer-only opening dependencies', () => {
   const source = read('manga-list-runtime.js');
   assert.doesNotMatch(source, /rememberReaderReturnView|closeSavedList|setReadingListContext|flashStatus|openItem/);
 });
+
+test('encrypted works use their encrypted-cover route rather than URL guessing', () => {
+  const source = read('manga-list-runtime.js');
+  assert.match(source, /item\.encryptedAssets\?\.pages\?\.length/);
+  assert.match(source, /context\.loadLocalCover\(item, img\)/);
+  const route = read('manga-list-route.js');
+  assert.match(route, /loadEncryptedCover/);
+  assert.match(route, /EncryptedAssetReader\.createPreviewLoader/);
+  assert.match(route, /host\.flushCloudSync\(\)/);
+  assert.match(route, /activeEncryptedImport\.abort\(\)/);
+});
