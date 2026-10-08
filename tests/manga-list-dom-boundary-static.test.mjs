@@ -32,7 +32,7 @@ test('manga list DOM references are centralized in the manga route and exclude R
 
 test('renderSavedList uses the centralized manga list DOM object', () => {
   assert.match(route, /runtime\.renderSavedList\(\)/);
-  assert.match(runtime, /function renderSavedList\(\)/);
+  assert.match(runtime, /function renderSavedList\(direction = 0\)/);
   assert.match(runtime, /const elements = context\.getElements\(\)/);
 });
 
