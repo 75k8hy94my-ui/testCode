@@ -12,6 +12,7 @@
     }catch(_){}
     document.querySelectorAll('[data-profile-menu-trigger], #desktopProfileButton').forEach((button)=>{
       const previous=button.querySelector('.profileAvatarButtonImage');
+      button.classList.toggle('hasProfileAvatar',!!avatar);
       if(!avatar){previous?.remove();return;}
       const image=previous||document.createElement('img');
       image.className='profileAvatarButtonImage';

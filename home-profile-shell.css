@@ -304,3 +304,6 @@ html[data-theme="dark"] .iosSwitch input:checked + .iosSwitchTrack{background:#3
 .profileAvatarStatus[data-state="error"]{color:var(--danger)!important}
 .headerProfileButton{position:relative;overflow:hidden}
 .headerProfileButton .profileAvatarButtonImage{position:absolute!important;inset:0;width:100%!important;height:100%!important;object-fit:cover;border-radius:50%;display:block}
+
+#desktopProfileButton.hasProfileAvatar>svg{display:none!important}
+#desktopProfileButton .profileAvatarButtonImage{width:28px!important;height:28px!important;min-width:28px;object-fit:cover;border-radius:50%}
