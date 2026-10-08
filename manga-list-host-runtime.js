@@ -151,83 +151,123 @@
       return runCloudSync({ requireSuccess: true });
     }
 
+    const activeFeedImages = new WeakMap();
+    function markCover(img, state) {
+      if (img?.dataset) img.dataset.coverState = state;
+    }
+
     async function loadLocalCover(item, img) {
       if (!canReadProtectedData()) return;
+      markCover(img, 'loading');
       if (item?.encryptedAssets?.pages?.length) {
-        return deps.images.loadEncryptedCover?.(item, img);
+        try {
+          await deps.images.loadEncryptedCover?.(item, img);
+        } catch (_) {
+          if (canReadProtectedData()) markCover(img, 'failed');
+        }
+        return;
       }
       try {
         const session = JSON.parse(deps.images.readStorageItem(deps.images.sessionKey) || 'null');
         const config = deps.images.getSupabaseConfig() || {};
         const path = (Array.isArray(item.storagePaths) && item.storagePaths[0]) || deps.images.getLocalStoragePathFromUrl(item.pages && item.pages[0]);
-        if (!session || !session.access_token || !path || !config.url) return;
+        if (!session?.access_token || !path || !config.url) {
+          markCover(img, 'failed');
+          return;
+        }
         const userId = session.user && session.user.id || session.user_id || '';
         const cacheKey = [config.url, userId, path].join('|');
         const cachedObjectUrl = deps.images.getLocalCoverObjectUrl(cacheKey);
-        if (cachedObjectUrl && img.isConnected) { img.src = cachedObjectUrl; return; }
+        if (cachedObjectUrl) {
+          // The bookshelf builds its cards in a detached fragment. Checking
+          // isConnected here lost otherwise valid cached thumbnails.
+          if (canReadProtectedData()) img.src = cachedObjectUrl;
+          return;
+        }
         const objectUrl = await deps.images.loadCachedLocalImage(config, session.access_token, path, item.storageBytes && item.storageBytes[0]);
-        if (objectUrl && img.isConnected) {
+        if (!canReadProtectedData()) {
+          deps.images.revokeLocalCoverObjectUrl?.(objectUrl);
+          return;
+        }
+        if (objectUrl) {
           deps.images.rememberLocalCoverObjectUrl(cacheKey, objectUrl);
           img.src = objectUrl;
-        }
-      } catch (_) {}
+        } else markCover(img, 'failed');
+      } catch (_) {
+        if (canReadProtectedData()) markCover(img, 'failed');
+      }
     }
 
-    function setupFeedImage(imgEl, baseUrlForItem, numberWidth, itemPattern, itemId) {
+    function setupFeedImage(imgEl, baseUrlForItem, numberWidth, itemPattern, itemId, exactUrl = '') {
       if (!canReadProtectedData()) return;
-      const parsed = deps.images.parseInputUrl(baseUrlForItem);
-      const folderUrl = parsed ? parsed.baseUrl : baseUrlForItem;
-      const identityKey = itemId ? 'item:' + String(itemId) : folderUrl;
-      const cached = deps.images.getCachedMangaInfo(identityKey, folderUrl);
-      const pattern = itemPattern || (parsed && parsed.pattern) || (cached && cached.pattern) || null;
-      const resolvedWidth = numberWidth || (cached && cached.numberWidth) || 1;
-      const cacheKey = [identityKey, folderUrl, String(resolvedWidth), JSON.stringify(pattern || null), String(cached && cached.ext != null ? cached.ext : '')].join('|');
+      activeFeedImages.get(imgEl)?.();
       const sourceCache = deps.images.getCoverSourceCache();
       const failedCache = deps.images.getCoverFailedCache();
-      const cachedSource = sourceCache.get(cacheKey);
-      if (cachedSource) {
-        imgEl.addEventListener('error', () => {
-          sourceCache.delete(cacheKey);
-          failedCache.delete(cacheKey);
-          setupFeedImage(imgEl, baseUrlForItem, numberWidth, itemPattern, itemId);
-        }, { once: true });
-        imgEl.src = cachedSource;
+      const directUrl = String(exactUrl || '').trim();
+      const parsed = directUrl ? null : deps.images.parseInputUrl(baseUrlForItem);
+      const folderUrl = parsed ? parsed.baseUrl : baseUrlForItem;
+      const identityKey = itemId ? 'item:' + String(itemId) : folderUrl;
+      const cached = directUrl ? null : deps.images.getCachedMangaInfo(identityKey, folderUrl);
+      const pattern = itemPattern || (parsed && parsed.pattern) || (cached && cached.pattern) || null;
+      const resolvedWidth = numberWidth || (cached && cached.numberWidth) || 1;
+      const cacheKey = directUrl || [identityKey, folderUrl, String(resolvedWidth), JSON.stringify(pattern || null), String(cached && cached.ext != null ? cached.ext : '')].join('|');
+      const rememberedUrl = sourceCache.get(cacheKey);
+      const extOrder = cached && Number.isInteger(cached.ext) && cached.ext >= 0 && cached.ext < deps.images.extCandidates.length
+        ? [cached.ext, ...deps.images.extCandidates.map((_, index) => index)]
+        : deps.images.extCandidates.map((_, index) => index);
+      const possibleUrls = directUrl ? [directUrl] : extOrder.map((index) => deps.images.pageUrlFor(folderUrl, 1, index, resolvedWidth, pattern));
+      const urls = [...new Set([rememberedUrl, ...possibleUrls].filter(Boolean))];
+      let index = 0;
+      let timer = null;
+      let stopped = false;
+      let ready = false;
+
+      const clearTimer = () => {
+        if (timer != null) deps.images.clearTimer(timer);
+        timer = null;
+      };
+      const onLoad = () => {
+        if (stopped || ready) return;
+        ready = true;
+        clearTimer();
+        sourceCache.set(cacheKey, imgEl.currentSrc || imgEl.src);
+        failedCache.delete(cacheKey);
+        markCover(imgEl, 'loaded');
+      };
+      const next = () => {
+        if (stopped || ready) return;
+        clearTimer();
+        if (index >= urls.length) {
+          failedCache.add(cacheKey);
+          imgEl.src = '';
+          markCover(imgEl, 'failed');
+          return;
+        }
+        imgEl.src = urls[index++];
+        // A deadline is per candidate, not shared by every extension. A slow
+        // response can be retried from the card instead of being blacklisted.
+        timer = deps.images.setTimer(() => next(), deps.images.loadTimeoutMs);
+      };
+      const onError = () => {
+        if (stopped || ready) return;
+        if (rememberedUrl && imgEl.src === rememberedUrl) sourceCache.delete(cacheKey);
+        next();
+      };
+      const stop = () => {
+        stopped = true;
+        clearTimer();
+        imgEl.removeEventListener?.('load', onLoad);
+        imgEl.removeEventListener?.('error', onError);
+      };
+      activeFeedImages.set(imgEl, stop);
+      imgEl.addEventListener('load', onLoad);
+      imgEl.addEventListener('error', onError);
+      markCover(imgEl, 'loading');
+      if (!urls.length) {
+        markCover(imgEl, 'failed');
         return;
       }
-      if (failedCache.has(cacheKey)) return;
-      let idx = 0;
-      let finished = false;
-      let timer = null;
-      function tryNext() {
-        if (finished || idx >= deps.images.extCandidates.length) {
-          failedCache.add(cacheKey);
-          return;
-        }
-        imgEl.src = deps.images.pageUrlFor(folderUrl, 1, idx, resolvedWidth, pattern);
-        idx++;
-      }
-      imgEl.addEventListener('load', () => {
-        finished = true;
-        deps.images.clearTimer(timer);
-        sourceCache.set(cacheKey, imgEl.currentSrc || imgEl.src);
-      }, { once: true });
-      imgEl.addEventListener('error', () => {
-        deps.images.clearTimer(timer);
-        if (finished) return;
-        if (idx >= deps.images.extCandidates.length) {
-          finished = true;
-          failedCache.add(cacheKey);
-          return;
-        }
-        tryNext();
-      });
-      tryNext();
-      timer = deps.images.setTimer(() => {
-        if (finished) return;
-        finished = true;
-        failedCache.add(cacheKey);
-        imgEl.src = '';
-      }, deps.images.loadTimeoutMs);
+      next();
     }
 
     function navigateToReader(item) {
