@@ -21,7 +21,7 @@
       img.alt = itemDisplayTitle(item);
       img.loading = 'eager';
       img.decoding = 'async';
-      img.fetchPriority = 'low';
+      img.fetchPriority = 'auto';
       cover.appendChild(img);
       card.appendChild(cover);
 

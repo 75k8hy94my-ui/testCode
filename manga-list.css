@@ -311,3 +311,25 @@ html[data-theme="light"] .folder-cover { background: linear-gradient(145deg, #ee
     font-size: 12px;
   }
 }
+
+/* Slow remote thumbnails should indicate progress and offer a retry after failure. */
+.book-cover-loading,
+.book-cover-retry {
+  display: none;
+  position: absolute;
+  z-index: 2;
+  inset: auto 5px 29px;
+  padding: 6px 4px;
+  border-radius: 6px;
+  background: rgba(9, 12, 18, .88);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1.3;
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+}
+.book-cover-loading { pointer-events: none; }
+.book-cover-retry { border: 1px solid rgba(255,255,255,.35); cursor: pointer; }
+.book-cover > img[data-cover-state="loading"] ~ .book-cover-loading { display: flex; }
+.book-cover > img[data-cover-state="failed"] ~ .book-cover-retry { display: flex; }
