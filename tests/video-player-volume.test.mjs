@@ -19,6 +19,7 @@ function createPlayer() {
       this.value = '';
     }
     append(...children) { this.children.push(...children); }
+    replaceChildren(...children) { this.children = [...children]; }
     addEventListener(type, listener) {
       if (!this.events.has(type)) this.events.set(type, []);
       this.events.get(type).push(listener);
