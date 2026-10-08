@@ -180,7 +180,7 @@ test('all authenticated mobile destinations load the shared Liquid Glass assets'
     assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-drag-lock/, page);
   }
   for (const page of ['home.html','profile.html','manga.html','video.html']) {
-    assert.match(read(page), /home-profile-spa\.js\?v=20261009-desktop-liquid-pager/, page);
+    assert.match(read(page), /home-profile-spa\.js\?v=20261009-guest-mode/, page);
   }
 });
 

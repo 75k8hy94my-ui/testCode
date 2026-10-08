@@ -213,6 +213,6 @@ test('sliding pages are clipped, preserve mobile grid density, and do not change
   assert.match(css, /\.bookshelf-slide-track > \.bookshelf-page\s*\{[^}]*flex:\s*0 0 50%/);
   assert.match(css, /#mangaListSection \.bookshelf-page\s*\{[^}]*grid-template-columns:\s*repeat\(3,/);
   assert.match(route, /runtime\.renderSavedList\(delta\)/);
-  assert.match(route, /manga-list-runtime\.js\?v=20261009-desktop-liquid-pager/);
+  assert.match(route, /manga-list-runtime\.js\?v=20261009-guest-mode/);
   assert.doesNotMatch(read('reader.html'), /bookshelf-slide-track|bookshelf-page-frame/);
 });

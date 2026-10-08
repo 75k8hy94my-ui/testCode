@@ -39,7 +39,7 @@ test('video route mounts while gated and passes the gate into its protected-data
   const gate = route.indexOf("deps.loadMediaGate()");
   const data = route.indexOf("deps.loadScript('video-data.js?v=20260918-video-data-no-window'");
   const renderer = route.indexOf("deps.loadScript('video-thumbnail-renderer.js?v=20261008-shared-thumbnails'");
-  const library = route.indexOf("deps.loadScript('video-library.js?v=20261009-ellipsis-route'");
+  const library = route.indexOf("deps.loadScript('video-library.js?v=20261009-guest-mode'");
   assert.ok(gate >= 0 && gate < data);
   assert.ok(data < renderer && renderer < library);
   assert.match(route, /MangaReaderVideoLibrary\.init\(deps\.mediaAccess\)/);
