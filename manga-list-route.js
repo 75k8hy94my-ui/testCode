@@ -1,7 +1,7 @@
 (function (root) {
   'use strict';
 
-  const STYLESHEET_URL = 'manga-list.css?v=20261009-desktop-liquid-pager';
+  const STYLESHEET_URL = 'manga-list.css?v=20261009-guest-mode';
   const SCRIPT_URLS = [
     ['manga-list-template.js?v=20261009-desktop-liquid-pager', 'mangaRouteTemplate'],
     ['manga-import-validator.js?v=20261007-momon-import', 'mangaImportValidator'],
@@ -47,7 +47,7 @@
     ['manga-list-image-cache.js?v=20260922-image-cache', 'mangaRouteImageCache'],
     ['reader-target.js?v=20261003-reader-launch-contract', 'mangaReaderTarget'],
     ['manga-list-host-runtime.js?v=20261009-cover-retry', 'mangaRouteHost'],
-    ['manga-list-runtime.js?v=20261009-desktop-liquid-pager', 'mangaRouteRuntime'],
+    ['manga-list-runtime.js?v=20261009-guest-mode', 'mangaRouteRuntime'],
     ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
   ];
 

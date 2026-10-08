@@ -80,7 +80,8 @@
   }
 
   async function runVaultSync() {
-    if (window.TestCodeGuest?.isActive() || !canReadProtectedData()) return;
+    if (!canReadProtectedData()) return;
+    if (window.TestCodeGuest?.isActive()) return;
     if (!window.MangaVault || !window.MangaVaultPayload || !MangaVault.loadActive || !MangaVault.loadActive()) return;
     if (state.syncRunning) { state.syncDirty = true; return; }
     state.syncRunning = true;
