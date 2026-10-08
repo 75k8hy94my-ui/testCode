@@ -38,7 +38,7 @@
     return { ok: false, conflict: { assetId, reason, targetRevision, remoteRevision: remote?.revision ?? null, remoteDeletedAt: remote?.deletedAt ?? null } };
   }
 
-  async function stageProcessedRevision({ cache, masterKey, assetId, targetRevision, processed }) {
+  async function stageProcessedRevision({ cache, masterKey, assetId, targetRevision, processed, signal }) {
     const target = positiveRevision(targetRevision);
     const ids = objectPlan(processed);
     const expectedTiles = ids.length - 1;
@@ -46,6 +46,7 @@
     const encryptedBytes = {};
     const inputs = [processed.previewBlob, ...processed.tileBlobs];
     for (let index = 0; index < ids.length; index += 1) {
+      throwIfAborted(signal);
       const objectId = ids[index];
       const existing = await cache.get(assetId, target, objectId);
       if (existing) {
@@ -54,6 +55,7 @@
         continue;
       }
       const encrypted = await cryptoApi.encryptAssetObject(masterKey, assetId, objectId, inputs[index]);
+      throwIfAborted(signal);
       await cache.put({ assetId, revision: target, objectId, encryptedBytes: encrypted, retention: 'pending' });
       encryptedBytes[objectId] = encrypted;
     }
