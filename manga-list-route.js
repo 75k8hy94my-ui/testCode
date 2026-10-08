@@ -43,6 +43,7 @@
     ['manga-list-bootstrap.js?v=20260922-bootstrap', 'mangaRouteBootstrap'],
     ['manga-list-controller.js?v=20260922-controller', 'mangaRouteController'],
     ['manga-list-runtime-context.js?v=20260922-runtime-context', 'mangaRouteContext'],
+    ['manga-list-cover-cache.js?v=20261008-cover-cache', 'mangaRouteCoverCache'],
     ['manga-list-image-cache.js?v=20260922-image-cache', 'mangaRouteImageCache'],
     ['reader-target.js?v=20261003-reader-launch-contract', 'mangaReaderTarget'],
     ['manga-list-host-runtime.js?v=20261003-reader-launch-contract', 'mangaRouteHost'],
@@ -206,9 +207,9 @@
       const data = createState(storage, keys, canReadProtectedData);
       let runtime = null;
       let elements = null;
-      const coverSourceCache = new Map();
+      const coverCache = windowRef.MangaListCoverCache;
+      if (!coverCache) throw new Error('manga cover cache failed to load');
       const coverFailedCache = new Set();
-      const coverObjectUrls = [];
       const extCandidates = ['jpg', 'jpeg', 'png', 'webp'];
       const iconFolder = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath d="M3 6a2 2 0 0 1 2-2h4.5a2 2 0 0 1 1.6.8L12.5 6H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6z" fill="%238d93a3"/%3E%3C/svg%3E';
       const iconBooks = iconFolder;
@@ -295,11 +296,12 @@
           onSyncError: () => {},
         },
         images: {
-          parseInputUrl, getCachedMangaInfo, getCoverSourceCache: () => coverSourceCache,
+          parseInputUrl, getCachedMangaInfo, getCoverSourceCache: coverCache.getSourceCache,
           getCoverFailedCache: () => coverFailedCache, pageUrlFor, extCandidates, loadTimeoutMs: 60000,
           sessionKey: 'mangaReaderSupabaseSession', readStorageItem: (key) => storage.getItem(key),
           getSupabaseConfig: () => windowRef.MANGA_READER_SUPABASE || {}, getLocalStoragePathFromUrl,
-          loadCachedLocalImage: imageCache.loadCachedLocalImage, rememberLocalCoverObjectUrl: (url) => coverObjectUrls.push(url),
+          loadCachedLocalImage: imageCache.loadCachedLocalImage,
+          getLocalCoverObjectUrl: coverCache.getLocalCover, rememberLocalCoverObjectUrl: coverCache.rememberLocalCover,
           setTimer: (callback, delay) => windowRef.setTimeout(callback, delay),
           clearTimer: (timer) => windowRef.clearTimeout(timer),
         },
@@ -362,12 +364,12 @@
       const renderAuthorDashboard = (show) => { if (elements && elements.dashboard && !show) elements.dashboard.replaceChildren(); };
       const contextDeps = {
         getState: state, setState, getElements: () => elements, getDocument: () => documentRef, getConfig: () => config,
-        getSavedVideos: () => state().savedVideos, clearLocalCoverObjectUrls: () => { while (coverObjectUrls.length) { const url = coverObjectUrls.pop(); if (windowRef.URL && windowRef.URL.revokeObjectURL) windowRef.URL.revokeObjectURL(url); } },
+        getSavedVideos: () => state().savedVideos, clearLocalCoverObjectUrls: coverCache.clear,
         confirmAction: (message) => windowRef.confirm(message), setTimeout: windowRef.setTimeout.bind(windowRef),
         persistItems: host.persistItems, persistFolders: host.persistFolders, persistAuthorCards: host.persistAuthorCards, persistAll: host.persistAll, scheduleCloudSync: host.scheduleCloudSync,
         openReader: (item) => host.navigateToReader(item), accessMedia: host.setupFeedImage,
         renderDashboard, renderAuthorDashboard,
-        getVisibleItems: visibleItems, appendFolderPreview, createStaticCard: (input) => MangaListCardBoundary.createStaticCard(input), loadLocalCover: host.loadLocalCover, getCoverSourceCache: () => coverSourceCache, setupFeedImage: host.setupFeedImage,
+        getVisibleItems: visibleItems, appendFolderPreview, createStaticCard: (input) => MangaListCardBoundary.createStaticCard(input), loadLocalCover: host.loadLocalCover, getCoverSourceCache: coverCache.getSourceCache, setupFeedImage: host.setupFeedImage,
         makeHeartIcon, moveItemInList, moveFolderInList, renderList,
         updateBulkEditButton, shelfVisibleItems: visibleItems, unreadOrderItems: () => visibleItems().filter((item) => !item.lastReadAt), itemDisplayTitle: title, itemSubtext, readingRecordText, itemPageCountText: pageCount,
         buildFavoritesFolderCard, buildSeriesFolderCard, buildSeriesGroupCard, buildAuthorGroupCard, buildSearchText,

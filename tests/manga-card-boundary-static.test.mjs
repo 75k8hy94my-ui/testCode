@@ -40,7 +40,7 @@ test('normal manga card clicks use one shelf interaction boundary', () => {
 test('buildBookCard uses one private cover dependency boundary without changing image branches', () => {
   assert.match(route, /loadLocalCover: host\.loadLocalCover/);
   assert.match(route, /setupFeedImage: host\.setupFeedImage/);
-  assert.match(route, /getCoverSourceCache: \(\) => coverSourceCache/);
+  assert.match(route, /getCoverSourceCache: coverCache\.getSourceCache/);
 
   const build = runtime;
   assert.match(build, /context\.loadLocalCover\(item, img\)/);

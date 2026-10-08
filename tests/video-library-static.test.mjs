@@ -113,6 +113,13 @@ test('video library supports hiding videos and restoring them from the hidden li
   assert.match(library, /hidden/);
 });
 
+test('video list reuses thumbnail DOM when the visible records do not change', () => {
+  const library = read('video-library.js');
+  assert.match(library, /let renderedResultsKey = null/);
+  assert.match(library, /const resultsKey = JSON\.stringify\(\[state\.view, state\.showHidden, videos\]\)/);
+  assert.match(library, /if \(resultsKey === renderedResultsKey\) return;[\s\S]*dom\.results\.replaceChildren\(\)/);
+});
+
 test('video editor exposes a persistent 90-degree rotation setting', () => {
   const library = read('video-library.js');
   assert.match(library, /videoLibraryRotate90Direction/);

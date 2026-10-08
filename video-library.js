@@ -22,6 +22,7 @@
   const dom = {};
   let eventsBound = false;
   let mediaAccess = window.MangaReaderMediaAccess || null;
+  let renderedResultsKey = null;
 
   function canReadProtectedData() {
     return !!mediaAccess && typeof mediaAccess.canReadProtectedData === 'function' && mediaAccess.canReadProtectedData() === true;
@@ -306,7 +307,11 @@
     dom.hiddenBtn.textContent = state.showHidden ? '動画一覧' : '非表示 (' + all.filter((video) => video.hidden).length + ')';
     dom.hiddenBtn.setAttribute('aria-pressed', state.showHidden ? 'true' : 'false');
     dom.count.textContent = videos.length + ' / ' + scoped.length + '件';
+    const resultsKey = JSON.stringify([state.view, state.showHidden, videos]);
+    // Keep loaded thumbnail elements when returning to an unchanged video list.
+    if (resultsKey === renderedResultsKey) return;
     dom.results.replaceChildren();
+    renderedResultsKey = resultsKey;
     if (!videos.length) { const empty = document.createElement('div'); empty.className = 'vl-empty'; empty.innerHTML = '<strong>' + (state.showHidden ? '非表示の動画はありません' : '該当する動画がありません') + '</strong><span>検索やフィルタを変更するか、動画を追加できます。</span>'; dom.results.append(empty); return; }
     const grid = document.createElement('div'); grid.className = 'vl-grid' + (state.view === 'compact' ? ' compact' : ''); videos.forEach((video) => grid.append(createCard(video))); dom.results.append(grid);
   }

@@ -26,6 +26,7 @@
     'getSupabaseConfig',
     'getLocalStoragePathFromUrl',
     'loadCachedLocalImage',
+    'getLocalCoverObjectUrl',
     'rememberLocalCoverObjectUrl',
     'setTimer',
     'clearTimer',
@@ -140,9 +141,13 @@
         const config = deps.images.getSupabaseConfig() || {};
         const path = (Array.isArray(item.storagePaths) && item.storagePaths[0]) || deps.images.getLocalStoragePathFromUrl(item.pages && item.pages[0]);
         if (!session || !session.access_token || !path || !config.url) return;
+        const userId = session.user && session.user.id || session.user_id || '';
+        const cacheKey = [config.url, userId, path].join('|');
+        const cachedObjectUrl = deps.images.getLocalCoverObjectUrl(cacheKey);
+        if (cachedObjectUrl && img.isConnected) { img.src = cachedObjectUrl; return; }
         const objectUrl = await deps.images.loadCachedLocalImage(config, session.access_token, path, item.storageBytes && item.storageBytes[0]);
         if (objectUrl && img.isConnected) {
-          deps.images.rememberLocalCoverObjectUrl(objectUrl);
+          deps.images.rememberLocalCoverObjectUrl(cacheKey, objectUrl);
           img.src = objectUrl;
         }
       } catch (_) {}

@@ -10,7 +10,7 @@ const standalone = [
   'encrypted-asset-backend.js', 'encrypted-asset-cache.js', 'encrypted-asset-crypto.js', 'encrypted-asset-import.js', 'encrypted-asset-item.js', 'encrypted-asset-reader.js', 'encrypted-asset-storage.js', 'encrypted-asset-sync.js',
   'encrypted-chunk-cache.js', 'encrypted-chunk-crypto.js', 'encrypted-chunk-sync.js', 'image-compression-profile.js', 'image-photo-processor.js', 'image-processing-worker.js', 'image-pyramid-builder.js', 'image-remote-access.js', 'image-transfer-ledger.js', 'image-transfer-settings.js', 'feature-flags.js', 'home-dashboard.js',
   'home-profile-spa.js', 'mobile-bottom-nav.js', 'manga-sandbox.js', 'media-access-gate.js', 'profile-menu.js', 'shelf-search.js',
-  'manga-import-validator.js', 'manga-import-candidate.js', 'manga-import-author-sync.js', 'manga-import-batch.js', 'manga-import-bridge.js', 'manga-import-dialog.js',
+  'manga-import-validator.js', 'manga-import-candidate.js', 'manga-import-author-sync.js', 'manga-import-batch.js', 'manga-import-bridge.js', 'manga-import-dialog.js', 'manga-list-cover-cache.js',
   'reader-target.js', 'reader-item-repository.js', 'reader-image-loader.js', 'reader-lifecycle.js', 'reader-page-transition.js', 'reader-page-source.js', 'reader-progress-repository.js', 'reader-runtime.js',
   'status-message.js',
   'supabase-config.js', 'url-parser.js', 'vault-payload.js', 'vault-session.js', 'video-data.js', 'video-thumbnail-renderer.js', 'video-player-gestures.js', 'video-library.js', 'video-routing-fix.js', 'video-thumbnail-time.js', 'video-list-route.js', 'video-list-template.js'

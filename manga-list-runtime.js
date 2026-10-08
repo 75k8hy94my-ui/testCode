@@ -193,7 +193,6 @@
       const elements = context.getElements();
       const state = context.getState();
       const config = context.getConfig();
-      context.clearLocalCoverObjectUrls();
       const inSeriesGroup = state.currentFolderView === config.SERIES_FOLDER_ID && !!state.currentSeriesView;
       const inSeriesRoot = state.currentFolderView === config.SERIES_FOLDER_ID && !state.currentSeriesView;
       const inAuthorView = !!state.currentAuthorView;

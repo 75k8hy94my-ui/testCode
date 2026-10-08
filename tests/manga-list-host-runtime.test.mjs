@@ -77,7 +77,8 @@ function imageDeps(calls) {
     getSupabaseConfig() { calls.push('supabase-config'); return { url: 'https://storage.example' }; },
     getLocalStoragePathFromUrl() { calls.push('path'); return 'folder/cover.jpg'; },
     loadCachedLocalImage() { calls.push('cached-image'); return Promise.resolve('blob:cover'); },
-    rememberLocalCoverObjectUrl(url) { calls.push(['remember-cover', url]); },
+    getLocalCoverObjectUrl(key) { calls.push(['get-cover', key]); return ''; },
+    rememberLocalCoverObjectUrl(key, url) { calls.push(['remember-cover', key, url]); },
     setTimer(callback, delay) { calls.push(['image-timer', delay]); return 'image-timer'; },
     clearTimer(timer) { calls.push(['image-clear', timer]); },
   };
@@ -173,11 +174,24 @@ test('host rejects missing image dependencies and exposes image callbacks', asyn
   await load;
   assert.equal(img.src, 'blob:cover');
   assert.deepEqual(calls.slice(-4), [
-    ['image-read', 'mangaReaderSupabaseSession'],
     'supabase-config',
+    ['get-cover', 'https://storage.example||folder/cover.jpg'],
     'cached-image',
-    ['remember-cover', 'blob:cover'],
+    ['remember-cover', 'https://storage.example||folder/cover.jpg', 'blob:cover'],
+
   ]);
+});
+
+test('host reuses a cached local cover object URL without reading the image cache again', async () => {
+  const calls = [];
+  const complete = deps(calls);
+  complete.images.getLocalCoverObjectUrl = (key) => { calls.push(['get-cover', key]); return 'blob:cached-cover'; };
+  const host = loadFactory().create(complete);
+  const img = { src: '', isConnected: true };
+  await host.loadLocalCover({ storagePaths: ['folder/cover.jpg'] }, img);
+  assert.equal(img.src, 'blob:cached-cover');
+  assert.ok(calls.some((call) => Array.isArray(call) && call[0] === 'get-cover'));
+  assert.ok(!calls.includes('cached-image'));
 });
 
 test('host checkpoints the shelf then performs standalone Reader document navigation', () => {
@@ -242,6 +256,10 @@ test('manga route owns shelf persistence and Reader uses its narrow item reposit
   const reader = fs.readFileSync(path.join(root, 'reader.html'), 'utf8');
   const route = fs.readFileSync(path.join(root, 'manga-list-route.js'), 'utf8');
   assert.match(route, /manga-list-host-runtime\.js\?v=/);
+  assert.match(route, /manga-list-cover-cache\.js\?v=/);
+  assert.match(route, /getLocalCoverObjectUrl: coverCache\.getLocalCover/);
+  assert.match(route, /getCoverSourceCache: coverCache\.getSourceCache/);
+  assert.doesNotMatch(fs.readFileSync(path.join(root, 'manga-list-runtime.js'), 'utf8'), /context\.clearLocalCoverObjectUrls\(\)/);
   assert.match(route, /MangaListHostRuntimeFactory\.create\(/);
   assert.match(route, /persistAll: host\.persistAll/);
   assert.doesNotMatch(reader, /manga-list-host-runtime|MangaListHostRuntimeFactory|persistFolders|persistAuthorCards/);
