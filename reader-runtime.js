@@ -66,7 +66,13 @@
       if (!dependencies.document || !dependencies.window) throw new TypeError('reader runtime requires document and window to render');
       const ready = await mountItem(resolved.item);
       if (destroyed) return null;
-      if (!ready) throw new Error('最初のページを表示できませんでした。「再試行」を押してください。');
+      if (!ready) {
+        const retryButton = byId('retryPageBtn');
+        const guidance = retryButton && retryButton.hidden === false
+          ? '「再試行」を押してください。'
+          : '本棚から作品のページ情報を確認してください。';
+        throw new Error('最初のページを表示できませんでした。' + guidance);
+      }
       return resolved.item;
     }
 
