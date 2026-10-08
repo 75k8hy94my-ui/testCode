@@ -10,7 +10,6 @@
       <section id="mangaImportDialog" role="dialog" aria-modal="true" aria-labelledby="mangaImportTitle" hidden style="position:fixed;inset:0;z-index:1210;background:#0009;overflow:auto;padding:16px;">
         <div style="width:min(900px,100%);margin:4vh auto;background:var(--panel,#fff);color:inherit;border-radius:14px;padding:20px;display:grid;gap:12px;box-shadow:0 16px 48px #0005;">
           <h2 id="mangaImportTitle" style="margin:0;">momon:GA作品を一括読み込み</h2>
-          <p>登録内容を確認してください。重複作品は初期状態で除外されます。ページURLは編集できません。</p>
           <div id="mangaImportRows" style="display:grid;gap:12px;"></div>
           <p id="mangaImportStatus" role="status" aria-live="polite" style="margin:0;min-height:1.5em;"></p>
           <div style="display:flex;justify-content:flex-end;gap:8px;">
