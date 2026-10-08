@@ -85,8 +85,7 @@
     }
 
     let cloudSyncTimer = null;
-    let cloudSyncRunning = false;
-    let cloudSyncDirty = false;
+    let cloudSyncPromise = null;
 
     function canReadProtectedData() {
       return deps.canReadProtectedData() === true;
@@ -119,23 +118,42 @@
       return payload;
     }
 
-    async function runCloudSync() {
-      if (!canReadProtectedData()) return;
-      if (cloudSyncRunning) { cloudSyncDirty = true; return; }
-      cloudSyncRunning = true;
-      try {
+    async function runCloudSync({ requireSuccess = false } = {}) {
+      if (!canReadProtectedData()) {
+        if (requireSuccess) throw new Error('VPN接続を確認できません。');
+        return false;
+      }
+      // A strict flush must not return while an older snapshot is being saved.
+      if (cloudSyncPromise) await cloudSyncPromise.catch(() => {});
+      const pending = (async () => {
         const payload = buildSyncPayload();
-        if (payload && canReadProtectedData()) await deps.sync.savePayload(payload);
+        if (!payload || !canReadProtectedData()) throw new Error('同期データにアクセスできません。');
+        await deps.sync.savePayload(payload);
+      })();
+      cloudSyncPromise = pending;
+      try {
+        await pending;
+        return true;
       } catch (error) {
         deps.sync.onSyncError(error && error.message ? error.message : 'クラウド同期に失敗しました', 'cloud-sync-error');
+        if (requireSuccess) throw error;
+        return false;
       } finally {
-        cloudSyncRunning = false;
-        if (cloudSyncDirty) { cloudSyncDirty = false; scheduleCloudSync(); }
+        if (cloudSyncPromise === pending) cloudSyncPromise = null;
       }
+    }
+
+    async function flushCloudSync() {
+      deps.sync.clearTimer(cloudSyncTimer);
+      cloudSyncTimer = null;
+      return runCloudSync({ requireSuccess: true });
     }
 
     async function loadLocalCover(item, img) {
       if (!canReadProtectedData()) return;
+      if (item?.encryptedAssets?.pages?.length) {
+        return deps.images.loadEncryptedCover?.(item, img);
+      }
       try {
         const session = JSON.parse(deps.images.readStorageItem(deps.images.sessionKey) || 'null');
         const config = deps.images.getSupabaseConfig() || {};
@@ -238,7 +256,7 @@
 
     function persistItems() {
       if (!canReadProtectedData()) return false;
-      deps.safeWriteJson(deps.keys.savedItems, deps.getState().savedItems);
+      if (deps.safeWriteJson(deps.keys.savedItems, deps.getState().savedItems) === false) return false;
       scheduleCloudSync();
       return true;
     }
@@ -266,6 +284,7 @@
       persistAll,
       buildSyncPayload,
       runCloudSync,
+      flushCloudSync,
       scheduleCloudSync,
       setupFeedImage,
       loadLocalCover,
