@@ -33,6 +33,7 @@ test('shared rail provides global destinations and page-aware active state', () 
   const destinations = [
     ['desktopNavHome','home.html'],
     ['desktopNavManga','manga.html'],
+    ['desktopNavImages','images.html'],
     ['desktopNavVideo','video.html'],
     ['desktopNavBackup','sync.html'],
     ['desktopNavSettings','profile.html'],
