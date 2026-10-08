@@ -38,13 +38,14 @@
     return { ok: false, conflict: { assetId, reason, targetRevision, remoteRevision: remote?.revision ?? null, remoteDeletedAt: remote?.deletedAt ?? null } };
   }
 
-  async function stageProcessedRevision({ cache, masterKey, assetId, targetRevision, processed, signal }) {
+  async function stageProcessedRevision({ cache, masterKey, assetId, targetRevision, processed, signal, onProgress }) {
     const target = positiveRevision(targetRevision);
     const ids = objectPlan(processed);
     const expectedTiles = ids.length - 1;
     if (!processed?.previewBlob || processed.tileBlobs?.length !== expectedTiles) throw new Error('processed tile count does not match manifest');
     const encryptedBytes = {};
     const inputs = [processed.previewBlob, ...processed.tileBlobs];
+    onProgress?.({ phase: 'encrypt', completed: 0, total: ids.length });
     for (let index = 0; index < ids.length; index += 1) {
       throwIfAborted(signal);
       const objectId = ids[index];
@@ -52,12 +53,14 @@
       if (existing) {
         if (existing.retention !== 'pending') throw new Error('published cache object cannot be restaged');
         encryptedBytes[objectId] = new Uint8Array(existing.encryptedBytes);
+        onProgress?.({ phase: 'encrypt', completed: index + 1, total: ids.length, reused: true });
         continue;
       }
       const encrypted = await cryptoApi.encryptAssetObject(masterKey, assetId, objectId, inputs[index]);
       throwIfAborted(signal);
       await cache.put({ assetId, revision: target, objectId, encryptedBytes: encrypted, retention: 'pending' });
       encryptedBytes[objectId] = encrypted;
+      onProgress?.({ phase: 'encrypt', completed: index + 1, total: ids.length });
     }
     return { assetId, targetRevision: target, objectIds: ids, encryptedBytes };
   }
@@ -108,13 +111,19 @@
     return true;
   }
 
-  async function uploadObjects({ storage, token, userId, assetId, revision, objectIds, pending, signal, transferStorage, now, mediaAccess }) {
-    for (const objectId of objectIds) {
+  async function uploadObjects({ storage, token, userId, assetId, revision, objectIds, pending, signal, transferStorage, now, mediaAccess, onProgress }) {
+    const totalBytes = objectIds.reduce((total, objectId) => total + pending[objectId].byteLength, 0);
+    let confirmedBytes = 0;
+    for (let index = 0; index < objectIds.length; index += 1) {
+      const objectId = objectIds[index];
+      onProgress?.({ phase: 'upload', completed: index, total: objectIds.length, confirmedBytes, totalBytes, currentBytes: pending[objectId].byteLength });
       const path = backendApi.buildStorageObjectPath(userId, assetId, revision, objectId);
       const result = await storage.upload(path, token, pending[objectId], signal);
       if (result.exists && !(await verifyRemoteObjects({ storage, token, userId, assetId, revision, objectIds: [objectId], pending, signal, transferStorage, now, mediaAccess }))) {
         return { ok: false, reason: 'storage-object-mismatch' };
       }
+      confirmedBytes += pending[objectId].byteLength;
+      onProgress?.({ phase: 'upload', completed: index + 1, total: objectIds.length, confirmedBytes, totalBytes, currentBytes: 0 });
     }
     return { ok: true };
   }
@@ -126,9 +135,10 @@
     }
   }
 
-  async function publishPendingRevision({ vault, storage, cache, assetId, targetRevision, objectIds, signal, transferStorage, now, mediaAccess }) {
+  async function publishPendingRevision({ vault, storage, cache, assetId, targetRevision, objectIds, signal, transferStorage, now, mediaAccess, onProgress }) {
     const target = positiveRevision(targetRevision);
     validateObjectIds(objectIds);
+    onProgress?.({ phase: 'checking', completed: 0, total: objectIds.length });
     const local = await localObjects(cache, assetId, target, objectIds, true);
     const remote = await backendApi.fetchRemoteAsset(vault, assetId);
     const recovery = remote && remote.revision === target && !remote.deletedAt;
@@ -139,7 +149,7 @@
     throwIfAborted(signal);
     if (recovery) {
       const verified = await session(vault, (token, user) => verifyRemoteObjects({ storage, token, userId: user.id, assetId, revision: target, objectIds, pending, signal, transferStorage, now, mediaAccess }));
-      if (verified) { await finalize(cache, assetId, target, objectIds); return { ok: true, resumed: true }; }
+      if (verified) { await finalize(cache, assetId, target, objectIds); onProgress?.({ phase: 'registered' }); return { ok: true, resumed: true }; }
       return conflict(assetId, 'published-revision-mismatch', target, remote);
     }
     if (target === 1) {
@@ -152,22 +162,24 @@
       return conflict(assetId, 'revision-mismatch', target, remote);
     }
 
-    const uploaded = await session(vault, (token, user) => uploadObjects({ storage, token, userId: user.id, assetId, revision: target, objectIds, pending, signal, transferStorage, now, mediaAccess }));
+    const uploaded = await session(vault, (token, user) => uploadObjects({ storage, token, userId: user.id, assetId, revision: target, objectIds, pending, signal, transferStorage, now, mediaAccess, onProgress }));
     if (!uploaded.ok) return conflict(assetId, uploaded.reason, target, remote);
     throwIfAborted(signal);
+    onProgress?.({ phase: 'register' });
     const published = target === 1 ? await backendApi.createRemoteAsset(vault, assetId) : await backendApi.publishRemoteAssetRevision(vault, assetId, target - 1);
     if (!published) {
       if (target === 1) {
         const raced = await backendApi.fetchRemoteAsset(vault, assetId);
         if (raced?.revision === 1 && !raced.deletedAt) {
           const verified = await session(vault, (token, user) => verifyRemoteObjects({ storage, token, userId: user.id, assetId, revision: target, objectIds, pending, signal, transferStorage, now, mediaAccess }));
-          if (verified) { await finalize(cache, assetId, target, objectIds); return { ok: true, resumed: true }; }
+          if (verified) { await finalize(cache, assetId, target, objectIds); onProgress?.({ phase: 'registered' }); return { ok: true, resumed: true }; }
         }
         return conflict(assetId, 'create-conflict', target, raced || remote);
       }
       return conflict(assetId, 'cas-conflict', target, remote);
     }
     await finalize(cache, assetId, target, objectIds);
+    onProgress?.({ phase: 'registered' });
     return { ok: true, metadata: published };
   }
 
