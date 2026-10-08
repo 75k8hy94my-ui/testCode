@@ -12,7 +12,7 @@
         select = documentRef.createElement('input');
         select.type = 'checkbox'; select.className = 'bulk-select'; select.checked = bulkSelected.has(item.id);
         select.title = '一括編集の対象にする';
-        card.appendChild(select);
+        select.setAttribute('aria-label', itemDisplayTitle(item) + 'を一括編集の対象にする');
       }
 
       const cover = documentRef.createElement('div');
@@ -23,6 +23,8 @@
       img.decoding = 'async';
       img.fetchPriority = 'auto';
       cover.appendChild(img);
+      // Selection belongs on the cover, not in an extra grid row above it.
+      if (select) cover.appendChild(select);
       card.appendChild(cover);
 
       const appendDetails = () => {
