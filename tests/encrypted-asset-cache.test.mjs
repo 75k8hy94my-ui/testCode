@@ -180,3 +180,34 @@ test('IndexedDB absence rejects clearly and the module is a classic script', () 
   assert.throws(() => cacheApi.createCache({ indexedDB: null }), /IndexedDB is unavailable/);
   assert.doesNotThrow(() => new vm.Script(fs.readFileSync(new URL('../encrypted-asset-cache.js', import.meta.url), 'utf8')));
 });
+
+
+
+test('putMany inserts encrypted tiles in one write transaction with a single eviction scan', async () => {
+  const cache = newCache();
+  await cache.clear();
+  idb.database.transactions.length = 0;
+  const objects = await Promise.all(['preview','L0:0:0','L0:1:0'].map(encrypted));
+  const source=objects.map((bytes,index)=>({assetId:'batched',revision:1,objectId:['preview','L0:0:0','L0:1:0'][index],encryptedBytes:bytes,retention:'pending'}));
+  await cache.putMany(source);
+  const writeTransactions=idb.database.transactions.filter(tx=>tx.operations.filter(op=>op==='put').length===3);
+  assert.equal(writeTransactions.length,1,'all records should be staged in a single write transaction');
+  const stored=await cache.getMany('batched',1,source.map(record=>record.objectId));
+  assert.equal(stored.length,3);
+  assert.ok(stored.every(record=>record?.retention==='pending'));
+  const fetched=await cache.getMany('batched',1,['preview','L9:0:0']);
+  assert.equal(fetched[1],null);
+  assert.equal(await cache.setRetentionMany('batched',1,source.map(record=>record.objectId),'cache'),true);
+  assert.ok((await cache.list()).every(record=>record.retention==='cache'));
+  assert.equal(await cache.setRetentionMany('batched',1,['preview','L9:0:0'],'pending'),false);
+  assert.equal((await cache.get('batched',1,'preview')).retention,'cache');
+});
+
+test('putMany does not evict pending ciphertext while over cache size', async () => {
+  const cache=newCache({maxBytes:1});
+  await cache.clear();
+  const bytes=await encrypted();
+  await cache.putMany([{assetId:'pending-batch',revision:1,objectId:'preview',encryptedBytes:bytes,retention:'pending'}]);
+  assert.equal((await cache.getUsage()).pendingCount,1);
+  await cache.clear();
+});
