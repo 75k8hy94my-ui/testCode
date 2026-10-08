@@ -302,3 +302,96 @@ test('encrypted covers take the dedicated loader path', async () => {
   assert.equal(invoked, true);
   assert.equal(img.src, 'blob:encrypted');
 });
+
+
+test('detached bookshelf cards receive cached local thumbnails before attachment', async () => {
+  const input = deps([]);
+  input.images.getLocalCoverObjectUrl = () => 'blob:already-cached';
+  input.images.loadCachedLocalImage = () => { throw new Error('should use cached cover'); };
+  const host = loadFactory().create(input);
+  const img = { src: '', isConnected: false, dataset: {} };
+  await host.loadLocalCover({ storagePaths: ['folder/001.jpg'] }, img);
+  assert.equal(img.src, 'blob:already-cached');
+  assert.equal(img.dataset.coverState, 'loading');
+});
+
+test('explicit cover URL failure shows retry and does not permanently blacklist the work', () => {
+  const cache = new Map();
+  const failed = new Set();
+  const input = deps([]);
+  input.images.getCoverSourceCache = () => cache;
+  input.images.getCoverFailedCache = () => failed;
+  const host = loadFactory().create(input);
+  const handlers = new Map();
+  const img = {
+    src: '', dataset: {},
+    addEventListener(type, callback) { handlers.set(type, callback); },
+    removeEventListener(type, callback) { if (handlers.get(type) === callback) handlers.delete(type); },
+  };
+  const exact = 'https://example.test/gallery/1.webp?sig=1';
+  host.setupFeedImage(img, exact, 1, null, 'one', exact);
+  assert.equal(img.src, exact);
+  assert.equal(img.dataset.coverState, 'loading');
+  handlers.get('error')();
+  assert.equal(img.dataset.coverState, 'failed');
+  assert.ok(failed.has(exact));
+  host.setupFeedImage(img, exact, 1, null, 'one', exact);
+  assert.equal(img.src, exact, 'a retry must run even when previously marked failed');
+  img.currentSrc = exact;
+  handlers.get('load')();
+  assert.equal(img.dataset.coverState, 'loaded');
+  assert.equal(cache.get(exact), exact);
+  assert.equal(failed.has(exact), false);
+});
+
+test('each cover fallback candidate has its own timeout; slow URLs remain retryable', () => {
+  const input = deps([]);
+  const timers = [];
+  input.images.extCandidates = ['jpg', 'png'];
+  input.images.setTimer = (callback, delay) => { timers.push({ callback, delay }); return timers.length; };
+  const host = loadFactory().create(input);
+  const handlers = {};
+  const img = {
+    src: '', dataset: {},
+    addEventListener(name, cb) { handlers[name] = cb; },
+    removeEventListener(name) { delete handlers[name]; },
+  };
+  host.setupFeedImage(img, 'https://example.test/series/', 2, null, 'slow');
+  assert.ok(img.src.endsWith('01.jpg'));
+  assert.equal(timers[0].delay, 60000);
+  timers[0].callback();
+  assert.ok(img.src.endsWith('01.png'));
+  assert.equal(img.dataset.coverState, 'loading');
+  assert.equal(timers[1].delay, 60000);
+  timers[1].callback();
+  assert.equal(img.dataset.coverState, 'failed');
+  host.setupFeedImage(img, 'https://example.test/series/', 2, null, 'slow');
+  assert.ok(img.src.endsWith('01.jpg'));
+});
+
+test('image discovery prefers an explicit filename and cached extension', () => {
+  const input = deps([]);
+  input.images.extCandidates = ['jpg', 'png', 'webp'];
+  input.images.getCachedMangaInfo = () => ({ ext: 2, numberWidth: 3 });
+  input.images.parseInputUrl = () => ({ baseUrl: 'https://example.test/book/', pattern: { prefix: 'chapter-', suffix: 'a' } });
+  input.images.pageUrlFor = (base, page, ext, width, pattern) =>
+    base + pattern.prefix + String(page).padStart(width, '0') + pattern.suffix + '.' + input.images.extCandidates[ext];
+  const host = loadFactory().create(input);
+  const img = { src: '', dataset: {}, addEventListener() {} };
+  host.setupFeedImage(img, 'https://example.test/book/', undefined, undefined, 'pattern');
+  assert.equal(img.src, 'https://example.test/book/chapter-001a.webp');
+});
+
+test('bookshelf DOM exposes loading, failed, and retry states without deleting work data', () => {
+  const runtime = fs.readFileSync(path.join(root, 'manga-list-runtime.js'), 'utf8');
+  const route = fs.readFileSync(path.join(root, 'manga-list-route.js'), 'utf8');
+  const css = fs.readFileSync(path.join(root, 'manga-list.css'), 'utf8');
+  assert.match(runtime, /className = 'book-cover-loading'/);
+  assert.match(runtime, /className = 'book-cover-retry'/);
+  assert.match(runtime, /event\.stopPropagation\(\);\s*loadCover\(\);/);
+  assert.match(css, /img\[data-cover-state="loading"\] ~ \.book-cover-loading/);
+  assert.match(css, /img\[data-cover-state="failed"\] ~ \.book-cover-retry/);
+  assert.match(route, /pattern\?\.prefix/);
+  assert.match(route, /manga-list\.css\?v=20261009-cover-status/);
+  assert.doesNotMatch(runtime.slice(runtime.indexOf('const loadCover = () =>'), runtime.indexOf('if (reorderMode) {', runtime.indexOf('const loadCover = () =>'))), /removeItem\(/);
+});
