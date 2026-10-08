@@ -34,7 +34,7 @@ test('manga mutation callbacks stop before protected work when access is blocked
   assert.match(extensionImport, /if \(!canReadProtectedData\(\)\)/);
   assert.match(registerImport, /if \(!canReadProtectedData\(\)\)/);
   assert.match(encryptedImport, /if \(!canReadProtectedData\(\)\)/);
-  assert.match(encryptedImport, /await service\.importFiles[\s\S]*if \(!canReadProtectedData\(\)\) return/);
+  assert.match(encryptedImport, /await service\.importFiles[\s\S]*importController\.signal\.aborted \|\| !canReadProtectedData\(\)/);
   assert.match(createFolder, /if \(!canReadProtectedData\(\)\) return/);
 });
 
