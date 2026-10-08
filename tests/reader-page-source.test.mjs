@@ -87,3 +87,14 @@ test('legacy discovery tries an exact first image with its query before speculat
   assert.equal(result.manifest.version, 1);
   assert.equal(tried.includes('https://img.test/book/chapter-002.jpg?access=example'), false);
 });
+
+test('legacy saved standalone image remains readable even without a numbered filename', async () => {
+  const url = 'https://img.test/work/cover.webp';
+  const tried = [];
+  const resolver = createLegacyResolver({
+    probe: async (candidate) => { tried.push(candidate); return candidate === url; },
+  });
+  const result = await create({ legacyResolver: resolver }).resolve({ id: 'single', url });
+  assert.deepEqual(result.urls, [url]);
+  assert.equal(tried[0], url);
+});
