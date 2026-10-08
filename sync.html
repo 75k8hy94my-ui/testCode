@@ -108,7 +108,7 @@
       copy:$('copyRecoveryBtn')
     };
     function setStatus(text) { ui.status.textContent=text || ''; }
-    function goReader() { const next = new URLSearchParams(location.search).get('next'); window.location.replace(next === 'images.html' ? 'images.html' : 'home.html'); }
+    function goReader() { const next = new URLSearchParams(location.search).get('next'); window.location.replace(['images.html','drive-gallery.html'].includes(next) ? next : 'home.html'); }
     let session = MangaVault.loadSession();
     if (!session || !session.user || !session.user.email) { window.location.replace('index.html'); return; }
     try {

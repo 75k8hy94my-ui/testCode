@@ -83,7 +83,7 @@ test('manga keeps normal works; encrypted image UI is isolated to images.html', 
   assert.doesNotMatch(manga,/bind\(importForm, 'submit'/);
   assert.match(read('app-desktop-rail.js'),/desktopNavImages/);
   assert.match(read('mobile-bottom-nav.js'),/mobileNavImages/);
-  assert.match(read('sync.html'),/next === 'images\.html'/);
+  assert.match(read('sync.html'),/\['images\.html','drive-gallery\.html'\]\.includes\(next\)/);
 });
 
 test('processing complete is never confused with upload success, and inactivity is visible', () => {

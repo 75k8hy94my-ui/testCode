@@ -70,7 +70,7 @@ test('home page is vault-gated and the shared routes remain intact', () => {
   assert.match(spa, /window\.location\.replace\(['"]index\.html['"]\)/);
   assert.match(home, /home-dashboard\.js\?v=20260924-home-media-cards/);
   assert.match(spa, /漫画・動画・作者カードなどのデータ/);
-  assert.match(read('sync.html'), /next === 'images\.html' \? 'images\.html' : 'home\.html'/);
+  assert.match(read('sync.html'), /\['images\.html','drive-gallery\.html'\]\.includes\(next\) \? next : 'home\.html'/);
 });
 
 test('logout remains on the profile settings route', () => {

@@ -1,6 +1,12 @@
 (() => {
   'use strict';
   const api = window.PublicDriveGallery;
+  const cryptoSettings = window.PublicDriveGalleryVault;
+  const vaultApi = window.MangaVault;
+  const vaultPayload = window.MangaVaultPayload;
+  const settingsStorageKey = vaultPayload.DATA_KEYS.driveGalleryEncrypted;
+  const syncStatus = document.getElementById('driveSyncStatus');
+  let saving = false;
   const byId = (id) => document.getElementById(id);
   const form = byId('driveGalleryForm');
   const folderInput = byId('driveFolder');
@@ -25,7 +31,31 @@
   function loading(value) {
     loadButton.disabled = value;
     cancelButton.hidden = !value;
-    loadButton.textContent = value ? '取得中…' : '画像を読み込む';
+    loadButton.textContent = value ? '取得中…' : '設定を暗号化・同期して読み込む';
+  }
+  function setSyncStatus(message, error = false) {
+    syncStatus.textContent = message;
+    syncStatus.dataset.error = error ? 'true' : 'false';
+  }
+  function vaultKey() {
+    const active = vaultApi?.loadActive?.();
+    if (!active?.rawKey) throw new Error('保管庫の解錠が必要です。');
+    return active.rawKey;
+  }
+  async function persistSettings(settings) {
+    // Only an AES-GCM envelope is stored on the device; plaintext never goes to localStorage.
+    const encrypted = await cryptoSettings.encryptSettings(vaultKey(), settings);
+    if (!vaultApi.loadActive()) throw new Error('保管庫がロックされています。再度解錠してください。');
+    localStorage.setItem(settingsStorageKey, JSON.stringify(encrypted));
+    setSyncStatus('暗号化した設定をクラウドへ同期しています…');
+    try {
+      await vaultApi.savePayload(vaultPayload.buildFromLocalStorage());
+      setSyncStatus('APIキーとフォルダを暗号化してクラウド同期しました。');
+    } catch (error) {
+      // Keep only the encrypted local value so a later explicit save can retry.
+      setSyncStatus('端末には暗号化保存済みですが、クラウド同期に失敗しました。再度保存してください。' +
+        (error?.message ? ' ' + error.message : ''), true);
+    }
   }
   function attachImageFallback(img, id, failureCallback) {
     const urls = api.imageUrls(id);
@@ -110,13 +140,8 @@
     updateViewer();
   }
 
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
+  async function loadImages(folderId, apiKey) {
     if (controller) controller.abort();
-    const folderId = api.folderIdFromInput(folderInput.value);
-    if (!folderId) { setStatus('正しいGoogle DriveフォルダURLまたはIDを入力してください。', true); return; }
-    const apiKey = keyInput.value.trim();
-    if (!apiKey) { setStatus('Google Drive APIキーを入力してください。', true); return; }
     controller = new AbortController();
     const current = controller;
     loading(true);
@@ -146,7 +171,76 @@
     } finally {
       if (controller === current) { controller = null; loading(false); }
     }
+  }
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (saving || controller) return;
+    const folderId = api.folderIdFromInput(folderInput.value);
+    if (!folderId) { setStatus('正しいGoogle DriveフォルダURLまたはIDを入力してください。', true); return; }
+    const apiKey = keyInput.value.trim();
+    if (!apiKey) { setStatus('Google Drive APIキーを入力してください。', true); return; }
+    try {
+      cryptoSettings.validateSettings({ folderId, apiKey });
+      saving = true;
+      loadButton.disabled = true;
+      await persistSettings({ folderId, apiKey });
+    } catch (error) {
+      setSyncStatus(error?.message || '設定を暗号化して保存できませんでした。', true);
+      return;
+    } finally {
+      saving = false;
+      loadButton.disabled = false;
+    }
+    await loadImages(folderId, apiKey);
   });
+  async function initialize() {
+    const config = window.MANGA_READER_SUPABASE || {};
+    const session = vaultApi?.loadSession?.();
+    if (!session?.refresh_token || !config.url || !config.publishableKey) {
+      location.replace('index.html');
+      return;
+    }
+    let active = vaultApi.loadActive();
+    if (!active && typeof vaultApi.waitForActive === 'function') active = await vaultApi.waitForActive(2500);
+    if (!active?.rawKey) {
+      location.replace('sync.html?next=drive-gallery.html');
+      return;
+    }
+    try {
+      await vaultApi.ensureSession();
+    } catch (error) {
+      if (vaultApi.isSessionAuthError?.(error)) vaultApi.saveSession(null);
+      location.replace('index.html');
+      return;
+    }
+    window.addEventListener('manga-vault-cleared', () => {
+      controller?.abort();
+      controller = null;
+      files = [];
+      grid.replaceChildren();
+      keyInput.value = '';
+      folderInput.value = '';
+      viewerImage.removeAttribute('src');
+      if (!viewer.hidden) closeViewer();
+      location.replace('sync.html?next=drive-gallery.html');
+    });
+    document.documentElement.classList.remove('auth-pending');
+    const saved = vaultPayload.buildFromLocalStorage().driveGalleryEncrypted;
+    if (!saved) {
+      setSyncStatus('保存済みのGoogle Drive設定はありません。入力すると暗号化して同期します。');
+      return;
+    }
+    try {
+      const settings = await cryptoSettings.decryptSettings(vaultKey(), saved);
+      folderInput.value = settings.folderId;
+      keyInput.value = settings.apiKey;
+      setSyncStatus('保管庫から保存済み設定を復元しました。');
+      await loadImages(settings.folderId, settings.apiKey);
+    } catch (error) {
+      keyInput.value = '';
+      setSyncStatus(error?.message || '保存済み設定を読み込めませんでした。', true);
+    }
+  }
   cancelButton.addEventListener('click', () => { if (controller) controller.abort(); });
   byId('driveViewerClose').addEventListener('click', closeViewer);
   byId('driveViewerPrev').addEventListener('click', () => moveViewer(-1));
@@ -166,4 +260,5 @@
   });
   const initialFolder = new URLSearchParams(window.location.search).get('folder');
   if (initialFolder) folderInput.value = api.folderIdFromInput(initialFolder);
+  void initialize();
 })();
