@@ -30,14 +30,22 @@ test('video player waits for protected-data access before reading records or ren
   assert.match(controls, /canReadProtectedData\(\)/);
 });
 
-test('video player page exposes quick editing for saved video details and syncs Vault payload', () => {
-  assert.match(page, /動画情報を編集/);
-  assert.match(page, /videoEditForm/);
-  assert.match(page, /name="title"/);
-  assert.match(page, /name="tags"/);
-  assert.match(page, /name="memo"/);
-  assert.match(page, /localStorage\.setItem\(META_KEY, JSON\.stringify\(nextMeta\)\)/);
-  assert.match(page, /MangaVault\.savePayload\(window\.MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
+test('video player edit action navigates to the dedicated editor instead of opening a dialog', () => {
+  assert.match(page, /const edit = document\.createElement\('a'\)/);
+  assert.match(page, /edit\.href = 'video-edit\.html\?id=' \+ encodeURIComponent\(id\) \+ '&return=player'/);
+  assert.doesNotMatch(page, /videoEditDialog|videoEditPanel|openEditor|aria-haspopup/);
+  assert.doesNotMatch(page, /document\.body\.append\(dialog\)/);
+
+  const editorHtml = fs.readFileSync(new URL('../video-edit.html', import.meta.url), 'utf8');
+  const editor = fs.readFileSync(new URL('../video-edit-page.js', import.meta.url), 'utf8');
+  assert.match(editorHtml, /id="videoEditPage"/);
+  assert.match(editorHtml, /video-edit-page\.js/);
+  for (const field of ['name="title"', 'name="folder"', 'name="status"', 'name="tags"', 'name="memo"', 'name="favorite"', 'name="rotate"']) {
+    assert.ok(editor.includes(field), field);
+  }
+  assert.match(editor, /MangaVault\.savePayload\(window\.MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
+  assert.match(editor, /location\.href = returnTarget\(returnKind, videoId\)/);
+  assert.match(editor, /if \(kind === 'player'\) return 'video-player\.html\?id='/);
 });
 
 test('watch page applies and cleans up the saved rotation direction for direct video', () => {
@@ -70,7 +78,7 @@ test('custom player defers single taps and maps double-tap zones to seek or full
 test('video player document cache keys identify the current watch-page design', () => {
   const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
   assert.match(html, /home-profile-shell\.css\?v=20261007-video-watch-layout/);
-  assert.match(html, /video-player-page\.js\?v=20261008-video-rotation/);
+  assert.match(html, /video-player-page\.js\?v=20261008-video-editor-route/);
 });
 
 test('marker registration defaults to the current playback position', () => {
