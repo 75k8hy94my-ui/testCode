@@ -97,7 +97,8 @@ test('cleanup removes both handlers, is idempotent, and makes instance terminal'
 });
 
 test('factory has no global, persistence, timer, route, or rendering dependencies', () => {
-  assert.doesNotMatch(source, /document|window|globalThis|localStorage|sessionStorage|MangaVault|Supabase|VPN|fetch|location|history|render|addEventListener\('(?:visibilitychange|pagehide|popstate|hashchange)'|setTimeout|setInterval|requestAnimationFrame/);
+  const codeOnly = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.doesNotMatch(codeOnly, /document|window|globalThis|localStorage|sessionStorage|MangaVault|Supabase|VPN|fetch|location|history|render|addEventListener\('(?:visibilitychange|pagehide|popstate|hashchange)'|setTimeout|setInterval|requestAnimationFrame/);
 });
 
 
