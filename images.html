@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="home-profile-shell.css?v=20261008-profile-avatar">
 <link rel="stylesheet" href="app-global-shell.css?v=20260924-theme-unified">
 <link rel="stylesheet" href="mobile-bottom-nav.css?v=20260925-instagram-drag-lock">
-<link rel="stylesheet" href="images.css?v=20261008-upload-progress">
+<link rel="stylesheet" href="images.css?v=20261008-size-preset">
 <style>html.auth-pending body{visibility:hidden}</style>
 </head>
 <body>
@@ -20,6 +20,14 @@
   <form id="imageUploadForm" class="imageUploadForm">
     <label>作品名<input id="imageTitle" name="title" type="text" required maxlength="200" autocomplete="off"></label>
     <label>画像ファイル（複数選択可）<input id="imageFiles" name="files" type="file" accept="image/*" multiple required></label>
+    <label>保存画質
+      <select id="imageQualityMode" name="quality">
+        <option value="balanced" selected>標準（推奨・長辺最大3,072px）</option>
+        <option value="compact">軽量（長辺最大2,048px）</option>
+        <option value="detailed">高画質（長辺最大4,096px）</option>
+      </select>
+    </label>
+    <p class="imageQualityHelp">拡大用画像を重複作成しない方式です。サイズは画像の内容によって変わります。細かい文字を読む画像は「高画質」も選べます。既存の保存画像は変更しません。</p>
     <div class="imageUploadActions"><button id="imageUploadButton" type="submit">暗号化して追加</button><button id="imageCancelButton" type="button" hidden>キャンセル</button><button id="imageRetrySync" type="button" hidden>クラウド同期を再試行</button></div>
   </form>
   <p id="imageStatus" class="imageStatus" role="status" aria-live="polite"></p>
@@ -29,6 +37,7 @@
     <progress id="imagePageProgress" value="0" max="1" aria-label="サーバー登録が完了したページ数"></progress>
     <div class="imageProgressMeta"><span id="imageProgressCount">登録済み 0 / 0ページ</span><span id="imageProgressActivity">処理を開始しています</span></div>
     <p id="imageProgressDetail" class="imageProgressDetail"></p>
+    <p id="imageUploadSize" class="imageProgressDetail" role="status" aria-live="polite"></p>
     <ol id="imageProgressSteps" class="imageProgressSteps" aria-label="処理の段階">
       <li data-upload-stage="processing">画像加工</li>
       <li data-upload-stage="encrypt">暗号化</li>
@@ -70,6 +79,6 @@
 <script src="image-photo-processor.js"></script>
 <script src="encrypted-asset-reader.js"></script>
 <script src="encrypted-asset-item.js"></script>
-<script src="encrypted-asset-import.js"></script>
-<script src="images.js?v=20261008-bulk-perf"></script>
+<script src="encrypted-asset-import.js?v=20261008-size-preset"></script>
+<script src="images.js?v=20261008-size-preset"></script>
 </body></html>
