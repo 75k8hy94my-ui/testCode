@@ -209,6 +209,58 @@
         savedVideos: 'mangaReaderVideos',
       };
       const data = createState(storage, keys, canReadProtectedData);
+      // Only opaque IDs are recorded. Network cleanup is deferred while VPN access is blocked.
+      const cleanupQueueKey = 'mangaReaderPendingEncryptedAssetCleanup';
+      const sessionUserId = () => {
+        const session = windowRef.MangaVault?.loadSession?.();
+        return String(session?.user?.id || session?.user_id || '');
+      };
+      const readCleanupQueue = () => {
+        try {
+          const value = JSON.parse(storage.getItem(cleanupQueueKey) || '[]');
+          return Array.isArray(value) ? value.filter(item => item && typeof item.assetId === 'string' && Number.isInteger(item.revision) && typeof item.userId === 'string') : [];
+        } catch (_) { return []; }
+      };
+      const writeCleanupQueue = (entries) => storage.setItem(cleanupQueueKey, JSON.stringify(entries));
+      const enqueueCleanup = (assetId, revision) => {
+        const userId = sessionUserId();
+        if (!userId) return;
+        const current = readCleanupQueue();
+        if (!current.some(item => item.userId === userId && item.assetId === assetId && item.revision === revision)) {
+          writeCleanupQueue([...current, { userId, assetId, revision }].slice(-2000));
+        }
+      };
+      const discardOrQueue = async ({ assetId, revision, cache, storageTransport }) => {
+        try {
+          if (!canReadProtectedData()) throw new Error('VPN切断のため画像の後始末を保留しました。');
+          await windowRef.EncryptedAssetSync.discardImportedAsset({
+            vault: windowRef.MangaVault, storage: storageTransport, cache, assetId, expectedRevision: revision
+          });
+        } catch (error) {
+          enqueueCleanup(assetId, revision);
+          throw error;
+        }
+      };
+      let cleanupRetry = null;
+      const retryPendingCleanup = () => {
+        if (cleanupRetry || !canReadProtectedData() || !windowRef.MangaVault?.loadActive?.()) return cleanupRetry;
+        cleanupRetry = (async () => {
+          const userId = sessionUserId();
+          const records = readCleanupQueue().filter(item => item.userId === userId);
+          if (!userId || !records.length) return;
+          const config = windowRef.MANGA_READER_SUPABASE || {};
+          const cache = windowRef.EncryptedAssetCache.createCache();
+          const storageTransport = windowRef.EncryptedAssetStorage.createStorageTransport({ baseUrl: config.url, publishableKey: config.publishableKey });
+          for (const entry of records) {
+            if (!canReadProtectedData()) break;
+            try {
+              await discardOrQueue({ assetId: entry.assetId, revision: entry.revision, cache, storageTransport });
+              writeCleanupQueue(readCleanupQueue().filter(item => !(item.userId === userId && item.assetId === entry.assetId && item.revision === entry.revision)));
+            } catch (_) { /* Keep the item for the next authorized retry. */ }
+          }
+        })().finally(() => { cleanupRetry = null; });
+        return cleanupRetry;
+      };
       let runtime = null;
       let elements = null;
       const coverCache = windowRef.MangaListCoverCache;
@@ -449,7 +501,10 @@
         let pendingShelfSync = false;
         cleanups.push(() => activeEncryptedImport?.abort());
         bind(documentRef, 'manga-reader-vpn-status', (event) => {
-          if (event && event.detail && event.detail.status === 'allowed') return;
+          if (event && event.detail && event.detail.status === 'allowed') {
+            void retryPendingCleanup();
+            return;
+          }
           if (activeEncryptedImport) activeEncryptedImport.abort();
           encryptedCoverLoader?.destroy();
           encryptedCoverLoader = null;
@@ -582,7 +637,7 @@
               stage: ({ assetId, targetRevision, processed }) => windowRef.EncryptedAssetSync.stageProcessedRevision({ cache, masterKey: activeVault.rawKey, assetId, targetRevision, processed }),
               publish: ({ assetId, targetRevision, staged, signal }) => windowRef.EncryptedAssetSync.publishPendingRevision({ vault: windowRef.MangaVault, storage: storageTransport, cache, assetId, targetRevision, objectIds: staged.objectIds, signal, transferStorage: windowRef.localStorage, mediaAccess: windowRef.MangaReaderMediaAccess }),
               tombstone: (assetId, revision) => windowRef.EncryptedAssetSync.tombstoneAsset({ vault: windowRef.MangaVault, assetId, expectedRevision: revision }),
-              cleanupAsset: ({ assetId, revision }) => windowRef.EncryptedAssetSync.discardImportedAsset({ vault: windowRef.MangaVault, storage: storageTransport, cache, assetId, expectedRevision: revision }),
+              cleanupAsset: ({ assetId, revision }) => discardOrQueue({ assetId, revision, cache, storageTransport }),
             });
             const item = await service.importFiles({ files: selectedFiles, title: importTitle.value, signal: importController.signal, onProgress: (progress) => {
               if (!canReadProtectedData()) { importController.abort(); return; }
@@ -590,7 +645,7 @@
             } });
             if (importController.signal.aborted || !canReadProtectedData()) {
               for (const page of item.encryptedAssets.pages) {
-                await windowRef.EncryptedAssetSync.discardImportedAsset({ vault: windowRef.MangaVault, storage: storageTransport, cache, assetId: page.assetId, expectedRevision: page.revision });
+                await discardOrQueue({ assetId: page.assetId, revision: page.revision, cache, storageTransport });
               }
               throw new Error('処理を中止しました。');
             }
@@ -602,7 +657,7 @@
               setState({ savedItems: previousItems });
               for (const page of item.encryptedAssets.pages) {
                 try {
-                  await windowRef.EncryptedAssetSync.discardImportedAsset({ vault: windowRef.MangaVault, storage: storageTransport, cache, assetId: page.assetId, expectedRevision: page.revision });
+                  await discardOrQueue({ assetId: page.assetId, revision: page.revision, cache, storageTransport });
                 } catch (_) {
                   saveError.message += ' 保存済み画像の後始末にも失敗しました。';
                 }
@@ -712,6 +767,7 @@
       }
       elements = result.elements;
       activeEntry = entry;
+      if (canReadProtectedData()) void retryPendingCleanup();
       return Object.freeze({ root: result.root, elements: result.elements, cleanup: entry.cleanup });
     }
     function cleanup() {
