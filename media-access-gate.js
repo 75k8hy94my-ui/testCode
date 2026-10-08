@@ -310,7 +310,6 @@
       '現在IP: ' + (d.ip || '取得前'),
       '国判定: ' + country,
       d.countrySource === 'fallback' ? '国情報の取得元: 予備API' : '',
-      '国判定ルール: 日本以外のIPはVPNとして扱う',
       '国判定結果: ' + countryPolicy,
       '手動指定: ' + manual,
       'Proton保有ネットワーク: ' + owned,
