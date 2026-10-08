@@ -110,3 +110,31 @@ test('manifest metadata contains only pure dimensions and binary metadata', () =
     }
   });
 });
+
+
+test('single-level zoom cap adapts to each input dimension without losing source detail', () => {
+  for (const [cap, input, expected] of [
+    [3072, 1200, []],
+    [3072, 1440, []],
+    [3072, 1500, [1500]],
+    [3072, 1900, [1900]],
+    [3072, 2500, [2500]],
+    [3072, 3072, [3072]],
+    [3072, 6000, [3072]],
+    [2048, 1900, [1900]],
+    [2048, 6000, [2048]],
+    [4096, 2500, [2500]],
+    [4096, 6000, [4096]]
+  ]) {
+    const profile = getCompressionProfile();
+    profile.zoom.intermediateLongEdge = cap;
+    profile.zoom.maximumLongEdge = cap;
+    const result = planZoomLevels(input, Math.round(input * 0.7), profile);
+    assert.deepEqual(result.map(level => level.longEdge), expected, 'cap=' + cap + ', source=' + input);
+    assert.ok(result.every(level => level.width <= input && level.height <= Math.round(input * 0.7)));
+    assert.ok(result.length <= 1);
+  }
+  // The original legacy two-level profile must remain untouched.
+  assert.deepEqual(planZoomLevels(2500, 1500).map(level => level.longEdge), [2048, 2500]);
+  assert.deepEqual(planZoomLevels(6000, 4000).map(level => level.longEdge), [2048, 4096]);
+});
