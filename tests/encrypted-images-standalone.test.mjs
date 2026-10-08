@@ -128,7 +128,7 @@ test('upload progress panel exposes confirmed-page counts, server steps and time
   const html = read('images.html');
   for (const id of ['imageUploadProgress','imageProgressState','imageProgressElapsed',
     'imageProgressFile','imagePageProgress','imageProgressCount','imageProgressActivity',
-    'imageProgressDetail','imageProgressSteps']) {
+    'imageProgressDetail','imageProgressSteps','imageProgressHint']) {
     assert.match(html,new RegExp('id="' + id + '"'));
   }
   assert.match(read('images.js'),/startUploadProgress\(files\.length\)/);
