@@ -130,7 +130,7 @@ test('saved theme drives home profile manga video and header colors', () => {
     const shellVersion = page === 'video-player.html' ? '20261009-generated-volume-icons' : '20261008-profile-avatar';
     assert.match(read(page), new RegExp(`home-profile-shell\\.css\\?v=${shellVersion}`));
     assert.match(read(page), /app-global-shell\.js\?v=20261003-reader-spa/);
-    const menuVersion = page === 'video-player.html' ? '20260924-theme-unified' : '20261008-profile-avatar';
+    const menuVersion = page === 'video-player.html' ? '20260924-theme-unified' : '20261009-guest-mode';
     assert.match(read(page), new RegExp(`profile-menu\\.js\\?v=${menuVersion}`));
   }
 });
