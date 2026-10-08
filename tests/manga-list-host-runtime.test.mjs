@@ -395,6 +395,6 @@ test('bookshelf DOM exposes loading, failed, and retry states without deleting w
   assert.match(css, /img\[data-cover-state="loading"\] ~ \.book-cover-loading/);
   assert.match(css, /img\[data-cover-state="failed"\] ~ \.book-cover-retry/);
   assert.match(route, /pattern\?\.prefix/);
-  assert.match(route, /manga-list\.css\?v=20261009-cover-controls/);
+  assert.match(route, /manga-list\.css\?v=20261009-desktop-liquid-pager/);
   assert.doesNotMatch(runtime.slice(runtime.indexOf('const loadCover = () =>'), runtime.indexOf('if (reorderMode) {', runtime.indexOf('const loadCover = () =>'))), /removeItem\(/);
 });
