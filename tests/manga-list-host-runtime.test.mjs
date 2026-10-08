@@ -265,6 +265,8 @@ test('manga route owns shelf persistence and Reader uses its narrow item reposit
   assert.doesNotMatch(reader, /manga-list-host-runtime|MangaListHostRuntimeFactory|persistFolders|persistAuthorCards/);
   assert.match(reader, /reader-item-repository\.js/);
   assert.match(reader, /ReaderItemRepositoryFactory\.create\(/);
-  assert.match(reader, /MangaVault\.savePayload\(payload\)/);
+  assert.match(reader, /ReaderSyncSchedulerFactory\.create/);
+  assert.match(reader, /flushSync:\s*\(\) => syncScheduler\.flush\(\)/);
+  assert.match(fs.readFileSync(path.join(root, 'reader-sync-scheduler.js'), 'utf8'), /return save\(\)/);
   assert.match(fs.readFileSync(path.join(root, 'reader-item-repository.js'), 'utf8'), /dependencies\.scheduleSync\(\)/);
 });
