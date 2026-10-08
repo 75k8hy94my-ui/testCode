@@ -24,10 +24,11 @@
       <input id="driveApiKey" name="apiKey" type="password" placeholder="AIza..." required spellcheck="false" autocomplete="off">
     </label>
     <div class="driveActions">
-      <button type="submit" id="driveLoad">設定を暗号化・同期して読み込む</button>
+      <button type="submit" id="driveLoad">設定を保存して表示</button>
+      <button type="button" id="driveRefresh" disabled>Driveから一覧を更新</button>
       <button type="button" id="driveCancel" hidden>中止</button>
     </div>
-    <p class="driveHelp">フォルダを「リンクを知っている全員・閲覧者」にし、Google CloudでDrive APIを有効化してください。APIキーとフォルダIDは保管庫の鍵で暗号化してクラウド同期します。解錠後は自動復元されます。キーにはGitHub PagesのHTTPリファラー制限とDrive APIへのAPI制限を設定してください。</p>
+    <p class="driveHelp">フォルダを「リンクを知っている全員・閲覧者」にし、Google CloudでDrive APIを有効化してください。APIキー・フォルダIDと画像の直リンク一覧は暗号化してクラウド同期します。通常は保存済み一覧を表示し、Drive APIへのアクセスは初回または「Driveから一覧を更新」の操作時だけです。キーにはHTTPリファラー制限とDrive API制限を設定してください。画像データ自体は保存されません。</p>
     <p id="driveSyncStatus" class="driveSyncStatus" role="status" aria-live="polite"></p>
   </form>
   <div class="driveResultHeader">
