@@ -22,26 +22,43 @@
       const pages = [];
       const attemptedAssets = [];
       const aborted = () => Object.assign(new Error('処理を中止しました。'), { name: 'AbortError' });
+      const emit = (fileIndex, phase, detail = {}) => onProgress?.({
+        index: fileIndex, fileIndex, total: selected.length,
+        completedPages: phase === 'uploaded' ? fileIndex + 1 : fileIndex,
+        fileName: selected[fileIndex]?.name || `画像 ${fileIndex + 1}`,
+        phase, detail
+      });
       try {
         for (let index = 0; index < selected.length; index += 1) {
           if (signal?.aborted) throw Object.assign(new Error('処理を中止しました。'), { name: 'AbortError' });
-          onProgress?.({ index, total: selected.length, fileName: selected[index].name || `画像 ${index + 1}`, phase: 'processing' });
-          const processed = await processPhoto(selected[index], { signal });
+          emit(index, 'processing');
+          const processed = await processPhoto(selected[index], {
+            signal, onProgress: (progress) => emit(index, 'processing', progress)
+          });
           const assetId = createAssetId();
           const attempt = { assetId, revision: 1, published: false };
           attemptedAssets.push(attempt);
-          const staged = await stage({ assetId, targetRevision: 1, processed, signal });
+          emit(index, 'encrypt');
+          const staged = await stage({
+            assetId, targetRevision: 1, processed, signal,
+            onProgress: (progress) => emit(index, 'encrypt', progress)
+          });
           if (signal?.aborted) throw aborted();
-          const result = await publish({ assetId, targetRevision: 1, staged, signal });
+          emit(index, 'checking');
+          const result = await publish({
+            assetId, targetRevision: 1, staged, signal,
+            onProgress: (progress) => emit(index, progress.phase || 'upload', progress)
+          });
           if (!result || result.ok === false) throw new Error('暗号化画像を同期できませんでした。');
           attempt.published = true;
           attempt.revision = Number(result.metadata?.revision) || 1;
           pages.push({ assetId, revision: attempt.revision, manifest: processed.manifest });
           if (signal?.aborted) throw aborted();
-          onProgress?.({ index: index + 1, total: selected.length, fileName: selected[index].name || `画像 ${index + 1}`, phase: 'uploaded' });
+          emit(index, 'uploaded');
         }
         if (signal?.aborted) throw aborted();
       } catch (error) {
+        onProgress?.({ phase: 'cleanup', total: selected.length, completedPages: 0, fileName: '' });
         const cleanupFailures = [];
         for (const attempt of attemptedAssets.reverse()) {
           try {
