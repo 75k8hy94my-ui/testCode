@@ -258,7 +258,7 @@
               writeCleanupQueue(readCleanupQueue().filter(item => !(item.userId === userId && item.assetId === entry.assetId && item.revision === entry.revision)));
             } catch (_) { /* Keep the item for the next authorized retry. */ }
           }
-        })().finally(() => { cleanupRetry = null; });
+        })().catch(() => { /* Keep queued cleanup for the next authorized retry. */ }).finally(() => { cleanupRetry = null; });
         return cleanupRetry;
       };
       let runtime = null;
@@ -634,7 +634,7 @@
               processPhoto: (file, options) => windowRef.ImagePhotoProcessor.processPhoto(file, { ...options, preferWorker: true, onProgress: (progress) => {
                 importStatus.textContent = `${file.name || '画像'}を処理中：${progress.phase}`;
               } }),
-              stage: ({ assetId, targetRevision, processed }) => windowRef.EncryptedAssetSync.stageProcessedRevision({ cache, masterKey: activeVault.rawKey, assetId, targetRevision, processed }),
+              stage: ({ assetId, targetRevision, processed, signal }) => windowRef.EncryptedAssetSync.stageProcessedRevision({ cache, masterKey: activeVault.rawKey, assetId, targetRevision, processed, signal }),
               publish: ({ assetId, targetRevision, staged, signal }) => windowRef.EncryptedAssetSync.publishPendingRevision({ vault: windowRef.MangaVault, storage: storageTransport, cache, assetId, targetRevision, objectIds: staged.objectIds, signal, transferStorage: windowRef.localStorage, mediaAccess: windowRef.MangaReaderMediaAccess }),
               tombstone: (assetId, revision) => windowRef.EncryptedAssetSync.tombstoneAsset({ vault: windowRef.MangaVault, assetId, expectedRevision: revision }),
               cleanupAsset: ({ assetId, revision }) => discardOrQueue({ assetId, revision, cache, storageTransport }),
