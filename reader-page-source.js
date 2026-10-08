@@ -24,11 +24,20 @@
     const formatted = String(number).padStart(source.width, '0');
     return `${source.base}${source.pattern?.prefix || ''}${formatted}${source.pattern?.suffix || ''}.${extension}${source.query || ''}`;
   }
-  function createLegacyResolver({ probe, maxPages = 2000, extensions = EXTENSIONS, baseHref } = {}) {
+  function createLegacyResolver({ probe, maxPages = 2000, extensions = EXTENSIONS, baseHref, getCachedInfo } = {}) {
     if (typeof probe !== 'function') throw new TypeError('legacy page resolver requires an isolated probe');
     return Object.freeze({ async resolve(item, { signal } = {}) {
-      const source = parseSequentialSource(item?.url, item, baseHref);
-      if (!source) throw new Error('作品のページURLがありません');
+      const originalSource = parseSequentialSource(item?.url, item, baseHref);
+      if (!originalSource) throw new Error('作品のページURLがありません');
+      let cachedInfo = null;
+      try { cachedInfo = typeof getCachedInfo === 'function' ? getCachedInfo(item, originalSource) : null; } catch (_) {}
+      const hints = cachedInfo && typeof cachedInfo === 'object' ? cachedInfo : {};
+      const enrichedItem = {
+        ...item,
+        numberWidth: Number(item?.numberWidth) || Number(hints.numberWidth) || undefined,
+        pagePattern: item?.pagePattern || hints.pattern || undefined,
+      };
+      const source = parseSequentialSource(item?.url, enrichedItem, baseHref);
       const pages = [];
       // Existing works often provide the exact first page; trust that link
       // before guessing alternative formats (and keep any required URL query).
@@ -36,7 +45,10 @@
       const initialPath = (() => { try { return new URL(initialUrl, baseHref).pathname; } catch (_) { return ''; } })();
       const initialMatch = initialPath.match(/(\d+)(?:[^/]*)\.(jpe?g|png|webp|avif)$/i);
       const initialFormat = initialPath.match(/\.(jpe?g|png|webp|avif)$/i)?.[1]?.toLowerCase();
-      const formats = [...new Set([initialFormat, ...extensions].filter(Boolean))];
+      const cachedExtension = Number.isInteger(hints.ext) && hints.ext >= 0
+        ? EXTENSIONS[hints.ext]
+        : typeof hints.ext === 'string' ? hints.ext.toLowerCase() : null;
+      const formats = [...new Set([initialFormat, cachedExtension, ...extensions].filter((ext) => ext && /^(jpe?g|png|webp|avif)$/.test(ext)))];
       for (let number = 1; number <= maxPages; number += 1) {
         if (signal?.aborted) throw Object.assign(new Error('Page discovery cancelled'), { name: 'AbortError' });
         let found = '';
