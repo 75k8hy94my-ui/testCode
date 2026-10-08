@@ -64,7 +64,15 @@
       const resolved = await resolve(itemId);
       if (!resolved) return null;
       if (!dependencies.document || !dependencies.window) throw new TypeError('reader runtime requires document and window to render');
-      await mountItem(resolved.item);
+      const ready = await mountItem(resolved.item);
+      if (destroyed) return null;
+      if (!ready) {
+        const retryButton = byId('retryPageBtn');
+        const guidance = retryButton && retryButton.hidden === false
+          ? '「再試行」を押してください。'
+          : '本棚から作品のページ情報を確認してください。';
+        throw new Error('最初のページを表示できませんでした。' + guidance);
+      }
       return resolved.item;
     }
 
@@ -254,6 +262,8 @@
       const previousRenderer = encryptedRenderer;
       restorePageEnhancements();
       stage.replaceChildren(candidate.frame);
+      const message = byId('readerMessage');
+      if (message) message.textContent = '';
       stage.classList.remove('vertical-scroll');
       viewer.classList.remove('vertical-scroll');
       encryptedRenderer = candidate.renderer || null;
@@ -552,6 +562,7 @@
     async function mountItem(item) {
       currentItem = item;
       split = Boolean(item.splitSpreads);
+      updateControls();
       page = resumePage(item);
       requestedPage = page;
       lastFailedRequest = null;
@@ -568,12 +579,12 @@
       const resume = page;
       if (item.encryptedAssets) {
         encryptedPages = win.EncryptedAssetItem.encryptedAssetPagesForItem(item) || [];
-        if (!encryptedPages.length) { status('暗号化ページがありません。'); return; }
+        if (!encryptedPages.length) { status('暗号化ページがありません。'); return false; }
         page = Math.min(page, encryptedPages.length);
         requestedPage = page;
-        await renderPage(page); if (!destroyed) showNextVolume(); return;
+        const ready = await renderPage(page); if (!destroyed) showNextVolume(); return ready;
       }
-      if (!pageSource) { status('ページ一覧を解決できません。'); return; }
+      if (!pageSource) { status('ページ一覧を解決できません。'); return false; }
       status(Array.isArray(item.pages) || item.pageManifest ? 'ページを準備しています…' : 'ページ一覧を初回確認しています…');
       const AbortControllerRef = win.AbortController || globalThis.AbortController;
       const discoveryController = typeof AbortControllerRef === 'function' ? new AbortControllerRef() : null;
@@ -581,7 +592,7 @@
       const resolved = await pageSource.resolve(item, { signal: discoveryController?.signal });
       if (destroyed || generationAtStart !== generation) return;
       pageUrls = resolved.urls;
-      if (!pageUrls.length) { status('画像を見つけられませんでした。'); return; }
+      if (!pageUrls.length) { status('画像を見つけられませんでした。'); return false; }
       if (resolved.migrated || !item.pageManifest) {
         currentItem = repository.saveItem(resolved.item) || resolved.item;
       }
@@ -591,6 +602,7 @@
       if (destroyed) return;
       showNextVolume();
       if (ready) status(`${pageUrls.length}ページ`);
+      return ready;
     }
 
     return Object.freeze({
