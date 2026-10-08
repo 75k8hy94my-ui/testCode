@@ -81,6 +81,31 @@
 #dashboard { display: grid; gap: 10px; margin: 12px 0; }
 .dashboard-row, .author-dashboard-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 7px; }
 
+/* A page is a real grid, while the outer shelf owns the pager and viewport.
+   During a page turn two grids travel together, clipped to the shelf width. */
+.bookshelf-page-frame {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+}
+.bookshelf-page {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  align-items: start;
+  gap: 18px 12px;
+  width: 100%;
+  min-width: 0;
+}
+.bookshelf-slide-track {
+  display: flex;
+  align-items: flex-start;
+  width: 200%;
+  will-change: transform;
+}
+.bookshelf-slide-track > .bookshelf-page {
+  flex: 0 0 50%;
+}
+
 #savedListItems {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
@@ -145,6 +170,7 @@
 @media (max-width: 600px) {
   #shelfSearchInput, #shelfSortSelect { flex: 1 1 100%; width: 100%; }
   #savedListItems { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 12px; }
+  .bookshelf-page { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 12px; }
   .bookshelfPagerButton { display: inline-block; min-width: 64px; min-height: 44px; }
   #mangaListSection .bookshelf-pagination {
     width: 100%;
@@ -284,6 +310,11 @@ html[data-theme="light"] .folder-cover { background: linear-gradient(145deg, #ee
     align-items: start;
   }
 
+  #mangaListSection .bookshelf-page {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px 10px;
+  }
+
   #mangaListSection .book-title {
     font-size: 11px;
     line-height: 1.35;
@@ -305,6 +336,9 @@ html[data-theme="light"] .folder-cover { background: linear-gradient(145deg, #ee
 
 @media (max-width: 380px) {
   #mangaListSection #savedListItems {
+    gap: 14px 8px;
+  }
+  #mangaListSection .bookshelf-page {
     gap: 14px 8px;
   }
 
