@@ -145,7 +145,14 @@
 @media (max-width: 600px) {
   #shelfSearchInput, #shelfSortSelect { flex: 1 1 100%; width: 100%; }
   #savedListItems { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 12px; }
-  .bookshelfPagerButton { display: none; }
+  .bookshelfPagerButton { display: inline-block; min-width: 64px; min-height: 44px; }
+  #mangaListSection .bookshelf-pagination {
+    width: 100%;
+    max-width: 100%;
+    margin: 12px auto;
+    gap: 8px;
+    padding: 8px;
+  }
 }
 
 html[data-theme="light"] #routeContent > #mangaListSection,
