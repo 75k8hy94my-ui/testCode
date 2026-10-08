@@ -52,8 +52,10 @@
           }
         }
         if (cleanupFailures.length) {
-          error.cleanupFailed = true;
-          error.message += ' アップロード済みデータの後始末に失敗しました。';
+          const combined = new Error((error?.message || String(error)) + ' アップロード済みデータの後始末に失敗しました。', { cause: error });
+          combined.name = error?.name || 'Error';
+          combined.cleanupFailed = true;
+          throw combined;
         }
         throw error;
       }
