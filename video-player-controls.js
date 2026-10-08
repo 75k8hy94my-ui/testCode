@@ -94,7 +94,7 @@
   });
   video.addEventListener('click', (event) => { showControls(); if (gestureController) gestureController.tap(event); });
   frame.addEventListener('mousemove', showControls); frame.addEventListener('touchstart', showControls, { passive: true }); controls.addEventListener('focusin', showControls); controls.addEventListener('focusout', showControls);
-  renderMarkers(); update();
+  renderMarkers(); update(); showControls();
   disposeCurrent = () => { clearTimeout(hideTimer); if (gestureController) gestureController.destroy(); try { video.pause(); } catch (_) {} controls.remove(); markerPanel.remove(); notice.remove(); delete video.dataset.customControlsReady; };
   }
   function handleAccessChange() { if (canReadProtectedData()) initializeControls(); else destroy(); }
