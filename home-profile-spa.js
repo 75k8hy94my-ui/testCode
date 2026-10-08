@@ -162,7 +162,7 @@ function renderVpnGate(target,route){
 }
 async function ensureVpnGate(){
   if(window.MangaReaderMediaAccess)return window.MangaReaderMediaAccess;
-  await loadScript('media-access-gate.js?v=20261008-vpn-data','spaMediaGate');
+  await loadScript('media-access-gate.js?v=20261009-guest-mode','spaMediaGate');
   return window.MangaReaderMediaAccess;
 }
 function cleanupMangaShell(){cleanupMangaRoute();document.querySelectorAll('#metadataSuggestions,#saveDialogOverlay,#customAddOverlay,#editItemOverlay,#bulkEditOverlay,#bulkDetectOverlay,#savedListOverlay,#tocOverlay').forEach((node)=>node.remove());}
@@ -181,7 +181,7 @@ async function renderVideo(generation){
     if(!videoRouteRuntime)videoRouteRuntime=window.VideoListRouteFactory.create({
       documentRef:document,
       loadScript,
-      loadMediaGate:()=>window.MangaReaderMediaAccess?Promise.resolve():loadScript('media-access-gate.js?v=20261008-vpn-data','spaMediaGate'),
+      loadMediaGate:()=>window.MangaReaderMediaAccess?Promise.resolve():loadScript('media-access-gate.js?v=20261009-guest-mode','spaMediaGate'),
       mediaAccess:gate,
     });
     await videoRouteRuntime.start({mountElement:target});
@@ -202,7 +202,7 @@ async function renderManga(generation){
     const gate=await ensureVpnGate();
     if(generation!==renderGeneration)return;
     if(!gate){renderVpnGate(target,'manga');setTitle('manga');syncHeaderRoute();return;}
-    if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20261009-desktop-liquid-pager','spaMangaListRoute');
+    if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20261009-guest-mode','spaMangaListRoute');
     if(generation!==renderGeneration)return;
     routeRuntime=window.MangaListRouteFactory.create({documentRef:document,windowRef:window,mediaAccess:gate});
     mangaRouteRuntime=routeRuntime;
