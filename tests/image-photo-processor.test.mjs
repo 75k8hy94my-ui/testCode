@@ -162,3 +162,28 @@ test('unsupported browser encoder fails rather than publishing incorrect MIME me
   runtime.encode=async()=>new Blob([new Uint8Array(5)],{type:'image/png'});
   await assert.rejects(processor.processPhoto(fakePhoto(),{preferWorker:false,runtime}),/JPEG画像の書き出し/);
 });
+
+
+test('actual encoded image keeps all source detail when shorter than chosen single-level cap', async () => {
+  const profiles = await import('../image-compression-profile.js');
+  const profile = profiles.default.getCompressionProfile();
+  profile.zoom.intermediateLongEdge = 3072;
+  profile.zoom.maximumLongEdge = 3072;
+  profile.zoom.quality = 0.76;
+  profile.zoom.tileSize = 1024;
+  const small = await processor.processPhoto(fakePhoto({width:2500,height:1500}), {
+    preferWorker:false, profile, runtime:createFakeRuntime({width:2500,height:1500})
+  });
+  assert.deepEqual(small.manifest.zoom.levels.map(level=>level.longEdge),[2500]);
+  assert.equal(small.manifest.zoom.levels[0].width,2500);
+  assert.equal(small.manifest.zoom.levels[0].height,1500);
+  const large = await processor.processPhoto(fakePhoto({width:6000,height:3600}), {
+    preferWorker:false, profile, runtime:createFakeRuntime({width:6000,height:3600})
+  });
+  assert.deepEqual(large.manifest.zoom.levels.map(level=>level.longEdge),[3072]);
+  const tiny = await processor.processPhoto(fakePhoto({width:1200,height:800}), {
+    preferWorker:false, profile, runtime:createFakeRuntime({width:1200,height:800})
+  });
+  assert.deepEqual(tiny.manifest.zoom.levels,[]);
+  assert.equal(tiny.manifest.preview.longEdge,1200);
+});
