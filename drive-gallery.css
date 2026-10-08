@@ -21,6 +21,7 @@ a{color:var(--accent)}
 .driveActions button:first-child{background:#3760a3;border-color:#517dca}
 .driveActions button:disabled{opacity:.55;cursor:wait}
 .driveHelp{grid-column:1/-1;color:var(--muted);font-size:12px;line-height:1.8;margin:0}
+.driveSyncStatus{grid-column:1/-1;margin:0;color:var(--muted);font-size:13px;min-height:1.6em}.driveSyncStatus[data-error="true"]{color:#ff9c9c}
 .driveResultHeader{margin:21px 0 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
 .driveResultHeader p{margin:0}
 .driveResultHeader p[data-error="true"]{color:#ff9c9c}
