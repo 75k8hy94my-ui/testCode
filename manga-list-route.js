@@ -490,24 +490,8 @@
         const back = elements.listBackBtn;
         const prev = elements.bookshelfPrevBtn;
         const next = elements.bookshelfNextBtn;
-        const addEncryptedImages = rootElement.querySelector('#addCustomBtn');
-        const importDialog = rootElement.querySelector('#encryptedImageAddDialog');
-        const importForm = rootElement.querySelector('#encryptedImageAddForm');
-        const importTitle = rootElement.querySelector('#encryptedImageTitleInput');
-        const importFiles = rootElement.querySelector('#encryptedImageFilesInput');
-        const importStatus = rootElement.querySelector('#encryptedImageImportStatus');
-        const importSubmit = rootElement.querySelector('#encryptedImageSubmitButton');
-        let activeEncryptedImport = null;
-        let pendingShelfSync = false;
-        cleanups.push(() => activeEncryptedImport?.abort());
         bind(documentRef, 'manga-reader-vpn-status', (event) => {
-          if (event && event.detail && event.detail.status === 'allowed') {
-            void retryPendingCleanup();
-            return;
-          }
-          if (activeEncryptedImport) activeEncryptedImport.abort();
-          encryptedCoverLoader?.destroy();
-          encryptedCoverLoader = null;
+          if (event?.detail?.status === 'allowed') void retryPendingCleanup();
         });
         const bulkDetect = rootElement.querySelector('#bulkDetectBtn');
         const mangaImportRegister = rootElement.querySelector('#mangaImportRegisterButton');
@@ -569,121 +553,6 @@
             mangaImportController.setStatus(error?.message || '登録できませんでした。');
           } finally {
             mangaImportRegister.disabled = !canReadProtectedData();
-          }
-        });
-        const closeImport = () => {
-          if (pendingShelfSync) {
-            importStatus.textContent = '画像は保存済みです。本棚の同期完了を確認するか、同期を再試行してください。';
-            return;
-          }
-          if (activeEncryptedImport) {
-            activeEncryptedImport.abort();
-            importStatus.textContent = '処理を中止し、保存済み画像を整理しています…';
-            return;
-          }
-          importDialog.hidden = true;
-          importDialog.style.display = '';
-        };
-        bind(addEncryptedImages, 'click', () => {
-          if (!canReadProtectedData()) return;
-          if (!windowRef.MangaVault?.loadActive?.()?.rawKey) {
-            importStatus.textContent = '画像の追加には、ログインして保管庫を開いてください。';
-          } else {
-            importStatus.textContent = '';
-          }
-          importDialog.hidden = false;
-          importDialog.style.display = 'grid';
-          importTitle.focus();
-        });
-        bind(rootElement.querySelector('#encryptedImageCancelButton'), 'click', closeImport);
-        bind(importForm, 'submit', async (event) => {
-          event.preventDefault();
-          if (!canReadProtectedData()) return;
-          const activeVault = windowRef.MangaVault?.loadActive?.();
-          if (!activeVault?.rawKey) { importStatus.textContent = 'ログインして保管庫を開いてから追加してください。'; return; }
-          const selectedFiles = Array.from(importFiles.files || []);
-          if (!pendingShelfSync && !selectedFiles.length) { importStatus.textContent = 'ページ画像を選択してください。'; return; }
-          if (pendingShelfSync) {
-            importSubmit.disabled = true;
-            try {
-              await host.flushCloudSync();
-              pendingShelfSync = false;
-              importSubmit.textContent = '暗号化して追加';
-              importStatus.textContent = '画像と本棚のクラウド同期が完了しました。';
-              importForm.reset();
-              windowRef.setTimeout(closeImport, 900);
-            } catch (error) {
-              importStatus.textContent = '本棚のクラウド同期に失敗しました。再試行してください：' + (error?.message || '不明なエラー');
-            } finally {
-              importSubmit.disabled = !canReadProtectedData();
-            }
-            return;
-          }
-          const config = windowRef.MANGA_READER_SUPABASE || {};
-          importSubmit.disabled = true;
-          importFiles.disabled = true;
-          importTitle.disabled = true;
-          importStatus.textContent = `画像を準備しています（0/${selectedFiles.length}）`;
-          const importController = new AbortController();
-          activeEncryptedImport = importController;
-          try {
-            const cache = await windowRef.EncryptedAssetCache.createCache();
-            if (!canReadProtectedData()) throw Object.assign(new Error('VPN接続を確認できるまで画像を追加できません。'), { name: 'AbortError' });
-            const storageTransport = windowRef.EncryptedAssetStorage.createStorageTransport({ baseUrl: config.url, publishableKey: config.publishableKey });
-            const service = windowRef.EncryptedAssetImport.create({
-              processPhoto: (file, options) => windowRef.ImagePhotoProcessor.processPhoto(file, { ...options, preferWorker: true, onProgress: (progress) => {
-                importStatus.textContent = `${file.name || '画像'}を処理中：${progress.phase}`;
-              } }),
-              stage: ({ assetId, targetRevision, processed, signal }) => windowRef.EncryptedAssetSync.stageProcessedRevision({ cache, masterKey: activeVault.rawKey, assetId, targetRevision, processed, signal }),
-              publish: ({ assetId, targetRevision, staged, signal }) => windowRef.EncryptedAssetSync.publishPendingRevision({ vault: windowRef.MangaVault, storage: storageTransport, cache, assetId, targetRevision, objectIds: staged.objectIds, signal, transferStorage: windowRef.localStorage, mediaAccess: windowRef.MangaReaderMediaAccess }),
-              tombstone: (assetId, revision) => windowRef.EncryptedAssetSync.tombstoneAsset({ vault: windowRef.MangaVault, assetId, expectedRevision: revision }),
-              cleanupAsset: ({ assetId, revision }) => discardOrQueue({ assetId, revision, cache, storageTransport }),
-            });
-            const item = await service.importFiles({ files: selectedFiles, title: importTitle.value, signal: importController.signal, onProgress: (progress) => {
-              if (!canReadProtectedData()) { importController.abort(); return; }
-              importStatus.textContent = `${progress.index}/${progress.total} ページを同期しました`;
-            } });
-            if (importController.signal.aborted || !canReadProtectedData()) {
-              for (const page of item.encryptedAssets.pages) {
-                await discardOrQueue({ assetId: page.assetId, revision: page.revision, cache, storageTransport });
-              }
-              throw new Error('処理を中止しました。');
-            }
-            const previousItems = state().savedItems.slice();
-            setState({ savedItems: [item, ...previousItems], bookshelfPage: 1 });
-            try {
-              if (host.persistItems() === false) throw new Error('本棚データを端末に保存できませんでした。');
-            } catch (saveError) {
-              setState({ savedItems: previousItems });
-              for (const page of item.encryptedAssets.pages) {
-                try {
-                  await discardOrQueue({ assetId: page.assetId, revision: page.revision, cache, storageTransport });
-                } catch (_) {
-                  saveError.message += ' 保存済み画像の後始末にも失敗しました。';
-                }
-              }
-              throw saveError;
-            }
-            pendingShelfSync = true;
-            renderList();
-            importStatus.textContent = '画像を暗号化保存しました。本棚をクラウド同期中…';
-            await host.flushCloudSync();
-            pendingShelfSync = false;
-            importStatus.textContent = '画像と本棚のクラウド同期が完了しました。';
-            importForm.reset();
-            windowRef.setTimeout(closeImport, 900);
-          } catch (error) {
-            if (canReadProtectedData()) {
-              importStatus.textContent = pendingShelfSync
-                ? '画像は保存されましたが、本棚のクラウド同期に失敗しました。「同期を再試行」を押してください：' + (error?.message || '不明なエラー')
-                : (error?.message || '暗号化画像を追加できませんでした。');
-              if (pendingShelfSync) importSubmit.textContent = '同期を再試行';
-            }
-          } finally {
-            if (activeEncryptedImport === importController) activeEncryptedImport = null;
-            importSubmit.disabled = !canReadProtectedData();
-            importFiles.disabled = !canReadProtectedData();
-            importTitle.disabled = !canReadProtectedData();
           }
         });
         bindFactory(MangaListSearchEventsFactory, { onSearchChange: (value) => { setState({ shelfSearchQuery: value, bookshelfPage: 1 }); renderList(); } }, { searchInput: search });
