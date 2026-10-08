@@ -25,6 +25,28 @@ test('video library provides search filters sorting view modes folders and edito
   assert.match(source, /history\.pushState/);
 });
 
+test('video list ellipsis navigates directly to the dedicated editor without an action popup', () => {
+  const library = read('video-library.js');
+  const editor = read('video-edit-page.js');
+  const editorHtml = read('video-edit.html');
+  assert.match(library, /const edit = document\.createElement\('a'\)/);
+  assert.match(library, /edit\.href = 'video-edit\.html\?id=' \+ encodeURIComponent\(video\.id\) \+ '&return=list'/);
+  assert.match(library, /edit\.setAttribute\('aria-label', '詳細を編集'\)/);
+  assert.doesNotMatch(library, /className = 'vl-menu'|className = 'vl-menu-panel'|createMenuButton\(/);
+  assert.match(editor, /name="hidden" type="checkbox"/);
+  assert.match(editor, /name="status"/);
+  assert.match(editor, /data-delete/);
+  assert.match(editor, /source\.href = current\.url/);
+  assert.match(editor, /remaining = latestVideos\.filter/);
+  assert.match(editor, /delete remainingMeta\[videoId\]/);
+  assert.match(editor, /MangaVault\.savePayload\(window\.MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
+  assert.match(editor, /name="thumbnailTime"/);
+  assert.match(editor, /Data\.parseMediaTime\(timestamp\)/);
+  assert.match(editorHtml, /video-edit-page\.js\?v=20261009-list-ellipsis/);
+  assert.doesNotMatch(editorHtml, /auth-pending/);
+  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261009-ellipsis-route/);
+});
+
 test('video cards delegate thumbnail rendering to the shared renderer', () => {
   const library = read('video-library.js');
   const route = read('video-list-route.js');
@@ -107,10 +129,11 @@ test('video URL additions reject an exact duplicate without writing another reco
 test('video library supports hiding videos and restoring them from the hidden list', () => {
   const library = read('video-library.js');
   assert.match(library, /videoLibraryHidden/);
-  assert.match(library, /動画を非表示/);
-  assert.match(library, /非表示/);
-  assert.match(library, /表示に戻す/);
-  assert.match(library, /hidden/);
+  const editor = read('video-edit-page.js');
+  assert.match(editor, /name="hidden" type="checkbox"/);
+  assert.match(editor, /elements\.hidden\.checked = current\.hidden/);
+  assert.match(editor, /hidden: elements\.hidden\.checked/);
+  assert.match(library, /state\.showHidden/);
 });
 
 test('video list reuses thumbnail DOM when the visible records do not change', () => {

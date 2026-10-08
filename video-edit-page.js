@@ -59,9 +59,10 @@
       <div class="videoEditField"><label for="videoEditTags">タグ（カンマ区切り）</label><input id="videoEditTags" name="tags" type="text" autocomplete="off"></div>
       <div class="videoEditField"><label for="videoEditMemo">メモ</label><textarea id="videoEditMemo" name="memo"></textarea></div>
       <label class="videoEditCheck"><input name="favorite" type="checkbox"> お気に入り</label>
+      <label class="videoEditCheck"><input name="hidden" type="checkbox"> 動画を非表示</label>
       <div class="videoEditField"><label for="videoEditRotate">再生時の回転</label><select id="videoEditRotate" name="rotate"><option value="none">回転なし</option><option value="left">常に左90°回転</option><option value="right">常に右90°回転</option></select></div>
-      <details class="videoEditField"><summary>再生情報・サムネイル</summary><div class="videoEditField"><label for="videoEditService">サービス名</label><input id="videoEditService" name="service" type="text" autocomplete="off"></div><div class="videoEditField"><label for="videoEditLegacyId">動画ID</label><input id="videoEditLegacyId" name="legacyId" type="text" autocomplete="off"></div><div class="videoEditField"><label for="videoEditThumbnail">サムネイルURL（任意）</label><input id="videoEditThumbnail" name="thumbnail" type="url" autocomplete="off"></div></details>
-      <p class="videoEditError" role="status" aria-live="polite"></p><div class="videoEditActions"><a class="videoEditButton" data-cancel>キャンセル</a><button class="videoEditButton save" type="submit">保存</button></div>`;
+      <details class="videoEditField"><summary>再生情報・サムネイル</summary><div class="videoEditField"><label for="videoEditService">サービス名</label><input id="videoEditService" name="service" type="text" autocomplete="off"></div><div class="videoEditField"><label for="videoEditLegacyId">動画ID</label><input id="videoEditLegacyId" name="legacyId" type="text" autocomplete="off"></div><div class="videoEditField"><label for="videoEditThumbnail">サムネイルURL（任意）</label><input id="videoEditThumbnail" name="thumbnail" type="url" autocomplete="off"></div><div class="videoEditField"><label for="videoEditThumbnailTime">サムネイル時刻（mm:ss）</label><input id="videoEditThumbnailTime" name="thumbnailTime" type="text" inputmode="numeric" placeholder="0:00" autocomplete="off"></div></details>
+      <p class="videoEditError" role="status" aria-live="polite"></p><div class="videoEditActions"><button class="videoEditButton danger" type="button" data-delete>動画を削除</button><a class="videoEditButton" data-cancel>キャンセル</a><button class="videoEditButton save" type="submit">保存</button></div>`;
     const elements = form.elements;
     elements.url.value = current.url;
     elements.title.value = current.title;
@@ -69,10 +70,18 @@
     elements.tags.value = current.tags.join(', ');
     elements.memo.value = current.memo;
     elements.favorite.checked = current.favorite;
+    elements.hidden.checked = current.hidden;
     elements.rotate.value = current.rotate90Direction;
     elements.service.value = base.a || '';
     elements.legacyId.value = base.b || '';
     elements.thumbnail.value = current.thumbnailUrl;
+    elements.thumbnailTime.value = current.thumbnailTimeSeconds == null ? '' : Data.formatMediaTime(current.thumbnailTimeSeconds);
+    elements.thumbnailTime.disabled = !Data.isDirectVideoUrl(current.url);
+    if (/^https?:\/\//i.test(current.url)) {
+      const source = document.createElement('a'); source.className = 'videoEditButton videoEditSource';
+      source.href = current.url; source.target = '_blank'; source.rel = 'noopener noreferrer'; source.textContent = '元ページを開く ↗';
+      form.prepend(source);
+    }
     const none = document.createElement('option'); none.value = ''; none.textContent = '未分類'; elements.folder.append(none);
     folders.forEach((folder) => { const option = document.createElement('option'); option.value = folder.id; option.textContent = folder.name; elements.folder.append(option); });
     elements.folder.value = current.folderId || '';
@@ -81,6 +90,7 @@
     elements.url.addEventListener('change', () => {
       const classified = Data.classifyVideoUrl(elements.url.value);
       const fields = classified.kind === 'invalid' ? null : Data.storageFieldsForVideoUrl(elements.url.value);
+      elements.thumbnailTime.disabled = !Data.isDirectVideoUrl(elements.url.value);
       if (!fields) return;
       elements.service.value = fields.a;
       elements.legacyId.value = fields.b;
@@ -95,12 +105,17 @@
       const duplicate = baseVideos.some((item) => String(item.id) !== videoId && Data.normalizeVideo(item).url === url);
       if (duplicate) { error.textContent = '同じ動画URLはすでに登録されています。'; return; }
       const fields = Data.storageFieldsForVideoUrl(url);
+      const timestamp = elements.thumbnailTime.value.trim();
+      const parsedTime = timestamp ? Data.parseMediaTime(timestamp) : null;
+      if (Data.isDirectVideoUrl(url) && timestamp && parsedTime == null) {
+        error.textContent = 'サムネイル時刻は mm:ss 形式で入力してください。'; return;
+      }
       const a = elements.service.value.trim() || classified.a || fields.a;
       const b = elements.legacyId.value.trim() || classified.b || fields.b;
       const nextBase = { ...base, title: elements.title.value.trim(), url, a, b, updatedAt: Date.now() };
       const storedMeta = read(META_KEY, {});
       const nextMeta = storedMeta && typeof storedMeta === 'object' && !Array.isArray(storedMeta) ? storedMeta : {};
-      nextMeta[videoId] = { ...(nextMeta[videoId] || {}), title: elements.title.value.trim(), folderId: elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, thumbnailUrl: elements.thumbnail.value.trim(), updatedAt: Date.now() };
+      nextMeta[videoId] = { ...(nextMeta[videoId] || {}), title: elements.title.value.trim(), folderId: elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, hidden: elements.hidden.checked, rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, thumbnailUrl: elements.thumbnail.value.trim(), thumbnailTimeSeconds: Data.isDirectVideoUrl(url) ? parsedTime : current.thumbnailTimeSeconds, updatedAt: Date.now() };
       const nextVideos = baseVideos.map((item) => String(item.id) === videoId ? nextBase : item);
       try {
         localStorage.setItem(VIDEO_KEY, JSON.stringify(nextVideos));
@@ -112,6 +127,30 @@
         if (!canReadProtectedData()) return;
         location.href = returnTarget(returnKind, videoId);
       } catch (_) { error.textContent = '保存できませんでした。端末の保存状態を確認してください。'; }
+    });
+    form.querySelector('[data-delete]').addEventListener('click', async () => {
+      if (!canReadProtectedData()) return;
+      if (!confirm('「' + (current.title || 'この動画') + '」を削除しますか？')) return;
+      const error = form.querySelector('.videoEditError'); error.textContent = '';
+      const latestVideos = read(VIDEO_KEY, []);
+      const latestMeta = read(META_KEY, {});
+      if (!Array.isArray(latestVideos)) { error.textContent = '動画一覧を読み込めませんでした。'; return; }
+      const remaining = latestVideos.filter((item) => String(item.id) !== videoId);
+      if (remaining.length === latestVideos.length) { error.textContent = '動画が見つかりません。'; return; }
+      const remainingMeta = latestMeta && typeof latestMeta === 'object' && !Array.isArray(latestMeta) ? { ...latestMeta } : {};
+      delete remainingMeta[videoId];
+      try {
+        localStorage.setItem(VIDEO_KEY, JSON.stringify(remaining));
+        localStorage.setItem(META_KEY, JSON.stringify(remainingMeta));
+        if (!canReadProtectedData()) return;
+        if (window.MangaVault && window.MangaVaultPayload && typeof window.MangaVault.savePayload === 'function' && window.MangaVault.loadActive && window.MangaVault.loadActive()) {
+          await window.MangaVault.savePayload(window.MangaVaultPayload.buildFromLocalStorage());
+        }
+        if (!canReadProtectedData()) return;
+        location.href = 'video.html';
+      } catch (reason) {
+        error.textContent = '端末には削除を保存しましたが、クラウド同期に失敗しました。' + (reason?.message || '');
+      }
     });
     page.replaceChildren(heading, lead, form);
     document.title = '動画を編集';
