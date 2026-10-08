@@ -25,9 +25,12 @@
   const play = document.createElement('button'); play.type = 'button'; play.className = 'customVideoButton'; play.textContent = '▶'; play.setAttribute('aria-label', '再生');
   const seek = document.createElement('input'); seek.type = 'range'; seek.className = 'customVideoSeek'; seek.min = '0'; seek.max = '0'; seek.step = '0.1'; seek.value = '0'; seek.setAttribute('aria-label', '再生位置');
   const time = document.createElement('span'); time.className = 'customVideoTime'; time.textContent = '0:00 / 0:00';
+  const mute = document.createElement('button'); mute.type = 'button'; mute.className = 'customVideoButton customVideoMute'; mute.textContent = '🔊'; mute.setAttribute('aria-label', 'ミュート');
+  const volume = document.createElement('input'); volume.type = 'range'; volume.className = 'customVideoVolume'; volume.min = '0'; volume.max = '100'; volume.step = '1'; volume.value = String(Math.round(video.volume * 100)); volume.setAttribute('aria-label', '音量');
+  const volumeGroup = document.createElement('div'); volumeGroup.className = 'customVideoVolumeGroup'; volumeGroup.append(mute, volume);
   const full = document.createElement('button'); full.type = 'button'; full.className = 'customVideoButton'; full.textContent = '⛶'; full.setAttribute('aria-label', '全画面');
   const markerToggle = document.createElement('button'); markerToggle.type = 'button'; markerToggle.className = 'customVideoButton'; markerToggle.textContent = '秒数登録';
-  controls.append(play, seek, time, markerToggle, full); frame.append(controls);
+  controls.append(play, seek, time, volumeGroup, markerToggle, full); frame.append(controls);
   const markerPanel = document.createElement('div'); markerPanel.className = 'videoMarkerPanel'; markerPanel.hidden = true;
   markerPanel.innerHTML = '<input class="videoMarkerSeconds" type="number" min="0" step="0.1" placeholder="秒数"><input class="videoMarkerLabel" type="text" maxlength="60" placeholder="ラベル"><button type="button">登録</button><div class="videoMarkerList"></div>';
   frame.append(markerPanel);
@@ -37,6 +40,32 @@
   const update = () => { seek.max = String(Number.isFinite(video.duration) ? video.duration : 0); seek.value = String(video.currentTime || 0); time.textContent = format(video.currentTime) + ' / ' + format(video.duration); const current = markers.find((marker) => Math.abs(marker.seconds - video.currentTime) < 1); notice.textContent = current ? current.label : ''; notice.classList.toggle('visible', Boolean(current)); };
   const renderMarkers = () => { list.replaceChildren(); markers.slice().sort((a, b) => a.seconds - b.seconds).forEach((marker, index) => { const button = document.createElement('button'); button.type = 'button'; button.textContent = format(marker.seconds) + ' ' + marker.label; button.addEventListener('click', () => { video.currentTime = marker.seconds; video.play(); }); const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '×'; remove.addEventListener('click', () => { markers.splice(index, 1); save(markers); renderMarkers(); window.dispatchEvent(new CustomEvent('manga-video-markers-changed')); }); const row = document.createElement('span'); row.append(button, remove); list.append(row); }); };
   play.addEventListener('click', () => video.paused ? video.play() : video.pause()); video.addEventListener('play', () => { play.textContent = '❚❚'; }); video.addEventListener('pause', () => { play.textContent = '▶'; }); video.addEventListener('loadedmetadata', update); video.addEventListener('timeupdate', update); seek.addEventListener('input', () => { video.currentTime = Number(seek.value); });
+  let lastAudibleVolume = video.volume > 0 ? video.volume : 1;
+  const syncVolume = () => {
+    const level = Math.round(video.volume * 100);
+    const silent = video.muted || level === 0;
+    if (!video.muted && level > 0) lastAudibleVolume = video.volume;
+    volume.value = String(silent ? 0 : level);
+    volume.setAttribute('aria-valuetext', (silent ? 0 : level) + '%');
+    mute.textContent = silent ? '🔇' : '🔊';
+    mute.setAttribute('aria-label', silent ? 'ミュート解除' : 'ミュート');
+    mute.setAttribute('aria-pressed', String(silent));
+  };
+  volume.addEventListener('input', () => {
+    const level = Math.max(0, Math.min(100, Number(volume.value)));
+    video.volume = level / 100;
+    video.muted = level === 0;
+    syncVolume();
+  });
+  mute.addEventListener('click', () => {
+    if (video.muted || video.volume === 0) {
+      if (video.volume === 0) video.volume = lastAudibleVolume;
+      video.muted = false;
+    } else video.muted = true;
+    syncVolume();
+  });
+  video.addEventListener('volumechange', syncVolume);
+  syncVolume();
   const toggleFullscreen = () => {
     const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
     if (fullscreenElement || video.webkitDisplayingFullscreen) {
