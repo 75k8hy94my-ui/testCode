@@ -25,7 +25,7 @@ test('buildBookCard delegates static DOM creation and keeps shelf interaction in
   assert.match(runtime, /context\.updateBulkEditButton\(\)/);
   assert.match(runtime, /stopPropagation\(\)/);
   assert.match(runtime, /context\.loadLocalCover\(item, img\)/);
-  assert.match(runtime, /context\.setupFeedImage\(img, item\.url, item\.numberWidth, item\.pagePattern, item\.id\)/);
+  assert.match(runtime, /context\.setupFeedImage\(img, item\.url, item\.numberWidth, item\.pagePattern, item\.id, originalPage\)/);
 });
 
 test('normal manga card clicks use one shelf interaction boundary', () => {
@@ -37,17 +37,18 @@ test('normal manga card clicks use one shelf interaction boundary', () => {
   assert.equal((build.match(/card\.addEventListener\('click'/g) || []).length, 1);
 });
 
-test('buildBookCard uses one private cover dependency boundary without changing image branches', () => {
+test('buildBookCard keeps thumbnail fetch and retry inside the shelf cover boundary', () => {
   assert.match(route, /loadLocalCover: host\.loadLocalCover/);
   assert.match(route, /setupFeedImage: host\.setupFeedImage/);
-  assert.match(route, /getCoverSourceCache: coverCache\.getSourceCache/);
-
+  const host = read('manga-list-host-runtime.js');
   const build = runtime;
+  assert.match(build, /const originalPage = item\.pageManifest/);
   assert.match(build, /context\.loadLocalCover\(item, img\)/);
-  assert.match(build, /coverSourceCache\.get\(source\)/);
-  assert.match(build, /coverSourceCache\.set\(source, img\.currentSrc \|\| img\.src\)/);
-  assert.match(build, /context\.setupFeedImage\(img, item\.url, item\.numberWidth, item\.pagePattern, item\.id\)/);
-  assert.equal((build.match(/context\.loadLocalCover\(item, img\)/g) || []).length, 2);
+  assert.match(build, /context\.setupFeedImage\(img, item\.url, item\.numberWidth, item\.pagePattern, item\.id, originalPage\)/);
+  assert.match(build, /retryButton\.addEventListener\('click'/);
+  assert.match(host, /sourceCache\.get\(cacheKey\)/);
+  assert.match(host, /sourceCache\.set\(cacheKey, imgEl\.currentSrc \|\| imgEl\.src\)/);
+  assert.equal((build.match(/context\.loadLocalCover\(item, img\)/g) || []).length, 1);
   assert.equal((build.match(/context\.setupFeedImage\(/g) || []).length, 1);
 });
 
@@ -58,6 +59,6 @@ test('manga card boundary preserves the required card classes and image attribut
   assert.match(card, /img\.alt/);
   assert.match(card, /img\.loading = 'eager'/);
   assert.match(card, /img\.decoding = 'async'/);
-  assert.match(card, /img\.fetchPriority = 'low'/);
+  assert.match(card, /img\.fetchPriority = 'auto'/);
   assert.match(card, /bulk-select/);
 });
