@@ -132,7 +132,8 @@ test('upload progress panel exposes confirmed-page counts, server steps and time
     assert.match(html,new RegExp('id="' + id + '"'));
   }
   assert.match(read('images.js'),/startUploadProgress\(files\.length\)/);
-  assert.match(read('images.js'),/onProgress: progress => reportUploadProgress\(progress\)/);
+  assert.match(read('images.js'),/onProgress: progress => \{/);
+  assert.match(read('images.js'),/reportUploadProgress\(progress\)/);
   assert.match(read('images.js'),/finishUploadProgress\('done'\)/);
   assert.match(read('images.js'),/window\.setInterval\(renderUploadProgress, 1000\)/);
 });
