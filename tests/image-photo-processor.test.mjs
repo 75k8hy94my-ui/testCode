@@ -125,3 +125,40 @@ test('abort during work stops before completing the result', async () => {
     error => error.name === 'AbortError'
   );
 });
+
+
+test('Safari-style Canvas WebP fallback is re-encoded as JPEG and never stored as mislabeled PNG', async () => {
+  const runtime=createFakeRuntime({width:6000,height:4000});
+  const encoded=[];
+  runtime.encode=async(canvas,mimeType,quality)=>{
+    const actual=mimeType==='image/webp' ? 'image/png' : mimeType;
+    const size=actual==='image/png' ? 2000000 : 25000;
+    const blob=new Blob([new Uint8Array(size)],{type:actual});
+    encoded.push({requested:mimeType,actual,size,quality});
+    return blob;
+  };
+  const original=await import('../image-compression-profile.js');
+  const profile=original.default.getCompressionProfile();
+  profile.zoom.intermediateLongEdge=3072;
+  profile.zoom.maximumLongEdge=3072;
+  profile.zoom.tileSize=1024;
+  profile.zoom.quality=0.76;
+  const result=await processor.processPhoto(fakePhoto(),{
+    preferWorker:false,runtime,profile
+  });
+  assert.ok(encoded.some(x=>x.requested==='image/webp'&&x.actual==='image/png'));
+  assert.ok(encoded.some(x=>x.requested==='image/jpeg'&&x.actual==='image/jpeg'));
+  assert.equal(result.previewBlob.type,'image/jpeg');
+  assert.equal(result.manifest.preview.mimeType,'image/jpeg');
+  assert.equal(result.manifest.zoom.levels.length,1);
+  assert.ok(result.tileBlobs.length>0);
+  assert.ok(result.tileBlobs.every(blob=>blob.type==='image/jpeg'));
+  assert.ok(result.manifest.zoom.levels.every(level=>level.tiles.every(tile=>tile.mimeType==='image/jpeg')));
+  assert.equal(result.tileBlobs.reduce((sum,b)=>sum+b.size,0),result.tileBlobs.length*25000);
+});
+
+test('unsupported browser encoder fails rather than publishing incorrect MIME metadata', async () => {
+  const runtime=createFakeRuntime({width:1600,height:1000});
+  runtime.encode=async()=>new Blob([new Uint8Array(5)],{type:'image/png'});
+  await assert.rejects(processor.processPhoto(fakePhoto(),{preferWorker:false,runtime}),/JPEG画像の書き出し/);
+});

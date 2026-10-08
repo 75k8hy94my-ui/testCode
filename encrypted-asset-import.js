@@ -35,6 +35,15 @@
           const processed = await processPhoto(selected[index], {
             signal, onProgress: (progress) => emit(index, 'processing', progress)
           });
+          // Report actual encoded Blob sizes before encryption/network transfer.
+          // Size is advisory; server confirmation remains the only upload success.
+          const parts = [processed.previewBlob, ...(processed.tileBlobs || [])];
+          emit(index, 'processing', {
+            phase: 'size',
+            originalBytes: Number(selected[index]?.size || 0),
+            outputBytes: parts.reduce((total, blob) => total + Number(blob?.size || 0), 0),
+            parts: parts.length
+          });
           const assetId = createAssetId();
           const attempt = { assetId, revision: 1, published: false };
           attemptedAssets.push(attempt);

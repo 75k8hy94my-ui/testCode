@@ -106,6 +106,25 @@
     return blob;
   }
 
+  // Canvas implementations may silently export PNG when asked for WebP.
+  // Safari/iOS Safari support WebP decoding but not Canvas WebP encoding.
+  // Avoid huge PNG files and misleading image/webp manifest metadata.
+  async function encodeWithSupportedFormat(runtime, canvas, requestedMimeType, quality, signal) {
+    const blob = await encodeCanvas(runtime, canvas, requestedMimeType, quality, signal);
+    const actualMimeType = String(blob.type || requestedMimeType).toLowerCase();
+    if (actualMimeType === requestedMimeType.toLowerCase()) {
+      return { blob, mimeType: requestedMimeType };
+    }
+    if (requestedMimeType === 'image/webp' && actualMimeType === 'image/png') {
+      const jpeg = await encodeCanvas(runtime, canvas, 'image/jpeg', quality, signal);
+      if (String(jpeg.type || '').toLowerCase() !== 'image/jpeg') {
+        throw new Error('このブラウザーはJPEG画像の書き出しに対応していません。');
+      }
+      return { blob: jpeg, mimeType: 'image/jpeg' };
+    }
+    throw new Error('ブラウザーが指定された画像形式で書き出せませんでした: ' + requestedMimeType);
+  }
+
   async function processPhotoOnMainThread(file, options = {}) {
     const profile = normalizeCompressionProfile(options.profile || getCompressionProfile());
     const signal = options.signal;
@@ -131,14 +150,17 @@
         { longEdge: profile.preview.fallbackLongEdge, quality: profile.preview.fallbackQuality }
       ];
       let preview = null;
+      let previewMimeType = profile.preview.mimeType;
       for (const candidate of previewCandidates) {
         throwIfAborted(signal);
         const dimensions = calculateScaledDimensions(decoded.width, decoded.height, candidate.longEdge);
         const canvas = runtime.createCanvas(dimensions.width, dimensions.height);
         try {
           runtime.drawImage(decoded.source, canvas, { width: dimensions.width, height: dimensions.height });
-          const blob = await encodeCanvas(runtime, canvas, profile.preview.mimeType, candidate.quality, signal);
-          preview = { ...dimensions, mimeType: profile.preview.mimeType, bytes: blob.size, quality: candidate.quality, blob };
+          const encoded = await encodeWithSupportedFormat(runtime, canvas, previewMimeType, candidate.quality, signal);
+          previewMimeType = encoded.mimeType;
+          const blob = encoded.blob;
+          preview = { ...dimensions, mimeType: encoded.mimeType, bytes: blob.size, quality: candidate.quality, blob };
           if (blob.size <= targetBytes) break;
         } finally {
           runtime.releaseCanvas?.(canvas);
@@ -148,6 +170,8 @@
       report(onProgress, 'preview', 1, 1);
       throwIfAborted(signal);
 
+      let zoomMimeType = profile.zoom.mimeType === 'image/webp' && previewMimeType === 'image/jpeg'
+        ? 'image/jpeg' : profile.zoom.mimeType;
       const plannedLevels = planZoomLevels(decoded.width, decoded.height, profile);
       report(onProgress, 'pyramid', 0, plannedLevels.length);
       const totalTiles = plannedLevels.reduce((sum, level) => sum + calculateTileGrid(level.width, level.height, profile.zoom.tileSize).columns * calculateTileGrid(level.width, level.height, profile.zoom.tileSize).rows, 0);
@@ -173,9 +197,11 @@
                   sourceWidth: rect.width,
                   sourceHeight: rect.height
                 });
-                const blob = await encodeCanvas(runtime, tileCanvas, profile.zoom.mimeType, profile.zoom.quality, signal);
+                const encoded = await encodeWithSupportedFormat(runtime, tileCanvas, zoomMimeType, profile.zoom.quality, signal);
+                zoomMimeType = encoded.mimeType;
+                const blob = encoded.blob;
                 tileBlobs.push(blob);
-                tileMetadata.push({ x, y, ...rect, mimeType: profile.zoom.mimeType, bytes: blob.size, quality: profile.zoom.quality });
+                tileMetadata.push({ x, y, ...rect, mimeType: encoded.mimeType, bytes: blob.size, quality: profile.zoom.quality });
                 completedTiles += 1;
                 report(onProgress, 'tiles', completedTiles, totalTiles);
               } finally {
@@ -204,7 +230,7 @@
     if (typeof WorkerObject !== 'function') return null;
     const documentObject = getGlobal('document');
     const base = documentObject?.baseURI || getGlobal('location')?.href || '';
-    const workerUrl = new URL('image-processing-worker.js', base || undefined);
+    const workerUrl = new URL('image-processing-worker.js?v=20261008-safari-jpeg', base || undefined);
     return () => new WorkerObject(workerUrl, { type: 'classic' });
   }
 

@@ -104,3 +104,27 @@ test('import forwards image-processing and storage confirmation stages with cons
   assert.equal(last.completedPages,1);
   assert.equal(last.total,1);
 });
+
+
+test('import reports encoded page size before encrypting or sending any bytes', async () => {
+  const events=[];
+  const step=[];
+  const api=importer.create({
+    processPhoto:async()=>({manifest,previewBlob:{size:440000},tileBlobs:[{size:130000},{size:250000}]}),
+    stage:async()=>{step.push('encrypt');return {objectIds:['preview','L0:0:0','L0:1:0']}},
+    publish:async()=>{step.push('upload');return {ok:true,metadata:{revision:1}}},
+    tombstone:async()=>{},
+    createAssetId:()=>'6dc3773a-a3ef-4bb8-9cbf-15096098db10'
+  });
+  const result=await api.importFiles({
+    files:[{name:'original.jpg',size:20000000}],title:'photo',
+    onProgress:event=>{events.push(event);if(event.detail?.phase==='size')step.push('size')}
+  });
+  assert.equal(result.encryptedAssets.pages.length,1);
+  assert.deepEqual(step,['size','encrypt','upload']);
+  const event=events.find(x=>x.detail?.phase==='size');
+  assert.equal(event.detail.originalBytes,20000000);
+  assert.equal(event.detail.outputBytes,820000);
+  assert.equal(event.detail.parts,3);
+  assert.equal(event.completedPages,0,'encoded size is not a cloud upload confirmation');
+});

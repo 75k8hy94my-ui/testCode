@@ -132,7 +132,48 @@ test('upload progress panel exposes confirmed-page counts, server steps and time
     assert.match(html,new RegExp('id="' + id + '"'));
   }
   assert.match(read('images.js'),/startUploadProgress\(files\.length\)/);
-  assert.match(read('images.js'),/onProgress: progress => reportUploadProgress\(progress\)/);
+  assert.match(read('images.js'),/onProgress: progress => \{/);
+  assert.match(read('images.js'),/reportUploadProgress\(progress\)/);
   assert.match(read('images.js'),/finishUploadProgress\('done'\)/);
   assert.match(read('images.js'),/window\.setInterval\(renderUploadProgress, 1000\)/);
+});
+
+
+test('gallery quality profiles use one zoom level and cap file count without altering original compression defaults', async () => {
+  const profileApi = await import('../image-compression-profile.js');
+  const pyramid = await import('../image-pyramid-builder.js');
+  const {api} = loadImagesModule();
+  const original = profileApi.default.getCompressionProfile();
+  const oldLevels = pyramid.default.planZoomLevels(6000, 6000, original);
+  assert.equal(oldLevels.length, 2, 'baseline format stored two overlapping zoom resolutions');
+
+  for (const [mode, maxEdge, quality] of [
+    ['compact',2048,0.68],['balanced',3072,0.76],['detailed',4096,0.82]
+  ]) {
+    const next = api.createImageUploadProfile(mode, original);
+    const validated = profileApi.default.normalizeCompressionProfile(next);
+    assert.equal(validated.zoom.maximumLongEdge,maxEdge);
+    assert.equal(validated.zoom.intermediateLongEdge,maxEdge);
+    assert.equal(validated.zoom.tileSize,1024);
+    assert.equal(validated.zoom.quality,quality);
+    assert.deepEqual(validated.preview,original.preview);
+    const levels = pyramid.default.planZoomLevels(6000,6000,validated);
+    assert.equal(levels.length,1);
+    assert.equal(levels[0].longEdge,maxEdge);
+  }
+  assert.equal(original.zoom.tileSize,512,'global/default profile must remain unchanged for existing data');
+  assert.equal(original.zoom.quality,0.88);
+  assert.equal(api.createImageUploadProfile('unknown',original).zoom.maximumLongEdge,3072);
+});
+
+test('image upload page exposes a quality choice and a real encoded size before upload', () => {
+  const html=read('images.html');
+  assert.match(html,/id="imageQualityMode"/);
+  for (const value of ['compact','balanced','detailed']) assert.match(html,new RegExp('value="'+value+'"'));
+  assert.match(html,/id="imageUploadSize"/);
+  const js=read('images.js');
+  assert.match(js,/const profile = createImageUploadProfile/);
+  assert.match(js,/processPhoto\(file, \{/);
+  assert.match(js,/onProgress: options\.onProgress/);
+  assert.match(js,/processedTotalBytes \+= size\.outputBytes/);
 });
