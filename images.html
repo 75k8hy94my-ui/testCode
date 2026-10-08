@@ -16,7 +16,7 @@
 <header class="homeHeader" data-profile-only-header="1"><div><span class="eyebrow">LIBRARY</span><h1 id="shellTitle">画像</h1></div><button class="headerProfileButton" type="button" data-profile-menu-trigger aria-label="アカウント" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg></button></header>
 <div id="routeContent">
 <section class="imageLibrary" aria-label="暗号化画像">
-  <div class="imageLibraryHead"><div><h2>暗号化写真</h2><p>写真の保存・表示にVPNは必要ありません。ログインと保管庫の解錠が必要です。</p><p><a href="drive-gallery.html">Google Driveの公開画像を表示する →</a></p></div></div>
+  <div class="imageLibraryHead"><div><h2>暗号化写真</h2><p><a href="drive-gallery.html">Google Driveの公開画像を表示する →</a></p></div></div>
   <form id="imageUploadForm" class="imageUploadForm">
     <label>作品名<input id="imageTitle" name="title" type="text" required maxlength="200" autocomplete="off"></label>
     <label>画像ファイル（複数選択可）<input id="imageFiles" name="files" type="file" accept="image/*" multiple required></label>
@@ -27,7 +27,6 @@
         <option value="detailed">高画質（写真のディテールを優先）</option>
       </select>
     </label>
-    <p class="imageQualityHelp">写真専用です。元写真を無理に拡大せず、圧縮後の実容量を確認して画質を調整します。容量目標は目安であり、写真の細部を守るため上回る場合もあります。既存の保存画像は変更しません。</p>
     <div class="imageUploadActions"><button id="imageUploadButton" type="submit">暗号化して追加</button><button id="imageCancelButton" type="button" hidden>キャンセル</button><button id="imageRetrySync" type="button" hidden>クラウド同期を再試行</button></div>
   </form>
   <p id="imageStatus" class="imageStatus" role="status" aria-live="polite"></p>
@@ -45,7 +44,6 @@
       <li data-upload-stage="register">ページ登録</li>
       <li data-upload-stage="sync">一覧の同期</li>
     </ol>
-    <p id="imageProgressHint" class="imageProgressHint">「画像加工完了」はアップロード完了ではありません。最終的な成功表示までお待ちください。</p>
   </section>
   <div id="imageGrid" class="imageGrid" aria-label="画像一覧"></div>
   <p id="imageEmpty" class="imageEmpty" hidden>保存した画像はまだありません。</p>
