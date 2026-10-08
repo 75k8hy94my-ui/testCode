@@ -28,7 +28,7 @@
     ['manga-list-filter-events.js?v=20260922-filter-events', 'mangaRouteFilterEvents'],
     ['manga-list-folder-events.js?v=20260922-folder-events', 'mangaRouteFolderEvents'],
     ['manga-list-smart-list-events.js?v=20260922-smart-events', 'mangaRouteSmartEvents'],
-    ['manga-list-pagination-events.js?v=20260922-pagination-events', 'mangaRoutePaginationEvents'],
+    ['manga-list-pagination-events.js?v=20261009-touch-swipe', 'mangaRoutePaginationEvents'],
     ['manga-list-navigation-events.js?v=20260922-navigation-events', 'mangaRouteNavigationEvents'],
     ['manga-list-bulk-events.js?v=20260922-bulk-events', 'mangaRouteBulkEvents'],
     ['manga-list-dom-resolver.js?v=20260922-dom-resolver', 'mangaRouteResolver'],
@@ -610,7 +610,7 @@
               if (typeof target?.scrollIntoView === 'function') target.scrollIntoView({ block: 'start', behavior: 'auto' });
             }
           }
-        }, { prevButton: prev, nextButton: next });
+        }, { prevButton: prev, nextButton: next, swipeSurface: elements.savedListItems });
         bindFactory(MangaListNavigationEventsFactory, { onBack: () => { setState({ currentFolderView: null, currentSeriesView: null, currentAuthorView: null, bookshelfPage: 1 }); renderList(); } }, { backButton: back });
         bindFactory(MangaListBulkEventsFactory, {
           onEdit: () => { setState({ bulkEditMode: !state().bulkEditMode, bookshelfPage: 1 }); updateBulkEditButton(); renderList(); },
