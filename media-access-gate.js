@@ -4,6 +4,20 @@
   if (root) root.MangaReaderMediaAccess = api;
 }(typeof window !== 'undefined' ? window : globalThis, function (root) {
   'use strict';
+  // Guest access is only to a separately scoped local dataset. It is not a
+  // VPN verdict or access to authenticated remote protected resources.
+  if (root.TestCodeGuest?.isActive()) {
+    return Object.freeze({
+      getStatus: () => 'allowed',
+      canReadProtectedData: () => true,
+      canLoadExternalMedia: () => true,
+      isProtectedMediaUrl: () => false,
+      mediaUrl: (url) => String(url ?? ''),
+      checkVpn: async () => true,
+      syncUi() {}, installGuards() {}, installDiagnosticsUi() {},
+      getDiagnostics: () => ({ final: 'guest', error: null }),
+    });
+  }
 
   const IP_URL = 'https://api.ipify.org?format=json';
   const CHECK_URL = 'https://ip-api.dev/api';

@@ -111,6 +111,10 @@
       const showVault = () => window.location.replace('sync.html');
       const hasSession = () => { try { const session = JSON.parse(localStorage.getItem(sessionKey) || 'null'); return !!(session && session.refresh_token); } catch (_) { return false; } };
       const config = window.MANGA_READER_SUPABASE || {};
+      if (window.TestCodeGuest?.isActive()) {
+        document.documentElement.classList.remove('auth-pending');
+        return true;
+      }
       if (!hasSession() || !config.url || !config.publishableKey) { showLogin(); return false; }
       if (!window.MangaVault) { showVault(); return false; }
       let active = MangaVault.loadActive();
@@ -185,7 +189,7 @@
         if (!itemId) { location.replace('manga.html'); return; }
         MangaReaderTarget.clearLegacyTarget(localStorage);
         const syncScheduler = ReaderSyncSchedulerFactory.create({
-          canSync: canReadProtectedData,
+          canSync: () => !window.TestCodeGuest?.isActive() && canReadProtectedData(),
           save: () => MangaVault.savePayload(MangaVaultPayload.buildFromLocalStorage()),
           onError: (error) => {
             if (canReadProtectedData()) document.getElementById('readerStatus').textContent = error?.message || '同期に失敗しました';

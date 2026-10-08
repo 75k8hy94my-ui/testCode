@@ -88,6 +88,7 @@
   function clearActive() { sessionStorage.removeItem(ACTIVE_KEY); channelPost({ type: 'vault-cleared' }); }
   function lockVault() { clearActive(); }
   function setupVaultChannel() {
+    if (window.TestCodeGuest?.isActive()) return;
     if (typeof BroadcastChannel !== 'function') return;
     try {
       vaultChannel = new BroadcastChannel(CHANNEL_NAME);
