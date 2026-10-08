@@ -25,7 +25,8 @@
   const play = document.createElement('button'); play.type = 'button'; play.className = 'customVideoButton'; play.textContent = '▶'; play.setAttribute('aria-label', '再生');
   const seek = document.createElement('input'); seek.type = 'range'; seek.className = 'customVideoSeek'; seek.min = '0'; seek.max = '0'; seek.step = '0.1'; seek.value = '0'; seek.setAttribute('aria-label', '再生位置');
   const time = document.createElement('span'); time.className = 'customVideoTime'; time.textContent = '0:00 / 0:00';
-  const mute = document.createElement('button'); mute.type = 'button'; mute.className = 'customVideoButton customVideoMute'; mute.textContent = '🔊'; mute.setAttribute('aria-label', 'ミュート');
+  const mute = document.createElement('button'); mute.type = 'button'; mute.className = 'customVideoButton customVideoMute'; mute.setAttribute('aria-label', 'ミュート');
+  const muteIcon = document.createElement('img'); muteIcon.className = 'customVideoMuteIcon'; muteIcon.alt = ''; muteIcon.setAttribute('aria-hidden', 'true'); mute.append(muteIcon);
   const volume = document.createElement('input'); volume.type = 'range'; volume.className = 'customVideoVolume'; volume.min = '0'; volume.max = '100'; volume.step = '1'; volume.value = String(Math.round(video.volume * 100)); volume.setAttribute('aria-label', '音量');
   const volumeGroup = document.createElement('div'); volumeGroup.className = 'customVideoVolumeGroup'; volumeGroup.append(mute, volume);
   const full = document.createElement('button'); full.type = 'button'; full.className = 'customVideoButton'; full.textContent = '⛶'; full.setAttribute('aria-label', '全画面');
@@ -47,7 +48,8 @@
     if (!video.muted && level > 0) lastAudibleVolume = video.volume;
     volume.value = String(silent ? 0 : level);
     volume.setAttribute('aria-valuetext', (silent ? 0 : level) + '%');
-    mute.textContent = silent ? '🔇' : '🔊';
+    const iconSrc = silent ? 'assets/volume-muted.png' : 'assets/volume-on.png';
+    if (muteIcon.getAttribute('src') !== iconSrc) muteIcon.setAttribute('src', iconSrc);
     mute.setAttribute('aria-label', silent ? 'ミュート解除' : 'ミュート');
     mute.setAttribute('aria-pressed', String(silent));
   };
