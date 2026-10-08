@@ -594,12 +594,23 @@
               }
               throw new Error('処理を中止しました。');
             }
-            const currentItems = state().savedItems.slice();
-            currentItems.unshift(item);
-            setState({ savedItems: currentItems, bookshelfPage: 1 });
-            if (host.persistItems() === false) throw new Error('本棚データを端末に保存できませんでした。');
-            renderList();
+            const previousItems = state().savedItems.slice();
+            setState({ savedItems: [item, ...previousItems], bookshelfPage: 1 });
+            try {
+              if (host.persistItems() === false) throw new Error('本棚データを端末に保存できませんでした。');
+            } catch (saveError) {
+              setState({ savedItems: previousItems });
+              for (const page of item.encryptedAssets.pages) {
+                try {
+                  await windowRef.EncryptedAssetSync.discardImportedAsset({ vault: windowRef.MangaVault, storage: storageTransport, cache, assetId: page.assetId, expectedRevision: page.revision });
+                } catch (_) {
+                  saveError.message += ' 保存済み画像の後始末にも失敗しました。';
+                }
+              }
+              throw saveError;
+            }
             pendingShelfSync = true;
+            renderList();
             importStatus.textContent = '画像を暗号化保存しました。本棚をクラウド同期中…';
             await host.flushCloudSync();
             pendingShelfSync = false;
