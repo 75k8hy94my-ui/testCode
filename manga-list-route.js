@@ -197,6 +197,8 @@
         activeEntry.cleanup();
         activeEntry = null;
       }
+      encryptedCoverLoader?.destroy();
+      encryptedCoverLoader = null;
       await Promise.all([ensureStylesheet(documentRef), loadDependencies(documentRef)]);
       if (token !== lifecycle) return null;
       const storage = windowRef.localStorage;
@@ -515,6 +517,10 @@
           }
         });
         const closeImport = () => {
+          if (pendingShelfSync) {
+            importStatus.textContent = '画像は保存済みです。本棚の同期完了を確認するか、同期を再試行してください。';
+            return;
+          }
           if (activeEncryptedImport) {
             activeEncryptedImport.abort();
             importStatus.textContent = '処理を中止し、保存済み画像を整理しています…';
