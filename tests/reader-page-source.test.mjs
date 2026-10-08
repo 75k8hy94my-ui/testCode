@@ -47,3 +47,70 @@ test('legacy discovery is isolated and stores a versioned manifest once', async 
   assert.deepEqual(second.urls, first.urls);
   assert.deepEqual(calls, []);
 });
+
+
+test('empty cached manifest falls back to saved pages and repairs that cache', async () => {
+  const pages = ['https://img.test/book/1.webp', 'https://img.test/book/2.webp'];
+  const source = create({ legacyResolver: { async resolve() { throw new Error('must not probe'); } } });
+  const result = await source.resolve({ id: 'work', url: pages[0], pages, pageManifest: { version: 1, pages: [] } });
+  assert.deepEqual(result.urls, pages);
+  assert.equal(result.migrated, true);
+  assert.deepEqual(result.item.pageManifest.pages, pages);
+  assert.equal(result.item.pageManifest.version, 1);
+});
+
+test('a valid manifest remains authoritative over the legacy pages field', async () => {
+  const source = create();
+  const result = await source.resolve({
+    id: 'work',
+    pages: ['https://img.test/old.jpg'],
+    pageManifest: { version: 1, pages: ['https://img.test/new.webp'] }
+  });
+  assert.deepEqual(result.urls, ['https://img.test/new.webp']);
+  assert.equal(result.migrated, false);
+});
+
+test('legacy discovery tries an exact first image with its query before speculative file extensions', async () => {
+  const tried = [];
+  const url = 'https://img.test/book/chapter-001.webp?access=example';
+  const resolver = createLegacyResolver({
+    extensions: ['jpg', 'jpeg', 'png', 'webp'],
+    probe: async (candidate) => {
+      tried.push(candidate);
+      return candidate === url || candidate === 'https://img.test/book/chapter-002.webp?access=example';
+    },
+  });
+  const source = create({ legacyResolver: resolver });
+  const result = await source.resolve({ id: 'work', url });
+  assert.equal(tried[0], url);
+  assert.deepEqual(result.urls, [url, 'https://img.test/book/chapter-002.webp?access=example']);
+  assert.equal(result.manifest.version, 1);
+  assert.equal(tried.includes('https://img.test/book/chapter-002.jpg?access=example'), false);
+});
+
+test('legacy saved standalone image remains readable even without a numbered filename', async () => {
+  const url = 'https://img.test/work/cover.webp';
+  const tried = [];
+  const resolver = createLegacyResolver({
+    probe: async (candidate) => { tried.push(candidate); return candidate === url; },
+  });
+  const result = await create({ legacyResolver: resolver }).resolve({ id: 'single', url });
+  assert.deepEqual(result.urls, [url]);
+  assert.equal(tried[0], url);
+});
+
+test('legacy books recover zero-padding and extension from saved image metadata', async () => {
+  const url = 'https://images.test/volume/';
+  const tried = [];
+  const resolver = createLegacyResolver({
+    getCachedInfo: () => ({ numberWidth: 3, ext: 3 }),
+    probe: async (candidate) => {
+      tried.push(candidate);
+      return candidate === url + '001.webp' || candidate === url + '002.webp';
+    },
+  });
+  const result = await create({ legacyResolver: resolver }).resolve({ id: 'legacy', url });
+  assert.deepEqual(result.urls, [url + '001.webp', url + '002.webp']);
+  assert.equal(tried[0], url + '001.webp');
+  assert.equal(result.item.pageManifest.version, 1);
+});
