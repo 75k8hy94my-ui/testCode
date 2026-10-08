@@ -288,10 +288,99 @@ test('progress notifications distinguish acknowledged encrypted bytes, uploads a
   });
   assert.equal(result.ok,true);
   const uploads=events.filter(e=>e.phase==='upload');
-  assert.deepEqual(uploads.map(e=>e.completed),[0,1,1,2,2,3,3,4]);
+  assert.deepEqual(uploads.map(e=>e.completed),[0,1,2,3,4]);
   assert.equal(uploads[0].confirmedBytes,0);
   assert.equal(uploads.at(-1).confirmedBytes,uploads.at(-1).totalBytes);
   assert.ok(uploads.at(-1).confirmedBytes>0);
   assert.ok(events.findIndex(e=>e.phase==='register')>events.findIndex(e=>e.phase==='upload'));
   assert.equal(events.at(-1).phase,'registered');
+});
+
+
+test('bounded concurrent uploads finish faster without publishing metadata before all requests settle', async () => {
+  const cache = makeCache();
+  const staged = await sync.stageProcessedRevision({ cache, masterKey: key, assetId, targetRevision: 1, processed: makeProcessed() });
+  let active = 0, peak = 0, metadataCalls = 0;
+  const waiters = [];
+  const uploads = [];
+  const storage = {
+    async upload(path, token, bytes) {
+      active += 1; peak = Math.max(peak, active);
+      uploads.push(path);
+      await new Promise(resolve => waiters.push(resolve));
+      active -= 1;
+      return { created:true, exists:false };
+    }
+  };
+  const vault = {
+    async withSession(callback) { return callback('token',{id:userId}); },
+    async api(path) {
+      if (path.includes('/rpc/create_manga_reader_encrypted_asset')) {
+        metadataCalls += 1;
+        assert.equal(active, 0, 'no metadata may be committed while an upload is in flight');
+        return [{asset_id:assetId, revision:1,deleted_at:null,updated_at:'now'}];
+      }
+      return [];
+    }
+  };
+  const task = sync.publishPendingRevision({vault,storage,cache,assetId,targetRevision:1,objectIds:staged.objectIds});
+  // A few async turns allow the remote metadata read and workers to start.
+  for (let i=0;i<30 && uploads.length!==4;i++) await new Promise(resolve=>setTimeout(resolve,1));
+  assert.equal(uploads.length,4, 'four uploads should be in flight before any finishes');
+  assert.equal(peak,4);
+  assert.equal(metadataCalls,0);
+  for (const release of waiters) release();
+  assert.equal((await task).ok,true);
+  assert.equal(metadataCalls,1);
+});
+
+test('one upload failure waits for other requests and never creates metadata', async () => {
+  const cache=makeCache();
+  const staged=await sync.stageProcessedRevision({cache,masterKey:key,assetId,targetRevision:1,processed:makeProcessed()});
+  let active=0, resolveOther, metadataCalls=0, issued=0;
+  const storage={
+    async upload() {
+      issued += 1; active += 1;
+      if(issued===1) { active -= 1; throw new Error('simulated upload failure'); }
+      await new Promise(resolve=>{resolveOther=resolve});
+      active -= 1;
+      return {created:true,exists:false};
+    }
+  };
+  const vault={
+    async withSession(fn){return fn('token',{id:userId})},
+    async api(path){if(path.includes('/rpc/'))metadataCalls++;return []}
+  };
+  const task=sync.publishPendingRevision({vault,storage,cache,assetId,targetRevision:1,objectIds:staged.objectIds});
+  for(let i=0;i<30 && !resolveOther;i++) await new Promise(resolve=>setTimeout(resolve,1));
+  assert.ok(resolveOther,'one in-flight request should still exist when a sibling fails');
+  assert.equal(metadataCalls,0);
+  resolveOther();
+  await assert.rejects(task,/simulated upload failure/);
+  assert.equal(active,0);
+  assert.equal(metadataCalls,0);
+});
+
+test('staging uses bulk cache read/write and finalize batches retention after metadata', async () => {
+  const source = makeCache();
+  let getMany=0,putMany=0,setRetentionMany=0,individualPuts=0;
+  const cache = {
+    ...source,
+    async getMany(a,r,ids){getMany++;return Promise.all(ids.map(id=>source.get(a,r,id)));},
+    async putMany(records){putMany++;for(const record of records) await source.put(record);},
+    async put(record){individualPuts++;return source.put(record);},
+    async setRetentionMany(a,r,ids,retention){setRetentionMany++;for(const id of ids) await source.setRetention(a,r,id,retention);return true;}
+  };
+  const staged=await sync.stageProcessedRevision({cache,masterKey:key,assetId,targetRevision:1,processed:makeProcessed()});
+  assert.equal(getMany,1);
+  assert.equal(putMany,1);
+  assert.equal(individualPuts,0);
+  const storage=makeStorage();
+  const vault={async withSession(fn){return fn('token',{id:userId})},async api(path){
+    return path.includes('/rpc/create_manga_reader_encrypted_asset') ? [{asset_id:assetId,revision:1,deleted_at:null,updated_at:'now'}] : [];
+  }};
+  const result=await sync.publishPendingRevision({vault,storage,cache,assetId,targetRevision:1,objectIds:staged.objectIds});
+  assert.equal(result.ok,true);
+  assert.equal(getMany,2);
+  assert.equal(setRetentionMany,1);
 });
