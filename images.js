@@ -135,11 +135,11 @@
     } finally { busy = false; updateButtons(); }
   }
   function destroyRenderer() {
-    ++pageGeneration;
     renderer?.destroy?.();
     renderer = null;
   }
   function closeViewer() {
+    ++pageGeneration;
     destroyRenderer();
     selected = null;
     $('imageViewer').hidden = true;
