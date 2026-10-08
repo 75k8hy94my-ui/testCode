@@ -5,6 +5,7 @@
     return String.raw`<div id="mangaListSection">
       <div id="exportImportRow">
         <button class="textActionBtn" id="newBtn">新規</button>
+        <button class="textActionBtn" id="bulkDetectBtn">一括読み込み</button>
       </div>
       <section id="mangaImportDialog" role="dialog" aria-modal="true" aria-labelledby="mangaImportTitle" hidden style="position:fixed;inset:0;z-index:1210;background:#0009;overflow:auto;padding:16px;">
         <div style="width:min(900px,100%);margin:4vh auto;background:var(--panel,#fff);color:inherit;border-radius:14px;padding:20px;display:grid;gap:12px;box-shadow:0 16px 48px #0005;">
