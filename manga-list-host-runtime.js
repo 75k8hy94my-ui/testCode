@@ -215,7 +215,12 @@
       const extOrder = cached && Number.isInteger(cached.ext) && cached.ext >= 0 && cached.ext < deps.images.extCandidates.length
         ? [cached.ext, ...deps.images.extCandidates.map((_, index) => index)]
         : deps.images.extCandidates.map((_, index) => index);
-      const possibleUrls = directUrl ? [directUrl] : extOrder.map((index) => deps.images.pageUrlFor(folderUrl, 1, index, resolvedWidth, pattern));
+      const firstPageUrl = /^https?:\/\//i.test(String(baseUrlForItem || '')) && /\.(?:jpe?g|png|webp|avif)(?:[?#]|$)/i.test(String(baseUrlForItem))
+        ? String(baseUrlForItem) : '';
+      const possibleUrls = directUrl ? [directUrl] : [
+        firstPageUrl,
+        ...extOrder.map((index) => deps.images.pageUrlFor(folderUrl, 1, index, resolvedWidth, pattern)),
+      ];
       const urls = [...new Set([rememberedUrl, ...possibleUrls].filter(Boolean))];
       let index = 0;
       let timer = null;
@@ -238,6 +243,7 @@
         if (stopped || ready) return;
         clearTimer();
         if (index >= urls.length) {
+          stopped = true;
           failedCache.add(cacheKey);
           imgEl.src = '';
           markCover(imgEl, 'failed');
