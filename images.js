@@ -297,13 +297,17 @@
   async function retrySync() {
     if (busy) return;
     busy = true;
+    startUploadProgress(0);
+    reportUploadProgress({ phase: 'sync', message: '画像の再アップロードなしで作品一覧だけを同期しています' });
     updateButtons();
-    status('本棚情報を暗号化してクラウドに同期しています…');
+    status('作品一覧のクラウド同期を再試行しています…');
     try {
       await syncMetadata();
+      finishUploadProgress('done', '作品一覧のクラウド同期が完了しました（画像の再送信なし）');
       status('クラウド同期が完了しました。');
     } catch (error) {
       pendingSync = true;
+      finishUploadProgress('error', '作品一覧の同期に失敗しました。画像本体は保存済みです。');
       status('画像は端末と暗号化ストレージに残っています。同期を再試行してください：' +
         (error?.message || '通信エラー'), true);
     } finally { busy = false; updateButtons(); }
@@ -408,25 +412,25 @@
     const controller = new AbortController();
     activeController = controller;
     busy = true;
+    startUploadProgress(files.length);
     updateButtons();
     let item = null;
     let persisted = false;
-    status('画像を暗号化しています…');
+    status('アップロード処理中です。各段階の進捗を下に表示しています。');
     try {
       const secret = requireUnlock();
       const service = window.EncryptedAssetImport.create({
         processPhoto: (file, options) => window.ImagePhotoProcessor.processPhoto(file, {
-          ...options, preferWorker: true,
-          onProgress: progress => status((file.name || '画像') + '：' + progress.phase)
+          ...options, preferWorker: true, onProgress: options.onProgress
         }),
-        stage: ({assetId,targetRevision,processed,signal}) =>
+        stage: ({assetId,targetRevision,processed,signal,onProgress}) =>
           window.EncryptedAssetSync.stageProcessedRevision({
-            cache, masterKey:secret, assetId,targetRevision,processed,signal
+            cache, masterKey:secret, assetId,targetRevision,processed,signal,onProgress
           }),
-        publish: ({assetId,targetRevision,staged,signal}) =>
+        publish: ({assetId,targetRevision,staged,signal,onProgress}) =>
           window.EncryptedAssetSync.publishPendingRevision({
             vault:api, storage:transport, cache, assetId,targetRevision,
-            objectIds:staged.objectIds,signal,transferStorage
+            objectIds:staged.objectIds,signal,transferStorage,onProgress
           }),
         tombstone: (assetId,revision) => window.EncryptedAssetSync.tombstoneAsset({
           vault:api,assetId,expectedRevision:revision
@@ -435,7 +439,7 @@
       });
       item = await service.importFiles({
         files,title,signal:controller.signal,
-        onProgress: progress => status(progress.index + ' / ' + progress.total + 'ページを暗号化保存しました')
+        onProgress: progress => reportUploadProgress(progress)
       });
       if (controller.signal.aborted) throw Object.assign(new Error('中断しました'),{name:'AbortError'});
       const original = localStorage.getItem(ITEM_KEY);
@@ -446,24 +450,35 @@
       persisted = true;
       pendingSync = true;
       localStorage.setItem(RETRY_KEY, currentUserId());
+      reportUploadProgress({
+        phase: 'sync', completedPages: files.length, total: files.length,
+        message: '全ページの登録完了を確認しました。作品一覧を保管庫へ同期しています'
+      });
       await renderGallery();
-      status('画像を保存しました。保管庫のメタデータをクラウド同期しています…');
+      status('全ページの登録が完了しました。作品一覧のクラウド同期を確認中です…');
       await syncMetadata();
+      finishUploadProgress('done');
       $('imageUploadForm').reset();
       status('画像を暗号化して保存し、クラウド同期しました。');
     } catch (error) {
       if (item && !persisted) {
+        reportUploadProgress({ phase: 'cleanup', message: '登録済み画像を整理しています…' });
         for (const page of item.encryptedAssets.pages) {
           try { await discard(page); } catch (_) {}
         }
       }
       if (persisted) {
         pendingSync = true;
+        finishUploadProgress('error', '画像は保存済みですが、作品一覧のクラウド同期が完了していません');
         status('画像は保存されています。クラウド同期を再試行してください：' +
           (error?.message || '通信エラー'), true);
       } else {
-        status(error?.name === 'AbortError' ? '追加を中止しました。' :
-          (error?.message || '画像を追加できませんでした。'), error?.name !== 'AbortError');
+        const canceled = error?.name === 'AbortError' || controller.signal.aborted;
+        finishUploadProgress(canceled ? 'canceled' : 'error',
+          canceled ? '処理を中断しました。未完了の画像は保存済み作品に追加していません' :
+          '処理を完了できませんでした：' + (error?.message || '不明なエラー'));
+        status(canceled ? '追加を中止しました。' :
+          (error?.message || '画像を追加できませんでした。'), !canceled);
       }
     } finally {
       busy = false;
@@ -501,7 +516,9 @@
     window.AppDesktopRail?.syncActive?.();
     $('imageUploadForm').addEventListener('submit',handleUpload);
     $('imageCancelButton').addEventListener('click',() => {
-      activeController?.abort();
+      if (!activeController || !busy || pendingSync) return;
+      activeController.abort();
+      reportUploadProgress({ phase: 'cleanup', message: '中断要求を送信しました。アップロード済みのデータを整理しています' });
       status('アップロードを中止し、暗号化データを整理しています…');
     });
     $('imageRetrySync').addEventListener('click',retrySync);
@@ -528,7 +545,7 @@
     void retryCleanup();
   }
 
-  window.EncryptedImages = Object.freeze({ isEncryptedItem, vpnFreeTransferStorage, initialize });
+  window.EncryptedImages = Object.freeze({ isEncryptedItem, vpnFreeTransferStorage, createUploadProgressTracker, initialize });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',()=>{void initialize();},{once:true});
   else void initialize();
 })();
