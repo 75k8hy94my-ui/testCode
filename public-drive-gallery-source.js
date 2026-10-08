@@ -93,7 +93,63 @@
     return images;
   }
 
-  const api = { folderIdFromInput, makeListUrl, normalizeImage, imageUrls, listPublicImages };
+  // Store only an address book, never image bytes. Links are scoped to one folder and
+  // validated against the known Google host before being restored from the Vault.
+  const CACHE_VERSION = 1;
+  const MAX_CACHE_BYTES = 1500000;
+  function cachedImage(file) {
+    if (!file || !ID_PATTERN.test(String(file.id || ''))) return null;
+    const name = file.name;
+    if (typeof name !== 'string' || !name || name.length > 500) return null;
+    const expected = imageUrls(file.id).direct;
+    if (file.directUrl !== expected) return null;
+    return { id: file.id, name, directUrl: expected };
+  }
+  function normalizeCache(cache, folderId) {
+    const id = folderIdFromInput(folderId);
+    if (!id || !cache || cache.schemaVersion !== CACHE_VERSION || cache.folderId !== id ||
+        typeof cache.updatedAt !== 'string' || !Number.isFinite(Date.parse(cache.updatedAt)) ||
+        !Array.isArray(cache.images)) return null;
+    if (JSON.stringify(cache).length > MAX_CACHE_BYTES) return null;
+    const seen = new Set();
+    const images = [];
+    for (const file of cache.images) {
+      const entry = cachedImage(file);
+      if (!entry || seen.has(entry.id)) return null;
+      seen.add(entry.id);
+      images.push(entry);
+    }
+    return { schemaVersion: CACHE_VERSION, folderId: id, updatedAt: cache.updatedAt, images };
+  }
+  function createCache(folderId, images, updatedAt = new Date().toISOString()) {
+    const id = folderIdFromInput(folderId);
+    if (!id || !Array.isArray(images)) throw new Error('キャッシュする画像一覧が不正です。');
+    const cache = {
+      schemaVersion: CACHE_VERSION,
+      folderId: id,
+      updatedAt,
+      images: images.map(file => {
+        if (!file || !ID_PATTERN.test(String(file.id || ''))) throw new Error('画像IDが不正です。');
+        const name = String(file.name || '');
+        if (!name || name.length > 500) throw new Error('画像名が不正です。');
+        return { id: file.id, name, directUrl: imageUrls(file.id).direct };
+      })
+    };
+    if (new TextEncoder().encode(JSON.stringify(cache)).byteLength > MAX_CACHE_BYTES) {
+      throw new Error('画像一覧がキャッシュの保存上限（約1.5MB）を超えました。画像は表示できますが、同期キャッシュには保存しません。');
+    }
+    const normalized = normalizeCache(cache, id);
+    if (!normalized) throw new Error('画像一覧をキャッシュできませんでした。');
+    return normalized;
+  }
+  async function loadGallery({ folderId, apiKey, cache = null, forceRefresh = false, fetcher, signal, onPage } = {}) {
+    const cached = normalizeCache(cache, folderId);
+    if (cached && !forceRefresh) return { images: cached.images, cache: cached, source: 'cache' };
+    const images = await listPublicImages({ folderId, apiKey, fetcher, signal, onPage });
+    return { images, cache: null, source: 'drive' };
+  }
+
+  const api = { folderIdFromInput, makeListUrl, normalizeImage, imageUrls, listPublicImages, createCache, normalizeCache, loadGallery, MAX_CACHE_BYTES };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.PublicDriveGallery = api;
 })(typeof window === 'undefined' ? globalThis : window);
