@@ -65,3 +65,42 @@ test('staging failure also invokes cleanup, and cleanup errors are surfaced', as
   await assert.rejects(api.importFiles({files:[{name:'one'}],title:'book'}), /後始末に失敗/);
   assert.equal(rolledBack.length, 1);
 });
+
+
+test('import forwards image-processing and storage confirmation stages with consistent page indices', async () => {
+  const events = [];
+  const api = importer.create({
+    processPhoto: async (_file, options) => {
+      options.onProgress({phase:'complete',completed:1,total:1});
+      return {manifest,previewBlob:'preview',tileBlobs:[]};
+    },
+    stage: async ({onProgress}) => {
+      onProgress({phase:'encrypt',completed:1,total:1});
+      return {objectIds:['preview']};
+    },
+    publish: async ({onProgress}) => {
+      onProgress({phase:'checking'});
+      onProgress({phase:'upload',completed:0,total:1,confirmedBytes:0,totalBytes:100});
+      onProgress({phase:'upload',completed:1,total:1,confirmedBytes:100,totalBytes:100});
+      onProgress({phase:'register'});
+      onProgress({phase:'registered'});
+      return {ok:true,metadata:{revision:1}};
+    },
+    tombstone: async()=>{},
+    createAssetId:()=>'6dc3773a-a3ef-4bb8-9cbf-15096098db10'
+  });
+  await api.importFiles({
+    files:[{name:'first.png'}],title:'test',
+    onProgress:e=>events.push(e)
+  });
+  assert.equal(events[0].phase,'processing');
+  assert.equal(events[1].detail.phase,'complete');
+  assert.equal(events[1].completedPages,0);
+  assert.equal(events.find(e=>e.phase==='encrypt'&&e.detail?.completed===1).fileIndex,0);
+  assert.equal(events.find(e=>e.phase==='upload'&&e.detail?.completed===0).completedPages,0);
+  assert.equal(events.find(e=>e.phase==='register').completedPages,0);
+  const last=events.at(-1);
+  assert.equal(last.phase,'uploaded');
+  assert.equal(last.completedPages,1);
+  assert.equal(last.total,1);
+});

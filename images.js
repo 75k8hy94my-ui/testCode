@@ -26,6 +26,106 @@
     };
   }
 
+
+  const UPLOAD_PHASES = Object.freeze(['processing', 'encrypt', 'upload', 'register', 'sync']);
+  const UPLOAD_LABELS = Object.freeze({
+    processing: '画像を加工中', encrypt: '暗号化中', checking: 'サーバーの状態を確認中',
+    upload: '暗号化データを送信中', register: 'ページ情報を登録中',
+    registered: 'ページの登録確認済み', uploaded: 'ページの登録確認済み',
+    sync: '作品一覧をクラウド同期中', cleanup: '中断・失敗したデータを整理中',
+    done: 'すべて完了', error: '処理に失敗', canceled: 'キャンセルしました'
+  });
+  function displayBytes(value) {
+    const bytes = Math.max(0, Number(value) || 0);
+    if (bytes < 1024) return Math.round(bytes) + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+  // This tracker measures confirmed responses rather than guessing the progress
+  // of an in-flight HTTP POST. Image-processing "complete" never means uploaded.
+  function createUploadProgressTracker(now = () => Date.now()) {
+    let current = null;
+    const between = (n, low, high) => Math.max(low, Math.min(high, n));
+    function start(totalPages) {
+      const stamp = now();
+      current = {
+        phase: 'processing', state: 'running', totalPages: Math.max(0, Math.floor(Number(totalPages) || 0)),
+        completedPages: 0, fileIndex: 0, fileName: '', detail: '画像の処理を準備しています',
+        startedAt: stamp, lastChangeAt: stamp
+      };
+      return snapshot();
+    }
+    function detailText(phase, detail = {}, completedPages = 0, totalPages = 0) {
+      const count = Number(detail.completed);
+      const total = Number(detail.total);
+      const fraction = Number.isInteger(count) && Number.isInteger(total) && total > 0
+        ? '（' + count + ' / ' + total + '）' : '';
+      if (phase === 'processing') {
+        const operation = detail.phase;
+        if (operation === 'decode') return '画像ファイルを読み込んでいます' + fraction;
+        if (operation === 'preview') return 'プレビュー画像を生成しました';
+        if (operation === 'tiles') return '拡大用の画像を作成中' + fraction;
+        if (operation === 'pyramid') return '解像度別画像を生成中' + fraction;
+        if (operation === 'complete') return '画像加工は完了しました。暗号化・アップロードはこれからです。';
+        return '画像を読み込み・圧縮しています';
+      }
+      if (phase === 'encrypt') return 'プレビューと拡大画像を暗号化しています' + fraction;
+      if (phase === 'checking') return '保存先の登録状態を問い合わせています';
+      if (phase === 'upload') {
+        const bytes = Number(detail.confirmedBytes) || 0;
+        const size = Number(detail.totalBytes) || 0;
+        const wait = Number.isInteger(count) && Number.isInteger(total) && count < total
+          ? '。次のファイルの送信・応答待ち' : '';
+        return '送信を確認したファイル ' + (Number.isInteger(count) ? count : 0) +
+          ' / ' + (Number.isInteger(total) ? total : '確認中') +
+          (size > 0 ? '、応答確認済み ' + displayBytes(bytes) + ' / ' + displayBytes(size) : '') + wait;
+      }
+      if (phase === 'register') return '暗号化ファイルの送信後、サーバーへのページ登録完了を待っています';
+      if (phase === 'registered') return 'サーバーからページ登録完了の応答を受信しました';
+      if (phase === 'uploaded') return 'ページ登録を確認しました（' + completedPages + ' / ' + totalPages + 'ページ）';
+      if (phase === 'sync') return '全ページの登録後、作品一覧を保管庫へ保存しています';
+      if (phase === 'cleanup') return 'アップロード済みデータを確認し、不要なデータを削除しています';
+      if (phase === 'done') return '画像の登録と作品一覧のクラウド同期が完了しました';
+      if (phase === 'canceled') return 'アップロードを中断しました';
+      if (phase === 'error') return '処理は完了していません。表示されたエラー内容を確認してください';
+      return '';
+    }
+    function update(event = {}) {
+      if (!current) start(event.total ?? 0);
+      const phase = UPLOAD_LABELS[event.phase] ? event.phase : current.phase;
+      const totalPages = Number.isInteger(event.total) && event.total >= 0 ? event.total : current.totalPages;
+      const completed = Number.isInteger(event.completedPages) ?
+        between(event.completedPages, current.completedPages, totalPages) : current.completedPages;
+      const index = Number.isInteger(event.fileIndex) ? event.fileIndex :
+        (Number.isInteger(event.index) ? event.index : current.fileIndex);
+      current = {
+        ...current, phase, totalPages, completedPages: completed,
+        fileIndex: between(index, 0, Math.max(totalPages - 1, 0)),
+        fileName: event.fileName == null ? current.fileName : String(event.fileName),
+        detail: event.message || detailText(phase, event.detail || {}, completed, totalPages),
+        lastChangeAt: now()
+      };
+      if (phase === 'done') current.state = 'done';
+      else if (phase === 'error') current.state = 'error';
+      else if (phase === 'canceled') current.state = 'canceled';
+      return snapshot();
+    }
+    function snapshot() {
+      if (!current) return null;
+      const elapsed = Math.max(0, Math.floor((now() - current.startedAt) / 1000));
+      const idle = Math.max(0, Math.floor((now() - current.lastChangeAt) / 1000));
+      const phaseIndex = UPLOAD_PHASES.indexOf(current.phase);
+      const index = current.phase === 'checking' ? 2 :
+        (current.phase === 'registered' || current.phase === 'uploaded' ? 3 : phaseIndex);
+      return {
+        ...current, elapsedSeconds: elapsed, idleSeconds: idle,
+        label: UPLOAD_LABELS[current.phase],
+        stageIndex: index, waiting: current.state === 'running' && idle >= 30
+      };
+    }
+    return Object.freeze({ start, update, snapshot });
+  }
+
   let cache = null;
   let transport = null;
   let previewLoader = null;
@@ -38,6 +138,79 @@
   let pendingSync = false;
   let busy = false;
   const transferStorage = vpnFreeTransferStorage(window.localStorage);
+
+  let uploadProgress = null;
+  let uploadProgressInterval = null;
+  function formatSeconds(seconds) {
+    const total = Math.max(0, Math.floor(Number(seconds) || 0));
+    if (total < 60) return total + '秒';
+    return Math.floor(total / 60) + '分' + String(total % 60).padStart(2, '0') + '秒';
+  }
+  function renderUploadProgress() {
+    const info = uploadProgress?.snapshot();
+    const panel = $('imageUploadProgress');
+    if (!panel || !info) return;
+    panel.hidden = false;
+    panel.dataset.status = info.state === 'running' ? 'running' : info.state;
+    $('imageProgressState').textContent = info.label;
+    $('imageProgressElapsed').textContent = '経過 ' + formatSeconds(info.elapsedSeconds);
+    $('imageProgressFile').textContent = info.fileName
+      ? '処理対象：' + info.fileName + '（' + Math.min(info.fileIndex + 1, info.totalPages) + ' / ' + info.totalPages + 'ページ目）'
+      : (info.totalPages === 0 ? '画像本体の再送信はありません' : '全' + info.totalPages + 'ページ');
+    const bar = $('imagePageProgress');
+    bar.hidden = info.totalPages === 0;
+    bar.max = Math.max(1, info.totalPages);
+    bar.value = Math.min(info.completedPages, bar.max);
+    $('imageProgressCount').textContent = info.totalPages
+      ? 'サーバー登録確認済み：' + info.completedPages + ' / ' + info.totalPages + 'ページ'
+      : '画像本体は保存済み（再送信なし）';
+    $('imageProgressActivity').textContent = info.state === 'running'
+      ? '最終進捗更新：' + formatSeconds(info.idleSeconds) + '前'
+      : (info.state === 'done' ? 'すべての保存完了を確認' : '処理は終了しています');
+    $('imageProgressDetail').textContent = info.detail;
+    $('imageProgressSteps').querySelectorAll('li[data-upload-stage]').forEach((item,index) => {
+      const state = info.state === 'done' ? 'complete'
+        : info.state === 'running' && info.stageIndex >= 0
+          ? (index < info.stageIndex ? 'complete' : index === info.stageIndex ? 'active' : 'pending')
+          : 'pending';
+      item.dataset.state = state;
+      if (state === 'active') item.setAttribute('aria-current', 'step');
+      else item.removeAttribute('aria-current');
+    });
+    $('imageProgressHint').textContent = info.waiting
+      ? '30秒以上進捗更新がありません。現在の段階で通信の応答または画像処理を待機している可能性があります。処理が完了したとは限りません。'
+      : info.state === 'done' ? '画像のサーバー登録と作品一覧のクラウド同期が完了しました。'
+      : info.state === 'error' ? '処理は正常完了していません。エラー内容と再試行ボタンを確認してください。'
+      : info.state === 'canceled' ? 'アップロードを中止しました。新しい操作を開始できます。'
+      : '画像加工の「complete」はアップロード完了ではありません。ページ登録・一覧同期まで確認します。';
+  }
+  function startUploadProgress(totalPages) {
+    if (uploadProgressInterval != null) {
+      window.clearInterval(uploadProgressInterval);
+      uploadProgressInterval = null;
+    }
+    uploadProgress = createUploadProgressTracker();
+    uploadProgress.start(totalPages);
+    renderUploadProgress();
+    uploadProgressInterval = window.setInterval(renderUploadProgress, 1000);
+  }
+  function reportUploadProgress(event) {
+    if (!uploadProgress) return;
+    if (activeController?.signal?.aborted && !['cleanup','canceled','error'].includes(event?.phase)) return;
+    uploadProgress.update(event);
+    renderUploadProgress();
+    updateButtons();
+  }
+  function finishUploadProgress(phase, message) {
+    if (!uploadProgress) return;
+    uploadProgress.update({ phase, message });
+    if (uploadProgressInterval != null) {
+      window.clearInterval(uploadProgressInterval);
+      uploadProgressInterval = null;
+    }
+    renderUploadProgress();
+  }
+
 
   function currentUserId() {
     return String(api.loadSession()?.user?.id || '');
@@ -109,7 +282,8 @@
     $('imageUploadButton').disabled = busy || pendingSync;
     $('imageFiles').disabled = busy || pendingSync;
     $('imageTitle').disabled = busy || pendingSync;
-    $('imageCancelButton').hidden = !busy;
+    $('imageCancelButton').hidden = !busy || !activeController || pendingSync ||
+      ['sync', 'cleanup', 'done', 'error'].includes(uploadProgress?.snapshot()?.phase);
     $('imageRetrySync').hidden = !pendingSync;
     $('imageRetrySync').disabled = busy;
   }
@@ -123,13 +297,17 @@
   async function retrySync() {
     if (busy) return;
     busy = true;
+    startUploadProgress(0);
+    reportUploadProgress({ phase: 'sync', message: '画像の再アップロードなしで作品一覧だけを同期しています' });
     updateButtons();
-    status('本棚情報を暗号化してクラウドに同期しています…');
+    status('作品一覧のクラウド同期を再試行しています…');
     try {
       await syncMetadata();
+      finishUploadProgress('done', '作品一覧のクラウド同期が完了しました（画像の再送信なし）');
       status('クラウド同期が完了しました。');
     } catch (error) {
       pendingSync = true;
+      finishUploadProgress('error', '作品一覧の同期に失敗しました。画像本体は保存済みです。');
       status('画像は端末と暗号化ストレージに残っています。同期を再試行してください：' +
         (error?.message || '通信エラー'), true);
     } finally { busy = false; updateButtons(); }
@@ -234,25 +412,25 @@
     const controller = new AbortController();
     activeController = controller;
     busy = true;
+    startUploadProgress(files.length);
     updateButtons();
     let item = null;
     let persisted = false;
-    status('画像を暗号化しています…');
+    status('アップロード処理中です。各段階の進捗を下に表示しています。');
     try {
       const secret = requireUnlock();
       const service = window.EncryptedAssetImport.create({
         processPhoto: (file, options) => window.ImagePhotoProcessor.processPhoto(file, {
-          ...options, preferWorker: true,
-          onProgress: progress => status((file.name || '画像') + '：' + progress.phase)
+          ...options, preferWorker: true, onProgress: options.onProgress
         }),
-        stage: ({assetId,targetRevision,processed,signal}) =>
+        stage: ({assetId,targetRevision,processed,signal,onProgress}) =>
           window.EncryptedAssetSync.stageProcessedRevision({
-            cache, masterKey:secret, assetId,targetRevision,processed,signal
+            cache, masterKey:secret, assetId,targetRevision,processed,signal,onProgress
           }),
-        publish: ({assetId,targetRevision,staged,signal}) =>
+        publish: ({assetId,targetRevision,staged,signal,onProgress}) =>
           window.EncryptedAssetSync.publishPendingRevision({
             vault:api, storage:transport, cache, assetId,targetRevision,
-            objectIds:staged.objectIds,signal,transferStorage
+            objectIds:staged.objectIds,signal,transferStorage,onProgress
           }),
         tombstone: (assetId,revision) => window.EncryptedAssetSync.tombstoneAsset({
           vault:api,assetId,expectedRevision:revision
@@ -261,7 +439,7 @@
       });
       item = await service.importFiles({
         files,title,signal:controller.signal,
-        onProgress: progress => status(progress.index + ' / ' + progress.total + 'ページを暗号化保存しました')
+        onProgress: progress => reportUploadProgress(progress)
       });
       if (controller.signal.aborted) throw Object.assign(new Error('中断しました'),{name:'AbortError'});
       const original = localStorage.getItem(ITEM_KEY);
@@ -272,24 +450,35 @@
       persisted = true;
       pendingSync = true;
       localStorage.setItem(RETRY_KEY, currentUserId());
+      reportUploadProgress({
+        phase: 'sync', completedPages: files.length, total: files.length,
+        message: '全ページの登録完了を確認しました。作品一覧を保管庫へ同期しています'
+      });
       await renderGallery();
-      status('画像を保存しました。保管庫のメタデータをクラウド同期しています…');
+      status('全ページの登録が完了しました。作品一覧のクラウド同期を確認中です…');
       await syncMetadata();
+      finishUploadProgress('done');
       $('imageUploadForm').reset();
       status('画像を暗号化して保存し、クラウド同期しました。');
     } catch (error) {
       if (item && !persisted) {
+        reportUploadProgress({ phase: 'cleanup', message: '登録済み画像を整理しています…' });
         for (const page of item.encryptedAssets.pages) {
           try { await discard(page); } catch (_) {}
         }
       }
       if (persisted) {
         pendingSync = true;
+        finishUploadProgress('error', '画像は保存済みですが、作品一覧のクラウド同期が完了していません');
         status('画像は保存されています。クラウド同期を再試行してください：' +
           (error?.message || '通信エラー'), true);
       } else {
-        status(error?.name === 'AbortError' ? '追加を中止しました。' :
-          (error?.message || '画像を追加できませんでした。'), error?.name !== 'AbortError');
+        const canceled = !error?.cleanupFailed && (error?.name === 'AbortError' || controller.signal.aborted);
+        finishUploadProgress(canceled ? 'canceled' : 'error',
+          canceled ? '処理を中断しました。未完了の画像は保存済み作品に追加していません' :
+          '処理を完了できませんでした：' + (error?.message || '不明なエラー'));
+        status(canceled ? '追加を中止しました。' :
+          (error?.message || '画像を追加できませんでした。'), !canceled);
       }
     } finally {
       busy = false;
@@ -327,7 +516,9 @@
     window.AppDesktopRail?.syncActive?.();
     $('imageUploadForm').addEventListener('submit',handleUpload);
     $('imageCancelButton').addEventListener('click',() => {
-      activeController?.abort();
+      if (!activeController || !busy || pendingSync) return;
+      activeController.abort();
+      reportUploadProgress({ phase: 'cleanup', message: '中断要求を送信しました。アップロード済みのデータを整理しています' });
       status('アップロードを中止し、暗号化データを整理しています…');
     });
     $('imageRetrySync').addEventListener('click',retrySync);
@@ -354,7 +545,7 @@
     void retryCleanup();
   }
 
-  window.EncryptedImages = Object.freeze({ isEncryptedItem, vpnFreeTransferStorage, initialize });
+  window.EncryptedImages = Object.freeze({ isEncryptedItem, vpnFreeTransferStorage, createUploadProgressTracker, initialize });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',()=>{void initialize();},{once:true});
   else void initialize();
 })();
