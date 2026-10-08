@@ -254,3 +254,12 @@ test('cleanup error preserves pending encrypted cache', async () => {
   await assert.rejects(sync.discardImportedAsset({vault,cache,storage:{remove:async()=>{throw new Error('cleanup failed');}},assetId}),/cleanup failed/);
   assert.ok(cache.records.size>0);
 });
+
+
+test('aborted staging does not leave a new ciphertext record', async () => {
+  const cache = makeCache();
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(sync.stageProcessedRevision({ cache, masterKey:key, assetId, targetRevision:1, processed:makeProcessed(), signal:controller.signal }), {name:'AbortError'});
+  assert.equal(cache.records.size,0);
+});
