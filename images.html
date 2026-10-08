@@ -16,18 +16,18 @@
 <header class="homeHeader" data-profile-only-header="1"><div><span class="eyebrow">LIBRARY</span><h1 id="shellTitle">画像</h1></div><button class="headerProfileButton" type="button" data-profile-menu-trigger aria-label="アカウント" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg></button></header>
 <div id="routeContent">
 <section class="imageLibrary" aria-label="暗号化画像">
-  <div class="imageLibraryHead"><div><h2>暗号化画像</h2><p>画像の保存・表示にVPNは必要ありません。ログインと保管庫の解錠が必要です。</p><p><a href="drive-gallery.html">Google Driveの公開画像を表示する →</a></p></div></div>
+  <div class="imageLibraryHead"><div><h2>暗号化写真</h2><p>写真の保存・表示にVPNは必要ありません。ログインと保管庫の解錠が必要です。</p><p><a href="drive-gallery.html">Google Driveの公開画像を表示する →</a></p></div></div>
   <form id="imageUploadForm" class="imageUploadForm">
     <label>作品名<input id="imageTitle" name="title" type="text" required maxlength="200" autocomplete="off"></label>
     <label>画像ファイル（複数選択可）<input id="imageFiles" name="files" type="file" accept="image/*" multiple required></label>
     <label>保存画質
       <select id="imageQualityMode" name="quality">
-        <option value="balanced" selected>標準（推奨・長辺最大3,072px）</option>
-        <option value="compact">軽量（長辺最大2,048px）</option>
-        <option value="detailed">高画質（長辺最大4,096px）</option>
+        <option value="balanced" selected>標準（推奨・写真ごとに自動調整）</option>
+        <option value="compact">軽量（容量を優先）</option>
+        <option value="detailed">高画質（写真のディテールを優先）</option>
       </select>
     </label>
-    <p class="imageQualityHelp">拡大用画像を重複作成しない方式です。サイズは画像の内容によって変わります。細かい文字を読む画像は「高画質」も選べます。既存の保存画像は変更しません。</p>
+    <p class="imageQualityHelp">写真専用です。元写真を無理に拡大せず、圧縮後の実容量を確認して画質を調整します。容量目標は目安であり、写真の細部を守るため上回る場合もあります。既存の保存画像は変更しません。</p>
     <div class="imageUploadActions"><button id="imageUploadButton" type="submit">暗号化して追加</button><button id="imageCancelButton" type="button" hidden>キャンセル</button><button id="imageRetrySync" type="button" hidden>クラウド同期を再試行</button></div>
   </form>
   <p id="imageStatus" class="imageStatus" role="status" aria-live="polite"></p>
@@ -76,9 +76,9 @@
 <script src="encrypted-asset-sync.js?v=20261008-bulk-perf"></script>
 <script src="image-compression-profile.js"></script>
 <script src="image-pyramid-builder.js?v=20261008-native-zoom"></script>
-<script src="image-photo-processor.js?v=20261008-native-zoom"></script>
+<script src="image-photo-processor.js?v=20261008-adaptive-photo"></script>
 <script src="encrypted-asset-reader.js"></script>
 <script src="encrypted-asset-item.js"></script>
 <script src="encrypted-asset-import.js?v=20261008-size-preset"></script>
-<script src="images.js?v=20261008-size-preset"></script>
+<script src="images.js?v=20261008-adaptive-photo"></script>
 </body></html>

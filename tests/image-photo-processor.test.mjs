@@ -187,3 +187,87 @@ test('actual encoded image keeps all source detail when shorter than chosen sing
   assert.deepEqual(tiny.manifest.zoom.levels,[]);
   assert.equal(tiny.manifest.preview.longEdge,1200);
 });
+
+
+test('photo optimizer reduces measured encoded size without upscaling or inventing duplicate zoom levels', async () => {
+  const profileModule = await import('../image-compression-profile.js');
+  const profile = profileModule.default.getCompressionProfile();
+  profile.zoom.intermediateLongEdge = 3072;
+  profile.zoom.maximumLongEdge = 3072;
+  profile.zoom.tileSize = 1024;
+  profile.zoom.quality = 0.86;
+  const runtime=createFakeRuntime({width:5000,height:3000});
+  const calls=[];
+  runtime.encode=async (canvas,mimeType,quality)=>{
+    calls.push({width:canvas.width,height:canvas.height,quality});
+    const size = Math.max(1, Math.floor(canvas.width*canvas.height*(0.28+quality*0.85)));
+    return new Blob([new Uint8Array(size)],{type:mimeType});
+  };
+  const updates=[];
+  const optimizer={
+    bytesPerMegapixel:440*1024,maxZoomBytes:3*1024*1024,minZoomBytes:550*1024,
+    minQuality:0.66,minZoomLongEdge:1700,maxPasses:5
+  };
+  const result=await processor.processPhoto(fakePhoto({width:5000,height:3000}),{
+    preferWorker:false,profile,photoOptimization:optimizer,runtime,
+    onProgress:x=>updates.push(x)
+  });
+  assert.equal(result.manifest.zoom.levels.length,1);
+  assert.equal(result.manifest.zoom.levels[0].tiles.length,result.tileBlobs.length);
+  assert.ok(result.manifest.zoom.levels[0].longEdge<=3072);
+  assert.ok(result.manifest.zoom.levels[0].longEdge>=1700);
+  assert.ok(updates.filter(x=>x.phase==='optimizing').length>1,'photograph exceeds initial target and must be re-encoded');
+  const zoomBytes=result.tileBlobs.reduce((sum,b)=>sum+b.size,0);
+  assert.equal(zoomBytes,result.manifest.zoom.levels[0].tiles.reduce((sum,t)=>sum+t.bytes,0));
+  assert.equal(result.manifest.source.bytes,900000);
+  assert.ok(result.manifest.zoom.levels[0].tiles.every(t=>t.quality>=0.66));
+  assert.ok(result.tileBlobs.every(b=>b.type==='image/webp'));
+  assert.equal(updates.at(-1).phase,'complete');
+});
+
+test('adaptive optimization keeps native resolution when already within image-size budget', async () => {
+  const profileModule=await import('../image-compression-profile.js');
+  const profile=profileModule.default.getCompressionProfile();
+  profile.zoom.maximumLongEdge=3072;
+  profile.zoom.intermediateLongEdge=3072;
+  profile.zoom.tileSize=1024;
+  profile.zoom.quality=0.86;
+  const runtime=createFakeRuntime({width:2400,height:1600});
+  const events=[];
+  const result=await processor.processPhoto(fakePhoto({width:2400,height:1600}),{
+    preferWorker:false,profile,runtime,
+    photoOptimization:{
+      bytesPerMegapixel:440*1024,maxZoomBytes:3*1024*1024,minZoomBytes:550*1024,
+      minQuality:0.66,minZoomLongEdge:1700,maxPasses:5
+    },
+    onProgress:e=>events.push(e)
+  });
+  assert.equal(result.manifest.zoom.levels[0].longEdge,2400);
+  assert.equal(result.manifest.zoom.levels[0].tiles[0].quality,0.86);
+  assert.equal(events.filter(e=>e.phase==='optimizing').length,1);
+});
+
+test('photo optimizer respects cancellation during its re-encode attempts', async () => {
+  const profileModule=await import('../image-compression-profile.js');
+  const profile=profileModule.default.getCompressionProfile();
+  profile.zoom.maximumLongEdge=3072;profile.zoom.intermediateLongEdge=3072;
+  profile.zoom.tileSize=1024;profile.zoom.quality=0.86;
+  const runtime=createFakeRuntime({width:5000,height:3000});
+  runtime.encode=async(c,type,quality)=>new Blob([new Uint8Array(Math.round(c.width*c.height*1.2))],{type});
+  const controller=new AbortController();
+  await assert.rejects(processor.processPhoto(fakePhoto(),{
+    preferWorker:false,runtime,profile,signal:controller.signal,
+    photoOptimization:{
+      bytesPerMegapixel:440*1024,maxZoomBytes:3*1024*1024,minZoomBytes:550*1024,
+      minQuality:0.66,minZoomLongEdge:1700,maxPasses:5
+    },
+    onProgress:e=>{if(e.phase==='optimizing')controller.abort()}
+  }),error=>error.name==='AbortError');
+});
+
+test('photo optimization settings reject invalid sizes and unbounded retries', async () => {
+  const runtime=createFakeRuntime();
+  await assert.rejects(processor.processPhoto(fakePhoto(),{
+    preferWorker:false,runtime,photoOptimization:{maxPasses:100}
+  }),/settings are invalid/);
+});

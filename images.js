@@ -45,9 +45,17 @@
   // Image uploads alone use one zoom resolution instead of storing both 2048
   // and 4096-pixel pyramids for each page.
   const IMAGE_UPLOAD_PRESETS = Object.freeze({
-    compact: Object.freeze({ longEdge: 2048, quality: 0.68, tileSize: 1024 }),
-    balanced: Object.freeze({ longEdge: 3072, quality: 0.76, tileSize: 1024 }),
-    detailed: Object.freeze({ longEdge: 4096, quality: 0.82, tileSize: 1024 })
+    // Photo-specific *upper bounds*. Encoding quality/actual dimensions are
+    // selected after checking the size of the generated images.
+    compact: Object.freeze({ longEdge: 2048, quality: 0.78, tileSize: 1024,
+      bytesPerMegapixel: 350 * 1024, maxZoomBytes: 1536 * 1024,
+      minZoomBytes: 320 * 1024, minQuality: 0.62, minZoomLongEdge: 1500 }),
+    balanced: Object.freeze({ longEdge: 3072, quality: 0.86, tileSize: 1024,
+      bytesPerMegapixel: 440 * 1024, maxZoomBytes: 3 * 1024 * 1024,
+      minZoomBytes: 550 * 1024, minQuality: 0.66, minZoomLongEdge: 1700 }),
+    detailed: Object.freeze({ longEdge: 4096, quality: 0.90, tileSize: 1024,
+      bytesPerMegapixel: 620 * 1024, maxZoomBytes: 6 * 1024 * 1024,
+      minZoomBytes: 800 * 1024, minQuality: 0.72, minZoomLongEdge: 2100 })
   });
   function createImageUploadProfile(mode, baseProfile = window.ImageCompressionProfile?.getCompressionProfile?.()) {
     const preset = IMAGE_UPLOAD_PRESETS[mode] || IMAGE_UPLOAD_PRESETS.balanced;
@@ -62,6 +70,18 @@
         intermediateLongEdge: preset.longEdge,
         maximumLongEdge: preset.longEdge
       }
+    };
+  }
+
+  function createPhotoOptimization(mode) {
+    const preset = IMAGE_UPLOAD_PRESETS[mode] || IMAGE_UPLOAD_PRESETS.balanced;
+    return {
+      bytesPerMegapixel: preset.bytesPerMegapixel,
+      maxZoomBytes: preset.maxZoomBytes,
+      minZoomBytes: preset.minZoomBytes,
+      minQuality: preset.minQuality,
+      minZoomLongEdge: preset.minZoomLongEdge,
+      maxPasses: 5
     };
   }
 
@@ -88,7 +108,11 @@
         const operation = detail.phase;
         if (operation === 'decode') return '画像ファイルを読み込んでいます' + fraction;
         if (operation === 'preview') return 'プレビュー画像を生成しました';
-        if (operation === 'tiles') return '拡大用の画像を作成中' + fraction;
+        if (operation === 'tiles') return '拡大用の写真を圧縮中' + fraction;
+        if (operation === 'optimizing') return '写真の容量を確認して画質を自動調整中' + fraction +
+          '（変換後 ' + displayBytes(detail.outputBytes) +
+          ' / 目安 ' + displayBytes(detail.targetBytes) +
+          '、長辺 ' + detail.longEdge + 'px）';
         if (operation === 'pyramid') return '解像度別画像を生成中' + fraction;
         if (operation === 'complete') return '画像加工は完了しました。暗号化・アップロードはこれからです。';
         if (operation === 'size') return '変換後のサイズを確認しました';
@@ -435,7 +459,9 @@
     const title = $('imageTitle').value.trim();
     if (!files.length || !title) return;
     // Snapshot selected quality; changing a field cannot alter a running import.
-    const profile = createImageUploadProfile($('imageQualityMode').value);
+    const mode = $('imageQualityMode').value;
+    const profile = createImageUploadProfile(mode);
+    const photoOptimization = createPhotoOptimization(mode);
     let processedTotalBytes = 0;
     let encryptedParts = 0;
     const controller = new AbortController();
@@ -451,7 +477,7 @@
       const secret = requireUnlock();
       const service = window.EncryptedAssetImport.create({
         processPhoto: (file, options) => window.ImagePhotoProcessor.processPhoto(file, {
-          ...options, profile, preferWorker: true, onProgress: options.onProgress
+          ...options, profile, photoOptimization, preferWorker: true, onProgress: options.onProgress
         }),
         stage: ({assetId,targetRevision,processed,signal,onProgress}) =>
           window.EncryptedAssetSync.stageProcessedRevision({
@@ -587,7 +613,7 @@
     void retryCleanup();
   }
 
-  window.EncryptedImages = Object.freeze({ isEncryptedItem, vpnFreeTransferStorage, createImageUploadProfile, createUploadProgressTracker, initialize });
+  window.EncryptedImages = Object.freeze({ isEncryptedItem, vpnFreeTransferStorage, createImageUploadProfile, createPhotoOptimization, createUploadProgressTracker, initialize });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',()=>{void initialize();},{once:true});
   else void initialize();
 })();

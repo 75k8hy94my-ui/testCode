@@ -125,12 +125,118 @@
     throw new Error('ブラウザーが指定された画像形式で書き出せませんでした: ' + requestedMimeType);
   }
 
+
+  function normalizePhotoOptimization(value) {
+    if (!value) return null;
+    const n = name => Number(value[name]);
+    const config = {
+      bytesPerMegapixel: n('bytesPerMegapixel'),
+      maxZoomBytes: n('maxZoomBytes'),
+      minZoomBytes: n('minZoomBytes'),
+      minQuality: n('minQuality'),
+      minZoomLongEdge: n('minZoomLongEdge'),
+      maxPasses: n('maxPasses')
+    };
+    if (!Number.isFinite(config.bytesPerMegapixel) || config.bytesPerMegapixel <= 0 ||
+        !Number.isSafeInteger(config.maxZoomBytes) || config.maxZoomBytes < 1 ||
+        !Number.isSafeInteger(config.minZoomBytes) || config.minZoomBytes < 1 ||
+        config.minZoomBytes > config.maxZoomBytes ||
+        !Number.isFinite(config.minQuality) || config.minQuality < 0.4 || config.minQuality > 1 ||
+        !Number.isSafeInteger(config.minZoomLongEdge) || config.minZoomLongEdge < 1 ||
+        !Number.isInteger(config.maxPasses) || config.maxPasses < 1 || config.maxPasses > 6) {
+      throw new TypeError('photo optimization settings are invalid');
+    }
+    return config;
+  }
+
+  async function encodeZoomLevel({ decoded, runtime, profile, plannedLevel, quality, mimeType, signal, onTile }) {
+    const grid = calculateTileGrid(plannedLevel.width, plannedLevel.height, profile.zoom.tileSize);
+    const levelCanvas = runtime.createCanvas(plannedLevel.width, plannedLevel.height);
+    const blobs = [];
+    const tileMetadata = [];
+    let totalBytes = 0;
+    let actualMimeType = mimeType;
+    try {
+      runtime.drawImage(decoded.source, levelCanvas, { width: plannedLevel.width, height: plannedLevel.height });
+      for (let y = 0; y < grid.rows; y += 1) {
+        for (let x = 0; x < grid.columns; x += 1) {
+          throwIfAborted(signal);
+          const rect = calculateTileRect(plannedLevel.width, plannedLevel.height, x, y, profile.zoom.tileSize);
+          const canvas = runtime.createCanvas(rect.width, rect.height);
+          try {
+            runtime.drawImage(levelCanvas, canvas, {
+              width: rect.width, height: rect.height, sourceX: rect.pixelX, sourceY: rect.pixelY,
+              sourceWidth: rect.width, sourceHeight: rect.height
+            });
+            const encoded = await encodeWithSupportedFormat(runtime, canvas, actualMimeType, quality, signal);
+            actualMimeType = encoded.mimeType;
+            blobs.push(encoded.blob);
+            totalBytes += encoded.blob.size;
+            tileMetadata.push({ x, y, ...rect, mimeType: encoded.mimeType, bytes: encoded.blob.size, quality });
+            onTile?.(blobs.length, grid.rows * grid.columns);
+          } finally {
+            runtime.releaseCanvas?.(canvas);
+          }
+        }
+      }
+    } finally {
+      runtime.releaseCanvas?.(levelCanvas);
+    }
+    return {
+      level: { ...plannedLevel, ...grid, tiles: tileMetadata },
+      blobs, totalBytes, mimeType: actualMimeType
+    };
+  }
+
+  async function optimizePhotoZoom({ decoded, runtime, profile, plannedLevel, mimeType, signal, onProgress, options }) {
+    const megapixels = plannedLevel.width * plannedLevel.height / 1000000;
+    // Limits scale with the *actual* photo dimensions, not with source file size.
+    const targetBytes = Math.min(options.maxZoomBytes,
+      Math.max(options.minZoomBytes, Math.round(megapixels * options.bytesPerMegapixel)));
+    const minEdge = Math.min(plannedLevel.longEdge,
+      Math.max(profile.preview.maxLongEdge + 1, options.minZoomLongEdge));
+    let quality = profile.zoom.quality;
+    if (quality < options.minQuality) throw new TypeError('minimum photo quality exceeds initial quality');
+    let edge = plannedLevel.longEdge;
+    let selected = null;
+    for (let attempt = 0; attempt < options.maxPasses; attempt += 1) {
+      throwIfAborted(signal);
+      const dims = calculateScaledDimensions(decoded.width, decoded.height, edge);
+      const level = { ...plannedLevel, ...dims, longEdge: dims.longEdge };
+      const encoded = await encodeZoomLevel({
+        decoded, runtime, profile, plannedLevel: level, quality, mimeType, signal,
+        onTile: (completed, total) => report(onProgress, 'tiles', completed, total)
+      });
+      const ratio = encoded.totalBytes / targetBytes;
+      onProgress?.({
+        phase: 'optimizing', completed: attempt + 1, total: options.maxPasses,
+        outputBytes: encoded.totalBytes, targetBytes, quality, longEdge: level.longEdge
+      });
+      // A later trial must not replace a smaller result with a larger one.
+      if (!selected || encoded.totalBytes < selected.totalBytes) selected = encoded;
+      if (encoded.totalBytes <= targetBytes) {
+        selected = encoded;
+        break;
+      }
+      if (attempt + 1 === options.maxPasses) break;
+      if (quality > options.minQuality + 0.005) {
+        const drop = Math.min(0.22, Math.max(0.06, Math.log2(Math.max(1, ratio)) * 0.10 + 0.04));
+        quality = Math.max(options.minQuality, Math.round((quality - drop) * 100) / 100);
+      } else if (edge > minEdge) {
+        const factor = Math.max(0.60, Math.min(0.90, Math.sqrt(1 / ratio) * 0.94));
+        edge = Math.max(minEdge, Math.min(edge - 1, Math.floor(edge * factor)));
+      } else break; // Quality and resolution floors are deliberate, not a hard size promise.
+    }
+    return selected;
+  }
+
   async function processPhotoOnMainThread(file, options = {}) {
     const profile = normalizeCompressionProfile(options.profile || getCompressionProfile());
     const signal = options.signal;
     const onProgress = options.onProgress;
     const runtime = options.runtime || createDefaultRuntime();
     const targetBytes = Number.isInteger(options.previewTargetBytes) ? options.previewTargetBytes : profile.preview.targetBytes;
+    const photoOptimization = normalizePhotoOptimization(options.photoOptimization);
     let decoded;
     const tileBlobs = [];
     const levels = [];
@@ -174,46 +280,31 @@
         ? 'image/jpeg' : profile.zoom.mimeType;
       const plannedLevels = planZoomLevels(decoded.width, decoded.height, profile);
       report(onProgress, 'pyramid', 0, plannedLevels.length);
-      const totalTiles = plannedLevels.reduce((sum, level) => sum + calculateTileGrid(level.width, level.height, profile.zoom.tileSize).columns * calculateTileGrid(level.width, level.height, profile.zoom.tileSize).rows, 0);
-      let completedTiles = 0;
-      for (const plannedLevel of plannedLevels) {
-        throwIfAborted(signal);
-        const grid = calculateTileGrid(plannedLevel.width, plannedLevel.height, profile.zoom.tileSize);
-        const levelCanvas = runtime.createCanvas(plannedLevel.width, plannedLevel.height);
-        const tileMetadata = [];
-        try {
-          runtime.drawImage(decoded.source, levelCanvas, { width: plannedLevel.width, height: plannedLevel.height });
-          for (let y = 0; y < grid.rows; y += 1) {
-            for (let x = 0; x < grid.columns; x += 1) {
-              throwIfAborted(signal);
-              const rect = calculateTileRect(plannedLevel.width, plannedLevel.height, x, y, profile.zoom.tileSize);
-              const tileCanvas = runtime.createCanvas(rect.width, rect.height);
-              try {
-                runtime.drawImage(levelCanvas, tileCanvas, {
-                  width: rect.width,
-                  height: rect.height,
-                  sourceX: rect.pixelX,
-                  sourceY: rect.pixelY,
-                  sourceWidth: rect.width,
-                  sourceHeight: rect.height
-                });
-                const encoded = await encodeWithSupportedFormat(runtime, tileCanvas, zoomMimeType, profile.zoom.quality, signal);
-                zoomMimeType = encoded.mimeType;
-                const blob = encoded.blob;
-                tileBlobs.push(blob);
-                tileMetadata.push({ x, y, ...rect, mimeType: encoded.mimeType, bytes: blob.size, quality: profile.zoom.quality });
-                completedTiles += 1;
-                report(onProgress, 'tiles', completedTiles, totalTiles);
-              } finally {
-                runtime.releaseCanvas?.(tileCanvas);
-              }
-            }
-          }
-        } finally {
-          runtime.releaseCanvas?.(levelCanvas);
+      if (photoOptimization && plannedLevels.length === 1) {
+        const selected = await optimizePhotoZoom({
+          decoded, runtime, profile, plannedLevel: plannedLevels[0],
+          mimeType: zoomMimeType, signal, onProgress, options: photoOptimization
+        });
+        tileBlobs.push(...selected.blobs);
+        levels.push(selected.level);
+        report(onProgress, 'pyramid', 1, 1);
+      } else {
+        const totalTiles = plannedLevels.reduce((sum, level) => sum +
+          calculateTileGrid(level.width, level.height, profile.zoom.tileSize).columns *
+          calculateTileGrid(level.width, level.height, profile.zoom.tileSize).rows, 0);
+        let completedTiles = 0;
+        for (const plannedLevel of plannedLevels) {
+          throwIfAborted(signal);
+          const encoded = await encodeZoomLevel({
+            decoded, runtime, profile, plannedLevel, mimeType: zoomMimeType,
+            quality: profile.zoom.quality, signal,
+            onTile: () => report(onProgress, 'tiles', ++completedTiles, totalTiles)
+          });
+          zoomMimeType = encoded.mimeType;
+          tileBlobs.push(...encoded.blobs);
+          levels.push(encoded.level);
+          report(onProgress, 'pyramid', levels.length, plannedLevels.length);
         }
-        levels.push({ ...plannedLevel, ...grid, tiles: tileMetadata });
-        report(onProgress, 'pyramid', levels.length, plannedLevels.length);
       }
 
       const manifest = buildManifestMetadata({ source, preview: { width: preview.width, height: preview.height, mimeType: preview.mimeType, bytes: preview.bytes, quality: preview.quality, longEdge: preview.longEdge }, levels }, profile);
@@ -230,7 +321,7 @@
     if (typeof WorkerObject !== 'function') return null;
     const documentObject = getGlobal('document');
     const base = documentObject?.baseURI || getGlobal('location')?.href || '';
-    const workerUrl = new URL('image-processing-worker.js?v=20261008-native-zoom', base || undefined);
+    const workerUrl = new URL('image-processing-worker.js?v=20261008-adaptive-photo', base || undefined);
     return () => new WorkerObject(workerUrl, { type: 'classic' });
   }
 
@@ -286,7 +377,7 @@
         }
         signal?.addEventListener?.('abort', onAbort, { once: true });
         throwIfAborted(signal);
-        worker.postMessage({ type: 'process', file, profile: options.profile || getCompressionProfile() });
+        worker.postMessage({ type: 'process', file, profile: options.profile || getCompressionProfile(), photoOptimization: options.photoOptimization });
       } catch (error) {
         if (error.name === 'AbortError') finish(reject, error);
         else {

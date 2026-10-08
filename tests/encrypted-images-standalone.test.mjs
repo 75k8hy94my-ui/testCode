@@ -148,7 +148,7 @@ test('gallery quality profiles use one zoom level and cap file count without alt
   assert.equal(oldLevels.length, 2, 'baseline format stored two overlapping zoom resolutions');
 
   for (const [mode, maxEdge, quality] of [
-    ['compact',2048,0.68],['balanced',3072,0.76],['detailed',4096,0.82]
+    ['compact',2048,0.78],['balanced',3072,0.86],['detailed',4096,0.90]
   ]) {
     const next = api.createImageUploadProfile(mode, original);
     const validated = profileApi.default.normalizeCompressionProfile(next);
@@ -176,4 +176,28 @@ test('image upload page exposes a quality choice and a real encoded size before 
   assert.match(js,/processPhoto\(file, \{/);
   assert.match(js,/onProgress: options\.onProgress/);
   assert.match(js,/processedTotalBytes \+= size\.outputBytes/);
+});
+
+
+test('photo-only modes provide content-dependent size limits and bounded quality protection', () => {
+  const {api}=loadImagesModule();
+  const caps={
+    compact:{max:1536*1024,minQ:0.62,mp:350*1024},
+    balanced:{max:3*1024*1024,minQ:0.66,mp:440*1024},
+    detailed:{max:6*1024*1024,minQ:0.72,mp:620*1024}
+  };
+  for(const [mode,expected] of Object.entries(caps)) {
+    const strategy=api.createPhotoOptimization(mode);
+    assert.equal(strategy.maxZoomBytes,expected.max);
+    assert.equal(strategy.bytesPerMegapixel,expected.mp);
+    assert.equal(strategy.minQuality,expected.minQ);
+    assert.ok(strategy.maxPasses>=3 && strategy.maxPasses<=6);
+    assert.ok(strategy.minZoomLongEdge>1440);
+    assert.ok(api.createImageUploadProfile(mode,{zoom:{quality:0.7},preview:{maxLongEdge:1440}}).zoom.quality>=strategy.minQuality);
+  }
+  assert.equal(api.createPhotoOptimization('unknown').maxZoomBytes,caps.balanced.max);
+  const html=read('images.html');
+  assert.match(html,/写真専用です/);
+  assert.doesNotMatch(html,/細かい文字を読む画像/);
+  assert.match(read('images.js'),/profile, photoOptimization, preferWorker: true/);
 });
