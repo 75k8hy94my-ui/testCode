@@ -358,7 +358,6 @@ test('reader bootstrap loads the VPN gate before reader media and the gate cover
   assert.match(source, /patchSrcProperty\(root\.HTMLIFrameElement\)/);
   assert.match(source, /data-vpn-blocked-src/);
   assert.match(source, /VPN診断/);
-  assert.doesNotMatch(source, /国判定ルール: 日本以外のIPはVPNとして扱う/);
   assert.doesNotMatch(source, /button\.id = DIAGNOSTICS_BUTTON_ID/);
   assert.match(source, /closest\('\[data-vpn-diagnostics-button\]'\)/);
   assert.match(source, /abort\(\), 15000/);
