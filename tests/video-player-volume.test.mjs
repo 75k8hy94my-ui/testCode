@@ -79,9 +79,21 @@ test('player exposes an accessible volume slider and mute control', () => {
   assert.equal(slider.getAttribute('aria-label'), '音量');
   assert.equal(slider.value, '80');
   assert.equal(mute.getAttribute('aria-label'), 'ミュート');
+  const icon = mute.children.find((node) => node.className === 'customVideoMuteIcon');
+  assert.ok(icon, 'image icon must replace the emoji');
+  assert.equal(icon.getAttribute('src'), 'assets/volume-on.png');
+  assert.equal(icon.getAttribute('aria-hidden'), 'true');
+  assert.doesNotMatch(source, /🔊|🔇/);
+  assert.match(css, /\.customVideoMuteIcon\{/);
+  for (const file of ['volume-on.png', 'volume-muted.png']) {
+    const bytes = fs.readFileSync(new URL('../assets/' + file, import.meta.url));
+    assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', file + ' must be a PNG image');
+    assert.equal(bytes.readUInt32BE(16), 48);
+    assert.equal(bytes.readUInt32BE(20), 48);
+  }
   assert.match(css, /customVideoVolumeGroup/);
   assert.match(css, /max-width:620px/);
-  assert.match(html, /video-player-controls\.js\?v=20261009-volume-controls/);
+  assert.match(html, /video-player-controls\.js\?v=20261009-generated-volume-icons/);
 });
 
 test('slider sets volume; mute restores prior audible level; outside volumechange updates UI', () => {
@@ -95,10 +107,12 @@ test('slider sets volume; mute restores prior audible level; outside volumechang
   assert.equal(video.muted, true);
   assert.equal(slider.value, '0');
   assert.equal(mute.getAttribute('aria-pressed'), 'true');
+  assert.equal(mute.children[0].getAttribute('src'), 'assets/volume-muted.png');
   mute.emit('click');
   assert.equal(video.muted, false);
   assert.equal(video.volume, 0.35);
   assert.equal(slider.value, '35');
+  assert.equal(mute.children[0].getAttribute('src'), 'assets/volume-on.png');
   slider.value = '0';
   slider.emit('input');
   assert.equal(video.volume, 0);
