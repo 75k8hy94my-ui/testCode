@@ -123,9 +123,11 @@
         if (requireSuccess) throw new Error('VPN接続を確認できません。');
         return false;
       }
-      // A strict flush must not return while an older snapshot is being saved.
-      if (cloudSyncPromise) await cloudSyncPromise.catch(() => {});
+      // Serialize saves. A strict flush always saves a fresh snapshot after
+      // any previously queued save has completed, even if that save failed.
+      const previous = cloudSyncPromise;
       const pending = (async () => {
+        if (previous) await previous.catch(() => {});
         const payload = buildSyncPayload();
         if (!payload || !canReadProtectedData()) throw new Error('同期データにアクセスできません。');
         await deps.sync.savePayload(payload);
