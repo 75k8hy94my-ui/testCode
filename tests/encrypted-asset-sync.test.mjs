@@ -337,12 +337,12 @@ test('bounded concurrent uploads finish faster without publishing metadata befor
 test('one upload failure waits for other requests and never creates metadata', async () => {
   const cache=makeCache();
   const staged=await sync.stageProcessedRevision({cache,masterKey:key,assetId,targetRevision:1,processed:makeProcessed()});
-  let active=0, resolveOther, metadataCalls=0, issued=0;
+  let active=0, metadataCalls=0, issued=0; const resolveOthers=[];
   const storage={
     async upload() {
       issued += 1; active += 1;
       if(issued===1) { active -= 1; throw new Error('simulated upload failure'); }
-      await new Promise(resolve=>{resolveOther=resolve});
+      await new Promise(resolve=>{resolveOthers.push(resolve)});
       active -= 1;
       return {created:true,exists:false};
     }
@@ -352,10 +352,10 @@ test('one upload failure waits for other requests and never creates metadata', a
     async api(path){if(path.includes('/rpc/'))metadataCalls++;return []}
   };
   const task=sync.publishPendingRevision({vault,storage,cache,assetId,targetRevision:1,objectIds:staged.objectIds});
-  for(let i=0;i<30 && !resolveOther;i++) await new Promise(resolve=>setTimeout(resolve,1));
-  assert.ok(resolveOther,'one in-flight request should still exist when a sibling fails');
+  for(let i=0;i<30 && !resolveOthers.length;i++) await new Promise(resolve=>setTimeout(resolve,1));
+  assert.ok(resolveOthers.length,'one in-flight request should still exist when a sibling fails');
   assert.equal(metadataCalls,0);
-  resolveOther();
+  for(const release of resolveOthers) release();
   await assert.rejects(task,/simulated upload failure/);
   assert.equal(active,0);
   assert.equal(metadataCalls,0);
