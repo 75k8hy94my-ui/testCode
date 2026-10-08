@@ -67,3 +67,146 @@ test('encrypted works use their encrypted-cover route rather than URL guessing',
   assert.match(route, /!item\.encryptedAssets\?\.pages\?\.length/);
   assert.doesNotMatch(route, /activeEncryptedImport\.abort\(\)/);
 });
+
+
+function createSlidingShelfHarness({ mobile = true, reducedMotion = false } = {}) {
+  const animations = [];
+  const makeNode = (tag = 'div') => {
+    const node = {
+      tag, children: [], parentElement: null, className: '', textContent: '', style: {},
+      classList: { add() {}, toggle() {} },
+      appendChild(child) {
+        if (child.parentElement) child.parentElement.removeChild(child);
+        this.children.push(child); child.parentElement = this;
+        return child;
+      },
+      append(...children) { for (const child of children) this.appendChild(child); },
+      removeChild(child) {
+        const index = this.children.indexOf(child);
+        if (index >= 0) this.children.splice(index, 1);
+        child.parentElement = null;
+        return child;
+      },
+      replaceChildren(...children) {
+        for (const child of this.children) child.parentElement = null;
+        this.children = [];
+        for (const child of children) this.appendChild(child);
+      },
+      contains(child) { return child === this || this.children.some((c) => c.contains(child)); },
+      animate(frames, options) {
+        let resolve;
+        const finished = new Promise((r) => { resolve = r; });
+        const animation = { frames, options, finished, cancel() { this.cancelled = true; }, complete: resolve };
+        animations.push(animation);
+        return animation;
+      }
+    };
+    Object.defineProperty(node, 'innerHTML', { set(value) { if (value === '') this.replaceChildren(); } });
+    return node;
+  };
+  const root = makeNode();
+  const pagination = makeNode();
+  const button = () => ({ style: {}, classList: { toggle() {} }, textContent: '', disabled: false });
+  const elements = {
+    savedListItems: root, bookshelfPagination: pagination, savedListEmpty: button(),
+    bookshelfPrevBtn: button(), bookshelfNextBtn: button(), bookshelfPageLabel: button(),
+    listBackBtn: button(), listNewFolderBtn: button(), editShelfBtn: button(),
+    listNewFolderRow: button(), listFolderTitle: button(), bulkEditBtn: button(),
+    smartListRow: button(), historyListBtn: button(), unreadListBtn: button(), groupAuthorBtn: button()
+  };
+  const state = {
+    currentFolderView: null, currentAuthorView: null, currentSeriesView: null,
+    savedItems: [], savedFolders: [], shelfSearchQuery: '', shelfFilters: {},
+    shelfSort: 'added-desc', bookshelfPage: 1
+  };
+  const doc = {
+    createElement: makeNode,
+    defaultView: { matchMedia(q) { return { matches: q.includes('max-width') ? mobile : reducedMotion }; } }
+  };
+  const ctx = new Proxy({
+    getDocument: () => doc, getState: () => state,
+    setState: (patch) => Object.assign(state, patch), getElements: () => elements,
+    getConfig: () => ({
+      SERIES_FOLDER_ID: 'series', FAVORITES_FOLDER_ID: 'favorites',
+      UNREAD_FOLDER_ID: 'unread', SYNCED_FOLDER_ID: 'synced', HISTORY_FOLDER_ID: 'history'
+    }),
+    getSavedVideos: () => [], shelfVisibleItems: () => [], unreadOrderItems: () => [],
+    renderDashboard() {}, renderAuthorDashboard() {}, updateBulkEditButton() {},
+    deriveViewModel: () => ({
+      itemsList: [], folderCards: [], totalPages: 2, normalizedPage: state.bookshelfPage,
+      totalEntries: 1, visibleEntries: [{ type: 'item', item: { id: 'page-' + state.bookshelfPage } }]
+    }),
+    renderCards({ elements: e, items }) {
+      for (const entry of items) {
+        const card = makeNode();
+        card.textContent = entry.item.id;
+        e.savedListItems.appendChild(card);
+      }
+      e.bookshelfPrevBtn.disabled = state.bookshelfPage === 1;
+      e.bookshelfNextBtn.disabled = state.bookshelfPage === 2;
+    }
+  }, { get(target, property) { return target[property] || (() => {}); } });
+  const vmContext = { self: {} };
+  vm.runInNewContext(read('manga-list-runtime.js'), vmContext);
+  return { runtime: vmContext.self.MangaListRuntimeFactory.create(ctx), state, elements, animations };
+}
+
+test('mobile shelf moves both real page grids together and releases the old page', async () => {
+  const { runtime, state, elements, animations } = createSlidingShelfHarness();
+  runtime.renderSavedList();
+  const firstFrame = elements.savedListItems.children[0];
+  const firstPage = firstFrame.children[0];
+  assert.equal(firstPage.children[0].textContent, 'page-1');
+  assert.equal(animations.length, 0, 'initial render does not animate');
+
+  state.bookshelfPage = 2;
+  runtime.renderSavedList(1);
+  const secondFrame = elements.savedListItems.children[0];
+  const track = secondFrame.children[0];
+  assert.equal(track.className, 'bookshelf-slide-track');
+  assert.strictEqual(track.children[0], firstPage);
+  assert.equal(track.children[1].children[0].textContent, 'page-2');
+  assert.deepEqual(Array.from(animations[0].frames, x => x.transform), ['translateX(0%)', 'translateX(-50%)']);
+  assert.equal(animations[0].options.duration, 300);
+  assert.strictEqual(elements.savedListItems.children[1], elements.bookshelfPagination);
+  animations[0].complete();
+  await animations[0].finished;
+  await Promise.resolve();
+  assert.equal(secondFrame.children.length, 1);
+  assert.equal(secondFrame.children[0].className, 'bookshelf-page');
+  assert.equal(secondFrame.children[0].children[0].textContent, 'page-2');
+
+  state.bookshelfPage = 1;
+  runtime.renderSavedList(-1);
+  const backwardTrack = elements.savedListItems.children[0].children[0];
+  assert.equal(backwardTrack.children[0].children[0].textContent, 'page-1');
+  assert.equal(backwardTrack.children[1].children[0].textContent, 'page-2');
+  assert.deepEqual(Array.from(animations[1].frames, x => x.transform), ['translateX(-50%)', 'translateX(0%)']);
+});
+
+test('non-page rerender, desktop and reduced motion avoid shelf animation', () => {
+  const harness = createSlidingShelfHarness();
+  harness.runtime.renderSavedList();
+  harness.runtime.renderSavedList();
+  assert.equal(harness.animations.length, 0);
+  for (const settings of [{ mobile: false }, { reducedMotion: true }]) {
+    const h = createSlidingShelfHarness(settings);
+    h.runtime.renderSavedList();
+    h.state.bookshelfPage = 2;
+    h.runtime.renderSavedList(1);
+    assert.equal(h.animations.length, 0);
+    assert.equal(h.elements.savedListItems.children[0].children[0].className, 'bookshelf-page');
+  }
+});
+
+test('sliding pages are clipped, preserve mobile grid density, and do not change Reader', () => {
+  const css = read('manga-list.css');
+  const route = read('manga-list-route.js');
+  assert.match(css, /\.bookshelf-page-frame\s*\{[^}]*overflow:\s*hidden/);
+  assert.match(css, /\.bookshelf-slide-track\s*\{[^}]*width:\s*200%/);
+  assert.match(css, /\.bookshelf-slide-track > \.bookshelf-page\s*\{[^}]*flex:\s*0 0 50%/);
+  assert.match(css, /#mangaListSection \.bookshelf-page\s*\{[^}]*grid-template-columns:\s*repeat\(3,/);
+  assert.match(route, /runtime\.renderSavedList\(delta\)/);
+  assert.match(route, /manga-list-runtime\.js\?v=20261009-slide-transition/);
+  assert.doesNotMatch(read('reader.html'), /bookshelf-slide-track|bookshelf-page-frame/);
+});

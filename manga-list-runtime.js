@@ -23,6 +23,46 @@
       }
     }
 
+    let activePage = null;
+    let activeAnimation = null;
+
+    function slideBetweenPages(doc, frame, outgoing, incoming, direction) {
+      const view = doc.defaultView;
+      if (!outgoing || !direction || typeof view?.matchMedia !== 'function' ||
+        !view.matchMedia('(max-width: 899px)').matches ||
+        view.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+      const track = doc.createElement('div');
+      track.className = 'bookshelf-slide-track';
+      if (direction > 0) track.append(outgoing, incoming);
+      else track.append(incoming, outgoing);
+      frame.replaceChildren(track);
+
+      // Both panels stay in the track until the slide finishes, so covers
+      // actually travel sideways instead of disappearing and reappearing.
+      if (typeof track.animate !== 'function') {
+        frame.replaceChildren(incoming);
+        return;
+      }
+      const start = direction > 0 ? 'translateX(0%)' : 'translateX(-50%)';
+      const end = direction > 0 ? 'translateX(-50%)' : 'translateX(0%)';
+      const animation = track.animate([{ transform: start }, { transform: end }], {
+        duration: 300,
+        easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+        fill: 'forwards'
+      });
+      activeAnimation = animation;
+      const finish = () => {
+        if (activeAnimation !== animation) return;
+        activeAnimation = null;
+        // Restore a single page as soon as the transition ends. Avoid
+        // keeping off-screen cards and their thumbnails mounted indefinitely.
+        frame.replaceChildren(incoming);
+        animation.cancel();
+      };
+      animation.finished.then(finish, finish);
+    }
+
     function handleMangaCardOpen(item, list) {
       return context.openReader(item, list);
     }
@@ -205,7 +245,7 @@
       return card;
     }
 
-    function renderSavedList() {
+    function renderSavedList(direction = 0) {
       const doc = context.getDocument();
       const elements = context.getElements();
       const state = context.getState();
@@ -242,8 +282,23 @@
         elements.listFolderTitle.textContent = folder ? folder.name : '';
       } else elements.listFolderTitle.textContent = '';
 
+      // Preserve the currently displayed DOM page only for a user-triggered
+      // page turn; ordinary rerenders (search, folders, edits) stay immediate.
+      const outgoingPage = direction && activePage && elements.savedListItems.contains(activePage)
+        ? activePage : null;
+      if (activeAnimation) {
+        activeAnimation.cancel();
+        activeAnimation = null;
+      }
       elements.savedListItems.innerHTML = '';
       elements.savedListItems.classList.add('bookshelf');
+      const frame = doc.createElement('div');
+      frame.className = 'bookshelf-page-frame';
+      const incomingPage = doc.createElement('div');
+      incomingPage.className = 'bookshelf-page';
+      frame.appendChild(incomingPage);
+      elements.savedListItems.appendChild(frame);
+      activePage = incomingPage;
 
       const viewModel = context.deriveViewModel({
         items: context.shelfVisibleItems(),
@@ -288,7 +343,7 @@
       // series or pinned folders independently of the page model.
       context.renderCards({
         elements: {
-          savedListItems: elements.savedListItems,
+          savedListItems: incomingPage,
           savedListEmpty: elements.savedListEmpty,
           bookshelfPagination: elements.bookshelfPagination,
           bookshelfPrevBtn: elements.bookshelfPrevBtn,
@@ -313,6 +368,7 @@
       });
       // Pager belongs after the current page in both DOM and visual order.
       elements.savedListItems.appendChild(elements.bookshelfPagination);
+      slideBetweenPages(doc, frame, outgoingPage, incomingPage, direction);
 
       elements.smartListRow.style.display = atRoot ? 'flex' : 'none';
       if (atRoot) {
