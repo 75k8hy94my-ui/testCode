@@ -1,7 +1,7 @@
 (function (root) {
   'use strict';
 
-  const STYLESHEET_URL = 'manga-list.css?v=20261009-shelf-pagination';
+  const STYLESHEET_URL = 'manga-list.css?v=20261009-slide-transition';
   const SCRIPT_URLS = [
     ['manga-list-template.js?v=20260922-vpn-tools', 'mangaRouteTemplate'],
     ['manga-import-validator.js?v=20261007-momon-import', 'mangaImportValidator'],
@@ -47,7 +47,7 @@
     ['manga-list-image-cache.js?v=20260922-image-cache', 'mangaRouteImageCache'],
     ['reader-target.js?v=20261003-reader-launch-contract', 'mangaReaderTarget'],
     ['manga-list-host-runtime.js?v=20261009-cover-retry', 'mangaRouteHost'],
-    ['manga-list-runtime.js?v=20261009-shelf-pagination', 'mangaRouteRuntime'],
+    ['manga-list-runtime.js?v=20261009-slide-transition', 'mangaRouteRuntime'],
     ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
   ];
 
@@ -602,9 +602,11 @@
         }, { historyButton: history, unreadButton: unread });
         bindFactory(MangaListPaginationEventsFactory, {
           onPageChange: (delta) => {
+            if ((delta < 0 && prev.disabled) || (delta > 0 && next.disabled)) return;
             const previousPage = state().bookshelfPage;
             setState({ bookshelfPage: previousPage + delta });
-            renderList();
+            // Only pagination animates; ordinary list updates remain instant.
+            runtime.renderSavedList(delta);
             if (state().bookshelfPage !== previousPage) {
               const target = rootElement.querySelector('#listToolbar') || elements.savedListItems;
               if (typeof target?.scrollIntoView === 'function') target.scrollIntoView({ block: 'start', behavior: 'auto' });
