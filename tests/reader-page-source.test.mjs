@@ -47,3 +47,43 @@ test('legacy discovery is isolated and stores a versioned manifest once', async 
   assert.deepEqual(second.urls, first.urls);
   assert.deepEqual(calls, []);
 });
+
+
+test('empty cached manifest falls back to saved pages and repairs that cache', async () => {
+  const pages = ['https://img.test/book/1.webp', 'https://img.test/book/2.webp'];
+  const source = create({ legacyResolver: { async resolve() { throw new Error('must not probe'); } } });
+  const result = await source.resolve({ id: 'work', url: pages[0], pages, pageManifest: { version: 1, pages: [] } });
+  assert.deepEqual(result.urls, pages);
+  assert.equal(result.migrated, true);
+  assert.deepEqual(result.item.pageManifest.pages, pages);
+  assert.equal(result.item.pageManifest.version, 1);
+});
+
+test('a valid manifest remains authoritative over the legacy pages field', async () => {
+  const source = create();
+  const result = await source.resolve({
+    id: 'work',
+    pages: ['https://img.test/old.jpg'],
+    pageManifest: { version: 1, pages: ['https://img.test/new.webp'] }
+  });
+  assert.deepEqual(result.urls, ['https://img.test/new.webp']);
+  assert.equal(result.migrated, false);
+});
+
+test('legacy discovery tries an exact first image with its query before speculative file extensions', async () => {
+  const tried = [];
+  const url = 'https://img.test/book/chapter-001.webp?access=example';
+  const resolver = createLegacyResolver({
+    extensions: ['jpg', 'jpeg', 'png', 'webp'],
+    probe: async (candidate) => {
+      tried.push(candidate);
+      return candidate === url || candidate === 'https://img.test/book/chapter-002.webp?access=example';
+    },
+  });
+  const source = create({ legacyResolver: resolver });
+  const result = await source.resolve({ id: 'work', url });
+  assert.equal(tried[0], url);
+  assert.deepEqual(result.urls, [url, 'https://img.test/book/chapter-002.webp?access=example']);
+  assert.equal(result.manifest.version, 1);
+  assert.equal(tried.includes('https://img.test/book/chapter-002.jpg?access=example'), false);
+});
