@@ -82,7 +82,7 @@
   };
   full.addEventListener('click', toggleFullscreen);
   markerToggle.addEventListener('click', () => { markerPanel.hidden = !markerPanel.hidden; if (!markerPanel.hidden) secondsInput.value = (Number(video.currentTime) || 0).toFixed(1); renderMarkers(); }); add.addEventListener('click', () => { const seconds = Number(secondsInput.value); const label = labelInput.value.trim() || '現在位置'; if (!Number.isFinite(seconds) || seconds < 0) return; markers.push({ seconds, label }); save(markers); secondsInput.value = ''; labelInput.value = ''; renderMarkers(); window.dispatchEvent(new CustomEvent('manga-video-markers-changed')); });
-  let hideTimer; const showControls = () => { frame.classList.add('controlsVisible'); clearTimeout(hideTimer); hideTimer = setTimeout(() => { if (!video.paused && markerPanel.hidden) frame.classList.remove('controlsVisible'); }, 2500); };
+  let hideTimer; const showControls = () => { frame.classList.add('controlsVisible'); clearTimeout(hideTimer); hideTimer = setTimeout(() => { if (!video.paused && markerPanel.hidden && !controls.contains(document.activeElement)) frame.classList.remove('controlsVisible'); }, 2500); };
   const gestureController = Gestures && Gestures.create({
     onSingleTap: () => { video.paused ? video.play() : video.pause(); },
     onDoubleTap: (event) => {
@@ -93,7 +93,7 @@
     },
   });
   video.addEventListener('click', (event) => { showControls(); if (gestureController) gestureController.tap(event); });
-  frame.addEventListener('mousemove', showControls); frame.addEventListener('touchstart', showControls, { passive: true });
+  frame.addEventListener('mousemove', showControls); frame.addEventListener('touchstart', showControls, { passive: true }); controls.addEventListener('focusin', showControls); controls.addEventListener('focusout', showControls);
   renderMarkers(); update();
   disposeCurrent = () => { clearTimeout(hideTimer); if (gestureController) gestureController.destroy(); try { video.pause(); } catch (_) {} controls.remove(); markerPanel.remove(); notice.remove(); delete video.dataset.customControlsReady; };
   }
