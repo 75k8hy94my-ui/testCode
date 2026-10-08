@@ -27,6 +27,9 @@
     button.primary:hover { background: linear-gradient(145deg, rgba(29,78,216,.98), rgba(37,99,235,.78)); }
     #loginForm button[type="submit"]:disabled { opacity:.55; cursor:wait; }
     #forgotRow { margin:14px 0 0; text-align:center; }
+    #guestLoginButton { width:100%;min-height:46px;border:1px solid #cbd5e1;border-radius:5px;cursor:pointer;font:inherit;font-weight:600;color:#24344c;background:#eff5ff; }
+    #guestLoginButton:hover { background:#e0efff; }
+    .guest-hint { margin:-6px 0 0;color:var(--sub);font-size:12px;text-align:center;line-height:1.5; }
     .link-button { appearance:none; border:0; background:transparent; color:#2563eb; padding:4px 6px; font:inherit; font-size:14px; cursor:pointer; }
     .link-button:hover { text-decoration:underline; text-underline-offset:3px; }
     .status { position:absolute; left:50%; top:calc(44% + 145px); transform:translateX(-50%); width:min(62vw,720px); min-height:1.5em; color:var(--sub); line-height:1.5; font-size:13px; text-align:center; margin:0; z-index:1; pointer-events:none; }
@@ -65,6 +68,8 @@
         <input id="loginEmail" type="email" autocomplete="email" placeholder="メールアドレス" required autofocus>
         <input id="loginPassword" type="password" autocomplete="current-password" placeholder="パスワード" required>
         <button class="primary" type="submit">ログイン</button>
+        <button id="guestLoginButton" type="button">ログインせずに使う</button>
+        <p class="guest-hint">デバッグ用・この端末のゲストデータのみ。VPN確認・クラウド同期なし。</p>
         <p id="forgotRow"><button id="showReset" class="link-button" type="button">ログインパスワードを忘れた</button></p>
       </form>
     </div>
@@ -93,7 +98,8 @@
     <p id="status" class="status" aria-live="polite"></p>
   </main>
 
-  <script src="supabase-config.js"></script>
+  <script src="guest-mode.js?v=20261009-guest"></script>
+<script src="supabase-config.js"></script>
   <script src="vault-session.js?v=20261006-passkey-reset"></script>
   <script>
   (() => {
@@ -101,7 +107,7 @@
     const SESSION_KEY = 'mangaReaderSupabaseSession';
     const config = window.MANGA_READER_SUPABASE || {};
     const $ = (id) => document.getElementById(id);
-    const ui = { loginView:$('loginView'), resetView:$('resetView'), completeResetView:$('completeResetView'), loginForm:$('loginForm'), loginEmail:$('loginEmail'), loginPassword:$('loginPassword'), resetForm:$('resetForm'), resetEmail:$('resetEmail'), completeResetForm:$('completeResetForm'), newPassword:$('newPassword'), showReset:$('showReset'), resetBack:$('resetBack'), status:$('status') };
+    const ui = { loginView:$('loginView'), resetView:$('resetView'), completeResetView:$('completeResetView'), loginForm:$('loginForm'), loginEmail:$('loginEmail'), loginPassword:$('loginPassword'), resetForm:$('resetForm'), resetEmail:$('resetEmail'), completeResetForm:$('completeResetForm'), newPassword:$('newPassword'), showReset:$('showReset'), resetBack:$('resetBack'), guestButton:$('guestLoginButton'), status:$('status') };
     function setStatus(text) { ui.status.textContent = text || ''; }
     function loadSession() { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (_) { return null; } }
     function saveSession(session) { if (session) localStorage.setItem(SESSION_KEY,JSON.stringify(session)); else localStorage.removeItem(SESSION_KEY); }
@@ -115,6 +121,7 @@
     async function resetPassword(event) { event.preventDefault(); const email=ui.resetEmail.value.trim(); if(!email)return; const button=ui.resetForm.querySelector('button[type="submit"]'); button.disabled=true; try { await api('/auth/v1/recover',{method:'POST',body:JSON.stringify({email,redirect_to:location.origin+location.pathname})}); showLogin('パスワード再設定メールを送信しました。ログインパスワードを変更しても、保管庫パスフレーズや復旧キーは変更されません。'); } catch(error) { setStatus(error.message||'再設定メールを送信できませんでした。'); } finally { button.disabled=false; } }
     async function completeReset(event) { event.preventDefault(); const hash=new URLSearchParams(location.hash.replace(/^#/,'').replace(/;/g,'&')); const token=hash.get('access_token'); const password=ui.newPassword.value; if(!token||password.length<8){setStatus('8文字以上の新しいパスワードを入力してください。');return;} const button=ui.completeResetForm.querySelector('button[type="submit"]');button.disabled=true;try{await api('/auth/v1/user',{method:'PUT',token,body:JSON.stringify({password})});history.replaceState(null,'',location.pathname);showLogin('ログインパスワードを更新しました。保管庫パスフレーズは別途必要です。');}catch(error){setStatus(error.message||'パスワードを更新できませんでした。');}finally{button.disabled=false;}}
     function showCompleteReset(){ui.loginView.hidden=true;ui.resetView.hidden=true;ui.completeResetView.hidden=false;ui.newPassword.focus();setStatus('');}
+    ui.guestButton.addEventListener('click', () => window.TestCodeGuest.begin());
     ui.showReset.addEventListener('click',showReset); ui.resetBack.addEventListener('click',() => showLogin('')); ui.loginForm.addEventListener('submit',login); ui.resetForm.addEventListener('submit',resetPassword); ui.completeResetForm.addEventListener('submit',completeReset); if(new URLSearchParams(location.hash.replace(/^#/,'')).get('type')==='recovery') showCompleteReset(); else refreshSavedSession();
   })();
   </script>
