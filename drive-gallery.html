@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" class="auth-pending">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -8,6 +8,7 @@
 <title>Google Drive画像 | testCode</title>
 <link rel="icon" href="icon-152.png" type="image/png">
 <link rel="stylesheet" href="drive-gallery.css">
+<style>html.auth-pending body{visibility:hidden}</style>
 </head>
 <body>
 <main class="drivePage">
@@ -23,10 +24,11 @@
       <input id="driveApiKey" name="apiKey" type="password" placeholder="AIza..." required spellcheck="false" autocomplete="off">
     </label>
     <div class="driveActions">
-      <button type="submit" id="driveLoad">画像を読み込む</button>
+      <button type="submit" id="driveLoad">設定を暗号化・同期して読み込む</button>
       <button type="button" id="driveCancel" hidden>中止</button>
     </div>
-    <p class="driveHelp">フォルダを「リンクを知っている全員・閲覧者」にし、Google CloudでDrive APIを有効化してください。APIキーはこのページ内でのみ使用し、保存しません。公開ページのため、キーにはHTTPリファラー制限とDrive APIへのAPI制限を設定してください。</p>
+    <p class="driveHelp">フォルダを「リンクを知っている全員・閲覧者」にし、Google CloudでDrive APIを有効化してください。APIキーとフォルダIDは保管庫の鍵で暗号化してクラウド同期します。解錠後は自動復元されます。キーにはGitHub PagesのHTTPリファラー制限とDrive APIへのAPI制限を設定してください。</p>
+    <p id="driveSyncStatus" class="driveSyncStatus" role="status" aria-live="polite"></p>
   </form>
   <div class="driveResultHeader">
     <p id="driveGalleryStatus" role="status" aria-live="polite">フォルダURLとAPIキーを入力してください。</p>
@@ -49,7 +51,11 @@
   </footer>
   <p class="driveViewerMessage" id="driveViewerMessage" role="status"></p>
 </div>
+<script src="supabase-config.js"></script>
+<script src="vault-session.js?v=20261006-passkey-reset"></script>
+<script src="vault-payload.js"></script>
 <script src="public-drive-gallery-source.js"></script>
+<script src="public-drive-gallery-vault.js"></script>
 <script src="public-drive-gallery.js"></script>
 </body>
 </html>
