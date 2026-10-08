@@ -38,29 +38,69 @@
     return { ok: false, conflict: { assetId, reason, targetRevision, remoteRevision: remote?.revision ?? null, remoteDeletedAt: remote?.deletedAt ?? null } };
   }
 
+  // Encrypt up to three independent objects at once. Complete the page's
+  // encrypted cache in one durable IndexedDB write, not N full-cache scans.
   async function stageProcessedRevision({ cache, masterKey, assetId, targetRevision, processed, signal, onProgress }) {
     const target = positiveRevision(targetRevision);
     const ids = objectPlan(processed);
     const expectedTiles = ids.length - 1;
     if (!processed?.previewBlob || processed.tileBlobs?.length !== expectedTiles) throw new Error('processed tile count does not match manifest');
-    const encryptedBytes = {};
     const inputs = [processed.previewBlob, ...processed.tileBlobs];
+    const encryptedBytes = {};
     onProgress?.({ phase: 'encrypt', completed: 0, total: ids.length });
-    for (let index = 0; index < ids.length; index += 1) {
-      throwIfAborted(signal);
-      const objectId = ids[index];
-      const existing = await cache.get(assetId, target, objectId);
-      if (existing) {
-        if (existing.retention !== 'pending') throw new Error('published cache object cannot be restaged');
-        encryptedBytes[objectId] = new Uint8Array(existing.encryptedBytes);
-        onProgress?.({ phase: 'encrypt', completed: index + 1, total: ids.length, reused: true });
-        continue;
+    if (typeof cache.getMany !== 'function' || typeof cache.putMany !== 'function') {
+      // Preserve the existing API for custom/older cache implementations.
+      for (let index = 0; index < ids.length; index += 1) {
+        throwIfAborted(signal);
+        const objectId = ids[index];
+        const existing = await cache.get(assetId, target, objectId);
+        if (existing) {
+          if (existing.retention !== 'pending') throw new Error('published cache object cannot be restaged');
+          encryptedBytes[objectId] = new Uint8Array(existing.encryptedBytes);
+        } else {
+          const encrypted = await cryptoApi.encryptAssetObject(masterKey, assetId, objectId, inputs[index]);
+          throwIfAborted(signal);
+          await cache.put({ assetId, revision: target, objectId, encryptedBytes: encrypted, retention: 'pending' });
+          encryptedBytes[objectId] = encrypted;
+        }
+        onProgress?.({ phase: 'encrypt', completed: index + 1, total: ids.length });
       }
-      const encrypted = await cryptoApi.encryptAssetObject(masterKey, assetId, objectId, inputs[index]);
+    } else {
       throwIfAborted(signal);
-      await cache.put({ assetId, revision: target, objectId, encryptedBytes: encrypted, retention: 'pending' });
-      encryptedBytes[objectId] = encrypted;
-      onProgress?.({ phase: 'encrypt', completed: index + 1, total: ids.length });
+      const previous = await cache.getMany(assetId, target, ids);
+      const output = new Array(ids.length);
+      const newRecords = [];
+      let next = 0;
+      let completed = 0;
+      let failure = null;
+      const work = async () => {
+        while (next < ids.length && !failure) {
+          const i = next++;
+          try {
+            throwIfAborted(signal);
+            const existing = previous[i];
+            if (existing) {
+              if (existing.retention !== 'pending') throw new Error('published cache object cannot be restaged');
+              output[i] = new Uint8Array(existing.encryptedBytes);
+            } else {
+              const bytes = await cryptoApi.encryptAssetObject(masterKey, assetId, ids[i], inputs[i]);
+              throwIfAborted(signal);
+              output[i] = bytes;
+              newRecords.push({ assetId, revision: target, objectId: ids[i], encryptedBytes: bytes, retention: 'pending' });
+            }
+            completed += 1;
+            onProgress?.({ phase: 'encrypt', completed, total: ids.length });
+          } catch (error) {
+            failure ||= error;
+          }
+        }
+      };
+      await Promise.all(Array.from({length: Math.min(3, ids.length)}, () => work()));
+      if (failure) throw failure;
+      throwIfAborted(signal);
+      if (newRecords.length) await cache.putMany(newRecords);
+      throwIfAborted(signal);
+      for (let i = 0; i < ids.length; i += 1) encryptedBytes[ids[i]] = output[i];
     }
     return { assetId, targetRevision: target, objectIds: ids, encryptedBytes };
   }
