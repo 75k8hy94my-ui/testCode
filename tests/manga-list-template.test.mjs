@@ -23,7 +23,7 @@ const requiredIds = [
   'mangaImportDialog', 'mangaImportRows', 'mangaImportStatus', 'mangaImportCancelButton', 'mangaImportRegisterButton',
   'savedListEmpty', 'bookshelfPagination', 'bookshelfPrevBtn',
   'bookshelfNextBtn', 'bookshelfPageLabel', 'exportImportRow', 'newBtn',
-  'addCustomBtn', 'bulkDetectBtn', 'editShelfBtn', 'undoBulkEditBtn',
+  'bulkDetectBtn', 'editShelfBtn', 'undoBulkEditBtn',
 ];
 
 test('manga list template exposes one frozen markup API without side effects', () => {
@@ -53,18 +53,12 @@ test('manga list template contains each required id once and no non-manga surfac
   }
 });
 
-test('individual add opens the encrypted image import form and connects the encrypted processing pipeline', () => {
-  const template = fs.readFileSync(new URL('../manga-list-template.js', import.meta.url), 'utf8');
-  const route = fs.readFileSync(new URL('../manga-list-route.js', import.meta.url), 'utf8');
-  for (const id of ['encryptedImageAddDialog', 'encryptedImageAddForm', 'encryptedImageTitleInput', 'encryptedImageFilesInput', 'encryptedImageImportStatus']) {
-    assert.match(template, new RegExp(`id="${id}"`));
-  }
-  assert.match(template, /type="file" accept="image\/\*" multiple/);
-  assert.match(route, /bind\(addEncryptedImages, 'click'/);
-  assert.match(route, /EncryptedAssetSync\.stageProcessedRevision/);
-  assert.match(route, /EncryptedAssetSync\.publishPendingRevision/);
-  assert.match(route, /service\.importFiles/);
-  assert.match(route, /host\.persistItems\(\)/);
+test('encrypted image entry is separate from the manga template', () => {
+  const markup = loadTemplate().createMarkup();
+  assert.doesNotMatch(markup, /encryptedImageAddForm|encryptedImageAddDialog|addCustomBtn/);
+  assert.doesNotMatch(route, /bind\(addEncryptedImages, 'click'/);
+  assert.match(fs.readFileSync('images.html','utf8'), /id="imageUploadForm"/);
+  assert.match(fs.readFileSync('images.js','utf8'), /EncryptedAssetImport\.create/);
 });
 
 test('manga route mounts the manga template and Reader has no shelf template dependency', () => {
