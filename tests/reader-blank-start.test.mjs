@@ -61,3 +61,17 @@ test('unexpected Reader boot failure reveals recovery links instead of retaining
   assert.match(html, /\['manga\.html', '本棚へ戻る'\]/);
   assert.match(html, /\['sync\.html', '保管庫を確認'\]/);
 });
+
+test('Reader never hides its startup progress when authentication is pending', () => {
+  assert.match(html, /html\.auth-pending #readerMessage \{ visibility:visible; \}/);
+  assert.match(html, /id="readerMessage"[^>]*>リーダーを起動しています…<\/div>/);
+  assert.match(html, /message\.textContent = '画像を準備しています…'/);
+});
+
+test('a page discovery error provides an explicit retry without discarding saved works', () => {
+  assert.match(html, /function showStartFailure\(error\)/);
+  assert.match(html, /retry\.textContent = 'もう一度読み込む'/);
+  assert.match(html, /startReader\(\)\.catch\(showStartFailure\)/);
+  assert.match(html, /runtime\?\.destroy\(\)/);
+  assert.doesNotMatch(html.slice(html.indexOf('function showStartFailure('), html.indexOf('function handleAccessChange(')), /localStorage\.removeItem\(/);
+});
