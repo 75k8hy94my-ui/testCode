@@ -20,7 +20,7 @@ test('manga and video entry shells use the same versioned SPA bootstrap', () => 
   const mangaSource = spaSource(manga);
   const videoSource = spaSource(video);
   assert.equal(mangaSource, videoSource);
-  assert.match(mangaSource, /home-profile-spa\.js\?v=20261009-ellipsis-route$/);
+  assert.match(mangaSource, /home-profile-spa\.js\?v=20261009-cover-retry$/);
   const videoScripts = scriptSources(video);
   for (const dependency of ['backup-format.js?v=20260822-backup-scope-fix']) {
     assert.ok(videoScripts.includes(dependency), `video entry must load ${dependency}`);
