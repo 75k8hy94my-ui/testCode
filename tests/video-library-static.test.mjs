@@ -129,10 +129,11 @@ test('video URL additions reject an exact duplicate without writing another reco
 test('video library supports hiding videos and restoring them from the hidden list', () => {
   const library = read('video-library.js');
   assert.match(library, /videoLibraryHidden/);
-  assert.match(library, /動画を非表示/);
-  assert.match(library, /非表示/);
-  assert.match(library, /表示に戻す/);
-  assert.match(library, /hidden/);
+  const editor = read('video-edit-page.js');
+  assert.match(editor, /name="hidden" type="checkbox"/);
+  assert.match(editor, /elements\.hidden\.checked = current\.hidden/);
+  assert.match(editor, /hidden: elements\.hidden\.checked/);
+  assert.match(library, /state\.showHidden/);
 });
 
 test('video list reuses thumbnail DOM when the visible records do not change', () => {
