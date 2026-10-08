@@ -175,6 +175,40 @@
         await enforceLimit();
         return { ...record, encryptedBytes: new Uint8Array(record.encryptedBytes) };
       },
+      // The original put() checks every cached object after each tile. Bulk
+      // staging uses one IDB transaction and one eviction scan per page.
+      async putMany(inputs) {
+        if (!Array.isArray(inputs)) throw new TypeError('inputs must be an array');
+        if (!inputs.length) return [];
+        const timestamp = nowValue(now);
+        const records = inputs.map(input => sanitizeRecord({ ...input, storedAt: timestamp, lastAccessedAt: timestamp }));
+        await replaceRecords(records);
+        await enforceLimit();
+        return records;
+      },
+      async getMany(assetId, revision, objectIds) {
+        if (!Array.isArray(objectIds)) throw new TypeError('objectIds must be an array');
+        if (!objectIds.length) return [];
+        const keys = objectIds.map(objectId => makeCacheKey(assetId, revision, objectId));
+        const database = await open();
+        const tx = database.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        // Queue all reads while the IDB transaction is active.
+        const reads = keys.map(key => requestResult(store.get(key)));
+        const found = await Promise.all(reads);
+        // Bulk reads happen during import/finalization and do not need LRU
+        // touch writes. Reader's individual get() still updates access time.
+        return found.map(value => value ? sanitizeRecord(value) : null);
+      },
+      async setRetentionMany(assetId, revision, objectIds, retention) {
+        if (!VALID_RETENTION.has(retention)) throw new TypeError('retention is invalid');
+        if (!Array.isArray(objectIds)) throw new TypeError('objectIds must be an array');
+        if (!objectIds.length) return true;
+        const records = await this.getMany(assetId, revision, objectIds);
+        if (records.some(record => !record)) return false;
+        await replaceRecords(records.map(record => ({ ...record, retention })));
+        return true;
+      },
       async get(assetId, revision, objectId) {
         const cacheKey = makeCacheKey(assetId, revision, objectId);
         const database = await open();

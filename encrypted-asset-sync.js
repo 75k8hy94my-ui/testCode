@@ -38,29 +38,69 @@
     return { ok: false, conflict: { assetId, reason, targetRevision, remoteRevision: remote?.revision ?? null, remoteDeletedAt: remote?.deletedAt ?? null } };
   }
 
+  // Encrypt up to three independent objects at once. Complete the page's
+  // encrypted cache in one durable IndexedDB write, not N full-cache scans.
   async function stageProcessedRevision({ cache, masterKey, assetId, targetRevision, processed, signal, onProgress }) {
     const target = positiveRevision(targetRevision);
     const ids = objectPlan(processed);
     const expectedTiles = ids.length - 1;
     if (!processed?.previewBlob || processed.tileBlobs?.length !== expectedTiles) throw new Error('processed tile count does not match manifest');
-    const encryptedBytes = {};
     const inputs = [processed.previewBlob, ...processed.tileBlobs];
+    const encryptedBytes = {};
     onProgress?.({ phase: 'encrypt', completed: 0, total: ids.length });
-    for (let index = 0; index < ids.length; index += 1) {
-      throwIfAborted(signal);
-      const objectId = ids[index];
-      const existing = await cache.get(assetId, target, objectId);
-      if (existing) {
-        if (existing.retention !== 'pending') throw new Error('published cache object cannot be restaged');
-        encryptedBytes[objectId] = new Uint8Array(existing.encryptedBytes);
-        onProgress?.({ phase: 'encrypt', completed: index + 1, total: ids.length, reused: true });
-        continue;
+    if (typeof cache.getMany !== 'function' || typeof cache.putMany !== 'function') {
+      // Preserve the existing API for custom/older cache implementations.
+      for (let index = 0; index < ids.length; index += 1) {
+        throwIfAborted(signal);
+        const objectId = ids[index];
+        const existing = await cache.get(assetId, target, objectId);
+        if (existing) {
+          if (existing.retention !== 'pending') throw new Error('published cache object cannot be restaged');
+          encryptedBytes[objectId] = new Uint8Array(existing.encryptedBytes);
+        } else {
+          const encrypted = await cryptoApi.encryptAssetObject(masterKey, assetId, objectId, inputs[index]);
+          throwIfAborted(signal);
+          await cache.put({ assetId, revision: target, objectId, encryptedBytes: encrypted, retention: 'pending' });
+          encryptedBytes[objectId] = encrypted;
+        }
+        onProgress?.({ phase: 'encrypt', completed: index + 1, total: ids.length });
       }
-      const encrypted = await cryptoApi.encryptAssetObject(masterKey, assetId, objectId, inputs[index]);
+    } else {
       throwIfAborted(signal);
-      await cache.put({ assetId, revision: target, objectId, encryptedBytes: encrypted, retention: 'pending' });
-      encryptedBytes[objectId] = encrypted;
-      onProgress?.({ phase: 'encrypt', completed: index + 1, total: ids.length });
+      const previous = await cache.getMany(assetId, target, ids);
+      const output = new Array(ids.length);
+      const newRecords = [];
+      let next = 0;
+      let completed = 0;
+      let failure = null;
+      const work = async () => {
+        while (next < ids.length && !failure) {
+          const i = next++;
+          try {
+            throwIfAborted(signal);
+            const existing = previous[i];
+            if (existing) {
+              if (existing.retention !== 'pending') throw new Error('published cache object cannot be restaged');
+              output[i] = new Uint8Array(existing.encryptedBytes);
+            } else {
+              const bytes = await cryptoApi.encryptAssetObject(masterKey, assetId, ids[i], inputs[i]);
+              throwIfAborted(signal);
+              output[i] = bytes;
+              newRecords.push({ assetId, revision: target, objectId: ids[i], encryptedBytes: bytes, retention: 'pending' });
+            }
+            completed += 1;
+            onProgress?.({ phase: 'encrypt', completed, total: ids.length });
+          } catch (error) {
+            failure ||= error;
+          }
+        }
+      };
+      await Promise.all(Array.from({length: Math.min(3, ids.length)}, () => work()));
+      if (failure) throw failure;
+      throwIfAborted(signal);
+      if (newRecords.length) await cache.putMany(newRecords);
+      throwIfAborted(signal);
+      for (let i = 0; i < ids.length; i += 1) encryptedBytes[ids[i]] = output[i];
     }
     return { assetId, targetRevision: target, objectIds: ids, encryptedBytes };
   }
@@ -72,8 +112,12 @@
   async function localObjects(cache, assetId, revision, objectIds, allowCache) {
     const result = {};
     const records = {};
-    for (const objectId of objectIds) {
-      const record = await cache.get(assetId, revision, objectId);
+    const cached = typeof cache.getMany === 'function'
+      ? await cache.getMany(assetId, revision, objectIds)
+      : await Promise.all(objectIds.map(objectId => cache.get(assetId, revision, objectId)));
+    for (let i = 0; i < objectIds.length; i += 1) {
+      const objectId = objectIds[i];
+      const record = cached[i];
       if (!record || record.revision !== revision || (record.retention !== 'pending' && (!allowCache || record.retention !== 'cache'))) throw new Error(`missing-pending-object:${objectId}`);
       cryptoApi.validateEncryptedAsset(record.encryptedBytes);
       result[objectId] = new Uint8Array(record.encryptedBytes);
@@ -111,24 +155,55 @@
     return true;
   }
 
+  const MAX_UPLOAD_CONCURRENCY = 4;
+
+  // Wait for every in-flight request to settle on error/cancel. Never publish
+  // remote metadata while any ciphertext upload is unfinished.
   async function uploadObjects({ storage, token, userId, assetId, revision, objectIds, pending, signal, transferStorage, now, mediaAccess, onProgress }) {
     const totalBytes = objectIds.reduce((total, objectId) => total + pending[objectId].byteLength, 0);
     let confirmedBytes = 0;
-    for (let index = 0; index < objectIds.length; index += 1) {
-      const objectId = objectIds[index];
-      onProgress?.({ phase: 'upload', completed: index, total: objectIds.length, confirmedBytes, totalBytes, currentBytes: pending[objectId].byteLength });
-      const path = backendApi.buildStorageObjectPath(userId, assetId, revision, objectId);
-      const result = await storage.upload(path, token, pending[objectId], signal);
-      if (result.exists && !(await verifyRemoteObjects({ storage, token, userId, assetId, revision, objectIds: [objectId], pending, signal, transferStorage, now, mediaAccess }))) {
-        return { ok: false, reason: 'storage-object-mismatch' };
+    let completed = 0;
+    let next = 0;
+    let failure = null;
+    let conflictReason = null;
+    onProgress?.({ phase: 'upload', completed, total: objectIds.length, confirmedBytes, totalBytes });
+    async function worker() {
+      while (next < objectIds.length && !failure && !conflictReason) {
+        const index = next++;
+        const objectId = objectIds[index];
+        try {
+          throwIfAborted(signal);
+          const path = backendApi.buildStorageObjectPath(userId, assetId, revision, objectId);
+          const result = await storage.upload(path, token, pending[objectId], signal);
+          throwIfAborted(signal);
+          if (result.exists && !(await verifyRemoteObjects({
+            storage, token, userId, assetId, revision, objectIds: [objectId], pending,
+            signal, transferStorage, now, mediaAccess
+          }))) {
+            conflictReason = 'storage-object-mismatch';
+            return;
+          }
+          completed += 1;
+          confirmedBytes += pending[objectId].byteLength;
+          onProgress?.({ phase: 'upload', completed, total: objectIds.length, confirmedBytes, totalBytes });
+        } catch (error) {
+          failure ||= error;
+        }
       }
-      confirmedBytes += pending[objectId].byteLength;
-      onProgress?.({ phase: 'upload', completed: index + 1, total: objectIds.length, confirmedBytes, totalBytes, currentBytes: 0 });
     }
+    await Promise.all(Array.from({ length: Math.min(MAX_UPLOAD_CONCURRENCY, objectIds.length) }, () => worker()));
+    if (failure) throw failure;
+    throwIfAborted(signal);
+    if (conflictReason) return { ok: false, reason: conflictReason };
     return { ok: true };
   }
 
   async function finalize(cache, assetId, revision, objectIds) {
+    if (typeof cache.setRetentionMany === 'function') {
+      const changed = await cache.setRetentionMany(assetId, revision, objectIds, 'cache');
+      if (changed === false) throw new Error('local finalize failed');
+      return;
+    }
     for (const objectId of objectIds) {
       const changed = await cache.setRetention(assetId, revision, objectId, 'cache');
       if (changed === false) throw new Error(`local finalize failed:${objectId}`);
