@@ -41,6 +41,30 @@
     if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / 1048576).toFixed(1) + ' MB';
   }
+  // The classic/default profile retains historical readers and other callers.
+  // Image uploads alone use one zoom resolution instead of storing both 2048
+  // and 4096-pixel pyramids for each page.
+  const IMAGE_UPLOAD_PRESETS = Object.freeze({
+    compact: Object.freeze({ longEdge: 2048, quality: 0.68, tileSize: 1024 }),
+    balanced: Object.freeze({ longEdge: 3072, quality: 0.76, tileSize: 1024 }),
+    detailed: Object.freeze({ longEdge: 4096, quality: 0.82, tileSize: 1024 })
+  });
+  function createImageUploadProfile(mode, baseProfile = window.ImageCompressionProfile?.getCompressionProfile?.()) {
+    const preset = IMAGE_UPLOAD_PRESETS[mode] || IMAGE_UPLOAD_PRESETS.balanced;
+    if (!baseProfile?.zoom || !baseProfile?.preview) throw new Error('画像圧縮設定を読み込めませんでした。');
+    // A single zoom level is enough; preview still provides instant navigation.
+    return {
+      ...baseProfile,
+      zoom: {
+        ...baseProfile.zoom,
+        tileSize: preset.tileSize,
+        quality: preset.quality,
+        intermediateLongEdge: preset.longEdge,
+        maximumLongEdge: preset.longEdge
+      }
+    };
+  }
+
   // This tracker measures confirmed responses rather than guessing the progress
   // of an in-flight HTTP POST. Image-processing "complete" never means uploaded.
   function createUploadProgressTracker(now = () => Date.now()) {
@@ -67,6 +91,7 @@
         if (operation === 'tiles') return '拡大用の画像を作成中' + fraction;
         if (operation === 'pyramid') return '解像度別画像を生成中' + fraction;
         if (operation === 'complete') return '画像加工は完了しました。暗号化・アップロードはこれからです。';
+        if (operation === 'size') return '変換後のサイズを確認しました';
         return '画像を読み込み・圧縮しています';
       }
       if (phase === 'encrypt') return 'プレビューと拡大画像を暗号化しています' + fraction;
@@ -409,10 +434,15 @@
     const files = [...$('imageFiles').files];
     const title = $('imageTitle').value.trim();
     if (!files.length || !title) return;
+    // Snapshot selected quality; changing a field cannot alter a running import.
+    const profile = createImageUploadProfile($('imageQualityMode').value);
+    let processedTotalBytes = 0;
+    let encryptedParts = 0;
     const controller = new AbortController();
     activeController = controller;
     busy = true;
     startUploadProgress(files.length);
+    $('imageUploadSize').textContent = '画像の容量を計測しています…';
     updateButtons();
     let item = null;
     let persisted = false;
@@ -421,7 +451,7 @@
       const secret = requireUnlock();
       const service = window.EncryptedAssetImport.create({
         processPhoto: (file, options) => window.ImagePhotoProcessor.processPhoto(file, {
-          ...options, preferWorker: true, onProgress: options.onProgress
+          ...options, profile, preferWorker: true, onProgress: options.onProgress
         }),
         stage: ({assetId,targetRevision,processed,signal,onProgress}) =>
           window.EncryptedAssetSync.stageProcessedRevision({
@@ -439,7 +469,19 @@
       });
       item = await service.importFiles({
         files,title,signal:controller.signal,
-        onProgress: progress => reportUploadProgress(progress)
+        onProgress: progress => {
+          if (progress.phase === 'processing' && progress.detail?.phase === 'size') {
+            const size = progress.detail;
+            processedTotalBytes += size.outputBytes;
+            encryptedParts += size.parts;
+            $('imageUploadSize').textContent =
+              '保存用画像の合計：' + displayBytes(processedTotalBytes) +
+              '（' + encryptedParts + 'ファイル、暗号化前。通信量は少し増えます）' +
+              ' ／ 現在のページ：元 ' + displayBytes(size.originalBytes) +
+              ' → 変換後 ' + displayBytes(size.outputBytes);
+          }
+          reportUploadProgress(progress);
+        }
       });
       if (controller.signal.aborted) throw Object.assign(new Error('中断しました'),{name:'AbortError'});
       const original = localStorage.getItem(ITEM_KEY);
@@ -545,7 +587,7 @@
     void retryCleanup();
   }
 
-  window.EncryptedImages = Object.freeze({ isEncryptedItem, vpnFreeTransferStorage, createUploadProgressTracker, initialize });
+  window.EncryptedImages = Object.freeze({ isEncryptedItem, vpnFreeTransferStorage, createImageUploadProfile, createUploadProgressTracker, initialize });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',()=>{void initialize();},{once:true});
   else void initialize();
 })();
