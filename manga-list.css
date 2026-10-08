@@ -104,6 +104,7 @@
 }
 .bookshelf-slide-track > .bookshelf-page {
   flex: 0 0 50%;
+  pointer-events: none;
 }
 
 #savedListItems {
