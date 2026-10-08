@@ -120,7 +120,9 @@
         });
       }
 
-      if (Array.isArray(item.pages) && item.pages.length) {
+      if (item.encryptedAssets?.pages?.length) {
+        context.loadLocalCover(item, img);
+      } else if (Array.isArray(item.pages) && item.pages.length) {
         const source = item.pages[0];
         if (item.localSync) {
           context.loadLocalCover(item, img);
