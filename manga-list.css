@@ -422,3 +422,83 @@ html[data-theme="light"] .folder-cover { background: linear-gradient(145deg, #ee
   right: 5px;
   bottom: 43px;
 }
+
+/* Desktop shelf controls: a stationary Liquid Glass bar using the mobile navigation palette. */
+.bookshelf-pagination .bookshelfPagerText { min-width: 0; }
+.bookshelfPagerGlyph { display: none; }
+@media (min-width: 900px) {
+  #routeContent > #mangaListSection, #mangaSandboxMount > #mangaListSection { padding-bottom: 116px; }
+  #mangaListSection .bookshelf-pagination {
+    --pager-glass-fill: rgba(19,22,28,.52);
+    --pager-glass-edge: rgba(255,255,255,.28);
+    --pager-glass-shine: rgba(255,255,255,.43);
+    --pager-glass-shadow: rgba(0,0,0,.30);
+    --pager-glass-text: #f7f9fe;
+    position: fixed;
+    z-index: 850;
+    left: 50%;
+    right: auto;
+    bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    width: auto;
+    min-width: 232px;
+    max-width: calc(100vw - 48px);
+    height: 68px;
+    margin: 0;
+    padding: 8px 11px;
+    gap: 10px;
+    isolation: isolate;
+    border: 1px solid var(--pager-glass-edge);
+    border-radius: 999px;
+    color: var(--pager-glass-text);
+    background: radial-gradient(110% 175% at 24% 0%,rgba(255,255,255,.18),transparent 48%),linear-gradient(180deg,rgba(255,255,255,.07),transparent 55%),var(--pager-glass-fill);
+    -webkit-backdrop-filter: blur(30px) saturate(180%) contrast(106%);
+    backdrop-filter: blur(30px) saturate(180%) contrast(106%);
+    box-shadow: 0 18px 46px var(--pager-glass-shadow),0 2px 6px rgba(0,0,0,.12),inset 0 1.5px 0 var(--pager-glass-shine),inset 0 -1px 0 rgba(255,255,255,.08);
+  }
+  html.app-desktop-rail-page #mangaListSection .bookshelf-pagination { left: calc(50% + 29px); }
+  #mangaListSection .bookshelf-pagination::before {
+    content: '';position: absolute;z-index: -1;inset: 3px;border-radius: inherit;border: 1px solid rgba(255,255,255,.09);pointer-events: none;
+  }
+  #mangaListSection .bookshelf-pagination .bookshelfPagerButton {
+    display: flex;flex: 0 0 50px;align-items: center;justify-content: center;
+    min-width: 50px;min-height: 50px;width: 50px;height: 50px;margin: 0;padding: 0;
+    border: 1px solid rgba(255,255,255,.20);border-radius: 50%;color: var(--pager-glass-text);
+    background: linear-gradient(165deg,rgba(255,255,255,.20),rgba(255,255,255,.035)),rgba(255,255,255,.035);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.23),0 2px 10px rgba(0,0,0,.13);
+    transition: transform .18s ease,background .18s ease,box-shadow .18s ease;
+  }
+  #mangaListSection .bookshelf-pagination .bookshelfPagerButton:hover:not(:disabled) {
+    color: var(--pager-glass-text);background: rgba(255,255,255,.23);transform: translateY(-1px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.38),0 5px 15px rgba(0,0,0,.19);
+  }
+  #mangaListSection .bookshelf-pagination .bookshelfPagerButton:active:not(:disabled) { transform: scale(.95); }
+  #mangaListSection .bookshelf-pagination .bookshelfPagerButton:disabled { opacity: .34;box-shadow: none;cursor: not-allowed; }
+  #mangaListSection .bookshelf-pagination .bookshelfPagerButton:focus-visible { outline: 2px solid #9ac9ff;outline-offset: 3px; }
+  #mangaListSection .bookshelf-pagination .bookshelfPagerGlyph { display: block;width: 22px;height: 22px;pointer-events: none; }
+  #mangaListSection .bookshelf-pagination .bookshelfPagerText { display: none; }
+  #mangaListSection .bookshelf-pagination #bookshelfPageLabel {
+    min-width: 84px;color: var(--pager-glass-text);font-size: 13px;line-height: 1;font-weight: 650;letter-spacing: .035em;
+    font-variant-numeric: tabular-nums;text-shadow: 0 1px 5px rgba(0,0,0,.16);white-space: nowrap;
+  }
+  html[data-theme="light"] #mangaListSection .bookshelf-pagination {
+    --pager-glass-fill: rgba(240,245,252,.63);--pager-glass-edge: rgba(255,255,255,.80);
+    --pager-glass-shine: rgba(255,255,255,.94);--pager-glass-shadow: rgba(48,61,77,.16);--pager-glass-text: #202834;
+    background: radial-gradient(110% 175% at 24% 0%,rgba(255,255,255,.58),transparent 50%),linear-gradient(180deg,rgba(255,255,255,.23),rgba(214,227,245,.10)),var(--pager-glass-fill);
+  }
+  html[data-theme="light"] #mangaListSection .bookshelf-pagination .bookshelfPagerButton {
+    border-color: rgba(255,255,255,.76);
+    background: linear-gradient(165deg,rgba(255,255,255,.80),rgba(207,220,239,.27));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.96),0 2px 10px rgba(49,61,80,.09);
+  }
+  html[data-theme="light"] #mangaListSection .bookshelf-pagination .bookshelfPagerButton:hover:not(:disabled) { background: rgba(255,255,255,.93); }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  @media (min-width: 900px) {
+    #mangaListSection .bookshelf-pagination { background: rgba(25,29,36,.96); }
+    html[data-theme="light"] #mangaListSection .bookshelf-pagination { background: rgba(244,247,251,.97); }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #mangaListSection .bookshelf-pagination .bookshelfPagerButton { transition: none; }
+}

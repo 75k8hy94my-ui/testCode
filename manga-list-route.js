@@ -1,9 +1,9 @@
 (function (root) {
   'use strict';
 
-  const STYLESHEET_URL = 'manga-list.css?v=20261009-cover-controls';
+  const STYLESHEET_URL = 'manga-list.css?v=20261009-desktop-liquid-pager';
   const SCRIPT_URLS = [
-    ['manga-list-template.js?v=20260922-vpn-tools', 'mangaRouteTemplate'],
+    ['manga-list-template.js?v=20261009-desktop-liquid-pager', 'mangaRouteTemplate'],
     ['manga-import-validator.js?v=20261007-momon-import', 'mangaImportValidator'],
     ['manga-import-candidate.js?v=20261007-momon-import', 'mangaImportCandidate'],
     ['manga-import-author-sync.js?v=20261007-momon-import', 'mangaImportAuthorSync'],
@@ -37,7 +37,7 @@
     ['manga-list-card.js?v=20261009-cover-controls', 'mangaRouteCard'],
     ['manga-list-state.js?v=20260922-state', 'mangaRouteState'],
     ['manga-list-view-model.js?v=20261009-shelf-pagination', 'mangaRouteViewModel'],
-    ['manga-list-renderer.js?v=20260922-renderer', 'mangaRouteRenderer'],
+    ['manga-list-renderer.js?v=20261009-desktop-liquid-pager', 'mangaRouteRenderer'],
     ['manga-list-state-runtime.js?v=20260922-state-runtime', 'mangaRouteStateRuntime'],
     ['manga-list-render-runtime.js?v=20260922-render-runtime', 'mangaRouteRenderRuntime'],
     ['manga-list-bootstrap.js?v=20260922-bootstrap', 'mangaRouteBootstrap'],
@@ -47,7 +47,7 @@
     ['manga-list-image-cache.js?v=20260922-image-cache', 'mangaRouteImageCache'],
     ['reader-target.js?v=20261003-reader-launch-contract', 'mangaReaderTarget'],
     ['manga-list-host-runtime.js?v=20261009-cover-retry', 'mangaRouteHost'],
-    ['manga-list-runtime.js?v=20261009-cover-controls', 'mangaRouteRuntime'],
+    ['manga-list-runtime.js?v=20261009-desktop-liquid-pager', 'mangaRouteRuntime'],
     ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
   ];
 
