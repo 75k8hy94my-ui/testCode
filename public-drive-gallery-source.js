@@ -110,7 +110,7 @@
     if (!id || !cache || cache.schemaVersion !== CACHE_VERSION || cache.folderId !== id ||
         typeof cache.updatedAt !== 'string' || !Number.isFinite(Date.parse(cache.updatedAt)) ||
         !Array.isArray(cache.images)) return null;
-    if (JSON.stringify(cache).length > MAX_CACHE_BYTES) return null;
+    if (new TextEncoder().encode(JSON.stringify(cache)).byteLength > MAX_CACHE_BYTES) return null;
     const seen = new Set();
     const images = [];
     for (const file of cache.images) {
