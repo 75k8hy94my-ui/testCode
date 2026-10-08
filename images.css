@@ -18,3 +18,7 @@
 .imageUploadProgress[data-status="error"]{border-color:var(--danger,#bb5555)}
 .imageUploadProgress[data-status="done"]{border-color:var(--ok,#4b9d78)}
 @media(max-width:640px){.imageUploadProgress{padding:13px}.imageProgressSteps{gap:5px}.imageProgressSteps li{padding:5px 8px}}
+
+.imageUploadForm select{width:100%;min-width:0;padding:10px;border-radius:10px;border:1px solid var(--line,#434956);background:var(--bg,#11141a);color:var(--text,#eee);font:inherit}
+.imageQualityHelp{grid-column:1/-1;margin:0;color:var(--sub,#a5aebb);font-size:12px;line-height:1.7}
+#imageUploadSize{font-weight:650;overflow-wrap:anywhere}
