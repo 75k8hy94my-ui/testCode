@@ -116,7 +116,7 @@ test('host persistence preserves write and sync order', () => {
   const host = loadFactory().create(deps(calls));
   assert.deepEqual(Object.keys(host), [
     'persistItems', 'persistFolders', 'persistAuthorCards', 'persistAll',
-    'buildSyncPayload', 'runCloudSync', 'scheduleCloudSync', 'setupFeedImage', 'loadLocalCover',
+    'buildSyncPayload', 'runCloudSync', 'flushCloudSync', 'scheduleCloudSync', 'setupFeedImage', 'loadLocalCover',
     'navigateToReader',
   ]);
   assert.ok(Object.isFrozen(host));
