@@ -112,8 +112,12 @@
   async function localObjects(cache, assetId, revision, objectIds, allowCache) {
     const result = {};
     const records = {};
-    for (const objectId of objectIds) {
-      const record = await cache.get(assetId, revision, objectId);
+    const cached = typeof cache.getMany === 'function'
+      ? await cache.getMany(assetId, revision, objectIds)
+      : await Promise.all(objectIds.map(objectId => cache.get(assetId, revision, objectId)));
+    for (let i = 0; i < objectIds.length; i += 1) {
+      const objectId = objectIds[i];
+      const record = cached[i];
       if (!record || record.revision !== revision || (record.retention !== 'pending' && (!allowCache || record.retention !== 'cache'))) throw new Error(`missing-pending-object:${objectId}`);
       cryptoApi.validateEncryptedAsset(record.encryptedBytes);
       result[objectId] = new Uint8Array(record.encryptedBytes);
@@ -151,24 +155,55 @@
     return true;
   }
 
+  const MAX_UPLOAD_CONCURRENCY = 4;
+
+  // Wait for every in-flight request to settle on error/cancel. Never publish
+  // remote metadata while any ciphertext upload is unfinished.
   async function uploadObjects({ storage, token, userId, assetId, revision, objectIds, pending, signal, transferStorage, now, mediaAccess, onProgress }) {
     const totalBytes = objectIds.reduce((total, objectId) => total + pending[objectId].byteLength, 0);
     let confirmedBytes = 0;
-    for (let index = 0; index < objectIds.length; index += 1) {
-      const objectId = objectIds[index];
-      onProgress?.({ phase: 'upload', completed: index, total: objectIds.length, confirmedBytes, totalBytes, currentBytes: pending[objectId].byteLength });
-      const path = backendApi.buildStorageObjectPath(userId, assetId, revision, objectId);
-      const result = await storage.upload(path, token, pending[objectId], signal);
-      if (result.exists && !(await verifyRemoteObjects({ storage, token, userId, assetId, revision, objectIds: [objectId], pending, signal, transferStorage, now, mediaAccess }))) {
-        return { ok: false, reason: 'storage-object-mismatch' };
+    let completed = 0;
+    let next = 0;
+    let failure = null;
+    let conflictReason = null;
+    onProgress?.({ phase: 'upload', completed, total: objectIds.length, confirmedBytes, totalBytes });
+    async function worker() {
+      while (next < objectIds.length && !failure && !conflictReason) {
+        const index = next++;
+        const objectId = objectIds[index];
+        try {
+          throwIfAborted(signal);
+          const path = backendApi.buildStorageObjectPath(userId, assetId, revision, objectId);
+          const result = await storage.upload(path, token, pending[objectId], signal);
+          throwIfAborted(signal);
+          if (result.exists && !(await verifyRemoteObjects({
+            storage, token, userId, assetId, revision, objectIds: [objectId], pending,
+            signal, transferStorage, now, mediaAccess
+          }))) {
+            conflictReason = 'storage-object-mismatch';
+            return;
+          }
+          completed += 1;
+          confirmedBytes += pending[objectId].byteLength;
+          onProgress?.({ phase: 'upload', completed, total: objectIds.length, confirmedBytes, totalBytes });
+        } catch (error) {
+          failure ||= error;
+        }
       }
-      confirmedBytes += pending[objectId].byteLength;
-      onProgress?.({ phase: 'upload', completed: index + 1, total: objectIds.length, confirmedBytes, totalBytes, currentBytes: 0 });
     }
+    await Promise.all(Array.from({ length: Math.min(MAX_UPLOAD_CONCURRENCY, objectIds.length) }, () => worker()));
+    if (failure) throw failure;
+    throwIfAborted(signal);
+    if (conflictReason) return { ok: false, reason: conflictReason };
     return { ok: true };
   }
 
   async function finalize(cache, assetId, revision, objectIds) {
+    if (typeof cache.setRetentionMany === 'function') {
+      const changed = await cache.setRetentionMany(assetId, revision, objectIds, 'cache');
+      if (changed === false) throw new Error('local finalize failed');
+      return;
+    }
     for (const objectId of objectIds) {
       const changed = await cache.setRetention(assetId, revision, objectId, 'cache');
       if (changed === false) throw new Error(`local finalize failed:${objectId}`);
