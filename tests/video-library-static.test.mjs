@@ -44,7 +44,7 @@ test('video list ellipsis navigates directly to the dedicated editor without an 
   assert.match(editor, /Data\.parseMediaTime\(timestamp\)/);
   assert.match(editorHtml, /video-edit-page\.js\?v=20261009-list-ellipsis/);
   assert.doesNotMatch(editorHtml, /auth-pending/);
-  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261009-ellipsis-route/);
+  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261009-guest-mode/);
 });
 
 test('video cards delegate thumbnail rendering to the shared renderer', () => {
