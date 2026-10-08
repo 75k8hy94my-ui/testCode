@@ -119,3 +119,22 @@ test('new worker scripts are classic-script parseable', () => {
     assert.doesNotThrow(() => new vm.Script(fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'), { filename: file }));
   }
 });
+
+
+test('worker forwards photo-only size and quality adaptation options unchanged', async () => {
+  const photoOptimization={
+    bytesPerMegapixel:440*1024,maxZoomBytes:3*1024*1024,
+    minZoomBytes:550*1024,minQuality:0.66,minZoomLongEdge:1700,maxPasses:5
+  };
+  const workerHandler=worker.createWorkerMessageHandler({
+    process:async options=>{
+      assert.deepEqual(options.photoOptimization,photoOptimization);
+      return {manifest:{schemaVersion:1},previewBlob:new Blob(['preview']),tileBlobs:[]};
+    }
+  });
+  const result=await processor.processPhoto(fakePhoto(),{
+    photoOptimization,
+    workerFactory:workerFactoryWith((message,send)=>workerHandler(message,send))
+  });
+  assert.equal(result.manifest.schemaVersion,1);
+});
