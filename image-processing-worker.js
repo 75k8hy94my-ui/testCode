@@ -17,6 +17,7 @@
         const result = await processFunction({
           file: message.file,
           profile: message.profile,
+          photoOptimization: message.photoOptimization,
           onProgress: progress => send({ type: 'progress', progress })
         });
         send({ type: 'complete', result });
@@ -28,7 +29,7 @@
 
   const host = typeof window !== 'undefined' ? window : (typeof self !== 'undefined' ? self : null);
   if (host && typeof host.importScripts === 'function' && !host.ImagePhotoProcessor) {
-    host.importScripts('image-compression-profile.js', 'image-pyramid-builder.js?v=20261008-native-zoom', 'image-photo-processor.js?v=20261008-safari-jpeg');
+    host.importScripts('image-compression-profile.js', 'image-pyramid-builder.js?v=20261008-native-zoom', 'image-photo-processor.js?v=20261008-adaptive-photo');
   }
   if (host && typeof host.postMessage === 'function' && typeof host.addEventListener === 'function') {
     const handler = createWorkerMessageHandler();
