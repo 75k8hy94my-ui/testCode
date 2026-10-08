@@ -42,6 +42,7 @@ class FakeElement {
     const visit = (node) => {
       for (const child of node.children || []) {
         if (selector === '.readerPageImage' && child.className === 'readerPageImage') matches.push(child);
+        if (selector === '.readerVerticalSlot' && child.className === 'readerVerticalSlot') matches.push(child);
         if (selector === '[data-page]' && child.dataset?.page) matches.push(child);
         visit(child);
       }
@@ -51,6 +52,7 @@ class FakeElement {
   }
   querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
   scrollIntoView() {}
+  getBoundingClientRect() { return this.rect || { top: 900, bottom: 1800 }; }
 }
 
 class FakeFragment extends FakeElement { constructor() { super(); this.fragment = true; } }
@@ -216,6 +218,51 @@ test('vertical mode shares decoded resources while keeping a scroll-list page mo
   assert.equal(runtime.getPageState().displayedPage, 2);
   assert.equal(elements.pageLabel.textContent, '2 / 6');
   assert.equal(elements.pageStage.children[1].firstChild, second);
+  runtime.close();
+});
+
+test('switching between paged and vertical layouts rebuilds the frame in both directions', async () => {
+  const { runtime, elements, values } = fixture();
+  const initial = runtime.start('book');
+  await settleLoad(await findImage('/1.jpg'));
+  await initial;
+
+  assert.equal(elements.pageStage.classList.contains('vertical-scroll'), false);
+  elements.verticalBtn.dispatch('click');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(elements.pageStage.classList.contains('vertical-scroll'), true);
+  assert.equal(elements.pageStage.children.length, 6);
+  assert.equal(elements.pageStage.children[0].firstChild?.src, 'https://img.test/1.jpg');
+  assert.equal(values.get('mangaReaderVerticalScroll'), '1');
+
+  elements.verticalBtn.dispatch('click');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(elements.pageStage.classList.contains('vertical-scroll'), false);
+  assert.equal(elements.pageStage.children.length, 1);
+  assert.equal(elements.pageStage.children[0].className, 'readerPageFrame');
+  assert.equal(elements.pageLabel.textContent, '1 / 6');
+  assert.equal(values.get('mangaReaderVerticalScroll'), '0');
+  runtime.close();
+});
+
+test('scrolling to an unloaded distant vertical slot loads it without snapping the viewport', async () => {
+  const { runtime, elements } = fixture({ vertical: true });
+  const initial = runtime.start('book');
+  await settleLoad(await findImage('/1.jpg'));
+  await initial;
+  const viewer = elements.viewer;
+  viewer.rect = { top: 0, bottom: 800 };
+  viewer.clientHeight = 800;
+  elements.pageStage.children.forEach((slot, index) => {
+    slot.rect = index === 5 ? { top: 20, bottom: 750 } : { top: 900, bottom: 1500 };
+  });
+  let automaticScrolls = 0;
+  elements.pageStage.children[5].scrollIntoView = () => { automaticScrolls++; };
+  viewer.dispatch('scroll');
+  await settleLoad(await findImage('/6.jpg'));
+  assert.equal(elements.pageStage.children[5].firstChild?.src, 'https://img.test/6.jpg');
+  assert.equal(elements.pageLabel.textContent, '6 / 6');
+  assert.equal(automaticScrolls, 0);
   runtime.close();
 });
 
