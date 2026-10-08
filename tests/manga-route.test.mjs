@@ -108,3 +108,11 @@ test('VPN recheck hides protected records immediately when an allowed route beco
   assert.match(spa, /lastVpnRouteAccess=route\+':blocked'[\s\S]*renderRoute\(\)/);
   assert.match(spa, /lastVpnRouteAccess=route\+':'\+\(gate&&gate\.canReadProtectedData/);
 });
+
+
+test('failed-image rollback can be retried after VPN access returns', () => {
+  assert.match(route, /mangaReaderPendingEncryptedAssetCleanup/);
+  assert.match(route, /const discardOrQueue = async/);
+  assert.match(route, /void retryPendingCleanup/);
+  assert.match(route, /EncryptedAssetSync.discardImportedAsset/);
+});
