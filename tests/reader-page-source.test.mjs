@@ -98,3 +98,19 @@ test('legacy saved standalone image remains readable even without a numbered fil
   assert.deepEqual(result.urls, [url]);
   assert.equal(tried[0], url);
 });
+
+test('legacy books recover zero-padding and extension from saved image metadata', async () => {
+  const url = 'https://images.test/volume/';
+  const tried = [];
+  const resolver = createLegacyResolver({
+    getCachedInfo: () => ({ numberWidth: 3, ext: 3 }),
+    probe: async (candidate) => {
+      tried.push(candidate);
+      return candidate === url + '001.webp' || candidate === url + '002.webp';
+    },
+  });
+  const result = await create({ legacyResolver: resolver }).resolve({ id: 'legacy', url });
+  assert.deepEqual(result.urls, [url + '001.webp', url + '002.webp']);
+  assert.equal(tried[0], url + '001.webp');
+  assert.equal(result.item.pageManifest.version, 1);
+});
