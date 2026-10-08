@@ -398,7 +398,7 @@
         ? item.encryptedAssets.pages.length + 'ページ'
         : Array.isArray(item.pages) ? item.pages.length + 'ページ' : '';
       const visibleItems = () => {
-        return state().savedItems.filter((item) => !item.localSync).slice();
+        return state().savedItems.filter((item) => !item.localSync && !item.encryptedAssets?.pages?.length).slice();
       };
       const appendFolderPreview = (cover, items, emptyIcon, emptyAlt, kindLabel) => {
         const preview = items.slice(0, 4); if (!preview.length) { const img = documentRef.createElement('img'); img.src = emptyIcon; img.alt = emptyAlt; cover.appendChild(img); return; }
