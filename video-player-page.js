@@ -108,7 +108,11 @@
   const frame = document.createElement('div'); frame.className = 'videoPlayerFrame'; frame.style.height = 'min(540px, calc(100svh - 150px))'; frame.style.minHeight = '240px';
   const sourceUrl = normalized.url || base.url || '';
   const directVideo = /\.(?:mp4|webm|ogg|ogv|m4v|mov)(?:[?#].*)?$/i.test(sourceUrl);
-  if (directVideo) { const video = document.createElement('video'); video.src = sourceUrl; video.controls = true; video.playsInline = true; video.preload = 'metadata'; video.style.display = 'block'; video.style.width = '100%'; video.style.height = '100%'; video.style.maxWidth = '100%'; video.style.maxHeight = '100%'; video.style.objectFit = 'contain'; frame.append(video); }
+  if (directVideo) {
+    const video = document.createElement('video'); video.src = sourceUrl; video.controls = true; video.playsInline = true; video.preload = 'metadata'; video.style.display = 'block'; video.style.width = '100%'; video.style.height = '100%'; video.style.maxWidth = '100%'; video.style.maxHeight = '100%'; video.style.objectFit = 'contain'; frame.append(video);
+    const cleanupRotation = window.MangaReaderVideoRotation.install(frame, video, normalized.rotate90Direction);
+    windowCleanups.push(cleanupRotation);
+  }
   else if (base.a && base.b) { const iframe = document.createElement('iframe'); iframe.src = 'https://www.' + base.a + '.com/embed/' + base.b; iframe.title = title; iframe.allowFullscreen = true; frame.append(iframe); }
   else { const link = document.createElement('a'); link.className = 'glassBtn'; link.href = sourceUrl || '#'; link.target = '_blank'; link.rel = 'noopener'; link.textContent = '元ページを開く'; frame.append(link); }
 
