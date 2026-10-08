@@ -174,3 +174,26 @@ test('reader opens a saved page at its restored position, updates favorite, and 
   assert.deepEqual(redirects, ['manga.html']);
   assert.ok(written.length >= 2);
 });
+
+test('Reader injects the previously cached image numbering metadata only for legacy discovery', () => {
+  let resolverOptions = null;
+  const cache = { 'item:book': { numberWidth: 3, ext: 3 } };
+  const win = {
+    location: { href: 'https://reader.test/reader.html?item=book' },
+    localStorage: { getItem(key) { return key === 'mangaReaderInfoCache' ? JSON.stringify(cache) : null; } },
+    ReaderPageSourceFactory: {
+      createLegacyResolver(options) { resolverOptions = options; return {}; },
+      create() { return { resolve() {} }; },
+    },
+  };
+  const runtime = factory.create({
+    repository: { loadItem() { return null; }, saveItem() {} },
+    target: {},
+    location: { replace() {} },
+    window: win,
+  });
+  assert.equal(typeof resolverOptions?.getCachedInfo, 'function');
+  assert.deepEqual(JSON.parse(JSON.stringify(resolverOptions.getCachedInfo({ id: 'book' }, { base: 'https://img.test/book/' }))), cache['item:book']);
+  assert.equal(resolverOptions.getCachedInfo({ id: 'missing' }, { base: 'https://img.test/missing/' }), null);
+  runtime.destroy();
+});
