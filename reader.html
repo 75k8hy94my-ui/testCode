@@ -77,13 +77,14 @@
     <aside id="nextVolumeBanner" hidden><span id="nextVolumeText"></span><button class="ctrlBtn" id="nextVolumeDismissBtn" type="button" aria-label="閉じる">×</button><button class="ctrlBtn" id="nextVolumeBtn" type="button">次の巻を読む</button></aside>
   </main>
 
-  <script src="supabase-config.js"></script>
-  <script src="vault-session.js?v=20261009-vault-sync-queue"></script>
+  <script src="guest-mode.js?v=20261009-guest"></script>
+<script src="supabase-config.js"></script>
+  <script src="vault-session.js?v=20261009-vault-sync-guest"></script>
   <script src="browser-storage.js"></script>
   <script src="reader-target.js?v=20261004-reader-item-route"></script>
   <script src="vault-payload.js"></script>
   <script src="feature-flags.js"></script>
-  <script src="media-access-gate.js?v=20261008-vpn-refresh"></script>
+  <script src="media-access-gate.js?v=20261009-guest-mode"></script>
   <script src="encrypted-asset-crypto.js"></script>
   <script src="encrypted-asset-cache.js"></script>
   <script src="encrypted-asset-backend.js"></script>
@@ -110,6 +111,10 @@
       const showVault = () => window.location.replace('sync.html');
       const hasSession = () => { try { const session = JSON.parse(localStorage.getItem(sessionKey) || 'null'); return !!(session && session.refresh_token); } catch (_) { return false; } };
       const config = window.MANGA_READER_SUPABASE || {};
+      if (window.TestCodeGuest?.isActive()) {
+        document.documentElement.classList.remove('auth-pending');
+        return true;
+      }
       if (!hasSession() || !config.url || !config.publishableKey) { showLogin(); return false; }
       if (!window.MangaVault) { showVault(); return false; }
       let active = MangaVault.loadActive();
@@ -184,7 +189,7 @@
         if (!itemId) { location.replace('manga.html'); return; }
         MangaReaderTarget.clearLegacyTarget(localStorage);
         const syncScheduler = ReaderSyncSchedulerFactory.create({
-          canSync: canReadProtectedData,
+          canSync: () => !window.TestCodeGuest?.isActive() && canReadProtectedData(),
           save: () => MangaVault.saveLocalChanges(),
           onError: (error) => {
             if (canReadProtectedData()) document.getElementById('readerStatus').textContent = error?.message || '同期に失敗しました';

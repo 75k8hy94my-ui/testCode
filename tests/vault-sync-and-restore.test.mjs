@@ -400,3 +400,23 @@ test('passkey registration refuses to replace a newer cloud payload with stale l
   assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), cloudPayload);
   assert.deepEqual(JSON.parse(local.getItem('testPayload')), localPayload);
 });
+
+test('same data with different remote credential wrappers is not treated as a lost successful save', async () => {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const expectedPayload = { items: [{ id: 'same-data' }], study: { progress: 5 } };
+  const remoteKeyWraps = { passkeys: [{ id: 'different-credential' }] };
+  const { vault, local, remote } = await fixture({
+    rawKey, initialPayload: expectedPayload, revision: 1,
+    rpc: async (_body, state) => {
+      state.record = {
+        payload: await encryptPayload(rawKey, expectedPayload, remoteKeyWraps),
+        revision: 2, updated_at: 'credential changed elsewhere',
+      };
+      return [];
+    },
+  });
+  await assert.rejects(vault.savePayload(expectedPayload), /別の端末で更新されています/);
+  assert.equal(remote.record.revision, 2);
+  assert.deepEqual(remote.record.payload.keyWraps, remoteKeyWraps);
+  assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, true);
+});

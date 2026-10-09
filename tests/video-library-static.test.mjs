@@ -42,9 +42,9 @@ test('video list ellipsis navigates directly to the dedicated editor without an 
   assert.match(editor, /MangaVault\.saveLocalChanges\(\)/);
   assert.match(editor, /name="thumbnailTime"/);
   assert.match(editor, /Data\.parseMediaTime\(timestamp\)/);
-  assert.match(editorHtml, /video-edit-page\.js\?v=20261009-vault-sync-queue/);
+  assert.match(editorHtml, /video-edit-page\.js\?v=20261009-vault-sync-guest/);
   assert.doesNotMatch(editorHtml, /auth-pending/);
-  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261009-vault-sync-queue/);
+  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261009-vault-sync-guest/);
 });
 
 test('video cards delegate thumbnail rendering to the shared renderer', () => {
@@ -223,5 +223,5 @@ test('dedicated video editor distinguishes local storage failures from cloud syn
   assert.match(editor, /端末に保存できませんでした。ブラウザの保存容量を確認してください。/);
   assert.match(editor, /端末には保存しましたが、クラウド同期に失敗しました:/);
   assert.doesNotMatch(editor, /保存できませんでした。端末の保存状態を確認してください。/);
-  assert.match(html, /video-edit-page\.js\?v=20261009-vault-sync-queue/);
+  assert.match(html, /video-edit-page\.js\?v=20261009-vault-sync-guest/);
 });

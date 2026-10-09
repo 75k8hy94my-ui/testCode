@@ -46,6 +46,14 @@
     return active.rawKey;
   }
   async function persistSettings(settings) {
+    if (window.TestCodeGuest?.isActive()) {
+      // Keep external API credentials in memory only in guest mode. Never
+      // persist plaintext API keys or put them in the account Vault.
+      savedSettings = settings;
+      refreshButton.disabled = false;
+      setSyncStatus('ゲスト：設定はこのページでのみ使用します。クラウド同期はしません。');
+      return;
+    }
     // Only an AES-GCM envelope is stored on the device; plaintext never goes to localStorage.
     const encrypted = await cryptoSettings.encryptSettings(vaultKey(), settings);
     if (!vaultApi.loadActive()) throw new Error('保管庫がロックされています。再度解錠してください。');
@@ -247,6 +255,11 @@
     await loadImages(folderId, apiKey);
   });
   async function initialize() {
+    if (window.TestCodeGuest?.isActive()) {
+      document.documentElement.classList.remove('auth-pending');
+      setSyncStatus('ゲスト：公開フォルダの閲覧は可能です。APIキーは保存・同期されません。');
+      return;
+    }
     const config = window.MANGA_READER_SUPABASE || {};
     const session = vaultApi?.loadSession?.();
     if (!session?.refresh_token || !config.url || !config.publishableKey) {
