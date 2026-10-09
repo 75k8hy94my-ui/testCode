@@ -138,6 +138,32 @@ test('cross-tab saves use Web Locks when available and keep revision CAS valid',
   assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, false);
 });
 
+test('a waiting tab snapshots localStorage only after it acquires the shared lock', async () => {
+  const locks = lockManager(); const local = makeStorage(); const sessionA = makeStorage(); const sessionB = makeStorage();
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const remote = { record: { payload: await encryptPayload(rawKey, { videos: [] }), revision: 1, updated_at: 'before' } };
+  const started = deferred(); const release = deferred(); let calls = 0;
+  const rpc = async (body, state) => {
+    calls++;
+    if (calls === 1) { started.resolve(); await release.promise; }
+    if (body.expected_revision !== state.record.revision) return [];
+    state.record = { payload: body.new_payload, revision: state.record.revision + 1, updated_at: 'locked-' + calls };
+    return [{ revision: state.record.revision, updated_at: state.record.updated_at }];
+  };
+  const a = await fixture({ initialPayload: { videos: [{ id: 'v1', title: '先行保存' }] }, rawKey, remote, localStorage: local, sessionStorage: sessionA, locks, rpc });
+  const b = await fixture({ initialPayload: { videos: [{ id: 'v1', title: '先行保存' }] }, rawKey, remote, localStorage: local, sessionStorage: sessionB, locks, rpc });
+  const first = a.vault.saveLocalChanges();
+  await started.promise;
+  const second = b.vault.saveLocalChanges();
+  await Promise.resolve();
+  const latest = { videos: [{ id: 'v1', url: 'https://example.test/1', title: 'ロック待ち後の最新' }, { id: 'v2', url: 'https://example.test/2', title: '追加' }] };
+  local.setItem('testPayload', JSON.stringify(latest));
+  release.resolve();
+  await Promise.all([first, second]);
+  assert.equal(calls, 2);
+  assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), latest);
+});
+
 test('revision conflict preserves the local edit and never replaces a different remote update', async () => {
   const localPayload = { videos: [{ id: 'v1', url: 'https://example.test/local', title: '端末側' }] };
   const externalPayload = { videos: [{ id: 'v1', url: 'https://example.test/remote', title: '別端末' }], study: { progress: { x: 4 } } };
