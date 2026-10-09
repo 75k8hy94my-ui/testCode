@@ -55,7 +55,7 @@ function start({ initialPermission = false, sourceValid = true } = {}) {
           virtualSeconds: 0, totalSeconds: 5, message: '', error: '',
         });
         return {
-          snapshot: () => ({ requestedPlay: false }),
+          snapshot: () => ({ requestedPlay: false, totalSeconds: 5 }),
           seek(value) { seeks.push(value); },
           play() { playCalls++; },
           pause() {},
@@ -117,6 +117,8 @@ test('virtual controls use total-timeline positions and pagehide releases media 
   ui.elements.get('[data-play]').trigger('click');
   assert.equal(ui.playCalls, 1);
   ui.elements.get('[data-seek]').value = '3.5';
+  ui.elements.get('[data-seek]').trigger('input');
+  assert.equal(ui.elements.get('[data-time]').textContent, '0:03 / 0:05');
   ui.elements.get('[data-seek]').trigger('change');
   assert.equal(ui.seeks[0], 3.5);
   ui.firePagehide();
