@@ -346,3 +346,57 @@ test('unlock page reports pending sync and offers local data access', () => {
   assert.match(syncPage, /端末データを開く/);
   assert.match(syncPage, /result\.pendingSync/);
 });
+
+test('a failed follow-up save keeps changes made during the earlier successful save pending', async () => {
+  const firstStarted = deferred();
+  const releaseFirst = deferred();
+  let calls = 0;
+  const newest = { local: 'newest edit' };
+  const { vault, local, remote, rawKey } = await fixture({
+    initialPayload: { local: 'first edit' },
+    rpc: async (body, state) => {
+      calls++;
+      if (calls === 1) {
+        firstStarted.resolve();
+        await releaseFirst.promise;
+        state.record = { payload: body.new_payload, revision: 2, updated_at: 'first success' };
+        return [{ revision: 2, updated_at: 'first success' }];
+      }
+      throw new Error('temporary second save failure');
+    },
+  });
+  const firstSave = vault.saveLocalChanges();
+  await firstStarted.promise;
+  local.setItem('testPayload', JSON.stringify(newest));
+  const secondSave = vault.saveLocalChanges();
+  releaseFirst.resolve();
+  const results = await Promise.allSettled([firstSave, secondSave]);
+  assert.equal(results[0].status, 'fulfilled');
+  assert.equal(results[1].status, 'rejected');
+  const meta = JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'];
+  assert.equal(meta.pendingSync, true);
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')), newest);
+  assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), { local: 'first edit' });
+});
+
+test('passkey registration refuses to replace a newer cloud payload with stale local data', async () => {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const prfOutput = webcrypto.getRandomValues(new Uint8Array(32));
+  const credentialId = new Uint8Array([4, 3, 2, 1]);
+  const salt = webcrypto.getRandomValues(new Uint8Array(16));
+  const passphrase = 'valid passphrase 123';
+  const material = await webcrypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+  const passphraseKey = await webcrypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' }, material, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  const keyWraps = { passphrase: { kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations: 600000, salt: b64url(salt) }, encryptedKey: await encrypt(passphraseKey, rawKey) } };
+  const cloudPayload = { items: [{ id: 'newer-cloud-item' }], videos: [{ id: 'cloud-video', title: 'Cloud title', url: 'https://example.test/cloud.mp4' }], study: { progress: 8 } };
+  const localPayload = { items: [{ id: 'stale-local-item' }], videos: [{ id: 'cloud-video', title: 'Old title', url: 'https://example.test/cloud.mp4' }], study: { progress: 3 } };
+  const { vault, local, remote } = await fixture({
+    initialPayload: localPayload, rawKey, revision: 1, passkeySupported: true,
+    credentials: { create: async () => ({ rawId: credentialId.buffer, getClientExtensionResults: () => ({ prf: { results: { first: prfOutput } } }) }), get: async () => null },
+  });
+  remote.record = { payload: await encryptPayload(rawKey, cloudPayload, keyWraps), revision: 2, updated_at: 'newer cloud revision' };
+  await assert.rejects(vault.registerPasskey(passphrase), /別の端末で保管庫が更新されています/);
+  assert.equal(remote.record.revision, 2);
+  assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), cloudPayload);
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')), localPayload);
+});
