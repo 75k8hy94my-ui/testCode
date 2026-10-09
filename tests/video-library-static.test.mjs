@@ -42,7 +42,7 @@ test('video list ellipsis navigates directly to the dedicated editor without an 
   assert.match(editor, /MangaVault\.savePayload\(window\.MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
   assert.match(editor, /name="thumbnailTime"/);
   assert.match(editor, /Data\.parseMediaTime\(timestamp\)/);
-  assert.match(editorHtml, /video-edit-page\.js\?v=20261009-add-page-contrast/);
+  assert.match(editorHtml, /video-edit-page\.js\?v=20261009-sync-save-feedback/);
   assert.doesNotMatch(editorHtml, /auth-pending/);
   assert.match(read('video-list-route.js'), /video-library\.js\?v=20261009-add-page-contrast/);
 });
