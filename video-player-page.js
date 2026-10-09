@@ -106,6 +106,14 @@
   heading.addEventListener('blur', saveTitle);
   const frame = document.createElement('div'); frame.className = 'videoPlayerFrame'; frame.style.height = 'min(540px, calc(100svh - 150px))'; frame.style.minHeight = '240px';
   const sourceUrl = normalized.url || base.url || '';
+  // Keep the ordinary detail editor unchanged; the virtual editor is MP4-only.
+  if (window.MangaReaderVideoVirtualEdit && window.MangaReaderVideoVirtualEdit.isMp4Url(sourceUrl)) {
+    const virtualEdit = document.createElement('a');
+    virtualEdit.className = 'videoPlayerEdit';
+    virtualEdit.textContent = '区間を編集・結合';
+    virtualEdit.href = 'video-virtual-editor.html?id=' + encodeURIComponent(id);
+    actionBar.append(virtualEdit);
+  }
   const directVideo = /\.(?:mp4|webm|ogg|ogv|m4v|mov)(?:[?#].*)?$/i.test(sourceUrl);
   if (directVideo) {
     const video = document.createElement('video'); video.src = sourceUrl; video.controls = true; video.playsInline = true; video.preload = 'metadata'; video.style.display = 'block'; video.style.width = '100%'; video.style.height = '100%'; video.style.maxWidth = '100%'; video.style.maxHeight = '100%'; video.style.objectFit = 'contain'; frame.append(video);
