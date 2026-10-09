@@ -107,6 +107,7 @@
       elements.service.value = fields.a;
       elements.legacyId.value = fields.b;
     });
+    let saving = false;
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const error = form.querySelector('.videoEditError'); error.textContent = '';
@@ -136,24 +137,39 @@
       const nextMeta = storedMeta && typeof storedMeta === 'object' && !Array.isArray(storedMeta) ? storedMeta : {};
       nextMeta[savedId] = { ...(nextMeta[savedId] || {}), title: elements.title.value.trim(), folderId: elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, hidden: elements.hidden.checked, rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, thumbnailUrl: elements.thumbnail.value.trim(), thumbnailTimeSeconds: Data.isDirectVideoUrl(url) ? parsedTime : current.thumbnailTimeSeconds, updatedAt: Date.now() };
       const nextVideos = isAddMode ? [nextBase, ...savedVideos] : savedVideos.map((item) => String(item.id) === videoId ? nextBase : item);
+      if (saving) return;
+      saving = true;
+      const submitButton = form.querySelector('[type="submit"]');
+      if (submitButton) submitButton.disabled = true;
       try {
-        localStorage.setItem(VIDEO_KEY, JSON.stringify(nextVideos));
-        localStorage.setItem(META_KEY, JSON.stringify(nextMeta));
-      } catch (_) {
-        error.textContent = '端末に保存できませんでした。ブラウザの保存容量を確認してください。';
-        return;
-      }
-      if (!canReadProtectedData()) return;
-      try {
-        if (window.MangaVault && window.MangaVaultPayload && typeof window.MangaVault.savePayload === 'function' && window.MangaVault.loadActive && window.MangaVault.loadActive()) {
-          await window.MangaVault.savePayload(window.MangaVaultPayload.buildFromLocalStorage());
+        try {
+          localStorage.setItem(VIDEO_KEY, JSON.stringify(nextVideos));
+          localStorage.setItem(META_KEY, JSON.stringify(nextMeta));
+        } catch (_) {
+          error.textContent = '端末に保存できませんでした。ブラウザの保存容量を確認してください。';
+          return;
         }
-      } catch (syncError) {
-        error.textContent = '端末には保存しましたが、クラウド同期に失敗しました: ' + (syncError && syncError.message ? syncError.message : '同期状態を確認してください。');
-        return;
+        if (window.MangaVault && typeof window.MangaVault.markLocalChangesPending === 'function') window.MangaVault.markLocalChangesPending();
+        if (!canReadProtectedData()) {
+          error.textContent = '端末には保存しましたが、VPN接続を確認できないためクラウド未同期です。';
+          return;
+        }
+        if (!window.MangaVault || typeof window.MangaVault.saveLocalChanges !== 'function') {
+          error.textContent = '端末には保存しましたが、保管庫が利用できずクラウド未同期です。保管庫を開いて再試行してください。';
+          return;
+        }
+        try {
+          await window.MangaVault.saveLocalChanges();
+        } catch (syncError) {
+          error.textContent = '端末には保存しましたが、クラウド同期に失敗しました: ' + (syncError && syncError.message ? syncError.message : '同期状態を確認してください。');
+          return;
+        }
+        if (!canReadProtectedData()) return;
+        location.href = returnTarget(returnKind, savedId);
+      } finally {
+        saving = false;
+        if (submitButton) submitButton.disabled = false;
       }
-      if (!canReadProtectedData()) return;
-      location.href = returnTarget(returnKind, savedId);
     });
     if (!isAddMode) form.querySelector('[data-delete]').addEventListener('click', async () => {
       if (!canReadProtectedData()) return;
@@ -169,10 +185,18 @@
       try {
         localStorage.setItem(VIDEO_KEY, JSON.stringify(remaining));
         localStorage.setItem(META_KEY, JSON.stringify(remainingMeta));
-        if (!canReadProtectedData()) return;
-        if (window.MangaVault && window.MangaVaultPayload && typeof window.MangaVault.savePayload === 'function' && window.MangaVault.loadActive && window.MangaVault.loadActive()) {
-          await window.MangaVault.savePayload(window.MangaVaultPayload.buildFromLocalStorage());
-        }
+      } catch (_) {
+        error.textContent = '端末に削除を保存できませんでした。ブラウザの保存容量を確認してください。';
+        return;
+      }
+      if (window.MangaVault && typeof window.MangaVault.markLocalChangesPending === 'function') window.MangaVault.markLocalChangesPending();
+      if (!canReadProtectedData()) {
+        error.textContent = '端末には削除を保存しましたが、VPN接続を確認できないためクラウド未同期です。';
+        return;
+      }
+      try {
+        if (!window.MangaVault || typeof window.MangaVault.saveLocalChanges !== 'function') throw new Error('保管庫を開いて再試行してください。');
+        await window.MangaVault.saveLocalChanges();
         if (!canReadProtectedData()) return;
         location.href = 'video.html';
       } catch (reason) {
