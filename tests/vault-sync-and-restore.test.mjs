@@ -150,6 +150,24 @@ test('revision conflict preserves the local edit and never replaces a different 
   assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, true);
 });
 
+test('a local deletion remains present when a newer remote revision conflicts', async () => {
+  const localDeletion = { videos: [], videoMeta: {}, items: [{ id: 'manga-1' }] };
+  const external = { videos: [{ id: 'v1', url: 'https://example.test/newer.mp4', title: '別端末で更新' }], videoMeta: { v1: { favorite: true } }, items: [{ id: 'manga-1' }] };
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const remote = { record: { payload: await encryptPayload(rawKey, external), revision: 2, updated_at: 'external-edit' } };
+  const { vault, local } = await fixture({ initialPayload: localDeletion, rawKey, revision: 1, remote, rpc: async () => [] });
+  await assert.rejects(vault.saveLocalChanges(), /別の端末で更新されています/);
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')), localDeletion);
+  assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), external);
+});
+
+test('a locked Vault leaves a pending marker instead of reporting a cloud save', async () => {
+  const { vault, local } = await fixture({ initialPayload: { videos: [{ id: 'v1' }] } });
+  vault.lockVault();
+  await assert.rejects(vault.saveLocalChanges(), /保管庫がロックされています/);
+  assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, true);
+});
+
 test('failed saves retain a retry marker and a later explicit sync stores the latest data', async () => {
   let fail = true;
   const localPayload = { videos: [{ id: 'v1', url: 'https://example.test/1', title: '保持された変更' }] };
@@ -239,6 +257,27 @@ test('unlock restores existing data with either passphrase or recovery code with
   }
 });
 
+
+test('unlock never applies an older remote payload over a pending local deletion', async () => {
+  const saved = { videos: [{ id: 'v-1', url: 'https://example.test/old.mp4', title: 'クラウド旧版' }], videoMeta: {}, items: [{ id: 'm1' }], study: { progress: { x: 2 } } };
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const salt = webcrypto.getRandomValues(new Uint8Array(16));
+  const material = await webcrypto.subtle.importKey('raw', new TextEncoder().encode('valid passphrase 123'), 'PBKDF2', false, ['deriveKey']);
+  const passKey = await webcrypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' }, material, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  const keyWraps = { passphrase: { kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations: 600000, salt: b64url(salt) }, encryptedKey: await encrypt(passKey, rawKey) } };
+  const remote = { record: { payload: await encryptPayload(rawKey, saved, keyWraps), revision: 7, updated_at: 'newer-cloud' } };
+  const { vault, local } = await fixture({ rawKey, revision: 6, remote });
+  const deleted = { videos: [], videoMeta: {}, items: [{ id: 'm1' }], study: { progress: { x: 2 } } };
+  local.setItem('testPayload', JSON.stringify(deleted));
+  local.setItem('mangaReaderSupabaseSyncMeta', JSON.stringify({ 'user-1': { revision: 6, updatedAt: 'before', pendingSync: true } }));
+  let applied = false;
+  const result = await vault.initialize('valid passphrase 123', '', () => { applied = true; }, () => ({}));
+  assert.equal(applied, false);
+  assert.equal(result.pendingSync, true);
+  assert.equal(result.syncError, undefined);
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')), deleted);
+  assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), saved);
+});
 
 test('passkey unlock restores the same cloud payload and video metadata', async () => {
   const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
