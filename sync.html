@@ -107,6 +107,21 @@
       copy:$('copyRecoveryBtn')
     };
     function setStatus(text) { ui.status.textContent=text || ''; }
+    let pendingContinueButton=null;
+    function showPendingSync(result) {
+      setStatus(['端末には未同期の変更があります。',result && result.syncError].filter(Boolean).join(' '));
+      if (!pendingContinueButton) {
+        pendingContinueButton=document.createElement('button');
+        pendingContinueButton.type='button';
+        pendingContinueButton.textContent='端末データを開く';
+        pendingContinueButton.addEventListener('click',goReader);
+        ui.unlockForm.appendChild(pendingContinueButton);
+      }
+    }
+    function clearPendingSyncNotice() {
+      if (pendingContinueButton) pendingContinueButton.remove();
+      pendingContinueButton=null;
+    }
     function goReader() { const next = new URLSearchParams(location.search).get('next'); window.location.replace(['images.html','drive-gallery.html'].includes(next) ? next : 'home.html'); }
     let session = MangaVault.loadSession();
     if (!session || !session.user || !session.user.email) { window.location.replace('index.html'); return; }
@@ -166,6 +181,7 @@
       opening=true;
       ui.credential.classList.remove('error');
       setStatus('');
+      clearPendingSyncNotice();
       try {
         if (passkeyOpening) {
           if (passkeyAbortController) passkeyAbortController.abort();
@@ -178,6 +194,8 @@
           ui.recoveryCode.textContent=result.recoveryCode;
           ui.recoveryBox.hidden=false;
           setTimeout(goReader,5500);
+        } else if (result.pendingSync) {
+          showPendingSync(result);
         } else {
           goReader();
         }
@@ -197,9 +215,14 @@
       passkeyAbortController=controller;
       ui.credential.classList.remove('error');
       setStatus('');
+      clearPendingSyncNotice();
       const attempt=(async()=>{
         try {
-          await MangaVault.initializeWithPasskey(applyPayload,{signal:controller.signal});
+          const result=await MangaVault.initializeWithPasskey(applyPayload,{signal:controller.signal});
+          if (result && result.pendingSync) {
+            showPendingSync(result);
+            return false;
+          }
           goReader();
           return true;
         } catch (error) {
@@ -255,6 +278,7 @@
     ui.credential.addEventListener('input',()=>{
       ui.credential.classList.remove('error');
       setStatus('');
+      clearPendingSyncNotice();
       if (ui.credential.value && passkeyOpening && passkeyAbortController) passkeyAbortController.abort();
     });
     ui.unlockForm.addEventListener('submit',unlockFromCredential);
