@@ -307,15 +307,22 @@
     markLocalChangesPending();
     return enqueueSave(() => writePayload(snapshot));
   }
+  async function writeLocalChanges() {
+    assertSyncAccess();
+    if (!loadActive()) throw new Error('保管庫がロックされています。端末には保存済みです。保管庫を開いて同期してください。');
+    if (!window.MangaVaultPayload || typeof window.MangaVaultPayload.buildFromLocalStorage !== 'function') throw new Error('端末の同期データを読み取れません。');
+    const session = loadSession(); const userId = session && session.user && session.user.id;
+    if (!userId) throw new Error('ログインしてください。');
+    return withVaultSaveLock(userId, () => withSession((token, user) => {
+      assertSyncAccess();
+      if (!loadActive()) throw new Error('保管庫がロックされています。端末には保存済みです。保管庫を開いて同期してください。');
+      return persistPayload(token, user, window.MangaVaultPayload.buildFromLocalStorage());
+    }));
+  }
   async function saveLocalChanges() {
     assertSyncAccess();
     markLocalChangesPending();
-    return enqueueSave(() => {
-      assertSyncAccess();
-      if (!loadActive()) throw new Error('保管庫がロックされています。端末には保存済みです。保管庫を開いて同期してください。');
-      if (!window.MangaVaultPayload || typeof window.MangaVaultPayload.buildFromLocalStorage !== 'function') throw new Error('端末の同期データを読み取れません。');
-      return writePayload(window.MangaVaultPayload.buildFromLocalStorage());
-    });
+    return enqueueSave(writeLocalChanges);
   }
   async function restoreExistingRecord(record, user, applyPayload, unlockRecord) {
     const known = getMeta(user.id);
