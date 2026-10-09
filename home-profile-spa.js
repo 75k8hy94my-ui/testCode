@@ -28,7 +28,7 @@ const guestMode=window.TestCodeGuest?.isActive()===true;
 const session=guestMode?null:window.MangaVault&&MangaVault.loadSession();
 const SPA_PAGES=(window.AppShell&&Array.isArray(AppShell.SPA_PAGES)?AppShell.SPA_PAGES:['home.html','profile.html','manga.html','video.html']);
 let layout=Home?Home.loadLayout():[];
-let editing=false,syncRunning=false,syncDirty=false,syncDirtyMessage='',syncClearTimer=null,profileSecurityBusy=false;
+let editing=false,syncRunning=false,syncDirty=false,syncDirtyMessage='',profileSecurityBusy=false;
 let mount=null,renderGeneration=0,mangaRouteRuntime=null,mangaRouteBootPromise=null,videoRouteRuntime=null,lastVpnRouteAccess='';
 
 function ensureAppShell(){
@@ -56,7 +56,7 @@ function getMount(){
 
 function routeName(path=location.pathname){const name=path.split('/').pop();if(name==='profile.html')return'profile';if(name==='manga.html')return'manga';if(name==='video.html')return'video';return'home';}
 function setTitle(route){const titles={home:'ホーム',profile:'プロフィール設定',manga:'漫画',video:'動画'};const title=titles[route]||titles.home;document.title=title;const h1=document.getElementById('shellTitle');if(h1)h1.textContent=title;}
-function setSyncStatus(text){const node=$('homeSyncStatus');if(!node)return;clearTimeout(syncClearTimer);node.textContent=text||'';if(text&&text!=='同期中…')syncClearTimer=setTimeout(()=>{if(node.isConnected)node.textContent='';},3500);}
+function setSyncStatus(text){const node=$('homeSyncStatus');if(!node)return;node.textContent=text||'';}
 function canSyncProtectedData(){if(guestMode)return false;const gate=window.MangaReaderMediaAccess;return !!gate&&typeof gate.canReadProtectedData==='function'&&gate.canReadProtectedData()===true;}
 async function runHomeSync(okMessage){if(guestMode){setSyncStatus('端末内に保存しました（ゲスト・同期なし）');return;}if(!canSyncProtectedData()){syncDirty=false;syncDirtyMessage='';setSyncStatus('VPN接続を確認できるまでクラウド同期を停止しています。');return;}if(syncRunning){syncDirty=true;syncDirtyMessage=okMessage||syncDirtyMessage;return;}syncRunning=true;setSyncStatus('同期中…');try{if(!canSyncProtectedData())return;await MangaVault.saveLocalChanges();setSyncStatus(okMessage||'保存しました');}catch(error){setSyncStatus('端末には保存済みです。クラウド同期: '+(error&&error.message?error.message:'失敗'));}finally{syncRunning=false;if(syncDirty){syncDirty=false;const queued=syncDirtyMessage;syncDirtyMessage='';runHomeSync(queued);}}}
 function commitLayout(next){layout=Home.saveLayout(next);renderHome();runHomeSync('ホームの並びを保存しました');}
