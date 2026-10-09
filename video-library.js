@@ -17,7 +17,7 @@
 
   const state = {
     baseVideos: [], folders: [], meta: {}, query: '', quick: 'all', folderId: '', tag: '', service: '', sort: 'recent-added', view: 'card',
-    syncTimer: null, syncRunning: false, syncDirty: false, editorId: null, sheetMode: null, showHidden: false,
+    syncTimer: null, syncRunning: false, syncDirty: false, syncPromise: null, editorSaving: false, editorId: null, sheetMode: null, showHidden: false,
   };
   const dom = {};
   let eventsBound = false;
@@ -80,20 +80,34 @@
   }
 
   async function runVaultSync() {
-    if (!canReadProtectedData()) return;
-    if (!window.MangaVault || !window.MangaVaultPayload || !MangaVault.loadActive || !MangaVault.loadActive()) return;
-    if (state.syncRunning) { state.syncDirty = true; return; }
+    if (!canReadProtectedData()) return false;
+    if (!window.MangaVault || typeof MangaVault.saveLocalChanges !== 'function') {
+      if (MangaVault && typeof MangaVault.markLocalChangesPending === 'function') MangaVault.markLocalChangesPending();
+      setStatus('端末には保存済みです。保管庫が利用できないためクラウド未同期です。', true);
+      return false;
+    }
+    if (state.syncRunning) { state.syncDirty = true; return state.syncPromise; }
     state.syncRunning = true;
     setStatus('同期中…');
-    try {
-      await MangaVault.savePayload(MangaVaultPayload.buildFromLocalStorage());
-      setStatus('保存しました');
-      setTimeout(() => { if (dom.status && dom.status.textContent === '保存しました') setStatus(''); }, 1800);
-    } catch (error) {
-      setStatus('端末には保存済みです。同期: ' + (error && error.message ? error.message : '失敗'), true);
-    } finally {
+    const pending = (async () => {
+      do {
+        state.syncDirty = false;
+        try {
+          await MangaVault.saveLocalChanges();
+        } catch (error) {
+          setStatus('端末には保存済みです。クラウド未同期: ' + (error && error.message ? error.message : '同期に失敗しました。'), true);
+          return false;
+        }
+      } while (state.syncDirty);
+      setStatus('端末保存・クラウド同期が完了しました');
+      setTimeout(() => { if (dom.status && dom.status.textContent === '端末保存・クラウド同期が完了しました') setStatus(''); }, 1800);
+      return true;
+    })();
+    state.syncPromise = pending;
+    try { return await pending; }
+    finally {
       state.syncRunning = false;
-      if (state.syncDirty) { state.syncDirty = false; runVaultSync(); }
+      if (state.syncPromise === pending) state.syncPromise = null;
     }
   }
   function scheduleVaultSync() {
@@ -444,9 +458,9 @@
     state.folders.push({ id: id('vf'), name, createdAt: Date.now() }); dom.newFolder.value = ''; persistAux(); renderFolderManager(); render();
   }
 
-  function saveEditor(event) {
+  async function saveEditor(event) {
     event.preventDefault(); dom.formError.textContent = '';
-    if (!canReadProtectedData()) return;
+    if (state.editorSaving || !canReadProtectedData()) return;
     const existingBase = state.editorId ? baseById(state.editorId) : null;
     const rawUrl = text(dom.url.value);
     const classified = Data.classifyVideoUrl(rawUrl);
@@ -460,6 +474,9 @@
       watchStatus: text(dom.statusSelect.value), thumbnailUrl: text(dom.thumbnail.value),
       rotate90: Data.isDirectVideoUrl(url) && dom.rotate90Direction.value !== 'none', rotate90Direction: Data.isDirectVideoUrl(url) ? dom.rotate90Direction.value : 'none',
     };
+    state.editorSaving = true;
+    const submitButton = dom.form.querySelector('[type="submit"]');
+    if (submitButton) submitButton.disabled = true;
     try {
       let targetId = state.editorId;
       if (!existingBase) {
@@ -470,16 +487,32 @@
         delete state.meta[state.editorId]; targetId = created.id;
       }
       state.meta[targetId] = { ...(state.meta[targetId] || {}), ...patch, updatedAt: Date.now() };
-      persistAux(); loadLibraryState(); render(); closeSheet();
-    } catch (error) { dom.formError.textContent = error && error.message ? error.message : '保存できませんでした。'; }
+      if (!persistAux({ sync: false })) throw new Error('端末データを保存できません。');
+      loadLibraryState(); render();
+      clearTimeout(state.syncTimer);
+      if (!await runVaultSync()) {
+        dom.formError.textContent = '端末には保存しましたが、クラウド未同期です。保管庫を開いてから再試行してください。';
+        return;
+      }
+      closeSheet();
+    } catch (error) {
+      dom.formError.textContent = error && error.message ? error.message : '保存できませんでした。';
+    } finally {
+      state.editorSaving = false;
+      if (submitButton) submitButton.disabled = false;
+    }
   }
 
-  function deleteVideoFromLibrary(videoId) {
+  async function deleteVideoFromLibrary(videoId) {
     if (!canReadProtectedData()) return;
     const base = baseById(videoId); if (!base) return;
     const video = effectiveVideo(base); if (!confirm('「' + (video.title || 'この動画') + '」を削除しますか？')) return;
     if (!invokeLegacyDelete(base)) { setStatus('削除できませんでした。ページを再読み込みして再試行してください。', true); return; }
-    delete state.meta[videoId]; persistAux(); loadLibraryState(); render();
+    delete state.meta[videoId];
+    if (!persistAux({ sync: false })) { setStatus('端末に削除を保存できませんでした。', true); return; }
+    loadLibraryState(); render();
+    clearTimeout(state.syncTimer);
+    if (!await runVaultSync()) { setStatus('端末には削除を保存しましたが、クラウド未同期です。保管庫を開いて再試行してください。', true); return; }
     if (state.editorId === videoId) closeSheet();
   }
 
