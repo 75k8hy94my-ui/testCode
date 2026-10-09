@@ -26,7 +26,7 @@
           await deps.loadMediaGate();
           await deps.loadScript('video-data.js?v=20260918-video-data-no-window', 'spaVideoData');
           await deps.loadScript('video-thumbnail-renderer.js?v=20261008-shared-thumbnails', 'spaVideoThumbnailRenderer');
-          await deps.loadScript('video-library.js?v=20261009-add-page-contrast', 'spaVideoLibrary');
+          await deps.loadScript('video-library.js?v=20261009-vault-sync-queue', 'spaVideoLibrary');
         })().catch((error) => {
           bootPromise = null;
           throw error;
@@ -35,8 +35,8 @@
       await bootPromise;
       if (canReadProtectedData() && !helperPromise) {
         helperPromise = (async () => {
-          await deps.loadScript('video-routing-fix.js?v=20261008-vpn-data', 'spaVideoRouting');
-          await deps.loadScript('video-thumbnail-time.js?v=20261008-vpn-data', 'spaVideoThumbnailTime');
+          await deps.loadScript('video-routing-fix.js?v=20261009-vault-sync-queue', 'spaVideoRouting');
+          await deps.loadScript('video-thumbnail-time.js?v=20261009-vault-sync-queue', 'spaVideoThumbnailTime');
         })().catch((error) => {
           helperPromise = null;
           throw error;

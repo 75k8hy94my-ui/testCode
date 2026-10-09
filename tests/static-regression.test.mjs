@@ -66,7 +66,7 @@ test('Reader stores progress and favorite updates through its focused repository
   assert.match(progress, /mangaReaderLastPage/);
   assert.match(repository, /updateItem\(itemId/);
   assert.match(repository, /dependencies\.scheduleSync\(\)/);
-  assert.match(read('reader.html'), /MangaVault\.savePayload\(MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
+  assert.match(read('reader.html'), /MangaVault\.saveLocalChanges\(\)/);
   assert.match(read('reader-runtime.js'), /repository\.flushSync\?\.\(\)/);
 });
 

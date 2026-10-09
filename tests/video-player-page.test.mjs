@@ -43,7 +43,7 @@ test('video player edit action navigates to the dedicated editor instead of open
   for (const field of ['name="title"', 'name="folder"', 'name="status"', 'name="tags"', 'name="memo"', 'name="favorite"', 'name="rotate"']) {
     assert.ok(editor.includes(field), field);
   }
-  assert.match(editor, /MangaVault\.savePayload\(window\.MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
+  assert.match(editor, /MangaVault\.saveLocalChanges\(\)/);
   assert.match(editor, /location\.href = returnTarget\(returnKind, savedId\)/);
   assert.match(editor, /if \(kind === 'player'\) return 'video-player\.html\?id='/);
 });
@@ -89,7 +89,7 @@ test('custom player defers single taps and maps double-tap zones to seek or full
 test('video player document cache keys identify the current watch-page design', () => {
   const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
   assert.match(html, /home-profile-shell\.css\?v=20261009-generated-volume-icons/);
-  assert.match(html, /video-player-page\.js\?v=20261009-stage3-entry/);
+  assert.match(html, /video-player-page\.js\?v=20261009-vault-sync-queue/);
 });
 
 test('marker registration defaults to the current playback position', () => {

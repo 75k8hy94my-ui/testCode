@@ -57,7 +57,7 @@ function routeName(path=location.pathname){const name=path.split('/').pop();if(n
 function setTitle(route){const titles={home:'ホーム',profile:'プロフィール設定',manga:'漫画',video:'動画'};const title=titles[route]||titles.home;document.title=title;const h1=document.getElementById('shellTitle');if(h1)h1.textContent=title;}
 function setSyncStatus(text){const node=$('homeSyncStatus');if(!node)return;clearTimeout(syncClearTimer);node.textContent=text||'';}
 function canSyncProtectedData(){const gate=window.MangaReaderMediaAccess;return !!gate&&typeof gate.canReadProtectedData==='function'&&gate.canReadProtectedData()===true;}
-async function runHomeSync(okMessage){if(!canSyncProtectedData()){syncDirty=false;syncDirtyMessage='';setSyncStatus('VPN接続を確認できるまでクラウド同期を停止しています。');return;}if(syncRunning){syncDirty=true;syncDirtyMessage=okMessage||syncDirtyMessage;return;}syncRunning=true;setSyncStatus('同期中…');try{if(!canSyncProtectedData())return;const payload=MangaVaultPayload.buildFromLocalStorage();if(!canSyncProtectedData())return;await MangaVault.savePayload(payload);setSyncStatus(okMessage||'保存しました');}catch(error){setSyncStatus('端末には保存済みです。クラウド同期: '+(error&&error.message?error.message:'失敗'));}finally{syncRunning=false;if(syncDirty){syncDirty=false;const queued=syncDirtyMessage;syncDirtyMessage='';runHomeSync(queued);}}}
+async function runHomeSync(okMessage){if(!canSyncProtectedData()){syncDirty=false;syncDirtyMessage='';setSyncStatus('VPN接続を確認できるまでクラウド同期を停止しています。');return;}if(syncRunning){syncDirty=true;syncDirtyMessage=okMessage||syncDirtyMessage;return;}syncRunning=true;setSyncStatus('同期中…');try{if(!canSyncProtectedData())return;if(!canSyncProtectedData())return;await MangaVault.saveLocalChanges();setSyncStatus(okMessage||'保存しました');}catch(error){setSyncStatus('端末には保存済みです。クラウド同期: '+(error&&error.message?error.message:'失敗'));}finally{syncRunning=false;if(syncDirty){syncDirty=false;const queued=syncDirtyMessage;syncDirtyMessage='';runHomeSync(queued);}}}
 function commitLayout(next){layout=Home.saveLayout(next);renderHome();runHomeSync('ホームの並びを保存しました');}
 function cardTop(card){const top=document.createElement('div');top.className='cardTop';const mark=document.createElement('span');mark.className='cardMark';mark.textContent=marks[card.id]||'・';const badge=document.createElement('span');badge.className='cardBadge';badge.textContent=card.badge||'';top.append(mark,badge);return top;}
 function addCardText(root,card){root.append(cardTop(card));const title=document.createElement('h2');title.textContent=card.title;root.append(title);}
@@ -169,7 +169,7 @@ async function renderVideo(generation){
     const gate=await ensureVpnGate();
     if(generation!==renderGeneration)return;
     if(!gate){renderVpnGate(target,'video');setTitle('video');syncHeaderRoute();return;}
-    if(!window.VideoListRouteFactory)await loadScript('video-list-route.js?v=20261009-add-page-contrast','spaVideoListRoute');
+    if(!window.VideoListRouteFactory)await loadScript('video-list-route.js?v=20261009-vault-sync-queue','spaVideoListRoute');
     if(!window.MangaReaderVideoTemplate)await loadScript('video-list-template.js?v=20260922-vpn-tools','spaVideoListTemplate');
     if(generation!==renderGeneration)return;
     if(!videoRouteRuntime)videoRouteRuntime=window.VideoListRouteFactory.create({
@@ -196,7 +196,7 @@ async function renderManga(generation){
     const gate=await ensureVpnGate();
     if(generation!==renderGeneration)return;
     if(!gate){renderVpnGate(target,'manga');setTitle('manga');syncHeaderRoute();return;}
-    if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20261009-desktop-liquid-pager','spaMangaListRoute');
+    if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20261009-vault-sync-queue','spaMangaListRoute');
     if(generation!==renderGeneration)return;
     routeRuntime=window.MangaListRouteFactory.create({documentRef:document,windowRef:window,mediaAccess:gate});
     mangaRouteRuntime=routeRuntime;

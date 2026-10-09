@@ -71,10 +71,14 @@
     const current = nextMeta[id] && typeof nextMeta[id] === 'object' ? nextMeta[id] : {};
     nextMeta[id] = { ...current, ...patch, updatedAt: Date.now() };
     localStorage.setItem(META_KEY, JSON.stringify(nextMeta));
-    if (window.MangaVault && window.MangaVaultPayload && typeof window.MangaVault.savePayload === 'function' && window.MangaVault.loadActive && window.MangaVault.loadActive()) {
-      await window.MangaVault.savePayload(window.MangaVaultPayload.buildFromLocalStorage());
+    if (!window.MangaVault || typeof window.MangaVault.saveLocalChanges !== 'function') {
+      const error = new Error('保管庫を開いてからクラウド同期を再試行してください。'); error.localSaved = true; Object.assign(allMeta, nextMeta); throw error;
     }
-    if (!canReadProtectedData()) throw new Error('VPN接続を確認できるまで動画を編集できません。');
+    try { await window.MangaVault.saveLocalChanges(); }
+    catch (error) { error.localSaved = true; Object.assign(allMeta, nextMeta); throw error; }
+    if (!canReadProtectedData()) {
+      const error = new Error('VPN接続を確認できるまで動画を編集できません。'); error.localSaved = true; throw error;
+    }
     Object.assign(allMeta, nextMeta);
     return nextMeta[id];
   };
@@ -95,7 +99,11 @@
       const saved = await saveMetaPatch({ title: next });
       if (!canReadProtectedData()) return;
       heading.textContent = saved.title; document.title = saved.title || '動画';
-    } catch (_) { heading.textContent = previous; info.dataset.saveError = 'タイトルを保存できませんでした'; setTimeout(() => { delete info.dataset.saveError; }, 3500); }
+    } catch (error) {
+      if (error && error.localSaved && canReadProtectedData()) { heading.textContent = next; document.title = next || '動画'; info.dataset.saveError = '端末には保存しましたが、クラウド未同期です。'; }
+      else heading.textContent = previous;
+      setTimeout(() => { delete info.dataset.saveError; }, 3500);
+    }
   };
   heading.addEventListener('click', beginTitleEdit);
   heading.addEventListener('keydown', (event) => {

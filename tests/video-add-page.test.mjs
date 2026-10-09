@@ -45,7 +45,7 @@ function startEditor({ mode = 'add', allowed = true, videos = [], meta = {} } = 
     addEventListener() {},
   };
   const gate = { canReadProtectedData: () => allowed, syncUi() {} };
-  const window = { MangaReaderVideoData: Data, MangaReaderMediaAccess: gate, crypto: { randomUUID: () => 'added-uuid' } };
+  const window = { MangaReaderVideoData: Data, MangaReaderMediaAccess: gate, MangaVault: { markLocalChangesPending() {}, async saveLocalChanges() {} }, crypto: { randomUUID: () => 'added-uuid' } };
   const location = { search: mode === 'add' ? '?mode=add&return=list' : '?id=existing&return=list', href: 'video-edit.html' };
   vm.runInNewContext(source, { window, document, localStorage, location, URLSearchParams, Date, Math, confirm: () => true });
   const form = page.children.find((child) => child.tag === 'form');

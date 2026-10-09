@@ -71,9 +71,9 @@
     clearTimeout(syncTimer);
     syncTimer = setTimeout(async () => {
       if (!canReadProtectedData()) return;
-      if (!window.MangaVault || !window.MangaVaultPayload || typeof MangaVault.loadActive !== 'function' || !MangaVault.loadActive()) return;
+      if (!window.MangaVault || typeof MangaVault.saveLocalChanges !== 'function') return;
       try {
-        await MangaVault.savePayload(MangaVaultPayload.buildFromLocalStorage());
+        await MangaVault.saveLocalChanges();
       } catch (_) {
         // Local metadata is already safe; a later normal sync can retry.
       }

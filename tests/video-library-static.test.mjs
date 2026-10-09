@@ -19,8 +19,8 @@ test('video library provides search filters sorting view modes folders and edito
   }
   assert.match(source, /mangaReaderVideoMeta/);
   assert.match(source, /mangaReaderVideoFolders/);
-  assert.match(source, /MangaVaultPayload\.buildFromLocalStorage/);
-  assert.match(source, /MangaVault\.savePayload/);
+  assert.match(source, /MangaVault\.saveLocalChanges/);
+  assert.match(source, /MangaVault\.saveLocalChanges/);
   assert.match(source, /videoDeleteBtn/);
   assert.match(source, /history\.pushState/);
 });
@@ -39,12 +39,12 @@ test('video list ellipsis navigates directly to the dedicated editor without an 
   assert.match(editor, /source\.href = current\.url/);
   assert.match(editor, /remaining = latestVideos\.filter/);
   assert.match(editor, /delete remainingMeta\[videoId\]/);
-  assert.match(editor, /MangaVault\.savePayload\(window\.MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
+  assert.match(editor, /MangaVault\.saveLocalChanges\(\)/);
   assert.match(editor, /name="thumbnailTime"/);
   assert.match(editor, /Data\.parseMediaTime\(timestamp\)/);
-  assert.match(editorHtml, /video-edit-page\.js\?v=20261009-sync-save-feedback/);
+  assert.match(editorHtml, /video-edit-page\.js\?v=20261009-vault-sync-queue/);
   assert.doesNotMatch(editorHtml, /auth-pending/);
-  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261009-add-page-contrast/);
+  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261009-vault-sync-queue/);
 });
 
 test('video cards delegate thumbnail rendering to the shared renderer', () => {
@@ -107,8 +107,9 @@ test('adding a video navigates to the dedicated form with opaque surfaces', () =
 
 test('video library saves enhanced records through its own Vault boundary', () => {
   const library = read('video-library.js');
-  assert.match(library, /MangaVaultPayload\.buildFromLocalStorage\(\)/);
-  assert.match(library, /MangaVault\.savePayload\(MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
+  assert.match(library, /MangaVault\.saveLocalChanges\(\)/);
+  assert.match(library, /async function saveEditor/);
+  assert.match(library, /if \(!await runVaultSync\(\)\)/);
   assert.doesNotMatch(read('reader.html'), /video-data\.js|video-library\.js|mangaReaderVideos/);
 });
 
@@ -119,7 +120,7 @@ test('video library never reads or mutates protected records without VPN access'
   assert.ok(load.indexOf('if (!canReadProtectedData())') < load.indexOf('readJson(VIDEO_KEY'));
   assert.match(library, /if \(isProtectedDataKey\(key\) && !canReadProtectedData\(\)\) return fallback/);
   assert.match(library, /if \(isProtectedDataKey\(key\) && !canReadProtectedData\(\)\) return false/);
-  assert.match(library, /if \(!canReadProtectedData\(\)\) return;[\s\S]*MangaVaultPayload\.buildFromLocalStorage/);
+  assert.match(library, /if \(!canReadProtectedData\(\)\) return false;[\s\S]*MangaVault\.saveLocalChanges/);
 });
 
 test('video playback and thumbnail helpers honor access loss before protected reads, media work, writes, and sync', () => {
@@ -128,7 +129,7 @@ test('video playback and thumbnail helpers honor access loss before protected re
   assert.match(routing, /function readJson\(key, fallback\)\s*\{\s*if \(PROTECTED_KEYS\.has\(key\) && !canReadProtectedData\(\)\) return fallback/);
   assert.match(routing, /function scanDirectVideoThumbnails\(\)\s*\{\s*if \(!canReadProtectedData\(\)\) return false/);
   assert.match(routing, /function persistPlaybackProgress\(base, video, options\)\s*\{\s*if \(!canReadProtectedData\(\)/);
-  assert.match(routing, /if \(!canReadProtectedData\(\)\) return;[\s\S]*MangaVaultPayload\.buildFromLocalStorage/);
+  assert.match(routing, /if \(!canReadProtectedData\(\)\) return;[\s\S]*MangaVault\.saveLocalChanges/);
   const persistThumbnail = thumbnail.slice(thumbnail.indexOf('function persistThumbnailTimeAfterSave'), thumbnail.indexOf('function installEditor'));
   assert.match(persistThumbnail, /if \(!canReadProtectedData\(\)\) return/);
   assert.match(thumbnail, /setTimeout\(async \(\) => \{\s*if \(!canReadProtectedData\(\)\) return/);
@@ -181,8 +182,8 @@ test('video routing bridge plays direct video URLs with a video element and keep
   assert.match(source, /addEventListener\(['"]click['"],[\s\S]*true\)/);
   assert.doesNotMatch(source, /node\.click\(\)/);
   assert.doesNotMatch(source, /screen=video-player/);
-  assert.match(source, /MangaVaultPayload\.buildFromLocalStorage/);
-  assert.match(source, /MangaVault\.savePayload/);
+  assert.match(source, /MangaVault\.saveLocalChanges/);
+  assert.match(source, /MangaVault\.saveLocalChanges/);
 });
 
 test('browser backup hook commits encrypted video sidecars only after import confirmation', () => {
@@ -222,5 +223,5 @@ test('dedicated video editor distinguishes local storage failures from cloud syn
   assert.match(editor, /端末に保存できませんでした。ブラウザの保存容量を確認してください。/);
   assert.match(editor, /端末には保存しましたが、クラウド同期に失敗しました:/);
   assert.doesNotMatch(editor, /保存できませんでした。端末の保存状態を確認してください。/);
-  assert.match(html, /video-edit-page\.js\?v=20261009-sync-save-feedback/);
+  assert.match(html, /video-edit-page\.js\?v=20261009-vault-sync-queue/);
 });

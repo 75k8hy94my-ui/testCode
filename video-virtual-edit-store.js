@@ -114,9 +114,8 @@
       return 've-' + globalThis.crypto.randomUUID();
     });
     const sync = options.sync || (async () => {
-      if (typeof window === 'undefined' || !window.MangaVault || !window.MangaVaultPayload
-        || !window.MangaVault.loadActive || !window.MangaVault.loadActive()) return false;
-      await window.MangaVault.savePayload(window.MangaVaultPayload.buildFromLocalStorage());
+      if (typeof window === 'undefined' || !window.MangaVault || typeof window.MangaVault.saveLocalChanges !== 'function') return false;
+      await window.MangaVault.saveLocalChanges();
       return true;
     });
 
