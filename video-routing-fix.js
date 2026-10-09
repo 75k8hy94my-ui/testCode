@@ -78,9 +78,9 @@
     clearTimeout(syncTimer);
     syncTimer = setTimeout(async () => {
       if (!canReadProtectedData()) return;
-      if (!window.MangaVault || !window.MangaVaultPayload || typeof MangaVault.loadActive !== 'function' || !MangaVault.loadActive()) return;
+      if (!window.MangaVault || typeof MangaVault.saveLocalChanges !== 'function') return;
       try {
-        await MangaVault.savePayload(MangaVaultPayload.buildFromLocalStorage());
+        await MangaVault.saveLocalChanges();
       } catch (_) {
         // The sidecar is already persisted locally; a later ordinary sync can retry.
       }
