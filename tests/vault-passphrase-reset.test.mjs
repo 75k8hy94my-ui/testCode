@@ -84,3 +84,22 @@ test('a passkey reset writes a passphrase wrapper that the normal unlock flow ac
   assert.deepEqual(JSON.parse(JSON.stringify(openedPayload)), { savedItems: [{ id: 'kept' }] });
   assert.equal(record.revision, 2);
 });
+
+test('new Vault creation uses a conflict-safe insert and requires a confirmed server row', async () => {
+  const localStorage = storage();
+  const sessionStorage = storage();
+  localStorage.setItem('mangaReaderSupabaseSession', JSON.stringify({ access_token: 'token', refresh_token: 'refresh', expires_at: Date.now() / 1000 + 3600, user: { id: 'user-1' } }));
+  let request;
+  const context = {
+    window: { MANGA_READER_SUPABASE: { url: 'https://vault.test', publishableKey: 'public' }, crypto: webcrypto },
+    navigator: {}, location: { hostname: 'vault.test', protocol: 'https:' }, crypto: webcrypto,
+    btoa: (value) => Buffer.from(value, 'binary').toString('base64'),
+    atob: (value) => Buffer.from(value, 'base64').toString('binary'), TextEncoder, TextDecoder,
+    localStorage, sessionStorage,
+    fetch: async (url, options = {}) => { request = { url: String(url), options }; return { ok: true, status: 201, json: async () => [], text: async () => '' }; },
+  };
+  vm.runInNewContext(source, context, { filename: 'vault-session.js' });
+  await assert.rejects(context.window.MangaVault.initialize('valid passphrase 123', '', () => {}, () => ({ items: [] })), /保存結果を確認できません/);
+  assert.equal(request.url, 'https://vault.test/rest/v1/manga_reader_vaults');
+  assert.equal(request.options.headers.Prefer, 'return=representation');
+});
