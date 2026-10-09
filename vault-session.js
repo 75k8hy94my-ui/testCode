@@ -271,6 +271,7 @@
       const encrypted = await envelope(payload);
       assertSyncAccess();
       const rows = await api('/rest/v1/rpc/update_manga_reader_vault', { method: 'POST', token, body: JSON.stringify({ expected_revision: knownRevision, new_payload: encrypted }) });
+      assertSyncAccess();
       if (!rows || !rows.length) {
         // A lost response after a successful CAS is safe to recognize only when
         // the current encrypted record decrypts to this exact payload.
@@ -287,6 +288,7 @@
     }
     assertSyncAccess();
     const rows = await api('/rest/v1/manga_reader_vaults', { method: 'POST', token, headers: { Prefer: 'return=representation' }, body: JSON.stringify({ user_id: user.id, payload: await envelope(payload), revision: 1 }) });
+    assertSyncAccess();
     const row = rows && rows[0];
     if (!row) throw new Error('クラウドへの保存結果を確認できませんでした。再読込して同期状態を確認してください。');
     setMeta(user.id, { revision: row.revision || 1, updatedAt: row.updated_at }); return row;
@@ -298,6 +300,7 @@
     return withVaultSaveLock(userId, () => withSession((token, user) => persistPayload(token, user, payload)));
   }
   async function savePayload(payload) {
+    assertSyncAccess();
     let snapshot;
     try { snapshot = JSON.parse(JSON.stringify(payload)); }
     catch (_) { throw new Error('保管庫に保存するデータを読み取れませんでした。'); }
