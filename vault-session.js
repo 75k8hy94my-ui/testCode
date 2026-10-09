@@ -331,7 +331,7 @@
     const payload = await decryptPayload(record.payload);
     if (pendingSync) {
       const revisionMatches = known && Number(known.revision) === Number(record.revision);
-      return { created: false, pendingSync: true, retryPending: Boolean(revisionMatches) };
+      return { created: false, pendingSync: true, retryPending: Boolean(revisionMatches), syncError: revisionMatches ? '' : '別の端末で更新されているため、端末データを保持したまま同期を停止しました。' };
     }
     await applyPayload(payload);
     setMeta(user.id, { revision: record.revision || 1, updatedAt: record.updated_at });
