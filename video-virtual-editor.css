@@ -32,3 +32,5 @@
 .vveSourceLink{overflow-wrap:anywhere}
 .vveHidden{display:none!important}
 @media(max-width:770px){.virtualVideoEditor{padding:14px 11px 100px}.vveGrid{grid-template-columns:1fr}.vvePanel{padding:12px}.vveAction{font-size:12px}.vveTop{align-items:stretch}.vveTop .vveButtons{justify-content:flex-start}}
+
+.virtualVideoEditor [hidden]{display:none!important}

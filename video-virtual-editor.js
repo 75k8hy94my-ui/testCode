@@ -153,6 +153,10 @@
     refs.moveUp.disabled = !hasSelected || selectedIndex === 0;
     refs.moveDown.disabled = !hasSelected || selectedIndex === edit.clips.length - 1;
     refs.save.disabled = busy || stale || !edit;
+    const canPlaySaved = !!project && !dirty && !stale && !busy;
+    refs.playSaved.hidden = !canPlaySaved;
+    if (canPlaySaved) refs.playSaved.href = 'video-virtual-player.html?project=' + encodeURIComponent(project.id);
+    else refs.playSaved.removeAttribute('href');
     refs.deleteProject.disabled = busy || !project;
     for (const key of ['add','source','title','start','end','markStart','markEnd']) refs[key].disabled = busy || stale;
     refs.projects.disabled = busy;
@@ -387,6 +391,7 @@
       '<button class="vveAction danger" type="button" data-remove>区間を削除</button></div>',
       '<p class="vveFootnote">今回の段階では素材を１区間ずつ確認できます。連続再生は第４段階で実装します。</p></section></div>',
       '<section class="vvePanel"><div class="vveButtons"><button class="vveAction primary" type="button" data-save>編集内容を保存</button>',
+      '<a class="vveAction" data-play-saved hidden>編集版を再生</a>',
       '<button class="vveAction danger" type="button" data-delete-project>プロジェクトを削除</button></div>',
       '<p class="vveStatus" role="status" aria-live="polite" data-status></p></section>'
     ].join('');
@@ -398,7 +403,7 @@
       total: $('[data-total]'), add: $('[data-add]'), trim: $('[data-trim]'),
       split: $('[data-split]'), removeClip: $('[data-remove]'), moveUp: $('[data-up]'),
       moveDown: $('[data-down]'), markStart: $('[data-mark-start]'), markEnd: $('[data-mark-end]'),
-      save: $('[data-save]'), deleteProject: $('[data-delete-project]'), status: $('[data-status]'),
+      save: $('[data-save]'), playSaved: $('[data-play-saved]'), deleteProject: $('[data-delete-project]'), status: $('[data-status]'),
     };
     sources.forEach((source) => {
       const option = document.createElement('option');
