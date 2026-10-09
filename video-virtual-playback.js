@@ -39,7 +39,7 @@
     function snapshot() {
       return {
         phase, error, message, clipIndex: activeIndex, clipCount: normalized.clips.length,
-        virtualSeconds: requestedSeconds, totalSeconds: total, playing: wantsPlay && phase === 'ready',
+        virtualSeconds: requestedSeconds, totalSeconds: total, requestedPlay: wantsPlay, playing: wantsPlay && phase === 'ready',
         sourceVideoId: activeIndex < 0 ? null : normalized.clips[activeIndex].sourceVideoId,
       };
     }
