@@ -24,8 +24,8 @@ test('video route loads its existing video modules without fetching reader.html'
   assert.match(route, /video-data\.js\?v=20260918-video-data-no-window/);
   assert.match(route, /video-thumbnail-renderer\.js\?v=20261008-shared-thumbnails/);
   assert.match(route, /video-library\.js\?v=20261009-vault-sync-queue/);
-  assert.match(route, /video-routing-fix\.js\?v=20261008-vpn-data/);
-  assert.match(route, /video-thumbnail-time\.js\?v=20261008-vpn-data/);
+  assert.match(route, /video-routing-fix\.js\?v=20261009-vault-sync-queue/);
+  assert.match(route, /video-thumbnail-time\.js\?v=20261009-vault-sync-queue/);
   assert.match(spa, /else if\(route==='video'\)renderVideo\(generation\)/);
   assert.doesNotMatch(spa, /route==='reader'|renderReader|reader\.html|iframe/);
   assert.match(spa, /if\(!SPA_PAGES\.includes\(name\)\)\{location\.href=target\.href;return;\}/);
