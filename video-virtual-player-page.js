@@ -16,6 +16,7 @@
   let blocked = false;
   let refs = {};
   let segments = [];
+  let scrubbing = false;
   const allowed = () => !!access && access.canReadProtectedData() === true;
   function stopPlayer() {
     if (player) player.destroy();
@@ -26,6 +27,7 @@
     loaded = false;
     refs = {};
     segments = [];
+    scrubbing = false;
     const section = document.createElement('section');
     section.className = 'vvpNotice vpnRouteGate';
     const heading = document.createElement('h2');
@@ -66,8 +68,10 @@
   function update(snapshot) {
     if (!allowed() || !loaded) return;
     refs.play.textContent = snapshot.requestedPlay ? '一時停止' : (snapshot.phase === 'finished' ? '最初から再生' : '再生');
-    refs.seek.value = String(Math.max(0, Math.min(snapshot.totalSeconds, snapshot.virtualSeconds)));
-    refs.time.textContent = format(snapshot.virtualSeconds) + ' / ' + format(snapshot.totalSeconds);
+    if (!scrubbing) {
+      refs.seek.value = String(Math.max(0, Math.min(snapshot.totalSeconds, snapshot.virtualSeconds)));
+      refs.time.textContent = format(snapshot.virtualSeconds) + ' / ' + format(snapshot.totalSeconds);
+    }
     refs.status.textContent = snapshot.error || snapshot.message || (snapshot.phase === 'idle' ? '再生ボタンを押してください。' : '');
     refs.status.dataset.error = snapshot.phase === 'error' ? '1' : '0';
     segments.forEach((button, index) =>
@@ -165,8 +169,15 @@
       if (player.snapshot().requestedPlay) player.pause();
       else player.play();
     });
+    refs.seek.addEventListener('input', () => {
+      if (!allowed() || !player) return;
+      scrubbing = true;
+      refs.time.textContent = format(Number(refs.seek.value)) + ' / ' + format(player.snapshot().totalSeconds);
+    });
     refs.seek.addEventListener('change', () => {
-      if (allowed() && player) player.seek(Number(refs.seek.value));
+      const seconds = Number(refs.seek.value);
+      scrubbing = false;
+      if (allowed() && player) player.seek(seconds);
     });
   }
   function handleAccess() {
