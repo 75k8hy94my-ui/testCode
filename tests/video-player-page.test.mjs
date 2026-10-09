@@ -44,7 +44,7 @@ test('video player edit action navigates to the dedicated editor instead of open
     assert.ok(editor.includes(field), field);
   }
   assert.match(editor, /MangaVault\.savePayload\(window\.MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
-  assert.match(editor, /location\.href = returnTarget\(returnKind, videoId\)/);
+  assert.match(editor, /location\.href = returnTarget\(returnKind, savedId\)/);
   assert.match(editor, /if \(kind === 'player'\) return 'video-player\.html\?id='/);
 });
 
