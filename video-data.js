@@ -36,6 +36,7 @@
     return `${minutes}:${String(seconds).padStart(2, '0')}`;
   }
 
+  const VIRTUAL_EDIT_PROJECTS_KEY = '__testCodeVirtualMp4ProjectsV1__';
   function mergeVideoMetaPreservingThumbnailTime(existingValue, incomingValue) {
     const existing = existingValue && typeof existingValue === 'object' && !Array.isArray(existingValue) ? existingValue : {};
     const incoming = incomingValue && typeof incomingValue === 'object' && !Array.isArray(incomingValue) ? incomingValue : {};
@@ -55,6 +56,16 @@
       });
       merged[id] = next;
     });
+    // Video list and editor pages may write metadata based on an older snapshot.
+    // Keep the newest virtual-project registry while preserving ordinary delete
+    // semantics for individual video metadata entries.
+    const previousProjects = existing[VIRTUAL_EDIT_PROJECTS_KEY];
+    const incomingProjects = merged[VIRTUAL_EDIT_PROJECTS_KEY];
+    const revision = (value) => value && value.schemaVersion === 1
+      && Number.isSafeInteger(value.revision) && value.revision >= 0 ? value.revision : -1;
+    if (revision(previousProjects) >= 0 && revision(previousProjects) > revision(incomingProjects)) {
+      merged[VIRTUAL_EDIT_PROJECTS_KEY] = previousProjects;
+    }
     return merged;
   }
 
