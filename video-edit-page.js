@@ -7,6 +7,10 @@
   const FOLDER_KEY = 'mangaReaderVideoFolders';
   const META_KEY = 'mangaReaderVideoMeta';
   let initialized = false;
+  const isAddMode = new URLSearchParams(location.search).get('mode') === 'add';
+  const shellTitle = document.getElementById('shellTitle');
+  if (shellTitle) shellTitle.textContent = isAddMode ? '動画を追加' : '動画を編集';
+  document.title = isAddMode ? '動画を追加' : '動画を編集';
 
   function canReadProtectedData() {
     return !!access && typeof access.canReadProtectedData === 'function' && access.canReadProtectedData() === true;
@@ -18,7 +22,7 @@
   function showGate() {
     const section = document.createElement('section'); section.className = 'videoEditNotice vpnRouteGate';
     const heading = document.createElement('h2'); heading.textContent = 'VPN接続が必要です';
-    const message = document.createElement('p'); message.textContent = 'VPN接続を確認できるまで、動画情報の読み込みと編集を停止しています。';
+    const message = document.createElement('p'); message.textContent = 'VPN接続を確認できるまで、動画情報の読み込みと追加・編集を停止しています。';
     const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'videoEditButton'; retry.dataset.vpnStatusButton = '1'; retry.dataset.vpnRecheckButton = '1'; retry.textContent = 'VPN接続を再確認';
     const diagnostics = document.createElement('button'); diagnostics.type = 'button'; diagnostics.className = 'videoEditButton'; diagnostics.dataset.vpnDiagnosticsButton = '1'; diagnostics.textContent = 'VPN診断';
     const back = document.createElement('a'); back.className = 'videoEditButton'; back.href = 'video.html'; back.textContent = '動画一覧へ戻る';
@@ -33,23 +37,25 @@
     if (initialized || !canReadProtectedData()) return;
     initialized = true;
     const params = new URLSearchParams(location.search);
-    const videoId = params.get('id') || '';
+    const videoId = isAddMode ? '' : (params.get('id') || '');
     const returnKind = params.get('return') === 'player' ? 'player' : 'list';
     const videos = read(VIDEO_KEY, []);
     const baseVideos = Array.isArray(videos) ? videos : [];
-    const base = baseVideos.find((item) => String(item.id) === videoId);
-    if (!base) {
+    const base = isAddMode ? null : baseVideos.find((item) => String(item.id) === videoId);
+    if (!isAddMode && !base) {
       const missing = document.createElement('section'); missing.className = 'videoEditNotice';
       const heading = document.createElement('h2'); heading.textContent = '動画が見つかりません';
       const back = document.createElement('a'); back.className = 'videoEditButton'; back.href = 'video.html'; back.textContent = '動画一覧へ戻る';
       missing.replaceChildren(heading, back); page.replaceChildren(missing); return;
     }
     const allMeta = read(META_KEY, {});
-    const originalMeta = allMeta[videoId] && typeof allMeta[videoId] === 'object' ? allMeta[videoId] : {};
-    const current = Data.normalizeVideo({ ...base, ...originalMeta, id: base.id, a: base.a, b: base.b, addedAt: base.addedAt });
+    const originalMeta = !isAddMode && allMeta[videoId] && typeof allMeta[videoId] === 'object' ? allMeta[videoId] : {};
+    const current = isAddMode
+      ? Data.normalizeVideo({ id: 'draft', addedAt: Date.now() })
+      : Data.normalizeVideo({ ...base, ...originalMeta, id: base.id, a: base.a, b: base.b, addedAt: base.addedAt });
     const folders = Data.normalizeFolders(read(FOLDER_KEY, []));
-    const heading = document.createElement('h2'); heading.className = 'videoEditHeading'; heading.textContent = '動画を編集';
-    const lead = document.createElement('p'); lead.className = 'videoEditLead'; lead.textContent = current.title || current.url || '動画情報を変更できます。';
+    const heading = document.createElement('h2'); heading.className = 'videoEditHeading'; heading.textContent = isAddMode ? '動画を追加' : '動画を編集';
+    const lead = document.createElement('p'); lead.className = 'videoEditLead'; lead.textContent = isAddMode ? '動画URLと情報を入力してください。' : (current.title || current.url || '動画情報を変更できます。');
     const form = document.createElement('form'); form.className = 'videoEditForm';
     form.innerHTML = `
       <div class="videoEditUrlRow"><div class="videoEditField"><label for="videoEditUrl">動画URL</label><input id="videoEditUrl" name="url" type="url" autocomplete="off" required readonly></div><button class="videoEditButton" type="button" data-edit-url>URLを変更</button></div>
@@ -72,12 +78,18 @@
     elements.favorite.checked = current.favorite;
     elements.hidden.checked = current.hidden;
     elements.rotate.value = current.rotate90Direction;
-    elements.service.value = base.a || '';
-    elements.legacyId.value = base.b || '';
+    elements.service.value = base ? (base.a || '') : '';
+    elements.legacyId.value = base ? (base.b || '') : '';
+    if (isAddMode) {
+      elements.url.readOnly = false;
+      form.querySelector('[data-edit-url]').hidden = true;
+      form.querySelector('[data-delete]').hidden = true;
+      form.querySelector('button[type="submit"]').textContent = '追加';
+    }
     elements.thumbnail.value = current.thumbnailUrl;
     elements.thumbnailTime.value = current.thumbnailTimeSeconds == null ? '' : Data.formatMediaTime(current.thumbnailTimeSeconds);
     elements.thumbnailTime.disabled = !Data.isDirectVideoUrl(current.url);
-    if (/^https?:\/\//i.test(current.url)) {
+    if (!isAddMode && /^https?:\/\//i.test(current.url)) {
       const source = document.createElement('a'); source.className = 'videoEditButton videoEditSource';
       source.href = current.url; source.target = '_blank'; source.rel = 'noopener noreferrer'; source.textContent = '元ページを開く ↗';
       form.prepend(source);
@@ -102,7 +114,9 @@
       const url = elements.url.value.trim();
       const classified = Data.classifyVideoUrl(url);
       if (classified.kind === 'invalid') { error.textContent = '有効な動画URLを入力してください。'; return; }
-      const duplicate = baseVideos.some((item) => String(item.id) !== videoId && Data.normalizeVideo(item).url === url);
+      const latestVideos = read(VIDEO_KEY, []);
+      const savedVideos = Array.isArray(latestVideos) ? latestVideos : [];
+      const duplicate = savedVideos.some((item) => (isAddMode || String(item.id) !== videoId) && Data.normalizeVideo(item).url === url);
       if (duplicate) { error.textContent = '同じ動画URLはすでに登録されています。'; return; }
       const fields = Data.storageFieldsForVideoUrl(url);
       const timestamp = elements.thumbnailTime.value.trim();
@@ -110,13 +124,18 @@
       if (Data.isDirectVideoUrl(url) && timestamp && parsedTime == null) {
         error.textContent = 'サムネイル時刻は mm:ss 形式で入力してください。'; return;
       }
-      const a = elements.service.value.trim() || classified.a || fields.a;
-      const b = elements.legacyId.value.trim() || classified.b || fields.b;
-      const nextBase = { ...base, title: elements.title.value.trim(), url, a, b, updatedAt: Date.now() };
+      const a = isAddMode ? fields.a : (elements.service.value.trim() || classified.a || fields.a);
+      const b = isAddMode ? fields.b : (elements.legacyId.value.trim() || classified.b || fields.b);
+      const now = Date.now();
+      const savedId = isAddMode ? 'v-' + (window.crypto && typeof window.crypto.randomUUID === 'function'
+        ? window.crypto.randomUUID() : Math.random().toString(36).slice(2) + now) : videoId;
+      const nextBase = isAddMode
+        ? Data.normalizeVideo({ id: savedId, title: elements.title.value.trim(), url, a, b, addedAt: now, updatedAt: now })
+        : { ...base, title: elements.title.value.trim(), url, a, b, updatedAt: now };
       const storedMeta = read(META_KEY, {});
       const nextMeta = storedMeta && typeof storedMeta === 'object' && !Array.isArray(storedMeta) ? storedMeta : {};
-      nextMeta[videoId] = { ...(nextMeta[videoId] || {}), title: elements.title.value.trim(), folderId: elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, hidden: elements.hidden.checked, rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, thumbnailUrl: elements.thumbnail.value.trim(), thumbnailTimeSeconds: Data.isDirectVideoUrl(url) ? parsedTime : current.thumbnailTimeSeconds, updatedAt: Date.now() };
-      const nextVideos = baseVideos.map((item) => String(item.id) === videoId ? nextBase : item);
+      nextMeta[savedId] = { ...(nextMeta[savedId] || {}), title: elements.title.value.trim(), folderId: elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, hidden: elements.hidden.checked, rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, thumbnailUrl: elements.thumbnail.value.trim(), thumbnailTimeSeconds: Data.isDirectVideoUrl(url) ? parsedTime : current.thumbnailTimeSeconds, updatedAt: Date.now() };
+      const nextVideos = isAddMode ? [nextBase, ...savedVideos] : savedVideos.map((item) => String(item.id) === videoId ? nextBase : item);
       try {
         localStorage.setItem(VIDEO_KEY, JSON.stringify(nextVideos));
         localStorage.setItem(META_KEY, JSON.stringify(nextMeta));
@@ -125,10 +144,10 @@
           await window.MangaVault.savePayload(window.MangaVaultPayload.buildFromLocalStorage());
         }
         if (!canReadProtectedData()) return;
-        location.href = returnTarget(returnKind, videoId);
+        location.href = returnTarget(returnKind, savedId);
       } catch (_) { error.textContent = '保存できませんでした。端末の保存状態を確認してください。'; }
     });
-    form.querySelector('[data-delete]').addEventListener('click', async () => {
+    if (!isAddMode) form.querySelector('[data-delete]').addEventListener('click', async () => {
       if (!canReadProtectedData()) return;
       if (!confirm('「' + (current.title || 'この動画') + '」を削除しますか？')) return;
       const error = form.querySelector('.videoEditError'); error.textContent = '';
@@ -153,7 +172,7 @@
       }
     });
     page.replaceChildren(heading, lead, form);
-    document.title = '動画を編集';
+    if (isAddMode) elements.url.focus();
   }
   function handleAccess() {
     if (canReadProtectedData()) initialize();
