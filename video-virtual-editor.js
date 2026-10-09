@@ -64,7 +64,7 @@
     dirty = busy = stale = false;
     const box = document.createElement('section');
     box.className = 'vveNotice vpnRouteGate';
-    const heading = document.createElement('h2'); heading.textContent = 'VPN接続が必要です';
+    const heading = document.createElement('h2'); heading.textContent = message ? '編集画面を開けません' : 'VPN接続が必要です';
     const detail = document.createElement('p'); detail.textContent = message || 'VPN接続が確認されるまで動画と編集情報の読み込みを停止します。';
     const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'vveAction';
     retry.dataset.vpnStatusButton = '1'; retry.dataset.vpnRecheckButton = '1'; retry.textContent = 'VPN接続を再確認';
@@ -158,7 +158,7 @@
     refs.projects.disabled = busy;
   }
   function chooseClip(index) {
-    if (!canRead() || busy || !edit || !edit.clips[index]) return;
+    if (!canRead() || busy || stale || !edit || !edit.clips[index]) return;
     selectedIndex = index;
     const clip = selectedClip();
     refs.source.value = sourceFor(clip.sourceVideoId) ? clip.sourceVideoId : '';
@@ -412,6 +412,7 @@
         refs.projects.value = project ? project.id : '';
         return;
       }
+      dirty = false;
       const url = new URL(location.href);
       url.search = refs.projects.value ? '?project=' + encodeURIComponent(refs.projects.value)
         : (sourceFor(routeSourceId) ? '?id=' + encodeURIComponent(routeSourceId) : '');
