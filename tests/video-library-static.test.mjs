@@ -42,7 +42,7 @@ test('video list ellipsis navigates directly to the dedicated editor without an 
   assert.match(editor, /MangaVault\.savePayload\(window\.MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
   assert.match(editor, /name="thumbnailTime"/);
   assert.match(editor, /Data\.parseMediaTime\(timestamp\)/);
-  assert.match(editorHtml, /video-edit-page\.js\?v=20261009-add-page-contrast/);
+  assert.match(editorHtml, /video-edit-page\.js\?v=20261009-sync-save-feedback/);
   assert.doesNotMatch(editorHtml, /auth-pending/);
   assert.match(read('video-list-route.js'), /video-library\.js\?v=20261009-add-page-contrast/);
 });
@@ -213,4 +213,14 @@ test('backup sidecar fields remain part of the existing migration and payload bo
   assert.match(backup, /videoMeta/);
   assert.match(payload, /videoFolders/);
   assert.match(payload, /videoMeta/);
+});
+
+
+test('dedicated video editor distinguishes local storage failures from cloud sync failures', () => {
+  const editor = read('video-edit-page.js');
+  const html = read('video-edit.html');
+  assert.match(editor, /端末に保存できませんでした。ブラウザの保存容量を確認してください。/);
+  assert.match(editor, /端末には保存しましたが、クラウド同期に失敗しました:/);
+  assert.doesNotMatch(editor, /保存できませんでした。端末の保存状態を確認してください。/);
+  assert.match(html, /video-edit-page\.js\?v=20261009-sync-save-feedback/);
 });

@@ -139,13 +139,21 @@
       try {
         localStorage.setItem(VIDEO_KEY, JSON.stringify(nextVideos));
         localStorage.setItem(META_KEY, JSON.stringify(nextMeta));
-        if (!canReadProtectedData()) return;
+      } catch (_) {
+        error.textContent = '端末に保存できませんでした。ブラウザの保存容量を確認してください。';
+        return;
+      }
+      if (!canReadProtectedData()) return;
+      try {
         if (window.MangaVault && window.MangaVaultPayload && typeof window.MangaVault.savePayload === 'function' && window.MangaVault.loadActive && window.MangaVault.loadActive()) {
           await window.MangaVault.savePayload(window.MangaVaultPayload.buildFromLocalStorage());
         }
-        if (!canReadProtectedData()) return;
-        location.href = returnTarget(returnKind, savedId);
-      } catch (_) { error.textContent = '保存できませんでした。端末の保存状態を確認してください。'; }
+      } catch (syncError) {
+        error.textContent = '端末には保存しましたが、クラウド同期に失敗しました: ' + (syncError && syncError.message ? syncError.message : '同期状態を確認してください。');
+        return;
+      }
+      if (!canReadProtectedData()) return;
+      location.href = returnTarget(returnKind, savedId);
     });
     if (!isAddMode) form.querySelector('[data-delete]').addEventListener('click', async () => {
       if (!canReadProtectedData()) return;
