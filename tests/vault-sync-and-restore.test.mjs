@@ -301,7 +301,7 @@ test('unlock never applies an older remote payload over a pending local deletion
   const result = await vault.initialize('valid passphrase 123', '', () => { applied = true; }, () => ({}));
   assert.equal(applied, false);
   assert.equal(result.pendingSync, true);
-  assert.equal(result.syncError, undefined);
+  assert.match(result.syncError, /別の端末で更新されている/);
   assert.deepEqual(JSON.parse(local.getItem('testPayload')), deleted);
   assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), saved);
 });
