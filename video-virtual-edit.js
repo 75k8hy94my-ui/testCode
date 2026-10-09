@@ -109,6 +109,57 @@
     return createEdit(result);
   }
 
+  // Duplicates only the clip instruction. Both entries continue to reference
+  // the same registered source, while later edits replace one array entry.
+  function duplicateClip(edit, index) {
+    const value = normalizeEdit(edit);
+    const clip = value.clips[checkedIndex(index, value.clips.length)];
+    const result = value.clips.slice();
+    result.splice(index + 1, 0, { ...clip });
+    return createEdit(result);
+  }
+
+  // Keep editor adjustments stable at millisecond precision, avoiding binary
+  // floating point tails accumulating over repeated button presses.
+  function adjustClipBoundary(edit, index, boundary, deltaSeconds, durationSeconds = null) {
+    const value = normalizeEdit(edit);
+    const clip = value.clips[checkedIndex(index, value.clips.length)];
+    if (boundary !== 'start' && boundary !== 'end') throw new TypeError('Boundary must be start or end');
+    if (typeof deltaSeconds !== 'number' || !Number.isFinite(deltaSeconds)) {
+      throw new TypeError('Boundary adjustment must be a finite number');
+    }
+    if (durationSeconds !== null && (typeof durationSeconds !== 'number'
+      || !Number.isFinite(durationSeconds) || durationSeconds <= 0)) {
+      throw new TypeError('Duration must be a positive finite number');
+    }
+    const roundSeconds = (seconds) => Math.round((seconds + Number.EPSILON) * 1000) / 1000;
+    let startSeconds = clip.startSeconds;
+    let endSeconds = clip.endSeconds;
+    if (boundary === 'start') {
+      const maximum = Math.min(endSeconds - 0.001,
+        durationSeconds === null ? Infinity : roundSeconds(Math.max(0, durationSeconds - 0.001)));
+      startSeconds = roundSeconds(Math.max(0, Math.min(maximum, roundSeconds(startSeconds + deltaSeconds))));
+    } else {
+      const maximum = durationSeconds === null ? Infinity : roundSeconds(durationSeconds);
+      endSeconds = roundSeconds(Math.max(startSeconds + 0.001, Math.min(maximum, roundSeconds(endSeconds + deltaSeconds))));
+    }
+    const result = value.clips.slice();
+    result[index] = { ...clip, startSeconds, endSeconds };
+    return createEdit(result);
+  }
+
+  function setClipBoundary(edit, index, boundary, sourceSeconds, durationSeconds = null) {
+    const value = normalizeEdit(edit);
+    const clip = value.clips[checkedIndex(index, value.clips.length)];
+    if (boundary !== 'start' && boundary !== 'end') throw new TypeError('Boundary must be start or end');
+    if (typeof sourceSeconds !== 'number' || !Number.isFinite(sourceSeconds)) {
+      throw new TypeError('Boundary position must be a finite number');
+    }
+    return adjustClipBoundary(value, index, boundary,
+      Math.round((sourceSeconds - clip[boundary === 'start' ? 'startSeconds' : 'endSeconds']) * 1000) / 1000,
+      durationSeconds);
+  }
+
   function moveClip(edit, from, to) {
     const value = normalizeEdit(edit);
     checkedIndex(from, value.clips.length);
@@ -150,7 +201,7 @@
 
   return Object.freeze({
     EDIT_TYPE, SCHEMA_VERSION, MAX_CLIPS, isMp4Url, createEdit, normalizeEdit,
-    validateSources, splitClip, joinEdits, trimClip, moveClip, removeClip,
+    validateSources, splitClip, joinEdits, trimClip, duplicateClip, adjustClipBoundary, setClipBoundary, moveClip, removeClip,
     totalDuration, locateTime,
   });
 }));

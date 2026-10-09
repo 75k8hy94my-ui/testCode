@@ -134,6 +134,7 @@
       button.type = 'button'; button.className = 'vveClip';
       button.dataset.clipIndex = String(index);
       button.setAttribute('aria-current', String(index === selectedIndex));
+      button.setAttribute('aria-pressed', String(index === selectedIndex));
       const label = document.createElement('strong');
       const source = sourceFor(clip.sourceVideoId);
       label.textContent = (index + 1) + '. ' + (source ? source.title : '参照できない素材');
@@ -147,18 +148,24 @@
       ? edit.clips.length + '区間・合計' + format(Edit.totalDuration(edit)) + '（仮想再生時間）'
       : '0区間';
     const hasSelected = !!selectedClip() && !busy && !stale;
+    refs.duplicate.disabled = !hasSelected || edit.clips.length >= Edit.MAX_CLIPS;
     refs.trim.disabled = !hasSelected;
     refs.split.disabled = !hasSelected;
     refs.removeClip.disabled = !hasSelected;
     refs.moveUp.disabled = !hasSelected || selectedIndex === 0;
     refs.moveDown.disabled = !hasSelected || selectedIndex === edit.clips.length - 1;
     refs.save.disabled = busy || stale || !edit;
+    refs.dirty.hidden = !dirty;
     const canPlaySaved = !!project && !dirty && !stale && !busy;
     refs.playSaved.hidden = !canPlaySaved;
     if (canPlaySaved) refs.playSaved.href = 'video-virtual-player.html?project=' + encodeURIComponent(project.id);
     else refs.playSaved.removeAttribute('href');
     refs.deleteProject.disabled = busy || !project;
     for (const key of ['add','source','title','start','end','markStart','markEnd']) refs[key].disabled = busy || stale;
+    for (const key of ['startMinusOne','startMinusTenth','startPlusTenth','startPlusOne',
+      'endMinusOne','endMinusTenth','endPlusTenth','endPlusOne','setStart','setEnd']) {
+      refs[key].disabled = !hasSelected;
+    }
     refs.projects.disabled = busy;
   }
   function chooseClip(index) {
@@ -216,6 +223,45 @@
       const next = readRange();
       if (clip.sourceVideoId !== next.sourceVideoId) throw new Error('別素材は新しい区間として追加してください。');
       setEdit(Edit.trimClip(edit, selectedIndex, next.startSeconds, next.endSeconds), selectedIndex);
+    });
+  }
+  function duplicateClip() {
+    action(() => {
+      if (!selectedClip()) throw new Error('複製する区間を選択してください。');
+      setEdit(Edit.duplicateClip(edit, selectedIndex), selectedIndex + 1);
+      status('選択区間の直後に複製しました。複製した区間は独立して編集できます。');
+    });
+  }
+  function adjustBoundary(boundary, delta) {
+    action(() => {
+      if (!selectedClip()) throw new Error('調整する区間を選択してください。');
+      const duration = previewUrl === sourceFor(selectedClip().sourceVideoId)?.url
+        && Number.isFinite(refs.preview.duration) ? refs.preview.duration : null;
+      const before = selectedClip()[boundary === 'start' ? 'startSeconds' : 'endSeconds'];
+      const next = Edit.adjustClipBoundary(edit, selectedIndex, boundary, delta, duration);
+      const after = next.clips[selectedIndex][boundary === 'start' ? 'startSeconds' : 'endSeconds'];
+      if (before === after) {
+        status(boundary === 'start' ? '開始位置はこれ以上前後に調整できません。' : '終了位置はこれ以上調整できません。');
+        return;
+      }
+      setEdit(next, selectedIndex);
+      status((boundary === 'start' ? '開始' : '終了') + '位置：' + format(before) + ' → ' + format(after) + '（元動画の時刻）');
+    });
+  }
+  function setBoundaryFromPreview(boundary) {
+    action(() => {
+      const clip = selectedClip();
+      if (!clip || refs.source.value !== clip.sourceVideoId) throw new Error('対象区間の素材をプレビューしてください。');
+      const duration = Number.isFinite(refs.preview.duration) ? refs.preview.duration : null;
+      const before = clip[boundary === 'start' ? 'startSeconds' : 'endSeconds'];
+      const next = Edit.setClipBoundary(edit, selectedIndex, boundary, refs.preview.currentTime, duration);
+      const after = next.clips[selectedIndex][boundary === 'start' ? 'startSeconds' : 'endSeconds'];
+      if (before === after) {
+        status('プレビュー位置が現在の区間範囲外のため、境界を変更できません。');
+        return;
+      }
+      setEdit(next, selectedIndex);
+      status((boundary === 'start' ? '開始' : '終了') + '位置：' + format(before) + ' → ' + format(after) + '（元動画の時刻）');
     });
   }
   function splitClip() {
@@ -383,16 +429,27 @@
       '<div class="vveControls"><button class="vveAction primary" type="button" data-add>区間を追加</button>',
       '<button class="vveAction" type="button" data-trim>選択区間を短縮</button>',
       '<button class="vveAction" type="button" data-split>再生位置で分割</button></div>',
+      '<h4 class="vveSubTitle">選択区間のトリム調整（元動画の時刻）</h4>',
+      '<div class="vveBoundary"><strong>開始位置</strong><div class="vveControls">',
+      '<button class="vveAction" type="button" data-start-minus-one>−1秒</button><button class="vveAction" type="button" data-start-minus-tenth>−0.1秒</button>',
+      '<button class="vveAction" type="button" data-start-plus-tenth>＋0.1秒</button><button class="vveAction" type="button" data-start-plus-one>＋1秒</button>',
+      '<button class="vveAction" type="button" data-set-start>プレビュー位置を開始に設定</button></div></div>',
+      '<div class="vveBoundary"><strong>終了位置</strong><div class="vveControls">',
+      '<button class="vveAction" type="button" data-end-minus-one>−1秒</button><button class="vveAction" type="button" data-end-minus-tenth>−0.1秒</button>',
+      '<button class="vveAction" type="button" data-end-plus-tenth>＋0.1秒</button><button class="vveAction" type="button" data-end-plus-one>＋1秒</button>',
+      '<button class="vveAction" type="button" data-set-end>プレビュー位置を終了に設定</button></div></div>',
       '<p class="vveFootnote">短縮は区間内への切り詰めです。元のMP4ファイルは変更しません。</p></section>',
       '<section class="vvePanel"><h3 class="vvePaneTitle">再生区間（上から順番）</h3>',
       '<div class="vveClips" data-clips></div><div class="vveTotal" data-total></div>',
-      '<div class="vveControls"><button class="vveAction" type="button" data-up>上へ</button>',
+      '<div class="vveControls"><button class="vveAction" type="button" data-duplicate>区間を複製</button>',
+      '<button class="vveAction" type="button" data-up>上へ</button>',
       '<button class="vveAction" type="button" data-down>下へ</button>',
       '<button class="vveAction danger" type="button" data-remove>区間を削除</button></div>',
-      '<p class="vveFootnote">今回の段階では素材を１区間ずつ確認できます。連続再生は第４段階で実装します。</p></section></div>',
+      '<p class="vveFootnote">区間時刻は元動画内の絶対秒数です。複製した区間は個別にトリム・移動・削除できます。</p></section></div>',
       '<section class="vvePanel"><div class="vveButtons"><button class="vveAction primary" type="button" data-save>編集内容を保存</button>',
       '<a class="vveAction" data-play-saved hidden>編集版を再生</a>',
       '<button class="vveAction danger" type="button" data-delete-project>プロジェクトを削除</button></div>',
+      '<p class="vveDirty" data-dirty hidden>未保存の変更があります</p>',
       '<p class="vveStatus" role="status" aria-live="polite" data-status></p></section>'
     ].join('');
     const $ = (selector) => root.querySelector(selector);
@@ -401,6 +458,12 @@
       preview: $('[data-preview]'), previewMeta: $('[data-preview-meta]'),
       start: $('[data-start]'), end: $('[data-end]'), clips: $('[data-clips]'),
       total: $('[data-total]'), add: $('[data-add]'), trim: $('[data-trim]'),
+      duplicate: $('[data-duplicate]'),
+      startMinusOne: $('[data-start-minus-one]'), startMinusTenth: $('[data-start-minus-tenth]'),
+      startPlusTenth: $('[data-start-plus-tenth]'), startPlusOne: $('[data-start-plus-one]'),
+      endMinusOne: $('[data-end-minus-one]'), endMinusTenth: $('[data-end-minus-tenth]'),
+      endPlusTenth: $('[data-end-plus-tenth]'), endPlusOne: $('[data-end-plus-one]'),
+      setStart: $('[data-set-start]'), setEnd: $('[data-set-end]'), dirty: $('[data-dirty]'),
       split: $('[data-split]'), removeClip: $('[data-remove]'), moveUp: $('[data-up]'),
       moveDown: $('[data-down]'), markStart: $('[data-mark-start]'), markEnd: $('[data-mark-end]'),
       save: $('[data-save]'), playSaved: $('[data-play-saved]'), deleteProject: $('[data-delete-project]'), status: $('[data-status]'),
@@ -425,6 +488,7 @@
     });
     refs.source.addEventListener('change', changeSource);
     refs.add.addEventListener('click', addClip);
+    refs.duplicate.addEventListener('click', duplicateClip);
     refs.trim.addEventListener('click', trimClip);
     refs.split.addEventListener('click', splitClip);
     refs.removeClip.addEventListener('click', removeClip);
@@ -432,6 +496,16 @@
     refs.moveDown.addEventListener('click', () => moveClip(1));
     refs.markStart.addEventListener('click', () => mark('start'));
     refs.markEnd.addEventListener('click', () => mark('end'));
+    refs.startMinusOne.addEventListener('click', () => adjustBoundary('start', -1));
+    refs.startMinusTenth.addEventListener('click', () => adjustBoundary('start', -0.1));
+    refs.startPlusTenth.addEventListener('click', () => adjustBoundary('start', 0.1));
+    refs.startPlusOne.addEventListener('click', () => adjustBoundary('start', 1));
+    refs.endMinusOne.addEventListener('click', () => adjustBoundary('end', -1));
+    refs.endMinusTenth.addEventListener('click', () => adjustBoundary('end', -0.1));
+    refs.endPlusTenth.addEventListener('click', () => adjustBoundary('end', 0.1));
+    refs.endPlusOne.addEventListener('click', () => adjustBoundary('end', 1));
+    refs.setStart.addEventListener('click', () => setBoundaryFromPreview('start'));
+    refs.setEnd.addEventListener('click', () => setBoundaryFromPreview('end'));
     refs.save.addEventListener('click', save);
     refs.deleteProject.addEventListener('click', removeProject);
     refs.preview.addEventListener('loadedmetadata', () => {
