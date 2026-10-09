@@ -214,3 +214,13 @@ test('backup sidecar fields remain part of the existing migration and payload bo
   assert.match(payload, /videoFolders/);
   assert.match(payload, /videoMeta/);
 });
+
+
+test('dedicated video editor distinguishes local storage failures from cloud sync failures', () => {
+  const editor = read('video-edit-page.js');
+  const html = read('video-edit.html');
+  assert.match(editor, /端末に保存できませんでした。ブラウザの保存容量を確認してください。/);
+  assert.match(editor, /端末には保存しましたが、クラウド同期に失敗しました:/);
+  assert.doesNotMatch(editor, /保存できませんでした。端末の保存状態を確認してください。/);
+  assert.match(html, /video-edit-page\.js\?v=20261009-sync-save-feedback/);
+});
