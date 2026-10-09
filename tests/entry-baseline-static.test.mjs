@@ -27,14 +27,14 @@ test('current entry pages keep their static bootstrap script baselines', () => {
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js',
     'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261008-profile-avatar', 'feature-flags.js',
     'media-access-gate.js?v=20261008-vpn-data',
-    'manga-list-route.js?v=20261009-desktop-liquid-pager',
-    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261009-sync-save-feedback',
+    'manga-list-route.js?v=20261009-vault-sync-queue',
+    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261009-vault-sync-queue',
   ]);
   assert.deepEqual(scriptSources(pages.video), [
     'supabase-config.js', 'vault-session.js?v=20261006-passkey-reset', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js',
-    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261008-profile-avatar', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261009-sync-save-feedback',
+    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261008-profile-avatar', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261009-vault-sync-queue',
   ]);
 });
 
@@ -72,10 +72,10 @@ test('authentication branches remain explicit in the current SPA bootstrap', () 
   assert.match(spa, /catch\(error\)\{if\(typeof MangaVault\.isSessionAuthError==='function'&&MangaVault\.isSessionAuthError\(error\)\)MangaVault\.saveSession\(null\);showLogin\(\);return;\}/);
 });
 
-test('vault saves use the existing payload builder and savePayload boundary', () => {
-  assert.match(spa, /const payload=MangaVaultPayload\.buildFromLocalStorage\(\);if\(!canSyncProtectedData\(\)\)return;await MangaVault\.savePayload\(payload\)/);
-  assert.match(videoLibrary, /MangaVault\.savePayload\(MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
-  assert.match(reader, /MangaVault\.savePayload\(/);
+test('ordinary vault sync requests use the local-storage save queue', () => {
+  assert.match(spa, /await MangaVault\.saveLocalChanges\(\)/);
+  assert.match(videoLibrary, /MangaVault\.saveLocalChanges\(\)/);
+  assert.match(reader, /MangaVault\.saveLocalChanges\(\)/);
   assert.match(vault, /rpc\/update_manga_reader_vault/);
   assert.match(vault, /expected_revision/);
   assert.match(vault, /new_payload/);
