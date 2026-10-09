@@ -218,14 +218,14 @@
       if (existing && knownRevision == null) throw new Error('保管庫の同期状態を確認できません。保管庫を再読込してから変更してください。');
       if (existing && !known) throw new Error('保管庫を読み込んでから変更してください。');
       if (existing) { const rows = await api('/rest/v1/rpc/update_manga_reader_vault', { method: 'POST', token, body: JSON.stringify({ expected_revision: knownRevision, new_payload: await envelope(payload) }) }); if (!rows || !rows.length) throw new Error('別の端末で更新されています。現在の端末の変更はまだ残っています。クラウドを再読込してから再試行してください。'); setMeta(user.id, rows[0]); return Object.assign({}, existing, rows[0]); }
-      const rows = await api('/rest/v1/manga_reader_vaults?on_conflict=user_id', { method: 'POST', token, headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify({ user_id: user.id, payload: await envelope(payload), revision: 1 }) });
-      const row = rows && rows[0]; if (row) setMeta(user.id, { revision: row.revision || 1, updatedAt: row.updated_at }); return row;
+      const rows = await api('/rest/v1/manga_reader_vaults', { method: 'POST', token, headers: { Prefer: 'return=representation' }, body: JSON.stringify({ user_id: user.id, payload: await envelope(payload), revision: 1 }) });
+      const row = rows && rows[0]; if (!row) throw new Error('クラウドへの保存結果を確認できませんでした。再読込して同期状態を確認してください。'); setMeta(user.id, { revision: row.revision || 1, updatedAt: row.updated_at }); return row;
     });
   }
   async function initialize(passphrase, recoveryCode, applyPayload, createPayload) {
     return withSession(async (token, user) => {
       const record = await fetchRecord(token, user);
-      if (!record) { const created = await create(passphrase); await applyPayload(createPayload()); const rows = await api('/rest/v1/manga_reader_vaults', { method: 'POST', token, headers: { Prefer: 'return=representation' }, body: JSON.stringify({ user_id: user.id, payload: await envelope(createPayload()), revision: 1 }) }); const row = rows && rows[0]; if (row) setMeta(user.id, { revision: row.revision || 1, updatedAt: row.updated_at }); return { created: true, recoveryCode: created.recoveryCode }; }
+      if (!record) { const created = await create(passphrase); const initialPayload = createPayload(); await applyPayload(initialPayload); const rows = await api('/rest/v1/manga_reader_vaults', { method: 'POST', token, headers: { Prefer: 'return=representation' }, body: JSON.stringify({ user_id: user.id, payload: await envelope(initialPayload), revision: 1 }) }); const row = rows && rows[0]; if (!row) throw new Error('クラウドへの保存結果を確認できませんでした。再読込して同期状態を確認してください。'); setMeta(user.id, { revision: row.revision || 1, updatedAt: row.updated_at }); return { created: true, recoveryCode: created.recoveryCode }; }
       await unlock(record.payload, passphrase, recoveryCode); await applyPayload(await decryptPayload(record.payload)); setMeta(user.id, { revision: record.revision || 1, updatedAt: record.updated_at }); return { created: false };
     });
   }
