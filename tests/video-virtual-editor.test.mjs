@@ -37,6 +37,7 @@ function element(tag = 'div') {
     replaceChildren(...items) { this.children = items; },
     addEventListener(type, handler) { listeners[type] = handler; },
     setAttribute(name, value) { this[name] = value; },
+    getAttribute(name) { return this[name]; },
     removeAttribute(name) { delete this[name]; },
     pause() { this.paused = true; },
     load() { this.loaded = true; },
@@ -140,6 +141,33 @@ test('editor exposes only registered MP4 sources and saves time ranges without e
   assert.equal(harness.calls[0].edit.clips[0].endSeconds, 25);
   assert.equal(harness.calls[0].title, '動画Ａ（編集版）');
   assert.equal(nodes.get('[data-status]').textContent, '保管庫へ保存しました。');
+});
+
+test('selected clip can be duplicated, independently trimmed and precisely adjusted before save', async () => {
+  const harness = startEditor({ allowed: true });
+  const nodes = harness.selectorMap;
+  nodes.get('[data-source]').value = 'direct';
+  nodes.get('[data-start]').value = '10.1';
+  nodes.get('[data-end]').value = '20';
+  nodes.get('[data-add]').dispatch('click');
+  nodes.get('[data-duplicate]').dispatch('click');
+  assert.equal(nodes.get('[data-clips]').children.length, 2);
+  assert.equal(nodes.get('[data-clips]').children[1].getAttribute('aria-current'), 'true');
+  nodes.get('[data-start-plus-tenth]').dispatch('click');
+  nodes.get('[data-end-minus-one]').dispatch('click');
+  const video = nodes.get('[data-preview]');
+  video.readyState = 1;
+  video.currentTime = 15.25;
+  nodes.get('[data-set-start]').dispatch('click');
+  await nodes.get('[data-save]').dispatch('click');
+  const clips = harness.calls[0].edit.clips;
+  assert.deepEqual(JSON.parse(JSON.stringify(clips)), [
+    { sourceVideoId: 'direct', startSeconds: 10.1, endSeconds: 20 },
+    { sourceVideoId: 'direct', startSeconds: 15.25, endSeconds: 19 },
+  ]);
+  assert.equal(nodes.get('[data-start]').value, '15.25');
+  assert.equal(nodes.get('[data-end]').value, '19');
+  assert.equal(nodes.get('[data-dirty]').hidden, true);
 });
 
 test('access revocation releases MP4 preview and clears the protected editor', () => {

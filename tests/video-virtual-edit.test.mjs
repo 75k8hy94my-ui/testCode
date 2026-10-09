@@ -78,6 +78,41 @@ test('trims, reorders, and removes without mutating the project', () => {
   assert.throws(() => edits.removeClip(edits.createEdit([clip('a', 0, 1)]), 0));
 });
 
+test('duplicates a selected clip immediately after it without sharing mutable entries', () => {
+  const original = edits.createEdit([clip('a', 2.25, 8.5), clip('b', 0, 3)]);
+  const duplicate = edits.duplicateClip(original, 0);
+  assert.deepEqual(duplicate.clips, [clip('a', 2.25, 8.5), clip('a', 2.25, 8.5), clip('b', 0, 3)]);
+  assert.notEqual(duplicate.clips[0], duplicate.clips[1]);
+  assert.deepEqual(original.clips, [clip('a', 2.25, 8.5), clip('b', 0, 3)]);
+  const trimmedCopy = edits.trimClip(duplicate, 1, 3, 7);
+  assert.deepEqual(trimmedCopy.clips[0], clip('a', 2.25, 8.5));
+  assert.deepEqual(trimmedCopy.clips[1], clip('a', 3, 7));
+  assert.throws(() => edits.duplicateClip(original, -1));
+  const full = edits.createEdit(Array.from({ length: edits.MAX_CLIPS }, (_, i) => clip('a', i, i + 1)));
+  assert.throws(() => edits.duplicateClip(full, 0), /1 to 200 clips/);
+});
+
+test('adjusts clip boundaries at millisecond precision and respects range limits', () => {
+  const original = edits.createEdit([clip('a', 10.1, 12.3)]);
+  let changed = original;
+  for (let index = 0; index < 20; index += 1) {
+    changed = edits.adjustClipBoundary(changed, 0, 'end', 0.1, 20);
+  }
+  assert.equal(changed.clips[0].endSeconds, 14.3);
+  assert.deepEqual(original.clips[0], clip('a', 10.1, 12.3));
+  assert.equal(edits.adjustClipBoundary(original, 0, 'start', -1).clips[0].startSeconds, 9.1);
+  assert.equal(edits.adjustClipBoundary(original, 0, 'start', -20).clips[0].startSeconds, 0);
+  assert.equal(edits.adjustClipBoundary(original, 0, 'start', 20).clips[0].startSeconds, 12.299);
+  assert.equal(edits.adjustClipBoundary(original, 0, 'end', -20).clips[0].endSeconds, 10.101);
+  assert.equal(edits.adjustClipBoundary(original, 0, 'end', 20, 15).clips[0].endSeconds, 15);
+  assert.equal(edits.adjustClipBoundary(original, 0, 'end', 20, 12.35).clips[0].endSeconds, 12.35);
+  assert.deepEqual(edits.setClipBoundary(original, 0, 'start', 10.5).clips[0], clip('a', 10.5, 12.3));
+  assert.deepEqual(edits.setClipBoundary(original, 0, 'end', 11.5).clips[0], clip('a', 10.1, 11.5));
+  assert.throws(() => edits.adjustClipBoundary(original, 0, 'middle', 1));
+  assert.throws(() => edits.adjustClipBoundary(original, 0, 'start', NaN));
+  assert.throws(() => edits.adjustClipBoundary(original, 0, 'end', 1, 0));
+});
+
 test('maps virtual timeline boundaries to source times without re-encoding', () => {
   const edit = edits.createEdit([clip('a', 10, 20), clip('b', 3, 7)]);
   assert.deepEqual(edits.locateTime(edit, 0), { clipIndex: 0, sourceVideoId: 'a', sourceSeconds: 10 });
