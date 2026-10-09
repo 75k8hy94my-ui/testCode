@@ -185,7 +185,7 @@
         MangaReaderTarget.clearLegacyTarget(localStorage);
         const syncScheduler = ReaderSyncSchedulerFactory.create({
           canSync: canReadProtectedData,
-          save: () => MangaVault.savePayload(MangaVaultPayload.buildFromLocalStorage()),
+          save: () => MangaVault.saveLocalChanges(),
           onError: (error) => {
             if (canReadProtectedData()) document.getElementById('readerStatus').textContent = error?.message || '同期に失敗しました';
           },
