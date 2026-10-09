@@ -31,8 +31,9 @@ test('virtual player protects reads, URL fingerprints and cross-tab changes', ()
 });
 test('virtual playback UI exposes total-timeline seek and accessible segment list', () => {
   assert.match(page, /data-seek/);
+  assert.match(page, /refs\.seek\.addEventListener\('input'/);
   assert.match(page, /aria-label="編集版の再生位置"/);
-  assert.match(page, /player\.seek\(Number\(refs\.seek\.value\)\)/);
+  assert.match(page, /player\.seek\(seconds\)/);
   assert.match(page, /player\.seek\(start\)/);
   assert.match(page, /aria-current/);
 });
