@@ -1,0 +1,34 @@
+.virtualVideoEditor{width:min(1140px,100%);margin:auto;padding:20px 16px 110px;color:var(--text);display:grid;gap:16px}
+.vveNotice{padding:18px;border:1px solid var(--border);border-radius:15px;background:var(--bg-soft);line-height:1.65}
+.vveTop,.vveButtons{display:flex;flex-wrap:wrap;align-items:center;gap:9px}
+.vveTop{justify-content:space-between}
+.vveTitle{margin:0;font-size:clamp(20px,3vw,28px)}
+.vveLead{color:var(--sub);font-size:13px;line-height:1.5;margin:6px 0 0}
+.vveAction,.vveLink{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:42px;padding:7px 13px;border-radius:11px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font:inherit;font-size:13px;font-weight:700;text-decoration:none;cursor:pointer}
+.vveAction.primary{background:var(--accent);color:white;border-color:transparent}
+.vveAction.danger{color:#f58b8b}
+.vveAction:disabled{opacity:.45;cursor:not-allowed}
+.vvePanel{background:var(--bg-soft);border:1px solid var(--border);border-radius:17px;padding:17px;min-width:0}
+.vveGrid{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(300px,.88fr);gap:14px;align-items:start}
+.vvePaneTitle{font-size:15px;margin:0 0 13px}
+.vveField{display:grid;gap:6px;min-width:0;font-size:12px;font-weight:700}
+.vveField input,.vveField select{min-width:0;width:100%;min-height:43px;padding:9px 12px;border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:10px;font:inherit;font-size:15px}
+.vveField input:focus-visible,.vveField select:focus-visible,.vveAction:focus-visible,.vveClip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.vveRow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.vvePreview{background:#090b10;aspect-ratio:16/9;border-radius:12px;overflow:hidden;display:grid;place-items:center}
+.vvePreview video{width:100%;height:100%;max-height:400px;object-fit:contain;background:black}
+.vvePreviewMeta{font-size:12px;color:var(--sub);margin-top:7px;min-height:18px}
+.vveControls{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.vveClips{display:grid;gap:7px}
+.vveClip{display:flex;gap:8px;width:100%;align-items:center;justify-content:space-between;text-align:left;border:1px solid var(--border);border-radius:11px;padding:11px 12px;background:var(--panel);color:var(--text);cursor:pointer}
+.vveClip[aria-current="true"]{border-color:var(--accent);background:var(--accent-dim)}
+.vveClip strong{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vveClip small{font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
+.vveEmpty{color:var(--sub);border:1px dashed var(--border);border-radius:10px;padding:15px;font-size:13px}
+.vveTotal{color:var(--sub);font-size:13px;margin-top:10px}
+.vveStatus{min-height:28px;font-size:13px;color:var(--sub);line-height:1.6}
+.vveStatus[data-error="1"]{color:#f58b8b}
+.vveFootnote{font-size:12px;color:var(--sub);line-height:1.6}
+.vveSourceLink{overflow-wrap:anywhere}
+.vveHidden{display:none!important}
+@media(max-width:770px){.virtualVideoEditor{padding:14px 11px 100px}.vveGrid{grid-template-columns:1fr}.vvePanel{padding:12px}.vveAction{font-size:12px}.vveTop{align-items:stretch}.vveTop .vveButtons{justify-content:flex-start}}
