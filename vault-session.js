@@ -358,7 +358,7 @@
     return withSession(async (token, user) => {
       const record = await fetchRecord(token, user); if (!record) throw new Error('先にパスフレーズで保管庫を作成してください。'); await unlock(record.payload, passphrase, ''); setMeta(user.id, { revision: record.revision || 1, updatedAt: record.updated_at });
       const wrapper = await registerPasskeyCredential(user); const vault = loadActive(); const existing = Array.isArray(vault.keyWraps.passkeys) ? vault.keyWraps.passkeys : (vault.keyWraps.passkey ? [vault.keyWraps.passkey] : []);
-      if (existing.some((entry) => entry.id === wrapper.id)) throw new Error('このパスキーは既に登録されています。'); vault.keyWraps.passkeys = existing.concat(wrapper); delete vault.keyWraps.passkey; saveActive(vault); const payload = await decryptPayload(record.payload); await savePayload(payload); return true;
+      if (existing.some((entry) => entry.id === wrapper.id)) throw new Error('このパスキーは既に登録されています。'); vault.keyWraps.passkeys = existing.concat(wrapper); delete vault.keyWraps.passkey; saveActive(vault); await decryptPayload(record.payload); await saveLocalChanges(); return true;
     });
   }
   async function removePasskeys(passphrase) {
@@ -369,7 +369,7 @@
       if (!existing.length) throw new Error('解除できるパスキーが登録されていません。');
       const nextKeyWraps = Object.assign({}, vault.keyWraps); delete nextKeyWraps.passkeys; delete nextKeyWraps.passkey;
       saveActive({ rawKey: vault.rawKey, keyWraps: nextKeyWraps });
-      try { const payload = await decryptPayload(record.payload); await savePayload(payload); return true; }
+      try { await decryptPayload(record.payload); await saveLocalChanges(); return true; }
       catch (error) { if (previous) saveActive(previous); throw error; }
     });
   }
@@ -387,7 +387,7 @@
       const salt = randomBytes(16); const passphraseKey = await derivePassphrase(nextPassphrase, salt);
       const nextKeyWraps = Object.assign({}, keyWraps, { passphrase: { kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations: ITERATIONS, salt: b64url(salt) }, encryptedKey: await encrypt(passphraseKey, rawKey) } });
       saveActive({ rawKey, keyWraps: nextKeyWraps });
-      try { await savePayload(payload); return true; }
+      try { await saveLocalChanges(); return true; }
       catch (error) { if (previous) saveActive(previous); throw error; }
     });
   }
