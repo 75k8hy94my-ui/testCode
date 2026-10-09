@@ -42,9 +42,9 @@ test('video list ellipsis navigates directly to the dedicated editor without an 
   assert.match(editor, /MangaVault\.savePayload\(window\.MangaVaultPayload\.buildFromLocalStorage\(\)\)/);
   assert.match(editor, /name="thumbnailTime"/);
   assert.match(editor, /Data\.parseMediaTime\(timestamp\)/);
-  assert.match(editorHtml, /video-edit-page\.js\?v=20261009-list-ellipsis/);
+  assert.match(editorHtml, /video-edit-page\.js\?v=20261009-add-page-contrast/);
   assert.doesNotMatch(editorHtml, /auth-pending/);
-  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261009-ellipsis-route/);
+  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261009-add-page-contrast/);
 });
 
 test('video cards delegate thumbnail rendering to the shared renderer', () => {
@@ -82,13 +82,27 @@ test('video editor locks URL until the explicit edit button and exposes one-clic
   assert.match(library, /suggestedTag\.addEventListener\(['"]click['"]/);
 });
 
-test('video add sheet only closes from explicit controls and accepts ordinary http URLs', () => {
+test('remaining folder sheet keeps explicit close behavior and the URL classifier accepts http URLs', () => {
   const library = read('video-library.js');
   assert.match(library, /dom\.sheet\.addEventListener\(['"]click['"],\s*\(event\)\s*=>\s*\{\s*if \(event\.target === dom\.sheet\) return;/);
   assert.match(library, /Data\.classifyVideoUrl\(rawUrl\)/);
   assert.match(library, /classified\.kind === ['"]invalid['"]/);
   assert.doesNotMatch(library, /sheetClose.*closeSheet/);
   assert.doesNotMatch(library, /invokeLegacyAdd|confirmVideoAddBtn|既存の動画追加機能を利用できません/);
+});
+
+test('adding a video navigates to the dedicated form with opaque surfaces', () => {
+  const library = read('video-library.js');
+  const editor = read('video-edit-page.js');
+  const html = read('video-edit.html');
+  assert.match(library, /video-edit\.html\?mode=add&return=list/);
+  assert.doesNotMatch(library, /dom\.add\.addEventListener\('click', \(\) => openEditor\(null\)/);
+  assert.match(library, /#videoLibrarySheet\{--bg-soft:#fff;--panel:#fff/);
+  assert.match(library, /html\[data-theme="dark"\] #videoLibrarySheet\{--bg-soft:#10141c/);
+  assert.match(html, /\.videoEditForm\{display:grid;gap:13px;padding:20px;[^}]*background:var\(--panel,#fff\)/);
+  assert.match(editor, /const isAddMode = new URLSearchParams\(location\.search\)\.get\('mode'\) === 'add'/);
+  assert.match(editor, /isAddMode \? \[nextBase, \.\.\.savedVideos\]/);
+  assert.match(editor, /if \(!isAddMode\) form\.querySelector\('\[data-delete\]'\)/);
 });
 
 test('video library saves enhanced records through its own Vault boundary', () => {
