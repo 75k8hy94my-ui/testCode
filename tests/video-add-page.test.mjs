@@ -20,7 +20,7 @@ function startEditor({ mode = 'add', allowed = true, videos = [], meta = {} } = 
   const nodes = new Map();
   function element(tag) {
     const node = {
-      tag, children: [], className: '', hidden: false, value: '', textContent: '',
+      tag, children: [], dataset: {}, className: '', hidden: false, value: '', textContent: '',
       replaceChildren(...children) { this.children = children; },
       append(...children) { this.children.push(...children); },
       prepend(...children) { this.children.unshift(...children); },
