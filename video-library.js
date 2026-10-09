@@ -104,6 +104,9 @@
   function persistAux({ sync = true } = {}) {
     if (!canReadProtectedData()) return false;
     writeJson(FOLDER_KEY, state.folders);
+    // Other routes may have saved virtual edits since this list was loaded.
+    // Merge the newest registry rather than overwriting it from stale state.
+    state.meta = Data.mergeVideoMetaPreservingThumbnailTime(readJson(META_KEY, {}), state.meta);
     writeJson(META_KEY, state.meta);
     if (sync) scheduleVaultSync();
     return true;
