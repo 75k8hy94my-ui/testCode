@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import { webcrypto } from 'node:crypto';
 
 const source = fs.readFileSync(new URL('../vault-session.js', import.meta.url), 'utf8');
+const syncPage = fs.readFileSync(new URL('../sync.html', import.meta.url), 'utf8');
 const b64url = (bytes) => Buffer.from(bytes).toString('base64url');
 const fromB64url = (value) => new Uint8Array(Buffer.from(value, 'base64url'));
 const deferred = () => { let resolve; const promise = new Promise((done) => { resolve = done; }); return { promise, resolve }; };
@@ -337,4 +338,11 @@ test('new Vault creation builds and applies the existing local payload exactly o
   assert.equal(builds, 1);
   assert.deepEqual(applied, localPayload);
   assert.deepEqual(await decryptPayload(vault.loadActive().rawKey, remote.record.payload), localPayload);
+});
+
+test('unlock page reports pending sync and offers local data access', () => {
+  assert.match(syncPage, /function showPendingSync\(result\)/);
+  assert.match(syncPage, /端末には未同期の変更があります。/);
+  assert.match(syncPage, /端末データを開く/);
+  assert.match(syncPage, /result\.pendingSync/);
 });
