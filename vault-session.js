@@ -88,6 +88,7 @@
   function clearActive() { sessionStorage.removeItem(ACTIVE_KEY); channelPost({ type: 'vault-cleared' }); }
   function lockVault() { clearActive(); }
   function setupVaultChannel() {
+    if (window.TestCodeGuest?.isActive()) return;
     if (typeof BroadcastChannel !== 'function') return;
     try {
       vaultChannel = new BroadcastChannel(CHANNEL_NAME);
@@ -301,7 +302,12 @@
         if (current && current.revision > knownRevision) {
           try {
             const remotePayload = await decryptPayload(current.payload);
-            if (stableJson(remotePayload) === stableJson(payload)) { setMeta(user.id, { revision: current.revision, updatedAt: current.updated_at }, pendingToken); return current; }
+            const activeVault = loadActive();
+            const wrappersMatch = stableJson(current.payload && current.payload.keyWraps || {}) === stableJson(activeVault && activeVault.keyWraps || {});
+            if (stableJson(remotePayload) === stableJson(payload) && wrappersMatch) {
+              setMeta(user.id, { revision: current.revision, updatedAt: current.updated_at }, pendingToken);
+              return current;
+            }
           } catch (_) {}
         }
         throw new Error('別の端末で更新されています。端末の変更は保持されています。クラウドを再読込して競合を確認してください。');

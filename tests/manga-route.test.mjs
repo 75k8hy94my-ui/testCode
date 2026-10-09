@@ -70,7 +70,7 @@ test('manga shell keeps the existing shared authentication and vault bootstrap',
   assert.match(manga, /browser-storage\.js/);
   assert.match(manga, /vault-payload\.js/);
   assert.match(manga, /feature-flags\.js/);
-  assert.match(manga, /media-access-gate\.js\?v=20261008-vpn-data/);
+  assert.match(manga, /media-access-gate\.js\?v=20261009-guest-mode/);
   assert.match(manga, /home-profile-spa\.js\?v=/);
 });
 
@@ -84,7 +84,7 @@ test('manga route startup failure and stale renders clean only their own runtime
 });
 
 test('manga route owns its stylesheet so SPA entry path cannot change shelf layout', () => {
-  assert.match(route, /const STYLESHEET_URL = 'manga-list\.css\?v=20261009-desktop-liquid-pager'/);
+  assert.match(route, /const STYLESHEET_URL = 'manga-list\.css\?v=20261009-guest-mode'/);
   assert.match(route, /function ensureStylesheet\(documentRef\)/);
   assert.match(route, /Promise\.all\(\[ensureStylesheet\(documentRef\), loadDependencies\(documentRef\)\]\)/);
   assert.match(route, /dataset\.mangaListRouteStyle = '1'/);

@@ -80,13 +80,13 @@
   }
 
   async function runVaultSync() {
-    if (!canReadProtectedData()) return false;
-    if (!window.MangaVault || typeof MangaVault.saveLocalChanges !== 'function') {
-      if (MangaVault && typeof MangaVault.markLocalChangesPending === 'function') MangaVault.markLocalChangesPending();
-      setStatus('端末には保存済みです。保管庫が利用できないためクラウド未同期です。', true);
-      return false;
+    if (window.TestCodeGuest?.isActive()) {
+      setStatus('端末内に保存しました（ゲスト・同期なし）');
+      return true;
     }
-    if (state.syncRunning) { state.syncDirty = true; return state.syncPromise; }
+    if (!canReadProtectedData()) return false;
+    if (!window.MangaVault || !window.MangaVaultPayload || !MangaVault.loadActive || !MangaVault.loadActive()) return;
+    if (state.syncRunning) { state.syncDirty = true; return; }
     state.syncRunning = true;
     setStatus('同期中…');
     const pending = (async () => {

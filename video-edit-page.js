@@ -149,6 +149,10 @@
           error.textContent = '端末に保存できませんでした。ブラウザの保存容量を確認してください。';
           return;
         }
+        if (window.TestCodeGuest?.isActive()) {
+          location.href = returnTarget(returnKind, savedId);
+          return;
+        }
         if (window.MangaVault && typeof window.MangaVault.markLocalChangesPending === 'function') window.MangaVault.markLocalChangesPending();
         if (!canReadProtectedData()) {
           error.textContent = '端末には保存しましたが、VPN接続を確認できないためクラウド未同期です。';

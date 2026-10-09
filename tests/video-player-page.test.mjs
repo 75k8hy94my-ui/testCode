@@ -89,7 +89,7 @@ test('custom player defers single taps and maps double-tap zones to seek or full
 test('video player document cache keys identify the current watch-page design', () => {
   const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
   assert.match(html, /home-profile-shell\.css\?v=20261009-generated-volume-icons/);
-  assert.match(html, /video-player-page\.js\?v=20261009-vault-sync-queue/);
+  assert.match(html, /video-player-page\.js\?v=20261009-vault-sync-guest/);
 });
 
 test('marker registration defaults to the current playback position', () => {

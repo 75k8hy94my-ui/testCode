@@ -8,7 +8,7 @@
     let avatar='';
     try{
       const source=localStorage.getItem(AVATAR_KEY)||'';
-      if(window.MangaVault?.loadActive?.()&&typeof source==='string'&&source.length<=100000&&/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(source))avatar=source;
+      if((window.TestCodeGuest?.isActive()||window.MangaVault?.loadActive?.())&&typeof source==='string'&&source.length<=100000&&/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(source))avatar=source;
     }catch(_){}
     document.querySelectorAll('[data-profile-menu-trigger], #desktopProfileButton').forEach((button)=>{
       const previous=button.querySelector('.profileAvatarButtonImage');
@@ -28,6 +28,7 @@
   }
 
   async function logout(button) {
+    if (window.TestCodeGuest?.isActive()) { window.TestCodeGuest.exit(); return; }
     if (!confirm('ログアウトしますか？')) return;
     if (button) button.disabled = true;
     const session = window.MangaVault && MangaVault.loadSession();
@@ -40,6 +41,7 @@
   }
 
   function lock(button) {
+    if (window.TestCodeGuest?.isActive()) { window.TestCodeGuest.exit(); return; }
     if (button) button.disabled = true;
     if (window.MangaVault) {
       if (typeof MangaVault.lockVault === 'function') MangaVault.lockVault();
@@ -74,10 +76,11 @@
       menu.hidden=true;
       menu.setAttribute('role','menu');
       menu.innerHTML='<button type="button" role="menuitem" data-profile-route>プロフィール設定</button><button type="button" role="menuitem" data-lock>ロック</button><button type="button" role="menuitem" data-logout>アカウントからログアウト</button>';
+      if (window.TestCodeGuest?.isActive()) { menu.querySelector('[data-lock]').remove();menu.querySelector('[data-logout]').textContent='ゲストモードを終了'; }
       document.body.appendChild(menu);
       menu.addEventListener('click',(event)=>event.stopPropagation());
       menu.querySelector('[data-profile-route]').addEventListener('click',()=>{close();openProfile();});
-      menu.querySelector('[data-lock]').addEventListener('click',()=>{close();lock(menu.querySelector('[data-lock]'));});
+      menu.querySelector('[data-lock]')?.addEventListener('click',()=>{close();lock(menu.querySelector('[data-lock]'));});
       menu.querySelector('[data-logout]').addEventListener('click',()=>logout(menu.querySelector('[data-logout]')));
     }
     return menu;

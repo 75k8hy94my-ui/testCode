@@ -24,7 +24,8 @@ function ensureProfileOnlyHeader(app){
 const $=(id)=>document.getElementById(id);
 const showLogin=()=>window.location.replace('index.html');
 const showVault=()=>window.location.replace('sync.html');
-const session=window.MangaVault&&MangaVault.loadSession();
+const guestMode=window.TestCodeGuest?.isActive()===true;
+const session=guestMode?null:window.MangaVault&&MangaVault.loadSession();
 const SPA_PAGES=(window.AppShell&&Array.isArray(AppShell.SPA_PAGES)?AppShell.SPA_PAGES:['home.html','profile.html','manga.html','video.html']);
 let layout=Home?Home.loadLayout():[];
 let editing=false,syncRunning=false,syncDirty=false,syncDirtyMessage='',syncClearTimer=null,profileSecurityBusy=false;
@@ -55,9 +56,9 @@ function getMount(){
 
 function routeName(path=location.pathname){const name=path.split('/').pop();if(name==='profile.html')return'profile';if(name==='manga.html')return'manga';if(name==='video.html')return'video';return'home';}
 function setTitle(route){const titles={home:'ホーム',profile:'プロフィール設定',manga:'漫画',video:'動画'};const title=titles[route]||titles.home;document.title=title;const h1=document.getElementById('shellTitle');if(h1)h1.textContent=title;}
-function setSyncStatus(text){const node=$('homeSyncStatus');if(!node)return;clearTimeout(syncClearTimer);node.textContent=text||'';}
-function canSyncProtectedData(){const gate=window.MangaReaderMediaAccess;return !!gate&&typeof gate.canReadProtectedData==='function'&&gate.canReadProtectedData()===true;}
-async function runHomeSync(okMessage){if(!canSyncProtectedData()){syncDirty=false;syncDirtyMessage='';setSyncStatus('VPN接続を確認できるまでクラウド同期を停止しています。');return;}if(syncRunning){syncDirty=true;syncDirtyMessage=okMessage||syncDirtyMessage;return;}syncRunning=true;setSyncStatus('同期中…');try{if(!canSyncProtectedData())return;if(!canSyncProtectedData())return;await MangaVault.saveLocalChanges();setSyncStatus(okMessage||'保存しました');}catch(error){setSyncStatus('端末には保存済みです。クラウド同期: '+(error&&error.message?error.message:'失敗'));}finally{syncRunning=false;if(syncDirty){syncDirty=false;const queued=syncDirtyMessage;syncDirtyMessage='';runHomeSync(queued);}}}
+function setSyncStatus(text){const node=$('homeSyncStatus');if(!node)return;clearTimeout(syncClearTimer);node.textContent=text||'';if(text&&text!=='同期中…')syncClearTimer=setTimeout(()=>{if(node.isConnected)node.textContent='';},3500);}
+function canSyncProtectedData(){if(guestMode)return false;const gate=window.MangaReaderMediaAccess;return !!gate&&typeof gate.canReadProtectedData==='function'&&gate.canReadProtectedData()===true;}
+async function runHomeSync(okMessage){if(guestMode){setSyncStatus('端末内に保存しました（ゲスト・同期なし）');return;}if(!canSyncProtectedData()){syncDirty=false;syncDirtyMessage='';setSyncStatus('VPN接続を確認できるまでクラウド同期を停止しています。');return;}if(syncRunning){syncDirty=true;syncDirtyMessage=okMessage||syncDirtyMessage;return;}syncRunning=true;setSyncStatus('同期中…');try{if(!canSyncProtectedData())return;await MangaVault.saveLocalChanges();setSyncStatus(okMessage||'保存しました');}catch(error){setSyncStatus('端末には保存済みです。クラウド同期: '+(error&&error.message?error.message:'失敗'));}finally{syncRunning=false;if(syncDirty){syncDirty=false;const queued=syncDirtyMessage;syncDirtyMessage='';runHomeSync(queued);}}}
 function commitLayout(next){layout=Home.saveLayout(next);renderHome();runHomeSync('ホームの並びを保存しました');}
 function cardTop(card){const top=document.createElement('div');top.className='cardTop';const mark=document.createElement('span');mark.className='cardMark';mark.textContent=marks[card.id]||'・';const badge=document.createElement('span');badge.className='cardBadge';badge.textContent=card.badge||'';top.append(mark,badge);return top;}
 function addCardText(root,card){root.append(cardTop(card));const title=document.createElement('h2');title.textContent=card.title;root.append(title);}
@@ -77,7 +78,12 @@ function renderProfile(){
   const email=(session&&session.user&&session.user.email)||'';
   const light=currentTheme()==='light';
   target.innerHTML=`<section class="profileContent"><p id="homeSyncStatus" class="syncStatus profileToastStatus" aria-live="polite"></p><h2>プロフィール設定</h2><section class="profileCard profileAvatarCard"><h3>プロフィール画像</h3><div class="profileAvatarRow"><div class="profileAvatarPreview" aria-hidden="true"><img id="profileAvatarPreview" alt="" hidden><span id="profileAvatarPlaceholder">アカウント</span></div><div class="profileAvatarSettings"><input id="profileAvatarInput" type="file" accept="image/jpeg,image/png,image/webp" hidden><div class="profileSecurityActions"><button class="glassBtn profileAction" id="profileAvatarChooseBtn" type="button">画像を選択</button><button class="glassBtn" id="profileAvatarRemoveBtn" type="button">画像を削除</button></div><p id="profileAvatarStatus" class="profileAvatarStatus" role="status" aria-live="polite"></p></div></div></section><dl class="profileMeta"><div><dt>ログイン中</dt><dd id="profileEmail"></dd></div></dl><section class="profileCard"><h3>保管庫</h3><a class="glassBtn profileAction" href="sync.html">保管庫を開く</a></section><section class="profileCard profileSecurityCard"><h3>認証方法</h3><div class="profileSecurityFields"><label class="profileField">現在のパスフレーズ<input id="profileCurrentPassphrase" type="password" autocomplete="current-password"></label><div class="profileSecurityActions"><button class="glassBtn profileAction" id="profilePasskeyRegisterBtn" type="button" data-profile-security-action>パスキーを設定</button><button class="glassBtn profileDanger" id="profilePasskeyRemoveBtn" type="button" data-profile-security-action>登録済みパスキーを解除</button></div><label class="profileField">新しいパスフレーズ<input id="profileNewPassphrase" type="password" autocomplete="new-password"></label><label class="profileField">新しいパスフレーズ（確認）<input id="profileNewPassphraseConfirm" type="password" autocomplete="new-password"></label><button class="glassBtn profileAction" id="profilePassphraseResetBtn" type="button" data-profile-security-action>パスキーで本人確認して再設定</button></div><p id="profileSecurityStatus" class="profileSecurityStatus" role="status" aria-live="polite"></p></section><section class="profileCard"><h3>VPN診断</h3><div id="profileNonVpnIps"></div></section><section class="profileCard"><h3>表示</h3><label class="profileThemeRow"><span>ライトテーマ</span><span class="iosSwitch"><input id="profileThemeLight" type="checkbox" role="switch" aria-label="ライトテーマ"><span class="iosSwitchTrack" aria-hidden="true"></span></span></label></section><section class="profileCard"><h3>セッション</h3><div class="profileSecurityActions"><button class="glassBtn profileAction" id="profileLockBtn" type="button">ロック</button><button class="glassBtn profileDanger" id="profileLogoutBtn" type="button">アカウントからログアウト</button></div></section></section>`;
-  const mail=$('profileEmail');if(mail)mail.textContent=email||'（メール未取得）';
+  const mail=$('profileEmail');if(mail)mail.textContent=guestMode?'ゲスト（端末内のみ）':(email||'（メール未取得）');
+  if(guestMode){
+    target.querySelectorAll('.profileSecurityCard, .profileCard:has(a[href="sync.html"]), .profileCard:has(#profileNonVpnIps)').forEach((element)=>{element.hidden=true;element.style.display='none';});
+    const lock=$('profileLockBtn');if(lock){lock.hidden=true;lock.style.display='none';}
+    const exit=$('profileLogoutBtn');if(exit)exit.textContent='ゲストモードを終了してログインへ';
+  }
   const avatarApi=window.ProfileAvatar;
   const avatarInput=$('profileAvatarInput'),avatarChoose=$('profileAvatarChooseBtn'),avatarRemove=$('profileAvatarRemoveBtn');
   const avatarStatus=$('profileAvatarStatus'),avatarPreview=$('profileAvatarPreview'),avatarPlaceholder=$('profileAvatarPlaceholder');
@@ -156,7 +162,7 @@ function renderVpnGate(target,route){
 }
 async function ensureVpnGate(){
   if(window.MangaReaderMediaAccess)return window.MangaReaderMediaAccess;
-  await loadScript('media-access-gate.js?v=20261008-vpn-data','spaMediaGate');
+  await loadScript('media-access-gate.js?v=20261009-guest-mode','spaMediaGate');
   return window.MangaReaderMediaAccess;
 }
 function cleanupMangaShell(){cleanupMangaRoute();document.querySelectorAll('#metadataSuggestions,#saveDialogOverlay,#customAddOverlay,#editItemOverlay,#bulkEditOverlay,#bulkDetectOverlay,#savedListOverlay,#tocOverlay').forEach((node)=>node.remove());}
@@ -169,13 +175,13 @@ async function renderVideo(generation){
     const gate=await ensureVpnGate();
     if(generation!==renderGeneration)return;
     if(!gate){renderVpnGate(target,'video');setTitle('video');syncHeaderRoute();return;}
-    if(!window.VideoListRouteFactory)await loadScript('video-list-route.js?v=20261009-vault-sync-queue','spaVideoListRoute');
+    if(!window.VideoListRouteFactory)await loadScript('video-list-route.js?v=20261009-vault-sync-guest','spaVideoListRoute');
     if(!window.MangaReaderVideoTemplate)await loadScript('video-list-template.js?v=20260922-vpn-tools','spaVideoListTemplate');
     if(generation!==renderGeneration)return;
     if(!videoRouteRuntime)videoRouteRuntime=window.VideoListRouteFactory.create({
       documentRef:document,
       loadScript,
-      loadMediaGate:()=>window.MangaReaderMediaAccess?Promise.resolve():loadScript('media-access-gate.js?v=20261008-vpn-data','spaMediaGate'),
+      loadMediaGate:()=>window.MangaReaderMediaAccess?Promise.resolve():loadScript('media-access-gate.js?v=20261009-guest-mode','spaMediaGate'),
       mediaAccess:gate,
     });
     await videoRouteRuntime.start({mountElement:target});
@@ -196,7 +202,7 @@ async function renderManga(generation){
     const gate=await ensureVpnGate();
     if(generation!==renderGeneration)return;
     if(!gate){renderVpnGate(target,'manga');setTitle('manga');syncHeaderRoute();return;}
-    if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20261009-vault-sync-queue','spaMangaListRoute');
+    if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20261009-vault-sync-guest','spaMangaListRoute');
     if(generation!==renderGeneration)return;
     routeRuntime=window.MangaListRouteFactory.create({documentRef:document,windowRef:window,mediaAccess:gate});
     mangaRouteRuntime=routeRuntime;
@@ -232,6 +238,15 @@ function navigate(path,{replace=false}={}){const target=new URL(path,location.hr
 function intercept(event){if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;const link=event.target.closest('a[href]');if(!link||link.target||link.hasAttribute('download'))return;const target=new URL(link.href,location.href),name=target.pathname.split('/').pop();if(target.origin===location.origin&&SPA_PAGES.includes(name)){event.preventDefault();navigate(target.href);}}
 async function start(){
   ensureAppShell();
+  if(guestMode){
+    document.documentElement.classList.remove('auth-pending');
+    applyTheme(currentTheme());
+    document.addEventListener('click',intercept);
+    document.addEventListener('manga-reader-vpn-status',handleVpnStatusChange);
+    window.addEventListener('popstate',renderRoute);
+    renderRoute();
+    return;
+  }
   if(!session||!session.refresh_token||!config.url||!config.publishableKey){showLogin();return;}if(!MangaVault.loadActive()){showVault();return;}try{await MangaVault.ensureSession();document.documentElement.classList.remove('auth-pending');}catch(error){if(typeof MangaVault.isSessionAuthError==='function'&&MangaVault.isSessionAuthError(error))MangaVault.saveSession(null);showLogin();return;}applyTheme(currentTheme());document.addEventListener('click',intercept);document.addEventListener('manga-reader-vpn-status',handleVpnStatusChange);window.addEventListener('popstate',renderRoute);renderRoute();
 }
 window.HomeProfileSPA={navigate,renderRoute,ensureAppShell};
