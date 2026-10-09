@@ -207,3 +207,9 @@ test('global Vault sync does not build a payload without protected-data access',
   assert.match(spa, /function canSyncProtectedData\(\)[\s\S]*canReadProtectedData\(\)===true/);
   assert.ok(sync.indexOf('canSyncProtectedData') < sync.indexOf('MangaVaultPayload.buildFromLocalStorage'));
 });
+
+test('sync result stays visible until another status replaces it', () => {
+  const spa = read('home-profile-spa.js');
+  assert.match(spa, /function setSyncStatus\(text\)\{[^}]*node\.textContent=text\|\|'';\}/);
+  assert.doesNotMatch(spa, /function setSyncStatus\(text\)[\s\S]{0,250}setTimeout\(/);
+});
