@@ -130,7 +130,8 @@
         if (previous) await previous.catch(() => {});
         const payload = buildSyncPayload();
         if (!payload || !canReadProtectedData()) throw new Error('同期データにアクセスできません。');
-        await deps.sync.savePayload(payload);
+        if (typeof deps.sync.saveLocalChanges === 'function') await deps.sync.saveLocalChanges();
+        else await deps.sync.savePayload(payload);
       })();
       cloudSyncPromise = pending;
       try {
