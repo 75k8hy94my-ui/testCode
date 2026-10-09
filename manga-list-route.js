@@ -364,7 +364,7 @@
           hasActiveVault: () => !!(windowRef.MangaVault && windowRef.MangaVault.loadActive()),
           clearTimer: (timer) => { if (timer) windowRef.clearTimeout(timer); },
           setTimer: (callback, delay) => windowRef.setTimeout(callback, delay),
-          savePayload: (payload) => windowRef.MangaVault.savePayload(payload),
+          saveLocalChanges: () => windowRef.MangaVault.saveLocalChanges(),
           buildBasePayload: () => windowRef.MangaVaultPayload.buildFromLocalStorage(),
           getSavedVideos: () => data.get().savedVideos,
           readStorageItem: (key) => storage.getItem(key),
