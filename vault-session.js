@@ -233,14 +233,6 @@
     catch (error) { next.pendingSync = true; next.syncError = error && error.message ? error.message : '同期に失敗しました。'; }
     return next;
   }
-  let lastOnlineRetryAt = 0;
-  if (typeof window.addEventListener === 'function') window.addEventListener('online', () => {
-    const session = loadSession(); const userId = session && session.user && session.user.id; const meta = userId && getMeta(userId);
-    if (!loadActive() || !meta || !meta.pendingSync) return;
-    if (Date.now() - lastOnlineRetryAt < 30000) return;
-    lastOnlineRetryAt = Date.now();
-    saveLocalChanges().catch(() => {});
-  });
   function assertConfig() { if (!config.url || !config.publishableKey) throw new Error('Supabase の設定が見つかりません。'); }
   async function api(path, options = {}) {
     assertConfig();
@@ -474,13 +466,15 @@
   async function commitMergedPayload(user, record, payload, localSnapshot, pendingToken, deletionOperationIds) {
     const currentLocal = window.MangaVaultPayload && typeof window.MangaVaultPayload.buildFromLocalStorage === 'function'
       ? window.MangaVaultPayload.buildFromLocalStorage() : localSnapshot;
-    if (samePayload(currentLocal, localSnapshot) && window.MangaVaultPayload && typeof window.MangaVaultPayload.applyToLocalStorage === 'function') {
-      window.MangaVaultPayload.applyToLocalStorage(payload);
-    }
+    const applyMergedPayload = samePayload(currentLocal, localSnapshot)
+      && window.MangaVaultPayload && typeof window.MangaVaultPayload.applyToLocalStorage === 'function';
+    const receivedRemoteChanges = applyMergedPayload && !samePayload(localSnapshot, payload);
+    if (applyMergedPayload) window.MangaVaultPayload.applyToLocalStorage(payload);
     const encryptedBaseline = await encryptBaseline(payload, user.id, record.revision);
     setMeta(user.id, { revision: record.revision, updatedAt: record.updated_at, encryptedBaseline }, pendingToken);
     await acknowledgeDeletionJournal(user.id, deletionOperationIds);
     pendingConflictChoices = null;
+    if (receivedRemoteChanges) emitPayloadApplied();
     return record;
   }
   async function persistPayloadWithProtocol(token, user, payload, pendingToken, protocolVersion, journaled, requireVpn) {
@@ -621,13 +615,141 @@
     return enqueueSave(() => writeLocalChanges(pendingToken, { requireVpn: false }));
   }
 
+  function dispatchVaultEvent(event) {
+    const target = window.document && typeof window.document.dispatchEvent === 'function' ? window.document : window;
+    if (typeof target.dispatchEvent === 'function') target.dispatchEvent(event);
+  }
+  function emitPayloadApplied() {
+    if (typeof window.CustomEvent !== 'function') return;
+    dispatchVaultEvent(new window.CustomEvent('manga-vault-payload-applied'));
+  }
+  function emitVaultSyncState(state, detail = {}) {
+    if (typeof window.CustomEvent !== 'function') return;
+    dispatchVaultEvent(new window.CustomEvent('manga-vault-sync-state', { detail: Object.assign({ state }, detail) }));
+  }
+  function canReceiveVaultPayload() {
+    const access = window.MangaReaderMediaAccess;
+    return Boolean(access && typeof access.canReadProtectedData === 'function' && access.canReadProtectedData() === true);
+  }
+  async function syncLatestInternal() {
+    if (window.TestCodeGuest?.isActive()) return { state: 'deferred', reason: 'guest' };
+    if (!loadActive()) return { state: 'deferred', reason: 'locked' };
+    const session = loadSession();
+    const userId = session && session.user && session.user.id;
+    if (!userId || !session.refresh_token) return { state: 'deferred', reason: 'unauthenticated' };
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return { state: 'deferred', reason: 'offline' };
+    const writePendingChanges = async () => {
+      const pendingToken = markPendingSync(userId);
+      if (!pendingToken) throw new Error('未同期状態を端末に記録できません。データは保持されています。保存領域を確認してください。');
+      await writeLocalChanges(pendingToken, { requireVpn: false });
+    };
+    if (hasPendingLocalChanges()) {
+      await writePendingChanges();
+      if (!canReceiveVaultPayload()) return { state: 'success', encryptedUpload: true };
+    }
+    if (!canReceiveVaultPayload()) return { state: 'deferred', reason: 'vpn' };
+    if (!window.MangaVaultPayload || typeof window.MangaVaultPayload.buildFromLocalStorage !== 'function'
+        || typeof window.MangaVaultPayload.applyToLocalStorage !== 'function') {
+      throw new Error('端末の同期データを安全に読み書きできません。');
+    }
+    const result = await withVaultSaveLock(userId, () => withSession(async (token, user) => {
+      const record = await fetchRecord(token, user);
+      if (!canReceiveVaultPayload()) return { state: 'deferred', reason: 'vpn' };
+      if (!record) throw new Error('クラウド保管庫が見つからないため受信同期を停止しました。端末データは保持されています。');
+      if (record.legacyRevision) throw new Error('クラウド保管庫のrevisionを確認できないため受信同期を停止しました。');
+      if (Number(record.payload && record.payload.syncProtocolVersion || LEGACY_SYNC_PROTOCOL_VERSION) > SYNC_PROTOCOL_VERSION) {
+        throw new Error('この保管庫は新しい同期方式で更新されています。アプリを再読込してから同期してください。');
+      }
+      const activeVault = loadActive();
+      if (!activeVault || stableJson(record.payload && record.payload.keyWraps || {}) !== stableJson(activeVault.keyWraps || {})) {
+        throw new Error('別の端末で保管庫の認証情報が更新されています。再読込して保管庫を開き直してください。');
+      }
+      const localSnapshot = window.MangaVaultPayload.buildFromLocalStorage();
+      const known = getMeta(user.id);
+      let baseline = null;
+      if (known && known.encryptedBaseline) baseline = await decryptBaseline(known.encryptedBaseline, user.id);
+      const remotePayload = await decryptPayload(record.payload);
+      if (!canReceiveVaultPayload()) return { state: 'deferred', reason: 'vpn' };
+      const currentMeta = getMeta(user.id);
+      const currentLocal = window.MangaVaultPayload.buildFromLocalStorage();
+      if ((currentMeta && currentMeta.pendingSync) || !samePayload(currentLocal, localSnapshot)) return { needsMerge: true };
+      if (baseline && !samePayload(localSnapshot, baseline)) return { needsMerge: true };
+      if (!baseline && !samePayload(localSnapshot, remotePayload)) {
+        throw new Error('未同期データの基準が見つからないため受信同期を停止しました。端末データを保持したまま暗号化バックアップから復旧してください。');
+      }
+      const changed = !samePayload(localSnapshot, remotePayload);
+      if (changed) window.MangaVaultPayload.applyToLocalStorage(remotePayload);
+      const encryptedBaseline = await encryptBaseline(remotePayload, user.id, record.revision);
+      setMeta(user.id, { revision: record.revision, updatedAt: record.updated_at, encryptedBaseline });
+      if (changed) emitPayloadApplied();
+      return { state: 'success', applied: changed, revision: record.revision };
+    }));
+    if (result.needsMerge) {
+      await writePendingChanges();
+      return { state: 'success', merged: true };
+    }
+    return result;
+  }
+  let syncLatestPromise = null;
+  let lastAutoSyncAt = 0;
+  let autoSyncTimer = null;
+  function syncLatest() {
+    if (syncLatestPromise) return syncLatestPromise;
+    if (autoSyncTimer !== null) {
+      clearTimeout(autoSyncTimer);
+      autoSyncTimer = null;
+    }
+    emitVaultSyncState('syncing');
+    lastAutoSyncAt = Date.now();
+    const operation = enqueueSave(syncLatestInternal);
+    const tracked = operation.then((result) => {
+      if (result && result.state === 'deferred') emitVaultSyncState('deferred', { reason: result.reason });
+      else if (result && result.state === 'success' && hasPendingLocalChanges()) {
+        result = Object.assign({}, result, { state: 'pending' });
+        emitVaultSyncState('pending');
+      } else emitVaultSyncState('success', { applied: Boolean(result && result.applied), merged: Boolean(result && result.merged), encryptedUpload: Boolean(result && result.encryptedUpload) });
+      return result;
+    }).catch((error) => {
+      emitVaultSyncState(error && Array.isArray(error.conflicts) ? 'conflict' : 'error', {
+        message: error && error.message ? error.message : '同期に失敗しました。',
+      });
+      throw error;
+    }).finally(() => {
+      if (syncLatestPromise === tracked) syncLatestPromise = null;
+    });
+    syncLatestPromise = tracked;
+    return tracked;
+  }
+  function requestAutoVaultSync(immediate = false) {
+    if (window.TestCodeGuest?.isActive() || !loadActive()) return;
+    const session = loadSession();
+    if (!session || !session.refresh_token || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
+    if (syncLatestPromise) return;
+    if (autoSyncTimer !== null) {
+      if (!immediate) return;
+      clearTimeout(autoSyncTimer);
+      autoSyncTimer = null;
+    }
+    const delay = immediate ? 0 : Math.max(0, 30000 - (Date.now() - lastAutoSyncAt));
+    autoSyncTimer = setTimeout(() => {
+      autoSyncTimer = null;
+      syncLatest().catch(() => {});
+    }, delay);
+    if (autoSyncTimer && typeof autoSyncTimer.unref === 'function') autoSyncTimer.unref();
+  }
+  if (typeof window.addEventListener === 'function') {
+    window.addEventListener('online', () => requestAutoVaultSync(true));
+    window.addEventListener('focus', () => requestAutoVaultSync());
+  }
   if (window.document && typeof window.document.addEventListener === 'function') {
+    window.document.addEventListener('visibilitychange', () => {
+      if (window.document.visibilityState === 'visible') requestAutoVaultSync();
+    });
     window.document.addEventListener('manga-reader-vpn-status', (event) => {
-      const status = event && event.detail && event.detail.status;
-      if (status !== 'allowed' || !loadActive() || !hasPendingLocalChanges()) return;
-      saveLocalChanges().catch(() => {});
+      if (event && event.detail && event.detail.status === 'allowed') requestAutoVaultSync(true);
     });
   }
+
 
   async function resolveConflicts(choices, conflictSnapshot) {
     if (!choices || typeof choices !== 'object') throw new Error('競合の選択内容を読み取れません。');
@@ -805,6 +927,6 @@
     });
     return retryPendingLocalChanges(result);
   }
-  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, ensureSession, refreshSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, loadPayload, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, resolveConflicts, recordSyncDeletion, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
+  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, ensureSession, refreshSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, loadPayload, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, syncLatest, resolveConflicts, recordSyncDeletion, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
 })();
 
