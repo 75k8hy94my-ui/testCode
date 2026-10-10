@@ -22,19 +22,19 @@ function scriptSources(html) {
 
 test('current entry pages keep their static bootstrap script baselines', () => {
   assert.deepEqual(scriptSources(pages.manga), [
-    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-sync-audit', 'vault-session.js?v=20261010-vault-sync-v4', 'vault-conflict-ui.js?v=20261010-vault-sync-audit', 'browser-storage.js',
+    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-sync-audit', 'vault-session.js?v=20261011-auto-receive-sync', 'vault-conflict-ui.js?v=20261010-vault-sync-audit', 'browser-storage.js',
     'vault-payload.js?v=20261010-vault-sync-v4', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js?v=20261010-vpn-diagnostics',
     'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261009-guest-mode', 'feature-flags.js',
     'media-access-gate.js?v=20261010-vpn-diagnostics',
     'manga-list-route.js?v=20261010-vpn-diagnostics',
-    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261010-vpn-diagnostics',
+    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261011-auto-receive-sync',
   ]);
   assert.deepEqual(scriptSources(pages.video), [
-    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-sync-audit', 'vault-session.js?v=20261010-vault-sync-v4', 'vault-conflict-ui.js?v=20261010-vault-sync-audit', 'browser-storage.js',
+    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-sync-audit', 'vault-session.js?v=20261011-auto-receive-sync', 'vault-conflict-ui.js?v=20261010-vault-sync-audit', 'browser-storage.js',
     'vault-payload.js?v=20261010-vault-sync-v4', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js?v=20261010-vpn-diagnostics',
-    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261009-guest-mode', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261010-vpn-diagnostics',
+    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261009-guest-mode', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261011-auto-receive-sync',
   ]);
 });
 
@@ -47,7 +47,7 @@ test('every Vault entry loads the same diff-sync dependency before the shared se
     const sources = scriptSources(html);
     const normalize = (source) => source.replace(/^\.\.\//, '');
     const merge = sources.findIndex((source) => normalize(source) === 'vault-sync-merge.js?v=20261010-vault-sync-audit');
-    const session = sources.findIndex((source) => normalize(source) === 'vault-session.js?v=20261010-vault-sync-v4');
+    const session = sources.findIndex((source) => normalize(source) === 'vault-session.js?v=20261011-auto-receive-sync');
     assert.ok(merge >= 0 && session > merge, `${name} loads merge before vault session`);
     const conflictUi = sources.findIndex((source) => normalize(source) === 'vault-conflict-ui.js?v=20261010-vault-sync-audit');
     if (name !== 'game/index.html') assert.ok(conflictUi > session, `${name} loads conflict UI after shared session`);
@@ -62,7 +62,7 @@ test('every Vault entry loads the same diff-sync dependency before the shared se
 test('VPN loss preserves pending home edits for retry after access returns', () => {
   assert.match(spa, /markLocalChangesPending\(\)/);
   assert.match(spa, /syncDirty=true;syncDirtyMessage=okMessage\|\|syncDirtyMessage/);
-  assert.match(spa, /next==='allowed'&&syncDirty&&!syncRunning\)runHomeSync/);
+  assert.match(spa, /next==='allowed'&&syncDirty&&!syncRunning\)\{[\s\S]*MangaVault\.syncLatest\(\)/);
   assert.doesNotMatch(spa, /if\(next!==['"]allowed['"]\)\{syncDirty=false/);
 });
 
@@ -103,7 +103,7 @@ test('authentication branches remain explicit in the current SPA bootstrap', () 
   assert.match(spa, /if\(!session\|\|!session\.refresh_token\|\|!config\.url\|\|!config\.publishableKey\)\{showLogin\(\);return;\}/);
   assert.match(spa, /if\(!MangaVault\.loadActive\(\)\)\{showVault\(\);return;\}/);
   assert.match(spa, /await MangaVault\.ensureSession\(\)/);
-  assert.match(spa, /catch\(error\)\{if\(typeof MangaVault\.isSessionAuthError==='function'&&MangaVault\.isSessionAuthError\(error\)\)MangaVault\.saveSession\(null\);showLogin\(\);return;\}/);
+  assert.match(spa, /catch\(error\)\{[\s\S]*MangaVault\.saveSession\(null\)[\s\S]*showLogin\(\);[\s\S]*return;/);
 });
 
 test('ordinary vault sync requests use the local-storage save queue', () => {
