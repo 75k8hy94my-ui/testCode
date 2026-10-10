@@ -71,6 +71,8 @@
 
   window.addEventListener('manga-vault-conflict', (event) => show(event.detail && event.detail.conflicts));
   window.addEventListener('manga-vault-cleared', () => {
+    if (dialog) dialog.remove();
+    dialog = null;
     if (window.TestCodeGuest?.isActive()) return;
     if (location.pathname.split('/').pop() !== 'sync.html') {
       const returnTo = location.pathname.split('/').pop() + location.search + location.hash;

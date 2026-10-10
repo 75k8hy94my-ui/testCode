@@ -460,7 +460,6 @@
     try { return await saveLocalChanges(); }
     catch (error) { pendingConflictChoices = null; throw error; }
   }
-
   async function restoreExistingRecord(record, user, applyPayload, unlockRecord) {
     const known = getMeta(user.id);
     const pendingSync = Boolean(known && known.pendingSync);
@@ -616,6 +615,6 @@
     });
     return retryPendingLocalChanges(result);
   }
-  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, refreshSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, loadPayload, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, resolveConflicts, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
+  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, refreshSession, ensureSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, loadPayload, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, resolveConflicts, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
 })();
 
