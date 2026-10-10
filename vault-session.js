@@ -446,9 +446,14 @@
         window.MangaVaultPayload.applyToLocalStorage(snapshot.cloud);
         assertSyncAccess();
         setMeta(user.id, { revision: record.revision, updatedAt: record.updated_at }, pendingToken);
+        const active = loadActive();
+        if (active) saveActive({ rawKey: active.rawKey, keyWraps: record.payload.keyWraps });
         return { choice, revision: record.revision };
       }
       const encrypted = await envelope(snapshot.local);
+      // Retain credential wrappers from the latest remote record, even when
+      // the local data wins. Losing passkeys here would lock out other devices.
+      encrypted.keyWraps = record.payload.keyWraps;
       assertSyncAccess();
       const rows = await api('/rest/v1/rpc/update_manga_reader_vault', {
         method: 'POST', token,
@@ -471,6 +476,8 @@
       }
       if (stableJson(window.MangaVaultPayload.buildFromLocalStorage()) !== stableJson(snapshot.local)) markPendingSync(user.id);
       setMeta(user.id, { revision: saved.revision, updatedAt: saved.updated_at }, pendingToken);
+      const active = loadActive();
+      if (active) saveActive({ rawKey: active.rawKey, keyWraps: encrypted.keyWraps });
       return { choice, revision: saved.revision };
     })));
   }
