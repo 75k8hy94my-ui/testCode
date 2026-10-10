@@ -17,3 +17,8 @@ test('login primary buttons keep contrast when backdrop-filter fallback is activ
 test('login form submit remains a primary button', () => {
   assert.match(source, /<form id="loginForm">[\s\S]*?<button class="primary" type="submit">ログイン<\/button>/);
 });
+
+test('project index URL redirects to the project directory without redirecting the directory itself', () => {
+  assert.match(source, /location\.pathname\s*===\s*['\"]\/testCode\/index\.html['\"]/);
+  assert.match(source, /location\.replace\(['\"]\/testCode\/['\"]\)/);
+});
