@@ -543,7 +543,7 @@ test('manual conflict resolution leaves pending on failed cloud CAS and on block
 });
 
 test('sync page exposes a self-service conflict dialog with an encrypted backup gate', () => {
-  assert.match(syncPage, /vault-conflict-ui\\.js/);
+  assert.match(syncPage, /vault-conflict-ui\.js/);
   assert.match(syncPage, /id="vaultConflictDialog"/);
   assert.match(syncPage, /id="vaultConflictDownload"/);
   assert.match(syncPage, /id="vaultConflictAcknowledge"/);
