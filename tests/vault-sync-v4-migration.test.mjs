@@ -3,12 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const migration = fs.readFileSync(new URL('../supabase/migrations/20261010120000_vault_sync_v4_rpc.sql', import.meta.url), 'utf8').trim();
+const historyMigration = fs.readFileSync(new URL('../supabase/migrations/20261010223740_vault_history.sql', import.meta.url), 'utf8').trim();
 const schema = fs.readFileSync(new URL('../supabase-schema.sql', import.meta.url), 'utf8');
 const postgresRunner = fs.readFileSync(new URL('../scripts/test-vault-sync-v4-postgres.sh', import.meta.url), 'utf8');
 const postgresAssertions = fs.readFileSync(new URL('./postgres/vault-sync-v4.sql', import.meta.url), 'utf8');
 
 test('bootstrap schema carries the exact current v4 RPC and privilege contract', () => {
-  assert.ok(schema.trimEnd().endsWith(migration));
+  assert.ok(schema.includes(migration));
+  assert.ok(schema.indexOf(historyMigration.split('\n')[0]) > schema.indexOf(migration));
   assert.match(migration, /syncProtocolVersion' is distinct from '4'/);
   assert.match(migration, /returns integer[\s\S]*security invoker[\s\S]*private\.manga_reader_vault_sync_capability_worker/);
   assert.match(migration, /private\.require_vault_sync_v4\(\)/);

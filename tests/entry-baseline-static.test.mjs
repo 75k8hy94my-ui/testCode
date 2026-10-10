@@ -28,13 +28,13 @@ test('current entry pages keep their static bootstrap script baselines', () => {
     'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261009-guest-mode', 'feature-flags.js',
     'media-access-gate.js?v=20261010-vpn-diagnostics',
     'manga-list-route.js?v=20261010-vpn-diagnostics',
-    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261011-auto-receive-sync',
+    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'vault-history.js?v=20261011-vault-history', 'vault-history-ui.js?v=20261011-vault-history', 'home-profile-spa.js?v=20261011-vault-history',
   ]);
   assert.deepEqual(scriptSources(pages.video), [
     'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-sync-audit', 'vault-session.js?v=20261011-auto-receive-sync', 'vault-conflict-ui.js?v=20261010-vault-sync-audit', 'browser-storage.js',
     'vault-payload.js?v=20261010-vault-sync-v4', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js?v=20261010-vpn-diagnostics',
-    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261009-guest-mode', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261011-auto-receive-sync',
+    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261009-guest-mode', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'vault-history.js?v=20261011-vault-history', 'vault-history-ui.js?v=20261011-vault-history', 'home-profile-spa.js?v=20261011-vault-history',
   ]);
 });
 
