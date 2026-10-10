@@ -133,8 +133,12 @@
     try {
       session = await MangaVault.ensureSession();
     } catch (error) {
-      if (typeof MangaVault.isSessionAuthError === 'function' && MangaVault.isSessionAuthError(error)) MangaVault.saveSession(null);
-      window.location.replace('index.html');
+      if (typeof MangaVault.isSessionAuthError === 'function' && MangaVault.isSessionAuthError(error)) {
+        MangaVault.saveSession(null);
+        window.location.replace('index.html');
+        return;
+      }
+      setStatus('保存済みのログイン状態を確認できませんでした。通信状況を確認して再読み込みしてください。');
       return;
     }
     ui.email.textContent=session.user.email;

@@ -20,3 +20,7 @@ test('logout asks for confirmation before clearing local/session data', () => {
   assert.match(html, /EncryptedChunkCache\.clearAll/);
   assert.match(html, /startsWith\('mangaReaderSavedVaultPassphrase:'\)/);
 });
+
+test('transient session refresh errors stay on the vault screen instead of redirecting to login', () => {
+  assert.match(html, /if \(typeof MangaVault\.isSessionAuthError === 'function' && MangaVault\.isSessionAuthError\(error\)\) \{\s*MangaVault\.saveSession\(null\);\s*window\.location\.replace\('index\.html'\);\s*return;\s*\}\s*setStatus\('保存済みのログイン状態を確認できませんでした。通信状況を確認して再読み込みしてください。'\);\s*return;/);
+});
