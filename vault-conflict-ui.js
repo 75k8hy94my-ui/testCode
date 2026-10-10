@@ -3,6 +3,16 @@
   if (!window || !document || !window.MangaVault) return;
   let dialog = null;
 
+  function describeConflict(conflict) {
+    const parts = String(conflict.path || '').split('/').slice(1).map((part) => part.replace(/~1/g, '/').replace(/~0/g, '~'));
+    const section = parts.shift() || 'データ';
+    const titles = { items: '漫画', videos: '動画', videoMeta: '動画設定', videoFolders: '動画フォルダ', videoMarkers: '動画マーカー', videoShortsState: 'ショート動画', theme: 'テーマ設定', dashboardVisibility: 'ホーム表示設定', homeCards: 'ホームカード', study: '学習データ', lastPages: '閲覧位置', statuteNotes: 'メモ' };
+    if (conflict.type === 'order') return (titles[section] || section) + 'の並び順';
+    const entity = ['items', 'videos', 'videoFolders', 'authorCards'].includes(section) ? parts.shift() : null;
+    const fields = parts.map((part) => ({ title: 'タイトル', thumbnailUrl: 'サムネイル', favorite: 'お気に入り', updatedAt: '更新日時', savedAt: '保存日時' }[part] || part));
+    return (titles[section] || section) + (entity ? '「' + entity + '」' : '') + (fields.length ? ' / ' + fields.join(' / ') : '');
+  }
+
   function show(conflicts) {
     if (!Array.isArray(conflicts) || !conflicts.length) return;
     if (dialog) dialog.remove();
@@ -23,7 +33,7 @@
     conflicts.forEach((conflict, index) => {
       const fieldset = document.createElement('fieldset');
       const legend = document.createElement('legend');
-      legend.textContent = conflict.path;
+      legend.textContent = describeConflict(conflict);
       fieldset.append(legend);
       for (const side of ['local', 'remote']) {
         const label = document.createElement('label');
@@ -53,7 +63,7 @@
       submit.disabled = true;
       error.textContent = '同期中…';
       try {
-        await window.MangaVault.resolveConflicts(choices);
+        await window.MangaVault.resolveConflicts(choices, conflicts);
         root.remove();
         dialog = null;
       } catch (failure) {

@@ -22,7 +22,7 @@ function scriptSources(html) {
 
 test('current entry pages keep their static bootstrap script baselines', () => {
   assert.deepEqual(scriptSources(pages.manga), [
-    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-diff-sync', 'vault-session.js?v=20261010-vault-diff-sync', 'vault-conflict-ui.js?v=20261010-vault-diff-sync', 'browser-storage.js',
+    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-sync-audit', 'vault-session.js?v=20261010-vault-sync-audit', 'vault-conflict-ui.js?v=20261010-vault-sync-audit', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js?v=20261010-vpn-diagnostics',
     'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261009-guest-mode', 'feature-flags.js',
@@ -31,7 +31,7 @@ test('current entry pages keep their static bootstrap script baselines', () => {
     'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261010-vpn-diagnostics',
   ]);
   assert.deepEqual(scriptSources(pages.video), [
-    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-diff-sync', 'vault-session.js?v=20261010-vault-diff-sync', 'vault-conflict-ui.js?v=20261010-vault-diff-sync', 'browser-storage.js',
+    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-sync-audit', 'vault-session.js?v=20261010-vault-sync-audit', 'vault-conflict-ui.js?v=20261010-vault-sync-audit', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js?v=20261010-vpn-diagnostics',
     'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261009-guest-mode', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261010-vpn-diagnostics',
@@ -45,10 +45,10 @@ test('every Vault entry loads the same diff-sync dependency before the shared se
     const html = read(name);
     if (!html.includes('vault-session.js')) continue;
     const sources = scriptSources(html);
-    const merge = sources.indexOf('vault-sync-merge.js?v=20261010-vault-diff-sync');
-    const session = sources.indexOf('vault-session.js?v=20261010-vault-diff-sync');
+    const merge = sources.indexOf('vault-sync-merge.js?v=20261010-vault-sync-audit');
+    const session = sources.indexOf('vault-session.js?v=20261010-vault-sync-audit');
     assert.ok(merge >= 0 && session > merge, `${name} loads merge before vault session`);
-    const conflictUi = sources.indexOf('vault-conflict-ui.js?v=20261010-vault-diff-sync');
+    const conflictUi = sources.indexOf('vault-conflict-ui.js?v=20261010-vault-sync-audit');
     assert.ok(conflictUi > session, `${name} loads conflict UI after shared session`);
     refs.push(sources[merge], sources[session], sources[conflictUi]);
   }

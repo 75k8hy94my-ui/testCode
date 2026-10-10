@@ -177,7 +177,7 @@
           if (controller === current) setStatus(pageCount + 'ページ取得：' + imageCount + '枚の画像を検出しました。続きの確認中…');
         }
       });
-      if (controller !== current || !vaultApi.loadActive()) return;
+      if (controller !== current || (!window.TestCodeGuest?.isActive() && !vaultApi.loadActive())) return;
       // No partial cache writes: commit only after every Drive page succeeded.
       const imageList = result.map(file => ({ id: file.id, name: file.name, directUrl: api.imageUrls(file.id).direct }));
       let cache = null;

@@ -7,14 +7,30 @@ create table if not exists public.manga_reader_vaults (
 
 alter table public.manga_reader_vaults add column if not exists revision bigint not null default 1;
 
+-- Vault writes must use the owner-bound compare-and-swap RPC. Keep the
+-- authenticated user's read/create path and preserve service_role access.
+revoke all on table public.manga_reader_vaults from public, anon, authenticated;
+grant select, insert on table public.manga_reader_vaults to authenticated;
+
 create or replace function public.update_manga_reader_vault(expected_revision bigint, new_payload jsonb)
 returns table(revision bigint, updated_at timestamptz)
-language plpgsql security invoker
-set search_path = public
+language plpgsql security definer
+set search_path = ''
 as $$
 declare
   current_payload jsonb;
+  current_protocol_text text;
+  incoming_protocol_text text;
+  current_protocol_version bigint := 0;
+  incoming_protocol_version bigint := 0;
 begin
+  if (select auth.uid()) is null or coalesce((select auth.jwt() ->> 'is_anonymous'), 'false') = 'true' then
+    raise exception 'vault_authentication_required' using errcode = '42501';
+  end if;
+  if new_payload is null or jsonb_typeof(new_payload) <> 'object' then
+    raise exception 'vault_payload_must_be_object' using errcode = '22023';
+  end if;
+
   select vault.payload into current_payload
   from public.manga_reader_vaults as vault
   where vault.user_id = (select auth.uid())
@@ -25,8 +41,11 @@ begin
     return;
   end if;
 
-  if current_payload ->> 'syncProtocolVersion' = '2'
-     and coalesce(new_payload ->> 'syncProtocolVersion', '') <> '2' then
+  current_protocol_text := current_payload ->> 'syncProtocolVersion';
+  incoming_protocol_text := new_payload ->> 'syncProtocolVersion';
+  if current_protocol_text ~ '^[0-9]{1,18}$' then current_protocol_version := current_protocol_text::bigint; end if;
+  if incoming_protocol_text ~ '^[0-9]{1,18}$' then incoming_protocol_version := incoming_protocol_text::bigint; end if;
+  if current_protocol_version >= 2 and incoming_protocol_version < current_protocol_version then
     raise exception 'vault_sync_client_outdated' using errcode = 'P0001';
   end if;
 
@@ -40,6 +59,9 @@ begin
   returning vault.revision, vault.updated_at;
 end;
 $$;
+
+revoke execute on function public.update_manga_reader_vault(bigint, jsonb) from public, anon;
+grant execute on function public.update_manga_reader_vault(bigint, jsonb) to authenticated;
 
 alter table public.manga_reader_vaults enable row level security;
 
@@ -55,12 +77,6 @@ using ((select auth.uid()) = user_id);
 create policy "Users can create their own encrypted vault"
 on public.manga_reader_vaults for insert
 to authenticated
-with check ((select auth.uid()) = user_id);
-
-create policy "Users can update their own encrypted vault"
-on public.manga_reader_vaults for update
-to authenticated
-using ((select auth.uid()) = user_id)
 with check ((select auth.uid()) = user_id);
 
 -- 大容量データの分割同期用。payload はブラウザ側で暗号化済みの envelope のみを保存する。

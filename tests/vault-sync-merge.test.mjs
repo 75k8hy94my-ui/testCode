@@ -27,6 +27,28 @@ test('merges different properties on the same entity and preserves unknown prope
   assert.deepEqual(result.payload.videos, [{ id: 'v1', title: 'new title', thumbnailUrl: 'new.jpg', futureField: { retained: true } }]);
 });
 
+test('merges independent video edits without treating updatedAt as user data', () => {
+  const base = { videos: [{ id: 'v1', title: 'old', thumbnailUrl: 'old.jpg', updatedAt: 100 }] };
+  const local = { videos: [{ id: 'v1', title: 'new', thumbnailUrl: 'old.jpg', updatedAt: 200 }] };
+  const remote = { videos: [{ id: 'v1', title: 'old', thumbnailUrl: 'new.jpg', updatedAt: 300 }] };
+
+  const result = mergeVaultPayload(base, local, remote);
+
+  assert.deepEqual(result.conflicts, []);
+  assert.deepEqual(result.payload.videos[0], { id: 'v1', title: 'new', thumbnailUrl: 'new.jpg', updatedAt: 300 });
+});
+
+test('reader progress uses the latest progress timestamp as a single record', () => {
+  const base = { lastPages: { work1: { page: 5, wasLast: false, updatedAt: 100 } } };
+  const local = { lastPages: { work1: { page: 8, wasLast: false, updatedAt: 200 } } };
+  const remote = { lastPages: { work1: { page: 6, wasLast: false, updatedAt: 300 } } };
+
+  const result = mergeVaultPayload(base, local, remote);
+
+  assert.deepEqual(result.conflicts, []);
+  assert.deepEqual(result.payload.lastPages.work1, remote.lastPages.work1);
+});
+
 test('restores baseline properties omitted by a legacy normalizer before merging', () => {
   const base = { futureState: { schemaVersion: 4, option: true }, items: [{ id: 'i1', futureField: 'kept' }] };
   const local = { items: [{ id: 'i1' }], videos: [{ id: 'v1' }] };
@@ -40,6 +62,29 @@ test('restores baseline properties omitted by a legacy normalizer before merging
   assert.deepEqual(result.payload.videos, local.videos);
 });
 
+test('explicit tombstones stop unknown-field restoration while dictionary and entity deletions stay deleted', () => {
+  const base = {
+    futureTopLevel: { keep: true },
+    videos: [{ id: 'v1', futureField: 'delete me', retained: { legacy: true } }],
+    videoMeta: { removedVideo: { title: 'deleted' }, v1: { futureSetting: 'delete me' } },
+    study: { preferences: { futureOption: true, retainedOption: true } },
+  };
+  const local = {
+    videos: [{ id: 'v1', retained: { legacy: true } }],
+    videoMeta: { v1: {} },
+    study: { preferences: { retainedOption: true } },
+    vaultSyncTombstones: ['/futureTopLevel', '/videos/v1/futureField', '/videoMeta/v1/futureSetting', '/study/preferences/futureOption'],
+  };
+
+  const result = mergeModule.retainUnknownProperties(base, local);
+
+  assert.equal('futureTopLevel' in result, false);
+  assert.equal('futureField' in result.videos[0], false);
+  assert.equal('removedVideo' in result.videoMeta, false);
+  assert.equal('futureSetting' in result.videoMeta.v1, false);
+  assert.deepEqual(result.videos[0].retained, { legacy: true });
+});
+
 test('reports different edits to the same property without choosing a winner', () => {
   const base = { videoMeta: { v1: { title: 'old' } } };
   const local = { videoMeta: { v1: { title: 'device title' } } };
@@ -48,7 +93,7 @@ test('reports different edits to the same property without choosing a winner', (
   const result = mergeVaultPayload(base, local, remote);
 
   assert.equal(result.conflicts.length, 1);
-  assert.equal(result.conflicts[0].path, 'videoMeta.v1.title');
+  assert.equal(result.conflicts[0].path, '/videoMeta/v1/title');
   assert.equal(result.conflicts[0].local, 'device title');
   assert.equal(result.conflicts[0].remote, 'cloud title');
   assert.equal(result.payload.videoMeta.v1.title, 'old');
@@ -59,9 +104,29 @@ test('applies a user-selected conflict value while keeping all non-conflicting r
   const local = { videoMeta: { v1: { title: 'device', favorite: false } } };
   const remote = { videoMeta: { v1: { title: 'cloud', favorite: true } } };
   const result = mergeVaultPayload(base, local, remote);
-  const resolved = mergeModule.applyConflictChoices(result.payload, result.conflicts, { 'videoMeta.v1.title': 'local' });
+  const resolved = mergeModule.applyConflictChoices(result.payload, result.conflicts, { '/videoMeta/v1/title': 'local' });
 
   assert.deepEqual(resolved.videoMeta.v1, { title: 'device', favorite: true });
+});
+
+test('conflict pointers safely address IDs containing JSON Pointer characters and Unicode', () => {
+  for (const id of ['clip.1', 'video/abc', 'a~b', '日本語の作品', 'item with spaces']) {
+    const base = { videoMeta: { [id]: { title: 'old', favorite: false } } };
+    const local = { videoMeta: { [id]: { title: 'device', favorite: false } } };
+    const remote = { videoMeta: { [id]: { title: 'cloud', favorite: true } } };
+    const merged = mergeVaultPayload(base, local, remote);
+    assert.equal(merged.conflicts.length, 1, id);
+    const conflict = merged.conflicts[0];
+    const resolved = mergeModule.applyConflictChoices(merged.payload, [conflict], { [conflict.path]: 'local' });
+    assert.equal(resolved.videoMeta[id].title, 'device', id);
+    assert.equal(resolved.videoMeta[id].favorite, true, id);
+  }
+});
+
+test('conflict application throws when its target path no longer resolves', () => {
+  assert.throws(() => mergeModule.applyConflictChoices({}, [{
+    type: 'value', path: '/videoMeta/v1/title', local: 'device', remote: 'cloud', localPresent: true, remotePresent: true,
+  }], { '/videoMeta/v1/title': 'local' }), /競合対象が見つかりません/);
 });
 
 test('reports delete versus edit rather than resurrecting or deleting the entity', () => {
@@ -73,7 +138,7 @@ test('reports delete versus edit rather than resurrecting or deleting the entity
 
   assert.equal(result.conflicts.length, 1);
   assert.equal(result.conflicts[0].type, 'delete-edit');
-  assert.equal(result.conflicts[0].path, 'videos.v1');
+  assert.equal(result.conflicts[0].path, '/videos/v1');
 });
 
 test('merges independent monotonic counter operations and deduplicates a repeated operation', () => {

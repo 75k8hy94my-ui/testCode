@@ -29,9 +29,10 @@ test('chunk CAS and tombstone functions are security invoker and authenticated-o
   for (const fn of ['update_manga_reader_encrypted_chunk', 'tombstone_manga_reader_encrypted_chunk']) {
     assert.match(sql, new RegExp(`create or replace function public\\.${fn}\\(`, 'i'));
   }
-  assert.doesNotMatch(sql, /security definer/i);
-  const invokers = sql.match(/security invoker/gi) || [];
-  assert.ok(invokers.length >= 3, 'existing vault RPC plus two chunk RPCs should be invoker functions');
+  const chunkFunctions = sql.slice(sql.indexOf('create or replace function public.update_manga_reader_encrypted_chunk'), sql.indexOf('create table if not exists public.manga_reader_encrypted_assets'));
+  assert.doesNotMatch(chunkFunctions, /security definer/i);
+  const invokers = chunkFunctions.match(/security invoker/gi) || [];
+  assert.ok(invokers.length >= 3, 'chunk update, tombstone, and cleanup RPCs should remain invoker functions');
   assert.match(sql, /revoke execute on function public\.update_manga_reader_encrypted_chunk[^;]* from public\s*,\s*anon/i);
   assert.match(sql, /grant execute on function public\.update_manga_reader_encrypted_chunk[^;]* to authenticated/i);
   assert.match(sql, /revoke execute on function public\.tombstone_manga_reader_encrypted_chunk[^;]* from public\s*,\s*anon/i);

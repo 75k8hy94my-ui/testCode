@@ -23,7 +23,7 @@ function fakeElement() {
     setAttribute() {}, removeAttribute() {}, focus() {}, remove() {}
   };
 }
-function makePage() {
+function makePage({ guest = false } = {}) {
   const ids = [
     'driveSyncStatus', 'driveGalleryForm', 'driveFolder', 'driveApiKey', 'driveLoad',
     'driveCancel', 'driveRefresh', 'driveGalleryStatus', 'driveGalleryCount',
@@ -41,8 +41,9 @@ function makePage() {
     driveCalls++;
     return [{ id: 'image_000000002', name: '新.jpg', mimeType: 'image/jpeg' }];
   }};
-  const active = { rawKey: new Uint8Array(32).fill(7) };
+  const active = guest ? null : { rawKey: new Uint8Array(32).fill(7) };
   const window = {
+    TestCodeGuest: { isActive: () => guest },
     PublicDriveGallery: cacheSource,
     PublicDriveGalleryVault: {
       validateSettings: () => {},
@@ -101,4 +102,19 @@ test('explicit refresh uses Drive API once and writes new encrypted manifest to 
   assert.equal(page.stats().cloudSaves, 1);
   assert.equal(page.elements.driveGalleryCount.textContent, '1枚');
   assert.match(page.elements.driveGalleryStatus.textContent, /Driveから最新の一覧を取得/);
+});
+
+test('guest can display public Drive images without an unlocked Vault or cloud persistence', async () => {
+  const page = makePage({ guest: true });
+  await page.settle();
+  page.elements.driveFolder.value = folderId;
+  page.elements.driveApiKey.value = apiKey;
+  await page.elements.driveGalleryForm.callbacks.get('submit')({ preventDefault() {} });
+  await page.settle();
+
+  assert.equal(page.stats().driveCalls, 1);
+  assert.equal(page.stats().cloudSaves, 0);
+  assert.equal(page.stats().encryptedWrites, 0);
+  assert.equal(page.elements.driveGalleryCount.textContent, '1枚');
+  assert.equal(page.elements.driveGalleryGrid.children.length, 1);
 });

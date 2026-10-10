@@ -8,7 +8,7 @@
   const META_KEY = 'mangaReaderSupabaseSyncMeta';
   const ACTIVE_KEY = 'mangaReaderActiveVault';
   const CHANNEL_NAME = 'mangaReaderVaultSession';
-  const SYNC_PROTOCOL_VERSION = 2;
+  const SYNC_PROTOCOL_VERSION = 3;
   let pendingConflictChoices = null;
   const VERSION = 1;
   const ITERATIONS = 600000;
@@ -212,7 +212,10 @@
   }
   function assertSyncAccess() {
     const access = window.MangaReaderMediaAccess;
-    if (access && typeof access.canReadProtectedData === 'function' && access.canReadProtectedData() !== true) {
+    if (!access || typeof access.canReadProtectedData !== 'function') {
+      throw new Error('VPNアクセス状態を確認できません。ページを再読込して判定を完了してください。');
+    }
+    if (access.canReadProtectedData() !== true) {
       throw new Error('VPN接続を確認できるまでクラウド同期を停止しています。');
     }
   }
@@ -384,16 +387,27 @@
         const localWithUnknown = window.MangaVaultSyncMerge.retainUnknownProperties(baseline, payload);
         const mergeResult = window.MangaVaultSyncMerge.mergeVaultPayload(baseline, localWithUnknown, remotePayload);
         if (mergeResult.conflicts.length) {
-          const choices = pendingConflictChoices;
-          if (!choices || mergeResult.conflicts.some((conflict) => !['local', 'remote'].includes(choices[conflict.path]))) {
+          const pending = pendingConflictChoices;
+          const choices = pending && pending.choices;
+          const snapshots = pending && pending.snapshots;
+          const staleChoices = !pending || mergeResult.conflicts.some((conflict) =>
+            !['local', 'remote'].includes(choices[conflict.path]) || snapshots[conflict.path] !== conflict.snapshot);
+          if (staleChoices) {
+            pendingConflictChoices = null;
             if (typeof window.dispatchEvent === 'function' && typeof window.CustomEvent === 'function') {
               window.dispatchEvent(new window.CustomEvent('manga-vault-conflict', { detail: { conflicts: mergeResult.conflicts } }));
             }
-            const error = new Error('同じデータが別の端末で変更されています。画面で端末またはクラウドの値を選択してください。');
+            const error = new Error(pending ? '競合後にデータが更新されました。最新の値を確認して選び直してください。' : '同じデータが別の端末で変更されています。画面で端末またはクラウドの値を選択してください。');
             error.conflicts = mergeResult.conflicts;
             throw error;
           }
           mergeResult.payload = window.MangaVaultSyncMerge.applyConflictChoices(mergeResult.payload, mergeResult.conflicts, choices);
+        }
+        delete mergeResult.payload.vaultSyncTombstones;
+        const comparableRemote = Object.assign({}, remotePayload);
+        delete comparableRemote.vaultSyncTombstones;
+        if (samePayload(mergeResult.payload, comparableRemote)) {
+          return commitMergedPayload(user, current, remotePayload, payload, pendingToken);
         }
         const encrypted = await envelope(mergeResult.payload);
         const rows = await api('/rest/v1/rpc/update_manga_reader_vault', { method: 'POST', token, body: JSON.stringify({ expected_revision: current.revision, new_payload: encrypted }) });
@@ -425,13 +439,13 @@
     return withVaultSaveLock(userId, () => withSession((token, user) => persistPayload(token, user, payload, pendingToken)));
   }
   async function savePayload(payload) {
-    assertSyncAccess();
     let snapshot;
     try { snapshot = JSON.parse(JSON.stringify(payload)); }
     catch (_) { throw new Error('保管庫に保存するデータを読み取れませんでした。'); }
     const session = loadSession(); const userId = session && session.user && session.user.id;
-    const existingMeta = userId && getMeta(userId);
-    const pendingToken = existingMeta && existingMeta.pendingSync ? null : markPendingSync(userId);
+    const pendingToken = markPendingSync(userId);
+    if (!pendingToken) throw new Error('未同期状態を端末に記録できません。データは保持されています。保存領域を確認してください。');
+    assertSyncAccess();
     return enqueueSave(() => writePayload(snapshot, pendingToken));
   }
   async function writeLocalChanges(pendingToken) {
@@ -447,16 +461,28 @@
     }));
   }
   async function saveLocalChanges() {
-    assertSyncAccess();
     const session = loadSession(); const userId = session && session.user && session.user.id;
     const pendingToken = markPendingSync(userId);
     if (!pendingToken) throw new Error('未同期状態を端末に記録できません。データは保持されています。保存領域を確認してください。');
+    assertSyncAccess();
     return enqueueSave(() => writeLocalChanges(pendingToken));
   }
 
-  async function resolveConflicts(choices) {
+  if (window.document && typeof window.document.addEventListener === 'function') {
+    window.document.addEventListener('manga-reader-vpn-status', (event) => {
+      const status = event && event.detail && event.detail.status;
+      if (status !== 'allowed' || !loadActive() || !hasPendingLocalChanges()) return;
+      saveLocalChanges().catch(() => {});
+    });
+  }
+
+  async function resolveConflicts(choices, conflictSnapshot) {
     if (!choices || typeof choices !== 'object') throw new Error('競合の選択内容を読み取れません。');
-    pendingConflictChoices = Object.assign({}, choices);
+    const snapshots = {};
+    (Array.isArray(conflictSnapshot) ? conflictSnapshot : []).forEach((conflict) => {
+      if (conflict && typeof conflict.path === 'string' && typeof conflict.snapshot === 'string') snapshots[conflict.path] = conflict.snapshot;
+    });
+    pendingConflictChoices = { choices: Object.assign({}, choices), snapshots };
     try { return await saveLocalChanges(); }
     catch (error) { pendingConflictChoices = null; throw error; }
   }
