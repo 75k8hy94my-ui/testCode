@@ -598,8 +598,12 @@
       const failedDirectIds = new Set(normalized.filter((video) => Data && Data.isDirectVideoUrl(video.url) && !successfulIds.has(String(video.id))).map((video) => String(video.id)));
       if (failedDirectIds.size) protectedState = { ...protectedState, knownVideoIds: ids.filter((id) => !failedDirectIds.has(id)) };
       const markers = markerPayload && typeof markerPayload === 'object' ? markerPayload : {};
-      if (queueIsUsable(protectedState.queue, currentVideos)) queue = protectedState.queue;
-      else queue = Queue.generate(currentVideos, { markersByVideo: markers, generation: protectedState.generation });
+      const savedQueueIsUsable = queueIsUsable(protectedState.queue, currentVideos);
+      if (savedQueueIsUsable) queue = protectedState.queue;
+      else {
+        queue = Queue.generate(currentVideos, { markersByVideo: markers, generation: protectedState.generation });
+        protectedState = { ...protectedState, currentIndex: 0, currentTime: 0 };
+      }
       queueIndex = Math.max(0, Math.min(protectedState.currentIndex, Math.max(0, queue.length - 1)));
       currentTime = queue.length ? Math.max(queue[queueIndex].startSeconds, Math.min(protectedState.currentTime || queue[queueIndex].startSeconds, queue[queueIndex].endSeconds)) : 0;
       protectedState = { ...protectedState, queue, currentIndex: queueIndex, currentTime };

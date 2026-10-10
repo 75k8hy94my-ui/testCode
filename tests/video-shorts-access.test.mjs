@@ -188,6 +188,10 @@ test('allowed route probes and queues direct videos only, then unloads them when
   stage.emit('pointermove', { clientX: 50, clientY: 300, target: current });
   stage.emit('pointerup', { clientX: 50, clientY: 300, target: current });
   assert.equal(controller.getState().currentIndex, 0, 'downward swipe returns to the immediately previous queue entry');
+  stage.emit('pointerdown', { button: 0, clientX: 50, clientY: 180, target: current });
+  stage.emit('pointermove', { clientX: 50, clientY: 300, target: current });
+  stage.emit('pointerup', { clientX: 50, clientY: 300, target: current });
+  assert.equal(controller.getState().currentIndex, 0, 'downward swipe at the first entry does not wrap to the queue end');
   current = media.children.find((node) => node.className === 'shortsVideo');
   controller.saveProgress(true);
   assert.equal(writes.at(-1).options.sync, false, 'guest-local route never syncs');
@@ -195,6 +199,15 @@ test('allowed route probes and queues direct videos only, then unloads them when
   current.currentTime = 22.75;
   controller.openOrdinaryPlayer();
   assert.match(href.value, /video-player\.html\?id=direct&start=22\.75/);
+  state.value = {
+    ...state.value,
+    queue: [...state.value.queue, { videoId: 'removed-video', startSeconds: 0, endSeconds: 20, entryType: 'random-short', tier: 1, generation: 1 }],
+    currentIndex: 3,
+    currentTime: 19,
+  };
+  windowEvents.get('storage')({ key: 'mangaReaderVideos' });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(controller.getState().currentIndex, 0, 'regenerating after a stale queue entry starts the new order at its first video');
   allowed = false;
   await documentEvents.get('manga-reader-vpn-status')();
   assert.equal(active.paused, true);
