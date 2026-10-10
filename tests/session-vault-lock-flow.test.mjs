@@ -7,6 +7,7 @@ const profileMenu = fs.readFileSync('./profile-menu.js', 'utf8');
 const profileSpa = fs.readFileSync('./home-profile-spa.js', 'utf8');
 const sync = fs.readFileSync('./sync.html', 'utf8');
 const index = fs.readFileSync('./index.html', 'utf8');
+const conflictUi = fs.readFileSync('./vault-conflict-ui.js', 'utf8');
 
 test('saved Supabase sessions are reused until the access token nears expiry', () => {
   assert.match(vault, /function sessionIsFresh\(session, skewSeconds = 60\)/);
@@ -27,6 +28,9 @@ test('vault lock clears only the active vault key and keeps account session inta
   assert.match(body, /sync\.html/);
   assert.doesNotMatch(body, /saveSession\(null\)/);
   assert.doesNotMatch(body, /localStorage\.removeItem/);
+  assert.match(conflictUi, /manga-vault-cleared/);
+  assert.match(conflictUi, /location\.replace\('sync\.html\?next='/);
+  assert.match(conflictUi, /TestCodeGuest\?\.isActive\(\)/);
 });
 
 test('full logout still clears auth session and device-local protected data', () => {
@@ -47,6 +51,12 @@ test('profile UI distinguishes lock from complete logout', () => {
   assert.match(profileSpa, /id="profileLogoutBtn"/);
 });
 
-test('unlock page does not ask for passkey again when vault is already active', () => {
-  assert.match(sync, /if \(MangaVault\.loadActive\(\)\) \{ goReader\(\); return; \}/);
+test('active vault proceeds normally and pending sync offers explicit conflict resolution', () => {
+  assert.ok(sync.includes('const alreadyActive=Boolean(MangaVault.loadActive());'));
+  assert.ok(sync.includes('if (MangaVault.hasPendingLocalChanges()) showPendingSync'));
+  assert.ok(sync.includes('else { goReader(); return; }'));
+  assert.match(sync, /vault-conflict-ui\.js\?v=20261010-vault-diff-sync/);
+  assert.match(profileMenu, /hasPendingLocalChanges/);
+  assert.match(profileMenu, /ログアウトは行いませんでした/);
+  assert.ok(sync.includes('if (!alreadyActive) autoUsePasskey();'));
 });

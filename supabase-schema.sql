@@ -9,13 +9,36 @@ alter table public.manga_reader_vaults add column if not exists revision bigint 
 
 create or replace function public.update_manga_reader_vault(expected_revision bigint, new_payload jsonb)
 returns table(revision bigint, updated_at timestamptz)
-language sql security invoker
+language plpgsql security invoker
 set search_path = public
 as $$
-  update public.manga_reader_vaults
-  set payload = new_payload, revision = manga_reader_vaults.revision + 1, updated_at = now()
-  where user_id = (select auth.uid()) and manga_reader_vaults.revision = expected_revision
-  returning manga_reader_vaults.revision, manga_reader_vaults.updated_at;
+declare
+  current_payload jsonb;
+begin
+  select vault.payload into current_payload
+  from public.manga_reader_vaults as vault
+  where vault.user_id = (select auth.uid())
+    and vault.revision = expected_revision
+  for update;
+
+  if not found then
+    return;
+  end if;
+
+  if current_payload ->> 'syncProtocolVersion' = '2'
+     and coalesce(new_payload ->> 'syncProtocolVersion', '') <> '2' then
+    raise exception 'vault_sync_client_outdated' using errcode = 'P0001';
+  end if;
+
+  return query
+  update public.manga_reader_vaults as vault
+  set payload = new_payload,
+      revision = vault.revision + 1,
+      updated_at = now()
+  where vault.user_id = (select auth.uid())
+    and vault.revision = expected_revision
+  returning vault.revision, vault.updated_at;
+end;
 $$;
 
 alter table public.manga_reader_vaults enable row level security;

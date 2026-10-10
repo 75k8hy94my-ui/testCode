@@ -11,13 +11,33 @@
     const n = Number(value);
     return Number.isFinite(n) && n >= 0 ? n : fallback;
   };
+  function normalizeCounterMap(value) {
+    const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    const result = {};
+    Object.entries(source).forEach(([client, raw]) => {
+      const count = Number(raw);
+      if (/^[A-Za-z0-9_-]{1,128}$/.test(client) && Number.isSafeInteger(count) && count >= 0) result[client] = count;
+    });
+    return result;
+  }
+  const sumCounters = (counters) => Object.values(counters).reduce((sum, count) => Math.min(Number.MAX_SAFE_INTEGER, sum + count), 0);
   function normalizeShorts(value) {
     const x = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    const playCountByClient = normalizeCounterMap(x.playCountByClient);
+    const earlySwipeCountByClient = normalizeCounterMap(x.earlySwipeCountByClient);
+    const rawPlayCount = Math.max(0, Math.trunc(asTime(x.playCount, 0)));
+    const rawEarlySwipeCount = Math.max(0, Math.trunc(asTime(x.earlySwipeCount, 0)));
+    const playCountBase = Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.trunc(asTime(x.playCountBase, Math.max(0, rawPlayCount - sumCounters(playCountByClient)))), rawPlayCount - sumCounters(playCountByClient)));
+    const earlySwipeCountBase = Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.trunc(asTime(x.earlySwipeCountBase, Math.max(0, rawEarlySwipeCount - sumCounters(earlySwipeCountByClient)))), rawEarlySwipeCount - sumCounters(earlySwipeCountByClient)));
     return {
       liked: x.liked === true,
-      playCount: Math.max(0, Math.trunc(asTime(x.playCount, 0))),
-      earlySwipeCount: Math.max(0, Math.trunc(asTime(x.earlySwipeCount, 0))),
+      playCount: Math.min(Number.MAX_SAFE_INTEGER, playCountBase + sumCounters(playCountByClient)),
+      earlySwipeCount: Math.min(Number.MAX_SAFE_INTEGER, earlySwipeCountBase + sumCounters(earlySwipeCountByClient)),
       updatedAt: asTime(x.updatedAt, 0),
+      playCountBase,
+      earlySwipeCountBase,
+      playCountByClient,
+      earlySwipeCountByClient,
     };
   }
 
@@ -66,16 +86,33 @@
       const incomingShorts = next.shorts && typeof next.shorts === 'object' && !Array.isArray(next.shorts) ? next.shorts : null;
       const previousShorts = previous && previous.shorts && typeof previous.shorts === 'object' && !Array.isArray(previous.shorts) ? previous.shorts : null;
       if (incomingShorts && previousShorts) {
-        const incomingTime = asTime(incomingShorts.updatedAt, 0);
-        const previousTime = asTime(previousShorts.updatedAt, 0);
+        const nextShorts = normalizeShorts(incomingShorts);
+        const oldShorts = normalizeShorts(previousShorts);
+        const incomingTime = nextShorts.updatedAt;
+        const previousTime = oldShorts.updatedAt;
+        const mergeCounters = (left, right) => {
+          const mergedCounters = { ...left };
+          Object.entries(right).forEach(([client, count]) => { mergedCounters[client] = Math.max(mergedCounters[client] || 0, count); });
+          return mergedCounters;
+        };
+        const playCountByClient = mergeCounters(oldShorts.playCountByClient, nextShorts.playCountByClient);
+        const earlySwipeCountByClient = mergeCounters(oldShorts.earlySwipeCountByClient, nextShorts.earlySwipeCountByClient);
+        const playCountBase = Math.max(oldShorts.playCountBase, nextShorts.playCountBase);
+        const earlySwipeCountBase = Math.max(oldShorts.earlySwipeCountBase, nextShorts.earlySwipeCountBase);
         next.shorts = {
           liked: incomingTime >= previousTime ? incomingShorts.liked === true : previousShorts.liked === true,
-          playCount: Math.max(Math.trunc(asTime(incomingShorts.playCount, 0)), Math.trunc(asTime(previousShorts.playCount, 0))),
-          earlySwipeCount: Math.max(Math.trunc(asTime(incomingShorts.earlySwipeCount, 0)), Math.trunc(asTime(previousShorts.earlySwipeCount, 0))),
+          playCount: Math.min(Number.MAX_SAFE_INTEGER, playCountBase + sumCounters(playCountByClient)),
+          earlySwipeCount: Math.min(Number.MAX_SAFE_INTEGER, earlySwipeCountBase + sumCounters(earlySwipeCountByClient)),
           updatedAt: Math.max(incomingTime, previousTime),
+          playCountBase,
+          earlySwipeCountBase,
+          playCountByClient,
+          earlySwipeCountByClient,
         };
       } else if (!incomingShorts && previousShorts) {
-        next.shorts = { ...previousShorts };
+        next.shorts = normalizeShorts(previousShorts);
+      } else if (incomingShorts) {
+        next.shorts = normalizeShorts(incomingShorts);
       }
       merged[id] = next;
     });
@@ -208,6 +245,20 @@
     };
   }
 
+  function getRotationDirection(value) {
+    const video = value && typeof value === 'object' ? value : {};
+    if (video.rotate90Direction === 'left' || video.rotate90Direction === 'right') return video.rotate90Direction;
+    return video.rotate90 === true ? 'left' : 'none';
+  }
+
+  function getDisplayDimensions(value) {
+    const video = value && typeof value === 'object' ? value : {};
+    const width = asTime(video.videoWidth, 0);
+    const height = asTime(video.videoHeight, 0);
+    if (getRotationDirection(video) === 'none') return { width, height };
+    return { width: height, height: width };
+  }
+
   function normalizeVideos(value) {
     return Array.isArray(value) ? value.map((item) => normalizeVideo(item)) : [];
   }
@@ -284,5 +335,5 @@
     };
   }
 
-  return { WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, storageFieldsForVideoUrl, stableUrlToken };
+  return { WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, storageFieldsForVideoUrl, stableUrlToken, getRotationDirection, getDisplayDimensions };
 }));

@@ -19,6 +19,15 @@ test('normalizes legacy video records without losing legacy playback fields', ()
   assert.equal(video.addedAt, 100);
 });
 
+test('display dimensions account for configured and legacy 90-degree rotation', () => {
+  assert.deepEqual(data.getDisplayDimensions({ videoWidth: 1920, videoHeight: 1080, rotate90Direction: 'left' }), { width: 1080, height: 1920 });
+  assert.deepEqual(data.getDisplayDimensions({ videoWidth: 720, videoHeight: 1280, rotate90Direction: 'right' }), { width: 1280, height: 720 });
+  assert.deepEqual(data.getDisplayDimensions({ videoWidth: 1920, videoHeight: 1080, rotate90: true }), { width: 1080, height: 1920 });
+  assert.deepEqual(data.getDisplayDimensions({ videoWidth: 1920, videoHeight: 1080, rotate90Direction: 'none' }), { width: 1920, height: 1080 });
+  assert.equal(data.getRotationDirection({ rotate90: true }), 'left');
+  assert.equal(data.getRotationDirection({ rotate90Direction: 'right', rotate90: true }), 'right');
+});
+
 test('normalizes and preserves the selected thumbnail timestamp', () => {
   assert.equal(normalizeVideo({ id:'v1', thumbnailTimeSeconds:42.5 }).thumbnailTimeSeconds, 42.5);
   assert.equal(normalizeVideo({ id:'v2' }).thumbnailTimeSeconds, null);
@@ -46,7 +55,7 @@ test('normalizes Shorts likes and counters separately from ordinary opens', () =
     id: 'shorts-v1', openCount: 8,
     shorts: { liked: true, playCount: 11.8, earlySwipeCount: -2, updatedAt: 123 },
   });
-  assert.deepEqual(video.shorts, { liked: true, playCount: 11, earlySwipeCount: 0, updatedAt: 123 });
+  assert.deepEqual(video.shorts, { liked: true, playCount: 11, earlySwipeCount: 0, updatedAt: 123, playCountBase: 11, earlySwipeCountBase: 0, playCountByClient: {}, earlySwipeCountByClient: {} });
   assert.equal(video.openCount, 8);
 });
 
@@ -55,7 +64,18 @@ test('stale video metadata cannot lower Shorts counters or undo a newer like cha
     { v1: { shorts: { liked: false, playCount: 9, earlySwipeCount: 4, updatedAt: 200 } } },
     { v1: { shorts: { liked: true, playCount: 3, earlySwipeCount: 1, updatedAt: 100 } } },
   );
-  assert.deepEqual(merged.v1.shorts, { liked: false, playCount: 9, earlySwipeCount: 4, updatedAt: 200 });
+  assert.deepEqual(merged.v1.shorts, { liked: false, playCount: 9, earlySwipeCount: 4, updatedAt: 200, playCountBase: 9, earlySwipeCountBase: 4, playCountByClient: {}, earlySwipeCountByClient: {} });
+});
+
+test('merges concurrent Shorts counter increments from different clients additively', () => {
+  const merged = mergeVideoMetaPreservingThumbnailTime(
+    { v1: { shorts: { liked: false, playCount: 11, earlySwipeCount: 5, playCountBase: 10, earlySwipeCountBase: 4, playCountByClient: { tabA: 1 }, earlySwipeCountByClient: { tabA: 1 }, updatedAt: 200 } } },
+    { v1: { shorts: { liked: false, playCount: 11, earlySwipeCount: 5, playCountBase: 10, earlySwipeCountBase: 4, playCountByClient: { tabB: 1 }, earlySwipeCountByClient: { tabB: 1 }, updatedAt: 201 } } },
+  );
+  assert.equal(merged.v1.shorts.playCount, 12);
+  assert.equal(merged.v1.shorts.earlySwipeCount, 6);
+  assert.deepEqual(merged.v1.shorts.playCountByClient, { tabA: 1, tabB: 1 });
+  assert.deepEqual(merged.v1.shorts.earlySwipeCountByClient, { tabA: 1, tabB: 1 });
 });
 
 test('parses and formats thumbnail timestamps for editor input', () => {

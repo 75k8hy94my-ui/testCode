@@ -4,6 +4,7 @@ import fs from 'node:fs';
 
 const read = (name) => fs.readFileSync(new URL('../' + name, import.meta.url), 'utf8');
 const page = read('video-shorts-page.js');
+const html = read('video-shorts.html');
 const css = read('video-shorts-player.css');
 const asset = fs.readFileSync(new URL('../assets/shorts-heart.png', import.meta.url));
 
@@ -38,6 +39,14 @@ test('landscape rotation is mobile-only, width adjusts for landscape, and resets
   assert.match(css, /@media\s*\(min-width:\s*900px\)[\s\S]*\.shortsStage\.is-landscape/);
 });
 
+test('Shorts includes configured source rotation for the clip and scrub preview', () => {
+  assert.match(html, /video-player-rotation\.js/);
+  assert.match(page, /getDisplayDimensions/);
+  assert.match(page, /getRotationDirection/);
+  assert.match(css, /shortsStage video\.videoPlayerRotatedLeft/);
+  assert.match(css, /shortsScrubPreviewFrame video\.videoPlayerRotatedRight/);
+});
+
 test('shorts gestures suppress native selection and long-press callouts across the stage and video', () => {
   assert.match(css, /\.shortsStage\s*\{[^}]*touch-action:\s*none/);
   assert.match(css, /\.shortsStage\s*,\s*\.shortsStage\s*\*\s*\{[^}]*-webkit-user-select:\s*none/);
@@ -45,4 +54,11 @@ test('shorts gestures suppress native selection and long-press callouts across t
   assert.match(css, /\.shortsStage\s*,\s*\.shortsStage\s*\*\s*\{[^}]*-webkit-touch-callout:\s*none/);
   assert.match(css, /\.shortsStage\s*,\s*\.shortsStage\s*\*\s*\{[^}]*-webkit-user-drag:\s*none/);
   assert.match(page, /stage\.addEventListener\('contextmenu',[^;]*preventDefault/);
+});
+
+test('mobile Shorts layout reserves the app header, bottom navigation, and iPhone safe areas', () => {
+  assert.match(css, /viewport-fit=cover|env\(safe-area-inset-bottom/);
+  assert.match(css, /env\(safe-area-inset-top/);
+  assert.match(css, /100dvh\s*-\s*64px\s*-\s*82px/);
+  assert.match(css, /is-shorts-rotated #mobileBottomNav/);
 });

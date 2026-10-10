@@ -118,8 +118,11 @@
         return;
       }
 
-      const width = time(video.videoWidth);
-      const height = time(video.videoHeight);
+      const dimensions = typeof VideoData.getDisplayDimensions === 'function'
+        ? VideoData.getDisplayDimensions(video)
+        : { width: time(video.videoWidth), height: time(video.videoHeight) };
+      const width = time(dimensions && dimensions.width);
+      const height = time(dimensions && dimensions.height);
       if (width == null || height == null || width <= 0 || height <= 0) return;
       if (height > width) {
         const tags = Array.isArray(video.tags) ? video.tags.filter((tag) => String(tag || '').trim()) : [];

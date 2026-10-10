@@ -31,6 +31,8 @@
     const probe = deps.probeMetadata || probeMetadata;
     let protectedState = null;
     let currentVideos = [];
+    let metadataFailureCount = 0;
+    const pendingProbeCancellations = new Set();
     let queue = [];
     let queueIndex = 0;
     let currentTime = 0;
@@ -52,6 +54,12 @@
     let likeButton = null;
     let rotateButton = null;
     let actionsElement = null;
+    let statusElement = null;
+    let playButton = null;
+    let retryButton = null;
+    let skipButton = null;
+    let muteButton = null;
+    let volumeControl = null;
     let pressTimer = null;
     let gestureState = null;
     let scrubTargetTime = 0;
@@ -60,11 +68,34 @@
     let playStartedAt = null;
     let earlySwipeRecorded = false;
     let startedEntryKey = '';
+    let activeLoadToken = 0;
+    let finishedLoadToken = 0;
+    let lastProgressSaveAt = -Infinity;
+    let wheelUnlockTimer = null;
+    let wheelLocked = false;
     let lastTapAt = 0;
     let lastTapTarget = null;
     const now = typeof deps.now === 'function' ? deps.now : Date.now;
+    const playbackNow = typeof deps.playbackNow === 'function' ? deps.playbackNow
+      : (windowRef && windowRef.performance && typeof windowRef.performance.now === 'function' ? () => windowRef.performance.now() : now);
+    function resolveMetricClientId() {
+      const key = 'mangaReaderVideoShortsCounterClient';
+      try {
+        const session = windowRef && windowRef.sessionStorage;
+        const existing = session && session.getItem(key);
+        if (existing && /^[A-Za-z0-9_-]{1,128}$/.test(existing)) return existing;
+        const generated = 'shorts-' + String(now()) + '-' + Math.random().toString(36).slice(2);
+        if (session && typeof session.setItem === 'function') session.setItem(key, generated);
+        return generated;
+      } catch (_) { return 'shorts-' + String(now()) + '-' + Math.random().toString(36).slice(2); }
+    }
+    const metricClientId = resolveMetricClientId();
     const schedule = typeof deps.setTimeout === 'function' ? deps.setTimeout : ((callback, delay) => root.setTimeout(callback, delay));
     const cancel = typeof deps.clearTimeout === 'function' ? deps.clearTimeout : ((timer) => root.clearTimeout(timer));
+    const progressThrottleMs = 5000;
+    const audioPreferenceKey = 'mangaReaderVideoShortsAudio';
+    let audioPreference = { muted: false, volume: 1 };
+    let audioPreferenceLoaded = false;
 
     function canReadProtectedData() {
       try { return !!mediaAccess && typeof mediaAccess.canReadProtectedData === 'function' && mediaAccess.canReadProtectedData() === true; }
@@ -114,6 +145,10 @@
 
     function removeVideo(video) {
       if (!video) return;
+      if (typeof video._shortsRotationCleanup === 'function') {
+        try { video._shortsRotationCleanup(); } catch (_) {}
+        video._shortsRotationCleanup = null;
+      }
       try { video.pause(); } catch (_) {}
       try { video.removeAttribute('src'); video.load(); } catch (_) {}
       if (video.parentNode) video.remove();
@@ -151,30 +186,38 @@
           try { if (vault.markLocalChangesPending()) scheduleMetricSync(); } catch (_) {}
         }
       }
-      return nextShorts;
+      return merged[String(videoId)] && merged[String(videoId)].shorts || nextShorts;
     }
 
     function recordShortsPlay(videoId) {
-      return updateShortsMeta(videoId, (shorts) => ({ playCount: shorts.playCount + 1 }));
+      return updateShortsMeta(videoId, (shorts) => {
+        const counters = { ...(shorts.playCountByClient || {}) };
+        counters[metricClientId] = (counters[metricClientId] || 0) + 1;
+        return { playCount: shorts.playCount + 1, playCountByClient: counters };
+      });
     }
 
     function recordEarlySwipe(videoId) {
       if (earlySwipeRecorded) return null;
       earlySwipeRecorded = true;
-      return updateShortsMeta(videoId, (shorts) => ({ earlySwipeCount: shorts.earlySwipeCount + 1 }));
+      return updateShortsMeta(videoId, (shorts) => {
+        const counters = { ...(shorts.earlySwipeCountByClient || {}) };
+        counters[metricClientId] = (counters[metricClientId] || 0) + 1;
+        return { earlySwipeCount: shorts.earlySwipeCount + 1, earlySwipeCountByClient: counters };
+      });
     }
 
     function currentPlayedMilliseconds() {
-      return entryPlayedMs + (playStartedAt == null ? 0 : Math.max(0, now() - playStartedAt));
+      return entryPlayedMs + (playStartedAt == null ? 0 : Math.max(0, playbackNow() - playStartedAt));
     }
 
     function pausePlaybackClock() {
-      if (playStartedAt != null) entryPlayedMs += Math.max(0, now() - playStartedAt);
+      if (playStartedAt != null) entryPlayedMs += Math.max(0, playbackNow() - playStartedAt);
       playStartedAt = null;
     }
 
     function resumePlaybackClock() {
-      if (playStartedAt == null && activeVideo && !activeVideo.paused) playStartedAt = now();
+      if (playStartedAt == null && activeVideo && !activeVideo.paused) playStartedAt = playbackNow();
     }
 
     function formatTime(value) {
@@ -183,8 +226,146 @@
     }
 
     function updateScrubThumb() {
-      if (!scrubThumb || !activeVideo || !Number.isFinite(activeVideo.duration) || activeVideo.duration <= 0) return;
-      scrubThumb.style.left = Math.max(0, Math.min(100, activeVideo.currentTime / activeVideo.duration * 100)) + '%';
+      const entry = queue[queueIndex];
+      if (!scrubThumb || !activeVideo || !entry || entry.endSeconds <= entry.startSeconds) return;
+      const ratio = Math.max(0, Math.min(1, (activeVideo.currentTime - entry.startSeconds) / (entry.endSeconds - entry.startSeconds)));
+      scrubThumb.style.left = (ratio * 100) + '%';
+    }
+
+    function setMediaStatus(message = '', kind = '') {
+      if (!statusElement) return;
+      statusElement.textContent = message;
+      statusElement.dataset.state = kind;
+      statusElement.hidden = !message;
+    }
+
+    function applyAudioPreference(video) {
+      if (!video) return;
+      video.muted = audioPreference.muted;
+      try { video.volume = audioPreference.volume; } catch (_) {}
+      if (muteButton) {
+        muteButton.setAttribute('aria-pressed', String(audioPreference.muted));
+        muteButton.setAttribute('aria-label', audioPreference.muted ? 'ミュート解除' : 'ミュート');
+        muteButton.innerHTML = audioPreference.muted
+          ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6l-5 4H4zm12-1 5 6m0-6-5 6"/></svg>'
+          : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6l-5 4H4zm12-1a5 5 0 0 1 0 6m2-9a9 9 0 0 1 0 12"/></svg>';
+      }
+      if (volumeControl && documentRef.activeElement !== volumeControl) volumeControl.value = String(audioPreference.volume);
+    }
+
+    function persistAudioPreference() {
+      try { storage.setItem(audioPreferenceKey, JSON.stringify(audioPreference)); } catch (_) {}
+    }
+
+    function loadAudioPreference() {
+      if (audioPreferenceLoaded) return;
+      audioPreferenceLoaded = true;
+      try {
+        const savedAudio = JSON.parse(storage.getItem(audioPreferenceKey) || 'null');
+        if (savedAudio && typeof savedAudio === 'object') audioPreference = {
+          muted: savedAudio.muted === true,
+          volume: Number.isFinite(Number(savedAudio.volume)) ? Math.max(0, Math.min(1, Number(savedAudio.volume))) : 1,
+        };
+      } catch (_) {}
+    }
+
+    function toggleMute() {
+      audioPreference = { ...audioPreference, muted: !audioPreference.muted };
+      applyAudioPreference(activeVideo); persistAudioPreference();
+    }
+
+    function setVolume(value) {
+      const volume = Math.max(0, Math.min(1, Number(value) || 0));
+      audioPreference = { volume, muted: volume === 0 ? true : audioPreference.muted };
+      if (volume > 0 && activeVideo) audioPreference.muted = false;
+      applyAudioPreference(activeVideo); persistAudioPreference();
+    }
+
+    function currentLoad(video, entry, token) {
+      return !!video && video === activeVideo && queue[queueIndex] === entry
+        && Number(video.dataset.loadToken) === token && token === activeLoadToken && canReadProtectedData();
+    }
+
+    function mediaErrorMessage(video) {
+      const code = video && video.error && Number(video.error.code);
+      if (code === 2) return '動画の通信に失敗しました。接続を確認して再試行してください。';
+      if (code === 3) return '動画データをデコードできませんでした。再試行するか次の動画へ進んでください。';
+      if (code === 4) return 'この動画形式を再生できません。次の動画へ進めます。';
+      return '動画を読み込めませんでした。再試行するか次の動画へ進んでください。';
+    }
+
+    function showPlaybackError(video, entry, token) {
+      if (!currentLoad(video, entry, token)) return;
+      setMediaStatus(mediaErrorMessage(video), 'error');
+      if (playButton) playButton.hidden = true;
+      if (retryButton) retryButton.hidden = false;
+      if (skipButton) skipButton.hidden = queueIndex >= queue.length - 1;
+    }
+
+    function markEntryStarted(video, entry, token) {
+      if (!currentLoad(video, entry, token)) return;
+      const key = token + ':' + entry.generation + ':' + entry.videoId;
+      if (startedEntryKey === key) return;
+      startedEntryKey = key;
+      recordShortsPlay(entry.videoId);
+    }
+
+    function attemptPlayback(video, entry, token, userInitiated = false) {
+      if (!currentLoad(video, entry, token)) return;
+      if (playButton) playButton.hidden = true;
+      if (retryButton) retryButton.hidden = true;
+      if (skipButton) skipButton.hidden = true;
+      let result;
+      try { result = video.play(); }
+      catch (error) { handlePlayFailure(error, video, entry, token); return; }
+      if (result && typeof result.then === 'function') result.then(() => {
+        if (!currentLoad(video, entry, token)) return;
+        markEntryStarted(video, entry, token);
+        if (!video.paused) resumePlaybackClock();
+        if (playButton) playButton.hidden = true;
+        setMediaStatus('', '');
+      }).catch((error) => handlePlayFailure(error, video, entry, token));
+      else {
+        markEntryStarted(video, entry, token);
+        if (!video.paused) resumePlaybackClock();
+        setMediaStatus('', '');
+      }
+      if (userInitiated && video.paused) setMediaStatus('再生を開始できませんでした。もう一度お試しください。', 'error');
+    }
+
+    function handlePlayFailure(error, video, entry, token) {
+      if (!currentLoad(video, entry, token)) return;
+      pausePlaybackClock();
+      if (error && error.name === 'NotAllowedError') {
+        setMediaStatus('', 'autoplay');
+        if (playButton) playButton.hidden = false;
+        if (retryButton) retryButton.hidden = true;
+        if (skipButton) skipButton.hidden = true;
+        return;
+      }
+      showPlaybackError(video, entry, token);
+    }
+
+    function finishActiveEntry(video, entry, token) {
+      if (!currentLoad(video, entry, token) || finishedLoadToken === token) return;
+      if (Number(video.currentTime) < entry.endSeconds - 0.12) return;
+      finishedLoadToken = token;
+      try { video.currentTime = entry.endSeconds; } catch (_) {}
+      pausePlaybackClock();
+      try { video.pause(); } catch (_) {}
+      currentTime = entry.endSeconds;
+      saveProgress(true);
+      resetLandscapeRotation();
+      if (queueIndex < queue.length - 1) goTo(queueIndex + 1, 'ended');
+    }
+
+    function performProgressSave() {
+      if (!protectedState || !canReadProtectedData() || !stateApi || typeof stateApi.save !== 'function') return null;
+      currentTime = activeVideo && Number.isFinite(activeVideo.currentTime) ? activeVideo.currentTime : currentTime;
+      const next = { ...protectedState, queue, currentIndex: queueIndex, currentTime, updatedAt: now() };
+      protectedState = stateApi.save(next, { sync: !isGuest() }) || protectedState;
+      lastProgressSaveAt = playbackNow();
+      return protectedState;
     }
 
     function clearPressTimer() { if (pressTimer != null) cancel(pressTimer); pressTimer = null; }
@@ -199,47 +380,95 @@
 
     function disposeGestures() {
       clearPressTimer();
-      if (gestureState && gestureState.heldWasPlaying && canReadProtectedData() && activeVideo) {
-        const result = activeVideo.play(); if (result && typeof result.catch === 'function') result.catch(() => {});
-      }
       cleanupScrubPreview(); gestureState = null;
     }
 
     function disposeProtectedState() {
       generationToken += 1;
+      pendingProbeCancellations.forEach((cancelProbe) => { try { cancelProbe(); } catch (_) {} });
+      pendingProbeCancellations.clear();
       cancel(syncTimer); syncTimer = null;
+      cancel(metricSyncTimer); metricSyncTimer = null;
+      if (wheelUnlockTimer != null) cancel(wheelUnlockTimer); wheelUnlockTimer = null; wheelLocked = false;
       disposeGestures();
       removeVideo(activeVideo); removeVideo(nextVideo); activeVideo = null; nextVideo = null;
-      protectedState = null; currentVideos = []; queue = []; queueIndex = 0; currentTime = 0;
+      protectedState = null; currentVideos = []; metadataFailureCount = 0; queue = []; queueIndex = 0; currentTime = 0;
       if (page) page.replaceChildren();
     }
 
     function saveProgress(immediate = false) {
       if (!protectedState || !canReadProtectedData() || !stateApi || typeof stateApi.save !== 'function') return null;
-      currentTime = activeVideo && Number.isFinite(activeVideo.currentTime) ? activeVideo.currentTime : currentTime;
-      const next = { ...protectedState, queue, currentIndex: queueIndex, currentTime, updatedAt: now() };
-      if (immediate) { cancel(syncTimer); syncTimer = null; protectedState = stateApi.save(next, { sync: !isGuest() }) || protectedState; return protectedState; }
-      cancel(syncTimer);
-      syncTimer = schedule(() => { syncTimer = null; if (canReadProtectedData()) protectedState = stateApi.save(next, { sync: !isGuest() }) || protectedState; }, 1200);
-      return next;
+      if (immediate) { cancel(syncTimer); syncTimer = null; return performProgressSave(); }
+      const elapsed = playbackNow() - lastProgressSaveAt;
+      if (elapsed >= progressThrottleMs) return performProgressSave();
+      if (syncTimer == null) syncTimer = schedule(() => {
+        syncTimer = null;
+        if (canReadProtectedData()) performProgressSave();
+      }, Math.max(0, progressThrottleMs - elapsed));
+      return protectedState;
     }
 
     function isGuest() { try { return !!windowRef.TestCodeGuest && windowRef.TestCodeGuest.isActive() === true; } catch (_) { return false; } }
 
     function findVideo(videoId) { return currentVideos.find((video) => String(video.id) === String(videoId)); }
 
-    function createVideo(entry, hidden = false) {
+    function displayDimensions(video) {
+      if (Data && typeof Data.getDisplayDimensions === 'function') return Data.getDisplayDimensions(video);
+      return { width: Number(video && video.videoWidth) || 0, height: Number(video && video.videoHeight) || 0 };
+    }
+
+    function installConfiguredRotation(video, videoData, frame = stageElement) {
+      if (!video || video._shortsRotationCleanup) return;
+      const direction = Data && typeof Data.getRotationDirection === 'function'
+        ? Data.getRotationDirection(videoData)
+        : (videoData && videoData.rotate90Direction) || (videoData && videoData.rotate90 ? 'left' : 'none');
+      const rotation = deps.rotation || windowRef.MangaReaderVideoRotation;
+      if (direction !== 'none' && rotation && typeof rotation.install === 'function') {
+        video._shortsRotationCleanup = rotation.install(frame, video, direction);
+      }
+    }
+
+    function createVideo(entry, hidden = false, entryIndex = queueIndex) {
       const videoData = findVideo(entry.videoId);
       if (!videoData) return null;
       const video = documentRef.createElement('video');
       video.className = hidden ? 'shortsPreload' : 'shortsVideo';
       video.preload = hidden ? 'auto' : 'metadata'; video.playsInline = true; video.controls = false; video.src = videoData.url;
-      video.dataset.entryIndex = String(hidden ? queueIndex + 1 : queueIndex);
+      video.dataset.entryIndex = String(entryIndex);
       video.hidden = hidden;
-      video.addEventListener('timeupdate', () => { if (video === activeVideo) saveProgress(false); });
-      video.addEventListener('playing', () => { if (video === activeVideo) resumePlaybackClock(); });
-      video.addEventListener('pause', () => { if (video === activeVideo) { pausePlaybackClock(); saveProgress(true); } });
-      video.addEventListener('ended', () => { if (video === activeVideo) { resetLandscapeRotation(); goTo(queueIndex + 1, 'ended'); } });
+      video._shortsEntry = entry;
+      video.addEventListener('loadedmetadata', () => {
+        const nextIndex = Number(video.dataset.entryIndex);
+        if (video === nextVideo && queue[nextIndex] === entry) {
+          try { video.currentTime = entry.startSeconds; } catch (_) {}
+          return;
+        }
+        const token = Number(video.dataset.loadToken);
+        if (!currentLoad(video, entry, token)) return;
+        const requested = Number(video.dataset.requestedTime);
+        if (Number.isFinite(requested)) { try { video.currentTime = requested; } catch (_) {} }
+      });
+      video.addEventListener('timeupdate', () => {
+        const token = Number(video.dataset.loadToken);
+        if (!currentLoad(video, entry, token)) return;
+        updateScrubThumb(); saveProgress(false); finishActiveEntry(video, entry, token);
+      });
+      video.addEventListener('playing', () => {
+        const token = Number(video.dataset.loadToken);
+        if (!currentLoad(video, entry, token)) return;
+        markEntryStarted(video, entry, token); resumePlaybackClock();
+        if (playButton) playButton.hidden = true;
+        setMediaStatus('', '');
+      });
+      video.addEventListener('pause', () => {
+        const token = Number(video.dataset.loadToken);
+        if (currentLoad(video, entry, token)) { pausePlaybackClock(); saveProgress(true); }
+      });
+      video.addEventListener('ended', () => finishActiveEntry(video, entry, Number(video.dataset.loadToken)));
+      video.addEventListener('waiting', () => { if (currentLoad(video, entry, Number(video.dataset.loadToken))) { pausePlaybackClock(); setMediaStatus('読み込み中…', 'loading'); } });
+      video.addEventListener('stalled', () => { if (currentLoad(video, entry, Number(video.dataset.loadToken))) { pausePlaybackClock(); setMediaStatus('動画データを待っています…', 'loading'); } });
+      video.addEventListener('canplay', () => { if (currentLoad(video, entry, Number(video.dataset.loadToken)) && statusElement?.dataset.state === 'loading') setMediaStatus('', ''); });
+      video.addEventListener('error', () => showPlaybackError(video, entry, Number(video.dataset.loadToken)));
       return video;
     }
 
@@ -249,36 +478,33 @@
       if (!protectedState || !queue.length || !canReadProtectedData()) return;
       const entry = queue[queueIndex];
       if (!entry) return;
+      const loadToken = ++activeLoadToken;
+      finishedLoadToken = 0;
       let video = nextVideo && Number(nextVideo.dataset.entryIndex) === queueIndex ? nextVideo : null;
       if (video) { nextVideo = null; video.hidden = false; video.className = 'shortsVideo'; }
-      else video = createVideo(entry, false);
+      else video = createVideo(entry, false, queueIndex);
       if (activeVideo && activeVideo !== video) removeVideo(activeVideo);
       activeVideo = video;
       if (!activeVideo) return;
+      installConfiguredRotation(activeVideo, findVideo(entry.videoId));
       activeVideo.hidden = false; activeVideo.className = 'shortsVideo';
+      activeVideo.dataset.entryIndex = String(queueIndex);
+      activeVideo.dataset.loadToken = String(loadToken);
+      applyAudioPreference(activeVideo);
       const start = Number.isFinite(startTime) ? startTime : (queueIndex === protectedState.currentIndex ? protectedState.currentTime : entry.startSeconds);
       const clamped = Math.max(entry.startSeconds, Math.min(start || entry.startSeconds, entry.endSeconds));
-      if (Math.abs(activeVideo.currentTime - clamped) > 0.25) {
-        const seekWhenReady = () => { try { activeVideo.currentTime = clamped; } catch (_) {} };
-        if (activeVideo.readyState >= 1) seekWhenReady();
-        else activeVideo.addEventListener('loadedmetadata', seekWhenReady, { once: true });
+      activeVideo.dataset.requestedTime = String(clamped);
+      entryPlayedMs = 0; playStartedAt = null; earlySwipeRecorded = false;
+      if (Math.abs(activeVideo.currentTime - clamped) > 0.25 && activeVideo.readyState >= 1) {
+        try { activeVideo.currentTime = clamped; } catch (_) {}
       }
-      const entryKey = queueIndex + ':' + entry.generation + ':' + entry.videoId;
-      if (startedEntryKey !== entryKey) {
-        startedEntryKey = entryKey; entryPlayedMs = 0; playStartedAt = null; earlySwipeRecorded = false;
-        recordShortsPlay(entry.videoId);
-      }
-      activeVideo.addEventListener('timeupdate', () => {
-        updateScrubThumb();
-        if (activeVideo.currentTime >= entry.endSeconds - 0.1 && queueIndex < queue.length - 1) { resetLandscapeRotation(); goTo(queueIndex + 1, 'ended'); }
-      }, { once: false });
-      activeVideo.addEventListener('playing', resumePlaybackClock);
       updateEntryUI(); updateScrubThumb();
       page.querySelector('.shortsMedia')?.append(activeVideo);
+      setMediaStatus('読み込み中…', 'loading');
       const nextEntry = queue[queueIndex + 1];
       releaseNext();
-      if (nextEntry) { nextVideo = createVideo(nextEntry, true); page.querySelector('.shortsMedia')?.append(nextVideo); }
-      const play = activeVideo.play(); playStartedAt = now(); if (play && typeof play.catch === 'function') play.catch(() => { playStartedAt = null; });
+      if (nextEntry) { nextVideo = createVideo(nextEntry, true, queueIndex + 1); applyAudioPreference(nextVideo); page.querySelector('.shortsMedia')?.append(nextVideo); }
+      attemptPlayback(activeVideo, entry, loadToken);
     }
 
     function goTo(nextIndex, reason = 'navigation') {
@@ -288,6 +514,7 @@
       if (reason === 'vertical-swipe' && queue[queueIndex] && currentPlayedMilliseconds() < EARLY_SWIPE_MS) recordEarlySwipe(queue[queueIndex].videoId);
       pausePlaybackClock();
       saveProgress(true);
+      resetLandscapeRotation();
       queueIndex = target; currentTime = queue[target].startSeconds;
       startedEntryKey = '';
       protectedState = { ...protectedState, currentIndex: queueIndex, currentTime };
@@ -310,15 +537,19 @@
     function resetLandscapeRotation() {
       rotatedLandscape = false;
       if (stageElement) stageElement.classList.remove('is-rotated');
+      const appRoot = documentRef.getElementById('shortsApp');
+      if (appRoot) appRoot.classList.remove('is-shorts-rotated');
       if (rotateButton) rotateButton.setAttribute('aria-pressed', 'false');
     }
 
     function toggleLandscapeRotation() {
       if (!isMobileLayout() || !queue[queueIndex]) return;
-      const video = findVideo(queue[queueIndex].videoId);
-      if (!video || Number(video.videoWidth) <= Number(video.videoHeight)) return;
+      const dimensions = displayDimensions(findVideo(queue[queueIndex].videoId));
+      if (!dimensions || Number(dimensions.width) <= Number(dimensions.height)) return;
       rotatedLandscape = !rotatedLandscape;
       if (stageElement) stageElement.classList.toggle('is-rotated', rotatedLandscape);
+      const appRoot = documentRef.getElementById('shortsApp');
+      if (appRoot) appRoot.classList.toggle('is-shorts-rotated', rotatedLandscape);
       if (rotateButton) rotateButton.setAttribute('aria-pressed', String(rotatedLandscape));
     }
 
@@ -328,7 +559,8 @@
       if (!video) { if (actionsElement) actionsElement.hidden = true; if (scrubArea) scrubArea.hidden = true; return; }
       if (actionsElement) actionsElement.hidden = false;
       if (scrubArea) scrubArea.hidden = false;
-      const landscape = Number(video.videoWidth) > Number(video.videoHeight);
+      const dimensions = displayDimensions(video);
+      const landscape = Number(dimensions.width) > Number(dimensions.height);
       if (!landscape) resetLandscapeRotation();
       if (stageElement) stageElement.classList.toggle('is-landscape', landscape);
       if (rotateButton) rotateButton.hidden = !landscape || !isMobileLayout();
@@ -359,7 +591,7 @@
         scrubPreview.style.left = (ratio * 100) + '%';
         scrubPreview.dataset.edge = ratio < 0.12 ? 'start' : (ratio > 0.88 ? 'end' : 'center');
       }
-      if (scrubTimeLabel) scrubTimeLabel.textContent = formatTime(scrubTargetTime) + ' / ' + formatTime(activeVideo.duration);
+      if (scrubTimeLabel) scrubTimeLabel.textContent = formatTime(scrubTargetTime - entry.startSeconds) + ' / ' + formatTime(entry.endSeconds - entry.startSeconds);
       if (previewVideo && previewVideo.readyState >= 1) { try { previewVideo.currentTime = scrubTargetTime; previewVideo.pause(); } catch (_) {} }
     }
 
@@ -376,8 +608,11 @@
         previewVideo.preload = 'metadata'; previewVideo.muted = true; previewVideo.playsInline = true; previewVideo.controls = false;
         const source = activeVideo.currentSrc || activeVideo.src;
         previewVideo.src = source;
-        const width = Number(activeVideo.videoWidth) || 9, height = Number(activeVideo.videoHeight) || 16;
+        const videoData = findVideo(queue[queueIndex].videoId);
+        const dimensions = displayDimensions(videoData);
+        const width = Number(dimensions.width) || 9, height = Number(dimensions.height) || 16;
         if (scrubPreview) scrubPreview.style.setProperty('--preview-ratio', width + ' / ' + height);
+        installConfiguredRotation(previewVideo, videoData, scrubPreviewFrame);
         previewVideo.addEventListener('loadedmetadata', () => { if (gestureState && gestureState.scrubbing) updateScrubAt(gestureState.lastX); });
         scrubPreviewFrame?.append(previewVideo);
         if (typeof previewVideo.load === 'function') previewVideo.load();
@@ -390,19 +625,24 @@
       const resume = gestureState.heldWasPlaying;
       if (commit && activeVideo && canReadProtectedData()) { activeVideo.currentTime = scrubTargetTime; currentTime = scrubTargetTime; saveProgress(true); }
       cleanupScrubPreview();
-      if (resume && activeVideo && canReadProtectedData()) { const result = activeVideo.play(); playStartedAt = now(); if (result && typeof result.catch === 'function') result.catch(() => { playStartedAt = null; }); }
+      if (resume && activeVideo && canReadProtectedData()) resumeActivePlayback();
+    }
+
+    function resumeActivePlayback() {
+      const entry = queue[queueIndex];
+      if (entry && activeVideo && canReadProtectedData()) attemptPlayback(activeVideo, entry, activeLoadToken, true);
     }
 
     function handlePointerDown(event) {
       if (!canReadProtectedData() || !activeVideo || (event.button != null && event.button !== 0)) return;
+      const target = event.target;
+      if (target.closest?.('.shortsActions') || target.closest?.('.shortsBack') || target.closest?.('button') || target.closest?.('a')) return;
+      const onScrub = target === scrubArea || target.closest?.('.shortsScrubArea') === scrubArea;
+      const onVideo = target === activeVideo || target.closest?.('.shortsVideo') === activeVideo;
+      if (!onScrub && !onVideo) return;
       if (event.pointerId != null && stageElement && typeof stageElement.setPointerCapture === 'function') {
         try { stageElement.setPointerCapture(event.pointerId); } catch (_) {}
       }
-      const target = event.target;
-      if (target.closest?.('.shortsActions')) return;
-      const onScrub = target === scrubArea || target.closest?.('.shortsScrubArea') === scrubArea;
-      const onVideo = target === activeVideo || target.closest?.('.shortsVideo');
-      if (!onScrub && !onVideo) return;
       clearPressTimer();
       gestureState = { startX: event.clientX, startY: event.clientY, lastX: event.clientX, lastY: event.clientY, moved: false, leftEdge: event.clientX <= 28, onScrub, onVideo, heldWasPlaying: false, scrubbing: false, longPressFired: false };
       pressTimer = schedule(() => { pressTimer = null; if (!gestureState || gestureState.moved) return; gestureState.longPressFired = true; if (gestureState.onScrub) beginScrub(); else if (gestureState.onVideo && !activeVideo.paused) { gestureState.heldWasPlaying = true; pausePlaybackClock(); activeVideo.pause(); } }, onScrub ? HOLD_TO_SCRUB_MS : HOLD_TO_PAUSE_MS);
@@ -421,7 +661,7 @@
       clearPressTimer(); gestureState.lastX = event.clientX; gestureState.lastY = event.clientY;
       if (gestureState.scrubbing) { updateScrubAt(event.clientX); endScrub(true); gestureState = null; return; }
       if (gestureState.heldWasPlaying) {
-        if (activeVideo && canReadProtectedData()) { const result = activeVideo.play(); playStartedAt = now(); if (result && typeof result.catch === 'function') result.catch(() => { playStartedAt = null; }); }
+        if (activeVideo && canReadProtectedData()) resumeActivePlayback();
         gestureState = null; return;
       }
       if (gestureState.longPressFired) { gestureState = null; return; }
@@ -441,12 +681,13 @@
     function handlePointerCancel() {
       clearPressTimer();
       if (gestureState && gestureState.scrubbing) endScrub(false);
-      else if (gestureState && gestureState.heldWasPlaying && activeVideo && canReadProtectedData()) { const result = activeVideo.play(); if (result && typeof result.catch === 'function') result.catch(() => {}); playStartedAt = now(); }
+      else if (gestureState && gestureState.heldWasPlaying && activeVideo && canReadProtectedData()) resumeActivePlayback();
       gestureState = null;
     }
 
     function renderPlayer() {
       if (!page || !documentRef.createElement) return;
+      loadAudioPreference();
       page.replaceChildren();
       const stage = documentRef.createElement('section'); stage.className = 'shortsStage';
       const back = documentRef.createElement('a'); back.className = 'shortsBack'; back.href = 'video.html'; back.setAttribute('aria-label', '動画一覧へ戻る'); back.textContent = '←';
@@ -456,7 +697,10 @@
       likeButton.innerHTML = '<img src="assets/shorts-heart.png" alt="" aria-hidden="true">';
       likeButton.addEventListener('click', () => toggleLike());
       rotateButton = documentRef.createElement('button'); rotateButton.type = 'button'; rotateButton.className = 'shortsRotate'; rotateButton.setAttribute('aria-label', '横向きに回転'); rotateButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h9a4 4 0 0 1 4 4v2m-3-3 3 3 3-3M17 17H8a4 4 0 0 1-4-4v-2m3 3-3-3-3 3"/></svg>';
-      rotateButton.addEventListener('click', () => toggleLandscapeRotation()); actions.append(likeButton, rotateButton);
+      rotateButton.addEventListener('click', () => toggleLandscapeRotation());
+      muteButton = documentRef.createElement('button'); muteButton.type = 'button'; muteButton.className = 'shortsMute'; muteButton.setAttribute('aria-label', 'ミュート'); muteButton.addEventListener('click', () => toggleMute());
+      volumeControl = documentRef.createElement('input'); volumeControl.type = 'range'; volumeControl.className = 'shortsVolume'; volumeControl.min = '0'; volumeControl.max = '1'; volumeControl.step = '0.05'; volumeControl.setAttribute('aria-label', '音量'); volumeControl.addEventListener('input', () => setVolume(volumeControl.value));
+      actions.append(likeButton, rotateButton, muteButton, volumeControl);
       scrubArea = documentRef.createElement('div'); scrubArea.className = 'shortsScrubArea'; scrubArea.setAttribute('aria-label', '長押しして動画をシーク');
       scrubTrack = documentRef.createElement('div'); scrubTrack.className = 'shortsScrubTrack';
       scrubThumb = documentRef.createElement('span'); scrubThumb.className = 'shortsScrubThumb';
@@ -464,13 +708,47 @@
       scrubPreviewFrame = documentRef.createElement('div'); scrubPreviewFrame.className = 'shortsScrubPreviewFrame';
       scrubTimeLabel = documentRef.createElement('span'); scrubTimeLabel.className = 'shortsScrubTime';
       scrubPreview.append(scrubPreviewFrame, scrubTimeLabel); scrubArea.append(scrubTrack, scrubThumb, scrubPreview);
-      const empty = documentRef.createElement('p'); empty.className = 'shortsEmpty'; empty.textContent = currentVideos.length ? '再生できる動画を準備できませんでした。' : '対象の動画がありません。';
+      const empty = documentRef.createElement('p'); empty.className = 'shortsEmpty';
+      empty.textContent = metadataFailureCount ? '動画情報を読み込めませんでした。接続を確認して再試行してください。' : (currentVideos.length ? '再生できる動画を準備できませんでした。' : '対象の動画がありません。');
+      const metadataRetry = documentRef.createElement('button'); metadataRetry.type = 'button'; metadataRetry.className = 'glassBtn shortsMetadataRetry'; metadataRetry.textContent = '再試行'; metadataRetry.hidden = !metadataFailureCount;
+      metadataRetry.addEventListener('click', () => { if (!canReadProtectedData()) return; disposeProtectedState(); initializeProtectedState(); });
+      const emptyState = documentRef.createElement('div'); emptyState.className = 'shortsEmptyState'; emptyState.append(empty, metadataRetry);
+      statusElement = documentRef.createElement('div'); statusElement.className = 'shortsMediaStatus'; statusElement.hidden = true; statusElement.setAttribute('role', 'status'); statusElement.setAttribute('aria-live', 'polite');
+      playButton = documentRef.createElement('button'); playButton.type = 'button'; playButton.className = 'shortsPlayButton'; playButton.textContent = '再生'; playButton.hidden = true; playButton.setAttribute('aria-label', '動画を再生');
+      playButton.addEventListener('click', () => { const entry = queue[queueIndex]; if (entry && activeVideo) attemptPlayback(activeVideo, entry, activeLoadToken, true); });
+      const errorActions = documentRef.createElement('div'); errorActions.className = 'shortsErrorActions';
+      retryButton = documentRef.createElement('button'); retryButton.type = 'button'; retryButton.className = 'glassBtn shortsRetry'; retryButton.textContent = '再試行'; retryButton.hidden = true;
+      retryButton.addEventListener('click', () => { const entry = queue[queueIndex]; if (!entry || !activeVideo) return; setMediaStatus('再読み込み中…', 'loading'); activeVideo.load(); attemptPlayback(activeVideo, entry, activeLoadToken, true); });
+      skipButton = documentRef.createElement('button'); skipButton.type = 'button'; skipButton.className = 'glassBtn shortsSkip'; skipButton.textContent = '次の動画'; skipButton.hidden = true;
+      skipButton.addEventListener('click', () => goTo(queueIndex + 1, 'error-skip'));
+      errorActions.append(retryButton, skipButton);
+      const keyboardHelp = documentRef.createElement('span'); keyboardHelp.className = 'shortsVisuallyHidden'; keyboardHelp.textContent = 'キーボード操作: 上下矢印で動画を移動、スペースで再生と一時停止';
+      keyboardHelp.hidden = !queue.length;
       stageElement = stage; mediaElement = media;
-      stage.append(back, media, actions, scrubArea); page.append(stage);
-      if (!queue.length) media.append(empty); else loadWindow(protectedState.currentTime);
-      const onWheel = (event) => { if (Math.abs(event.deltaY) > 20) goTo(queueIndex + (event.deltaY > 0 ? 1 : -1), 'wheel'); };
+      media.setAttribute('aria-keyshortcuts', 'ArrowUp ArrowDown Space'); media.setAttribute('aria-describedby', 'shortsKeyboardHelp'); keyboardHelp.id = 'shortsKeyboardHelp';
+      stage.append(back, media, actions, scrubArea, statusElement, playButton, errorActions, keyboardHelp); page.append(stage);
+      applyAudioPreference(null);
+      if (!queue.length) { actions.hidden = true; scrubArea.hidden = true; media.append(emptyState); }
+      else loadWindow(protectedState.currentTime);
+      const onWheel = (event) => {
+        if (Math.abs(event.deltaY) <= 20) return;
+        if (!wheelLocked) { wheelLocked = true; goTo(queueIndex + (event.deltaY > 0 ? 1 : -1), 'wheel'); }
+        if (wheelUnlockTimer != null) cancel(wheelUnlockTimer);
+        wheelUnlockTimer = schedule(() => { wheelUnlockTimer = null; wheelLocked = false; }, 240);
+      };
       media.addEventListener('wheel', onWheel, { passive: true });
-      media.addEventListener('keydown', (event) => { if (event.key === 'ArrowDown' || event.key === 'PageDown') goTo(queueIndex + 1, 'keyboard'); else if (event.key === 'ArrowUp' || event.key === 'PageUp') goTo(queueIndex - 1, 'keyboard'); });
+      media.addEventListener('keydown', (event) => {
+        const target = event.target;
+        const tag = String(target && target.tagName || '').toLowerCase();
+        if (target && (target.isContentEditable || ['input', 'textarea', 'select', 'button', 'a'].includes(tag))) return;
+        if (event.key === 'ArrowDown' || event.key === 'PageDown') { event.preventDefault?.(); goTo(queueIndex + 1, 'keyboard'); }
+        else if (event.key === 'ArrowUp' || event.key === 'PageUp') { event.preventDefault?.(); goTo(queueIndex - 1, 'keyboard'); }
+        else if (event.code === 'Space' || event.key === ' ') {
+          event.preventDefault?.();
+          if (activeVideo && !activeVideo.paused) { pausePlaybackClock(); activeVideo.pause(); saveProgress(true); }
+          else if (activeVideo && queue[queueIndex]) attemptPlayback(activeVideo, queue[queueIndex], activeLoadToken, true);
+        }
+      });
       stage.addEventListener('pointerdown', handlePointerDown);
       stage.addEventListener('pointermove', handlePointerMove);
       stage.addEventListener('pointerup', handlePointerUp);
@@ -483,15 +761,17 @@
       const element = documentRef.createElement('video'); element.preload = 'metadata'; element.muted = true;
       const result = await new Promise((resolve) => {
         let settled = false;
-        const done = (value) => { if (settled) return; settled = true; clearTimeout(timer); resolve(value); };
+        let cancelProbe = null;
+        const cleanup = () => { try { element.removeAttribute('src'); element.load(); } catch (_) {} if (element.parentNode) element.remove(); };
+        const done = (value) => { if (settled) return; settled = true; clearTimeout(timer); if (cancelProbe) pendingProbeCancellations.delete(cancelProbe); cleanup(); resolve(value); };
         const timer = setTimeout(() => done(null), 10000);
+        cancelProbe = () => done(null);
+        pendingProbeCancellations.add(cancelProbe);
         element.addEventListener('loadedmetadata', () => done({ videoWidth: element.videoWidth, videoHeight: element.videoHeight, durationSeconds: element.duration }));
         element.addEventListener('error', () => done(null));
         element.src = video.url;
         if (typeof element.load === 'function') element.load();
       });
-      try { element.removeAttribute('src'); element.load(); } catch (_) {}
-      if (element.parentNode) element.remove();
       return result;
     }
 
@@ -565,8 +845,9 @@
     }
 
     function queueIsUsable(candidate, videos) {
-      if (!Array.isArray(candidate) || !candidate.length) return false;
+      if (!Array.isArray(candidate)) return false;
       const byId = new Map(videos.map((video) => [String(video.id), video]));
+      if (!candidate.length && videos.length) return false;
       return candidate.every((entry) => {
         const video = byId.get(String(entry.videoId));
         return !!video && Number.isFinite(entry.startSeconds) && Number.isFinite(entry.endSeconds)
@@ -593,10 +874,8 @@
         : raw.markers;
       currentVideos = await probeAll(normalized, token, renderPreparing);
       if (token !== generationToken || !canReadProtectedData() || !protectedState) return;
+      metadataFailureCount = normalized.filter((video) => Data && Data.isDirectVideoUrl(video.url)).length - currentVideos.length;
       persistMediaInfoCache(currentVideos);
-      const successfulIds = new Set(currentVideos.map((video) => String(video.id)));
-      const failedDirectIds = new Set(normalized.filter((video) => Data && Data.isDirectVideoUrl(video.url) && !successfulIds.has(String(video.id))).map((video) => String(video.id)));
-      if (failedDirectIds.size) protectedState = { ...protectedState, knownVideoIds: ids.filter((id) => !failedDirectIds.has(id)) };
       const markers = markerPayload && typeof markerPayload === 'object' ? markerPayload : {};
       const savedQueueIsUsable = queueIsUsable(protectedState.queue, currentVideos);
       if (savedQueueIsUsable) queue = protectedState.queue;
@@ -607,7 +886,7 @@
       queueIndex = Math.max(0, Math.min(protectedState.currentIndex, Math.max(0, queue.length - 1)));
       currentTime = queue.length ? Math.max(queue[queueIndex].startSeconds, Math.min(protectedState.currentTime || queue[queueIndex].startSeconds, queue[queueIndex].endSeconds)) : 0;
       protectedState = { ...protectedState, queue, currentIndex: queueIndex, currentTime };
-      if (!queueIsUsable(stateApi.load()?.queue, currentVideos) || failedDirectIds.size || (observedState && JSON.stringify(observedState.knownVideoIds) !== JSON.stringify(protectedState.knownVideoIds))) protectedState = stateApi.save(protectedState, { sync: !isGuest() }) || protectedState;
+      if (!savedQueueIsUsable || (observedState && JSON.stringify(observedState.knownVideoIds) !== JSON.stringify(protectedState.knownVideoIds))) protectedState = stateApi.save(protectedState, { sync: !isGuest() }) || protectedState;
       renderPlayer();
     }
 
@@ -621,7 +900,8 @@
     }
 
     function handleStorage(event) {
-      if (!canReadProtectedData() || (event && event.key !== VIDEO_KEY && event.key !== null)) return;
+      const relevant = new Set([VIDEO_KEY, META_KEY, MARKER_KEY, 'mangaReaderVideoShortsState']);
+      if (!canReadProtectedData() || (event && event.key !== null && !relevant.has(event.key))) return;
       disposeProtectedState(); initializeProtectedState();
     }
 

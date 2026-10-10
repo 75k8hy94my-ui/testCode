@@ -134,7 +134,7 @@ test('allowed route probes and queues direct videos only, then unloads them when
   assert.equal(records.mangaReaderVideoMeta.direct.videoHeight, 1280);
   assert.equal(records.mangaReaderVideoMeta.direct.durationSeconds, 60);
   assert.equal(records.mangaReaderVideoMeta.direct.shortsMediaInfoUrlKey, 'key:https://media.example/a.mp4', 'the cache is tied to a compact URL token');
-  assert.equal(state.value.knownVideoIds.includes('broken'), false, 'failed direct probe is retried on a later route activation');
+  assert.equal(state.value.knownVideoIds.includes('broken'), true, 'failed direct metadata is retried without treating the same video as newly added');
   assert.equal(page.querySelector('.shortsMedia').children.length, 2, 'active and next media window is bounded');
   assert.equal(records.mangaReaderVideoMeta.direct.shorts.playCount, 1, 'Shorts play count increments independently when an entry begins');
   const active = page.querySelector('.shortsMedia').children[0];
@@ -152,6 +152,7 @@ test('allowed route probes and queues direct videos only, then unloads them when
   stage.emit('pointerup', { clientX: 50, clientY: 180, target: active });
   assert.equal(controller.getState().currentIndex, 1, 'upward swipe advances to the next queue entry');
   assert.equal(records.mangaReaderVideoMeta.direct.shorts.earlySwipeCount, 1, 'vertical swipe within five seconds increments a separate skip count');
+  await Promise.resolve();
   assert.equal(records.mangaReaderVideoMeta.direct.shorts.playCount, 2, 'each Shorts entry start increments play count');
   let current = media.children.find((node) => node.className === 'shortsVideo');
   current = media.children.find((node) => node.className === 'shortsVideo');
@@ -170,7 +171,7 @@ test('allowed route probes and queues direct videos only, then unloads them when
   scrubTimer[1].callback(); timers.delete(scrubTimer[0]);
   assert.equal(current.paused, true, 'scrubbing pauses playback');
   stage.emit('pointermove', { clientX: 75, clientY: 0, target: scrubTrackArea });
-  assert.equal(stage.children.find((child) => child.className === 'shortsScrubArea').children[2].children[1].textContent, '0:32 / 1:00');
+  assert.equal(stage.children.find((child) => child.className === 'shortsScrubArea').children[2].children[1].textContent, '0:22 / 0:30');
   stage.emit('pointerup', { clientX: 75, clientY: 0, target: scrubTrackArea });
   assert.equal(current.currentTime, 32.5, 'release commits the scrub position within the clip');
   assert.equal(current.paused, false, 'playback resumes after scrub release');
@@ -213,4 +214,41 @@ test('allowed route probes and queues direct videos only, then unloads them when
   assert.equal(active.paused, true);
   assert.equal(active.src, '');
   assert.equal(controller.getState(), null);
+});
+
+test('the final Shorts clip stops at its end boundary instead of continuing the source video', async () => {
+  class Element {
+    constructor(tagName = 'DIV') { this.tagName = tagName; this.children = []; this.dataset = {}; this.style = { setProperty() {} }; this.events = new Map(); this.classList = { add(){}, remove(){}, toggle(){} }; this.currentTime = 0; this.duration = 60; this.videoWidth = 720; this.videoHeight = 1280; this.paused = true; this.readyState = 1; this.src = ''; }
+    append(...children) { children.forEach((child) => { child.parentNode = this; this.children.push(child); }); }
+    replaceChildren(...children) { this.children = []; this.append(...children); }
+    addEventListener(type, listener) { if (!this.events.has(type)) this.events.set(type, []); this.events.get(type).push(listener); }
+    emit(type) { for (const listener of this.events.get(type) || []) listener({ type, target: this }); }
+    setAttribute() {}
+    removeAttribute(name) { if (name === 'src') this.src = ''; }
+    remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((child) => child !== this); }
+    load() {}
+    pause() { this.paused = true; }
+    play() { this.paused = false; return Promise.resolve(); }
+    querySelector(selector) { for (const child of this.children) { if (selector === '.shortsMedia' && child.className === 'shortsMedia') return child; const nested = child.querySelector?.(selector); if (nested) return nested; } return null; }
+    closest() { return null; }
+  }
+  const page = new Element(); const documentEvents = new Map();
+  const documentRef = { getElementById: () => page, createElement: (tag) => new Element(tag), addEventListener(type, fn) { documentEvents.set(type, fn); }, removeEventListener() {} };
+  const video = { id: 'clip', url: 'https://media.example/clip.mp4', title: '', tags: [] };
+  const state = { value: { schemaVersion: 1, queue: [], currentIndex: 0, currentTime: 0, knownVideoIds: ['clip'], generation: 1, updatedAt: 0, revision: 0 }, observeVideos() { return false; }, load() { return this.value; }, save(value) { this.value = value; return value; } };
+  const access = { canReadProtectedData: () => true };
+  const windowRef = { MangaReaderMediaAccess: access, TestCodeGuest: { isActive: () => true }, location: {}, setTimeout, clearTimeout, addEventListener() {}, removeEventListener() {} };
+  const storage = { getItem(key) { return JSON.stringify(key === 'mangaReaderVideos' ? [video] : {}); }, setItem() {} };
+  const module = { exports: {} };
+  vm.runInNewContext(source, { module, window: windowRef, URLSearchParams, Date, Number, Math, setTimeout, clearTimeout, console });
+  const controller = module.exports.create({ documentRef, page, windowRef, storage, mediaAccess: access, state,
+    videoData: { isDirectVideoUrl: () => true, stableUrlToken: () => 'clip-key', normalizeVideo: (value) => ({ ...value, tags: [], shorts: { liked: false, playCount: 0, earlySwipeCount: 0 } }), mergeVideoMetaPreservingThumbnailTime: (_old, next) => next },
+    queue: { generate: () => [{ videoId: 'clip', startSeconds: 10, endSeconds: 30, entryType: 'marker', tier: 1, generation: 1 }] },
+    probeMetadata: async () => ({ videoWidth: 720, videoHeight: 1280, durationSeconds: 60 }) });
+  await controller.start();
+  const active = page.querySelector('.shortsMedia').children.find((node) => node.className === 'shortsVideo');
+  active.currentTime = 29.95;
+  active.emit('timeupdate');
+  assert.equal(active.currentTime, 30);
+  assert.equal(active.paused, true);
 });

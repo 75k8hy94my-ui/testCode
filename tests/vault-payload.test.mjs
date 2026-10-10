@@ -3,6 +3,25 @@ test('normalizes legacy payload with empty video library metadata, study state a
 test('vault payload syncs manually fixed VPN and non-VPN IPs',()=>{const storage=new Map([['testCode.manualVpnIps',JSON.stringify(['10.0.0.1'])],['testCode.manualNonVpnIps',JSON.stringify(['115.163.102.200'])]]);const value=buildFromStorage(storage);assert.deepEqual(value.manualVpnIps,['10.0.0.1']);assert.deepEqual(value.manualNonVpnIps,['115.163.102.200']);const restored=new Map();applyToStorage(value,restored);assert.equal(restored.get('testCode.manualVpnIps'),'["10.0.0.1"]');assert.equal(restored.get('testCode.manualNonVpnIps'),'["115.163.102.200"]')});
 test('build and apply preserve every vault field including structured roppo settings',()=>{const study=structuredClone(emptyStudy);study.preferences.autoSpeak=true;study.argumentDrafts.new={argumentId:null,title:'途中',body:'下書き本文',savedAt:'2026-08-28T00:00:00.000Z'};const indexSearchSettings={matchModes:{exact:true,partial:false,and:true,fuzzy:false},activeKind:'case',selectedSubjects:['民法','民事訴訟法'],selectedBookIds:['book-1']},roppoState=structuredClone(emptyRoppoState);roppoState.preferences.memoMode='edit';const input={folders:[{id:'f1'}],items:[{id:'i1'}],videos:[{id:'v1'}],videoFolders:[{id:'vf1',name:'動画'}],videoMeta:{v1:{favorite:true,tags:['x'],memo:'note'}},authorCards:[{id:'a1',name:'作者'}],mangaInfo:{a:{count:10}},toc:{a:[{page:1}]},lastPages:{a:{page:3}},theme:'light',dashboardVisibility:{mobile:{continue:true,'recent-added':false,'recent-read':false,unread:false,random:false,favorites:false},desktop:{continue:false,'recent-added':false,'recent-read':false,unread:false,random:true,favorites:false}},homeCards:['study','bookshelf'],study,indexSearchSettings,roppoState,statuteNotes:{},profileAvatar:'',driveGalleryEncrypted:null,gameSave:null,manualVpnIps:[],manualNonVpnIps:[]};const normalized=normalize(input),storage=new Map();applyToStorage(normalized,storage);assert.deepEqual(buildFromStorage(storage),normalized);assert.equal(DATA_KEYS.roppoState,'mangaReaderRoppoState')});
 
+test('normalization preserves unknown future top-level and record properties',()=>{
+  const input={futureTopLevel:{schema:9,setting:'kept'},futureRecordList:[{id:'future-1',futureProperty:{preserve:true}}],videos:[{id:'v1',legacyField:'retained'}],gameSave:{inventory:{slot7:'legacy'}}};
+  const normalized=normalize(input);
+  assert.deepEqual(normalized.futureTopLevel,input.futureTopLevel);
+  assert.deepEqual(normalized.futureRecordList,input.futureRecordList);
+  assert.equal(normalized.videos[0].legacyField,'retained');
+  assert.deepEqual(normalized.gameSave,input.gameSave);
+});
+
+test('apply rolls back both canonical and manual VPN settings when either manual key write fails',()=>{
+  const values=new Map([['mangaReaderSavedFolders',JSON.stringify([{id:'old-folder'}])],['testCode.manualVpnIps',JSON.stringify(['192.0.2.1'])],['testCode.manualNonVpnIps',JSON.stringify(['192.0.2.2'])]]);
+  let vpnWrites=0;
+  const storage={getItem:key=>values.get(key)??null,setItem(key,value){if(key.startsWith('testCode.manual')&&++vpnWrites===2)throw new Error('quota');values.set(key,value)},removeItem:key=>values.delete(key)};
+  assert.throws(()=>applyToStorage({...normalize({folders:[{id:'new-folder'}]}),manualVpnIps:['198.51.100.1'],manualNonVpnIps:['198.51.100.2']},storage),/quota/);
+  assert.deepEqual(JSON.parse(values.get('mangaReaderSavedFolders')),[{id:'old-folder'}]);
+  assert.deepEqual(JSON.parse(values.get('testCode.manualVpnIps')),['192.0.2.1']);
+  assert.deepEqual(JSON.parse(values.get('testCode.manualNonVpnIps')),['192.0.2.2']);
+});
+
 test('normalizes legacy marker labels and round-trips canonical marker and Shorts queue keys through Vault storage',()=>{
   const markers={v1:[{seconds:10,label:'水しぶき'},{seconds:20,label:'custom legacy label'},{seconds:30,icon:'toilet'},{seconds:-1,icon:'water'}]};
   assert.deepEqual(payload.normalizeVideoMarkers(markers),{v1:[{seconds:10,icon:'water'},{seconds:20,icon:'triangle'},{seconds:30,icon:'toilet'}]});

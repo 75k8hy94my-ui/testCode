@@ -48,7 +48,8 @@ When changing Reader behavior, preserve these invariants unless the task explici
 - `vault-payload.js` is the authority for Vault-backed local data keys and normalization. Do not duplicate its key list in new code when it can be imported/reused.
 - Never persist credentials, Vault key material, provider secrets, decrypted protected content, or access tokens merely for convenience.
 - Encrypted chunk persistence may contain encrypted envelopes and the minimum synchronization metadata needed to manage them. Do not add plaintext protected corpus metadata/content to `encrypted-chunk-cache.js`.
-- Conflict/revision handling must not silently overwrite a newer remote revision or resurrect deleted encrypted data.
+- Vault snapshot saves use an encrypted last-success baseline and a three-way merge of baseline, local state, and latest remote state before each revision CAS. CAS failure requires fetching and merging the latest payload again; never retry by changing only the revision on a stale snapshot. Preserve unresolved edits and pending state, and do not recreate a missing Vault row or overwrite changed credential wrappers.
+- Per-item encrypted chunk sync keeps its revision conflict and tombstone protections; stale clients must not resurrect deleted encrypted data.
 - Treat logout/lock cleanup as part of the security boundary: newly introduced protected caches or sensitive in-memory resources must have an explicit cleanup path.
 - Browser code must not contain server/provider secret keys. Public client identifiers are not secrets, but access tokens and provider credentials are.
 - VPN access controls protected synchronized content separately from static application UI. Treat `pending`, `checking`, and `blocked` as no permission to read, display, mutate, or sync protected content; only `allowed` grants that permission. Route shells may still render, and access loss must clear protected runtime presentation without deleting persisted data.
@@ -65,6 +66,11 @@ When security-sensitive storage or sync behavior changes, add or update tests fo
 ## Git and GitHub workflow
 
 Do not report that publishing is impossible merely because the shell credential path fails.
+
+## Repository work lifecycle
+
+- Before starting repository work, check for updates on the target remote branch. Fetch and inspect the upstream changes before editing; if terminal fetch is unavailable, inspect the current remote branch through an authenticated GitHub integration and base the work on that revision. Integrate remote changes deliberately and preserve existing local/user work.
+- Do not end repository work until the deployment for the intended change has visibly started. Identify the deployment mechanism at the start, then after publishing verify that a deployment run exists for the intended commit and has entered a running or later state. A passing test workflow, pull request creation, or merge alone does not confirm deployment. If no deployment mechanism or status is available, report the exact blocker and leave the work explicitly incomplete rather than claiming deployment started.
 
 1. Inspect the repository state:
    ```bash

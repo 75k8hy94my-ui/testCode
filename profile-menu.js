@@ -32,7 +32,18 @@
     if (!confirm('ログアウトしますか？')) return;
     if (button) button.disabled = true;
     const session = window.MangaVault && MangaVault.loadSession();
-    try { await MangaVault.withSession((token) => MangaVault.api('/auth/v1/logout', { method:'POST', token })); } catch (_) {}
+    try {
+      if (MangaVault?.hasPendingLocalChanges?.()) {
+        const access = window.MangaReaderMediaAccess;
+        if (MangaVault.loadActive?.() && access?.canReadProtectedData?.() === true) await MangaVault.saveLocalChanges();
+        if (MangaVault.hasPendingLocalChanges()) throw new Error('未同期の変更が残っています。同期可能な状態で再試行してください。ログアウトは行いませんでした。');
+      }
+      await MangaVault.withSession((token) => MangaVault.api('/auth/v1/logout', { method:'POST', token }));
+    } catch (error) {
+      if (button) button.disabled = false;
+      window.alert(error?.message || 'ログアウトできませんでした。端末の変更を保持しています。');
+      return;
+    }
     try { if (session && session.user && session.user.id && window.EncryptedChunkCache) await EncryptedChunkCache.clearAll({ dbName:`${EncryptedChunkCache.DB_NAME}:${session.user.id}` }); } catch (_) {}
     if (window.MangaVault) { MangaVault.clearActive(); MangaVault.saveSession(null); localStorage.removeItem(MangaVault.META_KEY); }
     DEVICE_DATA_KEYS().forEach((key) => localStorage.removeItem(key));

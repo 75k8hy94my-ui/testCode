@@ -75,6 +75,19 @@ test('only direct-link URLs enter the queue and unmarked landscape/square videos
   ]);
 });
 
+test('always-rotate settings correct source aspect before choosing shorts or landscape overflow', () => {
+  const entries = generate([
+    video('rotated-to-portrait', { videoWidth: 1920, videoHeight: 1080, rotate90Direction: 'left' }),
+    video('rotated-to-landscape', { videoWidth: 720, videoHeight: 1280, rotate90Direction: 'right' }),
+    video('legacy-rotated-to-portrait', { videoWidth: 1920, videoHeight: 1080, rotate90: true }),
+  ], { markersByVideo: {}, random: fixedRandom });
+  assert.deepEqual(entries.map(({ videoId, entryType }) => [videoId, entryType]), [
+    ['rotated-to-portrait', 'random-short'],
+    ['legacy-rotated-to-portrait', 'random-short'],
+    ['rotated-to-landscape', 'overflow-landscape'],
+  ]);
+});
+
 test('videos at least twenty-five minutes long play in full after all shorter overflow videos', () => {
   const entries = generate([
     video('long-marked', { durationSeconds: 1500, videoWidth: 1920, videoHeight: 1080 }),

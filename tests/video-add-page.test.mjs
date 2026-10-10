@@ -94,6 +94,58 @@ test('add screen rejects duplicate URLs and invalid URLs without a write', async
   assert.equal(JSON.parse(app.stored.get(VIDEO_KEY)).length, 1);
 });
 
+test('JSON import adds URL records, preserves signed query strings, and skips existing duplicates', async () => {
+  const existing = Data.normalizeVideo({ id: 'existing', url: 'https://example.com/already.mp4?token=kept', a: 'url', b: '1' });
+  const app = startEditor({ videos: [existing] });
+  const fileInput = app.nodes.get('[data-json-import]');
+  fileInput.events.change({ target: { files: [{ text: async () => JSON.stringify([
+    'https://example.com/1.mp4?token=abc',
+    'https://example.com/already.mp4?token=kept',
+    'https://example.com/2.mp4?token=def',
+  ]) }] } });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const saved = JSON.parse(app.stored.get(VIDEO_KEY));
+  assert.deepEqual(saved.map((video) => video.url), [
+    'https://example.com/1.mp4?token=abc',
+    'https://example.com/2.mp4?token=def',
+    'https://example.com/already.mp4?token=kept',
+  ]);
+  assert.equal(app.pendingCalls, 1);
+  assert.equal(app.syncCalls, 1);
+  assert.match(app.nodes.get('.videoEditError').textContent, /2件追加.*クラウド同期も完了/);
+});
+
+test('JSON import keeps added rows pending when cloud sync fails', async () => {
+  const app = startEditor({ failSync: true });
+  app.nodes.get('[data-json-import]').events.change({ target: { files: [{ text: async () => JSON.stringify(['https://example.com/offline.mp4']) }] } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(JSON.parse(app.stored.get(VIDEO_KEY)).length, 1);
+  assert.equal(app.pendingCalls, 1);
+  assert.equal(app.syncCalls, 1);
+  assert.match(app.nodes.get('.videoEditError').textContent, /未同期として保持/);
+});
+
+test('JSON import rejects malformed data or any invalid URL without a partial write', async () => {
+  const app = startEditor();
+  const originalVideos = app.stored.get(VIDEO_KEY);
+  const originalMeta = app.stored.get(META_KEY);
+  const fileInput = app.nodes.get('[data-json-import]');
+  fileInput.events.change({ target: { files: [{ text: async () => JSON.stringify([
+    'https://example.com/valid.mp4', 'javascript:alert(1)',
+  ]) }] } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(app.nodes.get('.videoEditError').textContent, /無効な動画URL/);
+  assert.equal(app.stored.get(VIDEO_KEY), originalVideos);
+  assert.equal(app.stored.get(META_KEY), originalMeta);
+  assert.equal(app.pendingCalls, 0);
+
+  fileInput.events.change({ target: { files: [{ text: async () => '{bad json' }] } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(app.nodes.get('.videoEditError').textContent, /JSON/);
+  assert.equal(app.stored.get(VIDEO_KEY), originalVideos);
+});
+
 test('VPN-blocked add route never reads local protected data', () => {
   const app = startEditor({ allowed: false });
   assert.equal(app.form, undefined);
