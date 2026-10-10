@@ -1,7 +1,37 @@
 -- Route Vault updates through an owner-bound RPC with revision CAS. This
--- migration preserves every existing row, payload and revision.
+-- migration preserves every existing row, payload and revision. When applied
+-- by itself, it closes writes until the v4 RPC migration is ready.
+lock table public.manga_reader_vaults in access exclusive mode;
+
+create schema if not exists private;
+
+create or replace function private.enforce_vault_sync_v4_write_guard()
+returns trigger
+language plpgsql security definer
+set search_path = ''
+as $$
+begin
+  -- Requests that started before this migration acquired its table lock can
+  -- resume after commit. The trigger prevents an already-entered v3 RPC from
+  -- writing after the cutover, while leaving service_role management writes
+  -- intact.
+  if (select auth.jwt() ->> 'role') = 'authenticated'
+    and (jsonb_typeof(new.payload -> 'syncProtocolVersion') is distinct from 'number'
+      or new.payload ->> 'syncProtocolVersion' is distinct from '4') then
+    raise exception 'vault_sync_protocol_required' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function private.enforce_vault_sync_v4_write_guard() from public, anon, authenticated;
+drop trigger if exists enforce_vault_sync_v4_write_guard on public.manga_reader_vaults;
+create trigger enforce_vault_sync_v4_write_guard
+before insert or update of payload on public.manga_reader_vaults
+for each row execute function private.enforce_vault_sync_v4_write_guard();
+
 revoke all on table public.manga_reader_vaults from public, anon, authenticated;
-grant select, insert on table public.manga_reader_vaults to authenticated;
+grant select on table public.manga_reader_vaults to authenticated;
 
 drop policy if exists "Users can update their own encrypted vault" on public.manga_reader_vaults;
 
@@ -54,4 +84,4 @@ end;
 $$;
 
 revoke execute on function public.update_manga_reader_vault(bigint, jsonb) from public, anon;
-grant execute on function public.update_manga_reader_vault(bigint, jsonb) to authenticated;
+revoke execute on function public.update_manga_reader_vault(bigint, jsonb) from authenticated;

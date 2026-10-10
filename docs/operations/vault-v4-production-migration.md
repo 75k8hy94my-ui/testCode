@@ -1,15 +1,13 @@
 # Vault v4本番移行・バックアップ復元ランブック
 
-この文書は、2026-10-10時点の本番状態を確認した結果に基づく運用手順です。通常のmigration手順と、検証環境で復元できない場合の停止条件を定めます。暗号化Vaultのpayloadや認証秘密を、この文書・Git・CIへ記録しません。
+この文書はVault v4 migrationの運用手順と停止条件を定めます。main SHA、Pages deployment、本番DBの状態、利用可能な接続方法は実施直前に再取得し、この文書にある過去の値を現在値として扱いません。暗号化Vaultのpayloadや認証秘密を、この文書・Git・CIへ記録しません。
 
-## 現在の確認状態
+## 実行直前の再確認
 
-- `main`: `8a57a9e09bea1a4aa47abee56a01e33da6e3eb73`。PR #224はmainへ反映済みです。
-- Pagesの同SHA deploymentは `completed / success` です。
-- 本番SupabaseはFree plan、PostgreSQL 17です。Vaultは2行で、revisionは1と1133でした。payloadを復号・表示していません。
-- 本番にはv4 capability/create/update RPCがなく、v4 migration履歴もありません。authenticatedにはVault表の直接INSERT/UPDATE/DELETE権限と旧RPCが残り、RLSは有効ですが本人行に対する旧書込み経路を許しています。
-- PR #224のPostgreSQL 17 CIは合成データを使う隔離テストです。本番backupの取得・復元を証明しません。
-- この実行環境に `psql`、`pg_dump`、`pg_restore`、Supabase CLI、Docker、DB接続資格情報がありません。Supabase MCPのSQL機能は読み取り診断にのみ使用し、Vault payload自体を返さない照合値だけを取得しました。
+- GitHub `main` SHAとそのSHAに紐づくPages deploymentを確認します。PRのマージやCI成功だけでPages公開済みとは判定しません。
+- 本番のVault件数・revision・暗文SHA-256、RPC、RLS、権限、migration履歴をread-onlyで採取します。以前の件数やrevisionを固定値として前提にしません。
+- 本番migrationは、暗号化backupの復号・archive検査・隔離restore・照合を今回のmigration直前に完了するまで適用しません。
+- CIの合成fixtureによるrestore検証と、本番backupを使った隔離restore検証は別の証拠として記録します。
 
 ## Free planで使えるbackup経路
 
@@ -17,11 +15,11 @@
 | --- | --- |
 | Dashboardのmanaged backup download | Free planではダウンロードできません。Supabaseの管理バックアップを隔離restoreする方法として使用しません。 |
 | `pg_dump` / Supabase CLI `db dump` | Free planでも論理dumpを作れます。DB接続パスワード、PostgreSQL 17互換クライアント、ネットワーク接続が必要です。実行環境にdumpを保存し、GitHubや外部CIへ送信しません。 |
-| ローカルPostgreSQL/Supabase | 現在の実行環境にはPostgreSQL/Dockerがありません。ツールを備えたローカルの隔離環境を用意できれば無償で検証可能です。Supabase管理スキーマの依存関係を確認し、単なる空PostgreSQLへ全体dumpを直接restoreしません。 |
+| ローカルPostgreSQL/Supabase | ローカルのPostgreSQL 17または隔離Docker環境で検証できます。Supabase管理スキーマの依存関係を確認し、単なる空PostgreSQLへ全体dumpを無条件にrestoreしません。 |
 | GitHub Actions PostgreSQL 17 | PRで合成データのmigration・dump・restore手順を検証します。実Vault backupをrunnerへ転送したりartifactへ保存したりしません。 |
 | Supabase branch/追加project | 作成していません。Free quotaや費用が確認できない環境で作成しません。有料branch/PITRは費用の明示承認がない限り使用しません。 |
 
-この環境では本番dumpを安全に取得・restoreするための接続資格情報とローカル復元先がありません。Free planであることだけが障害ではなく、`pg_dump`によるローカル取得は可能です。次回実行前にDBパスワードを利用者が安全なローカル経路で用意し、PostgreSQL 17 clientと隔離復元環境を準備してください。パスワードをチャット、ソース、コマンド履歴、CIへ入力しないでください。
+Free planであることだけでは`pg_dump`によるローカル取得を妨げません。利用可能な接続経路とPostgreSQL 17 client、隔離復元先を実施時に確認します。パスワードをチャット、ソース、コマンド履歴、CIへ入力しません。
 
 ## 本番backupと隔離restore
 
@@ -29,17 +27,20 @@
 
 1. Supabase DashboardのConnectで接続情報を取得し、database passwordをローカルで確認します。接続URLへpasswordを埋め込まず、権限600の`.pgpass`または同等の秘密保管手段を使います。
 2. PostgreSQL 17互換の`pg_dump`/`pg_restore`と、Supabase依存オブジェクトを扱える隔離restore先を用意します。restore先は本番と別のローカルコンテナ/VMとし、本番endpointへ接続しないことを接続先とDNSで確認します。
-3. 一時保存先をGit checkout外に作成し、directory modeを700、file modeを600にします。FileVault等のディスク暗号化を有効にしてください。バックアップ用鍵をVault鍵やSupabase API keyと共用しません。
+3. 一時保存先をGit checkout外に作成し、directory modeを700、file modeを600にします。FileVault等のディスク暗号化を有効にしてください。バックアップ用鍵をVault鍵やSupabase API keyと共用しません。GPG鍵は暗号学的乱数で生成し、macOS Keychain APIを使って`WhenUnlockedThisDeviceOnly`属性で保存します。鍵をコマンド引数へ渡しません。`security find-generic-password`で別プロセスから再取得できることを値を表示せず確認します。
 4. backup対象が`public.manga_reader_vaults`の全行・全列、関連制約、RPC/function定義、RLS、GRANT/REVOKE、`supabase_migrations`履歴、restore依存オブジェクトを含むことを確認します。Vault以外の必要なアプリデータも同一DB内にある場合は、関係範囲を事前に決めます。Storage APIの実ファイルはPostgreSQL dumpに含まれないため別対象です。
 
 ### 2. 暗号化backupを取得
 
-CLIの形式はインストール済みSupabase CLIの`supabase db dump --help`で確認します。`pg_dump`のcustom archiveを使う場合は、passwordのない接続文字列と権限600のpassword fileを使用し、暗号化ファイルだけを保管します。例:
+CLIの形式はインストール済みSupabase CLIの`supabase db dump --help`で確認します。`pg_dump`のcustom archiveを使う場合は、passwordのない接続文字列と権限600のpassword fileを使用し、暗号化ファイルだけを永続保管します。custom archiveはseek可能である必要があるため、平文dumpは権限600のRAM disk内に一時作成し、暗号化後にRAM diskを取り外します。例:
 
 ```bash
 set -euo pipefail
 umask 077
 BACKUP_DIR="/private/var/<secure-local-backup-directory>"
+RAM_DISK="/Volumes/<private-ram-disk>"
+KEYCHAIN_SERVICE="<unique-backup-keychain-service>"
+KEYCHAIN_ACCOUNT="$(id -un)"
 mkdir -m 700 -p "$BACKUP_DIR"
 export PGPASSFILE="$BACKUP_DIR/.pgpass"
 test -f "$PGPASSFILE" # password file is prepared locally and never committed
@@ -49,22 +50,33 @@ chmod 600 "$PGPASSFILE"
 # PGPASSFILEへdatabase passwordを安全に入力し、値を画面へechoしない。
 DB_CONN="host=$PGHOST port=$PGPORT dbname=$PGDATABASE user=$PGUSER sslmode=require passfile=$PGPASSFILE"
 
-pg_dump --format=custom --dbname="$DB_CONN" \
-  | gpg --symmetric --cipher-algo AES256 --output "$BACKUP_DIR/vault-pre-v4.dump.gpg"
+pg_dump --format=custom --dbname="$DB_CONN" --file="$RAM_DISK/production.dump"
+chmod 600 "$RAM_DISK/production.dump"
+security find-generic-password -a "$KEYCHAIN_ACCOUNT" -s "$KEYCHAIN_SERVICE" -w \
+  | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+      --symmetric --cipher-algo AES256 --output "$BACKUP_DIR/vault-pre-v4.dump.gpg" \
+      "$RAM_DISK/production.dump"
+chmod 600 "$BACKUP_DIR/vault-pre-v4.dump.gpg"
+shasum -a 256 "$BACKUP_DIR/vault-pre-v4.dump.gpg" > "$BACKUP_DIR/vault-pre-v4.dump.gpg.sha256"
+chmod 600 "$BACKUP_DIR/vault-pre-v4.dump.gpg.sha256"
 ```
 
-暗号化前のdumpを平文ファイルに残しません。GPGの暗号化パスフレーズは対話入力し、バックアップと別の安全な場所で保管します。`pg_dump`、PostgreSQL server、`gpg`の終了コードを確認し、archive一覧を復号ストリームで`pg_restore --list`へ渡して完了性を確認します。暗号化backupのchecksum、作成時刻、対象project、ツールversionを記録します。Vault payloadやpasswordをログへ出しません。
+シェルではpipefailを有効にしてpg_dump/Keychain取得/GPGの失敗を検出します。Keychain値はpipe内だけで渡し、画面・環境変数・コマンド引数・ログへ出しません。暗号化backupのchecksum、作成時刻、対象project、tool versionを記録します。Vault payloadやdatabase passwordをログへ出しません。平文archiveは復号・restore検証後にRAM diskをdetachします。
 
 ```bash
-gpg --decrypt "$BACKUP_DIR/vault-pre-v4.dump.gpg" \
-  | pg_restore --exit-on-error --no-owner --dbname="$LOCAL_DB_CONN" -
+security find-generic-password -a "$KEYCHAIN_ACCOUNT" -s "$KEYCHAIN_SERVICE" -w \
+  | gpg --batch --pinentry-mode loopback --passphrase-fd 0 --decrypt \
+      "$BACKUP_DIR/vault-pre-v4.dump.gpg" > "$RAM_DISK/production.dump"
+chmod 600 "$RAM_DISK/production.dump"
+pg_restore --list "$RAM_DISK/production.dump" >/dev/null
+pg_restore --exit-on-error --no-owner --dbname="$LOCAL_DB_CONN" "$RAM_DISK/production.dump"
 ```
 
-`LOCAL_DB_CONN`は隔離先の接続情報です。復号データを一時ファイルへ書かず、対話入力したGPGパスフレーズを使用します。
+`LOCAL_DB_CONN`は隔離先の接続情報です。RAM diskが永続ディスクへマウントされていないことを確認してから復号します。復元を2回独立に行い、両方の結果を本番read-only fingerprintと照合するまでは旧暗号化backupを削除しません。
 
 ### 3. 隔離restoreと照合
 
-1. 本番と別の一時PostgreSQL/Supabase環境へ復元します。復元先を再確認してから、対話入力したbackupパスフレーズで復号し、`pg_restore --exit-on-error --no-owner`を使います。production接続文字列をrestore先へ指定しません。
+1. 本番と別の一時PostgreSQL/Supabase環境へ復元します。復元先を再確認してからKeychainから別プロセスで鍵を取得し、RAM disk上のarchiveを`pg_restore --exit-on-error --no-owner`で復元します。production接続文字列をrestore先へ指定しません。
 2. restore前後で、Vault件数、各行のrevision/updated_at、`payload::text`のSHA-256、テーブル/制約定義、RPCのidentity arguments/`prosecdef`/`search_path`/ACL、RLS/policy、table grants、migration履歴を照合します。比較結果だけを出し、payload本体はselect・表示・ログ出力しません。
 3. SQL関数/roleの依存が不足してrestoreが失敗した場合は、その場で本番を変更せず、足りないrole/schema/extensionを隔離環境へ用意して再検証します。auth.users等に依存する所有者IDは必要最小限のscopeで扱い、DB一式を外部サービスへ送信しません。
 4. 復元データのアプリ復号は専用fixtureで別に検証します。利用者の鍵を持たず実Vaultを復号できない場合、暗号文hash一致を復号確認と表現しません。
@@ -119,7 +131,7 @@ order by n.nspname, p.proname, p.oid;
 select version, name from supabase_migrations.schema_migrations order by version;
 ```
 
-PR #224以後、CIには合成fixtureをcustom archiveへdumpし、別DBへrestoreして行revision/hash、schema、RPC、RLS、grants、migration historyを比較する検証を追加します。このCIは手順と機械的な照合方法の検証だけを行い、本番backupの取得・restore結果として扱いません。
+PostgreSQL 17 CIは合成fixtureをcustom archiveへdumpし、別DBへrestoreして行revision/hash、schema、RPC、RLS、grants、migration historyを比較します。また`scripts/test-vault-v4-production-cutover.sh`で単一transactionのrollback/history、in-flight旧v3要求の拒否、段階適用時のwrite pauseを検証します。これらは手順の検証だけであり、本番backupの取得・restore結果として扱いません。
 
 ### 4. backup保管と削除
 
@@ -143,9 +155,19 @@ PR #224以後、CIには合成fixtureをcustom archiveへdumpし、別DBへresto
 
 1. 本番のread-only preflightでVault件数/revision/hash、migration履歴、RLS/grants/RPCを再採取する。
 2. 新しい暗号化backupを取得し、前回backupとVault件数/revision/hashを照合する。
-3. v3 CAS permission migration、次にv4 RPC migrationを適用する。各migrationの終了結果を確認し、失敗したmigrationの後続を続けない。
-4. read-only queryでcapability/create/update RPC、worker認可、RLS、authenticated/anon grants、`service_role`既存権限、migration履歴、Vault件数/revision/hashを確認する。
-5. 旧bundleが更新拒否され、v4 bundleがcapability確認後にのみ同期できることを、専用の2端末test accountで検証する。
+3. migration 2本は個別に`supabase db push`せず、次の単一`psql`呼び出しで適用します。psqlの`--single-transaction`と`ON_ERROR_STOP`を必須にし、両migrationと履歴行を同じtransactionに含めます。実行前に最新の暗号化backupと隔離restoreを完了してください。
+
+   ```bash
+   psql --single-transaction --set=ON_ERROR_STOP=1 --dbname="$DB_CONN" --file=scripts/vault-v4-atomic-cutover.psql
+   ```
+
+   このscriptはVault表に`ACCESS EXCLUSIVE` lockを取得して進行中の表操作をdrainし、migration 2本とmigration historyの2行を同じtransactionで実行します。lock timeout、SQL error、接続切断で失敗した場合、PostgreSQLは全変更と履歴をrollbackします。終了コードが0でない場合は後続を実行せず、読み取り診断で全migration前状態かを確認します。migration historyに片方だけある状態を検出したscriptは停止します。
+4. commit後、read-only queryでcapability/create/update RPC、worker認可、RLS、authenticated/anon grants、`service_role`既存権限、migration履歴、Vault件数/revision/hashを確認します。2つのmigration versionが履歴にあり、Vault fingerprintがbackupと一致することを確認します。
+5. transaction commit後、PostgRESTのschema cacheを`NOTIFY pgrst, 'reload schema'`で更新します。これにはdirectまたはsession-mode接続を使用します。transaction-mode poolerはsession機能のLISTEN/NOTIFYに使わず、Supabase SQL Editorから通知する代替手順を使います。Supabaseはmigration/backupにdirect connection、IPv4環境ではsession poolerを案内しています。
+6. capability/RPC probeを一定間隔で再試行します。`PGRST202`、RPC未認識、応答timeoutは一時的なunknownとして扱い、その間は同期を成功扱いせずpendingを維持します。必要ならschema reload通知を再送し、capability 4とRPCが応答するまで保護データの書き込みを再開しません。
+7. 旧bundleのv3書き込みが拒否され、v4 bundleがcapability確認後にのみ同期できることを、専用の2端末test accountで検証します。
+
+`supabase db push`はmigration fileごとにtransaction/historyを確定するため、この2本に対しては使用しません。保護策として1本目のmigration単体にもfail-closed write guardを入れています。誤って1本目だけがcommitした場合はv3/直接書き込みが拒否された停止状態になります。旧protocolや直接権限を戻さず、再度backup・診断後にv4 migrationをfix-forwardで適用します。この経路は通常の一括切替手順の代替ではありません。
 
 本番Vaultのpayload/revisionをmigrationで書き換えません。旧protocolの再許可や直接UPDATE/INSERT権限の再付与をrollbackとして行いません。
 
