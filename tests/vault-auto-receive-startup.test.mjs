@@ -24,6 +24,7 @@ test('received Vault state refreshes the active screen and sync state has explic
 });
 
 test('automatic sync is event-driven, throttled on tab activation, and keeps VPN receive gating', () => {
+  assert.match(vault, /window\.addEventListener\('load', \(\) => requestAutoVaultSync\(\), \{ once: true \}\)/);
   assert.match(vault, /window\.addEventListener\('focus', \(\) => requestAutoVaultSync\(\)\)/);
   assert.match(vault, /window\.addEventListener\('online', \(\) => requestAutoVaultSync\(true\)\)/);
   assert.match(vault, /visibilityState === 'visible'\) requestAutoVaultSync\(\)/);
