@@ -27,6 +27,18 @@ test('retains cloud tombstones across client snapshots that do not store plainte
   assert.deepEqual(result.payload.vaultSyncTombstones, ['/videos/private-id']);
 });
 
+test('a remote tombstone is received without a false field conflict when the baseline predates tombstones', () => {
+  const base = { videos: [{ id: 'v1', title: '削除対象' }] };
+  const local = { videos: [{ id: 'v1', title: '削除対象' }], vaultSyncTombstones: [] };
+  const remote = { videos: [], vaultSyncTombstones: ['/videos/v1', '/videoMeta/v1'] };
+
+  const result = mergeVaultPayload(base, local, remote);
+
+  assert.deepEqual(result.conflicts, []);
+  assert.deepEqual(result.payload.videos, []);
+  assert.deepEqual(result.payload.vaultSyncTombstones, ['/videos/v1', '/videoMeta/v1']);
+});
+
 test('does not auto-resurrect an entity that reuses a tombstoned ID', () => {
   const tombstone = '/videos/v1';
   const base = { videos: [], vaultSyncTombstones: [tombstone] };

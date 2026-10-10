@@ -88,6 +88,10 @@
   }
 
   function mergeValue(base, local, remote, path, conflicts) {
+    if (path === '/vaultSyncTombstones' && [base, local, remote].some(Array.isArray)) {
+      return [...new Set([base, local, remote].filter(Array.isArray).flat()
+        .filter((tombstone) => typeof tombstone === 'string' && tombstone.startsWith('/')))];
+    }
     if (equal(local, base)) return remote;
     if (equal(remote, base) || equal(local, remote)) return local;
 
