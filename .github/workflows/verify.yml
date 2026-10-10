@@ -54,6 +54,14 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: vault_sync_test
         run: bash scripts/test-vault-sync-v4-postgres.sh
+      - name: Verify atomic Vault v4 cutover transaction
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: vault_sync_test
+        run: bash scripts/test-vault-v4-production-cutover.sh
       - name: Verify synthetic PostgreSQL dump and isolated restore
         env:
           PGHOST: 127.0.0.1
