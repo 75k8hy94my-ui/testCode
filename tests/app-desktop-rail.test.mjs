@@ -30,6 +30,7 @@ test('shared rail mirrors the study desktop Liquid Glass material', () => {
 
 test('shared rail provides global destinations and page-aware active state', () => {
   const rail = read('app-desktop-rail.js');
+  assert.match(rail, /desktopNavVpnDiagnostics/);
   const destinations = [
     ['desktopNavHome','home.html'],
     ['desktopNavManga','manga.html'],

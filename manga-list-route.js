@@ -152,31 +152,6 @@
     };
   }
 
-  function installVpnControls(rootElement, documentRef) {
-    if (!rootElement || rootElement.querySelector('[data-vpn-header="manga-list"]')) return;
-    const controls = documentRef.createElement('div');
-    controls.className = 'listHeaderControls vpnListControls';
-    controls.dataset.vpnHeader = 'manga-list';
-    controls.setAttribute('aria-label', 'VPN状態');
-
-    const recheck = documentRef.createElement('button');
-    recheck.className = 'ctrlBtn vpnStatusButton vpnRecheckButton';
-    recheck.type = 'button';
-    recheck.dataset.vpnStatusButton = '1';
-    recheck.dataset.vpnRecheckButton = '1';
-    recheck.title = 'VPN接続を完全に再確認します';
-    recheck.textContent = 'VPN確認中';
-
-    const diagnostics = documentRef.createElement('button');
-    diagnostics.className = 'ctrlBtn vpnDiagnosticsButton';
-    diagnostics.type = 'button';
-    diagnostics.dataset.vpnDiagnosticsButton = '1';
-    diagnostics.textContent = 'VPN診断';
-
-    controls.append(recheck, diagnostics);
-    rootElement.insertBefore(controls, rootElement.firstChild);
-  }
-
   function createRoute(deps) {
     if (!deps || typeof deps !== 'object' || !deps.documentRef || !deps.windowRef) {
       throw new TypeError('MangaListRouteFactory requires documentRef and windowRef');
@@ -656,7 +631,6 @@
         entry.cleanup();
         return null;
       }
-      if (!windowRef.TestCodeGuest?.isActive()) installVpnControls(result.root, documentRef);
       const notice = documentRef.createElement('p');
       notice.className = 'vpnProtectedDataNotice';
       notice.setAttribute('aria-live', 'polite');
@@ -665,7 +639,6 @@
       result.root.insertBefore(notice, result.root.firstChild);
       result.root.dataset.protectedDataAccess = canReadProtectedData() ? 'allowed' : 'blocked';
       result.root.querySelectorAll('button, input, select, textarea, a[href*="reader.html"]').forEach((control) => {
-        if (control.hasAttribute('data-vpn-status-button') || control.hasAttribute('data-vpn-diagnostics-button')) return;
         if ('disabled' in control) control.disabled = !canReadProtectedData();
         if (control.matches('a[href*="reader.html"]')) {
           if (canReadProtectedData()) {

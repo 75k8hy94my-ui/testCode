@@ -154,6 +154,7 @@ test('media gate exposes status and dispatches status changes', () => {
   assert.equal(api.getStatus(), 'pending');
   api.setAllowedForTesting(true);
   assert.equal(api.getStatus(), 'allowed');
-  assert.equal(events.at(-1).type, 'manga-reader-vpn-status');
-  assert.equal(events.at(-1).detail.status, 'allowed');
+  const statusEvent = events.findLast(event => event.type === 'manga-reader-vpn-status');
+  assert.equal(statusEvent.detail.status, 'allowed');
+  assert.ok(events.some(event => event.type === 'manga-reader-vpn-diagnostics'));
 });

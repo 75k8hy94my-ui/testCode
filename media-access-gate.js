@@ -6,6 +6,7 @@
   'use strict';
   // Guest access is only to a separately scoped local dataset. It is not a
   // VPN verdict or access to authenticated remote protected resources.
+  const DIAGNOSTICS_PANEL_ID = 'vpnDiagnosticsPanel';
   if (root.TestCodeGuest?.isActive()) {
     return Object.freeze({
       getStatus: () => 'allowed',
@@ -16,6 +17,35 @@
       checkVpn: async () => true,
       syncUi() {}, installGuards() {}, installDiagnosticsUi() {},
       getDiagnostics: () => ({ final: 'guest', error: null }),
+      getDiagnosticText: () => 'ゲストモードではVPN・IPの判定を行っていません。',
+      openDiagnosticsPanel() {
+        if (!root.document) return false;
+        let panel = root.document.getElementById(DIAGNOSTICS_PANEL_ID);
+        if (!panel) {
+          panel = root.document.createElement('section');
+          panel.id = DIAGNOSTICS_PANEL_ID;
+          panel.setAttribute('role', 'dialog');
+          panel.setAttribute('aria-label', 'VPN診断');
+          panel.style.cssText = 'position:fixed;right:12px;bottom:calc(52px + env(safe-area-inset-bottom));z-index:99998;width:min(92vw,390px);padding:14px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(15,18,24,.96);color:#f5f7fb;box-shadow:0 14px 42px rgba(0,0,0,.42);font:13px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+          const title = root.document.createElement('strong');
+          title.textContent = 'VPN診断';
+          const message = root.document.createElement('p');
+          message.textContent = 'ゲストモードではVPN・IPの判定を行っていません。';
+          const close = root.document.createElement('button');
+          close.type = 'button';
+          close.textContent = '閉じる';
+          close.addEventListener('click', () => panel.remove());
+          panel.append(title, message, close);
+          root.document.body.append(panel);
+        }
+        panel.hidden = false;
+        return true;
+      },
+      toggleDiagnosticsPanel() {
+        const panel = root.document?.getElementById(DIAGNOSTICS_PANEL_ID);
+        if (panel && !panel.hidden) { panel.hidden = true; return false; }
+        return this.openDiagnosticsPanel();
+      },
     });
   }
 
@@ -28,7 +58,7 @@
     '159.26.96.0/20',
     '159.26.116.0/22',
     '134.82.68.0/22',
-    '72.251.208.0/21',
+    '72.251.208.0/20',
     '205.147.17.0/24',
     '205.147.22.0/24',
   ];
@@ -47,7 +77,6 @@
   ]);
   const NOTICE_ID = 'vpnMediaNotice';
   const DIAGNOSTICS_BUTTON_ID = 'vpnDiagnosticsButton';
-  const DIAGNOSTICS_PANEL_ID = 'vpnDiagnosticsPanel';
   const MANUAL_VPN_IPS_KEY = 'testCode.manualVpnIps';
   const MANUAL_NON_VPN_IPS_KEY = 'testCode.manualNonVpnIps';
   const MANUAL_VPN_APPROVAL_KEY = 'testCode.manualVpnSessionApproval';
@@ -366,10 +395,31 @@
   function renderDiagnostics() {
     if (!root.document) return;
     const panel = root.document.getElementById(DIAGNOSTICS_PANEL_ID);
-    if (!panel) return;
-    renderManualControls();
-    const pre = panel.querySelector('[data-vpn-diagnostics-text]');
-    if (pre) pre.textContent = diagnosticText();
+    if (panel) {
+      renderManualControls();
+      const pre = panel.querySelector('[data-vpn-diagnostics-text]');
+      if (pre) pre.textContent = diagnosticText();
+    }
+    const EventCtor = root.CustomEvent || (root.document.defaultView && root.document.defaultView.CustomEvent);
+    if (typeof EventCtor === 'function') root.document.dispatchEvent(new EventCtor('manga-reader-vpn-diagnostics', { detail: {} }));
+  }
+
+  function openDiagnosticsPanel() {
+    installDiagnosticsUi();
+    const panel = root.document && root.document.getElementById(DIAGNOSTICS_PANEL_ID);
+    if (!panel) return false;
+    panel.style.display = 'block';
+    renderDiagnostics();
+    return true;
+  }
+
+  function toggleDiagnosticsPanel() {
+    const panel = root.document && root.document.getElementById(DIAGNOSTICS_PANEL_ID);
+    if (panel && panel.style.display !== 'none') {
+      panel.style.display = 'none';
+      return false;
+    }
+    return openDiagnosticsPanel();
   }
 
   function hideDiagnosticsPanel() {
@@ -825,6 +875,9 @@
     getStatus: () => status,
     checkVpn,
     getDiagnostics,
+    getDiagnosticText: diagnosticText,
+    openDiagnosticsPanel,
+    toggleDiagnosticsPanel,
     getManualIpDesignation,
     setManualIpDesignation,
     clearManualVpnDesignation,

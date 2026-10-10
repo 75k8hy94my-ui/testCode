@@ -157,6 +157,27 @@ test('known public VPN IP snapshot is used before external VPN lookup', async ()
   assert.equal(Gate.getDiagnostics().generic.status, 'skipped-known-ip');
 });
 
+test('Proton-owned 72.251.208.0/20 addresses are recognized without external VPN APIs', async () => {
+  const currentIp = '72.251.220.42';
+  const calls = [];
+  const Gate = loadGate({
+    fetch: async (url) => {
+      calls.push(String(url));
+      if (url === Gate.IP_URL) return { ok: true, json: async () => ({ ip: currentIp }) };
+      throw new Error('known Proton network must not need an external verdict API');
+    },
+    setTimeout,
+    clearTimeout,
+  });
+
+  assert.equal(Gate.isKnownProtonOwnedIp(currentIp), true);
+  assert.equal(Gate.isKnownVpnIp(currentIp), true);
+  assert.equal(await Gate.checkVpn(), true);
+  assert.deepEqual(calls, [Gate.IP_URL]);
+  assert.equal(Gate.getDiagnostics().protonOwnedNetworkMatch, true);
+  assert.equal(Gate.getDiagnostics().generic.status, 'skipped-known-ip');
+});
+
 test('VPN check honors a manually designated VPN IP', async () => {
   const store = new Map();
   const currentIp = '198.51.100.120';
@@ -377,6 +398,20 @@ test('profile exposes controls to release manually fixed non-VPN IPs', () => {
   assert.match(spa, /profileNonVpnIps/);
   assert.match(spa, /profileClearNonVpn/);
   assert.match(spa, /testCode\.manualNonVpnIps/);
+});
+
+test('mobile profile renders live VPN diagnostics while desktop rail opens the shared panel', () => {
+  const spa = fs.readFileSync(new URL('../home-profile-spa.js', import.meta.url), 'utf8');
+  const rail = fs.readFileSync(new URL('../app-desktop-rail.js', import.meta.url), 'utf8');
+  const css = fs.readFileSync(new URL('../home-profile-shell.css', import.meta.url), 'utf8');
+  assert.match(spa, /profileVpnDiagnostics/);
+  assert.match(spa, /getDiagnosticText\?\.\(\)/);
+  assert.match(spa, /manga-reader-vpn-status/);
+  assert.match(css, /profileVpnDiagnostics[\s\S]*max-width:\s*899px/);
+  assert.match(rail, /desktopNavVpnDiagnostics/);
+  assert.match(rail, /openDiagnosticsPanel/);
+  assert.match(rail, /toggleDiagnosticsPanel/);
+  assert.match(spa, /profileVpnRecheck/);
 });
 
 test('explicit VPN recheck uses the full external verdict path', () => {

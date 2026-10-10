@@ -24,17 +24,17 @@ test('current entry pages keep their static bootstrap script baselines', () => {
   assert.deepEqual(scriptSources(pages.manga), [
     'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-session.js?v=20261010-local-first-save', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
-    'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js',
+    'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js?v=20261010-vpn-diagnostics',
     'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261009-guest-mode', 'feature-flags.js',
-    'media-access-gate.js?v=20261009-guest-mode',
-    'manga-list-route.js?v=20261010-sync-validation',
-    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261010-local-first-save',
+    'media-access-gate.js?v=20261010-vpn-diagnostics',
+    'manga-list-route.js?v=20261010-vpn-diagnostics',
+    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261010-vpn-diagnostics',
   ]);
   assert.deepEqual(scriptSources(pages.video), [
     'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-session.js?v=20261010-local-first-save', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
-    'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js',
-    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261009-guest-mode', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261010-local-first-save',
+    'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js?v=20261010-vpn-diagnostics',
+    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261009-guest-mode', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261010-vpn-diagnostics',
   ]);
 });
 

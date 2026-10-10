@@ -60,16 +60,13 @@ test('standalone bookshelf CSS covers the primary manga surfaces', () => {
   }
 });
 
-test('bookshelf and video surfaces expose separate VPN recheck and diagnostics controls', () => {
+test('video and manga lists keep VPN controls in shared navigation instead of list headers', () => {
   const mangaRoute = read('manga-list-route.js');
   const videoTemplate = read('video-list-template.js');
-  for (const source of [mangaRoute, videoTemplate]) {
-    assert.match(source, /vpnRecheckButton|data-vpn-recheck-button|vpnRecheckButton/);
-    assert.match(source, /vpnDiagnosticsButton|data-vpn-diagnostics-button/);
-    assert.match(source, /vpnStatusButton|data-vpn-status-button/);
-  }
+  assert.doesNotMatch(videoTemplate, /data-vpn-(?:recheck|diagnostics|status)-button|vpnListControls/);
+  assert.doesNotMatch(mangaRoute, /vpnListControls|data-vpn-header="manga-list"|data-vpn-diagnostics-button/);
   assert.doesNotMatch(read('manga-list-template.js'), /data-vpn-header="manga-list"/);
-  assert.doesNotMatch(videoTemplate, /data-vpn-status-button\s+data-vpn-diagnostics-button/);
+  assert.match(spa, /dataset\.vpnDiagnosticsButton='1'/);
 });
 
 test('late-mounted VPN controls resync to the current verdict', () => {

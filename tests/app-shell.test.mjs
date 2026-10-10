@@ -57,7 +57,7 @@ test('mobile bottom navigation stays visible on manga and video routes', () => {
   assert.doesNotMatch(css, /html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav[^{}]*\{display:none!important\}/);
   assert.match(css, /@media\(max-width:899px\)\{html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav\{display:flex!important\}\}/);
   for (const page of ['manga.html', 'video.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20261008-profile-avatar/);
+    assert.match(read(page), /home-profile-shell\.css\?v=20261010-vpn-diagnostics/);
   }
 });
 
@@ -95,7 +95,7 @@ test('VPN gate keeps readable contrast on dark manga/video routes', () => {
   assert.match(css, /color:#f8fafc/);
   assert.match(css, /vpnStatusButton\[data-vpn-state="blocked"\][\s\S]*color:#ffb4b4/);
   for (const page of ['home.html','profile.html','manga.html','video.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20261008-profile-avatar/);
+    assert.match(read(page), /home-profile-shell\.css\?v=20261010-vpn-diagnostics/);
   }
 });
 
@@ -127,7 +127,7 @@ test('saved theme drives home profile manga video and header colors', () => {
   assert.match(css, /reader-entry-video body[\s\S]*background:#0a0c11!important/);
   assert.match(globalCss, /--shell-header-bg/);
   for (const page of ['home.html','profile.html','manga.html','video.html','video-player.html']) {
-    const shellVersion = page === 'video-player.html' ? '20261010-icon-markers' : '20261008-profile-avatar';
+    const shellVersion = page === 'video-player.html' ? '20261010-icon-markers' : '20261010-vpn-diagnostics';
     assert.match(read(page), new RegExp(`home-profile-shell\\.css\\?v=${shellVersion}`));
     assert.match(read(page), /app-global-shell\.js\?v=20261003-reader-spa/);
     const menuVersion = page === 'video-player.html' ? '20260924-theme-unified' : '20261009-guest-mode';
@@ -180,7 +180,7 @@ test('all authenticated mobile destinations load the shared Liquid Glass assets'
     assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-drag-lock/, page);
   }
   for (const page of ['home.html','profile.html','manga.html','video.html']) {
-    const spaVersion = page === 'profile.html' ? '20261010-shorts-queue-reset' : '20261010-local-first-save';
+    const spaVersion = page === 'profile.html' ? '20261010-shorts-queue-reset' : '20261010-vpn-diagnostics';
     assert.match(read(page), new RegExp(`home-profile-spa\\.js\\?v=${spaVersion}`), page);
   }
 });

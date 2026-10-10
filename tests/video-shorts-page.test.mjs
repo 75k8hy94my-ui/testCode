@@ -15,6 +15,10 @@ test('Shorts is a separate standalone route with protected dependencies in order
   assert.match(page, /MangaReaderVideoShortsState/);
 });
 
+test('Shorts route does not stay hidden waiting for an auth initializer it does not load', () => {
+  assert.doesNotMatch(html, /<html[^>]*\bauth-pending\b/);
+});
+
 test('Shorts route does not render a title or queue counter', () => {
   assert.doesNotMatch(html + page, /縦スワイプ\s*\d+\s*\/|shortsCounter|videoTitle|videoDetails/);
 });
