@@ -51,7 +51,9 @@ test('video list ellipsis navigates directly to the dedicated editor without an 
   assert.doesNotMatch(editor, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.match(editor, /name="thumbnailTime"/);
   assert.match(editor, /Data\.parseMediaTime\(timestamp\)/);
-  assert.match(editorHtml, /video-edit-page\.js\?v=20261010-local-first-save/);
+  assert.match(editorHtml, /video-edit-page\.js\?v=20261010-json-url-import/);
+  assert.match(editor, /data-json-import/);
+  assert.match(editor, /accept="application\/json,\.json"/);
   assert.doesNotMatch(editorHtml, /auth-pending/);
   assert.match(read('video-list-route.js'), /video-library\.js\?v=20261010-shorts-entry/);
 });
@@ -233,5 +235,5 @@ test('dedicated video editor records pending sync after local save and returns w
   assert.match(editor, /markLocalChangesPending\(\)/);
   assert.doesNotMatch(editor, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.doesNotMatch(editor, /保存できませんでした。端末の保存状態を確認してください。/);
-  assert.match(html, /video-edit-page\.js\?v=20261010-local-first-save/);
+  assert.match(html, /video-edit-page\.js\?v=20261010-json-url-import/);
 });

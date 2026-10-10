@@ -58,6 +58,7 @@
     const lead = document.createElement('p'); lead.className = 'videoEditLead'; lead.textContent = isAddMode ? '動画URLと情報を入力してください。' : (current.title || current.url || '動画情報を変更できます。');
     const form = document.createElement('form'); form.className = 'videoEditForm';
     form.innerHTML = `
+      ${isAddMode ? '<details class="videoEditField videoEditJsonImport"><summary>JSONからURLを一括追加</summary><p class="videoEditHelp">URL文字列の配列を含むJSONファイルを選択します。例: ["https://example.com/1.mp4"]</p><label for="videoEditJsonFile">JSONファイル</label><input id="videoEditJsonFile" type="file" accept="application/json,.json" data-json-import></details>' : ''}
       <div class="videoEditUrlRow"><div class="videoEditField"><label for="videoEditUrl">動画URL</label><input id="videoEditUrl" name="url" type="url" autocomplete="off" required readonly></div><button class="videoEditButton" type="button" data-edit-url>URLを変更</button></div>
       <div class="videoEditField"><label for="videoEditTitle">タイトル</label><input id="videoEditTitle" name="title" type="text" maxlength="240" autocomplete="off"></div>
       <div class="videoEditField"><label for="videoEditFolder">フォルダ</label><select id="videoEditFolder" name="folder"></select></div>
@@ -99,6 +100,72 @@
     elements.folder.value = current.folderId || '';
     form.querySelector('[data-cancel]').href = returnTarget(returnKind, videoId);
     form.querySelector('[data-edit-url]').addEventListener('click', () => { if (!canReadProtectedData()) return; elements.url.readOnly = false; elements.url.focus(); });
+    if (isAddMode) {
+      const jsonImport = form.querySelector('[data-json-import]');
+      jsonImport.addEventListener('change', async (event) => {
+        const file = event.target.files && event.target.files[0];
+        const error = form.querySelector('.videoEditError');
+        error.textContent = '';
+        if (!file || !canReadProtectedData()) return;
+        let parsed;
+        try { parsed = JSON.parse(await file.text()); }
+        catch (_) { error.textContent = 'JSONを読み込めませんでした。形式を確認してください。'; return; }
+        if (!Array.isArray(parsed)) { error.textContent = 'JSONはURL文字列の配列にしてください。'; return; }
+
+        const urls = [];
+        for (let index = 0; index < parsed.length; index += 1) {
+          if (typeof parsed[index] !== 'string' || Data.classifyVideoUrl(parsed[index].trim()).kind === 'invalid') {
+            error.textContent = 'JSONの' + (index + 1) + '件目に無効な動画URLがあります。';
+            return;
+          }
+          urls.push(parsed[index].trim());
+        }
+        const latestVideos = read(VIDEO_KEY, []);
+        const savedVideos = Array.isArray(latestVideos) ? latestVideos : [];
+        const seen = new Set(savedVideos.map((item) => Data.normalizeVideo(item).url));
+        const newVideos = [];
+        const newMeta = {};
+        const now = Date.now();
+        urls.forEach((url) => {
+          if (seen.has(url)) return;
+          seen.add(url);
+          const fields = Data.storageFieldsForVideoUrl(url);
+          const videoId = 'v-' + (window.crypto && typeof window.crypto.randomUUID === 'function'
+            ? window.crypto.randomUUID() : Math.random().toString(36).slice(2) + now) + '-import-' + newVideos.length;
+          newVideos.push(Data.normalizeVideo({ id: videoId, title: '', url, ...fields, addedAt: now, updatedAt: now }));
+          newMeta[videoId] = { title: '', folderId: null, watchStatus: '', tags: [], memo: '', favorite: false, hidden: false, rotate90: false, rotate90Direction: 'none', thumbnailUrl: '', thumbnailTimeSeconds: null, updatedAt: now };
+        });
+        if (!newVideos.length) {
+          error.textContent = '追加できる新しい動画URLがありません。';
+          event.target.value = '';
+          return;
+        }
+        const currentMeta = read(META_KEY, {});
+        const nextMeta = currentMeta && typeof currentMeta === 'object' && !Array.isArray(currentMeta) ? { ...currentMeta, ...newMeta } : newMeta;
+        try {
+          localStorage.setItem(VIDEO_KEY, JSON.stringify([...newVideos, ...savedVideos]));
+          localStorage.setItem(META_KEY, JSON.stringify(nextMeta));
+        } catch (_) {
+          error.textContent = '端末に保存できませんでした。ブラウザの保存容量を確認してください。';
+          event.target.value = '';
+          return;
+        }
+        if (!window.TestCodeGuest?.isActive()) {
+          if (!window.MangaVault || typeof window.MangaVault.markLocalChangesPending !== 'function') {
+            error.textContent = '端末には保存しましたが、クラウド未同期の状態を管理できません。保管庫を開いて再試行してください。';
+            event.target.value = '';
+            return;
+          }
+          if (!window.MangaVault.markLocalChangesPending()) {
+            error.textContent = '端末には保存しましたが、未同期状態を記録できませんでした。保管庫を確認して再試行してください。';
+            event.target.value = '';
+            return;
+          }
+        }
+        error.textContent = newVideos.length + '件追加しました。';
+        event.target.value = '';
+      });
+    }
     elements.url.addEventListener('change', () => {
       const classified = Data.classifyVideoUrl(elements.url.value);
       const fields = classified.kind === 'invalid' ? null : Data.storageFieldsForVideoUrl(elements.url.value);
