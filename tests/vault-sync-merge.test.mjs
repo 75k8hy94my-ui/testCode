@@ -16,6 +16,56 @@ test('merges additions to different collections from two devices', () => {
   assert.deepEqual(result.payload.videos, remote.videos);
 });
 
+test('retains cloud tombstones across client snapshots that do not store plaintext tombstone metadata', () => {
+  const base = { videos: [], vaultSyncTombstones: ['/videos/private-id'] };
+  const local = { videos: [{ id: 'new-video' }], vaultSyncTombstones: [] };
+  const remote = { videos: [], vaultSyncTombstones: ['/videos/private-id'] };
+
+  const result = mergeVaultPayload(base, local, remote);
+
+  assert.deepEqual(result.conflicts, []);
+  assert.deepEqual(result.payload.vaultSyncTombstones, ['/videos/private-id']);
+});
+
+test('does not auto-resurrect an entity that reuses a tombstoned ID', () => {
+  const tombstone = '/videos/v1';
+  const base = { videos: [], vaultSyncTombstones: [tombstone] };
+  const local = { videos: [{ id: 'v1', title: '再作成' }], vaultSyncTombstones: [] };
+  const remote = { videos: [], vaultSyncTombstones: [tombstone] };
+
+  const result = mergeVaultPayload(base, local, remote);
+
+  assert.equal(result.conflicts.length, 1);
+  assert.equal(result.conflicts[0].type, 'delete-recreate');
+  assert.equal(result.conflicts[0].path, tombstone);
+  assert.deepEqual(result.payload.videos, local.videos);
+  assert.throws(() => mergeModule.applyConflictChoices(result.payload, result.conflicts, { [tombstone]: 'local' }), /新しいID/);
+});
+
+test('merges a marker deletion with an independent marker addition by stable marker ID', () => {
+  const base = { videoMarkers: { clip: [{ id: 'm1', seconds: 10, icon: 'water' }, { id: 'm2', seconds: 20, icon: 'triangle' }] }, vaultSyncTombstones: [] };
+  const local = { videoMarkers: { clip: [{ id: 'm2', seconds: 20, icon: 'triangle' }] }, vaultSyncTombstones: ['/videoMarkers/clip/m1'] };
+  const remote = { videoMarkers: { clip: [{ id: 'm1', seconds: 10, icon: 'water' }, { id: 'm2', seconds: 20, icon: 'triangle' }, { id: 'm3', seconds: 30, icon: 'toilet' }] }, vaultSyncTombstones: [] };
+
+  const result = mergeVaultPayload(base, local, remote);
+
+  assert.deepEqual(result.conflicts, []);
+  assert.deepEqual(result.payload.videoMarkers.clip.map((marker) => marker.id), ['m2', 'm3']);
+  assert.deepEqual(result.payload.vaultSyncTombstones, ['/videoMarkers/clip/m1']);
+});
+
+test('a marker cannot be recreated with its tombstoned identity', () => {
+  const tombstone = '/videoMarkers/clip/m1';
+  const base = { videoMarkers: { clip: [{ id: 'm1', seconds: 10, icon: 'water' }] }, vaultSyncTombstones: [] };
+  const local = { videoMarkers: { clip: [{ id: 'm1', seconds: 10, icon: 'toilet' }] }, vaultSyncTombstones: [tombstone] };
+  const remote = { videoMarkers: { clip: [] }, vaultSyncTombstones: [tombstone] };
+
+  const result = mergeVaultPayload(base, local, remote);
+
+  assert.ok(result.conflicts.some((conflict) => conflict.type === 'delete-recreate' && conflict.path === tombstone));
+  assert.throws(() => mergeModule.applyConflictChoices(result.payload, result.conflicts, { [tombstone]: 'local' }), /新しいID/);
+});
+
 test('merges different properties on the same entity and preserves unknown properties', () => {
   const base = { videos: [{ id: 'v1', title: 'old', thumbnailUrl: 'old.jpg', futureField: { retained: true } }] };
   const local = { videos: [{ id: 'v1', title: 'new title', thumbnailUrl: 'old.jpg', futureField: { retained: true } }] };

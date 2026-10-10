@@ -112,10 +112,11 @@ test('player saves title locally first, resumes pending sync in background, and 
   assert.doesNotMatch(page, /await window\.MangaVault\.saveLocalChanges\(\)/);
 });
 
-test('marker registration defaults to the current playback position', () => {
+test('marker registration defaults to the current playback position and receives a stable identity', () => {
   assert.match(controls, /video\.currentTime/);
   assert.match(controls, /const seconds = Math\.max\(0, Number\(video\.currentTime\) \|\| 0\)/);
-  assert.match(controls, /markers\.push\(\{ seconds, icon: selectedMarkerIcon \}\)/);
+  assert.match(controls, /next = markers\.concat\(\{ id: newMarkerId\(\), seconds, icon: selectedMarkerIcon \}\)/);
+  assert.match(controls, /vault\.saveLocalChanges\(\)/);
 });
 
 test('saved markers are rendered as seekable rows on the player page', () => {

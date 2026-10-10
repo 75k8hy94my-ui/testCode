@@ -68,6 +68,37 @@ test('encrypted works use their encrypted-cover route rather than URL guessing',
   assert.doesNotMatch(route, /activeEncryptedImport\.abort\(\)/);
 });
 
+test('folder deletion records every affected stable ID before persisting local deletions', async () => {
+  const nodes = [];
+  const node = () => {
+    const value = { children: [], className: '', textContent: '', addEventListener(type, callback) { (this.events ||= {})[type] = callback; }, appendChild(child) { this.children.push(child); }, append(...children) { this.children.push(...children); } };
+    nodes.push(value); return value;
+  };
+  const folder = { id: 'folder-1', name: 'Folder' };
+  const item = { id: 'manga/1', folderId: folder.id };
+  const state = { savedItems: [item], savedFolders: [folder], recentlyClosedFolderId: null };
+  const events = [];
+  const context = new Proxy({
+    getDocument: () => ({ createElement: node }), getConfig: () => ({ HISTORY_FOLDER_ID: 'history', ICON_FOLDER: 'folder' }),
+    getState: () => state, getVisibleItems: () => state.savedItems, appendFolderPreview() {}, confirmAction: () => true,
+    setState: (patch) => Object.assign(state, patch), pointerPath: (collection, id) => `/${collection}/${String(id).replace(/~/g, '~0').replace(/\//g, '~1')}`,
+    async recordSyncDeletion(paths, mutate) { events.push(['journal', paths]); await mutate(); },
+    persistItems() { events.push(['persist-items']); return true; }, persistFolders() { events.push(['persist-folders']); return true; },
+    renderList() { events.push(['render']); }, moveFolderInList() {}, createStaticCard() {},
+  }, { get(target, property) { return target[property] || (() => {}); } });
+  const runtimeContext = { self: {} };
+  vm.runInNewContext(read('manga-list-runtime.js'), runtimeContext);
+  runtimeContext.self.MangaListRuntimeFactory.create(context).buildFolderCard(folder, [folder], true);
+  const deleteButton = nodes.find((candidate) => candidate.className === 'book-delBtn');
+
+  await deleteButton.events.click({ stopPropagation() {} });
+
+  assert.deepEqual(events[0], ['journal', ['/items/manga~11', '/folders/folder-1']]);
+  assert.deepEqual(events.slice(1), [['persist-items'], ['persist-folders'], ['render']]);
+  assert.deepEqual(state.savedItems, []);
+  assert.deepEqual(state.savedFolders, []);
+});
+
 
 function createSlidingShelfHarness({ mobile = true, reducedMotion = false } = {}) {
   const animations = [];
@@ -211,8 +242,8 @@ test('sliding pages are clipped, preserve mobile grid density, and do not change
   assert.match(css, /\.bookshelf-page-frame\s*\{[^}]*overflow:\s*hidden/);
   assert.match(css, /\.bookshelf-slide-track\s*\{[^}]*width:\s*200%/);
   assert.match(css, /\.bookshelf-slide-track > \.bookshelf-page\s*\{[^}]*flex:\s*0 0 50%/);
-  assert.match(css, /#mangaListSection \.bookshelf-page\s*\{[^}]*grid-template-columns:\s*repeat\(3,/);
+  assert.match(css, /\.bookshelf-page\s*\{[^}]*grid-template-columns:\s*repeat\(3,/);
   assert.match(route, /runtime\.renderSavedList\(delta\)/);
-  assert.match(route, /manga-list-runtime\.js\?v=20261009-guest-mode/);
+  assert.match(route, /manga-list-runtime\.js\?v=20261010-vault-sync-v4-delete/);
   assert.doesNotMatch(read('reader.html'), /bookshelf-slide-track|bookshelf-page-frame/);
 });

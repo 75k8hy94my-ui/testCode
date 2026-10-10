@@ -256,32 +256,29 @@
       if (!canReadProtectedData()) return;
       if (!confirm('「' + (current.title || 'この動画') + '」を削除しますか？')) return;
       const error = form.querySelector('.videoEditError'); error.textContent = '';
-      const latestVideos = read(VIDEO_KEY, []);
-      const latestMeta = read(META_KEY, {});
-      if (!Array.isArray(latestVideos)) { error.textContent = '動画一覧を読み込めませんでした。'; return; }
-      const remaining = latestVideos.filter((item) => String(item.id) !== videoId);
-      if (remaining.length === latestVideos.length) { error.textContent = '動画が見つかりません。'; return; }
-      const remainingMeta = latestMeta && typeof latestMeta === 'object' && !Array.isArray(latestMeta) ? { ...latestMeta } : {};
-      delete remainingMeta[videoId];
-      try {
-        localStorage.setItem(VIDEO_KEY, JSON.stringify(remaining));
-        localStorage.setItem(META_KEY, JSON.stringify(remainingMeta));
-      } catch (_) {
-        error.textContent = '端末に削除を保存できませんでした。ブラウザの保存容量を確認してください。';
-        return;
-      }
+      const remove = () => {
+        const latestVideos = read(VIDEO_KEY, []);
+        const latestMeta = read(META_KEY, {});
+        if (!Array.isArray(latestVideos)) throw new Error('動画一覧を読み込めませんでした。');
+        const remaining = latestVideos.filter((item) => String(item.id) !== videoId);
+        if (remaining.length === latestVideos.length) throw new Error('動画が見つかりません。');
+        const remainingMeta = latestMeta && typeof latestMeta === 'object' && !Array.isArray(latestMeta) ? { ...latestMeta } : {};
+        delete remainingMeta[videoId];
+        try { writeVideoRecordsAtomically(remaining, remainingMeta); }
+        catch (_) { throw new Error('端末に削除を保存できませんでした。ブラウザの保存容量を確認してください。'); }
+      };
       if (window.TestCodeGuest?.isActive()) {
+        try { remove(); } catch (failure) { error.textContent = failure.message; return; }
         location.href = 'video.html';
         return;
       }
-      if (!window.MangaVault || typeof window.MangaVault.markLocalChangesPending !== 'function' || !window.MangaVault.markLocalChangesPending()) {
-        error.textContent = '端末には削除を保存しましたが、未同期状態を記録できませんでした。保管庫を確認して再試行してください。';
-        return;
+      const vault = window.MangaVault;
+      const pointerPath = window.MangaVaultPayload && window.MangaVaultPayload.pointerPath;
+      if (!vault || typeof vault.recordSyncDeletion !== 'function' || typeof pointerPath !== 'function') {
+        error.textContent = '保管庫を開いてから削除してください。'; return;
       }
-      if (!canReadProtectedData()) {
-        error.textContent = '端末には削除を保存しましたが、VPN接続を確認できないためクラウド未同期です。';
-        return;
-      }
+      try { await vault.recordSyncDeletion([pointerPath('videos', videoId), pointerPath('videoMeta', videoId)], remove); }
+      catch (failure) { error.textContent = failure && failure.message ? failure.message : '削除を保全できませんでした。'; return; }
       location.href = 'video.html';
     });
     page.replaceChildren(heading, lead, form);

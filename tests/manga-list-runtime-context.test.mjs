@@ -12,7 +12,7 @@ async function load(path) {
 const names = [
   'getState', 'setState', 'getElements', 'getDocument', 'getConfig',
   'getSavedVideos', 'clearLocalCoverObjectUrls', 'confirmAction', 'setTimeout',
-  'persistItems', 'persistFolders', 'persistAuthorCards', 'persistAll', 'scheduleCloudSync',
+  'persistItems', 'persistFolders', 'persistAuthorCards', 'persistAll', 'scheduleCloudSync', 'recordSyncDeletion', 'onDeletionError', 'pointerPath',
   'openReader', 'accessMedia', 'renderDashboard', 'renderAuthorDashboard',
   'getVisibleItems', 'appendFolderPreview', 'createStaticCard', 'loadLocalCover',
   'getCoverSourceCache', 'setupFeedImage', 'makeHeartIcon', 'moveItemInList',

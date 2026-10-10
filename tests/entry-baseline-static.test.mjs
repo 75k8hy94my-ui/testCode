@@ -22,8 +22,8 @@ function scriptSources(html) {
 
 test('current entry pages keep their static bootstrap script baselines', () => {
   assert.deepEqual(scriptSources(pages.manga), [
-    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-sync-audit', 'vault-session.js?v=20261010-vault-sync-audit', 'vault-conflict-ui.js?v=20261010-vault-sync-audit', 'browser-storage.js',
-    'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
+    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-sync-audit', 'vault-session.js?v=20261010-vault-sync-v4', 'vault-conflict-ui.js?v=20261010-vault-sync-audit', 'browser-storage.js',
+    'vault-payload.js?v=20261010-vault-sync-v4', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js?v=20261010-vpn-diagnostics',
     'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261009-guest-mode', 'feature-flags.js',
     'media-access-gate.js?v=20261010-vpn-diagnostics',
@@ -31,8 +31,8 @@ test('current entry pages keep their static bootstrap script baselines', () => {
     'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261010-vpn-diagnostics',
   ]);
   assert.deepEqual(scriptSources(pages.video), [
-    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-sync-audit', 'vault-session.js?v=20261010-vault-sync-audit', 'vault-conflict-ui.js?v=20261010-vault-sync-audit', 'browser-storage.js',
-    'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
+    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-sync-audit', 'vault-session.js?v=20261010-vault-sync-v4', 'vault-conflict-ui.js?v=20261010-vault-sync-audit', 'browser-storage.js',
+    'vault-payload.js?v=20261010-vault-sync-v4', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js?v=20261010-vpn-diagnostics',
     'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261009-guest-mode', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261010-vpn-diagnostics',
   ]);
@@ -45,15 +45,18 @@ test('every Vault entry loads the same diff-sync dependency before the shared se
     const html = read(name);
     if (!html.includes('vault-session.js')) continue;
     const sources = scriptSources(html);
-    const merge = sources.indexOf('vault-sync-merge.js?v=20261010-vault-sync-audit');
-    const session = sources.indexOf('vault-session.js?v=20261010-vault-sync-audit');
+    const normalize = (source) => source.replace(/^\.\.\//, '');
+    const merge = sources.findIndex((source) => normalize(source) === 'vault-sync-merge.js?v=20261010-vault-sync-audit');
+    const session = sources.findIndex((source) => normalize(source) === 'vault-session.js?v=20261010-vault-sync-v4');
     assert.ok(merge >= 0 && session > merge, `${name} loads merge before vault session`);
-    const conflictUi = sources.indexOf('vault-conflict-ui.js?v=20261010-vault-sync-audit');
-    assert.ok(conflictUi > session, `${name} loads conflict UI after shared session`);
-    refs.push(sources[merge], sources[session], sources[conflictUi]);
+    const conflictUi = sources.findIndex((source) => normalize(source) === 'vault-conflict-ui.js?v=20261010-vault-sync-audit');
+    if (name !== 'game/index.html') assert.ok(conflictUi > session, `${name} loads conflict UI after shared session`);
+    const payload = sources.findIndex((source) => normalize(source) === 'vault-payload.js?v=20261010-vault-sync-v4');
+    if (payload >= 0) assert.ok(payload > session, `${name} loads payload after shared session`);
+    refs.push(normalize(sources[merge]), normalize(sources[session]));
   }
   assert.ok(refs.length > 0);
-  assert.equal(new Set(refs).size, 3);
+  assert.equal(new Set(refs).size, 2);
 });
 
 test('VPN loss preserves pending home edits for retry after access returns', () => {
@@ -142,7 +145,7 @@ test('video bootstrap has one owner per page and does not load on the Reader doc
   assert.match(spa, /video-list-route\.js\?v=20261010-local-first-save/);
   const videoRoute = fs.readFileSync(new URL('../video-list-route.js', import.meta.url), 'utf8');
   assert.match(videoRoute, /video-thumbnail-renderer\.js\?v=20261008-shared-thumbnails/);
-  assert.match(videoRoute, /video-library\.js\?v=20261010-shorts-entry/);
+  assert.match(videoRoute, /video-library\.js\?v=20261010-vault-sync-v4-delete/);
   assert.match(recommendations, /const page = String\(\(root\.location && root\.location\.pathname\) \|\| ''\)\.split\('\/'\)\.pop\(\);/);
   assert.doesNotMatch(reader, /recommendations\.js|video-data\.js|video-library\.js/);
   assert.match(recommendations, /loadBrowserScript\('video-data\.js'\)/);

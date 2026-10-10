@@ -59,9 +59,12 @@ test('a passkey reset writes a passphrase wrapper that the normal unlock flow ac
     atob: (value) => Buffer.from(value, 'base64').toString('binary'),
     TextEncoder,
     TextDecoder,
+    setTimeout,
+    clearTimeout,
     localStorage,
     sessionStorage,
     fetch: async (url, options = {}) => {
+      if (String(url).includes('/rest/v1/rpc/manga_reader_vault_sync_capability')) return { ok: false, status: 404, json: async () => ({ code: 'PGRST202' }), text: async () => '{"code":"PGRST202"}' };
       if (String(url).includes('/rest/v1/rpc/update_manga_reader_vault')) {
         const request = JSON.parse(options.body);
         assert.equal(request.expected_revision, record.revision);
@@ -95,9 +98,12 @@ test('new Vault creation uses a conflict-safe insert and requires a confirmed se
     window: { MANGA_READER_SUPABASE: { url: 'https://vault.test', publishableKey: 'public' }, crypto: webcrypto, MangaReaderMediaAccess: { canReadProtectedData: () => true }, MangaVaultPayload: { buildFromLocalStorage: () => ({ items: [] }) } },
     navigator: {}, location: { hostname: 'vault.test', protocol: 'https:' }, crypto: webcrypto,
     btoa: (value) => Buffer.from(value, 'binary').toString('base64'),
-    atob: (value) => Buffer.from(value, 'base64').toString('binary'), TextEncoder, TextDecoder,
+    atob: (value) => Buffer.from(value, 'base64').toString('binary'), TextEncoder, TextDecoder, setTimeout, clearTimeout,
     localStorage, sessionStorage,
-    fetch: async (url, options = {}) => { request = { url: String(url), options }; return { ok: true, status: 201, json: async () => [], text: async () => '' }; },
+    fetch: async (url, options = {}) => {
+      if (String(url).includes('/rest/v1/rpc/manga_reader_vault_sync_capability')) return { ok: false, status: 404, json: async () => ({ code: 'PGRST202' }), text: async () => '{"code":"PGRST202"}' };
+      request = { url: String(url), options }; return { ok: true, status: 201, json: async () => [], text: async () => '' };
+    },
   };
   vm.runInNewContext(source, context, { filename: 'vault-session.js' });
   await assert.rejects(context.window.MangaVault.initialize('valid passphrase 123', '', () => {}, () => ({ items: [] })), /保存結果を確認できません/);

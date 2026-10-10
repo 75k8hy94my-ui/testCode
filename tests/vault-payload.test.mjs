@@ -12,16 +12,33 @@ test('normalization preserves unknown future top-level and record properties',()
   assert.deepEqual(normalized.gameSave,input.gameSave);
 });
 
-test('explicit sync deletion paths persist through Vault payload and are cleared with device data',()=>{
+test('explicit sync deletion paths remain payload data without plaintext localStorage persistence',()=>{
   const storage=new Map();
-  payload.markSyncDeletion('/videos/video~1one/futureField',storage);
-  const built=buildFromStorage(storage);
-  assert.deepEqual(built.vaultSyncTombstones,['/videos/video~1one/futureField']);
+  const built=normalize({vaultSyncTombstones:['/videos/video~1one/futureField']});
   const remote=new Map();
   applyToStorage(built,remote);
-  assert.deepEqual(buildFromStorage(remote).vaultSyncTombstones,['/videos/video~1one/futureField']);
+  assert.deepEqual(buildFromStorage(remote).vaultSyncTombstones,[]);
+  assert.equal(remote.has('mangaReaderVaultSyncTombstones'),false);
   payload.clearDeviceData(remote);
-  assert.equal(remote.has(DATA_KEYS.syncTombstones),false);
+  assert.equal(remote.has('mangaReaderVaultSyncTombstones'),false);
+});
+
+test('local-only encrypted deletion journal is exposed for cleanup but never included in Vault payload',()=>{
+  const storage=new Map([[payload.LOCAL_ONLY_KEYS[0],JSON.stringify({ciphertext:'opaque'})]]);
+  const built=buildFromStorage(storage);
+  assert.equal(Object.hasOwn(built,'mangaReaderVaultDeletionJournal'),false);
+  assert.deepEqual(payload.LOCAL_ONLY_KEYS,['mangaReaderVaultDeletionJournal','mangaReaderVaultSyncTombstones']);
+  payload.clearDeviceData(storage);
+  assert.equal(storage.has(payload.LOCAL_ONLY_KEYS[0]),false);
+});
+
+test('Vault tombstones never persist as plaintext localStorage fields',()=>{
+  const storage=new Map();
+  const value=normalize({vaultSyncTombstones:['/videos/private-id']});
+  applyToStorage(value,storage);
+  assert.equal(storage.has('mangaReaderVaultSyncTombstones'),false);
+  assert.deepEqual(buildFromStorage(storage).vaultSyncTombstones,[]);
+  assert.equal(typeof payload.markSyncDeletion,'undefined');
 });
 
 test('apply rolls back both canonical and manual VPN settings when either manual key write fails',()=>{
@@ -36,7 +53,7 @@ test('apply rolls back both canonical and manual VPN settings when either manual
 
 test('normalizes legacy marker labels and round-trips canonical marker and Shorts queue keys through Vault storage',()=>{
   const markers={v1:[{seconds:10,label:'水しぶき'},{seconds:20,label:'custom legacy label'},{seconds:30,icon:'toilet'},{seconds:-1,icon:'water'}]};
-  assert.deepEqual(payload.normalizeVideoMarkers(markers),{v1:[{seconds:10,icon:'water'},{seconds:20,icon:'triangle'},{seconds:30,icon:'toilet'}]});
+  assert.deepEqual(payload.normalizeVideoMarkers(markers),{v1:[{id:'legacy-10%3Awater-0',seconds:10,icon:'water'},{id:'legacy-20%3Atriangle-0',seconds:20,icon:'triangle'},{id:'legacy-30%3Atoilet-0',seconds:30,icon:'toilet'}]});
   assert.equal(DATA_KEYS.videoMarkers,'mangaReaderVideoMarkers');
   assert.equal(DATA_KEYS.videoShortsState,'mangaReaderVideoShortsState');
   const input=normalize({videoMarkers:markers,videoShortsState:{schemaVersion:1,queue:[{videoId:'v1',startSeconds:10,endSeconds:40,entryType:'marker',tier:1,generation:3}],currentIndex:0,currentTime:18,knownVideoIds:['v1'],generation:3,updatedAt:200,revision:4}});
@@ -49,6 +66,18 @@ test('normalizes legacy marker labels and round-trips canonical marker and Short
   payload.clearDeviceData(restored);
   assert.equal(restored.has(DATA_KEYS.videoMarkers),false);
   assert.equal(restored.has(DATA_KEYS.videoShortsState),false);
+});
+
+test('legacy video marker identities are stable across clients and unique for duplicate timestamps',()=>{
+  const first=payload.normalizeVideoMarkers({clip:[{seconds:12,icon:'water'},{seconds:12,icon:'water'},{seconds:20,icon:'toilet'}]});
+  const second=payload.normalizeVideoMarkers({clip:[{seconds:12,icon:'water'},{seconds:12,icon:'water'},{seconds:20,icon:'toilet'}]});
+  assert.deepEqual(first,second);
+  assert.equal(new Set(first.clip.map((marker)=>marker.id)).size,3);
+  assert.ok(first.clip.every((marker)=>marker.id.startsWith('legacy-')));
+});
+
+test('pointerPath escapes every nested JSON Pointer segment',()=>{
+  assert.equal(payload.pointerPath('videoMarkers','clip/1','m~2'),'/videoMarkers/clip~11/m~02');
 });
 
 test('build and apply support a plain key-value storage object without a get method',()=>{const input={items:[{id:'plain-storage'}],folders:[],manualVpnIps:[],manualNonVpnIps:[]};const storage={};applyToStorage(input,storage);assert.deepEqual(buildFromStorage(storage).items,input.items);assert.equal(JSON.parse(storage.mangaReaderSavedItems)[0].id,'plain-storage')});

@@ -4,7 +4,7 @@
   const REQUIRED = [
     'getState', 'setState', 'getElements', 'getDocument', 'getConfig',
     'getSavedVideos', 'clearLocalCoverObjectUrls', 'confirmAction', 'setTimeout',
-    'persistItems', 'persistFolders', 'persistAuthorCards', 'persistAll', 'scheduleCloudSync',
+    'persistItems', 'persistFolders', 'persistAuthorCards', 'persistAll', 'scheduleCloudSync', 'recordSyncDeletion', 'onDeletionError', 'pointerPath',
     'openReader', 'accessMedia', 'renderDashboard', 'renderAuthorDashboard',
     'getVisibleItems', 'appendFolderPreview', 'createStaticCard', 'loadLocalCover',
     'getCoverSourceCache', 'setupFeedImage', 'makeHeartIcon', 'moveItemInList',
@@ -39,6 +39,9 @@
       persistAuthorCards: deps.persistAuthorCards,
       persistAll: deps.persistAll,
       scheduleCloudSync: deps.scheduleCloudSync,
+      recordSyncDeletion: deps.recordSyncDeletion,
+      onDeletionError: deps.onDeletionError,
+      pointerPath: deps.pointerPath,
       openReader: deps.openReader,
       accessMedia: deps.accessMedia,
       renderDashboard: deps.renderDashboard,
