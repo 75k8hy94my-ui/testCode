@@ -236,8 +236,7 @@
   let lastOnlineRetryAt = 0;
   if (typeof window.addEventListener === 'function') window.addEventListener('online', () => {
     const session = loadSession(); const userId = session && session.user && session.user.id; const meta = userId && getMeta(userId);
-    const access = window.MangaReaderMediaAccess;
-    if (!loadActive() || !meta || !meta.pendingSync || (access && typeof access.canReadProtectedData === 'function' && access.canReadProtectedData() !== true)) return;
+    if (!loadActive() || !meta || !meta.pendingSync) return;
     if (Date.now() - lastOnlineRetryAt < 30000) return;
     lastOnlineRetryAt = Date.now();
     saveLocalChanges().catch(() => {});
@@ -484,8 +483,8 @@
     pendingConflictChoices = null;
     return record;
   }
-  async function persistPayloadWithProtocol(token, user, payload, pendingToken, protocolVersion, journaled) {
-    assertSyncAccess();
+  async function persistPayloadWithProtocol(token, user, payload, pendingToken, protocolVersion, journaled, requireVpn) {
+    if (requireVpn) assertSyncAccess();
     const localSnapshot = payload;
     payload = journaled.payload;
     if (protocolVersion === LEGACY_SYNC_PROTOCOL_VERSION
@@ -517,7 +516,7 @@
 
       let current = existing;
       for (let attempt = 0; attempt < 5; attempt += 1) {
-        assertSyncAccess();
+        if (requireVpn) assertSyncAccess();
         const activeVault = loadActive();
         const wrappersMatch = stableJson(current.payload && current.payload.keyWraps || {}) === stableJson(activeVault && activeVault.keyWraps || {});
         if (!wrappersMatch) throw new Error('別の端末で保管庫の認証情報が更新されています。端末データを保持したまま同期を停止しました。再読込して確認してください。');
@@ -547,7 +546,7 @@
         const encrypted = await envelope(mergeResult.payload, protocolVersion);
         const rpc = protocolVersion === SYNC_PROTOCOL_VERSION ? 'update_manga_reader_vault_v4' : 'update_manga_reader_vault';
         const rows = await api('/rest/v1/rpc/' + rpc, { method: 'POST', token, body: JSON.stringify({ expected_revision: current.revision, new_payload: encrypted }) });
-        assertSyncAccess();
+        if (requireVpn) assertSyncAccess();
         if (rows && rows.length) {
           return commitMergedPayload(user, Object.assign({}, current, rows[0]), mergeResult.payload, localSnapshot, pendingToken, journaled.operationIds);
         }
@@ -556,9 +555,9 @@
       }
       throw new Error('同期中にクラウド更新が続いたため自動再試行を停止しました。端末の変更は保持されています。再度同期してください。');
     }
-    assertSyncAccess();
+    if (requireVpn) assertSyncAccess();
     const rows = await createVaultRecord(token, user, payload);
-    assertSyncAccess();
+    if (requireVpn) assertSyncAccess();
     const row = rows && rows[0];
     if (!row) throw new Error('クラウドへの保存結果を確認できませんでした。再読込して同期状態を確認してください。');
     const revision = row.revision || 1;
@@ -569,12 +568,13 @@
     pendingConflictChoices = null;
     return row;
   }
-  async function persistPayload(token, user, payload, pendingToken) {
+  async function persistPayload(token, user, payload, pendingToken, options = {}) {
+    const requireVpn = options.requireVpn !== false;
     const journaled = await prepareJournaledPayload(payload, user.id);
     let protocolVersion = await probeSyncProtocol(token);
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        return await persistPayloadWithProtocol(token, user, payload, pendingToken, protocolVersion, journaled);
+        return await persistPayloadWithProtocol(token, user, payload, pendingToken, protocolVersion, journaled, requireVpn);
       } catch (error) {
         const legacyWriteRejected = protocolVersion === LEGACY_SYNC_PROTOCOL_VERSION && isLegacyWriteRejected(error);
         if (!legacyWriteRejected || attempt > 0) throw error;
@@ -601,24 +601,24 @@
     assertSyncAccess();
     return enqueueSave(() => writePayload(snapshot, pendingToken));
   }
-  async function writeLocalChanges(pendingToken) {
-    assertSyncAccess();
+  async function writeLocalChanges(pendingToken, options = {}) {
+    const requireVpn = options.requireVpn !== false;
+    if (requireVpn) assertSyncAccess();
     if (!loadActive()) throw new Error('保管庫がロックされています。端末には保存済みです。保管庫を開いて同期してください。');
     if (!window.MangaVaultPayload || typeof window.MangaVaultPayload.buildFromLocalStorage !== 'function') throw new Error('端末の同期データを読み取れません。');
     const session = loadSession(); const userId = session && session.user && session.user.id;
     if (!userId) throw new Error('ログインしてください。');
     return withVaultSaveLock(userId, () => withSession((token, user) => {
-      assertSyncAccess();
+      if (requireVpn) assertSyncAccess();
       if (!loadActive()) throw new Error('保管庫がロックされています。端末には保存済みです。保管庫を開いて同期してください。');
-      return persistPayload(token, user, window.MangaVaultPayload.buildFromLocalStorage(), pendingToken);
+      return persistPayload(token, user, window.MangaVaultPayload.buildFromLocalStorage(), pendingToken, { requireVpn });
     }));
   }
   async function saveLocalChanges() {
     const session = loadSession(); const userId = session && session.user && session.user.id;
     const pendingToken = markPendingSync(userId);
     if (!pendingToken) throw new Error('未同期状態を端末に記録できません。データは保持されています。保存領域を確認してください。');
-    assertSyncAccess();
-    return enqueueSave(() => writeLocalChanges(pendingToken));
+    return enqueueSave(() => writeLocalChanges(pendingToken, { requireVpn: false }));
   }
 
   if (window.document && typeof window.document.addEventListener === 'function') {

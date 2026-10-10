@@ -727,16 +727,7 @@ test('an explicit tombstone removes an unknown field while remaining in cloud an
   assert.deepEqual(JSON.parse(local.getItem('testPayload')), { videos: [], vaultSyncTombstones: ['/futureFeature'] });
 });
 
-test('sync fails closed when the VPN access module has not loaded', async () => {
-  const { vault, remote, local } = await fixture({ initialPayload: { local: true }, revision: 0, gate: null });
-
-  await assert.rejects(vault.saveLocalChanges(), /VPNアクセス状態を確認できません/);
-
-  assert.equal(remote.record, null);
-  assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, true);
-});
-
-test('VPN access loss during an in-flight CAS leaves the local sync marker for a safe retry', async () => {
+test('encrypted Vault sync does not require VPN access or the media access module', async () => {
   let allowed = true; const started = deferred(); const release = deferred();
   const gate = { canReadProtectedData: () => allowed };
   const payload = { videos: [{ id: 'v1', url: 'https://example.test/1', title: 'タイトル' }] };
@@ -754,13 +745,15 @@ test('VPN access loss during an in-flight CAS leaves the local sync marker for a
   await started.promise;
   allowed = false;
   release.resolve();
-  await assert.rejects(saving, /VPN接続を確認できるまで/);
+  await saving;
   assert.equal(remote.record.revision, 2);
-  assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, true);
-  allowed = true;
-  await vault.saveLocalChanges();
-  assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), payload);
   assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, false);
+  assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), payload);
+
+  const noGate = await fixture({ initialPayload: { local: true }, revision: 0, gate: null });
+  await noGate.vault.saveLocalChanges();
+  assert.equal(noGate.remote.record.revision, 1);
+  assert.equal(JSON.parse(noGate.local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, false);
 });
 
 test('unlock restores existing data with either passphrase or recovery code without changing video records', async () => {
@@ -796,6 +789,7 @@ test('unlock restores existing data with either passphrase or recovery code with
 
 
 test('unlock retries a pending local deletion against the latest cloud revision', async () => {
+  let vpnAllowed = true;
   const saved = { videos: [{ id: 'v-1', url: 'https://example.test/old.mp4', title: 'クラウド旧版' }], videoMeta: {}, items: [{ id: 'm1' }], study: { progress: { x: 2 } } };
   const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
   const salt = webcrypto.getRandomValues(new Uint8Array(16));
@@ -804,7 +798,7 @@ test('unlock retries a pending local deletion against the latest cloud revision'
   const keyWraps = { passphrase: { kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations: 600000, salt: b64url(salt) }, encryptedKey: await encrypt(passKey, rawKey) } };
   const remote = { record: { payload: await encryptPayload(rawKey, saved, keyWraps), revision: 7, updated_at: 'newer-cloud' } };
   let calls = 0;
-  const { vault, local } = await fixture({ rawKey, revision: 6, remote, rpc: async (body, state) => {
+  const { vault, local } = await fixture({ rawKey, revision: 6, remote, gate: { canReadProtectedData: () => vpnAllowed }, rpc: async (body, state) => {
     calls++;
     if (body.expected_revision !== state.record.revision) return [];
     state.record = { payload: body.new_payload, revision: state.record.revision + 1, updated_at: 'pending-delete-synced' };
@@ -812,6 +806,7 @@ test('unlock retries a pending local deletion against the latest cloud revision'
   } });
   const deleted = { videos: [], videoMeta: {}, items: [{ id: 'm1' }], study: { progress: { x: 2 } } };
   local.setItem('testPayload', JSON.stringify(deleted));
+  vpnAllowed = false;
   const existingMeta = JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'));
   local.setItem('mangaReaderSupabaseSyncMeta', JSON.stringify({ 'user-1': { ...existingMeta['user-1'], revision: 6, updatedAt: 'before', pendingSync: true } }));
   let applied = false;
