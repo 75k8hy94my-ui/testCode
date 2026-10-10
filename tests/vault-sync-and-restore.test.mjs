@@ -435,3 +435,13 @@ test('pending Vault sync blocks document unload but clears the warning after suc
   await vault.saveLocalChanges();
   assert.equal(vault.guardPendingSyncLeave(event, false), false);
 });
+
+test('guest local edits never count as pending cloud sync for the leave guard', async () => {
+  const { vault, context } = await fixture({ initialPayload: { videos: [{ id: 'guest-local' }] } });
+  vault.markLocalChangesPending();
+  context.window.TestCodeGuest = { isActive: () => true };
+  let prevented = false;
+  assert.equal(vault.hasPendingLocalChanges(), false);
+  assert.equal(vault.guardPendingSyncLeave({ preventDefault() { prevented = true; } }, false), false);
+  assert.equal(prevented, false);
+});

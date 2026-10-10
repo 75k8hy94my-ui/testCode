@@ -22,7 +22,7 @@ function scriptSources(html) {
 
 test('current entry pages keep their static bootstrap script baselines', () => {
   assert.deepEqual(scriptSources(pages.manga), [
-    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-session.js?v=20261009-vault-sync-guest', 'browser-storage.js',
+    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-session.js?v=20261010-local-first-save', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js',
     'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261009-guest-mode', 'feature-flags.js',
@@ -31,7 +31,7 @@ test('current entry pages keep their static bootstrap script baselines', () => {
     'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261010-local-first-save',
   ]);
   assert.deepEqual(scriptSources(pages.video), [
-    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-session.js?v=20261009-vault-sync-guest', 'browser-storage.js',
+    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-session.js?v=20261010-local-first-save', 'browser-storage.js',
     'vault-payload.js', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js',
     'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261009-guest-mode', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'home-profile-spa.js?v=20261010-local-first-save',
@@ -122,7 +122,7 @@ test('video bootstrap has one owner per page and does not load on the Reader doc
 
 test('Reader stays independent from the SPA history router', () => {
   assert.match(spa, /addEventListener\('click',intercept\)/);
-  assert.match(spa, /addEventListener\('popstate',renderRoute\)/);
+  assert.match(spa, /addEventListener\('popstate',handleRoutePopstate\)/);
   assert.doesNotMatch(reader, /popstate|hashchange|ReaderShell/);
   assert.match(videoLibrary, /addEventListener\(['"]popstate['"]/);
   assert.match(videoLibrary, /DOMContentLoaded/);

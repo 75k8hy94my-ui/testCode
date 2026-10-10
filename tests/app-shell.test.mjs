@@ -180,8 +180,16 @@ test('all authenticated mobile destinations load the shared Liquid Glass assets'
     assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-drag-lock/, page);
   }
   for (const page of ['home.html','profile.html','manga.html','video.html']) {
-    assert.match(read(page), /home-profile-spa\.js\?v=20261009-vault-sync-guest/, page);
+    assert.match(read(page), /home-profile-spa\.js\?v=20261010-local-first-save/, page);
   }
+});
+
+test('SPA navigation asks before leaving while Vault sync is pending', () => {
+  const spa = read('home-profile-spa.js');
+  assert.match(spa, /MangaVault\.hasPendingLocalChanges\(\)[\s\S]*window\.confirm\('クラウド同期が完了していません/);
+  assert.match(spa, /変更は端末に保存済みです。ページを移動しますか/);
+  assert.match(spa, /function handleRoutePopstate\(\)[\s\S]*history\.forward\(\)/);
+  assert.match(spa, /if\(location\.href===lastSpaUrl\)return/);
 });
 
 
@@ -213,3 +221,4 @@ test('sync result stays visible until another status replaces it', () => {
   assert.match(spa, /function setSyncStatus\(text\)\{[^}]*node\.textContent=text\|\|'';\}/);
   assert.doesNotMatch(spa, /function setSyncStatus\(text\)[\s\S]{0,250}setTimeout\(/);
 });
+
