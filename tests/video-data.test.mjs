@@ -32,6 +32,23 @@ test('normalizes only the persistent rotation direction', () => {
   assert.equal(Object.hasOwn(video, 'rotateLeftEndSeconds'), false);
 });
 
+test('normalizes Shorts likes and counters separately from ordinary opens', () => {
+  const video = normalizeVideo({
+    id: 'shorts-v1', openCount: 8,
+    shorts: { liked: true, playCount: 11.8, earlySwipeCount: -2, updatedAt: 123 },
+  });
+  assert.deepEqual(video.shorts, { liked: true, playCount: 11, earlySwipeCount: 0, updatedAt: 123 });
+  assert.equal(video.openCount, 8);
+});
+
+test('stale video metadata cannot lower Shorts counters or undo a newer like change', () => {
+  const merged = mergeVideoMetaPreservingThumbnailTime(
+    { v1: { shorts: { liked: false, playCount: 9, earlySwipeCount: 4, updatedAt: 200 } } },
+    { v1: { shorts: { liked: true, playCount: 3, earlySwipeCount: 1, updatedAt: 100 } } },
+  );
+  assert.deepEqual(merged.v1.shorts, { liked: false, playCount: 9, earlySwipeCount: 4, updatedAt: 200 });
+});
+
 test('parses and formats thumbnail timestamps for editor input', () => {
   assert.equal(parseMediaTime('90'), 90);
   assert.equal(parseMediaTime('1:30'), 90);

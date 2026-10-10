@@ -11,6 +11,15 @@
     const n = Number(value);
     return Number.isFinite(n) && n >= 0 ? n : fallback;
   };
+  function normalizeShorts(value) {
+    const x = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    return {
+      liked: x.liked === true,
+      playCount: Math.max(0, Math.trunc(asTime(x.playCount, 0))),
+      earlySwipeCount: Math.max(0, Math.trunc(asTime(x.earlySwipeCount, 0))),
+      updatedAt: asTime(x.updatedAt, 0),
+    };
+  }
 
   function parseMediaTime(value) {
     const raw = asText(value);
@@ -54,6 +63,20 @@
           next[field] = previous[field];
         }
       });
+      const incomingShorts = next.shorts && typeof next.shorts === 'object' && !Array.isArray(next.shorts) ? next.shorts : null;
+      const previousShorts = previous && previous.shorts && typeof previous.shorts === 'object' && !Array.isArray(previous.shorts) ? previous.shorts : null;
+      if (incomingShorts && previousShorts) {
+        const incomingTime = asTime(incomingShorts.updatedAt, 0);
+        const previousTime = asTime(previousShorts.updatedAt, 0);
+        next.shorts = {
+          liked: incomingTime >= previousTime ? incomingShorts.liked === true : previousShorts.liked === true,
+          playCount: Math.max(Math.trunc(asTime(incomingShorts.playCount, 0)), Math.trunc(asTime(previousShorts.playCount, 0))),
+          earlySwipeCount: Math.max(Math.trunc(asTime(incomingShorts.earlySwipeCount, 0)), Math.trunc(asTime(previousShorts.earlySwipeCount, 0))),
+          updatedAt: Math.max(incomingTime, previousTime),
+        };
+      } else if (!incomingShorts && previousShorts) {
+        next.shorts = { ...previousShorts };
+      }
       merged[id] = next;
     });
     // Video list and editor pages may write metadata based on an older snapshot.
@@ -176,6 +199,7 @@
       durationSeconds: x.durationSeconds == null ? null : asTime(x.durationSeconds, 0),
       openCount: Math.max(0, Math.trunc(asTime(x.openCount, 0))),
       lastOpenedAt: x.lastOpenedAt == null ? null : asTime(x.lastOpenedAt, 0),
+      shorts: normalizeShorts(x.shorts),
       addedAt,
       updatedAt,
     };
