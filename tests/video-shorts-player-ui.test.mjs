@@ -37,3 +37,12 @@ test('landscape rotation is mobile-only, width adjusts for landscape, and resets
   assert.match(css, /@media\s*\(max-width:\s*899px\)/);
   assert.match(css, /@media\s*\(min-width:\s*900px\)[\s\S]*\.shortsStage\.is-landscape/);
 });
+
+test('shorts gestures suppress native selection and long-press callouts across the stage and video', () => {
+  assert.match(css, /\.shortsStage\s*\{[^}]*touch-action:\s*none/);
+  assert.match(css, /\.shortsStage\s*,\s*\.shortsStage\s*\*\s*\{[^}]*-webkit-user-select:\s*none/);
+  assert.match(css, /\.shortsStage\s*,\s*\.shortsStage\s*\*\s*\{[^}]*user-select:\s*none/);
+  assert.match(css, /\.shortsStage\s*,\s*\.shortsStage\s*\*\s*\{[^}]*-webkit-touch-callout:\s*none/);
+  assert.match(css, /\.shortsStage\s*,\s*\.shortsStage\s*\*\s*\{[^}]*-webkit-user-drag:\s*none/);
+  assert.match(page, /stage\.addEventListener\('contextmenu',[^;]*preventDefault/);
+});

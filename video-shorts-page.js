@@ -475,6 +475,7 @@
       stage.addEventListener('pointermove', handlePointerMove);
       stage.addEventListener('pointerup', handlePointerUp);
       stage.addEventListener('pointercancel', handlePointerCancel);
+      stage.addEventListener('contextmenu', (event) => event.preventDefault());
     }
 
     async function probeMetadata(video) {

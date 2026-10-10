@@ -1,5 +1,6 @@
 #videoShortsPage{display:grid;place-items:center;min-height:calc(100dvh - 100px);padding:12px}
-.shortsStage{position:relative;width:min(100%,430px);height:min(82dvh,820px);min-height:420px;display:grid;place-items:center;background:#050608;border-radius:24px;overflow:hidden;box-shadow:0 16px 50px rgba(0,0,0,.3)}
+.shortsStage{position:relative;width:min(100%,430px);height:min(82dvh,820px);min-height:420px;display:grid;place-items:center;background:#050608;border-radius:24px;overflow:hidden;touch-action:none;box-shadow:0 16px 50px rgba(0,0,0,.3)}
+.shortsStage,.shortsStage *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-user-drag:none}
 .shortsBack{position:absolute;z-index:6;left:14px;top:14px;width:40px;height:40px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.26);border-radius:50%;background:rgba(0,0,0,.48);color:#fff;text-decoration:none;font-size:22px}
 .shortsMedia{position:relative;width:100%;height:100%;display:grid;place-items:center;overflow:hidden;touch-action:none;background:#000}
 .shortsVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}

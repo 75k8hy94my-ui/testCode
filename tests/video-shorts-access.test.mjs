@@ -154,6 +154,7 @@ test('allowed route probes and queues direct videos only, then unloads them when
   assert.equal(records.mangaReaderVideoMeta.direct.shorts.earlySwipeCount, 1, 'vertical swipe within five seconds increments a separate skip count');
   assert.equal(records.mangaReaderVideoMeta.direct.shorts.playCount, 2, 'each Shorts entry start increments play count');
   let current = media.children.find((node) => node.className === 'shortsVideo');
+  current = media.children.find((node) => node.className === 'shortsVideo');
   stage.emit('pointerdown', { button: 0, clientX: 50, clientY: 250, target: current });
   const pauseTimer = [...timers.entries()].find(([, timer]) => timer.delay === 350);
   assert.ok(pauseTimer, 'video long press schedules temporary pause');
@@ -183,6 +184,11 @@ test('allowed route probes and queues direct videos only, then unloads them when
   stage.emit('pointerup', { clientX: 180, clientY: 300, target: current });
   assert.equal(backCount, 1, 'horizontal movement away from the left edge is ignored');
   assert.equal(current.currentTime, 32.5, 'ignored horizontal movement does not seek');
+  stage.emit('pointerdown', { button: 0, clientX: 50, clientY: 180, target: current });
+  stage.emit('pointermove', { clientX: 50, clientY: 300, target: current });
+  stage.emit('pointerup', { clientX: 50, clientY: 300, target: current });
+  assert.equal(controller.getState().currentIndex, 0, 'downward swipe returns to the immediately previous queue entry');
+  current = media.children.find((node) => node.className === 'shortsVideo');
   controller.saveProgress(true);
   assert.equal(writes.at(-1).options.sync, false, 'guest-local route never syncs');
   current = page.querySelector('.shortsMedia').children.find((node) => node.className === 'shortsVideo');
