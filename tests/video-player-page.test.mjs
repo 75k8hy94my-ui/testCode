@@ -89,8 +89,8 @@ test('custom player defers single taps and maps double-tap zones to seek or full
 
 test('video player document cache keys identify the current watch-page design', () => {
   const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
-  assert.match(html, /home-profile-shell\.css\?v=20261010-related-video-scroll/);
-  assert.match(html, /video-player-page\.js\?v=20261010-local-first-save/);
+  assert.match(html, /home-profile-shell\.css\?v=20261010-icon-markers/);
+  assert.match(html, /video-player-page\.js\?v=20261010-icon-markers/);
 });
 
 test('desktop watch page keeps related videos in an independently scrolling viewport', () => {
@@ -113,8 +113,8 @@ test('player saves title locally first, resumes pending sync in background, and 
 
 test('marker registration defaults to the current playback position', () => {
   assert.match(controls, /video\.currentTime/);
-  assert.match(controls, /secondsInput\.value/);
-  assert.match(controls, /currentTime/);
+  assert.match(controls, /const seconds = Math\.max\(0, Number\(video\.currentTime\) \|\| 0\)/);
+  assert.match(controls, /markers\.push\(\{ seconds, icon: selectedMarkerIcon \}\)/);
 });
 
 test('saved markers are rendered as seekable rows on the player page', () => {

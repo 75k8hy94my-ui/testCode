@@ -89,7 +89,7 @@
   - `observeVideos` detects only IDs absent from `knownVideoIds`, clears queue/position and advances generation, then records the new known ID set. The route regenerates only after metadata probing.
   - Render a “再生順をリセット” button in the profile settings card; require `canReadProtectedData()` except guest-local mode, invoke state reset, and report success/error in a status element.
 - [x] **Step 4: Run `node --test tests/vault-payload.test.mjs tests/video-shorts-state.test.mjs tests/profile-short-reset.test.mjs`; confirm all pass.**
-- [ ] **Step 5: Commit `feat: sync video shorts queue state`.**
+- [x] **Step 5: Commit `feat: sync video shorts queue state`.**
 
 ### Task 3: Icon timestamp markers in the ordinary player
 
@@ -105,10 +105,10 @@
 - Marker records read/write as `{ seconds, icon }` with `icon` in `water`, `triangle`, `toilet`.
 - `video-player-controls.js` remains the owner of custom seek controls and marker persistence; `video-player-page.js` renders the accessible marker list using the same icon and seeks to marker seconds.
 
-- [ ] **Step 1: Write failing UI/static tests** for icon-only registration, defaults to current time, timeline marker positioning/click seek, legacy marker display, marker-list accessibility, and left/right arrow seek by 10 seconds.
-- [ ] **Step 2: Run `node --test tests/video-player-controls.test.mjs tests/video-player-page.test.mjs`; confirm tests fail before implementation.**
-- [ ] **Step 3: Replace free-form label/seconds inputs with the three icon choices and current-time registration. Render seek-bar bubbles at `seconds / duration`, dispatch the marker-change event, and update the ordinary player marker list. Add arrow-key handlers that ignore editable fields and controls.**
-- [ ] **Step 4: Run `node --test tests/video-player-controls.test.mjs tests/video-player-page.test.mjs tests/video-player-gestures.test.mjs`; confirm all pass.**
+- [x] **Step 1: Write failing UI/static tests** for icon-only registration, defaults to current time, timeline marker positioning/click seek, legacy marker display, marker-list accessibility, and left/right arrow seek by 10 seconds.
+- [x] **Step 2: Run `node --test tests/video-player-controls.test.mjs tests/video-player-page.test.mjs`; confirm tests fail before implementation.**
+- [x] **Step 3: Replace free-form label/seconds inputs with the three icon choices and current-time registration. Render seek-bar bubbles at `seconds / duration`, dispatch the marker-change event, and update the ordinary player marker list. Add arrow-key handlers that ignore editable fields and controls.**
+- [x] **Step 4: Run `node --test tests/video-player-controls.test.mjs tests/video-player-page.test.mjs tests/video-player-gestures.test.mjs`; confirm all pass.**
 - [ ] **Step 5: Commit `feat: add icon timestamp markers to video player`.**
 
 ### Task 4: Shorts route shell and protected-data lifecycle

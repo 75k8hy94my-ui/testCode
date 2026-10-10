@@ -93,7 +93,7 @@ test('player exposes an accessible volume slider and mute control', () => {
   }
   assert.match(css, /customVideoVolumeGroup/);
   assert.match(css, /max-width:620px/);
-  assert.match(html, /video-player-controls\.js\?v=20261009-generated-volume-icons/);
+  assert.match(html, /video-player-controls\.js\?v=20261010-icon-markers/);
 });
 
 test('slider sets volume; mute restores prior audible level; outside volumechange updates UI', () => {
