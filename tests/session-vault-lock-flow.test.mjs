@@ -12,6 +12,7 @@ const conflictUi = fs.readFileSync('./vault-conflict-ui.js', 'utf8');
 test('saved Supabase sessions are reused until the access token nears expiry', () => {
   assert.match(vault, /function sessionIsFresh\(session, skewSeconds = 60\)/);
   assert.match(vault, /async function ensureSession\(\)/);
+  assert.match(vault, /window\.MangaVault = \{[^}]*\bensureSession\b/);
   assert.match(vault, /if \(sessionIsFresh\(current\)\) return current;/);
   assert.match(vault, /return refreshSession\(\);/);
   assert.match(index, /MangaVault\.ensureSession\(\)/);
