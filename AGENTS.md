@@ -52,7 +52,7 @@ When changing Reader behavior, preserve these invariants unless the task explici
 - Per-item encrypted chunk sync keeps its revision conflict and tombstone protections; stale clients must not resurrect deleted encrypted data.
 - Treat logout/lock cleanup as part of the security boundary: newly introduced protected caches or sensitive in-memory resources must have an explicit cleanup path.
 - Browser code must not contain server/provider secret keys. Public client identifiers are not secrets, but access tokens and provider credentials are.
-- VPN access controls protected synchronized content separately from static application UI. Treat `pending`, `checking`, and `blocked` as no permission to read, display, mutate, or sync protected content; only `allowed` grants that permission. Route shells may still render, and access loss must clear protected runtime presentation without deleting persisted data.
+- VPN access controls user-facing reads, display, and direct edits of protected content separately from static application UI. Background synchronization of encrypted Vault envelopes, including the local three-way merge required to prepare the next encrypted envelope, does not require VPN access. This exception must not expose merged content in user-facing surfaces; sync failures must retain pending state. Treat `pending`, `checking`, and `blocked` as no permission for protected-content presentation or direct user edits. Route shells may still render, and access loss must clear protected runtime presentation without deleting persisted data.
 
 When security-sensitive storage or sync behavior changes, add or update tests for persistence, migration, conflict handling, and cleanup.
 
