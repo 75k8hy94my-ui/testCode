@@ -153,22 +153,14 @@
           location.href = returnTarget(returnKind, savedId);
           return;
         }
-        if (window.MangaVault && typeof window.MangaVault.markLocalChangesPending === 'function') window.MangaVault.markLocalChangesPending();
-        if (!canReadProtectedData()) {
-          error.textContent = '端末には保存しましたが、VPN接続を確認できないためクラウド未同期です。';
+        if (!window.MangaVault || typeof window.MangaVault.markLocalChangesPending !== 'function') {
+          error.textContent = '端末には保存しましたが、クラウド未同期の状態を管理できません。保管庫を開いて再試行してください。';
           return;
         }
-        if (!window.MangaVault || typeof window.MangaVault.saveLocalChanges !== 'function') {
-          error.textContent = '端末には保存しましたが、保管庫が利用できずクラウド未同期です。保管庫を開いて再試行してください。';
+        if (!window.MangaVault.markLocalChangesPending()) {
+          error.textContent = '端末には保存しましたが、未同期状態を記録できませんでした。保管庫を確認して再試行してください。';
           return;
         }
-        try {
-          await window.MangaVault.saveLocalChanges();
-        } catch (syncError) {
-          error.textContent = '端末には保存しましたが、クラウド同期に失敗しました: ' + (syncError && syncError.message ? syncError.message : '同期状態を確認してください。');
-          return;
-        }
-        if (!canReadProtectedData()) return;
         location.href = returnTarget(returnKind, savedId);
       } finally {
         saving = false;
@@ -193,19 +185,19 @@
         error.textContent = '端末に削除を保存できませんでした。ブラウザの保存容量を確認してください。';
         return;
       }
-      if (window.MangaVault && typeof window.MangaVault.markLocalChangesPending === 'function') window.MangaVault.markLocalChangesPending();
+      if (window.TestCodeGuest?.isActive()) {
+        location.href = 'video.html';
+        return;
+      }
+      if (!window.MangaVault || typeof window.MangaVault.markLocalChangesPending !== 'function' || !window.MangaVault.markLocalChangesPending()) {
+        error.textContent = '端末には削除を保存しましたが、未同期状態を記録できませんでした。保管庫を確認して再試行してください。';
+        return;
+      }
       if (!canReadProtectedData()) {
         error.textContent = '端末には削除を保存しましたが、VPN接続を確認できないためクラウド未同期です。';
         return;
       }
-      try {
-        if (!window.MangaVault || typeof window.MangaVault.saveLocalChanges !== 'function') throw new Error('保管庫を開いて再試行してください。');
-        await window.MangaVault.saveLocalChanges();
-        if (!canReadProtectedData()) return;
-        location.href = 'video.html';
-      } catch (reason) {
-        error.textContent = '端末には削除を保存しましたが、クラウド同期に失敗しました。' + (reason?.message || '');
-      }
+      location.href = 'video.html';
     });
     page.replaceChildren(heading, lead, form);
     if (isAddMode) elements.url.focus();

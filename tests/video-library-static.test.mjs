@@ -4,6 +4,14 @@ import fs from 'node:fs';
 
 const read = (name) => fs.readFileSync(new URL('../'+name, import.meta.url), 'utf8');
 
+test('closes saved video edits immediately and resumes any pending sync on the list', () => {
+  const source = read('video-library.js');
+  assert.match(source, /closeSheet\(\);\s*runVaultSync\(\);/);
+  assert.match(source, /resumePendingLocalSync\(\);/);
+  assert.match(source, /guardPendingSyncLeave\(event, state\.syncRunning\)/);
+  assert.match(source, /manga-reader-vpn-status/);
+});
+
 test('recommendations bootstrap loads the video enhancement after existing reader code', () => {
   const source = read('recommendations.js');
   assert.match(source, /video-data\.js/);
@@ -39,12 +47,13 @@ test('video list ellipsis navigates directly to the dedicated editor without an 
   assert.match(editor, /source\.href = current\.url/);
   assert.match(editor, /remaining = latestVideos\.filter/);
   assert.match(editor, /delete remainingMeta\[videoId\]/);
-  assert.match(editor, /MangaVault\.saveLocalChanges\(\)/);
+  assert.match(editor, /markLocalChangesPending\(\)/);
+  assert.doesNotMatch(editor, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.match(editor, /name="thumbnailTime"/);
   assert.match(editor, /Data\.parseMediaTime\(timestamp\)/);
-  assert.match(editorHtml, /video-edit-page\.js\?v=20261009-vault-sync-guest/);
+  assert.match(editorHtml, /video-edit-page\.js\?v=20261010-local-first-save/);
   assert.doesNotMatch(editorHtml, /auth-pending/);
-  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261009-vault-sync-guest/);
+  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261010-local-first-save/);
 });
 
 test('video cards delegate thumbnail rendering to the shared renderer', () => {
@@ -217,11 +226,12 @@ test('backup sidecar fields remain part of the existing migration and payload bo
 });
 
 
-test('dedicated video editor distinguishes local storage failures from cloud sync failures', () => {
+test('dedicated video editor records pending sync after local save and returns without awaiting cloud sync', () => {
   const editor = read('video-edit-page.js');
   const html = read('video-edit.html');
   assert.match(editor, /端末に保存できませんでした。ブラウザの保存容量を確認してください。/);
-  assert.match(editor, /端末には保存しましたが、クラウド同期に失敗しました:/);
+  assert.match(editor, /markLocalChangesPending\(\)/);
+  assert.doesNotMatch(editor, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.doesNotMatch(editor, /保存できませんでした。端末の保存状態を確認してください。/);
-  assert.match(html, /video-edit-page\.js\?v=20261009-vault-sync-guest/);
+  assert.match(html, /video-edit-page\.js\?v=20261010-local-first-save/);
 });

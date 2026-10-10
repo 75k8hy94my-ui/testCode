@@ -10,7 +10,7 @@ const source = fs.readFileSync(new URL('../video-edit-page.js', import.meta.url)
 const VIDEO_KEY = 'mangaReaderVideos';
 const META_KEY = 'mangaReaderVideoMeta';
 
-function startEditor({ mode = 'add', allowed = true, videos = [], meta = {}, guest = false, failLocalWrite = false, failSync = false } = {}) {
+function startEditor({ mode = 'add', allowed = true, videos = [], meta = {}, guest = false, failLocalWrite = false, failSync = false, deferSync = false, failPending = false } = {}) {
   const stored = new Map([[VIDEO_KEY, JSON.stringify(videos)], [META_KEY, JSON.stringify(meta)]]);
   let reads = 0;
   const localStorage = {
@@ -45,17 +45,17 @@ function startEditor({ mode = 'add', allowed = true, videos = [], meta = {}, gue
     addEventListener() {},
   };
   const gate = { canReadProtectedData: () => allowed, syncUi() {} };
-  let syncCalls = 0; let pendingCalls = 0;
+  let syncCalls = 0; let pendingCalls = 0; let releaseSync; const deferredSync = new Promise((resolve) => { releaseSync = resolve; });
   const window = {
     MangaReaderVideoData: Data, MangaReaderMediaAccess: gate,
-    MangaVault: { markLocalChangesPending() { pendingCalls++; }, async saveLocalChanges() { syncCalls++; if (failSync) throw new Error('offline'); } },
+    MangaVault: { markLocalChangesPending() { pendingCalls++; return !failPending; }, async saveLocalChanges() { syncCalls++; if (deferSync) return deferredSync; if (failSync) throw new Error('offline'); } },
     crypto: { randomUUID: () => 'added-uuid' },
   };
   if (guest) window.TestCodeGuest = { isActive: () => true };
   const location = { search: mode === 'add' ? '?mode=add&return=list' : '?id=' + encodeURIComponent(videos[0]?.id || 'existing') + '&return=list', href: 'video-edit.html' };
   vm.runInNewContext(source, { window, document, localStorage, location, URLSearchParams, Date, Math, confirm: () => true });
   const form = page.children.find((child) => child.tag === 'form');
-  return { page, form, nodes, location, localStorage, stored, shellTitle, get reads() { return reads; }, get syncCalls() { return syncCalls; }, get pendingCalls() { return pendingCalls; } };
+  return { page, form, nodes, location, localStorage, stored, shellTitle, get reads() { return reads; }, get syncCalls() { return syncCalls; }, get pendingCalls() { return pendingCalls; }, releaseSync };
 }
 
 test('video-add screen is a full-page, unlocked form without a delete action', async () => {
@@ -140,7 +140,7 @@ test('guest video add and edit save locally, skip cloud sync, and leave the edit
   assert.equal(edited.pendingCalls, 0);
 });
 
-test('normal account keeps local data on device-save or cloud-sync failure', async () => {
+test('normal account preserves local data when the device or pending marker cannot be saved', async () => {
   const deviceFailure = startEditor({ failLocalWrite: true });
   deviceFailure.form.elements.url.value = 'https://example.com/device-failure.mp4';
   await deviceFailure.form.events.submit({ preventDefault() {} });
@@ -148,12 +148,29 @@ test('normal account keeps local data on device-save or cloud-sync failure', asy
   assert.equal(deviceFailure.location.href, 'video-edit.html');
   assert.equal(deviceFailure.syncCalls, 0);
 
-  const cloudFailure = startEditor({ failSync: true });
-  cloudFailure.form.elements.url.value = 'https://example.com/cloud-failure.mp4';
-  cloudFailure.form.elements.title.value = 'Keep locally';
-  await cloudFailure.form.events.submit({ preventDefault() {} });
-  assert.match(cloudFailure.nodes.get('.videoEditError').textContent, /クラウド同期に失敗しました/);
-  assert.equal(JSON.parse(cloudFailure.stored.get(VIDEO_KEY))[0].title, 'Keep locally');
-  assert.equal(cloudFailure.location.href, 'video-edit.html');
-  assert.equal(cloudFailure.syncCalls, 1);
+  const pendingFailure = startEditor({ failPending: true });
+  pendingFailure.form.elements.url.value = 'https://example.com/pending-marker-failure.mp4';
+  pendingFailure.form.elements.title.value = 'Keep locally';
+  await pendingFailure.form.events.submit({ preventDefault() {} });
+  assert.match(pendingFailure.nodes.get('.videoEditError').textContent, /未同期状態を記録できませんでした/);
+  assert.equal(JSON.parse(pendingFailure.stored.get(VIDEO_KEY))[0].title, 'Keep locally');
+  assert.equal(pendingFailure.location.href, 'video-edit.html');
+  assert.equal(pendingFailure.syncCalls, 0);
+});
+
+test('normal video save returns to the list without waiting for cloud sync', async () => {
+  const app = startEditor({ deferSync: true });
+  app.form.elements.url.value = 'https://example.com/slow-cloud.mp4';
+  app.form.elements.title.value = 'Saved locally first';
+  const submit = app.form.events.submit({ preventDefault() {} });
+  await Promise.resolve();
+  try {
+    assert.equal(app.location.href, 'video.html');
+    assert.equal(app.syncCalls, 0);
+    assert.equal(app.pendingCalls, 1);
+    assert.equal(JSON.parse(app.stored.get(VIDEO_KEY))[0].title, 'Saved locally first');
+  } finally {
+    app.releaseSync();
+    await submit;
+  }
 });

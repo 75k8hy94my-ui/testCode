@@ -4,6 +4,15 @@
   const mediaAccess = window.MangaReaderMediaAccess;
   let initialized = false;
   const windowCleanups = [];
+  let syncRunning = false;
+  let syncRequestedWhileRunning = false;
+  let syncStatusNode = null;
+  function setSyncStatus(message, isError) {
+    if (!syncStatusNode) return;
+    syncStatusNode.textContent = message || '';
+    syncStatusNode.dataset.error = isError ? '1' : '0';
+    syncStatusNode.hidden = !message;
+  }
   function canReadProtectedData() {
     return !!mediaAccess && typeof mediaAccess.canReadProtectedData === 'function' && mediaAccess.canReadProtectedData() === true;
   }
@@ -27,6 +36,7 @@
   function handleAccessStatus() {
     if (canReadProtectedData()) {
       if (!initialized) initializePlayer();
+      else resumePendingLocalSync();
       return;
     }
     if (initialized) disposePlayer();
@@ -36,10 +46,50 @@
     window.addEventListener(type, handler);
     windowCleanups.push(() => window.removeEventListener(type, handler));
   }
+  function hasPendingLocalSync() {
+    const vault = window.MangaVault;
+    if (!vault || typeof vault.hasPendingLocalChanges !== 'function') return false;
+    try { return vault.hasPendingLocalChanges() === true; } catch (_) { return false; }
+  }
+  async function resumePendingLocalSync() {
+    if (window.TestCodeGuest?.isActive() || !hasPendingLocalSync()) return false;
+    if (syncRunning) { syncRequestedWhileRunning = true; return false; }
+    if (!canReadProtectedData()) { setSyncStatus('端末保存済み・クラウド未同期（VPN接続後に同期します）', true); return false; }
+    const vault = window.MangaVault;
+    if (!vault || typeof vault.saveLocalChanges !== 'function' || typeof vault.loadActive !== 'function' || !vault.loadActive()) {
+      setSyncStatus('端末保存済み・クラウド未同期（保管庫を開くと同期します）', true); return false;
+    }
+    syncRunning = true;
+    setSyncStatus('クラウド同期中…', false);
+    try {
+      let attempts = 0;
+      do {
+        await vault.saveLocalChanges();
+        attempts += 1;
+      } while (hasPendingLocalSync() && attempts < 3 && canReadProtectedData());
+      const synced = !hasPendingLocalSync();
+      setSyncStatus(synced ? '' : '端末保存済み・クラウド未同期（後で再試行します）', !synced);
+      return synced;
+    } catch (_) {
+      setSyncStatus('端末保存済み・クラウド未同期（通信復旧後に再試行します）', true);
+      return false;
+    } finally {
+      syncRunning = false;
+      if (syncRequestedWhileRunning && hasPendingLocalSync() && canReadProtectedData()) {
+        syncRequestedWhileRunning = false;
+        resumePendingLocalSync();
+      }
+    }
+  }
   document.addEventListener('manga-reader-vpn-status', handleAccessStatus);
   function initializePlayer() {
     if (initialized || !canReadProtectedData()) return;
     initialized = true;
+  listenWindow('beforeunload', (event) => {
+    const vault = window.MangaVault;
+    if (vault && typeof vault.guardPendingSyncLeave === 'function') vault.guardPendingSyncLeave(event, syncRunning);
+  });
+  listenWindow('online', () => { resumePendingLocalSync(); });
   const id = new URLSearchParams(location.search).get('id') || '';
   const VIDEO_KEY = 'mangaReaderVideos';
   const META_KEY = 'mangaReaderVideoMeta';
@@ -60,26 +110,24 @@
 
   const heading = document.createElement('h2'); heading.className = 'videoPlayerTitle'; heading.textContent = title; heading.contentEditable = 'false'; heading.setAttribute('role', 'button'); heading.setAttribute('tabindex', '0'); heading.setAttribute('aria-label', 'タイトルをクリックして編集'); heading.title = 'クリックしてタイトルを編集';
   const info = document.createElement('div'); info.className = 'videoPlayerInfo'; info.textContent = [base.a, base.b].filter(Boolean).join(' / ') || '動画';
+  syncStatusNode = document.createElement('small'); syncStatusNode.className = 'videoPlayerSyncStatus'; syncStatusNode.setAttribute('role', 'status');
   const edit = document.createElement('a'); edit.className = 'videoPlayerEdit'; edit.textContent = '詳細を編集'; edit.href = 'video-edit.html?id=' + encodeURIComponent(id) + '&return=player';
   const actionBar = document.createElement('div'); actionBar.className = 'videoPlayerActionBar'; actionBar.setAttribute('aria-label', '動画の操作'); actionBar.append(edit);
   const tagLine = document.createElement('div'); tagLine.className = 'videoPlayerTags';
   const renderTags = (nextTags) => { tagLine.textContent = nextTags.map((tag) => '#' + tag).join(' '); tagLine.hidden = !nextTags.length; };
-  renderTags(tags); info.append(tagLine);
+  renderTags(tags); info.append(tagLine, syncStatusNode);
   const saveMetaPatch = async (patch) => {
     if (!canReadProtectedData()) throw new Error('VPN接続を確認できるまで動画を編集できません。');
     const nextMeta = read(META_KEY, {});
     const current = nextMeta[id] && typeof nextMeta[id] === 'object' ? nextMeta[id] : {};
     nextMeta[id] = { ...current, ...patch, updatedAt: Date.now() };
     localStorage.setItem(META_KEY, JSON.stringify(nextMeta));
-    if (!window.MangaVault || typeof window.MangaVault.saveLocalChanges !== 'function') {
-      const error = new Error('保管庫を開いてからクラウド同期を再試行してください。'); error.localSaved = true; Object.assign(allMeta, nextMeta); throw error;
-    }
-    try { await window.MangaVault.saveLocalChanges(); }
-    catch (error) { error.localSaved = true; Object.assign(allMeta, nextMeta); throw error; }
-    if (!canReadProtectedData()) {
-      const error = new Error('VPN接続を確認できるまで動画を編集できません。'); error.localSaved = true; throw error;
+    if (window.TestCodeGuest?.isActive()) { Object.assign(allMeta, nextMeta); return nextMeta[id]; }
+    if (!window.MangaVault || typeof window.MangaVault.markLocalChangesPending !== 'function' || !window.MangaVault.markLocalChangesPending()) {
+      const error = new Error('端末には保存しましたが、未同期状態を記録できませんでした。'); error.localSaved = true; Object.assign(allMeta, nextMeta); throw error;
     }
     Object.assign(allMeta, nextMeta);
+    if (canReadProtectedData()) resumePendingLocalSync();
     return nextMeta[id];
   };
   const beginTitleEdit = () => {
@@ -146,6 +194,8 @@
   const descriptionSummary = document.createElement('summary'); descriptionSummary.textContent = normalized.memo ? '動画のメモ' : '動画情報';
   const descriptionText = document.createElement('p'); descriptionText.textContent = normalized.memo || [base.a, base.b].filter(Boolean).join(' / ') || '動画'; description.append(descriptionSummary, descriptionText);
   const main = document.createElement('section'); main.className = 'videoPlayerMain'; main.append(frame, heading, info, actionBar, description, markerList, back); const layout = document.createElement('div'); layout.className = 'videoPlayerLayout'; layout.append(main, relatedBox); page.replaceChildren(layout);
+  resumePendingLocalSync();
   }
   handleAccessStatus();
 })();
+
