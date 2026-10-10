@@ -12,6 +12,18 @@ test('normalization preserves unknown future top-level and record properties',()
   assert.deepEqual(normalized.gameSave,input.gameSave);
 });
 
+test('explicit sync deletion paths persist through Vault payload and are cleared with device data',()=>{
+  const storage=new Map();
+  payload.markSyncDeletion('/videos/video~1one/futureField',storage);
+  const built=buildFromStorage(storage);
+  assert.deepEqual(built.vaultSyncTombstones,['/videos/video~1one/futureField']);
+  const remote=new Map();
+  applyToStorage(built,remote);
+  assert.deepEqual(buildFromStorage(remote).vaultSyncTombstones,['/videos/video~1one/futureField']);
+  payload.clearDeviceData(remote);
+  assert.equal(remote.has(DATA_KEYS.syncTombstones),false);
+});
+
 test('apply rolls back both canonical and manual VPN settings when either manual key write fails',()=>{
   const values=new Map([['mangaReaderSavedFolders',JSON.stringify([{id:'old-folder'}])],['testCode.manualVpnIps',JSON.stringify(['192.0.2.1'])],['testCode.manualNonVpnIps',JSON.stringify(['192.0.2.2'])]]);
   let vpnWrites=0;

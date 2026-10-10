@@ -9,12 +9,13 @@
 
 ## Vault and CAS
 
-1. Apply `supabase-schema.sql` in Supabase SQL Editor.
+1. In a non-production project, apply `supabase-schema.sql`. For an existing production project, use the versioned migration only after the backup and non-production checks below.
 2. Create an account, create a vault, save the Recovery Key, then unlock by passphrase, Recovery Key, and Passkey where supported.
-3. In two browser profiles, unlock the same vault revision. Change and save from both profiles. Exactly one save succeeds; the other shows a conflict and its local data remains.
-4. Add an author card, sync, log out, log in on the second profile, and confirm the author card remains.
+3. In two browser profiles, unlock the same vault revision. Change different records or fields in both profiles and save. Both changes should be merged after a revision retry without a user-facing conflict.
+4. Change the same field to different values in both profiles. The sync should preserve both copies until the user selects a value; if either value changed since the conflict dialog opened, require a fresh choice.
+5. Add an author card, sync, log out, log in on the second profile, and confirm the author card remains.
 
-The configured Supabase project now exposes the `revision` column and the `update_manga_reader_vault` RPC. The two-client conflict scenario still requires two authenticated browser contexts and must be run with a test account.
+For a new environment, apply `supabase/migrations/20261010092010_vault_sync_cas_permissions.sql` only after confirming a recoverable database backup and validating the migration against a non-production project. It preserves rows and payloads, restricts direct table writes, and limits the owner-bound CAS RPC to authenticated users. Verify table grants, RLS policies, RPC execute grants, and one successful plus one stale-revision RPC call before enabling clients. The two-client scenarios require two authenticated browser contexts and a test account.
 
 ## Backup and security
 

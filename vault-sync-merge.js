@@ -18,7 +18,10 @@
 
   const equal = (left, right) => stableJson(left) === stableJson(right);
   const isRecord = (value) => value !== MISSING && value && typeof value === 'object' && !Array.isArray(value);
-  const pathJoin = (path, key) => path ? path + '.' + key : String(key);
+  const escapePointerToken = (value) => String(value).replace(/~/g, '~0').replace(/\//g, '~1');
+  const unescapePointerToken = (value) => String(value).replace(/~1/g, '/').replace(/~0/g, '~');
+  const pathJoin = (path, key) => path + '/' + escapePointerToken(key);
+  const pathParts = (path) => path === '' ? [] : String(path).split('/').slice(1).map(unescapePointerToken);
 
   function mergeVaultPayload(base, local, remote) {
     const conflicts = [];
@@ -28,33 +31,61 @@
     return { payload: merged, conflicts };
   }
 
-  function retainUnknownProperties(base, local) {
+  function retainUnknownProperties(base, local, deletedPaths, path) {
+    const tombstones = deletedPaths instanceof Set ? deletedPaths
+      : new Set(Array.isArray(deletedPaths) ? deletedPaths : Array.isArray(local && local.vaultSyncTombstones) ? local.vaultSyncTombstones : []);
+    const currentPath = typeof path === 'string' ? path : '';
+    const entityMaps = new Set(['/videoMeta', '/videoMarkers', '/mangaInfo', '/toc', '/lastPages', '/statuteNotes', '/study/progress', '/study/argumentDrafts', '/study/argumentProgress', '/roppoState/notes']);
     if (Array.isArray(base) && Array.isArray(local)
         && [...base, ...local].every((item) => isRecord(item) && typeof item.id === 'string' && item.id)) {
       const baseById = asMap(base);
-      return local.map((item) => baseById.has(item.id) ? retainUnknownProperties(baseById.get(item.id), item) : item);
+      return local.map((item) => baseById.has(item.id) ? retainUnknownProperties(baseById.get(item.id), item, tombstones, pathJoin(currentPath, item.id)) : item);
     }
     if (!isRecord(base) || !isRecord(local)) return local;
     const result = { ...local };
     for (const [key, baseValue] of Object.entries(base)) {
-      if (!Object.prototype.hasOwnProperty.call(local, key)) result[key] = baseValue;
+      const childPath = pathJoin(currentPath, key);
+      if (tombstones.has(childPath)) continue;
+      if (!Object.prototype.hasOwnProperty.call(local, key)) {
+        if (!entityMaps.has(currentPath)) result[key] = baseValue;
+      }
       else if ((isRecord(baseValue) && isRecord(local[key])) || (Array.isArray(baseValue) && Array.isArray(local[key]))) {
-        result[key] = retainUnknownProperties(baseValue, local[key]);
+        result[key] = retainUnknownProperties(baseValue, local[key], tombstones, childPath);
       }
     }
     return result;
   }
 
   function addConflict(conflicts, type, path, base, local, remote) {
-    conflicts.push({ type, path, base: base === MISSING ? undefined : base, local: local === MISSING ? undefined : local, remote: remote === MISSING ? undefined : remote,
-      basePresent: base !== MISSING, localPresent: local !== MISSING, remotePresent: remote !== MISSING });
+    const conflict = { type, path, base: base === MISSING ? undefined : base, local: local === MISSING ? undefined : local, remote: remote === MISSING ? undefined : remote,
+      basePresent: base !== MISSING, localPresent: local !== MISSING, remotePresent: remote !== MISSING };
+    conflict.snapshot = stableJson([type, conflict.basePresent, conflict.base, conflict.localPresent, conflict.local, conflict.remotePresent, conflict.remote]);
+    conflicts.push(conflict);
   }
 
   function mergeValue(base, local, remote, path, conflicts) {
     if (equal(local, base)) return remote;
     if (equal(remote, base) || equal(local, remote)) return local;
 
-    if (/\.(?:playCountByClient|earlySwipeCountByClient)$/.test(path)
+    const parts = pathParts(path);
+    if (parts[0] === 'lastPages' && parts.length === 2 && isRecord(base) && isRecord(local) && isRecord(remote)) {
+      const localTime = timestampOrder(local.updatedAt);
+      const remoteTime = timestampOrder(remote.updatedAt);
+      if (localTime !== null && remoteTime !== null && localTime !== remoteTime) return localTime > remoteTime ? local : remote;
+      if (localTime !== null && remoteTime !== null && localTime === remoteTime) {
+        addConflict(conflicts, 'progress', path, base, local, remote);
+        return base;
+      }
+    }
+    const field = parts.at(-1);
+    if ((field === 'updatedAt' || field === 'savedAt') && [base, local, remote].every((value) => value === MISSING || typeof value === 'number' || typeof value === 'string')) {
+      return latestTimestamp(local, remote);
+    }
+    if (field === 'createdAt' && [base, local, remote].every((value) => value === MISSING || typeof value === 'number' || typeof value === 'string')) {
+      return earliestTimestamp(local, remote);
+    }
+
+    if (['playCountByClient', 'earlySwipeCountByClient'].includes(field)
         && isRecord(base) && isRecord(local) && isRecord(remote)) {
       return mergeCounterVector(base, local, remote, path, conflicts);
     }
@@ -86,6 +117,33 @@
 
     addConflict(conflicts, 'value', path, base, local, remote);
     return base;
+  }
+
+  function timestampOrder(value) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim()) {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) return numeric;
+      const parsed = Date.parse(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+  }
+
+  function latestTimestamp(left, right) {
+    if (left === MISSING) return right;
+    if (right === MISSING) return left;
+    const l = timestampOrder(left), r = timestampOrder(right);
+    if (l === null || r === null) return left;
+    return r > l ? right : left;
+  }
+
+  function earliestTimestamp(left, right) {
+    if (left === MISSING) return right;
+    if (right === MISSING) return left;
+    const l = timestampOrder(left), r = timestampOrder(right);
+    if (l === null || r === null) return left;
+    return r < l ? right : left;
   }
 
   function mergeCounterVector(base, local, remote, path, conflicts) {
@@ -168,7 +226,7 @@
 
     let order;
     if (localReordered && remoteReordered && !equal(localOrder, remoteOrder)) {
-      addConflict(conflicts, 'order', path + '.[order]', baseOrder, localOrder, remoteOrder);
+      addConflict(conflicts, 'order', path, baseOrder, localOrder, remoteOrder);
       order = localIds.filter((id) => surviving.has(id));
     } else if (localReordered) order = localIds.filter((id) => surviving.has(id));
     else if (remoteReordered) order = remoteIds.filter((id) => surviving.has(id));
@@ -180,21 +238,28 @@
     return order.map((id) => resultMap.get(id));
   }
 
-  function setPath(root, path, value, present) {
-    const parts = path.replace(/\.\[order\]$/, '').split('.').filter(Boolean);
+  function valueAtPath(root, parts) {
     let parent = root;
     for (const key of parts.slice(0, -1)) {
       if (Array.isArray(parent)) {
         const index = parent.findIndex((item) => item && item.id === key);
-        if (index < 0) return;
+        if (index < 0) throw new Error('競合対象が見つかりません。最新状態を読み直してください。');
         parent = parent[index];
       } else {
-        if (!parent || typeof parent !== 'object') return;
+        if (!parent || typeof parent !== 'object' || !Object.prototype.hasOwnProperty.call(parent, key)) {
+          throw new Error('競合対象が見つかりません。最新状態を読み直してください。');
+        }
         parent = parent[key];
       }
     }
-    const key = parts[parts.length - 1];
-    if (!key || !parent || typeof parent !== 'object') return;
+    return { parent, key: parts[parts.length - 1] };
+  }
+
+  function setPath(root, path, value, present) {
+    const parts = pathParts(path);
+    if (!parts.length) throw new Error('競合対象が見つかりません。最新状態を読み直してください。');
+    const { parent, key } = valueAtPath(root, parts);
+    if (!parent || typeof parent !== 'object') throw new Error('競合対象が見つかりません。最新状態を読み直してください。');
     if (Array.isArray(parent)) {
       const index = parent.findIndex((item) => item && item.id === key);
       if (present && index < 0 && isRecord(value)) parent.push(value);
@@ -213,14 +278,13 @@
       const value = conflict[side];
       const present = conflict[side + 'Present'] !== false;
       if (conflict.type === 'order') {
-        const path = conflict.path.replace(/\.\[order\]$/, '');
-        const parts = path.split('.'); let parent = result;
-        for (const key of parts.slice(0, -1)) parent = Array.isArray(parent) ? parent.find((item) => item && item.id === key) : parent && parent[key];
-        const array = parent && parent[parts[parts.length - 1]];
-        if (Array.isArray(array)) {
-          const order = value || [];
-          array.sort((a, b) => { const ai = order.indexOf(a.id), bi = order.indexOf(b.id); return (ai < 0 ? Number.MAX_SAFE_INTEGER : ai) - (bi < 0 ? Number.MAX_SAFE_INTEGER : bi); });
-        }
+        const parts = pathParts(conflict.path);
+        let array;
+        if (parts.length === 1) array = result[parts[0]];
+        else array = valueAtPath(result, parts).parent[valueAtPath(result, parts).key];
+        if (!Array.isArray(array)) throw new Error('競合対象が見つかりません。最新状態を読み直してください。');
+        const order = value || [];
+        array.sort((a, b) => { const ai = order.indexOf(a.id), bi = order.indexOf(b.id); return (ai < 0 ? Number.MAX_SAFE_INTEGER : ai) - (bi < 0 ? Number.MAX_SAFE_INTEGER : bi); });
       } else setPath(result, conflict.path, value, present);
     }
     return result;

@@ -51,7 +51,7 @@ test('a passkey reset writes a passphrase wrapper that the normal unlock flow ac
   sessionStorage.setItem('mangaReaderActiveVault', JSON.stringify({ rawKey: b64url(rawKey), keyWraps }));
 
   const context = {
-    window: { MANGA_READER_SUPABASE: { url: 'https://vault.test', publishableKey: 'public' }, PublicKeyCredential: function PublicKeyCredential() {}, MangaVaultSyncMerge: mergeModule, MangaVaultPayload: { buildFromLocalStorage: () => ({ savedItems: [{ id: 'kept' }] }) } },
+    window: { MANGA_READER_SUPABASE: { url: 'https://vault.test', publishableKey: 'public' }, PublicKeyCredential: function PublicKeyCredential() {}, MangaReaderMediaAccess: { canReadProtectedData: () => true }, MangaVaultSyncMerge: mergeModule, MangaVaultPayload: { buildFromLocalStorage: () => ({ savedItems: [{ id: 'kept' }] }) } },
     navigator: { credentials: { create: async () => null, get: async () => ({ rawId: credentialId.buffer, getClientExtensionResults: () => ({ prf: { results: { first: prfOutput } } }) }) } },
     location: { hostname: 'vault.test', protocol: 'https:' },
     crypto: webcrypto,
@@ -92,7 +92,7 @@ test('new Vault creation uses a conflict-safe insert and requires a confirmed se
   localStorage.setItem('mangaReaderSupabaseSession', JSON.stringify({ access_token: 'token', refresh_token: 'refresh', expires_at: Date.now() / 1000 + 3600, user: { id: 'user-1' } }));
   let request;
   const context = {
-    window: { MANGA_READER_SUPABASE: { url: 'https://vault.test', publishableKey: 'public' }, crypto: webcrypto, MangaVaultPayload: { buildFromLocalStorage: () => ({ items: [] }) } },
+    window: { MANGA_READER_SUPABASE: { url: 'https://vault.test', publishableKey: 'public' }, crypto: webcrypto, MangaReaderMediaAccess: { canReadProtectedData: () => true }, MangaVaultPayload: { buildFromLocalStorage: () => ({ items: [] }) } },
     navigator: {}, location: { hostname: 'vault.test', protocol: 'https:' }, crypto: webcrypto,
     btoa: (value) => Buffer.from(value, 'binary').toString('base64'),
     atob: (value) => Buffer.from(value, 'base64').toString('binary'), TextEncoder, TextDecoder,
