@@ -4,6 +4,7 @@ import fs from 'node:fs';
 
 const read = (name) => fs.readFileSync(new URL('../' + name, import.meta.url), 'utf8');
 const page = read('video-shorts-page.js');
+const html = read('video-shorts.html');
 const css = read('video-shorts-player.css');
 const asset = fs.readFileSync(new URL('../assets/shorts-heart.png', import.meta.url));
 
@@ -36,6 +37,14 @@ test('landscape rotation is mobile-only, width adjusts for landscape, and resets
   assert.match(css, /\.shortsStage\.is-rotated/);
   assert.match(css, /@media\s*\(max-width:\s*899px\)/);
   assert.match(css, /@media\s*\(min-width:\s*900px\)[\s\S]*\.shortsStage\.is-landscape/);
+});
+
+test('Shorts includes configured source rotation for the clip and scrub preview', () => {
+  assert.match(html, /video-player-rotation\.js/);
+  assert.match(page, /getDisplayDimensions/);
+  assert.match(page, /getRotationDirection/);
+  assert.match(css, /shortsStage video\.videoPlayerRotatedLeft/);
+  assert.match(css, /shortsScrubPreviewFrame video\.videoPlayerRotatedRight/);
 });
 
 test('shorts gestures suppress native selection and long-press callouts across the stage and video', () => {

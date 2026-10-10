@@ -245,6 +245,20 @@
     };
   }
 
+  function getRotationDirection(value) {
+    const video = value && typeof value === 'object' ? value : {};
+    if (video.rotate90Direction === 'left' || video.rotate90Direction === 'right') return video.rotate90Direction;
+    return video.rotate90 === true ? 'left' : 'none';
+  }
+
+  function getDisplayDimensions(value) {
+    const video = value && typeof value === 'object' ? value : {};
+    const width = asTime(video.videoWidth, 0);
+    const height = asTime(video.videoHeight, 0);
+    if (getRotationDirection(video) === 'none') return { width, height };
+    return { width: height, height: width };
+  }
+
   function normalizeVideos(value) {
     return Array.isArray(value) ? value.map((item) => normalizeVideo(item)) : [];
   }
@@ -321,5 +335,5 @@
     };
   }
 
-  return { WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, storageFieldsForVideoUrl, stableUrlToken };
+  return { WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, storageFieldsForVideoUrl, stableUrlToken, getRotationDirection, getDisplayDimensions };
 }));

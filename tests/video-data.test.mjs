@@ -19,6 +19,15 @@ test('normalizes legacy video records without losing legacy playback fields', ()
   assert.equal(video.addedAt, 100);
 });
 
+test('display dimensions account for configured and legacy 90-degree rotation', () => {
+  assert.deepEqual(data.getDisplayDimensions({ videoWidth: 1920, videoHeight: 1080, rotate90Direction: 'left' }), { width: 1080, height: 1920 });
+  assert.deepEqual(data.getDisplayDimensions({ videoWidth: 720, videoHeight: 1280, rotate90Direction: 'right' }), { width: 1280, height: 720 });
+  assert.deepEqual(data.getDisplayDimensions({ videoWidth: 1920, videoHeight: 1080, rotate90: true }), { width: 1080, height: 1920 });
+  assert.deepEqual(data.getDisplayDimensions({ videoWidth: 1920, videoHeight: 1080, rotate90Direction: 'none' }), { width: 1920, height: 1080 });
+  assert.equal(data.getRotationDirection({ rotate90: true }), 'left');
+  assert.equal(data.getRotationDirection({ rotate90Direction: 'right', rotate90: true }), 'right');
+});
+
 test('normalizes and preserves the selected thumbnail timestamp', () => {
   assert.equal(normalizeVideo({ id:'v1', thumbnailTimeSeconds:42.5 }).thumbnailTimeSeconds, 42.5);
   assert.equal(normalizeVideo({ id:'v2' }).thumbnailTimeSeconds, null);

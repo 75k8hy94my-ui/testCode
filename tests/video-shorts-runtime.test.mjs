@@ -45,7 +45,7 @@ class Element {
   getBoundingClientRect() { return { left: 0, width: 100 }; }
 }
 
-function makeHarness({ queue, records = null, now = () => 1000, timers = null, play, probeMetadata } = {}) {
+function makeHarness({ queue, records = null, now = () => 1000, timers = null, play, probeMetadata, rotation } = {}) {
   const page = new Element(); const documentEvents = new Map(); const windowEvents = new Map();
   const videos = records || [{ id: 'v1', url: 'https://media.example/v1.mp4', tags: [] }, { id: 'v2', url: 'https://media.example/v2.mp4', tags: [] }];
   const data = { mangaReaderVideos: videos, mangaReaderVideoMeta: {}, mangaReaderVideoMarkers: {} };
@@ -60,14 +60,31 @@ function makeHarness({ queue, records = null, now = () => 1000, timers = null, p
     addEventListener(type, listener) { documentEvents.set(type, listener); }, removeEventListener(type) { documentEvents.delete(type); } };
   const module = { exports: {} };
   vm.runInNewContext(source, { module, window: windowRef, URLSearchParams, Date, Number, Math, setTimeout, clearTimeout, console });
-  const videoData = { isDirectVideoUrl: () => true, stableUrlToken: (url) => url, normalizeVideo: (value) => ({ ...value, tags: value.tags || [], shorts: { liked: false, playCount: 0, earlySwipeCount: 0, updatedAt: 0, ...(value.shorts || {}) } }), mergeVideoMetaPreservingThumbnailTime: (_old, next) => next };
+  const videoData = { isDirectVideoUrl: () => true, stableUrlToken: (url) => url,
+    getRotationDirection: (value) => value.rotate90Direction === 'left' || value.rotate90Direction === 'right' ? value.rotate90Direction : (value.rotate90 ? 'left' : 'none'),
+    getDisplayDimensions: (value) => videoData.getRotationDirection(value) === 'none'
+      ? { width: value.videoWidth || 720, height: value.videoHeight || 1280 }
+      : { width: value.videoHeight || 1280, height: value.videoWidth || 720 },
+    normalizeVideo: (value) => ({ ...value, tags: value.tags || [], shorts: { liked: false, playCount: 0, earlySwipeCount: 0, updatedAt: 0, ...(value.shorts || {}) } }),
+    mergeVideoMetaPreservingThumbnailTime: (_old, next) => next };
   const controller = module.exports.create({ documentRef, page, windowRef, storage, mediaAccess: access, state, videoData,
-    queue: { generate: () => queue }, probeMetadata: probeMetadata || (async () => ({ videoWidth: 720, videoHeight: 1280, durationSeconds: 60 })), now,
+    rotation, queue: { generate: () => queue }, probeMetadata: probeMetadata || (async () => ({ videoWidth: 720, videoHeight: 1280, durationSeconds: 60 })), now,
     setTimeout: timers?.setTimeout || setTimeout, clearTimeout: timers?.clearTimeout || clearTimeout });
   return { controller, page, state, data, documentEvents, windowEvents };
 }
 
 const entry = (videoId, startSeconds = 0, endSeconds = 30) => ({ videoId, startSeconds, endSeconds, entryType: 'marker', tier: 1, generation: 1 });
+
+test('configured video rotation is installed on active playback and disposed with the video', async () => {
+  const calls = [];
+  const h = makeHarness({ queue: [entry('v1')], records: [{ id: 'v1', url: 'https://media.example/v1.mp4', rotate90Direction: 'right' }],
+    rotation: { install: (frame, video, direction) => { calls.push({ frame, video, direction }); return () => calls.push({ cleanup: true }); } } });
+  await h.controller.start();
+  assert.equal(calls[0].direction, 'right');
+  assert.ok(calls[0].frame);
+  h.controller.destroy();
+  assert.ok(calls.some((call) => call.cleanup), 'rotation observer and styles are removed when playback is destroyed');
+});
 
 test('autoplay denial exposes a manual play button; successful manual playback hides it and counts once', async () => {
   let attempts = 0;
