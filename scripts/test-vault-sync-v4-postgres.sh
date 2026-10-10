@@ -30,10 +30,15 @@ create table public.manga_reader_vaults (
   revision bigint not null default 1,
   updated_at timestamptz not null default now()
 );
+create schema supabase_migrations;
+create table supabase_migrations.schema_migrations (version text primary key, name text not null);
 alter table public.manga_reader_vaults enable row level security;
 create policy "Users can read their own encrypted vault" on public.manga_reader_vaults for select to authenticated using ((select auth.uid()) = user_id);
+grant all on table public.manga_reader_vaults to service_role;
+grant execute on function public.update_manga_reader_vault(bigint, jsonb) to service_role;
 grant usage on schema auth to authenticated;
 grant execute on function auth.uid(), auth.jwt() to authenticated;
 SQL
 psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261010120000_vault_sync_v4_rpc.sql
+psql -v ON_ERROR_STOP=1 -c "insert into supabase_migrations.schema_migrations (version, name) values ('20261010120000', 'vault_sync_v4_rpc')"
 psql -v ON_ERROR_STOP=1 -f tests/postgres/vault-sync-v4.sql

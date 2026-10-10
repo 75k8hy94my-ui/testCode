@@ -82,7 +82,26 @@ select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000003
 select set_config('request.jwt.claims', '{"sub":"30000000-0000-0000-0000-000000000003","role":"authenticated","is_anonymous":false}', false);
 DO $$
 declare affected integer;
+  invalid_payload jsonb;
 begin
+  for invalid_payload in
+    select payload from (values
+      ('{"version":1}'::jsonb),
+      ('{"syncProtocolVersion":1,"version":1}'::jsonb),
+      ('{"syncProtocolVersion":2,"version":1}'::jsonb),
+      ('{"syncProtocolVersion":3,"version":1}'::jsonb),
+      ('{"syncProtocolVersion":"4","version":1}'::jsonb),
+      ('{"syncProtocolVersion":null,"version":1}'::jsonb),
+      ('{"syncProtocolVersion":"future","version":1}'::jsonb),
+      ('{"syncProtocolVersion":5,"version":1}'::jsonb)
+    ) as invalid(payload)
+  loop
+    begin
+      perform * from private.create_manga_reader_vault_v4_worker(invalid_payload);
+      raise exception 'invalid create protocol payload was accepted: %', invalid_payload using errcode = 'ZX001';
+    exception when sqlstate 'P0001' then null;
+    end;
+  end loop;
   begin
     perform * from private.create_manga_reader_vault_v4_worker('{"syncProtocolVersion":3,"version":1}');
     raise exception 'old protocol create was accepted' using errcode = 'ZX001';
@@ -130,6 +149,9 @@ begin
     or not has_table_privilege('service_role', 'public.manga_reader_vaults', 'UPDATE')
     or not has_table_privilege('service_role', 'public.manga_reader_vaults', 'DELETE') then
     raise exception 'service_role table administration privileges were not preserved';
+  end if;
+  if not has_function_privilege('service_role', 'public.update_manga_reader_vault(bigint,jsonb)', 'EXECUTE') then
+    raise exception 'service_role legacy RPC administration privilege was not preserved';
   end if;
 end $$;
 
