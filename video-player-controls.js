@@ -15,7 +15,27 @@
   const id = new URLSearchParams(location.search).get('id') || 'unknown';
   const key = 'mangaReaderVideoMarkers';
   const read = () => { try { const value = JSON.parse(localStorage.getItem(key) || '{}'); return value && typeof value === 'object' ? value : {}; } catch (_) { return {}; } };
-  const save = (markers) => { if (!canReadProtectedData()) return; try { const all = read(); all[id] = markers; localStorage.setItem(key, JSON.stringify(all)); } catch (_) {} };
+  const save = async (nextMarkers, deletedMarkers = []) => {
+    if (!canReadProtectedData()) throw new Error('VPN接続を確認できるまで動画マーカーを変更できません。');
+    const normalize = window.MangaVaultPayload && window.MangaVaultPayload.normalizeVideoMarkers;
+    const normalized = normalize ? (normalize({ [id]: nextMarkers })[id] || []) : nextMarkers;
+    const persist = () => { const all = read(); if (normalized.length) all[id] = normalized; else delete all[id]; localStorage.setItem(key, JSON.stringify(all)); };
+    if (window.TestCodeGuest?.isActive()) { persist(); return normalized; }
+    const vault = window.MangaVault;
+    if (!vault || typeof vault.markLocalChangesPending !== 'function' || typeof vault.saveLocalChanges !== 'function') throw new Error('保管庫を開いてからマーカーを変更してください。');
+    if (deletedMarkers.length) {
+      const pointerPath = window.MangaVaultPayload && window.MangaVaultPayload.pointerPath;
+      if (typeof vault.recordSyncDeletion !== 'function' || typeof pointerPath !== 'function') throw new Error('削除を同期用journalへ記録できません。');
+      await vault.recordSyncDeletion(deletedMarkers.map((marker) => pointerPath('videoMarkers', id, marker.id)), persist);
+    } else {
+      if (!vault.markLocalChangesPending()) throw new Error('未同期状態を端末に記録できません。マーカーは変更していません。');
+      persist();
+    }
+    try { await vault.saveLocalChanges(); notice.textContent = ''; }
+    catch (_) { notice.textContent = '端末には保存しました。クラウド未同期のため、通信復旧後に再試行します。'; }
+    return normalized;
+  };
+  const newMarkerId = () => 'marker-' + (crypto.randomUUID ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), (value) => value.toString(16).padStart(2, '0')).join(''));
   const normalizeMarkers = window.MangaVaultPayload && window.MangaVaultPayload.normalizeVideoMarkers;
   const markers = normalizeMarkers ? normalizeMarkers({ [id]: read()[id] })[id] || [] : (Array.isArray(read()[id]) ? read()[id].map((marker) => ({ seconds: Number(marker.seconds) || 0, icon: ['water', 'triangle', 'toilet'].includes(marker.icon) ? marker.icon : 'triangle' })) : []);
   let selectedMarkerIcon = 'water';
@@ -48,7 +68,7 @@
   const format = (value) => { const seconds = Math.max(0, Math.floor(Number(value) || 0)); return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0'); };
   let markerBubbles = [];
   const update = () => { seek.max = String(Number.isFinite(video.duration) ? video.duration : 0); seek.value = String(video.currentTime || 0); time.textContent = format(video.currentTime) + ' / ' + format(video.duration); const current = markers.find((marker) => Math.abs(marker.seconds - video.currentTime) < 1); notice.innerHTML = current ? iconSvg(current.icon) : ''; notice.setAttribute('aria-label', current ? iconLabels[current.icon] : ''); notice.classList.toggle('visible', Boolean(current)); };
-  const renderMarkers = () => { list.replaceChildren(); markerBubbles.forEach((node) => node.remove()); markerBubbles = []; markers.slice().sort((a, b) => a.seconds - b.seconds).forEach((marker) => { const bubble = document.createElement('button'); bubble.type = 'button'; bubble.className = 'videoMarkerBubble'; bubble.dataset.seconds = String(marker.seconds); bubble.style.left = (Number(video.duration) > 0 ? Math.max(0, Math.min(100, marker.seconds / video.duration * 100)) : 0) + '%'; bubble.setAttribute('aria-label', iconLabels[marker.icon] + ' ' + format(marker.seconds) + 'へ移動'); bubble.innerHTML = iconSvg(marker.icon); bubble.addEventListener('click', (event) => { event.stopPropagation(); video.currentTime = marker.seconds; video.play(); }); seekWrap.append(bubble); markerBubbles.push(bubble); const button = document.createElement('button'); button.type = 'button'; button.className = 'videoMarkerListItem'; button.setAttribute('aria-label', iconLabels[marker.icon] + ' ' + format(marker.seconds) + 'へ移動'); button.innerHTML = iconSvg(marker.icon); button.addEventListener('click', () => { video.currentTime = marker.seconds; video.play(); }); const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'videoMarkerRemove'; remove.textContent = '×'; remove.setAttribute('aria-label', iconLabels[marker.icon] + 'を削除'); remove.addEventListener('click', () => { const index = markers.indexOf(marker); if (index >= 0) markers.splice(index, 1); save(markers); renderMarkers(); window.dispatchEvent(new CustomEvent('manga-video-markers-changed')); }); const row = document.createElement('span'); row.append(button, remove); list.append(row); }); };
+  const renderMarkers = () => { list.replaceChildren(); markerBubbles.forEach((node) => node.remove()); markerBubbles = []; markers.slice().sort((a, b) => a.seconds - b.seconds).forEach((marker) => { const bubble = document.createElement('button'); bubble.type = 'button'; bubble.className = 'videoMarkerBubble'; bubble.dataset.seconds = String(marker.seconds); bubble.style.left = (Number(video.duration) > 0 ? Math.max(0, Math.min(100, marker.seconds / video.duration * 100)) : 0) + '%'; bubble.setAttribute('aria-label', iconLabels[marker.icon] + ' ' + format(marker.seconds) + 'へ移動'); bubble.innerHTML = iconSvg(marker.icon); bubble.addEventListener('click', (event) => { event.stopPropagation(); video.currentTime = marker.seconds; video.play(); }); seekWrap.append(bubble); markerBubbles.push(bubble); const button = document.createElement('button'); button.type = 'button'; button.className = 'videoMarkerListItem'; button.setAttribute('aria-label', iconLabels[marker.icon] + ' ' + format(marker.seconds) + 'へ移動'); button.innerHTML = iconSvg(marker.icon); button.addEventListener('click', () => { video.currentTime = marker.seconds; video.play(); }); const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'videoMarkerRemove'; remove.textContent = '×'; remove.setAttribute('aria-label', iconLabels[marker.icon] + 'を削除'); remove.addEventListener('click', () => { const next = markers.filter((item) => item !== marker); save(next, [marker]).then((saved) => { markers.splice(0, markers.length, ...saved); renderMarkers(); window.dispatchEvent(new CustomEvent('manga-video-markers-changed')); }).catch((error) => { notice.textContent = error.message || 'マーカーを削除できませんでした。'; }); }); const row = document.createElement('span'); row.append(button, remove); list.append(row); }); };
   play.addEventListener('click', () => video.paused ? video.play() : video.pause()); video.addEventListener('play', () => { play.textContent = '❚❚'; }); video.addEventListener('pause', () => { play.textContent = '▶'; }); video.addEventListener('loadedmetadata', () => { update(); renderMarkers(); }); video.addEventListener('timeupdate', update); seek.addEventListener('input', () => { video.currentTime = Number(seek.value); });
   let lastAudibleVolume = video.volume > 0 ? video.volume : 1;
   const syncVolume = () => {
@@ -92,7 +112,7 @@
     if (result && typeof result.catch === 'function') result.catch(() => {});
   };
   full.addEventListener('click', toggleFullscreen);
-  markerToggle.addEventListener('click', () => { markerPanel.hidden = !markerPanel.hidden; renderMarkers(); }); add.addEventListener('click', () => { const seconds = Math.max(0, Number(video.currentTime) || 0); markers.push({ seconds, icon: selectedMarkerIcon }); save(markers); renderMarkers(); window.dispatchEvent(new CustomEvent('manga-video-markers-changed')); });
+  markerToggle.addEventListener('click', () => { markerPanel.hidden = !markerPanel.hidden; renderMarkers(); }); add.addEventListener('click', () => { const seconds = Math.max(0, Number(video.currentTime) || 0); const next = markers.concat({ id: newMarkerId(), seconds, icon: selectedMarkerIcon }); save(next).then((saved) => { markers.splice(0, markers.length, ...saved); renderMarkers(); window.dispatchEvent(new CustomEvent('manga-video-markers-changed')); }).catch((error) => { notice.textContent = error.message || 'マーカーを保存できませんでした。'; }); });
   const handleArrowSeek = (event) => { if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return; const target = event.target; if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(target.tagName || '') || target.closest?.('button,input,textarea,select,[contenteditable="true"]'))) return; event.preventDefault(); const duration = Number.isFinite(video.duration) ? video.duration : Infinity; video.currentTime = Math.max(0, Math.min(duration, (Number(video.currentTime) || 0) + (event.key === 'ArrowLeft' ? -10 : 10))); };
   document.addEventListener('keydown', handleArrowSeek);
   let hideTimer; const showControls = () => { frame.classList.add('controlsVisible'); clearTimeout(hideTimer); hideTimer = setTimeout(() => { if (!video.paused && markerPanel.hidden && !controls.contains(document.activeElement)) frame.classList.remove('controlsVisible'); }, 2500); };

@@ -10,7 +10,7 @@ const source = fs.readFileSync(new URL('../video-edit-page.js', import.meta.url)
 const VIDEO_KEY = 'mangaReaderVideos';
 const META_KEY = 'mangaReaderVideoMeta';
 
-function startEditor({ mode = 'add', allowed = true, videos = [], meta = {}, guest = false, failLocalWrite = false, failSync = false, deferSync = false, failPending = false } = {}) {
+function startEditor({ mode = 'add', allowed = true, videos = [], meta = {}, guest = false, failLocalWrite = false, failSync = false, deferSync = false, failPending = false, failDeletionJournal = false } = {}) {
   const stored = new Map([[VIDEO_KEY, JSON.stringify(videos)], [META_KEY, JSON.stringify(meta)]]);
   let reads = 0;
   const localStorage = {
@@ -45,17 +45,18 @@ function startEditor({ mode = 'add', allowed = true, videos = [], meta = {}, gue
     addEventListener() {},
   };
   const gate = { canReadProtectedData: () => allowed, syncUi() {} };
-  let syncCalls = 0; let pendingCalls = 0; let releaseSync; const deferredSync = new Promise((resolve) => { releaseSync = resolve; });
+  let syncCalls = 0; let pendingCalls = 0; let deletionCalls = 0; let deletionPaths = []; let releaseSync; const deferredSync = new Promise((resolve) => { releaseSync = resolve; });
   const window = {
     MangaReaderVideoData: Data, MangaReaderMediaAccess: gate,
-    MangaVault: { markLocalChangesPending() { pendingCalls++; return !failPending; }, async saveLocalChanges() { syncCalls++; if (deferSync) return deferredSync; if (failSync) throw new Error('offline'); } },
+    MangaVaultPayload: { pointerPath(collection, id) { return '/' + collection + '/' + String(id).replace(/~/g, '~0').replace(/\//g, '~1'); } },
+    MangaVault: { markLocalChangesPending() { pendingCalls++; return !failPending; }, async saveLocalChanges() { syncCalls++; if (deferSync) return deferredSync; if (failSync) throw new Error('offline'); }, async recordSyncDeletion(paths, mutate) { deletionCalls++; deletionPaths = paths; if (failDeletionJournal) throw new Error('journal failed'); await mutate(); } },
     crypto: { randomUUID: () => 'added-uuid' },
   };
   if (guest) window.TestCodeGuest = { isActive: () => true };
   const location = { search: mode === 'add' ? '?mode=add&return=list' : '?id=' + encodeURIComponent(videos[0]?.id || 'existing') + '&return=list', href: 'video-edit.html' };
   vm.runInNewContext(source, { window, document, localStorage, location, URLSearchParams, Date, Math, confirm: () => true });
   const form = page.children.find((child) => child.tag === 'form');
-  return { page, form, nodes, location, localStorage, stored, shellTitle, get reads() { return reads; }, get syncCalls() { return syncCalls; }, get pendingCalls() { return pendingCalls; }, releaseSync };
+  return { page, form, nodes, location, localStorage, stored, shellTitle, get reads() { return reads; }, get syncCalls() { return syncCalls; }, get pendingCalls() { return pendingCalls; }, get deletionCalls() { return deletionCalls; }, get deletionPaths() { return deletionPaths; }, releaseSync };
 }
 
 test('video-add screen is a full-page, unlocked form without a delete action', async () => {
@@ -92,6 +93,32 @@ test('add screen rejects duplicate URLs and invalid URLs without a write', async
   await app.form.events.submit({ preventDefault() {} });
   assert.match(app.nodes.get('.videoEditError').textContent, /有効な動画URL/);
   assert.equal(JSON.parse(app.stored.get(VIDEO_KEY)).length, 1);
+});
+
+test('video deletion journals item and metadata before applying both local removals', async () => {
+  const existing = Data.normalizeVideo({ id: 'v/1', title: 'Delete me', url: 'https://example.com/clip.mp4', a: 'url', b: '12' });
+  const app = startEditor({ mode: 'edit', videos: [existing], meta: { 'v/1': { memo: 'private' } } });
+
+  await app.nodes.get('[data-delete]').events.click();
+
+  assert.equal(app.deletionCalls, 1);
+  assert.deepEqual([...app.deletionPaths], ['/videos/v~11', '/videoMeta/v~11']);
+  assert.deepEqual(JSON.parse(app.stored.get(VIDEO_KEY)), []);
+  assert.deepEqual(JSON.parse(app.stored.get(META_KEY)), {});
+  assert.equal(app.location.href, 'video.html');
+});
+
+test('failed deletion journal leaves video and metadata untouched', async () => {
+  const existing = Data.normalizeVideo({ id: 'v1', title: 'Delete me', url: 'https://example.com/clip.mp4', a: 'url', b: '12' });
+  const app = startEditor({ mode: 'edit', videos: [existing], meta: { v1: { memo: 'private' } }, failDeletionJournal: true });
+
+  await app.nodes.get('[data-delete]').events.click();
+
+  assert.equal(app.deletionCalls, 1);
+  assert.equal(JSON.parse(app.stored.get(VIDEO_KEY)).length, 1);
+  assert.equal(JSON.parse(app.stored.get(META_KEY)).v1.memo, 'private');
+  assert.equal(app.location.href, 'video-edit.html');
+  assert.match(app.nodes.get('.videoEditError').textContent, /journal failed/);
 });
 
 test('JSON import adds URL records, preserves signed query strings, and skips existing duplicates', async () => {

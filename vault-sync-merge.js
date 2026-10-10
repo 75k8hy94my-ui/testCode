@@ -27,6 +27,30 @@
     const conflicts = [];
     let merged = mergeValue(base, local, remote, '', conflicts);
     if (merged === MISSING) merged = {};
+    const tombstoneSources = [base, local, remote].map((payload) => payload && Array.isArray(payload.vaultSyncTombstones) ? payload.vaultSyncTombstones : []);
+    if (tombstoneSources.some((paths) => paths.length) || [base, local, remote].some((payload) => payload && Array.isArray(payload.vaultSyncTombstones))) {
+      merged.vaultSyncTombstones = [...new Set(tombstoneSources.flat().filter((path) => typeof path === 'string' && path.startsWith('/')))];
+      for (const tombstone of merged.vaultSyncTombstones) {
+        const parts = pathParts(tombstone);
+        if (parts.length === 3 && parts[0] === 'videoMarkers') {
+          const entity = Array.isArray(merged.videoMarkers && merged.videoMarkers[parts[1]])
+            && merged.videoMarkers[parts[1]].find((item) => item && item.id === parts[2]);
+          if (!entity) continue;
+          const localEntity = Array.isArray(local && local.videoMarkers && local.videoMarkers[parts[1]])
+            && local.videoMarkers[parts[1]].find((item) => item && item.id === parts[2]);
+          const remoteEntity = Array.isArray(remote && remote.videoMarkers && remote.videoMarkers[parts[1]])
+            && remote.videoMarkers[parts[1]].find((item) => item && item.id === parts[2]);
+          addConflict(conflicts, 'delete-recreate', tombstone, MISSING, localEntity || MISSING, remoteEntity || MISSING);
+          continue;
+        }
+        if (parts.length !== 2 || !['folders', 'items', 'videos', 'videoFolders', 'authorCards'].includes(parts[0])) continue;
+        const entity = Array.isArray(merged[parts[0]]) && merged[parts[0]].find((item) => item && item.id === parts[1]);
+        if (!entity) continue;
+        const localEntity = Array.isArray(local && local[parts[0]]) && local[parts[0]].find((item) => item && item.id === parts[1]);
+        const remoteEntity = Array.isArray(remote && remote[parts[0]]) && remote[parts[0]].find((item) => item && item.id === parts[1]);
+        addConflict(conflicts, 'delete-recreate', tombstone, MISSING, localEntity || MISSING, remoteEntity || MISSING);
+      }
+    }
     recomputeMonotonicCounters(merged);
     return { payload: merged, conflicts };
   }
@@ -272,6 +296,7 @@
   function applyConflictChoices(payload, conflicts, choices) {
     const result = JSON.parse(JSON.stringify(payload));
     for (const conflict of conflicts || []) {
+      if (conflict.type === 'delete-recreate') throw new Error('削除済みIDは再利用できません。新しいIDで作成してください。');
       const choice = choices && choices[conflict.path];
       if (choice !== 'local' && choice !== 'remote') throw new Error('すべての競合に端末またはクラウドの選択が必要です。');
       const side = choice === 'local' ? 'local' : 'remote';

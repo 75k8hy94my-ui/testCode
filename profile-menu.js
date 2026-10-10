@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
-  const DEVICE_DATA_KEYS = () => [...Object.values((window.MangaVaultPayload && MangaVaultPayload.DATA_KEYS) || {}),'mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
+  const DEVICE_DATA_KEYS = () => [...Object.values((window.MangaVaultPayload && MangaVaultPayload.DATA_KEYS) || {}),...((window.MangaVaultPayload && MangaVaultPayload.LOCAL_ONLY_KEYS) || []),'mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
   let menu=null, activeTrigger=null;
   const AVATAR_KEY='mangaReaderProfileAvatar';
   function refreshAvatar(){

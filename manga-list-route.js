@@ -42,12 +42,12 @@
     ['manga-list-render-runtime.js?v=20260922-render-runtime', 'mangaRouteRenderRuntime'],
     ['manga-list-bootstrap.js?v=20260922-bootstrap', 'mangaRouteBootstrap'],
     ['manga-list-controller.js?v=20260922-controller', 'mangaRouteController'],
-    ['manga-list-runtime-context.js?v=20260922-runtime-context', 'mangaRouteContext'],
+    ['manga-list-runtime-context.js?v=20261010-vault-sync-v4-delete', 'mangaRouteContext'],
     ['manga-list-cover-cache.js?v=20261008-cover-cache', 'mangaRouteCoverCache'],
     ['manga-list-image-cache.js?v=20260922-image-cache', 'mangaRouteImageCache'],
     ['reader-target.js?v=20261003-reader-launch-contract', 'mangaReaderTarget'],
     ['manga-list-host-runtime.js?v=20261010-sync-validation', 'mangaRouteHost'],
-    ['manga-list-runtime.js?v=20261009-guest-mode', 'mangaRouteRuntime'],
+    ['manga-list-runtime.js?v=20261010-vault-sync-v4-delete', 'mangaRouteRuntime'],
     ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
   ];
 
@@ -444,6 +444,17 @@
       const buildSeriesGroupCard = (group) => buildVirtualCard(group.name, iconBooks, group.items, () => setState({ currentFolderView: config.SERIES_FOLDER_ID, currentSeriesView: group.name, bookshelfPage: 1 }));
       const buildAuthorGroupCard = (group) => buildVirtualCard(group.name, iconFolder, group.items, () => setState({ currentAuthorView: group.name, bookshelfPage: 1 }));
       const buildSearchText = (item) => [title(item), item.author, item.series, ...(Array.isArray(item.tags) ? item.tags : []), item.url].filter(Boolean).join(' ');
+      const reportDeletionError = (message) => {
+        let notice = documentRef.getElementById('mangaDeletionError');
+        if (!notice) {
+          notice = documentRef.createElement('p'); notice.id = 'mangaDeletionError';
+          notice.setAttribute('role', 'status'); notice.setAttribute('aria-live', 'polite');
+          notice.style.cssText = 'position:fixed;left:16px;right:16px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:1600;padding:12px 16px;border-radius:12px;background:#7b2d24;color:#fff;box-shadow:0 8px 24px #0005';
+          documentRef.body.appendChild(notice);
+        }
+        notice.textContent = '削除を保全できませんでした。端末のデータは変更していません。' + (message ? ' ' + message : '');
+        windowRef.clearTimeout(notice._hideTimer); notice._hideTimer = windowRef.setTimeout(() => notice.remove(), 10000);
+      };
       const renderDashboard = (show) => {
         if (!elements || !elements.dashboard) return;
         elements.dashboard.hidden = !show;
@@ -462,6 +473,13 @@
         getSavedVideos: () => state().savedVideos, clearLocalCoverObjectUrls: coverCache.clear,
         confirmAction: (message) => windowRef.confirm(message), setTimeout: windowRef.setTimeout.bind(windowRef),
         persistItems: host.persistItems, persistFolders: host.persistFolders, persistAuthorCards: host.persistAuthorCards, persistAll: host.persistAll, scheduleCloudSync: host.scheduleCloudSync,
+        recordSyncDeletion: (paths, mutate) => {
+          if (windowRef.TestCodeGuest?.isActive()) { mutate(); return Promise.resolve(); }
+          if (!windowRef.MangaVault || typeof windowRef.MangaVault.recordSyncDeletion !== 'function') return Promise.reject(new Error('保管庫を開いてから削除してください。'));
+          return windowRef.MangaVault.recordSyncDeletion(paths, mutate);
+        },
+        onDeletionError: reportDeletionError,
+        pointerPath: (collection, id) => windowRef.MangaVaultPayload.pointerPath(collection, id),
         openReader: (item) => host.navigateToReader(item), accessMedia: host.setupFeedImage,
         renderDashboard, renderAuthorDashboard,
         getVisibleItems: visibleItems, appendFolderPreview, createStaticCard: (input) => MangaListCardBoundary.createStaticCard(input), loadLocalCover: host.loadLocalCover, getCoverSourceCache: coverCache.getSourceCache, setupFeedImage: host.setupFeedImage,

@@ -47,18 +47,18 @@ test('video list ellipsis navigates directly to the dedicated editor without an 
   assert.match(editor, /source\.href = current\.url/);
   assert.match(editor, /remaining = latestVideos\.filter/);
   assert.match(editor, /delete remainingMeta\[videoId\]/);
-  assert.match(editor, /markLocalChangesPending\(\)/);
+  assert.match(editor, /recordSyncDeletion\(\[pointerPath\('videos', videoId\), pointerPath\('videoMeta', videoId\)\]/);
   const ordinarySubmit = editor.slice(editor.indexOf("form.addEventListener('submit'"), editor.indexOf("if (!isAddMode) form.querySelector('[data-delete]')"));
   const jsonImport = editor.slice(editor.indexOf("jsonImport.addEventListener('change'"), editor.indexOf("elements.url.addEventListener('change'"));
   assert.doesNotMatch(ordinarySubmit, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.match(jsonImport, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.match(editor, /name="thumbnailTime"/);
   assert.match(editor, /Data\.parseMediaTime\(timestamp\)/);
-  assert.match(editorHtml, /video-edit-page\.js\?v=20261010-json-url-import/);
+  assert.match(editorHtml, /video-edit-page\.js\?v=20261010-vault-sync-v4-delete/);
   assert.match(editor, /data-json-import/);
   assert.match(editor, /accept="application\/json,\.json"/);
   assert.doesNotMatch(editorHtml, /auth-pending/);
-  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261010-shorts-entry/);
+  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261010-vault-sync-v4-delete/);
 });
 
 test('video cards delegate thumbnail rendering to the shared renderer', () => {
@@ -125,6 +125,19 @@ test('video library saves enhanced records through its own Vault boundary', () =
   assert.match(library, /async function saveEditor/);
   assert.match(library, /if \(!await runVaultSync\(\)\)/);
   assert.doesNotMatch(read('reader.html'), /video-data\.js|video-library\.js|mangaReaderVideos/);
+});
+
+test('video library deletion protects video and metadata with the encrypted deletion journal', () => {
+  const library = read('video-library.js');
+  assert.match(library, /async function deleteVideoRecords\(base\)/);
+  assert.match(library, /recordSyncDeletion\(\[pointerPath\('videos', base\.id\), pointerPath\('videoMeta', base\.id\)\]/);
+  assert.match(library, /await deleteVideoRecords\(base\)/);
+});
+
+test('video folder deletion journals the folder tombstone before persisting local removal', () => {
+  const library = read('video-library.js');
+  assert.match(library, /recordSyncDeletion\(pointerPath\('videoFolders', folder\.id\), remove\)/);
+  assert.match(library, /persistAux\(\{ sync: false \}\)/);
 });
 
 test('video library never reads or mutates protected records without VPN access', () => {
@@ -241,5 +254,5 @@ test('dedicated video editor records pending sync after local save and returns w
   assert.doesNotMatch(ordinarySubmit, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.match(jsonImport, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.doesNotMatch(editor, /保存できませんでした。端末の保存状態を確認してください。/);
-  assert.match(html, /video-edit-page\.js\?v=20261010-json-url-import/);
+  assert.match(html, /video-edit-page\.js\?v=20261010-vault-sync-v4-delete/);
 });

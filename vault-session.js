@@ -8,7 +8,8 @@
   const META_KEY = 'mangaReaderSupabaseSyncMeta';
   const ACTIVE_KEY = 'mangaReaderActiveVault';
   const CHANNEL_NAME = 'mangaReaderVaultSession';
-  const SYNC_PROTOCOL_VERSION = 3;
+  const SYNC_PROTOCOL_VERSION = 4;
+  const LEGACY_SYNC_PROTOCOL_VERSION = 3;
   let pendingConflictChoices = null;
   const VERSION = 1;
   const ITERATIONS = 600000;
@@ -248,7 +249,7 @@
     if (options.token) headers.Authorization = 'Bearer ' + options.token;
     if (options.body) headers['Content-Type'] = 'application/json';
     const response = await fetch(config.url + path, Object.assign({}, options, { headers }));
-    if (!response.ok) { const detail = await response.text().catch(() => ''); const error = new Error('通信に失敗しました (' + response.status + ')' + (detail ? '。' + detail.slice(0, 140) : '')); error.status = response.status; throw error; }
+    if (!response.ok) { const detail = await response.text().catch(() => ''); let parsed = null; try { parsed = JSON.parse(detail); } catch (_) {} const error = new Error((parsed && (parsed.message || parsed.details)) || ('通信に失敗しました (' + response.status + ')' + (detail ? '。' + detail.slice(0, 140) : ''))); error.status = response.status; error.code = parsed && parsed.code; throw error; }
     return response.status === 204 ? null : response.json();
   }
   async function refreshSession() { const current = loadSession(); if (!current || !current.refresh_token) throw new Error('ログインしてください。'); const next = await api('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: JSON.stringify({ refresh_token: current.refresh_token }) }); saveSession(next); return next; }
@@ -280,6 +281,42 @@
     return rows && rows[0] ? Object.assign({}, rows[0], legacyRevision ? { legacyRevision: true, revision: 1 } : {}) : null;
   }
   async function fetchRecordForUi(token, user) { return fetchRecord(token, user); }
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  async function probeSyncProtocol(token) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const version = await api('/rest/v1/rpc/manga_reader_vault_sync_capability', { method: 'POST', token, body: '{}' });
+        if (Number(version) !== SYNC_PROTOCOL_VERSION) throw new Error('同期サーバーが未対応のprotocolを返しました。同期を停止しました。');
+        return SYNC_PROTOCOL_VERSION;
+      } catch (error) {
+        if (error && error.code === 'PGRST202' && attempt < 2) {
+          await wait(25 * (attempt + 1));
+          continue;
+        }
+        if (error && error.code === 'PGRST202') return LEGACY_SYNC_PROTOCOL_VERSION;
+        throw error;
+      }
+    }
+    return LEGACY_SYNC_PROTOCOL_VERSION;
+  }
+  const isLegacyWriteRejected = (error) => [401, 403].includes(Number(error && error.status))
+    || error && (['42501', 'PGRST202', 'vault_sync_client_outdated'].includes(error.code)
+      || String(error.message || '').includes('vault_sync_client_outdated'));
+  async function createVaultRecord(token, user, payload) {
+    let protocolVersion = await probeSyncProtocol(token);
+    const encrypted = await envelope(payload, protocolVersion);
+    try {
+      return protocolVersion === SYNC_PROTOCOL_VERSION
+        ? await api('/rest/v1/rpc/create_manga_reader_vault_v4', { method: 'POST', token, headers: { Prefer: 'return=representation' }, body: JSON.stringify({ new_payload: encrypted }) })
+        : await api('/rest/v1/manga_reader_vaults', { method: 'POST', token, headers: { Prefer: 'return=representation' }, body: JSON.stringify({ user_id: user.id, payload: encrypted, revision: 1 }) });
+    } catch (error) {
+      if (protocolVersion !== LEGACY_SYNC_PROTOCOL_VERSION || !isLegacyWriteRejected(error)) throw error;
+      protocolVersion = await probeSyncProtocol(token);
+      if (protocolVersion !== SYNC_PROTOCOL_VERSION) throw error;
+      if (await fetchRecord(token, user)) throw new Error('別の端末またはタブで保管庫が作成されました。端末データは保持されています。再読込して保管庫を開いてください。');
+      return api('/rest/v1/rpc/create_manga_reader_vault_v4', { method: 'POST', token, headers: { Prefer: 'return=representation' }, body: JSON.stringify({ new_payload: await envelope(payload, protocolVersion) }) });
+    }
+  }
   async function loadPayload() {
     assertSyncAccess();
     return withSession(async (token, user) => {
@@ -313,8 +350,8 @@
     } catch (error) { if (rawKey) rawKey.fill(0); throw error.message ? error : new Error('パスフレーズ、復旧キー、または保管庫の内容を確認してください。'); }
     const vault = { rawKey, keyWraps: envelope.keyWraps }; saveActive(vault); return vault;
   }
-  async function envelope(payload) { const vault = loadActive(); if (!vault) throw new Error('パスフレーズを入力して保管庫を開いてください。'); return { type: 'manga-reader-vault', version: VERSION, syncProtocolVersion: SYNC_PROTOCOL_VERSION, createdAt: new Date().toISOString(), algorithm: 'AES-256-GCM', keyWraps: vault.keyWraps, data: await encrypt(await importAes(vault.rawKey), new TextEncoder().encode(JSON.stringify(payload))) }; }
-  async function decryptPayload(payload) { const vault = loadActive(); if (!vault) throw new Error('パスフレーズを入力して保管庫を開いてください。'); return JSON.parse(new TextDecoder().decode(await decrypt(await importAes(vault.rawKey), payload.data))); }
+  async function envelope(payload, syncProtocolVersion = SYNC_PROTOCOL_VERSION) { const vault = loadActive(); if (!vault) throw new Error('パスフレーズを入力して保管庫を開いてください。'); return { type: 'manga-reader-vault', version: VERSION, syncProtocolVersion, createdAt: new Date().toISOString(), algorithm: 'AES-256-GCM', keyWraps: vault.keyWraps, data: await encrypt(await importAes(vault.rawKey), new TextEncoder().encode(JSON.stringify(payload))) }; }
+  async function decryptPayload(payload) { const vault = loadActive(); if (!vault) throw new Error('パスフレーズを入力して保管庫を開いてください。'); const data = JSON.parse(new TextDecoder().decode(await decrypt(await importAes(vault.rawKey), payload.data))); if (data && data.videoMarkers && window.MangaVaultPayload && typeof window.MangaVaultPayload.normalizeVideoMarkers === 'function') data.videoMarkers = window.MangaVaultPayload.normalizeVideoMarkers(data.videoMarkers); return data; }
   async function encryptBaseline(payload, userId, revision) {
     const vault = loadActive();
     if (!vault) throw new Error('保管庫がロックされているため、同期基準を保存できません。');
@@ -339,13 +376,103 @@
       throw new Error('同期基準を復号できないため同期を停止しました。端末データは保持されています。暗号化バックアップから復旧してください。');
     }
   }
+  function journalAad(userId) { return new TextEncoder().encode(['manga-reader-vault-deletion-journal', 1, userId].join(':')); }
+  function deletionJournalKey() { const keys = window.MangaVaultPayload && window.MangaVaultPayload.LOCAL_ONLY_KEYS; if (!Array.isArray(keys) || typeof keys[0] !== 'string') throw new Error('削除journalの保存先を確認できません。'); return keys[0]; }
+  async function readDeletionJournal(userId) {
+    const keys = window.MangaVaultPayload && window.MangaVaultPayload.LOCAL_ONLY_KEYS;
+    const currentKey = deletionJournalKey();
+    const legacyKey = Array.isArray(keys) ? keys[1] : null;
+    const serialized = localStorage.getItem(currentKey);
+    let entries = [];
+    if (serialized) {
+      const envelope = JSON.parse(serialized);
+      if (!envelope || envelope.type !== 'manga-reader-vault-deletion-journal' || envelope.version !== 1 || envelope.userId !== userId
+          || !envelope.iv || !envelope.ciphertext) throw new Error('削除journalの所有者または形式を確認できないため、削除と同期を停止しました。');
+      const vault = loadActive();
+      if (!vault) throw new Error('保管庫がロックされているため削除journalを復号できません。');
+      try {
+        const bytes = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64url(envelope.iv), additionalData: journalAad(userId) }, await importAes(vault.rawKey), fromB64url(envelope.ciphertext));
+        entries = JSON.parse(new TextDecoder().decode(bytes));
+        if (!Array.isArray(entries) || entries.some((entry) => !entry || typeof entry.path !== 'string' || !entry.path.startsWith('/') || typeof entry.operationId !== 'string')) throw new Error('invalid journal');
+      } catch (_) { throw new Error('削除journalを復号できないため、削除と同期を停止しました。端末データを保持しています。'); }
+    }
+    if (legacyKey) {
+      const legacy = localStorage.getItem(legacyKey);
+      if (legacy) {
+        let paths;
+        try { paths = JSON.parse(legacy); } catch (_) { throw new Error('旧削除journalを読み取れないため、削除と同期を停止しました。'); }
+        if (!Array.isArray(paths) || paths.some((path) => typeof path !== 'string' || !path.startsWith('/'))) throw new Error('旧削除journalの形式を確認できないため、削除と同期を停止しました。');
+        const seen = new Set(entries.map((entry) => entry.path));
+        paths.forEach((path) => { if (!seen.has(path)) entries.push({ path, operationId: b64url(randomBytes(16)) }); });
+        await writeDeletionJournal(userId, entries);
+        localStorage.removeItem(legacyKey);
+      }
+    }
+    return entries;
+  }
+  async function writeDeletionJournal(userId, entries) {
+    const vault = loadActive();
+    if (!vault) throw new Error('保管庫がロックされているため削除journalを暗号化できません。');
+    const iv = randomBytes(12);
+    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: journalAad(userId) }, await importAes(vault.rawKey), new TextEncoder().encode(JSON.stringify(entries)));
+    const envelope = { type: 'manga-reader-vault-deletion-journal', version: 1, userId, iv: b64url(iv), ciphertext: b64url(new Uint8Array(ciphertext)) };
+    localStorage.setItem(deletionJournalKey(), JSON.stringify(envelope));
+  }
+  async function recordSyncDeletion(path, mutate) {
+    const pointers = (Array.isArray(path) ? path : [path]).map((pointer) => String(pointer || ''));
+    if (!pointers.length || pointers.some((pointer) => !pointer.startsWith('/')) || typeof mutate !== 'function') throw new TypeError('削除にはJSON Pointerとデータ変更処理が必要です。');
+    const session = loadSession(); const userId = session && session.user && session.user.id;
+    if (!userId || !loadActive()) throw new Error('保管庫を開いてから削除してください。');
+    const entries = await readDeletionJournal(userId);
+    const recorded = pointers.map((pointer) => {
+      let entry = entries.find((candidate) => candidate.path === pointer);
+      if (!entry) { entry = { path: pointer, operationId: b64url(randomBytes(16)) }; entries.push(entry); }
+      return entry;
+    });
+    await writeDeletionJournal(userId, entries);
+    const pendingToken = markPendingSync(userId);
+    if (!pendingToken) throw new Error('未同期状態を端末に記録できないため、削除を停止しました。');
+    await mutate(recorded.map((entry) => entry.operationId));
+    return recorded.map((entry) => entry.operationId);
+  }
+  function removeAtPointer(root, pointer) {
+    const parts = pointer.slice(1).split('/').map((part) => part.replace(/~1/g, '/').replace(/~0/g, '~'));
+    let parent = root;
+    for (const part of parts.slice(0, -1)) {
+      if (!parent || typeof parent !== 'object') return;
+      if (Array.isArray(parent)) parent = parent.find((item) => item && String(item.id) === part);
+      else parent = parent[part];
+    }
+    if (!parent || typeof parent !== 'object') return;
+    const key = parts.at(-1);
+    if (Array.isArray(parent)) {
+      const index = parent.findIndex((item, position) => (item && String(item.id) === key) || String(position) === key);
+      if (index >= 0) parent.splice(index, 1);
+    } else delete parent[key];
+  }
+  async function prepareJournaledPayload(payload, userId) {
+    const entries = await readDeletionJournal(userId);
+    if (!entries.length) return { payload, operationIds: [] };
+    const next = JSON.parse(JSON.stringify(payload));
+    const tombstones = new Set(Array.isArray(next.vaultSyncTombstones) ? next.vaultSyncTombstones : []);
+    entries.forEach((entry) => { tombstones.add(entry.path); removeAtPointer(next, entry.path); });
+    next.vaultSyncTombstones = [...tombstones];
+    return { payload: next, operationIds: entries.map((entry) => entry.operationId) };
+  }
+  async function acknowledgeDeletionJournal(userId, operationIds) {
+    if (!operationIds || !operationIds.length) return;
+    const acknowledged = new Set(operationIds);
+    const remaining = (await readDeletionJournal(userId)).filter((entry) => !acknowledged.has(entry.operationId));
+    if (remaining.length) await writeDeletionJournal(userId, remaining);
+    else localStorage.removeItem(deletionJournalKey());
+  }
   const samePayload = (left, right) => stableJson(left) === stableJson(right);
   function assertMergeAvailable() {
     if (!window.MangaVaultSyncMerge || typeof window.MangaVaultSyncMerge.mergeVaultPayload !== 'function') {
       throw new Error('差分同期機能を読み込めません。ページを再読込してください。');
     }
   }
-  async function commitMergedPayload(user, record, payload, localSnapshot, pendingToken) {
+  async function commitMergedPayload(user, record, payload, localSnapshot, pendingToken, deletionOperationIds) {
     const currentLocal = window.MangaVaultPayload && typeof window.MangaVaultPayload.buildFromLocalStorage === 'function'
       ? window.MangaVaultPayload.buildFromLocalStorage() : localSnapshot;
     if (samePayload(currentLocal, localSnapshot) && window.MangaVaultPayload && typeof window.MangaVaultPayload.applyToLocalStorage === 'function') {
@@ -353,17 +480,24 @@
     }
     const encryptedBaseline = await encryptBaseline(payload, user.id, record.revision);
     setMeta(user.id, { revision: record.revision, updatedAt: record.updated_at, encryptedBaseline }, pendingToken);
+    await acknowledgeDeletionJournal(user.id, deletionOperationIds);
     pendingConflictChoices = null;
     return record;
   }
-  async function persistPayload(token, user, payload, pendingToken) {
+  async function persistPayloadWithProtocol(token, user, payload, pendingToken, protocolVersion, journaled) {
     assertSyncAccess();
+    const localSnapshot = payload;
+    payload = journaled.payload;
+    if (protocolVersion === LEGACY_SYNC_PROTOCOL_VERSION
+        && (journaled.operationIds.length || Array.isArray(payload.vaultSyncTombstones) && payload.vaultSyncTombstones.length)) {
+      throw new Error('削除履歴を安全に共有できるv4同期がまだ利用できません。削除と端末の未同期変更を保持しています。');
+    }
     const existing = await fetchRecord(token, user);
     if (existing && existing.legacyRevision) throw new Error('Supabaseのrevision migrationが未適用です。supabase-schema.sqlをSQL Editorで実行してから保存してください。');
     const known = getMeta(user.id);
     if (existing) {
       assertMergeAvailable();
-      if (Number(existing.payload && existing.payload.syncProtocolVersion) > SYNC_PROTOCOL_VERSION) {
+      if (Number(existing.payload && existing.payload.syncProtocolVersion) > protocolVersion) {
         throw new Error('この保管庫は新しい同期方式で更新されています。アプリを再読込してから同期してください。');
       }
       let baseline;
@@ -372,9 +506,13 @@
         if (known && known.pendingSync) throw new Error('未同期データの基準が見つからないため上書きを停止しました。端末データを保持したまま暗号化バックアップから復旧してください。');
         const cloudPayload = await decryptPayload(existing.payload);
         if (!samePayload(payload, cloudPayload)) throw new Error('未同期データの基準が見つからないため上書きを停止しました。端末データを保持したまま暗号化バックアップから復旧してください。');
+        if (Number(existing.payload && existing.payload.syncProtocolVersion || LEGACY_SYNC_PROTOCOL_VERSION) !== protocolVersion) {
+          baseline = cloudPayload;
+        } else {
         const initialBaseline = await encryptBaseline(cloudPayload, user.id, existing.revision);
         setMeta(user.id, { revision: existing.revision, updatedAt: existing.updated_at, encryptedBaseline: initialBaseline });
         return existing;
+        }
       }
 
       let current = existing;
@@ -403,17 +541,15 @@
           }
           mergeResult.payload = window.MangaVaultSyncMerge.applyConflictChoices(mergeResult.payload, mergeResult.conflicts, choices);
         }
-        delete mergeResult.payload.vaultSyncTombstones;
-        const comparableRemote = Object.assign({}, remotePayload);
-        delete comparableRemote.vaultSyncTombstones;
-        if (samePayload(mergeResult.payload, comparableRemote)) {
-          return commitMergedPayload(user, current, remotePayload, payload, pendingToken);
+        if (samePayload(mergeResult.payload, remotePayload) && Number(current.payload && current.payload.syncProtocolVersion || LEGACY_SYNC_PROTOCOL_VERSION) === protocolVersion) {
+          return commitMergedPayload(user, current, remotePayload, localSnapshot, pendingToken, journaled.operationIds);
         }
-        const encrypted = await envelope(mergeResult.payload);
-        const rows = await api('/rest/v1/rpc/update_manga_reader_vault', { method: 'POST', token, body: JSON.stringify({ expected_revision: current.revision, new_payload: encrypted }) });
+        const encrypted = await envelope(mergeResult.payload, protocolVersion);
+        const rpc = protocolVersion === SYNC_PROTOCOL_VERSION ? 'update_manga_reader_vault_v4' : 'update_manga_reader_vault';
+        const rows = await api('/rest/v1/rpc/' + rpc, { method: 'POST', token, body: JSON.stringify({ expected_revision: current.revision, new_payload: encrypted }) });
         assertSyncAccess();
         if (rows && rows.length) {
-          return commitMergedPayload(user, Object.assign({}, current, rows[0]), mergeResult.payload, payload, pendingToken);
+          return commitMergedPayload(user, Object.assign({}, current, rows[0]), mergeResult.payload, localSnapshot, pendingToken, journaled.operationIds);
         }
         current = await fetchRecord(token, user);
         if (!current) throw new Error('クラウド保管庫が見つからないため同期を停止しました。端末の変更は保持されています。');
@@ -421,7 +557,7 @@
       throw new Error('同期中にクラウド更新が続いたため自動再試行を停止しました。端末の変更は保持されています。再度同期してください。');
     }
     assertSyncAccess();
-    const rows = await api('/rest/v1/manga_reader_vaults', { method: 'POST', token, headers: { Prefer: 'return=representation' }, body: JSON.stringify({ user_id: user.id, payload: await envelope(payload), revision: 1 }) });
+    const rows = await createVaultRecord(token, user, payload);
     assertSyncAccess();
     const row = rows && rows[0];
     if (!row) throw new Error('クラウドへの保存結果を確認できませんでした。再読込して同期状態を確認してください。');
@@ -429,8 +565,25 @@
     const encryptedBaseline = await encryptBaseline(payload, user.id, revision);
     if (window.MangaVaultPayload && typeof window.MangaVaultPayload.applyToLocalStorage === 'function') window.MangaVaultPayload.applyToLocalStorage(payload);
     setMeta(user.id, { revision, updatedAt: row.updated_at, encryptedBaseline }, pendingToken);
+    await acknowledgeDeletionJournal(user.id, journaled.operationIds);
     pendingConflictChoices = null;
     return row;
+  }
+  async function persistPayload(token, user, payload, pendingToken) {
+    const journaled = await prepareJournaledPayload(payload, user.id);
+    let protocolVersion = await probeSyncProtocol(token);
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await persistPayloadWithProtocol(token, user, payload, pendingToken, protocolVersion, journaled);
+      } catch (error) {
+        const legacyWriteRejected = protocolVersion === LEGACY_SYNC_PROTOCOL_VERSION && isLegacyWriteRejected(error);
+        if (!legacyWriteRejected || attempt > 0) throw error;
+        const detected = await probeSyncProtocol(token);
+        if (detected !== SYNC_PROTOCOL_VERSION) throw error;
+        protocolVersion = detected;
+      }
+    }
+    throw new Error('同期方式を確認できないため、端末の変更を保留しました。再度同期してください。');
   }
   async function writePayload(payload, pendingToken) {
     assertSyncAccess();
@@ -495,7 +648,7 @@
     await applyPayload(payload);
     const encryptedBaseline = await encryptBaseline(payload, user.id, record.revision || 1);
     setMeta(user.id, { revision: record.revision || 1, updatedAt: record.updated_at, encryptedBaseline });
-    return { created: false };
+    return { created: false, retryPending: Number(record.payload && record.payload.syncProtocolVersion || LEGACY_SYNC_PROTOCOL_VERSION) < SYNC_PROTOCOL_VERSION };
   }
   async function initialize(passphrase, recoveryCode, applyPayload, createPayload) {
     if (typeof applyPayload !== 'function' || typeof createPayload !== 'function') throw new TypeError('保管庫初期化にはapplyPayloadとcreatePayloadが必要です。');
@@ -511,7 +664,7 @@
           const latest = await fetchRecord(token, user);
           if (latest) throw new Error('別の端末またはタブで保管庫が作成されました。端末データは保持されています。再読込して保管庫を開いてください。');
           assertSyncAccess();
-          return api('/rest/v1/manga_reader_vaults', { method: 'POST', token, headers: { Prefer: 'return=representation' }, body: JSON.stringify({ user_id: user.id, payload: await envelope(initialPayload), revision: 1 }) });
+          return createVaultRecord(token, user, initialPayload);
         });
         const row = rows && rows[0];
         if (!row) throw new Error('クラウドへの保存結果を確認できませんでした。端末データは保持されています。再読込して同期状態を確認してください。');
@@ -551,8 +704,19 @@
     }
     return withVaultSaveLock(user.id, async () => {
       assertSyncAccess();
-      const encrypted = await envelope(remotePayload);
-      const rows = await api('/rest/v1/rpc/update_manga_reader_vault', { method: 'POST', token, body: JSON.stringify({ expected_revision: record.revision, new_payload: encrypted }) });
+      let protocolVersion = await probeSyncProtocol(token);
+      let encrypted = await envelope(remotePayload, protocolVersion);
+      let rpc = protocolVersion === SYNC_PROTOCOL_VERSION ? 'update_manga_reader_vault_v4' : 'update_manga_reader_vault';
+      let rows;
+      try {
+        rows = await api('/rest/v1/rpc/' + rpc, { method: 'POST', token, body: JSON.stringify({ expected_revision: record.revision, new_payload: encrypted }) });
+      } catch (error) {
+        if (protocolVersion !== LEGACY_SYNC_PROTOCOL_VERSION || !isLegacyWriteRejected(error)) throw error;
+        protocolVersion = await probeSyncProtocol(token);
+        if (protocolVersion !== SYNC_PROTOCOL_VERSION) throw error;
+        encrypted = await envelope(remotePayload, protocolVersion);
+        rows = await api('/rest/v1/rpc/update_manga_reader_vault_v4', { method: 'POST', token, body: JSON.stringify({ expected_revision: record.revision, new_payload: encrypted }) });
+      }
       assertSyncAccess();
       if (!rows || !rows.length) throw new Error('認証情報の保存中に保管庫が更新されました。認証情報は変更せず、保管庫を再読込してください。');
       const updated = Object.assign({}, record, rows[0]);
@@ -641,6 +805,6 @@
     });
     return retryPendingLocalChanges(result);
   }
-  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, refreshSession, ensureSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, loadPayload, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, resolveConflicts, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
+  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, refreshSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, loadPayload, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, resolveConflicts, recordSyncDeletion, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
 })();
 

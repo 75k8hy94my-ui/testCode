@@ -386,6 +386,19 @@
     button.click(); return true;
   }
 
+  async function deleteVideoRecords(base) {
+    const remove = () => {
+      if (!invokeLegacyDelete(base)) throw new Error('動画を削除できませんでした。ページを再読み込みして再試行してください。');
+      if (base && base.id) delete state.meta[base.id];
+      if (!persistAux({ sync: false })) throw new Error('端末に動画の削除を保存できませんでした。');
+    };
+    if (window.TestCodeGuest?.isActive()) { remove(); return; }
+    const vault = window.MangaVault;
+    const pointerPath = window.MangaVaultPayload && window.MangaVaultPayload.pointerPath;
+    if (!vault || typeof vault.recordSyncDeletion !== 'function' || typeof pointerPath !== 'function') throw new Error('保管庫を開いてから削除してください。');
+    await vault.recordSyncDeletion([pointerPath('videos', base.id), pointerPath('videoMeta', base.id)], remove);
+  }
+
   function effectiveFieldsForEditor(videoId) {
     const base = baseById(videoId); return base ? effectiveVideo(base) : null;
   }
@@ -465,7 +478,7 @@
     state.folders.forEach((folder) => {
       const row = document.createElement('div'); row.className = 'vl-folder-row'; const name = document.createElement('span'); name.textContent = folder.name;
       const rename = document.createElement('button'); rename.type = 'button'; rename.textContent = '名前変更'; rename.disabled = !canReadProtectedData(); rename.addEventListener('click', () => { if (!canReadProtectedData()) return; const next = prompt('フォルダ名', folder.name); if (next == null || !text(next)) return; folder.name = text(next); persistAux(); renderFolderManager(); render(); });
-      const del = document.createElement('button'); del.type = 'button'; del.className = 'danger'; del.textContent = '削除'; del.disabled = !canReadProtectedData(); del.addEventListener('click', () => { if (!canReadProtectedData() || !confirm('「' + folder.name + '」を削除しますか？動画自体は削除されません。')) return; state.folders = state.folders.filter((entry) => entry.id !== folder.id); Object.keys(state.meta).forEach((videoId) => { if (state.meta[videoId] && state.meta[videoId].folderId === folder.id) state.meta[videoId] = { ...state.meta[videoId], folderId: null, updatedAt: Date.now() }; }); persistAux(); state.folderId = state.folderId === folder.id ? '' : state.folderId; renderFolderManager(); render(); });
+      const del = document.createElement('button'); del.type = 'button'; del.className = 'danger'; del.textContent = '削除'; del.disabled = !canReadProtectedData(); del.addEventListener('click', async () => { if (!canReadProtectedData() || !confirm('「' + folder.name + '」を削除しますか？動画自体は削除されません。')) return; const remove = () => { state.folders = state.folders.filter((entry) => entry.id !== folder.id); Object.keys(state.meta).forEach((videoId) => { if (state.meta[videoId] && state.meta[videoId].folderId === folder.id) state.meta[videoId] = { ...state.meta[videoId], folderId: null, updatedAt: Date.now() }; }); if (!persistAux({ sync: false })) throw new Error('端末にフォルダの削除を保存できませんでした。'); }; try { if (window.TestCodeGuest?.isActive()) remove(); else { const vault = window.MangaVault; const pointerPath = window.MangaVaultPayload && window.MangaVaultPayload.pointerPath; if (!vault || typeof vault.recordSyncDeletion !== 'function' || typeof pointerPath !== 'function') throw new Error('保管庫を開いてから削除してください。'); await vault.recordSyncDeletion(pointerPath('videoFolders', folder.id), remove); } state.folderId = state.folderId === folder.id ? '' : state.folderId; renderFolderManager(); render(); } catch (error) { setStatus(error.message || 'フォルダを削除できませんでした。', true); } });
       row.append(name, rename, del); dom.folderList.append(row);
     });
   }
@@ -502,8 +515,8 @@
         const created = invokeUrlAdd({ title, url }); targetId = created.id;
       } else if (text(existingBase.a) !== a || text(existingBase.b) !== b) {
         const created = invokeUrlAdd({ title: title || existingBase.title, url });
-        if (!invokeLegacyDelete(existingBase)) { invokeLegacyDelete(created); throw new Error('元の動画を置き換えられませんでした。'); }
-        delete state.meta[state.editorId]; targetId = created.id;
+        await deleteVideoRecords(existingBase);
+        targetId = created.id;
       }
       state.meta[targetId] = { ...(state.meta[targetId] || {}), ...patch, updatedAt: Date.now() };
       if (!persistAux({ sync: false })) throw new Error('端末データを保存できません。');
@@ -523,9 +536,8 @@
     if (!canReadProtectedData()) return;
     const base = baseById(videoId); if (!base) return;
     const video = effectiveVideo(base); if (!confirm('「' + (video.title || 'この動画') + '」を削除しますか？')) return;
-    if (!invokeLegacyDelete(base)) { setStatus('削除できませんでした。ページを再読み込みして再試行してください。', true); return; }
-    delete state.meta[videoId];
-    if (!persistAux({ sync: false })) { setStatus('端末に削除を保存できませんでした。', true); return; }
+    try { await deleteVideoRecords(base); }
+    catch (error) { setStatus(error && error.message ? error.message : '削除を保全できませんでした。', true); return; }
     loadLibraryState(); render();
     clearTimeout(state.syncTimer);
     if (!await runVaultSync()) { setStatus('端末には削除を保存しましたが、クラウド未同期です。保管庫を開いて再試行してください。', true); return; }

@@ -4,7 +4,7 @@
   const REQUIRED = [
     'getState', 'setState', 'getElements', 'getDocument', 'getConfig',
     'getSavedVideos', 'clearLocalCoverObjectUrls', 'confirmAction', 'setTimeout',
-    'persistAll', 'renderDashboard', 'renderAuthorDashboard', 'updateBulkEditButton',
+    'persistAll', 'recordSyncDeletion', 'onDeletionError', 'pointerPath', 'renderDashboard', 'renderAuthorDashboard', 'updateBulkEditButton',
     'getVisibleItems', 'appendFolderPreview', 'createStaticCard', 'loadLocalCover',
     'getCoverSourceCache', 'setupFeedImage', 'makeHeartIcon', 'moveItemInList',
     'moveFolderInList', 'renderList', 'buildFavoritesFolderCard',
@@ -85,16 +85,23 @@
         delBtn.className = 'book-delBtn';
         delBtn.textContent = '×';
         delBtn.title = '削除';
-        delBtn.addEventListener('click', (e) => {
+        delBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
           if (folderItems.length && !context.confirmAction('「' + folder.name + '」フォルダと、その中のURLをすべて削除します。本当によろしいですか？')) return;
           const current = context.getState();
-          context.setState({
-            savedItems: current.savedItems.filter((it) => it.folderId !== folder.id),
-            savedFolders: current.savedFolders.filter((f) => f.id !== folder.id)
-          });
-          context.persistAll();
-          context.renderList();
+          const deletedItems = current.savedItems.filter((item) => item.folderId === folder.id);
+          const pointer = context.pointerPath;
+          const paths = deletedItems.map((item) => pointer('items', item.id)).concat(pointer('folders', folder.id));
+          try {
+            await context.recordSyncDeletion(paths, () => {
+              context.setState({
+                savedItems: current.savedItems.filter((item) => item.folderId !== folder.id),
+                savedFolders: current.savedFolders.filter((entry) => entry.id !== folder.id)
+              });
+              if (context.persistItems() === false || context.persistFolders() === false) throw new Error('端末に削除を保存できませんでした。');
+            });
+            context.renderList();
+          } catch (error) { context.onDeletionError(error && error.message ? error.message : '削除を保全できませんでした。'); }
         });
         cover.appendChild(delBtn);
 
