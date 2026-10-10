@@ -26,19 +26,24 @@ snapshot() {
   local database="$1"
   psql --no-psqlrc --quiet --tuples-only --no-align --dbname="$database" <<'SQL'
 select concat_ws('|',
-  (select string_agg(user_id::text || ':' || revision::text || ':' || md5(payload::text), ',' order by user_id)
+  (select string_agg(user_id::text || ':' || revision::text || ':' || updated_at::text || ':' || md5(payload::text), ',' order by user_id)
      from public.manga_reader_vaults),
-  (select string_agg(attname || ':' || format_type(atttypid, atttypmod), ',' order by attnum)
-     from pg_attribute where attrelid = 'public.manga_reader_vaults'::regclass and attnum > 0 and not attisdropped),
+  (select string_agg(attname || ':' || format_type(atttypid, atttypmod) || ':' || attnotnull::text || ':' || coalesce(pg_get_expr(adbin, adrelid), ''), ',' order by attnum)
+     from pg_attribute a left join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
+     where a.attrelid = 'public.manga_reader_vaults'::regclass and a.attnum > 0 and not a.attisdropped),
+  (select string_agg(conname || ':' || pg_get_constraintdef(oid), ',' order by conname)
+     from pg_constraint where conrelid = 'public.manga_reader_vaults'::regclass),
   (select relrowsecurity::text || ':' || relforcerowsecurity::text
      from pg_class where oid = 'public.manga_reader_vaults'::regclass),
   (select string_agg(policyname || ':' || cmd || ':' || coalesce(qual, '') || ':' || coalesce(with_check, ''), ',' order by policyname)
      from pg_policies where schemaname = 'public' and tablename = 'manga_reader_vaults'),
-  (select string_agg(proname || ':' || pg_get_function_identity_arguments(oid) || ':' || prosecdef::text || ':' || md5(pg_get_functiondef(oid)), ',' order by proname, oid)
+  (select string_agg(proname || ':' || pg_get_function_identity_arguments(oid) || ':' || prosecdef::text || ':' || coalesce(proconfig::text, '') || ':' || coalesce(proacl::text, '') || ':' || md5(pg_get_functiondef(oid)), ',' order by proname, oid)
      from pg_proc where oid in (
        to_regprocedure('public.update_manga_reader_vault(bigint,jsonb)'),
        to_regprocedure('public.manga_reader_vault_sync_capability()'),
+       to_regprocedure('private.manga_reader_vault_sync_capability_worker()'),
        to_regprocedure('public.create_manga_reader_vault_v4(jsonb)'),
+       to_regprocedure('private.create_manga_reader_vault_v4_worker(jsonb)'),
        to_regprocedure('public.update_manga_reader_vault_v4(bigint,jsonb)'),
        to_regprocedure('private.update_manga_reader_vault_v4_worker(bigint,jsonb)'))),
   (select string_agg(grantee || ':' || privilege_type, ',' order by grantee, privilege_type)
