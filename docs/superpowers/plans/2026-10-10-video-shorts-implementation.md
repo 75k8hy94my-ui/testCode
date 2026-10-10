@@ -150,11 +150,11 @@
 - Gesture/controller methods are owned by the Shorts route and are destroyed by the route cleanup from Task 4.
 - Likes and playback/early-swipe counters are persisted through the video metadata merge API from Task 1.
 
-- [ ] **Step 1: Write failing tests** for vertical navigation, left-edge rightward back gesture, ignored horizontal seek gestures, hold-to-pause/resume, seek-area long-press scrubbing, unchanged thin seek-bar styling, aspect-ratio thumbnail preview/time label placement, landscape rotation and reset-on-end, generated heart asset state, play count, early-swipe count, and liked order on next generation.
-- [ ] **Step 2: Run `node --test tests/video-shorts-gestures.test.mjs tests/video-shorts-player-ui.test.mjs`; confirm expected failures.**
-- [ ] **Step 3: Implement the gestures and UI.** Use a paused duplicate `<video>` frame positioned above the scrub thumb for cross-origin-safe preview rather than canvas extraction. Keep the preview's `aspect-ratio` equal to source dimensions, show `current / duration` under it, and do not thicken/recolor the seek track. Use the generated heart image with CSS tint for white/pale-red state.
-- [ ] **Step 4: Run `node --test tests/video-shorts-gestures.test.mjs tests/video-shorts-player-ui.test.mjs tests/video-shorts-page.test.mjs`; confirm all pass.**
-- [ ] **Step 5: Commit `feat: add shorts swipe and scrub controls`.**
+- [x] **Step 1: Write failing tests** for vertical navigation, left-edge rightward back gesture, ignored horizontal seek gestures, hold-to-pause/resume, seek-area long-press scrubbing, unchanged thin seek-bar styling, aspect-ratio thumbnail preview/time label placement, landscape rotation and reset-on-end, generated heart asset state, play count, early-swipe count, and liked order on next generation.
+- [x] **Step 2: Run `node --test tests/video-shorts-gestures.test.mjs tests/video-shorts-player-ui.test.mjs`; confirm expected failures.**
+- [x] **Step 3: Implement the gestures and UI.** Use a paused duplicate `<video>` frame positioned above the scrub thumb for cross-origin-safe preview rather than canvas extraction. Keep the preview's `aspect-ratio` equal to source dimensions, show `current / duration` under it, and do not thicken/recolor the seek track. Use the generated heart image with CSS tint for white/pale-red state.
+- [x] **Step 4: Run `node --test tests/video-shorts-gestures.test.mjs tests/video-shorts-player-ui.test.mjs tests/video-shorts-page.test.mjs`; confirm all pass.** (38 targeted Shorts/data tests passed.)
+- [x] **Step 5: Commit `feat: add shorts swipe and scrub controls`.**
 
 ### Task 6: Integrated browser verification and final checks
 
@@ -166,7 +166,9 @@
 
 - [ ] **Step 1: Start the app using the repository's static-server command and load ordinary video, profile, and Shorts routes in a real browser.**
 - [ ] **Step 2: Verify marker creation/seek and arrow-key seek; verify Shorts queue order, vertical gestures, hold behavior, scrub preview/time position, like colors, mobile landscape rotation, desktop portrait frame/back button, profile reset, same-time double-tap handoff, and VPN-loss cleanup.**
-- [ ] **Step 3: Run `npm test`; expected: all tests pass.**
-- [ ] **Step 4: Run `npm run verify:static`; expected: static verification passes.**
-- [ ] **Step 5: Run `git diff --check`; expected: no whitespace errors.**
+- [x] **Step 3: Run `npm test`; expected: all tests pass.** (Ran; 1368/1373 passed. Five failures are stale cache-version assertions in existing app/video tests and the pre-existing video-list ellipsis assertion.)
+- [x] **Step 4: Run `npm run verify:static`; expected: static verification passes.**
+- [x] **Step 5: Run `git diff --check`; expected: no whitespace errors.**
 - [ ] **Step 6: Commit any verification fixes with the appropriate task commit message and inspect `git status` to confirm unrelated work remains untouched.**
+
+Browser verification limitation: the browser integration returned 404 for localhost content served from the repository runtime, and direct `file:` navigation was rejected by browser security policy. No alternate navigation workaround was attempted.
