@@ -185,6 +185,18 @@
     const session = loadSession();
     return Boolean(markPendingSync(session && session.user && session.user.id));
   }
+  function hasPendingLocalChanges() {
+    if (window.TestCodeGuest?.isActive()) return false;
+    const session = loadSession(); const userId = session && session.user && session.user.id;
+    const meta = userId && getMeta(userId);
+    return Boolean(meta && meta.pendingSync);
+  }
+  function guardPendingSyncLeave(event, isSyncRunning) {
+    if (!isSyncRunning && !hasPendingLocalChanges()) return false;
+    if (event && typeof event.preventDefault === 'function') event.preventDefault();
+    if (event) event.returnValue = '';
+    return true;
+  }
   function stableJson(value) {
     if (Array.isArray(value)) return '[' + value.map(stableJson).join(',') + ']';
     if (value && typeof value === 'object') return '{' + Object.keys(value).sort().map((key) => JSON.stringify(key) + ':' + stableJson(value[key])).join(',') + '}';
@@ -514,5 +526,6 @@
     });
     return retryPendingLocalChanges(result);
   }
-  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, refreshSession, ensureSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, loadPayload, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, markLocalChangesPending };
+  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, refreshSession, ensureSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, loadPayload, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
 })();
+

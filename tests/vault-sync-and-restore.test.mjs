@@ -420,3 +420,28 @@ test('same data with different remote credential wrappers is not treated as a lo
   assert.deepEqual(remote.record.payload.keyWraps, remoteKeyWraps);
   assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, true);
 });
+test('pending Vault sync blocks document unload but clears the warning after success', async () => {
+  const { vault } = await fixture({ initialPayload: { videos: [{ id: 'pending' }] } });
+  assert.equal(typeof vault.guardPendingSyncLeave, 'function');
+  let prevented = false;
+  const event = { preventDefault() { prevented = true; } };
+  assert.equal(vault.guardPendingSyncLeave(event, false), false);
+  assert.equal(prevented, false);
+  vault.markLocalChangesPending();
+  assert.equal(vault.guardPendingSyncLeave(event, false), true);
+  assert.equal(prevented, true);
+  assert.equal(event.returnValue, '');
+  assert.equal(vault.guardPendingSyncLeave(event, true), true);
+  await vault.saveLocalChanges();
+  assert.equal(vault.guardPendingSyncLeave(event, false), false);
+});
+
+test('guest local edits never count as pending cloud sync for the leave guard', async () => {
+  const { vault, context } = await fixture({ initialPayload: { videos: [{ id: 'guest-local' }] } });
+  vault.markLocalChangesPending();
+  context.window.TestCodeGuest = { isActive: () => true };
+  let prevented = false;
+  assert.equal(vault.hasPendingLocalChanges(), false);
+  assert.equal(vault.guardPendingSyncLeave({ preventDefault() { prevented = true; } }, false), false);
+  assert.equal(prevented, false);
+});

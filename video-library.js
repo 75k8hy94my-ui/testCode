@@ -79,13 +79,30 @@
     dom.status.dataset.error = isError ? '1' : '0';
   }
 
+  function hasPendingLocalSync() {
+    const vault = window.MangaVault;
+    if (!vault || typeof vault.hasPendingLocalChanges !== 'function') return false;
+    try { return vault.hasPendingLocalChanges() === true; } catch (_) { return false; }
+  }
+  function resumePendingLocalSync() {
+    if (window.TestCodeGuest?.isActive() || state.syncRunning || !hasPendingLocalSync()) return;
+    if (!canReadProtectedData()) { setStatus('端末に保存済みです。VPN接続後にクラウド同期します。', true); return; }
+    if (!window.MangaVault || !MangaVault.loadActive || !MangaVault.loadActive()) {
+      setStatus('端末に保存済みです。保管庫を開くとクラウド同期します。', true); return;
+    }
+    clearTimeout(state.syncTimer);
+    runVaultSync();
+  }
   async function runVaultSync() {
     if (window.TestCodeGuest?.isActive()) {
       setStatus('端末内に保存しました（ゲスト・同期なし）');
       return true;
     }
     if (!canReadProtectedData()) return false;
-    if (!window.MangaVault || !window.MangaVaultPayload || !MangaVault.loadActive || !MangaVault.loadActive()) return;
+    if (!window.MangaVault || !window.MangaVaultPayload || !MangaVault.loadActive || !MangaVault.loadActive()) {
+      setStatus('端末に保存済みです。保管庫を開くとクラウド同期します。', true);
+      return false;
+    }
     if (state.syncRunning) { state.syncDirty = true; return; }
     state.syncRunning = true;
     setStatus('同期中…');
@@ -490,11 +507,8 @@
       if (!persistAux({ sync: false })) throw new Error('端末データを保存できません。');
       loadLibraryState(); render();
       clearTimeout(state.syncTimer);
-      if (!await runVaultSync()) {
-        dom.formError.textContent = '端末には保存しましたが、クラウド未同期です。保管庫を開いてから再試行してください。';
-        return;
-      }
       closeSheet();
+      runVaultSync();
     } catch (error) {
       dom.formError.textContent = error && error.message ? error.message : '保存できませんでした。';
     } finally {
@@ -545,6 +559,14 @@
     dom.url.addEventListener('input', () => { dom.rotate90Direction.disabled = !Data.isDirectVideoUrl(dom.url.value); });
     dom.createFolder.addEventListener('click', createFolder); dom.newFolder.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); createFolder(); } });
     dom.sheet.addEventListener('click', (event) => { if (event.target === dom.sheet) return; });
+    window.addEventListener('beforeunload', (event) => {
+      const vault = window.MangaVault;
+      if (vault && typeof vault.guardPendingSyncLeave === 'function') vault.guardPendingSyncLeave(event, state.syncRunning);
+    });
+    window.addEventListener('online', resumePendingLocalSync);
+    document.addEventListener('manga-reader-vpn-status', () => {
+      if (canReadProtectedData()) resumePendingLocalSync();
+    });
     window.addEventListener('popstate', () => { if (!(history.state && history.state.videoLibrarySheet)) setSheetVisible(false); });
   }
 
@@ -562,7 +584,7 @@
   function init(access) {
     if (access) mediaAccess = access;
     if (!document.getElementById('videoListSection')) return;
-    injectStyles(); loadPrefs(); loadLibraryState(); if (!setupMarkup()) return; bindEvents(); if (dom.search) dom.search.value = state.query; render();
+    injectStyles(); loadPrefs(); loadLibraryState(); if (!setupMarkup()) return; bindEvents(); if (dom.search) dom.search.value = state.query; render(); resumePendingLocalSync();
   }
 
   window.MangaReaderVideoLibrary = Object.freeze({ init, syncAccessUi });
