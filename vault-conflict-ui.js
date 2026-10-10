@@ -132,6 +132,13 @@
       else resetPreview();
     });
   }
+  // Another tab can lock the Vault while this dialog is open. Drop the
+  // decrypted conflict preview immediately rather than retaining it in memory.
+  window.addEventListener('manga-vault-cleared', () => {
+    resetPreview();
+    const dialog = $('vaultConflictDialog');
+    if (dialog && dialog.open) dialog.close();
+  });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind, { once:true });
   else bind();
   window.TestCodeVaultConflictUI = {
