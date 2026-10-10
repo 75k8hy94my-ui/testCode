@@ -6,7 +6,6 @@
     'hasActiveVault',
     'clearTimer',
     'setTimer',
-    'savePayload',
     'buildBasePayload',
     'getSavedVideos',
     'readStorageItem',
@@ -58,6 +57,9 @@
       if (typeof deps.sync[name] !== 'function') {
         throw new TypeError('MangaListHostRuntimeFactory requires sync function: ' + name);
       }
+    }
+    if (typeof deps.sync.savePayload !== 'function' && typeof deps.sync.saveLocalChanges !== 'function') {
+      throw new TypeError('MangaListHostRuntimeFactory requires sync function: savePayload or saveLocalChanges');
     }
     if (!deps.images || typeof deps.images !== 'object' || Array.isArray(deps.images)) {
       throw new TypeError('MangaListHostRuntimeFactory requires image dependency object');

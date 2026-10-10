@@ -101,7 +101,7 @@ test('host factory exposes the shared persistence callbacks and rejects missing 
     assert.throws(() => factory.create(missingNavigationDependency), (error) => error.name === 'TypeError' && error.message.includes(name));
   }
   for (const name of [
-    'hasActiveVault', 'clearTimer', 'setTimer', 'savePayload', 'buildBasePayload',
+    'hasActiveVault', 'clearTimer', 'setTimer', 'buildBasePayload',
     'getSavedVideos', 'readStorageItem', 'getMangaInfo', 'getToc', 'getTheme',
     'getDashboardVisibility', 'onSyncError',
   ]) {
@@ -109,6 +109,22 @@ test('host factory exposes the shared persistence callbacks and rejects missing 
     delete missing.sync[name];
     assert.throws(() => factory.create(missing), (error) => error.name === 'TypeError' && error.message.includes(name));
   }
+  const missingSaveHandler = deps([]);
+  delete missingSaveHandler.sync.savePayload;
+  assert.throws(() => factory.create(missingSaveHandler), /savePayload or saveLocalChanges/);
+});
+
+test('host accepts and invokes saveLocalChanges when savePayload is unavailable', async () => {
+  const calls = [];
+  const input = deps(calls);
+  delete input.sync.savePayload;
+  input.sync.saveLocalChanges = async () => calls.push('save-local-changes');
+  const host = loadFactory().create(input);
+
+  await host.runCloudSync();
+
+  assert.ok(calls.includes('save-local-changes'));
+  assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'save'), false);
 });
 
 test('host persistence preserves write and sync order', () => {
