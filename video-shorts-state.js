@@ -85,7 +85,9 @@
       const current = load();
       if (!current) return null;
       const candidate = normalize(value);
-      if (candidate.revision < current.revision && candidate.updatedAt < current.updatedAt) return current;
+      if (candidate.generation < current.generation) return current;
+      if (candidate.generation === current.generation && candidate.revision < current.revision) return current;
+      if (candidate.generation === current.generation && candidate.revision === current.revision && candidate.updatedAt < current.updatedAt) return current;
       const timestamp = Math.max(Number(now()) || 0, current.updatedAt + 1, candidate.updatedAt);
       const next = normalize({
         ...candidate,

@@ -67,6 +67,17 @@ test('rejects a stale queue snapshot without replacing a newer local revision', 
   assert.equal(api.load().revision, 8);
 });
 
+test('a newer timestamp cannot make an older revision replace the current queue generation', () => {
+  const { api } = makeState({ values: { mangaReaderVideoShortsState: {
+    schemaVersion: 1, queue: activeQueue(), currentIndex: 0, currentTime: 30,
+    knownVideoIds: ['v1'], generation: 5, updatedAt: 500, revision: 8,
+  } } });
+  const stale = { ...api.load(), generation: 4, currentTime: 12, updatedAt: 900, revision: 7 };
+  assert.equal(api.save(stale, { sync: false }).currentTime, 30);
+  assert.equal(api.load().generation, 5);
+  assert.equal(api.load().revision, 8);
+});
+
 test('accepts a newer queue revision and advances it when saving', () => {
   const { api } = makeState({ values: { mangaReaderVideoShortsState: {
     schemaVersion: 1, queue: activeQueue(), currentIndex: 0, currentTime: 30,

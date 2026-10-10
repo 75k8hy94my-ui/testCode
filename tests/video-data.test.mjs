@@ -46,7 +46,7 @@ test('normalizes Shorts likes and counters separately from ordinary opens', () =
     id: 'shorts-v1', openCount: 8,
     shorts: { liked: true, playCount: 11.8, earlySwipeCount: -2, updatedAt: 123 },
   });
-  assert.deepEqual(video.shorts, { liked: true, playCount: 11, earlySwipeCount: 0, updatedAt: 123 });
+  assert.deepEqual(video.shorts, { liked: true, playCount: 11, earlySwipeCount: 0, updatedAt: 123, playCountBase: 11, earlySwipeCountBase: 0, playCountByClient: {}, earlySwipeCountByClient: {} });
   assert.equal(video.openCount, 8);
 });
 
@@ -55,7 +55,18 @@ test('stale video metadata cannot lower Shorts counters or undo a newer like cha
     { v1: { shorts: { liked: false, playCount: 9, earlySwipeCount: 4, updatedAt: 200 } } },
     { v1: { shorts: { liked: true, playCount: 3, earlySwipeCount: 1, updatedAt: 100 } } },
   );
-  assert.deepEqual(merged.v1.shorts, { liked: false, playCount: 9, earlySwipeCount: 4, updatedAt: 200 });
+  assert.deepEqual(merged.v1.shorts, { liked: false, playCount: 9, earlySwipeCount: 4, updatedAt: 200, playCountBase: 9, earlySwipeCountBase: 4, playCountByClient: {}, earlySwipeCountByClient: {} });
+});
+
+test('merges concurrent Shorts counter increments from different clients additively', () => {
+  const merged = mergeVideoMetaPreservingThumbnailTime(
+    { v1: { shorts: { liked: false, playCount: 11, earlySwipeCount: 5, playCountBase: 10, earlySwipeCountBase: 4, playCountByClient: { tabA: 1 }, earlySwipeCountByClient: { tabA: 1 }, updatedAt: 200 } } },
+    { v1: { shorts: { liked: false, playCount: 11, earlySwipeCount: 5, playCountBase: 10, earlySwipeCountBase: 4, playCountByClient: { tabB: 1 }, earlySwipeCountByClient: { tabB: 1 }, updatedAt: 201 } } },
+  );
+  assert.equal(merged.v1.shorts.playCount, 12);
+  assert.equal(merged.v1.shorts.earlySwipeCount, 6);
+  assert.deepEqual(merged.v1.shorts.playCountByClient, { tabA: 1, tabB: 1 });
+  assert.deepEqual(merged.v1.shorts.earlySwipeCountByClient, { tabA: 1, tabB: 1 });
 });
 
 test('parses and formats thumbnail timestamps for editor input', () => {

@@ -18,7 +18,7 @@ test('video hold pauses only during the hold and long-press scrubbing uses a pau
   assert.match(page, /shortsScrubPreview/);
   assert.match(page, /const source = activeVideo\.currentSrc \|\| activeVideo\.src/);
   assert.match(page, /heldWasPlaying/);
-  assert.match(page, /if \(gestureState\.heldWasPlaying\)[\s\S]{0,220}activeVideo\.play\(\)/);
+  assert.match(page, /if \(gestureState\.heldWasPlaying\)[\s\S]{0,220}resumeActivePlayback\(\)/);
 });
 
 test('early swipes are recorded only for vertical-swipe exits within five seconds', () => {

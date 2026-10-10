@@ -46,3 +46,10 @@ test('shorts gestures suppress native selection and long-press callouts across t
   assert.match(css, /\.shortsStage\s*,\s*\.shortsStage\s*\*\s*\{[^}]*-webkit-user-drag:\s*none/);
   assert.match(page, /stage\.addEventListener\('contextmenu',[^;]*preventDefault/);
 });
+
+test('mobile Shorts layout reserves the app header, bottom navigation, and iPhone safe areas', () => {
+  assert.match(css, /viewport-fit=cover|env\(safe-area-inset-bottom/);
+  assert.match(css, /env\(safe-area-inset-top/);
+  assert.match(css, /100dvh\s*-\s*64px\s*-\s*82px/);
+  assert.match(css, /is-shorts-rotated #mobileBottomNav/);
+});

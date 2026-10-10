@@ -22,7 +22,9 @@ test('Shorts route does not stay hidden waiting for an auth initializer it does 
 test('Shorts reloads the VPN gate and media-cache scripts after their behavior changes', () => {
   assert.match(html, /media-access-gate\.js\?v=20261010-proton-range/);
   assert.match(html, /video-data\.js\?v=20261010-shorts-media-cache/);
-  assert.match(html, /video-shorts-page\.js\?v=20261010-queue-rebuild-reset/);
+  assert.match(html, /video-shorts-page\.js\?v=20261010-stability-audio/);
+  assert.match(html, /video-shorts-player\.css\?v=20261010-stability-audio/);
+  assert.match(html, /viewport-fit=cover/);
 });
 
 test('Shorts route does not render a title or queue counter', () => {
