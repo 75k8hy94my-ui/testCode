@@ -9,7 +9,7 @@ on conflict (id) do nothing;
 insert into public.manga_reader_vaults (user_id, payload, revision)
 values
   ('10000000-0000-0000-0000-000000000001', '{"version":1,"data":{"ciphertext":"legacy-fixture"}}', 7),
-  ('20000000-0000-0000-0000-000000000002', '{"syncProtocolVersion":3,"version":1}', 4)
+  ('20000000-0000-0000-0000-000000000002', '{"syncProtocolVersion":3,"version":1,"data":{"ciphertext":"legacy-fixture"}}', 4)
 on conflict (user_id) do update set payload = excluded.payload, revision = excluded.revision;
 
 set role authenticated;
@@ -72,7 +72,7 @@ begin
     raise exception 'old protocol was accepted by direct worker call' using errcode = 'ZX001';
   exception when sqlstate 'P0001' then null;
   end;
-  select count(*) into affected from public.update_manga_reader_vault_v4(7, '{"syncProtocolVersion":4,"version":1}');
+  select count(*) into affected from public.update_manga_reader_vault_v4(7, '{"syncProtocolVersion":4,"version":1,"data":{"ciphertext":"updated-fixture"}}');
   if affected <> 1 then raise exception 'v4 update failed'; end if;
   if (select revision from public.manga_reader_vaults where user_id = auth.uid()) <> 8 then raise exception 'revision was not incremented exactly once'; end if;
 end $$;
@@ -107,7 +107,7 @@ begin
     raise exception 'old protocol create was accepted' using errcode = 'ZX001';
   exception when sqlstate 'P0001' then null;
   end;
-  select count(*) into affected from public.create_manga_reader_vault_v4('{"syncProtocolVersion":4,"version":1}');
+  select count(*) into affected from public.create_manga_reader_vault_v4('{"syncProtocolVersion":4,"version":1,"data":{"ciphertext":"created-fixture"}}');
   if affected <> 1 then raise exception 'new owner Vault was not created'; end if;
   begin
     perform * from private.create_manga_reader_vault_v4_worker('{"syncProtocolVersion":4,"version":1}');

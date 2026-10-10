@@ -11,6 +11,7 @@
   const SYNC_PROTOCOL_VERSION = 4;
   const LEGACY_SYNC_PROTOCOL_VERSION = 3;
   let pendingConflictChoices = null;
+  let vaultHistoryRestorePreview = null;
   const VERSION = 1;
   const ITERATIONS = 600000;
   const config = window.MANGA_READER_SUPABASE || {};
@@ -81,14 +82,28 @@
   }
   function readJSON(key, fallback) { try { const value = JSON.parse(localStorage.getItem(key) || ''); return value == null ? fallback : value; } catch (_) { return fallback; } }
   function loadSession() { return readJSON(SESSION_KEY, null); }
-  function saveSession(session) { if (session) localStorage.setItem(SESSION_KEY, JSON.stringify(session)); else localStorage.removeItem(SESSION_KEY); }
+  function saveSession(session) {
+    const previous = loadSession();
+    const previousUser = previous && previous.user && previous.user.id;
+    const nextUser = session && session.user && session.user.id;
+    if (!session || previousUser !== nextUser) clearHistoryRestorePreview();
+    if (session) localStorage.setItem(SESSION_KEY, JSON.stringify(session)); else localStorage.removeItem(SESSION_KEY);
+  }
   function serializeVault(vault) { return vault && vault.rawKey && vault.keyWraps ? { rawKey: b64url(vault.rawKey), keyWraps: vault.keyWraps } : null; }
   function restoreVault(saved) { try { if (!saved || !saved.rawKey || !saved.keyWraps) return null; const rawKey = fromB64url(saved.rawKey); return rawKey.length === 32 ? { rawKey, keyWraps: saved.keyWraps } : null; } catch (_) { return null; } }
   function loadActive() { try { return restoreVault(JSON.parse(sessionStorage.getItem(ACTIVE_KEY) || 'null')); } catch (_) { return null; } }
   let vaultChannel = null;
   function channelPost(message) { try { if (vaultChannel) vaultChannel.postMessage(message); } catch (_) {} }
   function saveActive(vault) { const saved = serializeVault(vault); sessionStorage.setItem(ACTIVE_KEY, JSON.stringify(saved)); channelPost({ type: 'vault-response', vault: saved }); }
-  function clearActive() { sessionStorage.removeItem(ACTIVE_KEY); channelPost({ type: 'vault-cleared' }); }
+  function clearHistoryRestorePreview() { vaultHistoryRestorePreview = null; }
+  function clearActive() {
+    clearHistoryRestorePreview();
+    sessionStorage.removeItem(ACTIVE_KEY);
+    channelPost({ type: 'vault-cleared' });
+    if (typeof window.dispatchEvent === 'function' && typeof window.CustomEvent === 'function') {
+      window.dispatchEvent(new window.CustomEvent('manga-vault-cleared'));
+    }
+  }
   function lockVault() { clearActive(); }
   function setupVaultChannel() {
     if (window.TestCodeGuest?.isActive()) return;
@@ -112,6 +127,7 @@
           return;
         }
         if (message.type === 'vault-cleared') {
+          clearHistoryRestorePreview();
           sessionStorage.removeItem(ACTIVE_KEY);
           window.dispatchEvent(new CustomEvent('manga-vault-cleared'));
         }
@@ -272,6 +288,203 @@
     return rows && rows[0] ? Object.assign({}, rows[0], legacyRevision ? { legacyRevision: true, revision: 1 } : {}) : null;
   }
   async function fetchRecordForUi(token, user) { return fetchRecord(token, user); }
+  function assertVaultHistoryAccess() {
+    if (window.TestCodeGuest?.isActive()) { clearHistoryRestorePreview(); throw new Error('ゲストモードでは保管庫履歴を利用できません。'); }
+    if (!loadActive()) { clearHistoryRestorePreview(); throw new Error('保管庫を開いてから変更履歴を確認してください。'); }
+    try { assertSyncAccess(); } catch (error) { clearHistoryRestorePreview(); throw error; }
+  }
+  function vaultHistoryQuery(userId, filter) {
+    return '/rest/v1/manga_reader_vault_history?select=history_id,user_id,revision,updated_at,encrypted_data,encoded_bytes,protected'
+      + '&user_id=eq.' + encodeURIComponent(userId) + filter;
+  }
+  async function decryptVaultHistoryRows(rows) {
+    if (!Array.isArray(rows)) throw new Error('変更履歴の応答形式を確認できません。');
+    const result = [];
+    for (const row of rows) {
+      assertVaultHistoryAccess();
+      if (!row || typeof row.history_id !== 'string' || !Number.isSafeInteger(Number(row.revision))
+          || !row.encrypted_data || typeof row.encrypted_data !== 'object') {
+        throw new Error('変更履歴の暗号化データを確認できません。');
+      }
+      const payload = await decryptPayload({ data: row.encrypted_data });
+      assertVaultHistoryAccess();
+      const normalized = window.MangaVaultPayload && typeof window.MangaVaultPayload.normalize === 'function'
+        ? window.MangaVaultPayload.normalize(payload) : payload;
+      result.push({
+        historyId: row.history_id,
+        revision: Number(row.revision),
+        updatedAt: row.updated_at,
+        protected: row.protected === true,
+        payload: normalized,
+      });
+    }
+    return result;
+  }
+  async function listVaultHistory(options = {}) {
+    assertVaultHistoryAccess();
+    const requestedLimit = Number(options && options.limit);
+    const limit = Number.isSafeInteger(requestedLimit) ? Math.max(1, Math.min(50, requestedLimit)) : 20;
+    const beforeRevision = Number(options && options.beforeRevision);
+    const revisionFilter = Number.isSafeInteger(beforeRevision) && beforeRevision > 0
+      ? '&revision=lt.' + encodeURIComponent(String(beforeRevision)) : '';
+    return withSession(async (token, user) => {
+      assertVaultHistoryAccess();
+      const rows = await api(vaultHistoryQuery(user.id, revisionFilter + '&order=revision.desc&limit=' + limit), { token });
+      assertVaultHistoryAccess();
+      return decryptVaultHistoryRows(rows);
+    });
+  }
+  async function getVaultHistorySnapshot(historyId) {
+    const id = String(historyId || '').trim();
+    if (!id) throw new Error('復元ポイントを指定してください。');
+    assertVaultHistoryAccess();
+    return withSession(async (token, user) => {
+      assertVaultHistoryAccess();
+      const rows = await api(vaultHistoryQuery(user.id, '&history_id=eq.' + encodeURIComponent(id) + '&limit=1'), { token });
+      assertVaultHistoryAccess();
+      const decrypted = await decryptVaultHistoryRows(rows);
+      if (decrypted.length !== 1) throw new Error('指定した変更履歴が見つかりません。');
+      return decrypted[0];
+    });
+  }
+  async function setVaultHistoryProtected(historyId, protectedState) {
+    const id = String(historyId || '').trim();
+    if (!id || typeof protectedState !== 'boolean') throw new Error('変更履歴の保護設定を確認してください。');
+    assertVaultHistoryAccess();
+    return withSession(async (token) => {
+      assertVaultHistoryAccess();
+      const result = await api('/rest/v1/rpc/set_manga_reader_vault_history_protected', {
+        method: 'POST', token,
+        body: JSON.stringify({ requested_history_id: id, requested_protected: protectedState }),
+      });
+      assertVaultHistoryAccess();
+      if (result !== true) throw new Error('変更履歴の保護設定を確認できませんでした。');
+      return true;
+    });
+  }
+  function createVaultHistoryRestoreId() {
+    if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    const bytes = randomBytes(16);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20);
+  }
+  async function readVaultHistoryRestoreInputs(token, user) {
+    assertVaultHistoryAccess();
+    if (await probeSyncProtocol(token) !== SYNC_PROTOCOL_VERSION) {
+      throw new Error('変更履歴の復元にはv4同期サーバーが必要です。保管庫と端末の変更は保持されています。');
+    }
+    const record = await fetchRecord(token, user);
+    assertVaultHistoryAccess();
+    if (!record || record.legacyRevision || !Number.isSafeInteger(Number(record.revision)) || Number(record.revision) < 1) {
+      throw new Error('クラウド保管庫のrevisionを確認できないため、復元を停止しました。');
+    }
+    const activeVault = loadActive();
+    if (!activeVault || stableJson(record.payload && record.payload.keyWraps || {}) !== stableJson(activeVault.keyWraps || {})) {
+      throw new Error('別の端末で認証情報が更新されています。再読込して保管庫を開き直してください。');
+    }
+    const remotePayload = await decryptPayload(record.payload);
+    assertVaultHistoryAccess();
+    if (hasPendingLocalChanges()) throw new Error('端末に未同期の変更があるため復元を停止しました。先に同期を確認してください。');
+    if (!window.MangaVaultPayload || typeof window.MangaVaultPayload.buildFromLocalStorage !== 'function') {
+      throw new Error('端末の同期データを読み取れないため、復元を停止しました。');
+    }
+    const localPayload = window.MangaVaultPayload.buildFromLocalStorage();
+    const known = getMeta(user.id);
+    if (known && known.encryptedBaseline) {
+      const baseline = await decryptBaseline(known.encryptedBaseline, user.id);
+      const normalize = window.MangaVaultPayload.normalize;
+      if (!samePayload(normalize(localPayload), normalize(baseline))) throw new Error('端末に未同期の変更があるため復元を停止しました。端末データは保持されています。');
+    } else if (!samePayload(window.MangaVaultPayload.normalize(localPayload), window.MangaVaultPayload.normalize(remotePayload))) {
+      throw new Error('同期基準が見つからず端末の変更を確認できないため、復元を停止しました。');
+    }
+    return { record, remotePayload };
+  }
+  async function previewVaultHistoryRestore(historyId) {
+    const id = String(historyId || '').trim();
+    if (!id) throw new Error('復元ポイントを指定してください。');
+    assertVaultHistoryAccess();
+    if (!window.MangaVaultHistory || typeof window.MangaVaultHistory.prepareVaultHistoryRestore !== 'function'
+        || typeof window.MangaVaultHistory.diffVaultSnapshots !== 'function') {
+      throw new Error('変更履歴の復元機能を読み込めません。ページを再読み込みしてください。');
+    }
+    return withSession(async (token, user) => {
+      const { record, remotePayload } = await readVaultHistoryRestoreInputs(token, user);
+      const rows = await api(vaultHistoryQuery(user.id, '&history_id=eq.' + encodeURIComponent(id) + '&limit=1'), { token });
+      assertVaultHistoryAccess();
+      const snapshots = await decryptVaultHistoryRows(rows);
+      if (snapshots.length !== 1) throw new Error('指定した変更履歴が見つかりません。');
+      const normalize = window.MangaVaultPayload && window.MangaVaultPayload.normalize;
+      const prepared = window.MangaVaultHistory.prepareVaultHistoryRestore(
+        snapshots[0].payload, remotePayload, createVaultHistoryRestoreId, normalize,
+      );
+      const changes = window.MangaVaultHistory.diffVaultSnapshots(remotePayload, prepared.payload, normalize);
+      vaultHistoryRestorePreview = {
+        historyId: id, userId: user.id, baseRevision: Number(record.revision),
+        targetPayload: prepared.payload, idMap: prepared.idMap, changes,
+      };
+      return { historyId: id, baseRevision: Number(record.revision), idMap: prepared.idMap, changes };
+    });
+  }
+  async function confirmVaultHistoryRestore(historyId, expectedRevision) {
+    const id = String(historyId || '').trim();
+    const preview = vaultHistoryRestorePreview;
+    if (!preview || preview.historyId !== id || Number(expectedRevision) !== preview.baseRevision) {
+      clearHistoryRestorePreview();
+      throw new Error('復元プレビューを確認できないため、最新状態を読み直して再プレビューしてください。');
+    }
+    assertVaultHistoryAccess();
+    return withSession(async (token, user) => withVaultSaveLock(user.id, async () => {
+      assertVaultHistoryAccess();
+      if (preview.userId !== user.id) {
+        clearHistoryRestorePreview();
+        throw new Error('アカウントが変更されたため復元を停止しました。');
+      }
+      const { record } = await readVaultHistoryRestoreInputs(token, user);
+      if (Number(record.revision) !== preview.baseRevision) {
+        clearHistoryRestorePreview();
+        throw new Error('クラウド保管庫がプレビュー後に更新されました。最新状態を読み直して再プレビューしてください。');
+      }
+      const activeVault = loadActive();
+      if (!activeVault) throw new Error('保管庫がロックされたため復元を停止しました。');
+      const nextRevision = preview.baseRevision + 1;
+      const encryptedBaseline = await encryptBaseline(preview.targetPayload, user.id, nextRevision);
+      const newPayload = await envelope(preview.targetPayload, SYNC_PROTOCOL_VERSION);
+      let rows;
+      try {
+        rows = await api('/rest/v1/rpc/update_manga_reader_vault_v4', {
+          method: 'POST', token,
+          body: JSON.stringify({ expected_revision: preview.baseRevision, new_payload: newPayload }),
+        });
+      } catch (error) {
+        clearHistoryRestorePreview();
+        const uncertain = new Error('復元要求の応答を確認できませんでした。クラウドの最新revisionを読み直してから再試行してください。');
+        uncertain.cause = error;
+        throw uncertain;
+      }
+      if (!rows || rows.length !== 1 || Number(rows[0].revision) !== nextRevision) {
+        clearHistoryRestorePreview();
+        throw new Error('復元CASに失敗しました。最新状態を読み直して再プレビューしてください。');
+      }
+      assertVaultHistoryAccess();
+      try {
+        if (!window.MangaVaultPayload || typeof window.MangaVaultPayload.applyToLocalStorage !== 'function') {
+          throw new Error('端末の保存領域を更新できません。');
+        }
+        window.MangaVaultPayload.applyToLocalStorage(preview.targetPayload);
+        setMeta(user.id, { revision: nextRevision, updatedAt: rows[0].updated_at, encryptedBaseline });
+      } catch (error) {
+        clearHistoryRestorePreview();
+        const committed = new Error('クラウドへの復元はrevision ' + nextRevision + ' で保存されましたが、この端末へ反映できませんでした。ページを再読み込みしてください。');
+        committed.cause = error;
+        throw committed;
+      }
+      clearHistoryRestorePreview();
+      emitPayloadApplied();
+      return { revision: nextRevision, updatedAt: rows[0].updated_at, idMap: preview.idMap };
+    }));
+  }
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   async function probeSyncProtocol(token) {
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -741,6 +954,9 @@
     window.addEventListener('load', () => requestAutoVaultSync(), { once: true });
     window.addEventListener('online', () => requestAutoVaultSync(true));
     window.addEventListener('focus', () => requestAutoVaultSync());
+    window.addEventListener('storage', (event) => {
+      if (event && event.key === SESSION_KEY) clearHistoryRestorePreview();
+    });
   }
   if (window.document && typeof window.document.addEventListener === 'function') {
     window.document.addEventListener('visibilitychange', () => {
@@ -748,6 +964,7 @@
     });
     window.document.addEventListener('manga-reader-vpn-status', (event) => {
       if (event && event.detail && event.detail.status === 'allowed') requestAutoVaultSync(true);
+      else clearHistoryRestorePreview();
     });
   }
 
@@ -928,6 +1145,6 @@
     });
     return retryPendingLocalChanges(result);
   }
-  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, ensureSession, refreshSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, loadPayload, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, syncLatest, resolveConflicts, recordSyncDeletion, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
+  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, ensureSession, refreshSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, listVaultHistory, getVaultHistorySnapshot, setVaultHistoryProtected, previewVaultHistoryRestore, confirmVaultHistoryRestore, loadPayload, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, syncLatest, resolveConflicts, recordSyncDeletion, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
 })();
 
