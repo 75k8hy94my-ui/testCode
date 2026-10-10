@@ -89,8 +89,14 @@ test('custom player defers single taps and maps double-tap zones to seek or full
 
 test('video player document cache keys identify the current watch-page design', () => {
   const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
-  assert.match(html, /home-profile-shell\.css\?v=20261009-generated-volume-icons/);
+  assert.match(html, /home-profile-shell\\.css\\?v=20261010-related-video-scroll/);
   assert.match(html, /video-player-page\.js\?v=20261010-local-first-save/);
+});
+
+test('desktop watch page keeps related videos in an independently scrolling viewport', () => {
+  const css = fs.readFileSync(new URL('../home-profile-shell.css', import.meta.url), 'utf8');
+  assert.match(css, /@media\\s*\\(min-width:\\s*901px\\)[\\s\\S]*?\\.videoRelated\\s*\\{[^}]*max-height:\\s*calc\\(100dvh\\s*-\\s*[^)]+\\)[^}]*overflow-y:\\s*auto/s);
+  assert.match(css, /\\.videoRelated\\s*\\{[^}]*position:\\s*sticky[^}]*align-self:\\s*start/s);
 });
 
 test('player saves title locally first, resumes pending sync in background, and warns before leaving', () => {
