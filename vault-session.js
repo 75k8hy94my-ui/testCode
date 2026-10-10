@@ -379,6 +379,109 @@
     if (!pendingToken) throw new Error('未同期状態を端末に記録できません。データは保持されています。保存領域を確認してください。');
     return enqueueSave(() => writeLocalChanges(pendingToken));
   }
+
+  // A conflict preview is held only in memory. No decrypted copy or key is persisted.
+  async function inspectConflict() {
+    assertSyncAccess();
+    if (!loadActive()) throw new Error('保管庫を開いてから競合を確認してください。');
+    if (!window.MangaVaultPayload || typeof window.MangaVaultPayload.buildFromLocalStorage !== 'function') throw new Error('端末データを読み取れません。');
+    return withSession(async (token, user) => {
+      if (!(getMeta(user.id) || {}).pendingSync) throw new Error('未同期の変更がありません。画面を再読込してください。');
+      const record = await fetchRecord(token, user);
+      if (!record || record.legacyRevision) throw new Error('クラウドの更新番号を確認できません。同期設定を確認してください。');
+      const cloud = await decryptPayload(record.payload);
+      assertSyncAccess();
+      return {
+        userId: user.id,
+        revision: record.revision,
+        updatedAt: record.updated_at,
+        local: window.MangaVaultPayload.buildFromLocalStorage(),
+        cloud,
+        cloudEnvelope: record.payload
+      };
+    });
+  }
+
+  async function createConflictBackup(snapshot) {
+    assertSyncAccess();
+    const session = loadSession();
+    if (!snapshot || !session || !session.user || snapshot.userId !== session.user.id || !loadActive()) throw new Error('競合をもう一度確認してください。');
+    // Both payloads are encrypted; the remote envelope is preserved byte-for-byte.
+    const localEnvelope = await envelope(snapshot.local);
+    assertSyncAccess();
+    return {
+      type: 'testcode-vault-conflict-backup',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      remoteRevision: snapshot.revision,
+      local: localEnvelope,
+      cloud: snapshot.cloudEnvelope
+    };
+  }
+
+  async function resolveConflict(choice, snapshot) {
+    if (choice !== 'local' && choice !== 'cloud') throw new Error('採用するデータを選択してください。');
+    assertSyncAccess();
+    if (!loadActive() || !snapshot) throw new Error('競合をもう一度確認してください。');
+    const session = loadSession();
+    const userId = session && session.user && session.user.id;
+    if (!userId || snapshot.userId !== userId) throw new Error('ログインアカウントが変更されました。');
+    return enqueueSave(() => withVaultSaveLock(userId, () => withSession(async (token, user) => {
+      assertSyncAccess();
+      if (!loadActive() || user.id !== snapshot.userId) throw new Error('保管庫を開き直して確認してください。');
+      const meta = getMeta(user.id);
+      if (!meta || !meta.pendingSync) throw new Error('未同期状態が変わりました。画面を再読込してください。');
+      if (!window.MangaVaultPayload || typeof window.MangaVaultPayload.buildFromLocalStorage !== 'function') throw new Error('端末データを読み取れません。');
+      if (stableJson(window.MangaVaultPayload.buildFromLocalStorage()) !== stableJson(snapshot.local)) throw new Error('確認後に端末データが変更されました。競合を再確認してください。');
+      const record = await fetchRecord(token, user);
+      if (!record || record.legacyRevision || Number(record.revision) !== Number(snapshot.revision) || stableJson(record.payload) !== stableJson(snapshot.cloudEnvelope)) {
+        throw new Error('確認後にクラウドデータが変更されました。上書きせずに停止しました。競合を再確認してください。');
+      }
+      assertSyncAccess();
+      const pendingToken = markPendingSync(user.id);
+      if (!pendingToken) throw new Error('未同期状態を記録できません。処理を中止しました。');
+      if (choice === 'cloud') {
+        if (typeof window.MangaVaultPayload.applyToLocalStorage !== 'function') throw new Error('端末データの復元機能がありません。');
+        // A failed restore leaves the pending marker intact. Never clear it first.
+        window.MangaVaultPayload.applyToLocalStorage(snapshot.cloud);
+        assertSyncAccess();
+        setMeta(user.id, { revision: record.revision, updatedAt: record.updated_at }, pendingToken);
+        const active = loadActive();
+        if (active) saveActive({ rawKey: active.rawKey, keyWraps: record.payload.keyWraps });
+        return { choice, revision: record.revision };
+      }
+      const encrypted = await envelope(snapshot.local);
+      // Retain credential wrappers from the latest remote record, even when
+      // the local data wins. Losing passkeys here would lock out other devices.
+      encrypted.keyWraps = record.payload.keyWraps;
+      assertSyncAccess();
+      const rows = await api('/rest/v1/rpc/update_manga_reader_vault', {
+        method: 'POST', token,
+        body: JSON.stringify({ expected_revision: record.revision, new_payload: encrypted })
+      });
+      assertSyncAccess();
+      let saved = rows && rows[0];
+      if (!saved) {
+        // A lost response is accepted only if the remote version exactly matches
+        // the intended local data and credential wrappers.
+        const current = await fetchRecord(token, user);
+        if (current && Number(current.revision) > Number(record.revision)) {
+          const remoteData = await decryptPayload(current.payload);
+          const wrappersMatch = stableJson(current.payload.keyWraps || {}) === stableJson(encrypted.keyWraps || {});
+          if (stableJson(remoteData) === stableJson(snapshot.local) && wrappersMatch) {
+            saved = { revision: current.revision, updated_at: current.updated_at };
+          }
+        }
+        if (!saved) throw new Error('別の端末が先に更新しました。端末データは保持しています。競合を再確認してください。');
+      }
+      if (stableJson(window.MangaVaultPayload.buildFromLocalStorage()) !== stableJson(snapshot.local)) markPendingSync(user.id);
+      setMeta(user.id, { revision: saved.revision, updatedAt: saved.updated_at }, pendingToken);
+      const active = loadActive();
+      if (active) saveActive({ rawKey: active.rawKey, keyWraps: encrypted.keyWraps });
+      return { choice, revision: saved.revision };
+    })));
+  }
+
   async function restoreExistingRecord(record, user, applyPayload, unlockRecord) {
     const known = getMeta(user.id);
     const pendingSync = Boolean(known && known.pendingSync);
@@ -526,6 +629,6 @@
     });
     return retryPendingLocalChanges(result);
   }
-  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, refreshSession, ensureSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, loadPayload, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
+  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, refreshSession, ensureSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, loadPayload, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, inspectConflict, createConflictBackup, resolveConflict, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
 })();
 

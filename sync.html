@@ -35,6 +35,20 @@
     #recoveryBox { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(88vw,680px); padding:22px; border:1px solid #d1d5db; background:#fff; }
     #recoveryBox code { display:block; margin:12px 0; padding:12px; border:1px solid #d1d5db; overflow-wrap:anywhere; user-select:all; }
     #recoveryBox button { width:100%; min-height:44px; }
+    #unlockForm > button { width:100%; min-height:44px; margin-top:10px; background:#fff; color:var(--text); border:1px solid var(--line); cursor:pointer; }
+    #vaultConflictDialog { position:fixed; inset:0; width:min(700px,calc(100vw - 32px)); max-height:calc(100dvh - 48px); overflow:auto; padding:24px; border:1px solid #d1d5db; border-radius:14px; color:var(--text); background:#fff; box-shadow:0 18px 60px rgba(15,23,42,.18); }
+    #vaultConflictDialog::backdrop { background:rgba(15,23,42,.55); }
+    #vaultConflictDialog h2 { margin:0 0 12px; font-size:22px; }
+    #vaultConflictDialog p { font-size:14px; line-height:1.55; }
+    #vaultConflictDialog ul { list-style:none; padding:0; max-height:230px; overflow:auto; border:1px solid #e5e7eb; border-radius:8px; }
+    #vaultConflictDialog li { padding:8px 12px; font-size:14px; border-bottom:1px solid #e5e7eb; }
+    #vaultConflictDialog li:last-child { border-bottom:0; }
+    #vaultConflictDialog button { min-height:42px; border:1px solid #9ca3af; border-radius:7px; background:#fff; color:var(--text); padding:8px 12px; font:inherit; cursor:pointer; }
+    #vaultConflictDialog button:disabled { opacity:.5; cursor:not-allowed; }
+    #vaultConflictDialog button:focus-visible { outline:2px solid #2563eb; }
+    #vaultConflictDialog label { display:flex; align-items:flex-start; gap:8px; margin:12px 0; font-size:14px; line-height:1.5; }
+    .vaultConflictActions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0; }
+    @media(max-width:640px) { #vaultConflictDialog { padding:16px; } .vaultConflictActions { grid-template-columns:1fr; } }
     [hidden] { display:none!important; }
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
       #accountMenu { background:#fff; }
@@ -80,12 +94,31 @@
       <code id="recoveryCode"></code>
       <button id="copyRecoveryBtn" type="button">復旧キーをコピー</button>
     </div>
+    <dialog id="vaultConflictDialog" aria-labelledby="vaultConflictTitle">
+      <h2 id="vaultConflictTitle">クラウド同期の競合を解決</h2>
+      <p>端末版とクラウド版で異なるデータの種類を表示しています。自動統合は行いません。</p>
+      <p id="vaultConflictRevision"></p>
+      <ul id="vaultConflictDifferences"></ul>
+      <p><strong>先に双方の暗号化バックアップを保存してください。</strong> 一方の版を採用すると、もう一方の変更が置き換わります。</p>
+      <button id="vaultConflictDownload" type="button">双方の暗号化バックアップを保存</button>
+      <label><input id="vaultConflictAcknowledge" type="checkbox" disabled>バックアップの保存を確認し、採用しない側の変更が置き換わることを理解しました。</label>
+      <div class="vaultConflictActions">
+        <button id="vaultConflictLocal" type="button" disabled>端末版を採用（クラウドを更新）</button>
+        <button id="vaultConflictCloud" type="button" disabled>クラウド版を採用（端末を置換）</button>
+      </div>
+      <p id="vaultConflictStatus" role="status" aria-live="polite"></p>
+      <div class="vaultConflictActions">
+        <button id="vaultConflictRefresh" type="button">最新データを再確認</button>
+        <button id="vaultConflictClose" type="button">戻る</button>
+      </div>
+    </dialog>
   </main>
   <script src="guest-mode.js?v=20261009-guest"></script>
 <script src="supabase-config.js"></script>
-  <script src="vault-session.js?v=20261010-local-first-save"></script>
+  <script src="vault-session.js?v=20261010-conflict-resolution"></script>
   <script src="vault-payload.js"></script>
   <script src="encrypted-chunk-cache.js"></script>
+  <script src="vault-conflict-ui.js?v=20261010-conflict-resolution"></script>
   <script>
   (async () => {
     'use strict';
@@ -109,6 +142,7 @@
     };
     function setStatus(text) { ui.status.textContent=text || ''; }
     let pendingContinueButton=null;
+    let pendingResolveButton=null;
     function showPendingSync(result) {
       setStatus(['端末には未同期の変更があります。',result && result.syncError].filter(Boolean).join(' '));
       if (!pendingContinueButton) {
@@ -118,10 +152,19 @@
         pendingContinueButton.addEventListener('click',goReader);
         ui.unlockForm.appendChild(pendingContinueButton);
       }
+      if (!pendingResolveButton) {
+        pendingResolveButton=document.createElement('button');
+        pendingResolveButton.type='button';
+        pendingResolveButton.textContent='同期競合を確認・解決';
+        pendingResolveButton.addEventListener('click',()=>window.TestCodeVaultConflictUI.open(goReader));
+        ui.unlockForm.appendChild(pendingResolveButton);
+      }
     }
     function clearPendingSyncNotice() {
       if (pendingContinueButton) pendingContinueButton.remove();
+      if (pendingResolveButton) pendingResolveButton.remove();
       pendingContinueButton=null;
+      pendingResolveButton=null;
     }
     function goReader() { const next = new URLSearchParams(location.search).get('next'); window.location.replace(['images.html','drive-gallery.html'].includes(next) ? next : 'home.html'); }
     let session = MangaVault.loadSession();
@@ -134,7 +177,11 @@
       return;
     }
     ui.email.textContent=session.user.email;
-    if (MangaVault.loadActive()) { goReader(); return; }
+    const alreadyActive=Boolean(MangaVault.loadActive());
+    if (alreadyActive) {
+      if (MangaVault.hasPendingLocalChanges()) showPendingSync({pendingSync:true,syncError:'端末とクラウドを確認して競合を解決できます。'});
+      else { goReader(); return; }
+    }
     const DEVICE_DATA_KEYS=[...Object.values(MangaVaultPayload.DATA_KEYS||{}),'mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
     let opening=false;
     let passkeyOpening=false;
@@ -292,7 +339,7 @@
     document.addEventListener('click',closeAccountMenu);
     document.addEventListener('keydown',(event)=>{ if (event.key === 'Escape') closeAccountMenu(); });
     ui.copy.addEventListener('click',async()=>{ try { await navigator.clipboard.writeText(ui.recoveryCode.textContent); } catch (_) {} });
-    autoUsePasskey();
+    if (!alreadyActive) autoUsePasskey();
   })();
   </script>
   <script src="profile-menu.js?v=20260924-theme-unified"></script>
