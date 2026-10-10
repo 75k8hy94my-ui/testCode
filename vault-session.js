@@ -738,6 +738,7 @@
     if (autoSyncTimer && typeof autoSyncTimer.unref === 'function') autoSyncTimer.unref();
   }
   if (typeof window.addEventListener === 'function') {
+    window.addEventListener('load', () => requestAutoVaultSync(), { once: true });
     window.addEventListener('online', () => requestAutoVaultSync(true));
     window.addEventListener('focus', () => requestAutoVaultSync());
   }
