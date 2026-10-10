@@ -231,11 +231,17 @@
         rows + '</section>');
     }
     function walletApp() {
+      const arrears = Math.max(0, Math.floor(Number(model.rentArrears) || 0));
+      const rentRow = arrears > 0
+        ? '<div class="ios-list-row"><span>⌂</span><div><b>家賃滞納 · 利息なし</b><small>' + (model.rentStatus === "overdue" ? "猶予期間後も住み続けられます" : "Day " + (model.rentGraceEndsDay || model.day + 14) + ' まで猶予') + '</small></div><em>' + yen(arrears) + '</em></div>'
+        : '<div class="ios-list-row"><span>⌂</span><div><b>家賃</b><small>Day ' + (model.nextRentDay || 8) + '</small></div><em>' + yen(model.rent) + '</em></div>';
+      const homeAction = arrears > 0
+        ? '<button class="ios-wide-button" type="button" data-phone-action="home-action">自宅で返済する</button>'
+        : '';
       return shell("ウォレット",'<div class="ios-wallet-card"><small>WAKABA CASH</small><strong>' + yen(model.cash) +
         '</strong><span>•••• 2026</span></div><section class="ios-section"><h3>今後の支払い</h3>' +
-        '<div class="ios-list-row"><span>⌂</span><div><b>家賃</b><small>Day ' + (model.nextRentDay || 8) + '</small></div><em>' +
-        yen(model.rent) + '</em></div><div class="ios-list-row"><span>▣</span><div><b>食料</b><small>自宅で料理できます</small></div><em>' +
-        (model.groceries || 0) + '</em></div></section>');
+        rentRow + '<div class="ios-list-row"><span>▣</span><div><b>食料</b><small>自宅で料理できます</small></div><em>' +
+        (model.groceries || 0) + '</em></div></section>' + homeAction);
     }
     function healthApp() {
       const needs = model.needs || {};
@@ -497,6 +503,9 @@
         inTrain:value.inTrain,
         drivingRating:value.drivingRating,
         nextRentDay:value.nextRentDay,
+        rentArrears:value.rentArrears,
+        rentStatus:value.rentStatus,
+        rentGraceEndsDay:value.rentGraceEndsDay,
         waypoint:value.waypoint ? [value.waypoint.id,Math.round((value.waypoint.distance || 0) / 20)] : null,
         needs:["hunger","energy","hygiene","social","fun","health"].map(function(key){
           const value = Number(needs[key]);

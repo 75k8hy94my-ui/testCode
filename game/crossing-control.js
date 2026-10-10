@@ -143,10 +143,11 @@
     const activeClearance = Math.max(0, Number(claim.clearanceTime) || (Number(crosswalk.length) || 120) / 28);
     const conflictImminent = timeToArrival <= activeClearance + CLEARANCE_MARGIN || distance <= stoppingDistance + 42;
 
-    // A vehicle whose nose has already entered the pedestrian conflict envelope
-    // must clear the crossing when the pedestrian is still waiting. Asking both
-    // actors to stop is the reciprocal-yield deadlock this module is meant to avoid.
-    if (claim.phase === "waiting" && committed) {
+    // Once a vehicle's nose enters the pedestrian envelope, stopping inside it
+    // creates a reciprocal-yield deadlock. Waiting pedestrians are kept out by
+    // assessPedestrian; a newly crossing pedestrian must let the committed car
+    // clear while vehicles behind it remain stopped.
+    if (committed) {
       return {
         shouldYield:false,
         stopOffset:0,
@@ -154,21 +155,20 @@
         stoppingDistance,
         timeToArrival,
         emergencyBrake:false,
+        emergencyClear:claim.phase === "crossing",
         committed:true,
         frontClearance
       };
     }
 
-    const shouldYield = claim.phase === "crossing"
-      ? (committed || canStop && conflictImminent || speed < .1)
-      : (canStop && conflictImminent || speed < .1 && !committed);
+    const shouldYield = canStop && conflictImminent || speed < .1;
     return {
       shouldYield,
       stopOffset:Math.max(0, frontClearance - SAFE_FRONT_CLEARANCE),
       canStop,
       stoppingDistance,
       timeToArrival,
-      emergencyBrake:claim.phase === "crossing" && committed && !canStop,
+      emergencyBrake:false,
       committed,
       frontClearance
     };

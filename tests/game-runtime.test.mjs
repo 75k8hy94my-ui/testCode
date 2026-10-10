@@ -19,6 +19,15 @@ test('game keeps a timer fallback when requestAnimationFrame is unavailable', ()
   assert.match(source, /requestFrame\(frame\)/);
 });
 
+test('citizen restore resolves generated pedestrian graph nodes and preserves saved positions', () => {
+  const restore = source.slice(source.indexOf('function restoreCitizenFromSave('), source.indexOf('function applyGameSnapshot('));
+  assert.match(restore, /resolvePedestrianGraphNodeId\(stored\.currentNodeId\)/);
+  assert.match(restore, /resolvePedestrianGraphNodeId\(stored\.targetNodeId\)/);
+  assert.match(restore, /resolvePedestrianGraphNodeId\(pending\.nodeId\)/);
+  assert.match(restore, /const savedX = Number\(stored\.x\)/);
+  assert.match(restore, /pedestrianGraphNodePosition\(savedCurrentNode\)/);
+});
+
 test('game reports an unavailable canvas context instead of failing silently', () => {
   assert.match(source, /typeof canvas\.getContext === "function"/);
   assert.match(source, /Canvas API を利用できません/);
@@ -31,6 +40,55 @@ test('persistent HUD information is consolidated in the lower-left corner', () =
   assert.match(css, /\.hud-info-stack \.hud-card\{[\s\S]*position:relative/);
   assert.match(css, /\.hud-info-stack \.hud-card\{[\s\S]*top:auto/);
   assert.match(css, /\.hud-info-stack \.hud-card\{[\s\S]*transform:none/);
+});
+
+test('first-day HUD invites several optional ways to spend the day', () => {
+  assert.match(html, /id="objectiveTitle">今日はどう過ごす？/);
+  assert.match(html, /徒歩・電車や仕事、交流、地域活動から自由に選べます。車は序盤に購入できます/);
+  assert.match(source, /objectiveTitle\.textContent = "今日はどう過ごす？"/);
+  assert.match(source, /徒歩・電車や仕事、交流、地域活動から自由に選べます。車は序盤に購入できます/);
+});
+
+test('game manuals describe Vault autosave and do not claim progress is never saved', () => {
+  const guide = fs.readFileSync(path.join(root, 'docs', 'game-guide.md'), 'utf8');
+  const manual = fs.readFileSync(path.join(root, 'docs', 'game-manual.md'), 'utf8');
+  for (const document of [guide, manual]) {
+    assert.match(document, /Vault/);
+    assert.match(document, /自動保存/);
+    assert.doesNotMatch(document, /進行状況は(?:ブラウザーや端末に)?保存されません/);
+  }
+});
+
+test('vehicle progression loads before the game and new-car ownership is snapshot-safe', () => {
+  const progression = fs.readFileSync(path.join(root, 'game', 'vehicle-progression.js'), 'utf8');
+  assert.match(html, /vehicle-progression\.js\?v=/);
+  assert.ok(html.indexOf('vehicle-progression.js') < html.indexOf('game.js'));
+  assert.match(source, /vehicleProgression:vehicleProgressionModel\.createNewGame\(\)/);
+  assert.match(source, /vehicleProgression:vehicleProgressionModel\.normalize\(state\.vehicleProgression\)/);
+  assert.match(source, /state\.vehicleProgression = vehicleProgressionModel\.normalize\(saved\.vehicleProgression\)/);
+  assert.match(source, /state\.player\.inVehicle = Boolean\(saved\.player\.inVehicle\) && state\.vehicleProgression\.owned/);
+  assert.match(source, /function buyPersonalCar\(\)/);
+  assert.match(source, /function openPersonalCarMenu\(\)/);
+  assert.match(source, /type:"car-enter", label:"中古車を見て購入する"/);
+  assert.match(source, /vehicleProgressionForTest\(\)/);
+  assert.match(source, /movePlayerNearCarForTest\(\)/);
+  assert.match(source, /if \(!state\.vehicleProgression\.owned\) \{/);
+  assert.match(source, /if \(!state\.vehicleProgression\.owned\) return;/);
+  assert.match(progression, /const USED_CAR_PRICE = 10000/);
+});
+
+test('life economy persists rent arrears and keeps repayment available without eviction', () => {
+  assert.match(html, /life-economy\.js\?v=/);
+  assert.ok(html.indexOf('life-economy.js') < html.indexOf('game.js'));
+  assert.match(source, /lifeEconomy:lifeEconomyModel\.createProgress\(\)/);
+  assert.match(source, /lifeEconomy:lifeEconomyModel\.normalize\(state\.lifeEconomy\)/);
+  assert.match(source, /state\.lifeEconomy = lifeEconomyModel\.normalize\(saved\.lifeEconomy\)/);
+  assert.match(source, /lifeEconomyModel\.migrateLegacyCash\(savedCash, state\.day\)/);
+  assert.match(source, /lifeEconomyModel\.chargeRent\(state\.cash, RENT, state\.lifeEconomy, state\.day\)/);
+  assert.match(source, /function payRentArrears\(\)/);
+  assert.match(source, /addChoice\("家賃滞納を返済する"/);
+  assert.match(source, /rentArrears:state\.lifeEconomy\.arrears/);
+  assert.match(html, /未払いでも住居や行動は失われません/);
 });
 
 test('minimap remains independent in the upper-right and driving HUD no longer occupies top-center', () => {
@@ -82,6 +140,8 @@ test('pedestrians, vehicles, and rendering consume the same map crosswalk record
   assert.match(source, /crossingControl\.assessPedestrian\(crosswalk/);
   assert.match(source, /crossingControl\.vehicleYieldDecision\(crosswalk/);
   assert.match(source, /crosswalk\.stopLines \|\| \[\]/);
+  assert.match(source, /const nearCrossingJunction = junctionNode && distance\(vehicle\.x, vehicle\.y, junctionNode\.x, junctionNode\.y\)/);
+  assert.match(source, /const sameJunction = Boolean\(crosswalk\.nodeId && crosswalk\.nodeId === endpointId\)/);
   assert.match(source, /updateCrossingClaims\(\);\s*updateTraffic\(dt\)/);
 });
 
@@ -182,7 +242,7 @@ test('wardrobe model is loaded before runtime and is normalized in snapshots', (
   assert.match(source, /wardrobe:wardrobeModel\.createWardrobe\(\)/);
   assert.match(source, /wardrobe:wardrobeModel\.normalizeWardrobe\(state\.wardrobe\)/);
   assert.match(source, /state\.wardrobe = wardrobeModel\.normalizeWardrobe\(saved\.wardrobe\)/);
-  assert.match(html, /game\.js\?v=20260930-pedestrian-vehicle-deadlock-1/);
+  assert.match(html, /game\.js\?v=20261007-narrow-road-single-flow-1/);
 });
 
 test('arcade progress is loaded before the game and migrates safely through snapshots', () => {
@@ -252,8 +312,8 @@ test('home closet equips only owned outfits at home and both player scenes use t
   assert.match(home, /playerAppearance\(\)/);
   assert.doesNotMatch(street, /PLAYER_APPEARANCE/);
   assert.doesNotMatch(home, /PLAYER_APPEARANCE/);
-  const npc=source.slice(source.indexOf('function drawNpc('),source.indexOf('function drawPedestrians('));
-  const pedestrians=source.slice(source.indexOf('function drawPedestrians('),source.indexOf('function drawPlayer('));
+  const npc=source.slice(source.indexOf('function drawNpc('),source.indexOf('function drawRoadActors('));
+  const pedestrians=source.slice(source.indexOf('function drawRoadActors('),source.indexOf('function drawPlayer('));
   assert.match(npc, /npc\.appearance/);
   assert.match(pedestrians, /ped\.appearance/);
   assert.doesNotMatch(npc + pedestrians, /playerAppearance\(/);
@@ -772,7 +832,7 @@ test('public bath rules load before runtime and the sento interaction applies it
 
 test('clinic map and runtime changes request fresh browser assets', () => {
   assert.match(html, /map-model\.js\?v=20260930-pedestrian-vehicle-deadlock-1/);
-  assert.match(html, /game\.js\?v=20260930-pedestrian-vehicle-deadlock-1/);
+  assert.match(html, /game\.js\?v=20261007-narrow-road-single-flow-1/);
 });
 
 test('health model loads before runtime and has a visible sixth needs meter', () => {
@@ -963,13 +1023,15 @@ test('club members travel through normal pedestrian routes and revalidate the se
 test('club runtime modules have fresh browser cache keys', () => {
   assert.match(html, /community-center\.js\?v=20260929-community-clubs-1/);
   assert.match(html, /social-npc-system\.js\?v=20260929-community-clubs-1/);
-  assert.match(html, /game\.js\?v=20260930-pedestrian-vehicle-deadlock-1/);
+  assert.match(html, /game\.js\?v=20261007-narrow-road-single-flow-1/);
 });
 
 test('game loads overtake safety before the overtake planner and runtime', () => {
   assert.match(html, /<script src="\.\/traffic-overtake-safety\.js\?v=[^"]+"><\/script>/);
   assert.ok(html.indexOf('traffic-overtake-safety.js') < html.indexOf('traffic-overtake.js'));
-  assert.ok(html.indexOf('traffic-overtake.js') < html.indexOf('game.js'));
+  assert.match(html, /<script src="\.\/traffic-spawn\.js\?v=[^"]+"><\/script>/);
+  assert.ok(html.indexOf('traffic-overtake.js') < html.indexOf('traffic-spawn.js'));
+  assert.ok(html.indexOf('traffic-spawn.js') < html.indexOf('game.js'));
   assert.match(overtakeSource, /conflictsWithOncoming/);
   assert.match(overtakeSafetySource, /function conflictsWithOncoming\(/);
 });
@@ -1121,8 +1183,16 @@ test('building clearance follows the current map model rather than the retired g
 
 test('traffic lanes respect road width and parallel lanes do not brake for each other', () => {
   assert.match(source, /function trafficLaneOffsetForEdge\(edge, secondaryLane = false\)/);
+  assert.match(source, /return trafficSpawnModel\.laneOffset\(edge\?\.width, secondaryLane, LANE_OFFSET\)/);
   assert.match(source, /function trafficLeadInfo\(car, maxDistance = 320\)[\s\S]*const forward = dx \* Math\.cos\(car\.angle\)/);
   assert.match(source, /const laneCorridor = \(vehicleDimensions\(car\)\.width \+ vehicleDimensions\(other\)\.width\) \* \.5 \+ 12/);
+});
+
+test('ambient traffic yields at narrow-road entrances to prevent opposing cars meeting on curves', () => {
+  assert.match(source, /function trafficNarrowRoadBlocked\(car, endpoint\)/);
+  assert.match(source, /trafficSpawnModel\.blockedByOpposingTraffic\(next, directionSign, traffic\)/);
+  assert.match(source, /reason:"narrow-road"/);
+  assert.match(source, /trafficSpawnModel\.blockedByOpposingTraffic\(spawnEdge, p\.directionSign, traffic\)/);
 });
 
 test('traffic checks passing clearance for a parked personal car and shifts back after passing', () => {
@@ -1153,6 +1223,7 @@ test('ambient traffic signals a planned intersection turn unless an overtake sig
 test('reverse-direction pedestrians start from the correct edge end', () => {
   assert.match(source, /ped\.segmentAlong = ped\.segmentDirection > 0 \? 0 : firstSegment\.length/);
   assert.match(source, /ped\.segmentAlong = ped\.segmentDirection > 0 \? initialAlong : Math\.max\(0, segment\.length - initialAlong\)/);
+  assert.match(source, /return pedestrianNavigation\?\.poseAt\?\.\(segment, directionSign, along, lateralOffset\)/);
   assert.match(source, /const centerOffset = corridor\?\.centerOffset \?\? \(edge\.width \/ 2 \+ 22\)/);
   assert.match(source, /const flowBias = directionSign > 0 \? 7 : -7/);
 });
@@ -1238,6 +1309,40 @@ test('pedestrians traverse route starts and sidewalk corners continuously', () =
   assert.match(source, /function pedestrianTransitionPose\(transition\)/);
   assert.match(source, /transition\.progress \+= step/);
   assert.match(source, /junctionTransition:clonePedestrianTransition\(ped\.junctionTransition\)/);
+});
+
+test('pedestrian route replans animate their connector before projecting onto the new segment', () => {
+  const pose = source.slice(source.indexOf('function pedestrianPoseAt('), source.indexOf('function pedestrianSegmentLaneOffset('));
+  const movement = source.slice(source.indexOf('function moveCitizenAlongRoute('), source.indexOf('function pedestrianSpawnSpacing('));
+  const avoidance = source.slice(source.indexOf('function updatePedestrianAvoidance('), source.indexOf('function pedestrianFollowingLimit('));
+  assert.match(pose, /if \(ped\.junctionTransition\) return pedestrianTransitionPose\(ped\.junctionTransition\);[\s\S]*const segment =/);
+  assert.match(movement, /if \(ped\.junctionTransition && remaining > \.001\)/);
+  assert.match(avoidance, /if \(ped\.junctionTransition\) return;/);
+});
+
+test('pedestrians fade at indoor boundaries instead of disappearing or appearing instantly', () => {
+  const visibility = source.slice(source.indexOf('function updatePedestrianVisibility('), source.indexOf('function pedestrianFollowingLimit('));
+  assert.match(visibility, /ped\.visibilityAlpha = clamp\(/);
+  assert.match(visibility, /current \+ clamp\(target - current,[\s\S]*dt \/ PED_VISIBILITY_FADE_SECONDS/);
+  assert.match(visibility, /ped\.visible = ped\.state !== "inside" \|\| ped\.visibilityAlpha > \.001/);
+  assert.match(source, /visibilityAlpha:1/);
+});
+
+test('offscreen named pedestrians do not leak canvas opacity state', () => {
+  const drawNpc = source.slice(source.indexOf('function drawNpc('), source.indexOf('function drawRoadActors('));
+  assert.ok(drawNpc.indexOf('if (p.x < -40 || p.y < -40 || p.x > viewWidth + 40 || p.y > viewHeight + 40) return;') < drawNpc.indexOf('ctx.save();'));
+  assert.match(drawNpc, /ctx\.restore\(\);/);
+});
+
+test('pedestrians and cars render in one world-depth pass so traffic cannot blanket-hide walkers', () => {
+  const actorPass = source.slice(source.indexOf('function drawRoadActors('), source.indexOf('function drawPlayer('));
+  const render = source.slice(source.indexOf('function render('), source.indexOf('function frame('));
+  assert.match(actorPass, /actors\.sort\(\(a, b\) => a\.y - b\.y/);
+  assert.match(actorPass, /drawPerson\(/);
+  assert.match(actorPass, /drawNpc\(/);
+  assert.match(actorPass, /drawCar\(/);
+  assert.match(render, /drawRoadActors\(\)/);
+  assert.doesNotMatch(render, /drawPedestrians\(\)[\s\S]*for \(const car of traffic\) drawCar/);
 });
 
 test('pedestrian sidewalk side is immutable after spawn', () => {
@@ -1498,7 +1603,7 @@ test('pedestrian route starts honor map aliases instead of reversing the first s
 test('crosswalk stops use front-clearance ownership and never rewind a committed vehicle', () => {
   assert.match(source, /crossingControl\.SAFE_FRONT_CLEARANCE/);
   assert.match(source, /decision\.committed && claim\.phase === "crossing"/);
-  assert.match(source, /\? currentEndpointDistance\s*:\s*plannedCenterStopOffset/);
+  assert.match(source, /sameApproach \? currentEndpointDistance : Math\.max\(0, endpointDistance\)/);
 });
 
 test('signal stops follow the actual generated crosswalk instead of stale junction offsets', () => {
@@ -1521,7 +1626,10 @@ test('crosswalk rendering uses generated depth instead of road width as zebra de
   const markings = source.slice(source.indexOf('function drawMapModelIntersectionMarkings()'), source.indexOf('function drawMapModelRoads()'));
   assert.match(markings, /const crossingDepth = Math\.max\(18, Number\(crosswalk\.depth\) \|\| 24\)/);
   assert.match(markings, /const halfRoadSpan = Math\.max\(14, edge\.width \/ 2 - 7\)/);
-  assert.match(markings, /offset = -crossingDepth \/ 2 \+ 3/);
+  assert.match(markings, /offset = -halfRoadSpan \+ 4/);
+  assert.match(markings, /crosswalk\.x \+ crossingVector\.x \* offset/);
+  assert.match(markings, /cx - roadTangent\.x \* crossingDepth \/ 2/);
+  assert.match(markings, /cx \+ roadTangent\.x \* crossingDepth \/ 2/);
 });
 
 
