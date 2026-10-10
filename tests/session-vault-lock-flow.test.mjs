@@ -47,9 +47,10 @@ test('profile UI distinguishes lock from complete logout', () => {
   assert.match(profileSpa, /id="profileLogoutBtn"/);
 });
 
-test('active vault proceeds normally but exposes conflict resolution while pending', () => {
+test('active vault proceeds normally and pending sync has no manual conflict flow', () => {
   assert.ok(sync.includes('const alreadyActive=Boolean(MangaVault.loadActive());'));
   assert.ok(sync.includes('if (MangaVault.hasPendingLocalChanges()) showPendingSync'));
   assert.ok(sync.includes('else { goReader(); return; }'));
+  assert.doesNotMatch(sync, /競合を確認・解決|vault-conflict-ui/);
   assert.ok(sync.includes('if (!alreadyActive) autoUsePasskey();'));
 });

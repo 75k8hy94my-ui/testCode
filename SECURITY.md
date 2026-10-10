@@ -39,4 +39,4 @@ Supabaseのデータベース内容が漏えいしても、保管庫パスフレ
 - Local manga image blobs are stored in a private Supabase Storage bucket protected by authentication and RLS.
 - The Storage image blobs themselves are not currently end-to-end encrypted on the client.
 - The account login password and the vault passphrase/recovery key are separate credentials. Resetting the account password does not reset vault access.
-- Vault writes use a database-side revision CAS. A stale client receives a conflict and its local data is not deleted.
+- Vault writes use a database-side revision CAS for atomicity. When another device saves first, the stale client's still-pending snapshot retries against the latest live revision, so the last successful sync becomes authoritative; local changes remain pending if retries fail. A missing Vault row is never recreated by retry, and changed credential wrappers are never overwritten by a data save.
