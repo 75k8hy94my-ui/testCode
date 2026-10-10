@@ -145,6 +145,10 @@
 
     function removeVideo(video) {
       if (!video) return;
+      if (typeof video._shortsRotationCleanup === 'function') {
+        try { video._shortsRotationCleanup(); } catch (_) {}
+        video._shortsRotationCleanup = null;
+      }
       try { video.pause(); } catch (_) {}
       try { video.removeAttribute('src'); video.load(); } catch (_) {}
       if (video.parentNode) video.remove();
@@ -408,6 +412,22 @@
 
     function findVideo(videoId) { return currentVideos.find((video) => String(video.id) === String(videoId)); }
 
+    function displayDimensions(video) {
+      if (Data && typeof Data.getDisplayDimensions === 'function') return Data.getDisplayDimensions(video);
+      return { width: Number(video && video.videoWidth) || 0, height: Number(video && video.videoHeight) || 0 };
+    }
+
+    function installConfiguredRotation(video, videoData, frame = stageElement) {
+      if (!video || video._shortsRotationCleanup) return;
+      const direction = Data && typeof Data.getRotationDirection === 'function'
+        ? Data.getRotationDirection(videoData)
+        : (videoData && videoData.rotate90Direction) || (videoData && videoData.rotate90 ? 'left' : 'none');
+      const rotation = deps.rotation || windowRef.MangaReaderVideoRotation;
+      if (direction !== 'none' && rotation && typeof rotation.install === 'function') {
+        video._shortsRotationCleanup = rotation.install(frame, video, direction);
+      }
+    }
+
     function createVideo(entry, hidden = false, entryIndex = queueIndex) {
       const videoData = findVideo(entry.videoId);
       if (!videoData) return null;
@@ -466,6 +486,7 @@
       if (activeVideo && activeVideo !== video) removeVideo(activeVideo);
       activeVideo = video;
       if (!activeVideo) return;
+      installConfiguredRotation(activeVideo, findVideo(entry.videoId));
       activeVideo.hidden = false; activeVideo.className = 'shortsVideo';
       activeVideo.dataset.entryIndex = String(queueIndex);
       activeVideo.dataset.loadToken = String(loadToken);
@@ -523,8 +544,8 @@
 
     function toggleLandscapeRotation() {
       if (!isMobileLayout() || !queue[queueIndex]) return;
-      const video = findVideo(queue[queueIndex].videoId);
-      if (!video || Number(video.videoWidth) <= Number(video.videoHeight)) return;
+      const dimensions = displayDimensions(findVideo(queue[queueIndex].videoId));
+      if (!dimensions || Number(dimensions.width) <= Number(dimensions.height)) return;
       rotatedLandscape = !rotatedLandscape;
       if (stageElement) stageElement.classList.toggle('is-rotated', rotatedLandscape);
       const appRoot = documentRef.getElementById('shortsApp');
@@ -538,7 +559,8 @@
       if (!video) { if (actionsElement) actionsElement.hidden = true; if (scrubArea) scrubArea.hidden = true; return; }
       if (actionsElement) actionsElement.hidden = false;
       if (scrubArea) scrubArea.hidden = false;
-      const landscape = Number(video.videoWidth) > Number(video.videoHeight);
+      const dimensions = displayDimensions(video);
+      const landscape = Number(dimensions.width) > Number(dimensions.height);
       if (!landscape) resetLandscapeRotation();
       if (stageElement) stageElement.classList.toggle('is-landscape', landscape);
       if (rotateButton) rotateButton.hidden = !landscape || !isMobileLayout();
@@ -586,8 +608,11 @@
         previewVideo.preload = 'metadata'; previewVideo.muted = true; previewVideo.playsInline = true; previewVideo.controls = false;
         const source = activeVideo.currentSrc || activeVideo.src;
         previewVideo.src = source;
-        const width = Number(activeVideo.videoWidth) || 9, height = Number(activeVideo.videoHeight) || 16;
+        const videoData = findVideo(queue[queueIndex].videoId);
+        const dimensions = displayDimensions(videoData);
+        const width = Number(dimensions.width) || 9, height = Number(dimensions.height) || 16;
         if (scrubPreview) scrubPreview.style.setProperty('--preview-ratio', width + ' / ' + height);
+        installConfiguredRotation(previewVideo, videoData, scrubPreviewFrame);
         previewVideo.addEventListener('loadedmetadata', () => { if (gestureState && gestureState.scrubbing) updateScrubAt(gestureState.lastX); });
         scrubPreviewFrame?.append(previewVideo);
         if (typeof previewVideo.load === 'function') previewVideo.load();
