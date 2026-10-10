@@ -275,6 +275,17 @@
     return rows && rows[0] ? Object.assign({}, rows[0], legacyRevision ? { legacyRevision: true, revision: 1 } : {}) : null;
   }
   async function fetchRecordForUi(token, user) { return fetchRecord(token, user); }
+  async function loadPayload() {
+    assertSyncAccess();
+    return withSession(async (token, user) => {
+      assertSyncAccess();
+      const record = await fetchRecord(token, user);
+      if (!record) { setMeta(user.id, null); return null; }
+      const payload = await decryptPayload(record.payload);
+      setMeta(user.id, { revision: record.revision || 1, updatedAt: record.updated_at });
+      return payload;
+    });
+  }
   async function create(passphrase) {
     if (!window.crypto || !crypto.subtle) throw new Error('このブラウザは暗号化機能に対応していません。');
     if ((passphrase || '').length < 12) throw new Error('保管庫パスフレーズは12文字以上にしてください。');
@@ -515,5 +526,6 @@
     });
     return retryPendingLocalChanges(result);
   }
-  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, refreshSession, ensureSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
+  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, refreshSession, ensureSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, loadPayload, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
 })();
+

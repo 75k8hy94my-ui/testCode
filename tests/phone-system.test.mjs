@@ -61,6 +61,20 @@ test('phone receives live game data for health, contacts, transport and wallet',
   assert.match(gameSource, /stations:TRAIN_STATIONS\.map/);
   assert.match(gameSource, /trains:trains\.map/);
   assert.match(gameSource, /nextRentDay:nextRentDay\(\)/);
+  assert.match(gameSource, /rentArrears:state\.lifeEconomy\.arrears/);
+});
+
+test('wallet explains recoverable rent arrears and offers a home route', () => {
+  const root={hidden:false,innerHTML:'',classList:{toggle(){}},style:{setProperty(){}},addEventListener(){}};
+  const phone=phoneModule.createPhoneSystem({root});
+  phone.update({cash:0,groceries:0,rent:12000,nextRentDay:15,rentArrears:9000,rentStatus:'grace',rentGraceEndsDay:22,day:8});
+  phone.openApp('wallet');
+  assert.match(root.innerHTML,/家賃滞納 · 利息なし/);
+  assert.match(root.innerHTML,/¥9,000/);
+  assert.match(root.innerHTML,/Day 22 まで猶予/);
+  assert.match(root.innerHTML,/自宅で返済する/);
+  phone.update({cash:0,groceries:0,rent:12000,nextRentDay:15,rentArrears:9000,rentStatus:'overdue',rentGraceEndsDay:22,day:23});
+  assert.match(root.innerHTML,/猶予期間後も住み続けられます/);
 });
 
 test('weather app renders supplied clock-based forecast transitions and umbrella status', () => {
@@ -216,7 +230,8 @@ test('social contacts use their authored accent colors and escape profile text',
 });
 
 test('game hides special NPC map markers and phone coordinates while they are indoors', () => {
-  assert.match(gameSource, /npc\.hidden = citizen\.state === "inside" \|\| !citizen\.visible/);
+  assert.match(gameSource, /npc\.hidden = citizen\.visibilityAlpha <= \.001 \|\| !citizen\.visible/);
+  assert.match(gameSource, /npc\.visibilityAlpha = citizen\.visibilityAlpha/);
   assert.match(gameSource, /color:npc\.color/);
   assert.match(gameSource, /distance:npc\.hidden \? null : distance\(p\.x, p\.y, npc\.x, npc\.y\)/);
   assert.match(gameSource, /mapDX:npc\.hidden \? null/);

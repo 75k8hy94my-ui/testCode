@@ -30,6 +30,32 @@ const server = http.createServer(async (request, response) => {
 
 function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
+async function waitForExit(child, timeoutMs = 5000) {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return true;
+  return new Promise((resolve) => {
+    const finish = (exited) => {
+      clearTimeout(timer);
+      child.off('exit', onExit);
+      resolve(exited);
+    };
+    const onExit = () => finish(true);
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    child.once('exit', onExit);
+  });
+}
+
+async function removeTemporaryProfile(directory) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await fs.rm(directory, { recursive:true, force:true });
+      return;
+    } catch (error) {
+      if (!['EBUSY', 'ENOTEMPTY', 'EPERM'].includes(error.code) || attempt >= 9) throw error;
+      await wait(100 * (attempt + 1));
+    }
+  }
+}
+
 const profileDir = await fs.mkdtemp(path.join(os.tmpdir(), 'city-days-headless-'));
 let chrome;
 let socket;
@@ -172,11 +198,13 @@ try {
   } else if (chrome && !chrome.killed) {
     chrome.kill();
   }
+  if (chrome && !await waitForExit(chrome)) {
+    chrome.kill('SIGKILL');
+    await waitForExit(chrome, 2000);
+  }
   chrome?.unref();
   chrome?.stderr?.destroy();
   server.closeAllConnections?.();
   server.close();
-  try { await fs.rm(profileDir, { recursive:true, force:true }); } catch (error) {
-    if (error.code !== 'EBUSY' && error.code !== 'EPERM') throw error;
-  }
+  await removeTemporaryProfile(profileDir);
 }

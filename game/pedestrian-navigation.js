@@ -277,16 +277,11 @@
         const second = pedestrianPose(mapModel, edge, crossing.along, offset);
         if (!roadPose || !first || !second) return null;
 
-        const from = mapModel.getNode?.(crossing.nodeId) || null;
-        const to = from
-          ? (edge.from === crossing.nodeId ? mapModel.getNode(edge.to) : mapModel.getNode(edge.from))
-          : null;
-        const heading = Math.atan2(
-          (to?.y ?? edge.points.at(-1).y) - (from?.y ?? edge.points[0].y),
-          (to?.x ?? edge.points.at(-1).x) - (from?.x ?? edge.points[0].x)
-        );
-        const vector = { x:-Math.sin(heading), y:Math.cos(heading) };
-        const tangent = { x:Math.cos(heading), y:Math.sin(heading) };
+        const roadAngle = Number.isFinite(roadPose.angle)
+          ? roadPose.angle
+          : Math.atan2(edge.points.at(-1).y - edge.points[0].y, edge.points.at(-1).x - edge.points[0].x);
+        const vector = { x:-Math.sin(roadAngle), y:Math.cos(roadAngle) };
+        const tangent = { x:Math.cos(roadAngle), y:Math.sin(roadAngle) };
         const curbA = pedestrianPose(mapModel, edge, crossing.along, -edge.width / 2) || first;
         const curbB = pedestrianPose(mapModel, edge, crossing.along, edge.width / 2) || second;
         const crossingDepth = crossing.nodeId
@@ -595,8 +590,12 @@
   function nearestNode(graph, x, y, options = {}) {
     if (!graph?.nodePositions || !Number.isFinite(x) || !Number.isFinite(y)) return null;
     const maxDistance = Number.isFinite(options.maxDistance) ? Math.max(0, options.maxDistance) : Infinity;
+    const excludedNodeIds = options.excludeNodeIds instanceof Set
+      ? options.excludeNodeIds
+      : new Set(Array.isArray(options.excludeNodeIds) ? options.excludeNodeIds : []);
     let best = null;
     for (const [nodeId, point] of graph.nodePositions) {
+      if (excludedNodeIds.has(nodeId)) continue;
       const candidateDistance = Math.hypot(point.x - x, point.y - y);
       if (candidateDistance > maxDistance) continue;
       if (!best || candidateDistance < best.distance || candidateDistance === best.distance && String(nodeId).localeCompare(String(best.nodeId)) < 0) {
@@ -606,7 +605,46 @@
     return best;
   }
 
-  const api = Object.freeze({ buildGraph, findRoute, nearestNode });
+  function resolveNodeId(graph, nodeId) {
+    if (!graph?.nodePositions || typeof nodeId !== "string" || !nodeId) return null;
+    const visited = new Set();
+    let resolved = nodeId;
+    while (graph.externalNodeAliases?.has(resolved) && !visited.has(resolved)) {
+      visited.add(resolved);
+      resolved = graph.externalNodeAliases.get(resolved);
+    }
+    return graph.nodePositions.has(resolved) ? resolved : null;
+  }
+
+  function poseAt(segment, directionSign = 1, along = 0, lateralOffset = 0) {
+    if (!segment?.points?.length) return null;
+    const length = Math.max(0, Number(segment.length) || 0);
+    const distanceAlong = Math.max(0, Math.min(length, Number(along) || 0));
+    let remaining = distanceAlong;
+    let point = segment.points.at(-1);
+    let tangent = { x:1, y:0 };
+    for (let index = 1; index < segment.points.length; index += 1) {
+      const from = segment.points[index - 1];
+      const to = segment.points[index];
+      const span = distance(from, to);
+      if (remaining <= span || index === segment.points.length - 1) {
+        const progress = span > .001 ? Math.max(0, Math.min(1, remaining / span)) : 1;
+        point = { x:from.x + (to.x - from.x) * progress, y:from.y + (to.y - from.y) * progress };
+        tangent = span > .001 ? { x:(to.x - from.x) / span, y:(to.y - from.y) / span } : tangent;
+        break;
+      }
+      remaining -= span;
+    }
+    if (directionSign < 0) tangent = { x:-tangent.x, y:-tangent.y };
+    const offset = Number(lateralOffset) || 0;
+    return {
+      x:point.x + tangent.y * offset,
+      y:point.y - tangent.x * offset,
+      angle:Math.atan2(tangent.y, tangent.x)
+    };
+  }
+
+  const api = Object.freeze({ buildGraph, findRoute, nearestNode, resolveNodeId, poseAt });
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   global.CityDaysPedestrianNavigation = api;
 })(typeof globalThis !== "undefined" ? globalThis : window);

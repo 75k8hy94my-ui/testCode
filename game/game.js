@@ -64,6 +64,18 @@
     return;
   }
 
+  const vehicleProgressionModel = globalThis.CityDaysVehicleProgression;
+  if (!vehicleProgressionModel?.createNewGame || !vehicleProgressionModel?.normalize || !vehicleProgressionModel?.purchase) {
+    showRuntimeError("VehicleProgression を読み込めません。");
+    return;
+  }
+
+  const lifeEconomyModel = globalThis.CityDaysLifeEconomy;
+  if (!lifeEconomyModel?.createProgress || !lifeEconomyModel?.normalize || !lifeEconomyModel?.chargeRent || !lifeEconomyModel?.payArrears || !lifeEconomyModel?.status) {
+    showRuntimeError("LifeEconomy を読み込めません。");
+    return;
+  }
+
   const communityCenterModel = globalThis.CityDaysCommunityCenter;
   if (
     !communityCenterModel?.getSession ||
@@ -184,6 +196,12 @@
     return;
   }
 
+  const trafficSpawnModel = globalThis.CityDaysTrafficSpawn;
+  if (!trafficSpawnModel?.positionAlong || !trafficSpawnModel?.laneOffset || !trafficSpawnModel?.blockedByOpposingTraffic) {
+    showRuntimeError("TrafficSpawn を読み込めません。");
+    return;
+  }
+
   const crossingControl = globalThis.CityDaysCrossingControl;
   const vehicleTrajectory = globalThis.CityDaysVehicleTrajectory;
   if (!vehicleTrajectory?.createJunctionCurve || !vehicleTrajectory?.poseAt || !vehicleTrajectory?.withLateralVelocity || !vehicleTrajectory?.smoothstep) {
@@ -287,6 +305,7 @@
   const PLAYER_RADIUS = 14;
   const PLAYER_COLLISION_RADIUS = 11;
   const NPC_COLLISION_RADIUS = 6.5;
+  const PED_VISIBILITY_FADE_SECONDS = .8;
   const VEHICLE_COLLISION_SCALE = 0.9;
   const WALK_SPEED = 34;
   const RUN_SPEED = 62;
@@ -1225,6 +1244,8 @@
     day: 1,
     minute: 8 * 60,
     cash: 8000,
+    vehicleProgression:vehicleProgressionModel.createNewGame(),
+    lifeEconomy:lifeEconomyModel.createProgress(),
     railTransit:railTransitModel.createProgress(),
     wardrobe:wardrobeModel.createWardrobe(),
     arcade:arcadeGamesModel.createProgress(),
@@ -2054,22 +2075,34 @@
   }
 
   function trafficLaneOffsetForEdge(edge, secondaryLane = false) {
-    // Keep the vehicle body inside the carriageway even on the narrowest
-    // two-way street. This still leaves enough separation for two NPC vans.
-    const maxOffset = Math.max(18, edge.width / 2 - 20);
-    const primaryOffset = Math.min(LANE_OFFSET, maxOffset);
-    const extraOffset = secondaryLane && edge.width >= 180
-      ? Math.min(28, Math.max(0, maxOffset - primaryOffset))
-      : 0;
-    return primaryOffset + extraOffset;
+    return trafficSpawnModel.laneOffset(edge?.width, secondaryLane, LANE_OFFSET);
+  }
+
+  function trafficNarrowRoadBlocked(car, endpoint) {
+    const next = mapModel.getEdge(trafficNextEdgeId(car));
+    if (!next || !endpoint || (next.from !== endpoint.id && next.to !== endpoint.id)) return false;
+    const directionSign = next.from === endpoint.id ? 1 : -1;
+    return trafficSpawnModel.blockedByOpposingTraffic(next, directionSign, traffic);
   }
 
   function randomRoadPoint(seedA, seedB, offset = 0) {
     const vehicleEdges = mapModel.edges.filter((edge) => edge.vehicle);
     const edge = vehicleEdges[Math.floor(hash2(seedA, seedB, 8) * vehicleEdges.length) % vehicleEdges.length];
+    if (!edge) return null;
     const directionSign = hash2(seedA, seedB, 19) > .5 ? 1 : -1;
     const edgeLength = polylineLength(edge.points);
-    const along = edgeLength * (.12 + hash2(seedA, seedB, 13) * .76);
+    const frontOverhang = vehicleFrontOverhang({ type:"van" });
+    const startGeometry = mapModel.junctionGeometry(edge.from, edge.id);
+    const endGeometry = mapModel.junctionGeometry(edge.to, edge.id);
+    const startClearance = (startGeometry?.yieldOffset || 0) + frontOverhang + 24;
+    const endClearance = (endGeometry?.yieldOffset || 0) + frontOverhang + 24;
+    const along = trafficSpawnModel.positionAlong(
+      edgeLength,
+      .12 + hash2(seedA, seedB, 13) * .76,
+      startClearance,
+      endClearance
+    );
+    if (!Number.isFinite(along)) return null;
     const secondaryLane = hash2(seedA, seedB, 23) > .52;
     const laneOffset = trafficLaneOffsetForEdge(edge, secondaryLane) + offset * .05;
     const seedCar = {
@@ -2090,6 +2123,9 @@
       let car = null;
       for (let attempt = 0; attempt < 12; attempt += 1) {
         const p = randomRoadPoint(i + 2 + attempt * 37, i * 7 + 3 + attempt * 19, 18);
+        if (!p) continue;
+        const spawnEdge = mapModel.getEdge(p.edgeId);
+        if (trafficSpawnModel.blockedByOpposingTraffic(spawnEdge, p.directionSign, traffic)) continue;
         const cruise = 150 + hash2(i, 4, 22) * 110;
         car = {
           x:p.x,
@@ -2135,16 +2171,16 @@
 
 
   function nearestPedestrianNodeId(x, y) {
-    const graphHit = pedestrianNavigation?.nearestNode?.(mapModel.pedestrianNavigation, x, y);
+    const crosswalkNodeIds = new Set(
+      (mapModel.pedestrianNavigation?.crosswalks || []).flatMap((crossing) => crossing.endpointNodeIds || [])
+    );
+    const graphHit = pedestrianNavigation?.nearestNode?.(mapModel.pedestrianNavigation, x, y, {
+      excludeNodeIds:crosswalkNodeIds
+    });
     if (graphHit?.nodeId) return graphHit.nodeId;
-    const hit = mapModel.nearestRoad(x, y);
-    const edge = hit?.edge;
-    if (!edge) return HOME?.entranceNodeId || mapModel.nodes[0]?.id || null;
-    const from = mapModel.getNode(edge.from);
-    const to = mapModel.getNode(edge.to);
-    if (!from) return to?.id || null;
-    if (!to) return from.id;
-    return distance(x, y, from.x, from.y) <= distance(x, y, to.x, to.y) ? from.id : to.id;
+    return mapModel.pedestrianNavigation?.adjacency?.has(HOME?.entranceNodeId)
+      ? HOME.entranceNodeId
+      : null;
   }
 
   function citizenHomeCandidates() {
@@ -2723,7 +2759,7 @@
     ped.segmentAvoidanceTarget = 0;
     ped.segmentAvoidanceOffset = 0;
     ped.state = action.indoor ? "inside" : "staying";
-    ped.visible = ped.specialNpcId ? true : !action.indoor;
+    ped.visible = true;
     ped.speed = ped.baseSpeed;
   }
 
@@ -3001,7 +3037,7 @@
   }
 
   function pedestrianPoseAt(ped) {
-    if (ped.migrationTransition && ped.junctionTransition) return pedestrianTransitionPose(ped.junctionTransition);
+    if (ped.junctionTransition) return pedestrianTransitionPose(ped.junctionTransition);
     const segment = ped.segmentId && mapModel.pedestrianNavigation.segmentsById.get(ped.segmentId);
     if (segment) return pedestrianSegmentPose(
       segment,
@@ -3009,7 +3045,6 @@
       ped.segmentAlong,
       pedestrianSegmentLaneOffset(ped, segment)
     );
-    if (ped.junctionTransition) return pedestrianTransitionPose(ped.junctionTransition);
     const edge = mapModel.getEdge(ped.edgeId);
     if (!edge) return { x:ped.x, y:ped.y, angle:ped.dir };
     return pedestrianEdgePose(
@@ -3027,33 +3062,7 @@
   }
 
   function pedestrianSegmentPose(segment, directionSign = 1, along = 0, lateralOffset = 0) {
-    if (!segment?.points?.length) return null;
-    const length = Math.max(0, segment.length || 0);
-    const distanceAlong = clamp(Number(along) || 0, 0, length);
-    const points = segment.points;
-    const sampleDistance = directionSign < 0 ? length - distanceAlong : distanceAlong;
-    let remaining = sampleDistance;
-    let point = points.at(-1);
-    let tangent = { x:1, y:0 };
-    for (let index = 1; index < points.length; index += 1) {
-      const from = points[index - 1];
-      const to = points[index];
-      const span = distance(from.x, from.y, to.x, to.y);
-      if (remaining <= span || index === points.length - 1) {
-        const progress = span > .001 ? clamp(remaining / span, 0, 1) : 1;
-        point = { x:from.x + (to.x - from.x) * progress, y:from.y + (to.y - from.y) * progress };
-        tangent = span > .001 ? { x:(to.x - from.x) / span, y:(to.y - from.y) / span } : tangent;
-        break;
-      }
-      remaining -= span;
-    }
-    if (directionSign < 0) tangent = { x:-tangent.x, y:-tangent.y };
-    const offset = Number(lateralOffset) || 0;
-    return {
-      x:point.x + tangent.y * offset,
-      y:point.y - tangent.x * offset,
-      angle:Math.atan2(tangent.y, tangent.x)
-    };
+    return pedestrianNavigation?.poseAt?.(segment, directionSign, along, lateralOffset) || null;
   }
 
   function pedestrianSignalState(ped) {
@@ -3111,7 +3120,7 @@
     if (Array.isArray(ped.routeSegmentIds) && ped.routeSegmentIds.length) {
       let remaining = Math.max(0, distanceUnits);
       let transitions = 0;
-      if (ped.migrationTransition && ped.junctionTransition && remaining > .001) {
+      if (ped.junctionTransition && remaining > .001) {
         const transition = ped.junctionTransition;
         const step = Math.min(remaining, Math.max(0, transition.length - transition.progress));
         transition.progress += step;
@@ -3349,6 +3358,7 @@
         decisionCount:0,
         state:"deciding",
         visible:true,
+        visibilityAlpha:1,
         waitTimer:0,
         collisionWait:0,
         avoidanceOffset:0,
@@ -4177,6 +4187,43 @@
     actionSheet.hidden = false;
   }
 
+  function openPersonalCarMenu() {
+    actionTitle.textContent = state.vehicleProgression.owned ? "自分の車" : "中古車";
+    actionDescription.textContent = state.vehicleProgression.owned
+      ? "燃料 " + personalCar.fuelLiters.toFixed(1) + " / " + carFuelModel.CAPACITY_LITERS + " L。予定に合わせて徒歩・電車・車を選べます。"
+      : "街を自由に回るための中古車です。仕事や配達で収入を得てから購入することもできます。徒歩や電車は購入前から利用できます。";
+    actionChoices.replaceChildren();
+    if (!state.vehicleProgression.owned) {
+      const canBuy = state.cash >= vehicleProgressionModel.USED_CAR_PRICE;
+      addChoice(
+        "中古車を購入する",
+        "¥" + vehicleProgressionModel.USED_CAR_PRICE.toLocaleString("ja-JP") + " / 現在 ¥" + state.cash.toLocaleString("ja-JP"),
+        buyPersonalCar,
+        !canBuy
+      );
+      actionSheet.hidden = false;
+      return;
+    }
+    addChoice("車に乗る", "運転・目的地設定ができます", () => enterCar(), personalCar.fuelLiters <= 0);
+    actionSheet.hidden = false;
+  }
+
+  function buyPersonalCar() {
+    const result = vehicleProgressionModel.purchase(state.vehicleProgression, state.cash);
+    if (!result.ok) {
+      showToast(result.reason === "already-owned" ? "すでに車を所有しています" : "購入には¥" + vehicleProgressionModel.USED_CAR_PRICE.toLocaleString("ja-JP") + "必要です");
+      return false;
+    }
+    state.vehicleProgression = result.progress;
+    state.cash = result.cashRemaining;
+    advanceTime(15);
+    updateSmartphone();
+    updateHUD();
+    closeActionSheet();
+    showToast("中古車を購入しました。街の遠方まで行動範囲が広がりました");
+    return true;
+  }
+
   function currentDistrict(x, y) {
     return mapModel.districtAt(x, y)?.name || "City Days";
   }
@@ -4225,9 +4272,30 @@
 
   function chargeRentIfNeeded() {
     if (state.day > 1 && (state.day - 1) % 7 === 0) {
-      state.cash -= RENT;
-      showToast("家賃 ¥" + RENT.toLocaleString("ja-JP") + " を支払いました");
+      const result = lifeEconomyModel.chargeRent(state.cash, RENT, state.lifeEconomy, state.day);
+      state.cash = result.cashRemaining;
+      state.lifeEconomy = result.progress;
+      if (result.progress.arrears > 0) {
+        showToast("家賃の支払いが不足しています。滞納 ¥" + result.progress.arrears.toLocaleString("ja-JP") + " · 猶予 Day " + result.progress.graceEndsDay + " · 仕事などで後から返済できます");
+      } else {
+        showToast("家賃 ¥" + RENT.toLocaleString("ja-JP") + " を支払いました");
+      }
     }
+  }
+
+  function payRentArrears() {
+    const result = lifeEconomyModel.payArrears(state.lifeEconomy, state.cash);
+    if (!result.ok) {
+      showToast(result.reason === "no-arrears" ? "家賃の滞納はありません" : "返済に使える所持金がありません。仕事や配達の報酬を受け取ってから再度お試しください");
+      return false;
+    }
+    state.lifeEconomy = result.progress;
+    state.cash = result.cashRemaining;
+    advanceTime(5);
+    updateSmartphone();
+    updateHUD();
+    showToast("家賃滞納へ ¥" + result.paid.toLocaleString("ja-JP") + "を返済しました" + (result.progress.arrears > 0 ? " · 残り ¥" + result.progress.arrears.toLocaleString("ja-JP") : " · 支払い完了"));
+    return true;
   }
 
   function advanceTime(minutes, decay = true, updateCitizens = true) {
@@ -5447,8 +5515,16 @@
     }
 
     if (place.id === "home") {
-      actionDescription.textContent = "自宅の中では家具を使って、料理・入浴・睡眠・休憩ができます。";
+      const arrears = state.lifeEconomy.arrears;
+      actionDescription.textContent = "自宅の中では家具を使って、料理・入浴・睡眠・休憩ができます。" +
+        (arrears > 0 ? " 家賃滞納 ¥" + arrears.toLocaleString("ja-JP") + " · " + (lifeEconomyModel.status(state.lifeEconomy, state.day) === "grace" ? "猶予 Day " + state.lifeEconomy.graceEndsDay : "猶予期間後（利息なし）") : "");
       addChoice("自宅に入る", "屋内マップへ移動します", () => enterHome());
+      if (arrears > 0) {
+        const payment = Math.min(state.cash, arrears);
+        addChoice("家賃滞納を返済する", payment > 0
+          ? "現在の所持金から最大 ¥" + payment.toLocaleString("ja-JP") + " / 利息なし"
+          : "報酬を受け取ってから返済できます / 利息なし", () => payRentArrears(), payment <= 0);
+      }
     }
 
     if (place.id === "store") {
@@ -5559,14 +5635,16 @@
     }
 
     if (place.id === "fuel-station") {
-      const nearbyCar = !state.player.inVehicle && !state.player.inHome && personalCar.speed <= 1 &&
+      const nearbyCar = state.vehicleProgression.owned && !state.player.inVehicle && !state.player.inHome && personalCar.speed <= 1 &&
         distance(personalCar.x, personalCar.y, mapModel.getNode(place.roadNodeId).x, mapModel.getNode(place.roadNodeId).y) <= 260;
       actionDescription.textContent = nearbyCar
         ? "給油は停車中の車に行えます。燃料 " + personalCar.fuelLiters.toFixed(1) + " / " + carFuelModel.CAPACITY_LITERS + " L"
-        : "給油は車を給油機の近くに停車させてから行います。携行缶は車のそばで使えます。";
+        : state.vehicleProgression.owned
+          ? "給油は車を給油機の近くに停車させてから行います。携行缶は車のそばで使えます。"
+          : "中古車を購入すると給油所を利用できます。徒歩や電車は購入前から利用できます。";
       addChoice("10 L給油", "最大10 L / 1 L ¥" + carFuelModel.PRICE_PER_LITER + " / 5分", () => refuelAtStation(10), !nearbyCar || personalCar.fuelLiters >= carFuelModel.CAPACITY_LITERS);
       addChoice("満タンまで給油", "最大 " + carFuelModel.CAPACITY_LITERS + " L / 5分", () => refuelAtStation(carFuelModel.CAPACITY_LITERS - personalCar.fuelLiters), !nearbyCar || personalCar.fuelLiters >= carFuelModel.CAPACITY_LITERS);
-      addChoice("携行缶を購入", "5 L / ¥" + carFuelModel.CAN_PRICE.toLocaleString("ja-JP") + " / 1本まで", buyPortableCan, personalCar.portableCanCount >= 1 || state.cash < carFuelModel.CAN_PRICE);
+      addChoice("携行缶を購入", "5 L / ¥" + carFuelModel.CAN_PRICE.toLocaleString("ja-JP") + " / 1本まで", buyPortableCan, !state.vehicleProgression.owned || personalCar.portableCanCount >= 1 || state.cash < carFuelModel.CAN_PRICE);
     }
 
     if (place.id === "cafe") {
@@ -5694,7 +5772,7 @@
             if (!result.ok) return;
             state.garden = result.progress;
             state.groceries += result.yield;
-            showToast(crop.name + "を収穫し、食料が" + result.yield + "個増えました");
+            showToast(crop.name + "を収穫し、食料が" + result.yield + "個増えました。自宅の料理に使えます");
           });
         } else if (plot.wetRemaining <= 0) {
           addChoice("畝" + (plot.id + 1) + "に水をやる", crop.name + " · あと" + plot.remainingGrowth + "分 / 5分", () => {
@@ -6202,6 +6280,7 @@
     }
 
     if (distance(p.x, p.y, personalCar.x, personalCar.y) < 70) {
+      if (!state.vehicleProgression.owned) return { type:"car-enter", label:"中古車を見て購入する" };
       if (personalCar.portableCanCount > 0 && personalCar.fuelLiters < carFuelModel.CAPACITY_LITERS && personalCar.speed <= 1) {
         return { type:"car-refuel", label:"携行缶で車に給油する" };
       }
@@ -6261,6 +6340,10 @@
 
   function enterCar() {
     conversationCitizenId = null;
+    if (!state.vehicleProgression.owned) {
+      showToast("この車は中古車として販売中です。近くで購入できます");
+      return;
+    }
     if (state.petWalk.active) {
       showToast("散歩中は犬と一緒に帰宅してから乗車してください");
       return;
@@ -6315,6 +6398,10 @@
   }
 
   function refuelAtStation(requestedLiters) {
+    if (!state.vehicleProgression.owned) {
+      showToast("中古車を購入すると給油所を利用できます");
+      return;
+    }
     const station = PLACES.find((place) => place.id === "fuel-station");
     if (!station || state.player.inHome || state.player.inVehicle || distance(state.player.x, state.player.y, station.x, station.y) > 125) {
       showToast("給油所の入口で操作してください");
@@ -6337,6 +6424,10 @@
   }
 
   function buyPortableCan() {
+    if (!state.vehicleProgression.owned) {
+      showToast("中古車を購入すると携行缶を利用できます");
+      return;
+    }
     const result = carFuelModel.buyCan(personalCar.portableCanCount, state.cash);
     if (!result.ok) {
       showToast(result.reason === "can-already-owned" ? "携行缶は1本までです" : "携行缶を買うお金が足りません");
@@ -6349,6 +6440,7 @@
   }
 
   function usePortableCan() {
+    if (!state.vehicleProgression.owned) return;
     if (state.player.inHome || state.player.inVehicle || personalCar.speed > 1 || distance(state.player.x, state.player.y, personalCar.x, personalCar.y) > 76) {
       showToast("停車中の自分の車のそばで使用できます");
       return;
@@ -6376,7 +6468,10 @@
       return;
     }
 
-    if (item.type === "car-enter") enterCar();
+    if (item.type === "car-enter") {
+      if (state.vehicleProgression.owned) enterCar();
+      else openPersonalCarMenu();
+    }
     if (item.type === "car-refuel") usePortableCan();
     if (item.type === "car-menu") openDrivingMenu();
     if (item.type === "station") openStation(item.station, item.target);
@@ -6440,6 +6535,8 @@
         day: state.day,
         minute: state.minute,
         cash: state.cash,
+        vehicleProgression:vehicleProgressionModel.normalize(state.vehicleProgression),
+        lifeEconomy:lifeEconomyModel.normalize(state.lifeEconomy),
         railTransit:railTransitModel.normalizeProgress(state.railTransit, state.day),
         umbrellaOwned:state.umbrellaOwned === true,
         wardrobe:wardrobeModel.normalizeWardrobe(state.wardrobe),
@@ -6522,6 +6619,19 @@
   }
 
 
+  function resolvePedestrianGraphNodeId(nodeId) {
+    const resolved = pedestrianNavigation?.resolveNodeId?.(mapModel.pedestrianNavigation, nodeId);
+    if (resolved) return resolved;
+    return typeof nodeId === "string" && mapModel.getNode(nodeId) ? nodeId : null;
+  }
+
+  function pedestrianGraphNodePosition(nodeId) {
+    const resolved = resolvePedestrianGraphNodeId(nodeId);
+    if (!resolved) return null;
+    return mapModel.pedestrianNavigation.nodePositions.get(resolved) || mapModel.getNode(resolved) || null;
+  }
+
+
   function migratePlayerToCurrentMap(x, y) {
     if (Number.isFinite(x) && Number.isFinite(y) && canStand(x, y)) return { x, y };
     const entrance = mapModel.getNode(HOME.entranceNodeId);
@@ -6585,12 +6695,8 @@
 
     const allowedStates = new Set(["walking","waiting","inside","staying"]);
     const savedState = allowedStates.has(stored.state) ? stored.state : "deciding";
-    const savedCurrentNode = typeof stored.currentNodeId === "string" && mapModel.getNode(stored.currentNodeId)
-      ? stored.currentNodeId
-      : ped.homeNodeId;
-    const savedTargetNode = typeof stored.targetNodeId === "string" && mapModel.getNode(stored.targetNodeId)
-      ? stored.targetNodeId
-      : savedCurrentNode;
+    const savedCurrentNode = resolvePedestrianGraphNodeId(stored.currentNodeId) || ped.homeNodeId;
+    const savedTargetNode = resolvePedestrianGraphNodeId(stored.targetNodeId) || savedCurrentNode;
 
     ped.currentNodeId = savedCurrentNode;
     ped.targetNodeId = savedTargetNode;
@@ -6604,14 +6710,22 @@
     const pending = stored.pendingActivity && typeof stored.pendingActivity === "object"
       ? { ...stored.pendingActivity }
       : null;
-    if (pending?.nodeId && !mapModel.getNode(pending.nodeId)) pending.nodeId = ped.homeNodeId;
+    if (pending?.nodeId) pending.nodeId = resolvePedestrianGraphNodeId(pending.nodeId) || ped.homeNodeId;
     ped.pendingActivity = pending;
 
     if (savedState === "inside" || savedState === "staying") {
       ped.state = savedState;
-      ped.visible = ped.specialNpcId ? true : savedState === "staying";
-      const node = mapModel.getNode(savedCurrentNode);
-      if (node) {
+      ped.visibilityAlpha = savedState === "inside" ? 0 : 1;
+      ped.visible = savedState === "inside" ? Boolean(ped.specialNpcId) : true;
+      const savedX = Number(stored.x);
+      const savedY = Number(stored.y);
+      const savedPoseIsValid = Number.isFinite(savedX) && Number.isFinite(savedY) &&
+        canStand(savedX, savedY, NPC_COLLISION_RADIUS);
+      const node = pedestrianGraphNodePosition(savedCurrentNode);
+      if (savedPoseIsValid) {
+        ped.x = savedX;
+        ped.y = savedY;
+      } else if (node) {
         ped.x = node.x;
         ped.y = node.y;
       }
@@ -6635,6 +6749,7 @@
       routeSegmentIds.length > 0 && routeSegmentIds.length === (stored.routeSegmentIds?.length || 0) && routeIsConnected;
     if (routeSegmentsValid) {
       ped.state = savedState === "waiting" ? "waiting" : "walking";
+      ped.visibilityAlpha = 1;
       ped.visible = true;
       ped.routeSegmentIds = routeSegmentIds;
       ped.routeIndex = savedRouteIndex;
@@ -6670,6 +6785,7 @@
         ped.y = savedY;
         ped.dir = Number.isFinite(Number(stored.dir)) ? Number(stored.dir) : 0;
         ped.state = "walking";
+        ped.visibilityAlpha = 1;
         ped.visible = true;
         ped.segmentId = null;
         ped.routeSegmentIds = [];
@@ -6699,6 +6815,8 @@
     try {
       const mapMatches = saved.mapVersion == null || saved.mapVersion === mapModel.version;
 
+      state.vehicleProgression = vehicleProgressionModel.normalize(saved.vehicleProgression);
+
       if (saved.player) {
         const x = Number(saved.player.x);
         const y = Number(saved.player.y);
@@ -6709,7 +6827,7 @@
         state.player.facingY = Number(saved.player.facingY) || 1;
         state.player.inTrain = Boolean(saved.player.inTrain);
         state.player.trainId = typeof saved.player.trainId === "string" ? saved.player.trainId : null;
-        state.player.inVehicle = Boolean(saved.player.inVehicle) && !state.player.inTrain;
+        state.player.inVehicle = Boolean(saved.player.inVehicle) && state.vehicleProgression.owned && !state.player.inTrain;
         state.player.inHome = Boolean(saved.player.inHome) && !state.player.inVehicle && !state.player.inTrain;
         state.player.homeX = Number.isFinite(Number(saved.player.homeX)) ? Number(saved.player.homeX) : state.player.homeX;
         state.player.homeY = Number.isFinite(Number(saved.player.homeY)) ? Number(saved.player.homeY) : state.player.homeY;
@@ -6760,7 +6878,15 @@
       state.minute = saved.minute != null && Number.isFinite(savedMinute) ? clamp(savedMinute, 0, 1439.99) : 480;
       state.railTransit = railTransitModel.normalizeProgress(saved.railTransit, state.day);
       syncWeather();
-      state.cash = Math.floor(Number(saved.cash) || 0);
+      const savedCash = Math.floor(Number(saved.cash) || 0);
+      if (Object.hasOwn(saved, "lifeEconomy")) {
+        state.cash = savedCash;
+        state.lifeEconomy = lifeEconomyModel.normalize(saved.lifeEconomy);
+      } else {
+        const migration = lifeEconomyModel.migrateLegacyCash(savedCash, state.day);
+        state.cash = migration.cash;
+        state.lifeEconomy = migration.progress;
+      }
       state.umbrellaOwned = saved.umbrellaOwned === true;
       state.wardrobe = wardrobeModel.normalizeWardrobe(saved.wardrobe);
       state.arcade = arcadeGamesModel.normalizeProgress({ ...saved.arcade, activePlay:false });
@@ -7505,6 +7631,7 @@
     const actor = state.player.inVehicle ? personalCar : state.player;
     for (let attempt = 0; attempt < 28; attempt += 1) {
       const p = randomRoadPoint((car.seed || 1) + 601 + attempt * 43, (car.routeTrips || 0) + 811 + attempt * 29, 18);
+      if (!p) continue;
       if (distance(p.x, p.y, actor.x, actor.y) < 620) continue;
 
       const probe = {
@@ -7771,7 +7898,25 @@
     if (!edge) return [];
     return traffic.concat([personalCar]).map((vehicle) => {
       const hit = mapModel.nearestRoad(vehicle.x, vehicle.y, { vehicleOnly:true });
-      if (hit?.edgeId !== crosswalk.roadEdgeId) return null;
+      const sameApproach = hit?.edgeId === crosswalk.roadEdgeId;
+      const junctionNode = crosswalk.nodeId ? mapModel.getNode(crosswalk.nodeId) : null;
+      const nearCrossingJunction = junctionNode && distance(vehicle.x, vehicle.y, junctionNode.x, junctionNode.y) <=
+        junctionReleaseRadius(junctionNode) + vehicleDimensions(vehicle).length / 2;
+      if (!sameApproach && !nearCrossingJunction) return null;
+      if (!sameApproach) {
+        // At a junction nearestRoad can switch to the turning vehicle's exit
+        // edge even while its body still occupies this crosswalk's conflict
+        // area. Keep the pedestrian out until that vehicle clears the junction.
+        return {
+          id:vehicle.id || (vehicle === personalCar ? "player-car" : "traffic"),
+          edgeId:crosswalk.roadEdgeId,
+          along:crosswalk.along,
+          directionSign:1,
+          distanceToCrossing:0,
+          speed:vehicle.speed || 0,
+          length:vehicleDimensions(vehicle).length
+        };
+      }
       const along = trafficAlongForPosition(edge, vehicle.x, vehicle.y).along;
       const sign = vehicle.directionSign || (Math.cos(vehicle.angle) * (edge.points.at(-1).x - edge.points[0].x) + Math.sin(vehicle.angle) * (edge.points.at(-1).y - edge.points[0].y) >= 0 ? 1 : -1);
       return {
@@ -7856,16 +8001,31 @@
 
   function trafficCrosswalkStop(car, edge, endpointDistance) {
     let best = null;
+    const endpointId = car.directionSign > 0 ? edge.to : edge.from;
     for (const crosswalk of mapModel.crosswalks) {
-      if (crosswalk.roadEdgeId !== edge.id) continue;
+      const sameApproach = crosswalk.roadEdgeId === edge.id;
+      const sameJunction = Boolean(crosswalk.nodeId && crosswalk.nodeId === endpointId);
+      if (!sameApproach && !sameJunction) continue;
       const claim = crossingClaims.get(crosswalk.id);
       if (!claim) continue;
+      const junctionGeometry = sameJunction && !sameApproach
+        ? signalGeometryAtNode(endpointId, edge)
+        : null;
+      const junctionStopOffset = junctionGeometry
+        ? junctionGeometry.yieldOffset + vehicleFrontOverhang(car)
+        : null;
+      const vehicleDistance = sameApproach
+        ? trafficAlongForPosition(edge, car.x, car.y).along
+        : null;
+      const distanceToCrossing = sameApproach
+        ? (crosswalk.along - vehicleDistance) * car.directionSign
+        : endpointDistance - junctionStopOffset;
       const decision = crossingControl.vehicleYieldDecision(crosswalk, claim, {
         id:car.id,
-        edgeId:car.edgeId,
-        along:trafficAlongForPosition(edge, car.x, car.y).along,
-        directionSign:car.directionSign,
-        distanceToCrossing:(crosswalk.along - trafficAlongForPosition(edge, car.x, car.y).along) * car.directionSign,
+        edgeId:crosswalk.roadEdgeId,
+        along:sameApproach ? vehicleDistance : crosswalk.along - distanceToCrossing,
+        directionSign:sameApproach ? car.directionSign : 1,
+        distanceToCrossing,
         speed:car.speed,
         length:vehicleDimensions(car).length
       });
@@ -7878,14 +8038,18 @@
         ? polylineLength(edge.points) - trafficAlongForPosition(edge, car.x, car.y).along
         : trafficAlongForPosition(edge, car.x, car.y).along;
       const stopAlong = crosswalk.along - car.directionSign * (halfVehicle + crossingClearance);
-      const plannedCenterStopOffset = car.directionSign > 0 ? polylineLength(edge.points) - stopAlong : stopAlong;
+      const plannedCenterStopOffset = sameApproach
+        ? (car.directionSign > 0 ? polylineLength(edge.points) - stopAlong : stopAlong)
+        : junctionStopOffset;
       const centerStopOffset = decision.committed && claim.phase === "crossing"
-        ? currentEndpointDistance
+        ? (sameApproach ? currentEndpointDistance : Math.max(0, endpointDistance))
         : plannedCenterStopOffset;
-      const currentAlong = trafficAlongForPosition(edge, car.x, car.y).along;
-      const distanceToCrossing = (crosswalk.along - currentAlong) * car.directionSign;
-      if (distanceToCrossing < -halfVehicle || distanceToCrossing > endpointDistance + 1) continue;
-      if (!best || distanceToCrossing < best.distance) best = { distance:distanceToCrossing, centerStopOffset, crosswalkId:crosswalk.id };
+      const currentAlong = sameApproach ? trafficAlongForPosition(edge, car.x, car.y).along : null;
+      const approachCrossingDistance = sameApproach
+        ? (crosswalk.along - currentAlong) * car.directionSign
+        : endpointDistance;
+      if (approachCrossingDistance < -halfVehicle || approachCrossingDistance > endpointDistance + 1) continue;
+      if (!best || approachCrossingDistance < best.distance) best = { distance:approachCrossingDistance, centerStopOffset, crosswalkId:crosswalk.id };
     }
     return best;
   }
@@ -7954,6 +8118,16 @@
         targetSpeed = Math.min(targetSpeed, Math.max(0, crossingStop.distance * 1.8));
       }
 
+      if (endpoint && !activeStop && trafficNarrowRoadBlocked(car, endpoint) && endpointDistance < junctionYieldOffset + 150) {
+        const gapToYield = endpointDistance - junctionYieldOffset;
+        if (gapToYield > -2) {
+          activeStop = { centerStopOffset:junctionYieldOffset, endpointId:endpoint.id, reason:"narrow-road" };
+          blockReason = "narrow-road";
+          car.junctionWait = Math.max(0, (car.junctionWait || 0) - dt * 2);
+          targetSpeed = Math.min(targetSpeed, Math.max(0, gapToYield * 2.05));
+        }
+      }
+
       if (endpoint && !activeStop && endpointDistance < junctionYieldOffset + 150) {
         const hasExitSpace = junctionHasExitSpace(car, endpoint);
         const hasPermit = hasExitSpace &&
@@ -8011,7 +8185,8 @@
         targetSpeed < 8 &&
         blockReason !== "signal" &&
         blockReason !== "obstacle" &&
-        blockReason !== "spillback";
+        blockReason !== "spillback" &&
+        blockReason !== "narrow-road";
       if (stalledByTraffic) {
         car.trafficStall = (car.trafficStall || 0) + dt;
       } else {
@@ -8182,6 +8357,9 @@
 
   function updatePedestrianAvoidance(ped, dt) {
     if (!ped) return;
+    // A replan connector owns the pedestrian's pose until it reaches the new
+    // route. Projecting onto the first segment here would snap it instantly.
+    if (ped.junctionTransition) return;
     if (ped.segmentId) {
       const segment = mapModel.pedestrianNavigation.segmentsById.get(ped.segmentId);
       ped.avoidanceHold = Math.max(0, (Number(ped.avoidanceHold) || 0) - dt);
@@ -8241,6 +8419,17 @@
       ped.y = pose.y;
       ped.dir = pose.angle;
     }
+  }
+
+  function updatePedestrianVisibility(ped, dt) {
+    const target = ped.state === "inside" ? 0 : 1;
+    const current = clamp(Number.isFinite(ped.visibilityAlpha) ? ped.visibilityAlpha : (ped.visible ? 1 : 0), 0, 1);
+    ped.visibilityAlpha = clamp(
+      current + clamp(target - current, -dt / PED_VISIBILITY_FADE_SECONDS, dt / PED_VISIBILITY_FADE_SECONDS),
+      0,
+      1
+    );
+    ped.visible = ped.state !== "inside" || ped.visibilityAlpha > .001;
   }
 
   function pedestrianFollowingLimit(ped, distanceUnits) {
@@ -8351,6 +8540,7 @@
 
     for (const ped of pedestrians) {
       if (ped.id === conversationCitizenId) continue;
+      updatePedestrianVisibility(ped, dt);
       if (ped.socialActivityRequest && !citizenSocialRequestIsValid(ped, ped.socialActivityRequest)) {
         ped.socialActivityRequest = null;
       }
@@ -8612,9 +8802,10 @@
     state.visual.weatherClock += dt;
 
     autosaveTimer += dt;
-    if (autosaveTimer >= 5) {
+    if (autosaveTimer >= 30) {
       autosaveTimer = 0;
-      }
+      if (window.CityDaysCloudSave) void window.CityDaysCloudSave.flush();
+    }
 
     const p = actorPosition();
     let desiredLeadX = 0;
@@ -9222,11 +9413,11 @@
       const halfRoadSpan = Math.max(14, edge.width / 2 - 7);
       ctx.strokeStyle = "rgba(244,245,240,.88)";
       ctx.lineWidth = 4.5;
-      for (let offset = -crossingDepth / 2 + 3; offset <= crossingDepth / 2 - 3; offset += 8) {
-        const cx = crosswalk.x + roadTangent.x * offset;
-        const cy = crosswalk.y + roadTangent.y * offset;
-        const a = worldToScreen(cx - crossingVector.x * halfRoadSpan, cy - crossingVector.y * halfRoadSpan);
-        const b = worldToScreen(cx + crossingVector.x * halfRoadSpan, cy + crossingVector.y * halfRoadSpan);
+      for (let offset = -halfRoadSpan + 4; offset <= halfRoadSpan - 4; offset += 8) {
+        const cx = crosswalk.x + crossingVector.x * offset;
+        const cy = crosswalk.y + crossingVector.y * offset;
+        const a = worldToScreen(cx - roadTangent.x * crossingDepth / 2, cy - roadTangent.y * crossingDepth / 2);
+        const b = worldToScreen(cx + roadTangent.x * crossingDepth / 2, cy + roadTangent.y * crossingDepth / 2);
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
@@ -11351,7 +11542,8 @@
     phase,
     scale = 1,
     appearance = null,
-    visualState = "walk"
+    visualState = "walk",
+    opacity = 1
   ) {
     const p = worldToScreen(x, y);
     if (p.x < -70 || p.y < -100 || p.x > viewWidth + 70 || p.y > viewHeight + 100) return;
@@ -11360,6 +11552,8 @@
       Math.round(x * 7 + y * 13),
       {}
     );
+    ctx.save();
+    ctx.globalAlpha *= clamp(Number.isFinite(opacity) ? opacity : 1, 0, 1);
     characterRenderer.draw(ctx, {
       x:p.x,
       y:p.y,
@@ -11371,6 +11565,7 @@
       lod:characterLodAtScreen(p, scale),
       timeMs:performance.now()
     });
+    ctx.restore();
   }
 
   function syncNamedNpcCitizens() {
@@ -11380,7 +11575,8 @@
       npc.x = citizen.x;
       npc.y = citizen.y;
       npc.dir = citizen.dir;
-      npc.hidden = citizen.state === "inside" || !citizen.visible;
+      npc.hidden = citizen.visibilityAlpha <= .001 || !citizen.visible;
+      npc.visibilityAlpha = citizen.visibilityAlpha;
       npc.activityLabel = citizen.currentActivityLabel
         || citizen.pendingActivity?.label
         || (citizen.state === "waiting" ? "信号待ち" : "移動中");
@@ -11397,6 +11593,10 @@
 
   function drawNpc(npc) {
     if (npc.hidden) return;
+    const p = worldToScreen(npc.x, npc.y);
+    if (p.x < -40 || p.y < -40 || p.x > viewWidth + 40 || p.y > viewHeight + 40) return;
+    ctx.save();
+    ctx.globalAlpha *= clamp(Number.isFinite(npc.visibilityAlpha) ? npc.visibilityAlpha : 1, 0, 1);
     drawPerson(
       npc.x,
       npc.y,
@@ -11410,8 +11610,6 @@
       npc.appearance,
       npc.state || "idle"
     );
-    const p = worldToScreen(npc.x, npc.y);
-    if (p.x < -40 || p.y < -40 || p.x > viewWidth + 40 || p.y > viewHeight + 40) return;
     ctx.fillStyle = "rgba(12,18,15,.76)";
     roundedRectPath(ctx, p.x - 39, p.y - 78, 78, 20, 8);
     ctx.fill();
@@ -11425,25 +11623,54 @@
     ctx.fillText("…", p.x - 29, p.y - 64.5);
     ctx.textAlign = "left";
     ctx.fillText(npc.name, p.x - 20, p.y - 64);
+    ctx.restore();
   }
 
-  function drawPedestrians() {
+  function drawRoadActors() {
+    const actors = [];
+    let order = 0;
     for (const ped of pedestrians) {
       if (!ped.visible || ped.specialNpcId) continue;
-      drawPerson(
-        ped.x,
-        ped.y,
-        ped.dir,
-        ped.color,
-        ped.pants,
-        ped.hair,
-        ped.skin,
-        ped.phase,
-        .98,
-        ped.appearance,
-        ped.state
-      );
+      actors.push({
+        x:ped.x,
+        y:ped.y,
+        layer:1,
+        order:order++,
+        draw:() => drawPerson(
+          ped.x,
+          ped.y,
+          ped.dir,
+          ped.color,
+          ped.pants,
+          ped.hair,
+          ped.skin,
+          ped.phase,
+          .98,
+          ped.appearance,
+          ped.state,
+          ped.visibilityAlpha
+        )
+      });
     }
+    for (const npc of NPCS) {
+      if (npc.hidden) continue;
+      actors.push({ x:npc.x, y:npc.y, layer:1, order:order++, draw:() => drawNpc(npc) });
+    }
+    for (const car of traffic) {
+      actors.push({ x:car.x, y:car.y, layer:0, order:order++, draw:() => drawCar(car, false) });
+    }
+    actors.push({
+      x:personalCar.x,
+      y:personalCar.y,
+      layer:0,
+      order:order++,
+      draw:() => drawCar(personalCar, true)
+    });
+
+    // A consistent world-depth pass keeps a passing vehicle from painting over
+    // a pedestrian for an entire frame simply because of entity category.
+    actors.sort((a, b) => a.y - b.y || a.layer - b.layer || a.order - b.order);
+    for (const actor of actors) actor.draw();
   }
 
   function drawCar(car, owned = false) {
@@ -12415,10 +12642,9 @@
     }
 
     const n = state.needs;
-    if (state.cash < 0) {
+    if (state.lifeEconomy.arrears > 0) {
       objectiveTitle.textContent = "家計を立て直そう";
-      objectiveText.textContent = "カフェで働いて赤字を減らす";
-      return;
+      objectiveText.textContent = "仕事や配達で収入を得られます。家賃の猶予中も他の暮らしを続けられます";
     }
     if (n.energy < 25) {
       objectiveTitle.textContent = "かなり疲れている";
@@ -12451,7 +12677,7 @@
       return;
     }
     objectiveTitle.textContent = "今日はどう過ごす？";
-    objectiveText.textContent = "仕事・買い物・運動・読書・交流を自由に選べる";
+    objectiveText.textContent = "徒歩・電車や仕事、交流、地域活動から自由に選べます。車は序盤に購入できます";
   }
 
   function phoneFriendWaypointTarget() {
@@ -12522,6 +12748,9 @@
       drivingTrips:state.drive.trips,
       nextRentDay:nextRentDay(),
       rent:RENT,
+      rentArrears:state.lifeEconomy.arrears,
+      rentStatus:lifeEconomyModel.status(state.lifeEconomy, state.day),
+      rentGraceEndsDay:state.lifeEconomy.graceEndsDay,
       statusMessage:phoneStatusMessage(),
       homeDistance:state.player.inHome ? 0 : distance(p.x, p.y, HOME.x, HOME.y),
       carDistance:distance(p.x, p.y, personalCar.x, personalCar.y),
@@ -12686,7 +12915,8 @@
     const minimum = Math.min(...values);
     const generalStatus = minimum < 20 ? "かなりつらい" : average > 75 ? "とても充実" : average > 55 ? "いい感じ" : "少し疲れ気味";
     lifeStatus.textContent = playerHealthModel.conditionFor(state.needs.health) + " · " + generalStatus;
-    rentText.textContent = "次の家賃: Day " + nextRentDay() + " / ¥" + RENT.toLocaleString("ja-JP");
+    rentText.textContent = "次の家賃: Day " + nextRentDay() + " / ¥" + RENT.toLocaleString("ja-JP") +
+      (state.lifeEconomy.arrears > 0 ? " · 滞納 ¥" + state.lifeEconomy.arrears.toLocaleString("ja-JP") + "（利息なし）" : "");
     updateObjective();
     updateSmartphone();
 
@@ -12749,10 +12979,7 @@
     for (const place of PLACES) drawPlace(place);
     drawRailUnderstructure();
     drawCityLandmarks();
-    drawPedestrians();
-    for (const npc of NPCS) drawNpc(npc);
-    for (const car of traffic) drawCar(car, false);
-    drawCar(personalCar, true);
+    drawRoadActors();
     drawPetFollower();
     drawPlayer();
     drawTrafficLights();
@@ -12827,6 +13054,8 @@
         day:state.day,
         minute:state.minute,
         cash:state.cash,
+        vehicleProgression:vehicleProgressionModel.normalize(state.vehicleProgression),
+        carFuelLiters:personalCar.fuelLiters,
         player:{ x:state.player.x, y:state.player.y, homeX:state.player.homeX, homeY:state.player.homeY, inHome:state.player.inHome, inVehicle:state.player.inVehicle, inTrain:state.player.inTrain },
         needs:{ ...state.needs },
         weather:state.visual.weather,
@@ -12879,6 +13108,13 @@
           x:car.x,
           y:car.y,
           angle:car.angle,
+          speed:car.speed,
+          trafficStall:car.trafficStall || 0,
+          junctionWait:car.junctionWait || 0,
+          collisionYield:car.collisionYield || 0,
+          routeIndex:car.routeIndex,
+          nextEdgeId:car.routeEdgeIds?.[car.routeIndex] || null,
+          endpointId:(() => { const edge = mapModel.getEdge(car.edgeId); return car.directionSign > 0 ? edge?.to : edge?.from; })(),
           laneOffset:car.laneOffset,
           junctionTrajectoryActive:Boolean(trafficTurnCurve(car, car.along)),
           overtakeActive:Boolean(car.overtakePlan)
@@ -12932,6 +13168,9 @@
           return isPlayerUsingUmbrella();
         },
         buyUmbrellaForTest() { return buyUmbrella(); },
+        buyPersonalCarForTest() { return buyPersonalCar(); },
+        isPersonalCarOwnedForTest() { return state.vehicleProgression.owned; },
+        vehicleProgressionForTest() { return vehicleProgressionModel.normalize(state.vehicleProgression); },
         buyPreparedFoodForTest(itemId) { return buyPreparedFood(itemId); },
         buyHomeFurnitureForTest(furnitureId) { return buyHomeFurniture(furnitureId); },
         useHomeFurnitureForTest(placementId) { return useHomeFurniture(placementId); },
@@ -13088,6 +13327,17 @@
           state.camera.y = clamp(state.player.y - viewHeight / 2, 0, Math.max(0, WORLD_SIZE - viewHeight));
           return true;
         },
+        movePlayerNearCarForTest() {
+          state.player.inHome = false;
+          state.player.inVehicle = false;
+          state.player.inTrain = false;
+          state.player.trainId = null;
+          state.player.x = personalCar.x + 52;
+          state.player.y = personalCar.y;
+          state.camera.x = clamp(state.player.x - viewWidth / 2, 0, Math.max(0, WORLD_SIZE - viewWidth));
+          state.camera.y = clamp(state.player.y - viewHeight / 2, 0, Math.max(0, WORLD_SIZE - viewHeight));
+          return true;
+        },
         movePlayerToHomeFixture(fixtureId) {
           const fixture = HOME_FIXTURES.find((item) => item.id === fixtureId);
           if (!fixture) return false;
@@ -13143,6 +13393,7 @@
         }
       })
     });
+
   }
 
   function togglePause() {
@@ -13392,5 +13643,21 @@
 
   installSocialNpcTestHook();
   showToast("CITY DAYSへようこそ。今日は自由に過ごせます");
-  requestFrame(frame);
+  (async () => {
+    if (window.CityDaysCloudSave) {
+      await window.CityDaysCloudSave.initialize({
+        capture:buildGameSnapshot,
+        restore(snapshot) {
+          const restored = applyGameSnapshot(snapshot);
+          if (restored) {
+            state.camera.x = clamp(state.player.x - viewWidth / 2, 0, Math.max(0, WORLD_SIZE - viewWidth));
+            state.camera.y = clamp(state.player.y - viewHeight / 2, 0, Math.max(0, WORLD_SIZE - viewHeight));
+            updateHUD();
+          }
+          return restored;
+        }
+      });
+    }
+    requestFrame(frame);
+  })();
 })();

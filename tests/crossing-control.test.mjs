@@ -83,6 +83,18 @@ test('a vehicle already committed into the crossing clears first instead of mutu
   assert.equal(yieldDecision.shouldYield, false);
 });
 
+test('a vehicle already in the crosswalk clears before a pedestrian claims the crossing', () => {
+  const vehicle = { id:'committed-car', edgeId:'street', distanceToCrossing:30, speed:0, length:76 };
+  const decision = crossingControl.vehicleYieldDecision(
+    crosswalk,
+    { pedestrianId:'walker', phase:'crossing', clearanceTime:5 },
+    vehicle
+  );
+  assert.equal(decision.committed, true);
+  assert.equal(decision.shouldYield, false);
+  assert.equal(decision.emergencyClear, true);
+});
+
 test('a vehicle stopped fully behind the crossing yields and lets the pedestrian enter', () => {
   const vehicle = { id:'safe-stop', edgeId:'street', distanceToCrossing:70, speed:0, length:76 };
   const assessment = crossingControl.assessPedestrian(crosswalk, { id:'walker', speed:30 }, [vehicle]);

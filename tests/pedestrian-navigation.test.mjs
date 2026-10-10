@@ -4,7 +4,7 @@ import mapModule from '../game/map-model.js';
 import navigationModule from '../game/pedestrian-navigation.js';
 
 const { createMapModel } = mapModule;
-const { buildGraph, findRoute, nearestNode } = navigationModule;
+const { buildGraph, findRoute, nearestNode, resolveNodeId, poseAt } = navigationModule;
 
 test('map model exposes deterministic typed sidewalk, crosswalk, and facility access segments', () => {
   const map = createMapModel();
@@ -20,6 +20,21 @@ test('map model exposes deterministic typed sidewalk, crosswalk, and facility ac
     graph.segments.map(({ id }) => id),
     createMapModel().pedestrianNavigation.segments.map(({ id }) => id)
   );
+});
+
+test('citizen home and work anchors can exclude road-crossing nodes', () => {
+  const map = createMapModel();
+  const graph = map.pedestrianNavigation;
+  const crossingNodes = new Set(graph.crosswalks.flatMap((crossing) => crossing.endpointNodeIds));
+  const site = map.buildingSites.find((value) => value.use === 'residential');
+  const hit = nearestNode(graph, site.x + site.w / 2, site.y + site.h / 2, { excludeNodeIds:crossingNodes });
+  assert.ok(hit);
+  assert.equal(crossingNodes.has(hit.nodeId), false);
+  for (const candidate of map.buildingSites.filter((value) => ['residential','mixed-low','commercial','mixed'].includes(value.use))) {
+    const anchor = nearestNode(graph, candidate.x + candidate.w / 2, candidate.y + candidate.h / 2, { excludeNodeIds:crossingNodes });
+    assert.ok(anchor, candidate.id + ' should have a non-crossing pedestrian anchor');
+    assert.equal(crossingNodes.has(anchor.nodeId), false, candidate.id + ' must not hide a citizen on a crosswalk');
+  }
 });
 
 test('crosswalk records are stable map geometry with endpoint, road, and signal metadata', () => {
@@ -43,6 +58,17 @@ test('crosswalk records are stable map geometry with endpoint, road, and signal 
   }
 });
 
+test('crosswalk markings follow the local road tangent on curved approaches', () => {
+  const map = createMapModel();
+  for (const crossing of map.pedestrianNavigation.crosswalks) {
+    const edge = map.getEdge(crossing.roadEdgeId);
+    const roadPose = map.pedestrianOffsetPose(edge, crossing.along, 1, 0);
+    const expected = { x:-Math.sin(roadPose.angle), y:Math.cos(roadPose.angle) };
+    const alignment = Math.abs(crossing.vector.x * expected.x + crossing.vector.y * expected.y);
+    assert.ok(alignment > .9999, crossing.id + ' should align with its local road tangent');
+  }
+});
+
 test('typed pedestrian routes stay connected between home and every mapped facility', () => {
   const map = createMapModel();
   for (const place of map.places) {
@@ -50,6 +76,45 @@ test('typed pedestrian routes stay connected between home and every mapped facil
   }
   for (const station of map.stations) {
     assert.ok(findRoute(map.pedestrianNavigation, 'home-entrance', station.roadNodeId), station.id + ' should be reachable on the typed graph');
+  }
+});
+
+test('legacy map and place node aliases resolve to canonical pedestrian graph nodes', () => {
+  const map = createMapModel();
+  const graph = map.pedestrianNavigation;
+  for (const [alias, nodeId] of graph.externalNodeAliases) {
+    assert.equal(resolveNodeId(graph, alias), nodeId, alias + ' should restore onto its pedestrian node');
+    assert.ok(graph.nodePositions.has(resolveNodeId(graph, alias)), alias + ' should have a restorable world position');
+  }
+  assert.equal(resolveNodeId(graph, 'missing-pedestrian-node'), null);
+});
+
+test('reverse pedestrian traversal starts at the segment destination and walks toward its origin', () => {
+  const segment = { length:100, points:[{ x:0, y:0 },{ x:100, y:0 }] };
+  const reverseStart = poseAt(segment, -1, 100);
+  const reverseEnd = poseAt(segment, -1, 0);
+  assert.deepEqual({ x:reverseStart.x, y:reverseStart.y }, { x:100, y:0 });
+  assert.deepEqual({ x:reverseEnd.x, y:reverseEnd.y }, { x:0, y:0 });
+  assert.ok(Math.abs(Math.abs(reverseStart.angle) - Math.PI) < 1e-9);
+  assert.ok(Math.abs(Math.abs(reverseEnd.angle) - Math.PI) < 1e-9);
+  assert.deepEqual(poseAt(segment, 1, 0), { x:0, y:0, angle:0 });
+  assert.deepEqual(poseAt(segment, 1, 100), { x:100, y:0, angle:0 });
+});
+
+test('every pedestrian segment endpoint pose agrees with the graph node position in both directions', () => {
+  const map = createMapModel();
+  const graph = map.pedestrianNavigation;
+  for (const segment of graph.segments) {
+    for (const [direction, along, nodeId] of [
+      [1, 0, segment.from],
+      [1, segment.length, segment.to],
+      [-1, segment.length, segment.to],
+      [-1, 0, segment.from]
+    ]) {
+      const pose = poseAt(segment, direction, along);
+      const node = graph.nodePositions.get(nodeId);
+      assert.ok(Math.hypot(pose.x - node.x, pose.y - node.y) < .01, segment.id + ' must meet ' + nodeId + ' while moving ' + direction);
+    }
   }
 });
 

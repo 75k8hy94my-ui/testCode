@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#18201d">
   <link rel="icon" href="data:,">
   <title>City Days - 2D Life Sim</title>
-  <link rel="stylesheet" href="./game.css?v=20260929-packed-meals-1">
+  <link rel="stylesheet" href="./game.css?v=20261007-vault-autosave-1">
 </head>
 <body>
   <main id="gameShell">
@@ -44,8 +44,8 @@
 
         <div class="hud-card objective-card">
           <span class="eyebrow">TODAY</span>
-          <strong id="objectiveTitle">まず街を歩いてみよう</strong>
-          <span id="objectiveText">自宅・スーパー・カフェ・公園・ジムを利用できます</span>
+          <strong id="objectiveTitle">今日はどう過ごす？</strong>
+          <span id="objectiveText">徒歩・電車や仕事、交流、地域活動から自由に選べます。車は序盤に購入できます</span>
         </div>
       </div>
 
@@ -105,17 +105,21 @@
         <p><b>若葉診療所:</b> 南若葉住宅地にあります。8:00〜20:00に診察・処置（¥1,200）または重い不調向けの集中治療（¥2,800）を受けられます。</p>
         <p><b>カフェの仕事:</b> 体調と営業時間に合わせてシフトを選べます。勤務経験でロングシフトと昇給が解放され、勤務は1日1回です。</p>
         <p><b>若葉便の配達:</b> 自宅前の「若葉便 配達受付所」で1日3件まで受注できます。納品先でE / ACTIONから届けると報酬を受け取れます。期限後も減額で配達でき、受付所でキャンセルできます。</p>
-        <p><b>車:</b> 乗車後に目的地を選ぶとルートは自動設定。W / ↑ = 加速、S / ↓ / Space = 減速・停止、E = 行き先変更・降車。</p>
+        <p><b>車:</b> 初めは自分の車がありません。自宅近くの中古車に近づいてACTION / Eを押すと、¥10,000で購入できます。カフェの通常シフト1回、または若葉便の配達などで購入資金を得られます。購入前も徒歩・電車や仕事、交流、地域活動を利用できます。購入後は目的地を選ぶとルートが自動設定され、W / ↑ = 加速、S / ↓ / Space = 減速・停止、E = 行き先変更・降車です。</p>
         <p><b>電車:</b> 若葉線の駅入口でE / ACTION。電車が停車中なら乗車でき、乗車後は停車駅でE / ACTIONを押すと降車できます。</p>
         <p>操舵は自動です。信号、制限速度、前走車との車間を守ると運転評価が上がります。</p>
         <p><b>スマートフォン:</b> 画面右上の「スマホ」またはPキーでいつでも開閉できます。生活状況を確認し、自宅の近くなら自宅へ移動できます。</p>
         <p>スマホでは徒歩時は左スティック＋ACTION、運転時はBRAKE / ACCELを使います。</p>
-        <p><b>音:</b> 最初のタップやキー入力で有効になります。右上の「音 ON / OFF」でいつでも切り替えられます。</p>\n        <p><b>進行状況:</b> 現在は端末保存しません。ページを再読み込みすると最初から始まります。ログイン同期は今後対応予定です。</p>
+        <p><b>音:</b> 最初のタップやキー入力で有効になります。右上の「音 ON / OFF」でいつでも切り替えられます。</p>
+        <p><b>家賃:</b> Day 8から7日ごとに¥12,000です。支払いが足りない場合は所持金を超えて引き落とさず、不足分は利息なしで14ゲーム日の猶予があります。自宅前の操作から、報酬の範囲で一部返済できます。未払いでも住居や行動は失われません。</p>
+        <p><b>進行状況:</b> ログインし、保管庫を開いている間は約30秒ごとにクラウドへ自動保存します。別の端末では同じアカウントで保管庫を開いてください。localhostでURLに <code>?freshGame</code> を付けると、開発用の初期状態で起動して同期を無効にできます。</p>
         <button id="helpClose" type="button">閉じる</button>
       </div>
     </section>
 
     <div class="top-actions">
+      <span id="cloudSaveStatus" class="cloud-save-status" role="status" aria-live="polite">クラウド保存を確認中…</span>
+      <a id="cloudSaveOpenVault" class="cloud-save-vault-link" href="../sync.html" hidden>Vaultを開く</a>
       <button id="homeFurnitureButton" type="button" hidden aria-label="自宅の家具を配置・移動する">家具</button>
       <button id="smartphoneToggle" type="button" aria-controls="smartphonePanel" aria-expanded="false" title="スマホを開く (P)">スマホ</button>
       <button id="soundButton" type="button" aria-pressed="true" title="音声をオフにする">音 ON</button>
@@ -153,14 +157,16 @@
   </main>
 
   <script src="../guest-mode.js?v=20261009-guest"></script>
-<script src="./pedestrian-navigation.js?v=20260930-pedestrian-vehicle-deadlock-1"></script>
-  <script src="./crossing-control.js?v=20260930-pedestrian-vehicle-deadlock-1"></script>
+  <script src="./pedestrian-navigation.js?v=20261007-pedestrian-restore-nodes-1"></script>
+  <script src="./crossing-control.js?v=20261007-committed-vehicle-clear-1"></script>
   <script src="./vehicle-trajectory.js?v=20260930-vehicle-trajectory-1"></script>
   <script src="./home-fixtures.js?v=20260930-postmerge-debug-1"></script>
   <script src="./building-frontage.js?v=20260930-building-frontage-1"></script>
   <script src="./map-model.js?v=20260930-pedestrian-vehicle-deadlock-1"></script>
   <script src="./weather-system.js?v=20260929-deterministic-weather-1"></script>
   <script src="./car-fuel.js?v=20260929-vehicle-fuel-1"></script>
+  <script src="./vehicle-progression.js?v=20261007-early-car-1"></script>
+  <script src="./life-economy.js?v=20261007-life-sim-1"></script>
   <script src="./community-center.js?v=20260929-community-clubs-1"></script>
   <script src="./delivery-work.js?v=20260929-neighborhood-delivery-1"></script>
   <script src="./community-garden.js?v=20260929-community-garden-1"></script>
@@ -184,8 +190,13 @@
   <script src="./home-furniture.js?v=20260929-home-furniture-1"></script>
   <script src="./traffic-overtake-safety.js?v=20260928-overtake-safety-1"></script>
   <script src="./traffic-overtake.js?v=20260928-overtake-plan-integration-1"></script>
+  <script src="./traffic-spawn.js?v=20261007-narrow-road-single-flow-1"></script>
   <script src="./arcade-games.js?v=20260929-arcade-rules-1"></script>
   <script src="./rail-transit.js?v=20260929-rail-fares-1"></script>
-  <script src="./game.js?v=20260930-pedestrian-vehicle-deadlock-1"></script>
+  <script src="../supabase-config.js"></script>
+  <script src="../vault-session.js?v=20261006-passkey-reset"></script>
+  <script src="../vault-payload.js"></script>
+  <script src="./cloud-save.js?v=20261007-vault-autosave-1"></script>
+  <script src="./game.js?v=20261007-narrow-road-single-flow-1"></script>
 </body>
 </html>
