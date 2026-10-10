@@ -47,7 +47,26 @@ end $$;
 -- Direct worker invocation repeats protocol and CAS guards and can only mutate auth.uid().
 DO $$
 declare affected integer;
+  invalid_payload jsonb;
 begin
+  for invalid_payload in
+    select payload from (values
+      ('{"version":1}'::jsonb),
+      ('{"syncProtocolVersion":1,"version":1}'::jsonb),
+      ('{"syncProtocolVersion":2,"version":1}'::jsonb),
+      ('{"syncProtocolVersion":3,"version":1}'::jsonb),
+      ('{"syncProtocolVersion":"4","version":1}'::jsonb),
+      ('{"syncProtocolVersion":null,"version":1}'::jsonb),
+      ('{"syncProtocolVersion":"future","version":1}'::jsonb),
+      ('{"syncProtocolVersion":5,"version":1}'::jsonb)
+    ) as invalid(payload)
+  loop
+    begin
+      perform * from private.update_manga_reader_vault_v4_worker(7, invalid_payload);
+      raise exception 'invalid protocol payload was accepted: %', invalid_payload using errcode = 'ZX001';
+    exception when sqlstate 'P0001' then null;
+    end;
+  end loop;
   begin
     perform * from private.update_manga_reader_vault_v4_worker(7, '{"syncProtocolVersion":3,"version":1}');
     raise exception 'old protocol was accepted by direct worker call' using errcode = 'ZX001';
@@ -63,7 +82,26 @@ select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000003
 select set_config('request.jwt.claims', '{"sub":"30000000-0000-0000-0000-000000000003","role":"authenticated","is_anonymous":false}', false);
 DO $$
 declare affected integer;
+  invalid_payload jsonb;
 begin
+  for invalid_payload in
+    select payload from (values
+      ('{"version":1}'::jsonb),
+      ('{"syncProtocolVersion":1,"version":1}'::jsonb),
+      ('{"syncProtocolVersion":2,"version":1}'::jsonb),
+      ('{"syncProtocolVersion":3,"version":1}'::jsonb),
+      ('{"syncProtocolVersion":"4","version":1}'::jsonb),
+      ('{"syncProtocolVersion":null,"version":1}'::jsonb),
+      ('{"syncProtocolVersion":"future","version":1}'::jsonb),
+      ('{"syncProtocolVersion":5,"version":1}'::jsonb)
+    ) as invalid(payload)
+  loop
+    begin
+      perform * from private.create_manga_reader_vault_v4_worker(invalid_payload);
+      raise exception 'invalid create protocol payload was accepted: %', invalid_payload using errcode = 'ZX001';
+    exception when sqlstate 'P0001' then null;
+    end;
+  end loop;
   begin
     perform * from private.create_manga_reader_vault_v4_worker('{"syncProtocolVersion":3,"version":1}');
     raise exception 'old protocol create was accepted' using errcode = 'ZX001';
@@ -102,6 +140,20 @@ begin
 end $$;
 
 reset role;
+
+-- Existing service_role administration grants survive the migration.
+DO $$
+begin
+  if not has_table_privilege('service_role', 'public.manga_reader_vaults', 'SELECT')
+    or not has_table_privilege('service_role', 'public.manga_reader_vaults', 'INSERT')
+    or not has_table_privilege('service_role', 'public.manga_reader_vaults', 'UPDATE')
+    or not has_table_privilege('service_role', 'public.manga_reader_vaults', 'DELETE') then
+    raise exception 'service_role table administration privileges were not preserved';
+  end if;
+  if not has_function_privilege('service_role', 'public.update_manga_reader_vault(bigint,jsonb)', 'EXECUTE') then
+    raise exception 'service_role legacy RPC administration privilege was not preserved';
+  end if;
+end $$;
 
 -- Every definer worker pins search_path to empty and wrappers remain invoker functions.
 DO $$

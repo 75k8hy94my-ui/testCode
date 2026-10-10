@@ -370,7 +370,8 @@ begin
   if new_payload is null or jsonb_typeof(new_payload) <> 'object' then
     raise exception 'vault_payload_must_be_object' using errcode = '22023';
   end if;
-  if new_payload ->> 'syncProtocolVersion' is distinct from '4' then
+  if jsonb_typeof(new_payload -> 'syncProtocolVersion') is distinct from 'number'
+    or new_payload ->> 'syncProtocolVersion' is distinct from '4' then
     raise exception 'vault_sync_protocol_required' using errcode = 'P0001';
   end if;
   if exists (select 1 from public.manga_reader_vaults as vault where vault.user_id = caller_id) then
@@ -407,7 +408,8 @@ begin
   if new_payload is null or jsonb_typeof(new_payload) <> 'object' then
     raise exception 'vault_payload_must_be_object' using errcode = '22023';
   end if;
-  if new_payload ->> 'syncProtocolVersion' is distinct from '4' then
+  if jsonb_typeof(new_payload -> 'syncProtocolVersion') is distinct from 'number'
+    or new_payload ->> 'syncProtocolVersion' is distinct from '4' then
     raise exception 'vault_sync_protocol_required' using errcode = 'P0001';
   end if;
 
