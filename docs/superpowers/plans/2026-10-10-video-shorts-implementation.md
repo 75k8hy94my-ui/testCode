@@ -58,13 +58,12 @@
   - Order short tiers with liked entries first, retaining tier order within liked and unliked groups. Within Tier 1, order play-count `<=10` before `>10`; within each tier/count group, order by ascending early-swipe count and use randomized tie order. Keep all short tiers ahead of landscape overflow and all landscape overflow ahead of long-video overflow; likes only reorder entries within their overflow group.
   - Merge Shorts play/early-swipe counts using the maximum count and resolve like changes using the newest `shorts.updatedAt` so stale snapshots cannot undo a newer toggle.
 - [x] **Step 4: Run `node --test tests/video-shorts-queue.test.mjs tests/video-data.test.mjs`; confirm all pass.**
-- [ ] **Step 5: Commit `feat: add video shorts queue generation`.**
+- [x] **Step 5: Commit `feat: add video shorts queue generation`.**
 
 ### Task 2: Vault state, marker migration, and profile reset
 
 **Files:**
 - Modify: `vault-payload.js`
-- Modify: `video-data.js`
 - Create: `video-shorts-state.js`
 - Modify: `home-profile-spa.js`
 - Modify: `profile.html`
@@ -78,18 +77,18 @@
 - Queue state schema version 1 contains `queue`, `currentIndex`, `currentTime`, `knownVideoIds`, `generation`, `updatedAt`, and `revision`.
 - State saves are gated by `canReadProtectedData`; in guest mode they persist locally and never call Vault sync. Non-guest saves mark local changes pending and use existing Vault sync behavior.
 
-- [ ] **Step 1: Write failing state/payload tests**
+- [x] **Step 1: Write failing state/payload tests**
   - Test marker icon normalization and legacy label migration (`water`, `triangle`, `toilet`; unknown legacy labels map to `triangle`). Implement/export `MangaVaultPayload.normalizeVideoMarkers(value)` so player and Vault use the same rules.
   - Test state validation, queue/index/time bounds, revision precedence, Vault round-trip, local storage apply, and device-data clearing for both keys.
   - Test `observeVideos` preserves queue when no new IDs exist and clears queue/position while advancing generation when an unseen video ID appears; the Shorts route will probe metadata and generate the replacement queue.
   - Test profile reset action clears sequence/random assignments and is unavailable while VPN access is not allowed.
-- [ ] **Step 2: Run `node --test tests/vault-payload.test.mjs tests/video-shorts-state.test.mjs tests/profile-short-reset.test.mjs`; confirm failures identify missing behavior.**
-- [ ] **Step 3: Implement canonical marker/state normalizers and Vault payload wiring.**
+- [x] **Step 2: Run `node --test tests/vault-payload.test.mjs tests/video-shorts-state.test.mjs tests/profile-short-reset.test.mjs`; confirm failures identify missing behavior.**
+- [x] **Step 3: Implement canonical marker/state normalizers and Vault payload wiring.**
   - `normalize` retains only valid queue entries and clamps index/time/revision to nonnegative safe values.
   - `save` merges against latest local state; retain the state with higher revision, using `updatedAt` to resolve equal revisions, and advance revision for local changes.
   - `observeVideos` detects only IDs absent from `knownVideoIds`, clears queue/position and advances generation, then records the new known ID set. The route regenerates only after metadata probing.
   - Render a “再生順をリセット” button in the profile settings card; require `canReadProtectedData()` except guest-local mode, invoke state reset, and report success/error in a status element.
-- [ ] **Step 4: Run `node --test tests/vault-payload.test.mjs tests/video-shorts-state.test.mjs tests/profile-short-reset.test.mjs`; confirm all pass.**
+- [x] **Step 4: Run `node --test tests/vault-payload.test.mjs tests/video-shorts-state.test.mjs tests/profile-short-reset.test.mjs`; confirm all pass.**
 - [ ] **Step 5: Commit `feat: sync video shorts queue state`.**
 
 ### Task 3: Icon timestamp markers in the ordinary player
