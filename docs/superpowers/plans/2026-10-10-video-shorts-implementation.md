@@ -166,9 +166,9 @@
 
 - [ ] **Step 1: Start the app using the repository's static-server command and load ordinary video, profile, and Shorts routes in a real browser.**
 - [ ] **Step 2: Verify marker creation/seek and arrow-key seek; verify Shorts queue order, vertical gestures, hold behavior, scrub preview/time position, like colors, mobile landscape rotation, desktop portrait frame/back button, profile reset, same-time double-tap handoff, and VPN-loss cleanup.**
-- [x] **Step 3: Run `npm test`; expected: all tests pass.** (Ran; 1368/1373 passed. Five failures are stale cache-version assertions in existing app/video tests and the pre-existing video-list ellipsis assertion.)
+- [x] **Step 3: Run `npm test`; expected: all tests pass.** (Final run: 1373/1373 passed.)
 - [x] **Step 4: Run `npm run verify:static`; expected: static verification passes.**
 - [x] **Step 5: Run `git diff --check`; expected: no whitespace errors.**
-- [ ] **Step 6: Commit any verification fixes with the appropriate task commit message and inspect `git status` to confirm unrelated work remains untouched.**
+- [x] **Step 6: Commit any verification fixes with the appropriate task commit message and inspect `git status` to confirm unrelated work remains untouched.** (Cache-version assertion fixes committed separately; existing unrelated local changes remain unstaged.)
 
 Browser verification limitation: the browser integration returned 404 for localhost content served from the repository runtime, and direct `file:` navigation was rejected by browser security policy. No alternate navigation workaround was attempted.
