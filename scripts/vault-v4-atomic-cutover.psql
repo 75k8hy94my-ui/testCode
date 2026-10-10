@@ -1,0 +1,30 @@
+\set ON_ERROR_STOP on
+
+-- Run with psql --single-transaction --set=ON_ERROR_STOP=1. Keep both
+-- migrations and their history rows inside the same transaction boundary.
+set local lock_timeout = '30s';
+set local statement_timeout = '5min';
+lock table public.manga_reader_vaults in access exclusive mode;
+
+do $$
+begin
+  if to_regclass('supabase_migrations.schema_migrations') is null then
+    raise exception 'vault_migration_history_table_missing';
+  end if;
+  if exists (
+    select 1 from supabase_migrations.schema_migrations
+    where version in ('20261010092010', '20261010120000')
+  ) then
+    raise exception 'vault_v4_migration_history_already_partially_applied';
+  end if;
+end;
+$$;
+
+\ir ../supabase/migrations/20261010092010_vault_sync_cas_permissions.sql
+\ir ../supabase/migrations/20261010120000_vault_sync_v4_rpc.sql
+
+insert into supabase_migrations.schema_migrations (version, name)
+values
+  ('20261010092010', 'vault_sync_cas_permissions'),
+  ('20261010120000', 'vault_sync_v4_rpc');
+
