@@ -63,6 +63,11 @@ When security-sensitive storage or sync behavior changes, add or update tests fo
 - Do not remove a legacy read path until existing persisted user data has a safe migration path.
 - Avoid speculative backwards-compatibility code for formats that never existed in production.
 
+## Repository work lifecycle
+
+- Before starting repository work, check for updates on the target remote branch. Fetch and inspect the upstream changes before editing; if terminal fetch is unavailable, inspect the current remote branch through an authenticated GitHub integration and base the work on that revision. Integrate remote changes deliberately and preserve existing local/user work.
+- Do not end repository work until the deployment for the intended change has visibly started. Identify the deployment mechanism at the start, then after publishing verify that a deployment run exists for the intended commit and has entered a running or later state. A passing test workflow, pull request creation, or merge alone does not confirm deployment. If no deployment mechanism or status is available, report the exact blocker and leave the work explicitly incomplete rather than claiming deployment started.
+
 ## Git and GitHub workflow
 
 Do not report that publishing is impossible merely because the shell credential path fails.
