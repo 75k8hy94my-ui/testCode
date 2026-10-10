@@ -85,7 +85,8 @@
   </main>
   <script src="guest-mode.js?v=20261009-guest"></script>
 <script src="supabase-config.js"></script>
-  <script src="vault-session.js?v=20261010-last-sync-wins"></script>
+  <script src="vault-sync-merge.js?v=20261010-vault-diff-sync"></script>
+<script src="vault-session.js?v=20261010-vault-diff-sync"></script><script src="vault-conflict-ui.js?v=20261010-vault-diff-sync"></script>
   <script src="vault-payload.js"></script>
   <script src="encrypted-chunk-cache.js"></script>
   <script>
@@ -162,7 +163,18 @@
       if (!confirm('ログアウトしてよろしいですか？')) return;
       closeAccountMenu();
       ui.vaultLogout.disabled=true;
-      try { await MangaVault.withSession((token)=>MangaVault.api('/auth/v1/logout',{method:'POST',token})); } catch (_) {}
+      try {
+        if (MangaVault.hasPendingLocalChanges()) {
+          const access = window.MangaReaderMediaAccess;
+          if (MangaVault.loadActive() && access?.canReadProtectedData?.() === true) await MangaVault.saveLocalChanges();
+          if (MangaVault.hasPendingLocalChanges()) throw new Error('未同期の変更が残っています。同期可能な状態で再試行してください。ログアウトは行いませんでした。');
+        }
+        await MangaVault.withSession((token)=>MangaVault.api('/auth/v1/logout',{method:'POST',token}));
+      } catch (error) {
+        ui.vaultLogout.disabled=false;
+        setStatus(error?.message || 'ログアウトできませんでした。端末の変更を保持しています。');
+        return;
+      }
       try { if (session.user&&session.user.id) await EncryptedChunkCache.clearAll({dbName:`${EncryptedChunkCache.DB_NAME}:${session.user.id}`}); } catch (_) {}
       MangaVault.clearActive();
       MangaVault.saveSession(null);

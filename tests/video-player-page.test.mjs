@@ -44,7 +44,8 @@ test('video player edit action navigates to the dedicated editor instead of open
     assert.ok(editor.includes(field), field);
   }
   assert.match(editor, /MangaVault\.markLocalChangesPending\(\)/);
-  assert.doesNotMatch(editor, /await window\.MangaVault\.saveLocalChanges\(\)/);
+  const ordinarySubmit = editor.slice(editor.indexOf("form.addEventListener('submit'"), editor.indexOf("if (!isAddMode) form.querySelector('[data-delete]')"));
+  assert.doesNotMatch(ordinarySubmit, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.match(editor, /location\.href = returnTarget\(returnKind, savedId\)/);
   assert.match(editor, /if \(kind === 'player'\) return 'video-player\.html\?id='/);
 });

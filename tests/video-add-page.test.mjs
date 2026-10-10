@@ -112,7 +112,18 @@ test('JSON import adds URL records, preserves signed query strings, and skips ex
     'https://example.com/already.mp4?token=kept',
   ]);
   assert.equal(app.pendingCalls, 1);
-  assert.match(app.nodes.get('.videoEditError').textContent, /2件追加/);
+  assert.equal(app.syncCalls, 1);
+  assert.match(app.nodes.get('.videoEditError').textContent, /2件追加.*クラウド同期も完了/);
+});
+
+test('JSON import keeps added rows pending when cloud sync fails', async () => {
+  const app = startEditor({ failSync: true });
+  app.nodes.get('[data-json-import]').events.change({ target: { files: [{ text: async () => JSON.stringify(['https://example.com/offline.mp4']) }] } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(JSON.parse(app.stored.get(VIDEO_KEY)).length, 1);
+  assert.equal(app.pendingCalls, 1);
+  assert.equal(app.syncCalls, 1);
+  assert.match(app.nodes.get('.videoEditError').textContent, /未同期として保持/);
 });
 
 test('JSON import rejects malformed data or any invalid URL without a partial write', async () => {

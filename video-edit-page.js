@@ -19,6 +19,18 @@
     if (!canReadProtectedData()) return fallback;
     try { const value = JSON.parse(localStorage.getItem(key) || 'null'); return value == null ? fallback : value; } catch (_) { return fallback; }
   }
+  function writeVideoRecordsAtomically(videos, metadata) {
+    const previousVideos = localStorage.getItem(VIDEO_KEY);
+    const previousMetadata = localStorage.getItem(META_KEY);
+    try {
+      localStorage.setItem(VIDEO_KEY, JSON.stringify(videos));
+      localStorage.setItem(META_KEY, JSON.stringify(metadata));
+    } catch (error) {
+      try { if (previousVideos == null) localStorage.removeItem(VIDEO_KEY); else localStorage.setItem(VIDEO_KEY, previousVideos); } catch (_) {}
+      try { if (previousMetadata == null) localStorage.removeItem(META_KEY); else localStorage.setItem(META_KEY, previousMetadata); } catch (_) {}
+      throw error;
+    }
+  }
   function showGate() {
     const section = document.createElement('section'); section.className = 'videoEditNotice vpnRouteGate';
     const heading = document.createElement('h2'); heading.textContent = 'VPN接続が必要です';
@@ -143,8 +155,7 @@
         const currentMeta = read(META_KEY, {});
         const nextMeta = currentMeta && typeof currentMeta === 'object' && !Array.isArray(currentMeta) ? { ...currentMeta, ...newMeta } : newMeta;
         try {
-          localStorage.setItem(VIDEO_KEY, JSON.stringify([...newVideos, ...savedVideos]));
-          localStorage.setItem(META_KEY, JSON.stringify(nextMeta));
+          writeVideoRecordsAtomically([...newVideos, ...savedVideos], nextMeta);
         } catch (_) {
           error.textContent = '端末に保存できませんでした。ブラウザの保存容量を確認してください。';
           event.target.value = '';
@@ -162,7 +173,14 @@
             return;
           }
         }
-        error.textContent = newVideos.length + '件追加しました。';
+        let syncMessage = '端末に保存しました。';
+        if (!window.TestCodeGuest?.isActive()) {
+          if (canReadProtectedData()) {
+            try { await window.MangaVault.saveLocalChanges(); syncMessage = 'クラウド同期も完了しました。'; }
+            catch (syncError) { syncMessage = '未同期として保持し、後で再試行します。 ' + (syncError?.message || ''); }
+          } else syncMessage = 'VPN未許可のため未同期として保持しました。';
+        } else syncMessage = 'ゲスト端末内に保存しました。';
+        error.textContent = newVideos.length + '件追加しました。' + syncMessage;
         event.target.value = '';
       });
     }

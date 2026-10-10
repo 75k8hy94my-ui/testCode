@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { webcrypto } from 'node:crypto';
+import mergeModule from '../vault-sync-merge.js';
 
 const source = fs.readFileSync(new URL('../vault-session.js', import.meta.url), 'utf8');
 const b64url = (bytes) => Buffer.from(bytes).toString('base64url');
@@ -50,7 +51,7 @@ test('a passkey reset writes a passphrase wrapper that the normal unlock flow ac
   sessionStorage.setItem('mangaReaderActiveVault', JSON.stringify({ rawKey: b64url(rawKey), keyWraps }));
 
   const context = {
-    window: { MANGA_READER_SUPABASE: { url: 'https://vault.test', publishableKey: 'public' }, PublicKeyCredential: function PublicKeyCredential() {}, MangaVaultPayload: { buildFromLocalStorage: () => ({ savedItems: [{ id: 'kept' }] }) } },
+    window: { MANGA_READER_SUPABASE: { url: 'https://vault.test', publishableKey: 'public' }, PublicKeyCredential: function PublicKeyCredential() {}, MangaVaultSyncMerge: mergeModule, MangaVaultPayload: { buildFromLocalStorage: () => ({ savedItems: [{ id: 'kept' }] }) } },
     navigator: { credentials: { create: async () => null, get: async () => ({ rawId: credentialId.buffer, getClientExtensionResults: () => ({ prf: { results: { first: prfOutput } } }) }) } },
     location: { hostname: 'vault.test', protocol: 'https:' },
     crypto: webcrypto,

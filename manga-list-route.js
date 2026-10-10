@@ -347,7 +347,20 @@
           getToc: () => readInfo('mangaReaderToc'),
           getTheme: () => documentRef.documentElement.dataset.theme === 'light' ? 'light' : 'dark',
           getDashboardVisibility: () => ({}),
-          onSyncError: () => {},
+          onSyncError: (message) => {
+            let notice = documentRef.getElementById('mangaCloudSyncError');
+            if (!notice) {
+              notice = documentRef.createElement('p');
+              notice.id = 'mangaCloudSyncError';
+              notice.setAttribute('role', 'status');
+              notice.setAttribute('aria-live', 'polite');
+              notice.style.cssText = 'position:fixed;left:16px;right:16px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:1600;padding:12px 16px;border-radius:12px;background:#7b2d24;color:#fff;box-shadow:0 8px 24px #0005';
+              documentRef.body.appendChild(notice);
+            }
+            notice.textContent = '端末には保存済みですが、クラウド同期に失敗しました。変更は未同期として保持されています。' + (message ? ' ' + message : '');
+            windowRef.clearTimeout(notice._hideTimer);
+            notice._hideTimer = windowRef.setTimeout(() => notice.remove(), 10000);
+          },
         },
         images: {
           parseInputUrl, getCachedMangaInfo, getCoverSourceCache: coverCache.getSourceCache,
