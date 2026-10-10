@@ -59,7 +59,7 @@ async function fixture({ initialPayload = {}, rawKey = webcrypto.getRandomValues
       PublicKeyCredential: passkeySupported ? function PublicKeyCredential() {} : undefined,
       addEventListener() {},
       dispatchEvent() {},
-      MangaVaultPayload: { buildFromLocalStorage: () => JSON.parse(local.getItem('testPayload') || '{}') },
+      MangaVaultPayload: { buildFromLocalStorage: () => JSON.parse(local.getItem('testPayload') || '{}'), applyToLocalStorage: payload => local.setItem('testPayload', JSON.stringify(payload)) },
     },
     navigator: { locks, credentials: credentials || {} },
     location: { hostname: 'vault.test', protocol: 'https:' },
@@ -444,4 +444,108 @@ test('guest local edits never count as pending cloud sync for the leave guard', 
   assert.equal(vault.hasPendingLocalChanges(), false);
   assert.equal(vault.guardPendingSyncLeave({ preventDefault() { prevented = true; } }, false), false);
   assert.equal(prevented, false);
+});
+
+test('manual conflict preview and encrypted backup preserve both divergent versions', async () => {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const localPayload = { items: [{ id:'local-only', title:'SECRET_LOCAL_TEXT' }] };
+  const cloudPayload = { items: [{ id:'cloud-only', title:'SECRET_CLOUD_TEXT' }] };
+  const remote = { record: { payload: await encryptPayload(rawKey, cloudPayload), revision: 4, updated_at:'later' } };
+  const { vault, local } = await fixture({ rawKey, revision: 3, initialPayload: localPayload, remote });
+  vault.markLocalChangesPending();
+  const preview = await vault.inspectConflict();
+  assert.equal(preview.revision, 4);
+  assert.deepEqual(JSON.parse(JSON.stringify(preview.local)), localPayload);
+  assert.deepEqual(JSON.parse(JSON.stringify(preview.cloud)), cloudPayload);
+  const backup = await vault.createConflictBackup(preview);
+  assert.equal(backup.type, 'testcode-vault-conflict-backup');
+  assert.deepEqual(await decryptPayload(rawKey, backup.local), localPayload);
+  assert.deepEqual(await decryptPayload(rawKey, backup.cloud), cloudPayload);
+  assert.equal(JSON.stringify(backup).includes('SECRET_LOCAL_TEXT'), false);
+  assert.equal(JSON.stringify(backup).includes('SECRET_CLOUD_TEXT'), false);
+  assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, true);
+});
+
+test('manual local-win resolution writes with the latest cloud revision and clears pending', async () => {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const localPayload = { videos: [{ id:'v1', title:'端末編集' }] };
+  const cloudPayload = { videos: [{ id:'v1', title:'クラウド編集' }] };
+  const remote = { record: { payload: await encryptPayload(rawKey, cloudPayload), revision: 7, updated_at:'external' } };
+  const { vault, local } = await fixture({ rawKey, revision: 6, initialPayload: localPayload, remote });
+  vault.markLocalChangesPending();
+  const preview = await vault.inspectConflict();
+  const result = await vault.resolveConflict('local', preview);
+  assert.equal(result.revision, 8);
+  assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), localPayload);
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')), localPayload);
+  const meta = JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'];
+  assert.equal(meta.pendingSync, false);
+  assert.equal(meta.revision, 8);
+});
+
+test('manual cloud-win resolution restores remote locally without a cloud write', async () => {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const localPayload = { items: [{ id:'old-item' }], videos:[] };
+  const cloudPayload = { items: [{ id:'new-item' }], videos: [{ id:'v2' }] };
+  const remote = { record: { payload: await encryptPayload(rawKey, cloudPayload), revision: 11, updated_at:'external' } };
+  const { vault, local } = await fixture({ rawKey, revision: 10, initialPayload: localPayload, remote });
+  vault.markLocalChangesPending();
+  const preview = await vault.inspectConflict();
+  const result = await vault.resolveConflict('cloud', preview);
+  assert.equal(result.revision, 11);
+  assert.equal(remote.record.revision, 11);
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')), cloudPayload);
+  assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, false);
+});
+
+test('manual resolution rejects remote updates after preview and preserves both versions', async () => {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const localPayload = { items: [{ id:'local' }] };
+  const cloudPayload = { items: [{ id:'remote' }] };
+  const remote = { record: { payload: await encryptPayload(rawKey, cloudPayload), revision: 2, updated_at:'first' } };
+  const { vault, local } = await fixture({ rawKey, revision: 1, initialPayload: localPayload, remote });
+  vault.markLocalChangesPending();
+  const preview = await vault.inspectConflict();
+  remote.record = { payload: await encryptPayload(rawKey, { items: [{ id:'newer' }] }), revision: 3, updated_at:'second' };
+  await assert.rejects(vault.resolveConflict('local', preview), /クラウドデータが変更されました/);
+  await assert.rejects(vault.resolveConflict('cloud', preview), /クラウドデータが変更されました/);
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')), localPayload);
+  assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), { items: [{ id:'newer' }] });
+  assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, true);
+});
+
+test('manual resolution rejects a local edit after preview', async () => {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const remote = { record: { payload: await encryptPayload(rawKey, { items: [{ id:'cloud' }] }), revision: 2, updated_at:'external' } };
+  const { vault, local } = await fixture({ rawKey, revision: 1, initialPayload: { items: [{ id:'before' }] }, remote });
+  vault.markLocalChangesPending();
+  const preview = await vault.inspectConflict();
+  local.setItem('testPayload', JSON.stringify({ items: [{ id:'new-local' }] }));
+  await assert.rejects(vault.resolveConflict('cloud', preview), /端末データが変更されました/);
+  await assert.rejects(vault.resolveConflict('local', preview), /端末データが変更されました/);
+  assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, true);
+});
+
+test('manual conflict resolution leaves pending on failed cloud CAS and on blocked VPN', async () => {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  let allowed = true;
+  const gate = { canReadProtectedData: () => allowed };
+  const remote = { record: { payload: await encryptPayload(rawKey, { items: [{ id:'cloud' }] }), revision: 2, updated_at:'external' } };
+  const { vault, local } = await fixture({ rawKey, revision: 1, initialPayload: { items: [{ id:'local' }] }, remote, gate, rpc: async () => [] });
+  vault.markLocalChangesPending();
+  const preview = await vault.inspectConflict();
+  allowed = false;
+  await assert.rejects(vault.resolveConflict('cloud', preview), /VPN接続/);
+  allowed = true;
+  await assert.rejects(vault.resolveConflict('local', preview), /別の端末が先に更新しました/);
+  assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), { items: [{ id:'cloud' }] });
+  assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, true);
+});
+
+test('sync page exposes a self-service conflict dialog with an encrypted backup gate', () => {
+  assert.match(syncPage, /vault-conflict-ui\\.js/);
+  assert.match(syncPage, /id="vaultConflictDialog"/);
+  assert.match(syncPage, /id="vaultConflictDownload"/);
+  assert.match(syncPage, /id="vaultConflictAcknowledge"/);
+  assert.match(syncPage, /同期競合を確認・解決/);
 });
