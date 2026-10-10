@@ -109,7 +109,7 @@
 - [x] **Step 2: Run `node --test tests/video-player-controls.test.mjs tests/video-player-page.test.mjs`; confirm tests fail before implementation.**
 - [x] **Step 3: Replace free-form label/seconds inputs with the three icon choices and current-time registration. Render seek-bar bubbles at `seconds / duration`, dispatch the marker-change event, and update the ordinary player marker list. Add arrow-key handlers that ignore editable fields and controls.**
 - [x] **Step 4: Run `node --test tests/video-player-controls.test.mjs tests/video-player-page.test.mjs tests/video-player-gestures.test.mjs`; confirm all pass.**
-- [ ] **Step 5: Commit `feat: add icon timestamp markers to video player`.**
+- [x] **Step 5: Commit `feat: add icon timestamp markers to video player`.**
 
 ### Task 4: Shorts route shell and protected-data lifecycle
 
@@ -126,16 +126,16 @@
 - Route state is initialized only after access is allowed; queue generation receives direct video metadata probes and the canonical marker map.
 - `video-shorts.html` is a standalone route in the existing app shell and does not initialize the bookshelf runtime or iframe the ordinary player.
 
-- [ ] **Step 1: Write failing tests** for route entry/script order, no protected reads before allowed status, access-loss disposal, guest-local behavior, direct-link-only filtering, no title/counter UI, and ordinary-player double-tap URL/time handoff.
-- [ ] **Step 2: Run `node --test tests/video-shorts-page.test.mjs tests/video-shorts-access.test.mjs`; confirm expected failures.**
-- [ ] **Step 3: Implement the route shell, VPN gate, metadata probing, queue load/generation, queue entry navigation, and full route cleanup. Add the “縦スワイプ再生” action beside “＋ 追加” in the video library.**
+- [x] **Step 1: Write failing tests** for route entry/script order, no protected reads before allowed status, access-loss disposal, guest-local behavior, direct-link-only filtering, no title/counter UI, and ordinary-player double-tap URL/time handoff.
+- [x] **Step 2: Run `node --test tests/video-shorts-page.test.mjs tests/video-shorts-access.test.mjs`; confirm expected failures.**
+- [x] **Step 3: Implement the route shell, VPN gate, metadata probing, queue load/generation, queue entry navigation, and full route cleanup. Add the “縦スワイプ再生” action beside “＋ 追加” in the video library.**
   - Probe videos with a small bounded number of temporary `preload="metadata"` elements; on probe failure skip that item without blocking the rest. Remove each temporary source after its result is captured.
   - Keep a bounded active/next media window; revoke/remove sources for entries outside it.
   - Re-check saved video IDs on route activation and on a `storage` event for `mangaReaderVideos`; when an unseen ID appears, clear the old order and regenerate once metadata probes complete.
   - Persist queue/index/absolute current time on a throttle and immediately on pause, swipe, `pagehide`, and route exit.
   - Double-tap navigates to the ordinary player with the active video ID and current absolute time as a query parameter; extend ordinary-player initialization to honor the optional start time.
-- [ ] **Step 4: Run `node --test tests/video-shorts-page.test.mjs tests/video-shorts-access.test.mjs tests/video-player-page.test.mjs`; confirm all pass.**
-- [ ] **Step 5: Commit `feat: add protected video shorts route`.**
+- [x] **Step 4: Run `node --test tests/video-shorts-page.test.mjs tests/video-shorts-access.test.mjs tests/video-player-page.test.mjs`; confirm all pass.**
+- [x] **Step 5: Commit `feat: add protected video shorts route`.**
 
 ### Task 5: Shorts gestures, scrubbing, likes, and responsive layout
 

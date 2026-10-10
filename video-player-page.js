@@ -172,7 +172,11 @@
   }
   const directVideo = /\.(?:mp4|webm|ogg|ogv|m4v|mov)(?:[?#].*)?$/i.test(sourceUrl);
   if (directVideo) {
-    const video = document.createElement('video'); video.src = sourceUrl; video.controls = true; video.playsInline = true; video.preload = 'metadata'; video.style.display = 'block'; video.style.width = '100%'; video.style.height = '100%'; video.style.maxWidth = '100%'; video.style.maxHeight = '100%'; video.style.objectFit = 'contain'; frame.append(video);
+    const video = document.createElement('video'); video.controls = true; video.playsInline = true; video.preload = 'metadata'; video.style.display = 'block'; video.style.width = '100%'; video.style.height = '100%'; video.style.maxWidth = '100%'; video.style.maxHeight = '100%'; video.style.objectFit = 'contain';
+    const startValue = new URLSearchParams(location.search).get('start'); const startTime = startValue == null ? null : Number(startValue);
+    if (Number.isFinite(startTime) && startTime >= 0) video.addEventListener('loadedmetadata', () => { if (canReadProtectedData()) video.currentTime = Math.min(startTime, Number.isFinite(video.duration) ? video.duration : startTime); }, { once: true });
+    video.src = sourceUrl;
+    frame.append(video);
     const cleanupRotation = window.MangaReaderVideoRotation.install(frame, video, normalized.rotate90Direction);
     windowCleanups.push(cleanupRotation);
   }

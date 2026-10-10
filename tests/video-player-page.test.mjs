@@ -90,7 +90,7 @@ test('custom player defers single taps and maps double-tap zones to seek or full
 test('video player document cache keys identify the current watch-page design', () => {
   const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
   assert.match(html, /home-profile-shell\.css\?v=20261010-icon-markers/);
-  assert.match(html, /video-player-page\.js\?v=20261010-icon-markers/);
+  assert.match(html, /video-player-page\.js\?v=20261010-shorts-handoff/);
 });
 
 test('desktop watch page keeps related videos in an independently scrolling viewport', () => {
