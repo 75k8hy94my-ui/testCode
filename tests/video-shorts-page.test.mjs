@@ -19,6 +19,12 @@ test('Shorts route does not stay hidden waiting for an auth initializer it does 
   assert.doesNotMatch(html, /<html[^>]*\bauth-pending\b/);
 });
 
+test('Shorts reloads the VPN gate and media-cache scripts after their behavior changes', () => {
+  assert.match(html, /media-access-gate\.js\?v=20261010-proton-range/);
+  assert.match(html, /video-data\.js\?v=20261010-shorts-media-cache/);
+  assert.match(html, /video-shorts-page\.js\?v=20261010-loading-cache/);
+});
+
 test('Shorts route does not render a title or queue counter', () => {
   assert.doesNotMatch(html + page, /縦スワイプ\s*\d+\s*\/|shortsCounter|videoTitle|videoDetails/);
 });

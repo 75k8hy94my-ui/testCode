@@ -5,6 +5,53 @@ import vm from 'node:vm';
 
 const source = fs.readFileSync(new URL('../video-shorts-page.js', import.meta.url), 'utf8');
 
+test('VPN checking and video preparation have distinct loading states; only a blocked verdict shows the VPN gate', async () => {
+  class Element {
+    constructor() { this.children = []; this.dataset = {}; this.attributes = {}; this.classList = { add(){}, remove(){}, toggle(){} }; }
+    append(...children) { children.forEach((child) => { child.parentNode = this; this.children.push(child); }); }
+    replaceChildren(...children) { this.children = []; this.append(...children); }
+    addEventListener() {}
+    setAttribute(name, value) { this.attributes[name] = String(value); }
+    querySelector() { return null; }
+    text() { return [this.textContent || '', ...this.children.map((child) => child.text())].join(' '); }
+  }
+  const page = new Element(); const events = new Map(); let status = 'checking'; let allowed = false; let resolveProbe; const probes = [];
+  const documentRef = { getElementById: () => page, addEventListener(type, fn) { events.set(type, fn); }, removeEventListener() {}, createElement: () => new Element() };
+  const videos = [{ id: 'one', url: 'https://media.example/one.mp4' }];
+  const state = { value: { queue: [], currentIndex: 0, currentTime: 0, knownVideoIds: [], generation: 0 }, observeVideos(ids) { this.value.knownVideoIds = ids; }, load() { return this.value; }, save(value) { this.value = value; return value; } };
+  const mediaAccess = { canReadProtectedData: () => allowed, getStatus: () => status };
+  const records = { mangaReaderVideos: videos, mangaReaderVideoMeta: {}, mangaReaderVideoMarkers: {} };
+  const storage = { getItem(key) { return JSON.stringify(records[key] || {}); }, setItem(key, value) { records[key] = JSON.parse(value); } };
+  const windowRef = { MangaReaderMediaAccess: mediaAccess, MangaVaultPayload: { normalizeVideoMarkers: (value) => value }, TestCodeGuest: { isActive: () => true }, localStorage: storage, addEventListener() {}, removeEventListener() {}, setTimeout, clearTimeout };
+  const module = { exports: {} };
+  vm.runInNewContext(source, { module, window: windowRef, URLSearchParams, Date, Number, Math, setTimeout, clearTimeout, console });
+  const controller = module.exports.create({ documentRef, page, windowRef, storage, mediaAccess, state,
+    videoData: { isDirectVideoUrl: () => true, normalizeVideo: (value) => ({ ...value, tags: [], shorts: {} }), stableUrlToken: (url) => 'key:' + url, mergeVideoMetaPreservingThumbnailTime: (_old, next) => next },
+    queue: { generate: () => [] }, probeMetadata: (video) => { probes.push(video.id); return new Promise((resolve) => { resolveProbe = resolve; }); } });
+  await controller.start();
+  assert.match(page.text(), /VPN接続を確認中/);
+  assert.doesNotMatch(page.text(), /VPN接続が必要です/);
+
+  status = 'allowed'; allowed = true;
+  const initialize = events.get('manga-reader-vpn-status')();
+  assert.match(page.text(), /動画と再生順を準備中/);
+  assert.doesNotMatch(page.text(), /VPN接続が必要です/);
+  resolveProbe({ videoWidth: 720, videoHeight: 1280, durationSeconds: 60 });
+  await initialize;
+  assert.deepEqual(probes, ['one']);
+  assert.equal(records.mangaReaderVideoMeta.one.videoWidth, 720);
+
+  const cachedController = module.exports.create({ documentRef, page, windowRef, storage, mediaAccess, state,
+    videoData: { isDirectVideoUrl: () => true, normalizeVideo: (value) => ({ ...value, tags: [], shorts: {} }), stableUrlToken: (url) => 'key:' + url, mergeVideoMetaPreservingThumbnailTime: (_old, next) => next },
+    queue: { generate: () => [] }, probeMetadata: async () => { throw new Error('cached metadata should skip another probe'); } });
+  await cachedController.start();
+  assert.deepEqual(probes, ['one'], 'a subsequent route activation reuses the stored dimensions and duration');
+
+  status = 'blocked'; allowed = false;
+  await events.get('manga-reader-vpn-status')();
+  assert.match(page.text(), /VPN接続が必要です/);
+});
+
 test('creating the Shorts route while VPN access is pending does not read protected storage', () => {
   let reads = 0;
   class Element { constructor(){this.children=[];this.dataset={};this.classList={add(){},remove(){},toggle(){}};} append(...items){this.children.push(...items)} replaceChildren(...items){this.children=[...items]} addEventListener(){} setAttribute(){} }
@@ -75,7 +122,7 @@ test('allowed route probes and queues direct videos only, then unloads them when
   vm.runInNewContext(source, { module, window: windowRef, URLSearchParams, Date, Number, Math, setTimeout, clearTimeout, console });
   const controller = module.exports.create({ documentRef, page, windowRef, storage, mediaAccess: windowRef.MangaReaderMediaAccess,
     now: () => clock, setTimeout: scheduleTest, clearTimeout: cancelTest,
-    videoData: { isDirectVideoUrl: (url) => /\.(mp4|webm)$/.test(url), normalizeVideo: (value) => ({ ...value, url: value.url, tags: value.tags || [], shorts: { liked: false, playCount: 0, earlySwipeCount: 0, updatedAt: 0, ...(value.shorts || {}) } }), mergeVideoMetaPreservingThumbnailTime: (existing, incoming) => incoming },
+    videoData: { isDirectVideoUrl: (url) => /\.(mp4|webm)$/.test(url), stableUrlToken: (url) => 'key:' + url, normalizeVideo: (value) => ({ ...value, url: value.url, tags: value.tags || [], shorts: { liked: false, playCount: 0, earlySwipeCount: 0, updatedAt: 0, ...(value.shorts || {}) } }), mergeVideoMetaPreservingThumbnailTime: (existing, incoming) => incoming },
     queue: windowRef.MangaReaderVideoShortsQueue, state,
     probeMetadata: async (video) => { probed.push(video.id); return video.id === 'broken' ? null : { videoWidth: 720, videoHeight: 1280, durationSeconds: 60 }; },
   });
@@ -83,6 +130,10 @@ test('allowed route probes and queues direct videos only, then unloads them when
   assert.deepEqual(reads.slice(0, 3), ['mangaReaderVideos', 'mangaReaderVideoMeta', 'mangaReaderVideoMarkers']);
   assert.deepEqual(probed, ['direct', 'broken']);
   assert.deepEqual(JSON.parse(JSON.stringify(generated)), [['direct']]);
+  assert.equal(records.mangaReaderVideoMeta.direct.videoWidth, 720, 'successful metadata is cached in the existing protected video metadata map');
+  assert.equal(records.mangaReaderVideoMeta.direct.videoHeight, 1280);
+  assert.equal(records.mangaReaderVideoMeta.direct.durationSeconds, 60);
+  assert.equal(records.mangaReaderVideoMeta.direct.shortsMediaInfoUrlKey, 'key:https://media.example/a.mp4', 'the cache is tied to a compact URL token');
   assert.equal(state.value.knownVideoIds.includes('broken'), false, 'failed direct probe is retried on a later route activation');
   assert.equal(page.querySelector('.shortsMedia').children.length, 2, 'active and next media window is bounded');
   assert.equal(records.mangaReaderVideoMeta.direct.shorts.playCount, 1, 'Shorts play count increments independently when an entry begins');

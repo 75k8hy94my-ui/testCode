@@ -57,7 +57,7 @@
       }
       const next = { ...raw };
       const previous = existing[id] && typeof existing[id] === 'object' && !Array.isArray(existing[id]) ? existing[id] : null;
-      const preservedFields = ['thumbnailTimeSeconds', 'rotate90', 'rotate90Direction'];
+      const preservedFields = ['thumbnailTimeSeconds', 'rotate90', 'rotate90Direction', 'durationSeconds', 'videoWidth', 'videoHeight', 'shortsMediaInfoUrlKey'];
       preservedFields.forEach((field) => {
         if (!Object.prototype.hasOwnProperty.call(next, field) && previous && Object.prototype.hasOwnProperty.call(previous, field)) {
           next[field] = previous[field];
@@ -192,6 +192,9 @@
       memo: asText(x.memo),
       thumbnailUrl: asText(x.thumbnailUrl),
       thumbnailTimeSeconds: x.thumbnailTimeSeconds == null ? null : asTime(x.thumbnailTimeSeconds, 0),
+      videoWidth: x.videoWidth == null ? null : asTime(x.videoWidth, 0),
+      videoHeight: x.videoHeight == null ? null : asTime(x.videoHeight, 0),
+      shortsMediaInfoUrlKey: asText(x.shortsMediaInfoUrlKey),
       rotate90: x.rotate90 === true,
       rotate90Direction,
       watchStatus,
@@ -281,5 +284,5 @@
     };
   }
 
-  return { WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, storageFieldsForVideoUrl };
+  return { WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, storageFieldsForVideoUrl, stableUrlToken };
 }));

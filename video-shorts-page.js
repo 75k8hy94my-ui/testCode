@@ -13,7 +13,7 @@
   const VIDEO_KEY = 'mangaReaderVideos';
   const META_KEY = 'mangaReaderVideoMeta';
   const MARKER_KEY = 'mangaReaderVideoMarkers';
-  const MAX_PROBES = 3;
+  const MAX_PROBES = 6;
   const EARLY_SWIPE_MS = 5000;
   const HOLD_TO_PAUSE_MS = 350;
   const HOLD_TO_SCRUB_MS = 450;
@@ -90,6 +90,26 @@
       const back = documentRef.createElement('a'); back.className = 'glassBtn'; back.href = 'video.html'; back.textContent = '動画一覧へ戻る';
       section.append(heading, message, retry, diagnostics, back); page.replaceChildren(section);
       if (mediaAccess && typeof mediaAccess.syncUi === 'function') mediaAccess.syncUi();
+    }
+
+    function renderLoading(headingText, messageText) {
+      if (!page || !documentRef.createElement) return;
+      const section = documentRef.createElement('section'); section.className = 'profileContent shortsLoading';
+      section.setAttribute('role', 'status'); section.setAttribute('aria-live', 'polite');
+      const heading = documentRef.createElement('h2'); heading.textContent = headingText;
+      const message = documentRef.createElement('p'); message.className = 'profileLead'; message.textContent = messageText;
+      section.append(heading, message); page.replaceChildren(section);
+    }
+
+    function renderVpnChecking() {
+      renderLoading('VPN接続を確認中', '確認が終わるまで、動画データにはアクセスしません。');
+    }
+
+    function renderPreparing(completed = null, total = null) {
+      const message = Number.isFinite(total) && total > 0
+        ? `動画情報を確認中（${completed || 0}/${total}）`
+        : '保存済みの動画情報から再生順を準備しています。';
+      renderLoading('動画と再生順を準備中', message);
     }
 
     function removeVideo(video) {
@@ -474,13 +494,65 @@
       return result;
     }
 
-    async function probeAll(videos, token) {
+    function hasCachedMediaInfo(video) {
+      return !!Data && typeof Data.stableUrlToken === 'function'
+        && video.shortsMediaInfoUrlKey === Data.stableUrlToken(video.url)
+        && Number(video.durationSeconds) > 0 && Number(video.videoWidth) > 0 && Number(video.videoHeight) > 0;
+    }
+
+    function persistMediaInfoCache(videos) {
+      if (!canReadProtectedData() || !storage || typeof storage.setItem !== 'function') return;
+      const previous = readMetaMap();
+      const next = { ...previous };
+      let changed = false;
+      videos.forEach((video) => {
+        if (!hasCachedMediaInfo(video)) return;
+        const id = String(video.id);
+        const current = previous[id] && typeof previous[id] === 'object' ? previous[id] : {};
+        if (current.shortsMediaInfoUrlKey === video.shortsMediaInfoUrlKey
+          && Number(current.durationSeconds) === Number(video.durationSeconds)
+          && Number(current.videoWidth) === Number(video.videoWidth)
+          && Number(current.videoHeight) === Number(video.videoHeight)) return;
+        next[id] = {
+          ...current,
+          durationSeconds: Number(video.durationSeconds),
+          videoWidth: Number(video.videoWidth),
+          videoHeight: Number(video.videoHeight),
+          shortsMediaInfoUrlKey: video.shortsMediaInfoUrlKey,
+        };
+        changed = true;
+      });
+      if (!changed) return;
+      const merged = Data.mergeVideoMetaPreservingThumbnailTime(previous, next);
+      try { storage.setItem(META_KEY, JSON.stringify(merged)); } catch (_) { return; }
+      if (!isGuest()) {
+        const vault = windowRef.MangaVault;
+        if (vault && typeof vault.markLocalChangesPending === 'function') {
+          try { if (vault.markLocalChangesPending()) scheduleMetricSync(); } catch (_) {}
+        }
+      }
+    }
+
+    async function probeAll(videos, token, onProgress = () => {}) {
       const direct = videos.filter((video) => Data && Data.isDirectVideoUrl(video.url));
-      const results = new Array(direct.length); let nextIndex = 0;
-      const workers = Array.from({ length: Math.min(MAX_PROBES, direct.length) }, async () => {
-        while (nextIndex < direct.length) {
-          const index = nextIndex++;
-          try { results[index] = await probe(direct[index]); } catch (_) { results[index] = null; }
+      const results = new Array(direct.length); const pending = []; let completed = 0; let nextIndex = 0;
+      direct.forEach((video, index) => {
+        if (hasCachedMediaInfo(video)) results[index] = video;
+        else pending.push(index);
+      });
+      completed = direct.length - pending.length;
+      onProgress(completed, direct.length);
+      const workers = Array.from({ length: Math.min(MAX_PROBES, pending.length) }, async () => {
+        while (nextIndex < pending.length) {
+          const index = pending[nextIndex++];
+          try {
+            const metadata = await probe(direct[index]);
+            results[index] = metadata && typeof Data.stableUrlToken === 'function'
+              ? { ...direct[index], ...metadata, shortsMediaInfoUrlKey: Data.stableUrlToken(direct[index].url) }
+              : (metadata ? { ...direct[index], ...metadata } : null);
+          } catch (_) { results[index] = null; }
+          completed += 1;
+          onProgress(completed, direct.length);
           if (token !== generationToken || !canReadProtectedData()) return;
         }
       });
@@ -503,6 +575,7 @@
 
     async function initializeProtectedState() {
       if (!canReadProtectedData() || protectedState) return;
+      renderPreparing();
       const token = ++generationToken;
       const raw = readProtectedData();
       if (!raw) return;
@@ -517,8 +590,9 @@
       const markerPayload = windowRef.MangaVaultPayload && windowRef.MangaVaultPayload.normalizeVideoMarkers
         ? windowRef.MangaVaultPayload.normalizeVideoMarkers(raw.markers)
         : raw.markers;
-      currentVideos = await probeAll(normalized, token);
+      currentVideos = await probeAll(normalized, token, renderPreparing);
       if (token !== generationToken || !canReadProtectedData() || !protectedState) return;
+      persistMediaInfoCache(currentVideos);
       const successfulIds = new Set(currentVideos.map((video) => String(video.id)));
       const failedDirectIds = new Set(normalized.filter((video) => Data && Data.isDirectVideoUrl(video.url) && !successfulIds.has(String(video.id))).map((video) => String(video.id)));
       if (failedDirectIds.size) protectedState = { ...protectedState, knownVideoIds: ids.filter((id) => !failedDirectIds.has(id)) };
@@ -534,7 +608,11 @@
 
     function handleAccessStatus() {
       if (canReadProtectedData()) return initializeProtectedState();
-      else { disposeProtectedState(); renderGate(); }
+      disposeProtectedState();
+      let currentStatus = 'checking';
+      try { if (mediaAccess && typeof mediaAccess.getStatus === 'function') currentStatus = mediaAccess.getStatus(); } catch (_) {}
+      if (currentStatus === 'blocked') renderGate();
+      else renderVpnChecking();
     }
 
     function handleStorage(event) {

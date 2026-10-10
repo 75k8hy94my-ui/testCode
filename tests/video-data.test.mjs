@@ -32,6 +32,15 @@ test('normalizes only the persistent rotation direction', () => {
   assert.equal(Object.hasOwn(video, 'rotateLeftEndSeconds'), false);
 });
 
+test('normalizes cached Shorts media dimensions and source key without storing another URL copy', () => {
+  const video = normalizeVideo({ id: 'cached', url: 'https://cdn.example/video.mp4?token=secret', videoWidth: 1080, videoHeight: 1920, durationSeconds: 42, shortsMediaInfoUrlKey: data.stableUrlToken('https://cdn.example/video.mp4?token=secret') });
+  assert.equal(video.videoWidth, 1080);
+  assert.equal(video.videoHeight, 1920);
+  assert.equal(video.durationSeconds, 42);
+  assert.equal(video.shortsMediaInfoUrlKey, data.stableUrlToken(video.url));
+  assert.notEqual(video.shortsMediaInfoUrlKey, video.url, 'cache invalidation stores a compact token, not another URL copy');
+});
+
 test('normalizes Shorts likes and counters separately from ordinary opens', () => {
   const video = normalizeVideo({
     id: 'shorts-v1', openCount: 8,
@@ -61,7 +70,7 @@ test('parses and formats thumbnail timestamps for editor input', () => {
 test('preserves thumbnail timestamps when older in-memory video meta is written back', () => {
   assert.equal(typeof mergeVideoMetaPreservingThumbnailTime, 'function');
   const existing = {
-    keep: { thumbnailTimeSeconds: 42, rotate90Direction: 'right', memo: 'old' },
+    keep: { thumbnailTimeSeconds: 42, rotate90Direction: 'right', videoWidth: 1080, videoHeight: 1920, durationSeconds: 42, shortsMediaInfoUrlKey: 'url-key', memo: 'old' },
     removed: { thumbnailTimeSeconds: 9 },
     override: { thumbnailTimeSeconds: 12 },
   };
@@ -70,7 +79,7 @@ test('preserves thumbnail timestamps when older in-memory video meta is written 
     override: { thumbnailTimeSeconds: 30 },
   };
   const merged = mergeVideoMetaPreservingThumbnailTime(existing, incoming);
-  assert.deepEqual(merged.keep, { memo: 'new', thumbnailTimeSeconds: 42, rotate90Direction: 'right' });
+  assert.deepEqual(merged.keep, { memo: 'new', thumbnailTimeSeconds: 42, rotate90Direction: 'right', videoWidth: 1080, videoHeight: 1920, durationSeconds: 42, shortsMediaInfoUrlKey: 'url-key' });
   assert.equal(merged.override.thumbnailTimeSeconds, 30);
   assert.equal(Object.hasOwn(merged, 'removed'), false);
 });
