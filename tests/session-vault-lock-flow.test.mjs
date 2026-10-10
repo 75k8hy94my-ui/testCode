@@ -47,6 +47,9 @@ test('profile UI distinguishes lock from complete logout', () => {
   assert.match(profileSpa, /id="profileLogoutBtn"/);
 });
 
-test('unlock page does not ask for passkey again when vault is already active', () => {
-  assert.match(sync, /if \(MangaVault\.loadActive\(\)\) \{ goReader\(\); return; \}/);
+test('active vault proceeds normally but exposes conflict resolution while pending', () => {
+  assert.ok(sync.includes('const alreadyActive=Boolean(MangaVault.loadActive());'));
+  assert.ok(sync.includes('if (MangaVault.hasPendingLocalChanges()) showPendingSync'));
+  assert.ok(sync.includes('else { goReader(); return; }'));
+  assert.ok(sync.includes('if (!alreadyActive) autoUsePasskey();'));
 });
