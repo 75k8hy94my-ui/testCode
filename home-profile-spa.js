@@ -57,6 +57,29 @@ function getMount(){
 function routeName(path=location.pathname){const name=path.split('/').pop();if(name==='profile.html')return'profile';if(name==='manga.html')return'manga';if(name==='video.html')return'video';return'home';}
 function setTitle(route){const titles={home:'ホーム',profile:'プロフィール設定',manga:'漫画',video:'動画'};const title=titles[route]||titles.home;document.title=title;const h1=document.getElementById('shellTitle');if(h1)h1.textContent=title;}
 function setSyncStatus(text){const node=$('homeSyncStatus');if(!node)return;node.textContent=text||'';}
+function handleVaultSyncState(event){
+  const detail=event&&event.detail||{},state=String(detail.state||'');
+  const messages={
+    syncing:'クラウド同期中…',
+    success:detail.applied||detail.merged?'クラウドの更新を取り込みました':'クラウドと同期済みです',
+    deferred:detail.reason==='vpn'?'VPN確認後に保護データを受信します。暗号化Vaultの未同期送信は継続します。':'接続またはVaultの準備ができたら同期します',
+    pending:'端末に変更を保持しています。クラウド同期を再試行します。',
+    conflict:'別端末の変更と競合しています。選択するまで双方の変更を保持します。',
+    error:'同期に失敗しました。端末のデータは保持されています。'+(detail.message?' '+detail.message:''),
+  };
+  const node=$('homeSyncStatus')||$('videoLibraryStatus');
+  if(!node)return;
+  node.textContent=messages[state]||'';
+  node.dataset.syncState=state;
+  if(state==='success'&&!MangaVault.hasPendingLocalChanges()){syncDirty=false;syncDirtyMessage='';}
+}
+function handleVaultPayloadApplied(){
+  if(guestMode)return;
+  if(Home)layout=Home.loadLayout();
+  renderRoute();
+}
+document.addEventListener('manga-vault-sync-state',handleVaultSyncState);
+document.addEventListener('manga-vault-payload-applied',handleVaultPayloadApplied);
 function canSyncProtectedData(){if(guestMode)return false;const gate=window.MangaReaderMediaAccess;return !!gate&&typeof gate.canReadProtectedData==='function'&&gate.canReadProtectedData()===true;}
 async function runHomeSync(okMessage){if(guestMode){setSyncStatus('端末内に保存しました（ゲスト・同期なし）');return;}if(!canSyncProtectedData()){if(window.MangaVault&&typeof MangaVault.markLocalChangesPending==='function')MangaVault.markLocalChangesPending();syncDirty=true;syncDirtyMessage=okMessage||syncDirtyMessage;setSyncStatus('端末には保存済みです。VPN接続を確認できるまでクラウド同期を保留しています。');return;}if(syncRunning){syncDirty=true;syncDirtyMessage=okMessage||syncDirtyMessage;return;}syncRunning=true;setSyncStatus('同期中…');try{if(!canSyncProtectedData()){syncDirty=true;syncDirtyMessage=okMessage||syncDirtyMessage;return;}await MangaVault.saveLocalChanges();setSyncStatus(okMessage||'保存しました');}catch(error){setSyncStatus('端末には保存済みです。クラウド同期: '+(error&&error.message?error.message:'失敗'));}finally{syncRunning=false;if(syncDirty&&canSyncProtectedData()){syncDirty=false;const queued=syncDirtyMessage;syncDirtyMessage='';runHomeSync(queued);}}}
 function commitLayout(next){layout=Home.saveLayout(next);renderHome();runHomeSync('ホームの並びを保存しました');}
@@ -230,7 +253,10 @@ function handleVpnStatusChange(event){
   const route=routeName();
   refreshProfileShortsResetAccess();
   const next=String(event&&event.detail&&event.detail.status||'');
-  if(next==='allowed'&&syncDirty&&!syncRunning)runHomeSync(syncDirtyMessage||'保留中の変更を同期しました');
+  if(next==='allowed'&&syncDirty&&!syncRunning){
+    if(typeof MangaVault.syncLatest==='function')MangaVault.syncLatest().catch(()=>{});
+    else runHomeSync(syncDirtyMessage||'保留中の変更を同期しました');
+  }
   if(route!=='manga'&&route!=='video')return;
   if(next==='pending'||next==='checking'){
     if(lastVpnRouteAccess!==route+':allowed')return;
@@ -260,7 +286,22 @@ async function start(){
     renderRoute();
     return;
   }
-  if(!session||!session.refresh_token||!config.url||!config.publishableKey){showLogin();return;}if(!MangaVault.loadActive()){showVault();return;}try{await MangaVault.ensureSession();document.documentElement.classList.remove('auth-pending');}catch(error){if(typeof MangaVault.isSessionAuthError==='function'&&MangaVault.isSessionAuthError(error))MangaVault.saveSession(null);showLogin();return;}applyTheme(currentTheme());document.addEventListener('click',intercept);document.addEventListener('manga-reader-vpn-status',handleVpnStatusChange);window.addEventListener('popstate',handleRoutePopstate);renderRoute();
+  if(!session||!session.refresh_token||!config.url||!config.publishableKey){showLogin();return;}
+  if(!MangaVault.loadActive()){showVault();return;}
+  try{
+    await MangaVault.ensureSession();
+    document.documentElement.classList.remove('auth-pending');
+  }catch(error){
+    if(typeof MangaVault.isSessionAuthError==='function'&&MangaVault.isSessionAuthError(error))MangaVault.saveSession(null);
+    showLogin();
+    return;
+  }
+  applyTheme(currentTheme());
+  document.addEventListener('click',intercept);
+  document.addEventListener('manga-reader-vpn-status',handleVpnStatusChange);
+  window.addEventListener('popstate',handleRoutePopstate);
+  renderRoute();
+  if(typeof MangaVault.syncLatest==='function')MangaVault.syncLatest().catch(()=>{});
 }
 window.HomeProfileSPA={navigate,renderRoute,ensureAppShell};
 start();
