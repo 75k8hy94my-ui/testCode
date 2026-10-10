@@ -180,7 +180,7 @@ test('all authenticated mobile destinations load the shared Liquid Glass assets'
     assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-drag-lock/, page);
   }
   for (const page of ['home.html','profile.html','manga.html','video.html']) {
-    const spaVersion = page === 'profile.html' ? '20261010-shorts-queue-reset' : '20261010-vpn-diagnostics';
+    const spaVersion = page === 'profile.html' ? '20261010-shorts-reset-progress' : '20261010-vpn-diagnostics';
     assert.match(read(page), new RegExp(`home-profile-spa\\.js\\?v=${spaVersion}`), page);
   }
 });
