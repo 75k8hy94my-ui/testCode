@@ -61,4 +61,13 @@ jobs:
           PGUSER: postgres
           PGPASSWORD: postgres
           PGDATABASE: vault_sync_test
-        run: bash scripts/test-vault-backup-restore-synthetic.sh
+        run: |
+          docker run --rm --network host \
+            -e PGHOST="$PGHOST" \
+            -e PGPORT="$PGPORT" \
+            -e PGUSER="$PGUSER" \
+            -e PGPASSWORD="$PGPASSWORD" \
+            -e PGDATABASE="$PGDATABASE" \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" \
+            -w /workspace \
+            postgres:17 bash scripts/test-vault-backup-restore-synthetic.sh
