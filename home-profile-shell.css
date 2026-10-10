@@ -311,3 +311,7 @@ html[data-theme="dark"] .iosSwitch input:checked + .iosSwitchTrack{background:#3
 
 #desktopProfileButton.hasProfileAvatar>svg{display:none!important}
 #desktopProfileButton .profileAvatarButtonImage{width:28px!important;height:28px!important;min-width:28px;object-fit:cover;border-radius:50%}
+
+@media(min-width:901px){
+  .videoRelated{position:sticky;top:70px;align-self:start;min-height:0;max-height:calc(100dvh - 86px);overflow-y:auto;overscroll-behavior:contain}
+}
