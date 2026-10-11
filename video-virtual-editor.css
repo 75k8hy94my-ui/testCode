@@ -43,7 +43,7 @@
 .virtualVideoEditor [hidden]{display:none!important}
 
 .virtualVideoEditor{width:min(1480px,100%);gap:12px}
-.vveProjectBar{position:sticky;top:0;z-index:12;display:grid;grid-template-columns:minmax(300px,.9fr) minmax(0,1.4fr);gap:12px;align-items:end;padding:12px;background:var(--bg-soft);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 24px #0002}
+.vveProjectBar{position:sticky;top:54px;z-index:12;display:grid;grid-template-columns:minmax(300px,.9fr) minmax(0,1.4fr);gap:12px;align-items:end;padding:12px;background:var(--bg-soft);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 24px #0002}
 .vveProjectFields{display:grid;grid-template-columns:minmax(150px,.8fr) minmax(180px,1.2fr);gap:10px}
 .vveProjectActions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:7px}
 .vveSaveStatus{max-width:230px;color:var(--sub);font-size:12px;line-height:1.35}
@@ -98,7 +98,7 @@
 .vveStatus{margin:5px 0 0}
 @media(max-width:770px){
  .virtualVideoEditor{padding:10px 9px 100px;gap:10px}
- .vveProjectBar{top:0;grid-template-columns:1fr;gap:8px;padding:9px}
+ .vveProjectBar{top:54px;grid-template-columns:1fr;gap:8px;padding:9px}
  .vveProjectFields{grid-template-columns:minmax(120px,.8fr) minmax(145px,1.2fr);gap:7px}
  .vveProjectActions{justify-content:flex-start;gap:5px}
  .vveProjectActions .vveLink{display:none}
@@ -112,7 +112,7 @@
  .vveTimelineScroll{touch-action:pan-x}
  .vveTimelineCanvas{min-height:142px}
  .vveClips{height:90px}.vveClip{height:82px}.vveClipBody{padding:7px 3px}
- .vveClipBody strong{font-size:11px}.vveClipBody small{font-size:10px}.vveTrimHandle{flex-basis:18px;width:18px}
+ .vveClipBody strong{font-size:11px}.vveClipBody small{font-size:10px}.vveTrimHandle{flex-basis:14px;width:14px}
  .vveBoundary{grid-template-columns:45px minmax(0,1fr);gap:5px}
  .vveBoundary .vveControls{gap:4px}
  .vveBoundary .vveAction{padding:4px 7px;font-size:11px}

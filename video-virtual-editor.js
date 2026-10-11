@@ -57,6 +57,15 @@
       refs.saveStatus.dataset.error = isError ? '1' : '0';
     }
   }
+  function loadedProjectStatus() {
+    if (window.TestCodeGuest && typeof window.TestCodeGuest.isActive === 'function'
+        && window.TestCodeGuest.isActive()) return '端末のゲスト領域に保存済みです。クラウド同期はありません。';
+    const vault = window.MangaVault;
+    if (!vault || typeof vault.hasPendingLocalChanges !== 'function') return '端末に保存済みです。';
+    return vault.hasPendingLocalChanges()
+      ? '端末に保存済み・保管庫同期待ちです。'
+      : '端末と保管庫に保存済みです。';
+  }
   function stopPreview() {
     stopResultPreview();
     if (refs.preview) {
@@ -95,6 +104,9 @@
     stopResultPreview();
     previewUrl = '';
     pendingSeek = null;
+    if (refs.preview) {
+      try { refs.preview.pause(); refs.preview.removeAttribute('src'); refs.preview.load(); } catch (_) {}
+    }
     if (!edit) {
       refs.editControls.hidden = true;
       refs.previewMeta.textContent = '編集区間がありません。';
@@ -242,12 +254,13 @@
   }
   function drawClips() {
     refs.clips.replaceChildren();
-    const timeline = edit ? State.clipOffsets(edit) : { offsets: [], totalSeconds: 0 };
-    if (!edit) {
+    const displayEdit = pointerGesture && pointerGesture.kind === 'trim' ? pointerGesture.proposed : edit;
+    const timeline = displayEdit ? State.clipOffsets(displayEdit) : { offsets: [], totalSeconds: 0 };
+    if (!displayEdit) {
       const message = document.createElement('div'); message.className = 'vveEmpty';
       message.textContent = 'まだ区間がありません。MP4素材と開始・終了秒を指定して追加してください。';
       refs.clips.append(message);
-    } else edit.clips.forEach((clip, index) => {
+    } else displayEdit.clips.forEach((clip, index) => {
       const item = document.createElement('div');
       item.className = 'vveClip';
       item.dataset.clipIndex = String(index);
@@ -282,14 +295,19 @@
     if (refs.insertMarker) refs.timeline.append(refs.insertMarker);
     if (pointerGesture && pointerGesture.kind === 'move' && refs.insertMarker) {
       refs.insertMarker.hidden = false;
-      refs.insertMarker.style.left = (timeline.offsets[pointerGesture.destination] || 0) * zoom + 'px';
+      refs.insertMarker.style.left = reorderMarkerSeconds(pointerGesture, timeline.offsets) * zoom + 'px';
     } else if (refs.insertMarker) refs.insertMarker.hidden = true;
     refs.clips.style.width = Math.max(1, timeline.totalSeconds * zoom) + 'px';
     refs.clips.style.position = 'relative';
     refs.timeline.style.width = Math.max(1, timeline.totalSeconds * zoom) + 'px';
+    if (refs.ruler) refs.ruler.style.backgroundSize = (zoom * 5) + 'px 100%';
     refs.playhead.style.left = Math.max(0, Math.min(timeline.totalSeconds, timelinePosition || 0)) * zoom + 'px';
     const chosen = selectedClip();
-    refs.selectedDuration.textContent = chosen ? '長さ ' + format(chosen.endSeconds - chosen.startSeconds) : '未選択';
+    const displayChosen = pointerGesture && pointerGesture.kind === 'trim' && chosen
+      ? pointerGesture.proposed.clips[selectedIndex] : chosen;
+    refs.selectedDuration.textContent = displayChosen ? '長さ ' + format(displayChosen.endSeconds - displayChosen.startSeconds)
+      + (pointerGesture && pointerGesture.kind === 'trim' ? ' · ' + format(displayChosen.startSeconds) + '–' + format(displayChosen.endSeconds) : '')
+      : '未選択';
     refs.total.textContent = edit
       ? edit.clips.length + '区間・合計' + format(Edit.totalDuration(edit)) + '（仮想再生時間）'
       : '0区間';
@@ -336,6 +354,7 @@
     requireAccess();
     if (busy || stale) return;
     const previousVirtualSeconds = resultController ? resultController.snapshot().virtualSeconds : timelinePosition;
+    if (previewMode === 'edit') stopResultPreview();
     edit = next === null ? null : Edit.normalizeEdit(next);
     selectedIndex = nextIndex;
     historyState = State.push(historyState, edit, selectedIndex);
@@ -353,6 +372,7 @@
     requireAccess();
     if (busy || stale) return;
     const previousVirtualSeconds = resultController ? resultController.snapshot().virtualSeconds : timelinePosition;
+    if (previewMode === 'edit') stopResultPreview();
     edit = snapshot.edit ? Edit.normalizeEdit(snapshot.edit) : null;
     selectedIndex = edit && snapshot.selectedIndex !== null
       ? Math.min(snapshot.selectedIndex, edit.clips.length - 1) : null;
@@ -504,6 +524,13 @@
     const index = Number(target && target.dataset && target.dataset.clipIndex);
     return Number.isInteger(index) ? index : null;
   }
+  function reorderMarkerSeconds(gesture, offsets) {
+    const destination = gesture.destination;
+    const destinationClip = gesture.originalEdit.clips[destination];
+    return (offsets[destination] || 0)
+      + (destination > gesture.index && destinationClip
+        ? destinationClip.endSeconds - destinationClip.startSeconds : 0);
+  }
   function pointerDown(event) {
     if (!canRead() || busy || stale || !edit || event.button > 0) return;
     const target = event.target || {};
@@ -537,7 +564,7 @@
     const located = Edit.locateTime(edit, seconds);
     if (located) {
       if (selectedIndex !== located.clipIndex) chooseClip(located.clipIndex);
-      else setPreview(located.clip.sourceVideoId, located.sourceSeconds);
+      else setPreview(located.sourceVideoId, located.sourceSeconds);
     }
     drawClips();
   }
@@ -554,9 +581,7 @@
         ?? (previewUrl === source.url && Number.isFinite(refs.preview.duration) ? refs.preview.duration : null));
       try {
         gesture.proposed = Edit.setClipBoundary(gesture.originalEdit, gesture.index, gesture.boundary, proposedTime, duration);
-        const candidate = gesture.proposed.clips[gesture.index];
-        refs.selectedDuration.textContent = '長さ ' + format(candidate.endSeconds - candidate.startSeconds)
-          + ' · ' + format(candidate.startSeconds) + '–' + format(candidate.endSeconds);
+        drawClips();
       } catch (_) { /* Keep the last valid transient boundary. */ }
     } else if (gesture.kind === 'move') {
       const rect = refs.timeline.getBoundingClientRect();
@@ -577,7 +602,7 @@
       else if (event.clientX > scrollRight - 32) refs.timelineScroll.scrollLeft = (refs.timelineScroll.scrollLeft || 0) + 18;
       if (refs.insertMarker) {
         refs.insertMarker.hidden = false;
-        refs.insertMarker.style.left = (State.clipOffsets(gesture.originalEdit).offsets[gesture.destination] || 0) * zoom + 'px';
+        refs.insertMarker.style.left = reorderMarkerSeconds(gesture, State.clipOffsets(gesture.originalEdit).offsets) * zoom + 'px';
       }
     } else updateSeek(event.clientX, State.clipOffsets(edit).totalSeconds);
     if (event.preventDefault) event.preventDefault();
@@ -603,12 +628,25 @@
     pointerGesture = null;
     drawClips();
   }
+  function setZoom(next) {
+    const currentSeconds = resultController ? resultController.snapshot().virtualSeconds : timelinePosition;
+    zoom = State.clampZoom(next);
+    drawClips();
+    if (resultController) resultController.seek(currentSeconds);
+  }
+  function fitTimeline() {
+    const total = edit ? Edit.totalDuration(edit) : 0;
+    if (!total) return setZoom(State.DEFAULT_ZOOM);
+    const width = refs.timelineScroll.clientWidth || refs.timelineScroll.getBoundingClientRect().width;
+    if (Number.isFinite(width) && width > 0) setZoom(width / total);
+  }
 
   async function save() {
     if (!canRead() || busy || stale || !edit) return;
     const title = refs.title.value.trim();
     if (!title || title.length > 240) return status('タイトルは1〜240文字で入力してください。', true);
     busy = true;
+    const priorIds = new Set(repository.list().map((item) => item.id));
     drawClips();
     const activeGeneration = generation;
     status('保存中…');
@@ -632,8 +670,24 @@
     } catch (error) {
       if (!canRead() || generation !== activeGeneration) return;
       if (error.localSaved) {
-        stale = true;
-        status('端末には保存済みですが、クラウド同期に失敗しました。再読み込みして確認してください。', true);
+        const localProjects = repository.list();
+        const localProject = (project && localProjects.find((item) => item.id === project.id))
+          || localProjects.find((item) => !priorIds.has(item.id)
+            && item.title === title && JSON.stringify(item.edit) === JSON.stringify(edit));
+        if (localProject) {
+          project = localProject;
+          edit = Edit.normalizeEdit(localProject.edit);
+          baselineEdit = edit;
+          historyState = State.createHistory(edit, historyState.limit);
+          updateDirty();
+          const target = new URL(location.href);
+          target.searchParams.delete('id');
+          target.searchParams.set('project', project.id);
+          history.replaceState(null, '', target);
+          status('端末に保存済み・保管庫同期待ちです。編集内容はこの端末に残っています。', true);
+        } else {
+          status('同期に失敗しました。未保存の編集内容は画面に保持しています。', true);
+        }
       } else {
         if (error.code === 'VIRTUAL_EDIT_CONFLICT') stale = true;
         status(error.message || '保存に失敗しました。', true);
@@ -691,10 +745,12 @@
       drawSources();
       setPreview(refs.source.value);
     }
-    if (stale) status('参照元のMP4が削除・変更されています。安全のため上書き保存を停止しています。', true);
     const firstId = routeSourceId || (edit ? edit.clips[0].sourceVideoId : '');
     const back = root.querySelector('[data-back]');
     if (back && sourceFor(firstId)) back.href = 'video-player.html?id=' + encodeURIComponent(firstId);
+    if (stale) status('参照元のMP4が削除・変更されています。安全のため上書き保存を停止しています。', true);
+    else if (project) status(loadedProjectStatus());
+    else status('新しいプロジェクトです。保存すると端末に記録されます。');
   }
   function initialize() {
     if (initialized || !canRead()) return;
@@ -715,14 +771,14 @@
       throw new Error('指定された動画はMP4直リンクではないか、登録されていません。');
     }
     root.innerHTML = [
-      '<header class="vveProjectBar" data-project-toolbar><div class="vveProjectFields">',
+      '<div class="vveProjectBar" data-project-toolbar><div class="vveProjectFields">',
       '<label class="vveField">プロジェクト<select data-projects></select></label>',
       '<label class="vveField">プロジェクト名<input data-title type="text" maxlength="240" autocomplete="off" placeholder="タイトル"></label></div>',
       '<div class="vveProjectActions"><button class="vveAction" type="button" data-undo disabled>元に戻す</button>',
       '<button class="vveAction" type="button" data-redo disabled>やり直す</button>',
       '<span class="vveDirty" data-dirty hidden>未保存</span><span class="vveSaveStatus" data-save-status role="status" aria-live="polite">端末のプロジェクトを読み込み中</span>',
       '<button class="vveAction primary" type="button" data-save>保存</button>',
-      '<a class="vveLink" href="video.html">一覧へ</a><a class="vveLink" data-back href="video.html">元動画へ</a></div></header>',
+      '<a class="vveLink" href="video.html">一覧へ</a><a class="vveLink" data-back href="video.html">元動画へ</a></div></div>',
       '<div class="vveMainGrid">',
       '<section class="vvePanel vvePreviewPanel"><div class="vveSectionHeading"><div><h2 class="vvePaneTitle">プレビュー</h2>',
       '<p class="vveLead">素材を確認して区間を設定します。</p></div><div class="vveModeToggle" role="group" aria-label="プレビューモード">',
@@ -775,6 +831,7 @@
       editControls: $('[data-edit-controls]'), editPlay: $('[data-edit-play]'), editSeek: $('[data-edit-seek]'), editTime: $('[data-edit-time]'),
       start: $('[data-start]'), end: $('[data-end]'), clips: $('[data-clips]'),
       timeline: $('[data-timeline]'), timelineScroll: $('[data-timeline-scroll]'), playhead: $('[data-playhead]'),
+      ruler: $('[data-ruler]'),
       insertMarker: $('[data-insert-marker]'),
       selectedDuration: $('[data-selected-duration]'), saveStatus: $('[data-save-status]'),
       total: $('[data-total]'), add: $('[data-add]'), trim: $('[data-trim]'),
@@ -814,6 +871,9 @@
     refs.editSeek.addEventListener('input', () => {
       if (resultController) resultController.seek(Number(refs.editSeek.value));
     });
+    refs.zoomIn.addEventListener('click', () => setZoom(zoom * 1.25));
+    refs.zoomOut.addEventListener('click', () => setZoom(zoom / 1.25));
+    refs.zoomFit.addEventListener('click', fitTimeline);
     refs.timeline.addEventListener('pointerdown', pointerDown);
     refs.timeline.addEventListener('pointermove', pointerMove);
     refs.timeline.addEventListener('pointerup', pointerUp);
@@ -877,6 +937,12 @@
   }
 
   document.addEventListener('manga-reader-vpn-status', handleAccess);
+  document.addEventListener('manga-vault-sync-state', (event) => {
+    if (!project || dirty || !event || !event.detail) return;
+    if (event.detail.state === 'success') status('端末と保管庫に保存済みです。');
+    else if (event.detail.state === 'pending') status('端末に保存済み・保管庫同期待ちです。');
+    else if (event.detail.state === 'error') status('端末に保存済み・保管庫同期に失敗しました。', true);
+  });
   window.addEventListener('storage', (event) => {
     if (!initialized || !canRead()) return;
     if (event.key === Store.VIDEO_KEY || event.key === Store.META_KEY || event.key === null) {

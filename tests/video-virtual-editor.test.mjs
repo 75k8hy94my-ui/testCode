@@ -24,6 +24,8 @@ test('editor route loads protected media dependencies and model before controlle
   assert.ok(html.indexOf('video-virtual-editor-state.js') < html.indexOf('video-virtual-editor.js'));
   assert.ok(html.indexOf('video-virtual-playback.js') < html.indexOf('video-virtual-editor.js'));
   assert.ok(css.includes('@media(max-width:770px)'));
+  assert.match(css, /\.vveTrimHandle\{[^}]*touch-action:none/);
+  assert.match(css, /\.vveClipBody\{[^}]*touch-action:none/);
 });
 
 test('editor renders project toolbar, preview modes, searchable source library and virtual timeline', () => {
@@ -108,6 +110,9 @@ function startEditor({ allowed = false, search = '?id=direct', data = null } = {
       const p = { id: 've-0000000001', title: params.title, edit: params.edit, revision: 1,
         createdAt: 1000, updatedAt: 1000, sourceFingerprints: [] };
       stored.push(p);
+      if (data && data.syncFailure) {
+        const error = new Error('vault unavailable'); error.localSaved = true; throw error;
+      }
       return { project: p, synced: true, localSaved: true };
     },
     remove: async () => true,
@@ -202,12 +207,26 @@ test('trim pointer movement stays transient and pointer-up commits one expanded 
   timeline.dispatch('pointerdown', event(handle, 0));
   timeline.dispatch('pointermove', event(handle, -24));
   assert.equal(harness.calls.length, 0, 'pointer movement must not write a project');
+  assert.equal(nodes.get('[data-clips]').children[0].style.width, '264px', 'the proposed endpoint is visible while dragging');
   assert.equal(nodes.get('[data-clips]').children[0].dataset.clipIndex, '0');
   timeline.dispatch('pointerup', event(handle, -24));
   assert.equal(harness.calls.length, 0, 'committing a draft gesture must not save it');
   await nodes.get('[data-save]').dispatch('click');
   assert.equal(harness.calls[0].edit.clips[0].startSeconds, 9);
   assert.equal(harness.calls[0].edit.clips[0].endSeconds, 20);
+});
+
+test('timeline ruler seek maps virtual seconds to the correct source position', () => {
+  const harness = startEditor({ allowed: true });
+  const nodes = harness.selectorMap;
+  nodes.get('[data-end]').value = '10';
+  nodes.get('[data-add]').dispatch('click');
+  const event = { target: nodes.get('[data-ruler]'), clientX: 120, pointerId: 21, button: 0, preventDefault() {} };
+  nodes.get('[data-timeline]').dispatch('pointerdown', event);
+  assert.equal(nodes.get('[data-playhead]').style.left, '120px');
+  nodes.get('[data-preview]').dispatch('loadedmetadata');
+  assert.equal(nodes.get('[data-preview]').currentTime, 5);
+  nodes.get('[data-timeline]').dispatch('pointerup', event);
 });
 
 test('pointer cancellation restores the original trim without changing the draft', async () => {
@@ -287,6 +306,53 @@ test('edit preview reuses virtual playback and destroys its controller on source
   assert.equal(nodes.get('[data-edit-controls]').hidden, true);
   assert.equal(preview.controls, true);
   assert.equal((preview.listeners.loadedmetadata || []).length, 1, 'destroy removes playback engine listeners');
+});
+
+test('committing a draft edit replaces the old playback controller without orphan listeners', () => {
+  const harness = startEditor({ allowed: true });
+  const nodes = harness.selectorMap;
+  nodes.get('[data-source-list]').children[0].dispatch('click');
+  nodes.get('[data-end]').value = '10';
+  nodes.get('[data-add]').dispatch('click');
+  const preview = nodes.get('[data-preview]');
+  preview.readyState = 1;
+  nodes.get('[data-preview-edit]').dispatch('click');
+  preview.dispatch('loadedmetadata');
+  assert.equal((preview.listeners.loadedmetadata || []).length, 2);
+  nodes.get('[data-duplicate]').dispatch('click');
+  assert.equal((preview.listeners.loadedmetadata || []).length, 2, 'one editor listener plus one current playback listener');
+  nodes.get('[data-preview-source]').dispatch('click');
+  assert.equal((preview.listeners.loadedmetadata || []).length, 1, 'the replaced controller listener is removed');
+});
+
+test('timeline zoom controls scale, fit, and clamp without changing the edit', async () => {
+  const harness = startEditor({ allowed: true });
+  const nodes = harness.selectorMap;
+  nodes.get('[data-source-list]').children[0].dispatch('click');
+  nodes.get('[data-end]').value = '10';
+  nodes.get('[data-add]').dispatch('click');
+  const clips = nodes.get('[data-clips]');
+  const originalEditWidth = clips.children[0].style.width;
+  nodes.get('[data-zoom-in]').dispatch('click');
+  assert.notEqual(clips.children[0].style.width, originalEditWidth);
+  nodes.get('[data-zoom-fit]').dispatch('click');
+  assert.equal(clips.children[0].style.width, '1000px');
+  for (let i = 0; i < 20; i += 1) nodes.get('[data-zoom-in]').dispatch('click');
+  assert.ok(Number.parseFloat(clips.children[0].style.width) <= 5120);
+  assert.equal(harness.calls.length, 0);
+});
+
+test('cloud sync failure retains the local edit and keeps the draft editable', async () => {
+  const harness = startEditor({ allowed: true, data: { syncFailure: true } });
+  const nodes = harness.selectorMap;
+  nodes.get('[data-source-list]').children[0].dispatch('click');
+  nodes.get('[data-end]').value = '10';
+  nodes.get('[data-add]').dispatch('click');
+  await nodes.get('[data-save]').dispatch('click');
+  assert.equal(harness.calls.length, 1);
+  assert.equal(nodes.get('[data-dirty]').hidden, true, 'local save establishes a durable baseline');
+  assert.match(nodes.get('[data-save-status]').textContent, /端末に保存済み.*同期待ち/);
+  assert.equal(nodes.get('[data-save]').disabled, false);
 });
 
 test('selected clip can be duplicated, independently trimmed and precisely adjusted before save', async () => {
