@@ -297,6 +297,8 @@ html[data-theme="dark"] .iosSwitch input:checked + .iosSwitchTrack{background:#3
 .videoPlayerFrame video.videoPlayerRotatedLeft,.videoPlayerFrame video.videoPlayerRotatedRight{position:absolute;top:50%;left:50%;max-width:none;max-height:none;transform-origin:center center}
 .videoPlayerFrame video.videoPlayerRotatedLeft{transform:translate(-50%,-50%) rotate(-90deg)}
 .videoPlayerFrame video.videoPlayerRotatedRight{transform:translate(-50%,-50%) rotate(90deg)}
+.videoPlayerFrame.videoPlayerFrameRotated{height:min(800px,calc(100dvh - 150px));aspect-ratio:auto}
+.videoPlayerFrame.videoPlayerFrameRotated:fullscreen,.videoPlayerFrame.videoPlayerFrameRotated:-webkit-full-screen{width:100vw;height:100vh;max-width:none;aspect-ratio:auto;margin:0;background:#000}
 
 .profileAvatarRow{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
 .profileAvatarPreview{width:104px;height:104px;flex:0 0 104px;border-radius:50%;background:var(--bg);border:1px solid var(--line);display:grid;place-items:center;overflow:hidden}
