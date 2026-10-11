@@ -179,13 +179,11 @@
       const nextShorts = { ...normalized.shorts, ...update(normalized.shorts), updatedAt: now() };
       const incoming = { ...meta, [String(videoId)]: { ...current, shorts: nextShorts, updatedAt: now() } };
       const merged = Data.mergeVideoMetaPreservingThumbnailTime(meta, incoming);
+      const vault = windowRef.MangaVault;
+      if (!isGuest() && vault?.loadSession?.()?.user?.id
+        && (!vault.markLocalChangesPending || vault.markLocalChangesPending() !== true)) return null;
       try { storage.setItem(META_KEY, JSON.stringify(merged)); } catch (_) { return null; }
-      if (!isGuest()) {
-        const vault = windowRef.MangaVault;
-        if (vault && typeof vault.markLocalChangesPending === 'function') {
-          try { if (vault.markLocalChangesPending()) scheduleMetricSync(); } catch (_) {}
-        }
-      }
+      if (!isGuest() && vault?.loadSession?.()?.user?.id) scheduleMetricSync();
       return merged[String(videoId)] && merged[String(videoId)].shorts || nextShorts;
     }
 
@@ -805,13 +803,11 @@
       });
       if (!changed) return;
       const merged = Data.mergeVideoMetaPreservingThumbnailTime(previous, next);
+      const vault = windowRef.MangaVault;
+      if (!isGuest() && vault?.loadSession?.()?.user?.id
+        && (!vault.markLocalChangesPending || vault.markLocalChangesPending() !== true)) return;
       try { storage.setItem(META_KEY, JSON.stringify(merged)); } catch (_) { return; }
-      if (!isGuest()) {
-        const vault = windowRef.MangaVault;
-        if (vault && typeof vault.markLocalChangesPending === 'function') {
-          try { if (vault.markLocalChangesPending()) scheduleMetricSync(); } catch (_) {}
-        }
-      }
+      if (!isGuest() && vault?.loadSession?.()?.user?.id) scheduleMetricSync();
     }
 
     async function probeAll(videos, token, onProgress = () => {}) {

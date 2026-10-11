@@ -32,3 +32,12 @@ test('protocol v4 capability selects legacy compatibility only when its RPC is a
   assert.match(vaultSession, /probeSyncProtocol\(token\)/);
   assert.match(schema, /current_protocol_version\s*>=\s*2[\s\S]*?incoming_protocol_version\s*<\s*current_protocol_version/i);
 });
+
+test('encrypted asset RPC bodies use valid PostgreSQL dollar quoting', () => {
+  const functions = schema.match(/create or replace function public\.(?:create|publish|tombstone)_manga_reader_encrypted_asset[\s\S]*?\$;/g) || [];
+  assert.equal(functions.length, 3);
+  for (const definition of functions) {
+    assert.match(definition, /\bas \$\$[\s\S]*\n\$\$;/);
+    assert.doesNotMatch(definition, /\bas \$\n|\n\$;/);
+  }
+});

@@ -47,9 +47,8 @@ test('mobile home shell delegates navigation to the shared Liquid Glass componen
 
 test('static verifier covers the shared shell and profile entry', () => {
   const verifier = read('scripts/check-static.mjs');
-  for (const file of ['profile.html', 'home-profile-spa.js', 'profile-menu.js', 'video-library.js', 'media-access-gate.js']) {
-    assert.match(verifier, new RegExp(`['"]${file}['"]`));
-  }
+  assert.match(verifier, /readdirSync\(root\).*\.html/);
+  assert.match(verifier, /readdirSync\(root\).*\.js/);
 });
 
 test('mobile bottom navigation stays visible on manga and video routes', () => {

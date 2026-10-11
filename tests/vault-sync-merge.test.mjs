@@ -4,6 +4,11 @@ import mergeModule from '../vault-sync-merge.js';
 
 const { mergeVaultPayload } = mergeModule;
 
+test('missing values do not compare equal to a literal missing-marker string', () => {
+  const result = mergeVaultPayload({}, { setting: '<missing>' }, { setting: 'remote' });
+  assert.equal(result.conflicts.some((conflict) => conflict.path === '/setting'), true);
+});
+
 test('merges additions to different collections from two devices', () => {
   const base = { items: [], videos: [] };
   const local = { items: [{ id: 'manga-x', title: '漫画X' }], videos: [] };

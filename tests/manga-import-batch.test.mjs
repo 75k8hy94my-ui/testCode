@@ -32,6 +32,21 @@ test('commits valid selected items once using fresh IDs and returns actual queue
   assert.equal(context.state().other, true); assert.equal(context.state().savedItems.length, 2);
   assert.equal(context.state().savedItems[0].addedAt, 555); assert.notEqual(context.state().savedItems[0].id, 'queue-a');
 });
+
+test('does not report or return queue IDs when local persistence fails', () => {
+  let state = { savedItems: [], authorCards: [] };
+  const service = globalThis.MangaImportBatch.create({
+    getState: () => state, setState: next => { state = next; },
+    validator: globalThis.MangaImportValidator,
+    candidateFactory: globalThis.MangaImportCandidate,
+    authorSync: globalThis.MangaImportAuthorSync,
+    persistItems: () => false, persistAuthorCards: () => true,
+    render() {}, createId: () => 'i-fail', now: () => 555,
+  });
+  const result = service.register({ items: [entry(123, 'queue-a')], explicitDuplicateIds: [] });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.registeredQueueIds, []);
+});
 test('skips duplicate unless queue ID is explicitly overridden; no author persistence without change', () => {
   const old = { id: 'old', sourceUrl: good(123).sourceUrl, pages: good(123).pages };
   const context = setup([old]);

@@ -68,6 +68,9 @@
     }
 
     function detach() {
+      if (documentRef.dispatchEvent && typeof root.CustomEvent === 'function') {
+        documentRef.dispatchEvent(new root.CustomEvent('manga-video-list-route-detach'));
+      }
       if (rootElement && rootElement.parentNode) rootElement.remove();
       const sheet = documentRef.getElementById('videoLibrarySheet');
       if (sheet) sheet.hidden = true;

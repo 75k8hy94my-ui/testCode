@@ -16,7 +16,12 @@
   function currentStats(storage = storageDefault(), now = new Date()) { return normalizeStats(read(storage), now.toISOString().slice(0, 10)); }
   function amount(value) { const n = Number(value); return Number.isFinite(n) && n > 0 ? n : 0; }
   function kind(value) { return value === 'preview' || value === 'zoom' ? value : 'other'; }
-  function reserveEstimate(bytes, options = {}) {
+  async function reserveEstimate(bytes, options = {}) {
+    const lockManager = options.locks || root.navigator?.locks;
+    if (!lockManager || typeof lockManager.request !== 'function') return { ok: false, reason: 'lock-unavailable', amount: amount(bytes) };
+    return lockManager.request('image-transfer-ledger-reservation', { mode: 'exclusive' }, () => reserveEstimateLocked(bytes, options));
+  }
+  function reserveEstimateLocked(bytes, options = {}) {
     const storage = options.storage || storageDefault(); const now = options.now || new Date(); const n = amount(bytes); const settings = loadSettings(storage, now); const stats = currentStats(storage, now); const current = Math.max(settings.limitUsageBytes, stats.estimatedBytes);
     if (current + n > settings.dailyLimitBytes) return { ok: false, reason: 'limit', amount: n, usageBytes: current, limitBytes: settings.dailyLimitBytes, networkMode: settings.networkMode };
     stats.attemptedEstimatedBytes += n; stats.estimatedBytes = current + n; const saved = save(stats, storage, now); if (!saved) return { ok: false, reason: 'storage', amount: n, usageBytes: current, limitBytes: settings.dailyLimitBytes, networkMode: settings.networkMode };

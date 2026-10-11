@@ -1,14 +1,16 @@
 (() => {
   'use strict';
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
-  const DEVICE_DATA_KEYS = () => [...Object.values((window.MangaVaultPayload && MangaVaultPayload.DATA_KEYS) || {}),...((window.MangaVaultPayload && MangaVaultPayload.LOCAL_ONLY_KEYS) || []),'mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
+  const DEVICE_DATA_KEYS = () => [...Object.values((window.MangaVaultPayload && MangaVaultPayload.DATA_KEYS) || {}),...((window.MangaVaultPayload && MangaVaultPayload.LOCAL_ONLY_KEYS) || []),'testCode.manualVpnIps','testCode.manualNonVpnIps','mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
   let menu=null, activeTrigger=null;
   const AVATAR_KEY='mangaReaderProfileAvatar';
   function refreshAvatar(){
     let avatar='';
     try{
       const source=localStorage.getItem(AVATAR_KEY)||'';
-      if((window.TestCodeGuest?.isActive()||window.MangaVault?.loadActive?.())&&typeof source==='string'&&source.length<=100000&&/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(source))avatar=source;
+      const guest = window.TestCodeGuest?.isActive() === true;
+      const permitted = guest || window.MangaReaderMediaAccess?.canReadProtectedData?.() === true;
+      if(permitted&&(guest||window.MangaVault?.loadActive?.())&&typeof source==='string'&&source.length<=100000&&/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(source))avatar=source;
     }catch(_){}
     document.querySelectorAll('[data-profile-menu-trigger], #desktopProfileButton').forEach((button)=>{
       const previous=button.querySelector('.profileAvatarButtonImage');
@@ -137,6 +139,7 @@
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install,{once:true}); else install();
   document.addEventListener('manga-reader-desktop-nav-ready',install);
   document.addEventListener('testcode-profile-avatar-change',refreshAvatar);
+  document.addEventListener('manga-reader-vpn-status',refreshAvatar);
   document.addEventListener('home-profile-routechange',()=>{close();install();});
   document.addEventListener('click',close);
   document.addEventListener('keydown',(event)=>{if(event.key==='Escape')close();});

@@ -147,7 +147,7 @@
       if (MangaVault.hasPendingLocalChanges()) showPendingSync({pendingSync:true,syncError:'端末の未同期データを自動同期します。'});
       else { goReader(); return; }
     }
-    const DEVICE_DATA_KEYS=[...Object.values(MangaVaultPayload.DATA_KEYS||{}),'mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
+    const DEVICE_DATA_KEYS=[...Object.values(MangaVaultPayload.DATA_KEYS||{}),'testCode.manualVpnIps','testCode.manualNonVpnIps','mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
     let opening=false;
     let passkeyOpening=false;
     let passkeyAbortController=null;

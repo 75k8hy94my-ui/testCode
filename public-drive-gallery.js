@@ -4,6 +4,7 @@
   const cryptoSettings = window.PublicDriveGalleryVault;
   const vaultApi = window.MangaVault;
   const vaultPayload = window.MangaVaultPayload;
+  const mediaAccess = window.MangaReaderMediaAccess;
   const settingsStorageKey = vaultPayload.DATA_KEYS.driveGalleryEncrypted;
   const syncStatus = document.getElementById('driveSyncStatus');
   let saving = false;
@@ -25,6 +26,25 @@
   let files = [];
   let viewerIndex = -1;
   let restoreFocus = null;
+  let initialized = false;
+
+  function canReadProtectedData() {
+    return !!mediaAccess && typeof mediaAccess.canReadProtectedData === 'function'
+      && mediaAccess.canReadProtectedData() === true;
+  }
+  function clearProtectedPresentation() {
+    controller?.abort();
+    controller = null;
+    savedSettings = null;
+    files = [];
+    viewerImage.removeAttribute('src');
+    viewer.hidden = true;
+    keyInput.value = '';
+    folderInput.value = '';
+    refreshButton.disabled = true;
+    grid.replaceChildren();
+    count.textContent = '';
+  }
 
   function setStatus(message, error = false) {
     status.textContent = message;
@@ -260,6 +280,15 @@
       setSyncStatus('ゲスト：公開フォルダの閲覧は可能です。APIキーは保存・同期されません。');
       return;
     }
+    if (initialized) return;
+    if (!canReadProtectedData()) {
+      clearProtectedPresentation();
+      document.documentElement.classList.remove('auth-pending');
+      setSyncStatus('VPN接続を確認できるまで、保存済み設定と画像へのアクセスを停止しています。', true);
+      mediaAccess?.syncUi?.();
+      return;
+    }
+    initialized = true;
     const config = window.MANGA_READER_SUPABASE || {};
     const session = vaultApi?.loadSession?.();
     if (!session?.refresh_token || !config.url || !config.publishableKey) {
@@ -277,6 +306,13 @@
     } catch (error) {
       if (vaultApi.isSessionAuthError?.(error)) vaultApi.saveSession(null);
       location.replace('index.html');
+      return;
+    }
+    if (!canReadProtectedData()) {
+      initialized = false;
+      clearProtectedPresentation();
+      document.documentElement.classList.remove('auth-pending');
+      setSyncStatus('VPN接続を確認できるまで、保存済み設定と画像へのアクセスを停止しています。', true);
       return;
     }
     window.addEventListener('manga-vault-cleared', () => {
@@ -311,6 +347,17 @@
       setSyncStatus(error?.message || '保存済み設定を読み込めませんでした。', true);
     }
   }
+  document.addEventListener('manga-reader-vpn-status', () => {
+    if (window.TestCodeGuest?.isActive()) return;
+    if (!canReadProtectedData()) {
+      initialized = false;
+      clearProtectedPresentation();
+      setStatus('VPN接続を確認できるまで、設定と画像へのアクセスを停止しています。', true);
+      setSyncStatus('VPN接続を確認できるまで保護データを表示しません。', true);
+      return;
+    }
+    void initialize();
+  });
   cancelButton.addEventListener('click', () => { if (controller) controller.abort(); });
   byId('driveViewerClose').addEventListener('click', closeViewer);
   byId('driveViewerPrev').addEventListener('click', () => moveViewer(-1));

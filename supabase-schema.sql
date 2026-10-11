@@ -228,7 +228,7 @@ returns table(asset_id uuid, revision bigint, deleted_at timestamptz, updated_at
 language sql security
 definer
 set search_path = public
-as $
+as $$
   insert into public.manga_reader_encrypted_assets (user_id, asset_id, revision, deleted_at, updated_at)
   values ((select auth.uid()), expected_asset_id, 1, null, now())
   on conflict (user_id, asset_id) do nothing
@@ -236,7 +236,7 @@ as $
             manga_reader_encrypted_assets.revision,
             manga_reader_encrypted_assets.deleted_at,
             manga_reader_encrypted_assets.updated_at;
-$;
+$$;
 
 create or replace function public.publish_manga_reader_encrypted_asset_revision(
   expected_asset_id uuid,
@@ -246,7 +246,7 @@ returns table(asset_id uuid, revision bigint, deleted_at timestamptz, updated_at
 language sql security
 definer
 set search_path = public
-as $
+as $$
   update public.manga_reader_encrypted_assets
   set revision = manga_reader_encrypted_assets.revision + 1,
       updated_at = now()
@@ -258,7 +258,7 @@ as $
             manga_reader_encrypted_assets.revision,
             manga_reader_encrypted_assets.deleted_at,
             manga_reader_encrypted_assets.updated_at;
-$;
+$$;
 
 create or replace function public.tombstone_manga_reader_encrypted_asset(
   expected_asset_id uuid,
@@ -268,7 +268,7 @@ returns table(asset_id uuid, revision bigint, deleted_at timestamptz, updated_at
 language sql security
 definer
 set search_path = public
-as $
+as $$
   update public.manga_reader_encrypted_assets
   set revision = manga_reader_encrypted_assets.revision + 1,
       deleted_at = now(),
@@ -281,7 +281,7 @@ as $
             manga_reader_encrypted_assets.revision,
             manga_reader_encrypted_assets.deleted_at,
             manga_reader_encrypted_assets.updated_at;
-$;
+$$;
 
 revoke execute on function public.create_manga_reader_encrypted_asset(uuid) from public, anon;
 grant execute on function public.create_manga_reader_encrypted_asset(uuid) to authenticated;

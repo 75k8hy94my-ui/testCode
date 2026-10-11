@@ -9,8 +9,10 @@ const html = fs.readFileSync(new URL('../video-virtual-editor.html', import.meta
 const css = fs.readFileSync(new URL('../video-virtual-editor.css', import.meta.url), 'utf8');
 const player = fs.readFileSync(new URL('../video-player-page.js', import.meta.url), 'utf8');
 const playerHtml = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
+const playerVirtualHtml = fs.readFileSync(new URL('../video-virtual-player.html', import.meta.url), 'utf8');
 
 test('editor route loads protected media dependencies and model before controller', () => {
+  assert.ok(html.indexOf('guest-mode.js') >= 0 && html.indexOf('guest-mode.js') < html.indexOf('vault-session.js'));
   assert.match(html, /id="virtualVideoEditor"/);
   assert.match(html, /video-virtual-editor\.css/);
   assert.ok(html.indexOf('media-access-gate.js') < html.indexOf('video-virtual-editor.js'));
@@ -18,6 +20,11 @@ test('editor route loads protected media dependencies and model before controlle
   assert.ok(html.indexOf('video-virtual-edit.js') < html.indexOf('video-virtual-edit-store.js'));
   assert.ok(html.indexOf('video-virtual-edit-store.js') < html.indexOf('video-virtual-editor.js'));
   assert.ok(css.includes('@media(max-width:770px)'));
+});
+
+test('virtual player route applies guest storage isolation before loading protected storage', () => {
+  assert.ok(playerVirtualHtml.indexOf('guest-mode.js') >= 0);
+  assert.ok(playerVirtualHtml.indexOf('guest-mode.js') < playerVirtualHtml.indexOf('vault-session.js'));
 });
 
 test('MP4-only virtual editor link is separate from existing video detail action', () => {

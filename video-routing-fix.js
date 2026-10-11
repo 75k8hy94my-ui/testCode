@@ -548,6 +548,18 @@
   }
 
   document.addEventListener('click', handleEnhancedOpen, true);
+  document.addEventListener('manga-video-list-route-detach', () => {
+    persistActivePlayback(true);
+    closeActivePlayer();
+    document.querySelectorAll('#videoLibraryResults video, #videoLibraryResults iframe').forEach((media) => {
+      try { media.pause?.(); } catch (_) {}
+      if (media.tagName === 'VIDEO') {
+        media.removeAttribute('src');
+        try { media.load(); } catch (_) {}
+      }
+      media.remove();
+    });
+  });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') persistActivePlayback(true);
   });

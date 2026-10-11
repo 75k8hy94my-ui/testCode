@@ -7,26 +7,10 @@
   const RETRY_KEY = 'mangaReaderEncryptedImageUnsynced';
   const CLEANUP_KEY = 'mangaReaderPendingEncryptedAssetCleanup';
   const api = window.MangaVault;
+  const mediaAccess = window.MangaReaderMediaAccess;
   const isEncryptedItem = item => !!(item && item.encryptedAssets &&
     item.encryptedAssets.schemaVersion === 1 && Array.isArray(item.encryptedAssets.pages) &&
     item.encryptedAssets.pages.length > 0);
-  // Scoped transport policy: this page alone ignores the optional VPN requirement.
-  // All other settings and traffic accounting use the real underlying storage.
-  function vpnFreeTransferStorage(backing) {
-    return {
-      getItem(key) {
-        return key === 'mangaReaderImageVpnRequired' ? 'false' : backing.getItem(key);
-      },
-      setItem(key, value) {
-        if (key !== 'mangaReaderImageVpnRequired') backing.setItem(key, value);
-      },
-      removeItem(key) {
-        if (key !== 'mangaReaderImageVpnRequired') backing.removeItem(key);
-      }
-    };
-  }
-
-
   const UPLOAD_PHASES = Object.freeze(['processing', 'encrypt', 'upload', 'register', 'sync']);
   const UPLOAD_LABELS = Object.freeze({
     processing: '画像を加工中', encrypt: '暗号化中', checking: 'サーバーの状態を確認中',
@@ -186,7 +170,8 @@
   let galleryGeneration = 0;
   let pendingSync = false;
   let busy = false;
-  const transferStorage = vpnFreeTransferStorage(window.localStorage);
+  const transferStorage = window.localStorage;
+  let initialized = false;
 
   let uploadProgress = null;
   let uploadProgressInterval = null;
@@ -555,6 +540,14 @@
     }
   }
   async function initialize() {
+    if (initialized) return;
+    if (!window.TestCodeGuest?.isActive() &&
+        (!mediaAccess || typeof mediaAccess.canReadProtectedData !== 'function' || mediaAccess.canReadProtectedData() !== true)) {
+      document.documentElement.classList.remove('auth-pending');
+      status('VPN接続を確認できるまで、画像データへのアクセスを停止しています。', true);
+      mediaAccess?.syncUi?.();
+      return;
+    }
     if (window.TestCodeGuest?.isActive()) {
       document.documentElement.classList.remove('auth-pending');
       window.MobileBottomNav?.ensureSpaNav?.($('homeApp'));
@@ -563,6 +556,7 @@
       catch (error) { status('ゲスト画像を開けません：' + (error?.message || '保存領域を確認してください'), true); }
       return;
     }
+    initialized = true;
     const config = window.MANGA_READER_SUPABASE || {};
     const session = api?.loadSession?.();
     if (!session?.refresh_token || !config.url || !config.publishableKey) {
@@ -579,6 +573,12 @@
     catch (error) {
       if (api.isSessionAuthError?.(error)) api.saveSession(null);
       location.replace('index.html');
+      return;
+    }
+    if (mediaAccess?.canReadProtectedData?.() !== true) {
+      initialized = false;
+      document.documentElement.classList.remove('auth-pending');
+      status('VPN接続を確認できるまで、画像データへのアクセスを停止しています。', true);
       return;
     }
     transport = window.EncryptedAssetStorage.createStorageTransport({
@@ -621,7 +621,25 @@
     void retryCleanup();
   }
 
-  window.EncryptedImages = Object.freeze({ isEncryptedItem, vpnFreeTransferStorage, createImageUploadProfile, createPhotoOptimization, createUploadProgressTracker, initialize });
+  document.addEventListener('manga-reader-vpn-status', () => {
+    if (window.TestCodeGuest?.isActive()) return;
+    if (!mediaAccess || mediaAccess.canReadProtectedData?.() !== true) {
+      initialized = false;
+      activeController?.abort();
+      closeViewer();
+      previewLoader?.destroy?.();
+      previewLoader = null;
+      destroyRenderer();
+      transport = null;
+      cache = null;
+      $('imageGrid')?.replaceChildren();
+      status('VPN接続を確認できるまで、画像データへのアクセスを停止しています。', true);
+      return;
+    }
+    void initialize();
+  });
+
+  window.EncryptedImages = Object.freeze({ isEncryptedItem, createImageUploadProfile, createPhotoOptimization, createUploadProgressTracker, initialize });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',()=>{void initialize();},{once:true});
   else void initialize();
 })();

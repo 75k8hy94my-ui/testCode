@@ -101,6 +101,7 @@ test('signed-in writes mark Vault changes pending and schedule one background sy
     isGuestMode: () => false,
     now: () => 100,
     vault: {
+      loadSession: () => ({ user: { id: 'u1' } }),
       markLocalChangesPending: () => { marks += 1; return true; },
       loadActive: () => true,
       saveLocalChanges: async () => { syncs += 1; },
@@ -114,6 +115,17 @@ test('signed-in writes mark Vault changes pending and schedule one background sy
   assert.equal(scheduled.length, 1);
   await scheduled[0]();
   assert.equal(syncs, 1);
+});
+
+test('does not write a signed-in Shorts state when the pending marker cannot be saved', () => {
+  const storage = new Map();
+  const api = State.create({
+    storage, canReadProtectedData: () => true, isGuestMode: () => false,
+    vault: { loadSession: () => ({ user: { id: 'u1' } }), markLocalChangesPending: () => false },
+  });
+  const before = api.load();
+  assert.equal(api.save({ ...before, queue: activeQueue() }), null);
+  assert.equal(storage.has('mangaReaderVideoShortsState'), false);
 });
 
 test('guest reset is local-only and starts a fresh generation from the saved video IDs', () => {
