@@ -424,6 +424,9 @@
     const targetId = params.get('returnVideo');
     if (!targetId || !canReadProtectedData()) return;
     const all = effectiveVideos();
+    // Vault hydration can finish after the first route render. Keep the intent
+    // until the target is actually present in protected local data.
+    if (!all.some(video => String(video.id) === targetId)) return;
     const findInCurrentView = () => {
       const scoped = all.filter(video => video.hidden === state.showHidden);
       const visible = Data.filterVideos(scoped, { query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
@@ -443,7 +446,8 @@
         index = list.findIndex(video => String(video.id) === targetId);
       }
     }
-    if (index >= 0) state.page = Math.floor(index / Pagination.PAGE_SIZE) + 1;
+    if (index < 0) return;
+    state.page = Math.floor(index / Pagination.PAGE_SIZE) + 1;
     params.delete('returnVideo');
     const updated = location.pathname + (params.toString() ? '?' + params : '') + location.hash;
     history.replaceState(history.state, '', updated);
@@ -451,6 +455,7 @@
 
   function render(pageDirection = 0) {
     loadLibraryState();
+    restoreVideoPage();
     syncAccessUi();
     const all = effectiveVideos();
     const scoped = all.filter((video) => video.hidden === state.showHidden);
@@ -753,7 +758,7 @@
     });
     window.addEventListener('online', resumePendingLocalSync);
     document.addEventListener('manga-reader-vpn-status', () => {
-      if (canReadProtectedData()) resumePendingLocalSync();
+      if (canReadProtectedData()) { render(); resumePendingLocalSync(); }
     });
     window.addEventListener('popstate', () => { if (!(history.state && history.state.videoLibrarySheet)) setSheetVisible(false); });
   }
@@ -772,7 +777,7 @@
   function init(access) {
     if (access) mediaAccess = access;
     if (!document.getElementById('videoListSection')) return;
-    injectStyles(); loadPrefs(); loadLibraryState(); if (!setupMarkup()) return; bindEvents(); if (dom.search) dom.search.value = state.query; restoreVideoPage(); render(); resumePendingLocalSync();
+    injectStyles(); loadPrefs(); loadLibraryState(); if (!setupMarkup()) return; bindEvents(); if (dom.search) dom.search.value = state.query; render(); resumePendingLocalSync();
   }
 
   window.MangaReaderVideoLibrary = Object.freeze({ init, syncAccessUi });
