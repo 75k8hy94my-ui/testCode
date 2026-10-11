@@ -113,6 +113,25 @@ test('adjusts clip boundaries at millisecond precision and respects range limits
   assert.throws(() => edits.adjustClipBoundary(original, 0, 'end', 1, 0));
 });
 
+test('setClipBoundary can expand beyond the old clip and clamps to known source duration', () => {
+  const original = edits.createEdit([clip('a', 5, 8)]);
+  const earlierStart = edits.setClipBoundary(original, 0, 'start', 1);
+  assert.deepEqual(earlierStart.clips[0], clip('a', 1, 8));
+  const laterEnd = edits.setClipBoundary(original, 0, 'end', 10);
+  assert.deepEqual(laterEnd.clips[0], clip('a', 5, 10));
+  const boundedEnd = edits.setClipBoundary(original, 0, 'end', 12, 9.5);
+  assert.deepEqual(boundedEnd.clips[0], clip('a', 5, 9.5));
+  const boundedStart = edits.setClipBoundary(original, 0, 'start', 12, 9.5);
+  assert.deepEqual(boundedStart.clips[0], clip('a', 7.999, 8));
+  assert.deepEqual(original.clips[0], clip('a', 5, 8));
+});
+
+test('setClipBoundary preserves a one-millisecond range when endpoints cross', () => {
+  const original = edits.createEdit([clip('a', 5, 8)]);
+  assert.deepEqual(edits.setClipBoundary(original, 0, 'start', 9).clips[0], clip('a', 7.999, 8));
+  assert.deepEqual(edits.setClipBoundary(original, 0, 'end', 2).clips[0], clip('a', 5, 5.001));
+});
+
 test('maps virtual timeline boundaries to source times without re-encoding', () => {
   const edit = edits.createEdit([clip('a', 10, 20), clip('b', 3, 7)]);
   assert.deepEqual(edits.locateTime(edit, 0), { clipIndex: 0, sourceVideoId: 'a', sourceSeconds: 10 });
