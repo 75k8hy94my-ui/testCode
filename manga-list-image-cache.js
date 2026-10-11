@@ -64,6 +64,11 @@
             let value = request.result || null;
             if (value && value.encrypted && value.iv && value.ciphertext) {
               try {
+                const legacyNumericArrays = Array.isArray(value.iv) || Array.isArray(value.ciphertext);
+                if (legacyNumericArrays) {
+                  value.iv = new Uint8Array(value.iv);
+                  value.ciphertext = new Uint8Array(value.ciphertext);
+                }
                 const key = await deps.crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);
                 const plain = await deps.crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(value.iv) }, key, new Uint8Array(value.ciphertext));
                 value.blob = new Blob([plain], { type: value.type || 'application/octet-stream' });
@@ -135,7 +140,10 @@
             if (cachedBytes !== null) cachedBytes = Math.max(0, cachedBytes - (previous.result?.size || 0)) + (blob.size || 0);
             store.put({
             key: cacheKey(path, ownerId), path, userId: ownerId, encrypted: true,
-            iv: Array.from(iv), ciphertext: Array.from(new Uint8Array(ciphertext)), type: blob.type || 'application/octet-stream',
+            // IndexedDB structured-clones typed arrays as compact binary data.
+            // Keep legacy numeric-array rows readable in read(), but never
+            // expand new ciphertext into boxed JavaScript numbers.
+            iv: new Uint8Array(iv), ciphertext: new Uint8Array(ciphertext), type: blob.type || 'application/octet-stream',
             size: blob.size || 0, lastAccessedAt: Date.now()
             });
           };

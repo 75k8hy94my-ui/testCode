@@ -425,8 +425,8 @@
         img.height = 18;
         return img;
       };
-      const moveItemInList = (item, list, direction) => { const index = list.indexOf(item); const other = list[index + direction]; if (!other) return; const items = state().savedItems; const a = items.indexOf(item); const b = items.indexOf(other); if (a < 0 || b < 0) return; [items[a], items[b]] = [items[b], items[a]]; host.persistAll(); renderList(); };
-      const moveFolderInList = (folder, list, direction) => { const index = list.indexOf(folder); const other = list[index + direction]; if (!other) return; const folders = state().savedFolders; const a = folders.indexOf(folder); const b = folders.indexOf(other); if (a < 0 || b < 0) return; [folders[a], folders[b]] = [folders[b], folders[a]]; host.persistFolders(); renderList(); };
+      const moveItemInList = (item, list, direction) => { const index = list.indexOf(item); const other = list[index + direction]; if (!other) return; const items = state().savedItems; const a = items.indexOf(item); const b = items.indexOf(other); if (a < 0 || b < 0) return; [items[a], items[b]] = [items[b], items[a]]; if (!host.persistAll()) { [items[a], items[b]] = [items[b], items[a]]; reportPersistenceError(); } renderList(); };
+      const moveFolderInList = (folder, list, direction) => { const index = list.indexOf(folder); const other = list[index + direction]; if (!other) return; const folders = state().savedFolders; const a = folders.indexOf(folder); const b = folders.indexOf(other); if (a < 0 || b < 0) return; [folders[a], folders[b]] = [folders[b], folders[a]]; if (!host.persistFolders()) { [folders[a], folders[b]] = [folders[b], folders[a]]; reportPersistenceError(); } renderList(); };
       const updateBulkEditButton = () => {
         if (!elements) return;
         const current = state();
@@ -449,6 +449,17 @@
           documentRef.body.appendChild(notice);
         }
         notice.textContent = '削除を保全できませんでした。端末のデータは変更していません。' + (message ? ' ' + message : '');
+        windowRef.clearTimeout(notice._hideTimer); notice._hideTimer = windowRef.setTimeout(() => notice.remove(), 10000);
+      };
+      const reportPersistenceError = () => {
+        let notice = documentRef.getElementById('mangaPersistenceError');
+        if (!notice) {
+          notice = documentRef.createElement('p'); notice.id = 'mangaPersistenceError';
+          notice.setAttribute('role', 'status'); notice.setAttribute('aria-live', 'polite');
+          notice.style.cssText = 'position:fixed;left:16px;right:16px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:1600;padding:12px 16px;border-radius:12px;background:#7b2d24;color:#fff;box-shadow:0 8px 24px #0005';
+          documentRef.body.appendChild(notice);
+        }
+        notice.textContent = '変更を端末に保存できませんでした。未保存の変更を元に戻しました。ブラウザの保存領域を確認してください。';
         windowRef.clearTimeout(notice._hideTimer); notice._hideTimer = windowRef.setTimeout(() => notice.remove(), 10000);
       };
       const renderDashboard = (show) => {
@@ -475,6 +486,7 @@
           return windowRef.MangaVault.recordSyncDeletion(paths, mutate);
         },
         onDeletionError: reportDeletionError,
+        onPersistenceError: reportPersistenceError,
         pointerPath: (collection, id) => windowRef.MangaVaultPayload.pointerPath(collection, id),
         openReader: (item) => host.navigateToReader(item), accessMedia: host.setupFeedImage,
         renderDashboard, renderAuthorDashboard,
@@ -576,15 +588,7 @@
             const result = importBatch.register(selection);
             if (!result.ok) { mangaImportController.setStatus('登録を中止しました：' + result.errors.map((error) => error.message || error).join('、')); return; }
             if (!result.registeredQueueIds.length) { mangaImportController.setStatus('新しい作品はありません。重複作品は登録されませんでした。'); return; }
-            mangaImportController.setStatus(`${result.registeredQueueIds.length}作品を本棚へ登録しました。`);
-            if (canReadProtectedData() && windowRef.confirm(`${result.registeredQueueIds.length}作品を登録しました。登録済みの拡張機能キューから削除しますか？`)) {
-              try {
-                const removed = await importBridge.removeQueuedCandidates(result.registeredQueueIds);
-                if (canReadProtectedData()) mangaImportController.setStatus(`${result.registeredQueueIds.length}作品を登録し、キューから${removed.length}件を削除しました。`);
-              } catch (error) {
-                mangaImportController.setStatus(`作品は登録済みですが、キュー削除に失敗しました：${error?.message || '不明なエラー'}`);
-              }
-            }
+            mangaImportController.setStatus(`${result.registeredQueueIds.length}作品を本棚へ登録しました。キューから削除する場合は拡張機能のポップアップを開いてください。`);
           } catch (error) {
             mangaImportController.setStatus(error?.message || '登録できませんでした。');
           } finally {

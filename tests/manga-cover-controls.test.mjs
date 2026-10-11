@@ -106,6 +106,34 @@ test('favorite click changes icon state and re-renders favorites page, not Reade
   assert.equal(readerOpens, 0);
 });
 
+test('favorite click rolls back its optimistic state when durable persistence fails', () => {
+  const scope = { self: {} };
+  vm.runInNewContext(read('manga-list-runtime.js'), scope);
+  const item = { id: 'volume-1', url: 'https://example.test/page.jpg', favorite: false, title: 'Volume 1' };
+  let errors = 0;
+  const context = new Proxy({
+    getDocument: () => ({ createElement: node }),
+    getElements: () => ({ savedListItems: node() }),
+    getState: () => ({ bulkEditMode: false, bulkSelectedIds: new Set(), currentFolderView: null }),
+    getConfig: () => ({ FAVORITES_FOLDER_ID: '__favorites__' }),
+    createStaticCard: () => { const card = node(); const cover = node(); const img = node('img'); cover.appendChild(img); card.appendChild(cover); return { card, cover, img, select: null, appendDetails() {} }; },
+    makeHeartIcon: (active) => { const img = node('img'); img.src = active ? 'filled' : 'outline'; return img; },
+    setupFeedImage() {},
+    persistAll: () => false,
+    onPersistenceError: () => { errors++; },
+    openReader() {},
+  }, { get(target, key) { return target[key] ?? (() => {}); } });
+  const card = scope.self.MangaListRuntimeFactory.create(context).buildBookCard(item, [item], false);
+  const heart = card.children[0].children.find((element) => element.className === 'book-favBtn');
+
+  heart.click();
+
+  assert.equal(item.favorite, false);
+  assert.equal(heart.attributes['aria-pressed'], 'false');
+  assert.equal(heart.children[0].src, 'outline');
+  assert.equal(errors, 1);
+});
+
 test('all cover controls stay above status overlays and remain visible during normal paging', () => {
   const css = read('manga-list.css');
   const runtime = read('manga-list-runtime.js');

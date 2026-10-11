@@ -37,9 +37,7 @@ test('rejects malformed queue wrappers, failed responses, and times out', async 
   await assert.rejects(promise, /worker failed/);
   ctx = setup(); await assert.rejects(ctx.bridge.requestQueuedCandidates(), /timed out/i);
 });
-test('removes only explicitly requested queue IDs and checks the removal response', async () => {
-  const ctx = setup(); const promise = ctx.bridge.removeQueuedCandidates(['q1']);
-  assert.deepEqual(ctx.sent[0].data.queueIds, ['q1']);
-  ctx.respond({ type: 'TESTCODE_MOMON_IMPORT_REMOVE_RESPONSE', schemaVersion: 1, requestId: 'req-1', removedQueueIds: ['q1'] });
-  assert.deepEqual(await promise, ['q1']);
+test('page bridge intentionally exposes no queue deletion operation', () => {
+  const ctx = setup();
+  assert.equal(ctx.bridge.removeQueuedCandidates, undefined);
 });

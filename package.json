@@ -1,3 +1,10 @@
 {
-  "scripts": { "test": "node --test", "verify:static": "node scripts/check-static.mjs" }
+  "scripts": {
+    "test": "node --test",
+    "verify:static": "node scripts/check-static.mjs",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1"
+  }
 }
