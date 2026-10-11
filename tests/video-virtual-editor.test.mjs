@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import Edit from '../video-virtual-edit.js';
+import EditorState from '../video-virtual-editor-state.js';
 
 const source = fs.readFileSync(new URL('../video-virtual-editor.js', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../video-virtual-editor.html', import.meta.url), 'utf8');
@@ -19,7 +20,20 @@ test('editor route loads protected media dependencies and model before controlle
   assert.ok(html.indexOf('vault-payload.js') < html.indexOf('video-virtual-edit-store.js'));
   assert.ok(html.indexOf('video-virtual-edit.js') < html.indexOf('video-virtual-edit-store.js'));
   assert.ok(html.indexOf('video-virtual-edit-store.js') < html.indexOf('video-virtual-editor.js'));
+  assert.ok(html.indexOf('video-virtual-editor-state.js') < html.indexOf('video-virtual-editor.js'));
   assert.ok(css.includes('@media(max-width:770px)'));
+});
+
+test('editor renders project toolbar, preview modes, searchable source library and virtual timeline', () => {
+  const harness = startEditor({ allowed: true });
+  assert.match(harness.root.innerHTML, /data-project-toolbar/);
+  assert.match(harness.root.innerHTML, /data-preview-source/);
+  assert.match(harness.root.innerHTML, /data-preview-edit/);
+  assert.match(harness.root.innerHTML, /data-source-search/);
+  assert.match(harness.root.innerHTML, /data-timeline-scroll/);
+  assert.match(harness.root.innerHTML, /data-playhead/);
+  assert.match(harness.root.innerHTML, /data-clip-details/);
+  assert.match(harness.root.innerHTML, /data-save-status/);
 });
 
 test('virtual player route applies guest storage isolation before loading protected storage', () => {
@@ -38,7 +52,7 @@ test('MP4-only virtual editor link is separate from existing video detail action
 function element(tag = 'div') {
   const listeners = {};
   return {
-    tag, listeners, dataset: {}, children: [], value: '', disabled: false, readyState: 0,
+    tag, listeners, dataset: {}, children: [], style: {}, value: '', disabled: false, readyState: 0,
     duration: NaN, currentTime: 0, src: '', textContent: '',
     append(...items) { this.children.push(...items); },
     replaceChildren(...items) { this.children = items; },
@@ -56,6 +70,7 @@ function startEditor({ allowed = false, search = '?id=direct', data = null } = {
   const all = {
     mangaReaderVideos: [
       { id: 'direct', title: '動画Ａ', url: 'https://cdn.test/a.mp4?token=abc', addedAt: 1 },
+      { id: 'long', title: '長編動画B', url: 'https://cdn.test/b.mp4', durationSeconds: 7200, addedAt: 2 },
       { id: 'embedded', title: '埋め込み', url: 'https://www.example.com/watch?v=1', addedAt: 1 },
       { id: 'webm', title: 'WebM', url: 'https://cdn.test/x.webm', addedAt: 1 },
     ],
@@ -88,6 +103,7 @@ function startEditor({ allowed = false, search = '?id=direct', data = null } = {
   };
   const window = {
     MangaReaderVideoVirtualEdit: Edit,
+    MangaReaderVideoVirtualEditorState: EditorState,
     MangaReaderVideoVirtualEditStore: {
       VIDEO_KEY: 'mangaReaderVideos', META_KEY: 'mangaReaderVideoMeta',
       createRepository: () => repo,
@@ -133,10 +149,10 @@ test('VPN gate prevents any protected storage reads until permission is granted'
 test('editor exposes only registered MP4 sources and saves time ranges without editing source video records', async () => {
   const harness = startEditor({ allowed: true });
   const nodes = harness.selectorMap;
-  const select = nodes.get('[data-source]');
-  assert.equal(select.children.length, 1);
-  assert.equal(select.children[0].value, 'direct');
-  select.value = 'direct';
+  const sources = nodes.get('[data-source-list]');
+  assert.deepEqual(sources.children.map((item) => item.dataset.sourceId), ['direct', 'long']);
+  assert.equal(sources.children[0].getAttribute('aria-pressed'), 'true');
+  sources.children[0].dispatch('click');
   nodes.get('[data-start]').value = '12';
   nodes.get('[data-end]').value = '25';
   nodes.get('[data-add]').dispatch('click');
@@ -148,6 +164,17 @@ test('editor exposes only registered MP4 sources and saves time ranges without e
   assert.equal(harness.calls[0].edit.clips[0].endSeconds, 25);
   assert.equal(harness.calls[0].title, '動画Ａ（編集版）');
   assert.equal(nodes.get('[data-status]').textContent, '保管庫へ保存しました。');
+});
+
+test('source library search filters registered MP4 choices without loading their URLs', () => {
+  const harness = startEditor({ allowed: true });
+  const search = harness.selectorMap.get('[data-source-search]');
+  const options = harness.selectorMap.get('[data-source-list]');
+  assert.equal(options.children.length, 2);
+  search.value = '長編';
+  search.dispatch('input');
+  assert.deepEqual(options.children.map((item) => item.dataset.sourceId), ['long']);
+  assert.equal(harness.selectorMap.get('[data-source]').value, 'direct');
 });
 
 test('selected clip can be duplicated, independently trimmed and precisely adjusted before save', async () => {

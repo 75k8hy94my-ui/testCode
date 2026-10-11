@@ -38,3 +38,82 @@
 @media(max-width:770px){.virtualVideoEditor{padding:14px 11px 100px}.vveGrid{grid-template-columns:1fr}.vvePanel{padding:12px}.vveAction{font-size:12px;min-height:44px;padding:7px 10px}.vveTop{align-items:stretch}.vveTop .vveButtons{justify-content:flex-start}.vveBoundary .vveControls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.vveBoundary .vveControls button:last-child{grid-column:1/-1}}
 
 .virtualVideoEditor [hidden]{display:none!important}
+
+.virtualVideoEditor{width:min(1480px,100%);gap:12px}
+.vveProjectBar{position:sticky;top:0;z-index:12;display:grid;grid-template-columns:minmax(300px,.9fr) minmax(0,1.4fr);gap:12px;align-items:end;padding:12px;background:var(--bg-soft);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 24px #0002}
+.vveProjectFields{display:grid;grid-template-columns:minmax(150px,.8fr) minmax(180px,1.2fr);gap:10px}
+.vveProjectActions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:7px}
+.vveSaveStatus{max-width:230px;color:var(--sub);font-size:12px;line-height:1.35}
+.vveSaveStatus[data-error="1"]{color:#f58b8b}
+.vveMainGrid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(320px,.9fr);gap:12px;align-items:start}
+.vvePanel{padding:15px}
+.vvePreviewPanel,.vveDetailsPanel,.vveTimelinePanel{min-width:0}
+.vveSectionHeading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.vveSectionHeading .vvePaneTitle{margin:0}
+.vveSectionHeading .vveLead{margin:4px 0 0}
+.vveModeToggle{display:flex;gap:5px;padding:3px;border:1px solid var(--border);border-radius:12px;background:var(--panel)}
+.vveModeToggle .vveAction{min-height:36px;padding:5px 10px;border:0;background:transparent}
+.vveModeToggle .vveAction.active{background:var(--accent);color:#fff}
+.vvePreview{aspect-ratio:16/9;max-height:none}
+.vvePreview video{max-height:none}
+.vveSourcePicker{margin-top:11px}
+.vveSourceList{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;max-height:130px;overflow:auto;margin-top:7px;overscroll-behavior:contain}
+.vveSource{display:grid;gap:4px;min-width:0;min-height:50px;padding:8px 10px;text-align:left;border:1px solid var(--border);border-radius:10px;background:var(--panel);color:var(--text);cursor:pointer}
+.vveSource[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-dim);box-shadow:inset 3px 0 var(--accent)}
+.vveSource strong,.vveSource small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vveSource strong{font-size:12px}.vveSource small{font-size:11px;color:var(--sub)}
+.vveSource:disabled{opacity:.5;cursor:not-allowed}
+.vvePrimaryControls{justify-content:flex-start;margin-top:10px}
+.vveDetailsPanel .vveRow{margin-bottom:10px}
+.vveDetailsPanel .vveField input{font-variant-numeric:tabular-nums}
+.vveTimeHint{color:var(--sub);font-size:10px;font-weight:500}
+.vveBoundary{display:grid;grid-template-columns:54px minmax(0,1fr);align-items:center;gap:8px;padding-top:8px;margin-top:8px}
+.vveBoundary:first-of-type{border-top:1px solid var(--border)}
+.vveBoundary .vveControls{display:flex;flex-wrap:wrap;gap:5px;margin:0}
+.vveBoundary .vveAction{min-height:36px;padding:4px 9px;font-size:12px}
+.vveDetailsPanel>.vveControls{margin-top:14px}
+.vveProjectDelete{margin-top:12px;min-height:36px}
+.vveTimelinePanel{grid-column:1/-1}
+.vveTimelineTools{display:flex;gap:6px;align-items:center}
+.vveTimelineTools .vveAction{min-width:39px;min-height:38px;padding:5px 9px}
+.vveTimelineScroll{width:100%;overflow-x:auto;overflow-y:hidden;border:1px solid var(--border);border-radius:13px;background:var(--panel);overscroll-behavior-x:contain;scrollbar-gutter:stable}
+.vveTimelineCanvas{position:relative;min-width:100%;min-height:154px;padding-top:36px;background-image:linear-gradient(to right,transparent 99%,color-mix(in srgb,var(--border) 70%,transparent) 100%);background-size:120px 100%}
+.vveRuler{position:absolute;left:0;right:0;top:0;height:30px;border-bottom:1px solid var(--border);background:repeating-linear-gradient(to right,transparent 0,transparent 119px,var(--border) 120px)}
+.vveClips{position:relative;display:flex;align-items:stretch;gap:0;height:96px;margin-top:8px;padding:0;min-width:1px}
+.vveClip{position:relative;display:flex;flex:0 0 auto;flex-direction:column;align-items:flex-start;justify-content:center;gap:7px;min-width:1px;height:88px;overflow:hidden;padding:9px 10px;border-radius:8px;border-right-width:2px;background:linear-gradient(145deg,var(--accent-dim),var(--panel-2));touch-action:pan-x}
+.vveClip[aria-current="true"]{z-index:1;border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
+.vveClip strong{max-width:100%;font-size:12px}.vveClip small{font-size:11px;color:var(--sub);font-variant-numeric:tabular-nums}
+.vvePlayhead{position:absolute;z-index:4;top:0;bottom:0;left:0;width:2px;background:#ff4d62;pointer-events:none}
+.vvePlayhead:before{position:absolute;top:28px;left:-5px;width:12px;height:12px;border-radius:50%;background:#ff4d62;content:""}
+.vveTimelineFooter{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-top:10px}
+.vveTimelineFooter .vveTotal{margin:0}
+.vveStatus{margin:5px 0 0}
+@media(max-width:770px){
+ .virtualVideoEditor{padding:10px 9px 100px;gap:10px}
+ .vveProjectBar{top:0;grid-template-columns:1fr;gap:8px;padding:9px}
+ .vveProjectFields{grid-template-columns:minmax(120px,.8fr) minmax(145px,1.2fr);gap:7px}
+ .vveProjectActions{justify-content:flex-start;gap:5px}
+ .vveProjectActions .vveLink{display:none}
+ .vveSaveStatus{flex:1 1 100%;max-width:none;order:5}
+ .vveMainGrid{grid-template-columns:1fr;gap:9px}
+ .vvePreviewPanel{order:0}.vveTimelinePanel{order:1;grid-column:auto}.vveDetailsPanel{order:2}
+ .vvePanel{padding:11px;border-radius:14px}
+ .vvePreview{max-height:none}
+ .vveSourceList{grid-template-columns:repeat(2,minmax(0,1fr));max-height:108px}
+ .vveTimelineScroll{touch-action:pan-x}
+ .vveTimelineCanvas{min-height:142px}
+ .vveClips{height:90px}.vveClip{height:82px;padding:7px}
+ .vveClip strong{font-size:11px}.vveClip small{font-size:10px}
+ .vveBoundary{grid-template-columns:45px minmax(0,1fr);gap:5px}
+ .vveBoundary .vveControls{gap:4px}
+ .vveBoundary .vveAction{padding:4px 7px;font-size:11px}
+}
+@media(max-width:430px){
+ .vveProjectActions .vveAction{min-height:39px;padding:5px 9px}
+ .vveProjectFields .vveField{font-size:11px}
+ .vveProjectFields input,.vveProjectFields select{font-size:13px}
+ .vveSectionHeading{align-items:flex-start}
+ .vveTimelineTools{flex-wrap:wrap;justify-content:flex-end}
+ .vveTimelineTools .vveAction{min-width:36px;padding:4px 7px}
+ .vvePreviewMeta{font-size:11px}
+}

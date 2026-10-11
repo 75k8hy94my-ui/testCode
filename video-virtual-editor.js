@@ -3,9 +3,10 @@
   const root = document.getElementById('virtualVideoEditor');
   const Edit = window.MangaReaderVideoVirtualEdit;
   const Store = window.MangaReaderVideoVirtualEditStore;
+  const State = window.MangaReaderVideoVirtualEditorState;
   const Data = window.MangaReaderVideoData;
   const access = window.MangaReaderMediaAccess;
-  if (!root || !Edit || !Store || !Data) {
+  if (!root || !Edit || !Store || !State || !Data) {
     if (root) root.textContent = '編集画面を初期化できませんでした。';
     return;
   }
@@ -25,6 +26,9 @@
   let refs = {};
   let previewUrl = '';
   let pendingSeek = null;
+  let sourceSearchTerm = '';
+  let zoom = State.DEFAULT_ZOOM;
+  let timelinePosition = 0;
 
   const canRead = () => !!access && access.canReadProtectedData() === true;
   const format = (seconds) => Number.isFinite(seconds) ? Data.formatMediaTime(seconds) : '不明';
@@ -40,6 +44,10 @@
     if (!refs.status) return;
     refs.status.textContent = message;
     refs.status.dataset.error = isError ? '1' : '0';
+    if (refs.saveStatus) {
+      refs.saveStatus.textContent = message;
+      refs.saveStatus.dataset.error = isError ? '1' : '0';
+    }
   }
   function stopPreview() {
     if (refs.preview) {
@@ -123,8 +131,41 @@
     });
     refs.projects.value = project ? project.id : '';
   }
+  function drawSources() {
+    refs.sources.replaceChildren();
+    const query = sourceSearchTerm.trim().toLocaleLowerCase();
+    const matches = sources.filter((source) => !query
+      || source.title.toLocaleLowerCase().includes(query) || source.id.toLocaleLowerCase().includes(query));
+    if (!matches.length) {
+      const empty = document.createElement('p');
+      empty.className = 'vveEmpty'; empty.textContent = '該当するMP4素材がありません。';
+      refs.sources.append(empty);
+      return;
+    }
+    matches.forEach((source) => {
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'vveSource';
+      button.dataset.sourceId = source.id;
+      button.disabled = busy || stale;
+      button.setAttribute('role', 'option');
+      button.setAttribute('aria-pressed', String(refs.source.value === source.id));
+      button.setAttribute('aria-selected', String(refs.source.value === source.id));
+      button.title = source.title + (Number.isFinite(source.durationSeconds) ? '・' + format(source.durationSeconds) : '');
+      const title = document.createElement('strong'); title.textContent = source.title;
+      const duration = document.createElement('small');
+      duration.textContent = Number.isFinite(source.durationSeconds) ? format(source.durationSeconds) : '時間未取得';
+      button.append(title, duration);
+      button.addEventListener('click', () => {
+        refs.source.value = source.id;
+        drawSources();
+        changeSource();
+      });
+      refs.sources.append(button);
+    });
+  }
   function drawClips() {
     refs.clips.replaceChildren();
+    const timeline = edit ? State.clipOffsets(edit) : { offsets: [], totalSeconds: 0 };
     if (!edit) {
       const message = document.createElement('div'); message.className = 'vveEmpty';
       message.textContent = 'まだ区間がありません。MP4素材と開始・終了秒を指定して追加してください。';
@@ -133,17 +174,27 @@
       const button = document.createElement('button');
       button.type = 'button'; button.className = 'vveClip';
       button.dataset.clipIndex = String(index);
+      button.style.width = Math.max(1, (clip.endSeconds - clip.startSeconds) * zoom) + 'px';
+      button.style.flex = '0 0 auto';
       button.setAttribute('aria-current', String(index === selectedIndex));
       button.setAttribute('aria-pressed', String(index === selectedIndex));
       const label = document.createElement('strong');
       const source = sourceFor(clip.sourceVideoId);
-      label.textContent = (index + 1) + '. ' + (source ? source.title : '参照できない素材');
+      label.textContent = (index + 1) + ' · ' + (source ? source.title : '参照できない素材');
       const duration = document.createElement('small');
-      duration.textContent = format(clip.startSeconds) + ' – ' + format(clip.endSeconds);
+      duration.textContent = format(clip.endSeconds - clip.startSeconds);
+      button.title = (source ? source.title : '参照できない素材') + ' · ' + format(clip.startSeconds)
+        + ' – ' + format(clip.endSeconds) + ' · ' + format(clip.endSeconds - clip.startSeconds);
       button.append(label, duration);
       button.addEventListener('click', () => chooseClip(index));
       refs.clips.append(button);
     });
+    refs.clips.style.width = Math.max(1, timeline.totalSeconds * zoom) + 'px';
+    refs.clips.style.position = 'relative';
+    refs.timeline.style.width = Math.max(1, timeline.totalSeconds * zoom) + 'px';
+    refs.playhead.style.left = Math.max(0, Math.min(timeline.totalSeconds, timelinePosition || 0)) * zoom + 'px';
+    const chosen = selectedClip();
+    refs.selectedDuration.textContent = chosen ? '長さ ' + format(chosen.endSeconds - chosen.startSeconds) : '未選択';
     refs.total.textContent = edit
       ? edit.clips.length + '区間・合計' + format(Edit.totalDuration(edit)) + '（仮想再生時間）'
       : '0区間';
@@ -167,6 +218,7 @@
       refs[key].disabled = !hasSelected;
     }
     refs.projects.disabled = busy;
+    drawSources();
   }
   function chooseClip(index) {
     if (!canRead() || busy || stale || !edit || !edit.clips[index]) return;
@@ -175,7 +227,9 @@
     refs.source.value = sourceFor(clip.sourceVideoId) ? clip.sourceVideoId : '';
     refs.start.value = String(clip.startSeconds);
     refs.end.value = String(clip.endSeconds);
+    timelinePosition = State.clipOffsets(edit).offsets[index];
     drawClips();
+    drawSources();
     setPreview(clip.sourceVideoId, clip.startSeconds);
   }
   function setEdit(next, nextIndex = null) {
@@ -388,6 +442,7 @@
       refs.source.value = initialSource ? initialSource.id : (sources[0]?.id || '');
       refs.start.value = '0';
       refs.end.value = '';
+      drawSources();
       setPreview(refs.source.value);
     }
     if (stale) status('参照元のMP4が削除・変更されています。安全のため上書き保存を停止しています。', true);
@@ -406,57 +461,72 @@
     sources = videos.map((video) => {
       const override = meta[video.id] && typeof meta[video.id] === 'object' && !Array.isArray(meta[video.id]) ? meta[video.id] : {};
       const v = Data.normalizeVideo({ ...video, ...override, id: video.id, addedAt: video.addedAt });
-      return { id: String(video.id), url: v.url, title: v.title || String(video.id) };
+      return { id: String(video.id), url: v.url, title: v.title || String(video.id),
+        durationSeconds: Number.isFinite(v.durationSeconds) && v.durationSeconds > 0 ? v.durationSeconds : null };
     }).filter((source) => Edit.isMp4Url(source.url));
     const projectId = route.get('project') || '';
     if (!projectId && routeSourceId && !sourceFor(routeSourceId)) {
       throw new Error('指定された動画はMP4直リンクではないか、登録されていません。');
     }
     root.innerHTML = [
-      '<div class="vveTop"><div><h2 class="vveTitle">MP4仮想編集</h2><p class="vveLead">元ファイルを変更せず、再生区間を組み立てます。</p></div>',
-      '<div class="vveButtons"><a class="vveLink" href="video.html">動画一覧へ</a><a class="vveLink" data-back href="video.html">元の動画へ</a></div></div>',
-      '<section class="vvePanel"><label class="vveField">編集プロジェクトを選択<select data-projects></select></label></section>',
-      '<section class="vvePanel"><label class="vveField">編集版タイトル<input data-title type="text" maxlength="240" autocomplete="off" placeholder="タイトル"></label></section>',
-      '<div class="vveGrid">',
-      '<section class="vvePanel"><h3 class="vvePaneTitle">MP4素材プレビュー</h3>',
-      '<label class="vveField">登録済みMP4動画<select data-source></select></label>',
-      '<div class="vvePreview"><video data-preview controls playsinline preload="metadata" aria-label="MP4素材プレビュー"></video></div>',
+      '<header class="vveProjectBar" data-project-toolbar><div class="vveProjectFields">',
+      '<label class="vveField">プロジェクト<select data-projects></select></label>',
+      '<label class="vveField">プロジェクト名<input data-title type="text" maxlength="240" autocomplete="off" placeholder="タイトル"></label></div>',
+      '<div class="vveProjectActions"><button class="vveAction" type="button" data-undo disabled>元に戻す</button>',
+      '<button class="vveAction" type="button" data-redo disabled>やり直す</button>',
+      '<span class="vveDirty" data-dirty hidden>未保存</span><span class="vveSaveStatus" data-save-status role="status" aria-live="polite">端末のプロジェクトを読み込み中</span>',
+      '<button class="vveAction primary" type="button" data-save>保存</button>',
+      '<a class="vveLink" href="video.html">一覧へ</a><a class="vveLink" data-back href="video.html">元動画へ</a></div></header>',
+      '<div class="vveMainGrid">',
+      '<section class="vvePanel vvePreviewPanel"><div class="vveSectionHeading"><div><h2 class="vvePaneTitle">プレビュー</h2>',
+      '<p class="vveLead">素材を確認して区間を設定します。</p></div><div class="vveModeToggle" role="group" aria-label="プレビューモード">',
+      '<button class="vveAction active" type="button" data-preview-source aria-pressed="true">素材</button>',
+      '<button class="vveAction" type="button" data-preview-edit aria-pressed="false">編集結果</button></div></div>',
+      '<div class="vvePreview"><video data-preview controls playsinline preload="metadata" aria-label="動画プレビュー"></video></div>',
       '<div class="vvePreviewMeta" data-preview-meta aria-live="polite"></div>',
-      '<div class="vveRow"><label class="vveField">開始（秒）<input data-start type="number" min="0" step="any" inputmode="decimal" value="0"></label>',
-      '<label class="vveField">終了（秒）<input data-end type="number" min="0" step="any" inputmode="decimal" placeholder="動画の長さ"></label></div>',
-      '<div class="vveControls"><button class="vveAction" type="button" data-mark-start>現在位置を開始に</button>',
-      '<button class="vveAction" type="button" data-mark-end>現在位置を終了に</button></div>',
-      '<div class="vveControls"><button class="vveAction primary" type="button" data-add>区間を追加</button>',
-      '<button class="vveAction" type="button" data-trim>選択区間を短縮</button>',
-      '<button class="vveAction" type="button" data-split>再生位置で分割</button></div>',
-      '<h4 class="vveSubTitle">選択区間のトリム調整（元動画の時刻）</h4>',
-      '<div class="vveBoundary"><strong>開始位置</strong><div class="vveControls">',
-      '<button class="vveAction" type="button" data-start-minus-one>−1秒</button><button class="vveAction" type="button" data-start-minus-tenth>−0.1秒</button>',
-      '<button class="vveAction" type="button" data-start-plus-tenth>＋0.1秒</button><button class="vveAction" type="button" data-start-plus-one>＋1秒</button>',
-      '<button class="vveAction" type="button" data-set-start>プレビュー位置を開始に設定</button></div></div>',
-      '<div class="vveBoundary"><strong>終了位置</strong><div class="vveControls">',
-      '<button class="vveAction" type="button" data-end-minus-one>−1秒</button><button class="vveAction" type="button" data-end-minus-tenth>−0.1秒</button>',
-      '<button class="vveAction" type="button" data-end-plus-tenth>＋0.1秒</button><button class="vveAction" type="button" data-end-plus-one>＋1秒</button>',
-      '<button class="vveAction" type="button" data-set-end>プレビュー位置を終了に設定</button></div></div>',
-      '<p class="vveFootnote">短縮は区間内への切り詰めです。元のMP4ファイルは変更しません。</p></section>',
-      '<section class="vvePanel"><h3 class="vvePaneTitle">再生区間（上から順番）</h3>',
-      '<div class="vveClips" data-clips></div><div class="vveTotal" data-total></div>',
-      '<div class="vveControls"><button class="vveAction" type="button" data-duplicate>区間を複製</button>',
-      '<button class="vveAction" type="button" data-up>上へ</button>',
-      '<button class="vveAction" type="button" data-down>下へ</button>',
-      '<button class="vveAction danger" type="button" data-remove>区間を削除</button></div>',
-      '<p class="vveFootnote">区間時刻は元動画内の絶対秒数です。複製した区間は個別にトリム・移動・削除できます。</p></section></div>',
-      '<section class="vvePanel"><div class="vveButtons"><button class="vveAction primary" type="button" data-save>編集内容を保存</button>',
-      '<a class="vveAction" data-play-saved hidden>編集版を再生</a>',
-      '<button class="vveAction danger" type="button" data-delete-project>プロジェクトを削除</button></div>',
-      '<p class="vveDirty" data-dirty hidden>未保存の変更があります</p>',
-      '<p class="vveStatus" role="status" aria-live="polite" data-status></p></section>'
+      '<div class="vveSourcePicker"><label class="vveField">MP4素材を検索<input data-source-search type="search" autocomplete="off" placeholder="タイトルまたはID"></label>',
+      '<div class="vveSourceList" data-source-list role="listbox" aria-label="登録済みMP4素材"></div><input data-source type="hidden"></div>',
+      '<div class="vveControls vvePrimaryControls"><button class="vveAction" type="button" data-mark-start>開始を現在位置に</button>',
+      '<button class="vveAction" type="button" data-mark-end>終了を現在位置に</button>',
+      '<button class="vveAction primary" type="button" data-add>区間を追加</button></div></section>',
+      '<section class="vvePanel vveDetailsPanel" data-clip-details><div class="vveSectionHeading"><div><h2 class="vvePaneTitle">選択区間</h2>',
+      '<p class="vveLead">時刻は元動画内の位置です。</p></div><span class="vveTotal" data-selected-duration>未選択</span></div>',
+      '<div class="vveRow"><label class="vveField">開始 <span class="vveTimeHint">HH:MM:SS.mmm</span>',
+      '<input data-start type="number" min="0" step="0.001" inputmode="decimal" value="0"></label>',
+      '<label class="vveField">終了 <span class="vveTimeHint">HH:MM:SS.mmm</span>',
+      '<input data-end type="number" min="0" step="0.001" inputmode="decimal" placeholder="動画の長さ"></label></div>',
+      '<div class="vveBoundary"><strong>開始</strong><div class="vveControls">',
+      '<button class="vveAction" type="button" data-start-minus-one>−1秒</button><button class="vveAction" type="button" data-start-minus-tenth>−0.1</button>',
+      '<button class="vveAction" type="button" data-start-plus-tenth>＋0.1</button><button class="vveAction" type="button" data-start-plus-one>＋1秒</button>',
+      '<button class="vveAction" type="button" data-set-start>再生位置</button></div></div>',
+      '<div class="vveBoundary"><strong>終了</strong><div class="vveControls">',
+      '<button class="vveAction" type="button" data-end-minus-one>−1秒</button><button class="vveAction" type="button" data-end-minus-tenth>−0.1</button>',
+      '<button class="vveAction" type="button" data-end-plus-tenth>＋0.1</button><button class="vveAction" type="button" data-end-plus-one>＋1秒</button>',
+      '<button class="vveAction" type="button" data-set-end>再生位置</button></div></div>',
+      '<div class="vveControls"><button class="vveAction" type="button" data-trim>入力範囲を適用</button>',
+      '<button class="vveAction" type="button" data-split>分割</button><button class="vveAction" type="button" data-duplicate>複製</button>',
+      '<button class="vveAction danger" type="button" data-remove>削除</button></div>',
+      '<button class="vveAction danger vveProjectDelete" type="button" data-delete-project>プロジェクトを削除</button></section>',
+      '<section class="vvePanel vveTimelinePanel"><div class="vveSectionHeading"><div><h2 class="vvePaneTitle">編集タイムライン</h2>',
+      '<p class="vveLead">クリップ幅は仮想再生時間に比例します。</p></div><div class="vveTimelineTools">',
+      '<button class="vveAction" type="button" data-zoom-out aria-label="縮小">−</button><button class="vveAction" type="button" data-zoom-in aria-label="拡大">＋</button>',
+      '<button class="vveAction" type="button" data-zoom-fit>全体表示</button><button class="vveAction" type="button" data-up>←</button>',
+      '<button class="vveAction" type="button" data-down>→</button></div></div>',
+      '<div class="vveTimelineScroll" data-timeline-scroll tabindex="0" aria-label="仮想再生タイムライン">',
+      '<div class="vveTimelineCanvas" data-timeline><div class="vveRuler" data-ruler aria-hidden="true"></div>',
+      '<div class="vveClips" data-clips role="list"></div><span class="vvePlayhead" data-playhead aria-hidden="true"></span></div></div>',
+      '<div class="vveTimelineFooter"><span class="vveTotal" data-total>0区間</span>',
+      '<a class="vveAction" data-play-saved hidden>保存済みを再生</a><button class="vveAction danger" type="button" data-remove-legacy hidden>削除</button></div>',
+      '<p class="vveStatus" role="status" aria-live="polite" data-status></p></section></div>'
     ].join('');
     const $ = (selector) => root.querySelector(selector);
     refs = {
       projects: $('[data-projects]'), title: $('[data-title]'), source: $('[data-source]'),
+      sources: $('[data-source-list]'), sourceSearch: $('[data-source-search]'),
       preview: $('[data-preview]'), previewMeta: $('[data-preview-meta]'),
       start: $('[data-start]'), end: $('[data-end]'), clips: $('[data-clips]'),
+      timeline: $('[data-timeline]'), timelineScroll: $('[data-timeline-scroll]'), playhead: $('[data-playhead]'),
+      selectedDuration: $('[data-selected-duration]'), saveStatus: $('[data-save-status]'),
       total: $('[data-total]'), add: $('[data-add]'), trim: $('[data-trim]'),
       duplicate: $('[data-duplicate]'),
       startMinusOne: $('[data-start-minus-one]'), startMinusTenth: $('[data-start-minus-tenth]'),
@@ -467,13 +537,10 @@
       split: $('[data-split]'), removeClip: $('[data-remove]'), moveUp: $('[data-up]'),
       moveDown: $('[data-down]'), markStart: $('[data-mark-start]'), markEnd: $('[data-mark-end]'),
       save: $('[data-save]'), playSaved: $('[data-play-saved]'), deleteProject: $('[data-delete-project]'), status: $('[data-status]'),
+      undo: $('[data-undo]'), redo: $('[data-redo]'), previewSource: $('[data-preview-source]'),
+      previewEdit: $('[data-preview-edit]'), zoomIn: $('[data-zoom-in]'), zoomOut: $('[data-zoom-out]'), zoomFit: $('[data-zoom-fit]'),
     };
-    sources.forEach((source) => {
-      const option = document.createElement('option');
-      option.value = source.id;
-      option.textContent = source.title;
-      refs.source.append(option);
-    });
+    drawSources();
     refs.projects.addEventListener('change', () => {
       if (!canRead()) return;
       if (dirty && !confirm('未保存の変更を破棄して切り替えますか？')) {
@@ -487,6 +554,10 @@
       location.href = url.href;
     });
     refs.source.addEventListener('change', changeSource);
+    refs.sourceSearch.addEventListener('input', () => {
+      sourceSearchTerm = refs.sourceSearch.value;
+      drawSources();
+    });
     refs.add.addEventListener('click', addClip);
     refs.duplicate.addEventListener('click', duplicateClip);
     refs.trim.addEventListener('click', trimClip);
