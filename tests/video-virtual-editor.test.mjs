@@ -80,7 +80,7 @@ function element(tag = 'div') {
   };
 }
 
-function startEditor({ allowed = false, search = '?id=direct', data = null } = {}) {
+function startEditor({ allowed = false, search = '?id=direct', data = null, guest = false } = {}) {
   const all = {
     mangaReaderVideos: [
       { id: 'direct', title: '動画Ａ', url: 'https://cdn.test/a.mp4?token=abc', addedAt: 1 },
@@ -136,6 +136,7 @@ function startEditor({ allowed = false, search = '?id=direct', data = null } = {
     },
     addEventListener: (type, handler) => { windowListeners[type] = handler; },
   };
+  if (guest) window.TestCodeGuest = { isActive: () => true };
   const document = {
     getElementById: () => root,
     createElement: element,
@@ -374,6 +375,18 @@ test('cloud sync failure retains the local edit and keeps the draft editable', a
   assert.equal(harness.calls.length, 1);
   assert.equal(nodes.get('[data-dirty]').hidden, true, 'local save establishes a durable baseline');
   assert.match(nodes.get('[data-save-status]').textContent, /端末に保存済み.*同期待ち/);
+  assert.equal(nodes.get('[data-save]').disabled, false);
+});
+
+test('guest local-save failure state does not claim a cloud Vault sync is pending', async () => {
+  const harness = startEditor({ allowed: true, guest: true, data: { syncFailure: true } });
+  const nodes = harness.selectorMap;
+  nodes.get('[data-source-list]').children[0].dispatch('click');
+  nodes.get('[data-end]').value = '10';
+  nodes.get('[data-add]').dispatch('click');
+  await nodes.get('[data-save]').dispatch('click');
+  assert.equal(nodes.get('[data-dirty]').hidden, true, 'local save remains a durable baseline');
+  assert.equal(nodes.get('[data-save-status]').textContent, '端末のゲスト領域に保存済みです。クラウド同期はありません。');
   assert.equal(nodes.get('[data-save]').disabled, false);
 });
 
