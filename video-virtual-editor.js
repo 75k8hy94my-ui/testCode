@@ -4,6 +4,7 @@
   const Edit = window.MangaReaderVideoVirtualEdit;
   const Store = window.MangaReaderVideoVirtualEditStore;
   const State = window.MangaReaderVideoVirtualEditorState;
+  const Playback = window.MangaReaderVideoVirtualPlayback;
   const Data = window.MangaReaderVideoData;
   const access = window.MangaReaderMediaAccess;
   if (!root || !Edit || !Store || !State || !Data) {
@@ -32,6 +33,10 @@
   let zoom = State.DEFAULT_ZOOM;
   let timelinePosition = 0;
   let pointerGesture = null;
+  let previewMode = 'source';
+  let resultController = null;
+  let resultGeneration = 0;
+  let resultSnapshot = null;
 
   const canRead = () => !!access && access.canReadProtectedData() === true;
   const format = (seconds) => Number.isFinite(seconds) ? Data.formatMediaTime(seconds) : '不明';
@@ -53,6 +58,7 @@
     }
   }
   function stopPreview() {
+    stopResultPreview();
     if (refs.preview) {
       try {
         refs.preview.pause();
@@ -62,6 +68,74 @@
     }
     previewUrl = '';
     pendingSeek = null;
+  }
+  function stopResultPreview() {
+    resultGeneration++;
+    if (resultController) resultController.destroy();
+    resultController = null;
+    resultSnapshot = null;
+  }
+  function renderResultState(snapshot) {
+    if (!snapshot || previewMode !== 'edit') return;
+    resultSnapshot = snapshot;
+    timelinePosition = Math.max(0, Math.min(snapshot.totalSeconds, snapshot.virtualSeconds));
+    refs.previewMeta.textContent = snapshot.error || snapshot.message || (snapshot.phase === 'idle'
+      ? '編集結果の再生準備ができました。' : '');
+    if (refs.editPlay) refs.editPlay.textContent = snapshot.requestedPlay ? '一時停止' : '再生';
+    if (refs.editSeek) refs.editSeek.max = String(snapshot.totalSeconds);
+    if (refs.editSeek && !refs.editSeek.matches?.(':active')) refs.editSeek.value = String(timelinePosition);
+    if (refs.editTime) refs.editTime.textContent = format(timelinePosition) + ' / ' + format(snapshot.totalSeconds);
+    refs.playhead.style.left = timelinePosition * zoom + 'px';
+  }
+  function rebuildResultPreview(seconds = null) {
+    if (previewMode !== 'edit' || !Playback || !canRead()) return;
+    const previous = resultController && resultController.snapshot();
+    const targetSeconds = Number.isFinite(seconds) ? seconds
+      : previous ? previous.virtualSeconds : timelinePosition;
+    stopResultPreview();
+    previewUrl = '';
+    pendingSeek = null;
+    if (!edit) {
+      refs.editControls.hidden = true;
+      refs.previewMeta.textContent = '編集区間がありません。';
+      return;
+    }
+    try {
+      const token = resultGeneration;
+      const controller = Playback.createController({
+        video: refs.preview, edit, sources,
+        onState: (snapshot) => { if (token === resultGeneration && previewMode === 'edit' && canRead()) renderResultState(snapshot); },
+      });
+      resultController = controller;
+      refs.preview.controls = false;
+      refs.editControls.hidden = false;
+      refs.previewMeta.textContent = '';
+      if (Number.isFinite(targetSeconds) && Edit.totalDuration(edit) > 0) {
+        controller.seek(Math.max(0, Math.min(Edit.totalDuration(edit), targetSeconds)));
+      }
+    } catch (error) {
+      refs.previewMeta.textContent = error.message || '編集結果をプレビューできません。';
+      refs.editControls.hidden = false;
+    }
+  }
+  function setPreviewMode(mode) {
+    if (mode !== 'source' && mode !== 'edit') return;
+    if (mode === 'edit' && !edit) return status('プレビューする区間がありません。', true);
+    const seconds = resultController ? resultController.snapshot().virtualSeconds : timelinePosition;
+    if (previewMode === mode) return;
+    previewMode = mode;
+    refs.previewSource.classList.toggle('active', mode === 'source');
+    refs.previewSource.setAttribute('aria-pressed', String(mode === 'source'));
+    refs.previewEdit.classList.toggle('active', mode === 'edit');
+    refs.previewEdit.setAttribute('aria-pressed', String(mode === 'edit'));
+    if (mode === 'edit') rebuildResultPreview(seconds);
+    else {
+      stopResultPreview();
+      refs.editControls.hidden = true;
+      refs.preview.controls = true;
+      const clip = selectedClip();
+      if (clip) setPreview(clip.sourceVideoId, clip.startSeconds);
+    }
   }
   function showGate(message) {
     stopPreview();
@@ -255,11 +329,13 @@
     timelinePosition = State.clipOffsets(edit).offsets[index];
     drawClips();
     drawSources();
-    setPreview(clip.sourceVideoId, clip.startSeconds);
+    if (previewMode === 'edit' && resultController) resultController.seek(timelinePosition);
+    else if (previewMode === 'source') setPreview(clip.sourceVideoId, clip.startSeconds);
   }
   function setEdit(next, nextIndex = null) {
     requireAccess();
     if (busy || stale) return;
+    const previousVirtualSeconds = resultController ? resultController.snapshot().virtualSeconds : timelinePosition;
     edit = next === null ? null : Edit.normalizeEdit(next);
     selectedIndex = nextIndex;
     historyState = State.push(historyState, edit, selectedIndex);
@@ -267,6 +343,7 @@
     drawClips();
     if (nextIndex !== null) chooseClip(nextIndex);
     status('未保存の変更があります。');
+    if (previewMode === 'edit') rebuildResultPreview(previousVirtualSeconds);
   }
   function updateDirty() {
     dirty = JSON.stringify(edit) !== JSON.stringify(baselineEdit);
@@ -275,6 +352,7 @@
   function restoreHistory(snapshot) {
     requireAccess();
     if (busy || stale) return;
+    const previousVirtualSeconds = resultController ? resultController.snapshot().virtualSeconds : timelinePosition;
     edit = snapshot.edit ? Edit.normalizeEdit(snapshot.edit) : null;
     selectedIndex = edit && snapshot.selectedIndex !== null
       ? Math.min(snapshot.selectedIndex, edit.clips.length - 1) : null;
@@ -286,6 +364,7 @@
       refs.previewMeta.textContent = '編集区間がありません。';
     }
     status(dirty ? '未保存の変更があります。' : '保存済みの状態に戻しました。');
+    if (previewMode === 'edit') rebuildResultPreview(previousVirtualSeconds);
   }
   function undoEdit() {
     if (!canRead() || busy || stale) return;
@@ -651,6 +730,8 @@
       '<button class="vveAction" type="button" data-preview-edit aria-pressed="false">編集結果</button></div></div>',
       '<div class="vvePreview"><video data-preview controls playsinline preload="metadata" aria-label="動画プレビュー"></video></div>',
       '<div class="vvePreviewMeta" data-preview-meta aria-live="polite"></div>',
+      '<div class="vveEditPreviewControls" data-edit-controls hidden><button class="vveAction primary" type="button" data-edit-play>再生</button>',
+      '<input data-edit-seek type="range" min="0" max="0" step="0.05" value="0" aria-label="編集結果の再生位置"><span data-edit-time></span></div>',
       '<div class="vveSourcePicker"><label class="vveField">MP4素材を検索<input data-source-search type="search" autocomplete="off" placeholder="タイトルまたはID"></label>',
       '<div class="vveSourceList" data-source-list role="listbox" aria-label="登録済みMP4素材"></div><input data-source type="hidden"></div>',
       '<div class="vveControls vvePrimaryControls"><button class="vveAction" type="button" data-mark-start>開始を現在位置に</button>',
@@ -691,6 +772,7 @@
       projects: $('[data-projects]'), title: $('[data-title]'), source: $('[data-source]'),
       sources: $('[data-source-list]'), sourceSearch: $('[data-source-search]'),
       preview: $('[data-preview]'), previewMeta: $('[data-preview-meta]'),
+      editControls: $('[data-edit-controls]'), editPlay: $('[data-edit-play]'), editSeek: $('[data-edit-seek]'), editTime: $('[data-edit-time]'),
       start: $('[data-start]'), end: $('[data-end]'), clips: $('[data-clips]'),
       timeline: $('[data-timeline]'), timelineScroll: $('[data-timeline-scroll]'), playhead: $('[data-playhead]'),
       insertMarker: $('[data-insert-marker]'),
@@ -722,6 +804,16 @@
       location.href = url.href;
     });
     refs.source.addEventListener('change', changeSource);
+    refs.previewSource.addEventListener('click', () => setPreviewMode('source'));
+    refs.previewEdit.addEventListener('click', () => setPreviewMode('edit'));
+    refs.editPlay.addEventListener('click', () => {
+      if (!resultController) return;
+      if (resultController.snapshot().requestedPlay) resultController.pause();
+      else resultController.play();
+    });
+    refs.editSeek.addEventListener('input', () => {
+      if (resultController) resultController.seek(Number(refs.editSeek.value));
+    });
     refs.timeline.addEventListener('pointerdown', pointerDown);
     refs.timeline.addEventListener('pointermove', pointerMove);
     refs.timeline.addEventListener('pointerup', pointerUp);
@@ -795,6 +887,7 @@
     }
   });
   window.addEventListener('beforeunload', (event) => {
+    stopResultPreview();
     if (canRead() && dirty && !busy) {
       event.preventDefault();
       event.returnValue = '';

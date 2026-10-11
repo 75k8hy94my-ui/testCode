@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import Edit from '../video-virtual-edit.js';
 import EditorState from '../video-virtual-editor-state.js';
+import Playback from '../video-virtual-playback.js';
 
 const source = fs.readFileSync(new URL('../video-virtual-editor.js', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../video-virtual-editor.html', import.meta.url), 'utf8');
@@ -21,6 +22,7 @@ test('editor route loads protected media dependencies and model before controlle
   assert.ok(html.indexOf('video-virtual-edit.js') < html.indexOf('video-virtual-edit-store.js'));
   assert.ok(html.indexOf('video-virtual-edit-store.js') < html.indexOf('video-virtual-editor.js'));
   assert.ok(html.indexOf('video-virtual-editor-state.js') < html.indexOf('video-virtual-editor.js'));
+  assert.ok(html.indexOf('video-virtual-playback.js') < html.indexOf('video-virtual-editor.js'));
   assert.ok(css.includes('@media(max-width:770px)'));
 });
 
@@ -51,12 +53,16 @@ test('MP4-only virtual editor link is separate from existing video detail action
 
 function element(tag = 'div') {
   const listeners = {};
+  const classes = new Set();
   return {
     tag, listeners, dataset: {}, children: [], style: {}, value: '', disabled: false, readyState: 0,
     duration: NaN, currentTime: 0, src: '', textContent: '',
     append(...items) { this.children.push(...items); },
     replaceChildren(...items) { this.children = items; },
-    addEventListener(type, handler) { listeners[type] = handler; },
+    addEventListener(type, handler) { (listeners[type] ||= []).push(handler); },
+    removeEventListener(type, handler) { listeners[type] = (listeners[type] || []).filter((item) => item !== handler); },
+    matches(selector) { return selector === ':active' ? !!this.active : false; },
+    classList: { toggle(name, force) { if (force) classes.add(name); else classes.delete(name); }, add(name) { classes.add(name); }, remove(name) { classes.delete(name); }, contains(name) { return classes.has(name); } },
     getBoundingClientRect() { return this.rect || { left: 0, top: 0, width: 1000, height: 300 }; },
     setPointerCapture(id) { this.capturedPointer = id; },
     hasPointerCapture(id) { return this.capturedPointer === id; },
@@ -66,7 +72,8 @@ function element(tag = 'div') {
     removeAttribute(name) { delete this[name]; },
     pause() { this.paused = true; },
     load() { this.loaded = true; },
-    dispatch(type, event = {}) { return listeners[type] && listeners[type](event); },
+    dispatch(type, event = {}) { let result; (listeners[type] || []).forEach((handler) => { result = handler(event); }); return result; },
+    play() { this.playing = true; return Promise.resolve(); },
   };
 }
 
@@ -108,6 +115,7 @@ function startEditor({ allowed = false, search = '?id=direct', data = null } = {
   const window = {
     MangaReaderVideoVirtualEdit: Edit,
     MangaReaderVideoVirtualEditorState: EditorState,
+    MangaReaderVideoVirtualPlayback: Playback,
     MangaReaderVideoVirtualEditStore: {
       VIDEO_KEY: 'mangaReaderVideos', META_KEY: 'mangaReaderVideoMeta',
       createRepository: () => repo,
@@ -259,6 +267,26 @@ test('draft undo and redo restore committed edits without saving and preserve na
   await nodes.get('[data-save]').dispatch('click');
   assert.equal(harness.calls.length, 1, 'explicit save is the only persistence call: ' + nodes.get('[data-status]').textContent);
   assert.equal(harness.calls[0].edit.clips.length, 2);
+});
+
+test('edit preview reuses virtual playback and destroys its controller on source-mode exit', () => {
+  const harness = startEditor({ allowed: true });
+  const nodes = harness.selectorMap;
+  nodes.get('[data-source-list]').children[0].dispatch('click');
+  nodes.get('[data-end]').value = '10';
+  nodes.get('[data-add]').dispatch('click');
+  const preview = nodes.get('[data-preview]');
+  preview.readyState = 1;
+  nodes.get('[data-preview-edit]').dispatch('click');
+  assert.equal(nodes.get('[data-edit-controls]').hidden, false);
+  assert.equal(preview.controls, false);
+  assert.equal(preview.src, 'https://cdn.test/a.mp4?token=abc');
+  preview.dispatch('loadedmetadata');
+  assert.match(nodes.get('[data-edit-time]').textContent, /0s \/ 10s/);
+  nodes.get('[data-preview-source]').dispatch('click');
+  assert.equal(nodes.get('[data-edit-controls]').hidden, true);
+  assert.equal(preview.controls, true);
+  assert.equal((preview.listeners.loadedmetadata || []).length, 1, 'destroy removes playback engine listeners');
 });
 
 test('selected clip can be duplicated, independently trimmed and precisely adjusted before save', async () => {

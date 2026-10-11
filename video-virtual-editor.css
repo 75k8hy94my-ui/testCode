@@ -18,6 +18,9 @@
 .vvePreview{background:#090b10;aspect-ratio:16/9;border-radius:12px;overflow:hidden;display:grid;place-items:center}
 .vvePreview video{width:100%;height:100%;max-height:400px;object-fit:contain;background:black}
 .vvePreviewMeta{font-size:12px;color:var(--sub);margin-top:7px;min-height:18px}
+.vveEditPreviewControls{display:grid;grid-template-columns:auto minmax(100px,1fr) auto;align-items:center;gap:9px;margin-top:8px}
+.vveEditPreviewControls input{width:100%;accent-color:var(--accent)}
+.vveEditPreviewControls [data-edit-time]{color:var(--sub);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .vveControls{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .vveClips{display:grid;gap:7px}
 .vveClip{display:flex;gap:8px;width:100%;align-items:center;justify-content:space-between;text-align:left;border:1px solid var(--border);border-radius:11px;padding:11px 12px;background:var(--panel);color:var(--text);cursor:pointer}
@@ -104,6 +107,7 @@
  .vvePreviewPanel{order:0}.vveTimelinePanel{order:1;grid-column:auto}.vveDetailsPanel{order:2}
  .vvePanel{padding:11px;border-radius:14px}
  .vvePreview{max-height:none}
+ .vveEditPreviewControls{grid-template-columns:auto minmax(90px,1fr) auto}
  .vveSourceList{grid-template-columns:repeat(2,minmax(0,1fr));max-height:108px}
  .vveTimelineScroll{touch-action:pan-x}
  .vveTimelineCanvas{min-height:142px}
