@@ -26,6 +26,8 @@
           await deps.loadMediaGate();
           await deps.loadScript('video-data.js?v=20260918-video-data-no-window', 'spaVideoData');
           await deps.loadScript('video-thumbnail-renderer.js?v=20261008-shared-thumbnails', 'spaVideoThumbnailRenderer');
+          await deps.loadScript('video-custom-properties.js?v=20261012-video-custom-properties', 'spaVideoCustomProperties');
+          await deps.loadScript('video-custom-property-store.js?v=20261012-video-custom-properties', 'spaVideoCustomPropertyStore');
           await deps.loadScript('video-library.js?v=20261011-pending-sync', 'spaVideoLibrary');
         })().catch((error) => {
           bootPromise = null;

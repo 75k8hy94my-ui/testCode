@@ -6,12 +6,15 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const Data = require('../video-data.js');
+require('../video-custom-properties.js');
+const PropertyStore = require('../video-custom-property-store.js');
 const source = fs.readFileSync(new URL('../video-edit-page.js', import.meta.url), 'utf8');
 const VIDEO_KEY = 'mangaReaderVideos';
 const META_KEY = 'mangaReaderVideoMeta';
+const PROPERTY_VALUES_KEY = 'mangaReaderVideoPropertyValues';
 
-function startEditor({ mode = 'add', allowed = true, videos = [], meta = {}, guest = false, failLocalWrite = false, failSync = false, deferSync = false, failPending = false, failDeletionJournal = false } = {}) {
-  const stored = new Map([[VIDEO_KEY, JSON.stringify(videos)], [META_KEY, JSON.stringify(meta)]]);
+function startEditor({ mode = 'add', allowed = true, videos = [], meta = {}, propertyValues = {}, guest = false, failLocalWrite = false, failSync = false, deferSync = false, failPending = false, failDeletionJournal = false } = {}) {
+  const stored = new Map([[VIDEO_KEY, JSON.stringify(videos)], [META_KEY, JSON.stringify(meta)], [PROPERTY_VALUES_KEY, JSON.stringify(propertyValues)]]);
   let reads = 0;
   const localStorage = {
     getItem(key) { reads += 1; return stored.get(key) ?? null; },
@@ -47,7 +50,7 @@ function startEditor({ mode = 'add', allowed = true, videos = [], meta = {}, gue
   const gate = { canReadProtectedData: () => allowed, syncUi() {} };
   let syncCalls = 0; let pendingCalls = 0; let deletionCalls = 0; let deletionPaths = []; let releaseSync; const deferredSync = new Promise((resolve) => { releaseSync = resolve; });
   const window = {
-    MangaReaderVideoData: Data, MangaReaderMediaAccess: gate,
+    MangaReaderVideoData: Data, MangaReaderMediaAccess: gate, MangaReaderVideoCustomPropertyStore: PropertyStore,
     MangaVaultPayload: { pointerPath(collection, id) { return '/' + collection + '/' + String(id).replace(/~/g, '~0').replace(/\//g, '~1'); } },
     MangaVault: { markLocalChangesPending() { pendingCalls++; return !failPending; }, async saveLocalChanges() { syncCalls++; if (deferSync) return deferredSync; if (failSync) throw new Error('offline'); }, async recordSyncDeletion(paths, mutate) { deletionCalls++; deletionPaths = paths; if (failDeletionJournal) throw new Error('journal failed'); await mutate(); } },
     crypto: { randomUUID: () => 'added-uuid' },
@@ -95,28 +98,30 @@ test('add screen rejects duplicate URLs and invalid URLs without a write', async
   assert.equal(JSON.parse(app.stored.get(VIDEO_KEY)).length, 1);
 });
 
-test('video deletion journals item and metadata before applying both local removals', async () => {
+test('video deletion journals item, metadata, and custom values before applying local removals', async () => {
   const existing = Data.normalizeVideo({ id: 'v/1', title: 'Delete me', url: 'https://example.com/clip.mp4', a: 'url', b: '12' });
-  const app = startEditor({ mode: 'edit', videos: [existing], meta: { 'v/1': { memo: 'private' } } });
+  const app = startEditor({ mode: 'edit', videos: [existing], meta: { 'v/1': { memo: 'private' } }, propertyValues: { 'v/1': { rating: 4 }, v2: { rating: 0 } } });
 
   await app.nodes.get('[data-delete]').events.click();
 
   assert.equal(app.deletionCalls, 1);
-  assert.deepEqual([...app.deletionPaths], ['/videos/v~11', '/videoMeta/v~11']);
+  assert.deepEqual([...app.deletionPaths], ['/videos/v~11', '/videoMeta/v~11', '/videoPropertyValues/v~11']);
   assert.deepEqual(JSON.parse(app.stored.get(VIDEO_KEY)), []);
   assert.deepEqual(JSON.parse(app.stored.get(META_KEY)), {});
+  assert.deepEqual(JSON.parse(app.stored.get(PROPERTY_VALUES_KEY)), { v2: { rating: 0 } });
   assert.equal(app.location.href, 'video.html');
 });
 
 test('failed deletion journal leaves video and metadata untouched', async () => {
   const existing = Data.normalizeVideo({ id: 'v1', title: 'Delete me', url: 'https://example.com/clip.mp4', a: 'url', b: '12' });
-  const app = startEditor({ mode: 'edit', videos: [existing], meta: { v1: { memo: 'private' } }, failDeletionJournal: true });
+  const app = startEditor({ mode: 'edit', videos: [existing], meta: { v1: { memo: 'private' } }, propertyValues: { v1: { rating: 5 } }, failDeletionJournal: true });
 
   await app.nodes.get('[data-delete]').events.click();
 
   assert.equal(app.deletionCalls, 1);
   assert.equal(JSON.parse(app.stored.get(VIDEO_KEY)).length, 1);
   assert.equal(JSON.parse(app.stored.get(META_KEY)).v1.memo, 'private');
+  assert.equal(JSON.parse(app.stored.get(PROPERTY_VALUES_KEY)).v1.rating, 5);
   assert.equal(app.location.href, 'video-edit.html');
   assert.match(app.nodes.get('.videoEditError').textContent, /journal failed/);
 });

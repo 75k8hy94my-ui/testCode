@@ -414,16 +414,20 @@
   }
 
   async function deleteVideoRecords(base) {
-    const remove = () => {
+    const remove = async () => {
       if (!invokeLegacyDelete(base)) throw new Error('動画を削除できませんでした。ページを再読み込みして再試行してください。');
       if (base && base.id) delete state.meta[base.id];
+      const propertyStore = window.MangaReaderVideoCustomPropertyStore;
+      if (base && base.id && propertyStore && typeof propertyStore.removeVideoValues === 'function') {
+        await propertyStore.removeVideoValues({ storage: localStorage, videoId: base.id, guest: true, alreadyJournaled: true });
+      }
       if (!persistAux({ sync: false })) throw new Error('端末に動画の削除を保存できませんでした。');
     };
-    if (window.TestCodeGuest?.isActive()) { remove(); return; }
+    if (window.TestCodeGuest?.isActive()) { await remove(); return; }
     const vault = window.MangaVault;
     const pointerPath = window.MangaVaultPayload && window.MangaVaultPayload.pointerPath;
     if (!vault || typeof vault.recordSyncDeletion !== 'function' || typeof pointerPath !== 'function') throw new Error('保管庫を開いてから削除してください。');
-    await vault.recordSyncDeletion([pointerPath('videos', base.id), pointerPath('videoMeta', base.id)], remove);
+    await vault.recordSyncDeletion([pointerPath('videos', base.id), pointerPath('videoMeta', base.id), pointerPath('videoPropertyValues', base.id)], remove);
   }
 
   function effectiveFieldsForEditor(videoId) {

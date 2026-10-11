@@ -257,7 +257,7 @@
       if (!canReadProtectedData()) return;
       if (!confirm('「' + (current.title || 'この動画') + '」を削除しますか？')) return;
       const error = form.querySelector('.videoEditError'); error.textContent = '';
-      const remove = () => {
+      const remove = async () => {
         const latestVideos = read(VIDEO_KEY, []);
         const latestMeta = read(META_KEY, {});
         if (!Array.isArray(latestVideos)) throw new Error('動画一覧を読み込めませんでした。');
@@ -267,9 +267,13 @@
         delete remainingMeta[videoId];
         try { writeVideoRecordsAtomically(remaining, remainingMeta); }
         catch (_) { throw new Error('端末に削除を保存できませんでした。ブラウザの保存容量を確認してください。'); }
+        const propertyStore = window.MangaReaderVideoCustomPropertyStore;
+        if (propertyStore && typeof propertyStore.removeVideoValues === 'function') {
+          await propertyStore.removeVideoValues({ storage: localStorage, videoId, guest: true, alreadyJournaled: true });
+        }
       };
       if (window.TestCodeGuest?.isActive()) {
-        try { remove(); } catch (failure) { error.textContent = failure.message; return; }
+        try { await remove(); } catch (failure) { error.textContent = failure.message; return; }
         location.href = 'video.html';
         return;
       }
@@ -278,7 +282,7 @@
       if (!vault || typeof vault.recordSyncDeletion !== 'function' || typeof pointerPath !== 'function') {
         error.textContent = '保管庫を開いてから削除してください。'; return;
       }
-      try { await vault.recordSyncDeletion([pointerPath('videos', videoId), pointerPath('videoMeta', videoId)], remove); }
+      try { await vault.recordSyncDeletion([pointerPath('videos', videoId), pointerPath('videoMeta', videoId), pointerPath('videoPropertyValues', videoId)], remove); }
       catch (failure) { error.textContent = failure && failure.message ? failure.message : '削除を保全できませんでした。'; return; }
       location.href = 'video.html';
     });

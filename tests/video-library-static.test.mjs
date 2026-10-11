@@ -47,7 +47,7 @@ test('video list ellipsis navigates directly to the dedicated editor without an 
   assert.match(editor, /source\.href = current\.url/);
   assert.match(editor, /remaining = latestVideos\.filter/);
   assert.match(editor, /delete remainingMeta\[videoId\]/);
-  assert.match(editor, /recordSyncDeletion\(\[pointerPath\('videos', videoId\), pointerPath\('videoMeta', videoId\)\]/);
+  assert.match(editor, /recordSyncDeletion\(\[pointerPath\('videos', videoId\), pointerPath\('videoMeta', videoId\), pointerPath\('videoPropertyValues', videoId\)\]/);
   const ordinarySubmit = editor.slice(editor.indexOf("form.addEventListener('submit'"), editor.indexOf("if (!isAddMode) form.querySelector('[data-delete]')"));
   const jsonImport = editor.slice(editor.indexOf("jsonImport.addEventListener('change'"), editor.indexOf("elements.url.addEventListener('change'"));
   assert.doesNotMatch(ordinarySubmit, /await window\.MangaVault\.saveLocalChanges\(\)/);
@@ -127,10 +127,10 @@ test('video library saves enhanced records through its own Vault boundary', () =
   assert.doesNotMatch(read('reader.html'), /video-data\.js|video-library\.js|mangaReaderVideos/);
 });
 
-test('video library deletion protects video and metadata with the encrypted deletion journal', () => {
+test('video library deletion protects video, metadata, and custom values with the encrypted deletion journal', () => {
   const library = read('video-library.js');
   assert.match(library, /async function deleteVideoRecords\(base\)/);
-  assert.match(library, /recordSyncDeletion\(\[pointerPath\('videos', base\.id\), pointerPath\('videoMeta', base\.id\)\]/);
+  assert.match(library, /recordSyncDeletion\(\[pointerPath\('videos', base\.id\), pointerPath\('videoMeta', base\.id\), pointerPath\('videoPropertyValues', base\.id\)\]/);
   assert.match(library, /await deleteVideoRecords\(base\)/);
 });
 
@@ -266,4 +266,10 @@ test('video and manga edit paths record durable pending state before local prote
   assert.ok(jsonImport.indexOf('markLocalChangesPending()') < jsonImport.indexOf('writeVideoRecordsAtomically('));
   assert.match(library, /function persistAux[\s\S]*markLocalChangesPending\(\)[\s\S]*writeJson\(FOLDER_KEY/);
   assert.match(library, /function invokeUrlAdd[\s\S]*markLocalChangesPending\(\)[\s\S]*writeJson\(VIDEO_KEY/);
+});
+
+test('video library deletion journals and removes the per-video custom property map', () => {
+  const library = read('video-library.js');
+  assert.match(library, /removeVideoValues\(\{ storage: localStorage, videoId: base\.id, guest: true, alreadyJournaled: true \}\)/);
+  assert.match(library, /pointerPath\('videoPropertyValues', base\.id\)/);
 });
