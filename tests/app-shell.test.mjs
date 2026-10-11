@@ -78,7 +78,7 @@ test('authenticated top bars keep only the shared profile action', () => {
   const menu = read('profile-menu.js');
   assert.match(menu, /\[data-profile-menu-trigger\], #desktopProfileButton/);
   assert.doesNotMatch(menu, /matchMedia\('\(min-width: 900px\)'\)\.matches\) return/);
-  assert.match(read('sync.html'), /profile-menu\.js\?v=20260924-theme-unified/);
+  assert.match(read('sync.html'), /profile-menu\.js\?v=20261011-nongame-audit/);
 });
 
 test('login page has no top navigation menu', () => {
@@ -129,7 +129,7 @@ test('saved theme drives home profile manga video and header colors', () => {
     const shellVersion = page === 'video-player.html' ? '20261010-icon-markers' : '20261011-vault-history';
     assert.match(read(page), new RegExp(`home-profile-shell\\.css\\?v=${shellVersion}`));
     assert.match(read(page), /app-global-shell\.js\?v=20261003-reader-spa/);
-    const menuVersion = page === 'video-player.html' ? '20260924-theme-unified' : '20261009-guest-mode';
+    const menuVersion = '20261011-nongame-audit';
     assert.match(read(page), new RegExp(`profile-menu\\.js\\?v=${menuVersion}`));
   }
 });
