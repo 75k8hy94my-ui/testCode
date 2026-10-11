@@ -23,7 +23,7 @@ function fakeElement() {
     setAttribute() {}, removeAttribute() {}, focus() {}, remove() {}
   };
 }
-function makePage({ guest = false, accessAllowed = true } = {}) {
+function makePage({ guest = false, accessAllowed = true, ensureSession, decryptSettings } = {}) {
   const ids = [
     'driveSyncStatus', 'driveGalleryForm', 'driveFolder', 'driveApiKey', 'driveLoad',
     'driveCancel', 'driveRefresh', 'driveGalleryStatus', 'driveGalleryCount',
@@ -37,6 +37,11 @@ function makePage({ guest = false, accessAllowed = true } = {}) {
   let driveCalls = 0;
   let cloudSaves = 0;
   let encryptedWrites = 0;
+  let redirects = 0;
+  let allowed = accessAllowed;
+  const windowEvents = new Map();
+  const documentEvents = new Map();
+  const bodyClasses = new Set();
   const cacheSource = { ...gallery, async listPublicImages() {
     driveCalls++;
     return [{ id: 'image_000000002', name: '新.jpg', mimeType: 'image/jpeg' }];
@@ -44,11 +49,11 @@ function makePage({ guest = false, accessAllowed = true } = {}) {
   const active = guest ? null : { rawKey: new Uint8Array(32).fill(7) };
   const window = {
     TestCodeGuest: { isActive: () => guest },
-    MangaReaderMediaAccess: { canReadProtectedData: () => accessAllowed, syncUi() {} },
+    MangaReaderMediaAccess: { canReadProtectedData: () => allowed, syncUi() {} },
     PublicDriveGallery: cacheSource,
     PublicDriveGalleryVault: {
       validateSettings: () => {},
-      decryptSettings: async () => ({ folderId, apiKey, cache: cached }),
+      decryptSettings: decryptSettings || (async () => ({ folderId, apiKey, cache: cached })),
       encryptSettings: async (_key, data) => {
         encryptedWrites++;
         return { type: 'testcode-drive-gallery-settings', version: 1, iv: 'AAAAAAAAAAAAAAAA',
@@ -58,7 +63,8 @@ function makePage({ guest = false, accessAllowed = true } = {}) {
     MangaVault: {
       loadSession: () => ({ refresh_token: 'session' }),
       loadActive: () => active,
-      ensureSession: async () => {},
+      ensureSession: ensureSession || (async () => {}),
+      markLocalChangesPending: () => true,
       savePayload: async () => { cloudSaves++; }
     },
     MangaVaultPayload: {
@@ -66,22 +72,24 @@ function makePage({ guest = false, accessAllowed = true } = {}) {
       buildFromLocalStorage: () => ({ driveGalleryEncrypted: { ciphertext: 'encrypted' } })
     },
     MANGA_READER_SUPABASE: { url: 'https://example.supabase.co', publishableKey: 'public' },
-    location: { search: '', replace() {} },
-    addEventListener() {}
+    location: { search: '', replace() { redirects++; } },
+    addEventListener(event, callback) { windowEvents.set(event, callback); }
   };
   const localStorage = { setItem() {} };
   const document = {
     getElementById: id => elements[id],
     createElement: () => fakeElement(),
     createDocumentFragment: () => fakeElement(),
-    addEventListener() {},
+    addEventListener(event, callback) { documentEvents.set(event, callback); },
     documentElement: { classList: { remove() {} } },
-    body: { classList: { add() {}, remove() {} } }
+    body: { classList: { add(name) { bodyClasses.add(name); }, remove(name) { bodyClasses.delete(name); } } }
   };
   vm.runInNewContext(pageSource, { window, document, localStorage, location: window.location,
     AbortController, URLSearchParams, Date, Uint8Array, TextEncoder, setTimeout, clearTimeout });
   const settle = async () => { for (let i = 0; i < 5; i++) await new Promise(resolve => setImmediate(resolve)); };
-  return { elements, settle, stats: () => ({ driveCalls, cloudSaves, encryptedWrites }) };
+  return { elements, settle, windowEvents, documentEvents, bodyClasses,
+    setAccessAllowed(value) { allowed = value; },
+    stats: () => ({ driveCalls, cloudSaves, encryptedWrites, redirects }) };
 }
 
 test('opening cached gallery and saving unchanged settings never queries Drive API', async () => {
@@ -127,4 +135,48 @@ test('authenticated Drive gallery does not decrypt or fetch protected settings w
   assert.equal(page.elements.driveApiKey.value, '');
   assert.equal(page.elements.driveGalleryGrid.children.length, 0);
   assert.match(page.elements.driveSyncStatus.textContent, /VPN/);
+});
+
+test('temporary session refresh failures stay on the gallery and can be retried', async () => {
+  let attempts = 0;
+  const page = makePage({ ensureSession: async () => {
+    if (++attempts === 1) throw new Error('network unavailable');
+  }});
+  await page.settle();
+  assert.equal(page.stats().redirects, 0);
+  assert.match(page.elements.driveSyncStatus.textContent, /通信|ネットワーク|再試行/);
+
+  page.documentEvents.get('manga-reader-vpn-status')();
+  await page.settle();
+  assert.equal(attempts, 2);
+  assert.equal(page.elements.driveGalleryCount.textContent, '1枚');
+});
+
+test('VPN loss closes the Drive viewer and releases the scroll lock', async () => {
+  const page = makePage();
+  await page.settle();
+  page.elements.driveGalleryGrid.children[0].children[0].callbacks.get('click')();
+  assert.equal(page.bodyClasses.has('driveViewerOpen'), true);
+
+  page.setAccessAllowed(false);
+  page.documentEvents.get('manga-reader-vpn-status')();
+  assert.equal(page.elements.driveViewer.hidden, true);
+  assert.equal(page.bodyClasses.has('driveViewerOpen'), false);
+});
+
+test('late Drive settings decryption cannot restore protected UI after VPN loss', async () => {
+  let finishDecrypt;
+  const page = makePage({ decryptSettings: () => new Promise(resolve => { finishDecrypt = resolve; }) });
+  for (let i = 0; i < 10 && !finishDecrypt; i++) await page.settle();
+  assert.equal(typeof finishDecrypt, 'function');
+
+  page.setAccessAllowed(false);
+  page.documentEvents.get('manga-reader-vpn-status')();
+  finishDecrypt({ folderId, apiKey, cache: cached });
+  await page.settle();
+
+  assert.equal(page.elements.driveApiKey.value, '');
+  assert.equal(page.elements.driveGalleryGrid.children.length, 0);
+  assert.equal(page.elements.driveGalleryCount.textContent, '');
+  assert.equal(page.stats().driveCalls, 0);
 });

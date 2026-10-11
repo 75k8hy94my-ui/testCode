@@ -154,24 +154,24 @@
         }
         const currentMeta = read(META_KEY, {});
         const nextMeta = currentMeta && typeof currentMeta === 'object' && !Array.isArray(currentMeta) ? { ...currentMeta, ...newMeta } : newMeta;
+        if (!window.TestCodeGuest?.isActive()) {
+          if (!window.MangaVault || typeof window.MangaVault.markLocalChangesPending !== 'function') {
+            error.textContent = '未同期状態を管理できません。動画は変更していません。保管庫を開いて再試行してください。';
+            event.target.value = '';
+            return;
+          }
+          if (!window.MangaVault.markLocalChangesPending()) {
+            error.textContent = '未同期状態を記録できませんでした。動画は変更していません。保存領域を確認してください。';
+            event.target.value = '';
+            return;
+          }
+        }
         try {
           writeVideoRecordsAtomically([...newVideos, ...savedVideos], nextMeta);
         } catch (_) {
           error.textContent = '端末に保存できませんでした。ブラウザの保存容量を確認してください。';
           event.target.value = '';
           return;
-        }
-        if (!window.TestCodeGuest?.isActive()) {
-          if (!window.MangaVault || typeof window.MangaVault.markLocalChangesPending !== 'function') {
-            error.textContent = '端末には保存しましたが、クラウド未同期の状態を管理できません。保管庫を開いて再試行してください。';
-            event.target.value = '';
-            return;
-          }
-          if (!window.MangaVault.markLocalChangesPending()) {
-            error.textContent = '端末には保存しましたが、未同期状態を記録できませんでした。保管庫を確認して再試行してください。';
-            event.target.value = '';
-            return;
-          }
         }
         let syncMessage = '端末に保存しました。';
         if (!window.TestCodeGuest?.isActive()) {
@@ -227,6 +227,16 @@
       const submitButton = form.querySelector('[type="submit"]');
       if (submitButton) submitButton.disabled = true;
       try {
+        if (!window.TestCodeGuest?.isActive()) {
+          if (!window.MangaVault || typeof window.MangaVault.markLocalChangesPending !== 'function') {
+            error.textContent = '未同期状態を管理できません。動画は変更していません。保管庫を開いて再試行してください。';
+            return;
+          }
+          if (!window.MangaVault.markLocalChangesPending()) {
+            error.textContent = '未同期状態を記録できませんでした。動画は変更していません。保存領域を確認してください。';
+            return;
+          }
+        }
         try {
           writeVideoRecordsAtomically(nextVideos, nextMeta);
         } catch (_) {
@@ -235,14 +245,6 @@
         }
         if (window.TestCodeGuest?.isActive()) {
           location.href = returnTarget(returnKind, savedId);
-          return;
-        }
-        if (!window.MangaVault || typeof window.MangaVault.markLocalChangesPending !== 'function') {
-          error.textContent = '端末には保存しましたが、クラウド未同期の状態を管理できません。保管庫を開いて再試行してください。';
-          return;
-        }
-        if (!window.MangaVault.markLocalChangesPending()) {
-          error.textContent = '端末には保存しましたが、未同期状態を記録できませんでした。保管庫を確認して再試行してください。';
           return;
         }
         location.href = returnTarget(returnKind, savedId);

@@ -157,7 +157,17 @@
       catch (_) { return {}; }
     }
     function resumePage(item) {
-      if (!progressRepository && win.ReaderProgressRepositoryFactory?.create) progressRepository = win.ReaderProgressRepositoryFactory.create({ storage: win.localStorage, scheduleSync: () => repository.scheduleSync?.() });
+      if (!progressRepository && win.ReaderProgressRepositoryFactory?.create) progressRepository = win.ReaderProgressRepositoryFactory.create({
+        storage: win.localStorage,
+        scheduleSync: () => repository.scheduleSync?.(),
+        markPending: () => {
+          if (win.TestCodeGuest?.isActive()) return true;
+          const vault = win.MangaVault;
+          const session = vault?.loadSession?.();
+          if (!session?.user?.id) return true;
+          return typeof vault.markLocalChangesPending === 'function' && vault.markLocalChangesPending() === true;
+        },
+      });
       const saved = progressRepository?.load(item.id, item);
       return saved && !saved.wasLast ? saved.page : 1;
     }

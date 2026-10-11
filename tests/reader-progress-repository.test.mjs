@@ -31,3 +31,25 @@ test('reports failed progress writes without scheduling a sync', () => {
   assert.equal(repo.commit('book', 4, 10), false);
   assert.deepEqual(calls, []);
 });
+
+test('progress records pending Vault sync before persisting the local page map', () => {
+  const calls = [];
+  const local = storage();
+  const originalSet = local.setItem;
+  local.setItem = (key, value) => { calls.push(['write', key]); originalSet(key, value); };
+  const repo = create({ storage: local, markPending: () => { calls.push('pending'); return true; }, scheduleSync: () => calls.push('schedule'), now: () => 10 });
+
+  assert.deepEqual(repo.commit('item-1', 4, 10), { page: 4, wasLast: false, updatedAt: 10 });
+  assert.deepEqual(calls, ['pending', ['write', 'mangaReaderLastPage'], 'schedule']);
+});
+
+test('progress is not written when the durable pending marker cannot be saved', () => {
+  let writes = 0;
+  let schedules = 0;
+  const local = { getItem: () => null, setItem() { writes++; } };
+  const repo = create({ storage: local, markPending: () => false, scheduleSync: () => schedules++ });
+
+  assert.equal(repo.commit('item-1', 4, 10), false);
+  assert.equal(writes, 0);
+  assert.equal(schedules, 0);
+});

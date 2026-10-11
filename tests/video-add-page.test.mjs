@@ -227,12 +227,13 @@ test('normal account preserves local data when the device or pending marker cann
   assert.equal(deviceFailure.location.href, 'video-edit.html');
   assert.equal(deviceFailure.syncCalls, 0);
 
-  const pendingFailure = startEditor({ failPending: true });
+  const existing = Data.normalizeVideo({ id: 'existing', title: 'Keep existing', url: 'https://example.com/existing.mp4', a: 'url', b: '12' });
+  const pendingFailure = startEditor({ failPending: true, videos: [existing] });
   pendingFailure.form.elements.url.value = 'https://example.com/pending-marker-failure.mp4';
   pendingFailure.form.elements.title.value = 'Keep locally';
   await pendingFailure.form.events.submit({ preventDefault() {} });
   assert.match(pendingFailure.nodes.get('.videoEditError').textContent, /未同期状態を記録できませんでした/);
-  assert.equal(JSON.parse(pendingFailure.stored.get(VIDEO_KEY))[0].title, 'Keep locally');
+  assert.equal(JSON.parse(pendingFailure.stored.get(VIDEO_KEY))[0].title, 'Keep existing');
   assert.equal(pendingFailure.location.href, 'video-edit.html');
   assert.equal(pendingFailure.syncCalls, 0);
 });

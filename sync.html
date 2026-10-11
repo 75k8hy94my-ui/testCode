@@ -170,11 +170,11 @@
       ui.vaultLogout.disabled=true;
       try {
         if (MangaVault.hasPendingLocalChanges()) {
-          const access = window.MangaReaderMediaAccess;
-          if (MangaVault.loadActive() && access?.canReadProtectedData?.() === true) await MangaVault.saveLocalChanges();
+          if (MangaVault.loadActive()) await MangaVault.saveLocalChanges();
           if (MangaVault.hasPendingLocalChanges()) throw new Error('未同期の変更が残っています。同期可能な状態で再試行してください。ログアウトは行いませんでした。');
         }
         await MangaVault.withSession((token)=>MangaVault.api('/auth/v1/logout',{method:'POST',token}));
+        if (session?.user?.id) await MangaListImageCacheFactory.clearUserCache(indexedDB, String(session.user.id));
       } catch (error) {
         ui.vaultLogout.disabled=false;
         setStatus(error?.message || 'ログアウトできませんでした。端末の変更を保持しています。');
@@ -318,7 +318,8 @@
     if (!alreadyActive) autoUsePasskey();
   })();
   </script>
-  <script src="profile-menu.js?v=20260924-theme-unified"></script>
+  <script src="manga-list-image-cache.js?v=20261011-encrypted-cache"></script>
+  <script src="profile-menu.js?v=20261011-nongame-audit"></script>
   <script src="app-global-shell.js?v=20261003-reader-spa"></script>
 </body>
 </html>

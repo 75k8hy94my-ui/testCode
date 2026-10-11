@@ -7,18 +7,22 @@ const route = fs.readFileSync('manga-list-route.js', 'utf8');
 
 test('manga image cache exposes only the local-cover cache boundary', () => {
   assert.match(cache, /MangaListImageCacheFactory/);
-  assert.match(cache, /Object\.freeze\(\{ create \}\)/);
+  assert.match(cache, /clearUserCache/);
   assert.match(cache, /loadCachedLocalImage/);
   assert.match(cache, /mangaReaderImageCache/);
   assert.match(cache, /indexedDB\.open/);
   assert.doesNotMatch(cache, /reader\.html/);
   assert.doesNotMatch(cache, /document\.getElementById|querySelector/);
+  assert.match(cache, /remoteAccess\.runRemoteRead/);
+  assert.match(cache, /AES-GCM/);
+  assert.match(cache, /dbPromise = null/);
 });
 
 test('manga route loads and injects the shared local-cover cache', () => {
   assert.match(route, /manga-list-image-cache\.js\?v=/);
   assert.match(route, /MangaListImageCacheFactory\.create\(/);
   assert.match(route, /loadCachedLocalImage/);
-  assert.match(route, /mangaReaderStorageTransferLimitDaily/);
-  assert.match(route, /mangaReaderStorageTransferUsageDaily/);
+  assert.match(route, /remoteAccess: windowRef\.ImageRemoteAccess/);
+  assert.match(route, /getEncryptionKey:/);
+  assert.doesNotMatch(route, /mangaReaderStorageTransferUsageDaily/);
 });

@@ -4,6 +4,17 @@
   const DEVICE_DATA_KEYS = () => [...Object.values((window.MangaVaultPayload && MangaVaultPayload.DATA_KEYS) || {}),...((window.MangaVaultPayload && MangaVaultPayload.LOCAL_ONLY_KEYS) || []),'testCode.manualVpnIps','testCode.manualNonVpnIps','mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
   let menu=null, activeTrigger=null;
   const AVATAR_KEY='mangaReaderProfileAvatar';
+  async function clearMangaImageCache(userId) {
+    if (!userId) return;
+    if (!window.MangaListImageCacheFactory) {
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script'); script.src = 'manga-list-image-cache.js?v=20261011-encrypted-cache';
+        script.onload = resolve; script.onerror = () => reject(new Error('画像キャッシュを初期化できませんでした。ログアウトを中止しました。'));
+        document.head.appendChild(script);
+      });
+    }
+    await window.MangaListImageCacheFactory.clearUserCache(window.indexedDB, String(userId));
+  }
   function refreshAvatar(){
     let avatar='';
     try{
@@ -36,11 +47,11 @@
     const session = window.MangaVault && MangaVault.loadSession();
     try {
       if (MangaVault?.hasPendingLocalChanges?.()) {
-        const access = window.MangaReaderMediaAccess;
-        if (MangaVault.loadActive?.() && access?.canReadProtectedData?.() === true) await MangaVault.saveLocalChanges();
+        if (MangaVault.loadActive?.()) await MangaVault.saveLocalChanges();
         if (MangaVault.hasPendingLocalChanges()) throw new Error('未同期の変更が残っています。同期可能な状態で再試行してください。ログアウトは行いませんでした。');
       }
       await MangaVault.withSession((token) => MangaVault.api('/auth/v1/logout', { method:'POST', token }));
+      if (session?.user?.id) await clearMangaImageCache(session.user.id);
     } catch (error) {
       if (button) button.disabled = false;
       window.alert(error?.message || 'ログアウトできませんでした。端末の変更を保持しています。');

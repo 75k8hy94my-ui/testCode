@@ -33,6 +33,7 @@ function deps(calls) {
       getTheme() { calls.push('theme'); return 'dark'; },
       getDashboardVisibility() { calls.push('dashboard'); return { desktop: {} }; },
       onSyncError(message, kind) { calls.push(['error', message, kind]); },
+      markLocalChangesPending() { return true; },
     },
     images: imageDeps(calls),
     navigation: {
@@ -72,7 +73,7 @@ function imageDeps(calls) {
     sessionKey: 'mangaReaderSupabaseSession',
     readStorageItem(key) {
       calls.push(['image-read', key]);
-      return key === 'mangaReaderSupabaseSession' ? '{"access_token":"token"}' : null;
+      return key === 'mangaReaderSupabaseSession' ? '{"access_token":"token","user":{"id":"user-a"}}' : null;
     },
     getSupabaseConfig() { calls.push('supabase-config'); return { url: 'https://storage.example' }; },
     getLocalStoragePathFromUrl() { calls.push('path'); return 'folder/cover.jpg'; },
@@ -103,7 +104,7 @@ test('host factory exposes the shared persistence callbacks and rejects missing 
   for (const name of [
     'hasActiveVault', 'clearTimer', 'setTimer', 'buildBasePayload',
     'getSavedVideos', 'readStorageItem', 'getMangaInfo', 'getToc', 'getTheme',
-    'getDashboardVisibility', 'onSyncError',
+    'getDashboardVisibility', 'onSyncError', 'markLocalChangesPending',
   ]) {
     const missing = deps([]);
     delete missing.sync[name];
@@ -143,6 +144,26 @@ test('host persistence preserves write and sync order', () => {
     'state', 'write:authors-key', 'vault', 'clear:timer-id', 'timer:5000',
     'videos',
   ]);
+});
+
+test('host records pending sync before writing protected manga data', () => {
+  const calls = [];
+  const input = deps(calls);
+  input.sync.markLocalChangesPending = () => { calls.push('mark-pending'); return true; };
+  const host = loadFactory().create(input);
+
+  assert.equal(host.persistItems(), true);
+  assert.deepEqual(calls.slice(0, 3), ['mark-pending', 'state', ['write', 'items-key', ['items']]]);
+});
+
+test('host refuses a protected write when pending sync cannot be recorded', () => {
+  const calls = [];
+  const input = deps(calls);
+  input.sync.markLocalChangesPending = () => { calls.push('mark-pending'); return false; };
+  const host = loadFactory().create(input);
+
+  assert.equal(host.persistItems(), false);
+  assert.deepEqual(calls, ['mark-pending']);
 });
 
 test('host builds the sync payload through explicit injected dependencies', () => {
@@ -189,11 +210,12 @@ test('host rejects missing image dependencies and exposes image callbacks', asyn
   const load = host.loadLocalCover(item, img);
   await load;
   assert.equal(img.src, 'blob:cover');
-  assert.deepEqual(calls.slice(-4), [
+  assert.deepEqual(calls.slice(-5), [
     'supabase-config',
-    ['get-cover', 'https://storage.example||folder/cover.jpg'],
+    ['get-cover', 'https://storage.example|user-a|folder/cover.jpg'],
     'cached-image',
-    ['remember-cover', 'https://storage.example||folder/cover.jpg', 'blob:cover'],
+    ['image-read', 'mangaReaderSupabaseSession'],
+    ['remember-cover', 'https://storage.example|user-a|folder/cover.jpg', 'blob:cover'],
 
   ]);
 });

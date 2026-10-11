@@ -54,11 +54,11 @@ test('video list ellipsis navigates directly to the dedicated editor without an 
   assert.match(jsonImport, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.match(editor, /name="thumbnailTime"/);
   assert.match(editor, /Data\.parseMediaTime\(timestamp\)/);
-  assert.match(editorHtml, /video-edit-page\.js\?v=20261010-vault-sync-v4-delete/);
+  assert.match(editorHtml, /video-edit-page\.js\?v=20261011-pending-sync/);
   assert.match(editor, /data-json-import/);
   assert.match(editor, /accept="application\/json,\.json"/);
   assert.doesNotMatch(editorHtml, /auth-pending/);
-  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261010-vault-sync-v4-delete/);
+  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261011-pending-sync/);
 });
 
 test('video cards delegate thumbnail rendering to the shared renderer', () => {
@@ -254,5 +254,16 @@ test('dedicated video editor records pending sync after local save and returns w
   assert.doesNotMatch(ordinarySubmit, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.match(jsonImport, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.doesNotMatch(editor, /保存できませんでした。端末の保存状態を確認してください。/);
-  assert.match(html, /video-edit-page\.js\?v=20261010-vault-sync-v4-delete/);
+  assert.match(html, /video-edit-page\.js\?v=20261011-pending-sync/);
+});
+
+test('video and manga edit paths record durable pending state before local protected writes', () => {
+  const editor = read('video-edit-page.js');
+  const library = read('video-library.js');
+  const ordinarySubmit = editor.slice(editor.indexOf("form.addEventListener('submit'"), editor.indexOf("if (!isAddMode) form.querySelector('[data-delete]')"));
+  const jsonImport = editor.slice(editor.indexOf("jsonImport.addEventListener('change'"), editor.indexOf("elements.url.addEventListener('change'"));
+  assert.ok(ordinarySubmit.indexOf('markLocalChangesPending()') < ordinarySubmit.indexOf('writeVideoRecordsAtomically('));
+  assert.ok(jsonImport.indexOf('markLocalChangesPending()') < jsonImport.indexOf('writeVideoRecordsAtomically('));
+  assert.match(library, /function persistAux[\s\S]*markLocalChangesPending\(\)[\s\S]*writeJson\(FOLDER_KEY/);
+  assert.match(library, /function invokeUrlAdd[\s\S]*markLocalChangesPending\(\)[\s\S]*writeJson\(VIDEO_KEY/);
 });

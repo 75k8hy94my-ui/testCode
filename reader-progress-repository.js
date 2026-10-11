@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const KEY = 'mangaReaderLastPage';
-  function create({ storage = globalThis.localStorage, scheduleSync = () => {}, now = Date.now } = {}) {
+  function create({ storage = globalThis.localStorage, scheduleSync = () => {}, markPending = () => true, now = Date.now } = {}) {
     if (!storage) throw new TypeError('progress repository requires storage');
     function read() { try { const data = JSON.parse(storage.getItem(KEY) || '{}'); return data && typeof data === 'object' && !Array.isArray(data) ? data : {}; } catch (_) { return {}; } }
     function key(id) { const value = String(id || '').trim(); if (!value) throw new TypeError('item id required'); return `item:${value}`; }
@@ -12,7 +12,7 @@
       if (Number.isInteger(legacyPage) && legacyPage > 0) {
         const migrated = { page: legacyPage, wasLast: false, updatedAt: Number(item.readingProgress.updatedAt) || now() };
         map[k] = migrated;
-        try { storage.setItem(KEY, JSON.stringify(map)); scheduleSync(); } catch (_) {}
+        try { if (markPending() === true) { storage.setItem(KEY, JSON.stringify(map)); scheduleSync(); } } catch (_) {}
         return migrated;
       }
       return { page: 1, wasLast: false, updatedAt: 0 };
@@ -23,6 +23,7 @@
       const count = Math.max(0, Number(pageCount) || 0);
       const record = { page: Math.max(1, Math.floor(Number(page) || 1)), wasLast: count > 0 && Number(page) >= count, updatedAt: timestamp };
       map[k] = record;
+      try { if (markPending() !== true) return false; } catch (_) { return false; }
       try { storage.setItem(KEY, JSON.stringify(map)); } catch (_) { return false; }
       scheduleSync();
       return record;

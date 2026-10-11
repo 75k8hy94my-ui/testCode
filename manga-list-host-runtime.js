@@ -14,6 +14,7 @@
     'getTheme',
     'getDashboardVisibility',
     'onSyncError',
+    'markLocalChangesPending',
   ];
   const IMAGE_FUNCTION_NAMES = [
     'parseInputUrl',
@@ -91,6 +92,11 @@
 
     function canReadProtectedData() {
       return deps.canReadProtectedData() === true;
+    }
+
+    function markLocalChangesPending() {
+      try { return deps.sync.markLocalChangesPending() === true; }
+      catch (_) { return false; }
     }
 
     function scheduleCloudSync() {
@@ -187,8 +193,13 @@
           if (canReadProtectedData()) img.src = cachedObjectUrl;
           return;
         }
-        const objectUrl = await deps.images.loadCachedLocalImage(config, session.access_token, path, item.storageBytes && item.storageBytes[0]);
-        if (!canReadProtectedData()) {
+        const objectUrl = await deps.images.loadCachedLocalImage(config, session.access_token, path, item.storageBytes && item.storageBytes[0], String(session.user?.id || session.user_id || ''));
+        let currentUserId = '';
+        try {
+          const currentSession = JSON.parse(deps.images.readStorageItem(deps.images.sessionKey) || 'null');
+          currentUserId = currentSession?.user?.id || currentSession?.user_id || '';
+        } catch (_) {}
+        if (!canReadProtectedData() || String(currentUserId) !== String(userId)) {
           deps.images.revokeLocalCoverObjectUrl?.(objectUrl);
           return;
         }
@@ -300,6 +311,7 @@
 
     function persistFolders() {
       if (!canReadProtectedData()) return false;
+      if (!markLocalChangesPending()) return false;
       if (deps.safeWriteJson(deps.keys.savedFolders, deps.getState().savedFolders) === false) return false;
       scheduleCloudSync();
       return true;
@@ -307,6 +319,7 @@
 
     function persistItems() {
       if (!canReadProtectedData()) return false;
+      if (!markLocalChangesPending()) return false;
       if (deps.safeWriteJson(deps.keys.savedItems, deps.getState().savedItems) === false) return false;
       scheduleCloudSync();
       return true;
@@ -314,6 +327,7 @@
 
     function persistAuthorCards() {
       if (!canReadProtectedData()) return false;
+      if (!markLocalChangesPending()) return false;
       if (deps.safeWriteJson(deps.keys.authorCards, deps.getState().authorCards) === false) return false;
       scheduleCloudSync();
       return true;

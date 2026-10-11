@@ -27,23 +27,29 @@
   let viewerIndex = -1;
   let restoreFocus = null;
   let initialized = false;
+  let accessGeneration = 0;
 
   function canReadProtectedData() {
     return !!mediaAccess && typeof mediaAccess.canReadProtectedData === 'function'
       && mediaAccess.canReadProtectedData() === true;
   }
   function clearProtectedPresentation() {
+    accessGeneration += 1;
     controller?.abort();
     controller = null;
     savedSettings = null;
     files = [];
+    if (!viewer.hidden) closeViewer();
     viewerImage.removeAttribute('src');
     viewer.hidden = true;
+    document.body.classList.remove('driveViewerOpen');
     keyInput.value = '';
     folderInput.value = '';
     refreshButton.disabled = true;
     grid.replaceChildren();
     count.textContent = '';
+    empty.hidden = true;
+    loading(false);
   }
 
   function setStatus(message, error = false) {
@@ -65,7 +71,7 @@
     if (!active?.rawKey) throw new Error('保管庫の解錠が必要です。');
     return active.rawKey;
   }
-  async function persistSettings(settings) {
+  async function persistSettings(settings, generation = accessGeneration) {
     if (window.TestCodeGuest?.isActive()) {
       // Keep external API credentials in memory only in guest mode. Never
       // persist plaintext API keys or put them in the account Vault.
@@ -75,8 +81,14 @@
       return;
     }
     // Only an AES-GCM envelope is stored on the device; plaintext never goes to localStorage.
-    const encrypted = await cryptoSettings.encryptSettings(vaultKey(), settings);
-    if (!vaultApi.loadActive()) throw new Error('保管庫がロックされています。再度解錠してください。');
+    if (!canReadProtectedData() || generation !== accessGeneration) throw new Error('VPNアクセスが失われました。保護データは保存しません。');
+    const rawKey = vaultKey();
+    const encrypted = await cryptoSettings.encryptSettings(rawKey, settings);
+    if (!canReadProtectedData() || generation !== accessGeneration) throw new Error('VPNアクセスが失われました。保護データは保存しません。');
+    if (vaultApi.loadActive()?.rawKey !== rawKey) throw new Error('保管庫がロックされています。再度解錠してください。');
+    if (typeof vaultApi.markLocalChangesPending !== 'function' || vaultApi.markLocalChangesPending() !== true) {
+      throw new Error('未同期状態を端末に記録できません。保存領域を確認してください。');
+    }
     localStorage.setItem(settingsStorageKey, JSON.stringify(encrypted));
     savedSettings = settings;
     refreshButton.disabled = false;
@@ -89,6 +101,7 @@
       setSyncStatus('端末には暗号化保存済みですが、クラウド同期に失敗しました。再度保存してください。' +
         (error?.message ? ' ' + error.message : ''), true);
     }
+    if (!canReadProtectedData() || generation !== accessGeneration) clearProtectedPresentation();
   }
   function attachImageFallback(img, file, failureCallback) {
     const urls = api.imageUrls(file.id);
@@ -185,6 +198,9 @@
   }
 
   async function loadImages(folderId, apiKey) {
+    const generation = accessGeneration;
+    const guest = window.TestCodeGuest?.isActive();
+    if (!guest && !canReadProtectedData()) return;
     if (controller) controller.abort();
     controller = new AbortController();
     const current = controller;
@@ -197,7 +213,7 @@
           if (controller === current) setStatus(pageCount + 'ページ取得：' + imageCount + '枚の画像を検出しました。続きの確認中…');
         }
       });
-      if (controller !== current || (!window.TestCodeGuest?.isActive() && !vaultApi.loadActive())) return;
+      if (controller !== current || generation !== accessGeneration || (!guest && (!canReadProtectedData() || !vaultApi.loadActive()))) return;
       // No partial cache writes: commit only after every Drive page succeeded.
       const imageList = result.map(file => ({ id: file.id, name: file.name, directUrl: api.imageUrls(file.id).direct }));
       let cache = null;
@@ -214,13 +230,13 @@
         // Cache and API key are one authenticated, encrypted Vault item; folder change
         // cannot accidentally carry another folder's URLs across.
         try {
-          await persistSettings({ folderId, apiKey, cache });
+          await persistSettings({ folderId, apiKey, cache }, generation);
         } catch (error) {
           setSyncStatus('一覧を表示できましたが、暗号化キャッシュの保存に失敗しました。 ' + (error?.message || ''), true);
         }
       }
     } catch (error) {
-      if (controller !== current) return;
+      if (controller !== current || generation !== accessGeneration) return;
       if (error.name === 'AbortError') setStatus('更新を中止しました。保存済みの画像一覧はそのままです。');
       else setStatus('Driveの一覧を更新できませんでした。以前の一覧は維持しています。 ' + (error.message || ''), true);
     } finally {
@@ -230,6 +246,11 @@
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const generation = accessGeneration;
+    if (!window.TestCodeGuest?.isActive() && !canReadProtectedData()) {
+      setStatus('VPN接続を確認できるまで保護設定を変更できません。', true);
+      return;
+    }
     if (saving || controller) return;
     const folderId = api.folderIdFromInput(folderInput.value);
     if (!folderId) { setStatus('正しいGoogle DriveフォルダURLまたはIDを入力してください。', true); return; }
@@ -249,7 +270,8 @@
         count.textContent = '';
         empty.hidden = true;
       }
-      await persistSettings({ folderId, apiKey, ...(cache ? { cache } : {}) });
+      await persistSettings({ folderId, apiKey, ...(cache ? { cache } : {}) }, generation);
+      if (generation !== accessGeneration || (!window.TestCodeGuest?.isActive() && !canReadProtectedData())) return;
     } catch (error) {
       setSyncStatus(error?.message || '設定を暗号化して保存できませんでした。', true);
       return;
@@ -266,6 +288,7 @@
 
   refreshButton.addEventListener('click', async () => {
     if (saving || controller || !savedSettings) return;
+    if (!window.TestCodeGuest?.isActive() && !canReadProtectedData()) return;
     const folderId = api.folderIdFromInput(folderInput.value);
     const apiKey = keyInput.value.trim();
     if (folderId !== savedSettings.folderId || apiKey !== savedSettings.apiKey) {
@@ -289,6 +312,8 @@
       return;
     }
     initialized = true;
+    const generation = accessGeneration;
+    const isCurrent = () => generation === accessGeneration && canReadProtectedData();
     const config = window.MANGA_READER_SUPABASE || {};
     const session = vaultApi?.loadSession?.();
     if (!session?.refresh_token || !config.url || !config.publishableKey) {
@@ -297,6 +322,7 @@
     }
     let active = vaultApi.loadActive();
     if (!active && typeof vaultApi.waitForActive === 'function') active = await vaultApi.waitForActive(2500);
+    if (!isCurrent()) { initialized = false; return; }
     if (!active?.rawKey) {
       location.replace('sync.html?next=drive-gallery.html');
       return;
@@ -304,11 +330,17 @@
     try {
       await vaultApi.ensureSession();
     } catch (error) {
-      if (vaultApi.isSessionAuthError?.(error)) vaultApi.saveSession(null);
-      location.replace('index.html');
+      initialized = false;
+      if (vaultApi.isSessionAuthError?.(error)) {
+        vaultApi.saveSession(null);
+        clearProtectedPresentation();
+        location.replace('index.html');
+      } else {
+        setSyncStatus('ログイン状態を確認できませんでした。通信状況を確認して再試行してください。', true);
+      }
       return;
     }
-    if (!canReadProtectedData()) {
+    if (!isCurrent()) {
       initialized = false;
       clearProtectedPresentation();
       document.documentElement.classList.remove('auth-pending');
@@ -336,6 +368,7 @@
     }
     try {
       const settings = await cryptoSettings.decryptSettings(vaultKey(), saved);
+      if (!isCurrent() || vaultApi.loadActive()?.rawKey == null) return;
       savedSettings = settings;
       folderInput.value = settings.folderId;
       keyInput.value = settings.apiKey;
@@ -343,6 +376,7 @@
       setSyncStatus('保管庫から暗号化した設定を復元しました。');
       if (!showCachedImages(settings)) await loadImages(settings.folderId, settings.apiKey);
     } catch (error) {
+      if (!isCurrent()) return;
       keyInput.value = '';
       setSyncStatus(error?.message || '保存済み設定を読み込めませんでした。', true);
     }
