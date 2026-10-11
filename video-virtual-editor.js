@@ -516,7 +516,7 @@
       '<div class="vveTimelineCanvas" data-timeline><div class="vveRuler" data-ruler aria-hidden="true"></div>',
       '<div class="vveClips" data-clips role="list"></div><span class="vvePlayhead" data-playhead aria-hidden="true"></span></div></div>',
       '<div class="vveTimelineFooter"><span class="vveTotal" data-total>0区間</span>',
-      '<a class="vveAction" data-play-saved hidden>保存済みを再生</a><button class="vveAction danger" type="button" data-remove-legacy hidden>削除</button></div>',
+      '<a class="vveAction" data-play-saved hidden>保存済み編集版を再生</a></div>',
       '<p class="vveStatus" role="status" aria-live="polite" data-status></p></section></div>'
     ].join('');
     const $ = (selector) => root.querySelector(selector);
