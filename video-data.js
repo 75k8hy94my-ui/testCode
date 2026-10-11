@@ -335,5 +335,14 @@
     };
   }
 
-  return { WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, storageFieldsForVideoUrl, stableUrlToken, getRotationDirection, getDisplayDimensions };
+  function displayTitle(video, allVideos) {
+    const given = asText(video && video.title);
+    if (given) return given;
+    const id = video && String(video.id);
+    const untitled = (Array.isArray(allVideos) ? allVideos : []).filter(item => !asText(item && item.title));
+    const index = untitled.findIndex(item => item && String(item.id) === id);
+    const number = Math.max(1, index + 1);
+    return '名称未設定' + String(number).replace(/[0-9]/g, digit => String.fromCharCode(0xFF10 + Number(digit)));
+  }
+  return { displayTitle, WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, storageFieldsForVideoUrl, stableUrlToken, getRotationDirection, getDisplayDimensions };
 }));
