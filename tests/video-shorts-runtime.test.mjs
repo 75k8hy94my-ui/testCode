@@ -226,3 +226,36 @@ test('failed metadata preparation gives a retry control and can recover into the
   assert.equal(probes, 2);
   assert.ok(h.page.querySelector('.shortsVideo'));
 });
+
+test('seek bar accepts a normal tap and horizontal drag without waiting or switching Shorts', async () => {
+  const pending = new Map(); let timerId = 0;
+  const timers = {
+    setTimeout(callback, delay) { const id = ++timerId; pending.set(id, { callback, delay }); return id; },
+    clearTimeout(id) { pending.delete(id); },
+  };
+  const h = makeHarness({ queue: [entry('v1', 10, 40), entry('v2')], timers });
+  await h.controller.start();
+  const stage = h.page.children[0];
+  const bar = stage.children.find((node) => node.className === 'shortsScrubArea');
+  const video = h.page.querySelector('.shortsVideo');
+  assert.equal(bar.getAttribute('aria-label'), 'タップまたはドラッグして動画をシーク');
+
+  stage.emit('pointerdown', { pointerId: 1, button: 0, clientX: 25, clientY: 600, target: bar });
+  assert.equal(video.paused, true, 'pressing the seek bar pauses at once');
+  assert.equal([...pending.values()].some((timer) => timer.delay === 450), false, 'no long-press timer for seeking');
+  stage.emit('pointerup', { pointerId: 1, clientX: 25, clientY: 600, target: bar });
+  assert.equal(video.currentTime, 17.5, 'a short tap seeks to the touched position');
+  assert.equal(h.controller.getState().currentIndex, 0, 'tap must not change video');
+
+  stage.emit('pointerdown', { pointerId: 2, button: 0, clientX: 10, clientY: 600, target: bar });
+  stage.emit('pointermove', { pointerId: 2, clientX: 90, clientY: 100, target: bar });
+  assert.equal(h.controller.getState().currentIndex, 0, 'drag from the seek bar must never swipe to another video');
+  stage.emit('pointerup', { pointerId: 2, clientX: 90, clientY: 100, target: bar });
+  assert.equal(video.currentTime, 37, 'drag releases at the chosen position');
+
+  stage.emit('pointerdown', { pointerId: 3, button: 0, clientX: 20, clientY: 600, target: bar });
+  stage.emit('pointermove', { pointerId: 4, clientX: 100, clientY: 600, target: bar });
+  stage.emit('pointerup', { pointerId: 4, clientX: 100, clientY: 600, target: bar });
+  stage.emit('pointercancel', { pointerId: 3, target: bar });
+  assert.equal(video.currentTime, 37, 'other fingers and cancelled gestures do not commit a seek');
+});
