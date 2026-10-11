@@ -37,8 +37,15 @@
   // a video against the unfiltered default list often opens the wrong page.
   function captureReturnContext(videoId) {
     if (!videoId) return;
+    const scoped = effectiveVideos().filter(video => video.hidden === state.showHidden);
+    const visible = Data.filterVideos(scoped, { query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
+    const filtered = CustomProperties ? visible.filter(video => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, Object.values(state.customFilters))) : visible;
+    const ordered = Data.sortVideos(filtered, state.sort);
     const context = {
       id: String(videoId), page: state.page, sort: state.sort, view: state.view,
+      // Reopening a video changes 'recent-opened' ordering. Retain the original
+      // list order for this one return instead of moving it to page 1.
+      orderIds: ordered.length <= 10000 ? ordered.map(video => String(video.id)) : null,
       showHidden: state.showHidden, query: state.query, quick: state.quick,
       folderId: state.folderId, tag: state.tag, service: state.service,
       customFilters: state.customFilters,
@@ -46,10 +53,32 @@
     try { sessionStorage.setItem(RETURN_VIEW_KEY, JSON.stringify(context)); } catch (_) {}
   }
 
-  function restoreReturnContext(targetId) {
+  function readReturnContext(targetId) {
     try {
       const saved = JSON.parse(sessionStorage.getItem(RETURN_VIEW_KEY) || 'null');
-      if (!saved || saved.id !== targetId) return;
+      return saved && saved.id === targetId ? saved : null;
+    } catch (_) { return null; }
+  }
+
+  function sortForReturn(videos) {
+    const sorted = Data.sortVideos(videos, state.sort);
+    const context = returnIntent && readReturnContext(returnIntent.id);
+    if (!context || !Array.isArray(context.orderIds) || !context.orderIds.length) return sorted;
+    const ranks = new Map(context.orderIds.map((id, index) => [String(id), index]));
+    return sorted.sort((a, b) => {
+      const first = ranks.get(String(a.id));
+      const second = ranks.get(String(b.id));
+      if (first != null && second != null) return first - second;
+      if (first != null) return -1;
+      if (second != null) return 1;
+      return 0;
+    });
+  }
+
+  function restoreReturnContext(targetId) {
+    try {
+      const saved = readReturnContext(targetId);
+      if (!saved) return;
       // Use validated stored preferences to avoid malformed session state.
       if (Object.prototype.hasOwnProperty.call(SORT_LABELS, saved.sort)) state.sort = saved.sort;
       if (saved.view === 'card' || saved.view === 'compact') state.view = saved.view;
@@ -517,7 +546,7 @@
       const scoped = all.filter(video => video.hidden === state.showHidden);
       const visible = Data.filterVideos(scoped, { query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
       const filtered = CustomProperties ? visible.filter(video => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, Object.values(state.customFilters))) : visible;
-      return Data.sortVideos(filtered, state.sort);
+      return sortForReturn(filtered);
     };
     let list = findInCurrentView();
     let index = list.findIndex(video => String(video.id) === targetId);
@@ -551,7 +580,7 @@
     const baseFiltered = Data.filterVideos(scoped, { query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
     const filters = Object.values(state.customFilters);
     const filtered = CustomProperties ? baseFiltered.filter((video) => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, filters)) : baseFiltered;
-    const videos = Data.sortVideos(filtered, state.sort);
+    const videos = sortForReturn(filtered);
     dom.quick.querySelectorAll('[data-quick]').forEach((button) => button.classList.toggle('active', button.dataset.quick === state.quick));
     dom.view.textContent = state.view === 'card' ? '▤' : '▦'; dom.view.title = state.view === 'card' ? 'コンパクト表示へ' : 'カード表示へ';
     dom.hiddenBtn.textContent = state.showHidden ? '動画一覧' : '非表示 (' + all.filter((video) => video.hidden).length + ')';
