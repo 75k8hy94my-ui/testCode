@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 11642)
+Total output lines: 710
+
 (function (root) {
   'use strict';
 
@@ -44,9 +47,9 @@
     ['manga-list-controller.js?v=20260922-controller', 'mangaRouteController'],
     ['manga-list-runtime-context.js?v=20261010-vault-sync-v4-delete', 'mangaRouteContext'],
     ['manga-list-cover-cache.js?v=20261008-cover-cache', 'mangaRouteCoverCache'],
-    ['manga-list-image-cache.js?v=20260922-image-cache', 'mangaRouteImageCache'],
+    ['manga-list-image-cache.js?v=20261011-encrypted-cache', 'mangaRouteImageCache'],
     ['reader-target.js?v=20261003-reader-launch-contract', 'mangaReaderTarget'],
-    ['manga-list-host-runtime.js?v=20261010-sync-validation', 'mangaRouteHost'],
+    ['manga-list-host-runtime.js?v=20261011-nongame-audit', 'mangaRouteHost'],
     ['manga-list-runtime.js?v=20261010-vault-sync-v4-delete', 'mangaRouteRuntime'],
     ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
   ];
@@ -347,94 +350,7 @@
             let notice = documentRef.getElementById('mangaCloudSyncError');
             if (!notice) {
               notice = documentRef.createElement('p');
-              notice.id = 'mangaCloudSyncError';
-              notice.setAttribute('role', 'status');
-              notice.setAttribute('aria-live', 'polite');
-              notice.style.cssText = 'position:fixed;left:16px;right:16px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:1600;padding:12px 16px;border-radius:12px;background:#7b2d24;color:#fff;box-shadow:0 8px 24px #0005';
-              documentRef.body.appendChild(notice);
-            }
-            notice.textContent = '端末には保存済みですが、クラウド同期に失敗しました。変更は未同期として保持されています。' + (message ? ' ' + message : '');
-            windowRef.clearTimeout(notice._hideTimer);
-            notice._hideTimer = windowRef.setTimeout(() => notice.remove(), 10000);
-          },
-        },
-        images: {
-          parseInputUrl, getCachedMangaInfo, getCoverSourceCache: coverCache.getSourceCache,
-          getCoverFailedCache: () => coverFailedCache, pageUrlFor, extCandidates, loadTimeoutMs: 60000,
-          sessionKey: 'mangaReaderSupabaseSession', readStorageItem: (key) => storage.getItem(key),
-          getSupabaseConfig: () => windowRef.MANGA_READER_SUPABASE || {}, getLocalStoragePathFromUrl, loadEncryptedCover,
-          loadCachedLocalImage: imageCache.loadCachedLocalImage,
-          getLocalCoverObjectUrl: coverCache.getLocalCover, rememberLocalCoverObjectUrl: coverCache.rememberLocalCover,
-          revokeLocalCoverObjectUrl: (url) => { if (url) windowRef.URL.revokeObjectURL(url); },
-          setTimer: (callback, delay) => windowRef.setTimeout(callback, delay),
-          clearTimer: (timer) => windowRef.clearTimeout(timer),
-        },
-        navigation: {
-          readerUrl: 'reader.html',
-          buildReaderUrl: (itemId, base) => windowRef.MangaReaderTarget.buildReaderUrl(itemId, base),
-          // Reader is a separate document; the URL item id is its only route identity.
-          navigate: (url) => {
-            if (windowRef.location && typeof windowRef.location.assign === 'function') windowRef.location.assign(url);
-            else windowRef.location.href = url;
-          },
-        },
-      });
-      const state = data.get;
-      const setState = data.set;
-      const renderList = () => runtime.renderSavedList();
-      const title = (item) => item.title || item.url || '無題';
-      const itemSubtext = (item) => item.url || '';
-      const readingRecordText = (item) => item.lastReadAt ? '既読' : '未読';
-      const pageCount = (item) => Array.isArray(item.encryptedAssets?.pages)
-        ? item.encryptedAssets.pages.length + 'ページ'
-        : Array.isArray(item.pages) ? item.pages.length + 'ページ' : '';
-      const visibleItems = () => {
-        return state().savedItems.filter((item) => !item.localSync && !item.encryptedAssets?.pages?.length).slice();
-      };
-      const appendFolderPreview = (cover, items, emptyIcon, emptyAlt, kindLabel) => {
-        const preview = items.slice(0, 4); if (!preview.length) { const img = documentRef.createElement('img'); img.src = emptyIcon; img.alt = emptyAlt; cover.appendChild(img); return; }
-        const box = documentRef.createElement('div'); box.className = 'folder-preview preview-count-' + preview.length;
-        preview.forEach((item) => {
-          const img = documentRef.createElement('img');
-          img.alt = title(item);
-          img.fetchPriority = 'auto';
-          const first = item.pageManifest?.version === 1 && item.pageManifest.pages?.[0]
-            || item.pages?.[0] || '';
-          if (item.encryptedAssets?.pages?.length || item.localSync) {
-            img.addEventListener('load', () => { if (img.dataset) img.dataset.coverState = 'loaded'; });
-            img.addEventListener('error', () => { if (img.dataset) img.dataset.coverState = 'failed'; });
-            void host.loadLocalCover(item, img);
-          } else host.setupFeedImage(img, item.url, item.numberWidth, item.pagePattern, item.id, first);
-          box.appendChild(img);
-        });
-        cover.appendChild(box); const badge = documentRef.createElement('span'); badge.className = 'folder-kind-badge'; badge.textContent = kindLabel || 'フォルダ'; cover.appendChild(badge);
-      };
-      const makeHeartIcon = (active) => {
-        // The previous icon was an <img> without a src, so every favorite
-        // control rendered a broken image. Use a self-contained SVG with an
-        // explicit filled/outline state and no extra asset request.
-        const img = documentRef.createElement('img');
-        const fill = active ? '#ff6b4a' : 'none';
-        const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' +
-          '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78Z" ' +
-          'fill="' + fill + '" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        img.src = 'data:image/svg+xml,' + encodeURIComponent(svg);
-        img.alt = '';
-        img.setAttribute('aria-hidden', 'true');
-        img.width = 18;
-        img.height = 18;
-        return img;
-      };
-      const moveItemInList = (item, list, direction) => { const index = list.indexOf(item); const other = list[index + direction]; if (!other) return; const items = state().savedItems; const a = items.indexOf(item); const b = items.indexOf(other); if (a < 0 || b < 0) return; [items[a], items[b]] = [items[b], items[a]]; host.persistAll(); renderList(); };
-      const moveFolderInList = (folder, list, direction) => { const index = list.indexOf(folder); const other = list[index + direction]; if (!other) return; const folders = state().savedFolders; const a = folders.indexOf(folder); const b = folders.indexOf(other); if (a < 0 || b < 0) return; [folders[a], folders[b]] = [folders[b], folders[a]]; host.persistFolders(); renderList(); };
-      const updateBulkEditButton = () => {
-        if (!elements) return;
-        const current = state();
-        elements.bulkEditBtn.textContent = current.bulkEditMode ? '選択完了 (' + current.bulkSelectedIds.size + ')' : '一括編集';
-        elements.bulkEditBtn.classList.toggle('active', current.bulkEditMode);
-        elements.undoBulkEditBtn.style.display = 'none';
-      };
-      const buildVirtualCard = (label, icon, items, update) => { const card = documentRef.createElement('div'); card.className = 'book-card folder-card'; const cover = documentRef.createElement('div'); cover.className = 'book-cover folder-cover'; appendFolderPreview(cover, items, icon, label, label); const text = documentRef.createElement('div'); text.className = 'book-title'; text.textContent = label; card.append(cover, text); card.addEventListener('click', () => { update(); renderList(); }); return card; };
+              notice.id = 'mangaCloudSync…1642 tokens truncated… = documentRef.createElement('div'); text.className = 'book-title'; text.textContent = label; card.append(cover, text); card.addEventListener('click', () => { update(); renderList(); }); return card; };
       const buildFavoritesFolderCard = () => buildVirtualCard('お気に入り', iconFolder, visibleItems().filter((item) => item.favorite), () => setState({ currentFolderView: config.FAVORITES_FOLDER_ID, currentSeriesView: null, bookshelfPage: 1 }));
       const buildSeriesFolderCard = () => buildVirtualCard('シリーズ', iconBooks, visibleItems().filter((item) => item.series), () => setState({ currentFolderView: config.SERIES_FOLDER_ID, currentSeriesView: null, bookshelfPage: 1 }));
       const buildSeriesGroupCard = (group) => buildVirtualCard(group.name, iconBooks, group.items, () => setState({ currentFolderView: config.SERIES_FOLDER_ID, currentSeriesView: group.name, bookshelfPage: 1 }));
