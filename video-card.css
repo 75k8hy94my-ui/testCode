@@ -241,3 +241,11 @@
 .videoCardThumb { background: #0b0b0b; }
 .videoCardThumb img, .videoCardThumb video { object-fit: contain; }
 #videoLibraryResults .vl-thumb .vl-thumb-direct-video { object-fit: contain; }
+
+/* Menus are overlays: never expand the title row or change card/grid height. */
+.videoCard { position: relative; }
+.videoCard:has(.videoCardMenuWrap--open) { z-index: 100; }
+.videoCardTitleRow--menu-open { flex-wrap: nowrap; }
+.videoCardMenuWrap--open,
+.videoCard--related .videoCardMenuWrap--open { flex: 0 0 32px; width: 32px; margin: -4px -4px 0 0; }
+.videoCardMenu { position: absolute; top: calc(100% + 4px); right: 0; width: min(220px, calc(100vw - 24px)); max-width: none; margin: 0; }
