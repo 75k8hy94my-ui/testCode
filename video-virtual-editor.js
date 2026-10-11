@@ -29,6 +29,7 @@
   let sourceSearchTerm = '';
   let zoom = State.DEFAULT_ZOOM;
   let timelinePosition = 0;
+  let pointerGesture = null;
 
   const canRead = () => !!access && access.canReadProtectedData() === true;
   const format = (seconds) => Number.isFinite(seconds) ? Data.formatMediaTime(seconds) : '不明';
@@ -171,24 +172,42 @@
       message.textContent = 'まだ区間がありません。MP4素材と開始・終了秒を指定して追加してください。';
       refs.clips.append(message);
     } else edit.clips.forEach((clip, index) => {
-      const button = document.createElement('button');
-      button.type = 'button'; button.className = 'vveClip';
-      button.dataset.clipIndex = String(index);
-      button.style.width = Math.max(1, (clip.endSeconds - clip.startSeconds) * zoom) + 'px';
-      button.style.flex = '0 0 auto';
-      button.setAttribute('aria-current', String(index === selectedIndex));
-      button.setAttribute('aria-pressed', String(index === selectedIndex));
+      const item = document.createElement('div');
+      item.className = 'vveClip';
+      item.dataset.clipIndex = String(index);
+      item.style.width = Math.max(44, (clip.endSeconds - clip.startSeconds) * zoom) + 'px';
+      item.style.flex = '0 0 auto';
+      item.setAttribute('aria-current', String(index === selectedIndex));
+      item.setAttribute('role', 'listitem');
       const label = document.createElement('strong');
       const source = sourceFor(clip.sourceVideoId);
       label.textContent = (index + 1) + ' · ' + (source ? source.title : '参照できない素材');
       const duration = document.createElement('small');
       duration.textContent = format(clip.endSeconds - clip.startSeconds);
-      button.title = (source ? source.title : '参照できない素材') + ' · ' + format(clip.startSeconds)
+      const body = document.createElement('button');
+      body.type = 'button'; body.className = 'vveClipBody'; body.dataset.clipBody = '1';
+      body.dataset.clipIndex = String(index);
+      body.setAttribute('aria-label', (index + 1) + '番目 ' + (source ? source.title : '参照できない素材'));
+      body.title = (source ? source.title : '参照できない素材') + ' · ' + format(clip.startSeconds)
         + ' – ' + format(clip.endSeconds) + ' · ' + format(clip.endSeconds - clip.startSeconds);
-      button.append(label, duration);
-      button.addEventListener('click', () => chooseClip(index));
-      refs.clips.append(button);
+      body.append(label, duration);
+      body.addEventListener('click', () => chooseClip(index));
+      const startHandle = document.createElement('button');
+      startHandle.type = 'button'; startHandle.className = 'vveTrimHandle start';
+      startHandle.dataset.trimBoundary = 'start'; startHandle.dataset.clipIndex = String(index);
+      startHandle.setAttribute('aria-label', '開始端点をドラッグ');
+      const endHandle = document.createElement('button');
+      endHandle.type = 'button'; endHandle.className = 'vveTrimHandle end';
+      endHandle.dataset.trimBoundary = 'end'; endHandle.dataset.clipIndex = String(index);
+      endHandle.setAttribute('aria-label', '終了端点をドラッグ');
+      item.append(startHandle, body, endHandle);
+      refs.clips.append(item);
     });
+    if (refs.insertMarker) refs.timeline.append(refs.insertMarker);
+    if (pointerGesture && pointerGesture.kind === 'move' && refs.insertMarker) {
+      refs.insertMarker.hidden = false;
+      refs.insertMarker.style.left = (timeline.offsets[pointerGesture.destination] || 0) * zoom + 'px';
+    } else if (refs.insertMarker) refs.insertMarker.hidden = true;
     refs.clips.style.width = Math.max(1, timeline.totalSeconds * zoom) + 'px';
     refs.clips.style.position = 'relative';
     refs.timeline.style.width = Math.max(1, timeline.totalSeconds * zoom) + 'px';
@@ -276,7 +295,10 @@
       if (!clip) throw new Error('区間を選択してください。');
       const next = readRange();
       if (clip.sourceVideoId !== next.sourceVideoId) throw new Error('別素材は新しい区間として追加してください。');
-      setEdit(Edit.trimClip(edit, selectedIndex, next.startSeconds, next.endSeconds), selectedIndex);
+      const duration = sourceFor(clip.sourceVideoId)?.durationSeconds
+        ?? (previewUrl === sourceFor(clip.sourceVideoId)?.url && Number.isFinite(refs.preview.duration) ? refs.preview.duration : null);
+      const withStart = Edit.setClipBoundary(edit, selectedIndex, 'start', next.startSeconds, duration);
+      setEdit(Edit.setClipBoundary(withStart, selectedIndex, 'end', next.endSeconds, duration), selectedIndex);
     });
   }
   function duplicateClip() {
@@ -360,6 +382,110 @@
       if (!sourceFor(refs.source.value) || !Number.isFinite(refs.preview.currentTime)) return;
       refs[which].value = String(Math.round(refs.preview.currentTime * 1000) / 1000);
     });
+  }
+
+  function pointerIndex(target) {
+    const index = Number(target && target.dataset && target.dataset.clipIndex);
+    return Number.isInteger(index) ? index : null;
+  }
+  function pointerDown(event) {
+    if (!canRead() || busy || stale || !edit || event.button > 0) return;
+    const target = event.target || {};
+    const index = pointerIndex(target);
+    const offsets = State.clipOffsets(edit);
+    const gesture = { pointerId: event.pointerId, originalEdit: edit, kind: 'seek', index: null,
+      initialVirtualTime: timelinePosition, latestClientX: event.clientX };
+    if (target.dataset && target.dataset.trimBoundary && index !== null && edit.clips[index]) {
+      gesture.kind = 'trim'; gesture.index = index; gesture.boundary = target.dataset.trimBoundary;
+      gesture.startX = event.clientX; gesture.proposed = edit;
+      chooseClip(index);
+    } else if (target.dataset && target.dataset.clipBody && index !== null && edit.clips[index]) {
+      gesture.kind = 'move'; gesture.index = index; gesture.destination = index;
+      chooseClip(index);
+    } else if (target.dataset && target.dataset.playhead) {
+      gesture.kind = 'seek';
+    }
+    pointerGesture = gesture;
+    if (typeof refs.timeline.setPointerCapture === 'function' && Number.isFinite(event.pointerId)) {
+      try { refs.timeline.setPointerCapture(event.pointerId); } catch (_) {}
+    }
+    if (gesture.kind === 'seek') updateSeek(event.clientX, offsets.totalSeconds);
+    if (event.preventDefault) event.preventDefault();
+  }
+  function updateSeek(clientX, total) {
+    if (!Number.isFinite(clientX) || !edit) return;
+    const rect = refs.timeline.getBoundingClientRect();
+    const x = clientX - rect.left + (refs.timelineScroll.scrollLeft || 0);
+    const seconds = Math.max(0, Math.min(total, x / zoom));
+    timelinePosition = seconds;
+    const located = Edit.locateTime(edit, seconds);
+    if (located) {
+      if (selectedIndex !== located.clipIndex) chooseClip(located.clipIndex);
+      else setPreview(located.clip.sourceVideoId, located.sourceSeconds);
+    }
+    drawClips();
+  }
+  function pointerMove(event) {
+    const gesture = pointerGesture;
+    if (!gesture || (gesture.pointerId !== undefined && event.pointerId !== gesture.pointerId)) return;
+    gesture.latestClientX = event.clientX;
+    if (gesture.kind === 'trim') {
+      const clip = gesture.originalEdit.clips[gesture.index];
+      const field = gesture.boundary === 'start' ? 'startSeconds' : 'endSeconds';
+      const proposedTime = clip[field] + (event.clientX - gesture.startX) / zoom;
+      const source = sourceFor(clip.sourceVideoId);
+      const duration = source && (source.durationSeconds
+        ?? (previewUrl === source.url && Number.isFinite(refs.preview.duration) ? refs.preview.duration : null));
+      try {
+        gesture.proposed = Edit.setClipBoundary(gesture.originalEdit, gesture.index, gesture.boundary, proposedTime, duration);
+        const candidate = gesture.proposed.clips[gesture.index];
+        refs.selectedDuration.textContent = '長さ ' + format(candidate.endSeconds - candidate.startSeconds)
+          + ' · ' + format(candidate.startSeconds) + '–' + format(candidate.endSeconds);
+      } catch (_) { /* Keep the last valid transient boundary. */ }
+    } else if (gesture.kind === 'move') {
+      const rect = refs.timeline.getBoundingClientRect();
+      const x = event.clientX - rect.left + (refs.timelineScroll.scrollLeft || 0);
+      const at = x / zoom;
+      const offsets = State.clipOffsets(gesture.originalEdit).offsets;
+      let destination = offsets.length - 1;
+      for (let i = 0; i < offsets.length; i++) {
+        const clip = gesture.originalEdit.clips[i];
+        const midpoint = offsets[i] + (clip.endSeconds - clip.startSeconds) / 2;
+        if (at < midpoint) { destination = i; break; }
+      }
+      gesture.destination = Math.max(0, Math.min(gesture.originalEdit.clips.length - 1, destination));
+      refs.status.textContent = '移動先：' + (gesture.destination + 1) + '番目';
+      const scrollRect = refs.timelineScroll.getBoundingClientRect();
+      const scrollRight = Number.isFinite(scrollRect.right) ? scrollRect.right : scrollRect.left + scrollRect.width;
+      if (event.clientX < scrollRect.left + 32) refs.timelineScroll.scrollLeft = Math.max(0, (refs.timelineScroll.scrollLeft || 0) - 18);
+      else if (event.clientX > scrollRight - 32) refs.timelineScroll.scrollLeft = (refs.timelineScroll.scrollLeft || 0) + 18;
+      if (refs.insertMarker) {
+        refs.insertMarker.hidden = false;
+        refs.insertMarker.style.left = (State.clipOffsets(gesture.originalEdit).offsets[gesture.destination] || 0) * zoom + 'px';
+      }
+    } else updateSeek(event.clientX, State.clipOffsets(edit).totalSeconds);
+    if (event.preventDefault) event.preventDefault();
+  }
+  function pointerUp(event) {
+    const gesture = pointerGesture;
+    if (!gesture || (gesture.pointerId !== undefined && event.pointerId !== gesture.pointerId)) return;
+    pointerGesture = null;
+    if (gesture.kind === 'trim' && gesture.proposed !== gesture.originalEdit) {
+      setEdit(gesture.proposed, gesture.index);
+      status('端点を調整しました。');
+    } else if (gesture.kind === 'move' && gesture.destination !== gesture.index) {
+      setEdit(Edit.moveClip(gesture.originalEdit, gesture.index, gesture.destination), gesture.destination);
+      status('タイムライン上で区間を並べ替えました。');
+    } else if (gesture.kind === 'seek') updateSeek(gesture.latestClientX, State.clipOffsets(edit).totalSeconds);
+    if (typeof refs.timeline.releasePointerCapture === 'function' && Number.isFinite(event.pointerId)) {
+      try { refs.timeline.releasePointerCapture(event.pointerId); } catch (_) {}
+    }
+    drawClips();
+  }
+  function pointerCancel(event) {
+    if (!pointerGesture || (pointerGesture.pointerId !== undefined && event.pointerId !== pointerGesture.pointerId)) return;
+    pointerGesture = null;
+    drawClips();
   }
 
   async function save() {
@@ -514,7 +640,7 @@
       '<button class="vveAction" type="button" data-down>→</button></div></div>',
       '<div class="vveTimelineScroll" data-timeline-scroll tabindex="0" aria-label="仮想再生タイムライン">',
       '<div class="vveTimelineCanvas" data-timeline><div class="vveRuler" data-ruler aria-hidden="true"></div>',
-      '<div class="vveClips" data-clips role="list"></div><span class="vvePlayhead" data-playhead aria-hidden="true"></span></div></div>',
+      '<div class="vveClips" data-clips role="list"></div><span class="vveInsertMarker" data-insert-marker hidden></span><button class="vvePlayhead" type="button" data-playhead aria-label="再生位置"></button></div></div>',
       '<div class="vveTimelineFooter"><span class="vveTotal" data-total>0区間</span>',
       '<a class="vveAction" data-play-saved hidden>保存済み編集版を再生</a></div>',
       '<p class="vveStatus" role="status" aria-live="polite" data-status></p></section></div>'
@@ -526,6 +652,7 @@
       preview: $('[data-preview]'), previewMeta: $('[data-preview-meta]'),
       start: $('[data-start]'), end: $('[data-end]'), clips: $('[data-clips]'),
       timeline: $('[data-timeline]'), timelineScroll: $('[data-timeline-scroll]'), playhead: $('[data-playhead]'),
+      insertMarker: $('[data-insert-marker]'),
       selectedDuration: $('[data-selected-duration]'), saveStatus: $('[data-save-status]'),
       total: $('[data-total]'), add: $('[data-add]'), trim: $('[data-trim]'),
       duplicate: $('[data-duplicate]'),
@@ -554,6 +681,11 @@
       location.href = url.href;
     });
     refs.source.addEventListener('change', changeSource);
+    refs.timeline.addEventListener('pointerdown', pointerDown);
+    refs.timeline.addEventListener('pointermove', pointerMove);
+    refs.timeline.addEventListener('pointerup', pointerUp);
+    refs.timeline.addEventListener('pointercancel', pointerCancel);
+    refs.timeline.addEventListener('lostpointercapture', pointerCancel);
     refs.sourceSearch.addEventListener('input', () => {
       sourceSearchTerm = refs.sourceSearch.value;
       drawSources();

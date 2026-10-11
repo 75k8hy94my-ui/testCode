@@ -57,12 +57,16 @@ function element(tag = 'div') {
     append(...items) { this.children.push(...items); },
     replaceChildren(...items) { this.children = items; },
     addEventListener(type, handler) { listeners[type] = handler; },
+    getBoundingClientRect() { return this.rect || { left: 0, top: 0, width: 1000, height: 300 }; },
+    setPointerCapture(id) { this.capturedPointer = id; },
+    hasPointerCapture(id) { return this.capturedPointer === id; },
+    releasePointerCapture(id) { if (this.capturedPointer === id) this.capturedPointer = null; },
     setAttribute(name, value) { this[name] = value; },
     getAttribute(name) { return this[name]; },
     removeAttribute(name) { delete this[name]; },
     pause() { this.paused = true; },
     load() { this.loaded = true; },
-    dispatch(type) { return listeners[type] && listeners[type](); },
+    dispatch(type, event = {}) { return listeners[type] && listeners[type](event); },
   };
 }
 
@@ -175,6 +179,65 @@ test('source library search filters registered MP4 choices without loading their
   search.dispatch('input');
   assert.deepEqual(options.children.map((item) => item.dataset.sourceId), ['long']);
   assert.equal(harness.selectorMap.get('[data-source]').value, 'direct');
+});
+
+test('trim pointer movement stays transient and pointer-up commits one expanded model boundary', async () => {
+  const harness = startEditor({ allowed: true });
+  const nodes = harness.selectorMap;
+  nodes.get('[data-start]').value = '10';
+  nodes.get('[data-end]').value = '20';
+  nodes.get('[data-add]').dispatch('click');
+  const clip = nodes.get('[data-clips]').children[0];
+  const handle = clip.children.find((child) => child.dataset.trimBoundary === 'start');
+  const timeline = nodes.get('[data-timeline]');
+  const event = (target, clientX) => ({ target, clientX, pointerId: 7, button: 0, preventDefault() {} });
+  timeline.dispatch('pointerdown', event(handle, 0));
+  timeline.dispatch('pointermove', event(handle, -24));
+  assert.equal(harness.calls.length, 0, 'pointer movement must not write a project');
+  assert.equal(nodes.get('[data-clips]').children[0].dataset.clipIndex, '0');
+  timeline.dispatch('pointerup', event(handle, -24));
+  assert.equal(harness.calls.length, 0, 'committing a draft gesture must not save it');
+  await nodes.get('[data-save]').dispatch('click');
+  assert.equal(harness.calls[0].edit.clips[0].startSeconds, 9);
+  assert.equal(harness.calls[0].edit.clips[0].endSeconds, 20);
+});
+
+test('pointer cancellation restores the original trim without changing the draft', async () => {
+  const harness = startEditor({ allowed: true });
+  const nodes = harness.selectorMap;
+  nodes.get('[data-start]').value = '10';
+  nodes.get('[data-end]').value = '20';
+  nodes.get('[data-add]').dispatch('click');
+  const clip = nodes.get('[data-clips]').children[0];
+  const handle = clip.children.find((child) => child.dataset.trimBoundary === 'start');
+  const timeline = nodes.get('[data-timeline]');
+  const event = (target, clientX) => ({ target, clientX, pointerId: 9, button: 0, preventDefault() {} });
+  timeline.dispatch('pointerdown', event(handle, 0));
+  timeline.dispatch('pointermove', event(handle, -48));
+  timeline.dispatch('pointercancel', event(handle, -48));
+  await nodes.get('[data-save]').dispatch('click');
+  assert.equal(harness.calls[0].edit.clips[0].startSeconds, 10);
+});
+
+test('dragging a clip body reorders the virtual sequence only on pointer-up', async () => {
+  const harness = startEditor({ allowed: true });
+  const nodes = harness.selectorMap;
+  nodes.get('[data-start]').value = '1';
+  nodes.get('[data-end]').value = '11';
+  nodes.get('[data-add]').dispatch('click');
+  nodes.get('[data-source-list]').children.find((item) => item.dataset.sourceId === 'long').dispatch('click');
+  nodes.get('[data-start]').value = '0';
+  nodes.get('[data-end]').value = '20';
+  nodes.get('[data-add]').dispatch('click');
+  const timeline = nodes.get('[data-timeline]');
+  const firstBody = nodes.get('[data-clips]').children[0].children.find((child) => child.dataset.clipBody === '1');
+  const event = (target, clientX) => ({ target, clientX, pointerId: 11, button: 0, preventDefault() {} });
+  timeline.dispatch('pointerdown', event(firstBody, 30));
+  timeline.dispatch('pointermove', event(firstBody, 24 * 29));
+  assert.equal(harness.calls.length, 0);
+  timeline.dispatch('pointerup', event(firstBody, 24 * 29));
+  await nodes.get('[data-save]').dispatch('click');
+  assert.deepEqual(JSON.parse(JSON.stringify(harness.calls[0].edit.clips.map((item) => item.sourceVideoId))), ['long', 'direct']);
 });
 
 test('selected clip can be duplicated, independently trimmed and precisely adjusted before save', async () => {
