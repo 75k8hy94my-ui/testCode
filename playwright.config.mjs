@@ -5,7 +5,7 @@ const localChrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrom
 
 export default defineConfig({
   testDir: './e2e',
-  outputDir: '/private/tmp/testCode-playwright-results',
+  outputDir: process.env.CI ? './test-results' : '/private/tmp/testCode-playwright-results',
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
   reporter: 'list',
