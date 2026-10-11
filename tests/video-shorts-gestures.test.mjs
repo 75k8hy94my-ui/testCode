@@ -12,7 +12,9 @@ test('vertical swipes navigate entries; horizontal movement never seeks', () => 
   assert.doesNotMatch(page, /activeVideo\.currentTime\s*[+-]=\s*dx/);
 });
 
-test('video hold pauses only during the hold and long-press scrubbing uses a paused duplicate preview', () => {
+test('video hold pauses only during the hold and immediate scrubbing uses a paused duplicate preview', () => {
+  assert.match(page, /if \\(onScrub\\) \\{[\\s\\S]{0,280}beginScrub\\(\\)/);
+  assert.doesNotMatch(page, /HOLD_TO_SCRUB_MS/);
   assert.match(page, /beginScrub/);
   assert.match(page, /endScrub/);
   assert.match(page, /shortsScrubPreview/);
