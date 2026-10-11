@@ -282,23 +282,12 @@
         try { storage.setItem(key, JSON.stringify(value)); return true; }
         catch (_) { return false; }
       };
-      const transferLimitKey = 'mangaReaderStorageTransferLimitDaily';
-      const transferUsageKey = 'mangaReaderStorageTransferUsageDaily';
-      const transferDayKey = () => new Date().toISOString().slice(0, 10);
-      const transferLimitBytes = () => {
-        const value = Number(storage.getItem(transferLimitKey));
-        return Number.isFinite(value) && value > 0 ? value : 150 * 1024 * 1024;
-      };
-      const transferUsageBytes = () => {
-        try {
-          const saved = JSON.parse(storage.getItem(transferUsageKey) || 'null');
-          return saved && saved.day === transferDayKey() ? Number(saved.bytes) || 0 : 0;
-        } catch (_) { return 0; }
-      };
-      const recordTransferEstimate = (bytes) => {
-        const amount = Math.max(0, Number(bytes) || 0);
-        if (transferUsageBytes() + amount > transferLimitBytes()) return false;
-        return safeWriteJson(transferUsageKey, { day: transferDayKey(), bytes: transferUsageBytes() + amount }) !== false;
+      const markLocalChangesPending = () => {
+        if (windowRef.TestCodeGuest?.isActive()) return true;
+        const vault = windowRef.MangaVault;
+        const session = vault?.loadSession?.();
+        if (!session?.user?.id) return true;
+        return typeof vault.markLocalChangesPending === 'function' && vault.markLocalChangesPending() === true;
       };
       const parseInputUrl = (value) => {
         let url = String(value || '').trim();
@@ -334,15 +323,19 @@
         fetch: windowRef.fetch.bind(windowRef),
         readStorageItem: (key) => storage.getItem(key),
         sessionKey: 'mangaReaderSupabaseSession',
-        recordTransferEstimate,
+        remoteAccess: windowRef.ImageRemoteAccess,
+        mediaAccess,
+        crypto: windowRef.crypto,
+        getEncryptionKey: () => windowRef.MangaVault?.loadActive?.()?.rawKey || null,
       });
       const host = MangaListHostRuntimeFactory.create({
-        safeWriteJson, getState: data.get, persistVideos() { return canReadProtectedData() && safeWriteJson(keys.savedVideos, data.get().savedVideos) !== false; }, canReadProtectedData, keys,
+        safeWriteJson, getState: data.get, persistVideos() { return canReadProtectedData() && markLocalChangesPending() && safeWriteJson(keys.savedVideos, data.get().savedVideos) !== false; }, canReadProtectedData, keys,
         sync: {
           hasActiveVault: () => !!(windowRef.MangaVault && windowRef.MangaVault.loadActive()),
           clearTimer: (timer) => { if (timer) windowRef.clearTimeout(timer); },
           setTimer: (callback, delay) => windowRef.setTimeout(callback, delay),
           saveLocalChanges: () => windowRef.MangaVault.saveLocalChanges(),
+          markLocalChangesPending,
           buildBasePayload: () => windowRef.MangaVaultPayload.buildFromLocalStorage(),
           getSavedVideos: () => data.get().savedVideos,
           readStorageItem: (key) => storage.getItem(key),

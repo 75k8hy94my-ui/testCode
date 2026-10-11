@@ -40,6 +40,12 @@
     localStorage.setItem(key, JSON.stringify(value));
     return true;
   }
+  function markLocalChangesPending() {
+    if (window.TestCodeGuest?.isActive()) return true;
+    const vault = window.MangaVault;
+    if (!vault?.loadSession?.()?.user?.id) return true;
+    return typeof vault.markLocalChangesPending === 'function' && vault.markLocalChangesPending() === true;
+  }
   function id(prefix) { return prefix + '-' + (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now()); }
   function text(value) { return String(value == null ? '' : value).trim(); }
 
@@ -142,6 +148,7 @@
       previousMetaRaw = localStorage.getItem(META_KEY);
       const storedFolders = previousFolderRaw == null ? [] : JSON.parse(previousFolderRaw);
       previousFolders = Array.isArray(storedFolders) ? storedFolders : [];
+      if (!markLocalChangesPending()) throw new Error('pending marker write failed');
       if (!writeJson(FOLDER_KEY, state.folders)) throw new Error('folder write failed');
       // Other routes may have saved virtual edits since this list was loaded.
       // Merge the newest registry rather than overwriting it from stale state.
@@ -374,11 +381,12 @@
     if (list.some((item) => Data.normalizeVideo(item).url === url)) {
       throw new Error('同じ動画URLはすでに追加されています。');
     }
+    if (!markLocalChangesPending()) throw new Error('未同期状態を記録できませんでした。動画は変更していません。');
     const created = Data.normalizeVideo({
       id: id('v'), title, url, a: fields.a, b: fields.b, addedAt: Date.now(), updatedAt: Date.now(),
     });
     list.unshift(created);
-    writeJson(VIDEO_KEY, list);
+    if (!writeJson(VIDEO_KEY, list)) throw new Error('動画を端末に保存できませんでした。');
     scheduleVaultSync();
     return created;
   }

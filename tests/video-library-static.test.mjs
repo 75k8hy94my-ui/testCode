@@ -256,3 +256,14 @@ test('dedicated video editor records pending sync after local save and returns w
   assert.doesNotMatch(editor, /保存できませんでした。端末の保存状態を確認してください。/);
   assert.match(html, /video-edit-page\.js\?v=20261010-vault-sync-v4-delete/);
 });
+
+test('video and manga edit paths record durable pending state before local protected writes', () => {
+  const editor = read('video-edit-page.js');
+  const library = read('video-library.js');
+  const ordinarySubmit = editor.slice(editor.indexOf("form.addEventListener('submit'"), editor.indexOf("if (!isAddMode) form.querySelector('[data-delete]')"));
+  const jsonImport = editor.slice(editor.indexOf("jsonImport.addEventListener('change'"), editor.indexOf("elements.url.addEventListener('change'"));
+  assert.ok(ordinarySubmit.indexOf('markLocalChangesPending()') < ordinarySubmit.indexOf('writeVideoRecordsAtomically('));
+  assert.ok(jsonImport.indexOf('markLocalChangesPending()') < jsonImport.indexOf('writeVideoRecordsAtomically('));
+  assert.match(library, /function persistAux[\s\S]*markLocalChangesPending\(\)[\s\S]*writeJson\(FOLDER_KEY/);
+  assert.match(library, /function invokeUrlAdd[\s\S]*markLocalChangesPending\(\)[\s\S]*writeJson\(VIDEO_KEY/);
+});
