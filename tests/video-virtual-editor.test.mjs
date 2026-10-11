@@ -26,6 +26,7 @@ test('editor route loads protected media dependencies and model before controlle
   assert.ok(css.includes('@media(max-width:770px)'));
   assert.match(css, /\.vveTrimHandle\{[^}]*touch-action:none/);
   assert.match(css, /\.vveClipBody\{[^}]*touch-action:none/);
+  assert.match(css, /\.vveClip\{[^}]*min-width:0/);
 });
 
 test('editor renders project toolbar, preview modes, searchable source library and virtual timeline', () => {
@@ -59,8 +60,8 @@ function element(tag = 'div') {
   return {
     tag, listeners, dataset: {}, children: [], style: {}, value: '', disabled: false, readyState: 0,
     duration: NaN, currentTime: 0, src: '', textContent: '',
-    append(...items) { this.children.push(...items); },
-    replaceChildren(...items) { this.children = items; },
+    append(...items) { items.forEach((item) => { item.parentElement = this; }); this.children.push(...items); },
+    replaceChildren(...items) { items.forEach((item) => { item.parentElement = this; }); this.children = items; },
     addEventListener(type, handler) { (listeners[type] ||= []).push(handler); },
     removeEventListener(type, handler) { listeners[type] = (listeners[type] || []).filter((item) => item !== handler); },
     matches(selector) { return selector === ':active' ? !!this.active : false; },
@@ -263,6 +264,27 @@ test('dragging a clip body reorders the virtual sequence only on pointer-up', as
   timeline.dispatch('pointermove', event(firstBody, 24 * 29));
   assert.equal(harness.calls.length, 0);
   timeline.dispatch('pointerup', event(firstBody, 24 * 29));
+  await nodes.get('[data-save]').dispatch('click');
+  assert.deepEqual(JSON.parse(JSON.stringify(harness.calls[0].edit.clips.map((item) => item.sourceVideoId))), ['long', 'direct']);
+});
+
+test('short clip widths follow virtual seconds and nested labels start a reorder gesture', async () => {
+  const harness = startEditor({ allowed: true });
+  const nodes = harness.selectorMap;
+  nodes.get('[data-end]').value = '0.2';
+  nodes.get('[data-add]').dispatch('click');
+  nodes.get('[data-source-list]').children.find((item) => item.dataset.sourceId === 'long').dispatch('click');
+  nodes.get('[data-start]').value = '0';
+  nodes.get('[data-end]').value = '10';
+  nodes.get('[data-add]').dispatch('click');
+  const clips = nodes.get('[data-clips]').children;
+  assert.ok(Math.abs(Number.parseFloat(clips[0].style.width) - 4.8) < 0.001);
+  const label = clips[0].children.find((child) => child.dataset.clipBody === '1').children[0];
+  const timeline = nodes.get('[data-timeline]');
+  const event = (target, clientX) => ({ target, clientX, pointerId: 12, button: 0, preventDefault() {} });
+  timeline.dispatch('pointerdown', event(label, 30));
+  timeline.dispatch('pointermove', event(label, 24 * 11));
+  timeline.dispatch('pointerup', event(label, 24 * 11));
   await nodes.get('[data-save]').dispatch('click');
   assert.deepEqual(JSON.parse(JSON.stringify(harness.calls[0].edit.clips.map((item) => item.sourceVideoId))), ['long', 'direct']);
 });

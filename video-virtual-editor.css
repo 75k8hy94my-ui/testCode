@@ -83,11 +83,12 @@
 .vveTimelineCanvas{position:relative;min-width:100%;min-height:154px;padding-top:36px;background-image:linear-gradient(to right,transparent 99%,color-mix(in srgb,var(--border) 70%,transparent) 100%);background-size:120px 100%}
 .vveRuler{position:absolute;left:0;right:0;top:0;height:30px;border-bottom:1px solid var(--border);background:repeating-linear-gradient(to right,transparent 0,transparent 119px,var(--border) 120px)}
 .vveClips{position:relative;display:flex;align-items:stretch;gap:0;height:96px;margin-top:8px;padding:0;min-width:1px}
-.vveClip{position:relative;display:flex;flex:0 0 auto;align-items:stretch;min-width:44px;height:88px;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:linear-gradient(145deg,var(--accent-dim),var(--panel-2))}
+.vveClip{position:relative;display:flex;flex:0 0 auto;align-items:stretch;min-width:0;height:88px;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:linear-gradient(145deg,var(--accent-dim),var(--panel-2))}
 .vveClip[aria-current="true"]{z-index:1;border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
 .vveClipBody{display:flex;flex:1;min-width:0;flex-direction:column;align-items:flex-start;justify-content:center;gap:7px;overflow:hidden;padding:9px 4px;border:0;background:transparent;color:var(--text);text-align:left;cursor:grab;touch-action:none}
 .vveClipBody:active{cursor:grabbing}.vveClipBody strong{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.vveClipBody small{font-size:11px;color:var(--sub);font-variant-numeric:tabular-nums}
-.vveTrimHandle{position:relative;z-index:2;flex:0 0 14px;width:14px;padding:0;border:0;background:color-mix(in srgb,var(--accent) 55%,transparent);cursor:ew-resize;touch-action:none}
+.vveTrimHandle{position:absolute;z-index:2;top:0;bottom:0;flex:0 0 14px;width:14px;padding:0;border:0;background:color-mix(in srgb,var(--accent) 55%,transparent);cursor:ew-resize;touch-action:none}
+.vveTrimHandle.start{left:0}.vveTrimHandle.end{right:0}
 .vveTrimHandle:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}.vveTrimHandle.start{border-radius:7px 0 0 7px}.vveTrimHandle.end{border-radius:0 7px 7px 0}
 .vveInsertMarker{position:absolute;z-index:3;top:36px;bottom:20px;width:3px;background:var(--accent);pointer-events:none}
 .vvePlayhead{position:absolute;z-index:4;top:0;bottom:0;left:0;width:14px;margin-left:-6px;padding:0;border:0;background:transparent;cursor:ew-resize;touch-action:none}

@@ -264,7 +264,7 @@
       const item = document.createElement('div');
       item.className = 'vveClip';
       item.dataset.clipIndex = String(index);
-      item.style.width = Math.max(44, (clip.endSeconds - clip.startSeconds) * zoom) + 'px';
+      item.style.width = Math.max(1, (clip.endSeconds - clip.startSeconds) * zoom) + 'px';
       item.style.flex = '0 0 auto';
       item.setAttribute('aria-current', String(index === selectedIndex));
       item.setAttribute('role', 'listitem');
@@ -524,6 +524,15 @@
     const index = Number(target && target.dataset && target.dataset.clipIndex);
     return Number.isInteger(index) ? index : null;
   }
+  function pointerSurface(target) {
+    let node = target;
+    while (node) {
+      const data = node.dataset || {};
+      if (data.trimBoundary || data.clipBody || data.playhead) return node;
+      node = node.parentElement || node.parentNode || null;
+    }
+    return target;
+  }
   function reorderMarkerSeconds(gesture, offsets) {
     const destination = gesture.destination;
     const destinationClip = gesture.originalEdit.clips[destination];
@@ -533,7 +542,7 @@
   }
   function pointerDown(event) {
     if (!canRead() || busy || stale || !edit || event.button > 0) return;
-    const target = event.target || {};
+    const target = pointerSurface(event.target || {});
     const index = pointerIndex(target);
     const offsets = State.clipOffsets(edit);
     const gesture = { pointerId: event.pointerId, originalEdit: edit, kind: 'seek', index: null,
