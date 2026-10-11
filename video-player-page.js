@@ -95,6 +95,8 @@
     const link = document.createElement('a');
     const destination = new URL('video.html', location.href);
     if (id) destination.searchParams.set('returnVideo', id);
+    const fromPage = Number(new URLSearchParams(location.search).get('fromPage'));
+    if (Number.isSafeInteger(fromPage) && fromPage > 0) destination.searchParams.set('returnPage', String(fromPage));
     link.href = destination.href;
     link.textContent = '動画';
     link.setAttribute('aria-label', '動画一覧へ戻る');

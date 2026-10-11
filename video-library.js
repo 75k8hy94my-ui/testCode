@@ -422,6 +422,7 @@
   function restoreVideoPage() {
     const params = new URLSearchParams(location.search);
     const targetId = params.get('returnVideo');
+    const originPage = Number(params.get('returnPage'));
     if (!targetId || !canReadProtectedData()) return;
     const all = effectiveVideos();
     // Vault hydration can finish after the first route render. Keep the intent
@@ -447,8 +448,14 @@
       }
     }
     if (index < 0) return;
-    state.page = Math.floor(index / Pagination.PAGE_SIZE) + 1;
+    const calculatedPage = Math.floor(index / Pagination.PAGE_SIZE) + 1;
+    // Prefer the page captured at opening only when the target still occupies it.
+    const candidate = Number.isSafeInteger(originPage) && originPage > 0 ? originPage : calculatedPage;
+    const pageStart = (candidate - 1) * Pagination.PAGE_SIZE;
+    state.page = list.slice(pageStart, pageStart + Pagination.PAGE_SIZE).some(video => String(video.id) === targetId)
+      ? candidate : calculatedPage;
     params.delete('returnVideo');
+    params.delete('returnPage');
     const updated = location.pathname + (params.toString() ? '?' + params : '') + location.hash;
     history.replaceState(history.state, '', updated);
   }
@@ -716,6 +723,7 @@
     updateMeta(videoId, { openCount: (video.openCount || 0) + 1, lastOpenedAt: Date.now() });
     const target = new URL('video-player.html', location.href);
     target.searchParams.set('id', videoId);
+    target.searchParams.set('fromPage', String(state.page));
     window.location.href = target.href;
   }
 
