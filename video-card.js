@@ -95,7 +95,7 @@
     } else {
       const fallback = doc.createElement('span'); fallback.className = 'videoThumbnailFallback';
       const mark = doc.createElement('b'); mark.textContent = '▶';
-      const service = doc.createElement('span'); service.textContent = options.serviceLabel || record.service || record.a || 'VIDEO';
+      const service = doc.createElement('span'); service.textContent = options.serviceLabel || (options.thumbnailOptions && options.thumbnailOptions.serviceLabel) || record.service || record.a || 'VIDEO';
       fallback.append(mark, service); thumb.append(fallback);
     }
     thumb.append(duration); thumbTarget.append(thumb); card.append(thumbTarget);
