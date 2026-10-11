@@ -337,7 +337,7 @@
   function createCard(video) {
     const VideoCard = window.MangaReaderVideoCard;
     if (!VideoCard || typeof VideoCard.create !== 'function') throw new Error('video card component is unavailable');
-    const title = video.title || [Data.deriveService(video.url, video.a), video.b].filter(Boolean).join(' / ') || '動画';
+    const title = Data.displayTitle(video, effectiveVideos());
     const metadata = [];
     const service = Data.deriveService(video.url, video.a);
     if (service) metadata.push(service);
