@@ -43,7 +43,6 @@
       id, name: requireName(name), type,
       order: active.length,
       hidden: false,
-      showInCard: false,
       deleted: false,
       updatedAt: stamp(now),
       options: {},
@@ -60,16 +59,12 @@
       if (typeof patch.hidden !== 'boolean') throw new Error('表示設定が不正です。');
       property.hidden = patch.hidden;
     }
-    if (Object.prototype.hasOwnProperty.call(patch, 'showInCard')) {
-      if (typeof patch.showInCard !== 'boolean') throw new Error('カード表示設定が不正です。');
-      property.showInCard = patch.showInCard;
-    }
     property.updatedAt = stamp(patch.now);
     return source;
   }
 
   function setPropertyFlag(definitions, id, flag, value) {
-    if (flag !== 'hidden' && flag !== 'showInCard') throw new Error('表示設定が不正です。');
+    if (flag !== 'hidden') throw new Error('表示設定が不正です。');
     return updateProperty(definitions, id, { [flag]: value });
   }
 

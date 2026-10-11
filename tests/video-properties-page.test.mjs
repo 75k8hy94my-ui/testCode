@@ -20,16 +20,15 @@ test('createsSevenTypesWithStableOptionIds', () => {
   assert.throws(() => Admin.addOption(definitions, 'p2', { id: 'o1', name: '重複' }), /ID/);
 });
 
-test('editsOrderVisibilityAndCardVisibility', () => {
+test('editsOrderAndGeneralVisibility', () => {
   let definitions = { schemaVersion: 1, properties: {
     p1: { id: 'p1', name: 'A', type: 'text', order: 0, hidden: false, showInCard: false, deleted: false, options: {} },
     p2: { id: 'p2', name: 'B', type: 'text', order: 1, hidden: false, showInCard: false, deleted: false, options: {} },
   } };
   definitions = Admin.setPropertyFlag(definitions, 'p1', 'hidden', true);
-  definitions = Admin.setPropertyFlag(definitions, 'p1', 'showInCard', true);
   definitions = Admin.reorderProperty(definitions, 'p2', 0);
   assert.equal(definitions.properties.p1.hidden, true);
-  assert.equal(definitions.properties.p1.showInCard, true);
+  assert.throws(() => Admin.setPropertyFlag(definitions, 'p1', 'showInCard', true), /表示設定/);
   assert.equal(definitions.properties.p2.order, 0);
   assert.equal(definitions.properties.p1.order, 1);
 });
@@ -79,4 +78,14 @@ test('settingsRouteUsesTheVideoAccessGateAndTypedStore', () => {
   assert.match(page, /プロパティ設定/);
   assert.match(page, /aria-label/);
   assert.match(page, /textContent/);
+});
+
+test('card visibility switch is removed, active fields use automatic listing', () => {
+  const page = read('video-properties-page.js');
+  const model = read('video-custom-property-settings-model.js');
+  const library = read('video-library.js');
+  assert.doesNotMatch(page, /動画カードに表示|showInCard/);
+  assert.doesNotMatch(model, /showInCard/);
+  assert.doesNotMatch(library, /showInCard/);
+  assert.match(read('video-properties.html'), /video-properties-page\.js\?v=20261012-always-show-properties/);
 });
