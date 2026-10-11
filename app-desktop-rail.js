@@ -301,11 +301,14 @@
       const element = nav.querySelector('#' + item.id);
       if (!element) continue;
       const selected = item.key === active;
+      // A watch page is not the video list: the active Video item must stay
+      // clickable so viewers can return to the containing list page.
+      const isPlayerVideoLink = selected && item.key === 'video' && pageName() === 'video-player.html';
       element.classList.toggle('active', selected);
       if (selected) element.setAttribute('aria-current', 'page');
       else element.removeAttribute('aria-current');
-      element.toggleAttribute('aria-disabled', selected);
-      if (selected) {
+      element.toggleAttribute('aria-disabled', selected && !isPlayerVideoLink);
+      if (selected && !isPlayerVideoLink) {
         element.setAttribute('tabindex', '-1');
         element.removeAttribute('href');
       } else {
