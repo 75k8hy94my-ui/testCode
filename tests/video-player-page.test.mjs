@@ -67,6 +67,9 @@ test('watch page applies and cleans up the saved rotation direction for direct v
   const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
   assert.ok(html.indexOf('video-player-rotation.js') < html.indexOf('video-player-page.js'));
   assert.match(fs.readFileSync(new URL('../home-profile-shell.css', import.meta.url), 'utf8'), /videoPlayerFrame video\.videoPlayerRotatedLeft/);
+  assert.match(page, /MangaReaderVideoRotation\.install\(frame, video, normalized\.rotate90Direction, \{ expandFrame: true \}\)/);
+  assert.match(fs.readFileSync(new URL('../home-profile-shell.css', import.meta.url), 'utf8'), /videoPlayerFrame\.videoPlayerFrameRotated\{height:min\(800px,calc\(100dvh - 150px\)\);aspect-ratio:auto\}/);
+  assert.match(fs.readFileSync(new URL('../home-profile-shell.css', import.meta.url), 'utf8'), /videoPlayerFrame\.videoPlayerFrameRotated:fullscreen[^}]*height:100vh/);
 });
 
 test('video title edits in place and player details follow the video in a watch-page layout', () => {
