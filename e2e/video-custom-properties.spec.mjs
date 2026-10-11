@@ -34,7 +34,10 @@ test('guest configures a property, saves it on a video, filters, and reads it on
   await page.getByLabel('時間帯の条件').selectOption('equals');
   await page.getByLabel('時間帯の値').selectOption({ label: '朝' });
   await expect(page.locator('#videoLibraryCount')).toContainText('1 / 1');
-  await page.locator('.vl-edit-link').click();
+  const videoCard = page.locator('.videoCard').first();
+  await videoCard.locator('.videoCardMenuButton').click();
+  await expect(videoCard.locator('.videoCardMenu')).toBeVisible();
+  await videoCard.locator('.videoCardMenuEdit').evaluate((link) => link.click());
   await expect(page).toHaveURL(/video-edit\.html\?id=/);
   await expect(page.getByRole('button', { name: '朝', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: '夜', exact: true }).click();
@@ -44,7 +47,7 @@ test('guest configures a property, saves it on a video, filters, and reads it on
   await page.getByText('カスタムプロパティで絞り込む').click();
   await page.getByLabel('時間帯の値').selectOption({ label: '夜' });
   await expect(page.locator('#videoLibraryCount')).toContainText('1 / 1');
-  await page.locator('.vl-open').click();
+  await page.locator('.videoCardTitle').click();
   await expect(page).toHaveURL(/video-player\.html\?id=/);
   await page.getByText('プロパティ', { exact: true }).click();
   await expect(page.getByText('時間帯：')).toBeVisible();

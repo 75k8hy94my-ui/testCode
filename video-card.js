@@ -26,7 +26,6 @@
       if (doc.removeEventListener) {
         doc.removeEventListener('pointerdown', closeOutside, true);
         doc.removeEventListener('keydown', closeOnEscape, true);
-        doc.removeEventListener('scroll', close, true);
       }
       if (activeMenuClose === close) activeMenuClose = null;
     };
@@ -56,7 +55,6 @@
       if (doc.addEventListener) {
         doc.addEventListener('pointerdown', closeOutside, true);
         doc.addEventListener('keydown', closeOnEscape, true);
-        doc.addEventListener('scroll', close, true);
       }
       const firstAction = menu.children[0]; if (firstAction && typeof firstAction.focus === 'function') firstAction.focus();
     });
