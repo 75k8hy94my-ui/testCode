@@ -29,6 +29,50 @@
   let pageAnimation = null;
   let activePage = null;
   let paginationEventsBound = false;
+  const RETURN_INTENT_KEY = 'testcode.video.returnIntent';
+  let returnIntent = null;
+
+  function readReturnIntent() {
+    const params = new URLSearchParams(location.search);
+    const id = params.get('returnVideo');
+    const requestedPage = Number(params.get('returnPage'));
+    const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : null;
+    if (id) {
+      returnIntent = { id, page };
+      return;
+    }
+    if (returnIntent) return;
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(RETURN_INTENT_KEY) || 'null');
+      if (stored && typeof stored.id === 'string' && stored.id) {
+        const storedPage = Number(stored.page);
+        returnIntent = { id: stored.id, page: Number.isSafeInteger(storedPage) && storedPage > 0 ? storedPage : null };
+      }
+    } catch (_) { /* A missing session fallback does not affect URL navigation. */ }
+  }
+
+  function clearReturnIntent() {
+    returnIntent = null;
+    try { sessionStorage.removeItem(RETURN_INTENT_KEY); } catch (_) {}
+    const params = new URLSearchParams(location.search);
+    if (!params.has('returnVideo') && !params.has('returnPage')) return;
+    params.delete('returnVideo');
+    params.delete('returnPage');
+    history.replaceState(history.state, '', location.pathname + (params.toString() ? '?' + params : '') + location.hash);
+  }
+
+  function acknowledgeReturnIntent(pageItems) {
+    if (!returnIntent || !pageItems.some(video => String(video.id) === returnIntent.id)) return;
+    // Only acknowledge a return once the matching card actually exists in the
+    // displayed page. Retain returnIntent for later Vault/SPA re-render events.
+    if (!Array.from(dom.results.querySelectorAll('.vl-card')).some(card => card.dataset.videoId === returnIntent.id)) return;
+    try { sessionStorage.removeItem(RETURN_INTENT_KEY); } catch (_) {}
+    const params = new URLSearchParams(location.search);
+    if (params.get('returnVideo') !== returnIntent.id) return;
+    params.delete('returnVideo');
+    params.delete('returnPage');
+    history.replaceState(history.state, '', location.pathname + (params.toString() ? '?' + params : '') + location.hash);
+  }
 
   function canReadProtectedData() {
     return !!mediaAccess && typeof mediaAccess.canReadProtectedData === 'function' && mediaAccess.canReadProtectedData() === true;
@@ -364,6 +408,7 @@
       editHref: 'video-edit.html?id=' + encodeURIComponent(video.id) + '&return=list',
     });
     card.classList.add('vl-card');
+    card.dataset.videoId = String(video.id);
     return card;
   }
 
@@ -405,6 +450,7 @@
       valueNode.setAttribute('aria-label', property.name + 'の値');
       const clear = document.createElement('button'); clear.type='button'; clear.className='vl-icon-btn'; clear.textContent='解除'; clear.setAttribute('aria-label', property.name + 'の絞り込みを解除');
       const update = () => {
+        clearReturnIntent();
         const op = operator.value;
         if (op === operators[0][0] && !['is_unset','true','false'].includes(op) && !String(valueNode.value || '').trim() && property.type !== 'multi_select') delete state.customFilters[property.id];
         else if (property.type === 'multi_select') { const optionIds=[...valueNode.selectedOptions].map((item)=>item.value); if (!optionIds.length) delete state.customFilters[property.id]; else state.customFilters[property.id]={propertyId:property.id,operator:op,optionIds}; }
@@ -413,20 +459,19 @@
         render();
       };
       operator.addEventListener('change', update); valueNode.addEventListener('change', update);
-      clear.addEventListener('click', () => { delete state.customFilters[property.id]; render(); });
+      clear.addEventListener('click', () => { clearReturnIntent(); delete state.customFilters[property.id]; render(); });
       row.append(operator, valueNode, clear); dom.customFilters.append(row);
     });
     if (!properties.length) { const empty=document.createElement('span'); empty.textContent='表示可能なプロパティがありません。'; dom.customFilters.append(empty); }
   }
 
   function restoreVideoPage() {
-    const params = new URLSearchParams(location.search);
-    const targetId = params.get('returnVideo');
-    const originPage = Number(params.get('returnPage'));
+    readReturnIntent();
+    const targetId = returnIntent && returnIntent.id;
     if (!targetId || !canReadProtectedData()) return;
     const all = effectiveVideos();
-    // Vault hydration can finish after the first route render. Keep the intent
-    // until the target is actually present in protected local data.
+    // Initial local/Vault hydration can be asynchronous. Do not lose the
+    // return intent when the target is not yet available.
     if (!all.some(video => String(video.id) === targetId)) return;
     const findInCurrentView = () => {
       const scoped = all.filter(video => video.hidden === state.showHidden);
@@ -437,7 +482,6 @@
     let list = findInCurrentView();
     let index = list.findIndex(video => String(video.id) === targetId);
     if (index < 0) {
-      // Restore the video even when a saved filter excludes it.
       const target = all.find(video => String(video.id) === targetId);
       if (target) {
         state.showHidden = !!target.hidden;
@@ -449,15 +493,11 @@
     }
     if (index < 0) return;
     const calculatedPage = Math.floor(index / Pagination.PAGE_SIZE) + 1;
-    // Prefer the page captured at opening only when the target still occupies it.
+    const originPage = returnIntent.page;
     const candidate = Number.isSafeInteger(originPage) && originPage > 0 ? originPage : calculatedPage;
     const pageStart = (candidate - 1) * Pagination.PAGE_SIZE;
     state.page = list.slice(pageStart, pageStart + Pagination.PAGE_SIZE).some(video => String(video.id) === targetId)
       ? candidate : calculatedPage;
-    params.delete('returnVideo');
-    params.delete('returnPage');
-    const updated = location.pathname + (params.toString() ? '?' + params : '') + location.hash;
-    history.replaceState(history.state, '', updated);
   }
 
   function render(pageDirection = 0) {
@@ -486,7 +526,7 @@
     dom.pageLabel.textContent = state.page + ' / ' + state.totalPages;
     const resultsKey = JSON.stringify([state.view, state.showHidden, state.page, pageModel.items]);
     // Keep loaded thumbnail elements when returning to an unchanged video list.
-    if (resultsKey === renderedResultsKey) return;
+    if (resultsKey === renderedResultsKey) { acknowledgeReturnIntent(pageModel.items); return; }
     renderedResultsKey = resultsKey;
     const outgoing = pageDirection && activePage && dom.results.contains(activePage) ? activePage : null;
     if (pageAnimation) { pageAnimation.cancel(); pageAnimation = null; }
@@ -512,6 +552,7 @@
         animation.finished.then(finish, finish);
       } else frame.replaceChildren(incoming);
     } else { frame.append(incoming); dom.results.replaceChildren(frame); }
+    acknowledgeReturnIntent(pageModel.items);
   }
 
   function invokeUrlAdd({ title, url }) {
@@ -730,12 +771,13 @@
   function bindEvents() {
     if (eventsBound) return;
     eventsBound = true;
-    dom.search.addEventListener('input', () => { state.query = dom.search.value; render(); });
+    dom.search.addEventListener('input', () => { clearReturnIntent(); state.query = dom.search.value; render(); });
     if (!paginationEventsBound && window.MangaListPaginationEventsFactory) {
       const paginationEvents = window.MangaListPaginationEventsFactory.create({
         onPageChange(delta) {
           const nextPage = state.page + delta;
           if (nextPage < 1 || nextPage > state.totalPages || nextPage === state.page) return;
+          clearReturnIntent();
           state.page = nextPage;
           render(delta);
         },
@@ -744,13 +786,13 @@
       paginationEvents.bind({ prevButton: dom.prevPage, nextButton: dom.nextPage, swipeSurface: dom.results });
       paginationEventsBound = true;
     }
-    dom.quick.addEventListener('click', (event) => { const button = event.target.closest('[data-quick]'); if (!button) return; state.quick = button.dataset.quick; savePrefs(); render(); });
-    dom.folder.addEventListener('change', () => { state.folderId = dom.folder.value; render(); });
-    dom.tag.addEventListener('change', () => { state.tag = dom.tag.value; render(); });
-    dom.service.addEventListener('change', () => { state.service = dom.service.value; render(); });
-    dom.sort.addEventListener('change', () => { state.sort = dom.sort.value; savePrefs(); render(); });
-    dom.view.addEventListener('click', () => { state.view = state.view === 'card' ? 'compact' : 'card'; savePrefs(); render(); });
-    dom.hiddenBtn.addEventListener('click', () => { state.showHidden = !state.showHidden; state.query = ''; dom.search.value = ''; state.folderId = ''; state.tag = ''; state.service = ''; render(); });
+    dom.quick.addEventListener('click', (event) => { const button = event.target.closest('[data-quick]'); if (!button) return; clearReturnIntent(); state.quick = button.dataset.quick; savePrefs(); render(); });
+    dom.folder.addEventListener('change', () => { clearReturnIntent(); state.folderId = dom.folder.value; render(); });
+    dom.tag.addEventListener('change', () => { clearReturnIntent(); state.tag = dom.tag.value; render(); });
+    dom.service.addEventListener('change', () => { clearReturnIntent(); state.service = dom.service.value; render(); });
+    dom.sort.addEventListener('change', () => { clearReturnIntent(); state.sort = dom.sort.value; savePrefs(); render(); });
+    dom.view.addEventListener('click', () => { clearReturnIntent(); state.view = state.view === 'card' ? 'compact' : 'card'; savePrefs(); render(); });
+    dom.hiddenBtn.addEventListener('click', () => { clearReturnIntent(); state.showHidden = !state.showHidden; state.query = ''; dom.search.value = ''; state.folderId = ''; state.tag = ''; state.service = ''; render(); });
     dom.add.addEventListener('click', () => {
       if (!canReadProtectedData()) return;
       window.location.href = new URL('video-edit.html?mode=add&return=list', location.href).href;
