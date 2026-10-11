@@ -321,3 +321,51 @@ html[data-theme="dark"] .iosSwitch input:checked + .iosSwitchTrack{background:#3
 .customVideoSeekWrap{position:relative;flex:1;min-width:0;height:24px;display:flex;align-items:center}.customVideoSeekWrap .customVideoSeek{width:100%;flex:1}.videoMarkerBubble{position:absolute;z-index:2;top:50%;transform:translate(-50%,-50%);width:25px;height:25px;padding:3px;border:0;border-radius:50%;display:grid;place-items:center;background:#24262c;color:#fff;cursor:pointer}.videoMarkerBubble svg,.videoMarkerIconChoice svg,.videoMarkerListItem svg,.videoPlayerMarkerButton svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.videoMarkerChoices{display:flex;gap:6px}.videoMarkerIconChoice{width:40px;height:40px;padding:8px;border:1px solid rgba(255,255,255,.35);border-radius:10px;background:transparent;color:#fff;cursor:pointer}.videoMarkerIconChoice[aria-pressed=true]{background:rgba(255,255,255,.22);border-color:#fff}.videoMarkerAdd{padding:8px 12px}.videoMarkerListItem{width:32px;height:32px;padding:4px;border:0;background:transparent;color:inherit;cursor:pointer}.videoMarkerRemove{min-width:26px}.videoPlayerMarkerButton{width:38px;height:38px;padding:7px;margin:0 4px 4px 0;border:1px solid currentColor;border-radius:50%;background:transparent;color:inherit;cursor:pointer}
 @media(max-width:620px){.customVideoSeekWrap{order:-1;flex:0 0 100%}.customVideoSeekWrap .customVideoSeek{flex:1 1 auto}}
 .profileVaultHistoryRow{margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}.profileVaultHistoryRow h4{margin:0 0 6px;font-size:14px}.profileVaultHistoryActions{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.profileVaultHistoryActions button{border:1px solid var(--line)}#profileVaultHistoryPreview{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}#profileVaultHistoryPreview h4{margin:0 0 8px}#profileVaultHistoryPreview ul{padding-left:22px;max-height:260px;overflow:auto;overflow-wrap:anywhere}#profileVaultHistory [role=status][data-state=error]{color:var(--danger)}#profileVaultHistory [role=status][data-state=ok]{color:var(--ok)}
+
+
+/* Stable video page width across SPA navigation and standalone routes.
+   Include padding in the cap and permit nested grid/flex children to shrink. */
+#videoPlayerPage,
+#videoListSection,
+#videoLibraryApp,
+.videoPlayerLayout,
+.videoPlayerMain,
+.videoRelated,
+.vl-page-frame,
+.vl-page,
+.vl-grid {
+  box-sizing: border-box;
+  min-width: 0;
+}
+#videoPlayerPage,
+#videoListSection {
+  width: 100%;
+  max-width: 100%;
+}
+.videoPlayerLayout,
+#videoListSection #videoLibraryApp {
+  width: 100%;
+  max-width: 1540px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.videoPlayerLayout {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 380px);
+}
+#videoListSection #videoLibraryApp {
+  padding-left: 24px;
+  padding-right: 24px;
+}
+.vl-grid,
+.vl-page-frame,
+.videoPlayerFrame {
+  max-width: 100%;
+}
+@media (max-width: 900px) {
+  .videoPlayerLayout { display: block; padding-left: 14px; padding-right: 14px; }
+  #videoListSection #videoLibraryApp { padding-left: 14px; padding-right: 14px; }
+}
+@media (max-width: 560px) {
+  .videoPlayerLayout { padding-left: 10px; padding-right: 10px; }
+  #videoListSection #videoLibraryApp { padding-left: 10px; padding-right: 10px; }
+}
