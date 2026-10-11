@@ -22,7 +22,7 @@
     wrap.append(trigger, menu);
 
     const close = () => {
-      menu.hidden = true; trigger.setAttribute('aria-expanded', 'false'); wrap.className = 'videoCardMenuWrap'; titleRow.className = 'videoCardTitleRow';
+      menu.hidden = true; trigger.setAttribute('aria-expanded', 'false'); wrap.className = 'videoCardMenuWrap';
       if (doc.removeEventListener) {
         doc.removeEventListener('pointerdown', closeOutside, true);
         doc.removeEventListener('keydown', closeOnEscape, true);
@@ -51,7 +51,7 @@
       event.preventDefault(); event.stopPropagation();
       if (!menu.hidden) { close(); return; }
       if (activeMenuClose) activeMenuClose();
-      menu.hidden = false; trigger.setAttribute('aria-expanded', 'true'); wrap.className = 'videoCardMenuWrap videoCardMenuWrap--open'; titleRow.className = 'videoCardTitleRow videoCardTitleRow--menu-open'; activeMenuClose = close;
+      menu.hidden = false; trigger.setAttribute('aria-expanded', 'true'); wrap.className = 'videoCardMenuWrap videoCardMenuWrap--open'; activeMenuClose = close;
       if (doc.addEventListener) {
         doc.addEventListener('pointerdown', closeOutside, true);
         doc.addEventListener('keydown', closeOnEscape, true);
