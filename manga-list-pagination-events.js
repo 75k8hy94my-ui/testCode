@@ -41,6 +41,7 @@
       let gesture = null;
       const interactiveTarget = (target) => {
         const node = target?.nodeType === 3 ? target.parentElement : target;
+        if (typeof deps.allowSwipeTarget === 'function' && deps.allowSwipeTarget(node)) return false;
         return typeof node?.closest === 'function' && !!node.closest(
           'button, a, input, textarea, select, label, [contenteditable], [data-no-page-swipe]'
         );

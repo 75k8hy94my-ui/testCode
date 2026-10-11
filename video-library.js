@@ -3,7 +3,8 @@
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
   const Data = window.MangaReaderVideoData;
-  if (!Data) return;
+  const Pagination = window.VideoLibraryPagination;
+  if (!Data || !Pagination) return;
 
   const VIDEO_KEY = 'mangaReaderVideos';
   const FOLDER_KEY = 'mangaReaderVideoFolders';
@@ -16,13 +17,16 @@
   };
 
   const state = {
-    baseVideos: [], folders: [], meta: {}, query: '', quick: 'all', folderId: '', tag: '', service: '', sort: 'recent-added', view: 'card',
+    baseVideos: [], folders: [], meta: {}, query: '', quick: 'all', folderId: '', tag: '', service: '', sort: 'recent-added', view: 'card', page: 1, totalPages: 1,
     syncTimer: null, syncRunning: false, syncDirty: false, syncPromise: null, editorSaving: false, editorId: null, sheetMode: null, showHidden: false,
   };
   const dom = {};
   let eventsBound = false;
   let mediaAccess = window.MangaReaderMediaAccess || null;
   let renderedResultsKey = null;
+  let pageAnimation = null;
+  let activePage = null;
+  let paginationEventsBound = false;
 
   function canReadProtectedData() {
     return !!mediaAccess && typeof mediaAccess.canReadProtectedData === 'function' && mediaAccess.canReadProtectedData() === true;
@@ -187,6 +191,10 @@
       #videoLibraryShorts{white-space:nowrap;background:var(--panel-2);color:var(--text);border:1px solid var(--border)}
       .vl-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto auto;gap:7px}.vl-filters select,.vl-icon-btn{min-height:39px;min-width:0;border:1px solid var(--border);border-radius:11px;background:var(--bg-soft);color:var(--text);padding:0 9px}.vl-icon-btn{cursor:pointer;font-weight:700}.vl-summary{display:flex;justify-content:space-between;gap:10px;color:var(--sub);font-size:11px;min-height:18px}.vl-summary [data-error="1"]{color:#ef6464}
       #videoLibraryResults{overflow:auto;min-height:0;flex:1;padding:1px 1px 18px}.vl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:11px}.vl-grid.compact{display:flex;flex-direction:column;gap:6px}.vl-card{position:relative;min-width:0;border:1px solid var(--border);border-radius:16px;background:var(--bg-soft);overflow:visible;box-shadow:0 5px 18px rgba(0,0,0,.08)}.vl-open{display:block;width:100%;border:0;background:transparent;color:inherit;padding:0;text-align:left;cursor:pointer}.vl-thumb{position:relative;aspect-ratio:16/9;display:grid;place-items:center;border-radius:15px 15px 0 0;overflow:hidden;background:linear-gradient(135deg,var(--panel-2),var(--bg));color:var(--sub)}.vl-thumb img,.vl-thumb video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.vl-thumb-fallback{display:grid;place-items:center;text-align:center;gap:5px;font-size:11px}.vl-thumb-fallback b{font-size:27px;color:var(--text)}.vl-body{padding:11px 12px 12px}.vl-title{font-weight:750;font-size:14px;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.vl-meta{margin-top:6px;color:var(--sub);font-size:11px;display:flex;gap:6px;flex-wrap:wrap}.vl-tags{margin-top:7px;display:flex;gap:5px;flex-wrap:wrap}.vl-tag{font-size:10px;border:1px solid var(--border);border-radius:999px;padding:3px 6px;color:var(--sub)}.vl-card-actions{position:absolute;right:8px;top:8px;display:flex;gap:4px;z-index:3}.vl-round{width:34px;height:34px;border:1px solid rgba(255,255,255,.24);border-radius:50%;display:grid;place-items:center;background:rgba(10,12,17,.76);color:#fff;backdrop-filter:blur(14px);cursor:pointer}.vl-round.active{color:#ffd35a}.vl-edit-link{text-decoration:none;font-size:22px;line-height:1}.vl-progress{height:3px;background:var(--panel-2);margin-top:9px;border-radius:99px;overflow:hidden}.vl-progress i{display:block;height:100%;background:var(--accent)}
+      .vl-page-frame{min-width:0;overflow:hidden}.vl-page{min-width:0;width:100%}.vl-slide-track{display:flex;align-items:flex-start;width:200%;will-change:transform}.vl-slide-track>.vl-page{flex:0 0 50%;width:50%;pointer-events:none}
+      .vl-pagination{display:flex;justify-content:center;align-items:center;gap:10px;width:100%;margin:4px 0 0;padding:8px 10px;min-height:54px;border:1px solid rgba(255,255,255,.3);border-radius:16px;background:rgba(29,35,49,.96)}.vl-pagination[hidden]{display:none!important}.vl-pagination span{min-width:74px;color:var(--text);text-align:center;font-variant-numeric:tabular-nums}.vl-pagination .bookshelfPagerButton{display:flex;align-items:center;justify-content:center;min-width:50px;min-height:44px;border:1px solid var(--border);border-radius:999px;background:var(--panel-2);color:var(--text);cursor:pointer}.vl-pagination .bookshelfPagerButton:disabled{opacity:.38;cursor:not-allowed}.bookshelfPagerGlyph{width:22px;height:22px;pointer-events:none}
+      @media(min-width:900px){.vl-pagination{--pager-glass-fill:rgba(19,22,28,.52);--pager-glass-edge:rgba(255,255,255,.28);--pager-glass-shine:rgba(255,255,255,.43);--pager-glass-shadow:rgba(0,0,0,.3);position:fixed;z-index:850;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:auto;min-width:232px;max-width:calc(100vw - 48px);height:68px;padding:8px 11px;gap:10px;isolation:isolate;border:1px solid var(--pager-glass-edge);border-radius:999px;color:#f7f9fe;background:radial-gradient(110% 175% at 24% 0%,rgba(255,255,255,.18),transparent 48%),linear-gradient(180deg,rgba(255,255,255,.07),transparent 55%),var(--pager-glass-fill);-webkit-backdrop-filter:blur(30px) saturate(180%) contrast(106%);backdrop-filter:blur(30px) saturate(180%) contrast(106%);box-shadow:0 18px 46px var(--pager-glass-shadow),0 2px 6px rgba(0,0,0,.12),inset 0 1.5px 0 var(--pager-glass-shine),inset 0 -1px 0 rgba(255,255,255,.08)}.vl-pagination:before{content:'';position:absolute;z-index:-1;inset:3px;border-radius:inherit;border:1px solid rgba(255,255,255,.09);pointer-events:none}.vl-pagination .bookshelfPagerButton{flex:0 0 50px;width:50px;height:50px;min-height:50px;padding:0;border-color:rgba(255,255,255,.2);border-radius:50%;color:#f7f9fe;background:linear-gradient(165deg,rgba(255,255,255,.2),rgba(255,255,255,.035)),rgba(255,255,255,.035);box-shadow:inset 0 1px 0 rgba(255,255,255,.23),0 2px 10px rgba(0,0,0,.13)}.vl-pagination .bookshelfPagerButton:focus-visible{outline:2px solid #9ac9ff;outline-offset:3px}.vl-pagination span{min-width:84px;color:#f7f9fe;font-size:13px;font-weight:650;letter-spacing:.035em;text-shadow:0 1px 5px rgba(0,0,0,.16);white-space:nowrap}html.app-desktop-rail-page .vl-pagination{left:calc(50% + 29px)}html[data-theme="light"] .vl-pagination{--pager-glass-fill:rgba(240,245,252,.63);--pager-glass-edge:rgba(255,255,255,.8);--pager-glass-shine:rgba(255,255,255,.94);--pager-glass-shadow:rgba(48,61,77,.16);color:#202834;background:radial-gradient(110% 175% at 24% 0%,rgba(255,255,255,.58),transparent 50%),linear-gradient(180deg,rgba(255,255,255,.23),rgba(214,227,245,.1)),var(--pager-glass-fill)}html[data-theme="light"] .vl-pagination .bookshelfPagerButton{border-color:rgba(255,255,255,.76);color:#202834;background:linear-gradient(165deg,rgba(255,255,255,.8),rgba(207,220,239,.27));box-shadow:inset 0 1px 0 rgba(255,255,255,.96),0 2px 10px rgba(49,61,80,.09)}html[data-theme="light"] .vl-pagination span{color:#202834}}
+      @media(max-width:899px){.vl-pagination{margin:8px 0 0;padding:6px 8px;min-height:42px}.vl-pagination span{min-width:52px}.vl-pagination .bookshelfPagerButton{min-width:64px;min-height:44px}}
       .vl-grid.compact .vl-card{display:grid;grid-template-columns:116px minmax(0,1fr);min-height:76px;overflow:visible}.vl-grid.compact .vl-open{display:contents}.vl-grid.compact .vl-thumb{aspect-ratio:auto;height:76px;border-radius:15px 0 0 15px}.vl-grid.compact .vl-body{padding:10px 70px 8px 10px}.vl-grid.compact .vl-title{-webkit-line-clamp:1}.vl-grid.compact .vl-card-actions{top:50%;transform:translateY(-50%)}.vl-empty{padding:48px 18px;text-align:center;color:var(--sub);border:1px dashed var(--border);border-radius:16px}.vl-empty strong{display:block;color:var(--text);font-size:17px;margin-bottom:6px}
       /* This sheet is appended to body, outside .homeShell's theme variables. */
       #videoLibrarySheet{--bg-soft:#fff;--panel:#fff;--panel-2:#eef1f5;--text:#202124;--sub:#59616e;--border:#dfe3e8;--accent:#1769aa;color-scheme:light}
@@ -238,7 +246,12 @@
       </div>
       <div class="vl-summary"><span id="videoLibraryCount"></span><span id="videoLibraryStatus" aria-live="polite"></span></div>
       <p id="videoLibraryAccessNotice" class="vl-access-notice" aria-live="polite" hidden>VPN接続を確認できるまで、動画データの読み込みと追加・編集を停止しています。</p>
-      <div id="videoLibraryResults"></div>`;
+      <div id="videoLibraryResults"></div>
+      <nav id="videoLibraryPagination" class="bookshelf-pagination vl-pagination" aria-label="動画一覧のページ移動" hidden>
+        <button id="videoLibraryPrevPage" class="bookshelfPagerButton" type="button" aria-label="前のページ"><svg class="bookshelfPagerGlyph" viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <span id="videoLibraryPageLabel" aria-live="polite">1 / 1</span>
+        <button id="videoLibraryNextPage" class="bookshelfPagerButton" type="button" aria-label="次のページ"><svg class="bookshelfPagerGlyph" viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </nav>`;
     section.prepend(app);
 
     const sheet = document.createElement('section');
@@ -281,6 +294,7 @@
       folder: document.getElementById('videoLibraryFolder'), tag: document.getElementById('videoLibraryTag'), service: document.getElementById('videoLibraryService'),
       sort: document.getElementById('videoLibrarySort'), view: document.getElementById('videoLibraryView'), foldersBtn: document.getElementById('videoLibraryFolders'),
       add: document.getElementById('videoLibraryAdd'), shorts: document.getElementById('videoLibraryShorts'), hiddenBtn: document.getElementById('videoLibraryHidden'), count: document.getElementById('videoLibraryCount'), status: document.getElementById('videoLibraryStatus'), results: document.getElementById('videoLibraryResults'),
+      pagination: document.getElementById('videoLibraryPagination'), prevPage: document.getElementById('videoLibraryPrevPage'), nextPage: document.getElementById('videoLibraryNextPage'), pageLabel: document.getElementById('videoLibraryPageLabel'),
       sheet, sheetTitle: document.getElementById('videoLibrarySheetTitle'), form: document.getElementById('videoLibraryForm'),
       formError: document.getElementById('videoLibraryFormError'), url: document.getElementById('videoLibraryUrl'), urlEdit: document.getElementById('videoLibraryUrlEdit'), suggestedTags: document.getElementById('videoLibrarySuggestedTags'), title: document.getElementById('videoLibraryTitle'), editFolder: document.getElementById('videoLibraryEditFolder'),
       statusSelect: document.getElementById('videoLibraryStatusSelect'), tags: document.getElementById('videoLibraryTags'), memo: document.getElementById('videoLibraryMemo'), favorite: document.getElementById('videoLibraryFavorite'),
@@ -350,7 +364,7 @@
     fillSelect(dom.editFolder, state.folders.map((folder) => ({ value: folder.id, label: folder.name })), dom.editFolder.value, '未分類');
   }
 
-  function render() {
+  function render(pageDirection = 0) {
     loadLibraryState();
     syncAccessUi();
     const all = effectiveVideos();
@@ -363,13 +377,41 @@
     dom.hiddenBtn.textContent = state.showHidden ? '動画一覧' : '非表示 (' + all.filter((video) => video.hidden).length + ')';
     dom.hiddenBtn.setAttribute('aria-pressed', state.showHidden ? 'true' : 'false');
     dom.count.textContent = videos.length + ' / ' + scoped.length + '件';
-    const resultsKey = JSON.stringify([state.view, state.showHidden, videos]);
+    const pageModel = Pagination.derive(videos, state.page, Pagination.PAGE_SIZE);
+    state.page = pageModel.page;
+    state.totalPages = pageModel.totalPages;
+    dom.pagination.hidden = !pageModel.hasMultiplePages;
+    dom.prevPage.disabled = state.page <= 1;
+    dom.nextPage.disabled = state.page >= state.totalPages;
+    dom.pageLabel.textContent = state.page + ' / ' + state.totalPages;
+    const resultsKey = JSON.stringify([state.view, state.showHidden, state.page, pageModel.items]);
     // Keep loaded thumbnail elements when returning to an unchanged video list.
     if (resultsKey === renderedResultsKey) return;
-    dom.results.replaceChildren();
     renderedResultsKey = resultsKey;
-    if (!videos.length) { const empty = document.createElement('div'); empty.className = 'vl-empty'; empty.innerHTML = '<strong>' + (state.showHidden ? '非表示の動画はありません' : '該当する動画がありません') + '</strong><span>検索やフィルタを変更するか、動画を追加できます。</span>'; dom.results.append(empty); return; }
-    const grid = document.createElement('div'); grid.className = 'vl-grid' + (state.view === 'compact' ? ' compact' : ''); videos.forEach((video) => grid.append(createCard(video))); dom.results.append(grid);
+    const outgoing = pageDirection && activePage && dom.results.contains(activePage) ? activePage : null;
+    if (pageAnimation) { pageAnimation.cancel(); pageAnimation = null; }
+    const frame = document.createElement('div'); frame.className = 'vl-page-frame';
+    const incoming = document.createElement('div'); incoming.className = 'vl-page';
+    activePage = incoming;
+    if (!videos.length) {
+      const empty = document.createElement('div'); empty.className = 'vl-empty'; empty.innerHTML = '<strong>' + (state.showHidden ? '非表示の動画はありません' : '該当する動画がありません') + '</strong><span>検索やフィルタを変更するか、動画を追加できます。</span>'; incoming.append(empty);
+    } else {
+      const grid = document.createElement('div'); grid.className = 'vl-grid' + (state.view === 'compact' ? ' compact' : ''); pageModel.items.forEach((video) => grid.append(createCard(video))); incoming.append(grid);
+    }
+    const reduceMotion = document.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (outgoing && pageDirection && !reduceMotion) {
+      const track = document.createElement('div'); track.className = 'vl-slide-track';
+      if (pageDirection > 0) track.append(outgoing, incoming); else track.append(incoming, outgoing);
+      frame.append(track); dom.results.replaceChildren(frame);
+      if (typeof track.animate === 'function') {
+        const start = pageDirection > 0 ? 'translateX(0%)' : 'translateX(-50%)';
+        const end = pageDirection > 0 ? 'translateX(-50%)' : 'translateX(0%)';
+        const animation = track.animate([{ transform: start }, { transform: end }], { duration: 300, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' });
+        pageAnimation = animation;
+        const finish = () => { if (pageAnimation !== animation) return; pageAnimation = null; frame.replaceChildren(incoming); animation.cancel(); };
+        animation.finished.then(finish, finish);
+      } else frame.replaceChildren(incoming);
+    } else { frame.append(incoming); dom.results.replaceChildren(frame); }
   }
 
   function invokeUrlAdd({ title, url }) {
@@ -584,6 +626,19 @@
     if (eventsBound) return;
     eventsBound = true;
     dom.search.addEventListener('input', () => { state.query = dom.search.value; render(); });
+    if (!paginationEventsBound && window.MangaListPaginationEventsFactory) {
+      const paginationEvents = window.MangaListPaginationEventsFactory.create({
+        onPageChange(delta) {
+          const nextPage = state.page + delta;
+          if (nextPage < 1 || nextPage > state.totalPages || nextPage === state.page) return;
+          state.page = nextPage;
+          render(delta);
+        },
+        allowSwipeTarget(node) { return !!node?.closest?.('.vl-open'); },
+      });
+      paginationEvents.bind({ prevButton: dom.prevPage, nextButton: dom.nextPage, swipeSurface: dom.results });
+      paginationEventsBound = true;
+    }
     dom.quick.addEventListener('click', (event) => { const button = event.target.closest('[data-quick]'); if (!button) return; state.quick = button.dataset.quick; savePrefs(); render(); });
     dom.folder.addEventListener('change', () => { state.folderId = dom.folder.value; render(); });
     dom.tag.addEventListener('change', () => { state.tag = dom.tag.value; render(); });
