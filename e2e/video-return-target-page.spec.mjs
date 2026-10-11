@@ -13,6 +13,7 @@ async function openGuestVideoList(page) {
       title: '戻り先動画 ' + (index + 1),
       url: 'https://example.test/video/' + (index + 1) + '.mp4',
       a: 'url', b: String(index + 1), addedAt: index + 1,
+      tags: [index % 2 === 0 ? 'alpha' : 'beta'],
     }))));
     localStorage.setItem('mangaReaderVideoMeta', '{}');
     localStorage.setItem('mangaReaderVideoFolders', '[]');
@@ -43,6 +44,45 @@ test('player header returns to the page containing the current video, even after
 test('desktop Video navigation from the player also restores the video page', async ({ page }) => {
   await openGuestVideoList(page);
   await page.locator('#desktopNavVideo').click();
+  await expect(page.locator('#videoLibraryPageLabel')).toHaveText('3 / 3');
+  await expect(page.locator('.vl-card[data-video-id="return-video-3"]')).toBeVisible();
+});
+
+test('return restores the actual filtered list page, not a page in the default unfiltered list', async ({ page }) => {
+  await openGuestVideoList(page);
+  // First navigate back to the list so the filter is set on the source page.
+  await page.locator('#shellTitle a').click();
+  await expect(page.locator('#videoLibraryPageLabel')).toHaveText('3 / 3');
+  await page.locator('#videoLibraryTag').selectOption('alpha');
+  await expect(page.locator('#videoLibraryPageLabel')).toHaveText('2 / 2');
+  await expect(page.locator('.vl-card[data-video-id="return-video-3"]')).toBeVisible();
+  await page.locator('.vl-card[data-video-id="return-video-3"] .vl-open').first().click();
+  await expect(page).toHaveURL(/video-player\.html\?id=return-video-3/);
+  await page.locator('#shellTitle a').click();
+  await expect(page.locator('#videoLibraryTag')).toHaveValue('alpha');
+  await expect(page.locator('#videoLibraryPageLabel')).toHaveText('2 / 2');
+  await expect(page.locator('.vl-card[data-video-id="return-video-3"]')).toBeVisible();
+});
+
+test('return preserves the originating page even when recent-opened sort moves the video', async ({ page }) => {
+  await openGuestVideoList(page);
+  await page.locator('#shellTitle a').click();
+  await expect(page.locator('#videoLibraryPageLabel')).toHaveText('3 / 3');
+  await page.locator('#videoLibrarySort').selectOption('recent-opened');
+  await expect(page.locator('#videoLibraryPageLabel')).toHaveText('3 / 3');
+  await page.locator('.vl-card[data-video-id="return-video-2"] .vl-open').first().click();
+  await expect(page).toHaveURL(/video-player\.html\?id=return-video-2/);
+  await page.locator('#shellTitle a').click();
+  await expect(page.locator('#videoLibrarySort')).toHaveValue('recent-opened');
+  await expect(page.locator('#videoLibraryPageLabel')).toHaveText('3 / 3');
+  await expect(page.locator('.vl-card[data-video-id="return-video-2"]')).toBeVisible();
+});
+
+test('mobile Video tab returns from watch page even though the tab is highlighted', async ({ page }) => {
+  await openGuestVideoList(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('#mobileNavVideo')).toBeVisible();
+  await page.locator('#mobileNavVideo').click();
   await expect(page.locator('#videoLibraryPageLabel')).toHaveText('3 / 3');
   await expect(page.locator('.vl-card[data-video-id="return-video-3"]')).toBeVisible();
 });

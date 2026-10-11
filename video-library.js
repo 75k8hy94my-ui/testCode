@@ -30,7 +30,70 @@
   let activePage = null;
   let paginationEventsBound = false;
   const RETURN_INTENT_KEY = 'testcode.video.returnIntent';
+  const RETURN_VIEW_KEY = 'testcode.video.listReturnContext';
   let returnIntent = null;
+
+  // Capture the real list configuration, not just its page number. Restoring
+  // a video against the unfiltered default list often opens the wrong page.
+  function captureReturnContext(videoId) {
+    if (!videoId) return;
+    const scoped = effectiveVideos().filter(video => video.hidden === state.showHidden);
+    const visible = Data.filterVideos(scoped, { query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
+    const filtered = CustomProperties ? visible.filter(video => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, Object.values(state.customFilters))) : visible;
+    const ordered = Data.sortVideos(filtered, state.sort);
+    const context = {
+      id: String(videoId), page: state.page, sort: state.sort, view: state.view,
+      // Reopening a video changes 'recent-opened' ordering. Retain the original
+      // list order for this one return instead of moving it to page 1.
+      orderIds: ordered.length <= 10000 ? ordered.map(video => String(video.id)) : null,
+      showHidden: state.showHidden, query: state.query, quick: state.quick,
+      folderId: state.folderId, tag: state.tag, service: state.service,
+      customFilters: state.customFilters,
+    };
+    try { sessionStorage.setItem(RETURN_VIEW_KEY, JSON.stringify(context)); } catch (_) {}
+  }
+
+  function readReturnContext(targetId) {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(RETURN_VIEW_KEY) || 'null');
+      return saved && saved.id === targetId ? saved : null;
+    } catch (_) { return null; }
+  }
+
+  function sortForReturn(videos) {
+    const sorted = Data.sortVideos(videos, state.sort);
+    const context = returnIntent && readReturnContext(returnIntent.id);
+    if (!context || !Array.isArray(context.orderIds) || !context.orderIds.length) return sorted;
+    const ranks = new Map(context.orderIds.map((id, index) => [String(id), index]));
+    return sorted.sort((a, b) => {
+      const first = ranks.get(String(a.id));
+      const second = ranks.get(String(b.id));
+      if (first != null && second != null) return first - second;
+      if (first != null) return -1;
+      if (second != null) return 1;
+      return 0;
+    });
+  }
+
+  function restoreReturnContext(targetId) {
+    try {
+      const saved = readReturnContext(targetId);
+      if (!saved) return;
+      // Use validated stored preferences to avoid malformed session state.
+      if (Object.prototype.hasOwnProperty.call(SORT_LABELS, saved.sort)) state.sort = saved.sort;
+      if (saved.view === 'card' || saved.view === 'compact') state.view = saved.view;
+      state.showHidden = saved.showHidden === true;
+      state.query = typeof saved.query === 'string' ? saved.query.slice(0, 300) : '';
+      state.quick = ['all','favorite','later','watching','watched'].includes(saved.quick) ? saved.quick : 'all';
+      state.folderId = typeof saved.folderId === 'string' ? saved.folderId : '';
+      state.tag = typeof saved.tag === 'string' ? saved.tag : '';
+      state.service = typeof saved.service === 'string' ? saved.service : '';
+      state.customFilters = saved.customFilters && typeof saved.customFilters === 'object' && !Array.isArray(saved.customFilters)
+        ? saved.customFilters : {};
+      if (dom.search) dom.search.value = state.query;
+    } catch (_) { /* The target video alone still identifies its current page. */ }
+  }
+
 
   function readReturnIntent() {
     const params = new URLSearchParams(location.search);
@@ -38,7 +101,8 @@
     const requestedPage = Number(params.get('returnPage'));
     const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : null;
     if (id) {
-      returnIntent = { id, page };
+      if (!returnIntent || returnIntent.id !== id) returnIntent = { id, page };
+      else returnIntent.page = page;
       return;
     }
     if (returnIntent) return;
@@ -53,7 +117,10 @@
 
   function clearReturnIntent() {
     returnIntent = null;
-    try { sessionStorage.removeItem(RETURN_INTENT_KEY); } catch (_) {}
+    try {
+      sessionStorage.removeItem(RETURN_INTENT_KEY);
+      sessionStorage.removeItem(RETURN_VIEW_KEY);
+    } catch (_) {}
     const params = new URLSearchParams(location.search);
     if (!params.has('returnVideo') && !params.has('returnPage')) return;
     params.delete('returnVideo');
@@ -469,6 +536,8 @@
     readReturnIntent();
     const targetId = returnIntent && returnIntent.id;
     if (!targetId || !canReadProtectedData()) return;
+    // Reapply after loadPrefs() as well as async Vault/SPA remounts.
+    restoreReturnContext(targetId);
     const all = effectiveVideos();
     // Initial local/Vault hydration can be asynchronous. Do not lose the
     // return intent when the target is not yet available.
@@ -477,7 +546,7 @@
       const scoped = all.filter(video => video.hidden === state.showHidden);
       const visible = Data.filterVideos(scoped, { query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
       const filtered = CustomProperties ? visible.filter(video => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, Object.values(state.customFilters))) : visible;
-      return Data.sortVideos(filtered, state.sort);
+      return sortForReturn(filtered);
     };
     let list = findInCurrentView();
     let index = list.findIndex(video => String(video.id) === targetId);
@@ -511,7 +580,7 @@
     const baseFiltered = Data.filterVideos(scoped, { query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
     const filters = Object.values(state.customFilters);
     const filtered = CustomProperties ? baseFiltered.filter((video) => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, filters)) : baseFiltered;
-    const videos = Data.sortVideos(filtered, state.sort);
+    const videos = sortForReturn(filtered);
     dom.quick.querySelectorAll('[data-quick]').forEach((button) => button.classList.toggle('active', button.dataset.quick === state.quick));
     dom.view.textContent = state.view === 'card' ? '▤' : '▦'; dom.view.title = state.view === 'card' ? 'コンパクト表示へ' : 'カード表示へ';
     dom.hiddenBtn.textContent = state.showHidden ? '動画一覧' : '非表示 (' + all.filter((video) => video.hidden).length + ')';
@@ -761,6 +830,7 @@
   function openVideo(videoId) {
     if (!canReadProtectedData()) return;
     const base = baseById(videoId); if (!base) return; const video = effectiveVideo(base);
+    captureReturnContext(videoId);
     updateMeta(videoId, { openCount: (video.openCount || 0) + 1, lastOpenedAt: Date.now() });
     const target = new URL('video-player.html', location.href);
     target.searchParams.set('id', videoId);
@@ -830,7 +900,7 @@
     injectStyles(); loadPrefs(); loadLibraryState(); if (!setupMarkup()) return; bindEvents(); if (dom.search) dom.search.value = state.query; render(); resumePendingLocalSync();
   }
 
-  window.MangaReaderVideoLibrary = Object.freeze({ init, syncAccessUi });
+  window.MangaReaderVideoLibrary = Object.freeze({ init, syncAccessUi, captureReturnContext });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(init, 0), { once: true });
   else setTimeout(init, 0);
 })();

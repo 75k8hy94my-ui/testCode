@@ -254,7 +254,10 @@
   function navigateSpaItemAfterLens(nav, state, item, { duration = 210 } = {}) {
     if (!item || !item.isConnected || state.navigationAnimating) return;
     const current = activeItem(nav);
-    if (item === current) {
+    // The player highlights Video, but tapping Video there must still return
+    // to the list. It is not a no-op merely because the tab looks active.
+    const onVideoPlayer = location.pathname.split('/').pop() === 'video-player.html';
+    if (item === current && !(onVideoPlayer && item.dataset.mobileRoute === 'video')) {
       animateSpaLensToItem(nav, item, { duration:140 });
       return;
     }
