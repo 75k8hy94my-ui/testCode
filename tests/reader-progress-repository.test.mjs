@@ -23,3 +23,11 @@ test('older commit cannot overwrite newer stored progress', () => {
   assert.equal(repo.commit('x', 3, 9, 40), false);
   assert.equal(JSON.parse(local.getItem('mangaReaderLastPage'))['item:x'].page, 9);
 });
+
+test('reports failed progress writes without scheduling a sync', () => {
+  const calls = [];
+  const storage = { getItem: () => null, setItem() { throw new Error('quota'); } };
+  const repo = create({ storage, scheduleSync: () => calls.push('sync') });
+  assert.equal(repo.commit('book', 4, 10), false);
+  assert.deepEqual(calls, []);
+});

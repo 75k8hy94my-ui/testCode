@@ -20,7 +20,7 @@ test('manga shelf launches the standalone Reader document from its document boun
 test('manga route skips protected store reads and legacy migration without VPN access', () => {
   const load = route.slice(route.indexOf('load() {'), route.indexOf('wasLegacyMigrated()'));
   assert.ok(load.indexOf('if (!canReadProtectedData())') < load.indexOf('MangaListState.load'));
-  assert.match(route, /persistVideos\(\) \{ if \(canReadProtectedData\(\)\) safeWriteJson\(keys\.savedVideos/);
+  assert.match(route, /persistVideos\(\) \{ return canReadProtectedData\(\) && safeWriteJson\(keys\.savedVideos/);
   assert.match(route, /vpnProtectedDataNotice/);
   assert.match(route, /control\.disabled = !canReadProtectedData\(\)/);
 });

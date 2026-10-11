@@ -46,10 +46,11 @@
 
   function loadBrowserScript(src) {
     if (typeof document === 'undefined') return Promise.resolve();
-    const existing = document.querySelector('script[data-video-library-src="' + src + '"]');
+    let existing = document.querySelector('script[data-video-library-src="' + src + '"]');
+    if (existing && existing.dataset.failed === '1') { existing.remove(); existing = null; }
     if (existing) return existing.dataset.loaded === '1' ? Promise.resolve() : new Promise((resolve, reject) => {
       existing.addEventListener('load', resolve, { once: true });
-      existing.addEventListener('error', reject, { once: true });
+      existing.addEventListener('error', (event) => { existing.dataset.failed = '1'; existing.remove(); reject(event); }, { once: true });
     });
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
@@ -57,7 +58,7 @@
       script.async = false;
       script.dataset.videoLibrarySrc = src;
       script.addEventListener('load', () => { script.dataset.loaded = '1'; resolve(); }, { once: true });
-      script.addEventListener('error', reject, { once: true });
+      script.addEventListener('error', (event) => { script.dataset.failed = '1'; script.remove(); reject(event); }, { once: true });
       document.head.appendChild(script);
     });
   }

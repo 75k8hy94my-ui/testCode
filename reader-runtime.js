@@ -162,7 +162,9 @@
       return saved && !saved.wasLast ? saved.page : 1;
     }
     function persistPage(pageToPersist = page) {
-      if (currentItem && displayCount()) progressRepository?.commit(currentItem.id, pageToPersist, displayCount());
+      if (currentItem && displayCount() && progressRepository?.commit(currentItem.id, pageToPersist, displayCount()) === false) {
+        status('読書位置を端末に保存できませんでした。ブラウザの保存容量を確認してください。');
+      }
     }
     function revokeEncryptedRenderer() {
       if (encryptedRenderer) { try { encryptedRenderer.destroy(); } catch (_) {} }

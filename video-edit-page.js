@@ -228,8 +228,7 @@
       if (submitButton) submitButton.disabled = true;
       try {
         try {
-          localStorage.setItem(VIDEO_KEY, JSON.stringify(nextVideos));
-          localStorage.setItem(META_KEY, JSON.stringify(nextMeta));
+          writeVideoRecordsAtomically(nextVideos, nextMeta);
         } catch (_) {
           error.textContent = '端末に保存できませんでした。ブラウザの保存容量を確認してください。';
           return;

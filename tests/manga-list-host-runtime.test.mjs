@@ -414,3 +414,12 @@ test('bookshelf DOM exposes loading, failed, and retry states without deleting w
   assert.match(route, /manga-list\.css\?v=20261009-guest-mode/);
   assert.doesNotMatch(runtime.slice(runtime.indexOf('const loadCover = () =>'), runtime.indexOf('if (reorderMode) {', runtime.indexOf('const loadCover = () =>'))), /removeItem\(/);
 });
+
+test('host persistence reports failed storage writes instead of claiming success', () => {
+  const calls = [];
+  const input = deps(calls);
+  input.safeWriteJson = (key, value) => { calls.push(['write', key, value]); return key !== 'folders-key'; };
+  const host = loadFactory().create(input);
+  assert.equal(host.persistFolders(), false);
+  assert.equal(host.persistAll(), false);
+});

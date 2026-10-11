@@ -94,13 +94,18 @@
         revision: Math.max(current.revision, candidate.revision) + 1,
         updatedAt: timestamp,
       });
+      let pending = false;
+      let hasAccount = false;
+      try { hasAccount = !isGuestMode() && !!vault?.loadSession?.()?.user?.id; } catch (_) {}
+      if (hasAccount) {
+        try { pending = vault.markLocalChangesPending() === true; } catch (_) {}
+        if (!pending) {
+          emit('manga-video-shorts-sync', { status: 'error', message: '未同期状態を記録できないため、Shortsの変更を保存しませんでした。' });
+          return null;
+        }
+      }
       try { writeValue(STATE_KEY, next); }
       catch (error) { emit('manga-video-shorts-sync', { status: 'error', message: error && error.message ? error.message : '端末に保存できません。' }); return null; }
-
-      let pending = false;
-      if (!isGuestMode() && vault && typeof vault.markLocalChangesPending === 'function') {
-        try { pending = vault.markLocalChangesPending() === true; } catch (_) {}
-      }
       if (saveOptions.sync !== false && pending) scheduleSync();
       emit('manga-video-shorts-state-saved', { state: next, pending });
       return next;

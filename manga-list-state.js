@@ -4,7 +4,7 @@
   function readArray(storage, key) {
     try {
       const value = JSON.parse(storage.getItem(key) || '[]');
-      return value;
+      return Array.isArray(value) ? value : [];
     } catch (error) {
       return [];
     }

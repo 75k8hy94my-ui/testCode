@@ -134,19 +134,38 @@
   }
   function persistAux({ sync = true } = {}) {
     if (!canReadProtectedData()) return false;
-    writeJson(FOLDER_KEY, state.folders);
-    // Other routes may have saved virtual edits since this list was loaded.
-    // Merge the newest registry rather than overwriting it from stale state.
-    state.meta = Data.mergeVideoMetaPreservingThumbnailTime(readJson(META_KEY, {}), state.meta);
-    writeJson(META_KEY, state.meta);
+    let previousFolders = [];
+    let previousFolderRaw = null, previousMetaRaw = null;
+    const previousMetaState = state.meta;
+    try {
+      previousFolderRaw = localStorage.getItem(FOLDER_KEY);
+      previousMetaRaw = localStorage.getItem(META_KEY);
+      const storedFolders = previousFolderRaw == null ? [] : JSON.parse(previousFolderRaw);
+      previousFolders = Array.isArray(storedFolders) ? storedFolders : [];
+      if (!writeJson(FOLDER_KEY, state.folders)) throw new Error('folder write failed');
+      // Other routes may have saved virtual edits since this list was loaded.
+      // Merge the newest registry rather than overwriting it from stale state.
+      state.meta = Data.mergeVideoMetaPreservingThumbnailTime(readJson(META_KEY, {}), state.meta);
+      if (!writeJson(META_KEY, state.meta)) throw new Error('metadata write failed');
+    } catch (_) {
+      state.folders = previousFolders;
+      state.meta = previousMetaState;
+      try { if (previousFolderRaw == null) localStorage.removeItem(FOLDER_KEY); else localStorage.setItem(FOLDER_KEY, previousFolderRaw); } catch (_) {}
+      try { if (previousMetaRaw == null) localStorage.removeItem(META_KEY); else localStorage.setItem(META_KEY, previousMetaRaw); } catch (_) {}
+      return false;
+    }
     if (sync) scheduleVaultSync();
     return true;
   }
   function updateMeta(videoId, patch, options) {
     if (!canReadProtectedData()) return false;
     const current = state.meta[videoId] && typeof state.meta[videoId] === 'object' ? state.meta[videoId] : {};
+    const previous = state.meta[videoId];
     state.meta[videoId] = { ...current, ...patch, updatedAt: Date.now() };
-    persistAux(options);
+    if (!persistAux(options)) {
+      if (previous === undefined) delete state.meta[videoId]; else state.meta[videoId] = previous;
+      return false;
+    }
     return true;
   }
 

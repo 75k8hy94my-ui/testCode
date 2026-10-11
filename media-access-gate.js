@@ -173,6 +173,33 @@
     return null;
   }
 
+  function saveManualIpSets(vpnIps, nonVpnIps) {
+    const store = storage();
+    if (!store) return false;
+    const oldVpn = readIpSet(MANUAL_VPN_IPS_KEY);
+    const oldNonVpn = readIpSet(MANUAL_NON_VPN_IPS_KEY);
+    if (!writeIpSet(MANUAL_VPN_IPS_KEY, vpnIps) || !writeIpSet(MANUAL_NON_VPN_IPS_KEY, nonVpnIps)) {
+      writeIpSet(MANUAL_VPN_IPS_KEY, oldVpn);
+      writeIpSet(MANUAL_NON_VPN_IPS_KEY, oldNonVpn);
+      return false;
+    }
+    const vault = root.MangaVault;
+    const hasAccount = !root.TestCodeGuest?.isActive() && !!vault?.loadSession?.()?.user?.id;
+    if (hasAccount && (typeof vault.markLocalChangesPending !== 'function' || vault.markLocalChangesPending() !== true)) {
+      writeIpSet(MANUAL_VPN_IPS_KEY, oldVpn);
+      writeIpSet(MANUAL_NON_VPN_IPS_KEY, oldNonVpn);
+      return false;
+    }
+    return true;
+  }
+
+  async function syncManualIpSetsIfAllowed() {
+    const vault = root.MangaVault;
+    if (root.TestCodeGuest?.isActive() || !vault?.loadSession?.()?.user?.id
+      || !canReadProtectedData() || typeof vault.saveLocalChanges !== 'function') return;
+    try { await vault.saveLocalChanges(); } catch (_) { /* The pending marker preserves the retry. */ }
+  }
+
   function setManualIpDesignation(ip, designation) {
     const value = String(ip || '').trim();
     if (!value || (designation !== 'vpn' && designation !== 'non-vpn')) return false;
@@ -186,11 +213,11 @@
     if (designation === 'non-vpn') {
       vpnIps.delete(value);
       nonVpnIps.add(value);
-      return writeIpSet(MANUAL_VPN_IPS_KEY, vpnIps) && writeIpSet(MANUAL_NON_VPN_IPS_KEY, nonVpnIps);
+      return saveManualIpSets(vpnIps, nonVpnIps);
     }
 
     vpnIps.add(value);
-    return writeIpSet(MANUAL_VPN_IPS_KEY, vpnIps);
+    return saveManualIpSets(vpnIps, nonVpnIps);
   }
 
   function sessionStorage() {
@@ -221,7 +248,7 @@
     const vpnIps = readIpSet(MANUAL_VPN_IPS_KEY);
     if (!vpnIps.delete(value)) return true;
     clearManualVpnApproval(value);
-    return writeIpSet(MANUAL_VPN_IPS_KEY, vpnIps);
+    return saveManualIpSets(vpnIps, readIpSet(MANUAL_NON_VPN_IPS_KEY));
   }
 
   function ipv4ToInt(ip) {
@@ -459,7 +486,7 @@
       markVpn.addEventListener('click', async () => {
         const ip = diagnostics.ip;
         if (!ip || getManualIpDesignation(ip) === 'non-vpn') return;
-        if (setManualIpDesignation(ip, 'vpn')) await checkVpn({ external: false });
+        if (setManualIpDesignation(ip, 'vpn')) { await checkVpn({ external: false }); await syncManualIpSetsIfAllowed(); }
       });
       const markNonVpn = root.document.createElement('button');
       markNonVpn.type = 'button';
@@ -471,7 +498,7 @@
         if (!ip || getManualIpDesignation(ip) === 'non-vpn') return;
         const message = 'このIPを「VPNではない」と固定します。\nこの画面からは解除できず、あとからVPN例外にも変更できません。\nよろしいですか？';
         if (typeof root.confirm === 'function' && !root.confirm(message)) return;
-        if (setManualIpDesignation(ip, 'non-vpn')) await checkVpn({ external: false });
+        if (setManualIpDesignation(ip, 'non-vpn')) { await checkVpn({ external: false }); await syncManualIpSetsIfAllowed(); }
       });
       const clearVpn = root.document.createElement('button');
       clearVpn.type = 'button';
@@ -481,7 +508,7 @@
       clearVpn.hidden = true;
       clearVpn.addEventListener('click', async () => {
         const ip = diagnostics.ip;
-        if (clearManualVpnDesignation(ip)) await checkVpn({ external: false });
+        if (clearManualVpnDesignation(ip)) { await checkVpn({ external: false }); await syncManualIpSetsIfAllowed(); }
       });
       controls.append(recheck, markVpn, markNonVpn, clearVpn);
       panel.append(title, pre, controls);

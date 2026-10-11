@@ -44,8 +44,8 @@ test('manga list state keeps existing empty and malformed JSON behavior', () => 
   assert.deepEqual(JSON.parse(JSON.stringify(missing)), { savedFolders: [], savedItems: [], authorCards: [] });
   const malformed = api.load({ storage: storage({ items: '{', folders: 'null', authors: '"not-an-array"' }), keys });
   assert.equal(malformed.savedItems.length, 0);
-  assert.equal(malformed.savedFolders, null);
-  assert.equal(malformed.authorCards, 'not-an-array');
+  assert.deepEqual(JSON.parse(JSON.stringify(malformed.savedFolders)), []);
+  assert.deepEqual(JSON.parse(JSON.stringify(malformed.authorCards)), []);
 });
 
 test('manga route owns list initialization and delegates data loading to state runtime', () => {

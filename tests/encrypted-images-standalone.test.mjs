@@ -12,13 +12,13 @@ function loadImagesModule() {
     setItem(key, value) { values.set(key, String(value)); },
     removeItem(key) { values.delete(key); }
   };
-  const window = { localStorage: backing };
+  const window = { localStorage: backing, addEventListener() {} };
   const document = { readyState:'loading', addEventListener() {} };
   vm.runInNewContext(read('images.js'), { window, document });
   return { api:window.EncryptedImages, backing };
 }
 
-test('standalone encrypted gallery requires session and Vault, not VPN gate', () => {
+test('standalone encrypted gallery requires explicit protected-data VPN access', () => {
   const html = read('images.html');
   const source = read('images.js');
   assert.match(html,/id="imageUploadForm"/);
@@ -28,26 +28,26 @@ test('standalone encrypted gallery requires session and Vault, not VPN gate', ()
   assert.match(source,/api\.loadActive\(\)/);
   assert.match(source,/api\.ensureSession\(\)/);
   assert.match(source,/sync\.html\?next=images\.html/);
-  assert.doesNotMatch(html,/media-access-gate\.js|manga-list-route\.js|home-profile-spa\.js/);
-  assert.doesNotMatch(source,/MangaReaderMediaAccess|canReadProtectedData/);
+  assert.match(html,/media-access-gate\.js/);
+  assert.doesNotMatch(html,/manga-list-route\.js|home-profile-spa\.js/);
+  assert.match(source,/MangaReaderMediaAccess/);
+  assert.match(source,/canReadProtectedData/);
 });
 
-test('VPN bypass is scoped to gallery transfer settings and never changes user policy', () => {
+test('encrypted image gallery does not bypass the configured VPN policy', () => {
   const { api, backing } = loadImagesModule();
-  const scoped = api.vpnFreeTransferStorage(backing);
+  assert.equal(api.vpnFreeTransferStorage, undefined);
   assert.equal(backing.getItem('mangaReaderImageVpnRequired'),'true');
-  assert.equal(scoped.getItem('mangaReaderImageVpnRequired'),'false');
-  scoped.setItem('mangaReaderImageVpnRequired','false');
-  assert.equal(backing.getItem('mangaReaderImageVpnRequired'),'true');
+  const storage = backing;
   const verdict = remoteAccess.evaluate({
     estimatedBytes:256,
-    transferStorage:scoped,
-    storage:scoped,
+    transferStorage:storage,
+    storage,
     mediaAccess:{getStatus:()=> 'blocked',canLoadExternalMedia:()=>false}
   });
-  assert.equal(verdict.allowed,true);
+  assert.equal(verdict.allowed,false);
   assert.equal(backing.getItem('mangaReaderImageVpnRequired'),'true');
-  scoped.setItem('mangaReaderImageTransferStats','{"day":"2026-10-08"}');
+  storage.setItem('mangaReaderImageTransferStats','{"day":"2026-10-08"}');
   assert.ok(backing.getItem('mangaReaderImageTransferStats'));
 });
 

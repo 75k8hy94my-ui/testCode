@@ -83,9 +83,10 @@
     const existing = documentRef.getElementById(id);
     if (existing) {
       if (existing.dataset.loaded === '1') return Promise.resolve();
+      if (existing.dataset.failed === '1') { existing.remove(); return loadScript(src, id, documentRef); }
       return new Promise((resolve, reject) => {
         existing.addEventListener('load', resolve, { once: true });
-        existing.addEventListener('error', reject, { once: true });
+        existing.addEventListener('error', (event) => { existing.dataset.failed = '1'; existing.remove(); reject(event); }, { once: true });
       });
     }
     return new Promise((resolve, reject) => {
@@ -96,14 +97,15 @@
       // insertion order, preserving the module graph without serial RTTs.
       script.async = false;
       script.addEventListener('load', () => { script.dataset.loaded = '1'; resolve(); }, { once: true });
-      script.addEventListener('error', reject, { once: true });
+      script.addEventListener('error', (event) => { script.dataset.failed = '1'; script.remove(); reject(event); }, { once: true });
       documentRef.body.appendChild(script);
     });
   }
 
   function loadDependencies(documentRef) {
     if (!dependencyPromise) {
-      dependencyPromise = Promise.all(SCRIPT_URLS.map(([src, id]) => loadScript(src, id, documentRef)));
+      dependencyPromise = Promise.all(SCRIPT_URLS.map(([src, id]) => loadScript(src, id, documentRef)))
+        .catch((error) => { dependencyPromise = null; throw error; });
     }
     return dependencyPromise;
   }
@@ -275,8 +277,10 @@
       };
       const safeWriteJson = (key, value) => {
         if (windowRef.MangaReaderStorage && typeof windowRef.MangaReaderStorage.safeWriteJson === 'function') {
-          windowRef.MangaReaderStorage.safeWriteJson(key, value);
-        } else storage.setItem(key, JSON.stringify(value));
+          return windowRef.MangaReaderStorage.safeWriteJson(key, value);
+        }
+        try { storage.setItem(key, JSON.stringify(value)); return true; }
+        catch (_) { return false; }
       };
       const transferLimitKey = 'mangaReaderStorageTransferLimitDaily';
       const transferUsageKey = 'mangaReaderStorageTransferUsageDaily';
@@ -294,8 +298,7 @@
       const recordTransferEstimate = (bytes) => {
         const amount = Math.max(0, Number(bytes) || 0);
         if (transferUsageBytes() + amount > transferLimitBytes()) return false;
-        safeWriteJson(transferUsageKey, { day: transferDayKey(), bytes: transferUsageBytes() + amount });
-        return true;
+        return safeWriteJson(transferUsageKey, { day: transferDayKey(), bytes: transferUsageBytes() + amount }) !== false;
       };
       const parseInputUrl = (value) => {
         let url = String(value || '').trim();
@@ -334,7 +337,7 @@
         recordTransferEstimate,
       });
       const host = MangaListHostRuntimeFactory.create({
-        safeWriteJson, getState: data.get, persistVideos() { if (canReadProtectedData()) safeWriteJson(keys.savedVideos, data.get().savedVideos); }, canReadProtectedData, keys,
+        safeWriteJson, getState: data.get, persistVideos() { return canReadProtectedData() && safeWriteJson(keys.savedVideos, data.get().savedVideos) !== false; }, canReadProtectedData, keys,
         sync: {
           hasActiveVault: () => !!(windowRef.MangaVault && windowRef.MangaVault.loadActive()),
           clearTimer: (timer) => { if (timer) windowRef.clearTimeout(timer); },
@@ -610,7 +613,14 @@
             if (!name) return;
             const folders = state().savedFolders.slice();
             folders.push({ id: 'f-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name });
-            setState({ savedFolders: folders }); host.persistFolders();
+            const previousFolders = state().savedFolders;
+            setState({ savedFolders: folders });
+            if (!host.persistFolders()) {
+              setState({ savedFolders: previousFolders });
+              windowRef.alert('フォルダーを端末に保存できませんでした。ブラウザの保存容量を確認してください。');
+              renderList();
+              return;
+            }
             if (newFolderInput) newFolderInput.value = '';
             newFolderRow.style.display = 'none'; renderList();
           },

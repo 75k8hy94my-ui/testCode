@@ -23,7 +23,7 @@ function fakeElement() {
     setAttribute() {}, removeAttribute() {}, focus() {}, remove() {}
   };
 }
-function makePage({ guest = false } = {}) {
+function makePage({ guest = false, accessAllowed = true } = {}) {
   const ids = [
     'driveSyncStatus', 'driveGalleryForm', 'driveFolder', 'driveApiKey', 'driveLoad',
     'driveCancel', 'driveRefresh', 'driveGalleryStatus', 'driveGalleryCount',
@@ -44,6 +44,7 @@ function makePage({ guest = false } = {}) {
   const active = guest ? null : { rawKey: new Uint8Array(32).fill(7) };
   const window = {
     TestCodeGuest: { isActive: () => guest },
+    MangaReaderMediaAccess: { canReadProtectedData: () => accessAllowed, syncUi() {} },
     PublicDriveGallery: cacheSource,
     PublicDriveGalleryVault: {
       validateSettings: () => {},
@@ -117,4 +118,13 @@ test('guest can display public Drive images without an unlocked Vault or cloud p
   assert.equal(page.stats().encryptedWrites, 0);
   assert.equal(page.elements.driveGalleryCount.textContent, '1枚');
   assert.equal(page.elements.driveGalleryGrid.children.length, 1);
+});
+
+test('authenticated Drive gallery does not decrypt or fetch protected settings without VPN access', async () => {
+  const page = makePage({ accessAllowed: false });
+  await page.settle();
+  assert.equal(page.stats().driveCalls, 0);
+  assert.equal(page.elements.driveApiKey.value, '');
+  assert.equal(page.elements.driveGalleryGrid.children.length, 0);
+  assert.match(page.elements.driveSyncStatus.textContent, /VPN/);
 });

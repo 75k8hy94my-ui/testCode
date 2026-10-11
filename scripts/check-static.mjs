@@ -4,8 +4,8 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const pages = ['index.html', 'sync.html', 'home.html', 'profile.html', 'manga.html', 'manga-sandbox.html', 'images.html', 'drive-gallery.html', 'video.html', 'reader.html', 'video-player.html'];
-const standalone = [
+const pages = fs.readdirSync(root).filter((file) => file.endsWith('.html')).sort();
+const requiredStandalone = [
   'app-desktop-rail.js', 'app-global-shell.js', 'author-summary.js', 'backup-format.js', 'browser-storage.js', 'desktop-navigation.js',
   'encrypted-asset-backend.js', 'encrypted-asset-cache.js', 'encrypted-asset-crypto.js', 'encrypted-asset-import.js', 'encrypted-asset-item.js', 'encrypted-asset-reader.js', 'encrypted-asset-storage.js', 'encrypted-asset-sync.js',
   'encrypted-chunk-cache.js', 'encrypted-chunk-crypto.js', 'encrypted-chunk-sync.js', 'image-compression-profile.js', 'image-photo-processor.js', 'image-processing-worker.js', 'image-pyramid-builder.js', 'image-remote-access.js', 'image-transfer-ledger.js', 'image-transfer-settings.js', 'feature-flags.js', 'home-dashboard.js',
@@ -15,6 +15,7 @@ const standalone = [
   'status-message.js',
   'supabase-config.js', 'url-parser.js', 'vault-payload.js', 'vault-session.js', 'video-data.js', 'video-thumbnail-renderer.js', 'video-player-rotation.js', 'video-player-gestures.js', 'video-library.js', 'video-routing-fix.js', 'video-thumbnail-time.js', 'video-list-route.js', 'video-list-template.js'
 ];
+const standalone = [...new Set([...fs.readdirSync(root).filter((file) => file.endsWith('.js')), ...requiredStandalone])].sort();
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 const extensionRoot = path.join(root, 'extensions', 'momon-ga-importer');

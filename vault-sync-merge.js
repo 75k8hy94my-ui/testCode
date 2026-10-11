@@ -16,7 +16,8 @@
     return JSON.stringify(value);
   }
 
-  const equal = (left, right) => stableJson(left) === stableJson(right);
+  const equal = (left, right) => left === MISSING || right === MISSING
+    ? left === right : stableJson(left) === stableJson(right);
   const isRecord = (value) => value !== MISSING && value && typeof value === 'object' && !Array.isArray(value);
   const escapePointerToken = (value) => String(value).replace(/~/g, '~0').replace(/\//g, '~1');
   const unescapePointerToken = (value) => String(value).replace(/~1/g, '/').replace(/~0/g, '~');

@@ -300,7 +300,7 @@
 
     function persistFolders() {
       if (!canReadProtectedData()) return false;
-      deps.safeWriteJson(deps.keys.savedFolders, deps.getState().savedFolders);
+      if (deps.safeWriteJson(deps.keys.savedFolders, deps.getState().savedFolders) === false) return false;
       scheduleCloudSync();
       return true;
     }
@@ -314,18 +314,18 @@
 
     function persistAuthorCards() {
       if (!canReadProtectedData()) return false;
-      deps.safeWriteJson(deps.keys.authorCards, deps.getState().authorCards);
+      if (deps.safeWriteJson(deps.keys.authorCards, deps.getState().authorCards) === false) return false;
       scheduleCloudSync();
       return true;
     }
 
     function persistAll() {
       if (!canReadProtectedData()) return false;
-      persistFolders();
-      persistItems();
-      persistAuthorCards();
-      deps.persistVideos();
-      return true;
+      const folders = persistFolders();
+      const items = persistItems();
+      const authors = persistAuthorCards();
+      const videos = deps.persistVideos() !== false;
+      return folders && items && authors && videos;
     }
 
     return Object.freeze({

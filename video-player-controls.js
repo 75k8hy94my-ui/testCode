@@ -12,6 +12,7 @@
   const video = document.querySelector('#videoPlayerPage video');
   if (!video || video.dataset.customControlsReady === '1') return;
   video.dataset.customControlsReady = '1';
+  const nativeControls = video.controls;
   const id = new URLSearchParams(location.search).get('id') || 'unknown';
   const key = 'mangaReaderVideoMarkers';
   const read = () => { try { const value = JSON.parse(localStorage.getItem(key) || '{}'); return value && typeof value === 'object' ? value : {}; } catch (_) { return {}; } };
@@ -69,7 +70,19 @@
   let markerBubbles = [];
   const update = () => { seek.max = String(Number.isFinite(video.duration) ? video.duration : 0); seek.value = String(video.currentTime || 0); time.textContent = format(video.currentTime) + ' / ' + format(video.duration); const current = markers.find((marker) => Math.abs(marker.seconds - video.currentTime) < 1); notice.innerHTML = current ? iconSvg(current.icon) : ''; notice.setAttribute('aria-label', current ? iconLabels[current.icon] : ''); notice.classList.toggle('visible', Boolean(current)); };
   const renderMarkers = () => { list.replaceChildren(); markerBubbles.forEach((node) => node.remove()); markerBubbles = []; markers.slice().sort((a, b) => a.seconds - b.seconds).forEach((marker) => { const bubble = document.createElement('button'); bubble.type = 'button'; bubble.className = 'videoMarkerBubble'; bubble.dataset.seconds = String(marker.seconds); bubble.style.left = (Number(video.duration) > 0 ? Math.max(0, Math.min(100, marker.seconds / video.duration * 100)) : 0) + '%'; bubble.setAttribute('aria-label', iconLabels[marker.icon] + ' ' + format(marker.seconds) + 'へ移動'); bubble.innerHTML = iconSvg(marker.icon); bubble.addEventListener('click', (event) => { event.stopPropagation(); video.currentTime = marker.seconds; video.play(); }); seekWrap.append(bubble); markerBubbles.push(bubble); const button = document.createElement('button'); button.type = 'button'; button.className = 'videoMarkerListItem'; button.setAttribute('aria-label', iconLabels[marker.icon] + ' ' + format(marker.seconds) + 'へ移動'); button.innerHTML = iconSvg(marker.icon); button.addEventListener('click', () => { video.currentTime = marker.seconds; video.play(); }); const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'videoMarkerRemove'; remove.textContent = '×'; remove.setAttribute('aria-label', iconLabels[marker.icon] + 'を削除'); remove.addEventListener('click', () => { const next = markers.filter((item) => item !== marker); save(next, [marker]).then((saved) => { markers.splice(0, markers.length, ...saved); renderMarkers(); window.dispatchEvent(new CustomEvent('manga-video-markers-changed')); }).catch((error) => { notice.textContent = error.message || 'マーカーを削除できませんでした。'; }); }); const row = document.createElement('span'); row.append(button, remove); list.append(row); }); };
-  play.addEventListener('click', () => video.paused ? video.play() : video.pause()); video.addEventListener('play', () => { play.textContent = '❚❚'; }); video.addEventListener('pause', () => { play.textContent = '▶'; }); video.addEventListener('loadedmetadata', () => { update(); renderMarkers(); }); video.addEventListener('timeupdate', update); seek.addEventListener('input', () => { video.currentTime = Number(seek.value); });
+  const onPlay = () => { play.textContent = '❚❚'; };
+  const onPause = () => { play.textContent = '▶'; };
+  const onMetadata = () => { update(); renderMarkers(); };
+  const onTimeUpdate = update;
+  const onSeekInput = () => { video.currentTime = Number(seek.value); };
+  const onVideoClick = (event) => { showControls(); if (gestureController) gestureController.tap(event); };
+  const onFrameMouseMove = () => showControls();
+  const onFrameTouchStart = () => showControls();
+  const onControlsFocus = () => showControls();
+  play.addEventListener('click', () => video.paused ? video.play() : video.pause());
+  video.addEventListener('play', onPlay); video.addEventListener('pause', onPause);
+  video.addEventListener('loadedmetadata', onMetadata); video.addEventListener('timeupdate', onTimeUpdate);
+  seek.addEventListener('input', onSeekInput);
   let lastAudibleVolume = video.volume > 0 ? video.volume : 1;
   const syncVolume = () => {
     const level = Math.round(video.volume * 100);
@@ -82,6 +95,7 @@
     mute.setAttribute('aria-label', silent ? 'ミュート解除' : 'ミュート');
     mute.setAttribute('aria-pressed', String(silent));
   };
+  const onVolumeChange = syncVolume;
   volume.addEventListener('input', () => {
     const level = Math.max(0, Math.min(100, Number(volume.value)));
     video.volume = level / 100;
@@ -95,7 +109,7 @@
     } else video.muted = true;
     syncVolume();
   });
-  video.addEventListener('volumechange', syncVolume);
+  video.addEventListener('volumechange', onVolumeChange);
   syncVolume();
   const toggleFullscreen = () => {
     const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
@@ -125,10 +139,25 @@
       else toggleFullscreen();
     },
   });
-  video.addEventListener('click', (event) => { showControls(); if (gestureController) gestureController.tap(event); });
-  frame.addEventListener('mousemove', showControls); frame.addEventListener('touchstart', showControls, { passive: true }); controls.addEventListener('focusin', showControls); controls.addEventListener('focusout', showControls);
+  video.addEventListener('click', onVideoClick);
+  frame.addEventListener('mousemove', onFrameMouseMove); frame.addEventListener('touchstart', onFrameTouchStart, { passive: true });
+  controls.addEventListener('focusin', onControlsFocus); controls.addEventListener('focusout', onControlsFocus);
   renderMarkers(); update(); showControls();
-  disposeCurrent = () => { clearTimeout(hideTimer); if (document.removeEventListener) document.removeEventListener('keydown', handleArrowSeek); if (gestureController) gestureController.destroy(); try { video.pause(); } catch (_) {} controls.remove(); markerPanel.remove(); notice.remove(); delete video.dataset.customControlsReady; };
+  disposeCurrent = () => {
+    clearTimeout(hideTimer);
+    if (document.removeEventListener) document.removeEventListener('keydown', handleArrowSeek);
+    video.removeEventListener?.('play', onPlay); video.removeEventListener?.('pause', onPause);
+    video.removeEventListener?.('loadedmetadata', onMetadata); video.removeEventListener?.('timeupdate', onTimeUpdate);
+    video.removeEventListener?.('volumechange', onVolumeChange); video.removeEventListener?.('click', onVideoClick);
+    seek.removeEventListener?.('input', onSeekInput);
+    frame.removeEventListener?.('mousemove', onFrameMouseMove); frame.removeEventListener?.('touchstart', onFrameTouchStart);
+    controls.removeEventListener?.('focusin', onControlsFocus); controls.removeEventListener?.('focusout', onControlsFocus);
+    if (gestureController) gestureController.destroy();
+    try { video.pause(); } catch (_) {}
+    video.controls = nativeControls;
+    controls.remove(); markerPanel.remove(); notice.remove();
+    delete video.dataset.customControlsReady;
+  };
   }
   function handleAccessChange() { if (canReadProtectedData()) initializeControls(); else destroy(); }
   window.MangaReaderVideoPlayerControls = Object.freeze({ destroy, initialize: initializeControls });

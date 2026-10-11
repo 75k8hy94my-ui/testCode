@@ -27,8 +27,20 @@
         const savedItems = [...state.savedItems, ...additions];
         const synced = authorSync.synchronize({ savedItems, authorCards: state.authorCards, createId, now });
         setState({ ...state, savedItems, authorCards: synced.authorCards });
-        persistItems();
-        if (synced.changed) persistAuthorCards();
+        let persisted = false;
+        try {
+          if (persistItems() === false) throw new Error('作品を端末に保存できませんでした。');
+          if (synced.changed && persistAuthorCards() === false) throw new Error('著者情報を端末に保存できませんでした。');
+          persisted = true;
+        } catch (error) {
+          setState(state);
+          // Restore any earlier write from this batch before returning failure.
+          try { persistItems(); } catch (_) {}
+          try { persistAuthorCards(); } catch (_) {}
+          render();
+          return { ok: false, errors: [error], registeredQueueIds: [], skippedQueueIds, savedItems: state.savedItems, authorCards: state.authorCards };
+        }
+        if (!persisted) return { ok: false, errors: ['保存に失敗しました。'], registeredQueueIds: [], skippedQueueIds };
         render();
         return { ok: true, registeredQueueIds, skippedQueueIds, savedItems, authorCards: synced.authorCards };
       }

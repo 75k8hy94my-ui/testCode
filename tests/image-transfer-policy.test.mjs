@@ -14,6 +14,8 @@ function memoryStorage() {
 const now = new Date('2026-09-25T00:00:00.000Z');
 const allowed = { getStatus: () => 'allowed', canLoadExternalMedia: () => true };
 const blocked = { getStatus: () => 'blocked', canLoadExternalMedia: () => false };
+globalThis.navigator ||= {};
+globalThis.navigator.locks ||= { request(_name, _options, callback) { return Promise.resolve().then(callback); } };
 
 test('settings defaults and UTC legacy compatibility are stable', () => {
   const storage = memoryStorage();
@@ -55,9 +57,9 @@ test('network mode changes only after the exact half-limit boundary', () => {
   assert.equal(settings.load(storage, now).networkMode, settings.SAVER_NETWORK_MODE);
 });
 
-test('ledger separates estimate, observed, kind totals, cache and partial savings', () => {
+test('ledger separates estimate, observed, kind totals, cache and partial savings', async () => {
   const storage = memoryStorage();
-  assert.equal(ledger.reserveEstimate(100, { storage, now }).ok, true);
+  assert.equal((await ledger.reserveEstimate(100, { storage, now })).ok, true);
   ledger.recordObserved(80, 'preview', { storage, now });
   ledger.recordObserved(30, 'zoom', { storage, now });
   ledger.recordCacheHit(500, { storage, now });
@@ -74,13 +76,27 @@ test('ledger separates estimate, observed, kind totals, cache and partial saving
   assert.equal(stats.partialSavedBytes, 20);
 });
 
-test('providerReportedBytes null survives writes while zero remains numeric', () => {
+test('providerReportedBytes null survives writes while zero remains numeric', async () => {
   const storage = memoryStorage();
-  ledger.reserveEstimate(1, { storage, now });
+  await ledger.reserveEstimate(1, { storage, now });
   ledger.recordObserved(1, 'preview', { storage, now });
   assert.equal(ledger.currentStats(storage, now).providerReportedBytes, null);
   ledger.recordProviderReported(0, { storage, now });
   assert.equal(ledger.currentStats(storage, now).providerReportedBytes, 0);
+});
+
+test('cross-context reservations serialize under Web Locks and fail closed without locks', async () => {
+  const storage = memoryStorage();
+  storage.setItem(settings.KEYS.dailyLimit, '100');
+  let tail = Promise.resolve();
+  const locks = { request(_name, _options, callback) { const next = tail.then(callback); tail = next.catch(() => {}); return next; } };
+  const results = await Promise.all([
+    ledger.reserveEstimate(70, { storage, now, locks }),
+    ledger.reserveEstimate(70, { storage, now, locks }),
+  ]);
+  assert.equal(results.filter((result) => result.ok).length, 1);
+  assert.equal(ledger.currentStats(storage, now).estimatedBytes, 70);
+  assert.equal((await ledger.reserveEstimate(1, { storage, now, locks: {} })).reason, 'lock-unavailable');
 });
 
 test('limit equality is allowed and one byte over is rejected before operation', async () => {
