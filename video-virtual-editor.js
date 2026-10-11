@@ -693,7 +693,10 @@
           target.searchParams.delete('id');
           target.searchParams.set('project', project.id);
           history.replaceState(null, '', target);
-          status('端末に保存済み・保管庫同期待ちです。編集内容はこの端末に残っています。', true);
+          const guestMode = window.TestCodeGuest && typeof window.TestCodeGuest.isActive === 'function'
+            && window.TestCodeGuest.isActive();
+          status(guestMode ? loadedProjectStatus()
+            : '端末に保存済み・保管庫同期待ちです。編集内容はこの端末に残っています。', !guestMode);
         } else {
           status('同期に失敗しました。未保存の編集内容は画面に保持しています。', true);
         }

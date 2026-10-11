@@ -134,6 +134,21 @@ test('cloud sync failures preserve local changes and report a recoverable error'
   assert.equal(repository.list().length, 1);
 });
 
+test('VPN loss during cloud sync leaves the locally saved revision available after access returns', async () => {
+  let access = true;
+  const { repository } = setup({
+    allowed: () => access,
+    sync: async () => { access = false; throw new Error('VPN access lost during sync'); },
+  });
+  await assert.rejects(repository.save({ title: 'Interrupted sync', edit: projectEdit() }),
+    (error) => error.code === 'VIRTUAL_EDIT_SYNC_FAILED' && error.localSaved === true);
+  access = true;
+  const saved = repository.list();
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].title, 'Interrupted sync');
+  assert.equal(saved[0].revision, 1);
+});
+
 test('outdated metadata writes never roll back a newer virtual-project revision', async () => {
   const { repository, raw } = setup();
   const stale = JSON.parse(raw.get(Store.META_KEY));
