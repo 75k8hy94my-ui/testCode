@@ -27,6 +27,7 @@
           await deps.loadScript('video-data.js?v=20260918-video-data-no-window', 'spaVideoData');
           await deps.loadScript('manga-list-pagination-events.js?v=20261012-video-pagination', 'spaMangaPaginationEvents');
           await deps.loadScript('video-library-pagination.js?v=20261012-video-pagination', 'spaVideoLibraryPagination');
+          await deps.loadScript('video-thumbnail-cache.js?v=20261012-indexeddb-thumbs', 'spaVideoThumbnailCache');
           await deps.loadScript('video-thumbnail-renderer.js?v=20261012-youtube-video-cards', 'spaVideoThumbnailRenderer');
           await deps.loadScript('video-card.js?v=20261012-youtube-video-cards', 'spaVideoCard');
           await deps.loadScript('video-custom-properties.js?v=20261012-video-custom-properties', 'spaVideoCustomProperties');

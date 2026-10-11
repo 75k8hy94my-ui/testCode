@@ -28,6 +28,7 @@
     let image = null; let preview = null;
     const show = (media) => { if (media.dataset) media.dataset.frameReady = '1'; media.style.visibility = 'visible'; fallback.hidden = true; };
     const revealFallback = (media) => { if (media && media.parentNode) media.remove(); fallback.hidden = false; };
+    const cache = root.MangaReaderVideoThumbnailCache;
     const addDirectPreview = () => {
       if (preview || !isDirectVideo(record.url)) return;
       preview = doc.createElement('video'); preview.className = options && options.videoClass || 'vl-thumb-direct-video';
@@ -37,7 +38,27 @@
         if (Number.isFinite(duration) && duration > 0 && options && typeof options.onDuration === 'function') options.onDuration(duration);
         try { preview.currentTime = Math.max(0, Number(record.thumbnailTimeSeconds) || 0.1); } catch (_) {}
       });
-      preview.addEventListener('seeked', () => show(preview));
+      preview.addEventListener('seeked', () => {
+        show(preview);
+        if (cache && cache.permitted()) {
+          const time = Math.max(0, Number(record.thumbnailTimeSeconds) || 0.1);
+          cache.getOrCapture(record.url, time).then(blob => {
+            if (!blob || !preview || !preview.isConnected || !cache.permitted() || !root.URL || !root.URL.createObjectURL) return;
+            const objectUrl = root.URL.createObjectURL(blob);
+            const cached = doc.createElement('img');
+            cached.alt = ''; cached.className = 'videoThumbnailCached';
+            cached.onload = () => {
+              if (preview && preview.isConnected && cache.permitted()) {
+                preview.pause(); preview.removeAttribute('src'); preview.remove(); preview = null;
+                container.append(cached); show(cached);
+              }
+              root.URL.revokeObjectURL(objectUrl);
+            };
+            cached.onerror = () => root.URL.revokeObjectURL(objectUrl);
+            cached.src = objectUrl;
+          }).catch(() => {});
+        }
+      });
       preview.addEventListener('loadeddata', () => { if (!preview.currentTime) show(preview); });
       preview.addEventListener('error', () => revealFallback(preview)); container.append(preview);
     };
@@ -46,6 +67,15 @@
       image = doc.createElement('img'); image.alt = ''; image.loading = 'lazy'; image.referrerPolicy = 'no-referrer'; image.src = src;
       image.style.visibility = 'hidden'; image.addEventListener('load', () => show(image));
       image.addEventListener('error', () => { revealFallback(image); image = null; addDirectPreview(); }); container.append(image);
+    } else if (cache && cache.permitted() && isDirectVideo(record.url)) {
+      cache.read(record.url, Math.max(0, Number(record.thumbnailTimeSeconds) || 0.1)).then(blob => {
+        if (!blob || !root.URL || !root.URL.createObjectURL || !cache.permitted()) { addDirectPreview(); return; }
+        const url = root.URL.createObjectURL(blob), cached = doc.createElement('img');
+        cached.className = 'videoThumbnailCached'; cached.alt = '';
+        cached.onload = () => { if (cache.permitted()) show(cached); root.URL.revokeObjectURL(url); };
+        cached.onerror = () => { cached.remove(); root.URL.revokeObjectURL(url); addDirectPreview(); };
+        cached.src = url; container.append(cached);
+      }).catch(addDirectPreview);
     } else addDirectPreview();
     return { fallback, get image() { return image; }, get video() { return preview; } };
   }
