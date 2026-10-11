@@ -23,11 +23,16 @@ test('video pagination uses the 25-item manga page size and clamps valid pages',
 
 test('video pagination keeps one logical page for zero items and clamps after filtering', () => {
   const empty = window.VideoLibraryPagination.derive([], 9);
+  const single = window.VideoLibraryPagination.derive([{ id: 'one' }], 1);
   const filtered = window.VideoLibraryPagination.derive(Array.from({ length: 25 }, (_, i) => i), 2);
 
   assert.equal(empty.totalPages, 1);
   assert.equal(empty.page, 1);
   assert.deepEqual(Array.from(empty.items), []);
+  assert.equal(single.totalPages, 1);
+  assert.equal(single.page, 1);
+  assert.equal(single.items.length, 1);
+  assert.equal(single.hasMultiplePages, false);
   assert.equal(filtered.totalPages, 1);
   assert.equal(filtered.page, 1);
   assert.equal(filtered.items.length, 25);
