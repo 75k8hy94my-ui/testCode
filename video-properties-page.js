@@ -94,7 +94,6 @@
     if (!property.deleted) {
       const settings = node('div', null, 'videoPropertySettings');
       appendCheckbox(settings, '入力・一覧に表示', property.hidden !== true, (visible) => change((definitions) => Model.setPropertyFlag(definitions, property.id, 'hidden', !visible)));
-      appendCheckbox(settings, '動画カードに表示', property.showInCard === true, (visible) => change((definitions) => Model.setPropertyFlag(definitions, property.id, 'showInCard', visible)));
       card.append(settings); renderOptions(card, property);
     }
     return card;
