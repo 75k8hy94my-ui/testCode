@@ -546,6 +546,8 @@
     if (Number.isSafeInteger(pageNumber) && pageNumber > 0) targetUrl.searchParams.set('fromPage', String(pageNumber));
     event.preventDefault();
     event.stopImmediatePropagation();
+    // Capture filters, sort and original page before recordOpen changes ranking.
+    window.MangaReaderVideoLibrary?.captureReturnContext?.(videoId);
     recordOpen(base);
     window.location.href = targetUrl.href;
   }
