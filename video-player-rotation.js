@@ -7,6 +7,8 @@
     if (!frame || !media || !className) return () => {};
 
     const config = options || {};
+    const expandFrame = config.expandFrame === true;
+    const previousFrameHeight = frame.style ? frame.style.height : '';
     const requestFrame = config.requestFrame || (typeof root.requestAnimationFrame === 'function'
       ? (callback) => root.requestAnimationFrame(callback)
       : (callback) => callback());
@@ -34,6 +36,10 @@
     }
 
     media.classList.add(className);
+    if (expandFrame) {
+      frame.classList.add('videoPlayerFrameRotated');
+      if (frame.style) frame.style.height = '';
+    }
     media.addEventListener('loadedmetadata', onMetadata);
     if (typeof ResizeObserverImpl === 'function') {
       resizeObserver = new ResizeObserverImpl(resize);
@@ -49,6 +55,10 @@
       media.classList.remove(className);
       media.style.width = '';
       media.style.height = '';
+      if (expandFrame) {
+        frame.classList.remove('videoPlayerFrameRotated');
+        if (frame.style) frame.style.height = previousFrameHeight;
+      }
     };
   }
 
