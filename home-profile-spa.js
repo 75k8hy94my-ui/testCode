@@ -286,6 +286,7 @@ async function start(){
     document.addEventListener('click',intercept);
     document.addEventListener('manga-reader-vpn-status',handleVpnStatusChange);
     window.addEventListener('popstate',handleRoutePopstate);
+    await ensureVpnGate().catch(()=>null);
     renderRoute();
     return;
   }
@@ -303,6 +304,9 @@ async function start(){
   document.addEventListener('click',intercept);
   document.addEventListener('manga-reader-vpn-status',handleVpnStatusChange);
   window.addEventListener('popstate',handleRoutePopstate);
+  // The home route must also initialize the VPN gate so its status badge updates
+  // without visiting the video/profile sections or pressing manual recheck.
+  await ensureVpnGate().catch(()=>null);
   renderRoute();
   if(typeof MangaVault.syncLatest==='function')MangaVault.syncLatest().catch(()=>{});
 }
