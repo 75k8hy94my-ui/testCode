@@ -122,9 +122,21 @@
 
     const metadata = (options.metadata || []).map((value) => String(value == null ? '' : value).trim()).filter(Boolean);
     const tags = (options.tags || []).map((value) => String(value == null ? '' : value).trim()).filter(Boolean);
-    if (metadata.length || tags.length) {
-      const meta = doc.createElement('div'); meta.className = 'videoCardMeta'; meta.textContent = metadata.concat(tags.map((tag) => '#' + tag)).join(' · ');
+    const customLabels = (options.customLabels || []).map((value) => String(value == null ? '' : value).trim()).filter(Boolean);
+    if (metadata.length) {
+      const meta = doc.createElement('div'); meta.className = 'videoCardMeta'; meta.textContent = metadata.join(' · ');
       details.append(meta);
+    }
+    if (tags.length || customLabels.length) {
+      const labels = doc.createElement('div'); labels.className = 'videoCardLabels';
+      labels.setAttribute('aria-label', '動画のタグとカスタムプロパティ');
+      tags.forEach((tag) => {
+        const chip = doc.createElement('span'); chip.className = 'videoCardLabel videoCardLabel--tag'; chip.textContent = '#' + tag; labels.append(chip);
+      });
+      customLabels.forEach((label) => {
+        const chip = doc.createElement('span'); chip.className = 'videoCardLabel videoCardLabel--custom'; chip.textContent = label; labels.append(chip);
+      });
+      details.append(labels);
     }
     if (options.progressPercent != null && Number.isFinite(Number(options.progressPercent))) {
       const progress = doc.createElement('div'); progress.className = 'videoCardProgress';
