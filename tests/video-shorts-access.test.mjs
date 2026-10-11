@@ -166,10 +166,8 @@ test('allowed route probes and queues direct videos only, then unloads them when
   const scrubTrackArea = stage.children.find((child) => child.className === 'shortsScrubArea');
   scrubTrackArea.rect = { left: 0, width: 100 };
   stage.emit('pointerdown', { button: 0, clientX: 25, clientY: 0, target: scrubTrackArea });
-  const scrubTimer = [...timers.entries()].find(([, timer]) => timer.delay === 450);
-  assert.ok(scrubTimer, 'scrub track requires a separate long press');
-  scrubTimer[1].callback(); timers.delete(scrubTimer[0]);
-  assert.equal(current.paused, true, 'scrubbing pauses playback');
+  assert.equal([...timers.values()].some((timer) => timer.delay === 450), false, 'seeking does not wait for a long-press timer');
+  assert.equal(current.paused, true, 'the first pointerdown on the bar immediately starts scrubbing and pauses playback');
   stage.emit('pointermove', { clientX: 75, clientY: 0, target: scrubTrackArea });
   assert.equal(stage.children.find((child) => child.className === 'shortsScrubArea').children[2].children[1].textContent, '0:22 / 0:30');
   stage.emit('pointerup', { clientX: 75, clientY: 0, target: scrubTrackArea });

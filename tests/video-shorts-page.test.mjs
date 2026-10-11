@@ -23,7 +23,7 @@ test('Shorts reloads the VPN gate and media-cache scripts after their behavior c
   assert.match(html, /media-access-gate\.js\?v=20261010-proton-range/);
   assert.match(html, /video-data\.js\?v=20261010-rotation-aware/);
   assert.match(html, /video-shorts-queue\.js\?v=20261010-rotation-aware/);
-  assert.match(html, /video-shorts-page\.js\?v=20261010-rotation-aware/);
+  assert.match(html, /video-shorts-page\.js\?v=20261012-immediate-scrub/);
   assert.match(html, /video-shorts-player\.css\?v=20261010-rotation-aware/);
   assert.match(html, /video-player-rotation\.js\?v=20261008-video-rotation/);
   assert.match(html, /viewport-fit=cover/);
