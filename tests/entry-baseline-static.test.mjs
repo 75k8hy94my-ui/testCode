@@ -28,13 +28,13 @@ test('current entry pages keep their static bootstrap script baselines', () => {
     'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261011-nongame-audit', 'feature-flags.js',
     'media-access-gate.js?v=20261010-vpn-diagnostics',
     'manga-list-route.js?v=20261011-nongame-audit',
-    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'vault-history.js?v=20261011-vault-history', 'vault-history-ui.js?v=20261011-vault-history', 'video-shorts-state.js?v=20261010-shorts-state', 'profile-shorts-reset.js?v=20261010-reset-progress', 'home-profile-spa.js?v=20261012-video-custom-properties-v3',
+    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'vault-history.js?v=20261011-vault-history', 'vault-history-ui.js?v=20261011-vault-history', 'video-shorts-state.js?v=20261010-shorts-state', 'profile-shorts-reset.js?v=20261010-reset-progress', 'home-profile-spa.js?v=20261012-youtube-video-cards-v2',
   ]);
   assert.deepEqual(scriptSources(pages.video), [
     'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-sync-audit', 'vault-session.js?v=20261011-auto-receive-sync', 'vault-conflict-ui.js?v=20261010-vault-sync-audit', 'browser-storage.js',
     'vault-payload.js?v=20261012-video-custom-properties', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js?v=20261010-vpn-diagnostics',
-    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261011-nongame-audit', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'vault-history.js?v=20261011-vault-history', 'vault-history-ui.js?v=20261011-vault-history', 'video-shorts-state.js?v=20261010-shorts-state', 'profile-shorts-reset.js?v=20261010-reset-progress', 'home-profile-spa.js?v=20261012-video-custom-properties-v3',
+    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261011-nongame-audit', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'vault-history.js?v=20261011-vault-history', 'vault-history-ui.js?v=20261011-vault-history', 'video-shorts-state.js?v=20261010-shorts-state', 'profile-shorts-reset.js?v=20261010-reset-progress', 'home-profile-spa.js?v=20261012-youtube-video-cards-v2',
   ]);
 });
 
@@ -142,12 +142,13 @@ test('VPN checks and manual designations remain available to protected reader me
 });
 
 test('video bootstrap has one owner per page and does not load on the Reader document', () => {
-  assert.match(spa, /video-list-route\.js\?v=20261012-video-custom-properties-v3/);
+  assert.match(spa, /video-list-route\.js\?v=20261012-youtube-video-cards-v2/);
   const videoRoute = fs.readFileSync(new URL('../video-list-route.js', import.meta.url), 'utf8');
-  assert.match(videoRoute, /video-thumbnail-renderer\.js\?v=20261008-shared-thumbnails/);
+  assert.match(videoRoute, /video-thumbnail-renderer\.js\?v=20261012-youtube-video-cards/);
+  assert.match(videoRoute, /video-card\.js\?v=20261012-youtube-video-cards/);
   assert.match(videoRoute, /manga-list-pagination-events\.js\?v=20261012-video-pagination/);
   assert.match(videoRoute, /video-library-pagination\.js\?v=20261012-video-pagination/);
-  assert.match(videoRoute, /video-library\.js\?v=20261012-video-custom-properties-v3/);
+  assert.match(videoRoute, /video-library\.js\?v=20261012-youtube-video-cards-v2/);
   assert.match(recommendations, /const page = String\(\(root\.location && root\.location\.pathname\) \|\| ''\)\.split\('\/'\)\.pop\(\);/);
   assert.doesNotMatch(reader, /recommendations\.js|video-data\.js|video-library\.js/);
   assert.match(recommendations, /loadBrowserScript\('video-data\.js'\)/);

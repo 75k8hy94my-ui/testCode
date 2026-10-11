@@ -1,0 +1,209 @@
+.videoCard {
+  --video-card-text: var(--text, #f1f2f6);
+  --video-card-sub: var(--sub, #9aa3b5);
+  --video-card-menu-bg: var(--panel, #1d2230);
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--video-card-text);
+}
+
+.videoCardThumbOpen,
+.videoCardTitle {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.videoCardThumbOpen { width: 100%; }
+.videoCardThumb {
+  position: relative;
+  display: grid;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--panel-2, #202430);
+  color: var(--video-card-sub);
+  isolation: isolate;
+}
+
+.videoCardThumb img,
+.videoCardThumb video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.videoCardThumb .videoThumbnailFallback,
+.videoCardThumb .vl-thumb-fallback {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-content: center;
+  justify-items: center;
+  gap: 5px;
+  color: var(--video-card-sub);
+  font-size: 11px;
+}
+
+.videoCardThumb .videoThumbnailFallback b,
+.videoCardThumb .vl-thumb-fallback b { color: var(--video-card-text); font-size: 25px; }
+.videoCardDuration[hidden] { display: none; }
+.videoCardDuration {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  z-index: 2;
+  border-radius: 4px;
+  padding: 2px 4px;
+  background: rgb(0 0 0 / 80%);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  pointer-events: none;
+}
+
+.videoCardBody { min-width: 0; padding: 0; }
+.videoCardTitleRow { display: flex; min-width: 0; flex-wrap: nowrap; align-items: flex-start; gap: 4px; }
+.videoCardTitleRow--menu-open { flex-wrap: wrap; }
+.videoCardTitle {
+  display: -webkit-box;
+  flex: 1 1 auto;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.videoCardTitle:focus-visible,
+.videoCardThumbOpen:focus-visible,
+.videoCardMenuButton:focus-visible { outline: 2px solid #75b8ff; outline-offset: 2px; }
+.videoCardMenuWrap { position: relative; z-index: 4; flex: 0 0 40px; width: 40px; margin: -7px -7px 0 0; }
+.videoCardMenuWrap--open { flex: 0 0 100%; width: 100%; margin: 0; }
+.videoCardMenuButton {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--video-card-text);
+  font-size: 23px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.videoCardMenuButton:hover,
+.videoCardMenuButton[aria-expanded="true"] { background: color-mix(in srgb, var(--video-card-sub) 18%, transparent); }
+.videoCardMenu[hidden] { display: none; }
+.videoCardMenu {
+  position: relative;
+  z-index: 1200;
+  display: grid;
+  width: min(220px, 100%);
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--video-card-sub) 22%, transparent);
+  border-radius: 12px;
+  margin: 1px 0 0 auto;
+  padding: 5px;
+  background: var(--video-card-menu-bg);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 34%);
+}
+.videoCardMenuEdit,
+.videoCardMenuAction {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 12px;
+  background: transparent;
+  color: var(--video-card-text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.videoCardMenuEdit:hover,
+.videoCardMenuAction:hover { background: color-mix(in srgb, var(--video-card-sub) 16%, transparent); }
+.videoCardMeta {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--video-card-sub);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+.videoCardProgress { height: 3px; overflow: hidden; margin-top: 8px; border-radius: 99px; background: var(--panel-2, #202430); }
+.videoCardProgress i { display: block; height: 100%; background: var(--accent, #6aa9ff); }
+.vl-grid .vl-card.videoCard { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.vl-grid .vl-card.videoCard .videoCardThumb { border-radius: 12px; }
+
+.videoCard--compact { display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 10px; align-items: start; }
+.videoCard--compact .videoCardThumbOpen { grid-row: 1 / span 2; }
+.videoCard--compact .videoCardThumb { border-radius: 8px; }
+.videoCard--compact .videoCardTitle { -webkit-line-clamp: 2; font-size: 14px; }
+.videoCard--compact .videoCardMeta { margin-top: 3px; }
+
+.videoCard--related { display: grid; grid-template-columns: minmax(124px, 42%) minmax(0, 1fr); align-items: start; gap: 10px; }
+.videoCard--related .videoCardThumb { border-radius: 8px; }
+.videoCard--related .videoCardTitle { -webkit-line-clamp: 3; font-size: 14px; line-height: 1.35; }
+.videoCard--related .videoCardMenuWrap { flex-basis: 36px; width: 36px; margin: -6px 0 0 0; }
+.videoCard--related .videoCardMenuWrap--open { flex-basis: 100%; width: 100%; margin: 0; }
+.videoCard--related .videoCardMenuButton { width: 36px; height: 36px; }
+.videoCard--related .videoCardMeta { margin-top: 4px; }
+.videoRelated { min-width: 0; border: 0; border-radius: 0; padding: 0 0 0 8px; background: transparent; }
+.videoRelated h3 { margin: 0 0 14px; font-size: 16px; font-weight: 650; }
+.videoRelated .videoCard + .videoCard { margin-top: 10px; }
+
+@media (min-width: 641px) {
+  .vl-grid:not(.compact) { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 32px 16px; }
+}
+@media (min-width: 1px) {
+  .vl-grid.compact .videoCardThumbOpen { display: block; grid-row: auto; grid-column: 1; }
+  .vl-grid.compact .videoCardBody { grid-row: 1; grid-column: 2; padding: 0; }
+}
+@media (max-width: 640px) {
+  .vl-grid:not(.compact) { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+  .videoCard { gap: 9px; }
+  .videoCardThumb { border-radius: 10px; }
+  .videoCardTitle { font-size: 16px; }
+  .videoRelated { margin-top: 24px; border: 0; padding: 0; }
+  .videoRelated .videoCard + .videoCard { margin-top: 14px; }
+  .videoCard--related { grid-template-columns: minmax(112px, 38%) minmax(0, 1fr); gap: 9px; }
+}
+@media (max-width: 380px) {
+  .videoCard--related { grid-template-columns: minmax(96px, 36%) minmax(0, 1fr); }
+  .videoCard--compact { grid-template-columns: 100px minmax(0, 1fr); }
+}

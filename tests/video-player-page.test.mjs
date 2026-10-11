@@ -13,8 +13,10 @@ test('video player page uses the normalized saved title and renders marker list'
 
 test('related videos use normalized thumbnail metadata and the shared renderer', () => {
   assert.match(page, /itemVideo/);
-  assert.match(page, /MangaReaderVideoThumbnailRenderer\.render\(thumb, itemVideo/);
+  assert.match(page, /MangaReaderVideoCard/);
+  assert.match(page, /layout: 'related'/);
   assert.match(fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8'), /video-thumbnail-renderer\.js/);
+  assert.match(fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8'), /video-card\.js/);
 });
 
 test('video player waits for protected-data access before reading records or rendering metadata', () => {
@@ -94,7 +96,7 @@ test('custom player defers single taps and maps double-tap zones to seek or full
 test('video player document cache keys identify the current watch-page design', () => {
   const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
   assert.match(html, /home-profile-shell\.css\?v=20261010-icon-markers/);
-  assert.match(html, /video-player-page\.js\?v=20261012-video-custom-properties-v2/);
+  assert.match(html, /video-player-page\.js\?v=20261012-youtube-video-cards-v2/);
 });
 
 test('desktop watch page keeps related videos in an independently scrolling viewport', () => {

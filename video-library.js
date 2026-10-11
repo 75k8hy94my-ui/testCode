@@ -335,35 +335,32 @@
   }
 
   function createCard(video) {
-    const card = document.createElement('article'); card.className = 'vl-card'; card.dataset.id = video.id;
-    const open = document.createElement('button'); open.type = 'button'; open.className = 'vl-open'; open.setAttribute('aria-label', (video.title || '動画') + 'を開く');
-    const thumb = document.createElement('div'); thumb.className = 'vl-thumb';
-    const ThumbnailRenderer = window.MangaReaderVideoThumbnailRenderer;
-    if (ThumbnailRenderer && typeof ThumbnailRenderer.render === 'function') ThumbnailRenderer.render(thumb, video, { fallbackClass: 'vl-thumb-fallback', videoClass: 'vl-thumb-direct-video', serviceLabel: Data.deriveService(video.url, video.a) || 'VIDEO' });
-    const body = document.createElement('div'); body.className = 'vl-body';
-    const title = document.createElement('div'); title.className = 'vl-title'; title.textContent = video.title || (Data.deriveService(video.url, video.a) + ' / ' + video.b);
-    const meta = document.createElement('div'); meta.className = 'vl-meta';
-    const serviceText = document.createElement('span'); serviceText.textContent = Data.deriveService(video.url, video.a) || video.a || 'video'; meta.append(serviceText);
-    if (video.folderId && folderName(video.folderId)) { const f = document.createElement('span'); f.textContent = '· ' + folderName(video.folderId); meta.append(f); }
-    if (video.watchStatus) { const s = document.createElement('span'); s.textContent = '· ' + STATUS_LABELS[video.watchStatus]; meta.append(s); }
-    if (video.lastOpenedAt) { const l = document.createElement('span'); l.textContent = '· ' + formatDate(video.lastOpenedAt); meta.append(l); }
-    if (video.openCount) { const c = document.createElement('span'); c.textContent = '· ' + video.openCount + '回'; meta.append(c); }
-    body.append(title, meta);
+    const VideoCard = window.MangaReaderVideoCard;
+    if (!VideoCard || typeof VideoCard.create !== 'function') throw new Error('video card component is unavailable');
+    const title = video.title || [Data.deriveService(video.url, video.a), video.b].filter(Boolean).join(' / ') || '動画';
+    const metadata = [];
+    const service = Data.deriveService(video.url, video.a);
+    if (service) metadata.push(service);
+    if (video.folderId && folderName(video.folderId)) metadata.push(folderName(video.folderId));
+    if (video.watchStatus && STATUS_LABELS[video.watchStatus]) metadata.push(STATUS_LABELS[video.watchStatus]);
+    if (video.lastOpenedAt) metadata.push(formatDate(video.lastOpenedAt));
+    if (video.openCount) metadata.push(video.openCount + '回');
     if (canReadProtectedData() && CustomProperties) {
       const stored = state.customValues[String(video.id)] || {};
       const shown = Object.values(state.customDefinitions.properties || {}).filter((property) => property && property.deleted !== true && property.hidden !== true && property.showInCard === true && Object.prototype.hasOwnProperty.call(stored, property.id) && stored[property.id] !== null && stored[property.id] !== '').sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)).slice(0, 3);
-      if (shown.length) { const custom = document.createElement('div'); custom.className = 'vl-custom-properties'; shown.forEach((property) => { const line = document.createElement('span'); line.className = 'vl-tag'; line.textContent = property.name + ': ' + CustomProperties.formatValue(property, stored[property.id], state.customDefinitions); custom.append(line); }); body.append(custom); }
+      shown.forEach((property) => metadata.push(property.name + ': ' + CustomProperties.formatValue(property, stored[property.id], state.customDefinitions)));
     }
-    if (video.tags.length) { const tags = document.createElement('div'); tags.className = 'vl-tags'; video.tags.slice(0, 4).forEach((tag) => { const span = document.createElement('span'); span.className = 'vl-tag'; span.textContent = '#' + tag; tags.append(span); }); body.append(tags); }
-    const percent = progressPercent(video); if (percent != null) { const progress = document.createElement('div'); progress.className = 'vl-progress'; const inner = document.createElement('i'); inner.style.width = percent + '%'; progress.append(inner); body.append(progress); }
-    open.append(thumb, body); open.addEventListener('click', () => openVideo(video.id));
-
-    const actions = document.createElement('div'); actions.className = 'vl-card-actions';
-    const favorite = document.createElement('button'); favorite.type = 'button'; favorite.className = 'vl-round' + (video.favorite ? ' active' : ''); favorite.textContent = video.favorite ? '★' : '☆'; favorite.setAttribute('aria-label', 'お気に入り'); favorite.addEventListener('click', (event) => { event.stopPropagation(); updateMeta(video.id, { favorite: !video.favorite }); render(); });
-    const edit = document.createElement('a'); edit.className = 'vl-round vl-edit-link'; edit.textContent = '⋯';
-    edit.setAttribute('aria-label', '詳細を編集'); edit.title = '詳細を編集';
-    edit.href = 'video-edit.html?id=' + encodeURIComponent(video.id) + '&return=list';
-    actions.append(favorite, edit); card.append(open, actions); return card;
+    const card = VideoCard.create(video, {
+      documentRef: document, layout: state.view === 'compact' ? 'compact' : 'grid', openClass: 'vl-open',
+      title, metadata, tags: video.tags.slice(0, 4), progressPercent: progressPercent(video),
+      thumbnailRenderer: window.MangaReaderVideoThumbnailRenderer,
+      thumbnailOptions: { fallbackClass: 'vl-thumb-fallback', videoClass: 'vl-thumb-direct-video', serviceLabel: service || 'VIDEO' },
+      onOpen: () => openVideo(video.id),
+      menuActions: [{ label: video.favorite ? 'お気に入りを解除' : 'お気に入りに追加', onSelect: () => { updateMeta(video.id, { favorite: !video.favorite }); render(); } }],
+      editHref: 'video-edit.html?id=' + encodeURIComponent(video.id) + '&return=list',
+    });
+    card.classList.add('vl-card');
+    return card;
   }
 
   function renderFilterOptions(videos) {
