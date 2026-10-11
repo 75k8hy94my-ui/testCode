@@ -70,12 +70,12 @@ test('return preserves the originating page even when recent-opened sort moves t
   await expect(page.locator('#videoLibraryPageLabel')).toHaveText('3 / 3');
   await page.locator('#videoLibrarySort').selectOption('recent-opened');
   await expect(page.locator('#videoLibraryPageLabel')).toHaveText('3 / 3');
-  await page.locator('.vl-card[data-video-id="return-video-3"] .vl-open').first().click();
-  await expect(page).toHaveURL(/video-player\.html\?id=return-video-3/);
+  await page.locator('.vl-card[data-video-id="return-video-2"] .vl-open').first().click();
+  await expect(page).toHaveURL(/video-player\.html\?id=return-video-2/);
   await page.locator('#shellTitle a').click();
   await expect(page.locator('#videoLibrarySort')).toHaveValue('recent-opened');
   await expect(page.locator('#videoLibraryPageLabel')).toHaveText('3 / 3');
-  await expect(page.locator('.vl-card[data-video-id="return-video-3"]')).toBeVisible();
+  await expect(page.locator('.vl-card[data-video-id="return-video-2"]')).toBeVisible();
 });
 
 test('mobile Video tab returns from watch page even though the tab is highlighted', async ({ page }) => {
