@@ -236,3 +236,8 @@
   .videoCardThumb { border-radius: 10px; }
   .videoCardTitle { font-size: 15px; }
 }
+
+/* Preserve portrait, landscape, and square thumbnails without cropping. */
+.videoCardThumb { background: #0b0b0b; }
+.videoCardThumb img, .videoCardThumb video { object-fit: contain; }
+#videoLibraryResults .vl-thumb .vl-thumb-direct-video { object-fit: contain; }

@@ -29,11 +29,16 @@
     const show = (media) => { if (media.dataset) media.dataset.frameReady = '1'; media.style.visibility = 'visible'; fallback.hidden = true; };
     const revealFallback = (media) => { if (media && media.parentNode) media.remove(); fallback.hidden = false; };
     const cache = root.MangaReaderVideoThumbnailCache;
+    const applyNativeRatio = (width, height) => {
+      if (!isDirectVideo(record.url) || !(width > 0 && height > 0)) return;
+      container.style.aspectRatio = width + ' / ' + height;
+    };
     const addDirectPreview = () => {
       if (preview || !isDirectVideo(record.url)) return;
       preview = doc.createElement('video'); preview.className = options && options.videoClass || 'vl-thumb-direct-video';
       preview.muted = true; preview.playsInline = true; preview.preload = 'metadata'; preview.src = record.url;
       preview.style.visibility = 'hidden'; preview.addEventListener('loadedmetadata', () => {
+        applyNativeRatio(Number(preview.videoWidth), Number(preview.videoHeight));
         const duration = Number(preview.duration);
         if (Number.isFinite(duration) && duration > 0 && options && typeof options.onDuration === 'function') options.onDuration(duration);
         try { preview.currentTime = Math.max(0, Number(record.thumbnailTimeSeconds) || 0.1); } catch (_) {}
@@ -48,6 +53,7 @@
             const cached = doc.createElement('img');
             cached.alt = ''; cached.className = 'videoThumbnailCached';
             cached.onload = () => {
+              applyNativeRatio(cached.naturalWidth, cached.naturalHeight);
               if (preview && preview.isConnected && cache.permitted()) {
                 preview.pause(); preview.removeAttribute('src'); preview.remove(); preview = null;
                 container.append(cached); show(cached);
@@ -72,7 +78,7 @@
         if (!blob || !root.URL || !root.URL.createObjectURL || !cache.permitted()) { addDirectPreview(); return; }
         const url = root.URL.createObjectURL(blob), cached = doc.createElement('img');
         cached.className = 'videoThumbnailCached'; cached.alt = '';
-        cached.onload = () => { if (cache.permitted()) show(cached); root.URL.revokeObjectURL(url); };
+        cached.onload = () => { applyNativeRatio(cached.naturalWidth, cached.naturalHeight); if (cache.permitted()) show(cached); root.URL.revokeObjectURL(url); };
         cached.onerror = () => { cached.remove(); root.URL.revokeObjectURL(url); addDirectPreview(); };
         cached.src = url; container.append(cached);
       }).catch(addDirectPreview);
