@@ -249,3 +249,8 @@
 .videoCardMenuWrap--open,
 .videoCard--related .videoCardMenuWrap--open { flex: 0 0 32px; width: 32px; margin: -4px -4px 0 0; }
 .videoCardMenu { position: absolute; top: calc(100% + 4px); right: 0; width: min(220px, calc(100vw - 24px)); max-width: none; margin: 0; }
+
+/* Assigned tags and custom fields are visible independently from clipped metadata. */
+.videoCardLabels { display: flex; flex-wrap: wrap; gap: 5px 6px; align-items: center; margin-top: 7px; min-width: 0; }
+.videoCardLabel { max-width: 100%; overflow-wrap: anywhere; white-space: normal; border-radius: 6px; padding: 3px 7px; background: var(--panel-2, #303744); color: var(--video-card-text); font-size: 12px; line-height: 1.4; }
+.videoCardLabel--custom { border: 1px solid color-mix(in srgb, var(--video-card-sub) 25%, transparent); }
