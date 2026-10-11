@@ -16,7 +16,6 @@
   const MAX_PROBES = 6;
   const EARLY_SWIPE_MS = 5000;
   const HOLD_TO_PAUSE_MS = 350;
-  const HOLD_TO_SCRUB_MS = 450;
 
   function create(deps = {}) {
     const documentRef = deps.documentRef || root.document;
@@ -632,7 +631,7 @@
     }
 
     function handlePointerDown(event) {
-      if (!canReadProtectedData() || !activeVideo || (event.button != null && event.button !== 0)) return;
+      if (!canReadProtectedData() || !activeVideo || gestureState || (event.button != null && event.button !== 0)) return;
       const target = event.target;
       if (target.closest?.('.shortsActions') || target.closest?.('.shortsBack') || target.closest?.('button') || target.closest?.('a')) return;
       const onScrub = target === scrubArea || target.closest?.('.shortsScrubArea') === scrubArea;
@@ -642,12 +641,20 @@
         try { stageElement.setPointerCapture(event.pointerId); } catch (_) {}
       }
       clearPressTimer();
-      gestureState = { startX: event.clientX, startY: event.clientY, lastX: event.clientX, lastY: event.clientY, moved: false, leftEdge: event.clientX <= 28, onScrub, onVideo, heldWasPlaying: false, scrubbing: false, longPressFired: false };
-      pressTimer = schedule(() => { pressTimer = null; if (!gestureState || gestureState.moved) return; gestureState.longPressFired = true; if (gestureState.onScrub) beginScrub(); else if (gestureState.onVideo && !activeVideo.paused) { gestureState.heldWasPlaying = true; pausePlaybackClock(); activeVideo.pause(); } }, onScrub ? HOLD_TO_SCRUB_MS : HOLD_TO_PAUSE_MS);
+      gestureState = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, lastX: event.clientX, lastY: event.clientY, moved: false, leftEdge: event.clientX <= 28, onScrub, onVideo, heldWasPlaying: false, scrubbing: false, longPressFired: false };
+      if (onScrub) {
+        // A tap selects the position immediately; dragging updates the preview.
+        // Never treat a scrub-bar gesture as a swipe to another video.
+        event.preventDefault?.();
+        beginScrub();
+        return;
+      }
+      // Long press is kept only for pausing when holding the video itself.
+      pressTimer = schedule(() => { pressTimer = null; if (!gestureState || gestureState.moved) return; gestureState.longPressFired = true; if (gestureState.onVideo && !activeVideo.paused) { gestureState.heldWasPlaying = true; pausePlaybackClock(); activeVideo.pause(); } }, HOLD_TO_PAUSE_MS);
     }
 
     function handlePointerMove(event) {
-      if (!gestureState) return;
+      if (!gestureState || (gestureState.pointerId != null && event.pointerId !== gestureState.pointerId)) return;
       gestureState.lastX = event.clientX; gestureState.lastY = event.clientY;
       if (gestureState.scrubbing) { updateScrubAt(event.clientX); return; }
       const dx = event.clientX - gestureState.startX, dy = event.clientY - gestureState.startY;
@@ -655,7 +662,7 @@
     }
 
     function handlePointerUp(event) {
-      if (!gestureState) return;
+      if (!gestureState || (gestureState.pointerId != null && event.pointerId !== gestureState.pointerId)) return;
       clearPressTimer(); gestureState.lastX = event.clientX; gestureState.lastY = event.clientY;
       if (gestureState.scrubbing) { updateScrubAt(event.clientX); endScrub(true); gestureState = null; return; }
       if (gestureState.heldWasPlaying) {
@@ -676,7 +683,8 @@
       else { lastTapAt = time; lastTapTarget = activeVideo; }
     }
 
-    function handlePointerCancel() {
+    function handlePointerCancel(event) {
+      if (!gestureState || (gestureState.pointerId != null && event.pointerId !== gestureState.pointerId)) return;
       clearPressTimer();
       if (gestureState && gestureState.scrubbing) endScrub(false);
       else if (gestureState && gestureState.heldWasPlaying && activeVideo && canReadProtectedData()) resumeActivePlayback();
@@ -699,7 +707,7 @@
       muteButton = documentRef.createElement('button'); muteButton.type = 'button'; muteButton.className = 'shortsMute'; muteButton.setAttribute('aria-label', 'ミュート'); muteButton.addEventListener('click', () => toggleMute());
       volumeControl = documentRef.createElement('input'); volumeControl.type = 'range'; volumeControl.className = 'shortsVolume'; volumeControl.min = '0'; volumeControl.max = '1'; volumeControl.step = '0.05'; volumeControl.setAttribute('aria-label', '音量'); volumeControl.addEventListener('input', () => setVolume(volumeControl.value));
       actions.append(likeButton, rotateButton, muteButton, volumeControl);
-      scrubArea = documentRef.createElement('div'); scrubArea.className = 'shortsScrubArea'; scrubArea.setAttribute('aria-label', '長押しして動画をシーク');
+      scrubArea = documentRef.createElement('div'); scrubArea.className = 'shortsScrubArea'; scrubArea.setAttribute('aria-label', 'タップまたはドラッグして動画をシーク');
       scrubTrack = documentRef.createElement('div'); scrubTrack.className = 'shortsScrubTrack';
       scrubThumb = documentRef.createElement('span'); scrubThumb.className = 'shortsScrubThumb';
       scrubPreview = documentRef.createElement('div'); scrubPreview.className = 'shortsScrubPreview'; scrubPreview.hidden = true;
