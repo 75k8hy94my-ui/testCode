@@ -32,7 +32,7 @@
           await deps.loadScript('video-card.js?v=20261012-custom-labels', 'spaVideoCard');
           await deps.loadScript('video-custom-properties.js?v=20261012-video-custom-properties', 'spaVideoCustomProperties');
           await deps.loadScript('video-custom-property-store.js?v=20261012-video-custom-properties', 'spaVideoCustomPropertyStore');
-          await deps.loadScript('video-library.js?v=20261012-untitled-names', 'spaVideoLibrary');
+          await deps.loadScript('video-library.js?v=20261012-video-header-return', 'spaVideoLibrary');
         })().catch((error) => {
           bootPromise = null;
           throw error;
