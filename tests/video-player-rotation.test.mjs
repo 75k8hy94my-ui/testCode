@@ -81,3 +81,24 @@ test('no rotation leaves the video unchanged', () => {
   assert.equal(media.classList.contains('videoPlayerRotatedRight'), false);
   cleanup();
 });
+
+test('regular player can request a larger rotated frame without changing short-player defaults', () => {
+  const media = fakeMedia();
+  const frame = { classList: fakeClassList(), style: { height: 'min(540px, calc(100svh - 150px))', minHeight: '240px' }, clientWidth: 900, clientHeight: 720 };
+  const originalHeight = frame.style.height;
+  const originalMinHeight = frame.style.minHeight;
+  const cleanup = Rotation.install(frame, media, 'left', { expandFrame: true });
+
+  assert.equal(frame.classList.contains('videoPlayerFrameRotated'), true);
+  assert.equal(frame.style.height, '');
+  assert.equal(media.classList.contains('videoPlayerRotatedLeft'), true);
+  cleanup();
+  assert.equal(frame.classList.contains('videoPlayerFrameRotated'), false);
+  assert.equal(frame.style.height, originalHeight);
+  assert.equal(frame.style.minHeight, originalMinHeight);
+
+  const shortsFrame = { classList: fakeClassList(), style: {}, clientWidth: 900, clientHeight: 720 };
+  const shortsCleanup = Rotation.install(shortsFrame, fakeMedia(), 'right');
+  assert.equal(shortsFrame.classList.contains('videoPlayerFrameRotated'), false);
+  shortsCleanup();
+});
