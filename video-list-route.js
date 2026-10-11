@@ -28,7 +28,9 @@
           await deps.loadScript('manga-list-pagination-events.js?v=20261012-video-pagination', 'spaMangaPaginationEvents');
           await deps.loadScript('video-library-pagination.js?v=20261012-video-pagination', 'spaVideoLibraryPagination');
           await deps.loadScript('video-thumbnail-renderer.js?v=20261008-shared-thumbnails', 'spaVideoThumbnailRenderer');
-          await deps.loadScript('video-library.js?v=20261012-video-pagination', 'spaVideoLibrary');
+          await deps.loadScript('video-custom-properties.js?v=20261012-video-custom-properties', 'spaVideoCustomProperties');
+          await deps.loadScript('video-custom-property-store.js?v=20261012-video-custom-properties', 'spaVideoCustomPropertyStore');
+          await deps.loadScript('video-library.js?v=20261012-video-custom-properties-v3', 'spaVideoLibrary');
         })().catch((error) => {
           bootPromise = null;
           throw error;

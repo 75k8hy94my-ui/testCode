@@ -199,7 +199,19 @@
   const description = document.createElement('details'); description.className = 'videoPlayerDescription';
   const descriptionSummary = document.createElement('summary'); descriptionSummary.textContent = normalized.memo ? '動画のメモ' : '動画情報';
   const descriptionText = document.createElement('p'); descriptionText.textContent = normalized.memo || [base.a, base.b].filter(Boolean).join(' / ') || '動画'; description.append(descriptionSummary, descriptionText);
-  const main = document.createElement('section'); main.className = 'videoPlayerMain'; main.append(frame, heading, info, actionBar, description, markerList, back); const layout = document.createElement('div'); layout.className = 'videoPlayerLayout'; layout.append(main, relatedBox); page.replaceChildren(layout);
+  let customPropertyDetails = null;
+  const propertyStore = window.MangaReaderVideoCustomPropertyStore;
+  if (canReadProtectedData() && propertyStore) {
+    const propertyState = propertyStore.read();
+    const saved = propertyState.values[String(id)] || {};
+    const visible = Object.values(propertyState.definitions.properties || {}).filter((property) => property && property.deleted !== true && property.hidden !== true && Object.prototype.hasOwnProperty.call(saved, property.id) && saved[property.id] !== null && saved[property.id] !== '').sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+    if (visible.length) {
+      customPropertyDetails = document.createElement('details'); customPropertyDetails.className = 'videoPlayerDescription videoPlayerCustomProperties';
+      const summary = document.createElement('summary'); summary.textContent = 'プロパティ'; customPropertyDetails.append(summary);
+      visible.forEach((property) => { const row = document.createElement('p'); const name = document.createElement('strong'); name.textContent = property.name + '：'; const value = document.createElement('span'); value.textContent = window.MangaReaderVideoCustomProperties.formatValue(property, saved[property.id], propertyState.definitions); row.append(name, value); customPropertyDetails.append(row); });
+    }
+  }
+  const main = document.createElement('section'); main.className = 'videoPlayerMain'; main.append(frame, heading, info, actionBar, description); if (customPropertyDetails) main.append(customPropertyDetails); main.append(markerList, back); const layout = document.createElement('div'); layout.className = 'videoPlayerLayout'; layout.append(main, relatedBox); page.replaceChildren(layout);
   resumePendingLocalSync();
   }
   handleAccessStatus();

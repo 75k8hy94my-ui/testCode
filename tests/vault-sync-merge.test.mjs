@@ -166,6 +166,46 @@ test('reports different edits to the same property without choosing a winner', (
   assert.equal(result.payload.videoMeta.v1.title, 'old');
 });
 
+test('mergesIndependentPropertyAndVideoValueEdits',()=>{
+  const base={videoPropertyDefinitions:{schemaVersion:1,properties:{}},videoPropertyValues:{v1:{}}};
+  const local={videoPropertyDefinitions:{schemaVersion:1,properties:{p1:{id:'p1',name:'時間帯',type:'text'}}},videoPropertyValues:{v1:{p1:'夜'}}};
+  const remote={videoPropertyDefinitions:{schemaVersion:1,properties:{p2:{id:'p2',name:'評価',type:'number'}}},videoPropertyValues:{v1:{p2:4}}};
+  const merged=mergeVaultPayload(base,local,remote);
+  assert.deepEqual(merged.conflicts,[]);
+  assert.deepEqual(Object.keys(merged.payload.videoPropertyDefinitions.properties).sort(),['p1','p2']);
+  assert.deepEqual(merged.payload.videoPropertyValues.v1,{p1:'夜',p2:4});
+});
+
+test('sameCustomValueEditProducesPathConflict',()=>{
+  const base={videoPropertyValues:{v1:{rating:3}}};
+  const local={videoPropertyValues:{v1:{rating:4}}};
+  const remote={videoPropertyValues:{v1:{rating:2}}};
+  const merged=mergeVaultPayload(base,local,remote);
+  assert.equal(merged.conflicts.length,1);
+  assert.equal(merged.conflicts[0].path,'/videoPropertyValues/v1/rating');
+  assert.equal(merged.payload.videoPropertyValues.v1.rating,3);
+});
+
+test('retainsCustomKeysFromLegacyClientSnapshot',()=>{
+  const base={videoPropertyDefinitions:{schemaVersion:1,properties:{p1:{id:'p1',name:'評価'}}},videoPropertyValues:{v1:{p1:0}},videos:[{id:'v1',title:'old'}]};
+  const local={videos:[{id:'v1',title:'new'}]};
+  const retained=mergeModule.retainUnknownProperties(base,local);
+  const merged=mergeVaultPayload(base,retained,base);
+  assert.deepEqual(merged.conflicts,[]);
+  assert.deepEqual(merged.payload.videoPropertyDefinitions,base.videoPropertyDefinitions);
+  assert.deepEqual(merged.payload.videoPropertyValues,base.videoPropertyValues);
+  assert.equal(merged.payload.videos[0].title,'new');
+});
+
+test('videoValueTombstonePreventsResurrection',()=>{
+  const path='/videoPropertyValues/v1';
+  const base={videoPropertyValues:{},vaultSyncTombstones:[]};
+  const local={videoPropertyValues:{},vaultSyncTombstones:[path]};
+  const remote={videoPropertyValues:{v1:{rating:4}},vaultSyncTombstones:[]};
+  const merged=mergeVaultPayload(base,local,remote);
+  assert.ok(merged.conflicts.some((conflict)=>conflict.type==='delete-recreate'&&conflict.path===path));
+});
+
 test('applies a user-selected conflict value while keeping all non-conflicting remote edits', () => {
   const base = { videoMeta: { v1: { title: 'old', favorite: false } } };
   const local = { videoMeta: { v1: { title: 'device', favorite: false } } };

@@ -9,6 +9,8 @@
   const VIDEO_KEY = 'mangaReaderVideos';
   const FOLDER_KEY = 'mangaReaderVideoFolders';
   const META_KEY = 'mangaReaderVideoMeta';
+  const PropertyStore = window.MangaReaderVideoCustomPropertyStore;
+  const CustomProperties = window.MangaReaderVideoCustomProperties;
   const PREF_KEY = 'mangaReaderVideoLibraryView';
   const PROTECTED_DATA_KEYS = new Set([VIDEO_KEY, FOLDER_KEY, META_KEY]);
   const STATUS_LABELS = { '': '', later: 'あとで見る', watching: '視聴中', watched: '視聴済み' };
@@ -18,7 +20,7 @@
 
   const state = {
     baseVideos: [], folders: [], meta: {}, query: '', quick: 'all', folderId: '', tag: '', service: '', sort: 'recent-added', view: 'card', page: 1, totalPages: 1,
-    syncTimer: null, syncRunning: false, syncDirty: false, syncPromise: null, editorSaving: false, editorId: null, sheetMode: null, showHidden: false,
+    syncTimer: null, syncRunning: false, syncDirty: false, syncPromise: null, editorSaving: false, editorId: null, sheetMode: null, showHidden: false, customDefinitions: { schemaVersion: 1, properties: {} }, customValues: {}, customFilters: {},
   };
   const dom = {};
   let eventsBound = false;
@@ -66,6 +68,8 @@
       state.baseVideos = [];
       state.folders = [];
       state.meta = {};
+      state.customDefinitions = { schemaVersion: 1, properties: {} };
+      state.customValues = {};
       return;
     }
     const rawVideos = readJson(VIDEO_KEY, []);
@@ -73,6 +77,7 @@
     state.folders = Data.normalizeFolders(readJson(FOLDER_KEY, []));
     const rawMeta = readJson(META_KEY, {});
     state.meta = rawMeta && typeof rawMeta === 'object' && !Array.isArray(rawMeta) ? rawMeta : {};
+    if (canReadProtectedData() && PropertyStore && CustomProperties) { const custom = PropertyStore.read(); state.customDefinitions = custom.definitions; state.customValues = custom.values; }
   }
 
   function effectiveVideo(base) {
@@ -187,9 +192,9 @@
     style.textContent = `
       #videoListSection[data-video-library-enhanced="1"]{overflow:hidden!important}#videoListSection[data-video-library-enhanced="1"] #videoListToolbar,#videoListSection[data-video-library-enhanced="1"] #videoListItems,#videoListSection[data-video-library-enhanced="1"] #videoListEmpty{display:none!important}
       #videoLibraryApp{display:flex;flex-direction:column;min-height:0;flex:1;gap:10px}
-      .vl-top{display:flex;gap:8px;align-items:center}.vl-search{position:relative;flex:1}.vl-search input{width:100%;min-height:44px;border:1px solid var(--border);border-radius:14px;background:var(--bg-soft);color:var(--text);padding:10px 13px 10px 38px;font-size:16px}.vl-search::before{content:'⌕';position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--sub);font-size:20px}.vl-primary{min-height:44px;border:0;border-radius:14px;padding:0 14px;background:var(--accent);color:#fff;font-weight:750;cursor:pointer}.vl-chips{display:flex;gap:7px;overflow-x:auto;padding:1px 0 3px;scrollbar-width:none}.vl-chips::-webkit-scrollbar{display:none}.vl-chip{flex:0 0 auto;border:1px solid var(--border);border-radius:999px;background:var(--bg-soft);color:var(--sub);padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer}.vl-chip.active{color:var(--text);border-color:color-mix(in srgb,var(--accent) 55%,var(--border));background:var(--accent-dim)}
+      .vl-top{display:flex;gap:8px;align-items:center}.vl-search{position:relative;flex:1}.vl-search input{width:100%;min-height:44px;border:1px solid var(--border);border-radius:14px;background:var(--bg-soft);color:var(--text);padding:10px 13px 10px 38px;font-size:16px}.vl-search::before{content:'⌕';position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--sub);font-size:20px}.vl-primary{min-height:44px;border:0;border-radius:14px;padding:0 14px;background:var(--accent);color:#fff;font-weight:750;cursor:pointer}.vl-top #videoLibraryProperties{display:inline-flex;align-items:center;min-height:42px;padding:0 12px;border:1px solid var(--border);border-radius:12px;color:var(--text);background:var(--panel-2);font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap}.vl-custom-properties{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}.vl-custom-properties .vl-tag{max-width:100%;overflow-wrap:anywhere}.vl-chips{display:flex;gap:7px;overflow-x:auto;padding:1px 0 3px;scrollbar-width:none}.vl-chips::-webkit-scrollbar{display:none}.vl-chip{flex:0 0 auto;border:1px solid var(--border);border-radius:999px;background:var(--bg-soft);color:var(--sub);padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer}.vl-chip.active{color:var(--text);border-color:color-mix(in srgb,var(--accent) 55%,var(--border));background:var(--accent-dim)}
       #videoLibraryShorts{white-space:nowrap;background:var(--panel-2);color:var(--text);border:1px solid var(--border)}
-      .vl-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto auto;gap:7px}.vl-filters select,.vl-icon-btn{min-height:39px;min-width:0;border:1px solid var(--border);border-radius:11px;background:var(--bg-soft);color:var(--text);padding:0 9px}.vl-icon-btn{cursor:pointer;font-weight:700}.vl-summary{display:flex;justify-content:space-between;gap:10px;color:var(--sub);font-size:11px;min-height:18px}.vl-summary [data-error="1"]{color:#ef6464}
+      .vl-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto auto;gap:7px}.vl-filters select,.vl-icon-btn{min-height:39px;min-width:0;border:1px solid var(--border);border-radius:11px;background:var(--bg-soft);color:var(--text);padding:0 9px}.vl-icon-btn{cursor:pointer;font-weight:700}.vl-custom-filter{border:1px solid var(--border);border-radius:12px;padding:0 10px;background:var(--bg-soft)}.vl-custom-filter summary{padding:10px 0;color:var(--text);font-size:12px;font-weight:700;cursor:pointer}.vl-custom-filter-list{display:grid;gap:7px;padding:0 0 10px}.vl-custom-filter-row{display:grid;grid-template-columns:minmax(90px,.7fr) minmax(100px,.8fr) minmax(110px,1fr) auto;align-items:center;gap:6px;color:var(--text);font-size:12px}.vl-custom-filter-row select,.vl-custom-filter-row input,.vl-custom-filter-row textarea{box-sizing:border-box;min-width:0;width:100%;min-height:38px;border:1px solid var(--border);border-radius:9px;background:var(--panel);color:var(--text);padding:7px}.vl-summary{display:flex;justify-content:space-between;gap:10px;color:var(--sub);font-size:11px;min-height:18px}.vl-summary [data-error="1"]{color:#ef6464}
       #videoLibraryResults{overflow:auto;min-height:0;flex:1;padding:1px 1px 18px}.vl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:11px}.vl-grid.compact{display:flex;flex-direction:column;gap:6px}.vl-card{position:relative;min-width:0;border:1px solid var(--border);border-radius:16px;background:var(--bg-soft);overflow:visible;box-shadow:0 5px 18px rgba(0,0,0,.08)}.vl-open{display:block;width:100%;border:0;background:transparent;color:inherit;padding:0;text-align:left;cursor:pointer}.vl-thumb{position:relative;aspect-ratio:16/9;display:grid;place-items:center;border-radius:15px 15px 0 0;overflow:hidden;background:linear-gradient(135deg,var(--panel-2),var(--bg));color:var(--sub)}.vl-thumb img,.vl-thumb video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.vl-thumb-fallback{display:grid;place-items:center;text-align:center;gap:5px;font-size:11px}.vl-thumb-fallback b{font-size:27px;color:var(--text)}.vl-body{padding:11px 12px 12px}.vl-title{font-weight:750;font-size:14px;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.vl-meta{margin-top:6px;color:var(--sub);font-size:11px;display:flex;gap:6px;flex-wrap:wrap}.vl-tags{margin-top:7px;display:flex;gap:5px;flex-wrap:wrap}.vl-tag{font-size:10px;border:1px solid var(--border);border-radius:999px;padding:3px 6px;color:var(--sub)}.vl-card-actions{position:absolute;right:8px;top:8px;display:flex;gap:4px;z-index:3}.vl-round{width:34px;height:34px;border:1px solid rgba(255,255,255,.24);border-radius:50%;display:grid;place-items:center;background:rgba(10,12,17,.76);color:#fff;backdrop-filter:blur(14px);cursor:pointer}.vl-round.active{color:#ffd35a}.vl-edit-link{text-decoration:none;font-size:22px;line-height:1}.vl-progress{height:3px;background:var(--panel-2);margin-top:9px;border-radius:99px;overflow:hidden}.vl-progress i{display:block;height:100%;background:var(--accent)}
       .vl-page-frame{min-width:0;overflow:hidden}.vl-page{min-width:0;width:100%}.vl-slide-track{display:flex;align-items:flex-start;width:200%;will-change:transform}.vl-slide-track>.vl-page{flex:0 0 50%;width:50%;pointer-events:none}
       .vl-pagination{display:flex;justify-content:center;align-items:center;gap:10px;width:100%;margin:4px 0 0;padding:8px 10px;min-height:54px;border:1px solid rgba(255,255,255,.3);border-radius:16px;background:rgba(29,35,49,.96)}.vl-pagination[hidden]{display:none!important}.vl-pagination span{min-width:74px;color:var(--text);text-align:center;font-variant-numeric:tabular-nums}.vl-pagination .bookshelfPagerButton{display:flex;align-items:center;justify-content:center;min-width:50px;min-height:44px;border:1px solid var(--border);border-radius:999px;background:var(--panel-2);color:var(--text);cursor:pointer}.vl-pagination .bookshelfPagerButton:disabled{opacity:.38;cursor:not-allowed}.bookshelfPagerGlyph{width:22px;height:22px;pointer-events:none}
@@ -202,7 +207,7 @@
       #videoLibrarySheet .vl-sheet-panel{background:var(--panel)!important;color:var(--text)!important}
       #videoLibrarySheet{position:fixed;inset:0;z-index:180;background:rgba(0,0,0,.58);display:grid;align-items:end;padding:12px;backdrop-filter:blur(10px)}#videoLibrarySheet[hidden]{display:none!important}.vl-sheet-panel{width:min(680px,100%);max-height:min(90dvh,820px);margin:0 auto;overflow:auto;border:1px solid color-mix(in srgb,var(--accent) 30%,var(--border));border-radius:24px;background:var(--panel);color:var(--text);box-shadow:0 24px 70px rgba(0,0,0,.55);padding:18px}.vl-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:var(--panel);padding:16px 0 12px;z-index:2;border-bottom:1px solid var(--border);margin-bottom:4px}.vl-sheet-head h2{margin:0;font-size:20px}.vl-close{border:1px solid var(--border);border-radius:999px;background:var(--panel-2);color:var(--text);width:38px;height:38px}.vl-form{display:grid;gap:14px}.vl-field{padding:10px 11px 11px;border:1px solid var(--border);border-radius:14px;background:color-mix(in srgb,var(--bg-soft) 72%,var(--panel))}.vl-field:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 22%,transparent)}.vl-field label{display:block;color:var(--text);font-size:13px;font-weight:750;margin:0 0 7px}.vl-field input,.vl-field select,.vl-field textarea{width:100%;border:1px solid color-mix(in srgb,var(--sub) 48%,var(--border));border-radius:10px;background:var(--panel);color:var(--text);padding:12px;font-size:16px;min-height:46px}.vl-field input::placeholder,.vl-field textarea::placeholder{color:var(--sub);opacity:.9}.vl-field input:focus,.vl-field select:focus,.vl-field textarea:focus{outline:2px solid color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:1px}.vl-field textarea{min-height:90px;resize:vertical}.vl-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.vl-check{display:flex;gap:10px;align-items:center;min-height:46px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-soft);font-weight:700}.vl-sheet-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px;padding-top:12px;border-top:1px solid var(--border)}.vl-sheet-actions button{min-height:44px;border-radius:12px;padding:0 14px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-weight:700}.vl-sheet-actions .save{border:0;background:var(--accent);color:#fff}.vl-sheet-actions .danger{margin-right:auto;color:#ff7777}.vl-advanced{border:1px solid var(--border);border-radius:12px;padding:0 11px;background:var(--bg-soft)}.vl-advanced summary{padding:13px 0;cursor:pointer;color:var(--text);font-size:13px;font-weight:700}.vl-help{margin:-4px 0 2px;color:var(--sub);font-size:11px;line-height:1.5}.vl-folder-create{display:flex;gap:8px}.vl-folder-create input{flex:1}.vl-folder-list{display:grid;gap:7px;margin-top:12px}.vl-folder-row{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:12px;padding:9px 10px}.vl-folder-row span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}.vl-folder-row button{border:0;background:var(--panel-2);color:var(--text);border-radius:8px;padding:7px 9px}.vl-folder-row .danger{color:#ff7777}
       .vl-access-notice{margin:10px 0;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--bg-soft);color:var(--text);font-size:13px;line-height:1.6}
-      @media(max-width:700px){.vl-top{flex-wrap:wrap}.vl-search{flex:1 0 100%}.vl-top #videoLibraryAdd,.vl-top #videoLibraryShorts,.vl-top #videoLibraryHidden{flex:1}.vl-filters{grid-template-columns:1fr 1fr 1fr}.vl-filters #videoLibrarySort{grid-column:span 1}.vl-grid{grid-template-columns:1fr 1fr}.vl-sheet-panel{border-radius:24px 24px 18px 18px}.vl-two{grid-template-columns:1fr}}
+      @media(max-width:700px){.vl-top{flex-wrap:wrap}.vl-search{flex:1 0 100%}.vl-top #videoLibraryAdd,.vl-top #videoLibraryShorts,.vl-top #videoLibraryHidden,.vl-top #videoLibraryProperties{flex:1}.vl-filters{grid-template-columns:1fr 1fr 1fr}.vl-filters #videoLibrarySort{grid-column:span 1}.vl-grid{grid-template-columns:1fr 1fr}.vl-sheet-panel{border-radius:24px 24px 18px 18px}.vl-two{grid-template-columns:1fr}}
       @media(max-width:480px){.vl-top{align-items:stretch}.vl-primary{padding:0 12px}.vl-filters{grid-template-columns:1fr 1fr}.vl-grid{grid-template-columns:1fr}.vl-grid.compact .vl-card{grid-template-columns:104px minmax(0,1fr)}.vl-grid.compact .vl-thumb{height:72px}.vl-grid.compact .vl-body{padding-right:66px}.vl-summary{padding:0 2px}}
     `;
     document.head.appendChild(style);
@@ -226,6 +231,7 @@
       <div class="vl-top">
         <div class="vl-search"><input id="videoLibrarySearch" type="search" inputmode="search" autocomplete="off" placeholder="動画を検索"></div>
         <button id="videoLibraryAdd" class="vl-primary" type="button">＋ 追加</button>
+        <a id="videoLibraryProperties" class="vl-secondary" href="video-properties.html">プロパティ設定</a>
         <button id="videoLibraryShorts" class="vl-primary vl-shorts" type="button">縦スワイプ再生</button>
         <button id="videoLibraryHidden" class="vl-icon-btn" type="button">非表示</button>
       </div>
@@ -244,6 +250,7 @@
         <button id="videoLibraryView" class="vl-icon-btn" type="button" aria-label="表示形式を切り替え">表示</button>
         <button id="videoLibraryFolders" class="vl-icon-btn" type="button">フォルダ</button>
       </div>
+      <details class="vl-custom-filter"><summary>カスタムプロパティで絞り込む</summary><div id="videoLibraryCustomFilters" class="vl-custom-filter-list"></div></details>
       <div class="vl-summary"><span id="videoLibraryCount"></span><span id="videoLibraryStatus" aria-live="polite"></span></div>
       <p id="videoLibraryAccessNotice" class="vl-access-notice" aria-live="polite" hidden>VPN接続を確認できるまで、動画データの読み込みと追加・編集を停止しています。</p>
       <div id="videoLibraryResults"></div>
@@ -293,6 +300,7 @@
       section, app, search: document.getElementById('videoLibrarySearch'), quick: document.getElementById('videoLibraryQuick'),
       folder: document.getElementById('videoLibraryFolder'), tag: document.getElementById('videoLibraryTag'), service: document.getElementById('videoLibraryService'),
       sort: document.getElementById('videoLibrarySort'), view: document.getElementById('videoLibraryView'), foldersBtn: document.getElementById('videoLibraryFolders'),
+      customFilters: document.getElementById('videoLibraryCustomFilters'),
       add: document.getElementById('videoLibraryAdd'), shorts: document.getElementById('videoLibraryShorts'), hiddenBtn: document.getElementById('videoLibraryHidden'), count: document.getElementById('videoLibraryCount'), status: document.getElementById('videoLibraryStatus'), results: document.getElementById('videoLibraryResults'),
       pagination: document.getElementById('videoLibraryPagination'), prevPage: document.getElementById('videoLibraryPrevPage'), nextPage: document.getElementById('videoLibraryNextPage'), pageLabel: document.getElementById('videoLibraryPageLabel'),
       sheet, sheetTitle: document.getElementById('videoLibrarySheetTitle'), form: document.getElementById('videoLibraryForm'),
@@ -341,6 +349,11 @@
     if (video.lastOpenedAt) { const l = document.createElement('span'); l.textContent = '· ' + formatDate(video.lastOpenedAt); meta.append(l); }
     if (video.openCount) { const c = document.createElement('span'); c.textContent = '· ' + video.openCount + '回'; meta.append(c); }
     body.append(title, meta);
+    if (canReadProtectedData() && CustomProperties) {
+      const stored = state.customValues[String(video.id)] || {};
+      const shown = Object.values(state.customDefinitions.properties || {}).filter((property) => property && property.deleted !== true && property.hidden !== true && property.showInCard === true && Object.prototype.hasOwnProperty.call(stored, property.id) && stored[property.id] !== null && stored[property.id] !== '').sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)).slice(0, 3);
+      if (shown.length) { const custom = document.createElement('div'); custom.className = 'vl-custom-properties'; shown.forEach((property) => { const line = document.createElement('span'); line.className = 'vl-tag'; line.textContent = property.name + ': ' + CustomProperties.formatValue(property, stored[property.id], state.customDefinitions); custom.append(line); }); body.append(custom); }
+    }
     if (video.tags.length) { const tags = document.createElement('div'); tags.className = 'vl-tags'; video.tags.slice(0, 4).forEach((tag) => { const span = document.createElement('span'); span.className = 'vl-tag'; span.textContent = '#' + tag; tags.append(span); }); body.append(tags); }
     const percent = progressPercent(video); if (percent != null) { const progress = document.createElement('div'); progress.className = 'vl-progress'; const inner = document.createElement('i'); inner.style.width = percent + '%'; progress.append(inner); body.append(progress); }
     open.append(thumb, body); open.addEventListener('click', () => openVideo(video.id));
@@ -364,13 +377,57 @@
     fillSelect(dom.editFolder, state.folders.map((folder) => ({ value: folder.id, label: folder.name })), dom.editFolder.value, '未分類');
   }
 
+  function renderCustomFilters() {
+    if (!dom.customFilters || !CustomProperties || !canReadProtectedData()) return;
+    dom.customFilters.replaceChildren();
+    const properties = Object.values(state.customDefinitions.properties || {}).filter((property) => property && property.deleted !== true && property.hidden !== true).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+    properties.forEach((property) => {
+      const row = document.createElement('label'); row.className = 'vl-custom-filter-row';
+      const name = document.createElement('span'); name.textContent = property.name; row.append(name);
+      const operator = document.createElement('select'); operator.setAttribute('aria-label', property.name + 'の条件');
+      const operators = property.type === 'text' || property.type === 'long_text' ? [['contains','を含む'],['equals','完全一致'],['is_unset','未設定']] :
+        property.type === 'single_select' ? [['equals','次の値'],['is_unset','未設定']] :
+        property.type === 'multi_select' ? [['contains_any','いずれかを含む'],['contains_all','すべて含む']] :
+        property.type === 'checkbox' ? [['true','ON'],['false','OFF'],['is_unset','未設定']] :
+        property.type === 'number' ? [['equals','と等しい'],['gte','以上'],['lte','以下'],['is_unset','未設定']] : [['equals','と等しい'],['on_or_after','以降'],['on_or_before','以前'],['is_unset','未設定']];
+      operators.forEach(([value,label]) => { const option = document.createElement('option'); option.value = value; option.textContent = label; operator.append(option); });
+      const existing = state.customFilters[property.id] || { operator: operators[0][0] };
+      operator.value = operators.some(([value]) => value === existing.operator) ? existing.operator : operators[0][0];
+      const valueControl = document.createElement(property.type === 'long_text' ? 'textarea' : 'input');
+      if (valueControl.tagName === 'INPUT') valueControl.type = property.type === 'number' ? 'number' : property.type === 'date' ? 'date' : 'search';
+      valueControl.setAttribute('aria-label', property.name + 'の値');
+      let valueNode = valueControl;
+      if (property.type === 'single_select') { valueNode = document.createElement('select'); const blank = document.createElement('option'); blank.value=''; blank.textContent='選択'; valueNode.append(blank); Object.values(property.options || {}).filter((item)=>item && item.deleted!==true).sort((a,b)=>a.order-b.order).forEach((item)=>{const option=document.createElement('option');option.value=item.id;option.textContent=item.name;valueNode.append(option);}); valueNode.value=existing.value || ''; }
+      else if (property.type === 'multi_select') { valueNode = document.createElement('select'); valueNode.multiple = true; valueNode.setAttribute('aria-label', property.name + 'の選択肢'); Object.values(property.options || {}).filter((item)=>item && item.deleted!==true).sort((a,b)=>a.order-b.order).forEach((item)=>{const option=document.createElement('option');option.value=item.id;option.textContent=item.name;option.selected=Array.isArray(existing.optionIds)&&existing.optionIds.includes(item.id);valueNode.append(option);}); }
+      else if (property.type === 'checkbox') { valueNode = document.createElement('span'); valueNode.textContent = '条件を選択'; }
+      else { valueNode.value = existing.value == null ? '' : String(existing.value); }
+      valueNode.setAttribute('aria-label', property.name + 'の値');
+      const clear = document.createElement('button'); clear.type='button'; clear.className='vl-icon-btn'; clear.textContent='解除'; clear.setAttribute('aria-label', property.name + 'の絞り込みを解除');
+      const update = () => {
+        const op = operator.value;
+        if (op === operators[0][0] && !['is_unset','true','false'].includes(op) && !String(valueNode.value || '').trim() && property.type !== 'multi_select') delete state.customFilters[property.id];
+        else if (property.type === 'multi_select') { const optionIds=[...valueNode.selectedOptions].map((item)=>item.value); if (!optionIds.length) delete state.customFilters[property.id]; else state.customFilters[property.id]={propertyId:property.id,operator:op,optionIds}; }
+        else if (['is_unset','true','false'].includes(op)) state.customFilters[property.id]={propertyId:property.id,operator:op};
+        else { const raw=valueNode.value; if (!String(raw).trim()) delete state.customFilters[property.id]; else state.customFilters[property.id]={propertyId:property.id,operator:op,value:property.type==='number'?Number(raw):raw}; }
+        render();
+      };
+      operator.addEventListener('change', update); valueNode.addEventListener('change', update);
+      clear.addEventListener('click', () => { delete state.customFilters[property.id]; render(); });
+      row.append(operator, valueNode, clear); dom.customFilters.append(row);
+    });
+    if (!properties.length) { const empty=document.createElement('span'); empty.textContent='表示可能なプロパティがありません。'; dom.customFilters.append(empty); }
+  }
+
   function render(pageDirection = 0) {
     loadLibraryState();
     syncAccessUi();
     const all = effectiveVideos();
     const scoped = all.filter((video) => video.hidden === state.showHidden);
     renderFilterOptions(scoped);
-    const filtered = Data.filterVideos(scoped, { query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
+    renderCustomFilters();
+    const baseFiltered = Data.filterVideos(scoped, { query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
+    const filters = Object.values(state.customFilters);
+    const filtered = CustomProperties ? baseFiltered.filter((video) => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, filters)) : baseFiltered;
     const videos = Data.sortVideos(filtered, state.sort);
     dom.quick.querySelectorAll('[data-quick]').forEach((button) => button.classList.toggle('active', button.dataset.quick === state.quick));
     dom.view.textContent = state.view === 'card' ? '▤' : '▦'; dom.view.title = state.view === 'card' ? 'コンパクト表示へ' : 'カード表示へ';
@@ -456,16 +513,20 @@
   }
 
   async function deleteVideoRecords(base) {
-    const remove = () => {
+    const remove = async () => {
       if (!invokeLegacyDelete(base)) throw new Error('動画を削除できませんでした。ページを再読み込みして再試行してください。');
       if (base && base.id) delete state.meta[base.id];
+      const propertyStore = window.MangaReaderVideoCustomPropertyStore;
+      if (base && base.id && propertyStore && typeof propertyStore.removeVideoValues === 'function') {
+        await propertyStore.removeVideoValues({ storage: localStorage, videoId: base.id, guest: true, alreadyJournaled: true });
+      }
       if (!persistAux({ sync: false })) throw new Error('端末に動画の削除を保存できませんでした。');
     };
-    if (window.TestCodeGuest?.isActive()) { remove(); return; }
+    if (window.TestCodeGuest?.isActive()) { await remove(); return; }
     const vault = window.MangaVault;
     const pointerPath = window.MangaVaultPayload && window.MangaVaultPayload.pointerPath;
     if (!vault || typeof vault.recordSyncDeletion !== 'function' || typeof pointerPath !== 'function') throw new Error('保管庫を開いてから削除してください。');
-    await vault.recordSyncDeletion([pointerPath('videos', base.id), pointerPath('videoMeta', base.id)], remove);
+    await vault.recordSyncDeletion([pointerPath('videos', base.id), pointerPath('videoMeta', base.id), pointerPath('videoPropertyValues', base.id)], remove);
   }
 
   function effectiveFieldsForEditor(videoId) {

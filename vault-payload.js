@@ -41,3 +41,47 @@ const buildWithManualIps=(storage=globalThis.localStorage)=>({...originalBuildFr
 const applyWithManualIps=(payload,storage=globalThis.localStorage)=>{const keys=[...Object.values(DATA_KEYS),MANUAL_VPN_IPS_KEY,MANUAL_NON_VPN_IPS_KEY],snapshot=new Map(keys.map((key)=>[key,rawValue(storage,key)]));try{const result=originalApplyToStorage(payload,storage),vpn=normalizeStringArray(payload&&payload.manualVpnIps),nonVpn=normalizeStringArray(payload&&payload.manualNonVpnIps);write(storage,MANUAL_VPN_IPS_KEY,vpn);write(storage,MANUAL_NON_VPN_IPS_KEY,nonVpn);return{...result,manualVpnIps:vpn,manualNonVpnIps:nonVpn}}catch(error){snapshot.forEach((value,key)=>{try{if(value==null)removeRaw(storage,key);else setRaw(storage,key,value)}catch(_){}});throw error}};
 const clearWithManualIps=(storage=globalThis.localStorage)=>{clearDeviceData(storage);removeRaw(storage,MANUAL_VPN_IPS_KEY);removeRaw(storage,MANUAL_NON_VPN_IPS_KEY)};
 const api={DATA_KEYS,LOCAL_ONLY_KEYS,pointerPath,defaults,normalize:normalizeWithManualIps,normalizeVideoMarkers,normalizeVideoShortsState,buildFromLocalStorage:buildWithManualIps,applyToLocalStorage:applyWithManualIps,clearDeviceData:clearWithManualIps,normalizeIndexSearchSettings,normalizeRoppoState,normalizeStatuteNotes};if(typeof window!=='undefined')window.MangaVaultPayload=api;if(typeof module!=='undefined')module.exports=api;
+
+;(function (root) {
+  'use strict';
+  const payload = typeof module !== 'undefined' && module.exports ? module.exports : root.MangaVaultPayload;
+  if (!payload || !payload.DATA_KEYS) return;
+  const normalize = payload.normalize;
+  const build = payload.buildFromLocalStorage;
+  const apply = payload.applyToLocalStorage;
+  const own = (value, key) => !!value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key);
+  const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+  payload.DATA_KEYS.videoPropertyDefinitions = 'mangaReaderVideoPropertyDefinitions';
+  payload.DATA_KEYS.videoPropertyValues = 'mangaReaderVideoPropertyValues';
+  payload.defaults.videoPropertyDefinitions = { schemaVersion: 1, properties: {} };
+  payload.defaults.videoPropertyValues = {};
+  function normalizeCustomProperties(value) {
+    const normalized = normalize(value);
+    const source = isRecord(value) ? value : {};
+    if (!own(source, 'videoPropertyDefinitions')) normalized.videoPropertyDefinitions = { schemaVersion: 1, properties: {} };
+    if (!own(source, 'videoPropertyValues')) normalized.videoPropertyValues = {};
+    return normalized;
+  }
+  function rawValue(storage, key) {
+    if (storage && typeof storage.getItem === 'function') return storage.getItem(key);
+    if (storage && typeof storage.get === 'function') return storage.get(key) ?? null;
+    return storage && typeof storage === 'object' && own(storage, key) ? storage[key] : null;
+  }
+  function parseValue(storage, key, fallback) {
+    const raw = rawValue(storage, key);
+    if (raw == null) return fallback;
+    try { return JSON.parse(raw); } catch (_) { return fallback; }
+  }
+  payload.normalize = normalizeCustomProperties;
+  payload.buildFromLocalStorage = function (storage = globalThis.localStorage) {
+    const base = build(storage);
+    return normalizeCustomProperties({
+      ...base,
+      videoPropertyDefinitions: parseValue(storage, payload.DATA_KEYS.videoPropertyDefinitions, { schemaVersion: 1, properties: {} }),
+      videoPropertyValues: parseValue(storage, payload.DATA_KEYS.videoPropertyValues, {}),
+    });
+  };
+  payload.applyToLocalStorage = function (value, storage = globalThis.localStorage) {
+    return apply(normalizeCustomProperties(value), storage);
+  };
+}(typeof window !== 'undefined' ? window : globalThis));

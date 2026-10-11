@@ -41,6 +41,28 @@ test('Vault tombstones never persist as plaintext localStorage fields',()=>{
   assert.equal(typeof payload.markSyncDeletion,'undefined');
 });
 
+test('buildApplyAndClearRoundTripCustomPropertyKeys',()=>{
+  const definitions={schemaVersion:1,properties:{rating:{id:'rating',name:'評価',type:'number',options:{},futureDefinitionField:'keep'}}};
+  const values={video1:{rating:0}};
+  const storage=new Map([[DATA_KEYS.videoPropertyDefinitions,JSON.stringify(definitions)],[DATA_KEYS.videoPropertyValues,JSON.stringify(values)]]);
+  const built=buildFromStorage(storage);
+  assert.deepEqual(built.videoPropertyDefinitions,definitions);
+  assert.deepEqual(built.videoPropertyValues,values);
+  const restored=new Map();
+  applyToStorage(built,restored);
+  assert.deepEqual(buildFromStorage(restored),built);
+  payload.clearDeviceData(restored);
+  assert.equal(restored.has(DATA_KEYS.videoPropertyDefinitions),false);
+  assert.equal(restored.has(DATA_KEYS.videoPropertyValues),false);
+});
+
+test('legacyPayloadDefaultsCustomPropertyKeysToEmpty',()=>{
+  const built=normalize({videos:[{id:'old-video',title:'legacy'}],videoMeta:{'old-video':{favorite:true}}});
+  assert.deepEqual(built.videoPropertyDefinitions,{schemaVersion:1,properties:{}});
+  assert.deepEqual(built.videoPropertyValues,{});
+  assert.deepEqual(built.videoMeta['old-video'],{favorite:true});
+});
+
 test('apply rolls back both canonical and manual VPN settings when either manual key write fails',()=>{
   const values=new Map([['mangaReaderSavedFolders',JSON.stringify([{id:'old-folder'}])],['testCode.manualVpnIps',JSON.stringify(['192.0.2.1'])],['testCode.manualNonVpnIps',JSON.stringify(['192.0.2.2'])]]);
   let vpnWrites=0;

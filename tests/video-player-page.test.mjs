@@ -76,7 +76,7 @@ test('video title edits in place and player details follow the video in a watch-
   assert.match(page, /heading\.contentEditable\s*=\s*['"]true['"]/);
   assert.match(page, /heading\.addEventListener\(['"]keydown['"]/);
   assert.match(page, /saveTitle/);
-  assert.match(page, /main\.append\(frame, heading, info, actionBar, description, markerList, back\)/);
+  assert.match(page, /main\.append\(frame, heading, info, actionBar, description\); if \(customPropertyDetails\) main\.append\(customPropertyDetails\); main\.append\(markerList, back\)/);
   assert.match(page, /videoPlayerActionBar/);
   assert.match(fs.readFileSync(new URL('../home-profile-shell.css', import.meta.url), 'utf8'), /\.videoPlayerActionBar/);
 });
@@ -94,7 +94,7 @@ test('custom player defers single taps and maps double-tap zones to seek or full
 test('video player document cache keys identify the current watch-page design', () => {
   const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
   assert.match(html, /home-profile-shell\.css\?v=20261010-icon-markers/);
-  assert.match(html, /video-player-page\.js\?v=20261010-shorts-handoff/);
+  assert.match(html, /video-player-page\.js\?v=20261012-video-custom-properties-v2/);
 });
 
 test('desktop watch page keeps related videos in an independently scrolling viewport', () => {
