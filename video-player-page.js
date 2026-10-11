@@ -195,7 +195,19 @@
 
   const back = document.createElement('a'); back.className = 'glassBtn videoBack'; back.href = 'video.html'; back.textContent = '動画一覧へ戻る';
   const relatedBox = document.createElement('aside'); relatedBox.className = 'videoRelated'; const relatedHeading = document.createElement('h3'); relatedHeading.textContent = '関連動画'; relatedBox.append(relatedHeading);
-  related.forEach(({ item, itemVideo, itemTitle, itemTags }) => { const link = document.createElement('a'); link.className = 'videoRelatedItem'; link.href = 'video-player.html?id=' + encodeURIComponent(item.id); const thumb = document.createElement('span'); thumb.className = 'videoRelatedThumb'; if (window.MangaReaderVideoThumbnailRenderer) window.MangaReaderVideoThumbnailRenderer.render(thumb, itemVideo); const text = document.createElement('span'); text.className = 'videoRelatedText'; text.textContent = itemTitle; const tagsText = document.createElement('small'); tagsText.textContent = itemTags.slice(0, 3).map((tag) => '#' + tag).join(' '); text.append(tagsText); link.append(thumb, text); relatedBox.append(link); });
+  const VideoCard = window.MangaReaderVideoCard;
+  if (!VideoCard || typeof VideoCard.create !== 'function') throw new Error('video card component is unavailable');
+  related.forEach(({ item, itemVideo, itemTitle, itemTags }) => {
+    const relatedCard = VideoCard.create(itemVideo, {
+      documentRef: document, layout: 'related', title: itemTitle, tags: itemTags.slice(0, 3),
+      durationSeconds: itemVideo.durationSeconds,
+      thumbnailRenderer: window.MangaReaderVideoThumbnailRenderer,
+      thumbnailOptions: { serviceLabel: videos ? videos.deriveService(itemVideo.url, itemVideo.a) : itemVideo.a || 'VIDEO' },
+      openHref: 'video-player.html?id=' + encodeURIComponent(item.id),
+      editHref: 'video-edit.html?id=' + encodeURIComponent(item.id) + '&return=player',
+    });
+    relatedBox.append(relatedCard);
+  });
   const description = document.createElement('details'); description.className = 'videoPlayerDescription';
   const descriptionSummary = document.createElement('summary'); descriptionSummary.textContent = normalized.memo ? '動画のメモ' : '動画情報';
   const descriptionText = document.createElement('p'); descriptionText.textContent = normalized.memo || [base.a, base.b].filter(Boolean).join(' / ') || '動画'; description.append(descriptionSummary, descriptionText);

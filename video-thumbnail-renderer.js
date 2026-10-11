@@ -32,7 +32,11 @@
       if (preview || !isDirectVideo(record.url)) return;
       preview = doc.createElement('video'); preview.className = options && options.videoClass || 'vl-thumb-direct-video';
       preview.muted = true; preview.playsInline = true; preview.preload = 'metadata'; preview.src = record.url;
-      preview.style.visibility = 'hidden'; preview.addEventListener('loadedmetadata', () => { try { preview.currentTime = Math.max(0, Number(record.thumbnailTimeSeconds) || 0.1); } catch (_) {} });
+      preview.style.visibility = 'hidden'; preview.addEventListener('loadedmetadata', () => {
+        const duration = Number(preview.duration);
+        if (Number.isFinite(duration) && duration > 0 && options && typeof options.onDuration === 'function') options.onDuration(duration);
+        try { preview.currentTime = Math.max(0, Number(record.thumbnailTimeSeconds) || 0.1); } catch (_) {}
+      });
       preview.addEventListener('seeked', () => show(preview));
       preview.addEventListener('loadeddata', () => { if (!preview.currentTime) show(preview); });
       preview.addEventListener('error', () => revealFallback(preview)); container.append(preview);

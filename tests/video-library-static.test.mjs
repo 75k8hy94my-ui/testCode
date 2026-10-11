@@ -33,14 +33,17 @@ test('video library provides search filters sorting view modes folders and edito
   assert.match(source, /history\.pushState/);
 });
 
-test('video list ellipsis navigates directly to the dedicated editor without an action popup', () => {
+test('video list uses the shared card menu for existing favorite and editor actions', () => {
   const library = read('video-library.js');
+  const card = read('video-card.js');
   const editor = read('video-edit-page.js');
   const editorHtml = read('video-edit.html');
-  assert.match(library, /const edit = document\.createElement\('a'\)/);
-  assert.match(library, /edit\.href = 'video-edit\.html\?id=' \+ encodeURIComponent\(video\.id\) \+ '&return=list'/);
-  assert.match(library, /edit\.setAttribute\('aria-label', '詳細を編集'\)/);
-  assert.doesNotMatch(library, /className = 'vl-menu'|className = 'vl-menu-panel'|createMenuButton\(/);
+  assert.match(library, /VideoCard\.create\(video/);
+  assert.match(library, /onSelect: \(\) => \{ updateMeta\(video\.id, \{ favorite: !video\.favorite \}\)/);
+  assert.match(library, /editHref: 'video-edit\.html\?id=' \+ encodeURIComponent\(video\.id\) \+ '&return=list'/);
+  assert.match(card, /videoCardMenuButton/);
+  assert.match(card, /videoCardMenuEdit/);
+  assert.match(card, /event\.preventDefault\(\); event\.stopPropagation\(\)/);
   assert.match(editor, /name="hidden" type="checkbox"/);
   assert.match(editor, /name="status"/);
   assert.match(editor, /data-delete/);
@@ -58,14 +61,20 @@ test('video list ellipsis navigates directly to the dedicated editor without an 
   assert.match(editor, /data-json-import/);
   assert.match(editor, /accept="application\/json,\.json"/);
   assert.doesNotMatch(editorHtml, /auth-pending/);
-  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261012-video-pagination/);
+  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261012-youtube-video-cards/);
 });
 
 test('video cards delegate thumbnail rendering to the shared renderer', () => {
   const library = read('video-library.js');
+  const card = read('video-card.js');
+  const player = read('video-player-page.js');
   const route = read('video-list-route.js');
   assert.match(library, /MangaReaderVideoThumbnailRenderer/);
-  assert.match(library, /render\(thumb, video/);
+  assert.match(library, /VideoCard\.create\(video/);
+  assert.match(card, /renderer\.render\(thumb, record/);
+  assert.match(player, /VideoCard\.create\(itemVideo/);
+  assert.match(player, /return=player/);
+  assert.match(route, /video-card\.js\?v=20261012-youtube-video-cards/);
   assert.match(route, /video-thumbnail-renderer\.js/);
 });
 
