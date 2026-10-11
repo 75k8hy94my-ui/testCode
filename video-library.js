@@ -345,14 +345,18 @@
     if (video.watchStatus && STATUS_LABELS[video.watchStatus]) metadata.push(STATUS_LABELS[video.watchStatus]);
     if (video.lastOpenedAt) metadata.push(formatDate(video.lastOpenedAt));
     if (video.openCount) metadata.push(video.openCount + '回');
+    const customLabels = [];
     if (canReadProtectedData() && CustomProperties) {
       const stored = state.customValues[String(video.id)] || {};
-      const shown = Object.values(state.customDefinitions.properties || {}).filter((property) => property && property.deleted !== true && property.hidden !== true && property.showInCard === true && Object.prototype.hasOwnProperty.call(stored, property.id) && stored[property.id] !== null && stored[property.id] !== '').sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)).slice(0, 3);
-      shown.forEach((property) => metadata.push(property.name + ': ' + CustomProperties.formatValue(property, stored[property.id], state.customDefinitions)));
+      const shown = Object.values(state.customDefinitions.properties || {}).filter((property) => property && property.deleted !== true && property.hidden !== true && Object.prototype.hasOwnProperty.call(stored, property.id) && stored[property.id] !== null && stored[property.id] !== '').sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+      shown.forEach((property) => {
+        const value = CustomProperties.formatValue(property, stored[property.id], state.customDefinitions);
+        if (value !== '') customLabels.push(property.name + ': ' + value);
+      });
     }
     const card = VideoCard.create(video, {
       documentRef: document, layout: state.view === 'compact' ? 'compact' : 'grid', openClass: 'vl-open',
-      title, metadata, tags: video.tags.slice(0, 4), progressPercent: progressPercent(video),
+      title, metadata, tags: Array.isArray(video.tags) ? video.tags : [], customLabels, progressPercent: progressPercent(video),
       thumbnailRenderer: window.MangaReaderVideoThumbnailRenderer,
       thumbnailOptions: { fallbackClass: 'vl-thumb-fallback', videoClass: 'vl-thumb-direct-video', serviceLabel: service || 'VIDEO' },
       onOpen: () => openVideo(video.id),
