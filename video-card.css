@@ -207,3 +207,32 @@
   .videoCard--related { grid-template-columns: minmax(96px, 36%) minmax(0, 1fr); }
   .videoCard--compact { grid-template-columns: 100px minmax(0, 1fr); }
 }
+
+/* YouTube-inspired cards: keep the thumbnail wide and establish a clear
+   thumbnail / source / text / actions hierarchy without synthetic statistics. */
+.videoCard { gap: 11px; }
+.videoCardThumb { border-radius: 12px; }
+.videoCardBody { padding: 0 1px; }
+.videoCardInfo { display: grid; grid-template-columns: 36px minmax(0,1fr); gap: 11px; align-items: start; }
+.videoCardSourceIcon { width: 36px; height: 36px; border-radius: 50%; background: var(--panel-2,#303744); color: var(--video-card-text); display: grid; place-items: center; font-size: 14px; font-weight: 700; overflow: hidden; }
+.videoCardDetails { min-width: 0; }
+.videoCardTitleRow { align-items: flex-start; gap: 8px; }
+.videoCardTitle { font-size: 16px; line-height: 1.4; font-weight: 650; -webkit-line-clamp: 2; }
+.videoCardMeta { margin-top: 5px; font-size: 12px; line-height: 1.5; -webkit-line-clamp: 2; }
+.videoCardMenuWrap { flex: 0 0 32px; width: 32px; margin: -4px -4px 0 0; }
+.videoCardMenuButton { width: 32px; height: 32px; font-size: 21px; }
+.videoCardMenuWrap--open { flex-basis: 100%; width: 100%; margin: 0; }
+.videoCard--compact .videoCardInfo, .videoCard--related .videoCardInfo { grid-template-columns: minmax(0,1fr); gap: 0; }
+.videoCard--compact .videoCardSourceIcon, .videoCard--related .videoCardSourceIcon { display: none; }
+.videoCard--compact .videoCardTitle, .videoCard--related .videoCardTitle { font-size: 14px; }
+.videoCard--related .videoCardMenuWrap { flex-basis: 32px; width: 32px; margin: -4px 0 0; }
+.videoCard--related .videoCardMenuButton { width: 32px; height: 32px; }
+@media (min-width: 641px) {
+  .vl-grid:not(.compact) { grid-template-columns: repeat(auto-fill,minmax(min(100%,300px),1fr)); gap: 36px 20px; }
+}
+@media (max-width: 640px) {
+  .vl-grid:not(.compact) { gap: 24px; }
+  .videoCardInfo { grid-template-columns: 36px minmax(0,1fr); gap: 10px; }
+  .videoCardThumb { border-radius: 10px; }
+  .videoCardTitle { font-size: 15px; }
+}

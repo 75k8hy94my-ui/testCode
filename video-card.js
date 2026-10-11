@@ -95,12 +95,18 @@
     } else {
       const fallback = doc.createElement('span'); fallback.className = 'videoThumbnailFallback';
       const mark = doc.createElement('b'); mark.textContent = '▶';
-      const service = doc.createElement('span'); service.textContent = options.serviceLabel || record.service || record.a || 'VIDEO';
+      const service = doc.createElement('span'); service.textContent = options.serviceLabel || (options.thumbnailOptions && options.thumbnailOptions.serviceLabel) || record.service || record.a || 'VIDEO';
       fallback.append(mark, service); thumb.append(fallback);
     }
     thumb.append(duration); thumbTarget.append(thumb); card.append(thumbTarget);
 
     const body = doc.createElement('div'); body.className = 'videoCardBody';
+    const info = doc.createElement('div'); info.className = 'videoCardInfo';
+    const icon = doc.createElement('span'); icon.className = 'videoCardSourceIcon'; icon.setAttribute('aria-hidden', 'true');
+    const sourceName = String(options.serviceLabel || record.service || record.a || 'VIDEO');
+    icon.textContent = sourceName.slice(0, 1).toUpperCase();
+    info.append(icon);
+    const details = doc.createElement('div'); details.className = 'videoCardDetails';
     const titleRow = doc.createElement('div'); titleRow.className = 'videoCardTitleRow';
     const titleTarget = options.openHref ? doc.createElement('a') : doc.createElement('button');
     if (options.openHref) titleTarget.href = options.openHref;
@@ -112,19 +118,19 @@
     titleTarget.setAttribute('aria-label', titleTarget.textContent + 'を開く');
     titleRow.append(titleTarget);
     addMenu(card, titleRow, record, options, doc);
-    body.append(titleRow);
+    details.append(titleRow);
 
     const metadata = (options.metadata || []).map((value) => String(value == null ? '' : value).trim()).filter(Boolean);
     const tags = (options.tags || []).map((value) => String(value == null ? '' : value).trim()).filter(Boolean);
     if (metadata.length || tags.length) {
       const meta = doc.createElement('div'); meta.className = 'videoCardMeta'; meta.textContent = metadata.concat(tags.map((tag) => '#' + tag)).join(' · ');
-      body.append(meta);
+      details.append(meta);
     }
     if (options.progressPercent != null && Number.isFinite(Number(options.progressPercent))) {
       const progress = doc.createElement('div'); progress.className = 'videoCardProgress';
       const inner = doc.createElement('i'); inner.style.width = Math.max(0, Math.min(100, Number(options.progressPercent))) + '%'; progress.append(inner); body.append(progress);
     }
-    card.append(body);
+    info.append(details); body.append(info); card.append(body);
     return card;
   }
 
