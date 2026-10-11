@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 async function openGuestVideoList(page) {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.route(/supabase\\.co|\\/auth\\/v1\\/|\\/rest\\/v1\\//i, route => route.abort());
+  await page.route(/supabase\.co|\/auth\/v1\/|\/rest\/v1\//i, route => route.abort());
   await page.goto('index.html');
   await page.getByRole('button', { name: 'ログインせずに使う' }).click();
   await page.locator('#desktopNavVideo').click();
@@ -24,7 +24,7 @@ async function openGuestVideoList(page) {
   await page.locator('#videoLibraryNextPage').click();
   await expect(page.locator('#videoLibraryPageLabel')).toHaveText('3 / 3');
   await page.locator('.vl-card[data-video-id="return-video-3"] .vl-open').first().click();
-  await expect(page).toHaveURL(/video-player\\.html\\?id=return-video-3/);
+  await expect(page).toHaveURL(/video-player\.html\?id=return-video-3/);
 }
 
 test('player header returns to the page containing the current video, even after a route refresh', async ({ page }) => {
