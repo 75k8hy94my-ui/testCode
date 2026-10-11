@@ -19,6 +19,8 @@
   let sources = [];
   let project = null;
   let edit = null;
+  let historyState = State.createHistory(null);
+  let baselineEdit = null;
   let selectedIndex = null;
   let dirty = false;
   let busy = false;
@@ -225,6 +227,10 @@
     refs.moveUp.disabled = !hasSelected || selectedIndex === 0;
     refs.moveDown.disabled = !hasSelected || selectedIndex === edit.clips.length - 1;
     refs.save.disabled = busy || stale || !edit;
+    const canUndo = !!historyState.past.length && !busy && !stale;
+    const canRedo = !!historyState.future.length && !busy && !stale;
+    refs.undo.disabled = !canUndo;
+    refs.redo.disabled = !canRedo;
     refs.dirty.hidden = !dirty;
     const canPlaySaved = !!project && !dirty && !stale && !busy;
     refs.playSaved.hidden = !canPlaySaved;
@@ -254,12 +260,46 @@
   function setEdit(next, nextIndex = null) {
     requireAccess();
     if (busy || stale) return;
-    edit = Edit.normalizeEdit(next);
-    dirty = true;
+    edit = next === null ? null : Edit.normalizeEdit(next);
     selectedIndex = nextIndex;
+    historyState = State.push(historyState, edit, selectedIndex);
+    updateDirty();
     drawClips();
     if (nextIndex !== null) chooseClip(nextIndex);
     status('未保存の変更があります。');
+  }
+  function updateDirty() {
+    dirty = JSON.stringify(edit) !== JSON.stringify(baselineEdit);
+    refs.dirty.hidden = !dirty;
+  }
+  function restoreHistory(snapshot) {
+    requireAccess();
+    if (busy || stale) return;
+    edit = snapshot.edit ? Edit.normalizeEdit(snapshot.edit) : null;
+    selectedIndex = edit && snapshot.selectedIndex !== null
+      ? Math.min(snapshot.selectedIndex, edit.clips.length - 1) : null;
+    updateDirty();
+    drawClips();
+    if (selectedIndex !== null) chooseClip(selectedIndex);
+    else {
+      stopPreview();
+      refs.previewMeta.textContent = '編集区間がありません。';
+    }
+    status(dirty ? '未保存の変更があります。' : '保存済みの状態に戻しました。');
+  }
+  function undoEdit() {
+    if (!canRead() || busy || stale) return;
+    const result = State.undo(historyState);
+    if (result.history === historyState) return;
+    historyState = result.history;
+    restoreHistory(result.snapshot);
+  }
+  function redoEdit() {
+    if (!canRead() || busy || stale) return;
+    const result = State.redo(historyState);
+    if (result.history === historyState) return;
+    historyState = result.history;
+    restoreHistory(result.snapshot);
   }
   function readRange() {
     requireAccess();
@@ -351,10 +391,7 @@
     action(() => {
       if (!selectedClip()) return;
       if (edit.clips.length === 1) {
-        edit = null;
-        selectedIndex = null;
-        dirty = true;
-        drawClips();
+        setEdit(null, null);
         status('全区間を削除しました。新しい区間を追加するまで保存できません。');
         return;
       }
@@ -505,7 +542,9 @@
       if (!canRead() || generation !== activeGeneration) return;
       project = result.project;
       edit = Edit.normalizeEdit(project.edit);
-      dirty = false;
+      baselineEdit = edit;
+      historyState = State.createHistory(edit, historyState.limit);
+      updateDirty();
       const target = new URL(location.href);
       target.searchParams.delete('id');
       target.searchParams.set('project', project.id);
@@ -556,8 +595,10 @@
     project = projectId ? repository.get(projectId) : null;
     if (projectId && !project) throw new Error('指定された編集プロジェクトが見つかりません。');
     edit = project ? Edit.normalizeEdit(project.edit) : null;
+    baselineEdit = edit;
     dirty = false;
     selectedIndex = edit ? 0 : null;
+    historyState = State.createHistory(edit, 100);
     stale = project ? !repository.inspect(project.id).usable : false;
     const initialSource = sourceFor(routeSourceId);
     refs.title.value = project ? project.title : (initialSource ? initialSource.title + '（編集版）' : '');
@@ -711,6 +752,18 @@
     refs.setEnd.addEventListener('click', () => setBoundaryFromPreview('end'));
     refs.save.addEventListener('click', save);
     refs.deleteProject.addEventListener('click', removeProject);
+    refs.undo.addEventListener('click', undoEdit);
+    refs.redo.addEventListener('click', redoEdit);
+    document.addEventListener('keydown', (event) => {
+      if (!event || !(event.metaKey || event.ctrlKey) || event.altKey) return;
+      const target = event.target || {};
+      const tag = String(target.tagName || '').toLowerCase();
+      if (['input', 'textarea', 'select'].includes(tag) || target.isContentEditable) return;
+      const key = String(event.key || '').toLowerCase();
+      if (key === 'z' && event.shiftKey) { event.preventDefault(); redoEdit(); }
+      else if (key === 'z') { event.preventDefault(); undoEdit(); }
+      else if (key === 'y' && event.ctrlKey && !event.metaKey) { event.preventDefault(); redoEdit(); }
+    });
     refs.preview.addEventListener('loadedmetadata', () => {
       if (!canRead()) return;
       const duration = refs.preview.duration;

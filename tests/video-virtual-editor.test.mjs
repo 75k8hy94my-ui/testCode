@@ -240,6 +240,27 @@ test('dragging a clip body reorders the virtual sequence only on pointer-up', as
   assert.deepEqual(JSON.parse(JSON.stringify(harness.calls[0].edit.clips.map((item) => item.sourceVideoId))), ['long', 'direct']);
 });
 
+test('draft undo and redo restore committed edits without saving and preserve native input shortcuts', async () => {
+  const harness = startEditor({ allowed: true });
+  const nodes = harness.selectorMap;
+  nodes.get('[data-title]').value = 'Undo test';
+  nodes.get('[data-source-list]').children[0].dispatch('click');
+  nodes.get('[data-end]').value = '10';
+  nodes.get('[data-add]').dispatch('click');
+  nodes.get('[data-duplicate]').dispatch('click');
+  const undo = harness.documentListeners.keydown;
+  let prevented = false;
+  undo({ key: 'z', ctrlKey: true, target: { tagName: 'INPUT' }, preventDefault() { prevented = true; } });
+  assert.equal(prevented, false, 'text editing keeps the browser undo shortcut');
+  undo({ key: 'z', ctrlKey: true, target: { tagName: 'MAIN' }, preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(harness.calls.length, 0, 'undo remains draft-only');
+  nodes.get('[data-redo]').dispatch('click');
+  await nodes.get('[data-save]').dispatch('click');
+  assert.equal(harness.calls.length, 1, 'explicit save is the only persistence call: ' + nodes.get('[data-status]').textContent);
+  assert.equal(harness.calls[0].edit.clips.length, 2);
+});
+
 test('selected clip can be duplicated, independently trimmed and precisely adjusted before save', async () => {
   const harness = startEditor({ allowed: true });
   const nodes = harness.selectorMap;
