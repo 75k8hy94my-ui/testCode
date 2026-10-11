@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 import fs from 'node:fs';
 
 const localChrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const port = Number(process.env.E2E_PORT || 4173);
 
 export default defineConfig({
   testDir: './e2e',
@@ -10,7 +11,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: 'list',
   use: {
-    baseURL: 'http://127.0.0.1:4173/',
+    baseURL: `http://127.0.0.1:${port}/`,
     browserName: 'chromium',
     headless: true,
     viewport: { width: 390, height: 844 },
@@ -19,8 +20,8 @@ export default defineConfig({
       : {},
   },
   webServer: {
-    command: 'python3 -m http.server 4173 --bind 127.0.0.1',
-    url: 'http://127.0.0.1:4173/index.html',
+    command: `python3 -m http.server ${port} --bind 127.0.0.1`,
+    url: `http://127.0.0.1:${port}/index.html`,
     reuseExistingServer: !process.env.CI,
     timeout: 30000,
   },

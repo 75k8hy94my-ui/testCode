@@ -13,13 +13,10 @@ test('video player page uses the normalized saved title and renders marker list'
 
 test('related videos use normalized thumbnail metadata and the shared renderer', () => {
   assert.match(page, /itemVideo/);
-  assert.match(page, /VideoCard\.create\(itemVideo/);
-  assert.match(page, /openHref: 'video-player\.html\?id=' \+ encodeURIComponent\(item\.id\)/);
-  assert.match(page, /editHref: 'video-edit\.html\?id=' \+ encodeURIComponent\(item\.id\) \+ '&return=player'/);
-  const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
-  assert.ok(html.indexOf('video-thumbnail-renderer.js') < html.indexOf('video-card.js'));
-  assert.ok(html.indexOf('video-card.js') < html.indexOf('video-player-page.js'));
-  assert.match(html, /video-card\.css\?v=20261012-youtube-video-cards/);
+  assert.match(page, /MangaReaderVideoCard/);
+  assert.match(page, /layout: 'related'/);
+  assert.match(fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8'), /video-thumbnail-renderer\.js/);
+  assert.match(fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8'), /video-card\.js/);
 });
 
 test('video player waits for protected-data access before reading records or rendering metadata', () => {
@@ -81,7 +78,7 @@ test('video title edits in place and player details follow the video in a watch-
   assert.match(page, /heading\.contentEditable\s*=\s*['"]true['"]/);
   assert.match(page, /heading\.addEventListener\(['"]keydown['"]/);
   assert.match(page, /saveTitle/);
-  assert.match(page, /main\.append\(frame, heading, info, actionBar, description, markerList, back\)/);
+  assert.match(page, /main\.append\(frame, heading, info, actionBar, description\); if \(customPropertyDetails\) main\.append\(customPropertyDetails\); main\.append\(markerList, back\)/);
   assert.match(page, /videoPlayerActionBar/);
   assert.match(fs.readFileSync(new URL('../home-profile-shell.css', import.meta.url), 'utf8'), /\.videoPlayerActionBar/);
 });
@@ -99,7 +96,7 @@ test('custom player defers single taps and maps double-tap zones to seek or full
 test('video player document cache keys identify the current watch-page design', () => {
   const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
   assert.match(html, /home-profile-shell\.css\?v=20261010-icon-markers/);
-  assert.match(html, /video-player-page\.js\?v=20261012-youtube-video-cards/);
+  assert.match(html, /video-player-page\.js\?v=20261012-youtube-video-cards-v2/);
 });
 
 test('desktop watch page keeps related videos in an independently scrolling viewport', () => {

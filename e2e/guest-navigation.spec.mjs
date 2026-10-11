@@ -11,15 +11,15 @@ test('guest can navigate home, manga, video, and profile without protected backe
   await expect(page).toHaveURL(/home\.html$/);
   await expect(page.locator('#homeGrid')).toBeVisible();
 
-  await page.locator('#mobileNavManga').click();
+  await page.getByRole('navigation', { name: 'モバイルメニュー' }).getByRole('link', { name: '漫画' }).click();
   await expect(page).toHaveURL(/manga\.html$/);
   await expect(page.locator('#mangaListSection')).toBeVisible();
 
-  await page.locator('#mobileNavVideo').click();
+  await page.getByRole('navigation', { name: 'モバイルメニュー' }).getByRole('link', { name: '動画' }).click();
   await expect(page).toHaveURL(/video\.html$/);
   await expect(page.locator('#videoLibraryApp')).toBeVisible();
 
-  await page.locator('#mobileNavProfile').click();
+  await page.getByRole('navigation', { name: 'モバイルメニュー' }).getByRole('link', { name: 'プロフィール' }).click();
   await expect(page).toHaveURL(/profile\.html$/);
   await expect(page.locator('#profileShortsResetBtn')).toBeVisible();
   expect(await page.evaluate(() => typeof window.MangaReaderVideoShortsState?.reset)).toBe('function');
@@ -35,9 +35,9 @@ for (const startRoute of ['manga', 'video']) {
     await page.goto('index.html');
     await page.getByRole('button', { name: 'ログインせずに使う' }).click();
     await expect(page).toHaveURL(/home\.html$/);
-    await page.locator(`#mobileNav${startRoute === 'manga' ? 'Manga' : 'Video'}`).click();
+    await page.getByRole('navigation', { name: 'モバイルメニュー' }).getByRole('link', { name: startRoute === 'manga' ? '漫画' : '動画' }).click();
     await expect(page).toHaveURL(new RegExp(`${startRoute}\\.html$`));
-    await page.locator('#mobileNavProfile').click();
+    await page.getByRole('navigation', { name: 'モバイルメニュー' }).getByRole('link', { name: 'プロフィール' }).click();
     await expect(page).toHaveURL(/profile\.html$/);
     expect(await page.evaluate(() => typeof window.MangaReaderVideoShortsState?.reset)).toBe('function');
     await expect(page.locator('#profileShortsResetStatus')).not.toContainText('読み込めませんでした');

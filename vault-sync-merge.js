@@ -44,11 +44,18 @@
           addConflict(conflicts, 'delete-recreate', tombstone, MISSING, localEntity || MISSING, remoteEntity || MISSING);
           continue;
         }
-        if (parts.length !== 2 || !['folders', 'items', 'videos', 'videoFolders', 'authorCards'].includes(parts[0])) continue;
-        const entity = Array.isArray(merged[parts[0]]) && merged[parts[0]].find((item) => item && item.id === parts[1]);
+        const valueMapPath = parts[0] === 'videoPropertyValues';
+        if (parts.length !== 2 || (!valueMapPath && !['folders', 'items', 'videos', 'videoFolders', 'authorCards'].includes(parts[0]))) continue;
+        const entity = valueMapPath
+          ? isRecord(merged.videoPropertyValues) ? merged.videoPropertyValues[parts[1]] : undefined
+          : Array.isArray(merged[parts[0]]) && merged[parts[0]].find((item) => item && item.id === parts[1]);
         if (!entity) continue;
-        const localEntity = Array.isArray(local && local[parts[0]]) && local[parts[0]].find((item) => item && item.id === parts[1]);
-        const remoteEntity = Array.isArray(remote && remote[parts[0]]) && remote[parts[0]].find((item) => item && item.id === parts[1]);
+        const localEntity = valueMapPath
+          ? isRecord(local && local.videoPropertyValues) ? local.videoPropertyValues[parts[1]] : undefined
+          : Array.isArray(local && local[parts[0]]) && local[parts[0]].find((item) => item && item.id === parts[1]);
+        const remoteEntity = valueMapPath
+          ? isRecord(remote && remote.videoPropertyValues) ? remote.videoPropertyValues[parts[1]] : undefined
+          : Array.isArray(remote && remote[parts[0]]) && remote[parts[0]].find((item) => item && item.id === parts[1]);
         addConflict(conflicts, 'delete-recreate', tombstone, MISSING, localEntity || MISSING, remoteEntity || MISSING);
       }
     }
@@ -60,7 +67,7 @@
     const tombstones = deletedPaths instanceof Set ? deletedPaths
       : new Set(Array.isArray(deletedPaths) ? deletedPaths : Array.isArray(local && local.vaultSyncTombstones) ? local.vaultSyncTombstones : []);
     const currentPath = typeof path === 'string' ? path : '';
-    const entityMaps = new Set(['/videoMeta', '/videoMarkers', '/mangaInfo', '/toc', '/lastPages', '/statuteNotes', '/study/progress', '/study/argumentDrafts', '/study/argumentProgress', '/roppoState/notes']);
+    const entityMaps = new Set(['/videoMeta', '/videoMarkers', '/mangaInfo', '/toc', '/lastPages', '/statuteNotes', '/videoPropertyValues', '/study/progress', '/study/argumentDrafts', '/study/argumentProgress', '/roppoState/notes']);
     if (Array.isArray(base) && Array.isArray(local)
         && [...base, ...local].every((item) => isRecord(item) && typeof item.id === 'string' && item.id)) {
       const baseById = asMap(base);
