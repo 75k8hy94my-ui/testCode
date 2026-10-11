@@ -177,7 +177,7 @@
     if (Number.isFinite(startTime) && startTime >= 0) video.addEventListener('loadedmetadata', () => { if (canReadProtectedData()) video.currentTime = Math.min(startTime, Number.isFinite(video.duration) ? video.duration : startTime); }, { once: true });
     video.src = sourceUrl;
     frame.append(video);
-    const cleanupRotation = window.MangaReaderVideoRotation.install(frame, video, normalized.rotate90Direction);
+    const cleanupRotation = window.MangaReaderVideoRotation.install(frame, video, normalized.rotate90Direction, { expandFrame: true });
     windowCleanups.push(cleanupRotation);
   }
   else if (base.a && base.b) { const iframe = document.createElement('iframe'); iframe.src = 'https://www.' + base.a + '.com/embed/' + base.b; iframe.title = title; iframe.allowFullscreen = true; frame.append(iframe); }
