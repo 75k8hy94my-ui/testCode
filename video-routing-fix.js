@@ -541,6 +541,9 @@
 
     const targetUrl = new URL('video-player.html', location.href);
     targetUrl.searchParams.set('id', videoId);
+    const indicator = document.getElementById('videoLibraryPageLabel');
+    const pageNumber = indicator && Number.parseInt(indicator.textContent, 10);
+    if (Number.isSafeInteger(pageNumber) && pageNumber > 0) targetUrl.searchParams.set('fromPage', String(pageNumber));
     event.preventDefault();
     event.stopImmediatePropagation();
     recordOpen(base);
