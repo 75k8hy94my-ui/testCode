@@ -23,8 +23,7 @@
     const message = document.createElement('p'); message.className = 'profileLead'; message.textContent = 'VPN接続を確認できるまで、動画情報を読み込みません。';
     const status = document.createElement('button'); status.type = 'button'; status.className = 'glassBtn vpnStatusButton'; status.dataset.vpnStatusButton = '1'; status.dataset.vpnRecheckButton = '1'; status.textContent = 'VPN接続を再確認';
     const diagnostics = document.createElement('button'); diagnostics.type = 'button'; diagnostics.className = 'glassBtn vpnDiagnosticsButton'; diagnostics.dataset.vpnDiagnosticsButton = '1'; diagnostics.textContent = 'VPN診断';
-    const back = document.createElement('a'); back.className = 'glassBtn'; back.href = 'video.html'; back.textContent = '動画一覧へ戻る';
-    section.append(heading, message, status, diagnostics, back); page.replaceChildren(section);
+    section.append(heading, message, status, diagnostics); page.replaceChildren(section);
     if (mediaAccess && typeof mediaAccess.syncUi === 'function') mediaAccess.syncUi();
   }
   function disposePlayer() {
@@ -91,13 +90,24 @@
   });
   listenWindow('online', () => { resumePendingLocalSync(); });
   const id = new URLSearchParams(location.search).get('id') || '';
+  const headerTitle = document.getElementById('shellTitle');
+  if (headerTitle) {
+    const link = document.createElement('a');
+    const destination = new URL('video.html', location.href);
+    if (id) destination.searchParams.set('returnVideo', id);
+    link.href = destination.href;
+    link.textContent = '動画';
+    link.setAttribute('aria-label', '動画一覧へ戻る');
+    link.style.color = 'inherit'; link.style.textDecoration = 'none';
+    headerTitle.replaceChildren(link);
+  }
   const VIDEO_KEY = 'mangaReaderVideos';
   const META_KEY = 'mangaReaderVideoMeta';
   const read = (key, fallback) => { try { const value = JSON.parse(localStorage.getItem(key) || 'null'); return value == null ? fallback : value; } catch (_) { return fallback; } };
   const baseVideos = read(VIDEO_KEY, []);
   const base = baseVideos.find((item) => String(item.id) === id);
   const allMeta = read(META_KEY, {});
-  if (!base) { page.innerHTML = '<section class="profileContent"><h2>動画が見つかりません</h2><a class="glassBtn" href="video.html">動画一覧へ戻る</a></section>'; return; }
+  if (!base) { page.innerHTML = '<section class="profileContent"><h2>動画が見つかりません</h2></section>'; return; }
 
   const meta = allMeta[id] && typeof allMeta[id] === 'object' ? allMeta[id] : {};
   const videos = window.MangaReaderVideoData;
@@ -193,7 +203,6 @@
   renderPageMarkers();
   listenWindow('manga-video-markers-changed', renderPageMarkers);
 
-  const back = document.createElement('a'); back.className = 'glassBtn videoBack'; back.href = 'video.html'; back.textContent = '動画一覧へ戻る';
   const relatedBox = document.createElement('aside'); relatedBox.className = 'videoRelated'; const relatedHeading = document.createElement('h3'); relatedHeading.textContent = '関連動画'; relatedBox.append(relatedHeading);
   const VideoCard = window.MangaReaderVideoCard;
   if (!VideoCard || typeof VideoCard.create !== 'function') throw new Error('video card component is unavailable');
@@ -223,7 +232,7 @@
       visible.forEach((property) => { const row = document.createElement('p'); const name = document.createElement('strong'); name.textContent = property.name + '：'; const value = document.createElement('span'); value.textContent = window.MangaReaderVideoCustomProperties.formatValue(property, saved[property.id], propertyState.definitions); row.append(name, value); customPropertyDetails.append(row); });
     }
   }
-  const main = document.createElement('section'); main.className = 'videoPlayerMain'; main.append(frame, heading, info, actionBar, description); if (customPropertyDetails) main.append(customPropertyDetails); main.append(markerList, back); const layout = document.createElement('div'); layout.className = 'videoPlayerLayout'; layout.append(main, relatedBox); page.replaceChildren(layout);
+  const main = document.createElement('section'); main.className = 'videoPlayerMain'; main.append(frame, heading, info, actionBar, description); if (customPropertyDetails) main.append(customPropertyDetails); main.append(markerList); const layout = document.createElement('div'); layout.className = 'videoPlayerLayout'; layout.append(main, relatedBox); page.replaceChildren(layout);
   resumePendingLocalSync();
   }
   handleAccessStatus();

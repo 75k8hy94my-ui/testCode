@@ -419,6 +419,36 @@
     if (!properties.length) { const empty=document.createElement('span'); empty.textContent='表示可能なプロパティがありません。'; dom.customFilters.append(empty); }
   }
 
+  function restoreVideoPage() {
+    const params = new URLSearchParams(location.search);
+    const targetId = params.get('returnVideo');
+    if (!targetId || !canReadProtectedData()) return;
+    const all = effectiveVideos();
+    const findInCurrentView = () => {
+      const scoped = all.filter(video => video.hidden === state.showHidden);
+      const visible = Data.filterVideos(scoped, { query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
+      const filtered = CustomProperties ? visible.filter(video => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, Object.values(state.customFilters))) : visible;
+      return Data.sortVideos(filtered, state.sort);
+    };
+    let list = findInCurrentView();
+    let index = list.findIndex(video => String(video.id) === targetId);
+    if (index < 0) {
+      // Restore the video even when a saved filter excludes it.
+      const target = all.find(video => String(video.id) === targetId);
+      if (target) {
+        state.showHidden = !!target.hidden;
+        state.query = ''; state.quick = 'all'; state.folderId = ''; state.tag = ''; state.service = ''; state.customFilters = {};
+        if (dom.search) dom.search.value = '';
+        list = findInCurrentView();
+        index = list.findIndex(video => String(video.id) === targetId);
+      }
+    }
+    if (index >= 0) state.page = Math.floor(index / Pagination.PAGE_SIZE) + 1;
+    params.delete('returnVideo');
+    const updated = location.pathname + (params.toString() ? '?' + params : '') + location.hash;
+    history.replaceState(history.state, '', updated);
+  }
+
   function render(pageDirection = 0) {
     loadLibraryState();
     syncAccessUi();
@@ -742,7 +772,7 @@
   function init(access) {
     if (access) mediaAccess = access;
     if (!document.getElementById('videoListSection')) return;
-    injectStyles(); loadPrefs(); loadLibraryState(); if (!setupMarkup()) return; bindEvents(); if (dom.search) dom.search.value = state.query; render(); resumePendingLocalSync();
+    injectStyles(); loadPrefs(); loadLibraryState(); if (!setupMarkup()) return; bindEvents(); if (dom.search) dom.search.value = state.query; restoreVideoPage(); render(); resumePendingLocalSync();
   }
 
   window.MangaReaderVideoLibrary = Object.freeze({ init, syncAccessUi });
