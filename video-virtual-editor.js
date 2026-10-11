@@ -3,9 +3,11 @@
   const root = document.getElementById('virtualVideoEditor');
   const Edit = window.MangaReaderVideoVirtualEdit;
   const Store = window.MangaReaderVideoVirtualEditStore;
+  const State = window.MangaReaderVideoVirtualEditorState;
+  const Playback = window.MangaReaderVideoVirtualPlayback;
   const Data = window.MangaReaderVideoData;
   const access = window.MangaReaderMediaAccess;
-  if (!root || !Edit || !Store || !Data) {
+  if (!root || !Edit || !Store || !State || !Data) {
     if (root) root.textContent = '編集画面を初期化できませんでした。';
     return;
   }
@@ -18,6 +20,8 @@
   let sources = [];
   let project = null;
   let edit = null;
+  let historyState = State.createHistory(null);
+  let baselineEdit = null;
   let selectedIndex = null;
   let dirty = false;
   let busy = false;
@@ -25,6 +29,14 @@
   let refs = {};
   let previewUrl = '';
   let pendingSeek = null;
+  let sourceSearchTerm = '';
+  let zoom = State.DEFAULT_ZOOM;
+  let timelinePosition = 0;
+  let pointerGesture = null;
+  let previewMode = 'source';
+  let resultController = null;
+  let resultGeneration = 0;
+  let resultSnapshot = null;
 
   const canRead = () => !!access && access.canReadProtectedData() === true;
   const format = (seconds) => Number.isFinite(seconds) ? Data.formatMediaTime(seconds) : '不明';
@@ -40,8 +52,22 @@
     if (!refs.status) return;
     refs.status.textContent = message;
     refs.status.dataset.error = isError ? '1' : '0';
+    if (refs.saveStatus) {
+      refs.saveStatus.textContent = message;
+      refs.saveStatus.dataset.error = isError ? '1' : '0';
+    }
+  }
+  function loadedProjectStatus() {
+    if (window.TestCodeGuest && typeof window.TestCodeGuest.isActive === 'function'
+        && window.TestCodeGuest.isActive()) return '端末のゲスト領域に保存済みです。クラウド同期はありません。';
+    const vault = window.MangaVault;
+    if (!vault || typeof vault.hasPendingLocalChanges !== 'function') return '端末に保存済みです。';
+    return vault.hasPendingLocalChanges()
+      ? '端末に保存済み・保管庫同期待ちです。'
+      : '端末と保管庫に保存済みです。';
   }
   function stopPreview() {
+    stopResultPreview();
     if (refs.preview) {
       try {
         refs.preview.pause();
@@ -51,6 +77,77 @@
     }
     previewUrl = '';
     pendingSeek = null;
+  }
+  function stopResultPreview() {
+    resultGeneration++;
+    if (resultController) resultController.destroy();
+    resultController = null;
+    resultSnapshot = null;
+  }
+  function renderResultState(snapshot) {
+    if (!snapshot || previewMode !== 'edit') return;
+    resultSnapshot = snapshot;
+    timelinePosition = Math.max(0, Math.min(snapshot.totalSeconds, snapshot.virtualSeconds));
+    refs.previewMeta.textContent = snapshot.error || snapshot.message || (snapshot.phase === 'idle'
+      ? '編集結果の再生準備ができました。' : '');
+    if (refs.editPlay) refs.editPlay.textContent = snapshot.requestedPlay ? '一時停止' : '再生';
+    if (refs.editSeek) refs.editSeek.max = String(snapshot.totalSeconds);
+    if (refs.editSeek && !refs.editSeek.matches?.(':active')) refs.editSeek.value = String(timelinePosition);
+    if (refs.editTime) refs.editTime.textContent = format(timelinePosition) + ' / ' + format(snapshot.totalSeconds);
+    refs.playhead.style.left = timelinePosition * zoom + 'px';
+  }
+  function rebuildResultPreview(seconds = null) {
+    if (previewMode !== 'edit' || !Playback || !canRead()) return;
+    const previous = resultController && resultController.snapshot();
+    const targetSeconds = Number.isFinite(seconds) ? seconds
+      : previous ? previous.virtualSeconds : timelinePosition;
+    stopResultPreview();
+    previewUrl = '';
+    pendingSeek = null;
+    if (refs.preview) {
+      try { refs.preview.pause(); refs.preview.removeAttribute('src'); refs.preview.load(); } catch (_) {}
+    }
+    if (!edit) {
+      refs.editControls.hidden = true;
+      refs.previewMeta.textContent = '編集区間がありません。';
+      return;
+    }
+    try {
+      const token = resultGeneration;
+      const controller = Playback.createController({
+        video: refs.preview, edit, sources,
+        onState: (snapshot) => { if (token === resultGeneration && previewMode === 'edit' && canRead()) renderResultState(snapshot); },
+      });
+      resultController = controller;
+      refs.preview.controls = false;
+      refs.editControls.hidden = false;
+      refs.previewMeta.textContent = '';
+      if (Number.isFinite(targetSeconds) && Edit.totalDuration(edit) > 0) {
+        controller.seek(Math.max(0, Math.min(Edit.totalDuration(edit), targetSeconds)));
+      }
+    } catch (error) {
+      refs.previewMeta.textContent = error.message || '編集結果をプレビューできません。';
+      refs.editControls.hidden = false;
+    }
+  }
+  function setPreviewMode(mode) {
+    if (mode !== 'source' && mode !== 'edit') return;
+    if (mode === 'edit' && !edit) return status('プレビューする区間がありません。', true);
+    const seconds = resultController ? resultController.snapshot().virtualSeconds : timelinePosition;
+    if (previewMode === mode) return;
+    previewMode = mode;
+    refs.previewSource.classList.toggle('active', mode === 'source');
+    refs.previewSource.setAttribute('aria-pressed', String(mode === 'source'));
+    refs.previewEdit.classList.toggle('active', mode === 'edit');
+    refs.previewEdit.setAttribute('aria-pressed', String(mode === 'edit'));
+    if (mode === 'edit') rebuildResultPreview(seconds);
+    else {
+      stopResultPreview();
+      refs.editControls.hidden = true;
+      refs.preview.controls = true;
+      const clip = selectedClip();
+      if (clip) setPreview(clip.sourceVideoId, clip.startSeconds);
+    }
   }
   function showGate(message) {
     stopPreview();
@@ -123,27 +220,94 @@
     });
     refs.projects.value = project ? project.id : '';
   }
+  function drawSources() {
+    refs.sources.replaceChildren();
+    const query = sourceSearchTerm.trim().toLocaleLowerCase();
+    const matches = sources.filter((source) => !query
+      || source.title.toLocaleLowerCase().includes(query) || source.id.toLocaleLowerCase().includes(query));
+    if (!matches.length) {
+      const empty = document.createElement('p');
+      empty.className = 'vveEmpty'; empty.textContent = '該当するMP4素材がありません。';
+      refs.sources.append(empty);
+      return;
+    }
+    matches.forEach((source) => {
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'vveSource';
+      button.dataset.sourceId = source.id;
+      button.disabled = busy || stale;
+      button.setAttribute('role', 'option');
+      button.setAttribute('aria-pressed', String(refs.source.value === source.id));
+      button.setAttribute('aria-selected', String(refs.source.value === source.id));
+      button.title = source.title + (Number.isFinite(source.durationSeconds) ? '・' + format(source.durationSeconds) : '');
+      const title = document.createElement('strong'); title.textContent = source.title;
+      const duration = document.createElement('small');
+      duration.textContent = Number.isFinite(source.durationSeconds) ? format(source.durationSeconds) : '時間未取得';
+      button.append(title, duration);
+      button.addEventListener('click', () => {
+        refs.source.value = source.id;
+        drawSources();
+        changeSource();
+      });
+      refs.sources.append(button);
+    });
+  }
   function drawClips() {
     refs.clips.replaceChildren();
-    if (!edit) {
+    const displayEdit = pointerGesture && pointerGesture.kind === 'trim' ? pointerGesture.proposed : edit;
+    const timeline = displayEdit ? State.clipOffsets(displayEdit) : { offsets: [], totalSeconds: 0 };
+    if (!displayEdit) {
       const message = document.createElement('div'); message.className = 'vveEmpty';
       message.textContent = 'まだ区間がありません。MP4素材と開始・終了秒を指定して追加してください。';
       refs.clips.append(message);
-    } else edit.clips.forEach((clip, index) => {
-      const button = document.createElement('button');
-      button.type = 'button'; button.className = 'vveClip';
-      button.dataset.clipIndex = String(index);
-      button.setAttribute('aria-current', String(index === selectedIndex));
-      button.setAttribute('aria-pressed', String(index === selectedIndex));
+    } else displayEdit.clips.forEach((clip, index) => {
+      const item = document.createElement('div');
+      item.className = 'vveClip';
+      item.dataset.clipIndex = String(index);
+      item.style.width = Math.max(1, (clip.endSeconds - clip.startSeconds) * zoom) + 'px';
+      item.style.flex = '0 0 auto';
+      item.setAttribute('aria-current', String(index === selectedIndex));
+      item.setAttribute('role', 'listitem');
       const label = document.createElement('strong');
       const source = sourceFor(clip.sourceVideoId);
-      label.textContent = (index + 1) + '. ' + (source ? source.title : '参照できない素材');
+      label.textContent = (index + 1) + ' · ' + (source ? source.title : '参照できない素材');
       const duration = document.createElement('small');
-      duration.textContent = format(clip.startSeconds) + ' – ' + format(clip.endSeconds);
-      button.append(label, duration);
-      button.addEventListener('click', () => chooseClip(index));
-      refs.clips.append(button);
+      duration.textContent = format(clip.endSeconds - clip.startSeconds);
+      const body = document.createElement('button');
+      body.type = 'button'; body.className = 'vveClipBody'; body.dataset.clipBody = '1';
+      body.dataset.clipIndex = String(index);
+      body.setAttribute('aria-label', (index + 1) + '番目 ' + (source ? source.title : '参照できない素材'));
+      body.title = (source ? source.title : '参照できない素材') + ' · ' + format(clip.startSeconds)
+        + ' – ' + format(clip.endSeconds) + ' · ' + format(clip.endSeconds - clip.startSeconds);
+      body.append(label, duration);
+      body.addEventListener('click', () => chooseClip(index));
+      const startHandle = document.createElement('button');
+      startHandle.type = 'button'; startHandle.className = 'vveTrimHandle start';
+      startHandle.dataset.trimBoundary = 'start'; startHandle.dataset.clipIndex = String(index);
+      startHandle.setAttribute('aria-label', '開始端点をドラッグ');
+      const endHandle = document.createElement('button');
+      endHandle.type = 'button'; endHandle.className = 'vveTrimHandle end';
+      endHandle.dataset.trimBoundary = 'end'; endHandle.dataset.clipIndex = String(index);
+      endHandle.setAttribute('aria-label', '終了端点をドラッグ');
+      item.append(startHandle, body, endHandle);
+      refs.clips.append(item);
     });
+    if (refs.insertMarker) refs.timeline.append(refs.insertMarker);
+    if (pointerGesture && pointerGesture.kind === 'move' && refs.insertMarker) {
+      refs.insertMarker.hidden = false;
+      refs.insertMarker.style.left = reorderMarkerSeconds(pointerGesture, timeline.offsets) * zoom + 'px';
+    } else if (refs.insertMarker) refs.insertMarker.hidden = true;
+    refs.clips.style.width = Math.max(1, timeline.totalSeconds * zoom) + 'px';
+    refs.clips.style.position = 'relative';
+    refs.timeline.style.width = Math.max(1, timeline.totalSeconds * zoom) + 'px';
+    if (refs.ruler) refs.ruler.style.backgroundSize = (zoom * 5) + 'px 100%';
+    refs.playhead.style.left = Math.max(0, Math.min(timeline.totalSeconds, timelinePosition || 0)) * zoom + 'px';
+    const chosen = selectedClip();
+    const displayChosen = pointerGesture && pointerGesture.kind === 'trim' && chosen
+      ? pointerGesture.proposed.clips[selectedIndex] : chosen;
+    refs.selectedDuration.textContent = displayChosen ? '長さ ' + format(displayChosen.endSeconds - displayChosen.startSeconds)
+      + (pointerGesture && pointerGesture.kind === 'trim' ? ' · ' + format(displayChosen.startSeconds) + '–' + format(displayChosen.endSeconds) : '')
+      : '未選択';
     refs.total.textContent = edit
       ? edit.clips.length + '区間・合計' + format(Edit.totalDuration(edit)) + '（仮想再生時間）'
       : '0区間';
@@ -155,6 +319,10 @@
     refs.moveUp.disabled = !hasSelected || selectedIndex === 0;
     refs.moveDown.disabled = !hasSelected || selectedIndex === edit.clips.length - 1;
     refs.save.disabled = busy || stale || !edit;
+    const canUndo = !!historyState.past.length && !busy && !stale;
+    const canRedo = !!historyState.future.length && !busy && !stale;
+    refs.undo.disabled = !canUndo;
+    refs.redo.disabled = !canRedo;
     refs.dirty.hidden = !dirty;
     const canPlaySaved = !!project && !dirty && !stale && !busy;
     refs.playSaved.hidden = !canPlaySaved;
@@ -167,6 +335,7 @@
       refs[key].disabled = !hasSelected;
     }
     refs.projects.disabled = busy;
+    drawSources();
   }
   function chooseClip(index) {
     if (!canRead() || busy || stale || !edit || !edit.clips[index]) return;
@@ -175,18 +344,61 @@
     refs.source.value = sourceFor(clip.sourceVideoId) ? clip.sourceVideoId : '';
     refs.start.value = String(clip.startSeconds);
     refs.end.value = String(clip.endSeconds);
+    timelinePosition = State.clipOffsets(edit).offsets[index];
     drawClips();
-    setPreview(clip.sourceVideoId, clip.startSeconds);
+    drawSources();
+    if (previewMode === 'edit' && resultController) resultController.seek(timelinePosition);
+    else if (previewMode === 'source') setPreview(clip.sourceVideoId, clip.startSeconds);
   }
   function setEdit(next, nextIndex = null) {
     requireAccess();
     if (busy || stale) return;
-    edit = Edit.normalizeEdit(next);
-    dirty = true;
+    const previousVirtualSeconds = resultController ? resultController.snapshot().virtualSeconds : timelinePosition;
+    if (previewMode === 'edit') stopResultPreview();
+    edit = next === null ? null : Edit.normalizeEdit(next);
     selectedIndex = nextIndex;
+    historyState = State.push(historyState, edit, selectedIndex);
+    updateDirty();
     drawClips();
     if (nextIndex !== null) chooseClip(nextIndex);
     status('未保存の変更があります。');
+    if (previewMode === 'edit') rebuildResultPreview(previousVirtualSeconds);
+  }
+  function updateDirty() {
+    dirty = JSON.stringify(edit) !== JSON.stringify(baselineEdit);
+    refs.dirty.hidden = !dirty;
+  }
+  function restoreHistory(snapshot) {
+    requireAccess();
+    if (busy || stale) return;
+    const previousVirtualSeconds = resultController ? resultController.snapshot().virtualSeconds : timelinePosition;
+    if (previewMode === 'edit') stopResultPreview();
+    edit = snapshot.edit ? Edit.normalizeEdit(snapshot.edit) : null;
+    selectedIndex = edit && snapshot.selectedIndex !== null
+      ? Math.min(snapshot.selectedIndex, edit.clips.length - 1) : null;
+    updateDirty();
+    drawClips();
+    if (selectedIndex !== null) chooseClip(selectedIndex);
+    else {
+      stopPreview();
+      refs.previewMeta.textContent = '編集区間がありません。';
+    }
+    status(dirty ? '未保存の変更があります。' : '保存済みの状態に戻しました。');
+    if (previewMode === 'edit') rebuildResultPreview(previousVirtualSeconds);
+  }
+  function undoEdit() {
+    if (!canRead() || busy || stale) return;
+    const result = State.undo(historyState);
+    if (result.history === historyState) return;
+    historyState = result.history;
+    restoreHistory(result.snapshot);
+  }
+  function redoEdit() {
+    if (!canRead() || busy || stale) return;
+    const result = State.redo(historyState);
+    if (result.history === historyState) return;
+    historyState = result.history;
+    restoreHistory(result.snapshot);
   }
   function readRange() {
     requireAccess();
@@ -222,7 +434,10 @@
       if (!clip) throw new Error('区間を選択してください。');
       const next = readRange();
       if (clip.sourceVideoId !== next.sourceVideoId) throw new Error('別素材は新しい区間として追加してください。');
-      setEdit(Edit.trimClip(edit, selectedIndex, next.startSeconds, next.endSeconds), selectedIndex);
+      const duration = sourceFor(clip.sourceVideoId)?.durationSeconds
+        ?? (previewUrl === sourceFor(clip.sourceVideoId)?.url && Number.isFinite(refs.preview.duration) ? refs.preview.duration : null);
+      const withStart = Edit.setClipBoundary(edit, selectedIndex, 'start', next.startSeconds, duration);
+      setEdit(Edit.setClipBoundary(withStart, selectedIndex, 'end', next.endSeconds, duration), selectedIndex);
     });
   }
   function duplicateClip() {
@@ -275,10 +490,7 @@
     action(() => {
       if (!selectedClip()) return;
       if (edit.clips.length === 1) {
-        edit = null;
-        selectedIndex = null;
-        dirty = true;
-        drawClips();
+        setEdit(null, null);
         status('全区間を削除しました。新しい区間を追加するまで保存できません。');
         return;
       }
@@ -308,11 +520,142 @@
     });
   }
 
+  function pointerIndex(target) {
+    const index = Number(target && target.dataset && target.dataset.clipIndex);
+    return Number.isInteger(index) ? index : null;
+  }
+  function pointerSurface(target) {
+    let node = target;
+    while (node) {
+      const data = node.dataset || {};
+      if (data.trimBoundary || data.clipBody || data.playhead) return node;
+      node = node.parentElement || node.parentNode || null;
+    }
+    return target;
+  }
+  function reorderMarkerSeconds(gesture, offsets) {
+    const destination = gesture.destination;
+    const destinationClip = gesture.originalEdit.clips[destination];
+    return (offsets[destination] || 0)
+      + (destination > gesture.index && destinationClip
+        ? destinationClip.endSeconds - destinationClip.startSeconds : 0);
+  }
+  function pointerDown(event) {
+    if (!canRead() || busy || stale || !edit || event.button > 0) return;
+    const target = pointerSurface(event.target || {});
+    const index = pointerIndex(target);
+    const offsets = State.clipOffsets(edit);
+    const gesture = { pointerId: event.pointerId, originalEdit: edit, kind: 'seek', index: null,
+      initialVirtualTime: timelinePosition, latestClientX: event.clientX };
+    if (target.dataset && target.dataset.trimBoundary && index !== null && edit.clips[index]) {
+      gesture.kind = 'trim'; gesture.index = index; gesture.boundary = target.dataset.trimBoundary;
+      gesture.startX = event.clientX; gesture.proposed = edit;
+      chooseClip(index);
+    } else if (target.dataset && target.dataset.clipBody && index !== null && edit.clips[index]) {
+      gesture.kind = 'move'; gesture.index = index; gesture.destination = index;
+      chooseClip(index);
+    } else if (target.dataset && target.dataset.playhead) {
+      gesture.kind = 'seek';
+    }
+    pointerGesture = gesture;
+    if (typeof refs.timeline.setPointerCapture === 'function' && Number.isFinite(event.pointerId)) {
+      try { refs.timeline.setPointerCapture(event.pointerId); } catch (_) {}
+    }
+    if (gesture.kind === 'seek') updateSeek(event.clientX, offsets.totalSeconds);
+    if (event.preventDefault) event.preventDefault();
+  }
+  function updateSeek(clientX, total) {
+    if (!Number.isFinite(clientX) || !edit) return;
+    const rect = refs.timeline.getBoundingClientRect();
+    const x = clientX - rect.left + (refs.timelineScroll.scrollLeft || 0);
+    const seconds = Math.max(0, Math.min(total, x / zoom));
+    timelinePosition = seconds;
+    const located = Edit.locateTime(edit, seconds);
+    if (located) {
+      if (selectedIndex !== located.clipIndex) chooseClip(located.clipIndex);
+      else setPreview(located.sourceVideoId, located.sourceSeconds);
+    }
+    drawClips();
+  }
+  function pointerMove(event) {
+    const gesture = pointerGesture;
+    if (!gesture || (gesture.pointerId !== undefined && event.pointerId !== gesture.pointerId)) return;
+    gesture.latestClientX = event.clientX;
+    if (gesture.kind === 'trim') {
+      const clip = gesture.originalEdit.clips[gesture.index];
+      const field = gesture.boundary === 'start' ? 'startSeconds' : 'endSeconds';
+      const proposedTime = clip[field] + (event.clientX - gesture.startX) / zoom;
+      const source = sourceFor(clip.sourceVideoId);
+      const duration = source && (source.durationSeconds
+        ?? (previewUrl === source.url && Number.isFinite(refs.preview.duration) ? refs.preview.duration : null));
+      try {
+        gesture.proposed = Edit.setClipBoundary(gesture.originalEdit, gesture.index, gesture.boundary, proposedTime, duration);
+        drawClips();
+      } catch (_) { /* Keep the last valid transient boundary. */ }
+    } else if (gesture.kind === 'move') {
+      const rect = refs.timeline.getBoundingClientRect();
+      const x = event.clientX - rect.left + (refs.timelineScroll.scrollLeft || 0);
+      const at = x / zoom;
+      const offsets = State.clipOffsets(gesture.originalEdit).offsets;
+      let destination = offsets.length - 1;
+      for (let i = 0; i < offsets.length; i++) {
+        const clip = gesture.originalEdit.clips[i];
+        const midpoint = offsets[i] + (clip.endSeconds - clip.startSeconds) / 2;
+        if (at < midpoint) { destination = i; break; }
+      }
+      gesture.destination = Math.max(0, Math.min(gesture.originalEdit.clips.length - 1, destination));
+      refs.status.textContent = '移動先：' + (gesture.destination + 1) + '番目';
+      const scrollRect = refs.timelineScroll.getBoundingClientRect();
+      const scrollRight = Number.isFinite(scrollRect.right) ? scrollRect.right : scrollRect.left + scrollRect.width;
+      if (event.clientX < scrollRect.left + 32) refs.timelineScroll.scrollLeft = Math.max(0, (refs.timelineScroll.scrollLeft || 0) - 18);
+      else if (event.clientX > scrollRight - 32) refs.timelineScroll.scrollLeft = (refs.timelineScroll.scrollLeft || 0) + 18;
+      if (refs.insertMarker) {
+        refs.insertMarker.hidden = false;
+        refs.insertMarker.style.left = reorderMarkerSeconds(gesture, State.clipOffsets(gesture.originalEdit).offsets) * zoom + 'px';
+      }
+    } else updateSeek(event.clientX, State.clipOffsets(edit).totalSeconds);
+    if (event.preventDefault) event.preventDefault();
+  }
+  function pointerUp(event) {
+    const gesture = pointerGesture;
+    if (!gesture || (gesture.pointerId !== undefined && event.pointerId !== gesture.pointerId)) return;
+    pointerGesture = null;
+    if (gesture.kind === 'trim' && gesture.proposed !== gesture.originalEdit) {
+      setEdit(gesture.proposed, gesture.index);
+      status('端点を調整しました。');
+    } else if (gesture.kind === 'move' && gesture.destination !== gesture.index) {
+      setEdit(Edit.moveClip(gesture.originalEdit, gesture.index, gesture.destination), gesture.destination);
+      status('タイムライン上で区間を並べ替えました。');
+    } else if (gesture.kind === 'seek') updateSeek(gesture.latestClientX, State.clipOffsets(edit).totalSeconds);
+    if (typeof refs.timeline.releasePointerCapture === 'function' && Number.isFinite(event.pointerId)) {
+      try { refs.timeline.releasePointerCapture(event.pointerId); } catch (_) {}
+    }
+    drawClips();
+  }
+  function pointerCancel(event) {
+    if (!pointerGesture || (pointerGesture.pointerId !== undefined && event.pointerId !== pointerGesture.pointerId)) return;
+    pointerGesture = null;
+    drawClips();
+  }
+  function setZoom(next) {
+    const currentSeconds = resultController ? resultController.snapshot().virtualSeconds : timelinePosition;
+    zoom = State.clampZoom(next);
+    drawClips();
+    if (resultController) resultController.seek(currentSeconds);
+  }
+  function fitTimeline() {
+    const total = edit ? Edit.totalDuration(edit) : 0;
+    if (!total) return setZoom(State.DEFAULT_ZOOM);
+    const width = refs.timelineScroll.clientWidth || refs.timelineScroll.getBoundingClientRect().width;
+    if (Number.isFinite(width) && width > 0) setZoom(width / total);
+  }
+
   async function save() {
     if (!canRead() || busy || stale || !edit) return;
     const title = refs.title.value.trim();
     if (!title || title.length > 240) return status('タイトルは1〜240文字で入力してください。', true);
     busy = true;
+    const priorIds = new Set(repository.list().map((item) => item.id));
     drawClips();
     const activeGeneration = generation;
     status('保存中…');
@@ -325,7 +668,9 @@
       if (!canRead() || generation !== activeGeneration) return;
       project = result.project;
       edit = Edit.normalizeEdit(project.edit);
-      dirty = false;
+      baselineEdit = edit;
+      historyState = State.createHistory(edit, historyState.limit);
+      updateDirty();
       const target = new URL(location.href);
       target.searchParams.delete('id');
       target.searchParams.set('project', project.id);
@@ -334,8 +679,27 @@
     } catch (error) {
       if (!canRead() || generation !== activeGeneration) return;
       if (error.localSaved) {
-        stale = true;
-        status('端末には保存済みですが、クラウド同期に失敗しました。再読み込みして確認してください。', true);
+        const localProjects = repository.list();
+        const localProject = (project && localProjects.find((item) => item.id === project.id))
+          || localProjects.find((item) => !priorIds.has(item.id)
+            && item.title === title && JSON.stringify(item.edit) === JSON.stringify(edit));
+        if (localProject) {
+          project = localProject;
+          edit = Edit.normalizeEdit(localProject.edit);
+          baselineEdit = edit;
+          historyState = State.createHistory(edit, historyState.limit);
+          updateDirty();
+          const target = new URL(location.href);
+          target.searchParams.delete('id');
+          target.searchParams.set('project', project.id);
+          history.replaceState(null, '', target);
+          const guestMode = window.TestCodeGuest && typeof window.TestCodeGuest.isActive === 'function'
+            && window.TestCodeGuest.isActive();
+          status(guestMode ? loadedProjectStatus()
+            : '端末に保存済み・保管庫同期待ちです。編集内容はこの端末に残っています。', !guestMode);
+        } else {
+          status('同期に失敗しました。未保存の編集内容は画面に保持しています。', true);
+        }
       } else {
         if (error.code === 'VIRTUAL_EDIT_CONFLICT') stale = true;
         status(error.message || '保存に失敗しました。', true);
@@ -376,8 +740,10 @@
     project = projectId ? repository.get(projectId) : null;
     if (projectId && !project) throw new Error('指定された編集プロジェクトが見つかりません。');
     edit = project ? Edit.normalizeEdit(project.edit) : null;
+    baselineEdit = edit;
     dirty = false;
     selectedIndex = edit ? 0 : null;
+    historyState = State.createHistory(edit, 100);
     stale = project ? !repository.inspect(project.id).usable : false;
     const initialSource = sourceFor(routeSourceId);
     refs.title.value = project ? project.title : (initialSource ? initialSource.title + '（編集版）' : '');
@@ -388,12 +754,15 @@
       refs.source.value = initialSource ? initialSource.id : (sources[0]?.id || '');
       refs.start.value = '0';
       refs.end.value = '';
+      drawSources();
       setPreview(refs.source.value);
     }
-    if (stale) status('参照元のMP4が削除・変更されています。安全のため上書き保存を停止しています。', true);
     const firstId = routeSourceId || (edit ? edit.clips[0].sourceVideoId : '');
     const back = root.querySelector('[data-back]');
     if (back && sourceFor(firstId)) back.href = 'video-player.html?id=' + encodeURIComponent(firstId);
+    if (stale) status('参照元のMP4が削除・変更されています。安全のため上書き保存を停止しています。', true);
+    else if (project) status(loadedProjectStatus());
+    else status('新しいプロジェクトです。保存すると端末に記録されます。');
   }
   function initialize() {
     if (initialized || !canRead()) return;
@@ -406,57 +775,77 @@
     sources = videos.map((video) => {
       const override = meta[video.id] && typeof meta[video.id] === 'object' && !Array.isArray(meta[video.id]) ? meta[video.id] : {};
       const v = Data.normalizeVideo({ ...video, ...override, id: video.id, addedAt: video.addedAt });
-      return { id: String(video.id), url: v.url, title: v.title || String(video.id) };
+      return { id: String(video.id), url: v.url, title: v.title || String(video.id),
+        durationSeconds: Number.isFinite(v.durationSeconds) && v.durationSeconds > 0 ? v.durationSeconds : null };
     }).filter((source) => Edit.isMp4Url(source.url));
     const projectId = route.get('project') || '';
     if (!projectId && routeSourceId && !sourceFor(routeSourceId)) {
       throw new Error('指定された動画はMP4直リンクではないか、登録されていません。');
     }
     root.innerHTML = [
-      '<div class="vveTop"><div><h2 class="vveTitle">MP4仮想編集</h2><p class="vveLead">元ファイルを変更せず、再生区間を組み立てます。</p></div>',
-      '<div class="vveButtons"><a class="vveLink" href="video.html">動画一覧へ</a><a class="vveLink" data-back href="video.html">元の動画へ</a></div></div>',
-      '<section class="vvePanel"><label class="vveField">編集プロジェクトを選択<select data-projects></select></label></section>',
-      '<section class="vvePanel"><label class="vveField">編集版タイトル<input data-title type="text" maxlength="240" autocomplete="off" placeholder="タイトル"></label></section>',
-      '<div class="vveGrid">',
-      '<section class="vvePanel"><h3 class="vvePaneTitle">MP4素材プレビュー</h3>',
-      '<label class="vveField">登録済みMP4動画<select data-source></select></label>',
-      '<div class="vvePreview"><video data-preview controls playsinline preload="metadata" aria-label="MP4素材プレビュー"></video></div>',
+      '<div class="vveProjectBar" data-project-toolbar><div class="vveProjectFields">',
+      '<label class="vveField">プロジェクト<select data-projects></select></label>',
+      '<label class="vveField">プロジェクト名<input data-title type="text" maxlength="240" autocomplete="off" placeholder="タイトル"></label></div>',
+      '<div class="vveProjectActions"><button class="vveAction" type="button" data-undo disabled>元に戻す</button>',
+      '<button class="vveAction" type="button" data-redo disabled>やり直す</button>',
+      '<span class="vveDirty" data-dirty hidden>未保存</span><span class="vveSaveStatus" data-save-status role="status" aria-live="polite">端末のプロジェクトを読み込み中</span>',
+      '<button class="vveAction primary" type="button" data-save>保存</button>',
+      '<a class="vveLink" href="video.html">一覧へ</a><a class="vveLink" data-back href="video.html">元動画へ</a></div></div>',
+      '<div class="vveMainGrid">',
+      '<section class="vvePanel vvePreviewPanel"><div class="vveSectionHeading"><div><h2 class="vvePaneTitle">プレビュー</h2>',
+      '<p class="vveLead">素材を確認して区間を設定します。</p></div><div class="vveModeToggle" role="group" aria-label="プレビューモード">',
+      '<button class="vveAction active" type="button" data-preview-source aria-pressed="true">素材</button>',
+      '<button class="vveAction" type="button" data-preview-edit aria-pressed="false">編集結果</button></div></div>',
+      '<div class="vvePreview"><video data-preview controls playsinline preload="metadata" aria-label="動画プレビュー"></video></div>',
       '<div class="vvePreviewMeta" data-preview-meta aria-live="polite"></div>',
-      '<div class="vveRow"><label class="vveField">開始（秒）<input data-start type="number" min="0" step="any" inputmode="decimal" value="0"></label>',
-      '<label class="vveField">終了（秒）<input data-end type="number" min="0" step="any" inputmode="decimal" placeholder="動画の長さ"></label></div>',
-      '<div class="vveControls"><button class="vveAction" type="button" data-mark-start>現在位置を開始に</button>',
-      '<button class="vveAction" type="button" data-mark-end>現在位置を終了に</button></div>',
-      '<div class="vveControls"><button class="vveAction primary" type="button" data-add>区間を追加</button>',
-      '<button class="vveAction" type="button" data-trim>選択区間を短縮</button>',
-      '<button class="vveAction" type="button" data-split>再生位置で分割</button></div>',
-      '<h4 class="vveSubTitle">選択区間のトリム調整（元動画の時刻）</h4>',
-      '<div class="vveBoundary"><strong>開始位置</strong><div class="vveControls">',
-      '<button class="vveAction" type="button" data-start-minus-one>−1秒</button><button class="vveAction" type="button" data-start-minus-tenth>−0.1秒</button>',
-      '<button class="vveAction" type="button" data-start-plus-tenth>＋0.1秒</button><button class="vveAction" type="button" data-start-plus-one>＋1秒</button>',
-      '<button class="vveAction" type="button" data-set-start>プレビュー位置を開始に設定</button></div></div>',
-      '<div class="vveBoundary"><strong>終了位置</strong><div class="vveControls">',
-      '<button class="vveAction" type="button" data-end-minus-one>−1秒</button><button class="vveAction" type="button" data-end-minus-tenth>−0.1秒</button>',
-      '<button class="vveAction" type="button" data-end-plus-tenth>＋0.1秒</button><button class="vveAction" type="button" data-end-plus-one>＋1秒</button>',
-      '<button class="vveAction" type="button" data-set-end>プレビュー位置を終了に設定</button></div></div>',
-      '<p class="vveFootnote">短縮は区間内への切り詰めです。元のMP4ファイルは変更しません。</p></section>',
-      '<section class="vvePanel"><h3 class="vvePaneTitle">再生区間（上から順番）</h3>',
-      '<div class="vveClips" data-clips></div><div class="vveTotal" data-total></div>',
-      '<div class="vveControls"><button class="vveAction" type="button" data-duplicate>区間を複製</button>',
-      '<button class="vveAction" type="button" data-up>上へ</button>',
-      '<button class="vveAction" type="button" data-down>下へ</button>',
-      '<button class="vveAction danger" type="button" data-remove>区間を削除</button></div>',
-      '<p class="vveFootnote">区間時刻は元動画内の絶対秒数です。複製した区間は個別にトリム・移動・削除できます。</p></section></div>',
-      '<section class="vvePanel"><div class="vveButtons"><button class="vveAction primary" type="button" data-save>編集内容を保存</button>',
-      '<a class="vveAction" data-play-saved hidden>編集版を再生</a>',
-      '<button class="vveAction danger" type="button" data-delete-project>プロジェクトを削除</button></div>',
-      '<p class="vveDirty" data-dirty hidden>未保存の変更があります</p>',
-      '<p class="vveStatus" role="status" aria-live="polite" data-status></p></section>'
+      '<div class="vveEditPreviewControls" data-edit-controls hidden><button class="vveAction primary" type="button" data-edit-play>再生</button>',
+      '<input data-edit-seek type="range" min="0" max="0" step="0.05" value="0" aria-label="編集結果の再生位置"><span data-edit-time></span></div>',
+      '<div class="vveSourcePicker"><label class="vveField">MP4素材を検索<input data-source-search type="search" autocomplete="off" placeholder="タイトルまたはID"></label>',
+      '<div class="vveSourceList" data-source-list role="listbox" aria-label="登録済みMP4素材"></div><input data-source type="hidden"></div>',
+      '<div class="vveControls vvePrimaryControls"><button class="vveAction" type="button" data-mark-start>開始を現在位置に</button>',
+      '<button class="vveAction" type="button" data-mark-end>終了を現在位置に</button>',
+      '<button class="vveAction primary" type="button" data-add>区間を追加</button></div></section>',
+      '<section class="vvePanel vveDetailsPanel" data-clip-details><div class="vveSectionHeading"><div><h2 class="vvePaneTitle">選択区間</h2>',
+      '<p class="vveLead">時刻は元動画内の位置です。</p></div><span class="vveTotal" data-selected-duration>未選択</span></div>',
+      '<div class="vveRow"><label class="vveField">開始 <span class="vveTimeHint">HH:MM:SS.mmm</span>',
+      '<input data-start type="number" min="0" step="0.001" inputmode="decimal" value="0"></label>',
+      '<label class="vveField">終了 <span class="vveTimeHint">HH:MM:SS.mmm</span>',
+      '<input data-end type="number" min="0" step="0.001" inputmode="decimal" placeholder="動画の長さ"></label></div>',
+      '<div class="vveBoundary"><strong>開始</strong><div class="vveControls">',
+      '<button class="vveAction" type="button" data-start-minus-one>−1秒</button><button class="vveAction" type="button" data-start-minus-tenth>−0.1</button>',
+      '<button class="vveAction" type="button" data-start-plus-tenth>＋0.1</button><button class="vveAction" type="button" data-start-plus-one>＋1秒</button>',
+      '<button class="vveAction" type="button" data-set-start>再生位置</button></div></div>',
+      '<div class="vveBoundary"><strong>終了</strong><div class="vveControls">',
+      '<button class="vveAction" type="button" data-end-minus-one>−1秒</button><button class="vveAction" type="button" data-end-minus-tenth>−0.1</button>',
+      '<button class="vveAction" type="button" data-end-plus-tenth>＋0.1</button><button class="vveAction" type="button" data-end-plus-one>＋1秒</button>',
+      '<button class="vveAction" type="button" data-set-end>再生位置</button></div></div>',
+      '<div class="vveControls"><button class="vveAction" type="button" data-trim>入力範囲を適用</button>',
+      '<button class="vveAction" type="button" data-split>分割</button><button class="vveAction" type="button" data-duplicate>複製</button>',
+      '<button class="vveAction danger" type="button" data-remove>削除</button></div>',
+      '<button class="vveAction danger vveProjectDelete" type="button" data-delete-project>プロジェクトを削除</button></section>',
+      '<section class="vvePanel vveTimelinePanel"><div class="vveSectionHeading"><div><h2 class="vvePaneTitle">編集タイムライン</h2>',
+      '<p class="vveLead">クリップ幅は仮想再生時間に比例します。</p></div><div class="vveTimelineTools">',
+      '<button class="vveAction" type="button" data-zoom-out aria-label="縮小">−</button><button class="vveAction" type="button" data-zoom-in aria-label="拡大">＋</button>',
+      '<button class="vveAction" type="button" data-zoom-fit>全体表示</button><button class="vveAction" type="button" data-up>←</button>',
+      '<button class="vveAction" type="button" data-down>→</button></div></div>',
+      '<div class="vveTimelineScroll" data-timeline-scroll tabindex="0" aria-label="仮想再生タイムライン">',
+      '<div class="vveTimelineCanvas" data-timeline><div class="vveRuler" data-ruler aria-hidden="true"></div>',
+      '<div class="vveClips" data-clips role="list"></div><span class="vveInsertMarker" data-insert-marker hidden></span><button class="vvePlayhead" type="button" data-playhead aria-label="再生位置"></button></div></div>',
+      '<div class="vveTimelineFooter"><span class="vveTotal" data-total>0区間</span>',
+      '<a class="vveAction" data-play-saved hidden>保存済み編集版を再生</a></div>',
+      '<p class="vveStatus" role="status" aria-live="polite" data-status></p></section></div>'
     ].join('');
     const $ = (selector) => root.querySelector(selector);
     refs = {
       projects: $('[data-projects]'), title: $('[data-title]'), source: $('[data-source]'),
+      sources: $('[data-source-list]'), sourceSearch: $('[data-source-search]'),
       preview: $('[data-preview]'), previewMeta: $('[data-preview-meta]'),
+      editControls: $('[data-edit-controls]'), editPlay: $('[data-edit-play]'), editSeek: $('[data-edit-seek]'), editTime: $('[data-edit-time]'),
       start: $('[data-start]'), end: $('[data-end]'), clips: $('[data-clips]'),
+      timeline: $('[data-timeline]'), timelineScroll: $('[data-timeline-scroll]'), playhead: $('[data-playhead]'),
+      ruler: $('[data-ruler]'),
+      insertMarker: $('[data-insert-marker]'),
+      selectedDuration: $('[data-selected-duration]'), saveStatus: $('[data-save-status]'),
       total: $('[data-total]'), add: $('[data-add]'), trim: $('[data-trim]'),
       duplicate: $('[data-duplicate]'),
       startMinusOne: $('[data-start-minus-one]'), startMinusTenth: $('[data-start-minus-tenth]'),
@@ -467,13 +856,10 @@
       split: $('[data-split]'), removeClip: $('[data-remove]'), moveUp: $('[data-up]'),
       moveDown: $('[data-down]'), markStart: $('[data-mark-start]'), markEnd: $('[data-mark-end]'),
       save: $('[data-save]'), playSaved: $('[data-play-saved]'), deleteProject: $('[data-delete-project]'), status: $('[data-status]'),
+      undo: $('[data-undo]'), redo: $('[data-redo]'), previewSource: $('[data-preview-source]'),
+      previewEdit: $('[data-preview-edit]'), zoomIn: $('[data-zoom-in]'), zoomOut: $('[data-zoom-out]'), zoomFit: $('[data-zoom-fit]'),
     };
-    sources.forEach((source) => {
-      const option = document.createElement('option');
-      option.value = source.id;
-      option.textContent = source.title;
-      refs.source.append(option);
-    });
+    drawSources();
     refs.projects.addEventListener('change', () => {
       if (!canRead()) return;
       if (dirty && !confirm('未保存の変更を破棄して切り替えますか？')) {
@@ -487,6 +873,28 @@
       location.href = url.href;
     });
     refs.source.addEventListener('change', changeSource);
+    refs.previewSource.addEventListener('click', () => setPreviewMode('source'));
+    refs.previewEdit.addEventListener('click', () => setPreviewMode('edit'));
+    refs.editPlay.addEventListener('click', () => {
+      if (!resultController) return;
+      if (resultController.snapshot().requestedPlay) resultController.pause();
+      else resultController.play();
+    });
+    refs.editSeek.addEventListener('input', () => {
+      if (resultController) resultController.seek(Number(refs.editSeek.value));
+    });
+    refs.zoomIn.addEventListener('click', () => setZoom(zoom * 1.25));
+    refs.zoomOut.addEventListener('click', () => setZoom(zoom / 1.25));
+    refs.zoomFit.addEventListener('click', fitTimeline);
+    refs.timeline.addEventListener('pointerdown', pointerDown);
+    refs.timeline.addEventListener('pointermove', pointerMove);
+    refs.timeline.addEventListener('pointerup', pointerUp);
+    refs.timeline.addEventListener('pointercancel', pointerCancel);
+    refs.timeline.addEventListener('lostpointercapture', pointerCancel);
+    refs.sourceSearch.addEventListener('input', () => {
+      sourceSearchTerm = refs.sourceSearch.value;
+      drawSources();
+    });
     refs.add.addEventListener('click', addClip);
     refs.duplicate.addEventListener('click', duplicateClip);
     refs.trim.addEventListener('click', trimClip);
@@ -508,6 +916,18 @@
     refs.setEnd.addEventListener('click', () => setBoundaryFromPreview('end'));
     refs.save.addEventListener('click', save);
     refs.deleteProject.addEventListener('click', removeProject);
+    refs.undo.addEventListener('click', undoEdit);
+    refs.redo.addEventListener('click', redoEdit);
+    document.addEventListener('keydown', (event) => {
+      if (!event || !(event.metaKey || event.ctrlKey) || event.altKey) return;
+      const target = event.target || {};
+      const tag = String(target.tagName || '').toLowerCase();
+      if (['input', 'textarea', 'select'].includes(tag) || target.isContentEditable) return;
+      const key = String(event.key || '').toLowerCase();
+      if (key === 'z' && event.shiftKey) { event.preventDefault(); redoEdit(); }
+      else if (key === 'z') { event.preventDefault(); undoEdit(); }
+      else if (key === 'y' && event.ctrlKey && !event.metaKey) { event.preventDefault(); redoEdit(); }
+    });
     refs.preview.addEventListener('loadedmetadata', () => {
       if (!canRead()) return;
       const duration = refs.preview.duration;
@@ -529,6 +949,12 @@
   }
 
   document.addEventListener('manga-reader-vpn-status', handleAccess);
+  document.addEventListener('manga-vault-sync-state', (event) => {
+    if (!project || dirty || !event || !event.detail) return;
+    if (event.detail.state === 'success') status('端末と保管庫に保存済みです。');
+    else if (event.detail.state === 'pending') status('端末に保存済み・保管庫同期待ちです。');
+    else if (event.detail.state === 'error') status('端末に保存済み・保管庫同期に失敗しました。', true);
+  });
   window.addEventListener('storage', (event) => {
     if (!initialized || !canRead()) return;
     if (event.key === Store.VIDEO_KEY || event.key === Store.META_KEY || event.key === null) {
@@ -539,6 +965,7 @@
     }
   });
   window.addEventListener('beforeunload', (event) => {
+    stopResultPreview();
     if (canRead() && dirty && !busy) {
       event.preventDefault();
       event.returnValue = '';

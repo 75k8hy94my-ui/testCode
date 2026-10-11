@@ -103,6 +103,7 @@
     if (!state) return;
     const active = doc.activeElement;
     if (active && host.contains(active) && active.matches('input:not([type="checkbox"]):not([type="radio"]), textarea')) { deferredRefresh = true; return; }
+    deferredRefresh = false;
     const head = node('div', null, 'videoPropertyHead');
     const title = node('div'); title.append(node('h2', 'プロパティ設定'), node('p', '項目名、種類、選択肢、表示順、表示・非表示とカード表示を設定できます。削除した項目や選択肢は復元できます。'));
     const back = node('a', '動画一覧へ', 'videoPropertyButton videoPropertyBack'); back.href = 'video.html'; head.append(title, back);
@@ -126,7 +127,7 @@
     if (!canRead()) { host.replaceChildren(node('p', '保護データへのアクセスを確認しています…', 'videoPropertyNotice')); return; }
     state = Store.read(); render(); announce('Vaultのプロパティ定義と動画ごとの値を表示しています。');
   }
-  host.addEventListener('focusout', () => { if (deferredRefresh) { deferredRefresh = false; render(); } });
+  host.addEventListener('focusout', (event) => { if (!deferredRefresh || (event.relatedTarget && host.contains(event.relatedTarget))) return; deferredRefresh = false; render(); });
   doc.addEventListener('manga-reader-vpn-status', () => { if (canRead()) initialize(); else { state = null; host.replaceChildren(node('p', '保護データへのアクセスがありません。', 'videoPropertyNotice')); } });
   root.addEventListener('storage', (event) => { if (event.key === Store.DEFINITIONS_KEY || event.key === Store.VALUES_KEY) { if (canRead()) initialize(); } });
   initialize();

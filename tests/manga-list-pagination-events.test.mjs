@@ -198,6 +198,22 @@ test('interactive card controls, multiple fingers and browser edge gestures are 
   assert.deepEqual(calls, []);
 });
 
+test('a caller can opt a semantic card button into swipe navigation while other controls stay protected', () => {
+  const calls = [];
+  const surface = touchSurface();
+  const openButton = { closest(selector) { return selector === '.vl-open' || selector.includes('button, a') ? this : null; } };
+  const controls = loadFactory().create({
+    onPageChange(delta) { calls.push(delta); },
+    allowSwipeTarget(node) { return !!node?.closest?.('.vl-open'); },
+  });
+  controls.bind({ prevButton: button(), nextButton: button(), swipeSurface: surface });
+
+  assert.equal(swipe(surface, 250, 110, 120, 110, openButton), true);
+  const favoriteButton = { closest(selector) { return selector.includes('button') ? this : null; } };
+  assert.equal(swipe(surface, 250, 110, 120, 110, favoriteButton), false);
+  assert.deepEqual(calls, [1]);
+});
+
 test('disabled page boundaries suppress accidental clicks without navigating past the end', () => {
   const calls = [];
   const surface = touchSurface();

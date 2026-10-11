@@ -58,7 +58,7 @@ test('video list ellipsis navigates directly to the dedicated editor without an 
   assert.match(editor, /data-json-import/);
   assert.match(editor, /accept="application\/json,\.json"/);
   assert.doesNotMatch(editorHtml, /auth-pending/);
-  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261012-video-custom-properties-v2/);
+  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261012-video-custom-properties-v3/);
 });
 
 test('video cards delegate thumbnail rendering to the shared renderer', () => {
@@ -181,8 +181,8 @@ test('video library supports hiding videos and restoring them from the hidden li
 test('video list reuses thumbnail DOM when the visible records do not change', () => {
   const library = read('video-library.js');
   assert.match(library, /let renderedResultsKey = null/);
-  assert.match(library, /const resultsKey = JSON\.stringify\(\[state\.view, state\.showHidden, videos\]\)/);
-  assert.match(library, /if \(resultsKey === renderedResultsKey\) return;[\s\S]*dom\.results\.replaceChildren\(\)/);
+  assert.match(library, /const resultsKey = JSON\.stringify\(\[state\.view, state\.showHidden, state\.page, pageModel\.items\]\)/);
+  assert.match(library, /if \(resultsKey === renderedResultsKey\) return;[\s\S]*dom\.results\.replaceChildren\(frame\)/);
 });
 
 test('video editor exposes a persistent 90-degree rotation setting', () => {
