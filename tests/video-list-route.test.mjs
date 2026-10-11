@@ -23,7 +23,7 @@ test('video route loads its existing video modules without fetching reader.html'
   assert.match(spa, /VideoListRouteFactory\.create\(/);
   assert.match(route, /video-data\.js\?v=20260918-video-data-no-window/);
   assert.match(route, /video-thumbnail-renderer\.js\?v=20261008-shared-thumbnails/);
-  assert.match(route, /manga-list-pagination-events\.js\?v=20261009-touch-swipe/);
+  assert.match(route, /manga-list-pagination-events\.js\?v=20261012-video-pagination/);
   assert.match(route, /video-library-pagination\.js\?v=20261012-video-pagination/);
   assert.match(route, /video-library\.js\?v=20261012-video-pagination/);
   assert.match(route, /video-routing-fix\.js\?v=20261009-vault-sync-queue/);
@@ -40,7 +40,7 @@ test('video route mounts while gated and passes the gate into its protected-data
   const route = read('video-list-route.js');
   const gate = route.indexOf("deps.loadMediaGate()");
   const data = route.indexOf("deps.loadScript('video-data.js?v=20260918-video-data-no-window'");
-  const paginationEvents = route.indexOf("deps.loadScript('manga-list-pagination-events.js?v=20261009-touch-swipe'");
+  const paginationEvents = route.indexOf("deps.loadScript('manga-list-pagination-events.js?v=20261012-video-pagination'");
   const paginationModel = route.indexOf("deps.loadScript('video-library-pagination.js?v=20261012-video-pagination'");
   const renderer = route.indexOf("deps.loadScript('video-thumbnail-renderer.js?v=20261008-shared-thumbnails'");
   const library = route.indexOf("deps.loadScript('video-library.js?v=20261012-video-pagination'");
