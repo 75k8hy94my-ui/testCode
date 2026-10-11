@@ -28,7 +28,7 @@ test('video route loads its existing video modules without fetching reader.html'
   assert.match(route, /video-thumbnail-time\.js\?v=20261009-vault-sync-queue/);
   assert.match(spa, /else if\(route==='video'\)renderVideo\(generation\)/);
   assert.doesNotMatch(spa, /route==='reader'|renderReader|reader\.html|iframe/);
-  assert.match(spa, /if\(!SPA_PAGES\.includes\(name\)\)\{location\.href=target\.href;return;\}/);
+  assert.match(spa, /if\(!SPA_PAGES\.includes\(name\)\)\{location\.href=target\.href;return true;\}/);
   const renderVideo = spa.slice(spa.indexOf('async function renderVideo'), spa.indexOf('async function renderManga'));
   assert.doesNotMatch(renderVideo, /fetch\('reader\.html/);
   assert.doesNotMatch(page, /reader-route-runtime|reader\.html/);

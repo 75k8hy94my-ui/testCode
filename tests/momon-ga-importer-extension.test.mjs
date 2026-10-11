@@ -32,20 +32,30 @@ test('extension manifest references existing local files and uses narrowly scope
     match === 'https://momon-ga.com/fanzine/*' || match === 'https://75k8hy94my-ui.github.io/testCode/manga.html')));
 });
 
-test('bridge only handles same-origin explicit request on manga.html and matches request IDs', async () => {
+test('bridge requires a trusted shelf action before exposing the extension queue', async () => {
   const events = [];
   const sent = [];
   const location = { origin: 'https://75k8hy94my-ui.github.io', pathname: '/testCode/manga.html' };
-  const window = { location, addEventListener: (_, fn) => events.push(fn), postMessage: message => sent.push(message) };
+  const window = { location, addEventListener: (name, fn) => events.push([name, fn]), postMessage: message => sent.push(message) };
   const chrome = { runtime: { sendMessage: async message => ({ type: 'TESTCODE_MOMON_IMPORT_RESPONSE', schemaVersion: 1, requestId: message.requestId, items: [{ candidate: { title: 'T' } }] }) } };
   vm.runInNewContext(read('content-testcode.js'), { window, chrome, location });
-  const fire = async (data, origin = location.origin, source = window) => { await events[0]({ data, origin, source }); };
+  const click = events.find(([name]) => name === 'click')?.[1];
+  const message = events.find(([name]) => name === 'message')?.[1];
+  const fire = async (data, origin = location.origin, source = window) => { await message({ data, origin, source }); };
   await fire({ type: 'TESTCODE_MOMON_IMPORT_REQUEST', schemaVersion: 1, requestId: 'a' }, 'https://evil.example');
   await fire({ type: 'TESTCODE_MOMON_IMPORT_REQUEST', schemaVersion: 1, requestId: 'a' }, location.origin, {});
   await fire({ type: 'TESTCODE_MOMON_IMPORT_REQUEST', schemaVersion: 1 });
   assert.equal(sent.length, 0);
+  await fire({ type: 'TESTCODE_MOMON_IMPORT_REQUEST', schemaVersion: 1, requestId: 'forged' });
+  assert.equal(sent.length, 0, 'same-page scripts cannot read the queue without trusted user intent');
+  click({ isTrusted: false, target: { closest: selector => selector === '#bulkDetectBtn' ? {} : null } });
+  await fire({ type: 'TESTCODE_MOMON_IMPORT_REQUEST', schemaVersion: 1, requestId: 'untrusted-click' });
+  assert.equal(sent.length, 0);
+  click({ isTrusted: true, target: { closest: selector => selector === '#bulkDetectBtn' ? {} : null } });
   await fire({ type: 'TESTCODE_MOMON_IMPORT_REQUEST', schemaVersion: 1, requestId: 'a' });
   assert.equal(sent[0].requestId, 'a');
+  await fire({ type: 'TESTCODE_MOMON_IMPORT_REQUEST', schemaVersion: 1, requestId: 'replay' });
+  assert.equal(sent.length, 1, 'a trusted grant is consumed exactly once');
   chrome.runtime.sendMessage = async () => ({ type: 'TESTCODE_MOMON_IMPORT_RESPONSE', schemaVersion: 1, requestId: 'stale', items: [] });
   await fire({ type: 'TESTCODE_MOMON_IMPORT_REQUEST', schemaVersion: 1, requestId: 'b' });
   assert.equal(sent.length, 1);
@@ -82,36 +92,21 @@ test('momon content queues valid pages with metadata warnings, rejects missing p
   assert.equal(sent.length, 1);
 });
 
-test('bridge relays selected removal only with a matching request ID', async () => {
-  let listener;
-  const sent = [];
-  const location = { origin: 'https://75k8hy94my-ui.github.io', pathname: '/testCode/manga.html' };
-  const window = { location, addEventListener: (_, fn) => { listener = fn; }, postMessage: payload => sent.push(payload) };
-  const chrome = { runtime: { sendMessage: async request => ({ type: 'TESTCODE_MOMON_IMPORT_REMOVE_RESPONSE', schemaVersion: 1, requestId: request.requestId, removedQueueIds: request.queueIds }) } };
-  vm.runInNewContext(read('content-testcode.js'), { window, chrome, location });
-  const fire = data => listener({ data, origin: location.origin, source: window });
-  await fire({ type: 'TESTCODE_MOMON_IMPORT_REMOVE_REQUEST', schemaVersion: 1, requestId: 'remove1', queueIds: ['q1'] });
-  assert.equal(sent[0].removedQueueIds[0], 'q1');
-  assert.equal(sent[0].requestId, 'remove1');
-  chrome.runtime.sendMessage = async () => ({ type: 'TESTCODE_MOMON_IMPORT_REMOVE_RESPONSE', schemaVersion: 1, requestId: 'stale', removedQueueIds: ['q1'] });
-  await fire({ type: 'TESTCODE_MOMON_IMPORT_REMOVE_REQUEST', schemaVersion: 1, requestId: 'remove2', queueIds: ['q1'] });
-  assert.equal(sent.length, 1);
-  await fire({ type: 'TESTCODE_MOMON_IMPORT_REMOVE_REQUEST', schemaVersion: 1, requestId: 'remove3', queueIds: [] });
-  assert.equal(sent.length, 1);
+test('page bridge has no queue deletion capability', () => {
+  assert.doesNotMatch(read('content-testcode.js'), /MOMON_QUEUE_REMOVE_SELECTED|IMPORT_REMOVE_REQUEST/);
+  assert.doesNotMatch(read('service-worker.js'), /MOMON_QUEUE_REMOVE_SELECTED/);
 });
 
-test('worker removes selected IDs for manga page and refuses another sender', async () => {
+test('worker refuses page-originated queue deletion; popup retains delete capability', async () => {
   let listener;
   const items = [{ queueId: 'q1' }, { queueId: 'q2' }];
   const calls = [];
   const chrome = { storage: { local: {} }, runtime: { onMessage: { addListener: fn => { listener = fn; } } } };
-  vm.runInNewContext(read('service-worker.js'), { chrome, importScripts: () => {}, MomonGaImportQueue: { create: () => ({ list: async () => items, removeMany: async ids => { calls.push(ids); return ids; } }) } });
+  vm.runInNewContext(read('service-worker.js'), { chrome, importScripts: () => {}, MomonGaImportQueue: { create: () => ({ list: async () => items, removeMany: async ids => { calls.push(ids); return ids; }, remove: async id => { calls.push([id]); } }) } });
   const message = (payload, url) => new Promise(resolve => listener(payload, { url }, resolve));
   const request = { type: 'MOMON_QUEUE_REMOVE_SELECTED', schemaVersion: 1, requestId: 'remove1', queueIds: ['q1'] };
-  assert.equal((await message(request, 'https://momon-ga.com/fanzine/mo1/')).error, 'Unauthorized sender');
-  const result = await message(request, 'https://75k8hy94my-ui.github.io/testCode/manga.html');
-  assert.equal(result.type, 'TESTCODE_MOMON_IMPORT_REMOVE_RESPONSE');
-  assert.equal(result.requestId, 'remove1');
-  assert.equal(JSON.stringify(calls), '[["q1"]]');
-  assert.equal(JSON.stringify(result.removedQueueIds), '["q1"]');
+  assert.equal((await message(request, 'https://75k8hy94my-ui.github.io/testCode/manga.html')).error, 'Unknown message');
+  assert.equal(calls.length, 0);
+  await message({ type: 'MOMON_QUEUE_REMOVE', schemaVersion: 1, queueId: 'q1' }, 'chrome-extension://extension/popup.html');
+  assert.deepEqual(calls[0], ['q1']);
 });

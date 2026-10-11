@@ -16,8 +16,8 @@ Other hosts, paths, galleries, and alternate testCode deployments are not enable
 3. Turn on **Developer mode**.
 4. Choose **Load unpacked** and select the `extensions/momon-ga-importer` directory.
 5. Open a momon:GA work detail page and use the extension popup to add it to the queue.
-6. Open the supported testCode manga shelf page and choose **一括読み込み** to review and register selected works.
+6. Open the supported testCode manga shelf page and choose **一括読み込み** to review and register selected works. If you want to remove imported entries from the queue, open the extension popup and remove them there.
 
-The extension stores only its own queued metadata in browser extension storage. The queue handoff uses the page bridge on the supported testCode manga page; the extension does not write testCode localStorage, Vault data, or Supabase credentials.
+The extension stores only its own queued metadata in browser extension storage. The page bridge grants a single queue read after a trusted click on **一括読み込み**; queue deletion stays in the extension popup. The extension does not write testCode localStorage, Vault data, or Supabase credentials.
 
 To update a locally loaded copy, replace the directory contents and reload the extension from the extensions page.

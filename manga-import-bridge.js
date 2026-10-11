@@ -22,14 +22,9 @@
             if (data.schemaVersion === 1 && typeof data.error === 'string') finish(reject, new Error(data.error));
             return;
           }
-          const removing = type === 'TESTCODE_MOMON_IMPORT_REMOVE_REQUEST';
-          const expectedType = removing ? 'TESTCODE_MOMON_IMPORT_REMOVE_RESPONSE' : 'TESTCODE_MOMON_IMPORT_RESPONSE';
+          const expectedType = 'TESTCODE_MOMON_IMPORT_RESPONSE';
           if (data.type !== expectedType) return finish(reject, new Error('Invalid import response type'));
           if (data.schemaVersion !== 1) return finish(reject, new Error('Invalid import response schema'));
-          if (removing) {
-            if (!Array.isArray(data.removedQueueIds) || data.removedQueueIds.some(id => typeof id !== 'string')) return finish(reject, new Error('Invalid queue removal response'));
-            return finish(resolve, data.removedQueueIds);
-          }
           let serializedBytes = Infinity;
           try { serializedBytes = new TextEncoder().encode(JSON.stringify(data.items)).length; } catch (_) {}
           if (!Array.isArray(data.items) || data.items.length > MAX_ITEMS || serializedBytes > 4 * 1024 * 1024 || data.items.some(item => !item || typeof item.queueId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(item.queueId) || !Number.isFinite(item.addedAt) || !item.candidate || typeof item.candidate !== 'object' || !Array.isArray(item.warnings) || item.warnings.length > 20 || item.warnings.some(warning => typeof warning !== 'string' || warning.length > 500))) return finish(reject, new Error('Invalid queued item response'));
@@ -43,10 +38,6 @@
     }
     return Object.freeze({
       requestQueuedCandidates: () => request('TESTCODE_MOMON_IMPORT_REQUEST'),
-      removeQueuedCandidates(queueIds) {
-        if (!Array.isArray(queueIds) || !queueIds.length || queueIds.length > MAX_ITEMS || queueIds.some(id => typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(id)) || new Set(queueIds).size !== queueIds.length) return Promise.reject(new Error('Invalid queue IDs'));
-        return request('TESTCODE_MOMON_IMPORT_REMOVE_REQUEST', { queueIds: [...queueIds] });
-      },
     });
   }
   root.MangaImportBridge = Object.freeze({ create });

@@ -41,6 +41,7 @@
       scheduleCloudSync: deps.scheduleCloudSync,
       recordSyncDeletion: deps.recordSyncDeletion,
       onDeletionError: deps.onDeletionError,
+      onPersistenceError: deps.onPersistenceError,
       pointerPath: deps.pointerPath,
       openReader: deps.openReader,
       accessMedia: deps.accessMedia,

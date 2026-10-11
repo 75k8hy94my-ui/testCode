@@ -78,10 +78,10 @@ test('momon import template provides an accessible review dialog and route wires
   assert.match(route, /persistItems: host\.persistItems/);
   assert.match(route, /persistAuthorCards: host\.persistAuthorCards/);
   assert.match(route, /render: renderList/);
-  assert.match(route, /windowRef\.confirm\(/);
   assert.match(route, /requestQueuedCandidates\(\)/);
   assert.match(route, /importBatch\.register\(selection\)/);
-  assert.match(route, /removeQueuedCandidates\(result\.registeredQueueIds\)/);
+  assert.match(route, /キューから削除する場合は拡張機能のポップアップを開いてください/);
+  assert.doesNotMatch(route, /removeQueuedCandidates|登録済みの拡張機能キューから削除/);
   assert.doesNotMatch(route, /localStorage\.setItem\([^)]*savedItems/);
   assert.doesNotMatch(fs.readFileSync('manga-import-dialog.js', 'utf8'), /innerHTML|insertAdjacentHTML/);
 });

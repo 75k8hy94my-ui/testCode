@@ -190,6 +190,9 @@ test('SPA navigation asks before leaving while Vault sync is pending', () => {
   assert.match(spa, /変更は端末に保存済みです。ページを移動しますか/);
   assert.match(spa, /function handleRoutePopstate\(\)[\s\S]*history\.forward\(\)/);
   assert.match(spa, /if\(location\.href===lastSpaUrl\)return/);
+  assert.match(spa, /function navigate\(path,\{replace=false\}=\{\}\)\{[^}]*confirmPendingSyncLeave\(\)/);
+  assert.match(spa, /function intercept\(event\)\{[^}]*event\.preventDefault\(\);navigate\(target\.href\)/);
+  assert.doesNotMatch(spa, /function intercept\(event\)\{[^}]*if\(!confirmPendingSyncLeave\(\)\)/);
 });
 
 

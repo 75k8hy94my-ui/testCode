@@ -226,8 +226,12 @@
         updateFavoriteButton();
         favBtn.addEventListener('click', (e) => {
           e.stopPropagation();
+          const previousFavorite = item.favorite;
           item.favorite = !item.favorite;
-          context.persistAll();
+          if (context.persistAll() === false) {
+            item.favorite = previousFavorite;
+            context.onPersistenceError?.();
+          }
           updateFavoriteButton();
           if (context.getState().currentFolderView === context.getConfig().FAVORITES_FOLDER_ID && !item.favorite) {
             // Recompute the list rather than detaching only this card.

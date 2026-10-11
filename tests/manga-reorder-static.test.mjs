@@ -15,7 +15,8 @@ test('reorder mode preserves the savedItems-derived display order instead of re-
 test('moveItemInList swaps only adjacent saved items and persists the result', () => {
   assert.match(route, /const moveItemInList = \(item, list, direction\)/);
   assert.match(route, /const index = list\.indexOf\(item\)/);
-  assert.match(route, /host\.persistAll\(\); renderList\(\);/);
+  assert.match(route, /if \(!host\.persistAll\(\)\) \{ \[items\[a\], items\[b\]\] = \[items\[b\], items\[a\]\]; reportPersistenceError\(\); \} renderList\(\);/);
+  assert.match(route, /if \(!host\.persistFolders\(\)\) \{ \[folders\[a\], folders\[b\]\] = \[folders\[b\], folders\[a\]\]; reportPersistenceError\(\); \} renderList\(\);/);
 });
 
 test('reorder controls and manga card boundary remain unchanged', () => {

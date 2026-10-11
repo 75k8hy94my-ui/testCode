@@ -83,7 +83,27 @@ test('cache miss goes through the shared quota/VPN gate and encrypts private ima
   const stored = [...harness.idb.database.records.values()].find(row => row.userId === 'user-a');
   assert.ok(stored.encrypted);
   assert.equal(stored.blob, undefined);
+  assert.equal(Object.prototype.toString.call(stored.iv), '[object Uint8Array]', 'IV should remain a compact binary value in IndexedDB');
+  assert.equal(Object.prototype.toString.call(stored.ciphertext), '[object Uint8Array]', 'ciphertext should remain a compact binary value in IndexedDB');
   assert.doesNotMatch(JSON.stringify(stored), /private image bytes|access-token/);
+});
+
+test('encrypted image cache continues to decrypt legacy numeric-array IndexedDB records', async () => {
+  const harness = createCache();
+  const iv = crypto.randomBytes(12);
+  const rawKey = new Uint8Array(32).fill(3);
+  const key = await crypto.webcrypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['encrypt']);
+  const plaintext = new TextEncoder().encode('legacy cached image');
+  const ciphertext = new Uint8Array(await crypto.webcrypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext));
+  harness.idb.database.records.set('user-a:user-a/books/legacy.jpg', {
+    key: 'user-a:user-a/books/legacy.jpg', path: 'user-a/books/legacy.jpg', userId: 'user-a', encrypted: true,
+    iv: Array.from(iv), ciphertext: Array.from(ciphertext), type: 'image/jpeg', size: plaintext.length, lastAccessedAt: 1,
+  });
+
+  assert.equal(await harness.cache.loadCachedLocalImage({ url: 'https://storage.test' }, 'token-a', 'user-a/books/legacy.jpg', 10, 'user-a'), 'blob:image');
+  const migrated = harness.idb.database.records.get('user-a:user-a/books/legacy.jpg');
+  assert.equal(Object.prototype.toString.call(migrated.iv), '[object Uint8Array]');
+  assert.equal(Object.prototype.toString.call(migrated.ciphertext), '[object Uint8Array]');
 });
 
 test('account changes during a delayed fetch cannot cache or display the prior account image', async () => {
