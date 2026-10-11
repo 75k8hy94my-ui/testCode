@@ -181,7 +181,7 @@ test('video list reuses thumbnail DOM when the visible records do not change', (
   const library = read('video-library.js');
   assert.match(library, /let renderedResultsKey = null/);
   assert.match(library, /const resultsKey = JSON\.stringify\(\[state\.view, state\.showHidden, state\.page, pageModel\.items\]\)/);
-  assert.match(library, /if \(resultsKey === renderedResultsKey\) return;[\s\S]*dom\.results\.replaceChildren\(frame\)/);
+  assert.match(library, /if \(resultsKey === renderedResultsKey\) \{ acknowledgeReturnIntent\(pageModel\.items\); return; \}[\s\S]*dom\.results\.replaceChildren\(frame\)/);
 });
 
 test('video editor exposes a persistent 90-degree rotation setting', () => {
