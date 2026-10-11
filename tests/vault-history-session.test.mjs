@@ -194,6 +194,104 @@ test('restore preview compares a selected encrypted snapshot with the latest clo
   assert.equal(state.remoteRecord.revision, 8);
 });
 
+test('restore preview accepts a synchronized local payload when the cloud baseline contains tombstones', async () => {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const wrappers = { passphrase: { marker: 'current' } };
+  const current = payloadApi.normalize({ videos: [], vaultSyncTombstones: ['/videos/deleted-video'] });
+  const historical = payloadApi.normalize({ videos: [{ id: 'deleted-video', title: '過去の動画' }] });
+  const row = { history_id: 'history-before-delete', revision: 19, updated_at: 'then', encrypted_data: await encryptSnapshot(rawKey, historical), protected: false };
+  const state = await fixture({ rawKey, remoteRecord: await makeVaultRecord(rawKey, current, wrappers, 20), historyRows: [row] });
+
+  const local = payloadApi.normalize(payloadApi.buildFromLocalStorage(state.local));
+  const meta = JSON.parse(state.local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'];
+  assert.equal(meta.pendingSync, false);
+  assert.equal(meta.encryptedBaseline.revision, 20);
+  assert.deepEqual(local.vaultSyncTombstones, []);
+  assert.deepEqual(current.vaultSyncTombstones, ['/videos/deleted-video']);
+
+  const preview = await state.vault.previewVaultHistoryRestore(row.history_id);
+
+  assert.equal(preview.baseRevision, 20);
+  assert.equal(preview.idMap['videos:deleted-video'] !== undefined, true);
+  assert.ok(preview.changes.some((change) => change.path.startsWith('/videos/') && change.type === 'add'));
+  assert.equal(state.requests.some((request) => request.url.includes('update_manga_reader_vault_v4')), false);
+});
+
+test('receive sync does not create a revision just because local storage omits cloud tombstones', async () => {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const wrappers = { passphrase: { marker: 'current' } };
+  const current = payloadApi.normalize({ videos: [], vaultSyncTombstones: ['/videos/deleted-video'] });
+  const state = await fixture({ rawKey, remoteRecord: await makeVaultRecord(rawKey, current, wrappers, 20) });
+
+  const result = await state.vault.syncLatest();
+
+  assert.equal(result.state, 'success');
+  assert.equal(result.applied, false);
+  assert.equal(state.remoteRecord.revision, 20);
+  assert.equal(state.requests.filter((request) => request.url.includes('update_manga_reader_vault_v4')).length, 0);
+  assert.deepEqual((await decryptEnvelope(rawKey, state.remoteRecord.payload.data)).vaultSyncTombstones, ['/videos/deleted-video']);
+});
+
+test('restore rejects the explicit pendingSync flag independently of payload comparison', async () => {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const current = payloadApi.normalize({ videos: [], vaultSyncTombstones: ['/videos/deleted-video'] });
+  const historical = payloadApi.normalize({ videos: [{ id: 'deleted-video', title: '過去の動画' }] });
+  const row = { history_id: 'history-pending-flag', revision: 19, updated_at: 'then', encrypted_data: await encryptSnapshot(rawKey, historical), protected: false };
+  const state = await fixture({ rawKey, remoteRecord: await makeVaultRecord(rawKey, current, { passphrase: { marker: 'current' } }, 20), historyRows: [row] });
+  state.vault.markLocalChangesPending();
+
+  await assert.rejects(state.vault.previewVaultHistoryRestore(row.history_id), /未同期の変更/);
+
+  assert.equal(state.vault.hasPendingLocalChanges(), true);
+  assert.equal(state.requests.some((request) => request.url.includes('update_manga_reader_vault_v4')), false);
+});
+
+test('restore rejects actual local data changes even when pendingSync is false', async () => {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const current = payloadApi.normalize({ items: [{ id: 'm1', title: 'current' }], vaultSyncTombstones: ['/videos/deleted-video'] });
+  const historical = payloadApi.normalize({ items: [{ id: 'm1', title: 'past' }] });
+  const row = { history_id: 'history-local-change', revision: 19, updated_at: 'then', encrypted_data: await encryptSnapshot(rawKey, historical), protected: false };
+  const state = await fixture({ rawKey, remoteRecord: await makeVaultRecord(rawKey, current, { passphrase: { marker: 'current' } }, 20), historyRows: [row] });
+  state.local.setItem(payloadApi.DATA_KEYS.items, JSON.stringify([{ id: 'm1', title: 'local-only edit' }]));
+
+  await assert.rejects(state.vault.previewVaultHistoryRestore(row.history_id), /端末データと同期基準が一致しない/);
+
+  assert.equal(state.vault.hasPendingLocalChanges(), false);
+  assert.equal(state.local.getItem(payloadApi.DATA_KEYS.items), JSON.stringify([{ id: 'm1', title: 'local-only edit' }]));
+  assert.equal(state.requests.some((request) => request.url.includes('update_manga_reader_vault_v4')), false);
+});
+
+test('restore rejects and retains a pending deletion journal even if pendingSync was cleared', async () => {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const current = payloadApi.normalize({ videos: [], vaultSyncTombstones: ['/videos/deleted-video'] });
+  const historical = payloadApi.normalize({ videos: [{ id: 'deleted-video', title: '過去の動画' }] });
+  const row = { history_id: 'history-pending-journal', revision: 19, updated_at: 'then', encrypted_data: await encryptSnapshot(rawKey, historical), protected: false };
+  const state = await fixture({ rawKey, remoteRecord: await makeVaultRecord(rawKey, current, { passphrase: { marker: 'current' } }, 20), historyRows: [row] });
+  await state.vault.recordSyncDeletion('/videos/pending-delete', () => {});
+  const meta = JSON.parse(state.local.getItem('mangaReaderSupabaseSyncMeta'));
+  meta['user-1'].pendingSync = false;
+  state.local.setItem('mangaReaderSupabaseSyncMeta', JSON.stringify(meta));
+  const journalBefore = state.local.getItem(payloadApi.LOCAL_ONLY_KEYS[0]);
+
+  await assert.rejects(state.vault.previewVaultHistoryRestore(row.history_id), /削除.*未同期|未同期.*削除/);
+
+  assert.equal(state.local.getItem(payloadApi.LOCAL_ONLY_KEYS[0]), journalBefore);
+  assert.equal(state.requests.some((request) => request.url.includes('update_manga_reader_vault_v4')), false);
+});
+
+test('restore rejects a local baseline revision that does not match the current cloud revision', async () => {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const current = payloadApi.normalize({ videos: [], vaultSyncTombstones: ['/videos/deleted-video'] });
+  const historical = payloadApi.normalize({ videos: [{ id: 'deleted-video', title: '過去の動画' }] });
+  const row = { history_id: 'history-stale-baseline', revision: 19, updated_at: 'then', encrypted_data: await encryptSnapshot(rawKey, historical), protected: false };
+  const state = await fixture({ rawKey, remoteRecord: await makeVaultRecord(rawKey, current, { passphrase: { marker: 'current' } }, 20), historyRows: [row] });
+  state.remoteRecord.revision = 21;
+
+  await assert.rejects(state.vault.previewVaultHistoryRestore(row.history_id), /revision|同期基準|最新/);
+
+  assert.equal(state.requests.some((request) => request.url.includes('update_manga_reader_vault_v4')), false);
+});
+
 test('restore confirmation creates one new v4 revision with current wrappers and applies only after CAS success', async () => {
   const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
   const wrappers = { passphrase: { marker: 'current-wrapper' }, recovery: { marker: 'current-recovery' } };
@@ -239,7 +337,7 @@ test('restore confirmation aborts when the cloud revision changed after preview'
   await state.vault.previewVaultHistoryRestore(row.history_id);
   state.remoteRecord.revision += 1;
   const updateCalls = state.requests.filter((request) => request.url.includes('update_manga_reader_vault_v4')).length;
-  await assert.rejects(state.vault.confirmVaultHistoryRestore(row.history_id, 8), /更新|再確認|プレビュー/);
+  await assert.rejects(state.vault.confirmVaultHistoryRestore(row.history_id, 8), /revision|更新|再確認|プレビュー/);
   assert.equal(state.requests.filter((request) => request.url.includes('update_manga_reader_vault_v4')).length, updateCalls);
 });
 
@@ -253,6 +351,7 @@ test('restore with a tombstoned entity previews and saves a fresh ID while retai
   const state = await fixture({ rawKey, remoteRecord: await makeVaultRecord(rawKey, previouslyLoaded, wrappers), historyRows: [row] });
   state.remoteRecord.payload.data = await encryptSnapshot(rawKey, current);
   state.remoteRecord.revision = 9;
+  await state.vault.loadPayload();
   await state.vault.previewVaultHistoryRestore(row.history_id);
   const result = await state.vault.confirmVaultHistoryRestore(row.history_id, 9);
   const saved = await decryptEnvelope(rawKey, state.remoteRecord.payload.data);

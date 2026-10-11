@@ -387,16 +387,31 @@
     const remotePayload = await decryptPayload(record.payload);
     assertVaultHistoryAccess();
     if (hasPendingLocalChanges()) throw new Error('端末に未同期の変更があるため復元を停止しました。先に同期を確認してください。');
+    if ((await readDeletionJournal(user.id)).length) {
+      throw new Error('未同期の削除journalが残っているため復元を停止しました。端末データは保持されています。');
+    }
     if (!window.MangaVaultPayload || typeof window.MangaVaultPayload.buildFromLocalStorage !== 'function') {
       throw new Error('端末の同期データを読み取れないため、復元を停止しました。');
     }
     const localPayload = window.MangaVaultPayload.buildFromLocalStorage();
     const known = getMeta(user.id);
+    const recordRevision = Number(record.revision);
+    if (known && known.revision !== undefined
+        && (!Number.isSafeInteger(Number(known.revision)) || Number(known.revision) !== recordRevision)) {
+      throw new Error('端末の同期基準revisionがクラウドと一致しないため、復元を停止しました。最新状態を同期してください。');
+    }
     if (known && known.encryptedBaseline) {
       const baseline = await decryptBaseline(known.encryptedBaseline, user.id);
       const normalize = window.MangaVaultPayload.normalize;
-      if (!samePayload(normalize(localPayload), normalize(baseline))) throw new Error('端末に未同期の変更があるため復元を停止しました。端末データは保持されています。');
-    } else if (!samePayload(window.MangaVaultPayload.normalize(localPayload), window.MangaVaultPayload.normalize(remotePayload))) {
+      const baselineRevision = Number(known.encryptedBaseline.revision);
+      if (!Number.isSafeInteger(baselineRevision) || baselineRevision !== Number(known.revision)
+          || baselineRevision !== recordRevision) {
+        throw new Error('端末の同期基準revisionがクラウドと一致しないため、復元を停止しました。最新状態を同期してください。');
+      }
+      if (!sameLocalPayload(normalize(localPayload), normalize(baseline))) {
+        throw new Error('端末データと同期基準が一致しないため復元を停止しました。端末データは保持されています。');
+      }
+    } else if (!sameLocalPayload(window.MangaVaultPayload.normalize(localPayload), window.MangaVaultPayload.normalize(remotePayload))) {
       throw new Error('同期基準が見つからず端末の変更を確認できないため、復元を停止しました。');
     }
     return { record, remotePayload };
@@ -671,6 +686,17 @@
     else localStorage.removeItem(deletionJournalKey());
   }
   const samePayload = (left, right) => stableJson(left) === stableJson(right);
+  function sameLocalPayload(left, right) {
+    const localData = (payload) => {
+      const normalized = window.MangaVaultPayload && typeof window.MangaVaultPayload.normalize === 'function'
+        ? window.MangaVaultPayload.normalize(payload) : payload;
+      if (!normalized || typeof normalized !== 'object' || Array.isArray(normalized)) return normalized;
+      const result = Object.assign({}, normalized);
+      delete result.vaultSyncTombstones;
+      return result;
+    };
+    return samePayload(localData(left), localData(right));
+  }
   function assertMergeAvailable() {
     if (!window.MangaVaultSyncMerge || typeof window.MangaVaultSyncMerge.mergeVaultPayload !== 'function') {
       throw new Error('差分同期機能を読み込めません。ページを再読込してください。');
@@ -886,11 +912,11 @@
       const currentMeta = getMeta(user.id);
       const currentLocal = window.MangaVaultPayload.buildFromLocalStorage();
       if ((currentMeta && currentMeta.pendingSync) || !samePayload(currentLocal, localSnapshot)) return { needsMerge: true };
-      if (baseline && !samePayload(localSnapshot, baseline)) return { needsMerge: true };
-      if (!baseline && !samePayload(localSnapshot, remotePayload)) {
+      if (baseline && !sameLocalPayload(localSnapshot, baseline)) return { needsMerge: true };
+      if (!baseline && !sameLocalPayload(localSnapshot, remotePayload)) {
         throw new Error('未同期データの基準が見つからないため受信同期を停止しました。端末データを保持したまま暗号化バックアップから復旧してください。');
       }
-      const changed = !samePayload(localSnapshot, remotePayload);
+      const changed = !sameLocalPayload(localSnapshot, remotePayload);
       if (changed) window.MangaVaultPayload.applyToLocalStorage(remotePayload);
       const encryptedBaseline = await encryptBaseline(remotePayload, user.id, record.revision);
       setMeta(user.id, { revision: record.revision, updatedAt: record.updated_at, encryptedBaseline });
