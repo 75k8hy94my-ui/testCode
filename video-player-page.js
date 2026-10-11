@@ -1,6 +1,33 @@
 (() => {
   'use strict';
   const page = document.getElementById('videoPlayerPage');
+  const playerParams = new URLSearchParams(location.search);
+  const returnVideoId = playerParams.get('id') || '';
+  const returnPageValue = playerParams.get('fromPage');
+  const returnPage = returnPageValue == null ? null : Number(returnPageValue);
+  const validReturnPage = Number.isSafeInteger(returnPage) && returnPage > 0 ? returnPage : null;
+  const RETURN_INTENT_KEY = 'testcode.video.returnIntent';
+  function videoListReturnUrl(href = 'video.html') {
+    const destination = new URL(href, location.href);
+    if (returnVideoId) destination.searchParams.set('returnVideo', returnVideoId);
+    if (validReturnPage != null) destination.searchParams.set('returnPage', String(validReturnPage));
+    return destination;
+  }
+  // The top title and the desktop/mobile "動画" navigation must behave alike.
+  // Amend the destination before ordinary anchor navigation (including links
+  // inserted after this script), and retain a same-tab fallback for SPA routing.
+  document.addEventListener('click', (event) => {
+    const link = event.target?.closest?.('a[href]');
+    if (!link || link.hasAttribute('download') || link.target) return;
+    let destination;
+    try { destination = new URL(link.href, location.href); } catch (_) { return; }
+    if (destination.origin !== location.origin || destination.pathname.split('/').pop() !== 'video.html') return;
+    link.href = videoListReturnUrl(destination.href).href;
+    if (returnVideoId) {
+      try { sessionStorage.setItem(RETURN_INTENT_KEY, JSON.stringify({ id: returnVideoId, page: validReturnPage })); }
+      catch (_) { /* The URL itself remains sufficient when storage is unavailable. */ }
+    }
+  }, true);
   const mediaAccess = window.MangaReaderMediaAccess;
   let initialized = false;
   const windowCleanups = [];
@@ -93,10 +120,7 @@
   const headerTitle = document.getElementById('shellTitle');
   if (headerTitle) {
     const link = document.createElement('a');
-    const destination = new URL('video.html', location.href);
-    if (id) destination.searchParams.set('returnVideo', id);
-    const fromPage = Number(new URLSearchParams(location.search).get('fromPage'));
-    if (Number.isSafeInteger(fromPage) && fromPage > 0) destination.searchParams.set('returnPage', String(fromPage));
+    const destination = videoListReturnUrl();
     link.href = destination.href;
     link.textContent = '動画';
     link.setAttribute('aria-label', '動画一覧へ戻る');
