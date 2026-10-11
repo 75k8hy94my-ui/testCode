@@ -7,6 +7,17 @@ import assetCrypto from '../encrypted-asset-crypto.js';
 import sync from '../encrypted-asset-sync.js';
 
 if (!globalThis.crypto) globalThis.crypto = crypto.webcrypto;
+// Browser production code requires Web Locks to reserve transfer budget atomically.
+// Node's test runner does not expose navigator.locks, so provide a serialized test lock.
+if (!globalThis.navigator?.locks?.request) {
+  let lockQueue = Promise.resolve();
+  const locks = { request(_name, _options, callback) {
+    const pending = lockQueue.then(callback);
+    lockQueue = pending.then(() => undefined, () => undefined);
+    return pending;
+  } };
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { ...globalThis.navigator, locks } });
+}
 const key = new Uint8Array(32).fill(4);
 const userId = '00000000-0000-4000-8000-000000000001';
 const assetId = '6dc3773a-a3ef-4bb8-9cbf-15096098db20';
