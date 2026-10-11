@@ -80,6 +80,20 @@ test('restore accepts paired video and videoMeta tombstones when remapping a del
   assert.equal(result.idMap['videos:video-deleted'], 'video-restored');
 });
 
+test('history restore retains property definitions and moves video values with a remapped video ID', () => {
+  const oldId = 'video-deleted';
+  const target = normalize({
+    videos: [{ id: oldId, title: 'Restored video' }],
+    videoPropertyDefinitions: { schemaVersion: 1, properties: { p1: { id: 'p1', name: '分類', type: 'text', order: 0, hidden: false, deleted: false, options: {} } } },
+    videoPropertyValues: { [oldId]: { p1: '旅行' } },
+    vaultSyncTombstones: [],
+  });
+  const current = normalize({ videos: [], videoPropertyValues: {}, vaultSyncTombstones: ['/videos/video-deleted', '/videoPropertyValues/video-deleted'] });
+  const result = history.prepareVaultHistoryRestore(target, current, () => 'video-restored', normalize);
+  assert.deepEqual(result.payload.videoPropertyValues, { 'video-restored': { p1: '旅行' } });
+  assert.equal(result.payload.videoPropertyDefinitions.properties.p1.name, '分類');
+});
+
 test('restore rejects an unrecognized tombstone relation that would reuse an entity ID', () => {
   const target = normalize({ items: [{ id: 'manga-old', title: 'Manga' }] });
   const current = normalize({ vaultSyncTombstones: ['/unknownCollection/manga-old'] });

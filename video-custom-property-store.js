@@ -82,7 +82,7 @@
     }
   }
 
-  async function mutate({ storage = globalThis.localStorage, guest = false, vault, recipe } = {}) {
+  async function mutate({ storage = globalThis.localStorage, guest = false, vault, recipe, pendingAlreadyMarked = false, sync = true, commit } = {}) {
     if (typeof recipe !== 'function') throw new TypeError('recipe must be a function');
     const outcome = await runLocked(async () => {
       const current = stateFrom(storage);
@@ -92,11 +92,11 @@
       const values = proposed.values === undefined ? current.state.values : Properties.normalizeValues(proposed.values);
       const definitionsChanged = stableJson(definitions) !== stableJson(current.state.definitions);
       const valuesChanged = stableJson(values) !== stableJson(current.state.values);
-      if (!definitionsChanged && !valuesChanged) return { state: current.state, changed: false };
+      if (!definitionsChanged && !valuesChanged && typeof commit !== 'function') return { state: current.state, changed: false };
       if (definitionsChanged && !rootIsValid(current.raw.definitions, 'definitions')) throw new Error('プロパティ定義データが破損しているため、変更を保存できません。元データは保持しました。');
       if (valuesChanged && !rootIsValid(current.raw.values, 'values')) throw new Error('動画プロパティデータが破損しているため、変更を保存できません。元データは保持しました。');
 
-      if (!guest) {
+      if (!guest && !pendingAlreadyMarked) {
         if (!vault || typeof vault.markLocalChangesPending !== 'function' || vault.markLocalChangesPending() !== true) {
           throw new Error('未同期状態を記録できないため、変更を保存しませんでした。');
         }
@@ -108,6 +108,7 @@
       const snapshots = keys.map(([key, raw]) => [key, raw]);
       try {
         for (const [key, , value] of keys) setRaw(storage, key, JSON.stringify(value));
+        if (typeof commit === 'function') await commit();
       } catch (error) {
         restoreSnapshot(storage, snapshots);
         throw error;
@@ -115,8 +116,9 @@
       return { state: { definitions, values }, changed: true };
     });
 
-    if (!outcome.changed) return { localSaved: true, synced: guest ? null : true, guest, state: outcome.state };
+    if (!outcome.changed) return { localSaved: true, synced: guest ? null : (sync ? true : false), guest, state: outcome.state };
     if (guest) return { localSaved: true, synced: null, guest: true, state: outcome.state };
+    if (!sync) return { localSaved: true, synced: false, guest: false, state: outcome.state };
     try {
       await vault.saveLocalChanges();
       return { localSaved: true, synced: true, guest: false, state: outcome.state };

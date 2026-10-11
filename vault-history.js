@@ -7,10 +7,10 @@
   'use strict';
 
   const ENTITY_COLLECTIONS = new Set(['folders', 'items', 'videos', 'videoFolders']);
-  const ENTITY_MAPS = ['mangaInfo', 'toc', 'lastPages', 'videoMeta', 'videoMarkers'];
+  const ENTITY_MAPS = ['mangaInfo', 'toc', 'lastPages', 'videoMeta', 'videoMarkers', 'videoPropertyValues'];
   const ENTITY_MAP_OWNERS = new Map([
     ['mangaInfo', 'items'], ['toc', 'items'], ['lastPages', 'items'],
-    ['videoMeta', 'videos'], ['videoMarkers', 'videos'],
+    ['videoMeta', 'videos'], ['videoMarkers', 'videos'], ['videoPropertyValues', 'videos'],
   ]);
   const clone = (value) => JSON.parse(JSON.stringify(value));
   const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);

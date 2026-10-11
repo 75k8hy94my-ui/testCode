@@ -34,10 +34,10 @@
 
 **Interfaces:** Export `PROPERTY_TYPES`, `normalizeDefinitions(value)`, `normalizeValues(value)`, `validateValue(property, value, definitions)`, `formatValue(property, value, definitions)`, and `matchesFilters(video, definitions, values, filters)` through CommonJS and `window.MangaReaderVideoCustomProperties`.
 
-- [ ] Add tests named `normalizesAllSevenPropertyTypes`, `validatesTypedValuesWithoutCoercion`, `distinguishesFalseZeroEmptyAndUnset`, `preservesUnknownFieldsAndArchivedOptionIds`, and `matchesTypedFiltersWithAndAndMultiSelectAnyAll`; assert option IDs resolve to current names while stored values remain IDs.
-- [ ] Run `node --test tests/video-custom-properties.test.mjs`; expect the missing module/API failures.
-- [ ] Implement pure normalization and validation without storage or DOM dependencies.
-- [ ] Re-run the focused test; expect all assertions to pass.
+- [x] Add tests named `normalizesAllSevenPropertyTypes`, `validatesTypedValuesWithoutCoercion`, `distinguishesFalseZeroEmptyAndUnset`, `preservesUnknownFieldsAndArchivedOptionIds`, and `matchesTypedFiltersWithAndAndMultiSelectAnyAll`; assert option IDs resolve to current names while stored values remain IDs.
+- [x] Run `node --test tests/video-custom-properties.test.mjs`; expect the missing module/API failures.
+- [x] Implement pure normalization and validation without storage or DOM dependencies.
+- [x] Re-run the focused test; expect all assertions to pass.
 
 ### Task 2: Vault payload keys, sync merges, and deletion semantics
 
@@ -45,21 +45,21 @@
 
 **Interfaces:** Consume Task 1 normalizers. Add `DATA_KEYS.videoPropertyDefinitions` and `DATA_KEYS.videoPropertyValues`; expose both through defaults, normalize/build/apply/clear. Accept `/videoPropertyValues/<videoId>` as a video deletion tombstone path.
 
-- [ ] Add tests named `buildApplyAndClearRoundTripCustomPropertyKeys`, `legacyPayloadDefaultsCustomPropertyKeysToEmpty`, `mergesIndependentPropertyAndVideoValueEdits`, `sameCustomValueEditProducesPathConflict`, `retainsCustomKeysFromLegacyClientSnapshot`, and `videoValueTombstonePreventsResurrection`; assert conflict paths identify one property/value and independent keys both survive.
-- [ ] Run the focused Vault/video tests; expect failures for the new keys and tombstone behavior.
-- [ ] Integrate the keys without changing `SYNC_PROTOCOL_VERSION`; extend deletion journaling to include values.
-- [ ] Run focused tests; expect existing metadata, history, and video deletion behavior to remain intact.
+- [x] Add tests named `buildApplyAndClearRoundTripCustomPropertyKeys`, `legacyPayloadDefaultsCustomPropertyKeysToEmpty`, `mergesIndependentPropertyAndVideoValueEdits`, `sameCustomValueEditProducesPathConflict`, `retainsCustomKeysFromLegacyClientSnapshot`, and `videoValueTombstonePreventsResurrection`; assert conflict paths identify one property/value and independent keys both survive.
+- [x] Run the focused Vault/video tests; expect failures for the new keys and tombstone behavior.
+- [x] Integrate the keys without changing `SYNC_PROTOCOL_VERSION`; extend deletion journaling to include values.
+- [x] Run focused tests; expect existing metadata, history, and video deletion behavior to remain intact.
 
 ### Task 3: Safe custom-property repository
 
 **Files:** Create `video-custom-property-store.js`, `tests/video-custom-property-store.test.mjs`.
 
-**Interfaces:** Export `read(storage)`, `mutate({ storage, guest, vault, definitions, values })`, and `removeVideoValues({ storage, videoId, guest, vault, pointerPath })`. `mutate` returns local/sync status and uses the existing `markLocalChangesPending`, `saveLocalChanges`, and `recordSyncDeletion` methods.
+**Interfaces:** Export `read(storage)`, `mutate({ storage, guest, vault, recipe, pendingAlreadyMarked, sync, commit })`, and `removeVideoValues({ storage, videoId, guest, vault, pointerPath })`. `mutate` returns local/sync status and uses the existing `markLocalChangesPending`, `saveLocalChanges`, and `recordSyncDeletion` methods.
 
-- [ ] Add tests named `pendingMarkerFailurePreventsPropertyWrites`, `storageFailureRollsBackBothKeys`, `syncFailureKeepsLocalValuesAndPendingState`, `guestMutationsStayLocal`, and `videoValueDeletionUsesJournalAndTombstone`; assert unrelated property maps remain byte-for-byte intact.
-- [ ] Run the focused store tests; expect missing module failures.
-- [ ] Implement transactional writes and status separation using the Task 1 model.
-- [ ] Re-run tests; expect local state and pending marker guarantees to pass.
+- [x] Add tests named `pendingMarkerFailurePreventsPropertyWrites`, `storageFailureRollsBackBothKeys`, `syncFailureKeepsLocalValuesAndPendingState`, `guestMutationsStayLocal`, and `videoValueDeletionUsesJournalAndTombstone`; assert unrelated property maps remain byte-for-byte intact.
+- [x] Run the focused store tests; expect missing module failures.
+- [x] Implement transactional writes and status separation using the Task 1 model.
+- [x] Re-run tests; expect local state and pending marker guarantees to pass.
 
 ### Task 4: Property settings route
 
@@ -67,21 +67,21 @@
 
 **Interfaces:** Consume Tasks 1 and 3. Settings load/save through `video-custom-property-store.js` and expose create/edit/reorder/hide/card visibility/soft-delete/restore and option management.
 
-- [ ] Add tests named `createsSevenTypesWithStableOptionIds`, `editsOrderVisibilityAndCardVisibility`, `locksTypeAfterCreation`, `showsAffectedVideoCountsBeforeSoftDelete`, and `restoresDeletedPropertyAndOptionByOriginalId`.
-- [ ] Run the new settings tests; expect route/UI behaviors to fail initially.
-- [ ] Implement the accessible responsive settings page and a video-list entry point.
-- [ ] Run settings and static tests; expect all controls to preserve IDs and archived data.
+- [x] Add tests named `createsSevenTypesWithStableOptionIds`, `editsOrderVisibilityAndCardVisibility`, `locksTypeAfterCreation`, `showsAffectedVideoCountsBeforeSoftDelete`, and `restoresDeletedPropertyAndOptionByOriginalId`.
+- [x] Run the new settings tests; expect route/UI behaviors to fail initially.
+- [x] Implement the accessible responsive settings page and a video-list entry point.
+- [x] Run settings and static tests; expect all controls to preserve IDs and archived data.
 
 ### Task 5: Dynamic add/edit fields and video deletion cleanup
 
-**Files:** Modify `video-edit.html`, `video-edit-page.js`; modify `tests/video-add-page.test.mjs` and add `tests/video-custom-property-editor.test.mjs`.
+**Files:** Modify `video-edit.html`, `video-edit-page.js`; modify `tests/video-add-page.test.mjs` and add focused editor coverage in the existing video and browser tests.
 
 **Interfaces:** Consume Tasks 1 and 3. Render active definitions in order and persist values by video/property ID for add and edit.
 
-- [ ] Add tests named `rendersControlsForEveryPropertyType`, `rendersDirectSingleSelectButtonsForTwoToFourOptions`, `clearsSingleSelectToUnset`, `rejectsInvalidNumberAndDate`, `keepsDraftByStableIdWhenDefinitionsChange`, and `savesCustomValuesForGuestAndOfflineVault`.
-- [ ] Run focused editor tests; expect dynamic controls and values to fail.
-- [ ] Implement DOM-safe field creation and transactional property-value writes; retain current built-in fields and access gates.
-- [ ] Re-run editor and video-add tests; expect built-in and custom values to round-trip together.
+- [x] Add tests named `rendersControlsForEveryPropertyType`, `rendersDirectSingleSelectButtonsForTwoToFourOptions`, `clearsSingleSelectToUnset`, `rejectsInvalidNumberAndDate`, `keepsDraftByStableIdWhenDefinitionsChange`, and `savesCustomValuesForGuestAndOfflineVault`.
+- [x] Run focused editor tests; expect dynamic controls and values to fail.
+- [x] Implement DOM-safe field creation and transactional property-value writes; retain current built-in fields and access gates.
+- [x] Re-run editor and video-add tests; expect built-in and custom values to round-trip together.
 
 ### Task 6: Player metadata display
 
@@ -89,10 +89,10 @@
 
 **Interfaces:** Consume Task 1 `formatValue` and Task 3 repository reads.
 
-- [ ] Add tests named `showsOnlyConfiguredVisibleProperties`, `omitsEmptyHiddenAndDeletedProperties`, `rendersArchivedOptionNameWithoutChangingItsId`, and `usesTextNodesForPropertyNamesAndValues`.
-- [ ] Run focused player tests; expect display assertions to fail.
-- [ ] Add the metadata summary next to current details with text nodes.
-- [ ] Re-run player tests; expect playback and rotation behaviors unchanged.
+- [x] Add tests named `showsOnlyConfiguredVisibleProperties`, `omitsEmptyHiddenAndDeletedProperties`, `rendersArchivedOptionNameWithoutChangingItsId`, and `usesTextNodesForPropertyNamesAndValues`.
+- [x] Run focused player tests; expect display assertions to fail.
+- [x] Add the metadata summary next to current details with text nodes.
+- [x] Re-run player tests; expect playback and rotation behaviors unchanged.
 
 ### Task 7: List cards and custom filters
 
@@ -100,21 +100,21 @@
 
 **Interfaces:** Consume Tasks 1 and 3. Filter values combine with existing search/folder/visibility rules using AND; cards show at most three `showInCard` active properties.
 
-- [ ] Add tests named `filtersEveryPropertyTypeByItsSupportedOperators`, `andsMultipleCustomPropertyFilters`, `supportsMultiSelectAnyAndAll`, `matchesUnsetValues`, `combinesWithExistingSearchAndFolderFilters`, and `limitsCardsToThreeEnabledProperties`.
-- [ ] Run focused list tests; expect custom filtering/display to fail.
-- [ ] Implement local-only filter state and accessible type-specific controls without changing sorting/pagination.
-- [ ] Re-run list tests; expect existing query behavior and custom filtering to compose.
+- [x] Add tests named `filtersEveryPropertyTypeByItsSupportedOperators`, `andsMultipleCustomPropertyFilters`, `supportsMultiSelectAnyAndAll`, `matchesUnsetValues`, `combinesWithExistingSearchAndFolderFilters`, and `limitsCardsToThreeEnabledProperties`.
+- [x] Run focused list tests; expect custom filtering/display to fail.
+- [x] Implement local-only filter state and accessible type-specific controls without changing sorting/pagination.
+- [x] Re-run list tests; expect existing query behavior and custom filtering to compose.
 
 ### Task 8: History, compatibility, and browser verification
 
-**Files:** Add `tests/video-custom-property-vault-flow.test.mjs` and `tests/e2e/video-custom-properties.spec.mjs`; adjust source cache versions and static checks where needed.
+**Files:** Add `e2e/video-custom-properties.spec.mjs` and focused coverage in existing Vault/history/store tests; adjust source cache versions and static checks where needed.
 
 **Interfaces:** Exercise Tasks 1–7 through Vault payload build/apply, merge/history restore, and browser routes.
 
-- [ ] Add tests named `historyRestoreRoundTripsDefinitionsAndValues`, `legacySnapshotRetentionKeepsUnknownPropertyKeys`, `pendingMarkerRecoveryRetainsLocalPropertyEdits`, `conflictChoiceResolvesSameValueEdit`, and `concurrentEditsToDifferentPropertiesBothSurvive`.
-- [ ] Run focused sync tests; expect any missing integration guarantees to fail.
-- [ ] Add Playwright flow: create a property, edit a video, reload, filter it, verify player output, and exercise guest/no-access guard.
-- [ ] Run `npm test`, `npm run verify:static`, `git diff --check`, then browser flow in a real browser; record exact results and any environment limitation.
+- [x] Add tests named `historyRestoreRoundTripsDefinitionsAndValues`, `legacySnapshotRetentionKeepsUnknownPropertyKeys`, `pendingMarkerRecoveryRetainsLocalPropertyEdits`, `conflictChoiceResolvesSameValueEdit`, and `concurrentEditsToDifferentPropertiesBothSurvive`.
+- [x] Run focused sync tests; expect any missing integration guarantees to fail.
+- [x] Add Playwright flow: create a property, edit a video, reload, filter it, verify player output, and exercise guest/no-access guard.
+- [x] Run `npm test`, `npm run verify:static`, `git diff --check`, then browser flow in a real browser; record exact results and any environment limitation.
 
 ### Task 9: PR, merge, and Pages deployment start
 

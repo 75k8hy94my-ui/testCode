@@ -18,14 +18,14 @@ test('video route has a dedicated template and route runtime without reader HTML
 
 test('video route loads its existing video modules without fetching reader.html', () => {
   assert.match(spa, /renderVideo\(generation\)/);
-  assert.match(spa, /video-list-route\.js\?v=20261010-local-first-save/);
+  assert.match(spa, /video-list-route\.js\?v=20261012-video-custom-properties-v2/);
   assert.match(spa, /video-list-template\.js\?v=20261010-vpn-navigation/);
   assert.match(spa, /VideoListRouteFactory\.create\(/);
   assert.match(route, /video-data\.js\?v=20260918-video-data-no-window/);
   assert.match(route, /video-thumbnail-renderer\.js\?v=20261008-shared-thumbnails/);
   assert.match(route, /video-custom-properties\.js\?v=20261012-video-custom-properties/);
   assert.match(route, /video-custom-property-store\.js\?v=20261012-video-custom-properties/);
-  assert.match(route, /video-library\.js\?v=20261011-pending-sync/);
+  assert.match(route, /video-library\.js\?v=20261012-video-custom-properties-v2/);
   assert.match(route, /video-routing-fix\.js\?v=20261009-vault-sync-queue/);
   assert.match(route, /video-thumbnail-time\.js\?v=20261009-vault-sync-queue/);
   assert.match(spa, /else if\(route==='video'\)renderVideo\(generation\)/);
@@ -43,7 +43,7 @@ test('video route mounts while gated and passes the gate into its protected-data
   const renderer = route.indexOf("deps.loadScript('video-thumbnail-renderer.js?v=20261008-shared-thumbnails'");
   const properties = route.indexOf("deps.loadScript('video-custom-properties.js?v=20261012-video-custom-properties'");
   const propertyStore = route.indexOf("deps.loadScript('video-custom-property-store.js?v=20261012-video-custom-properties'");
-  const library = route.indexOf("deps.loadScript('video-library.js?v=20261011-pending-sync'");
+  const library = route.indexOf("deps.loadScript('video-library.js?v=20261012-video-custom-properties-v2'");
   assert.ok(gate >= 0 && gate < data);
   assert.ok(data < renderer && renderer < properties && properties < propertyStore && propertyStore < library);
   assert.match(route, /MangaReaderVideoLibrary\.init\(deps\.mediaAccess\)/);
@@ -132,7 +132,7 @@ test('video thumbnail helper does not inspect protected metadata during storage 
 test('video feature helpers are deferred until the route has protected-data access', () => {
   const baseScripts = route.slice(route.indexOf('async function loadFeatureScripts'), route.indexOf('async function start'));
   assert.match(baseScripts, /await deps\.loadScript\('video-thumbnail-renderer\.js\?v=20261008-shared-thumbnails'/);
-  assert.match(baseScripts, /await deps\.loadScript\('video-library\.js\?v=20261011-pending-sync'/);
+  assert.match(baseScripts, /await deps\.loadScript\('video-library\.js\?v=20261012-video-custom-properties-v2'/);
   assert.match(baseScripts, /canReadProtectedData\(\)[\s\S]*video-routing-fix\.js/);
 });
 

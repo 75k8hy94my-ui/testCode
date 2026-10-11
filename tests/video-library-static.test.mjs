@@ -54,11 +54,11 @@ test('video list ellipsis navigates directly to the dedicated editor without an 
   assert.match(jsonImport, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.match(editor, /name="thumbnailTime"/);
   assert.match(editor, /Data\.parseMediaTime\(timestamp\)/);
-  assert.match(editorHtml, /video-edit-page\.js\?v=20261011-pending-sync/);
+  assert.match(editorHtml, /video-edit-page\.js\?v=20261012-video-custom-properties-v2/);
   assert.match(editor, /data-json-import/);
   assert.match(editor, /accept="application\/json,\.json"/);
   assert.doesNotMatch(editorHtml, /auth-pending/);
-  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261011-pending-sync/);
+  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261012-video-custom-properties-v2/);
 });
 
 test('video cards delegate thumbnail rendering to the shared renderer', () => {
@@ -254,7 +254,7 @@ test('dedicated video editor records pending sync after local save and returns w
   assert.doesNotMatch(ordinarySubmit, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.match(jsonImport, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.doesNotMatch(editor, /保存できませんでした。端末の保存状態を確認してください。/);
-  assert.match(html, /video-edit-page\.js\?v=20261011-pending-sync/);
+  assert.match(html, /video-edit-page\.js\?v=20261012-video-custom-properties-v2/);
 });
 
 test('video and manga edit paths record durable pending state before local protected writes', () => {

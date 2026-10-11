@@ -6,6 +6,8 @@
   const VIDEO_KEY = 'mangaReaderVideos';
   const FOLDER_KEY = 'mangaReaderVideoFolders';
   const META_KEY = 'mangaReaderVideoMeta';
+  const PropertyStore = window.MangaReaderVideoCustomPropertyStore;
+  const CustomProperties = window.MangaReaderVideoCustomProperties;
   let initialized = false;
   const isAddMode = new URLSearchParams(location.search).get('mode') === 'add';
   const shellTitle = document.getElementById('shellTitle');
@@ -19,15 +21,19 @@
     if (!canReadProtectedData()) return fallback;
     try { const value = JSON.parse(localStorage.getItem(key) || 'null'); return value == null ? fallback : value; } catch (_) { return fallback; }
   }
-  function writeVideoRecordsAtomically(videos, metadata) {
+  function writeVideoRecordsAtomically(videos, metadata, propertyValues = null) {
     const previousVideos = localStorage.getItem(VIDEO_KEY);
     const previousMetadata = localStorage.getItem(META_KEY);
+    const propertyValuesKey = 'mangaReaderVideoPropertyValues';
+    const previousPropertyValues = propertyValues == null ? null : localStorage.getItem(propertyValuesKey);
     try {
       localStorage.setItem(VIDEO_KEY, JSON.stringify(videos));
       localStorage.setItem(META_KEY, JSON.stringify(metadata));
+      if (propertyValues != null) localStorage.setItem(propertyValuesKey, JSON.stringify(propertyValues));
     } catch (error) {
       try { if (previousVideos == null) localStorage.removeItem(VIDEO_KEY); else localStorage.setItem(VIDEO_KEY, previousVideos); } catch (_) {}
       try { if (previousMetadata == null) localStorage.removeItem(META_KEY); else localStorage.setItem(META_KEY, previousMetadata); } catch (_) {}
+      if (propertyValues != null) { try { if (previousPropertyValues == null) localStorage.removeItem(propertyValuesKey); else localStorage.setItem(propertyValuesKey, previousPropertyValues); } catch (_) {} }
       throw error;
     }
   }
@@ -83,6 +89,50 @@
       <details class="videoEditField"><summary>再生情報・サムネイル</summary><div class="videoEditField"><label for="videoEditService">サービス名</label><input id="videoEditService" name="service" type="text" autocomplete="off"></div><div class="videoEditField"><label for="videoEditLegacyId">動画ID</label><input id="videoEditLegacyId" name="legacyId" type="text" autocomplete="off"></div><div class="videoEditField"><label for="videoEditThumbnail">サムネイルURL（任意）</label><input id="videoEditThumbnail" name="thumbnail" type="url" autocomplete="off"></div><div class="videoEditField"><label for="videoEditThumbnailTime">サムネイル時刻（mm:ss）</label><input id="videoEditThumbnailTime" name="thumbnailTime" type="text" inputmode="numeric" placeholder="0:00" autocomplete="off"></div></details>
       <p class="videoEditError" role="status" aria-live="polite"></p><div class="videoEditActions"><button class="videoEditButton danger" type="button" data-delete>動画を削除</button><a class="videoEditButton" data-cancel>キャンセル</a><button class="videoEditButton save" type="submit">保存</button></div>`;
     const elements = form.elements;
+    const customValueInputs = new Map();
+    if (PropertyStore && CustomProperties) {
+      const customState = PropertyStore.read();
+      const customSection = document.createElement('section'); customSection.className = 'videoEditCustomProperties';
+      const customHeading = document.createElement('h3'); customHeading.textContent = 'カスタムプロパティ'; customSection.append(customHeading);
+      const savedValues = customState.values[String(videoId)] || {};
+      Object.values(customState.definitions.properties).filter((property) => property && property.deleted !== true && property.hidden !== true).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)).forEach((property) => {
+        const wrapper = document.createElement('div'); wrapper.className = 'videoEditField';
+        const label = document.createElement('div'); label.className = 'videoEditCustomPropertyName'; label.textContent = property.name; wrapper.append(label);
+        const previous = Object.prototype.hasOwnProperty.call(savedValues, property.id) ? savedValues[property.id] : undefined;
+        let control;
+        if (property.type === 'long_text') { control = document.createElement('textarea'); control.value = typeof previous === 'string' ? previous : ''; }
+        else if (property.type === 'checkbox') { control = document.createElement('input'); control.type = 'checkbox'; control.checked = previous === true; }
+        else if (property.type === 'single_select' || property.type === 'multi_select') {
+          const options = Object.values(property.options || {}).filter((option) => option && option.deleted !== true).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+          if (property.type === 'single_select' && options.length >= 2 && options.length <= 4) {
+            control = document.createElement('div'); control.className = 'videoEditChoiceGroup'; control.setAttribute('role', 'group'); control.setAttribute('aria-label', property.name);
+            const unset = document.createElement('button'); unset.type = 'button'; unset.textContent = '未設定'; unset.dataset.optionId = ''; unset.setAttribute('aria-pressed', previous == null ? 'true' : 'false'); control.append(unset);
+            options.forEach((option) => { const choice = document.createElement('button'); choice.type = 'button'; choice.textContent = option.name; choice.dataset.optionId = option.id; choice.setAttribute('aria-pressed', previous === option.id ? 'true' : 'false'); control.append(choice); });
+            const archived = property.options && property.options[previous];
+            if (typeof previous === 'string' && archived && archived.deleted === true) { const choice = document.createElement('button'); choice.type = 'button'; choice.disabled = true; choice.textContent = archived.name + '（削除済み）'; choice.dataset.optionId = previous; choice.setAttribute('aria-pressed', 'true'); control.append(choice); }
+            control.addEventListener('click', (event) => { const choice = event.target.closest('button[data-option-id]'); if (!choice) return; control.querySelectorAll('button').forEach((item) => item.setAttribute('aria-pressed', item === choice ? 'true' : 'false')); });
+          } else {
+            control = document.createElement(property.type === 'single_select' ? 'select' : 'div');
+            if (property.type === 'single_select') { const empty = document.createElement('option'); empty.value = ''; empty.textContent = '未設定'; control.append(empty); }
+            options.forEach((option) => { const input = property.type === 'single_select' ? document.createElement('option') : document.createElement('label'); if (property.type === 'single_select') { input.value = option.id; input.textContent = option.name; control.append(input); } else { const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.value = option.id; checkbox.checked = Array.isArray(previous) && previous.includes(option.id); input.append(checkbox, document.createTextNode(option.name)); input.className = 'videoEditCheck'; control.append(input); } });
+            if (property.type === 'single_select' && typeof previous === 'string' && !options.some((option) => option.id === previous)) { const old = property.options && property.options[previous]; const stale = document.createElement('option'); stale.value = previous; stale.textContent = (old && old.name || '削除済みの選択肢') + '（削除済み）'; stale.disabled = true; control.append(stale); }
+            if (property.type === 'multi_select' && Array.isArray(previous)) previous.filter((optionId) => !options.some((option) => option.id === optionId)).forEach((optionId) => { const old = property.options && property.options[optionId]; const archived = document.createElement('label'); const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = true; checkbox.disabled = true; checkbox.value = optionId; archived.className = 'videoEditCheck'; archived.append(checkbox, document.createTextNode((old && old.name || '削除済みの選択肢') + '（削除済み）')); control.append(archived); });
+            if (property.type === 'single_select') control.value = typeof previous === 'string' ? previous : '';
+          }
+        } else {
+          control = document.createElement('input');
+          control.type = property.type === 'number' ? 'number' : property.type === 'date' ? 'date' : 'text';
+          if (property.type === 'number') control.step = 'any';
+          control.value = previous == null ? '' : String(previous);
+        }
+        control.setAttribute('aria-label', property.name);
+        if (property.type === 'checkbox') control.className = 'videoEditCustomCheckbox';
+        wrapper.append(control); customSection.append(wrapper);
+        customValueInputs.set(property.id, { property, control, previous });
+      });
+      if (!customValueInputs.size) { const hint = document.createElement('p'); hint.textContent = '動画プロパティ設定から項目を追加できます。'; const settings = document.createElement('a'); settings.href = 'video-properties.html'; settings.textContent = 'プロパティ設定'; hint.append(' ', settings); customSection.append(hint); }
+      const anchor = form.querySelector('.videoEditError'); form.insertBefore(customSection, anchor);
+    }
     elements.url.value = current.url;
     elements.title.value = current.title;
     elements.status.value = current.watchStatus;
@@ -222,6 +272,29 @@
       const nextMeta = storedMeta && typeof storedMeta === 'object' && !Array.isArray(storedMeta) ? storedMeta : {};
       nextMeta[savedId] = { ...(nextMeta[savedId] || {}), title: elements.title.value.trim(), folderId: elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, hidden: elements.hidden.checked, rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, thumbnailUrl: elements.thumbnail.value.trim(), thumbnailTimeSeconds: Data.isDirectVideoUrl(url) ? parsedTime : current.thumbnailTimeSeconds, updatedAt: Date.now() };
       const nextVideos = isAddMode ? [nextBase, ...savedVideos] : savedVideos.map((item) => String(item.id) === videoId ? nextBase : item);
+      const propertyUpdates = [];
+      if (customValueInputs.size) {
+        const latestPropertyState = PropertyStore.read();
+        for (const [propertyId, entry] of customValueInputs) {
+          const { property, control, previous } = entry;
+          let value;
+          if (property.type === 'checkbox') value = control.checked;
+          else if (property.type === 'single_select') value = control.matches('select') ? (control.value || null) : (control.querySelector('button[aria-pressed="true"]')?.dataset.optionId || null);
+          else if (property.type === 'multi_select') {
+            const activeOptionIds = new Set(Object.values(property.options || {}).filter((option) => option && option.deleted !== true).map((option) => option.id));
+            const retained = Array.isArray(previous) ? previous.filter((optionId) => !activeOptionIds.has(optionId)) : [];
+            value = [...new Set([...retained, ...[...control.querySelectorAll('input[type="checkbox"]:checked:not(:disabled)')].map((input) => input.value)])];
+          }
+          else if (property.type === 'number') value = control.value.trim() === '' ? null : Number(control.value);
+          else value = control.value;
+          const options = property.options || {};
+          let valid = CustomProperties.validateValue(property, value, latestPropertyState.definitions);
+          if (property.type === 'single_select' && value === previous && value != null && options[value]?.deleted === true) valid = true;
+          if (property.type === 'multi_select' && Array.isArray(value)) valid = value.length === new Set(value).size && value.every((optionId) => typeof optionId === 'string' && (!!options[optionId] && options[optionId].deleted !== true || Array.isArray(previous) && previous.includes(optionId)));
+          if (!valid) { error.textContent = `「${property.name}」の値を確認してください。`; return; }
+          propertyUpdates.push({ propertyId, property, previous, value });
+        }
+      }
       if (saving) return;
       saving = true;
       const submitButton = form.querySelector('[type="submit"]');
@@ -238,7 +311,28 @@
           }
         }
         try {
-          writeVideoRecordsAtomically(nextVideos, nextMeta);
+          if (customValueInputs.size && PropertyStore) {
+            await PropertyStore.mutate({
+              storage: localStorage,
+              guest: !!window.TestCodeGuest?.isActive(),
+              vault: window.MangaVault,
+              pendingAlreadyMarked: !window.TestCodeGuest?.isActive(),
+              sync: false,
+              recipe: (latest) => {
+                const values = { ...latest.values };
+                const videoValues = { ...(values[String(savedId)] || {}) };
+                for (const update of propertyUpdates) {
+                  const latestProperty = latest.definitions.properties[update.propertyId];
+                  if (!latestProperty || latestProperty.deleted === true) continue;
+                  if (JSON.stringify(update.previous) === JSON.stringify(update.value)) continue;
+                  videoValues[update.propertyId] = update.value;
+                }
+                values[String(savedId)] = videoValues;
+                return { ...latest, values };
+              },
+              commit: () => writeVideoRecordsAtomically(nextVideos, nextMeta),
+            });
+          } else writeVideoRecordsAtomically(nextVideos, nextMeta);
         } catch (_) {
           error.textContent = '端末に保存できませんでした。ブラウザの保存容量を確認してください。';
           return;

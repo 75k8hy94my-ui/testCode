@@ -23,18 +23,18 @@ function scriptSources(html) {
 test('current entry pages keep their static bootstrap script baselines', () => {
   assert.deepEqual(scriptSources(pages.manga), [
     'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-sync-audit', 'vault-session.js?v=20261011-auto-receive-sync', 'vault-conflict-ui.js?v=20261010-vault-sync-audit', 'browser-storage.js',
-    'vault-payload.js?v=20261010-vault-sync-v4', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
+    'vault-payload.js?v=20261012-video-custom-properties', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js?v=20261010-vpn-diagnostics',
     'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261011-nongame-audit', 'feature-flags.js',
     'media-access-gate.js?v=20261010-vpn-diagnostics',
     'manga-list-route.js?v=20261011-nongame-audit',
-    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'vault-history.js?v=20261011-vault-history', 'vault-history-ui.js?v=20261011-vault-history', 'video-shorts-state.js?v=20261010-shorts-state', 'profile-shorts-reset.js?v=20261010-reset-progress', 'home-profile-spa.js?v=20261011-vault-history',
+    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'vault-history.js?v=20261011-vault-history', 'vault-history-ui.js?v=20261011-vault-history', 'video-shorts-state.js?v=20261010-shorts-state', 'profile-shorts-reset.js?v=20261010-reset-progress', 'home-profile-spa.js?v=20261012-video-custom-properties-v2',
   ]);
   assert.deepEqual(scriptSources(pages.video), [
     'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-sync-audit', 'vault-session.js?v=20261011-auto-receive-sync', 'vault-conflict-ui.js?v=20261010-vault-sync-audit', 'browser-storage.js',
-    'vault-payload.js?v=20261010-vault-sync-v4', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
+    'vault-payload.js?v=20261012-video-custom-properties', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
     'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js?v=20261010-vpn-diagnostics',
-    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261011-nongame-audit', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'vault-history.js?v=20261011-vault-history', 'vault-history-ui.js?v=20261011-vault-history', 'video-shorts-state.js?v=20261010-shorts-state', 'profile-shorts-reset.js?v=20261010-reset-progress', 'home-profile-spa.js?v=20261011-vault-history',
+    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261011-nongame-audit', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'vault-history.js?v=20261011-vault-history', 'vault-history-ui.js?v=20261011-vault-history', 'video-shorts-state.js?v=20261010-shorts-state', 'profile-shorts-reset.js?v=20261010-reset-progress', 'home-profile-spa.js?v=20261012-video-custom-properties-v2',
   ]);
 });
 
@@ -51,7 +51,7 @@ test('every Vault entry loads the same diff-sync dependency before the shared se
     assert.ok(merge >= 0 && session > merge, `${name} loads merge before vault session`);
     const conflictUi = sources.findIndex((source) => normalize(source) === 'vault-conflict-ui.js?v=20261010-vault-sync-audit');
     if (name !== 'game/index.html') assert.ok(conflictUi > session, `${name} loads conflict UI after shared session`);
-    const payload = sources.findIndex((source) => normalize(source) === 'vault-payload.js?v=20261010-vault-sync-v4');
+    const payload = sources.findIndex((source) => ['vault-payload.js?v=20261010-vault-sync-v4', 'vault-payload.js?v=20261012-video-custom-properties'].includes(normalize(source)));
     if (payload >= 0) assert.ok(payload > session, `${name} loads payload after shared session`);
     refs.push(normalize(sources[merge]), normalize(sources[session]));
   }
@@ -142,10 +142,10 @@ test('VPN checks and manual designations remain available to protected reader me
 });
 
 test('video bootstrap has one owner per page and does not load on the Reader document', () => {
-  assert.match(spa, /video-list-route\.js\?v=20261010-local-first-save/);
+  assert.match(spa, /video-list-route\.js\?v=20261012-video-custom-properties-v2/);
   const videoRoute = fs.readFileSync(new URL('../video-list-route.js', import.meta.url), 'utf8');
   assert.match(videoRoute, /video-thumbnail-renderer\.js\?v=20261008-shared-thumbnails/);
-  assert.match(videoRoute, /video-library\.js\?v=20261011-pending-sync/);
+  assert.match(videoRoute, /video-library\.js\?v=20261012-video-custom-properties-v2/);
   assert.match(recommendations, /const page = String\(\(root\.location && root\.location\.pathname\) \|\| ''\)\.split\('\/'\)\.pop\(\);/);
   assert.doesNotMatch(reader, /recommendations\.js|video-data\.js|video-library\.js/);
   assert.match(recommendations, /loadBrowserScript\('video-data\.js'\)/);

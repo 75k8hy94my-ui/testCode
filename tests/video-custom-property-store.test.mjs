@@ -100,3 +100,18 @@ test('concurrentDifferentPropertyUpdatesKeepBothMaps', async () => {
   assert.deepEqual(JSON.parse(storage.get(valuesKey)).v1, { p1: 'p1', p2: 'p2' });
   assert.deepEqual(queue, ['p1', 'p2']);
 });
+
+test('editorCommitWithoutPropertyChangesStaysMarkedForBackgroundSync', async () => {
+  const storage = new Map([[definitionKey, JSON.stringify(initial.definitions)], [valuesKey, JSON.stringify({ v1: { rating: 0 } })]]);
+  let committed = false;
+  const fakeVault = vault();
+  const result = await Store.mutate({
+    storage, vault: fakeVault, pendingAlreadyMarked: true, sync: false,
+    recipe: ({ definitions, values }) => ({ definitions, values }),
+    commit: async () => { committed = true; },
+  });
+  assert.equal(committed, true);
+  assert.equal(result.localSaved, true);
+  assert.equal(result.synced, false);
+  assert.equal(fakeVault.syncCalls, undefined);
+});
