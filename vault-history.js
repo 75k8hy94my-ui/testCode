@@ -8,6 +8,10 @@
 
   const ENTITY_COLLECTIONS = new Set(['folders', 'items', 'videos', 'videoFolders']);
   const ENTITY_MAPS = ['mangaInfo', 'toc', 'lastPages', 'videoMeta', 'videoMarkers'];
+  const ENTITY_MAP_OWNERS = new Map([
+    ['mangaInfo', 'items'], ['toc', 'items'], ['lastPages', 'items'],
+    ['videoMeta', 'videos'], ['videoMarkers', 'videos'],
+  ]);
   const clone = (value) => JSON.parse(JSON.stringify(value));
   const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
   const escapePointer = (value) => String(value).replace(/~/g, '~0').replace(/\//g, '~1');
@@ -166,7 +170,10 @@
         idMap.set(collection + ':' + id, nextId);
         usedIds.add(nextId);
       } else if (targetIds.has(id)) {
-        throw new Error('未対応の削除履歴を安全に復元できないため、処理を停止しました。');
+        const ownerCollection = ENTITY_MAP_OWNERS.get(collection);
+        const mapsToTargetEntity = ownerCollection
+          && (Array.isArray(target[ownerCollection]) ? target[ownerCollection] : []).some((entity) => entity && entity.id === id);
+        if (!mapsToTargetEntity) throw new Error('未対応の削除履歴を安全に復元できないため、処理を停止しました。');
       }
     }
     remapEntityReferences(target, idMap);
