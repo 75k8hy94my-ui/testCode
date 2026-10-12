@@ -279,7 +279,9 @@
       body.setAttribute('aria-label', (index + 1) + '番目 ' + (source ? source.title : '参照できない素材'));
       body.title = (source ? source.title : '参照できない素材') + ' · ' + format(clip.startSeconds)
         + ' – ' + format(clip.endSeconds) + ' · ' + format(clip.endSeconds - clip.startSeconds);
-      body.append(label, duration);
+      const angle = document.createElement('small');
+      angle.textContent = ({ 0: '回転なし', '-90': '左90°', 90: '右90°', 180: '180°' })[clip.rotation || 0];
+      body.append(label, duration, angle);
       body.addEventListener('click', () => chooseClip(index));
       const startHandle = document.createElement('button');
       startHandle.type = 'button'; startHandle.className = 'vveTrimHandle start';
@@ -312,6 +314,8 @@
       ? edit.clips.length + '区間・合計' + format(Edit.totalDuration(edit)) + '（仮想再生時間）'
       : '0区間';
     const hasSelected = !!selectedClip() && !busy && !stale;
+    refs.rotation.disabled = !hasSelected;
+    refs.rotation.value = displayChosen ? String(displayChosen.rotation || 0) : '0';
     refs.duplicate.disabled = !hasSelected || edit.clips.length >= Edit.MAX_CLIPS;
     refs.trim.disabled = !hasSelected;
     refs.split.disabled = !hasSelected;
@@ -819,6 +823,7 @@
       '<button class="vveAction" type="button" data-end-minus-one>−1秒</button><button class="vveAction" type="button" data-end-minus-tenth>−0.1</button>',
       '<button class="vveAction" type="button" data-end-plus-tenth>＋0.1</button><button class="vveAction" type="button" data-end-plus-one>＋1秒</button>',
       '<button class="vveAction" type="button" data-set-end>再生位置</button></div></div>',
+      '<label class="vveField">選択区間の回転<select data-rotation><option value="0">回転なし</option><option value="-90">左90°</option><option value="90">右90°</option><option value="180">180°</option></select></label>',
       '<div class="vveControls"><button class="vveAction" type="button" data-trim>入力範囲を適用</button>',
       '<button class="vveAction" type="button" data-split>分割</button><button class="vveAction" type="button" data-duplicate>複製</button>',
       '<button class="vveAction danger" type="button" data-remove>削除</button></div>',
@@ -847,7 +852,7 @@
       insertMarker: $('[data-insert-marker]'),
       selectedDuration: $('[data-selected-duration]'), saveStatus: $('[data-save-status]'),
       total: $('[data-total]'), add: $('[data-add]'), trim: $('[data-trim]'),
-      duplicate: $('[data-duplicate]'),
+      duplicate: $('[data-duplicate]'), rotation: $('[data-rotation]'),
       startMinusOne: $('[data-start-minus-one]'), startMinusTenth: $('[data-start-minus-tenth]'),
       startPlusTenth: $('[data-start-plus-tenth]'), startPlusOne: $('[data-start-plus-one]'),
       endMinusOne: $('[data-end-minus-one]'), endMinusTenth: $('[data-end-minus-tenth]'),
@@ -897,6 +902,10 @@
     });
     refs.add.addEventListener('click', addClip);
     refs.duplicate.addEventListener('click', duplicateClip);
+    refs.rotation.addEventListener('change', () => action(() => {
+      if (selectedIndex === null) return;
+      setEdit(Edit.setClipRotation(edit, selectedIndex, Number(refs.rotation.value)), selectedIndex);
+    }));
     refs.trim.addEventListener('click', trimClip);
     refs.split.addEventListener('click', splitClip);
     refs.removeClip.addEventListener('click', removeClip);
