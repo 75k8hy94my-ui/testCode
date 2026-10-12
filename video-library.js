@@ -19,7 +19,7 @@
   };
 
   const state = {
-    baseVideos: [], folders: [], meta: {}, query: '', quick: 'all', folderId: '', tag: '', service: '', sort: 'recent-added', view: 'card', page: 1, totalPages: 1,
+    baseVideos: [], folders: [], meta: {}, query: '', quick: 'all', folderId: '', tag: '', service: '', sort: 'recent-added', view: 'card', thumbnailSize: 'normal', page: 1, totalPages: 1,
     syncTimer: null, syncRunning: false, syncDirty: false, syncPromise: null, editorSaving: false, editorId: null, sheetMode: null, showHidden: false, customDefinitions: { schemaVersion: 1, properties: {} }, customValues: {}, customFilters: {},
   };
   const dom = {};
@@ -170,9 +170,10 @@
     const prefs = readJson(PREF_KEY, {});
     state.sort = SORT_LABELS[prefs.sort] ? prefs.sort : 'recent-added';
     state.view = prefs.view === 'compact' ? 'compact' : 'card';
+    state.thumbnailSize = ['small', 'normal', 'large'].includes(prefs.thumbnailSize) ? prefs.thumbnailSize : 'normal';
     state.quick = ['all', 'favorite', 'later', 'watching', 'watched'].includes(prefs.quick) ? prefs.quick : 'all';
   }
-  function savePrefs() { writeJson(PREF_KEY, { sort: state.sort, view: state.view, quick: state.quick }); }
+  function savePrefs() { writeJson(PREF_KEY, { sort: state.sort, view: state.view, thumbnailSize: state.thumbnailSize, quick: state.quick }); }
 
   function loadLibraryState() {
     if (!canReadProtectedData()) {
@@ -359,6 +360,7 @@
         <select id="videoLibraryService" aria-label="サービス"><option value="">全サービス</option></select>
         <select id="videoLibrarySort" aria-label="並べ替え"></select>
         <button id="videoLibraryView" class="vl-icon-btn" type="button" aria-label="表示形式を切り替え">表示</button>
+        <label class="vl-thumbnail-size-label" for="videoLibraryThumbnailSize">サムネイルサイズ <select id="videoLibraryThumbnailSize" aria-label="動画一覧のサムネイルサイズ"><option value="small">小</option><option value="normal">標準</option><option value="large">大</option></select></label>
         <button id="videoLibraryFolders" class="vl-icon-btn" type="button">フォルダ</button>
       </div>
       <details class="vl-custom-filter"><summary>カスタムプロパティで絞り込む</summary><div id="videoLibraryCustomFilters" class="vl-custom-filter-list"></div></details>
@@ -410,7 +412,7 @@
     Object.assign(dom, {
       section, app, search: document.getElementById('videoLibrarySearch'), quick: document.getElementById('videoLibraryQuick'),
       folder: document.getElementById('videoLibraryFolder'), tag: document.getElementById('videoLibraryTag'), service: document.getElementById('videoLibraryService'),
-      sort: document.getElementById('videoLibrarySort'), view: document.getElementById('videoLibraryView'), foldersBtn: document.getElementById('videoLibraryFolders'),
+      sort: document.getElementById('videoLibrarySort'), view: document.getElementById('videoLibraryView'), thumbnailSize: document.getElementById('videoLibraryThumbnailSize'), foldersBtn: document.getElementById('videoLibraryFolders'),
       customFilters: document.getElementById('videoLibraryCustomFilters'),
       add: document.getElementById('videoLibraryAdd'), shorts: document.getElementById('videoLibraryShorts'), hiddenBtn: document.getElementById('videoLibraryHidden'), count: document.getElementById('videoLibraryCount'), status: document.getElementById('videoLibraryStatus'), results: document.getElementById('videoLibraryResults'),
       pagination: document.getElementById('videoLibraryPagination'), prevPage: document.getElementById('videoLibraryPrevPage'), nextPage: document.getElementById('videoLibraryNextPage'), pageLabel: document.getElementById('videoLibraryPageLabel'),
@@ -582,6 +584,8 @@
     const filtered = CustomProperties ? baseFiltered.filter((video) => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, filters)) : baseFiltered;
     const videos = sortForReturn(filtered);
     dom.quick.querySelectorAll('[data-quick]').forEach((button) => button.classList.toggle('active', button.dataset.quick === state.quick));
+    dom.thumbnailSize.value = state.thumbnailSize;
+    dom.app.dataset.thumbnailSize = state.thumbnailSize;
     dom.view.textContent = state.view === 'card' ? '▤' : '▦'; dom.view.title = state.view === 'card' ? 'コンパクト表示へ' : 'カード表示へ';
     dom.hiddenBtn.textContent = state.showHidden ? '動画一覧' : '非表示 (' + all.filter((video) => video.hidden).length + ')';
     dom.hiddenBtn.setAttribute('aria-pressed', state.showHidden ? 'true' : 'false');
@@ -877,6 +881,7 @@
     dom.service.addEventListener('change', () => { clearReturnIntent(); state.service = dom.service.value; render(); });
     dom.sort.addEventListener('change', () => { clearReturnIntent(); state.sort = dom.sort.value; savePrefs(); render(); });
     dom.view.addEventListener('click', () => { clearReturnIntent(); state.view = state.view === 'card' ? 'compact' : 'card'; savePrefs(); render(); });
+    dom.thumbnailSize.addEventListener('change', () => { state.thumbnailSize = ['small', 'normal', 'large'].includes(dom.thumbnailSize.value) ? dom.thumbnailSize.value : 'normal'; savePrefs(); dom.app.dataset.thumbnailSize = state.thumbnailSize; });
     dom.hiddenBtn.addEventListener('click', () => { clearReturnIntent(); state.showHidden = !state.showHidden; state.query = ''; dom.search.value = ''; state.folderId = ''; state.tag = ''; state.service = ''; render(); });
     dom.add.addEventListener('click', () => {
       if (!canReadProtectedData()) return;
