@@ -24,6 +24,9 @@ test('manga page turns do not snap the vertical scroll position back to the tool
   });
   await page.goto('manga.html');
   await expect(page.locator('#mangaListSection')).toBeVisible();
+  // Guest route startup can rehydrate from its own storage snapshot.
+  // Remount after seeding to guarantee the pagination model sees new items.
+  await page.evaluate(() => window.HomeProfileSPA.renderRoute());
   await expect(page.locator('#bookshelfPageLabel')).toHaveText('1 / 3');
   await expect(page.locator('.book-card')).toHaveCount(25);
 

@@ -124,5 +124,7 @@ test('mobile page navigation remains visible and all cards render from one page 
   assert.match(runtime, /entry\.type === 'series-group'/);
   assert.match(runtime, /entry\.type === 'author-group'/);
   assert.match(runtime, /elements\.savedListItems\.appendChild\(elements\.bookshelfPagination\)/);
-  assert.match(route, /onPageChange: \(delta\) => \{[\s\S]*scrollIntoView/);
+  const pageTurn = route.slice(route.indexOf('onPageChange: (delta) => {'), route.indexOf('swipeSurface: elements.savedListItems'));
+  assert.match(pageTurn, /runtime\.renderSavedList\(delta\)/);
+  assert.doesNotMatch(pageTurn, /scrollIntoView|scrollTo|scrollTop/);
 });
