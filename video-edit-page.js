@@ -347,7 +347,7 @@
       if (!matching) nextMeta[savedId] = { ...(nextMeta[savedId] || {}), title: matching ? (nextMeta[savedId]?.title || '') : elements.title.value.trim(), folderId: matching ? (nextMeta[savedId]?.folderId || null) : elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, hidden: elements.hidden.checked, rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, thumbnailUrl: elements.thumbnail.value.trim(), thumbnailTimeSeconds: Data.isDirectVideoUrl(url) ? parsedTime : current.thumbnailTimeSeconds, updatedAt: Date.now() };
       const nextVideos = matching ? savedVideos.map(item => String(item.id) === savedId ? nextBase : item) : isAddMode ? [nextBase, ...savedVideos] : savedVideos.map((item) => String(item.id) === videoId ? nextBase : item);
       const propertyUpdates = [];
-      if (customValueInputs.size) {
+      if (customValueInputs.size && !matching) {
         const latestPropertyState = PropertyStore.read();
         for (const [propertyId, entry] of customValueInputs) {
           const { property, control, previous } = entry;
@@ -385,7 +385,7 @@
           }
         }
         try {
-          if (customValueInputs.size && PropertyStore) {
+          if (customValueInputs.size && PropertyStore && !matching) {
             await PropertyStore.mutate({
               storage: localStorage,
               guest: !!window.TestCodeGuest?.isActive(),
