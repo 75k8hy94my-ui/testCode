@@ -80,7 +80,7 @@
       <div class="videoEditUrlRow"><div class="videoEditField"><label for="videoEditUrl">動画URL</label><input id="videoEditUrl" name="url" type="url" autocomplete="off" required readonly></div><button class="videoEditButton" type="button" data-edit-url>URLを変更</button></div>
       <div class="videoEditField"><label for="videoEditTitle">タイトル</label><input id="videoEditTitle" name="title" type="text" maxlength="240" autocomplete="off"></div>
       <div class="videoEditField"><label for="videoEditFolder">フォルダ</label><select id="videoEditFolder" name="folder"></select><div class="videoEditUrlRow" style="margin-top:9px"><input id="videoEditNewFolder" type="text" maxlength="100" placeholder="新しいフォルダ名" autocomplete="off"><button class="videoEditButton" type="button" data-create-folder>新規作成</button></div><p class="videoEditHelp" data-folder-feedback role="status" aria-live="polite"></p></div>
-      <div class="videoEditField"><label for="videoEditAlternates">サブURL（１行につき１つ）</label><textarea id="videoEditAlternates" name="alternateUrls" placeholder="サブURLを入力"></textarea><p class="videoEditHelp">通常はメインURLで再生します。サブURLをメインに切り替える場合は上の動画URLに貼り付けて保存してください。</p></div>
+      <div class="videoEditField"><label for="videoEditAlternates">サブURL（１行につき１つ）</label><textarea id="videoEditAlternates" name="alternateUrls" placeholder="サブURLを入力"></textarea><div class="videoEditUrlRow"><select id="videoEditAlternateChoice" aria-label="切替先のサブURL"></select><button type="button" class="videoEditButton" data-promote-alternate>サブをメインに切替</button></div><p class="videoEditHelp">切替後に「保存」を押すと、選んだURLを通常再生に使用します。</p></div>
        <div class="videoEditField"><label for="videoEditStatus">状態</label><select id="videoEditStatus" name="status"><option value="">未設定</option><option value="later">あとで見る</option><option value="watching">視聴中</option><option value="watched">視聴済み</option></select></div>
       <div class="videoEditField"><label for="videoEditTags">タグ（カンマ区切り）</label><input id="videoEditTags" name="tags" type="text" autocomplete="off"></div>
       <div class="videoEditField"><label for="videoEditMemo">メモ</label><textarea id="videoEditMemo" name="memo"></textarea></div>
@@ -137,6 +137,29 @@
     elements.url.value = current.url;
     elements.title.value = current.title;
     elements.alternateUrls.value = (current.alternateUrls || []).join('\n');
+    const updateAlternateChoices = () => {
+      const choice = form.querySelector('#videoEditAlternateChoice');
+      const previous = choice.value;
+      choice.replaceChildren();
+      elements.alternateUrls.value.split(/\r?\n/).map(v => v.trim()).filter(v => v && v !== elements.url.value.trim()).forEach(url => {
+        const option = document.createElement('option'); option.value = url; option.textContent = url; choice.append(option);
+      });
+      if ([...choice.options].some(o => o.value === previous)) choice.value = previous;
+    };
+    elements.alternateUrls.addEventListener('input', updateAlternateChoices);
+    form.querySelector('[data-promote-alternate]').addEventListener('click', () => {
+      const selected = form.querySelector('#videoEditAlternateChoice').value;
+      if (!selected) return;
+      const oldMain = elements.url.value.trim();
+      const variants = elements.alternateUrls.value.split(/\r?\n/).map(v => v.trim()).filter(v => v && v !== selected);
+      if (oldMain && !variants.includes(oldMain)) variants.unshift(oldMain);
+      elements.url.value = selected;
+      elements.alternateUrls.value = variants.join('\n');
+      updateAlternateChoices();
+      elements.url.dispatchEvent(new Event('change'));
+    });
+    updateAlternateChoices();
+
     elements.status.value = current.watchStatus;
     elements.tags.value = current.tags.join(', ');
     elements.memo.value = current.memo;
