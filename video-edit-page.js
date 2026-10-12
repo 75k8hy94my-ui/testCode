@@ -80,7 +80,8 @@
       <div class="videoEditUrlRow"><div class="videoEditField"><label for="videoEditUrl">動画URL</label><input id="videoEditUrl" name="url" type="url" autocomplete="off" required readonly></div><button class="videoEditButton" type="button" data-edit-url>URLを変更</button></div>
       <div class="videoEditField"><label for="videoEditTitle">タイトル</label><input id="videoEditTitle" name="title" type="text" maxlength="240" autocomplete="off"></div>
       <div class="videoEditField"><label for="videoEditFolder">フォルダ</label><select id="videoEditFolder" name="folder"></select><div class="videoEditUrlRow" style="margin-top:9px"><input id="videoEditNewFolder" type="text" maxlength="100" placeholder="新しいフォルダ名" autocomplete="off"><button class="videoEditButton" type="button" data-create-folder>新規作成</button></div><p class="videoEditHelp" data-folder-feedback role="status" aria-live="polite"></p></div>
-      <div class="videoEditField"><label for="videoEditStatus">状態</label><select id="videoEditStatus" name="status"><option value="">未設定</option><option value="later">あとで見る</option><option value="watching">視聴中</option><option value="watched">視聴済み</option></select></div>
+      <div class="videoEditField"><label for="videoEditAlternates">サブURL（１行につき１つ）</label><textarea id="videoEditAlternates" name="alternateUrls" placeholder="サブURLを入力"></textarea><div class="videoEditUrlRow"><select id="videoEditAlternateChoice" aria-label="切替先のサブURL"></select><button type="button" class="videoEditButton" data-promote-alternate>サブをメインに切替</button></div><p class="videoEditHelp">切替後に「保存」を押すと、選んだURLを通常再生に使用します。</p></div>
+       <div class="videoEditField"><label for="videoEditStatus">状態</label><select id="videoEditStatus" name="status"><option value="">未設定</option><option value="later">あとで見る</option><option value="watching">視聴中</option><option value="watched">視聴済み</option></select></div>
       <div class="videoEditField"><label for="videoEditTags">タグ（カンマ区切り）</label><input id="videoEditTags" name="tags" type="text" autocomplete="off"></div>
       <div class="videoEditField"><label for="videoEditMemo">メモ</label><textarea id="videoEditMemo" name="memo"></textarea></div>
       <label class="videoEditCheck"><input name="favorite" type="checkbox"> お気に入り</label>
@@ -135,6 +136,30 @@
     }
     elements.url.value = current.url;
     elements.title.value = current.title;
+    elements.alternateUrls.value = (current.alternateUrls || []).join('\n');
+    const updateAlternateChoices = () => {
+      const choice = form.querySelector('#videoEditAlternateChoice');
+      const previous = choice.value;
+      choice.replaceChildren();
+      elements.alternateUrls.value.split(/\r?\n/).map(v => v.trim()).filter(v => v && v !== elements.url.value.trim()).forEach(url => {
+        const option = document.createElement('option'); option.value = url; option.textContent = url; choice.append(option);
+      });
+      if ([...choice.options].some(o => o.value === previous)) choice.value = previous;
+    };
+    elements.alternateUrls.addEventListener('input', updateAlternateChoices);
+    form.querySelector('[data-promote-alternate]').addEventListener('click', () => {
+      const selected = form.querySelector('#videoEditAlternateChoice').value;
+      if (!selected) return;
+      const oldMain = elements.url.value.trim();
+      const variants = elements.alternateUrls.value.split(/\r?\n/).map(v => v.trim()).filter(v => v && v !== selected);
+      if (oldMain && !variants.includes(oldMain)) variants.unshift(oldMain);
+      elements.url.value = selected;
+      elements.alternateUrls.value = variants.join('\n');
+      updateAlternateChoices();
+      elements.url.dispatchEvent(new Event('change'));
+    });
+    updateAlternateChoices();
+
     elements.status.value = current.watchStatus;
     elements.tags.value = current.tags.join(', ');
     elements.memo.value = current.memo;
@@ -218,21 +243,28 @@
         }
         const latestVideos = read(VIDEO_KEY, []);
         const savedVideos = Array.isArray(latestVideos) ? latestVideos : [];
-        const seen = new Set(savedVideos.map((item) => Data.normalizeVideo(item).url));
+        const updatedVideos = savedVideos.map(v => ({ ...v }));
         const newVideos = [];
         const newMeta = {};
         const now = Date.now();
+        let promoted = 0;
         urls.forEach((url) => {
-          if (seen.has(url)) return;
-          seen.add(url);
+          const identity = Data.videoUrlIdentity(url);
+          const found = updatedVideos.find(v => [v.url, ...(v.alternateUrls || [])].some(x => Data.videoUrlIdentity(x) === identity));
+          if (found) {
+            if (found.url !== url) { Object.assign(found, Data.promoteVideoUrl(found, url)); promoted++; }
+            return;
+          }
           const fields = Data.storageFieldsForVideoUrl(url);
           const videoId = 'v-' + (window.crypto && typeof window.crypto.randomUUID === 'function'
             ? window.crypto.randomUUID() : Math.random().toString(36).slice(2) + now) + '-import-' + newVideos.length;
-          newVideos.push(Data.normalizeVideo({ id: videoId, title: '', url, ...fields, addedAt: now, updatedAt: now }));
+          const added = Data.normalizeVideo({ id: videoId, title: '', url, ...fields, addedAt: now, updatedAt: now });
+          newVideos.push(added);
+          updatedVideos.push(added);
           newMeta[videoId] = { title: '', folderId: null, watchStatus: '', tags: [], memo: '', favorite: false, hidden: false, rotate90: false, rotate90Direction: 'none', thumbnailUrl: '', thumbnailTimeSeconds: null, updatedAt: now };
         });
-        if (!newVideos.length) {
-          error.textContent = '追加できる新しい動画URLがありません。';
+        if (!newVideos.length && !promoted) {
+          error.textContent = '追加・切り替えできるURLがありません。';
           event.target.value = '';
           return;
         }
@@ -251,7 +283,7 @@
           }
         }
         try {
-          writeVideoRecordsAtomically([...newVideos, ...savedVideos], nextMeta);
+          writeVideoRecordsAtomically([...newVideos, ...updatedVideos.filter(v => !newVideos.some(n => n.id === v.id))], nextMeta);
         } catch (_) {
           error.textContent = '端末に保存できませんでした。ブラウザの保存容量を確認してください。';
           event.target.value = '';
@@ -264,7 +296,7 @@
             catch (syncError) { syncMessage = '未同期として保持し、後で再試行します。 ' + (syncError?.message || ''); }
           } else syncMessage = 'VPN未許可のため未同期として保持しました。';
         } else syncMessage = 'ゲスト端末内に保存しました。';
-        error.textContent = newVideos.length + '件追加しました。' + syncMessage;
+        error.textContent = newVideos.length + '件追加、' + promoted + '件をメインURLに変更しました。' + syncMessage;
         event.target.value = '';
       });
     }
@@ -286,8 +318,13 @@
       if (classified.kind === 'invalid') { error.textContent = '有効な動画URLを入力してください。'; return; }
       const latestVideos = read(VIDEO_KEY, []);
       const savedVideos = Array.isArray(latestVideos) ? latestVideos : [];
-      const duplicate = savedVideos.some((item) => (isAddMode || String(item.id) !== videoId) && Data.normalizeVideo(item).url === url);
-      if (duplicate) { error.textContent = '同じ動画URLはすでに登録されています。'; return; }
+      const identity = Data.videoUrlIdentity(url);
+      const matching = savedVideos.find(item => (isAddMode || String(item.id) !== videoId) &&
+        [item.url, ...(item.alternateUrls || [])].some(candidate => Data.videoUrlIdentity(candidate) === identity));
+      const variants = [...new Set([...elements.alternateUrls.value.split(/\r?\n/).map(v => v.trim()), ...(!isAddMode && current.url !== url ? [current.url] : [])])].filter(v => v && v !== url);
+      if (variants.some(v => Data.classifyVideoUrl(v).kind === 'invalid')) { error.textContent = 'サブURLを確認してください。'; return; }
+      if (variants.some(v => savedVideos.some(item => String(item.id) !== videoId && String(item.id) !== String(matching?.id || '') && [item.url, ...(item.alternateUrls || [])].some(other => other === v)))) { error.textContent = '別の動画に登録されているURLをサブにできません。'; return; }
+      if (matching && !isAddMode) { error.textContent = '別の登録済み動画と同じURLです。'; return; }
       const fields = Data.storageFieldsForVideoUrl(url);
       const timestamp = elements.thumbnailTime.value.trim();
       const parsedTime = timestamp ? Data.parseMediaTime(timestamp) : null;
@@ -297,17 +334,20 @@
       const a = isAddMode ? fields.a : (elements.service.value.trim() || classified.a || fields.a);
       const b = isAddMode ? fields.b : (elements.legacyId.value.trim() || classified.b || fields.b);
       const now = Date.now();
-      const savedId = isAddMode ? 'v-' + (window.crypto && typeof window.crypto.randomUUID === 'function'
+      const savedId = matching ? String(matching.id) : isAddMode ? 'v-' + (window.crypto && typeof window.crypto.randomUUID === 'function'
         ? window.crypto.randomUUID() : Math.random().toString(36).slice(2) + now) : videoId;
-      const nextBase = isAddMode
-        ? Data.normalizeVideo({ id: savedId, title: elements.title.value.trim(), url, a, b, addedAt: now, updatedAt: now })
-        : { ...base, title: elements.title.value.trim(), url, a, b, updatedAt: now };
+      const nextBase = matching
+        ? Data.promoteVideoUrl(matching, url)
+        : isAddMode
+          ? Data.normalizeVideo({ id: savedId, title: elements.title.value.trim(), url, alternateUrls: variants, a, b, addedAt: now, updatedAt: now })
+          : { ...base, title: elements.title.value.trim(), url, alternateUrls: variants, a, b, updatedAt: now };
+      if (matching) nextBase.alternateUrls = [...new Set([...(nextBase.alternateUrls || []), ...variants])].filter(v => v !== url);
       const storedMeta = read(META_KEY, {});
       const nextMeta = storedMeta && typeof storedMeta === 'object' && !Array.isArray(storedMeta) ? storedMeta : {};
-      nextMeta[savedId] = { ...(nextMeta[savedId] || {}), title: elements.title.value.trim(), folderId: elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, hidden: elements.hidden.checked, rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, thumbnailUrl: elements.thumbnail.value.trim(), thumbnailTimeSeconds: Data.isDirectVideoUrl(url) ? parsedTime : current.thumbnailTimeSeconds, updatedAt: Date.now() };
-      const nextVideos = isAddMode ? [nextBase, ...savedVideos] : savedVideos.map((item) => String(item.id) === videoId ? nextBase : item);
+      if (!matching) nextMeta[savedId] = { ...(nextMeta[savedId] || {}), title: matching ? (nextMeta[savedId]?.title || '') : elements.title.value.trim(), folderId: matching ? (nextMeta[savedId]?.folderId || null) : elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, hidden: elements.hidden.checked, rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, thumbnailUrl: elements.thumbnail.value.trim(), thumbnailTimeSeconds: Data.isDirectVideoUrl(url) ? parsedTime : current.thumbnailTimeSeconds, updatedAt: Date.now() };
+      const nextVideos = matching ? savedVideos.map(item => String(item.id) === savedId ? nextBase : item) : isAddMode ? [nextBase, ...savedVideos] : savedVideos.map((item) => String(item.id) === videoId ? nextBase : item);
       const propertyUpdates = [];
-      if (customValueInputs.size) {
+      if (customValueInputs.size && !matching) {
         const latestPropertyState = PropertyStore.read();
         for (const [propertyId, entry] of customValueInputs) {
           const { property, control, previous } = entry;
@@ -345,7 +385,7 @@
           }
         }
         try {
-          if (customValueInputs.size && PropertyStore) {
+          if (customValueInputs.size && PropertyStore && !matching) {
             await PropertyStore.mutate({
               storage: localStorage,
               guest: !!window.TestCodeGuest?.isActive(),

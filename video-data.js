@@ -208,6 +208,31 @@
     return { a: 'url', b: stableUrlToken(classified.url) };
   }
 
+  function videoUrlIdentity(value) {
+    try {
+      const url = new URL(String(value || ''));
+      if (!/^https?:$/.test(url.protocol)) return String(value || '').trim();
+      // Direct media links often vary only by signed URL or start-time query parameters.
+      if (/\.(?:mp4|webm|ogg|ogv|m4v|mov)$/i.test(url.pathname)) return url.origin + url.pathname;
+      for (const key of ['st', 'start', 't', 'utm_source', 'utm_medium', 'utm_campaign']) url.searchParams.delete(key);
+      url.hash = '';
+      return url.origin + url.pathname + url.search;
+    } catch (_) { return String(value || '').trim(); }
+  }
+  function alternateUrls(value) {
+    const x = value && typeof value === 'object' ? value : {};
+    const primary = String(x.url || '').trim();
+    const input = Array.isArray(x.alternateUrls) ? x.alternateUrls : [];
+    return [...new Set(input.filter(url => typeof url === 'string').map(url => url.trim()).filter(url => url && url !== primary))];
+  }
+  function promoteVideoUrl(video, url) {
+    const normalized = normalizeVideo(video);
+    const next = String(url || '').trim();
+    const variants = [...new Set([normalized.url, ...normalized.alternateUrls].filter(Boolean))].filter(item => item !== next);
+    const fields = storageFieldsForVideoUrl(next);
+    return { ...video, url: next, a: fields ? fields.a : normalized.a, b: fields ? fields.b : normalized.b, alternateUrls: variants, updatedAt: Date.now() };
+  }
+
   function normalizeVideo(value, now = Date.now()) {
     const x = value && typeof value === 'object' ? value : {};
     const a = asText(x.a);
@@ -220,6 +245,7 @@
       id: asText(x.id) || `v-${Math.random().toString(36).slice(2)}-${now}`,
       title: asText(x.title),
       url: asText(x.url) || legacyUrl(a, b),
+      alternateUrls: alternateUrls(x),
       a,
       b,
       folderId: asText(x.folderId) || null,
@@ -344,5 +370,5 @@
     const number = Math.max(1, index + 1);
     return '名称未設定' + String(number).replace(/[0-9]/g, digit => String.fromCharCode(0xFF10 + Number(digit)));
   }
-  return { displayTitle, WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, storageFieldsForVideoUrl, stableUrlToken, getRotationDirection, getDisplayDimensions };
+  return { displayTitle, WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, storageFieldsForVideoUrl, stableUrlToken, videoUrlIdentity, alternateUrls, promoteVideoUrl, getRotationDirection, getDisplayDimensions };
 }));
