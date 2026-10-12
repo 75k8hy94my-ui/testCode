@@ -36,6 +36,15 @@
     let timer = null;
     let revision = 0;
 
+    const originalTransform = video.style ? video.style.transform : '';
+    const originalTransformOrigin = video.style ? video.style.transformOrigin : '';
+    function applyRotation(index) {
+      if (!video.style) return;
+      const rotation = index < 0 ? 0 : normalized.clips[index].rotation;
+      video.style.transformOrigin = 'center center';
+      video.style.transform = rotation ? 'rotate(' + rotation + 'deg)' : originalTransform;
+    }
+
     function snapshot() {
       return {
         phase, error, message, clipIndex: activeIndex, clipCount: normalized.clips.length,
@@ -148,6 +157,7 @@
       const found = Edit.locateTime(normalized, seconds);
       const url = sourceMap.get(found.sourceVideoId);
       activeIndex = found.clipIndex;
+      applyRotation(activeIndex);
       requestedSeconds = seconds;
       sourceTime = found.sourceSeconds;
       pendingSeek = found.sourceSeconds;
@@ -261,6 +271,7 @@
       clearTimer();
       wantsPlay = false;
       listeners.forEach(([name, handler]) => video.removeEventListener(name, handler));
+      if (video.style) { video.style.transform = originalTransform; video.style.transformOrigin = originalTransformOrigin; }
       try { video.pause(); video.removeAttribute('src'); video.load(); } catch (_) {}
       currentUrl = '';
       activeIndex = -1;
