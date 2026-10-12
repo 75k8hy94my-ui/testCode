@@ -155,3 +155,18 @@ test('normalizes and preserves the persistent 90-degree rotation setting', () =>
   assert.equal(normalizeVideo({ id: 'v4', rotate90Direction: 'right' }).rotate90Direction, 'right');
   assert.equal(normalizeVideo({ id: 'v5', rotate90Direction: 'invalid' }).rotate90Direction, 'none');
 });
+
+
+test('URL variants of the same direct video share an identity', () => {
+  assert.equal(data.videoUrlIdentity('https://media.example/watch/movie.mp4?st=10'), data.videoUrlIdentity('https://media.example/watch/movie.mp4?st=30'));
+  assert.notEqual(data.videoUrlIdentity('https://media.example/watch/other.mp4?st=10'), data.videoUrlIdentity('https://media.example/watch/movie.mp4?st=30'));
+  assert.notEqual(data.videoUrlIdentity('https://youtube.com/watch?v=abc'), data.videoUrlIdentity('https://youtube.com/watch?v=def'));
+});
+test('new URL becomes primary while the old and other variants remain alternatives', () => {
+  const original = { id:'v1', url:'https://media.example/a.mp4?st=10', alternateUrls:['https://media.example/a.mp4?st=5'], title:'keep', addedAt:100 };
+  const promoted = data.promoteVideoUrl(original, 'https://media.example/a.mp4?st=30');
+  assert.equal(promoted.id, 'v1');
+  assert.equal(promoted.url, 'https://media.example/a.mp4?st=30');
+  assert.deepEqual(promoted.alternateUrls, ['https://media.example/a.mp4?st=10','https://media.example/a.mp4?st=5']);
+  assert.equal(data.normalizeVideo(promoted).title, 'keep');
+});
