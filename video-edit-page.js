@@ -321,8 +321,9 @@
       const identity = Data.videoUrlIdentity(url);
       const matching = savedVideos.find(item => (isAddMode || String(item.id) !== videoId) &&
         [item.url, ...(item.alternateUrls || [])].some(candidate => Data.videoUrlIdentity(candidate) === identity));
-      const variants = [...new Set([...(current.alternateUrls || []), ...elements.alternateUrls.value.split(/\r?\n/).map(v => v.trim()), ...(!isAddMode && current.url !== url ? [current.url] : [])])].filter(v => v && v !== url);
+      const variants = [...new Set([...elements.alternateUrls.value.split(/\r?\n/).map(v => v.trim()), ...(!isAddMode && current.url !== url ? [current.url] : [])])].filter(v => v && v !== url);
       if (variants.some(v => Data.classifyVideoUrl(v).kind === 'invalid')) { error.textContent = 'サブURLを確認してください。'; return; }
+      if (variants.some(v => savedVideos.some(item => String(item.id) !== videoId && String(item.id) !== String(matching?.id || '') && [item.url, ...(item.alternateUrls || [])].some(other => other === v)))) { error.textContent = '別の動画に登録されているURLをサブにできません。'; return; }
       if (matching && !isAddMode) { error.textContent = '別の登録済み動画と同じURLです。'; return; }
       const fields = Data.storageFieldsForVideoUrl(url);
       const timestamp = elements.thumbnailTime.value.trim();
