@@ -220,21 +220,28 @@
         }
         const latestVideos = read(VIDEO_KEY, []);
         const savedVideos = Array.isArray(latestVideos) ? latestVideos : [];
-        const seen = new Set(savedVideos.map((item) => Data.normalizeVideo(item).url));
+        const updatedVideos = savedVideos.map(v => ({ ...v }));
         const newVideos = [];
         const newMeta = {};
         const now = Date.now();
+        let promoted = 0;
         urls.forEach((url) => {
-          if (seen.has(url)) return;
-          seen.add(url);
+          const identity = Data.videoUrlIdentity(url);
+          const found = updatedVideos.find(v => [v.url, ...(v.alternateUrls || [])].some(x => Data.videoUrlIdentity(x) === identity));
+          if (found) {
+            if (found.url !== url) { Object.assign(found, Data.promoteVideoUrl(found, url)); promoted++; }
+            return;
+          }
           const fields = Data.storageFieldsForVideoUrl(url);
           const videoId = 'v-' + (window.crypto && typeof window.crypto.randomUUID === 'function'
             ? window.crypto.randomUUID() : Math.random().toString(36).slice(2) + now) + '-import-' + newVideos.length;
-          newVideos.push(Data.normalizeVideo({ id: videoId, title: '', url, ...fields, addedAt: now, updatedAt: now }));
+          const added = Data.normalizeVideo({ id: videoId, title: '', url, ...fields, addedAt: now, updatedAt: now });
+          newVideos.push(added);
+          updatedVideos.push(added);
           newMeta[videoId] = { title: '', folderId: null, watchStatus: '', tags: [], memo: '', favorite: false, hidden: false, rotate90: false, rotate90Direction: 'none', thumbnailUrl: '', thumbnailTimeSeconds: null, updatedAt: now };
         });
-        if (!newVideos.length) {
-          error.textContent = '追加できる新しい動画URLがありません。';
+        if (!newVideos.length && !promoted) {
+          error.textContent = '追加・切り替えできるURLがありません。';
           event.target.value = '';
           return;
         }
@@ -253,7 +260,7 @@
           }
         }
         try {
-          writeVideoRecordsAtomically([...newVideos, ...savedVideos], nextMeta);
+          writeVideoRecordsAtomically([...newVideos, ...updatedVideos.filter(v => !newVideos.some(n => n.id === v.id))], nextMeta);
         } catch (_) {
           error.textContent = '端末に保存できませんでした。ブラウザの保存容量を確認してください。';
           event.target.value = '';
@@ -266,7 +273,7 @@
             catch (syncError) { syncMessage = '未同期として保持し、後で再試行します。 ' + (syncError?.message || ''); }
           } else syncMessage = 'VPN未許可のため未同期として保持しました。';
         } else syncMessage = 'ゲスト端末内に保存しました。';
-        error.textContent = newVideos.length + '件追加しました。' + syncMessage;
+        error.textContent = newVideos.length + '件追加、' + promoted + '件をメインURLに変更しました。' + syncMessage;
         event.target.value = '';
       });
     }
