@@ -369,3 +369,11 @@ html[data-theme="dark"] .iosSwitch input:checked + .iosSwitchTrack{background:#3
   .videoPlayerLayout { padding-left: 10px; padding-right: 10px; }
   #videoListSection #videoLibraryApp { padding-left: 10px; padding-right: 10px; }
 }
+
+/* Point markers remain circular; interval markers mark their full time span. */
+.videoMarkerPeriodBubble{transform:translateY(-50%);min-width:10px;max-width:none;height:25px;border-radius:12px;background:rgba(42,133,222,.78);border:1px solid #b8deff;overflow:hidden}
+.videoMarkerPeriodBubble svg{width:20px;height:20px;flex:none}
+.videoMarkerPeriodControls{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;width:100%;padding-top:8px;border-top:1px solid rgba(255,255,255,.2)}
+.videoMarkerPeriodControls input{width:100%;min-width:0;max-width:none;background:#fff;color:#111;border:1px solid #aaa;border-radius:5px}
+.videoMarkerPeriodControls button{min-height:34px;padding:5px 8px;border:1px solid rgba(255,255,255,.4);border-radius:6px;background:#343942;color:#fff;cursor:pointer}
+.videoMarkerPeriodControls .videoMarkerAdd{grid-column:1/-1;background:#1769aa}
