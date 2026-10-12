@@ -353,44 +353,18 @@
 
   function diagnosticText() {
     const d = diagnostics;
-    const generic = d.generic.status === 'success'
-      ? (d.generic.verdict ? 'VPN判定: YES' : 'VPN判定: NO')
-      : d.generic.status === 'country-only'
-        ? '国判定のみ実施'
-        : d.generic.status === 'country-fallback'
-          ? '国判定のみ実施（予備API）'
-        : d.generic.status === 'unavailable'
-          ? '判定不能' + (d.generic.httpStatus ? ' (HTTP ' + d.generic.httpStatus + ')' : '')
-          : d.generic.status === 'error'
-            ? 'エラー' + (d.generic.httpStatus ? ' (HTTP ' + d.generic.httpStatus + ')' : '')
-          : d.generic.status === 'checking' ? '確認中' : '未確認';
-    const owned = d.protonOwnedNetworkMatch === true ? '一致' : d.protonOwnedNetworkMatch === false ? '不一致' : '未確認';
-    const proton = d.protonExitMatch === true ? '一致' : d.protonExitMatch === false ? '不一致' : '未確認';
-    const manual = d.manualDesignation === 'vpn' ? 'VPNとして手動指定' : d.manualDesignation === 'non-vpn' ? 'VPNではないと固定' : 'なし';
-    const country = d.countryCode
-      ? (d.countryName ? d.countryCode + ' (' + d.countryName + ')' : d.countryCode)
-      : d.countryName || '未確認';
-    const countryPolicy = d.countryPolicy === 'non-jp-vpn'
-      ? '日本国外IPのためVPNとして扱う'
-      : d.countryPolicy === 'jp'
-        ? '日本IPのため国判定だけではVPN扱いしない'
-        : d.countryPolicy === 'unavailable'
-          ? '国判定不能'
-          : '未判定';
-    const final = d.final === 'allowed' ? '許可' : d.final === 'blocked' ? 'ブロック' : d.final === 'checking' ? '確認中' : '未判定';
+    const policy = d.countryPolicy === 'jp' ? '日本IP: ブロック'
+      : d.countryPolicy === 'non-jp-vpn' ? '日本国外IP: 許可'
+      : '判定不能: ブロック';
     return [
-      '現在IP: ' + (d.ip || '取得前'),
-      '国判定: ' + country,
-      d.countrySource === 'fallback' ? '国情報の取得元: 予備API' : '',
-      '国判定結果: ' + countryPolicy,
-      '手動指定: ' + manual,
-      'Proton保有ネットワーク: ' + owned,
-      '一般VPN判定: ' + generic,
-      'Proton出口IP: ' + proton,
-      '最終判定: ' + final,
+      'グローバルIP: ' + (d.ip || '未取得'),
+      '国別判定: ' + policy,
+      '判定元: IPdeny（ローカルJP範囲）',
+      'IP取得元: ipify',
+      '最終判定: ' + (d.final === 'allowed' ? '許可' : d.final === 'checking' ? '確認中' : '拒否'),
       d.error ? 'エラー詳細: ' + d.error : '',
       d.checkedAt ? '確認時刻: ' + d.checkedAt : '',
-    ].filter(Boolean).join('\n');
+    ].filter(Boolean).join('\\n');
   }
 
   function renderManualControls() {
@@ -512,7 +486,7 @@
         const ip = diagnostics.ip;
         if (clearManualVpnDesignation(ip)) { await checkVpn({ external: false }); await syncManualIpSetsIfAllowed(); }
       });
-      controls.append(recheck, markVpn, markNonVpn, clearVpn);
+      controls.append(recheck);
       panel.append(title, pre, controls);
       root.document.body.append(panel);
       root.document.addEventListener('click', (event) => {
@@ -779,14 +753,14 @@
   function validPublicIp(ip) {
     const v4 = parseIpv4(ip);
     if (v4 != null) {
-      const a = Math.floor(v4 / 16777216), b = Math.floor(v4 / 65536) % 256;
+      const a = Math.floor(v4 / 16777216), b = Math.floor(v4 / 65536) % 256,
+      c = Math.floor(v4 / 256) % 256;
       return !(a === 0 || a === 10 || a === 127 || a >= 224 ||
         (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) ||
         (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) ||
-        (a === 192 && b === 0) || (a === 198 && (b === 18 || b === 19)) ||
-        (a === 192 && b === 0) || (a === 192 && b === 0) ||
-        (a === 192 && b === 0) || (a === 203 && b === 0) ||
-        (a === 198 && b === 51));
+        (a === 192 && b === 0 && c === 2) ||
+        (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) ||
+        (a === 203 && b === 0 && c === 113));
     }
     const v6 = parseIpv6(ip);
     if (v6 == null) return false;
