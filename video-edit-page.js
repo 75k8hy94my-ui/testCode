@@ -79,7 +79,7 @@
       ${isAddMode ? '<details class="videoEditField videoEditJsonImport"><summary>JSONからURLを一括追加</summary><p class="videoEditHelp">URL文字列の配列を含むJSONファイルを選択します。例: ["https://example.com/1.mp4"]</p><label for="videoEditJsonFile">JSONファイル</label><input id="videoEditJsonFile" type="file" accept="application/json,.json" data-json-import></details>' : ''}
       <div class="videoEditUrlRow"><div class="videoEditField"><label for="videoEditUrl">動画URL</label><input id="videoEditUrl" name="url" type="url" autocomplete="off" required readonly></div><button class="videoEditButton" type="button" data-edit-url>URLを変更</button></div>
       <div class="videoEditField"><label for="videoEditTitle">タイトル</label><input id="videoEditTitle" name="title" type="text" maxlength="240" autocomplete="off"></div>
-      <div class="videoEditField"><label for="videoEditFolder">フォルダ</label><select id="videoEditFolder" name="folder"></select></div>
+      <div class="videoEditField"><label for="videoEditFolder">フォルダ</label><select id="videoEditFolder" name="folder"></select><div class="videoEditUrlRow" style="margin-top:9px"><input id="videoEditNewFolder" type="text" maxlength="100" placeholder="新しいフォルダ名" autocomplete="off"><button class="videoEditButton" type="button" data-create-folder>新規作成</button></div><p class="videoEditHelp" data-folder-feedback role="status" aria-live="polite"></p></div>
       <div class="videoEditField"><label for="videoEditStatus">状態</label><select id="videoEditStatus" name="status"><option value="">未設定</option><option value="later">あとで見る</option><option value="watching">視聴中</option><option value="watched">視聴済み</option></select></div>
       <div class="videoEditField"><label for="videoEditTags">タグ（カンマ区切り）</label><input id="videoEditTags" name="tags" type="text" autocomplete="off"></div>
       <div class="videoEditField"><label for="videoEditMemo">メモ</label><textarea id="videoEditMemo" name="memo"></textarea></div>
@@ -160,6 +160,40 @@
     const none = document.createElement('option'); none.value = ''; none.textContent = '未分類'; elements.folder.append(none);
     folders.forEach((folder) => { const option = document.createElement('option'); option.value = folder.id; option.textContent = folder.name; elements.folder.append(option); });
     elements.folder.value = current.folderId || '';
+    form.querySelector('[data-create-folder]').addEventListener('click', async () => {
+      const input = form.querySelector('#videoEditNewFolder');
+      const feedback = form.querySelector('[data-folder-feedback]');
+      const button = form.querySelector('[data-create-folder]');
+      feedback.textContent = '';
+      if (!canReadProtectedData()) { feedback.textContent = '保管庫を開いてから作成してください。'; return; }
+      const name = input.value.trim();
+      if (!name) { feedback.textContent = 'フォルダ名を入力してください。'; return; }
+      const latest = Data.normalizeFolders(read(FOLDER_KEY, []));
+      if (latest.some(folder => folder.name.toLocaleLowerCase('ja') === name.toLocaleLowerCase('ja'))) {
+        feedback.textContent = '同じ名前のフォルダが存在します。'; return;
+      }
+      button.disabled = true;
+      try {
+        if (!window.TestCodeGuest?.isActive()) {
+          if (!window.MangaVault || typeof window.MangaVault.markLocalChangesPending !== 'function' || !window.MangaVault.markLocalChangesPending()) {
+            throw new Error('未同期状態を記録できません。フォルダは作成していません。');
+          }
+        }
+        const newFolder = { id: 'vf-' + (window.crypto?.randomUUID?.() || Math.random().toString(36).slice(2) + Date.now()), name, createdAt: Date.now() };
+        localStorage.setItem(FOLDER_KEY, JSON.stringify([...latest, newFolder]));
+        const option = document.createElement('option'); option.value = newFolder.id; option.textContent = newFolder.name;
+        elements.folder.append(option);
+        elements.folder.value = newFolder.id;
+        input.value = '';
+        feedback.textContent = 'フォルダを作成しました。動画への割当ては「保存」で確定します。';
+        if (!window.TestCodeGuest?.isActive()) {
+          try { await window.MangaVault.saveLocalChanges(); }
+          catch (_) { feedback.textContent += ' クラウドには未同期として保持しています。'; }
+        }
+      } catch (error) {
+        feedback.textContent = error.message || 'フォルダの作成に失敗しました。';
+      } finally { button.disabled = false; }
+    });
     form.querySelector('[data-cancel]').href = returnTarget(returnKind, videoId);
     form.querySelector('[data-edit-url]').addEventListener('click', () => { if (!canReadProtectedData()) return; elements.url.readOnly = false; elements.url.focus(); });
     if (isAddMode) {
