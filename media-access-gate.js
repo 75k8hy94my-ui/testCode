@@ -364,7 +364,7 @@
       '最終判定: ' + (d.final === 'allowed' ? '許可' : d.final === 'checking' ? '確認中' : '拒否'),
       d.error ? 'エラー詳細: ' + d.error : '',
       d.checkedAt ? '確認時刻: ' + d.checkedAt : '',
-    ].filter(Boolean).join('\\n');
+    ].filter(Boolean).join('\n');
   }
 
   function renderManualControls() {
@@ -724,7 +724,7 @@
   // Non-matches mean "not listed as Japan by IPdeny", not proof of actual VPN use.
   function parseIpv4(value) {
     const parts = String(value).split('.');
-    if (parts.length !== 4 || parts.some((p) => !/^\\d{1,3}$/.test(p) || Number(p) > 255)) return null;
+    if (parts.length !== 4 || parts.some((p) => !/^\d{1,3}$/.test(p) || Number(p) > 255)) return null;
     return parts.reduce((n, p) => (n * 256 + Number(p)), 0);
   }
   function parseIpv6(value) {
