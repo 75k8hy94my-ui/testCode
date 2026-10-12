@@ -41,8 +41,8 @@
       media.style.inset = 'auto';
       media.style.left = '50%';
       media.style.top = '50%';
-      media.style.width = (width / height * 100) + '%';
-      media.style.height = (height / width * 100) + '%';
+      media.style.width = '56.25%';
+      media.style.height = '177.777778%';
       media.style.transform = 'translate(-50%, -50%) rotate(' + (rotation === 'right' ? '90' : '-90') + 'deg)';
       media.style.objectFit = 'cover';
     };
