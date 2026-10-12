@@ -850,6 +850,13 @@
       state.page = 1;
       render();
     });
+    // VideoListRoute persists across Home SPA transitions: discard transient
+    // search terms when leaving the video list, even when its DOM is detached.
+    document.addEventListener('manga-video-list-route-detach', () => {
+      state.query = '';
+      if (dom.search) dom.search.value = '';
+      state.page = 1;
+    });
     if (!paginationEventsBound && window.MangaListPaginationEventsFactory) {
       const paginationEvents = window.MangaListPaginationEventsFactory.create({
         onPageChange(delta) {
