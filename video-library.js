@@ -192,6 +192,105 @@
     if (canReadProtectedData() && PropertyStore && CustomProperties) { const custom = PropertyStore.read(); state.customDefinitions = custom.definitions; state.customValues = custom.values; }
   }
 
+  let urlMigrationRunning = false;
+  async function migrateExistingVideoUrls() {
+    if (urlMigrationRunning || !canReadProtectedData()) return;
+    const videos = readJson(VIDEO_KEY, []);
+    if (!Array.isArray(videos) || videos.length < 2) return;
+    const groups = new Map();
+    videos.forEach((video, index) => {
+      const key = Data.videoUrlIdentity(video.url);
+      if (!key) return;
+      const group = groups.get(key) || [];
+      group.push({ video, index });
+      groups.set(key, group);
+    });
+    const duplicates = [...groups.values()].filter(group => group.length > 1);
+    if (!duplicates.length) return;
+    urlMigrationRunning = true;
+    try {
+      const meta = readJson(META_KEY, {});
+      const markers = readJson('mangaReaderVideoMarkers', {});
+      const propertyKey = 'mangaReaderVideoPropertyValues';
+      const properties = readJson(propertyKey, {});
+      const nextMeta = { ...meta }, nextMarkers = { ...markers }, nextProperties = { ...properties };
+      const removed = new Set();
+      const nextVideos = videos.map(item => ({ ...item }));
+      for (const group of duplicates) {
+        // The most recently added entry supplies the default playback URL.
+        const newest = group.slice().sort((a, b) =>
+          (Number(b.video.addedAt) || 0) - (Number(a.video.addedAt) || 0) || b.index - a.index)[0];
+        const keeper = nextVideos[newest.index];
+        const keeperId = String(keeper.id);
+        const all = group.slice().sort((a, b) =>
+          (Number(a.video.addedAt) || 0) - (Number(b.video.addedAt) || 0) || a.index - b.index);
+        keeper.alternateUrls = [...new Set(all.flatMap(entry =>
+          [entry.video.url, ...(Array.isArray(entry.video.alternateUrls) ? entry.video.alternateUrls : [])]))]
+          .filter(url => url && url !== keeper.url);
+        let combined = { ...(nextMeta[keeperId] || {}) };
+        let mergedMarkers = Array.isArray(nextMarkers[keeperId]) ? [...nextMarkers[keeperId]] : [];
+        let mergedProps = { ...(nextProperties[keeperId] || {}) };
+        for (const entry of all) {
+          const item = entry.video;
+          if (String(item.id) === keeperId) continue;
+          const oldId = String(item.id);
+          const old = nextMeta[oldId] || {};
+          // Preserve the keeper's existing values, filling blank fields from removed entries.
+          for (const [key, value] of Object.entries(old)) {
+            if ((combined[key] == null || combined[key] === '' || (Array.isArray(combined[key]) && !combined[key].length))
+              && value != null && value !== '') combined[key] = value;
+          }
+          combined.tags = [...new Set([...(Array.isArray(combined.tags) ? combined.tags : []), ...(Array.isArray(old.tags) ? old.tags : [])])];
+          combined.favorite = combined.favorite === true || old.favorite === true;
+          combined.openCount = (Number(combined.openCount) || 0) + (Number(old.openCount) || 0);
+          combined.lastOpenedAt = Math.max(Number(combined.lastOpenedAt) || 0, Number(old.lastOpenedAt) || 0);
+          combined.progressSeconds = Math.max(Number(combined.progressSeconds) || 0, Number(old.progressSeconds) || 0);
+          if (Array.isArray(nextMarkers[oldId])) mergedMarkers.push(...nextMarkers[oldId]);
+          for (const [key, value] of Object.entries(nextProperties[oldId] || {})) {
+            if (mergedProps[key] == null || mergedProps[key] === '') mergedProps[key] = value;
+          }
+          delete nextMeta[oldId]; delete nextMarkers[oldId]; delete nextProperties[oldId];
+          removed.add(oldId);
+        }
+        combined.updatedAt = Date.now();
+        nextMeta[keeperId] = combined;
+        nextMarkers[keeperId] = mergedMarkers.filter((marker, index, list) =>
+          list.findIndex(m => (m.id && marker.id ? m.id === marker.id : JSON.stringify(m) === JSON.stringify(marker))) === index);
+        nextProperties[keeperId] = mergedProps;
+      }
+      const output = nextVideos.filter(item => !removed.has(String(item.id)));
+      const keys = [VIDEO_KEY, META_KEY, 'mangaReaderVideoMarkers', propertyKey];
+      const values = [output, nextMeta, nextMarkers, nextProperties];
+      const commit = () => {
+        const before = keys.map(key => localStorage.getItem(key));
+        try {
+          keys.forEach((key, index) => localStorage.setItem(key, JSON.stringify(values[index])));
+        } catch (error) {
+          keys.forEach((key, index) => {
+            try { before[index] == null ? localStorage.removeItem(key) : localStorage.setItem(key, before[index]); } catch (_) {}
+          });
+          throw error;
+        }
+      };
+      if (window.TestCodeGuest?.isActive()) commit();
+      else {
+        const vault = window.MangaVault;
+        const pointer = window.MangaVaultPayload?.pointerPath;
+        if (!vault || typeof vault.recordSyncDeletion !== 'function' || typeof pointer !== 'function') return;
+        const paths = [...removed].flatMap(id => [
+          pointer('videos', id), pointer('videoMeta', id), pointer('videoMarkers', id),
+          pointer('videoPropertyValues', id)]);
+        await vault.recordSyncDeletion(paths, commit);
+      }
+      loadLibraryState();
+      render();
+      scheduleVaultSync();
+    } catch (error) {
+      console.error('Video URL migration failed; original records retained where possible', error);
+      setStatus('既存URLの統合を保存できませんでした。', true);
+    } finally { urlMigrationRunning = false; }
+  }
+
   function effectiveVideo(base) {
     const meta = state.meta[base.id] && typeof state.meta[base.id] === 'object' ? state.meta[base.id] : {};
     return Data.normalizeVideo({ ...base, ...meta, id: base.id, a: base.a, b: base.b, addedAt: base.addedAt });
@@ -921,7 +1020,7 @@
   function init(access) {
     if (access) mediaAccess = access;
     if (!document.getElementById('videoListSection')) return;
-    injectStyles(); loadPrefs(); loadLibraryState(); if (!setupMarkup()) return; bindEvents(); if (dom.search) dom.search.value = state.query; render(); resumePendingLocalSync();
+    injectStyles(); loadPrefs(); loadLibraryState(); if (!setupMarkup()) return; bindEvents(); if (dom.search) dom.search.value = state.query; render(); resumePendingLocalSync(); migrateExistingVideoUrls();
   }
 
   window.MangaReaderVideoLibrary = Object.freeze({ init, syncAccessUi, captureReturnContext });
