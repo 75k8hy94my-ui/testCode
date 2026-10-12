@@ -641,11 +641,10 @@
             const previousPage = state().bookshelfPage;
             setState({ bookshelfPage: previousPage + delta });
             // Only pagination animates; ordinary list updates remain instant.
+            // Do not snap the viewport back to the toolbar when the user
+            // swipes sideways or uses the page buttons. Keep their vertical
+            // scroll position; only the bookshelf page changes.
             runtime.renderSavedList(delta);
-            if (state().bookshelfPage !== previousPage) {
-              const target = rootElement.querySelector('#listToolbar') || elements.savedListItems;
-              if (typeof target?.scrollIntoView === 'function') target.scrollIntoView({ block: 'start', behavior: 'auto' });
-            }
           }
         }, { prevButton: prev, nextButton: next, swipeSurface: elements.savedListItems });
         bindFactory(MangaListNavigationEventsFactory, { onBack: () => { setState({ currentFolderView: null, currentSeriesView: null, currentAuthorView: null, bookshelfPage: 1 }); renderList(); } }, { backButton: back });
