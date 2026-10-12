@@ -49,7 +49,9 @@
     });
   }
 
-  const IP_URL = 'https://api.ipify.org?format=json';
+  const IP_URL = 'https://api64.ipify.org?format=json';
+  const LOCAL_JP_RANGES_URL = 'ip-country-jp.json';
+  let jpRangesPromise = null;
   const CHECK_URL = 'https://ip-api.dev/api';
   const COUNTRY_FALLBACK_URL = 'https://api.ipapi.is';
   const PROTON_EXIT_IPS_URL = 'https://raw.githubusercontent.com/tn3w/ProtonVPN-IPs/master/protonvpn_ips.json';
@@ -351,44 +353,18 @@
 
   function diagnosticText() {
     const d = diagnostics;
-    const generic = d.generic.status === 'success'
-      ? (d.generic.verdict ? 'VPN判定: YES' : 'VPN判定: NO')
-      : d.generic.status === 'country-only'
-        ? '国判定のみ実施'
-        : d.generic.status === 'country-fallback'
-          ? '国判定のみ実施（予備API）'
-        : d.generic.status === 'unavailable'
-          ? '判定不能' + (d.generic.httpStatus ? ' (HTTP ' + d.generic.httpStatus + ')' : '')
-          : d.generic.status === 'error'
-            ? 'エラー' + (d.generic.httpStatus ? ' (HTTP ' + d.generic.httpStatus + ')' : '')
-          : d.generic.status === 'checking' ? '確認中' : '未確認';
-    const owned = d.protonOwnedNetworkMatch === true ? '一致' : d.protonOwnedNetworkMatch === false ? '不一致' : '未確認';
-    const proton = d.protonExitMatch === true ? '一致' : d.protonExitMatch === false ? '不一致' : '未確認';
-    const manual = d.manualDesignation === 'vpn' ? 'VPNとして手動指定' : d.manualDesignation === 'non-vpn' ? 'VPNではないと固定' : 'なし';
-    const country = d.countryCode
-      ? (d.countryName ? d.countryCode + ' (' + d.countryName + ')' : d.countryCode)
-      : d.countryName || '未確認';
-    const countryPolicy = d.countryPolicy === 'non-jp-vpn'
-      ? '日本国外IPのためVPNとして扱う'
-      : d.countryPolicy === 'jp'
-        ? '日本IPのため国判定だけではVPN扱いしない'
-        : d.countryPolicy === 'unavailable'
-          ? '国判定不能'
-          : '未判定';
-    const final = d.final === 'allowed' ? '許可' : d.final === 'blocked' ? 'ブロック' : d.final === 'checking' ? '確認中' : '未判定';
+    const policy = d.countryPolicy === 'jp' ? '日本IP: ブロック'
+      : d.countryPolicy === 'non-jp-vpn' ? '日本国外IP: 許可'
+      : '判定不能: ブロック';
     return [
-      '現在IP: ' + (d.ip || '取得前'),
-      '国判定: ' + country,
-      d.countrySource === 'fallback' ? '国情報の取得元: 予備API' : '',
-      '国判定結果: ' + countryPolicy,
-      '手動指定: ' + manual,
-      'Proton保有ネットワーク: ' + owned,
-      '一般VPN判定: ' + generic,
-      'Proton出口IP: ' + proton,
-      '最終判定: ' + final,
+      'グローバルIP: ' + (d.ip || '未取得'),
+      '国別判定: ' + policy,
+      '判定元: IPdeny（ローカルJP範囲）',
+      'IP取得元: ipify',
+      '最終判定: ' + (d.final === 'allowed' ? '許可' : d.final === 'checking' ? '確認中' : '拒否'),
       d.error ? 'エラー詳細: ' + d.error : '',
       d.checkedAt ? '確認時刻: ' + d.checkedAt : '',
-    ].filter(Boolean).join('\n');
+    ].filter(Boolean).join('\\n');
   }
 
   function renderManualControls() {
@@ -510,7 +486,7 @@
         const ip = diagnostics.ip;
         if (clearManualVpnDesignation(ip)) { await checkVpn({ external: false }); await syncManualIpSetsIfAllowed(); }
       });
-      controls.append(recheck, markVpn, markNonVpn, clearVpn);
+      controls.append(recheck);
       panel.append(title, pre, controls);
       root.document.body.append(panel);
       root.document.addEventListener('click', (event) => {
@@ -743,8 +719,103 @@
     return true;
   }
 
+
+  // Only ipify is contacted at runtime; JP ranges are served as static same-origin data.
+  // Non-matches mean "not listed as Japan by IPdeny", not proof of actual VPN use.
+  function parseIpv4(value) {
+    const parts = String(value).split('.');
+    if (parts.length !== 4 || parts.some((p) => !/^\\d{1,3}$/.test(p) || Number(p) > 255)) return null;
+    return parts.reduce((n, p) => (n * 256 + Number(p)), 0);
+  }
+  function parseIpv6(value) {
+    let ip = String(value).toLowerCase().split('%')[0];
+    if (!ip.includes(':')) return null;
+    // Handle IPv4-mapped IPv6, e.g. ::ffff:192.0.2.1.
+    if (ip.includes('.')) {
+      const last = ip.substring(ip.lastIndexOf(':') + 1);
+      const asInt = parseIpv4(last);
+      if (asInt == null) return null;
+      ip = ip.substring(0, ip.lastIndexOf(':') + 1) +
+        ((asInt >>> 16).toString(16)) + ':' + ((asInt & 65535).toString(16));
+    }
+    if (ip.split('::').length > 2) return null;
+    const halves = ip.split('::');
+    const left = halves[0] ? halves[0].split(':') : [];
+    const right = halves[1] ? halves[1].split(':') : [];
+    if (left.concat(right).some((part) => !/^[0-9a-f]{1,4}$/.test(part))) return null;
+    if (halves.length === 1 && left.length !== 8) return null;
+    if (halves.length === 2 && left.length + right.length >= 8) return null;
+    const groups = halves.length === 2
+      ? [...left, ...Array(8 - left.length - right.length).fill('0'), ...right] : left;
+    if (groups.length !== 8) return null;
+    return groups.reduce((n, part) => (n << 16n) | BigInt(parseInt(part, 16)), 0n);
+  }
+  function validPublicIp(ip) {
+    const v4 = parseIpv4(ip);
+    if (v4 != null) {
+      const a = Math.floor(v4 / 16777216), b = Math.floor(v4 / 65536) % 256,
+      c = Math.floor(v4 / 256) % 256;
+      return !(a === 0 || a === 10 || a === 127 || a >= 224 ||
+        (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) ||
+        (a === 192 && b === 0 && c === 2) ||
+        (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) ||
+        (a === 203 && b === 0 && c === 113));
+    }
+    const v6 = parseIpv6(ip);
+    if (v6 == null) return false;
+    const top = v6 >> 120n;
+    // Global unicast 2000::/3 only, excluding documentation 2001:db8::/32.
+    return top >= 0x20n && top <= 0x3fn && (v6 >> 96n) !== 0x20010db8n;
+  }
+  async function loadJpRanges(signal) {
+    if (!jpRangesPromise) {
+      jpRangesPromise = (async () => {
+        const response = await root.fetch(LOCAL_JP_RANGES_URL, {
+          cache: 'no-cache', credentials: 'same-origin', signal
+        });
+        if (!response.ok) throw new Error('JP IPデータベースを取得できません (HTTP ' + response.status + ')');
+        const data = await response.json();
+        if (!Array.isArray(data.ipv4) || data.ipv4.length < 100 ||
+            !Array.isArray(data.ipv6) || data.ipv6.length < 100) {
+          throw new Error('JP IPデータベースが不完全です');
+        }
+        const parse = (rows, version) => rows.map((cidr) => {
+          const parts = String(cidr).split('/');
+          const bits = Number(parts[1]);
+          const address = version === 4 ? parseIpv4(parts[0]) : parseIpv6(parts[0]);
+          const max = version === 4 ? 32 : 128;
+          if (address == null || !Number.isInteger(bits) || bits < 0 || bits > max) throw new Error('IPデータが不正です');
+          const big = BigInt(address);
+          const shift = BigInt(max - bits);
+          const start = (big >> shift) << shift;
+          return [start, start + ((1n << shift) - 1n)];
+        }).sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
+        return { ipv4: parse(data.ipv4, 4), ipv6: parse(data.ipv6, 6), updated: data.updated };
+      })().catch((error) => { jpRangesPromise = null; throw error; });
+    }
+    return jpRangesPromise;
+  }
+  function matchesRanges(value, ranges) {
+    let lo = 0, hi = ranges.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1, [first, last] = ranges[mid];
+      if (value < first) hi = mid - 1;
+      else if (value > last) lo = mid + 1;
+      else return true;
+    }
+    return false;
+  }
+  async function assessLocalCountry(ip, signal) {
+    if (!validPublicIp(ip)) throw new Error('公開IPアドレスではありません');
+    const database = await loadJpRanges(signal);
+    const v4 = parseIpv4(ip);
+    const v6 = v4 == null ? parseIpv6(ip) : null;
+    const jp = matchesRanges(v4 == null ? v6 : BigInt(v4), v4 == null ? database.ipv6 : database.ipv4);
+    return { countryCode: jp ? 'JP' : 'NON_JP', countryPolicy: jp ? 'jp' : 'non-jp-vpn', updated: database.updated };
+  }
+
   async function checkVpn(options = {}) {
-    const useExternalApi = options.external !== false;
     const ownGeneration = ++checkGeneration;
     activeController?.abort();
     const controller = typeof root.AbortController === 'function' ? new root.AbortController() : null;
@@ -760,61 +831,28 @@
     const result = freshDiagnostics();
     result.final = 'checking';
     diagnostics = result;
-    const notify = () => { if (isCurrent()) renderDiagnostics(); };
-    notify();
+    renderDiagnostics();
     const timer = root.setTimeout && controller ? root.setTimeout(() => controller.abort(), 15000) : null;
     try {
-      if (typeof root.fetch !== 'function') throw new Error('fetch unavailable');
-      const ipPayload = await fetchJson(IP_URL, controller ? controller.signal : undefined);
+      const ipPayload = await fetchJson(IP_URL, controller?.signal);
       if (!isCurrent()) return false;
-      const ip = String(ipPayload && ipPayload.ip || '').trim();
-      if (!ip) throw new Error('public IP unavailable');
+      const ip = String(ipPayload?.ip || '').trim();
+      if (!ip) throw new Error('グローバルIPを取得できません');
       result.ip = ip;
-
-      const manualDesignation = getManualIpDesignation(ip);
-      result.manualDesignation = manualDesignation;
-      if (manualDesignation === 'non-vpn') return applyFinalStatus(false);
-
-      result.protonOwnedNetworkMatch = isKnownProtonOwnedIp(ip);
-      notify();
-      const signal = controller ? controller.signal : undefined;
-      let allowed = isKnownVpnIp(ip);
-      if (allowed) {
-        result.generic = { status: 'skipped-known-ip', httpStatus: null, verdict: true };
-        notify();
-      } else {
-        const [assessment, protonExitMatch] = await Promise.all([
-          lookupIpAssessment(ip, signal, useExternalApi, result, notify),
-          isKnownProtonExitIp(ip, signal),
-        ]);
-        if (!isCurrent()) return false;
-        result.protonExitMatch = protonExitMatch;
-        if (assessment.nonJapanVpn) allowed = true;
-        else if (useExternalApi) allowed = assessment.vpnVerdict;
-        if (!allowed) allowed = protonExitMatch;
-      }
+      const assessment = await assessLocalCountry(ip, controller?.signal);
       if (!isCurrent()) return false;
-      if (!allowed && manualDesignation === 'vpn') {
-        if (allowManualVpn(ip)) return applyFinalStatus(true);
-        result.error = 'VPNと確認できなかったため手動指定を適用しませんでした';
-      }
-      return applyFinalStatus(allowed);
+      result.countryCode = assessment.countryCode === 'NON_JP' ? '' : assessment.countryCode;
+      result.countryName = assessment.countryCode === 'NON_JP' ? '日本国外のIP範囲' : 'Japan';
+      result.countrySource = 'local-ipdeny';
+      result.countryPolicy = assessment.countryPolicy;
+      result.generic = { status: 'local-country', httpStatus: null, verdict: null };
+      // Only known non-Japanese public IPs are allowed; no manual or Proton exception.
+      return applyFinalStatus(assessment.countryPolicy === 'non-jp-vpn');
     } catch (error) {
       if (!isCurrent()) return false;
-      if (result.manualDesignation === 'vpn' || getManualIpDesignation(result.ip) === 'vpn') {
-        if (allowManualVpn(result.ip)) return applyFinalStatus(true);
-        result.error = 'VPNを確認できなかったため手動指定を適用しませんでした';
-      }
-      status = 'blocked';
-      emitStatus();
-      updateStatusButtons(status);
-      result.final = 'blocked';
-      result.checkedAt = new Date().toISOString();
-      lastCompletedCheckAt = Date.now();
-      result.error = result.error || (error && error.message ? error.message : 'VPN接続を確認できません');
-      notify();
-      showNotice('VPN接続を確認できません。接続後に「再確認」を押してください。');
-      return false;
+      result.countryPolicy = 'unavailable';
+      result.error = error?.message || 'IPの国判定ができません';
+      return applyFinalStatus(false);
     } finally {
       if (isCurrent()) { activeController = null; checkInFlight = false; }
       if (timer && root.clearTimeout) root.clearTimeout(timer);
@@ -836,7 +874,7 @@
 
   function updateStatusButtons(nextStatus) {
     if (!root.document) return;
-    const labels = { allowed: 'VPN接続済み', blocked: 'VPN未接続', checking: 'VPN確認中', pending: 'VPN確認中' };
+    const labels = { allowed: '海外IP確認済み', blocked: '海外IP未確認', checking: 'IP確認中', pending: 'IP確認中' };
     root.document.querySelectorAll('[data-vpn-status-button]').forEach((button) => {
       const label = labels[nextStatus] || labels.pending;
       button.textContent = button.hasAttribute('data-vpn-recheck-button') && nextStatus !== 'checking' && nextStatus !== 'pending'
@@ -883,6 +921,8 @@
 
   return {
     IP_URL,
+    LOCAL_JP_RANGES_URL,
+    assessLocalCountry,
     CHECK_URL,
     COUNTRY_FALLBACK_URL,
     PROTON_EXIT_IPS_URL,

@@ -1,0 +1,33 @@
+name: Update Japanese IP ranges
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 3 * * 1'
+  push:
+    branches:
+      - main
+      - codex/local-jp-ip-vpn-gate-20261012
+    paths:
+      - 'scripts/update-ip-country-jp.py'
+      - '.github/workflows/update-ip-country-jp.yml'
+permissions:
+  contents: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch and validate static IPdeny JP ranges
+        run: python scripts/update-ip-country-jp.py
+      - name: Commit updated IP ranges
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ip-country-jp.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: refresh Japanese IPv4 and IPv6 ranges"
+            git push
+          fi
