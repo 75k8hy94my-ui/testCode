@@ -361,7 +361,6 @@
         <select id="videoLibrarySort" aria-label="並べ替え"></select>
         <button id="videoLibraryView" class="vl-icon-btn" type="button" aria-label="表示形式を切り替え">表示</button>
         <label class="vl-thumbnail-size-label" for="videoLibraryThumbnailSize">サムネイルサイズ <select id="videoLibraryThumbnailSize" aria-label="動画一覧のサムネイルサイズ"><option value="small">小</option><option value="normal">標準</option><option value="large">大</option></select></label>
-        <button id="videoLibraryFolders" class="vl-icon-btn" type="button">フォルダ</button>
       </div>
       <details class="vl-custom-filter"><summary>カスタムプロパティで絞り込む</summary><div id="videoLibraryCustomFilters" class="vl-custom-filter-list"></div></details>
       <div class="vl-summary"><span id="videoLibraryCount"></span><span id="videoLibraryStatus" aria-live="polite"></span></div>
@@ -886,7 +885,7 @@
     dom.add.addEventListener('click', () => {
       if (!canReadProtectedData()) return;
       window.location.href = new URL('video-edit.html?mode=add&return=list', location.href).href;
-    }); dom.shorts.addEventListener('click', () => { window.location.href = new URL('video-shorts.html', location.href).href; }); dom.foldersBtn.addEventListener('click', openFolderManager);
+    }); dom.shorts.addEventListener('click', () => { window.location.href = new URL('video-shorts.html', location.href).href; });
     dom.cancel.addEventListener('click', closeSheet); dom.form.addEventListener('submit', saveEditor); dom.deleteBtn.addEventListener('click', () => state.editorId && deleteVideoFromLibrary(state.editorId));
     dom.urlEdit.addEventListener('click', () => setUrlEditing(true));
     dom.url.addEventListener('input', () => { dom.rotate90Direction.disabled = !Data.isDirectVideoUrl(dom.url.value); });
@@ -907,7 +906,6 @@
     const allowed = canReadProtectedData();
     if (dom.accessNotice) dom.accessNotice.hidden = allowed;
     if (dom.add) dom.add.disabled = !allowed;
-    if (dom.foldersBtn) dom.foldersBtn.disabled = !allowed;
     if (dom.deleteBtn) dom.deleteBtn.disabled = !allowed;
     if (dom.createFolder) dom.createFolder.disabled = !allowed;
     if (dom.form) dom.form.querySelectorAll('button[type="submit"]').forEach((button) => { button.disabled = !allowed; });
