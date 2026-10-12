@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja" class="auth-pending"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive,nosnippet"><title>追加</title>
+<link rel="stylesheet" href="app-global-shell.css?v=20260924-theme-unified">
+<link rel="stylesheet" href="home-profile-shell.css?v=20261012-video-width-stable">
+<link rel="stylesheet" href="mobile-bottom-nav.css?v=20260925-instagram-drag-lock">
+<style>
+#mediaAddPage{width:min(880px,100%);margin:0 auto;padding:24px 18px 120px;color:var(--text,#f2f4f7)}
+.mediaAddChoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0 22px}
+.mediaAddButton{min-height:52px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;border:1px solid var(--border,#4f5563);border-radius:14px;background:var(--panel,#252b36);color:var(--text,#f2f4f7);font:inherit;font-weight:700;text-decoration:none;cursor:pointer}
+.mediaAddButton.primary{background:var(--accent,#ff6b4a);color:#10131b;border-color:transparent}
+.mediaAddForm{display:grid;gap:13px;padding:20px;border:1px solid var(--border,#4f5563);border-radius:18px;background:var(--panel,#222833)}
+.mediaAddForm label{display:grid;gap:6px;font-weight:650}
+.mediaAddForm input,.mediaAddForm textarea{width:100%;min-height:44px;box-sizing:border-box;background:var(--bg-soft,#151921);border:1px solid var(--border,#4f5563);border-radius:10px;padding:10px 12px;color:var(--text,#fff);font:inherit;font-size:16px}
+.mediaAddForm textarea{min-height:110px;resize:vertical}
+.mediaAddMessage{min-height:1.5em;line-height:1.5}
+.mediaAddMessage[data-error="true"]{color:#f67c7c}
+#mediaAddPage .mediaAddButton[disabled]{opacity:.45;cursor:not-allowed}
+@media(max-width:540px){.mediaAddChoices{grid-template-columns:1fr}#mediaAddPage{padding:18px 12px 110px}}
+</style></head><body>
+<div class="homeShell" id="homeApp">
+<header class="homeHeader" data-profile-only-header="1"><div><span class="eyebrow">HOME</span><h1 id="shellTitle">追加</h1></div><button class="headerProfileButton" type="button" data-profile-menu-trigger aria-label="アカウント" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6.5 6.5-6.5s5.8 2.5 6.5 6.5"/></svg></button></header>
+<main id="mediaAddPage">
+<h2>新規追加</h2>
+<p>漫画・動画の登録をここから行います。</p>
+<div class="mediaAddChoices">
+<button class="mediaAddButton" id="openMangaAdd" type="button" aria-expanded="false">＋ 漫画を追加</button>
+<a class="mediaAddButton" href="video-edit.html?mode=add&amp;return=list">＋ 動画を追加</a>
+</div>
+<section id="mangaAddSection" hidden aria-label="漫画を追加">
+<form class="mediaAddForm" id="mangaAddForm">
+<h3>漫画を追加</h3>
+<label>タイトル <input name="title" required maxlength="240"></label>
+<label>作者 <input name="author"></label>
+<label>シリーズ <input name="series"></label>
+<label>巻数（任意） <input name="volume" type="number" min="1"></label>
+<label>タグ（カンマ区切り） <input name="tags"></label>
+<label>画像URLまたはページURL <input name="url" type="url" placeholder="https://..." required></label>
+<label>各ページの画像URL（任意・1行1URL）<textarea name="pages" placeholder="https://example.com/1.jpg"></textarea></label>
+<p class="mediaAddMessage" id="mangaAddStatus" role="status" aria-live="polite"></p>
+<div><button class="mediaAddButton primary" type="submit">漫画を保存</button></div>
+</form>
+</section>
+<section class="mediaAddForm" aria-label="一括読み込み">
+<h3>momon:GAから一括読み込み</h3>
+<button class="mediaAddButton" id="mangaBatchImport" type="button">拡張機能のキューを確認</button>
+<p class="mediaAddMessage" id="mangaBatchStatus" role="status" aria-live="polite"></p>
+</section>
+<section id="mangaImportDialog" role="dialog" aria-modal="true" aria-labelledby="mangaImportTitle" hidden style="position:fixed;inset:0;z-index:2400;background:#000b;overflow:auto;padding:16px">
+<div style="width:min(900px,100%);margin:4vh auto;background:var(--panel,#222833);color:var(--text,#fff);border-radius:14px;padding:20px;display:grid;gap:12px">
+<h2 id="mangaImportTitle">momon:GA作品を一括読み込み</h2>
+<div id="mangaImportRows" style="display:grid;gap:12px"></div>
+<p id="mangaImportStatus" role="status" aria-live="polite"></p>
+<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
+<button class="mediaAddButton" id="mangaImportCancelButton" type="button">閉じる</button>
+<button class="mediaAddButton primary" id="mangaImportRegisterButton" type="button">選択した作品を登録</button>
+</div></div></section>
+<p class="mediaAddMessage" id="mediaAddAccessMessage" role="status" aria-live="polite"></p>
+</main></div>
+<script src="guest-mode.js?v=20261009-guest"></script>
+<script src="supabase-config.js"></script><script src="media-access-gate.js?v=20261010-vpn-diagnostics"></script>
+<script src="vault-sync-merge.js?v=20261010-vault-sync-audit"></script>
+<script src="vault-session.js?v=20261011-auto-receive-sync"></script>
+<script src="vault-conflict-ui.js?v=20261010-vault-sync-audit"></script>
+<script src="browser-storage.js"></script><script src="vault-payload.js?v=20261012-video-custom-properties"></script>
+<script src="app-global-shell.js?v=20261003-reader-spa"></script>
+<script src="app-desktop-rail.js?v=20261012-shared-add"></script>
+<script src="profile-menu.js?v=20261011-nongame-audit"></script>
+<script src="mobile-bottom-nav.js?v=20261012-shared-add"></script>
+<script src="manga-import-validator.js?v=20261007-momon-import"></script>
+<script src="manga-import-candidate.js?v=20261007-momon-import"></script>
+<script src="manga-import-author-sync.js?v=20261007-momon-import"></script>
+<script src="manga-import-batch.js?v=20261007-momon-import"></script>
+<script src="manga-import-bridge.js?v=20261007-momon-import"></script>
+<script src="manga-import-dialog.js?v=20261007-momon-import"></script>
+<script src="media-add.js?v=20261012-shared-add"></script>
+</body></html>

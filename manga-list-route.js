@@ -596,6 +596,13 @@
           }
         });
         bindFactory(MangaListSearchEventsFactory, { onSearchChange: (value) => { setState({ shelfSearchQuery: value, bookshelfPage: 1 }); renderList(); } }, { searchInput: search });
+        bind(documentRef, 'testcode-context-search-change', (event) => {
+          if (event.detail?.page !== 'manga') return;
+          const query = String(event.detail.query || '');
+          search.value = query;
+          setState({ shelfSearchQuery: query, bookshelfPage: 1 });
+          renderList();
+        });
         bindFactory(MangaListSortEventsFactory, { onSortChange: (value) => { setState({ shelfSort: value, bookshelfPage: 1 }); renderList(); } }, { sortSelect: sort });
         bindFactory(MangaListFilterEventsFactory, {
           onToggle: () => { rootElement.querySelector('#filterRow').style.display = ''; },

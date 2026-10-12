@@ -28,10 +28,10 @@
         const names = authorCard ? [authorCard.name, authorCard.circleName].filter(Boolean) : [authorView];
         itemsList = visibleShelfItems.filter((it) => names.includes(String(it.author || '').trim()));
       } else if (!folderView) {
-        itemsList = visibleShelfItems.filter((it) => !it.folderId && !it.series);
-        folderCards = folders.filter((folder) => folder.id !== ids.history && !String(folder.id || '').startsWith('local-'));
-        showFavoritesCard = true;
-        showSeriesCard = true;
+        itemsList = searchQuery ? visibleShelfItems : visibleShelfItems.filter((it) => !it.folderId && !it.series);
+        folderCards = searchQuery ? [] : folders.filter((folder) => folder.id !== ids.history && !String(folder.id || '').startsWith('local-'));
+        showFavoritesCard = !searchQuery;
+        showSeriesCard = !searchQuery;
       } else if (folderView === ids.favorites) {
         itemsList = visibleShelfItems.filter((it) => it.favorite);
       } else if (folderView === ids.unread) {

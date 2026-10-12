@@ -1100,3 +1100,6 @@
       0 5px 15px rgba(52,61,74,.11);
   }
 }
+
+/* The contextual search command is not a route/lens destination. */
+#mobileBottomNav.liquidGlassNav #mobileNavSearch[hidden]{display:none!important}
