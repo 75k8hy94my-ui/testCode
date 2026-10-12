@@ -36,6 +36,35 @@
     let timer = null;
     let revision = 0;
 
+    const originalStyle = video.getAttribute ? video.getAttribute('style') : null;
+    function applyRotation(index) {
+      if (!video.style) return;
+      const rotation = index < 0 ? 0 : (normalized.clips[index].rotation || 0);
+      if (video.setAttribute && video.removeAttribute) {
+        if (originalStyle === null) video.removeAttribute('style');
+        else video.setAttribute('style', originalStyle);
+      }
+      if (!rotation) return;
+      const parent = video.parentElement;
+      if (!parent) {
+        video.style.transform = 'rotate(' + rotation + 'deg)';
+        return;
+      }
+      const w = parent.clientWidth, h = parent.clientHeight;
+      if (rotation === 90 || rotation === -90) {
+        video.style.width = h + 'px';
+        video.style.height = w + 'px';
+      }
+      video.style.position = 'absolute';
+      video.style.left = '50%';
+      video.style.top = '50%';
+      video.style.maxHeight = 'none';
+      video.style.transformOrigin = 'center center';
+      video.style.transform = 'translate(-50%, -50%) rotate(' + rotation + 'deg)';
+    }
+    const onResize = () => { if (!destroyed && activeIndex >= 0) applyRotation(activeIndex); };
+    if (typeof window !== 'undefined') window.addEventListener('resize', onResize);
+
     function snapshot() {
       return {
         phase, error, message, clipIndex: activeIndex, clipCount: normalized.clips.length,
@@ -148,6 +177,7 @@
       const found = Edit.locateTime(normalized, seconds);
       const url = sourceMap.get(found.sourceVideoId);
       activeIndex = found.clipIndex;
+      applyRotation(activeIndex);
       requestedSeconds = seconds;
       sourceTime = found.sourceSeconds;
       pendingSeek = found.sourceSeconds;
@@ -261,6 +291,11 @@
       clearTimer();
       wantsPlay = false;
       listeners.forEach(([name, handler]) => video.removeEventListener(name, handler));
+      if (typeof window !== 'undefined') window.removeEventListener('resize', onResize);
+      if (video.setAttribute && video.removeAttribute) {
+        if (originalStyle === null) video.removeAttribute('style');
+        else video.setAttribute('style', originalStyle);
+      }
       try { video.pause(); video.removeAttribute('src'); video.load(); } catch (_) {}
       currentUrl = '';
       activeIndex = -1;

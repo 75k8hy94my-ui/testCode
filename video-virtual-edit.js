@@ -33,7 +33,9 @@
     if (typeof endSeconds !== 'number' || !Number.isFinite(endSeconds) || endSeconds <= startSeconds) {
       throw new RangeError('Clip end must be greater than clip start');
     }
-    return { sourceVideoId, startSeconds, endSeconds };
+    const rotation = raw.rotation === undefined ? 0 : raw.rotation;
+    if (![0, -90, 90, 180].includes(rotation)) throw new RangeError('Unsupported clip rotation');
+    return rotation === 0 ? { sourceVideoId, startSeconds, endSeconds } : { sourceVideoId, startSeconds, endSeconds, rotation };
   }
 
   function createEdit(clips) {
@@ -88,6 +90,15 @@
       { ...clip, endSeconds: sourceSeconds },
       { ...clip, startSeconds: sourceSeconds });
     return createEdit(result);
+  }
+
+  function setClipRotation(edit, index, rotation) {
+    if (![0, -90, 90, 180].includes(rotation)) throw new RangeError('Unsupported clip rotation');
+    const value = normalizeEdit(edit);
+    checkedIndex(index, value.clips.length);
+    const clips = value.clips.slice();
+    clips[index] = { ...clips[index], rotation };
+    return createEdit(clips);
   }
 
   function joinEdits(first, second) {
@@ -201,7 +212,7 @@
 
   return Object.freeze({
     EDIT_TYPE, SCHEMA_VERSION, MAX_CLIPS, isMp4Url, createEdit, normalizeEdit,
-    validateSources, splitClip, joinEdits, trimClip, duplicateClip, adjustClipBoundary, setClipBoundary, moveClip, removeClip,
+    validateSources, splitClip, setClipRotation, joinEdits, trimClip, duplicateClip, adjustClipBoundary, setClipBoundary, moveClip, removeClip,
     totalDuration, locateTime,
   });
 }));

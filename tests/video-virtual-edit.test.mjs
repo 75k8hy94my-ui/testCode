@@ -141,3 +141,20 @@ test('maps virtual timeline boundaries to source times without re-encoding', () 
   assert.equal(edits.locateTime(edit, 14), null);
   assert.equal(edits.locateTime(edit, -0.1), null);
 });
+
+test('segment rotation persists through split, duplication and undo-compatible normalization', () => {
+  const base = edits.createEdit([clip('a', 0, 20)]);
+  const rotated = edits.setClipRotation(base, 0, -90);
+  assert.equal(rotated.clips[0].rotation, -90);
+  assert.deepEqual(base.clips[0], clip('a', 0, 20));
+  const split = edits.splitClip(rotated, 0, 10);
+  assert.equal(split.clips[0].rotation, -90);
+  assert.equal(split.clips[1].rotation, -90);
+  const normal = edits.setClipRotation(split, 1, 0);
+  assert.equal(normal.clips[0].rotation, -90);
+  assert.equal(normal.clips[1].rotation, undefined);
+  assert.deepEqual(edits.normalizeEdit(JSON.parse(JSON.stringify(normal))), normal);
+  assert.equal(edits.duplicateClip(normal, 0).clips[1].rotation, -90);
+  assert.throws(() => edits.setClipRotation(normal, 0, 45), /Unsupported/);
+  assert.throws(() => edits.createEdit([{...clip('a', 0, 1), rotation: 45}]), /Unsupported/);
+});
