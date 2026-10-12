@@ -106,7 +106,7 @@
     loadBrowserScript('desktop-navigation.js')
       .catch((error) => console.warn('デスクトップナビの読み込みに失敗しました', error));
     loadBrowserScript('video-data.js?v=20261012-alternate-urls')
-      .then(() => loadBrowserScript('video-library.js?v=20261012-alternate-urls'))
+      .then(() => loadBrowserScript('video-library.js?v=20261012-existing-url-migration'))
       .then(() => loadBrowserScript('video-routing-fix.js'))
       .then(() => loadBrowserScript('video-thumbnail-time.js'))
       .catch((error) => console.warn('動画ライブラリの読み込みに失敗しました', error));
