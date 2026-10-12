@@ -29,6 +29,23 @@
     const show = (media) => { if (media.dataset) media.dataset.frameReady = '1'; media.style.visibility = 'visible'; fallback.hidden = true; };
     const revealFallback = (media) => { if (media && media.parentNode) media.remove(); fallback.hidden = false; };
     const cache = root.MangaReaderVideoThumbnailCache;
+    const rotation = root.MangaReaderVideoData && typeof root.MangaReaderVideoData.getRotationDirection === 'function'
+      ? root.MangaReaderVideoData.getRotationDirection(record)
+      : (record.rotate90Direction === 'left' || record.rotate90Direction === 'right'
+        ? record.rotate90Direction : record.rotate90 === true ? 'left' : 'none');
+    const rotate = isDirectVideo(record.url) && rotation !== 'none';
+    const applyMediaRotation = (media, width, height) => {
+      if (!rotate || !media || !(width > 0 && height > 0)) return;
+      // A rotated media element must occupy the exchanged width/height of the thumbnail.
+      // Percentages are relative to the thumbnail's (rotated) dimensions.
+      media.style.inset = 'auto';
+      media.style.left = '50%';
+      media.style.top = '50%';
+      media.style.width = (width / height * 100) + '%';
+      media.style.height = (height / width * 100) + '%';
+      media.style.transform = 'translate(-50%, -50%) rotate(' + (rotation === 'right' ? '90' : '-90') + 'deg)';
+      media.style.objectFit = 'cover';
+    };
     const applyNativeRatio = (width, height) => {
       if (!isDirectVideo(record.url) || !(width > 0 && height > 0)) return;
       container.style.aspectRatio = width + ' / ' + height;
@@ -39,6 +56,7 @@
       preview.muted = true; preview.playsInline = true; preview.preload = 'metadata'; preview.src = record.url;
       preview.style.visibility = 'hidden'; preview.addEventListener('loadedmetadata', () => {
         applyNativeRatio(Number(preview.videoWidth), Number(preview.videoHeight));
+        applyMediaRotation(preview, Number(preview.videoWidth), Number(preview.videoHeight));
         const duration = Number(preview.duration);
         if (Number.isFinite(duration) && duration > 0 && options && typeof options.onDuration === 'function') options.onDuration(duration);
         try { preview.currentTime = Math.max(0, Number(record.thumbnailTimeSeconds) || 0.1); } catch (_) {}
@@ -54,6 +72,7 @@
             cached.alt = ''; cached.className = 'videoThumbnailCached';
             cached.onload = () => {
               applyNativeRatio(cached.naturalWidth, cached.naturalHeight);
+              applyMediaRotation(cached, cached.naturalWidth, cached.naturalHeight);
               if (preview && preview.isConnected && cache.permitted()) {
                 preview.pause(); preview.removeAttribute('src'); preview.remove(); preview = null;
                 container.append(cached); show(cached);
@@ -71,14 +90,21 @@
     const src = imageUrl(record);
     if (src) {
       image = doc.createElement('img'); image.alt = ''; image.loading = 'lazy'; image.referrerPolicy = 'no-referrer'; image.src = src;
-      image.style.visibility = 'hidden'; image.addEventListener('load', () => show(image));
+      image.style.visibility = 'hidden'; image.addEventListener('load', () => {
+        if (rotate) {
+          // Custom thumbnails may not have the same ratio as the video frame.
+          applyNativeRatio(image.naturalWidth, image.naturalHeight);
+          applyMediaRotation(image, image.naturalWidth, image.naturalHeight);
+        }
+        show(image);
+      });
       image.addEventListener('error', () => { revealFallback(image); image = null; addDirectPreview(); }); container.append(image);
     } else if (cache && cache.permitted() && isDirectVideo(record.url)) {
       cache.read(record.url, Math.max(0, Number(record.thumbnailTimeSeconds) || 0.1)).then(blob => {
         if (!blob || !root.URL || !root.URL.createObjectURL || !cache.permitted()) { addDirectPreview(); return; }
         const url = root.URL.createObjectURL(blob), cached = doc.createElement('img');
         cached.className = 'videoThumbnailCached'; cached.alt = '';
-        cached.onload = () => { applyNativeRatio(cached.naturalWidth, cached.naturalHeight); if (cache.permitted()) show(cached); root.URL.revokeObjectURL(url); };
+        cached.onload = () => { applyNativeRatio(cached.naturalWidth, cached.naturalHeight); applyMediaRotation(cached, cached.naturalWidth, cached.naturalHeight); if (cache.permitted()) show(cached); root.URL.revokeObjectURL(url); };
         cached.onerror = () => { cached.remove(); root.URL.revokeObjectURL(url); addDirectPreview(); };
         cached.src = url; container.append(cached);
       }).catch(addDirectPreview);
