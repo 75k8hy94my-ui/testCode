@@ -35,7 +35,7 @@
     }
     const rotation = raw.rotation === undefined ? 0 : raw.rotation;
     if (![0, -90, 90, 180].includes(rotation)) throw new RangeError('Unsupported clip rotation');
-    return { sourceVideoId, startSeconds, endSeconds, rotation };
+    return rotation === 0 ? { sourceVideoId, startSeconds, endSeconds } : { sourceVideoId, startSeconds, endSeconds, rotation };
   }
 
   function createEdit(clips) {
