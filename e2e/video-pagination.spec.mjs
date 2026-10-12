@@ -69,12 +69,14 @@ test('video list paginates filtered results, animates turns, and supports deskto
   await expect(page.locator('#videoLibraryPageLabel')).toHaveText('2 / 2');
   await expect(page.locator('.vl-card')).toHaveCount(1);
 
-  await page.locator('#videoLibrarySearch').fill('ページ確認動画 1');
+  await expect(page.locator('#videoLibrarySearch')).toBeHidden();
+  await page.locator('#mobileNavSearch').click();
+  await page.locator('#testcodeContextSearchInput').fill('ページ確認動画 1');
   await expect(page.locator('#videoLibraryCount')).toHaveText('11 / 26件');
   await expect(page.locator('#videoLibraryPageLabel')).toHaveText('1 / 1');
   await expect(pager).toBeHidden();
 
-  await page.locator('#videoLibrarySearch').fill('no matching video');
+  await page.locator('#testcodeContextSearchInput').fill('no matching video');
   await expect(page.locator('#videoLibraryCount')).toHaveText('0 / 26件');
   await expect(pager).toBeHidden();
   await expect(page.locator('.vl-empty')).toBeVisible();

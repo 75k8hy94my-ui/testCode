@@ -502,3 +502,6 @@ html[data-theme="light"] .folder-cover { background: linear-gradient(145deg, #ee
 @media (prefers-reduced-motion: reduce) {
   #mangaListSection .bookshelf-pagination .bookshelfPagerButton { transition: none; }
 }
+
+/* Entry/import and quick actions live on add.html; search is a shared nav overlay. */
+#mangaListSection #exportImportRow,#mangaListSection #smartListRow,#mangaListSection #shelfSearchInput{display:none!important}

@@ -10,6 +10,8 @@
     profile: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg>',
     backup: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7.5h14v12H5z"/><path d="M8 4h8v3.5H8zM9 12h6M9 16h4"/></svg>',
     settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.1M12 19.1v2.1M21.2 12h-2.1M4.9 12H2.8M18.5 5.5 17 7M7 17l-1.5 1.5M18.5 18.5 17 17M7 7 5.5 5.5"/></svg>',
+    add: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg>',
+    search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.7"/><path d="m16 16 5 5"/></svg>',
     vpn: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 19 6v5c0 4.7-2.8 8-7 10-4.2-2-7-5.3-7-10V6z"/><path d="m9 12 2 2 4-4"/></svg>',
   };
 
@@ -18,6 +20,7 @@
     { id: 'desktopNavManga', key: 'manga', label: '漫画', href: 'manga.html' },
     { id: 'desktopNavImages', key: 'images', label: '画像', href: 'images.html' },
     { id: 'desktopNavVideo', key: 'video', label: '動画', href: 'video.html' },
+    { id: 'desktopNavAdd', key: 'add', label: '追加', href: 'add.html' },
     { id: 'desktopNavBackup', key: 'backup', label: 'バックアップ', href: 'sync.html' },
     { id: 'desktopNavSettings', key: 'settings', label: '設定', href: 'profile.html' },
   ];
@@ -32,6 +35,7 @@
     if (page === 'home.html') return 'home';
     if (page === 'manga.html') return 'manga';
     if (page === 'images.html') return 'images';
+    if (page === 'add.html') return 'add';
     if (page === 'video.html' || page === 'video-player.html' || page === 'video-edit.html') return 'video';
     if (page === 'sync.html') return 'backup';
     if (page === 'profile.html') return 'settings';
@@ -263,6 +267,18 @@
     return button;
   }
 
+  function makeSearchButton() {
+    const button = document.createElement('button');
+    button.id = 'desktopNavSearch';
+    button.type = 'button';
+    button.className = 'appDesktopRailItem';
+    button.innerHTML = ICONS.search + '<span>探す</span>';
+    button.setAttribute('aria-label', '開いているページを検索');
+    button.addEventListener('click', () => window.TestCodeContextSearch?.toggle?.());
+    button.hidden = !['manga.html', 'video.html'].includes(pageName());
+    return button;
+  }
+
   function makeVpnDiagnosticsButton() {
     const button = document.createElement('button');
     button.id = 'desktopNavVpnDiagnostics';
@@ -296,6 +312,8 @@
 
   function syncActive(nav = document.getElementById('appDesktopRail')) {
     if (!nav) return;
+    const search = nav.querySelector('#desktopNavSearch');
+    if (search) search.hidden = !['manga.html', 'video.html'].includes(pageName());
     const active = activeKey();
     for (const item of ITEMS) {
       const element = nav.querySelector('#' + item.id);
@@ -336,6 +354,7 @@
     nav.setAttribute('aria-label', 'デスクトップナビ');
     nav.appendChild(makeProfileButton());
     for (const item of ITEMS) nav.appendChild(makeItem(item));
+    nav.appendChild(makeSearchButton());
     nav.appendChild(makeVpnDiagnosticsButton());
     document.body.appendChild(nav);
     document.documentElement.classList.add('app-desktop-rail-page');

@@ -9,6 +9,7 @@
     'profile.html': 'プロフィール設定',
     'manga.html': '漫画',
     'images.html': '画像',
+    'add.html': '追加',
     'video.html': '動画',
     'sync.html': '保管庫'
   };

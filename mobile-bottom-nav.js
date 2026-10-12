@@ -7,6 +7,8 @@
     manga: '<svg class="mobileNavGlyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5c3-1.5 5.5-1.2 8 .7v13c-2.2-1.7-4.8-2-8-.6z"/><path d="M20 5.5c-3-1.5-5.5-1.2-8 .7v13c2.2-1.7 4.8-2 8-.6z"/></svg>',
     images: '<svg class="mobileNavGlyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.5"/><path d="m4 18 5.5-5.5 3.5 3.5 2.4-2.4L20 18"/></svg>',
     video: '<svg class="mobileNavGlyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></svg>',
+    add: '<svg class="mobileNavGlyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg>',
+    search: '<svg class="mobileNavGlyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.7"/><path d="m16 16 5 5"/></svg>',
     profile: '<svg class="mobileNavGlyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg>'
   });
 
@@ -15,6 +17,7 @@
     { key:'manga', label:'漫画', href:'manga.html', id:'mobileNavManga' },
     { key:'images', label:'画像', href:'images.html', id:'mobileNavImages' },
     { key:'video', label:'動画', href:'video.html', id:'mobileNavVideo' },
+    { key:'add', label:'追加', href:'add.html', id:'mobileNavAdd' },
     { key:'profile', label:'プロフィール', href:'profile.html', id:'mobileNavProfile' },
   ]);
 
@@ -33,6 +36,7 @@
     if (name === 'profile.html') return 'profile';
     if (name === 'manga.html') return 'manga';
     if (name === 'images.html') return 'images';
+    if (name === 'add.html') return 'add';
     if (name === 'video.html' || name === 'video-player.html' || name === 'video-edit.html') return 'video';
     return 'home';
   }
@@ -57,6 +61,18 @@
     return link;
   }
 
+  function makeSearchAction() {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.id = 'mobileNavSearch';
+    button.className = 'liquidGlassNavItem';
+    button.setAttribute('aria-label', '開いているページを検索');
+    button.innerHTML = ICONS.search + '<span class="liquidGlassNavLabel">探す</span>';
+    button.addEventListener('click', () => window.TestCodeContextSearch?.toggle?.());
+    button.hidden = !['manga', 'video'].includes(pageKey());
+    return button;
+  }
+
   function populateSpaNav(nav) {
     nav.replaceChildren();
     nav.className = 'mobileBottomNav liquidGlassNav';
@@ -64,6 +80,7 @@
     nav.setAttribute('aria-label','モバイルメニュー');
     nav.appendChild(createLens());
     SPA_ITEMS.forEach((item) => nav.appendChild(createSpaItem(item)));
+    nav.appendChild(makeSearchAction());
   }
 
   function ensureLens(nav) {
@@ -633,6 +650,8 @@
 
   function syncActive(nav = document.getElementById('mobileBottomNav')) {
     if (!nav) return;
+    const search = nav.querySelector('#mobileNavSearch');
+    if (search) search.hidden = !['manga', 'video'].includes(pageKey());
     enhance(nav);
     scheduleLens(nav, true);
   }
@@ -646,7 +665,7 @@
       return;
     }
     const name = location.pathname.split('/').pop() || 'home.html';
-    if (['home.html','profile.html','manga.html','images.html','video.html','video-player.html','video-edit.html'].includes(name)) ensureSpaNav();
+    if (['home.html','profile.html','manga.html','images.html','video.html','video-player.html','video-edit.html','add.html'].includes(name)) ensureSpaNav();
   }
 
   function scheduleAttach() {
