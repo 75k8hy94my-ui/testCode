@@ -263,7 +263,7 @@
           feedback.textContent = snapshot.phase === 'error' ? snapshot.error
             : snapshot.phase === 'loading' || snapshot.phase === 'seeking' ? snapshot.message : '';
         });
-        if (Number.isFinite(startTime) && startTime > 0) playback.currentTime = startTime;
+        playback.currentTime = Number.isFinite(startTime) && startTime >= 0 ? startTime : 0;
       } catch (error) {
         const feedback = document.createElement('p');
         feedback.className = 'videoPlayerVirtualStatus';
