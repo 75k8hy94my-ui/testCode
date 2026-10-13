@@ -49,8 +49,8 @@ test('virtual player route applies guest storage isolation before loading protec
 test('MP4-only virtual editor link is separate from existing video detail action', () => {
   assert.match(player, /const edit = document\.createElement\('a'\)/);
   assert.match(player, /edit\.href = 'video-edit\.html\?id='/);
-  assert.match(player, /MangaReaderVideoVirtualEdit\.isMp4Url\(sourceUrl\)/);
-  assert.match(player, /virtualEdit\.href = 'video-virtual-editor\.html\?id='/);
+  assert.match(player, /MP4\.isMp4Url\(sourceUrl\) \|\| publishedEdit/);
+  assert.match(player, /virtualEdit\.href = 'video-virtual-editor\.html\?'/);
   assert.ok(playerHtml.indexOf('video-virtual-edit.js') < playerHtml.indexOf('video-player-page.js'));
 });
 
