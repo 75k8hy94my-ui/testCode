@@ -56,6 +56,30 @@
       section.append(retry);
     }
     section.append(back, library);
+    // Recovery must remain available even if the edited source MP4 was removed
+    // or changed; otherwise the user could become stuck with an unplayable edit.
+    if (allowed() && publishedVideoId && Publish) {
+      try {
+        const item = Publish.createPublisher().get(publishedVideoId);
+        if (item && item.kind === 'overwrite') {
+          const restore = document.createElement('button');
+          restore.type = 'button'; restore.className = 'vvpButton';
+          restore.textContent = '編集版を解除して元動画に戻す';
+          restore.addEventListener('click', async () => {
+            if (!allowed() || !confirm('元のMP4の再生に戻しますか？ 編集済みの上書き設定は解除されます。')) return;
+            restore.disabled = true;
+            try {
+              await Publish.createPublisher().restore(publishedVideoId);
+              location.replace('video-player.html?id=' + encodeURIComponent(publishedVideoId));
+            } catch (error) {
+              lead.textContent = error.message || '元動画への復元に失敗しました。';
+              restore.disabled = false;
+            }
+          });
+          section.append(restore);
+        }
+      } catch (_) { /* A malformed stored publication must never bypass the access gate. */ }
+    }
     page.replaceChildren(section);
     if (access && typeof access.syncUi === 'function') access.syncUi();
   }
