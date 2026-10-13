@@ -8,7 +8,7 @@ test('closes saved video edits immediately and resumes any pending sync on the l
   const source = read('video-library.js');
   assert.match(source, /closeSheet\(\);\s*runVaultSync\(\);/);
   assert.match(source, /resumePendingLocalSync\(\);/);
-  assert.match(source, /guardPendingSyncLeave\(event, state\.syncRunning\)/);
+  assert.doesNotMatch(source, /beforeunload|guardPendingSyncLeave/);
   assert.match(source, /manga-reader-vpn-status/);
 });
 

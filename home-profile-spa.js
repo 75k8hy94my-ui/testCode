@@ -30,7 +30,7 @@ const SPA_PAGES=(window.AppShell&&Array.isArray(AppShell.SPA_PAGES)?AppShell.SPA
 let layout=Home?Home.loadLayout():[];
 let editing=false,syncRunning=false,syncDirty=false,syncDirtyMessage='',profileSecurityBusy=false;
 let profileHistoryCleanup=null;
-let mount=null,renderGeneration=0,mangaRouteRuntime=null,mangaRouteBootPromise=null,videoRouteRuntime=null,lastVpnRouteAccess='',skipNextPopstate=false,lastSpaUrl=location.href;
+let mount=null,renderGeneration=0,mangaRouteRuntime=null,mangaRouteBootPromise=null,videoRouteRuntime=null,lastVpnRouteAccess='',lastSpaUrl=location.href;
 
 function ensureAppShell(){
   const app=document.getElementById('homeApp')||document.querySelector('.homeShell');
@@ -274,10 +274,9 @@ function handleVpnStatusChange(event){
   renderRoute();
 }
 document.addEventListener('manga-reader-vpn-diagnostics',refreshProfileVpnDiagnostics);
-function navigate(path,{replace=false}={}){const target=new URL(path,location.href),name=target.pathname.split('/').pop();if(target.href!==location.href&&!confirmPendingSyncLeave())return false;if(!SPA_PAGES.includes(name)){location.href=target.href;return true;}if(replace)history.replaceState({appShellSPA:true},'',target.href);else history.pushState({appShellSPA:true},'',target.href);lastSpaUrl=location.href;renderRoute();return true;}
-function confirmPendingSyncLeave(){return guestMode||!window.MangaVault||typeof MangaVault.hasPendingLocalChanges!=='function'||!MangaVault.hasPendingLocalChanges()||window.confirm('クラウド同期が完了していません。変更は端末に保存済みです。ページを移動しますか？');}
+function navigate(path,{replace=false}={}){const target=new URL(path,location.href),name=target.pathname.split('/').pop();if(!SPA_PAGES.includes(name)){location.href=target.href;return true;}if(replace)history.replaceState({appShellSPA:true},'',target.href);else history.pushState({appShellSPA:true},'',target.href);lastSpaUrl=location.href;renderRoute();return true;}
 function intercept(event){if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;const link=event.target.closest('a[href]');if(!link||link.target||link.hasAttribute('download'))return;const target=new URL(link.href,location.href),name=target.pathname.split('/').pop();if(target.origin===location.origin&&SPA_PAGES.includes(name)){event.preventDefault();navigate(target.href);}}
-function handleRoutePopstate(){if(skipNextPopstate){skipNextPopstate=false;lastSpaUrl=location.href;return;}if(location.href===lastSpaUrl)return;if(!confirmPendingSyncLeave()){skipNextPopstate=true;history.forward();return;}lastSpaUrl=location.href;renderRoute();}
+function handleRoutePopstate(){if(location.href===lastSpaUrl)return;lastSpaUrl=location.href;renderRoute();}
 async function start(){
   ensureAppShell();
   if(guestMode){

@@ -210,8 +210,10 @@
     const meta = userId && getMeta(userId);
     return Boolean(meta && meta.pendingSync);
   }
-  function guardPendingSyncLeave(event, isSyncRunning) {
-    if (!isSyncRunning && !hasPendingLocalChanges()) return false;
+  function guardPendingSyncLeave(event, hasUnpersistedChanges = false) {
+    // Cloud-pending changes and in-flight cloud sync are already stored locally.
+    // A page-leave warning is justified only for changes that will be lost on navigation.
+    if (!hasUnpersistedChanges) return false;
     if (event && typeof event.preventDefault === 'function') event.preventDefault();
     if (event) event.returnValue = '';
     return true;

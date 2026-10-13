@@ -111,10 +111,6 @@
   function initializePlayer() {
     if (initialized || !canReadProtectedData()) return;
     initialized = true;
-  listenWindow('beforeunload', (event) => {
-    const vault = window.MangaVault;
-    if (vault && typeof vault.guardPendingSyncLeave === 'function') vault.guardPendingSyncLeave(event, syncRunning);
-  });
   listenWindow('online', () => { resumePendingLocalSync(); });
   const id = new URLSearchParams(location.search).get('id') || '';
   const headerTitle = document.getElementById('shellTitle');

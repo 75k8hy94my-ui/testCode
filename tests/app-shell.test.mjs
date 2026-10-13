@@ -184,15 +184,13 @@ test('all authenticated mobile destinations load the shared Liquid Glass assets'
   }
 });
 
-test('SPA navigation asks before leaving while Vault sync is pending', () => {
+test('SPA navigation and browser back do not block locally saved pending cloud sync', () => {
   const spa = read('home-profile-spa.js');
-  assert.match(spa, /MangaVault\.hasPendingLocalChanges\(\)[\s\S]*window\.confirm\('クラウド同期が完了していません/);
-  assert.match(spa, /変更は端末に保存済みです。ページを移動しますか/);
-  assert.match(spa, /function handleRoutePopstate\(\)[\s\S]*history\.forward\(\)/);
-  assert.match(spa, /if\(location\.href===lastSpaUrl\)return/);
-  assert.match(spa, /function navigate\(path,\{replace=false\}=\{\}\)\{[^}]*confirmPendingSyncLeave\(\)/);
+  assert.doesNotMatch(spa, /confirmPendingSyncLeave|window\.confirm\('クラウド同期が完了していません/);
+  assert.doesNotMatch(spa, /skipNextPopstate|history\.forward\(\)/);
+  assert.match(spa, /function handleRoutePopstate\(\)\{if\(location\.href===lastSpaUrl\)return;lastSpaUrl=location\.href;renderRoute\(\);\}/);
+  assert.match(spa, /history\.pushState/);
   assert.match(spa, /function intercept\(event\)\{[^}]*event\.preventDefault\(\);navigate\(target\.href\)/);
-  assert.doesNotMatch(spa, /function intercept\(event\)\{[^}]*if\(!confirmPendingSyncLeave\(\)\)/);
 });
 
 

@@ -41,6 +41,25 @@ test('editor renders project toolbar, preview modes, searchable source library a
   assert.match(harness.root.innerHTML, /data-save-status/);
 });
 
+test('editor only warns for an unsaved draft, including during local persistence', async () => {
+  const harness = startEditor({ allowed: true });
+  const nodes = harness.selectorMap;
+  const tryLeave = () => {
+    const event = { prevented: false, preventDefault() { this.prevented = true; } };
+    harness.windowListeners.beforeunload(event);
+    return event;
+  };
+  assert.equal(tryLeave().prevented, false, 'no edits to lose');
+  nodes.get('[data-source-list]').children[0].dispatch('click');
+  nodes.get('[data-end]').value = '10';
+  nodes.get('[data-add]').dispatch('click');
+  assert.equal(tryLeave().prevented, true, 'editing without local save is unsafe');
+  const saving = nodes.get('[data-save]').dispatch('click');
+  assert.equal(tryLeave().prevented, true, 'a pending local save is still unsafe');
+  await saving;
+  assert.equal(tryLeave().prevented, false, 'the saved local baseline is safe even if cloud sync is pending');
+});
+
 test('virtual player route applies guest storage isolation before loading protected storage', () => {
   assert.ok(playerVirtualHtml.indexOf('guest-mode.js') >= 0);
   assert.ok(playerVirtualHtml.indexOf('guest-mode.js') < playerVirtualHtml.indexOf('vault-session.js'));

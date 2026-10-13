@@ -105,11 +105,11 @@ test('desktop watch page keeps related videos in an independently scrolling view
   assert.match(css, /\.videoRelated\s*\{[^}]*position:\s*sticky[^}]*align-self:\s*start/s);
 });
 
-test('player saves title locally first, resumes pending sync in background, and warns before leaving', () => {
+test('player saves title locally first and syncs in background without a spurious leave warning', () => {
   assert.match(page, /function hasPendingLocalSync\(\)/);
   assert.match(page, /resumePendingLocalSync\(\)/);
   assert.match(page, /syncRequestedWhileRunning/);
-  assert.match(page, /guardPendingSyncLeave\(event, syncRunning\)/);
+  assert.doesNotMatch(page, /beforeunload|guardPendingSyncLeave/);
   assert.match(page, /listenWindow\('online',/);
   assert.match(page, /else resumePendingLocalSync\(\)/);
   assert.match(page, /videoPlayerSyncStatus/);
