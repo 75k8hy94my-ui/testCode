@@ -258,7 +258,7 @@
     const timeline = displayEdit ? State.clipOffsets(displayEdit) : { offsets: [], totalSeconds: 0 };
     if (!displayEdit) {
       const message = document.createElement('div'); message.className = 'vveEmpty';
-      message.textContent = 'まだ区間がありません。MP4素材と開始・終了秒を指定して追加してください。';
+      message.textContent = '左の素材をタイムラインにドラッグするか、「動画全体を追加」で開始できます。';
       refs.clips.append(message);
     } else displayEdit.clips.forEach((clip, index) => {
       const item = document.createElement('div');
@@ -294,6 +294,18 @@
       item.append(startHandle, body, endHandle);
       refs.clips.append(item);
     });
+    if (refs.ruler) {
+      refs.ruler.replaceChildren();
+      const units = [1,2,5,10,15,30,60,120,300,600,900,1800,3600];
+      const interval = units.find((n) => n * zoom >= 85) || 3600;
+      for (let time = 0; time <= timeline.totalSeconds && time / interval < 300; time += interval) {
+        const tick = document.createElement('span');
+        tick.className = 'vveRulerTick';
+        tick.textContent = format(time);
+        tick.style.left = time * zoom + 'px';
+        refs.ruler.append(tick);
+      }
+    }
     if (refs.insertMarker) refs.timeline.append(refs.insertMarker);
     if (pointerGesture && pointerGesture.kind === 'move' && refs.insertMarker) {
       refs.insertMarker.hidden = false;
@@ -485,9 +497,20 @@
   }
   function splitClip() {
     action(() => {
-      const clip = selectedClip();
-      if (!clip || refs.source.value !== clip.sourceVideoId) throw new Error('分割する区間を選択してください。');
-      setEdit(Edit.splitClip(edit, selectedIndex, refs.preview.currentTime), selectedIndex + 1);
+      if (!edit) throw new Error('タイムラインに動画を追加してください。');
+      const where = Edit.locateTime(edit, timelinePosition);
+      if (!where) throw new Error('再生ヘッドを分割する位置に移動してください。');
+      const clip = edit.clips[where.clipIndex];
+      const second = Math.round(where.sourceSeconds * 1000) / 1000;
+      if (second <= clip.startSeconds || second >= clip.endSeconds) {
+        throw new Error('クリップの端では分割できません。');
+      }
+      const seconds = timelinePosition;
+      setEdit(Edit.splitClip(edit, where.clipIndex, second), where.clipIndex + 1);
+      timelinePosition = seconds;
+      if (previewMode === 'edit' && resultController) resultController.seek(seconds);
+      drawClips();
+      status('再生ヘッドの位置でクリップを分割しました。');
     });
   }
   function removeClip() {
@@ -573,12 +596,20 @@
     const rect = refs.timeline.getBoundingClientRect();
     const x = clientX - rect.left + (refs.timelineScroll.scrollLeft || 0);
     const seconds = Math.max(0, Math.min(total, x / zoom));
-    timelinePosition = seconds;
-    const located = Edit.locateTime(edit, seconds);
+    const offsets = State.clipOffsets(edit).offsets;
+    const snaps = [...offsets, total];
+    let target = seconds;
+    for (const boundary of snaps) {
+      if (Math.abs(seconds - boundary) * zoom < 8 &&
+          Math.abs(boundary - seconds) < Math.abs(target - seconds)) target = boundary;
+    }
+    const located = Edit.locateTime(edit, Math.min(target, Math.max(0, total - 0.001)));
     if (located) {
       if (selectedIndex !== located.clipIndex) chooseClip(located.clipIndex);
-      else setPreview(located.sourceVideoId, located.sourceSeconds);
+      if (previewMode === 'source') setPreview(located.sourceVideoId, located.sourceSeconds);
     }
+    timelinePosition = target;
+    if (previewMode === 'edit' && resultController) resultController.seek(target);
     drawClips();
   }
   function pointerMove(event) {
