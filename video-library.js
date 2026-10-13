@@ -199,6 +199,9 @@
     if (!Array.isArray(videos) || videos.length < 2) return;
     const groups = new Map();
     videos.forEach((video, index) => {
+      // Published editions have independent IDs even if they play the same MP4
+      // bytes. URL-based duplicate consolidation must never merge them.
+      if (video.virtualEdition === true || (state.meta[String(video.id)]?.virtualPublishedEdit)) return;
       const key = Data.videoUrlIdentity(video.url);
       if (!key) return;
       const group = groups.get(key) || [];
@@ -567,7 +570,24 @@
         if (value !== '') customLabels.push(property.name + ': ' + value);
       });
     }
-    const card = VideoCard.create(video, {
+    // Legacy publications used a link to a special player as their stored
+    // URL. Give them the exact same MP4 thumbnail and dimensions as all new
+    // published video cards, without rewriting saved IDs or metadata.
+    let cardMedia = video;
+    if (state.meta[String(video.id)]?.virtualPublishedEdit && !Data.isDirectVideoUrl(video.url)) {
+      const publication = state.meta[String(video.id)].virtualPublishedEdit;
+      const first = publication.edit?.clips?.[0];
+      const source = first && state.baseVideos.find((item) => String(item.id) === first.sourceVideoId);
+      if (source) {
+        const sourceMeta = state.meta[String(source.id)] || {};
+        const mediaUrl = typeof sourceMeta.url === 'string' ? sourceMeta.url : source.url;
+        if (Data.isDirectVideoUrl(mediaUrl)) {
+          cardMedia = { ...video, url: mediaUrl, thumbnailTimeSeconds: first.startSeconds,
+            rotate90Direction: first.rotation === 90 ? 'right' : first.rotation === -90 ? 'left' : 'none' };
+        }
+      }
+    }
+    const card = VideoCard.create(cardMedia, {
       documentRef: document, layout: state.view === 'compact' ? 'compact' : 'grid', openClass: 'vl-open',
       title, metadata, tags: Array.isArray(video.tags) ? video.tags : [], customLabels, progressPercent: progressPercent(video),
       thumbnailRenderer: window.MangaReaderVideoThumbnailRenderer,
@@ -734,7 +754,9 @@
     if (!fields) throw new Error('動画URLを確認してください。');
     const videos = readJson(VIDEO_KEY, []);
     const list = Array.isArray(videos) ? videos : [];
-    const matchingIndex = list.findIndex(item => [item.url, ...(item.alternateUrls || [])].some(candidate => Data.videoUrlIdentity(candidate) === Data.videoUrlIdentity(url)));
+    const matchingIndex = list.findIndex(item => item.virtualEdition !== true
+      && !state.meta[String(item.id)]?.virtualPublishedEdit
+      && [item.url, ...(item.alternateUrls || [])].some(candidate => Data.videoUrlIdentity(candidate) === Data.videoUrlIdentity(url)));
     if (matchingIndex >= 0) {
       if (list[matchingIndex].url === url) return Data.normalizeVideo(list[matchingIndex]);
       if (!markLocalChangesPending()) throw new Error('未同期状態を記録できませんでした。');
