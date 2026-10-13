@@ -572,7 +572,7 @@
     // URL. Give them the exact same MP4 thumbnail and dimensions as all new
     // published video cards, without rewriting saved IDs or metadata.
     let cardMedia = video;
-    if (state.meta[String(video.id)]?.virtualPublishedEdit && !Data.isDirectVideoUrl(video.url)) {
+    if (state.meta[String(video.id)]?.virtualPublishedEdit) {
       const publication = state.meta[String(video.id)].virtualPublishedEdit;
       const first = publication.edit?.clips?.[0];
       const source = first && state.baseVideos.find((item) => String(item.id) === first.sourceVideoId);
@@ -580,8 +580,10 @@
         const sourceMeta = state.meta[String(source.id)] || {};
         const mediaUrl = typeof sourceMeta.url === 'string' ? sourceMeta.url : source.url;
         if (Data.isDirectVideoUrl(mediaUrl)) {
-          cardMedia = { ...video, url: mediaUrl, thumbnailTimeSeconds: first.startSeconds,
-            rotate90Direction: first.rotation === 90 ? 'right' : first.rotation === -90 ? 'left' : 'none' };
+          cardMedia = { ...video, url: mediaUrl,
+            thumbnailTimeSeconds: video.thumbnailTimeSeconds == null ? first.startSeconds : video.thumbnailTimeSeconds,
+            rotate90Direction: first.rotation === 90 ? 'right' : first.rotation === -90 ? 'left' : 'none',
+            virtualThumbRotation: first.rotation || 0 };
         }
       }
     }
