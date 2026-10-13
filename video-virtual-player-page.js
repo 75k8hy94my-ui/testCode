@@ -3,6 +3,7 @@
   const page = document.getElementById('virtualVideoPlayer');
   const Edit = window.MangaReaderVideoVirtualEdit;
   const Store = window.MangaReaderVideoVirtualEditStore;
+  const Publish = window.MangaReaderVideoVirtualPublish;
   const Playback = window.MangaReaderVideoVirtualPlayback;
   const Data = window.MangaReaderVideoData;
   const access = window.MangaReaderMediaAccess;
@@ -10,7 +11,11 @@
     if (page) page.textContent = '動画再生機能を初期化できませんでした。';
     return;
   }
-  const projectId = new URLSearchParams(location.search).get('project') || '';
+  const params = new URLSearchParams(location.search);
+  const projectId = params.get('project') || '';
+  const publishedVideoId = params.get('video') || '';
+  const returnPage = params.get('fromPage');
+  const returnSuffix = Number.isSafeInteger(Number(returnPage)) && Number(returnPage) > 0 ? '&fromPage=' + encodeURIComponent(returnPage) : '';
   let player = null;
   let loaded = false;
   let blocked = false;
@@ -36,10 +41,12 @@
     lead.textContent = message;
     const back = document.createElement('a');
     back.className = 'vvpLink';
-    back.href = 'video-virtual-editor.html' + (projectId ? '?project=' + encodeURIComponent(projectId) : '');
+    back.href = 'video-virtual-editor.html' + (publishedVideoId ? '?published=' + encodeURIComponent(publishedVideoId) : (projectId ? '?project=' + encodeURIComponent(projectId) : ''));
     back.textContent = '編集画面へ';
     const library = document.createElement('a');
-    library.className = 'vvpLink'; library.href = 'video.html'; library.textContent = '動画一覧へ';
+    library.className = 'vvpLink';
+    library.href = publishedVideoId ? 'video.html?returnVideo=' + encodeURIComponent(publishedVideoId) + (returnPage ? '&returnPage=' + encodeURIComponent(returnPage) : '') : 'video.html';
+    library.textContent = '動画一覧へ';
     section.append(heading, lead);
     if (!allowed()) {
       const retry = document.createElement('button');
@@ -49,6 +56,30 @@
       section.append(retry);
     }
     section.append(back, library);
+    // Recovery must remain available even if the edited source MP4 was removed
+    // or changed; otherwise the user could become stuck with an unplayable edit.
+    if (allowed() && publishedVideoId && Publish) {
+      try {
+        const item = Publish.createPublisher().get(publishedVideoId);
+        if (item && item.kind === 'overwrite') {
+          const restore = document.createElement('button');
+          restore.type = 'button'; restore.className = 'vvpButton';
+          restore.textContent = '編集版を解除して元動画に戻す';
+          restore.addEventListener('click', async () => {
+            if (!allowed() || !confirm('元のMP4の再生に戻しますか？ 編集済みの上書き設定は解除されます。')) return;
+            restore.disabled = true;
+            try {
+              await Publish.createPublisher().restore(publishedVideoId);
+              location.replace('video-player.html?id=' + encodeURIComponent(publishedVideoId));
+            } catch (error) {
+              lead.textContent = error.message || '元動画への復元に失敗しました。';
+              restore.disabled = false;
+            }
+          });
+          section.append(restore);
+        }
+      } catch (_) { /* A malformed stored publication must never bypass the access gate. */ }
+    }
     page.replaceChildren(section);
     if (access && typeof access.syncUi === 'function') access.syncUi();
   }
@@ -79,23 +110,47 @@
   }
   function loadPlayer() {
     if (loaded || !allowed() || blocked) return;
-    if (!projectId) {
-      showBlock('編集プロジェクトを指定してください', '編集画面から保存済みの編集プロジェクトを選択してください。');
-      return;
-    }
-    const repo = Store.createRepository();
-    const project = repo.get(projectId);
-    if (!project) {
-      showBlock('編集プロジェクトが見つかりません', '削除または移動された可能性があります。');
-      return;
-    }
-    const diagnosis = repo.inspect(projectId);
-    if (!diagnosis || !diagnosis.usable) {
-      showBlock('素材が変更されています', '元のMP4の削除・URL変更・形式変更を検出しました。安全のため再生しません。');
+    if (!projectId && !publishedVideoId) {
+      showBlock('編集動画を指定してください', '動画一覧から編集版を選ぶか、編集プロジェクトを指定してください。');
       return;
     }
     const videos = read(Store.VIDEO_KEY, []);
     const meta = read(Store.META_KEY, {});
+    let project;
+    let publication = null;
+    if (publishedVideoId) {
+      if (!Publish) throw new Error('編集版の公開機能が読み込まれていません。');
+      const target = videos.find((item) => String(item.id) === publishedVideoId);
+      const data = Publish.createPublisher().get(publishedVideoId);
+      if (!target || !data) {
+        showBlock('公開済み編集版が見つかりません', '動画一覧から再度選択してください。');
+        return;
+      }
+      try {
+        publication = Publish.createPublisher().inspect(publishedVideoId);
+      } catch (error) {
+        showBlock('元動画の参照に問題があります', error.message || '素材を検証できません。');
+        return;
+      }
+      const override = meta[publishedVideoId] && typeof meta[publishedVideoId] === 'object' ? meta[publishedVideoId] : {};
+      project = {
+        title: String(override.title || target.title || '編集済み動画'),
+        edit: publication.edit,
+        sourceFingerprints: publication.fingerprints,
+      };
+    } else {
+      const repo = Store.createRepository();
+      project = repo.get(projectId);
+      if (!project) {
+        showBlock('編集プロジェクトが見つかりません', '削除または移動された可能性があります。');
+        return;
+      }
+      const diagnosis = repo.inspect(projectId);
+      if (!diagnosis || !diagnosis.usable) {
+        showBlock('素材が変更されています', '元のMP4の削除・URL変更・形式変更を検出しました。安全のため再生しません。');
+        return;
+      }
+    }
     if (!Array.isArray(videos) || !meta || typeof meta !== 'object' || Array.isArray(meta)) {
       throw new TypeError('動画データが不正です。');
     }
@@ -127,8 +182,9 @@
       '<p class="vvpStatus" role="status" aria-live="polite" data-status></p>',
       '<p class="vvpFootnote">MP4の切替時は通信・シークのため一時停止することがあります。配信元によっては途中再生ができません。</p></section>',
       '<section class="vvpPanel"><h3>再生区間</h3><div class="vvpSegments" data-segments></div></section>',
-      '<nav class="vvpLinks"><a class="vvpLink" data-edit>編集画面に戻る</a>',
-      '<a class="vvpLink" href="video.html">動画一覧へ</a></nav>',
+      '<nav class="vvpLinks"><a class="vvpLink" data-edit>編集画面へ</a>',
+      '<button class="vvpButton" type="button" data-restore hidden>元動画に戻す</button>',
+      '<a class="vvpLink" data-library-link href="video.html">動画一覧へ</a></nav>',
     ].join('');
     const $ = (query) => page.querySelector(query);
     refs = {
@@ -137,7 +193,35 @@
       segments: $('[data-segments]'),
     };
     $('[data-title]').textContent = project.title;
-    $('[data-edit]').href = 'video-virtual-editor.html?project=' + encodeURIComponent(projectId);
+    $('[data-edit]').href = publishedVideoId
+      ? 'video-virtual-editor.html?published=' + encodeURIComponent(publishedVideoId)
+      : 'video-virtual-editor.html?project=' + encodeURIComponent(projectId);
+    if (publishedVideoId) {
+      $('[data-library-link]').href = 'video.html?returnVideo=' + encodeURIComponent(publishedVideoId)
+        + (returnPage ? '&returnPage=' + encodeURIComponent(returnPage) : '');
+      const restore = $('[data-restore]');
+      if (publication && publication.kind === 'overwrite') {
+        restore.hidden = false;
+        restore.addEventListener('click', async () => {
+          if (!allowed() || !confirm('編集版の上書きを解除して、元のMP4の再生に戻しますか？')) return;
+          restore.disabled = true;
+          refs.status.textContent = '元動画の表示を復元しています…';
+          try {
+            const result = await Publish.createPublisher().restore(publishedVideoId);
+            if (!allowed()) return;
+            if (!result.synced) {
+              // Local recovery already succeeded; it will be included in the next Vault sync.
+              refs.status.textContent = '元動画に戻しました。端末保存済み・クラウド同期待ちです。';
+            }
+            location.replace('video-player.html?id=' + encodeURIComponent(publishedVideoId) + (returnPage ? '&fromPage=' + encodeURIComponent(returnPage) : ''));
+          } catch (error) {
+            refs.status.textContent = error.message || '元動画への復元に失敗しました。';
+            refs.status.dataset.error = '1';
+            restore.disabled = false;
+          }
+        });
+      }
+    }
     document.title = project.title + ' — 編集済み動画';
     let offset = 0;
     segments = validated.clips.map((clip, index) => {
