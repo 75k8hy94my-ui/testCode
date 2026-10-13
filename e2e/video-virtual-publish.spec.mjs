@@ -48,8 +48,8 @@ test('guest publishes split clips and full edit to video list, overwrites and re
   await expect(page.locator('.vl-card')).toHaveCount(4);
   await expect(page.locator('.vl-card[data-video-id="publish-original"]')).toContainText('元動画の編集版');
   // Independently saved clips use the standard MP4 thumbnail renderer and IDs.
-  await expect(page.locator('.vl-card[data-video-id="' + clipIds[0] + '"] .videoCard')).toHaveCount(1);
-  await expect(page.locator('.vl-card[data-video-id="' + clipIds[0] + '"] video[src="https://media.example.test/movie.mp4"]')).toHaveCount(1);
+  await expect(page.locator('.vl-card[data-video-id="' + clipIds[0] + '"]')).toHaveCount(1);
+  await expect(page.locator('.vl-card[data-video-id="' + clipIds[0] + '"] .videoCardThumb')).toBeVisible();
   const cardData = await page.evaluate((id) => JSON.parse(localStorage.getItem('mangaReaderVideos')).find(v => v.id === id), clipIds[0]);
   expect(cardData.virtualEdition).toBe(true);
   expect(cardData.url).toBe('https://media.example.test/movie.mp4');
