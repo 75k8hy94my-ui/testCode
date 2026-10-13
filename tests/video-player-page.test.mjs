@@ -64,12 +64,12 @@ test('dedicated video editor renders its loading and VPN gate instead of leaving
 });
 
 test('watch page applies and cleans up the saved rotation direction for direct video', () => {
-  assert.match(page, /MangaReaderVideoRotation\.install\(frame, video, normalized\.rotate90Direction/);
+  assert.match(page, /MangaReaderVideoRotation\.install\([\s\S]*?frame, video, normalized\.rotate90Direction/);
   assert.match(page, /windowCleanups\.push\(cleanupRotation\)/);
   const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
   assert.ok(html.indexOf('video-player-rotation.js') < html.indexOf('video-player-page.js'));
   assert.match(fs.readFileSync(new URL('../home-profile-shell.css', import.meta.url), 'utf8'), /videoPlayerFrame video\.videoPlayerRotatedLeft/);
-  assert.match(page, /MangaReaderVideoRotation\.install\(frame, video, normalized\.rotate90Direction, \{ expandFrame: true \}\)/);
+  assert.match(page, /MangaReaderVideoRotation\.install\([\s\S]*?frame, video, normalized\.rotate90Direction, \{ expandFrame: true \}/);
   assert.match(fs.readFileSync(new URL('../home-profile-shell.css', import.meta.url), 'utf8'), /videoPlayerFrame\.videoPlayerFrameRotated\{height:min\(800px,calc\(100dvh - 150px\)\);aspect-ratio:auto\}/);
   assert.match(fs.readFileSync(new URL('../home-profile-shell.css', import.meta.url), 'utf8'), /videoPlayerFrame\.videoPlayerFrameRotated:fullscreen[^}]*height:100vh/);
 });
@@ -85,7 +85,7 @@ test('video title edits in place and player details follow the video in a watch-
 
 test('custom player defers single taps and maps double-tap zones to seek or fullscreen', () => {
   assert.match(controls, /Gestures\.create\(/);
-  assert.match(controls, /onSingleTap: \(\) => \{ video\.paused \? video\.play\(\) : video\.pause\(\); \}/);
+  assert.match(controls, /onSingleTap: \(\) => \{ playback\.paused \? playback\.play\(\) : playback\.pause\(\); \}/);
   assert.match(controls, /Gestures\.actionAt\(event\.clientX, video\.getBoundingClientRect\(\)\)/);
   assert.match(controls, /else toggleFullscreen\(\)/);
   assert.match(controls, /gestureController\.destroy\(\)/);
@@ -118,8 +118,8 @@ test('player saves title locally first, resumes pending sync in background, and 
 });
 
 test('marker registration defaults to the current playback position and receives a stable identity', () => {
-  assert.match(controls, /video\.currentTime/);
-  assert.match(controls, /const seconds = Math\.max\(0, Number\(video\.currentTime\) \|\| 0\)/);
+  assert.match(controls, /playback\.currentTime/);
+  assert.match(controls, /const seconds = Math\.max\(0, Number\(playback\.currentTime\) \|\| 0\)/);
   assert.match(controls, /next = markers\.concat\(\{ id: newMarkerId\(\), seconds, icon: selectedMarkerIcon \}\)/);
   assert.match(controls, /vault\.saveLocalChanges\(\)/);
 });
