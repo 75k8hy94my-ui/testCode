@@ -88,6 +88,22 @@ test('overwrite retains the original MP4 and restoration is reversible', async (
   assert.rejects(() => publisher.restore('source'), /元動画に戻せる/);
 });
 
+test('overwriting a previously published video can restore the prior edited version', async () => {
+  const { publisher, state } = fixture();
+  const original = Edit.createEdit([clips[0]]);
+  const first = await publisher.publish({ mode: 'new', title: '初回の編集版', edit: original });
+  assert.equal(publisher.inspect(first.ids[0]).kind, 'new');
+  assert.ok(publisher.listOverwriteTargets().some((item) => item.id === first.ids[0]));
+  await publisher.publish({ mode: 'overwrite', title: '再編集', targetId: first.ids[0], edit: Edit.createEdit(clips) });
+  assert.equal(publisher.inspect(first.ids[0]).kind, 'overwrite');
+  assert.equal(state().meta[first.ids[0]].virtualPublishedPrevious.kind, 'new');
+  await publisher.restore(first.ids[0]);
+  assert.equal(publisher.inspect(first.ids[0]).kind, 'new');
+  assert.deepEqual(publisher.inspect(first.ids[0]).edit.clips, [clips[0]]);
+  assert.match(state().videos.find((video) => video.id === first.ids[0]).url, /video-virtual-player/);
+  assert.equal(state().videos.length, 3);
+});
+
 test('source URL changes prevent playing obsolete virtual edits', async () => {
   const { publisher, storage } = fixture();
   const result = await publisher.publish({ mode: 'new', edit: Edit.createEdit(clips), title: '公開' });
