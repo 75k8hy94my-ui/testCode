@@ -48,8 +48,10 @@ test('all three publish modes store virtual time instructions, not actual media 
   const s = state();
   assert.equal(s.videos.length, 3);
   assert.equal(s.videos[0].title, '完成動画');
-  assert.equal(s.videos[0].url, 'https://example.test/testCode/video-virtual-player.html?video=' + a.ids[0]);
-  assert.equal(Data.videoUrlIdentity(s.videos[0].url) !== Data.videoUrlIdentity(sourceVideo.url), true);
+  assert.equal(s.videos[0].url, sourceVideo.url);
+  assert.equal(s.videos[0].virtualEdition, true);
+  assert.equal(s.meta[a.ids[0]].thumbnailTimeSeconds, clips[0].startSeconds);
+  assert.equal(Data.videoUrlIdentity(s.videos[0].url), Data.videoUrlIdentity(sourceVideo.url));
   assert.equal(s.videos.find((video) => video.id === sourceVideo.id).url, sourceVideo.url);
 });
 
@@ -59,8 +61,8 @@ test('split publish creates distinct library videos and preserves each clip rota
   assert.equal(result.count, 3);
   const s = state();
   assert.equal(s.videos.length, 5);
-  assert.equal(new Set(s.videos.map((video) => Data.videoUrlIdentity(video.url))).size, s.videos.length,
-    'library URL deduplication must not merge split outputs');
+  assert.equal(new Set(s.videos.filter(video => video.virtualEdition).map(video => video.id)).size, 3,
+    'published clips retain independent IDs even when their MP4 URLs are identical');
   result.ids.forEach((id, index) => {
     const part = publisher.inspect(id);
     assert.equal(part.kind, 'split');
@@ -100,7 +102,7 @@ test('overwriting a previously published video can restore the prior edited vers
   await publisher.restore(first.ids[0]);
   assert.equal(publisher.inspect(first.ids[0]).kind, 'new');
   assert.deepEqual(publisher.inspect(first.ids[0]).edit.clips, [clips[0]]);
-  assert.match(state().videos.find((video) => video.id === first.ids[0]).url, /video-virtual-player/);
+  assert.equal(state().videos.find((video) => video.id === first.ids[0]).url, sourceVideo.url);
   assert.equal(state().videos.length, 3);
 });
 
@@ -139,7 +141,7 @@ test('publication UI, original player routing and edited player are connected', 
   assert.match(ui, /data-publish-clips/);
   assert.match(ui, /data-publish-overwrite/);
   assert.match(entry, /virtualPublishedEdit/);
-  assert.match(entry, /video-virtual-player\.html/);
+  assert.match(entry, /MangaReaderVideoVirtualAdapter/);
   assert.match(virtual, /data-restore/);
   assert.match(virtual, /Publish\.createPublisher\(\)\.restore\(publishedVideoId\)/);
 });
