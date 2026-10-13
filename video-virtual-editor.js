@@ -95,6 +95,8 @@
     if (refs.editSeek && !refs.editSeek.matches?.(':active')) refs.editSeek.value = String(timelinePosition);
     if (refs.editTime) refs.editTime.textContent = format(timelinePosition) + ' / ' + format(snapshot.totalSeconds);
     refs.playhead.style.left = timelinePosition * zoom + 'px';
+    const programClock = root.querySelector('[data-premiere-clock]');
+    if (programClock) programClock.textContent = format(timelinePosition);
   }
   function rebuildResultPreview(seconds = null) {
     if (previewMode !== 'edit' || !Playback || !canRead()) return;
@@ -599,9 +601,13 @@
     const offsets = State.clipOffsets(edit).offsets;
     const snaps = [...offsets, total];
     let target = seconds;
+    let distance = 8 / zoom;
     for (const boundary of snaps) {
-      if (Math.abs(seconds - boundary) * zoom < 8 &&
-          Math.abs(boundary - seconds) < Math.abs(target - seconds)) target = boundary;
+      const gap = Math.abs(boundary - seconds);
+      if (gap < distance) {
+        target = boundary;
+        distance = gap;
+      }
     }
     const located = Edit.locateTime(edit, Math.min(target, Math.max(0, total - 0.001)));
     if (located) {
@@ -610,6 +616,8 @@
     }
     timelinePosition = target;
     if (previewMode === 'edit' && resultController) resultController.seek(target);
+    const programClock = root.querySelector('[data-premiere-clock]');
+    if (programClock) programClock.textContent = format(target);
     drawClips();
   }
   function pointerMove(event) {
