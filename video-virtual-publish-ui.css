@@ -1,0 +1,44 @@
+.virtualVideoEditor .vveMainGrid>.vvePublishPanel {
+  grid-column:1/-1;grid-row:3;
+  padding:15px 16px;
+  background:var(--vve-panel,#222630);
+}
+.virtualVideoEditor .vvePublishHeading {margin-bottom:12px}
+.virtualVideoEditor .vvePublishHeading .vvePaneTitle {margin:0 0 6px;font-size:15px}
+.virtualVideoEditor .vvePublishHeading .vveLead {line-height:1.5}
+.virtualVideoEditor .vvePublishGrid {
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  align-items:stretch;gap:10px;
+}
+.virtualVideoEditor .vvePublishChoice {
+  display:flex;flex-direction:column;align-items:stretch;
+  min-width:0;gap:9px;padding:14px;border:1px solid var(--vve-border,#3b4250);
+  border-radius:7px;background:var(--vve-bg,#171a20);
+}
+.virtualVideoEditor .vvePublishChoice strong {font-size:13px;color:var(--vve-text,#eee)}
+.virtualVideoEditor .vvePublishChoice p {
+  font-size:11px;line-height:1.7;color:var(--vve-muted,#acb3c2);
+  margin:0 0 auto;
+}
+.virtualVideoEditor .vvePublishChoice>.vveAction {min-height:40px;width:100%}
+.virtualVideoEditor .vvePublishChoice .vveField {font-size:11px;gap:5px}
+.virtualVideoEditor .vvePublishChoice .vveField select {
+  width:100%;min-width:0;min-height:40px;background:var(--vve-raised,#292e39);
+  color:var(--vve-text,#eee);border:1px solid var(--vve-border,#3b4250);
+  border-radius:5px;padding:6px 9px;
+}
+.virtualVideoEditor .vvePublishStatus {font-size:12px;line-height:1.5;min-height:15px;margin:12px 0 0;color:var(--vve-muted,#adb5c3)}
+.virtualVideoEditor .vvePublishStatus[data-error="1"] {color:#f6b885}
+.virtualVideoEditor .vvePublishResult {display:flex;flex-wrap:wrap;gap:8px}
+.virtualVideoEditor .vvePublishResult:empty {display:none}
+@media(max-width:920px) {
+ .virtualVideoEditor .vvePublishGrid {grid-template-columns:repeat(2,minmax(0,1fr))}
+ .virtualVideoEditor .vveMainGrid>.vvePublishPanel {grid-row:4}
+}
+@media(max-width:650px) {
+ .virtualVideoEditor .vvePublishGrid {grid-template-columns:1fr;gap:8px}
+ .virtualVideoEditor .vveMainGrid>.vvePublishPanel {grid-column:1;grid-row:5}
+ .virtualVideoEditor .vveMainGrid>.vveMediaBin {grid-row:4}
+ .virtualVideoEditor .vvePublishChoice {gap:7px;padding:11px}
+ .virtualVideoEditor .vvePublishChoice p {margin-bottom:3px}
+}
