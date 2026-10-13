@@ -550,6 +550,8 @@
     if (!VideoCard || typeof VideoCard.create !== 'function') throw new Error('video card component is unavailable');
     const title = Data.displayTitle(video, effectiveVideos());
     const metadata = [];
+    const publication = state.meta[String(video.id)]?.virtualPublishedEdit;
+    if (publication && typeof publication === 'object') metadata.push(publication.kind === 'overwrite' ? '元動画の編集版' : '編集済み動画');
     const service = Data.deriveService(video.url, video.a);
     if (service) metadata.push(service);
     if (video.folderId && folderName(video.folderId)) metadata.push(folderName(video.folderId));
