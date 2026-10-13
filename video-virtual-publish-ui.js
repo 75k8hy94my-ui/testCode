@@ -111,7 +111,7 @@
       '<button class="vveAction" type="button" data-publish-clips>すべての分割を別動画として追加</button></div>',
       '<div class="vvePublishChoice"><strong>既存動画の編集版として上書き</strong>',
       '<p>元のURLや前の編集版を保持し、再生する内容だけを変更します。再生画面から元に戻せます。</p>',
-      '<label class="vveField">上書き先の動画<select data-publish-target aria-label="上書きする動画"></select></label>',
+      '<label class="vveField">上書き先の既存動画<select data-publish-target aria-label="上書きする動画"></select></label>',
       '<button class="vveAction" type="button" data-publish-overwrite>選択動画を編集版に変更</button></div>',
       '</div><p class="vvePublishStatus" data-publish-status role="status" aria-live="polite"></p>',
       '<div class="vvePublishResult" data-publish-result></div>',
