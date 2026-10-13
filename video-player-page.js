@@ -136,6 +136,15 @@
   if (!base) { page.innerHTML = '<section class="profileContent"><h2>動画が見つかりません</h2></section>'; return; }
 
   const meta = allMeta[id] && typeof allMeta[id] === 'object' ? allMeta[id] : {};
+  // Virtual publications are ordinary library entries, but must use the
+  // non-destructive sequenced player instead of loading the original MP4.
+  if (meta.virtualPublishedEdit && typeof meta.virtualPublishedEdit === 'object') {
+    const route = new URL('video-virtual-player.html', location.href);
+    route.searchParams.set('video', id);
+    if (validReturnPage != null) route.searchParams.set('fromPage', String(validReturnPage));
+    location.replace(route.href);
+    return;
+  }
   const videos = window.MangaReaderVideoData;
   const normalized = videos ? videos.normalizeVideo({ ...base, ...meta, id: base.id, a: base.a, b: base.b, addedAt: base.addedAt }) : { ...base, ...meta };
   const title = videos ? videos.displayTitle(normalized, baseVideos.map(item => { const entryMeta = allMeta[item.id] || {}; return videos.normalizeVideo({ ...item, ...entryMeta, id: item.id, a: item.a, b: item.b, addedAt: item.addedAt }); })) : (normalized.title || '名称未設定１');
