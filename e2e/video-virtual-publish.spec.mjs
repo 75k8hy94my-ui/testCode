@@ -53,9 +53,12 @@ test('guest publishes split clips and full edit to video list, overwrites and re
   expect(publication.edit.clips[1].rotation).toBe(90);
 
   await page.goto('video-player.html?id=publish-original');
-  await expect(page).toHaveURL(/video-virtual-player\.html\?video=publish-original/);
-  await expect(page.locator('[data-restore]')).toBeVisible();
-  await page.locator('[data-restore]').click();
+  await expect(page).toHaveURL(/video-player\.html\?id=publish-original/);
+  await expect(page.locator('.videoPlayerTitle')).toHaveText('編集元');
+  await expect(page.locator('.customVideoControls')).toBeVisible();
+  await expect(page.locator('video[data-virtual-edited="1"]')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: '上書き前の動画に戻す' })).toBeVisible();
+  await page.getByRole('button', { name: '上書き前の動画に戻す' }).click();
   await expect(page).toHaveURL(/video-player\.html\?id=publish-original/);
   const snapshot = await page.evaluate(() => ({
     original: JSON.parse(localStorage.getItem('mangaReaderVideos')).find(video => video.id === 'publish-original'),
@@ -64,8 +67,12 @@ test('guest publishes split clips and full edit to video list, overwrites and re
   expect(snapshot.original.url).toBe('https://media.example.test/movie.mp4');
   expect(snapshot.publication).toBeNull();
 
-  // One of the split outputs also routes into the virtual sequence player.
+  // Split outputs have exactly the same card, page and playback UI as an ordinary MP4.
   await page.goto('video-player.html?id=' + encodeURIComponent(clipIds[0]));
-  await expect(page).toHaveURL(/video-virtual-player\.html\?video=/);
-  await expect(page.locator('[data-title]')).toContainText('分割');
+  await expect(page).toHaveURL(/video-player\.html\?id=/);
+  await expect(page.locator('.videoPlayerTitle')).toContainText('分割');
+  await expect(page.locator('.customVideoControls')).toBeVisible();
+  await expect(page.locator('.customVideoVolume')).toBeVisible();
+  await expect(page.locator('.videoPlayerDescription')).toBeVisible();
+  await expect(page.getByRole('link', { name: '詳細を編集' })).toBeVisible();
 });
