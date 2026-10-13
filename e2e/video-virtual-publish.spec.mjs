@@ -46,7 +46,8 @@ test('guest publishes split clips and full edit to video list, overwrites and re
   await page.goto('video.html');
   await expect(page.locator('#videoLibraryApp')).toBeVisible();
   await expect(page.locator('.vl-card')).toHaveCount(4);
-  await expect(page.locator('.vl-card[data-video-id="publish-original"]')).toContainText('元動画の編集版');
+  await expect(page.locator('.vl-card[data-video-id="publish-original"]')).toContainText('編集元');
+  await expect(page.locator('.vl-card[data-video-id="publish-original"] .videoCardThumb')).toBeVisible();
   // Independently saved clips use the standard MP4 thumbnail renderer and IDs.
   await expect(page.locator('.vl-card[data-video-id="' + clipIds[0] + '"]')).toHaveCount(1);
   await expect(page.locator('.vl-card[data-video-id="' + clipIds[0] + '"] .videoCardThumb')).toBeVisible();
