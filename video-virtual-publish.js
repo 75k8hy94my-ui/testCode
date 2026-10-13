@@ -182,12 +182,25 @@
           ids.push(id);
           const label = mode === 'split' ? caption.slice(0, 210) + '（分割' + (index + 1) + '／' + clips.length + '）' : caption;
           const sourceVideo = videos.find((v) => String(v.id) === current.clips[0].sourceVideoId);
-          // Unique ?video= IDs prevent identical-source clips from being merged by URL migration.
-          const url = new URL('video-virtual-player.html?video=' + encodeURIComponent(id), routeBase).href;
-          nextVideos.unshift({ id, title: label, url, a: '', b: '', addedAt: publishedAt + index, updatedAt: publishedAt });
-          // Carry the original thumbnail when provided, while leaving all source records untouched.
-          nextMeta[id] = { ...(sourceVideo && isObject(meta[sourceVideo.id]) && meta[sourceVideo.id].thumbnailUrl
-            ? { thumbnailUrl: meta[sourceVideo.id].thumbnailUrl } : {}), durationSeconds: Edit.totalDuration(current) };
+          // A published edit has a real MP4 source URL, exactly like every
+          // other video card. Its own ID and edit metadata determine playback.
+          // Deduplication MUST distinguish published editions by identity.
+          const first = current.clips[0];
+          const url = sourceById.get(first.sourceVideoId);
+          const fields = { a: sourceVideo && sourceVideo.a || 'url',
+            b: sourceVideo && sourceVideo.b || '' };
+          nextVideos.unshift({ id, title: label, url, ...fields,
+            virtualEdition: true, addedAt: publishedAt + index, updatedAt: publishedAt });
+          // An ordinary thumbnail renderer can seek directly to the first
+          // displayed frame of the source MP4.
+          const initialRotation = first.rotation || 0;
+          nextMeta[id] = {
+            ...(sourceVideo && isObject(meta[sourceVideo.id]) && meta[sourceVideo.id].thumbnailUrl
+              ? { thumbnailUrl: meta[sourceVideo.id].thumbnailUrl } : {}),
+            durationSeconds: Edit.totalDuration(current),
+            thumbnailTimeSeconds: first.startSeconds,
+            rotate90Direction: initialRotation === 90 ? 'right' : initialRotation === -90 ? 'left' : 'none',
+          };
         }
         const fingerprintIds = [...new Set(current.clips.map((clip) => clip.sourceVideoId))];
         const publication = {

@@ -136,15 +136,10 @@
   if (!base) { page.innerHTML = '<section class="profileContent"><h2>動画が見つかりません</h2></section>'; return; }
 
   const meta = allMeta[id] && typeof allMeta[id] === 'object' ? allMeta[id] : {};
-  // Virtual publications are ordinary library entries, but must use the
-  // non-destructive sequenced player instead of loading the original MP4.
-  if (meta.virtualPublishedEdit && typeof meta.virtualPublishedEdit === 'object') {
-    const route = new URL('video-virtual-player.html', location.href);
-    route.searchParams.set('video', id);
-    if (validReturnPage != null) route.searchParams.set('fromPage', String(validReturnPage));
-    location.replace(route.href);
-    return;
-  }
+  // The video card, detail page and controls are shared for raw MP4s and
+  // published virtual edits. Only the decoding / seek implementation differs.
+  const publishedEdit = meta.virtualPublishedEdit && typeof meta.virtualPublishedEdit === 'object'
+    ? meta.virtualPublishedEdit : null;
   const videos = window.MangaReaderVideoData;
   const normalized = videos ? videos.normalizeVideo({ ...base, ...meta, id: base.id, a: base.a, b: base.b, addedAt: base.addedAt }) : { ...base, ...meta };
   const title = videos ? videos.displayTitle(normalized, baseVideos.map(item => { const entryMeta = allMeta[item.id] || {}; return videos.normalizeVideo({ ...item, ...entryMeta, id: item.id, a: item.a, b: item.b, addedAt: item.addedAt }); })) : (normalized.title || '名称未設定１');
@@ -207,23 +202,87 @@
   heading.addEventListener('blur', saveTitle);
   const frame = document.createElement('div'); frame.className = 'videoPlayerFrame'; frame.style.height = 'min(540px, calc(100svh - 150px))'; frame.style.minHeight = '240px';
   const sourceUrl = normalized.url || base.url || '';
-  // Keep the ordinary detail editor unchanged; the virtual editor is MP4-only.
-  if (window.MangaReaderVideoVirtualEdit && window.MangaReaderVideoVirtualEdit.isMp4Url(sourceUrl)) {
+  const MP4 = window.MangaReaderVideoVirtualEdit;
+  if (MP4 && (MP4.isMp4Url(sourceUrl) || publishedEdit)) {
     const virtualEdit = document.createElement('a');
     virtualEdit.className = 'videoPlayerEdit';
     virtualEdit.textContent = '区間を編集・結合';
-    virtualEdit.href = 'video-virtual-editor.html?id=' + encodeURIComponent(id);
+    virtualEdit.href = 'video-virtual-editor.html?'
+      + (publishedEdit ? 'published=' : 'id=') + encodeURIComponent(id);
     actionBar.append(virtualEdit);
   }
+  if (publishedEdit && publishedEdit.kind === 'overwrite') {
+    const restore = document.createElement('button');
+    restore.type = 'button';
+    restore.className = 'videoPlayerEdit';
+    restore.textContent = '上書き前の動画に戻す';
+    restore.addEventListener('click', async () => {
+      if (!canReadProtectedData() || !confirm('この動画の上書き編集を解除して、上書き前の状態へ戻しますか？')) return;
+      restore.disabled = true;
+      try {
+        await window.MangaReaderVideoVirtualPublish.createPublisher().restore(id);
+        location.reload();
+      } catch (error) {
+        restore.disabled = false;
+        setSyncStatus(error && error.message || '元動画への復元に失敗しました。', true);
+      }
+    });
+    actionBar.append(restore);
+  }
   const directVideo = /\.(?:mp4|webm|ogg|ogv|m4v|mov)(?:[?#].*)?$/i.test(sourceUrl);
-  if (directVideo) {
-    const video = document.createElement('video'); video.controls = true; video.playsInline = true; video.preload = 'metadata'; video.style.display = 'block'; video.style.width = '100%'; video.style.height = '100%'; video.style.maxWidth = '100%'; video.style.maxHeight = '100%'; video.style.objectFit = 'contain';
-    const startValue = new URLSearchParams(location.search).get('start'); const startTime = startValue == null ? null : Number(startValue);
-    if (Number.isFinite(startTime) && startTime >= 0) video.addEventListener('loadedmetadata', () => { if (canReadProtectedData()) video.currentTime = Math.min(startTime, Number.isFinite(video.duration) ? video.duration : startTime); }, { once: true });
-    video.src = sourceUrl;
+  if (publishedEdit || directVideo) {
+    const video = document.createElement('video');
+    video.controls = true; video.playsInline = true; video.preload = 'metadata';
+    video.style.display = 'block'; video.style.width = '100%'; video.style.height = '100%';
+    video.style.maxWidth = '100%'; video.style.maxHeight = '100%';
+    video.style.objectFit = 'contain';
     frame.append(video);
-    const cleanupRotation = window.MangaReaderVideoRotation.install(frame, video, normalized.rotate90Direction, { expandFrame: true });
-    windowCleanups.push(cleanupRotation);
+    const startValue = new URLSearchParams(location.search).get('start');
+    const startTime = startValue == null ? null : Number(startValue);
+    if (publishedEdit) {
+      try {
+        const Publish = window.MangaReaderVideoVirtualPublish;
+        const Adapter = window.MangaReaderVideoVirtualAdapter;
+        if (!Publish || !Adapter) throw new Error('編集済み動画の再生コンポーネントを読み込めません。');
+        const publication = Publish.createPublisher().inspect(id);
+        const sources = baseVideos.map((entry) => {
+          const m = allMeta[entry.id] && typeof allMeta[entry.id] === 'object' ? allMeta[entry.id] : {};
+          const record = videos.normalizeVideo({ ...entry, ...m, id: entry.id,
+            a: entry.a, b: entry.b, addedAt: entry.addedAt });
+          return { id: String(entry.id), url: record.url, title: record.title || String(entry.id) };
+        });
+        const playback = Adapter.attach({ video, edit: publication.edit, sources });
+        windowCleanups.push(() => playback.destroy());
+        const feedback = document.createElement('p');
+        feedback.className = 'videoPlayerVirtualStatus';
+        feedback.setAttribute('role', 'status');
+        feedback.setAttribute('aria-live', 'polite');
+        frame.append(feedback);
+        video.addEventListener('virtual-edit-state', (event) => {
+          const snapshot = event.detail;
+          feedback.textContent = snapshot.phase === 'error' ? snapshot.error
+            : snapshot.phase === 'loading' || snapshot.phase === 'seeking' ? snapshot.message : '';
+        });
+        playback.currentTime = Number.isFinite(startTime) && startTime >= 0 ? startTime : 0;
+      } catch (error) {
+        const feedback = document.createElement('p');
+        feedback.className = 'videoPlayerVirtualStatus';
+        feedback.setAttribute('role', 'alert');
+        feedback.textContent = '編集版の再生に失敗しました：' + (error.message || '参照元MP4を確認してください。');
+        frame.replaceChildren(feedback);
+      }
+    } else {
+      if (Number.isFinite(startTime) && startTime >= 0) {
+        video.addEventListener('loadedmetadata', () => {
+          if (canReadProtectedData()) video.currentTime = Math.min(startTime,
+            Number.isFinite(video.duration) ? video.duration : startTime);
+        }, { once: true });
+      }
+      video.src = sourceUrl;
+      const cleanupRotation = window.MangaReaderVideoRotation.install(
+        frame, video, normalized.rotate90Direction, { expandFrame: true });
+      windowCleanups.push(cleanupRotation);
+    }
   }
   else if (base.a && base.b) { const iframe = document.createElement('iframe'); iframe.src = 'https://www.' + base.a + '.com/embed/' + base.b; iframe.title = title; iframe.allowFullscreen = true; frame.append(iframe); }
   else { const link = document.createElement('a'); link.className = 'glassBtn'; link.href = sourceUrl || '#'; link.target = '_blank'; link.rel = 'noopener'; link.textContent = '元ページを開く'; frame.append(link); }
@@ -234,7 +293,7 @@
   const formatMarker = (seconds) => Math.floor(seconds / 60) + ':' + String(Math.floor(seconds % 60)).padStart(2, '0');
   const markerSvg = (icon) => ({ water: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C9.2 6 5 10.1 5 14a7 7 0 0 0 14 0c0-3.9-4.2-8-7-12Zm-3.5 12a3.5 3.5 0 0 0 3.5 3.5"/></svg>', triangle: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 4 9 16H3L12 4Z"/></svg>', toilet: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h8v6H5zM4 9h14l-2 7a4 4 0 0 1-4 3h-2a5 5 0 0 1-5-4L4 9Zm9 10v2m4-2 2 2"/></svg>' , hand: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.8 21c-1.2-1.7-2.5-3.7-3.4-5.4-.6-1.2-.2-2.2.7-2.6.9-.4 1.7 0 2.3.8l1.4 1.8V4.2a1.5 1.5 0 0 1 3 0v8.1c.2-1.1.8-1.6 1.6-1.6 1 0 1.5.6 1.5 1.6v1.1c.2-1.2.8-1.7 1.6-1.7 1 0 1.5.7 1.5 1.7v.7l.6-9.4a1.5 1.5 0 0 1 3 .2l-.5 11.4c-.2 3-2.1 4.7-4.8 4.7H5.8Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>' })[icon] || '';
   const markerNames = { water: '水しぶき', triangle: '上向き三角', toilet: 'トイレマーク', hand: '人差し指・小指・親指を伸ばした手' };
-  const renderPageMarkers = () => { markerItems.replaceChildren(); markerStore().slice().sort((a, b) => a.seconds - b.seconds).forEach((marker) => { const button = document.createElement('button'); button.type = 'button'; button.className = 'videoPlayerMarkerButton'; button.setAttribute('aria-label', markerNames[marker.icon] + ' ' + formatMarker(Number(marker.seconds) || 0) + (marker.endSeconds != null ? '〜' + formatMarker(marker.endSeconds) : '') + 'へ移動'); button.innerHTML = markerSvg(marker.icon); button.addEventListener('click', () => { const target = frame.querySelector('video'); if (target) { target.currentTime = marker.seconds; target.play(); } }); markerItems.append(button); }); markerList.hidden = !markerItems.children.length; };
+  const renderPageMarkers = () => { markerItems.replaceChildren(); markerStore().slice().sort((a, b) => a.seconds - b.seconds).forEach((marker) => { const button = document.createElement('button'); button.type = 'button'; button.className = 'videoPlayerMarkerButton'; button.setAttribute('aria-label', markerNames[marker.icon] + ' ' + formatMarker(Number(marker.seconds) || 0) + (marker.endSeconds != null ? '〜' + formatMarker(marker.endSeconds) : '') + 'へ移動'); button.innerHTML = markerSvg(marker.icon); button.addEventListener('click', () => { const media = frame.querySelector('video'); const target = media && (media.__virtualPlaybackAdapter || media); if (target) { target.currentTime = marker.seconds; target.play(); } }); markerItems.append(button); }); markerList.hidden = !markerItems.children.length; };
   renderPageMarkers();
   listenWindow('manga-video-markers-changed', renderPageMarkers);
 

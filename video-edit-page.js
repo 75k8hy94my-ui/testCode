@@ -250,7 +250,7 @@
         let promoted = 0;
         urls.forEach((url) => {
           const identity = Data.videoUrlIdentity(url);
-          const found = updatedVideos.find(v => [v.url, ...(v.alternateUrls || [])].some(x => Data.videoUrlIdentity(x) === identity));
+          const found = updatedVideos.find(v => v.virtualEdition !== true && !read(META_KEY, {})[String(v.id)]?.virtualPublishedEdit && [v.url, ...(v.alternateUrls || [])].some(x => Data.videoUrlIdentity(x) === identity));
           if (found) {
             if (found.url !== url) { Object.assign(found, Data.promoteVideoUrl(found, url)); promoted++; }
             return;
@@ -319,7 +319,7 @@
       const latestVideos = read(VIDEO_KEY, []);
       const savedVideos = Array.isArray(latestVideos) ? latestVideos : [];
       const identity = Data.videoUrlIdentity(url);
-      const matching = savedVideos.find(item => (isAddMode || String(item.id) !== videoId) &&
+      const matching = base?.virtualEdition === true || originalMeta.virtualPublishedEdit ? null : savedVideos.find(item => item.virtualEdition !== true && (isAddMode || String(item.id) !== videoId) &&
         [item.url, ...(item.alternateUrls || [])].some(candidate => Data.videoUrlIdentity(candidate) === identity));
       const variants = [...new Set([...elements.alternateUrls.value.split(/\r?\n/).map(v => v.trim()), ...(!isAddMode && current.url !== url ? [current.url] : [])])].filter(v => v && v !== url);
       if (variants.some(v => Data.classifyVideoUrl(v).kind === 'invalid')) { error.textContent = 'サブURLを確認してください。'; return; }

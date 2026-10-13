@@ -33,9 +33,19 @@
       ? root.MangaReaderVideoData.getRotationDirection(record)
       : (record.rotate90Direction === 'left' || record.rotate90Direction === 'right'
         ? record.rotate90Direction : record.rotate90 === true ? 'left' : 'none');
-    const rotate = isDirectVideo(record.url) && rotation !== 'none';
+    const rotate180 = record.virtualThumbRotation === 180;
+    const rotate = isDirectVideo(record.url) && (rotation !== 'none' || rotate180);
     const applyMediaRotation = (media, width, height) => {
       if (!rotate || !media || !(width > 0 && height > 0)) return;
+      if (rotate180) {
+        media.style.inset = '0';
+        media.style.width = '100%';
+        media.style.height = '100%';
+        media.style.transformOrigin = 'center center';
+        media.style.transform = 'rotate(180deg)';
+        media.style.objectFit = 'cover';
+        return;
+      }
       // A rotated media element must occupy the exchanged width/height of the thumbnail.
       // Percentages are relative to the thumbnail's (rotated) dimensions.
       media.style.inset = 'auto';
