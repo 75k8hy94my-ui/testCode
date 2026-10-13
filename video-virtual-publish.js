@@ -108,7 +108,11 @@
       const { videos, meta } = readState();
       return effectiveSources(videos, meta).filter((source) => {
         const base = videos.find((video) => String(video.id) === source.id);
-        return Edit.isMp4Url(source.url) && base && Edit.isMp4Url(base.url);
+        // Existing videos need not themselves be MP4s: only the edit sources do.
+        // A previously published virtual item is also valid if its snapshot survives.
+        return base && typeof base.url === 'string' && /^https?:\/\//i.test(base.url)
+          && (Edit.isMp4Url(base.url) || !/video-virtual-player\.html\?video=/.test(base.url)
+            || !!readPublication(meta, source.id));
       }).map(({ id, title }) => ({ id, title: title || id }));
     }
     function get(videoId) {
@@ -164,8 +168,8 @@
       if (mode === 'overwrite') {
         const id = String(targetId || '');
         const original = videos.find((video) => String(video.id) === id);
-        if (!original || !Edit.isMp4Url(original.url) || !Edit.isMp4Url(sourceById.get(id))) {
-          throw new Error('上書き先は元のMP4を保持している動画から選択してください。');
+        if (!original || !listOverwriteTargets().some((item) => item.id === id)) {
+          throw new Error('動画一覧に存在する上書き可能な動画を指定してください。');
         }
         ids.push(id);
       } else if (!routeBase || !/^https?:/.test(new URL(routeBase).protocol)) {
@@ -192,7 +196,18 @@
             ({ sourceVideoId, fingerprint: Store.sourceFingerprint(sourceById.get(sourceVideoId)) })),
           publishedAt,
         };
-        nextMeta[id] = { ...(isObject(nextMeta[id]) ? nextMeta[id] : {}), [FIELD]: publication, updatedAt: publishedAt };
+        const oldMeta = isObject(nextMeta[id]) ? nextMeta[id] : {};
+        // When overwriting an already published virtual item, retain its previous
+        // playable snapshot: the synthetic URL is not a raw MP4 fallback.
+        const previous = mode === 'overwrite'
+          ? (oldMeta.virtualPublishedPrevious || (
+            isObject(oldMeta[FIELD]) && oldMeta[FIELD].kind !== 'overwrite' ? oldMeta[FIELD] : null))
+          : null;
+        nextMeta[id] = {
+          ...oldMeta, [FIELD]: publication,
+          ...(mode === 'overwrite' ? { virtualPublishedPrevious: previous } : {}),
+          updatedAt: publishedAt,
+        };
       }
       commit(state, nextVideos, nextMeta);
       return finish(ids);
@@ -201,10 +216,21 @@
       const state = readState(), id = String(videoId || '');
       const original = state.videos.find((video) => String(video.id) === id);
       const publication = readPublication(state.meta, id);
-      if (!original || !publication || publication.kind !== 'overwrite' || !Edit.isMp4Url(original.url)) {
+      if (!original || !publication || publication.kind !== 'overwrite') {
         throw new Error('元動画に戻せる上書き編集が見つかりません。');
       }
-      const nextMeta = { ...state.meta, [id]: { ...(state.meta[id] || {}), [FIELD]: null, updatedAt: now() } };
+      const previous = isObject(state.meta[id]) && isObject(state.meta[id].virtualPublishedPrevious)
+        ? validatePublication(state.meta[id].virtualPublishedPrevious) : null;
+      if (!previous && /video-virtual-player\.html\?video=/.test(original.url)) {
+        throw new Error('元に戻すための編集版が見つかりません。上書き前のデータを確認してください。');
+      }
+      const nextMeta = {
+        ...state.meta,
+        [id]: {
+          ...(state.meta[id] || {}), [FIELD]: previous,
+          virtualPublishedPrevious: null, updatedAt: now(),
+        },
+      };
       commit(state, state.videos, nextMeta);
       return finish([id]);
     }
