@@ -258,7 +258,7 @@
       const target = event.target.closest('[data-source-id]');
       if (target) target.draggable = true;
     });
-    bin.addEventListener('click', () => { ++pendingToken; });
+    // Pending inserts also verify the chosen source before applying.
     const clips = $('[data-clips]');
     if (clips) {
       const observer = new MutationObserver(() => { syncTransform(); syncClock(); });
