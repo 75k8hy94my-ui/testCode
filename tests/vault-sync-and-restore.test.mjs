@@ -966,20 +966,27 @@ test('same data with different remote credential wrappers is not treated as a lo
   assert.deepEqual(remote.record.payload.keyWraps, remoteKeyWraps);
   assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, true);
 });
-test('pending Vault sync blocks document unload but clears the warning after success', async () => {
+test('pending cloud sync is safe to leave; only explicitly volatile edits trigger a warning', async () => {
   const { vault } = await fixture({ initialPayload: { videos: [{ id: 'pending' }] } });
-  assert.equal(typeof vault.guardPendingSyncLeave, 'function');
-  let prevented = false;
-  const event = { preventDefault() { prevented = true; } };
-  assert.equal(vault.guardPendingSyncLeave(event, false), false);
-  assert.equal(prevented, false);
+  const event = () => ({ prevented: false, preventDefault() { this.prevented = true; } });
+  let leaving = event();
+  assert.equal(vault.guardPendingSyncLeave(leaving), false);
+  assert.equal(leaving.prevented, false);
   vault.markLocalChangesPending();
-  assert.equal(vault.guardPendingSyncLeave(event, false), true);
-  assert.equal(prevented, true);
-  assert.equal(event.returnValue, '');
-  assert.equal(vault.guardPendingSyncLeave(event, true), true);
+  assert.equal(vault.hasPendingLocalChanges(), true);
+  leaving = event();
+  assert.equal(vault.guardPendingSyncLeave(leaving), false);
+  assert.equal(leaving.prevented, false);
+  assert.equal(leaving.returnValue, undefined);
+  leaving = event();
+  assert.equal(vault.guardPendingSyncLeave(leaving, true), true);
+  assert.equal(leaving.prevented, true);
+  assert.equal(leaving.returnValue, '');
   await vault.saveLocalChanges();
-  assert.equal(vault.guardPendingSyncLeave(event, false), false);
+  assert.equal(vault.hasPendingLocalChanges(), false);
+  leaving = event();
+  assert.equal(vault.guardPendingSyncLeave(leaving), false);
+  assert.equal(leaving.prevented, false);
 });
 
 test('guest local edits never count as pending cloud sync for the leave guard', async () => {
