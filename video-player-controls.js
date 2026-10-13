@@ -94,7 +94,6 @@
   const onVirtualUpdate = () => {
     update();
     play.textContent = playback.paused ? '▶' : '❚❚';
-    renderMarkers();
   };
   if (video.__virtualPlaybackAdapter) video.addEventListener('virtual-edit-state', onVirtualUpdate);
   seek.addEventListener('input', onSeekInput);
