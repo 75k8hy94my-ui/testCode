@@ -780,16 +780,25 @@
   }
 
   function loadProject(projectId) {
+    const publishedId = !projectId ? route.get('published') || '' : '';
+    const publisher = publishedId && window.MangaReaderVideoVirtualPublish
+      ? window.MangaReaderVideoVirtualPublish.createPublisher() : null;
+    const publication = publisher && publisher.get(publishedId);
+    if (publishedId && !publication) throw new Error('公開済みの編集動画が見つかりません。');
     project = projectId ? repository.get(projectId) : null;
     if (projectId && !project) throw new Error('指定された編集プロジェクトが見つかりません。');
-    edit = project ? Edit.normalizeEdit(project.edit) : null;
+    edit = project ? Edit.normalizeEdit(project.edit) : (publication ? Edit.normalizeEdit(publication.edit) : null);
     baselineEdit = edit;
     dirty = false;
     selectedIndex = edit ? 0 : null;
     historyState = State.createHistory(edit, 100);
     stale = project ? !repository.inspect(project.id).usable : false;
     const initialSource = sourceFor(routeSourceId);
-    refs.title.value = project ? project.title : (initialSource ? initialSource.title + '（編集版）' : '');
+    const publishedVideo = publishedId ? read(Store.VIDEO_KEY, []).find((video) => String(video.id) === publishedId) : null;
+    const publishedMeta = publishedId ? read(Store.META_KEY, {})[publishedId] : null;
+    refs.title.value = project ? project.title
+      : (publishedVideo ? String(publishedMeta?.title || publishedVideo.title || '編集済み動画')
+        : (initialSource ? initialSource.title + '（編集版）' : ''));
     drawProjects();
     drawClips();
     if (edit) chooseClip(0);
@@ -805,6 +814,7 @@
     if (back && sourceFor(firstId)) back.href = 'video-player.html?id=' + encodeURIComponent(firstId);
     if (stale) status('参照元のMP4が削除・変更されています。安全のため上書き保存を停止しています。', true);
     else if (project) status(loadedProjectStatus());
+    else if (publication) status('登録済みの編集版を開きました。保存メニューから一覧への追加・元動画への上書きができます。');
     else status('新しいプロジェクトです。保存すると端末に記録されます。');
   }
   function initialize() {
@@ -1018,6 +1028,19 @@
       event.preventDefault();
       event.returnValue = '';
     }
+  });
+  // The publishing UI reads a validated copy of the active draft rather than
+  // writing directly to the private editor state or silently saving a project.
+  window.MangaReaderVideoVirtualEditorDraft = Object.freeze({
+    snapshot() {
+      if (!initialized || !canRead() || busy || stale || !edit) return null;
+      return {
+        edit: Edit.normalizeEdit(edit),
+        title: refs.title.value.trim(),
+        selectedIndex,
+        dirty,
+      };
+    },
   });
   handleAccess();
 })();
