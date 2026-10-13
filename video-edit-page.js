@@ -250,7 +250,7 @@
         let promoted = 0;
         urls.forEach((url) => {
           const identity = Data.videoUrlIdentity(url);
-          const found = updatedVideos.find(v => [v.url, ...(v.alternateUrls || [])].some(x => Data.videoUrlIdentity(x) === identity));
+          const found = updatedVideos.find(v => v.virtualEdition !== true && !read(META_KEY, {})[String(v.id)]?.virtualPublishedEdit && [v.url, ...(v.alternateUrls || [])].some(x => Data.videoUrlIdentity(x) === identity));
           if (found) {
             if (found.url !== url) { Object.assign(found, Data.promoteVideoUrl(found, url)); promoted++; }
             return;
