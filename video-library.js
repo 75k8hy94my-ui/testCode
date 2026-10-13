@@ -998,10 +998,6 @@
     dom.url.addEventListener('input', () => { dom.rotate90Direction.disabled = !Data.isDirectVideoUrl(dom.url.value); });
     dom.createFolder.addEventListener('click', createFolder); dom.newFolder.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); createFolder(); } });
     dom.sheet.addEventListener('click', (event) => { if (event.target === dom.sheet) return; });
-    window.addEventListener('beforeunload', (event) => {
-      const vault = window.MangaVault;
-      if (vault && typeof vault.guardPendingSyncLeave === 'function') vault.guardPendingSyncLeave(event, state.syncRunning);
-    });
     window.addEventListener('online', resumePendingLocalSync);
     document.addEventListener('manga-reader-vpn-status', () => {
       if (canReadProtectedData()) { render(); resumePendingLocalSync(); }
