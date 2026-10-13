@@ -1,0 +1,191 @@
+/* A focused, Premiere-inspired desktop editing workspace.
+   Contains one ordered V1 virtual track; it does not re-encode MP4 media. */
+.virtualVideoEditor {
+  --vve-bg:#171a20;--vve-panel:#222630;--vve-raised:#292e39;
+  --vve-border:#383f4c;--vve-text:#ecedf4;--vve-muted:#a4abba;
+  --vve-accent:#9a88f8;--vve-accent-bg:#383354;
+  width:min(1920px,100%);max-width:100%;margin-inline:auto;
+  gap:9px;padding:10px 12px 110px;color:var(--vve-text);
+}
+.virtualVideoEditor .vvePanel,.virtualVideoEditor .vveProjectBar {
+  background:var(--vve-panel);border:1px solid var(--vve-border);
+  border-radius:7px;box-shadow:none;color:var(--vve-text);
+}
+.virtualVideoEditor .vveProjectBar {
+  position:sticky;top:50px;z-index:15;grid-template-columns:minmax(340px,1.1fr) minmax(0,1.4fr);
+  align-items:center;gap:12px;padding:10px 13px;
+}
+.virtualVideoEditor .vveProjectFields {grid-template-columns:minmax(150px,.65fr) minmax(220px,1.35fr)}
+.virtualVideoEditor .vveProjectActions {gap:5px}
+.virtualVideoEditor .vveProjectActions .vveAction.primary {min-width:85px}
+.virtualVideoEditor .vveAction,.virtualVideoEditor .vveLink {
+  min-height:33px;padding:5px 10px;border:1px solid var(--vve-border);
+  background:var(--vve-raised);color:var(--vve-text);
+  font-size:12px;border-radius:5px;font-weight:600;
+}
+.virtualVideoEditor .vveAction.primary {
+  color:#15131f;background:var(--vve-accent);border-color:var(--vve-accent);
+}
+.virtualVideoEditor .vveAction:hover:not(:disabled),
+.virtualVideoEditor .vveLink:hover {border-color:var(--vve-accent);filter:brightness(1.1)}
+.virtualVideoEditor .vveAction:focus-visible,
+.virtualVideoEditor .vveSource:focus-visible,
+.virtualVideoEditor .vveRotateBar button:focus-visible {
+  outline:2px solid var(--vve-accent);outline-offset:2px;
+}
+.virtualVideoEditor .vveMainGrid {
+  display:grid;grid-template-columns:minmax(195px,245px) minmax(340px,1fr) minmax(245px,310px);
+  gap:9px;align-items:stretch;
+}
+.virtualVideoEditor .vveMainGrid>.vveMediaBin {grid-column:1;grid-row:1;align-self:stretch;min-width:0;margin:0;display:block}
+.virtualVideoEditor .vveMainGrid>.vvePreviewPanel {grid-column:2;grid-row:1}
+.virtualVideoEditor .vveMainGrid>.vveDetailsPanel {grid-column:3;grid-row:1}
+.virtualVideoEditor .vveMainGrid>.vveTimelinePanel {grid-column:1/-1;grid-row:2}
+.virtualVideoEditor .vvePanel {padding:12px;min-width:0}
+.virtualVideoEditor .vvePaneTitle {font-size:13px;font-weight:700;letter-spacing:.015em}
+.virtualVideoEditor .vveLead,.virtualVideoEditor .vveBinHelp {color:var(--vve-muted);font-size:11px}
+.virtualVideoEditor .vveField {color:var(--vve-muted);font-size:11px}
+.virtualVideoEditor .vveField input,.virtualVideoEditor .vveField select {
+  min-height:34px;padding:6px 8px;background:var(--vve-bg);
+  border:1px solid var(--vve-border);border-radius:5px;color:var(--vve-text);font-size:13px;
+}
+.virtualVideoEditor .vveSaveStatus {color:var(--vve-muted);font-size:11px}
+.virtualVideoEditor .vveDirty {color:#f1c97a}
+.virtualVideoEditor .vveBinTitle {display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.virtualVideoEditor .vveBinTitle strong {font-size:13px}
+.virtualVideoEditor .vveBinTitle small {color:var(--vve-muted);font-size:9px;letter-spacing:.1em}
+.virtualVideoEditor .vveBinHelp {margin:0 0 11px;line-height:1.6}
+.virtualVideoEditor .vveMediaBin .vveSourceList {
+  display:grid;grid-template-columns:1fr;gap:4px;max-height:360px;overflow-y:auto;margin-top:8px;
+}
+.virtualVideoEditor .vveSource {
+  background:var(--vve-raised);color:var(--vve-text);
+  border:1px solid var(--vve-border);border-radius:5px;min-height:52px;
+  cursor:grab;touch-action:pan-y;
+}
+.virtualVideoEditor .vveSource:active {cursor:grabbing}
+.virtualVideoEditor .vveSource[aria-pressed="true"] {
+  background:var(--vve-accent-bg);border-color:var(--vve-accent);
+  box-shadow:inset 3px 0 var(--vve-accent);
+}
+.virtualVideoEditor .vveSource strong {color:var(--vve-text);font-size:12px}
+.virtualVideoEditor .vveSource small {color:var(--vve-muted)}
+.virtualVideoEditor .vvePreview {background:#080a10;border:1px solid #05060a;border-radius:5px;max-height:44vh}
+.virtualVideoEditor .vvePreview video {max-height:44vh;object-fit:contain}
+.virtualVideoEditor .vveModeToggle {
+  border-color:var(--vve-border);border-radius:5px;background:var(--vve-bg);gap:2px;padding:2px;
+}
+.virtualVideoEditor .vveModeToggle .vveAction {border:none;border-radius:4px;min-height:28px;padding:4px 8px}
+.virtualVideoEditor .vveModeToggle .vveAction.active {background:var(--vve-accent);color:#16131e}
+.virtualVideoEditor .vveEditPreviewControls input {accent-color:var(--vve-accent)}
+.virtualVideoEditor .vvePreviewMeta {color:var(--vve-muted);font-size:11px}
+.virtualVideoEditor .vvePrimaryControls {display:flex;align-items:center;gap:5px}
+.virtualVideoEditor .vvePrimaryControls .vveAction.primary {flex-grow:1}
+.virtualVideoEditor .vveOriginalRotation {display:none!important}
+.virtualVideoEditor .vveTransform {margin:13px 0;padding:12px;border:1px solid var(--vve-border);border-radius:6px;background:var(--vve-bg)}
+.virtualVideoEditor .vveTransform strong {display:block;color:var(--vve-muted);font-size:11px;margin-bottom:9px}
+.virtualVideoEditor .vveTransform p {font-size:11px;color:var(--vve-muted);margin:9px 0 0;line-height:1.6}
+.virtualVideoEditor .vveRotateBar {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.virtualVideoEditor .vveRotateBar button {
+  padding:10px 6px;min-height:40px;border:1px solid var(--vve-border);
+  border-radius:5px;background:var(--vve-raised);color:var(--vve-text);
+  font-size:13px;font-weight:650;cursor:pointer;
+}
+.virtualVideoEditor .vveRotateBar button[aria-pressed="true"] {
+  border-color:var(--vve-accent);color:#e5dcff;background:var(--vve-accent-bg);
+}
+.virtualVideoEditor .vveRotateBar button:disabled {cursor:not-allowed;opacity:.4}
+.virtualVideoEditor .vveAdvanced {margin-top:14px;border:1px solid var(--vve-border);border-radius:5px;padding:8px}
+.virtualVideoEditor .vveAdvanced summary {font-size:11px;color:var(--vve-muted);cursor:pointer;user-select:none}
+.virtualVideoEditor .vveAdvanced[open] summary {margin-bottom:9px}
+.virtualVideoEditor .vveAdvanced .vveBoundary {grid-template-columns:40px minmax(0,1fr)}
+.virtualVideoEditor .vveAdvanced .vveRow {margin-top:9px}
+.virtualVideoEditor .vveDetailsPanel>.vveControls {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.virtualVideoEditor .vveDetailsPanel>.vveControls .vveAction {min-width:0}
+.virtualVideoEditor .vveProjectDelete {font-size:11px}
+.virtualVideoEditor .vveTimelinePanel {min-height:270px;background:#1e222b}
+.virtualVideoEditor .vveTimelineTools {align-items:center;gap:4px}
+.virtualVideoEditor .vveTimelineTools .vveAction {min-width:34px;min-height:32px}
+.virtualVideoEditor .vveTimelineTools .vveRazor {border-color:#b2a1ff;color:#d8cfff}
+.virtualVideoEditor .vvePosition {
+  white-space:nowrap;margin:0 6px 0 0;color:#a6cfff;
+  font:600 13px ui-monospace,SFMono-Regular,monospace;font-variant-numeric:tabular-nums;
+}
+.virtualVideoEditor .vveTrackCaption {
+  display:flex;align-items:center;gap:15px;padding:9px 12px;
+  margin:6px 0 0;border:1px solid var(--vve-border);border-bottom:0;
+  border-radius:5px 5px 0 0;background:#272d38;color:var(--vve-muted);font-size:11px;
+}
+.virtualVideoEditor .vveTrackCaption strong {background:#59668c;color:#fff;padding:2px 7px;border-radius:3px}
+.virtualVideoEditor .vveTrackCaption span:last-child {margin-left:auto}
+.virtualVideoEditor .vveTimelineScroll {
+  border:1px solid var(--vve-border);border-radius:0 0 5px 5px;background:#171b24;
+  min-height:174px;
+}
+.virtualVideoEditor .vveTimelineScroll.vveDropTarget {outline:2px dashed var(--vve-accent);outline-offset:-5px;background:#292638}
+.virtualVideoEditor .vveTimelineCanvas {min-height:172px;background-image:none}
+.virtualVideoEditor .vveRuler {
+  height:32px;background-color:#252a35;background-image:none;
+  border-bottom:1px solid var(--vve-border);color:#d0d6e1;
+}
+.virtualVideoEditor .vveRulerTick {
+  position:absolute;top:0;display:block;border-left:1px solid #778196;
+  padding:4px 0 0 6px;height:26px;white-space:nowrap;
+  font:10px ui-monospace,SFMono-Regular,monospace;pointer-events:none;
+}
+.virtualVideoEditor .vveRulerTick:before {
+  content:"";position:absolute;left:-1px;top:30px;height:120px;width:1px;
+  background:rgba(185,191,207,.12);
+}
+.virtualVideoEditor .vveClips {height:108px;margin-top:9px}
+.virtualVideoEditor .vveClip {
+  height:100px;border:1px solid #647ab3;border-radius:4px;
+  background:linear-gradient(180deg,#425783,#34496e);
+  color:#f6f7ff;box-shadow:inset 0 -22px rgba(18,29,52,.24);
+}
+.virtualVideoEditor .vveClip[aria-current="true"] {border-color:#c2b1ff;box-shadow:inset 0 0 0 2px #c2b1ff}
+.virtualVideoEditor .vveClipBody {gap:5px;color:#fff;padding:8px 10px}
+.virtualVideoEditor .vveClipBody small {color:#dce6fc}
+.virtualVideoEditor .vveTrimHandle {width:11px;flex-basis:11px;background:rgba(180,202,255,.4)}
+.virtualVideoEditor .vveTrimHandle:hover {background:var(--vve-accent)}
+.virtualVideoEditor .vvePlayhead {pointer-events:auto}
+.virtualVideoEditor .vvePlayhead:before {background:#ff697b}
+.virtualVideoEditor .vvePlayhead:after {background:#ff697b;box-shadow:0 0 0 1px rgba(0,0,0,.3)}
+.virtualVideoEditor .vveTimelineFooter {color:var(--vve-muted)}
+.virtualVideoEditor .vveStatus {color:var(--vve-muted);min-height:25px}
+.virtualVideoEditor .vveStatus[data-error="1"] {color:#ff9a9a}
+.virtualVideoEditor .vveEmpty {background:#242b39;border:1px dashed #59678a;color:#b8c9e2}
+@media(max-width:1240px) {
+  .virtualVideoEditor .vveMainGrid {grid-template-columns:minmax(160px,210px) minmax(310px,1fr) minmax(215px,260px)}
+  .virtualVideoEditor .vveProjectBar {grid-template-columns:1fr}
+}
+@media(max-width:920px) {
+  .virtualVideoEditor .vveMainGrid {grid-template-columns:minmax(200px,.8fr) minmax(0,1.2fr)}
+  .virtualVideoEditor .vveMainGrid>.vveMediaBin {grid-column:1;grid-row:1}
+  .virtualVideoEditor .vveMainGrid>.vvePreviewPanel {grid-column:2;grid-row:1}
+  .virtualVideoEditor .vveMainGrid>.vveTimelinePanel {grid-column:1/-1;grid-row:2}
+  .virtualVideoEditor .vveMainGrid>.vveDetailsPanel {grid-column:1/-1;grid-row:3}
+  .virtualVideoEditor .vveRotateBar {grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(max-width:650px) {
+  .virtualVideoEditor {padding:8px 8px 100px;gap:7px}
+  .virtualVideoEditor .vveProjectBar {top:52px;padding:9px}
+  .virtualVideoEditor .vveProjectFields {grid-template-columns:1fr;gap:6px}
+  .virtualVideoEditor .vveMainGrid {grid-template-columns:minmax(0,1fr);gap:7px}
+  .virtualVideoEditor .vveMainGrid>.vvePreviewPanel {grid-column:1;grid-row:1}
+  .virtualVideoEditor .vveMainGrid>.vveTimelinePanel {grid-column:1;grid-row:2}
+  .virtualVideoEditor .vveMainGrid>.vveDetailsPanel {grid-column:1;grid-row:3}
+  .virtualVideoEditor .vveMainGrid>.vveMediaBin {grid-column:1;grid-row:4}
+  .virtualVideoEditor .vveMediaBin .vveSourceList {grid-template-columns:repeat(2,minmax(0,1fr));max-height:180px}
+  .virtualVideoEditor .vvePanel {padding:9px}
+  .virtualVideoEditor .vveSectionHeading {align-items:start;gap:8px}
+  .virtualVideoEditor .vveTimelineTools {flex-wrap:wrap;justify-content:end}
+  .virtualVideoEditor .vveTrackCaption {gap:9px}
+  .virtualVideoEditor .vvePrimaryControls {display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .virtualVideoEditor .vvePrimaryControls .vveAction:last-child {grid-column:1/-1}
+  .virtualVideoEditor .vvePreview {max-height:none}
+  .virtualVideoEditor .vvePreview video {max-height:none}
+}
+@media(prefers-reduced-motion:reduce) {
+ .virtualVideoEditor * {animation-duration:0.01ms!important;transition-duration:0.01ms!important}
+}
