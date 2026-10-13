@@ -1024,7 +1024,9 @@
   });
   window.addEventListener('beforeunload', (event) => {
     stopResultPreview();
-    if (canRead() && dirty && !busy) {
+    // Keep the warning while a dirty draft is being saved: persistence may not
+    // have finished yet. Once the local baseline is saved, dirty becomes false.
+    if (canRead() && dirty) {
       event.preventDefault();
       event.returnValue = '';
     }
