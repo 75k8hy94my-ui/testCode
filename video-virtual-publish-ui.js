@@ -64,7 +64,7 @@
     const targetId = mode === 'overwrite' ? refs.target.value : '';
     if (mode === 'overwrite') {
       if (!targetId) return show('上書きする元動画を選択してください。', true);
-      if (!confirm('選択した既存動画の再生内容を編集版に変更しますか？\n元のMP4は残り、あとから「元動画に戻す」で復元できます。')) return;
+      if (!confirm('選択した既存動画の再生内容を編集版に変更しますか？\n元の動画や以前の編集版は残り、あとから「上書き前に戻す」で復元できます。')) return;
     }
     if (mode === 'split' && !confirm(draft.edit.clips.length + '個の区間を、それぞれ独立した動画として一覧に追加しますか？')) return;
     setBusy(true);
