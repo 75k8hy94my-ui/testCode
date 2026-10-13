@@ -64,8 +64,8 @@ test('timestamp registration offers only the three canonical icons without name 
 
 test('saved timeline icons are positioned by duration and clicking one seeks to its marker', () => {
   assert.match(controls, /videoMarkerBubble/);
-  assert.match(controls, /marker\.seconds\s*\/\s*video\.duration/);
-  assert.match(controls, /video\.currentTime\s*=\s*marker\.seconds/);
+  assert.match(controls, /marker\.seconds\s*\/\s*playback\.duration/);
+  assert.match(controls, /playback\.currentTime\s*=\s*marker\.seconds/);
   assert.match(controls, /manga-video-markers-changed/);
 });
 
