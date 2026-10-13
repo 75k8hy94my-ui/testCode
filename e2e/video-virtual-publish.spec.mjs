@@ -47,6 +47,12 @@ test('guest publishes split clips and full edit to video list, overwrites and re
   await expect(page.locator('#videoLibraryApp')).toBeVisible();
   await expect(page.locator('.vl-card')).toHaveCount(4);
   await expect(page.locator('.vl-card[data-video-id="publish-original"]')).toContainText('元動画の編集版');
+  // Independently saved clips use the standard MP4 thumbnail renderer and IDs.
+  await expect(page.locator('.vl-card[data-video-id="' + clipIds[0] + '"] .videoCard')).toHaveCount(1);
+  await expect(page.locator('.vl-card[data-video-id="' + clipIds[0] + '"] video[src="https://media.example.test/movie.mp4"]')).toHaveCount(1);
+  const cardData = await page.evaluate((id) => JSON.parse(localStorage.getItem('mangaReaderVideos')).find(v => v.id === id), clipIds[0]);
+  expect(cardData.virtualEdition).toBe(true);
+  expect(cardData.url).toBe('https://media.example.test/movie.mp4');
 
   const publication = await page.evaluate(() => JSON.parse(localStorage.getItem('mangaReaderVideoMeta'))['publish-original'].virtualPublishedEdit);
   expect(publication.kind).toBe('overwrite');
@@ -57,6 +63,10 @@ test('guest publishes split clips and full edit to video list, overwrites and re
   await expect(page.locator('.videoPlayerTitle')).toHaveText('編集元');
   await expect(page.locator('.customVideoControls')).toBeVisible();
   await expect(page.locator('video[data-virtual-edited="1"]')).toHaveCount(1);
+  await expect(page.locator('.customVideoSeek')).toHaveAttribute('max', '20');
+  await expect(page.locator('.customVideoVolume')).toBeVisible();
+  await expect(page.getByRole('button', { name: '秒数登録' })).toBeVisible();
+  await expect(page.locator('.videoRelated')).toBeVisible();
   await expect(page.getByRole('button', { name: '上書き前の動画に戻す' })).toBeVisible();
   await page.getByRole('button', { name: '上書き前の動画に戻す' }).click();
   await expect(page).toHaveURL(/video-player\.html\?id=publish-original/);
