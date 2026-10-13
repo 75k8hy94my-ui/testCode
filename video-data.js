@@ -77,7 +77,7 @@
       }
       const next = { ...raw };
       const previous = existing[id] && typeof existing[id] === 'object' && !Array.isArray(existing[id]) ? existing[id] : null;
-      const preservedFields = ['thumbnailTimeSeconds', 'rotate90', 'rotate90Direction', 'durationSeconds', 'videoWidth', 'videoHeight', 'shortsMediaInfoUrlKey'];
+      const preservedFields = ['thumbnailTimeSeconds', 'rotate90', 'rotate90Direction', 'durationSeconds', 'videoWidth', 'videoHeight', 'shortsMediaInfoUrlKey', 'virtualPublishedEdit'];
       preservedFields.forEach((field) => {
         if (!Object.prototype.hasOwnProperty.call(next, field) && previous && Object.prototype.hasOwnProperty.call(previous, field)) {
           next[field] = previous[field];
