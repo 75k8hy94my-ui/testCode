@@ -147,7 +147,7 @@
     }
 
     if (!open) {
-      restoreWindowScroll = window.scrollY || document.documentElement.scrollTop || 0;
+      restoreWindowScroll = root.classList.contains('statutes-definition-open') ? page.scrollTop : (window.scrollY || document.documentElement.scrollTop || 0);
       root.classList.add('statutes-split-open');
       panel.inert = false;
       panel.setAttribute('aria-hidden', 'false');
@@ -175,7 +175,10 @@
     activeTab = null;
     originLink = null;
     root.style.removeProperty('--statutes-split-height');
-    requestAnimationFrame(() => window.scrollTo(0, scroll));
+    requestAnimationFrame(() => {
+      if (root.classList.contains('statutes-definition-open')) page.scrollTop = scroll;
+      else window.scrollTo(0, scroll);
+    });
   }
 
   document.addEventListener('click', event => {
