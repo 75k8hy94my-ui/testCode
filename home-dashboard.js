@@ -1,11 +1,13 @@
 (()=>{
 'use strict';
 const HOME_LAYOUT_KEY = 'mangaReaderHomeCards';
+const STATUTES_CARD_MIGRATION_KEY = 'mangaReaderHomeStatutesCardAddedV1';
 const LEGACY_DEFAULT_CARD_IDS = ['bookshelf'];
-const DEFAULT_CARD_IDS = ['manga','video'];
+const DEFAULT_CARD_IDS = ['manga','video','statutes'];
 const CARD_CATALOG = Object.freeze({
   manga: Object.freeze({ id: 'manga', title: '漫画', kind: 'internal', href: 'manga.html', badge: 'APP' }),
   video: Object.freeze({ id: 'video', title: '動画', kind: 'internal', href: 'video.html', badge: 'APP' }),
+  statutes: Object.freeze({ id: 'statutes', title: '逐条集', kind: 'internal', href: 'statutes.html', badge: 'APP' }),
 });
 const isKnownCard = (id) => Object.prototype.hasOwnProperty.call(CARD_CATALOG, id);
 function normalizeLayout(value) {
@@ -37,9 +39,17 @@ function setRaw(storage, key, value) { if (storage.setItem) storage.setItem(key,
 function loadLayout(storage = globalThis.localStorage) {
   try {
     const raw = getRaw(storage, HOME_LAYOUT_KEY);
-    if (raw == null) return DEFAULT_CARD_IDS.slice();
+    if (raw == null) {
+      setRaw(storage, STATUTES_CARD_MIGRATION_KEY, '1');
+      return DEFAULT_CARD_IDS.slice();
+    }
     const parsed = JSON.parse(raw);
-    const normalized = normalizeLayout(parsed);
+    let normalized = normalizeLayout(parsed);
+    // Introduce the new shortcut once without re-adding it after a user removes it.
+    if (getRaw(storage, STATUTES_CARD_MIGRATION_KEY) !== '1') {
+      if (!normalized.includes('statutes')) normalized = normalized.concat('statutes');
+      setRaw(storage, STATUTES_CARD_MIGRATION_KEY, '1');
+    }
     if (JSON.stringify(parsed) !== JSON.stringify(normalized)) setRaw(storage, HOME_LAYOUT_KEY, JSON.stringify(normalized));
     return normalized;
   } catch (_) { return DEFAULT_CARD_IDS.slice(); }
