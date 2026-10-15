@@ -4,6 +4,8 @@
   if (!page || !document.documentElement.classList.contains('statutes-page')) return;
   const originalMarkup = page.innerHTML;
   const store = new Map();
+  const captionCache = new Map();
+  const captionRequests = new Map();
   let generation = 0;
   const sections = {
     constitution:['constitution'],
@@ -62,7 +64,33 @@
     return Boolean(activeData()?.articles.some(row=>row[0]===number));
   }
 
-  function buildCard(row) {
+  // The legacy second tuple item is a CHAPTER, not an ArticleCaption.
+  // Obtain actual captions from the official e-Gov law XML instead.
+  const articleId = number => String(number).replace(/[０-９]/g, c => String('０１２３４５６７８９'.indexOf(c))).replace(/条(?:の)?/, '_').replace(/の/g, '_').replace(/_$/, '');
+  async function getCaptions(data) {
+    if (captionCache.has(data.key)) return captionCache.get(data.key);
+    if (captionRequests.has(data.key)) return captionRequests.get(data.key);
+    const request = (async () => {
+      const captions = new Map();
+      if (!data.id) return captions;
+      const response = await fetch('https://laws.e-gov.go.jp/api/1/lawdata/' + encodeURIComponent(data.id));
+      if (!response.ok) throw Error('Caption API HTTP ' + response.status);
+      const xml = new DOMParser().parseFromString(await response.text(), 'application/xml');
+      if (xml.querySelector('parsererror')) throw Error('Invalid law XML');
+      // Only the main provisions: supplementary provisions may reuse article numbers.
+      const articles = xml.querySelectorAll('Law > LawBody > MainProvision Article');
+      articles.forEach(article => {
+        const caption = Array.from(article.children).find(el => el.tagName === 'ArticleCaption');
+        const name = caption?.textContent?.trim().replace(/^（|）$/g, '') || '';
+        if (name) captions.set(article.getAttribute('Num'), name);
+      });
+      captionCache.set(data.key, captions);
+      return captions;
+    })();
+    captionRequests.set(data.key, request);
+    try { return await request; } finally { captionRequests.delete(data.key); }
+  }
+  function buildCard(row, captions = null) {
     const [number,_chapter,body,articleCaption]=row;
     const card=document.createElement('section');
     card.className='statuteCard';
@@ -147,10 +175,28 @@
         preamble.append(header,body);
         fragment.appendChild(preamble);
       }
-      rows.forEach(row=>fragment.appendChild(buildCard(row)));
+      rows.forEach(row=>fragment.appendChild(buildCard(row, captionCache.get(key))));
       if (!rows.length) displayMessage('この分類の条文は未登録です。');
       else page.replaceChildren(fragment);
       refresh(section);
+      // Progressive enhancement: the legacy chapter labels are never presented as captions.
+      // When the official API is unavailable, omit the caption rather than fabricate one.
+      getCaptions(data).then(captions => {
+        if (generationId !== generation || activeKey !== key) return;
+        page.querySelectorAll('.statuteCard').forEach(card => {
+          const number = card.querySelector('.statuteNumber')?.textContent;
+          if (!number) return;
+          const caption = captions.get(articleId(number)) || '';
+          let heading = card.querySelector('.statuteHeading');
+          if (!caption) { heading?.remove(); return; }
+          if (!heading) {
+            heading = document.createElement('span');
+            heading.className = 'statuteHeading';
+            card.querySelector('.statuteTitle')?.appendChild(heading);
+          }
+          heading.textContent = caption;
+        });
+      }).catch(() => {});
     } catch(error) {
       if(generationId!==generation)return;
       // Never present another subject's text as if it belonged to this subject.
