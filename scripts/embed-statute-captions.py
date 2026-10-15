@@ -32,12 +32,13 @@ def captions_for_law(law_id):
     result = {}
     for article in provision.iter("Article"):
         key = article.get("Num")
-        caption = article.findtext("ArticleCaption")
+        caption_node = article.find("ArticleCaption")
+        caption = caption_node.text if caption_node is not None else None
         if not key or not caption:
             continue
         caption = caption.strip().removeprefix("（").removesuffix("）").strip()
         if caption:
-            result[key] = caption
+            result[key] = (caption, caption_node.get("CommonCaption", "false").lower() == "true")
     return result
 
 def main():
@@ -62,10 +63,12 @@ def main():
             if row[2].strip() == "削除":
                 caption = ""
             else:
-                direct = official.get(key, "")
+                direct = official.get(key)
                 if direct:
-                    inherited = direct
-                caption = direct or inherited
+                    caption, is_common = direct
+                    inherited = caption if is_common else ""
+                else:
+                    caption = inherited
             if len(row) > 3:
                 row[3] = caption
             else:
