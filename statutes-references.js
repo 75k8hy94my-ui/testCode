@@ -6,48 +6,54 @@
   if (!page || !host) return;
 
   const articles = new Map();
+  const pattern = /第[０-９]+条(?:の[０-９]+)*/g;
+
+  function linkify(container) {
+    const spans = container.matches?.('.statuteSelectable')
+      ? [container] : container.querySelectorAll('.statuteSelectable');
+    spans.forEach(span => {
+      const walker = document.createTreeWalker(span, NodeFilter.SHOW_TEXT);
+      const nodes = [];
+      while (walker.nextNode()) nodes.push(walker.currentNode);
+      nodes.forEach(node => {
+        if (node.parentElement?.closest('.statuteReference')) return;
+        const source = node.textContent || '';
+        pattern.lastIndex = 0;
+        let match, end = 0, changed = false;
+        const fragment = document.createDocumentFragment();
+        while ((match = pattern.exec(source))) {
+          const target = match[0].slice(1);
+          if (!articles.has(target) && !window.StatutesData?.hasReferencedArticle?.(target)) continue;
+          changed = true;
+          fragment.append(document.createTextNode(source.slice(end, match.index)));
+          const link = document.createElement('a');
+          link.className = 'statuteReference';
+          link.href = '#';
+          link.dataset.statuteRef = target;
+          link.setAttribute('aria-label', match[0] + 'を下部に表示');
+          link.textContent = match[0];
+          fragment.append(link);
+          end = match.index + match[0].length;
+        }
+        if (changed) {
+          fragment.append(document.createTextNode(source.slice(end)));
+          node.replaceWith(fragment);
+        }
+      });
+    });
+  }
+
   function refreshReferences() {
     articles.clear();
     page.querySelectorAll('.statuteCard').forEach(card => {
-    const number = card.querySelector('.statuteNumber')?.textContent.trim();
-    if (number) articles.set(number, card);
-  });
-
-  // Make references clickable only when the actual article exists on this page.
-  const pattern = /第[０-９]+条(?:の[０-９]+)?/g;
-    page.querySelectorAll('.statuteSelectable').forEach(span => {
-    const walker = document.createTreeWalker(span, NodeFilter.SHOW_TEXT);
-    const nodes = [];
-    while (walker.nextNode()) nodes.push(walker.currentNode);
-    nodes.forEach(node => {
-      const source = node.textContent || '';
-      pattern.lastIndex = 0;
-      let match, end = 0, changed = false;
-      const fragment = document.createDocumentFragment();
-      while ((match = pattern.exec(source))) {
-        const target = match[0].slice(1);
-        if (!articles.has(target)) continue;
-        changed = true;
-        fragment.append(document.createTextNode(source.slice(end, match.index)));
-        const link = document.createElement('a');
-        link.className = 'statuteReference';
-        link.href = '#';
-        link.dataset.statuteRef = target;
-        link.setAttribute('aria-label', match[0] + 'を下部に表示');
-        link.textContent = match[0];
-        fragment.append(link);
-        end = match.index + match[0].length;
-      }
-      if (changed) {
-        fragment.append(document.createTextNode(source.slice(end)));
-        node.replaceWith(fragment);
-      }
+      const number = card.querySelector('.statuteNumber')?.textContent.trim();
+      if (number) articles.set(number, card);
     });
-  });
-
+    linkify(page);
   }
   refreshReferences();
-  const panel = document.createElement('section');
+
+    const panel = document.createElement('section');
   panel.id = 'statutesSplitPanel';
   panel.className = 'statutesSplitPanel';
   panel.setAttribute('role', 'region');
@@ -123,7 +129,7 @@
   }
 
   function newTab(number, sourceLink) {
-    const article = articles.get(number);
+    const article = articles.get(number) || window.StatutesData?.createReferencedCard?.(number);
     if (!article) return;
     const existing = tabs.find(tab => tab.number === number);
     if (existing) {
@@ -135,6 +141,7 @@
         node: article.cloneNode(true),
         scrollTop: 0
       };
+      linkify(tab.node);
       tabs.push(tab);
       activateTab(tab);
     }
