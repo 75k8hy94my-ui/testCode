@@ -29,6 +29,38 @@
     'childcare-leave':['childcare-leave']
   };
   const articleOrder = s => parseInt(s.replace(/[０-９]/g,c=>String('０１２３４５６７８９'.indexOf(c))),10);
+  const fullwidth = value => String(value).replace(/[0-9]/g,c=>'０１２３４５６７８９'[Number(c)]);
+  function kanjiNumber(source) {
+    const digits = {〇:0,零:0,一:1,二:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9};
+    const units = {十:10,百:100,千:1000,万:10000};
+    let sum=0,part=0,current=0;
+    for(const ch of source) {
+      if(ch in digits) { current=digits[ch]; continue; }
+      if(ch==='万') { sum+=(part+current||1)*10000; part=0;current=0;continue; }
+      if(!(ch in units)) return null;
+      part+=(current||1)*units[ch];current=0;
+    }
+    return sum+part+current;
+  }
+  const normalizeReferences = source => String(source).replace(
+    /第([〇零一二三四五六七八九十百千万]+)(条|項|号)(?:の([〇零一二三四五六七八九十百千万]+))?/g,
+    (match,number,unit,suffix) => {
+      const converted=kanjiNumber(number);
+      if(converted===null)return match;
+      const extra=suffix?kanjiNumber(suffix):null;
+      return '第'+fullwidth(converted)+unit+(extra!==null?'の'+fullwidth(extra):'');
+    }
+  );
+  let activeKey=null;
+  function activeData() { return activeKey ? store.get(activeKey) : null; }
+  function createReferencedCard(number) {
+    const data=activeData();
+    const row=data?.articles.find(item=>item[0]===number);
+    return row ? buildCard(row) : null;
+  }
+  function hasReferencedArticle(number) {
+    return Boolean(activeData()?.articles.some(row=>row[0]===number));
+  }
 
   function buildCard(row) {
     const [number,chapter,body]=row;
@@ -60,7 +92,7 @@
       }
       const span=document.createElement('span');
       span.className='statuteSelectable';
-      span.textContent=m?line.slice(m[0].length):line;
+      span.textContent=normalizeReferences(m?line.slice(m[0].length):line);
       paragraph.appendChild(span);
     });
     card.append(title,paragraph);
@@ -87,13 +119,14 @@
       const [key,start,end]=config;
       let data=store.get(key);
       if (!data) {
-        const res=await fetch('statutes-data/'+encodeURIComponent(key)+'.json?v=20261015-corpus-1',{cache:'force-cache'});
+        const res=await fetch('statutes-data/'+encodeURIComponent(key)+'.json?v=20261015-corpus-2',{cache:'force-cache'});
         if (!res.ok) throw Error('HTTP '+res.status);
         data=await res.json();
         if (!Array.isArray(data.articles)) throw Error('Invalid law data');
         store.set(key,data);
       }
       if (generationId!==generation) return;
+      activeKey=key;
       const rows=data.articles.filter(row=>{
         if(!start)return true;
         const n=articleOrder(row[0]);
@@ -124,5 +157,5 @@
       refresh(section);
     }
   }
-  window.StatutesData={load};
+  window.StatutesData={load,hasReferencedArticle,createReferencedCard};
 })();
