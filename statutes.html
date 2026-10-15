@@ -60,6 +60,28 @@ html[data-theme="dark"] .statutesLawDropdown{background:#1b1f29;color:#f1f2f6;bo
 .statutesLawMenuItem{display:block;width:100%;min-height:32px;appearance:none;border:0;border-radius:5px;padding:6px 12px;background:transparent;color:inherit;text-align:left;font:inherit;font-size:13px;white-space:nowrap;cursor:pointer}
 .statutesLawMenuItem:hover,.statutesLawMenuItem:focus-visible,.statutesLawMenuItem[aria-current="page"]{background:rgba(128,128,128,.18);outline:none}
 @media(max-width:899px){.statutes-page #appGlobalHeader{padding-left:12px!important;padding-right:10px!important}.statutesLawRoot{padding:5px 9px}.statutesCurrentSection{max-width:28vw;padding-left:8px;font-size:12px}}
+
+/* Definition annotations and the edit-only registration UI. */
+.statutesEditToggle{flex:0 0 auto;appearance:none;border:1px solid rgba(128,128,128,.40);border-radius:5px;background:transparent;color:inherit;padding:5px 8px;font:inherit;font-size:12px;white-space:nowrap;cursor:pointer}
+.statutesEditToggle[aria-pressed="true"]{background:var(--accent-dim,rgba(23,105,170,.17));border-color:var(--accent,#1769aa);color:var(--accent,#1769aa)}
+.statuteDefinitionMark{background:var(--accent-dim,rgba(23,105,170,.16));border-bottom:1px solid var(--accent,#1769aa);border-radius:2px;cursor:pointer;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.statuteDefinitionMark:hover,.statuteDefinitionMark:focus-visible{outline:1px solid var(--accent,#1769aa);outline-offset:1px}
+.statutesDefinitionSide{position:fixed;z-index:1040;top:58px;right:0;bottom:0;width:min(420px,calc(100vw - 58px));display:flex;flex-direction:column;min-height:0;overflow:hidden;background:var(--bg,#fff);color:var(--text,#202124);border-left:1px solid var(--line,#dfe3e8);box-shadow:-7px 0 24px rgba(0,0,0,.14);transform:translateX(100%);visibility:hidden;pointer-events:none;transition:transform .22s ease,visibility .22s,bottom .22s}
+.statutes-definition-open .statutesDefinitionSide{transform:translateX(0);visibility:visible;pointer-events:auto}
+.statutes-split-open .statutesDefinitionSide{bottom:calc(var(--statutes-split-height) + var(--statutes-split-bottom))}
+.statutesDefinitionHeader{flex:0 0 auto;min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 12px;border-bottom:1px solid var(--line,#dfe3e8);font-size:14px}
+.statutesDefinitionClose{width:28px;height:28px;padding:0;appearance:none;border:0;border-radius:5px;background:transparent;color:inherit;font:inherit;font-size:21px;cursor:pointer}
+.statutesDefinitionClose:hover,.statutesDefinitionClose:focus-visible{background:var(--accent-dim,rgba(128,128,128,.16))}
+.statutesDefinitionBody{flex:1 1 auto;min-height:0;overflow-y:auto;padding:12px 14px}
+.statutesDefinitionQuote{margin:0 0 12px;color:var(--sub,#6b7280);font-size:12px;overflow-wrap:anywhere}
+.statutesDefinitionValue{font-size:14px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.statutesDefinitionForm textarea{display:block;width:100%;min-height:120px;max-width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line,#dfe3e8);border-radius:5px;background:var(--surface,#fff);color:var(--text,#202124);font:inherit;font-size:14px;line-height:1.6;resize:vertical}
+.statutesDefinitionActions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:10px}
+.statutesDefinitionActions button{appearance:none;border:1px solid var(--line,#dfe3e8);border-radius:5px;padding:6px 12px;background:var(--surface,#fff);color:var(--text,#202124);font:inherit;font-size:13px;cursor:pointer}
+.statutesDefinitionActions button[type="submit"]{background:var(--accent-dim,rgba(23,105,170,.16));border-color:var(--accent,#1769aa)}
+.statutesDefinitionStatus{margin:8px 0 0;font-size:12px;color:var(--sub,#6b7280)}
+@media(max-width:899px){.statutesEditToggle{padding:4px 6px;font-size:11px}.statutesDefinitionSide{top:54px;bottom:var(--statutes-split-bottom);width:min(420px,100vw)}}
+@media(prefers-reduced-motion:reduce){.statutesDefinitionSide{transition:none}}
 </style>
 </head>
 <body>
@@ -399,34 +421,9 @@ html[data-theme="dark"] .statutesLawDropdown{background:#1b1f29;color:#f1f2f6;bo
 })();
 </script>
 <button id="statuteSelectionPopup" class="statuteSelectionPopup" type="button">選択</button>
-<script>
-(() => {
-  const popup = document.getElementById('statuteSelectionPopup');
-  const hide = () => { popup.dataset.visible = 'false'; };
-  const update = () => {
-    const selection = window.getSelection();
-    if (!selection || selection.isCollapsed || !selection.toString().trim()) { hide(); return; }
-    const range = selection.getRangeAt(0);
-    const start = range.startContainer.nodeType === Node.TEXT_NODE ? range.startContainer.parentElement : range.startContainer;
-    const end = range.endContainer.nodeType === Node.TEXT_NODE ? range.endContainer.parentElement : range.endContainer;
-    const a = start?.closest?.('.statuteSelectable');
-    const b = end?.closest?.('.statuteSelectable');
-    if (!a || !b || a.closest('.statuteText') !== b.closest('.statuteText')) { hide(); return; }
-    const rect = range.getBoundingClientRect();
-    if (!rect.width && !rect.height) { hide(); return; }
-    popup.style.left = Math.max(8, Math.min(window.innerWidth - 85, rect.left + rect.width / 2 - 26)) + 'px';
-    popup.style.top = Math.max(8, Math.min(window.innerHeight - 40, rect.top - 38)) + 'px';
-    popup.dataset.visible = 'true';
-  };
-  document.addEventListener('selectionchange', () => requestAnimationFrame(update));
-  document.addEventListener('pointerup', update);
-  document.addEventListener('keyup', update);
-  document.addEventListener('pointerdown', e => { if (!popup.contains(e.target)) hide(); });
-  window.addEventListener('scroll', hide, true);
-  popup.addEventListener('click', () => {});
-})();
-</script>
+
 <script src="statutes-references.js?v=20261015-split-tabs-v2"></script>
 <script src="statutes-law-menu.js?v=20261015-header-section-v4"></script>
+<script src="statutes-definitions.js?v=20261015-definitions-v1"></script>
 </body>
 </html>
