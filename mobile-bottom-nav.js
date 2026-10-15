@@ -9,7 +9,6 @@
     video: '<svg class="mobileNavGlyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></svg>',
     add: '<svg class="mobileNavGlyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg>',
     search: '<svg class="mobileNavGlyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.7"/><path d="m16 16 5 5"/></svg>',
-    statutes: '<svg class="mobileNavGlyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5c3-1.5 5.5-1.2 8 .7v13c-2.2-1.7-4.8-2-8-.6z"/><path d="M20 5.5c-3-1.5-5.5-1.2-8 .7v13c2.2-1.7 4.8-2 8-.6z"/></svg>',
     profile: '<svg class="mobileNavGlyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg>'
   });
 
@@ -18,7 +17,6 @@
     { key:'manga', label:'漫画', href:'manga.html', id:'mobileNavManga' },
     { key:'images', label:'画像', href:'images.html', id:'mobileNavImages' },
     { key:'video', label:'動画', href:'video.html', id:'mobileNavVideo' },
-    { key:'statutes', label:'逐条集', href:'statutes.html', id:'mobileNavStatutes' },
     { key:'add', label:'追加', href:'add.html', id:'mobileNavAdd' },
     { key:'profile', label:'プロフィール', href:'profile.html', id:'mobileNavProfile' },
   ]);
@@ -38,8 +36,8 @@
     if (name === 'profile.html') return 'profile';
     if (name === 'manga.html') return 'manga';
     if (name === 'images.html') return 'images';
-    if (name === 'statutes.html') return 'statutes';
     if (name === 'add.html') return 'add';
+    if (name === 'statutes.html') return '';
     if (name === 'video.html' || name === 'video-player.html' || name === 'video-edit.html') return 'video';
     return 'home';
   }
