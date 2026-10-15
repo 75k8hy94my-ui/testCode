@@ -15,8 +15,8 @@ FW = str.maketrans("0123456789", "０１２３４５６７８９")
 
 def article_key(label):
     raw = label.translate(str.maketrans("０１２３４５６７８９", "0123456789"))
-    m = re.fullmatch(r"(\d+)条(?:の(\d+))?", raw)
-    return (m.group(1) + ("_" + m.group(2) if m.group(2) else "")) if m else None
+    m = re.fullmatch(r"(\d+)条((?:の\d+)*)", raw)
+    return (m.group(1) + m.group(2).replace("の", "_")) if m else None
 
 def captions_for_law(law_id):
     url = "https://laws.e-gov.go.jp/api/1/lawdata/" + law_id
@@ -49,12 +49,23 @@ def main():
             raise RuntimeError(f"{path}: missing law ID")
         official = captions_for_law(law_id)
         found = 0
+        inherited = ""
+        previous_chapter = None
         for row in data["articles"]:
             key = article_key(row[0])
             if key is None:
                 # Don't guess a caption for supplementary or irregular numbering.
                 continue
-            caption = official.get(key, "")
+            if row[1] != previous_chapter:
+                inherited = ""
+                previous_chapter = row[1]
+            if row[2].strip() == "削除":
+                caption = ""
+            else:
+                direct = official.get(key, "")
+                if direct:
+                    inherited = direct
+                caption = direct or inherited
             if len(row) > 3:
                 row[3] = caption
             else:
