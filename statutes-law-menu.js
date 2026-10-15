@@ -59,9 +59,21 @@
   dropdown.hidden = true;
   document.body.appendChild(dropdown);
 
+  const categories = new Map();
+  menus.forEach(root => {
+    categories.set(root.id, { root, child: null });
+    root.children?.forEach(child => categories.set(child.id, { root, child }));
+  });
+  const DEFAULT_SECTION = 'civil-general';
+  const sectionFromUrl = () => {
+    const id = new URL(window.location.href).searchParams.get('section');
+    return categories.has(id) ? id : DEFAULT_SECTION;
+  };
+
   let currentRoot = 'civil';
-  let currentCategory = 'civil-general';
+  let currentCategory = DEFAULT_SECTION;
   let openRoot = null;
+  let menuPinned = false;
   let closeTimer = null;
   const roots = new Map();
 
@@ -71,6 +83,7 @@
   };
   const scheduleClose = () => {
     cancelClose();
+    if (menuPinned) return;
     closeTimer = setTimeout(closeDropdown, 160);
   };
 
@@ -79,6 +92,7 @@
     dropdown.hidden = true;
     dropdown.replaceChildren();
     openRoot = null;
+    menuPinned = false;
     roots.forEach(button => button.setAttribute('aria-expanded', 'false'));
   }
 
@@ -95,7 +109,9 @@
     dropdown.style.maxHeight = Math.max(90, window.innerHeight - y - 10) + 'px';
   }
 
-  function selectCategory(root, child = null) {
+  function renderCategory(id) {
+    const category = categories.get(id) || categories.get(DEFAULT_SECTION);
+    const { root, child } = category;
     const next = child?.id || root.id;
     if (document.documentElement.classList.contains('statutes-split-open')) {
       document.querySelector('.statutesSplitClose')?.click();
@@ -103,20 +119,43 @@
     currentRoot = root.id;
     currentCategory = next;
     sectionHeading.textContent = child?.label || root.label;
-    // Only Civil Code general provisions have been registered so far.
-    const showCivil = next === 'civil-general';
-    articleCards.forEach(card => { card.hidden = !showCivil; });
-    roots.forEach((button, id) => {
-      if (id === currentRoot) button.setAttribute('aria-current', 'page');
+    // The Civil Code general provisions are the only category with data for now.
+    articleCards.forEach(card => { card.hidden = next !== 'civil-general'; });
+    roots.forEach((button, rootId) => {
+      if (rootId === currentRoot) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     });
-    closeDropdown();
+    // Keep an open submenu available when its category is selected.
+    if (openRoot && openRoot.id !== currentRoot) closeDropdown();
+    if (!dropdown.hidden) {
+      dropdown.querySelectorAll('.statutesLawMenuItem').forEach(item => {
+        if (item.dataset.section === currentCategory) item.setAttribute('aria-current', 'page');
+        else item.removeAttribute('aria-current');
+      });
+      positionDropdown();
+    }
+  }
+
+  function selectCategory(root, child = null) {
+    const id = child?.id || root.id;
+    const url = new URL(window.location.href);
+    // Each category gets a distinct address and its own browser history entry.
+    if (url.searchParams.get('section') !== id) {
+      url.searchParams.set('section', id);
+      window.history.pushState({ statuteSection: id }, '', url);
+    }
+    renderCategory(id);
+    if (child && openRoot === root && !dropdown.hidden) {
+      menuPinned = true;
+      cancelClose();
+    }
     requestAnimationFrame(() => window.scrollTo(0, 0));
   }
 
   function openDropdown(root, focusFirst = false) {
     cancelClose();
     if (!root.children?.length) { closeDropdown(); return; }
+    if (openRoot !== root) menuPinned = false;
     openRoot = root;
     dropdown.replaceChildren();
     dropdown.setAttribute('aria-label', root.label + 'の下位分類');
@@ -126,6 +165,7 @@
       item.className = 'statutesLawMenuItem';
       item.setAttribute('role', 'menuitem');
       item.textContent = child.label;
+      item.dataset.section = child.id;
       if (currentCategory === child.id) item.setAttribute('aria-current', 'page');
       item.addEventListener('click', () => selectCategory(root, child));
       dropdown.appendChild(item);
@@ -154,7 +194,7 @@
       });
       button.addEventListener('click', () => {
         const alreadyOpen = openRoot === root && !dropdown.hidden;
-        if (alreadyOpen && window.matchMedia('(hover: none)').matches) closeDropdown();
+        if (alreadyOpen && (menuPinned || window.matchMedia('(hover: none)').matches)) closeDropdown();
         else openDropdown(root);
       });
       button.addEventListener('keydown', event => {
@@ -174,6 +214,11 @@
   });
 
   brand.replaceChildren(menuBar);
+  // Restore the selected category on reload, direct URL visits, Back, and Forward.
+  renderCategory(sectionFromUrl());
+  window.addEventListener('popstate', () => {
+    renderCategory(sectionFromUrl());
+  });
   dropdown.addEventListener('pointerenter', cancelClose);
   dropdown.addEventListener('pointerleave', event => {
     if (event.pointerType === 'mouse') scheduleClose();
