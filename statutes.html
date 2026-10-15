@@ -30,6 +30,7 @@
 .statutes-page{--statutes-split-height:min(42dvh,420px);--statutes-split-bottom:0px}
 .statuteReference{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;cursor:pointer}
 .statuteReference:hover,.statuteReference:focus-visible{color:var(--accent,#1769aa);text-decoration-style:solid}
+html[data-theme="dark"] .statutesSplitPanel{background:#0a0c11;color:#f1f2f6;border-top-color:#2b3240}
 .statutesSplitPanel{position:fixed;z-index:1050;left:58px;right:0;bottom:var(--statutes-split-bottom);height:var(--statutes-split-height);background:var(--bg,#fff);color:var(--text,#202124);border-top:1px solid var(--line,#dfe3e8);box-shadow:0 -7px 24px rgba(0,0,0,.17);transform:translateY(100%);opacity:0;visibility:hidden;pointer-events:none;transition:transform .24s ease,opacity .24s ease,visibility .24s}
 .statutes-split-open .statutesSplitPanel{transform:translateY(0);opacity:1;visibility:visible;pointer-events:auto}
 .statutesSplitScroll{height:100%;overflow-y:auto;overscroll-behavior:contain;padding:34px 14px 12px}
@@ -406,6 +407,6 @@ html.statutes-page.statutes-split-open #homeApp > #routeContent.statutesMain{hei
   popup.addEventListener('click', () => {});
 })();
 </script>
-<script src="statutes-references.js?v=20261015-split-view"></script>
+<script src="statutes-references.js?v=20261015-split-autoheight-theme"></script>
 </body>
 </html>
