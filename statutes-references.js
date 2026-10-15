@@ -48,7 +48,7 @@
   panel.setAttribute('aria-label', '参照条文');
   panel.setAttribute('aria-hidden', 'true');
   panel.innerHTML = '<button class="statutesSplitClose" type="button" aria-label="参照条文を閉じる">×</button><div class="statutesSplitScroll"></div>';
-  document.body.appendChild(panel);
+  document.getElementById('homeApp').appendChild(panel);
   panel.inert = true;
 
   const root = document.documentElement;
@@ -56,6 +56,17 @@
   const close = panel.querySelector('.statutesSplitClose');
   const popup = document.getElementById('statuteSelectionPopup');
   let previousFocus = null;
+
+  function fitPanelToArticle() {
+    const card = content.firstElementChild;
+    if (!card) return;
+    const styles = getComputedStyle(content);
+    const padding = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+    const needed = Math.ceil(card.getBoundingClientRect().height + padding + 1);
+    const viewportHeight = window.visualViewport?.height || window.innerHeight;
+    const maxHeight = Math.min(420, viewportHeight * 0.42);
+    root.style.setProperty('--statutes-split-height', Math.ceil(Math.min(needed, maxHeight)) + 'px');
+  }
 
   function showArticle(number, trigger) {
     const article = articles.get(number);
@@ -65,6 +76,7 @@
     if (!alreadyOpen) previousFocus = trigger;
 
     content.replaceChildren(article.cloneNode(true));
+    fitPanelToArticle();
     content.scrollTop = 0;
     window.getSelection()?.removeAllRanges();
     if (popup) popup.dataset.visible = 'false';
@@ -86,6 +98,7 @@
     panel.inert = true;
     panel.setAttribute('aria-hidden', 'true');
     content.replaceChildren();
+    root.style.removeProperty('--statutes-split-height');
     const focus = previousFocus;
     previousFocus = null;
     requestAnimationFrame(() => {
@@ -104,6 +117,9 @@
   });
 
   close.addEventListener('click', closeArticle);
+  window.addEventListener('resize', () => {
+    if (root.classList.contains('statutes-split-open')) fitPanelToArticle();
+  });
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape' && root.classList.contains('statutes-split-open')) {
       event.preventDefault();
