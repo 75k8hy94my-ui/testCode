@@ -10,7 +10,6 @@
 <link rel="stylesheet" href="mobile-bottom-nav.css?v=20260925-instagram-drag-lock">
 <style>
 .statutesMain{width:100%;max-width:none;margin:0;padding:12px 14px 12px;color:var(--text,#e5e7eb)}
-.statutesGroup{font-size:13px;font-weight:600;margin:8px 0 6px;color:var(--muted,#94a3b8)}
 .statuteCard{border-bottom:1px solid var(--border,rgba(150,160,175,.25));padding:7px 0 8px}
 .statuteCard:last-child{border-bottom:0}
 .statuteTitle{display:flex;align-items:baseline;gap:8px;margin:0 0 2px}
@@ -21,7 +20,7 @@
 @media(min-width:900px){html.app-desktop-rail-page.statutes-page body{padding-left:58px!important}html.app-desktop-rail-page.statutes-page #homeApp{width:100%;max-width:none;margin:0;padding:0}html.app-desktop-rail-page.statutes-page #homeApp > #routeContent.statutesMain{width:100%;max-width:960px;margin:0 auto;padding:54px 14px 12px;transform:none}}
 @media(max-width:620px){.statutesMain{padding:8px 12px 12px}}
 @media(min-width:900px){html.app-desktop-rail-page.statutes-page #homeApp > #routeContent.statutesMain{padding-bottom:12px!important}}
-.statutes-page .statutesGroup,.statutes-page .statuteTitle,.statutes-page .statuteUnselectable{user-select:none;-webkit-user-select:none}
+.statutes-page .statuteTitle,.statutes-page .statuteUnselectable{user-select:none;-webkit-user-select:none}
 .statutes-page .statuteText{user-select:none;-webkit-user-select:none}
 .statutes-page .statuteSelectable{user-select:text;-webkit-user-select:text}
 .statuteSelectionPopup{position:fixed;z-index:1500;display:none;padding:6px 10px;border:1px solid #51565d;border-radius:7px;background:#303033;color:#fff;font-size:12px;line-height:1.3;font-family:inherit;box-shadow:0 4px 14px rgba(0,0,0,.28);cursor:pointer}
@@ -49,7 +48,8 @@ html.statutes-page.statutes-split-open #homeApp > #routeContent.statutesMain{hei
 
 /* Section navigation in the shared top header, scoped to statutes.html. */
 .statutes-page #appGlobalHeader{z-index:1150;gap:10px}
-.statutes-page #appGlobalHeader .globalShellBrand{flex:1 1 auto;min-width:0;max-width:calc(100% - 52px)}
+.statutes-page #appGlobalHeader .globalShellBrand{flex:1 1 auto;min-width:0;max-width:none}
+.statutesCurrentSection{flex:0 1 auto;min-width:0;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 0 0 12px;border-left:1px solid rgba(128,128,128,.4);font-size:13px;font-weight:650;line-height:1.4;user-select:none;-webkit-user-select:none}
 .statutesLawMenu{width:100%;min-width:0;display:flex;align-items:center;gap:2px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;white-space:nowrap;touch-action:pan-x}
 .statutesLawMenu::-webkit-scrollbar{display:none}
 .statutesLawRoot{flex:0 0 auto;min-height:34px;appearance:none;border:0;border-radius:5px;padding:5px 10px;background:transparent;color:inherit;font:inherit;font-size:13px;font-weight:500;line-height:1.4;cursor:pointer}
@@ -59,14 +59,13 @@ html.statutes-page.statutes-split-open #homeApp > #routeContent.statutesMain{hei
 html[data-theme="dark"] .statutesLawDropdown{background:#1b1f29;color:#f1f2f6;border-color:#384152;box-shadow:0 10px 28px rgba(0,0,0,.4)}
 .statutesLawMenuItem{display:block;width:100%;min-height:32px;appearance:none;border:0;border-radius:5px;padding:6px 12px;background:transparent;color:inherit;text-align:left;font:inherit;font-size:13px;white-space:nowrap;cursor:pointer}
 .statutesLawMenuItem:hover,.statutesLawMenuItem:focus-visible,.statutesLawMenuItem[aria-current="page"]{background:rgba(128,128,128,.18);outline:none}
-@media(max-width:899px){.statutes-page #appGlobalHeader{padding-left:12px!important;padding-right:10px!important}.statutesLawRoot{padding:5px 9px}}
+@media(max-width:899px){.statutes-page #appGlobalHeader{padding-left:12px!important;padding-right:10px!important}.statutesLawRoot{padding:5px 9px}.statutesCurrentSection{max-width:28vw;padding-left:8px;font-size:12px}}
 </style>
 </head>
 <body>
 <div class="homeShell" id="homeApp">
 <header class="homeHeader" data-profile-only-header="1"><div><span class="eyebrow">LAW</span><h1 id="shellTitle"></h1></div><button class="headerProfileButton" type="button" data-profile-menu-trigger aria-label="アカウント" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg></button></header>
 <main class="statutesMain" id="routeContent">
-<h2 class="statutesGroup">民法総則</h2>
 <section class="statuteCard">
 <div class="statuteTitle"><span class="statuteNumber">１条</span><span class="statuteHeading">基本原則</span></div>
 <p class="statuteText"><span class="statuteSelectable">私権は、公共の福祉に適合しなければならない。</span>
@@ -428,6 +427,6 @@ html[data-theme="dark"] .statutesLawDropdown{background:#1b1f29;color:#f1f2f6;bo
 })();
 </script>
 <script src="statutes-references.js?v=20261015-split-tabs-v2"></script>
-<script src="statutes-law-menu.js?v=20261015-law-section-history-v3"></script>
+<script src="statutes-law-menu.js?v=20261015-header-section-v4"></script>
 </body>
 </html>
