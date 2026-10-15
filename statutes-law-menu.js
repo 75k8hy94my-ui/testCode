@@ -43,8 +43,12 @@
   const header = document.getElementById('appGlobalHeader') || document.querySelector('.homeHeader');
   const brand = header?.querySelector('.globalShellBrand') || header?.firstElementChild;
   const page = document.querySelector('#routeContent.statutesMain');
-  const sectionHeading = page?.querySelector('.statutesGroup');
-  if (!brand || !page || !sectionHeading) return;
+  if (!header || !brand || !page) return;
+
+  const currentSectionLabel = document.createElement('span');
+  currentSectionLabel.id = 'statutesCurrentSection';
+  currentSectionLabel.className = 'statutesCurrentSection';
+  currentSectionLabel.setAttribute('aria-live', 'polite');
 
   const articleCards = Array.from(page.querySelectorAll('.statuteCard'));
   const menuBar = document.createElement('nav');
@@ -118,7 +122,7 @@
     }
     currentRoot = root.id;
     currentCategory = next;
-    sectionHeading.textContent = child?.label || root.label;
+    currentSectionLabel.textContent = child?.label || root.label;
     // The Civil Code general provisions are the only category with data for now.
     articleCards.forEach(card => { card.hidden = next !== 'civil-general'; });
     roots.forEach((button, rootId) => {
@@ -214,6 +218,7 @@
   });
 
   brand.replaceChildren(menuBar);
+  brand.after(currentSectionLabel);
   // Restore the selected category on reload, direct URL visits, Back, and Forward.
   renderCategory(sectionFromUrl());
   window.addEventListener('popstate', () => {
