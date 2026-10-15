@@ -65,8 +65,11 @@ def main():
             else:
                 direct = official.get(key)
                 if direct:
-                    caption, is_common = direct
-                    inherited = caption if is_common else ""
+                    caption, _is_common = direct
+                    # In the published law, a caption heads a consecutive group of
+                    # articles until the next caption (even without CommonCaption).
+                    # Keep the chapter boundary as a guard against stale headings.
+                    inherited = caption
                 else:
                     caption = inherited
             if len(row) > 3:
