@@ -9,7 +9,7 @@
   if (!root.classList.contains('statutes-page') || !page || !host || !header || !popup) return;
 
   const STORAGE_KEY = 'testCode.statutes.definitions.v1';
-  const subjectId = 'civil-general';
+  let subjectId = 'civil-general';
   const lawForSubject = subject => subject.startsWith('civil-') || subject === 'civil' ? '民法' : ({
     constitution: '日本国憲法', 'criminal-general': '刑法', 'criminal-special': '刑法',
     'civil-procedure': '民事訴訟法', 'criminal-procedure': '刑事訴訟法', corporations: '会社法',
@@ -30,18 +30,22 @@
   };
   const originals = new Map();
   const spansByArticle = new Map();
-  const spans = Array.from(page.querySelectorAll('.statuteCard .statuteSelectable'));
-  page.querySelectorAll('.statuteCard').forEach(card => {
-    const article = card.querySelector('.statuteNumber')?.textContent?.trim();
-    if (!article) return;
-    const parts = Array.from(card.querySelectorAll('.statuteSelectable'));
-    spansByArticle.set(article, parts);
-    parts.forEach((span, part) => {
-      span.dataset.statuteArticle = article;
-      span.dataset.statutePart = String(part);
-      originals.set(span, span.cloneNode(true));
+  function indexEditableText() {
+    originals.clear();
+    spansByArticle.clear();
+    page.querySelectorAll('.statuteCard').forEach(card => {
+      const article = card.querySelector('.statuteNumber')?.textContent?.trim();
+      if (!article) return;
+      const parts = Array.from(card.querySelectorAll('.statuteSelectable'));
+      spansByArticle.set(article, parts);
+      parts.forEach((span, part) => {
+        span.dataset.statuteArticle = article;
+        span.dataset.statutePart = String(part);
+        originals.set(span, span.cloneNode(true));
+      });
     });
-  });
+  }
+  indexEditableText();
 
   function loadDefinitions() {
     try {
@@ -413,5 +417,14 @@
     closePopup();
     closeSide();
   });
+  window.StatutesDefinitions = {
+    refresh(section) {
+      subjectId = section || 'civil-general';
+      closePopup();
+      closeSide();
+      indexEditableText();
+      redraw();
+    }
+  };
   redraw();
 })();
