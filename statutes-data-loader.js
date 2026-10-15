@@ -58,7 +58,7 @@
   function createReferencedCard(number) {
     const data=activeData();
     const row=data?.articles.find(item=>item[0]===number);
-    return row ? buildCard(row) : null;
+    return row ? buildCard(row, captionCache.get(data.key)) : null;
   }
   function hasReferencedArticle(number) {
     return Boolean(activeData()?.articles.some(row=>row[0]===number));
@@ -102,10 +102,12 @@
     title.appendChild(num);
     // Chapter/section labels in the legacy corpus are not article captions.
     // Render only a separately verified per-article caption (fourth field).
-    if (typeof articleCaption === 'string' && articleCaption.trim()) {
+    const officialCaption = captions?.get(articleId(number));
+    const visibleCaption = officialCaption || (typeof articleCaption === 'string' ? articleCaption.trim() : '');
+    if (visibleCaption) {
       const small=document.createElement('span');
       small.className='statuteHeading';
-      small.textContent=articleCaption.trim();
+      small.textContent=visibleCaption;
       title.appendChild(small);
     }
     const paragraph=document.createElement('p');
