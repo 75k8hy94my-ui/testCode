@@ -123,8 +123,8 @@
     currentRoot = root.id;
     currentCategory = next;
     currentSectionLabel.textContent = child?.label || root.label;
-    // The Civil Code general provisions are the only category with data for now.
-    articleCards.forEach(card => { card.hidden = next !== 'civil-general'; });
+    if (window.StatutesData) void window.StatutesData.load(next);
+    else articleCards.forEach(card => { card.hidden = next !== 'civil-general'; });
     roots.forEach((button, rootId) => {
       if (rootId === currentRoot) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
