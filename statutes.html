@@ -96,6 +96,66 @@ html[data-theme="dark"] .statutesLawDropdown{background:#1b1f29;color:#f1f2f6;bo
 .statutesDefinitionCardView button:disabled{opacity:.4;cursor:default}
 .statutesFlashcardNav{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .statutesFlashcardCount{font-size:12px;color:var(--sub,#6b7280);font-variant-numeric:tabular-nums}
+
+/* A real two-column page layout for definition reading, not an overlay. */
+html.statutes-page{--statutes-definition-width:clamp(270px,34vw,420px)}
+html.statutes-page.statutes-definition-open #homeApp{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) var(--statutes-definition-width);
+  grid-template-rows:minmax(0,1fr);
+  height:100dvh!important;
+  min-height:0!important;
+  overflow:hidden;
+}
+html.statutes-page.statutes-definition-open.statutes-split-open #homeApp{
+  height:calc(100dvh - var(--statutes-split-height) - var(--statutes-split-bottom))!important;
+}
+html.statutes-page.statutes-definition-open #homeApp > #routeContent.statutesMain{
+  grid-column:1;
+  grid-row:1;
+  min-width:0;
+  min-height:0!important;
+  width:100%!important;
+  height:100%!important;
+  max-height:100%;
+  margin:0 auto!important;
+  overflow-y:auto;
+  overflow-x:hidden;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+}
+html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
+  grid-column:2;
+  grid-row:1;
+  position:relative;
+  top:auto;
+  right:auto;
+  bottom:auto;
+  left:auto;
+  width:100%;
+  height:auto;
+  min-width:0;
+  min-height:0;
+  margin-top:54px;
+  margin-bottom:0;
+  transform:none;
+  visibility:visible;
+  pointer-events:auto;
+  box-shadow:none;
+  transition:none;
+  z-index:auto;
+}
+@media(max-width:899px){
+  html.statutes-page{--statutes-definition-width:min(47vw,360px)}
+  html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
+    margin-top:54px;
+    margin-bottom:0;
+  }
+  html.statutes-page.statutes-definition-open #homeApp > #routeContent.statutesMain{
+    padding-left:10px;
+    padding-right:10px;
+  }
+}
 </style>
 </head>
 <body>
@@ -438,6 +498,6 @@ html[data-theme="dark"] .statutesLawDropdown{background:#1b1f29;color:#f1f2f6;bo
 
 <script src="statutes-references.js?v=20261015-split-tabs-v2"></script>
 <script src="statutes-law-menu.js?v=20261015-header-section-v4"></script>
-<script src="statutes-definitions.js?v=20261015-definition-cards-v3"></script>
+<script src="statutes-definitions.js?v=20261015-definition-split-layout-v4"></script>
 </body>
 </html>
