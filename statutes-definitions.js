@@ -124,6 +124,7 @@
     status.textContent = '';
   }
   function showSide() {
+    side.setAttribute('aria-label', cardView.hidden ? '定義' : '定義カード');
     root.classList.add('statutes-definition-open');
     side.inert = false;
     side.setAttribute('aria-hidden', 'false');
@@ -303,7 +304,7 @@
     window.getSelection()?.removeAllRanges();
     showSide();
     renderCard();
-    cardFlip.focus({ preventScroll: true });
+    (cards.length ? cardFlip : closeButton).focus({ preventScroll: true });
   }
 
   cardsButton.addEventListener('click', () => {
