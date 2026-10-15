@@ -118,14 +118,29 @@
     selectedDefinition = null;
   }
   function closeSide() {
+    if (!root.classList.contains('statutes-definition-open')) return;
+    const originalScroll = page.scrollTop;
+    const lowerReferenceOpen = root.classList.contains('statutes-split-open');
     root.classList.remove('statutes-definition-open');
     side.inert = true;
     side.setAttribute('aria-hidden', 'true');
     status.textContent = '';
+    if (lowerReferenceOpen) {
+      page.scrollTop = originalScroll;
+    } else {
+      requestAnimationFrame(() => window.scrollTo(0, originalScroll));
+    }
   }
   function showSide() {
     side.setAttribute('aria-label', cardView.hidden ? '定義' : '定義カード');
-    root.classList.add('statutes-definition-open');
+    if (!root.classList.contains('statutes-definition-open')) {
+      // The main document becomes its own scroll pane when the columns split.
+      const lowerReferenceOpen = root.classList.contains('statutes-split-open');
+      const originalScroll = lowerReferenceOpen ? page.scrollTop : window.scrollY;
+      root.classList.add('statutes-definition-open');
+      window.scrollTo(0, 0);
+      page.scrollTop = originalScroll;
+    }
     side.inert = false;
     side.setAttribute('aria-hidden', 'false');
   }
