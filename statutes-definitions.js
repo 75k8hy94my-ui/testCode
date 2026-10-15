@@ -30,7 +30,7 @@
       const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
       if (!Array.isArray(data)) return [];
       return data.filter(item =>
-        item && item.subject === subjectId &&
+        item && typeof item.subject === 'string' &&
         typeof item.article === 'string' &&
         Number.isSafeInteger(item.part) && item.part >= 0 &&
         Number.isSafeInteger(item.start) && item.start >= 0 &&
@@ -116,6 +116,7 @@
       span.replaceChildren(...Array.from(replacement.childNodes));
     });
     definitions.forEach(entry => {
+      if (entry.subject !== subjectId) return;
       const span = spansByArticle.get(entry.article)?.[entry.part];
       if (!span) return;
       if (span.textContent.slice(entry.start, entry.end) !== entry.quote) return;
@@ -160,7 +161,7 @@
     const end = start + range.toString().length;
     const quoteText = span.textContent.slice(start, end);
     if (!quoteText.trim()) return null;
-    const overlapping = definitions.find(d => d.article === article && d.part === part && start < d.end && end > d.start);
+    const overlapping = definitions.find(d => d.subject === subjectId && d.article === article && d.part === part && start < d.end && end > d.start);
     if (overlapping && (overlapping.start !== start || overlapping.end !== end)) return null;
     return {
       candidate: { subject: subjectId, article, part, start, end, quote: quoteText },
@@ -240,9 +241,9 @@
     if (entry) openDefinition(entry, editMode);
   });
 
-  page.addEventListener('click', event => {
+  document.addEventListener('click', event => {
     const mark = event.target.closest?.('.statuteDefinitionMark');
-    if (!mark || event.target.closest('.statuteReference')) return;
+    if (!mark || (!page.contains(mark) && !document.getElementById('statutesSplitPanel')?.contains(mark)) || event.target.closest('.statuteReference')) return;
     const selection = window.getSelection();
     if (selection && !selection.isCollapsed && selection.toString().trim()) return;
     selectSavedMark(mark);
@@ -290,6 +291,12 @@
     if (saveDefinitions(definitions.filter(d => definitionId(d) !== id))) closeSide();
   });
 
+  document.addEventListener('click', event => {
+    if (event.target.closest?.('.statutesLawMenuItem, .statutesLawRoot')) {
+      closePopup();
+      closeSide();
+    }
+  });
   window.addEventListener('popstate', () => {
     closePopup();
     closeSide();
