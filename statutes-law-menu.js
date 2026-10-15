@@ -153,7 +153,8 @@
         if (event.pointerType === 'mouse') scheduleClose();
       });
       button.addEventListener('click', () => {
-        if (openRoot === root && !dropdown.hidden) closeDropdown();
+        const alreadyOpen = openRoot === root && !dropdown.hidden;
+        if (alreadyOpen && window.matchMedia('(hover: none)').matches) closeDropdown();
         else openDropdown(root);
       });
       button.addEventListener('keydown', event => {
