@@ -30,12 +30,18 @@
 .statutes-page{--statutes-split-height:min(42dvh,420px);--statutes-split-bottom:0px}
 .statuteReference{color:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;cursor:pointer}
 .statuteReference:hover,.statuteReference:focus-visible{color:var(--accent,#1769aa);text-decoration-style:solid}
+.statuteReference.is-ref-trigger{color:var(--accent,#1769aa);background:var(--accent-dim,rgba(23,105,170,.16));text-decoration-style:solid;border-radius:2px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 html[data-theme="dark"] .statutesSplitPanel{background:#0a0c11;color:#f1f2f6;border-top-color:#2b3240}
-.statutesSplitPanel{position:fixed;z-index:1050;left:58px;right:0;bottom:var(--statutes-split-bottom);height:var(--statutes-split-height);background:var(--bg,#fff);color:var(--text,#202124);border-top:1px solid var(--line,#dfe3e8);box-shadow:0 -7px 24px rgba(0,0,0,.17);transform:translateY(100%);opacity:0;visibility:hidden;pointer-events:none;transition:transform .24s ease,opacity .24s ease,visibility .24s}
+.statutesSplitPanel{display:flex;flex-direction:column;position:fixed;z-index:1050;left:58px;right:0;bottom:var(--statutes-split-bottom);height:var(--statutes-split-height);background:var(--bg,#fff);color:var(--text,#202124);border-top:1px solid var(--line,#dfe3e8);box-shadow:0 -7px 24px rgba(0,0,0,.17);transform:translateY(100%);opacity:0;visibility:hidden;pointer-events:none;transition:transform .24s ease,opacity .24s ease,visibility .24s}
 .statutes-split-open .statutesSplitPanel{transform:translateY(0);opacity:1;visibility:visible;pointer-events:auto}
-.statutesSplitScroll{height:100%;overflow-y:auto;overscroll-behavior:contain;padding:34px 14px 12px}
-.statutesSplitScroll > .statuteCard{max-width:960px;margin:0 auto;border-bottom:0}
-.statutesSplitClose{position:absolute;z-index:1;right:16px;top:5px;width:30px;height:28px;padding:0;border:0;border-radius:5px;background:transparent;color:inherit;font:inherit;font-size:22px;line-height:1;cursor:pointer}
+.statutesSplitToolbar{flex:0 0 auto;display:flex;align-items:center;gap:8px;min-height:30px;padding:2px 10px 2px 12px;border-bottom:1px solid var(--line,#dfe3e8)}
+.statutesSplitTabs{flex:1;min-width:0;display:flex;gap:4px;overflow-x:auto;scrollbar-width:thin;white-space:nowrap}
+.statutesSplitTab{flex:0 0 auto;min-height:25px;padding:2px 9px;border:0;border-radius:4px;background:transparent;color:inherit;font:inherit;font-size:13px;cursor:pointer}
+.statutesSplitTab[aria-selected="true"]{color:var(--accent,#1769aa);background:var(--accent-dim,rgba(23,105,170,.16));font-weight:650}
+.statutesSplitTab:hover,.statutesSplitTab:focus-visible{outline:1px solid var(--accent,#1769aa)}
+.statutesSplitScroll{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:5px 14px 5px}
+.statutesSplitScroll > .statuteCard{max-width:960px;margin:0 auto;padding:0;border-bottom:0}
+.statutesSplitClose{flex:0 0 28px;width:28px;height:26px;padding:0;border:0;border-radius:5px;background:transparent;color:inherit;font:inherit;font-size:21px;line-height:1;cursor:pointer}
 .statutesSplitClose:hover,.statutesSplitClose:focus-visible{background:var(--surface,#e8ebf0)}
 html.statutes-page.statutes-split-open #homeApp > #routeContent.statutesMain{height:calc(100dvh - var(--statutes-split-height))!important;min-height:0!important;overflow-y:auto;overscroll-behavior:contain}
 @media(max-width:899px){html.statutes-page{--statutes-split-bottom:calc(82px + env(safe-area-inset-bottom))}.statutesSplitPanel{left:0}.statutesSplitScroll{padding-left:12px;padding-right:12px}html.statutes-page.statutes-split-open #homeApp > #routeContent.statutesMain{height:calc(100dvh - var(--statutes-split-height) - var(--statutes-split-bottom) - 54px)!important}}
@@ -407,6 +413,6 @@ html.statutes-page.statutes-split-open #homeApp > #routeContent.statutesMain{hei
   popup.addEventListener('click', () => {});
 })();
 </script>
-<script src="statutes-references.js?v=20261015-split-autoheight-theme"></script>
+<script src="statutes-references.js?v=20261015-split-tabs-v2"></script>
 </body>
 </html>
