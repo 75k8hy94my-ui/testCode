@@ -170,7 +170,7 @@
   }
 
   function updateSelectionPopup() {
-    if (!editMode || !side.inert === false) return;
+    if (!editMode || !side.inert) return;
     const data = selectionCandidate();
     if (!data) {
       if (!selectedDefinition) closePopup();
