@@ -63,7 +63,7 @@
   }
 
   function buildCard(row) {
-    const [number,chapter,body]=row;
+    const [number,_chapter,body,articleCaption]=row;
     const card=document.createElement('section');
     card.className='statuteCard';
     const title=document.createElement('div');
@@ -72,10 +72,12 @@
     num.className='statuteNumber';
     num.textContent=number;
     title.appendChild(num);
-    if (chapter) {
+    // Chapter/section labels in the legacy corpus are not article captions.
+    // Render only a separately verified per-article caption (fourth field).
+    if (typeof articleCaption === 'string' && articleCaption.trim()) {
       const small=document.createElement('span');
       small.className='statuteHeading';
-      small.textContent=chapter;
+      small.textContent=articleCaption.trim();
       title.appendChild(small);
     }
     const paragraph=document.createElement('p');
