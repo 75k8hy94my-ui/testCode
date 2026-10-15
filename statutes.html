@@ -46,13 +46,27 @@ html[data-theme="dark"] .statutesSplitPanel{background:#0a0c11;color:#f1f2f6;bor
 html.statutes-page.statutes-split-open #homeApp > #routeContent.statutesMain{height:calc(100dvh - var(--statutes-split-height))!important;min-height:0!important;overflow-y:auto;overscroll-behavior:contain}
 @media(max-width:899px){html.statutes-page{--statutes-split-bottom:calc(82px + env(safe-area-inset-bottom))}.statutesSplitPanel{left:0}.statutesSplitScroll{padding-left:12px;padding-right:12px}html.statutes-page.statutes-split-open #homeApp > #routeContent.statutesMain{height:calc(100dvh - var(--statutes-split-height) - var(--statutes-split-bottom) - 54px)!important}}
 @media(prefers-reduced-motion:reduce){.statutesSplitPanel{transition:none}}
+
+/* Section navigation in the shared top header, scoped to statutes.html. */
+.statutes-page #appGlobalHeader{z-index:1150;gap:10px}
+.statutes-page #appGlobalHeader .globalShellBrand{flex:1 1 auto;min-width:0;max-width:calc(100% - 52px)}
+.statutesLawMenu{width:100%;min-width:0;display:flex;align-items:center;gap:2px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;white-space:nowrap;touch-action:pan-x}
+.statutesLawMenu::-webkit-scrollbar{display:none}
+.statutesLawRoot{flex:0 0 auto;min-height:34px;appearance:none;border:0;border-radius:5px;padding:5px 10px;background:transparent;color:inherit;font:inherit;font-size:13px;font-weight:500;line-height:1.4;cursor:pointer}
+.statutesLawRoot:hover,.statutesLawRoot:focus-visible,.statutesLawRoot[aria-expanded="true"]{background:rgba(128,128,128,.17);outline:none}
+.statutesLawRoot[aria-current="page"]{font-weight:700}
+.statutesLawDropdown{position:fixed;z-index:1500;min-width:188px;max-width:calc(100vw - 16px);overflow-y:auto;padding:5px;background:#fff;color:#202124;border:1px solid #dfe3e8;border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.19)}
+html[data-theme="dark"] .statutesLawDropdown{background:#1b1f29;color:#f1f2f6;border-color:#384152;box-shadow:0 10px 28px rgba(0,0,0,.4)}
+.statutesLawMenuItem{display:block;width:100%;min-height:32px;appearance:none;border:0;border-radius:5px;padding:6px 12px;background:transparent;color:inherit;text-align:left;font:inherit;font-size:13px;white-space:nowrap;cursor:pointer}
+.statutesLawMenuItem:hover,.statutesLawMenuItem:focus-visible,.statutesLawMenuItem[aria-current="page"]{background:rgba(128,128,128,.18);outline:none}
+@media(max-width:899px){.statutes-page #appGlobalHeader{padding-left:12px!important;padding-right:10px!important}.statutesLawRoot{padding:5px 9px}}
 </style>
 </head>
 <body>
 <div class="homeShell" id="homeApp">
-<header class="homeHeader" data-profile-only-header="1"><div><span class="eyebrow">LAW</span><h1 id="shellTitle">逐条集</h1></div><button class="headerProfileButton" type="button" data-profile-menu-trigger aria-label="アカウント" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg></button></header>
+<header class="homeHeader" data-profile-only-header="1"><div><span class="eyebrow">LAW</span><h1 id="shellTitle"></h1></div><button class="headerProfileButton" type="button" data-profile-menu-trigger aria-label="アカウント" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg></button></header>
 <main class="statutesMain" id="routeContent">
-<h2 class="statutesGroup">民法／総則</h2>
+<h2 class="statutesGroup">民法総則</h2>
 <section class="statuteCard">
 <div class="statuteTitle"><span class="statuteNumber">１条</span><span class="statuteHeading">基本原則</span></div>
 <p class="statuteText"><span class="statuteSelectable">私権は、公共の福祉に適合しなければならない。</span>
@@ -414,5 +428,6 @@ html.statutes-page.statutes-split-open #homeApp > #routeContent.statutesMain{hei
 })();
 </script>
 <script src="statutes-references.js?v=20261015-split-tabs-v2"></script>
+<script src="statutes-law-menu.js?v=20261015-law-sections-v1"></script>
 </body>
 </html>
