@@ -123,7 +123,7 @@
       const [key,start,end]=config;
       let data=store.get(key);
       if (!data) {
-        const res=await fetch('statutes-data/'+encodeURIComponent(key)+'.json?v=20261015-corpus-2',{cache:'force-cache'});
+        const res=await fetch('statutes-data/'+encodeURIComponent(key)+'.json?v=20261016-article-captions-2',{cache:'no-cache'});
         if (!res.ok) throw Error('HTTP '+res.status);
         data=await res.json();
         if (!Array.isArray(data.articles)) throw Error('Invalid law data');
