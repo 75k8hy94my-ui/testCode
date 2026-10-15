@@ -3,7 +3,7 @@
 if (typeof window === 'undefined' || typeof document === 'undefined') return;
 const Home=window.MangaReaderHome;
 const config=window.MANGA_READER_SUPABASE||{};
-const marks={manga:'漫',video:'動'};
+const marks={manga:'漫',video:'動',statutes:'法'};
 const PROFILE_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg>';
 function profileHeaderButtonMarkup(){return '<button class="headerProfileButton" type="button" data-profile-menu-trigger aria-label="アカウント" aria-haspopup="menu" aria-expanded="false">'+PROFILE_ICON+'</button>';}
 function ensureProfileOnlyHeader(app){
