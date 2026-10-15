@@ -6,19 +6,21 @@ import dashboard from '../home-dashboard.js';
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 
 const LEGACY_DEFAULT_IDS = ['bookshelf'];
-const DEFAULT_IDS = ['manga', 'video'];
+const DEFAULT_IDS = ['manga', 'video', 'statutes'];
 
-test('home dashboard exposes only manga and video cards', () => {
+test('home dashboard exposes manga, video and statutes shortcut cards', () => {
   assert.deepEqual(dashboard.DEFAULT_CARD_IDS, DEFAULT_IDS);
   assert.deepEqual(Object.keys(dashboard.CARD_CATALOG), DEFAULT_IDS);
   assert.deepEqual(dashboard.CARD_CATALOG.manga, { id:'manga', title:'漫画', kind:'internal', href:'manga.html', badge:'APP' });
   assert.deepEqual(dashboard.CARD_CATALOG.video, { id:'video', title:'動画', kind:'internal', href:'video.html', badge:'APP' });
+  assert.deepEqual(dashboard.CARD_CATALOG.statutes, { id:'statutes', title:'逐条集', kind:'internal', href:'statutes.html', badge:'APP' });
   assert.equal('subtitle' in dashboard.CARD_CATALOG.manga, false);
   assert.equal('subtitle' in dashboard.CARD_CATALOG.video, false);
+  assert.equal('subtitle' in dashboard.CARD_CATALOG.statutes, false);
 });
 
-test('legacy bookshelf layout migrates to manga and video', () => {
-  assert.deepEqual(dashboard.normalizeLayout(LEGACY_DEFAULT_IDS), DEFAULT_IDS);
+test('legacy bookshelf layout migrates to manga, video, and statutes shortcut', () => {
+  assert.deepEqual(dashboard.normalizeLayout(LEGACY_DEFAULT_IDS), ['manga', 'video']);
   const storage = new Map([['mangaReaderHomeCards', JSON.stringify(LEGACY_DEFAULT_IDS)]]);
   assert.deepEqual(dashboard.loadLayout(storage), DEFAULT_IDS);
   assert.deepEqual(JSON.parse(storage.get('mangaReaderHomeCards')), DEFAULT_IDS);
@@ -42,8 +44,8 @@ test('home cards can be added, removed, and reordered without mutating source la
 
 test('saved custom home layouts ignore removed cards', () => {
   const storage = new Map([['mangaReaderHomeCards', JSON.stringify(['manga', 'index-search'])]]);
-  assert.deepEqual(dashboard.loadLayout(storage), ['manga']);
-  assert.deepEqual(dashboard.hiddenCardIds(['manga']), ['video']);
+  assert.deepEqual(dashboard.loadLayout(storage), ['manga', 'statutes']);
+  assert.deepEqual(dashboard.hiddenCardIds(['manga']), ['video', 'statutes']);
   assert.deepEqual(dashboard.addCard(['manga'], 'index-search'), ['manga']);
 });
 
@@ -54,9 +56,16 @@ test('home layout storage round-trips and missing storage falls back to defaults
   assert.deepEqual(dashboard.loadLayout(storage), ['video', 'manga']);
 });
 
+test('new shortcut is added to a saved layout only once and can subsequently be removed', () => {
+  const storage = new Map([['mangaReaderHomeCards', JSON.stringify(['video'])]]);
+  assert.deepEqual(dashboard.loadLayout(storage), ['video', 'statutes']);
+  dashboard.saveLayout(['video'], storage);
+  assert.deepEqual(dashboard.loadLayout(storage), ['video']);
+});
+
 test('home cards render without short description text', () => {
   const spa = read('home-profile-spa.js');
-  assert.match(spa, /const marks=\{manga:'漫',video:'動'\}/);
+  assert.match(spa, /const marks=\{manga:'漫',video:'動',statutes:'法'\}/);
   assert.doesNotMatch(spa, /card\.subtitle/);
   assert.match(spa, /title\.textContent=card\.title;root\.append\(title\)/);
 });
@@ -68,7 +77,7 @@ test('home page is vault-gated and the shared routes remain intact', () => {
   assert.match(spa, /MangaVault\.loadActive\(\)/);
   assert.match(spa, /window\.location\.replace\(['"]sync\.html['"]\)/);
   assert.match(spa, /window\.location\.replace\(['"]index\.html['"]\)/);
-  assert.match(home, /home-dashboard\.js\?v=20260924-home-media-cards/);
+  assert.match(home, /home-dashboard\.js\?v=20261015-statutes-shortcut/);
   assert.match(spa, /MangaVault\.saveLocalChanges/);
   assert.match(read('sync.html'), /\['images\.html','drive-gallery\.html'\]\.includes\(next\) \? next : 'home\.html'/);
 });
