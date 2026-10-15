@@ -6,14 +6,16 @@
   if (!page || !host) return;
 
   const articles = new Map();
-  page.querySelectorAll('.statuteCard').forEach(card => {
+  function refreshReferences() {
+    articles.clear();
+    page.querySelectorAll('.statuteCard').forEach(card => {
     const number = card.querySelector('.statuteNumber')?.textContent.trim();
     if (number) articles.set(number, card);
   });
 
   // Make references clickable only when the actual article exists on this page.
   const pattern = /第[０-９]+条(?:の[０-９]+)?/g;
-  page.querySelectorAll('.statuteSelectable').forEach(span => {
+    page.querySelectorAll('.statuteSelectable').forEach(span => {
     const walker = document.createTreeWalker(span, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
@@ -43,6 +45,8 @@
     });
   });
 
+  }
+  refreshReferences();
   const panel = document.createElement('section');
   panel.id = 'statutesSplitPanel';
   panel.className = 'statutesSplitPanel';
@@ -191,6 +195,7 @@
     else newTab(link.dataset.statuteRef, link);
   });
 
+  window.StatutesReferences = { refresh: refreshReferences, close: closeReferences };
   close.addEventListener('click', closeReferences);
   tabBar.addEventListener('keydown', event => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || !tabs.length) return;
