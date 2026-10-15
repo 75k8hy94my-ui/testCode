@@ -52,5 +52,25 @@
 <script src="profile-menu.js?v=20261011-nongame-audit"></script>
 <script src="app-global-shell.js?v=20261015-statutes"></script>
 <script src="mobile-bottom-nav.js?v=20261015-statutes"></script>
+<script>
+(async () => {
+  const show = () => document.documentElement.classList.remove('auth-pending');
+  if (window.TestCodeGuest?.isActive() === true) { show(); return; }
+  const vault = window.MangaVault;
+  const config = window.MANGA_READER_SUPABASE || {};
+  const session = vault?.loadSession?.();
+  if (!session?.refresh_token || !config.url || !config.publishableKey) {
+    location.replace('index.html'); return;
+  }
+  if (!vault.loadActive?.()) { location.replace('sync.html'); return; }
+  try {
+    await vault.ensureSession();
+    show();
+  } catch (error) {
+    if (vault.isSessionAuthError?.(error)) vault.saveSession(null);
+    location.replace('index.html');
+  }
+})();
+</script>
 </body>
 </html>
