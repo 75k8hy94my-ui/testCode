@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja" class="auth-pending">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive,nosnippet">
+<title>逐条集</title>
+<link rel="stylesheet" href="app-global-shell.css?v=20260924-theme-unified">
+<link rel="stylesheet" href="home-profile-shell.css?v=20261012-video-width-stable">
+<link rel="stylesheet" href="mobile-bottom-nav.css?v=20260925-instagram-drag-lock">
+<style>
+.statutesMain{max-width:900px;margin:0 auto;padding:20px 18px 110px;color:var(--text,#e5e7eb)}
+.statutesNote{font-size:12px;color:var(--muted,#94a3b8);margin:0 0 16px}
+.statutesGroup{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted,#94a3b8)}
+.statuteCard{border:1px solid var(--border,rgba(150,160,175,.25));border-radius:10px;margin-bottom:8px;overflow:hidden;background:var(--surface,rgba(130,140,160,.06))}
+.statuteCard summary{display:flex;align-items:baseline;gap:12px;padding:11px 14px;cursor:pointer;list-style:none}
+.statuteCard summary::-webkit-details-marker{display:none}
+.statuteCard summary::after{content:'⌄';margin-left:auto;color:var(--muted,#94a3b8)}
+.statuteCard[open] summary::after{content:'⌃'}
+.statuteNumber{font-weight:700;white-space:nowrap;font-size:14px}
+.statuteHeading{font-size:13px;color:var(--muted,#94a3b8)}
+.statuteText{margin:0;padding:0 14px 13px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.75}
+.statutesEmpty{font-size:13px;color:var(--muted,#94a3b8);padding:12px 0}
+@media(max-width:620px){.statutesMain{padding:13px 12px 110px}.statuteCard summary{padding:10px 12px}.statuteText{padding:0 12px 12px}}
+</style>
+</head>
+<body>
+<div class="homeShell" id="homeApp">
+<header class="homeHeader" data-profile-only-header="1"><div><span class="eyebrow">LAW</span><h1 id="shellTitle">逐条集</h1></div><button class="headerProfileButton" type="button" data-profile-menu-trigger aria-label="アカウント" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg></button></header>
+<main class="statutesMain" id="routeContent">
+<p class="statutesNote">条文のコンパクト表示（表示確認用）。条文の登録・編集・同期機能は未実装です。</p>
+<h2 class="statutesGroup">民法／総則</h2>
+<details class="statuteCard" open>
+<summary><span class="statuteNumber">第１条</span><span class="statuteHeading">基本原則</span></summary>
+<p class="statuteText">私権は、公共の福祉に適合しなければならない。
+２　権利の行使及び義務の履行は、信義に従い誠実に行わなければならない。
+３　権利の濫用は、これを許さない。</p>
+</details>
+<details class="statuteCard">
+<summary><span class="statuteNumber">第２条</span><span class="statuteHeading">解釈の基準</span></summary>
+<p class="statuteText">この法律は、個人の尊厳と両性の本質的平等を旨として、解釈しなければならない。</p>
+</details>
+<p class="statutesEmpty">※上記２条は画面確認用の固定サンプルです。法令の保存形式・貼付け操作は今後の設計対象です。</p>
+</main>
+</div>
+<script src="guest-mode.js?v=20261009-guest"></script>
+<script src="context-search.js?v=20261012-context-search"></script>
+<script src="app-desktop-rail.js?v=20261015-statutes"></script>
+<script src="supabase-config.js"></script>
+<script src="vault-session.js?v=20261013-safe-leave"></script>
+<script src="profile-avatar.js?v=20261008-profile-avatar"></script>
+<script src="profile-menu.js?v=20261011-nongame-audit"></script>
+<script src="app-global-shell.js?v=20261015-statutes"></script>
+<script src="mobile-bottom-nav.js?v=20261015-statutes"></script>
+</body>
+</html>
