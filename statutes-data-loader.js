@@ -105,7 +105,7 @@
   // Combine runs of deleted whole-number articles; leave single deletions alone.
   function isDeleted(row) { return String(row[2] || '').trim() === '削除'; }
   function wholeArticleNumber(row) {
-    const match=String(row[0]).normalize('NFKC').match(/^(\\d+)条$/);
+    const match=String(row[0]).normalize('NFKC').match(/^([0-9]+)条$/);
     return match ? Number(match[1]) : null;
   }
   function appendGroupedArticles(fragment, rows) {
