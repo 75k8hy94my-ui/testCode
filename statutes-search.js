@@ -38,6 +38,7 @@
   list.className = 'statutesSearchResults';
   region.append(input, count, list);
   header.appendChild(trigger);
+  window.StatutesSearch = { open, close, toggle: () => region.hidden ? open() : close() };
   document.body.appendChild(region);
   let timer = null;
   let version = 0;
@@ -70,9 +71,14 @@
     trigger.focus();
   }
   function position() {
-    const rect = trigger.getBoundingClientRect();
-    region.style.top = Math.min(window.innerHeight - 80, rect.bottom + 7) + 'px';
-    region.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
+    if (window.matchMedia('(min-width:900px)').matches) {
+      region.style.top = '76px';
+      region.style.right = 'max(16px, calc((100vw - 560px) / 2))';
+    } else {
+      const rect = trigger.getBoundingClientRect();
+      region.style.top = Math.min(window.innerHeight - 80, rect.bottom + 7) + 'px';
+      region.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
+    }
   }
   trigger.addEventListener('click', () => region.hidden ? open() : close());
   document.addEventListener('keydown', event => {
