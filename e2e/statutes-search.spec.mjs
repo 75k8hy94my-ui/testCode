@@ -20,7 +20,7 @@ test('statutes common header searches article numbers and article text', async (
 });
 
 test('civil general article 972 search opens family law and scrolls to the correct article', async ({ page }) => {
-  await page.route(/supabase\\.co|\\/auth\\/v1\\/|\\/rest\\/v1\\//i, route => route.abort());
+  await page.route(/supabase\.co|\/auth\/v1\/|\/rest\/v1\//i, route => route.abort());
   await page.goto('index.html');
   await page.getByRole('button', { name: 'ログインせずに使う' }).click();
   await page.goto('statutes.html?section=civil-general');
