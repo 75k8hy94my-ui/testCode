@@ -98,3 +98,13 @@ test('mobile search starts hidden and search overlay can overlap with translucen
   await page.locator('#statutesSearchInput').focus();
   await expect(page.locator('#statutesSearchPanel')).toHaveCSS('opacity', '1');
 });
+
+test('consecutive deleted civil articles appear as one range', async ({ page }) => {
+  await page.goto('index.html');
+  await page.getByRole('button', { name: 'ログインせずに使う' }).click();
+  await page.goto('statutes.html?section=civil-general');
+  const deletedRange = page.locator('.statuteDeletedRange').filter({ hasText: '３８条〜' }).first();
+  await expect(deletedRange).toBeVisible();
+  await expect(deletedRange).toContainText('削除');
+  await expect(page.locator('.statuteCard .statuteNumber').filter({ hasText: /^３９条$/ })).toHaveCount(0);
+});
