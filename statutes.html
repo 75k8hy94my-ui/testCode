@@ -161,10 +161,10 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
   }
 }
 
-.statutesSearchPanel{position:fixed;z-index:1600;width:min(420px,calc(100vw - 16px));max-height:min(65dvh,560px);display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--border,rgba(128,128,128,.45));border-radius:10px;background:var(--bg,#fff);color:var(--text,#222);box-shadow:0 12px 35px rgba(0,0,0,.25)}
+.statutesSearchPanel{position:fixed;right:16px;bottom:16px;top:auto;z-index:1600;width:min(420px,calc(100vw - 16px));max-height:min(65dvh,560px);display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--border,rgba(128,128,128,.45));border-radius:10px;background:var(--bg,#fff);color:var(--text,#222);box-shadow:0 12px 35px rgba(0,0,0,.25)}
 .statutesSearchPanel[hidden]{display:none}
 #statutesSearchInput{width:100%;font:inherit;font-size:14px;padding:9px;border:1px solid rgba(128,128,128,.5);border-radius:7px;background:transparent;color:inherit}
-#statutesSearchCount{font-size:12px;opacity:.75}
+@media(max-width:899px){.statutesSearchPanel{bottom:calc(82px + env(safe-area-inset-bottom))}}
 .statutesSearchResults{overflow-y:auto;min-height:0}
 .statutesSearchResult{display:flex;flex-direction:column;gap:3px;box-sizing:border-box;width:100%;padding:10px 8px;border:0;border-bottom:1px solid rgba(128,128,128,.18);background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer}
 .statutesSearchResult:hover,.statutesSearchResult:focus-visible{background:rgba(128,128,128,.14)}
@@ -519,6 +519,6 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
 <script src="statutes-references.js?v=20261015-cross-law-refs-v5"></script>
 <script src="statutes-law-menu.js?v=20261016-cross-section-search"></script>
 <script src="statutes-definitions.js?v=20261016-definition-sync-ui"></script>
-<script src="statutes-search.js?v=20261016-statute-sidebar-search"></script>
+<script src="statutes-search.js?v=20261016-bottom-right-default-open"></script>
 </body>
 </html>
