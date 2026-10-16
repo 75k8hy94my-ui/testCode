@@ -102,6 +102,40 @@
     card.append(title,paragraph);
     return card;
   }
+  // Combine runs of deleted whole-number articles; leave single deletions alone.
+  function isDeleted(row) { return String(row[2] || '').trim() === '削除'; }
+  function wholeArticleNumber(row) {
+    const match=String(row[0]).normalize('NFKC').match(/^(\\d+)条$/);
+    return match ? Number(match[1]) : null;
+  }
+  function appendGroupedArticles(fragment, rows) {
+    for (let i=0;i<rows.length;) {
+      let end=i;
+      if (isDeleted(rows[i]) && wholeArticleNumber(rows[i]) !== null) {
+        while (end+1<rows.length && isDeleted(rows[end+1])
+          && wholeArticleNumber(rows[end+1]) === wholeArticleNumber(rows[end])+1) end++;
+      }
+      if (end>i) {
+        const card=document.createElement('section');
+        card.className='statuteCard statuteDeletedRange';
+        const title=document.createElement('div');
+        title.className='statuteTitle';
+        const number=document.createElement('span');
+        number.className='statuteNumber';
+        number.textContent=rows[i][0]+'〜'+rows[end][0];
+        title.appendChild(number);
+        const caption=document.createElement('span');
+        caption.className='statuteHeading';
+        caption.textContent='削除';
+        title.appendChild(caption);
+        card.appendChild(title);
+        fragment.appendChild(card);
+      } else {
+        fragment.appendChild(buildCard(rows[i]));
+      }
+      i=end+1;
+    }
+  }
   function refresh(section) {
     window.StatutesReferences?.refresh?.();
     window.StatutesDefinitions?.refresh?.(section);
@@ -149,7 +183,7 @@
         preamble.append(header,body);
         fragment.appendChild(preamble);
       }
-      rows.forEach(row=>fragment.appendChild(buildCard(row)));
+      appendGroupedArticles(fragment,rows);
       if (!rows.length) displayMessage('この分類の条文は未登録です。');
       else page.replaceChildren(fragment);
       refresh(section);
