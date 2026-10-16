@@ -35,3 +35,17 @@ test('civil general article 972 search opens family law and scrolls to the corre
   await expect(page.locator('#statutesCurrentSection')).toHaveText('家族法');
   await expect(page.locator('.statutesSearchHit .statuteNumber')).toHaveText('９７２条');
 });
+
+test('desktop statutes search uses the shared sidebar magnifier, not the top bar', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.route(/supabase\.co|\/auth\/v1\/|\/rest\/v1\//i, route => route.abort());
+  await page.goto('index.html');
+  await page.getByRole('button', { name: 'ログインせずに使う' }).click();
+  await page.goto('statutes.html?section=civil-general');
+  await expect(page.locator('#statutesSearchToggle')).toBeHidden();
+  await expect(page.locator('#desktopNavSearch')).toBeVisible();
+  await page.locator('#desktopNavSearch').click();
+  await expect(page.locator('#statutesSearchPanel')).toBeVisible();
+  await page.locator('#statutesSearchInput').fill('９７２');
+  await expect(page.locator('.statutesSearchResult strong')).toContainText('９７２条');
+});
