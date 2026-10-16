@@ -22,7 +22,7 @@
   const region = document.createElement('section');
   region.id = 'statutesSearchPanel';
   region.className = 'statutesSearchPanel';
-  region.hidden = false;
+  region.hidden = window.matchMedia('(max-width:899px)').matches;
   region.setAttribute('aria-label', '逐条集検索');
   const input = document.createElement('input');
   input.type = 'search';
@@ -164,6 +164,6 @@
     timer = setTimeout(search, 80);
   });
   observer.observe(main, { childList: true });
-  trigger.setAttribute('aria-expanded', 'true');
+  trigger.setAttribute('aria-expanded', String(!region.hidden));
   position();
 })();
