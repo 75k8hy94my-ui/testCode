@@ -73,3 +73,14 @@ test('search dock does not overlap statute text and wraps long results on deskto
   await expect(result).toHaveCSS('white-space', 'normal');
   await expect(result).toHaveCSS('overflow-wrap', 'anywhere');
 });
+
+test('Enter navigates to the first statute search result', async ({ page }) => {
+  await page.goto('index.html');
+  await page.getByRole('button', { name: 'ログインせずに使う' }).click();
+  await page.goto('statutes.html?section=civil-general');
+  const input = page.locator('#statutesSearchInput');
+  await input.fill('９７２');
+  await input.press('Enter');
+  await expect(page).toHaveURL(/section=civil-family/);
+  await expect(page.locator('.statutesSearchHit .statuteNumber')).toHaveText('９７２条');
+});
