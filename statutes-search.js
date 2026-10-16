@@ -38,8 +38,21 @@
   document.body.appendChild(region);
   let timer = null;
   let version = 0;
-  let activeSection = '';
-  const indexed = new Map();
+  const corpusCache = new Map();
+  const corpusForSection = section => section.startsWith('civil-') ? 'civil' : section.startsWith('criminal-') ? 'criminal' : null;
+  const sectionForArticle = (law, number) => {
+    const n = Number(String(number).normalize('NFKC').match(/^\d+/)?.[0]);
+    if (law === 'civil') return n <= 174 ? 'civil-general' : n <= 398 ? 'civil-property' : n <= 520 ? 'civil-obligations-general' : n <= 724 ? 'civil-obligations-special' : 'civil-family';
+    if (law === 'criminal') return n <= 72 ? 'criminal-general' : 'criminal-special';
+    return null;
+  };
+  const readCorpus = async law => {
+    if (!corpusCache.has(law)) corpusCache.set(law, fetch('statutes-data/' + law + '.json?v=20261016-article-captions-2', { cache: 'no-cache' }).then(response => {
+      if (!response.ok) throw Error('HTTP ' + response.status);
+      return response.json();
+    }).catch(error => { corpusCache.delete(law); throw error; }));
+    return corpusCache.get(law);
+  };
 
   function open() {
     region.hidden = false;
@@ -70,7 +83,6 @@
 
   function getRows() {
     const section = new URL(location.href).searchParams.get('section') || 'civil-general';
-    if (indexed.has(section)) return indexed.get(section);
     // The dataset is checked into the repository, not fetched from an external API.
     const cards = [...main.querySelectorAll('.statuteCard')];
     return cards.map(card => ({
@@ -85,13 +97,28 @@
     // Keep excerpt legible even when whitespace was normalized for matching.
     return body.slice(0, 100).replace(/\s+/g, ' ').trim() + (body.length > 100 ? '…' : '');
   }
-  function search() {
+  async function search() {
+    const serial = ++version;
     const query = normalize(input.value);
     list.replaceChildren();
     if (!query) { count.textContent = '現在の法令から検索します'; return; }
-    const rows = getRows();
+    let rows = getRows();
     const looksLikeNumber = numberPattern.test(query);
     const targetNumber = normalizedArticle(query);
+    const section = window.StatutesNavigation?.currentSection() || new URL(location.href).searchParams.get('section') || 'civil-general';
+    const law = corpusForSection(section);
+    if (looksLikeNumber && law) {
+      count.textContent = '条文を検索中…';
+      try {
+        const corpus = await readCorpus(law);
+        if (serial !== version || region.hidden) return;
+        rows = corpus.articles.map(row => ({ number: row[0], caption: row[3] || '', body: row[2] || '', section: sectionForArticle(law, row[0]) }));
+      } catch (_) {
+        if (serial !== version) return;
+        count.textContent = '検索データを読み込めませんでした';
+        return;
+      }
+    }
     const hits = rows.filter(row => {
       const num = normalizedArticle(row.number);
       if (looksLikeNumber) {
@@ -111,13 +138,18 @@
       excerpt.textContent = snippet(row.body, query);
       button.append(heading, excerpt);
       button.addEventListener('click', () => {
-        const card = [...main.querySelectorAll('.statuteCard')].find(el => el.querySelector('.statuteNumber')?.textContent?.trim() === row.number);
-        if (!card) return;
-        region.hidden = true;
-        trigger.setAttribute('aria-expanded', 'false');
-        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        card.classList.add('statutesSearchHit');
-        setTimeout(() => card.classList.remove('statutesSearchHit'), 1800);
+        void (async () => {
+          if (row.section && row.section !== (window.StatutesNavigation?.currentSection() || section)) {
+            try { await window.StatutesNavigation.selectSection(row.section); } catch (_) { return; }
+          }
+          const card = [...main.querySelectorAll('.statuteCard')].find(el => el.querySelector('.statuteNumber')?.textContent?.trim() === row.number);
+          if (!card) return;
+          region.hidden = true;
+          trigger.setAttribute('aria-expanded', 'false');
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          card.classList.add('statutesSearchHit');
+          setTimeout(() => card.classList.remove('statutesSearchHit'), 1800);
+        })();
       });
       list.appendChild(button);
     });
