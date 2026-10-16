@@ -84,3 +84,16 @@ test('Enter navigates to the first statute search result', async ({ page }) => {
   await expect(page).toHaveURL(/section=civil-family/);
   await expect(page.locator('.statutesSearchHit .statuteNumber')).toHaveText('９７２条');
 });
+
+test('mobile search starts hidden and search overlay can overlap with translucency', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('index.html');
+  await page.getByRole('button', { name: 'ログインせずに使う' }).click();
+  await page.goto('statutes.html?section=civil-general');
+  await expect(page.locator('#statutesSearchPanel')).toBeHidden();
+  await page.locator('#statutesSearchToggle').click();
+  await expect(page.locator('#statutesSearchPanel')).toBeVisible();
+  await expect(page.locator('#statutesSearchPanel')).toHaveCSS('opacity', '0.57');
+  await page.locator('#statutesSearchInput').focus();
+  await expect(page.locator('#statutesSearchPanel')).toHaveCSS('opacity', '1');
+});
