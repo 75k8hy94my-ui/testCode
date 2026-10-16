@@ -52,3 +52,24 @@ test('desktop statutes search uses the shared sidebar magnifier, not the top bar
   await page.locator('#statutesSearchInput').fill('９７２');
   await expect(page.locator('.statutesSearchResult strong')).toContainText('９７２条');
 });
+
+test('search dock does not overlap statute text and wraps long results on desktop', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.route(/supabase\.co|\/auth\/v1\/|\/rest\/v1\//i, route => route.abort());
+  await page.goto('index.html');
+  await page.getByRole('button', { name: 'ログインせずに使う' }).click();
+  await page.goto('statutes.html?section=civil-general');
+  const dock = page.locator('#statutesSearchPanel');
+  await expect(dock).toBeVisible();
+  await expect.poll(async () => {
+    const a = await page.locator('#routeContent').boundingBox();
+    const b = await dock.boundingBox();
+    return a && b ? a.x + a.width <= b.x : false;
+  }).toBe(true);
+  await expect.poll(async () => (await dock.boundingBox()).width).toBeLessThan(250);
+  await page.locator('#statutesSearchInput').fill('法律行為');
+  await expect(page.locator('.statutesSearchResult').first()).toBeVisible();
+  const result = page.locator('.statutesSearchResult span').first();
+  await expect(result).toHaveCSS('white-space', 'normal');
+  await expect(result).toHaveCSS('overflow-wrap', 'anywhere');
+});
