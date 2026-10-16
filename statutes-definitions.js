@@ -86,6 +86,48 @@
   cardsButton.textContent = '定義カード';
   editButton.after(cardsButton);
 
+  const syncButton = document.createElement('button');
+  syncButton.type = 'button';
+  syncButton.id = 'statutesSyncButton';
+  syncButton.className = 'statutesEditToggle';
+  syncButton.textContent = '同期';
+  syncButton.setAttribute('aria-label', '逐条集を同期');
+  const syncStatus = document.createElement('span');
+  syncStatus.id = 'statutesSyncStatus';
+  syncStatus.setAttribute('role', 'status');
+  syncStatus.style.cssText = 'font-size:12px;opacity:.8;max-width:200px';
+  cardsButton.after(syncButton, syncStatus);
+  const guestMode = window.TestCodeGuest?.isActive() === true;
+  function setSyncStatus(text) { syncStatus.textContent = text; }
+  if (guestMode) {
+    syncButton.disabled = true;
+    setSyncStatus('ゲスト：端末保存のみ');
+  } else setSyncStatus(window.MangaVault?.hasPendingLocalChanges?.() ? 'クラウド同期待ち' : 'クラウド同期可能');
+  async function performSync() {
+    if (guestMode || syncButton.disabled) return;
+    syncButton.disabled = true;
+    setSyncStatus('同期中…');
+    try {
+      const result = await window.MangaVault.syncLatest();
+      if (result?.state === 'success') {
+        setSyncStatus('同期完了');
+      } else {
+        setSyncStatus('クラウド同期待ち' + (result?.reason ? '（' + result.reason + '）' : ''));
+      }
+    } catch (error) {
+      setSyncStatus('同期失敗・端末保存済み');
+    } finally {
+      syncButton.disabled = false;
+    }
+  }
+  syncButton.addEventListener('click', performSync);
+  document.addEventListener('manga-vault-sync-state', event => {
+    if (guestMode) return;
+    const state = event.detail?.state;
+    if (state === 'success') setSyncStatus('同期完了');
+    else if (state === 'error' || state === 'failed') setSyncStatus('同期失敗・端末保存済み');
+  });
+
   const side = document.createElement('aside');
   side.id = 'statutesDefinitionSide';
   side.className = 'statutesDefinitionSide';
@@ -284,6 +326,7 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
       definitions = normalized;
       redraw();
+      if (!guestMode) setSyncStatus('クラウド同期待ち');
       if (!window.TestCodeGuest?.isActive()) {
         const vault = window.MangaVault;
         try {
@@ -443,9 +486,7 @@
     if (event.key === STORAGE_KEY) reloadAfterVaultApply();
   });
   if (!window.TestCodeGuest?.isActive() && window.MangaVault?.loadActive?.()) {
-    Promise.resolve(window.MangaVault.syncLatest()).catch(() => {
-      // Keep the local copy if offline, VPN-gated or the Vault is unavailable.
-    });
+    void performSync();
   }
   window.StatutesDefinitions = {
     refresh(section) {
