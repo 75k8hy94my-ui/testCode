@@ -284,6 +284,20 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
       definitions = normalized;
       redraw();
+      if (!window.TestCodeGuest?.isActive()) {
+        const vault = window.MangaVault;
+        try {
+          if (vault?.markLocalChangesPending?.()) {
+            Promise.resolve(vault.saveLocalChanges()).catch(error => {
+              status.textContent = '端末に保存済み・クラウド同期待ち：' + (error?.message || '接続を確認してください');
+            });
+          } else {
+            status.textContent = '端末に保存済み・クラウド同期待ち';
+          }
+        } catch (error) {
+          status.textContent = '端末に保存済み・クラウド同期待ち';
+        }
+      }
       return true;
     } catch (_) {
       status.textContent = '保存できませんでした';
@@ -417,6 +431,22 @@
     closePopup();
     closeSide();
   });
+  // Other tabs and encrypted Vault downloads may replace the local corpus.
+  function reloadAfterVaultApply() {
+    definitions = loadDefinitions();
+    indexEditableText();
+    redraw();
+    if (!side.inert) closeSide();
+  }
+  document.addEventListener('manga-vault-payload-applied', reloadAfterVaultApply);
+  window.addEventListener('storage', event => {
+    if (event.key === STORAGE_KEY) reloadAfterVaultApply();
+  });
+  if (!window.TestCodeGuest?.isActive() && window.MangaVault?.loadActive?.()) {
+    Promise.resolve(window.MangaVault.syncLatest()).catch(() => {
+      // Keep the local copy if offline, VPN-gated or the Vault is unavailable.
+    });
+  }
   window.StatutesDefinitions = {
     refresh(section) {
       subjectId = section || 'civil-general';
