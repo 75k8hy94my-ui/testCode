@@ -123,8 +123,8 @@
     currentRoot = root.id;
     currentCategory = next;
     currentSectionLabel.textContent = child?.label || root.label;
-    if (window.StatutesData) void window.StatutesData.load(next);
-    else articleCards.forEach(card => { card.hidden = next !== 'civil-general'; });
+    const loading = window.StatutesData ? window.StatutesData.load(next) : Promise.resolve();
+    if (!window.StatutesData) articleCards.forEach(card => { card.hidden = next !== 'civil-general'; });
     roots.forEach((button, rootId) => {
       if (rootId === currentRoot) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
@@ -138,6 +138,7 @@
       });
       positionDropdown();
     }
+    return loading;
   }
 
   function selectCategory(root, child = null) {
@@ -216,6 +217,19 @@
     roots.set(root.id, button);
     menuBar.appendChild(button);
   });
+
+  window.StatutesNavigation = {
+    selectSection(id) {
+      if (!categories.has(id)) return Promise.reject(new Error('Unknown statute section'));
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('section') !== id) {
+        url.searchParams.set('section', id);
+        window.history.pushState({ statuteSection: id }, '', url);
+      }
+      return renderCategory(id);
+    },
+    currentSection() { return currentCategory; }
+  };
 
   brand.replaceChildren(menuBar);
   brand.after(currentSectionLabel);
