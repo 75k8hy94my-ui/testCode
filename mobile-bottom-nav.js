@@ -37,7 +37,7 @@
     if (name === 'manga.html') return 'manga';
     if (name === 'images.html') return 'images';
     if (name === 'add.html') return 'add';
-    if (name === 'statutes.html') return '';
+    if (name === 'statutes.html' || name === 'definition-cards.html') return '';
     if (name === 'video.html' || name === 'video-player.html' || name === 'video-edit.html') return 'video';
     return 'home';
   }
@@ -666,7 +666,7 @@
       return;
     }
     const name = location.pathname.split('/').pop() || 'home.html';
-    if (['home.html','profile.html','manga.html','images.html','video.html','video-player.html','video-edit.html','add.html','statutes.html'].includes(name)) ensureSpaNav();
+    if (['home.html','profile.html','manga.html','images.html','video.html','video-player.html','video-edit.html','add.html','statutes.html','definition-cards.html'].includes(name)) ensureSpaNav();
   }
 
   function scheduleAttach() {

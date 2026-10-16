@@ -377,3 +377,7 @@ html[data-theme="dark"] .iosSwitch input:checked + .iosSwitchTrack{background:#3
 .videoMarkerPeriodControls input{width:100%;min-width:0;max-width:none;background:#fff;color:#111;border:1px solid #aaa;border-radius:5px}
 .videoMarkerPeriodControls button{min-height:34px;padding:5px 8px;border:1px solid rgba(255,255,255,.4);border-radius:6px;background:#343942;color:#fff;cursor:pointer}
 .videoMarkerPeriodControls .videoMarkerAdd{grid-column:1/-1;background:#1769aa}
+
+/* On mobile the desktop menu is hidden; provide the definition-card entry on Home. */
+.homeStudyMenu{display:none}
+@media(max-width:899px){.homeStudyMenu{display:flex;justify-content:flex-start;padding:6px 16px 0}.homeStudyMenu a{display:inline-flex;align-items:center;min-height:36px;padding:5px 13px;border:1px solid var(--border,rgba(128,128,128,.35));border-radius:8px;background:var(--surface,rgba(128,128,128,.08));color:inherit;text-decoration:none;font-size:13px;font-weight:600}}
