@@ -934,6 +934,49 @@
   let syncLatestPromise = null;
   let lastAutoSyncAt = 0;
   let autoSyncTimer = null;
+  // Statute annotations are non-media data. Receive only this one field when
+  // VPN is absent; never apply the rest of the decrypted Vault payload.
+  async function syncStatutesLatest() {
+    if (window.TestCodeGuest?.isActive()) return { state: 'deferred', reason: 'guest' };
+    if (!loadActive()) return { state: 'deferred', reason: 'locked' };
+    const session = loadSession();
+    const userId = session && session.user && session.user.id;
+    if (!userId || !session.refresh_token) return { state: 'deferred', reason: 'unauthenticated' };
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return { state: 'deferred', reason: 'offline' };
+    if (hasPendingLocalChanges()) await saveLocalChanges();
+    const key = 'testCode.statutes.definitions.v1';
+    const readLocal = () => {
+      try { const value = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(value) ? value : []; }
+      catch (_) { return []; }
+    };
+    return withVaultSaveLock(userId, () => withSession(async (token, user) => {
+      const record = await fetchRecord(token, user);
+      if (!record) throw new Error('クラウド保管庫が見つかりません。');
+      if (record.legacyRevision) throw new Error('保管庫のrevisionを検証できません。');
+      const active = loadActive();
+      if (!active || stableJson(record.payload?.keyWraps || {}) !== stableJson(active.keyWraps || {}))
+        throw new Error('認証情報が更新されています。保管庫を開き直してください。');
+      const before = readLocal();
+      const known = getMeta(user.id);
+      const baseline = known?.encryptedBaseline ? await decryptBaseline(known.encryptedBaseline, user.id) : null;
+      const remote = await decryptPayload(record.payload);
+      const remoteNotes = Array.isArray(remote.statuteDefinitions) ? remote.statuteDefinitions : [];
+      const previousNotes = baseline && Array.isArray(baseline.statuteDefinitions) ? baseline.statuteDefinitions : [];
+      // Without a trustworthy common baseline, never overwrite divergent
+      // unsynced local annotations. Other Vault fields stay completely untouched.
+      if (!baseline && before.length && !samePayload(before, remoteNotes))
+        return { state: 'deferred', reason: 'local-conflict' };
+      if (baseline && !samePayload(before, previousNotes) && !samePayload(before, remoteNotes))
+        return { state: 'deferred', reason: 'local-conflict' };
+      if (!samePayload(before, remoteNotes)) {
+        if (hasPendingLocalChanges() || !samePayload(before, readLocal()))
+          return { state: 'deferred', reason: 'local-conflict' };
+        localStorage.setItem(key, JSON.stringify(remoteNotes));
+        emitPayloadApplied();
+      }
+      return { state: 'success', applied: !samePayload(before, remoteNotes) };
+    }));
+  }
   function syncLatest() {
     if (syncLatestPromise) return syncLatestPromise;
     if (autoSyncTimer !== null) {
@@ -974,7 +1017,7 @@
     const delay = immediate ? 0 : Math.max(0, 30000 - (Date.now() - lastAutoSyncAt));
     autoSyncTimer = setTimeout(() => {
       autoSyncTimer = null;
-      syncLatest().catch(() => {});
+      (window.document?.documentElement?.classList.contains('statutes-page') ? syncStatutesLatest() : syncLatest()).catch(() => {});
     }, delay);
     if (autoSyncTimer && typeof autoSyncTimer.unref === 'function') autoSyncTimer.unref();
   }
@@ -1173,6 +1216,6 @@
     });
     return retryPendingLocalChanges(result);
   }
-  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, ensureSession, refreshSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, listVaultHistory, getVaultHistorySnapshot, setVaultHistoryProtected, previewVaultHistoryRestore, confirmVaultHistoryRestore, loadPayload, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, syncLatest, resolveConflicts, recordSyncDeletion, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
+  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, ensureSession, refreshSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, listVaultHistory, getVaultHistorySnapshot, setVaultHistoryProtected, previewVaultHistoryRestore, confirmVaultHistoryRestore, loadPayload, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, syncLatest, syncStatutesLatest, resolveConflicts, recordSyncDeletion, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
 })();
 
