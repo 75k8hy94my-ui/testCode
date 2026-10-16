@@ -93,6 +93,7 @@ test('mobile search starts hidden and search overlay can overlap with translucen
   await expect(page.locator('#statutesSearchPanel')).toBeHidden();
   await page.locator('#statutesSearchToggle').click();
   await expect(page.locator('#statutesSearchPanel')).toBeVisible();
+  await page.locator('#statutesSearchInput').evaluate(element => element.blur());
   await expect(page.locator('#statutesSearchPanel')).toHaveCSS('opacity', '0.57');
   await page.locator('#statutesSearchInput').focus();
   await expect(page.locator('#statutesSearchPanel')).toHaveCSS('opacity', '1');
