@@ -7,17 +7,17 @@ test('statutes common header searches article numbers and article text', async (
   await page.goto('statutes.html?section=labor-standards');
   await expect(page.locator('#statutesCurrentSection')).toHaveText('労働基準法');
   await expect(page.locator('.statuteNumber').filter({ hasText: /^３２条$/ })).toHaveCount(1);
-  await page.getByRole('button', { name: '条文を検索' }).click();
+  await expect(page.locator('#statutesSearchPanel')).toBeVisible();
   const input = page.getByRole('searchbox', { name: '条番号または条文の文字列' });
   await input.fill('32条');
-  await expect(page.locator('#statutesSearchCount')).toHaveText('1件見つかりました');
+  await expect(page.locator('.statutesSearchResult')).toHaveCount(1);
   await expect(page.locator('.statutesSearchResult strong')).toHaveText('３２条　労働時間');
   await input.fill('３２条');
   await expect(page.locator('.statutesSearchResult strong')).toHaveText('３２条　労働時間');
   await input.fill('労働時間');
   await expect(page.locator('.statutesSearchResult').first()).toBeVisible();
   await page.locator('.statutesSearchResult').first().click();
-  await expect(page.locator('#statutesSearchPanel')).toBeHidden();
+  await expect(page.locator('#statutesSearchPanel')).toBeVisible();
   await expect(page.locator('.statutesSearchHit')).toHaveCount(1);
 });
 
@@ -27,7 +27,7 @@ test('civil general article 972 search opens family law and scrolls to the corre
   await page.getByRole('button', { name: 'ログインせずに使う' }).click();
   await page.goto('statutes.html?section=civil-general');
   await expect(page.locator('#statutesCurrentSection')).toHaveText('民法総則');
-  await page.getByRole('button', { name: '条文を検索' }).click();
+  await expect(page.locator('#statutesSearchPanel')).toBeVisible();
   await page.getByRole('searchbox', { name: '条番号または条文の文字列' }).fill('９７２');
   await expect(page.locator('.statutesSearchResult strong')).toContainText('９７２条');
   await page.locator('.statutesSearchResult').first().click();
@@ -44,6 +44,9 @@ test('desktop statutes search uses the shared sidebar magnifier, not the top bar
   await page.goto('statutes.html?section=civil-general');
   await expect(page.locator('#statutesSearchToggle')).toBeHidden();
   await expect(page.locator('#desktopNavSearch')).toBeVisible();
+  await expect(page.locator('#statutesSearchPanel')).toBeVisible();
+  await page.locator('#desktopNavSearch').click();
+  await expect(page.locator('#statutesSearchPanel')).toBeHidden();
   await page.locator('#desktopNavSearch').click();
   await expect(page.locator('#statutesSearchPanel')).toBeVisible();
   await page.locator('#statutesSearchInput').fill('９７２');
