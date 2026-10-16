@@ -24,7 +24,7 @@ test('statutes route bootstraps encrypted Vault sync and refreshes annotations',
   assert.match(definitions, /manga-vault-payload-applied/);
   assert.match(definitions, /markLocalChangesPending/);
   assert.match(definitions, /saveLocalChanges/);
-  assert.match(definitions, /syncLatest/);
+  assert.match(definitions, /syncStatutesLatest/);
 });
 
 test('VPN-free statute sync only applies statuteDefinitions and never bypasses media gates', () => {
