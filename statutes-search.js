@@ -22,13 +22,13 @@
   const region = document.createElement('section');
   region.id = 'statutesSearchPanel';
   region.className = 'statutesSearchPanel';
-  region.hidden = true;
+  region.hidden = false;
   region.setAttribute('aria-label', '逐条集検索');
   const input = document.createElement('input');
   input.type = 'search';
   input.id = 'statutesSearchInput';
   input.setAttribute('aria-label', '条番号または条文の文字列');
-  input.placeholder = '条番号・条文の文字列を検索';
+  input.placeholder = '';
   input.autocomplete = 'off';
   const count = document.createElement('span');
   count.id = 'statutesSearchCount';
@@ -36,7 +36,7 @@
   const list = document.createElement('div');
   list.id = 'statutesSearchResults';
   list.className = 'statutesSearchResults';
-  region.append(input, count, list);
+  region.append(input, list);
   header.appendChild(trigger);
   window.StatutesSearch = { open, close, toggle: () => region.hidden ? open() : close() };
   document.body.appendChild(region);
@@ -71,22 +71,12 @@
     trigger.focus();
   }
   function position() {
-    if (window.matchMedia('(min-width:900px)').matches) {
-      region.style.top = '76px';
-      region.style.right = 'max(16px, calc((100vw - 560px) / 2))';
-    } else {
-      const rect = trigger.getBoundingClientRect();
-      region.style.top = Math.min(window.innerHeight - 80, rect.bottom + 7) + 'px';
-      region.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
-    }
+    region.style.top = 'auto';
+    region.style.right = '16px';
+    region.style.bottom = window.matchMedia('(min-width:900px)').matches
+      ? '16px' : 'calc(82px + env(safe-area-inset-bottom))';
   }
   trigger.addEventListener('click', () => region.hidden ? open() : close());
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && !region.hidden) { event.preventDefault(); close(); }
-  });
-  document.addEventListener('pointerdown', event => {
-    if (!region.hidden && !region.contains(event.target) && !trigger.contains(event.target)) close();
-  });
   window.addEventListener('resize', position);
   input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(search, 100); });
 
@@ -110,21 +100,19 @@
     const serial = ++version;
     const query = normalize(input.value);
     list.replaceChildren();
-    if (!query) { count.textContent = '現在の法令から検索します'; return; }
+    if (!query) return;
     let rows = getRows();
     const looksLikeNumber = numberPattern.test(query);
     const targetNumber = normalizedArticle(query);
     const section = window.StatutesNavigation?.currentSection() || new URL(location.href).searchParams.get('section') || 'civil-general';
     const law = corpusForSection(section);
     if (looksLikeNumber && law) {
-      count.textContent = '条文を検索中…';
       try {
         const corpus = await readCorpus(law);
         if (serial !== version || region.hidden) return;
         rows = corpus.articles.map(row => ({ number: row[0], caption: row[3] || '', body: row[2] || '', section: sectionForArticle(law, row[0]) }));
       } catch (_) {
         if (serial !== version) return;
-        count.textContent = '検索データを読み込めませんでした';
         return;
       }
     }
@@ -135,7 +123,6 @@
       }
       return normalize(row.number).includes(query) || normalize(row.caption).includes(query) || normalize(row.body).includes(query);
     });
-    count.textContent = hits.length + '件見つかりました';
     hits.slice(0, 100).forEach(row => {
       const button = document.createElement('button');
       button.type = 'button';
@@ -152,8 +139,6 @@
           }
           const card = [...main.querySelectorAll('.statuteCard')].find(el => el.querySelector('.statuteNumber')?.textContent?.trim() === row.number);
           if (!card) return;
-          region.hidden = true;
-          trigger.setAttribute('aria-expanded', 'false');
           card.scrollIntoView({ behavior: 'smooth', block: 'center' });
           card.classList.add('statutesSearchHit');
           setTimeout(() => card.classList.remove('statutesSearchHit'), 1800);
@@ -161,7 +146,6 @@
       });
       list.appendChild(button);
     });
-    if (hits.length > 100) count.textContent += '（先頭100件を表示）';
   }
   // The existing menu swaps the article content when the user changes laws.
   const observer = new MutationObserver(() => {
@@ -170,4 +154,6 @@
     timer = setTimeout(search, 80);
   });
   observer.observe(main, { childList: true });
+  trigger.setAttribute('aria-expanded', 'true');
+  position();
 })();
