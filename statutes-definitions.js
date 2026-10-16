@@ -8,26 +8,7 @@
   const popup = document.getElementById('statuteSelectionPopup');
   if (!root.classList.contains('statutes-page') || !page || !host || !header || !popup) return;
 
-  const STORAGE_KEY = 'testCode.statutes.definitions.v1';
-  let subjectId = 'civil-general';
-  const lawForSubject = subject => subject.startsWith('civil-') || subject === 'civil' ? '民法' : ({
-    constitution: '日本国憲法', 'criminal-general': '刑法', 'criminal-special': '刑法',
-    'civil-procedure': '民事訴訟法', 'criminal-procedure': '刑事訴訟法', corporations: '会社法',
-    'administrative-litigation': '行政事件訴訟法', 'administrative-procedure': '行政手続法',
-    'administrative-appeal': '行政不服審査法', 'administrative-execution': '行政代執行法',
-    'state-compensation': '国家賠償法', 'local-autonomy': '地方自治法',
-    'information-disclosure': '行政機関情報公開法',
-    'labor-standards': '労働基準法', 'labor-contract': '労働契約法',
-    'labor-unions': '労働組合法', 'labor-relations': '労働関係調整法',
-    'labor-safety': '労働安全衛生法', 'labor-dispatch': '労働者派遣法',
-    'minimum-wage': '最低賃金法', 'equal-employment': '男女雇用機会均等法',
-    'childcare-leave': '育児・介護休業法'
-  }[subject] || '');
-  const enrichDefinition = item => {
-    const law = lawForSubject(item.subject) || item.law || '';
-    const source = law ? law + item.article : (item.source || '');
-    return { ...item, law, source, card: item.card === true };
-  };
+  const { STORAGE_KEY, enrichDefinition, loadDefinitions } = window.StatutesDefinitionStore;
   const originals = new Map();
   const spansByArticle = new Map();
   function indexEditableText() {
@@ -47,25 +28,6 @@
   }
   indexEditableText();
 
-  function loadDefinitions() {
-    try {
-      const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-      if (!Array.isArray(data)) return [];
-      const valid = data.filter(item =>
-        item && typeof item.subject === 'string' &&
-        typeof item.article === 'string' &&
-        Number.isSafeInteger(item.part) && item.part >= 0 &&
-        Number.isSafeInteger(item.start) && item.start >= 0 &&
-        Number.isSafeInteger(item.end) && item.end > item.start &&
-        typeof item.quote === 'string' && typeof item.definition === 'string'
-      ).map(enrichDefinition);
-      // Add the article source and card flag to previously saved definitions.
-      if (JSON.stringify(data) !== JSON.stringify(valid)) {
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(valid)); } catch (_) {}
-      }
-      return valid;
-    } catch (_) { return []; }
-  }
   let definitions = loadDefinitions();
   let editMode = false;
   let pending = null;
@@ -79,13 +41,6 @@
   editButton.textContent = '編集 OFF';
   (currentLabel || header.querySelector('.globalShellBrand'))?.after(editButton);
 
-  const cardsButton = document.createElement('button');
-  cardsButton.type = 'button';
-  cardsButton.id = 'statutesCardsOpen';
-  cardsButton.className = 'statutesEditToggle';
-  cardsButton.textContent = '定義カード';
-  editButton.after(cardsButton);
-
   const syncButton = document.createElement('button');
   syncButton.type = 'button';
   syncButton.id = 'statutesSyncButton';
@@ -96,7 +51,7 @@
   syncStatus.id = 'statutesSyncStatus';
   syncStatus.setAttribute('role', 'status');
   syncStatus.style.cssText = 'font-size:12px;opacity:.8;max-width:200px';
-  cardsButton.after(syncButton, syncStatus);
+  editButton.after(syncButton, syncStatus);
   const guestMode = window.TestCodeGuest?.isActive() === true;
   function setSyncStatus(text) { syncStatus.textContent = text; }
   if (guestMode) {
@@ -133,23 +88,12 @@
   side.className = 'statutesDefinitionSide';
   side.setAttribute('aria-label', '定義');
   side.setAttribute('aria-hidden', 'true');
-  side.innerHTML = '<div class="statutesDefinitionHeader"><strong>定義</strong><button type="button" class="statutesDefinitionClose" aria-label="閉じる">×</button></div><div class="statutesDefinitionBody"><p class="statutesDefinitionQuote"></p><p class="statutesDefinitionSource"></p><div class="statutesDefinitionValue"></div><form class="statutesDefinitionForm" hidden><textarea aria-label="定義の内容" rows="6" required></textarea><label class="statutesDefinitionCardCheck"><input type="checkbox" class="statutesDefinitionCardCheckbox"> 定義カードにする</label><div class="statutesDefinitionActions"><button type="submit">保存</button><button type="button" class="statutesDefinitionDelete" hidden>削除</button><button type="button" class="statutesDefinitionCancel">キャンセル</button></div><p class="statutesDefinitionStatus" role="status"></p></form></div><div class="statutesDefinitionCardView" hidden><div class="statutesFlashcardFront"><strong class="statutesFlashcardTerm"></strong><span class="statutesFlashcardSource"></span></div><div class="statutesFlashcardAnswer" hidden></div><button type="button" class="statutesFlashcardFlip">答えを見る</button><div class="statutesFlashcardNav"><button type="button" class="statutesFlashcardPrev">前へ</button><span class="statutesFlashcardCount"></span><button type="button" class="statutesFlashcardNext">次へ</button></div></div>';
+  side.innerHTML = '<div class="statutesDefinitionHeader"><strong>定義</strong><button type="button" class="statutesDefinitionClose" aria-label="閉じる">×</button></div><div class="statutesDefinitionBody"><p class="statutesDefinitionQuote"></p><p class="statutesDefinitionSource"></p><div class="statutesDefinitionValue"></div><form class="statutesDefinitionForm" hidden><textarea aria-label="定義の内容" rows="6" required></textarea><div class="statutesDefinitionActions"><button type="submit">保存</button><button type="button" class="statutesDefinitionDelete" hidden>削除</button><button type="button" class="statutesDefinitionCancel">キャンセル</button></div><p class="statutesDefinitionStatus" role="status"></p></form></div>';
   host.appendChild(side);
   side.inert = true;
   const headerTitle = side.querySelector('.statutesDefinitionHeader strong');
   const definitionBody = side.querySelector('.statutesDefinitionBody');
   const definitionSource = side.querySelector('.statutesDefinitionSource');
-  const cardView = side.querySelector('.statutesDefinitionCardView');
-  const cardTerm = side.querySelector('.statutesFlashcardTerm');
-  const cardSource = side.querySelector('.statutesFlashcardSource');
-  const cardAnswer = side.querySelector('.statutesFlashcardAnswer');
-  const cardFlip = side.querySelector('.statutesFlashcardFlip');
-  const cardPrev = side.querySelector('.statutesFlashcardPrev');
-  const cardNext = side.querySelector('.statutesFlashcardNext');
-  const cardCount = side.querySelector('.statutesFlashcardCount');
-  const cardCheckbox = side.querySelector('.statutesDefinitionCardCheckbox');
-  let cards = [];
-  let cardIndex = 0;
   const quote = side.querySelector('.statutesDefinitionQuote');
   const value = side.querySelector('.statutesDefinitionValue');
   const form = side.querySelector('.statutesDefinitionForm');
@@ -178,7 +122,7 @@
     }
   }
   function showSide() {
-    side.setAttribute('aria-label', cardView.hidden ? '定義' : '定義カード');
+    side.setAttribute('aria-label', '定義');
     if (!root.classList.contains('statutes-definition-open')) {
       // The main document becomes its own scroll pane when the columns split.
       const lowerReferenceOpen = root.classList.contains('statutes-split-open');
@@ -298,7 +242,6 @@
     entry = enrichDefinition(entry);
     headerTitle.textContent = '定義';
     definitionBody.hidden = false;
-    cardView.hidden = true;
     selectedDefinition = entry.definition ? entry : null;
     pending = {
       subject: subjectId, article: entry.article, part: entry.part,
@@ -306,7 +249,6 @@
     };
     quote.textContent = entry.quote;
     definitionSource.textContent = entry.source;
-    cardCheckbox.checked = entry.card === true;
     form.hidden = !editing;
     value.hidden = editing;
     value.textContent = entry.definition || '';
@@ -356,48 +298,6 @@
     selectedDefinition = entry;
     showPopup(mark.getBoundingClientRect());
   }
-
-  function renderCard() {
-    const entry = cards[cardIndex];
-    const available = Boolean(entry);
-    cardTerm.textContent = available ? entry.quote : 'カードはありません';
-    cardSource.textContent = available ? entry.source : '';
-    cardAnswer.textContent = available ? entry.definition : '';
-    cardAnswer.hidden = true;
-    cardFlip.hidden = !available;
-    cardFlip.textContent = '答えを見る';
-    cardPrev.disabled = !available || cardIndex === 0;
-    cardNext.disabled = !available || cardIndex === cards.length - 1;
-    cardCount.textContent = available ? (cardIndex + 1) + ' / ' + cards.length : '0 / 0';
-  }
-  function openCards() {
-    cards = definitions.filter(entry => entry.card && entry.definition.trim());
-    cardIndex = 0;
-    headerTitle.textContent = '定義カード';
-    definitionBody.hidden = true;
-    cardView.hidden = false;
-    closePopup();
-    window.getSelection()?.removeAllRanges();
-    showSide();
-    renderCard();
-    (cards.length ? cardFlip : closeButton).focus({ preventScroll: true });
-  }
-
-  cardsButton.addEventListener('click', () => {
-    if (root.classList.contains('statutes-definition-open') && !cardView.hidden) closeSide();
-    else openCards();
-  });
-  cardFlip.addEventListener('click', () => {
-    if (!cards.length) return;
-    cardAnswer.hidden = !cardAnswer.hidden;
-    cardFlip.textContent = cardAnswer.hidden ? '答えを見る' : '答えを隠す';
-  });
-  cardPrev.addEventListener('click', () => {
-    if (cardIndex > 0) { cardIndex--; renderCard(); }
-  });
-  cardNext.addEventListener('click', () => {
-    if (cardIndex + 1 < cards.length) { cardIndex++; renderCard(); }
-  });
 
   editButton.addEventListener('click', () => {
     editMode = !editMode;
@@ -449,7 +349,7 @@
     if (!editMode || !pending) return;
     const text = textarea.value.trim();
     if (!text) return;
-    const entry = enrichDefinition({ ...pending, definition: text, card: cardCheckbox.checked });
+    const entry = enrichDefinition({ ...pending, definition: text });
     const id = definitionId(entry);
     const updated = definitions.filter(d => definitionId(d) !== id);
     updated.push(entry);
