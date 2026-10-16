@@ -108,11 +108,11 @@
     syncButton.disabled = true;
     setSyncStatus('同期中…');
     try {
-      const result = await window.MangaVault.syncLatest();
+      const result = await window.MangaVault.syncStatutesLatest();
       if (result?.state === 'success') {
         setSyncStatus('同期完了');
       } else {
-        setSyncStatus('クラウド同期待ち' + (result?.reason ? '（' + result.reason + '）' : ''));
+        setSyncStatus(result?.reason === 'local-conflict' ? '別端末の登録と競合・端末保存済み' : 'クラウド同期待ち' + (result?.reason ? '（' + result.reason + '）' : ''));
       }
     } catch (error) {
       setSyncStatus('同期失敗・端末保存済み');
