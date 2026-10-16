@@ -182,7 +182,16 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
   html.statutes-page:has(#statutesSearchPanel:not([hidden])) #homeApp > #routeContent.statutesMain{box-sizing:border-box;max-width:min(960px,100%)!important}
 }
 @media(max-width:899px){
-  html.statutes-page:has(#statutesSearchPanel:not([hidden])) #homeApp > #routeContent.statutesMain{box-sizing:border-box;padding-bottom:220px!important}
+  html.statutes-page #statutesSearchPanel{max-height:190px}
+  html.statutes-page:has(#statutesSearchPanel:not([hidden])) #homeApp > #routeContent.statutesMain{
+    box-sizing:border-box;
+    height:calc(100dvh - 54px - 82px - env(safe-area-inset-bottom) - 208px)!important;
+    max-height:calc(100dvh - 54px - 82px - env(safe-area-inset-bottom) - 208px)!important;
+    min-height:0!important;
+    overflow-y:auto!important;
+    overscroll-behavior:contain;
+    padding-bottom:12px!important;
+  }
 }
 @media(min-width:900px){#statutesSearchToggle{display:none!important}}
 </style>
