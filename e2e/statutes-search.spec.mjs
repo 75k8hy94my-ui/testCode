@@ -108,3 +108,21 @@ test('consecutive deleted civil articles appear as one range', async ({ page }) 
   await expect(deletedRange).toContainText('削除');
   await expect(page.locator('.statuteCard .statuteNumber').filter({ hasText: /^３９条$/ })).toHaveCount(0);
 });
+
+test('Companies Act article 2 numbered definitions wrap to separate lines', async ({ page }) => {
+  await page.route('**/statutes-data/corporations.json*', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({articles:[
+      ['１条','','この法律は、会社について定める。','趣旨'],
+      ['２条','','この法律において、次の各号に掲げる用語の意義は、次に定めるところによる。　一　会社　株式会社その他をいう。　二　外国会社　外国の法令に準拠する法人をいう。','定義']
+    ]})
+  }));
+  await page.goto('index.html');
+  await page.getByRole('button', { name: 'ログインせずに使う' }).click();
+  await page.goto('statutes.html?section=corporations');
+  const article = page.locator('.statuteCard').filter({ has: page.locator('.statuteNumber', { hasText: /^２条$/ }) });
+  await expect(article.locator('.statuteText')).toContainText('一　会社');
+  await expect(article.locator('.statuteText')).toContainText('二　外国会社');
+  await expect(article.locator('.statuteText')).toContainText(/\n一　会社/);
+  await expect(article.locator('.statuteText')).toContainText(/\n二　外国会社/);
+});
