@@ -84,10 +84,14 @@
     }
     const paragraph=document.createElement('p');
     paragraph.className='statuteText';
-    const lines=String(body || '').split('\n');
+    // Some bundled statutes contain inline item labels separated by fullwidth
+    // spaces instead of newlines (notably Companies Act article 2).
+    // Split only unambiguous numbered item prefixes, preserving the wording.
+    const formatted=String(body || '').replace(/[ 　]+(?=[一二三四五六七八九十]+[ 　]+)/g,'\\n');
+    const lines=formatted.split('\\n');
     lines.forEach((line,index)=>{
       if(index) paragraph.appendChild(document.createTextNode('\n'));
-      const m=line.match(/^([０-９]+)[ 　]+/);
+      const m=line.match(/^([０-９]+|[一二三四五六七八九十]+)[ 　]+/);
       if(m){
         const prefix=document.createElement('span');
         prefix.className='statuteUnselectable';
