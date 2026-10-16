@@ -6,7 +6,10 @@
   if (!header || !main) return;
 
   const normalize = text => String(text || '').normalize('NFKC').toLocaleLowerCase('ja').replace(/[\s　]+/g, '');
-  const normalizedArticle = value => normalize(value).replace(/^第/, '').replace(/条$/, '').replace(/条/, '条');
+  const normalizedArticle = value => {
+    const text = normalize(value).replace(/^第/, '');
+    return /^[0-9]+$/.test(text) ? text + '条' : text;
+  };
   const numberPattern = /^(?:第)?[0-9]+(?:条(?:の[0-9]+)*)?$/;
   const trigger = document.createElement('button');
   trigger.id = 'statutesSearchToggle';
@@ -122,8 +125,7 @@
     const hits = rows.filter(row => {
       const num = normalizedArticle(row.number);
       if (looksLikeNumber) {
-        const requested = targetNumber.endsWith('条') ? targetNumber : targetNumber + '条';
-        return num === requested;
+        return num === targetNumber;
       }
       return normalize(row.number).includes(query) || normalize(row.caption).includes(query) || normalize(row.body).includes(query);
     });
