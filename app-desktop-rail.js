@@ -343,6 +343,7 @@
     let nav = document.getElementById(id);
     if (nav) {
       ensureStyles();
+      nav.querySelector('#desktopProfileButton')?.remove();
       document.documentElement.classList.add('app-desktop-rail-page');
       syncActive(nav);
       return nav;
@@ -352,7 +353,6 @@
     nav.id = id;
     nav.className = 'appDesktopRailSurface';
     nav.setAttribute('aria-label', 'デスクトップナビ');
-    nav.appendChild(makeProfileButton());
     for (const item of ITEMS) nav.appendChild(makeItem(item));
     nav.appendChild(makeSearchButton());
     nav.appendChild(makeVpnDiagnosticsButton());
