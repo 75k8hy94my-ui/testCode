@@ -26,3 +26,13 @@ test('statutes route bootstraps encrypted Vault sync and refreshes annotations',
   assert.match(definitions, /saveLocalChanges/);
   assert.match(definitions, /syncLatest/);
 });
+
+test('VPN-free statute sync only applies statuteDefinitions and never bypasses media gates', () => {
+  const vault = fs.readFileSync(new URL('../vault-session.js', import.meta.url), 'utf8');
+  const scope = vault.slice(vault.indexOf('async function syncStatutesLatest()'), vault.indexOf('function syncLatest()', vault.indexOf('async function syncStatutesLatest()')));
+  assert.match(scope, /remote\.statuteDefinitions/);
+  assert.match(scope, /localStorage\.setItem\(key, JSON\.stringify\(remoteNotes\)\)/);
+  assert.doesNotMatch(scope, /applyToLocalStorage\(remote/);
+  assert.doesNotMatch(scope, /canReceiveVaultPayload\(\)/);
+  assert.match(definitions, /await window\.MangaVault\.syncStatutesLatest\(\)/);
+});
