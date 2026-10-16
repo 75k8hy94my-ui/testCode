@@ -19,50 +19,23 @@ test('home dashboard exposes manga, video and statutes shortcut cards', () => {
   assert.equal('subtitle' in dashboard.CARD_CATALOG.statutes, false);
 });
 
-test('legacy bookshelf layout migrates to manga, video, and statutes shortcut', () => {
-  assert.deepEqual(dashboard.normalizeLayout(LEGACY_DEFAULT_IDS), ['manga', 'video']);
-  const storage = new Map([['mangaReaderHomeCards', JSON.stringify(LEGACY_DEFAULT_IDS)]]);
-  assert.deepEqual(dashboard.loadLayout(storage), DEFAULT_IDS);
-  assert.deepEqual(JSON.parse(storage.get('mangaReaderHomeCards')), DEFAULT_IDS);
+test('fixed three cards ignore old Vault layouts and disabled editing APIs', () => {
+  for (const old of [['bookshelf'], ['manga'], ['video'], [], ['statutes'], ['video','manga']]) {
+    const storage = new Map([['mangaReaderHomeCards', JSON.stringify(old)]]);
+    assert.deepEqual(dashboard.loadLayout(storage), DEFAULT_IDS);
+    assert.deepEqual(dashboard.normalizeLayout(old), DEFAULT_IDS);
+    assert.deepEqual(dashboard.saveLayout(old, storage), DEFAULT_IDS);
+    assert.deepEqual(dashboard.removeCard(old, 'statutes'), DEFAULT_IDS);
+    assert.deepEqual(dashboard.moveCard(old, 'video', -1), DEFAULT_IDS);
+    assert.deepEqual(dashboard.hiddenCardIds(old), []);
+    assert.deepEqual(JSON.parse(storage.get('mangaReaderHomeCards')), old);
+  }
 });
-
-test('home layout normalization keeps order, removes duplicates, and preserves an intentional empty home', () => {
-  assert.deepEqual(dashboard.normalizeLayout(null), DEFAULT_IDS);
-  assert.deepEqual(dashboard.normalizeLayout(['video', 'manga', 'video']), ['video', 'manga']);
-  assert.deepEqual(dashboard.normalizeLayout([]), []);
-  assert.deepEqual(dashboard.normalizeLayout(['removed-card']), DEFAULT_IDS);
+test('home UI has no remove, reorder, or add controls', () => {
+  const spa = read('home-profile-spa.js');
+  assert.doesNotMatch(spa, /cardEditControls|addCardPanel|emptyEditBtn/);
+  assert.match(spa, /layout=Home.DEFAULT_CARD_IDS.slice\(\)/);
 });
-
-test('home cards can be added, removed, and reordered without mutating source layout', () => {
-  const source = ['manga', 'video'];
-  assert.deepEqual(dashboard.removeCard(source, 'video'), ['manga']);
-  assert.deepEqual(dashboard.addCard(['manga'], 'video'), ['manga', 'video']);
-  assert.deepEqual(dashboard.addCard(['manga', 'video'], 'video'), ['manga', 'video']);
-  assert.deepEqual(dashboard.moveCard(source, 'video', -1), ['video', 'manga']);
-  assert.deepEqual(source, ['manga', 'video']);
-});
-
-test('saved custom home layouts ignore removed cards', () => {
-  const storage = new Map([['mangaReaderHomeCards', JSON.stringify(['manga', 'index-search'])]]);
-  assert.deepEqual(dashboard.loadLayout(storage), ['manga', 'statutes']);
-  assert.deepEqual(dashboard.hiddenCardIds(['manga']), ['video', 'statutes']);
-  assert.deepEqual(dashboard.addCard(['manga'], 'index-search'), ['manga']);
-});
-
-test('home layout storage round-trips and missing storage falls back to defaults', () => {
-  const storage = new Map();
-  assert.deepEqual(dashboard.loadLayout(storage), DEFAULT_IDS);
-  dashboard.saveLayout(['video', 'manga'], storage);
-  assert.deepEqual(dashboard.loadLayout(storage), ['video', 'manga']);
-});
-
-test('new shortcut is added to a saved layout only once and can subsequently be removed', () => {
-  const storage = new Map([['mangaReaderHomeCards', JSON.stringify(['video'])]]);
-  assert.deepEqual(dashboard.loadLayout(storage), ['video', 'statutes']);
-  dashboard.saveLayout(['video'], storage);
-  assert.deepEqual(dashboard.loadLayout(storage), ['video']);
-});
-
 test('home cards render without short description text', () => {
   const spa = read('home-profile-spa.js');
   assert.match(spa, /const marks=\{manga:'漫',video:'動',statutes:'法'\}/);
