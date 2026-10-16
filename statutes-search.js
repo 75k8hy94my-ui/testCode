@@ -42,6 +42,7 @@
   document.body.appendChild(region);
   let timer = null;
   let version = 0;
+  let composing = false;
   const corpusCache = new Map();
   const corpusForSection = section => section.startsWith('civil-') ? 'civil' : section.startsWith('criminal-') ? 'criminal' : null;
   const sectionForArticle = (law, number) => {
@@ -79,6 +80,15 @@
   trigger.addEventListener('click', () => region.hidden ? open() : close());
   window.addEventListener('resize', position);
   input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(search, 100); });
+  input.addEventListener('compositionstart', () => { composing = true; });
+  input.addEventListener('compositionend', () => { composing = false; });
+  input.addEventListener('keydown', async event => {
+    if (event.key !== 'Enter' || event.isComposing || composing || event.keyCode === 229) return;
+    event.preventDefault();
+    clearTimeout(timer);
+    await search();
+    list.querySelector('.statutesSearchResult')?.click();
+  });
 
   function getRows() {
     const section = new URL(location.href).searchParams.get('section') || 'civil-general';
