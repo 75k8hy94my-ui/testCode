@@ -84,18 +84,6 @@ html[data-theme="dark"] .statutesLawDropdown{background:#1b1f29;color:#f1f2f6;bo
 @media(prefers-reduced-motion:reduce){.statutesDefinitionSide{transition:none}}
 
 .statutesDefinitionSource{margin:-7px 0 14px;color:var(--sub,#6b7280);font-size:12px}
-.statutesDefinitionCardCheck{display:flex;align-items:center;gap:7px;margin-top:11px;font-size:13px;cursor:pointer}
-.statutesDefinitionCardCheck input{width:16px;height:16px;margin:0;accent-color:var(--accent,#1769aa)}
-.statutesDefinitionCardView{flex:1 1 auto;min-height:0;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:14px}
-.statutesDefinitionCardView[hidden]{display:none!important}
-.statutesFlashcardFront{display:flex;flex-direction:column;gap:8px;min-height:92px;padding:14px;border:1px solid var(--line,#dfe3e8);border-radius:8px;background:var(--surface,#fff)}
-.statutesFlashcardTerm{font-size:18px;line-height:1.4;overflow-wrap:anywhere}
-.statutesFlashcardSource{color:var(--sub,#6b7280);font-size:12px}
-.statutesFlashcardAnswer{padding:14px;border:1px solid var(--line,#dfe3e8);border-radius:8px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.65}
-.statutesDefinitionCardView button{appearance:none;min-height:34px;padding:6px 12px;border:1px solid var(--line,#dfe3e8);border-radius:5px;background:var(--surface,#fff);color:var(--text,#202124);font:inherit;font-size:13px;cursor:pointer}
-.statutesDefinitionCardView button:disabled{opacity:.4;cursor:default}
-.statutesFlashcardNav{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.statutesFlashcardCount{font-size:12px;color:var(--sub,#6b7280);font-variant-numeric:tabular-nums}
 
 /* A real two-column page layout for definition reading, not an overlay. */
 html.statutes-page.statutes-definition-open body{height:100dvh;overflow:hidden}
@@ -491,7 +479,7 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
 </div>
 <script src="guest-mode.js?v=20261009-guest"></script>
 <script src="context-search.js?v=20261012-context-search"></script>
-<script src="app-desktop-rail.js?v=20261016-remove-duplicate-profile"></script>
+<script src="app-desktop-rail.js?v=20261016-definition-cards"></script>
 <script src="supabase-config.js"></script>
 <script src="media-access-gate.js?v=20261010-vpn-diagnostics"></script>
 <script src="vault-sync-merge.js?v=20261010-vault-sync-audit"></script>
@@ -526,7 +514,8 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
 <script src="statutes-data-loader.js?v=20261016-numbered-item-linebreaks"></script>
 <script src="statutes-references.js?v=20261015-cross-law-refs-v5"></script>
 <script src="statutes-law-menu.js?v=20261016-cross-section-search"></script>
-<script src="statutes-definitions.js?v=20261016-vpn-free-statute-sync"></script>
+<script src="statutes-definition-store.js?v=20261016-definition-cards"></script>
+<script src="statutes-definitions.js?v=20261016-card-required"></script>
 <script src="statutes-search.js?v=20261016-mobile-hidden"></script>
 </body>
 </html>
