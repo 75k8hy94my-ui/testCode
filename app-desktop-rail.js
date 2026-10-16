@@ -12,6 +12,7 @@
     settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.1M12 19.1v2.1M21.2 12h-2.1M4.9 12H2.8M18.5 5.5 17 7M7 17l-1.5 1.5M18.5 18.5 17 17M7 7 5.5 5.5"/></svg>',
     add: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg>',
     search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.7"/><path d="m16 16 5 5"/></svg>',
+    cards: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="13" rx="2"/><path d="M7 10h10M7 13h7M8 21h8"/></svg>',
     vpn: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 19 6v5c0 4.7-2.8 8-7 10-4.2-2-7-5.3-7-10V6z"/><path d="m9 12 2 2 4-4"/></svg>',
   };
 
@@ -20,6 +21,7 @@
     { id: 'desktopNavManga', key: 'manga', label: '漫画', href: 'manga.html' },
     { id: 'desktopNavImages', key: 'images', label: '画像', href: 'images.html' },
     { id: 'desktopNavVideo', key: 'video', label: '動画', href: 'video.html' },
+    { id: 'desktopNavDefinitionCards', key: 'cards', label: '定義カード', href: 'definition-cards.html' },
     { id: 'desktopNavAdd', key: 'add', label: '追加', href: 'add.html' },
     { id: 'desktopNavBackup', key: 'backup', label: 'バックアップ', href: 'sync.html' },
     { id: 'desktopNavSettings', key: 'settings', label: '設定', href: 'profile.html' },
@@ -38,6 +40,7 @@
     if (page === 'add.html') return 'add';
     if (page === 'video.html' || page === 'video-player.html' || page === 'video-edit.html') return 'video';
     if (page === 'sync.html') return 'backup';
+    if (page === 'definition-cards.html') return 'cards';
     if (page === 'profile.html') return 'settings';
     return '';
   }
