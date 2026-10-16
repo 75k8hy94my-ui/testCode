@@ -274,8 +274,8 @@
     button.className = 'appDesktopRailItem';
     button.innerHTML = ICONS.search + '<span>探す</span>';
     button.setAttribute('aria-label', '開いているページを検索');
-    button.addEventListener('click', () => window.TestCodeContextSearch?.toggle?.());
-    button.hidden = !['manga.html', 'video.html'].includes(pageName());
+    button.addEventListener('click', () => { if (pageName() === 'statutes.html') window.StatutesSearch?.toggle?.(); else window.TestCodeContextSearch?.toggle?.(); });
+    button.hidden = !['manga.html', 'video.html', 'statutes.html'].includes(pageName());
     return button;
   }
 
@@ -313,7 +313,7 @@
   function syncActive(nav = document.getElementById('appDesktopRail')) {
     if (!nav) return;
     const search = nav.querySelector('#desktopNavSearch');
-    if (search) search.hidden = !['manga.html', 'video.html'].includes(pageName());
+    if (search) search.hidden = !['manga.html', 'video.html', 'statutes.html'].includes(pageName());
     const active = activeKey();
     for (const item of ITEMS) {
       const element = nav.querySelector('#' + item.id);
