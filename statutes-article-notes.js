@@ -135,6 +135,7 @@
         localStorage.setItem(KEY, JSON.stringify(next));
         history = trimmed;
         notes = next;
+        document.dispatchEvent(new CustomEvent('statutes-last-edit',{detail:{section:key.slice(0,key.lastIndexOf(':')),article:article(card)}}));
         if (!window.TestCodeGuest?.isActive()) {
           const vault = window.MangaVault;
           if (vault?.markLocalChangesPending?.()) Promise.resolve(vault.saveLocalChanges?.()).catch(() => {});
