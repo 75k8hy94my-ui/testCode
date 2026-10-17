@@ -30,7 +30,19 @@
 
   let subjectId = new URLSearchParams(location.search).get('section') || 'civil-general';
   let definitions = loadDefinitions();
+  let editMode = false;
   let pending = null;
+  let inlineDefinition = null;
+  const editSwitch = document.createElement('button');
+  editSwitch.type = 'button';
+  editSwitch.className = 'statutesModeSwitch';
+  editSwitch.setAttribute('role','switch');
+  editSwitch.setAttribute('aria-checked','false');
+  editSwitch.setAttribute('aria-label','編集モード');
+  editSwitch.innerHTML = '<span>編集</span><i aria-hidden="true"></i>';
+  const modeStyle = document.createElement('style');
+  modeStyle.textContent = '.statutesModeSwitch{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:inherit;font:inherit;font-size:12px;cursor:pointer;white-space:nowrap}.statutesModeSwitch i{position:relative;display:block;width:41px;height:25px;border-radius:15px;background:#9da3aa;transition:background .18s}.statutesModeSwitch i:after{content:"";position:absolute;top:2px;left:2px;width:21px;height:21px;background:#fff;border-radius:50%;box-shadow:0 1px 3px #0003;transition:transform .18s}.statutesModeSwitch[aria-checked="true"] i{background:#34c759}.statutesModeSwitch[aria-checked="true"] i:after{transform:translateX(16px)}.statuteInlineDefinition{margin:9px 0 4px;padding:10px 12px;border-left:2px solid var(--accent,#1769aa);background:rgba(128,128,128,.07);white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.65}.statuteInlineDefinition[hidden]{display:none}.statuteInlineDefinition strong{display:block;font-size:12px;margin-bottom:5px}';
+  document.head.append(modeStyle);
   let selectedDefinition = null;
 
 
@@ -38,7 +50,7 @@
   syncStatus.id = 'statutesSyncStatus';
   syncStatus.setAttribute('role', 'status');
   syncStatus.style.cssText = 'font-size:12px;opacity:.8;max-width:200px';
-  (currentLabel || header.querySelector('.globalShellBrand'))?.after(syncStatus);
+  (currentLabel || header.querySelector('.globalShellBrand'))?.after(editSwitch, syncStatus);
   const guestMode = window.TestCodeGuest?.isActive() === true;
   function setSyncStatus(text) { syncStatus.textContent = text; }
   if (guestMode) {
@@ -154,6 +166,13 @@
     pending = null;
     selectedDefinition = null;
   }
+  function closeInline() { if (inlineDefinition) { inlineDefinition.remove(); inlineDefinition = null; } }
+  editSwitch.addEventListener('click', () => {
+    editMode = !editMode;
+    editSwitch.setAttribute('aria-checked', String(editMode));
+    closeInline();
+    closeSide();
+  });
   function closeSide() {
     if (!root.classList.contains('statutes-definition-open')) return;
     const originalScroll = page.scrollTop;
@@ -285,6 +304,24 @@
 
   function openDefinition(entry, editing) {
     if (!entry) return;
+    if (!editMode) {
+      closeSide();
+      const card = Array.from(page.querySelectorAll('.statuteCard')).find(c => c.querySelector('.statuteNumber')?.textContent?.trim() === entry.article);
+      if (!card) return;
+      if (inlineDefinition && inlineDefinition.parentElement === card && inlineDefinition.dataset.definitionId === definitionId(entry)) { closeInline(); return; }
+      closeInline();
+      const panel = document.createElement('div');
+      panel.className = 'statuteInlineDefinition';
+      panel.dataset.definitionId = definitionId(entry);
+      const heading = document.createElement('strong');
+      heading.textContent = entry.quote;
+      const body = document.createElement('div');
+      body.textContent = resolveDefinition(entry);
+      panel.append(heading, body);
+      card.append(panel);
+      inlineDefinition = panel;
+      return;
+    }
     entry = enrichDefinition(entry);
     headerTitle.textContent = '定義';
     definitionBody.hidden = false;
@@ -359,13 +396,13 @@
     if (!entry) return;
     pending = null;
     selectedDefinition = entry;
-    openDefinition(entry, true);
+    openDefinition(entry, editMode);
   }
 
   popup.addEventListener('pointerdown', e => e.preventDefault());
   popup.addEventListener('click', () => {
     const entry = selectedDefinition || pending;
-    if (entry) openDefinition(entry, true);
+    if (entry) openDefinition(entry, editMode);
   });
 
   document.addEventListener('click', event => {
@@ -428,6 +465,7 @@
   // Other tabs and encrypted Vault downloads may replace the local corpus.
   function reloadAfterVaultApply() {
     definitions = loadDefinitions();
+    closeInline();
     indexEditableText();
     redraw();
     if (!side.inert) closeSide();
@@ -445,12 +483,14 @@
     },
     openContextDefinition(data) {
       if (!data) return;
+      if (!editMode) return;
       openDefinition(data.existing || data.candidate, true);
     },
     refresh(section) {
       subjectId = section || 'civil-general';
       closePopup();
       closeSide();
+      closeInline();
       indexEditableText();
       redraw();
     }
