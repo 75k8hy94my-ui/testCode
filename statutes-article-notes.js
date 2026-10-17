@@ -11,8 +11,22 @@
   let activeCard = null;
   let activeSelection = null;
   let selectionBeforeRightClick = null;
+  let lastSelection = null;
+  const rememberSelection = () => {
+    const candidate = window.StatutesDefinitions?.selectionForContext?.();
+    if (candidate) lastSelection = candidate;
+  };
+  document.addEventListener('selectionchange', rememberSelection);
+  page.addEventListener('pointerup', event => { if (event.button === 0) rememberSelection(); });
+  page.addEventListener('keyup', rememberSelection);
   page.addEventListener('pointerdown', event => {
-    if (event.button === 2) selectionBeforeRightClick = window.StatutesDefinitions?.selectionForContext?.() || null;
+    if (event.button === 2) {
+      const card = event.target.closest?.('.statuteCard');
+      const candidate = window.StatutesDefinitions?.selectionForContext?.() || lastSelection;
+      selectionBeforeRightClick = candidate?.candidate?.article === (card?.querySelector('.statuteNumber')?.textContent?.trim()) ? candidate : null;
+    } else if (event.button === 0) {
+      lastSelection = null;
+    }
   }, true);
   const style = document.createElement('style');
   style.textContent = `
@@ -145,7 +159,7 @@
     activeCard = card;
     const currentSelection = window.StatutesDefinitions?.selectionForContext?.() || null;
     const savedSelection = selectionBeforeRightClick;
-    activeSelection = currentSelection || (savedSelection?.candidate?.article === article(card) ? savedSelection : null);
+    activeSelection = (currentSelection?.candidate?.article === article(card) ? currentSelection : null) || (savedSelection?.candidate?.article === article(card) ? savedSelection : null);
     selectionBeforeRightClick = null;
     menu.querySelector('[data-action="note"]').textContent = article(card) + 'のメモ';
     menu.querySelector('[data-action="note"]').hidden = false;
@@ -158,6 +172,7 @@
   menu.querySelector('[data-action="definition"]').addEventListener('click', () => {
     hideMenu();
     window.StatutesDefinitions?.openContextDefinition?.(activeSelection);
+    lastSelection = null;
   });
   document.addEventListener('pointerdown', event => { if (!menu.contains(event.target)) hideMenu(); });
   document.addEventListener('keydown', event => {
