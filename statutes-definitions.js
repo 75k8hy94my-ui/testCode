@@ -391,6 +391,12 @@
     showPopup(data.rect);
   }
 
+  // Native text selection changes do not fire a click event; expose the edit action
+  // after mouse, keyboard and touch selection without requiring a context menu.
+  document.addEventListener('selectionchange', updateSelectionPopup);
+  page.addEventListener('pointerup', updateSelectionPopup);
+  page.addEventListener('keyup', updateSelectionPopup);
+
   function openDefinition(entry, editing) {
     if (!entry) return;
     if (!editMode) {
