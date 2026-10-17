@@ -3,9 +3,11 @@
   const page = document.getElementById('routeContent');
   if (!page || !document.documentElement.classList.contains('statutes-page')) return;
   const KEY = 'testCode.statutes.articleNotes.v1';
+  const HISTORY_KEY = 'testCode.statutes.articleNoteHistory.v1';
   const root = document.documentElement;
   let section = new URLSearchParams(location.search).get('section') || 'civil-general';
   let notes = read();
+  let history = readHistory();
   let activeCard = null;
   let activeSelection = null;
   let selectionBeforeRightClick = null;
@@ -19,6 +21,7 @@
     .statuteNoteMenu button{display:block;width:100%;padding:9px 12px;border:0;border-radius:5px;background:transparent;color:inherit;text-align:left;cursor:pointer}
     .statuteNoteMenu button[hidden]{display:none}
     .statuteNoteMenu button:hover{background:rgba(128,128,128,.17)}
+    .statuteNoteHistory{display:block;width:100%;margin-top:8px;font:inherit;font-size:12px;padding:5px;color:inherit;background:transparent}
     .statuteArticleNote textarea{box-sizing:border-box;width:100%;min-height:110px;padding:8px;resize:vertical;font:inherit;color:inherit;background:transparent;border:1px solid #8888;border-radius:5px}
     .statuteNoteButtons{display:flex;justify-content:flex-end;gap:6px;margin-top:8px;flex-wrap:wrap}
     .statuteNoteButtons button{padding:5px 9px;cursor:pointer}
@@ -34,6 +37,10 @@
   document.body.append(menu);
   function read() {
     try { const value = JSON.parse(localStorage.getItem(KEY) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
+    catch (_) { return {}; }
+  }
+  function readHistory() {
+    try { const value = JSON.parse(localStorage.getItem(HISTORY_KEY) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
     catch (_) { return {}; }
   }
   function article(card) { return card?.querySelector('.statuteNumber')?.textContent?.trim() || ''; }
@@ -77,6 +84,24 @@
     deleteButton.textContent = '削除';
     deleteButton.hidden = !initial;
     actions.append(deleteButton, cancelButton, saveButton);
+    const versions = Object.entries(history).filter(([, v]) => v.key === key)
+      .sort((a,b) => b[1].at-a[1].at).slice(0,50);
+    if (versions.length) {
+      const selector = document.createElement('select');
+      selector.className = 'statuteNoteHistory';
+      selector.setAttribute('aria-label','編集履歴');
+      selector.add(new Option('編集履歴から復元',''));
+      versions.forEach(([id, item]) => {
+        selector.add(new Option(new Date(item.at).toLocaleString('ja-JP') + (item.after ? '　編集' : '　削除'),id));
+      });
+      selector.addEventListener('change', () => {
+        if (!selector.value) return;
+        textarea.value = history[selector.value]?.before || '';
+        selector.value = '';
+        textarea.focus();
+      });
+      form.append(selector);
+    }
     form.append(textarea, actions);
     el.append(form);
     function cancel() {
@@ -88,8 +113,18 @@
       if (value.trim()) next[key] = value.trim();
       else delete next[key];
       try {
+        if ((notes[key] || '') === (next[key] || '')) { cancel(); return; }
+        const id = Date.now() + '-' + Math.random().toString(36).slice(2);
+        const updatedHistory = {...history, [id]: {key, before: notes[key] || '', after: next[key] || '', at: Date.now()}};
+        const trimmed = Object.fromEntries(Object.entries(updatedHistory).sort((a,b) => b[1].at-a[1].at).slice(0,50));
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(trimmed));
         localStorage.setItem(KEY, JSON.stringify(next));
+        history = trimmed;
         notes = next;
+        if (!window.TestCodeGuest?.isActive()) {
+          const vault = window.MangaVault;
+          if (vault?.markLocalChangesPending?.()) Promise.resolve(vault.saveLocalChanges?.()).catch(() => {});
+        }
         if (value.trim()) el.textContent = value.trim();
         else el.remove();
       } catch (_) {
@@ -138,7 +173,7 @@
       render();
     };
   }
-  window.addEventListener('storage', event => { if (event.key === KEY) {notes = read();render();} });
-  document.addEventListener('manga-vault-payload-applied', () => {notes = read();render();});
+  window.addEventListener('storage', event => { if (event.key === KEY || event.key === HISTORY_KEY) {notes = read(); history = readHistory(); render();} });
+  document.addEventListener('manga-vault-payload-applied', () => {notes = read();history = readHistory();render();});
   render();
 })();
