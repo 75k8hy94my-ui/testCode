@@ -366,6 +366,7 @@
         }
       });
       localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+      if (pending?.article) document.dispatchEvent(new CustomEvent('statutes-last-edit',{detail:{section:subjectId,article:pending.article}}));
       definitions = normalized;
       redraw();
       if (!guestMode) setSyncStatus('クラウド同期待ち');
