@@ -25,7 +25,7 @@
     if (!localPresent || !remotePresent) return { recommendation: null, reason: '一方が削除されています。削除が意図的か確認してください。', localOnly: [], remoteOnly: [] };
     const a = conflict.local, b = conflict.remote;
     if (stable(a) === stable(b)) return { recommendation: 'local', reason: '両方の内容が一致しています。', localOnly: [], remoteOnly: [] };
-    if (Array.isArray(a) && Array.isArray(b)) {
+    if (conflict.type !== 'order' && Array.isArray(a) && Array.isArray(b)) {
       const difference = (first, second) => {
         const counts = new Map();
         second.forEach(v => { const key = stable(v); counts.set(key, (counts.get(key) || 0) + 1); });
