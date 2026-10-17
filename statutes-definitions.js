@@ -296,7 +296,7 @@
     if (!entry) return;
     pending = null;
     selectedDefinition = entry;
-    showPopup(mark.getBoundingClientRect());
+    openDefinition(entry, editMode);
   }
 
   editButton.addEventListener('click', () => {
@@ -331,9 +331,6 @@
       else closePopup();
     }
   });
-  document.addEventListener('selectionchange', () => requestAnimationFrame(updateSelectionPopup));
-  document.addEventListener('pointerup', updateSelectionPopup);
-  document.addEventListener('keyup', updateSelectionPopup);
   document.addEventListener('pointerdown', event => {
     if (!popup.contains(event.target) && !side.contains(event.target) &&
         !event.target.closest?.('.statuteDefinitionMark')) {
@@ -389,6 +386,13 @@
     void performSync();
   }
   window.StatutesDefinitions = {
+    selectionForContext() {
+      return selectionCandidate();
+    },
+    openContextDefinition(data) {
+      if (!data || !editMode) return;
+      openDefinition(data.existing || data.candidate, true);
+    },
     refresh(section) {
       subjectId = section || 'civil-general';
       closePopup();
