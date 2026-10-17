@@ -70,4 +70,36 @@
   document.head.append(highlight);
   window.addEventListener('storage',event=>{if(event.key===KEY)update();});
   update();
+
+  // Remember the reading position per law section across reloads.
+  const scrollKey = () => 'testCode.statutes.scroll.v1:' + (window.StatutesNavigation?.currentSection?.() || new URL(location.href).searchParams.get('section') || 'civil-general');
+  const savedSection = scrollKey();
+  let savedOffset = null;
+  try { savedOffset = JSON.parse(sessionStorage.getItem(savedSection) || 'null'); } catch (_) {}
+  let restoringScroll = Number.isFinite(savedOffset) && savedOffset >= 0;
+  const scrollPane = () => document.documentElement.classList.contains('statutes-definition-open') || document.documentElement.classList.contains('statutes-split-open');
+  function recordScroll() {
+    if (restoringScroll || !page.querySelector('.statuteCard')) return;
+    try { sessionStorage.setItem(scrollKey(), JSON.stringify(scrollPane() ? page.scrollTop : window.scrollY)); } catch (_) {}
+  }
+  let scrollFrame = 0;
+  function scheduleRecord() {
+    if (restoringScroll || scrollFrame) return;
+    scrollFrame = requestAnimationFrame(() => { scrollFrame = 0; recordScroll(); });
+  }
+  window.addEventListener('scroll', scheduleRecord, { passive: true });
+  page.addEventListener('scroll', scheduleRecord, { passive: true });
+  window.addEventListener('pagehide', recordScroll);
+  function restoreScroll() {
+    if (!restoringScroll || scrollKey() !== savedSection || !page.querySelector('.statuteCard')) return;
+    if (scrollPane()) page.scrollTop = savedOffset;
+    else window.scrollTo({ top: savedOffset, behavior: 'instant' });
+    restoringScroll = false;
+  }
+  const scrollObserver = new MutationObserver(() => {
+    if (scrollKey() !== savedSection) restoringScroll = false;
+    else if (restoringScroll) requestAnimationFrame(restoreScroll);
+  });
+  scrollObserver.observe(page, { childList: true });
+  if (restoringScroll) requestAnimationFrame(restoreScroll);
 })();
