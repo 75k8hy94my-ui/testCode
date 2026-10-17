@@ -19,12 +19,9 @@
     .statuteNoteMenu button{display:block;width:100%;padding:9px 12px;border:0;border-radius:5px;background:transparent;color:inherit;text-align:left;cursor:pointer}
     .statuteNoteMenu button[hidden]{display:none}
     .statuteNoteMenu button:hover{background:rgba(128,128,128,.17)}
-    .statuteNoteEditor{position:fixed;z-index:12001;inset:0;display:grid;place-items:center;background:#0006}
-    .statuteNoteEditor[hidden]{display:none}
-    .statuteNoteDialog{box-sizing:border-box;width:min(440px,calc(100vw - 32px));padding:16px;border-radius:12px;background:var(--bg,#fff);color:var(--text,#222);box-shadow:0 12px 32px #0004}
-    .statuteNoteDialog textarea{box-sizing:border-box;width:100%;min-height:140px;resize:vertical;padding:10px;font:inherit;background:transparent;color:inherit;border:1px solid #8888;border-radius:6px}
-    .statuteNoteButtons{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
-    .statuteNoteButtons button{padding:7px 14px;cursor:pointer}
+    .statuteArticleNote textarea{box-sizing:border-box;width:100%;min-height:110px;padding:8px;resize:vertical;font:inherit;color:inherit;background:transparent;border:1px solid #8888;border-radius:5px}
+    .statuteNoteButtons{display:flex;justify-content:flex-end;gap:6px;margin-top:8px;flex-wrap:wrap}
+    .statuteNoteButtons button{padding:5px 9px;cursor:pointer}
     .statuteArticleNote{box-sizing:border-box;white-space:pre-wrap;overflow-wrap:anywhere;padding:8px 10px;border-left:2px solid #8b96a8;font-size:13px;line-height:1.65;color:var(--text,#222);opacity:.86}
     @media(min-width:1100px){.statuteCard:has(>.statuteArticleNote){position:relative}.statuteCard>.statuteArticleNote{position:absolute;left:calc(100% + 16px);top:0;width:min(270px,calc((100vw - 100%) / 2 - 26px))}}
     @media(max-width:1099px){.statuteArticleNote{margin-top:8px}}
@@ -35,13 +32,6 @@
   menu.hidden = true;
   menu.innerHTML = '<button type="button" data-action="note">メモを編集</button><button type="button" data-action="definition">定義</button>';
   document.body.append(menu);
-  const overlay = document.createElement('div');
-  overlay.className = 'statuteNoteEditor';
-  overlay.hidden = true;
-  overlay.innerHTML = '<form class="statuteNoteDialog"><strong class="statuteNoteTitle"></strong><textarea aria-label="条文メモ"></textarea><div class="statuteNoteButtons"><button type="button" data-action="delete">削除</button><button type="button" data-action="cancel">キャンセル</button><button type="submit">保存</button></div></form>';
-  document.body.append(overlay);
-  const form = overlay.querySelector('form');
-  const textarea = overlay.querySelector('textarea');
   function read() {
     try { const value = JSON.parse(localStorage.getItem(KEY) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
     catch (_) { return {}; }
@@ -63,23 +53,55 @@
   function edit() {
     if (!activeCard) return;
     hideMenu();
-    overlay.querySelector('.statuteNoteTitle').textContent = article(activeCard);
-    textarea.value = notes[identity(activeCard)] || '';
-    overlay.querySelector('[data-action="delete"]').hidden = !textarea.value;
-    overlay.hidden = false;
-    textarea.focus();
-  }
-  function save(value) {
-    if (!activeCard) return;
-    const next = {...notes};
-    if (value.trim()) next[identity(activeCard)] = value.trim();
-    else delete next[identity(activeCard)];
-    try {
-      localStorage.setItem(KEY, JSON.stringify(next));
-      notes = next;
-      overlay.hidden = true;
-      render();
-    } catch (_) { textarea.setCustomValidity('保存できませんでした'); textarea.reportValidity(); textarea.setCustomValidity(''); }
+    const card = activeCard;
+    const key = identity(card);
+    const initial = notes[key] || '';
+    const el = card.querySelector(':scope > .statuteArticleNote') || document.createElement('aside');
+    el.className = 'statuteArticleNote';
+    el.replaceChildren();
+    if (!el.isConnected) card.append(el);
+    const form = document.createElement('form');
+    const textarea = document.createElement('textarea');
+    textarea.setAttribute('aria-label', article(card) + 'のメモ');
+    textarea.value = initial;
+    const actions = document.createElement('div');
+    actions.className = 'statuteNoteButtons';
+    const saveButton = document.createElement('button');
+    saveButton.type = 'submit';
+    saveButton.textContent = '保存';
+    const cancelButton = document.createElement('button');
+    cancelButton.type = 'button';
+    cancelButton.textContent = 'キャンセル';
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.textContent = '削除';
+    deleteButton.hidden = !initial;
+    actions.append(deleteButton, cancelButton, saveButton);
+    form.append(textarea, actions);
+    el.append(form);
+    function cancel() {
+      if (initial) el.textContent = initial;
+      else el.remove();
+    }
+    function save(value) {
+      const next = {...notes};
+      if (value.trim()) next[key] = value.trim();
+      else delete next[key];
+      try {
+        localStorage.setItem(KEY, JSON.stringify(next));
+        notes = next;
+        if (value.trim()) el.textContent = value.trim();
+        else el.remove();
+      } catch (_) {
+        textarea.setCustomValidity('保存できませんでした');
+        textarea.reportValidity();
+        textarea.setCustomValidity('');
+      }
+    }
+    form.addEventListener('submit', event => { event.preventDefault(); save(textarea.value); });
+    cancelButton.addEventListener('click', cancel);
+    deleteButton.addEventListener('click', () => save(''));
+    textarea.focus({preventScroll:true});
   }
   page.addEventListener('contextmenu', event => {
     const card = event.target.closest?.('.statuteCard');
@@ -104,12 +126,8 @@
   });
   document.addEventListener('pointerdown', event => { if (!menu.contains(event.target)) hideMenu(); });
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') { hideMenu(); overlay.hidden = true; }
+    if (event.key === 'Escape') hideMenu();
   });
-  form.addEventListener('submit', event => { event.preventDefault(); save(textarea.value); });
-  form.querySelector('[data-action="cancel"]').addEventListener('click', () => { overlay.hidden = true; });
-  form.querySelector('[data-action="delete"]').addEventListener('click', () => save(''));
-  overlay.addEventListener('pointerdown', event => { if (event.target === overlay) overlay.hidden = true; });
   const originalRefresh = window.StatutesDefinitions?.refresh;
   if (originalRefresh) {
     window.StatutesDefinitions.refresh = function(nextSection) {
@@ -117,7 +135,6 @@
       originalRefresh.call(this, nextSection);
       activeCard = null;
       hideMenu();
-      overlay.hidden = true;
       render();
     };
   }
