@@ -29,17 +29,9 @@
   indexEditableText();
 
   let definitions = loadDefinitions();
-  let editMode = false;
   let pending = null;
   let selectedDefinition = null;
 
-  const editButton = document.createElement('button');
-  editButton.type = 'button';
-  editButton.id = 'statutesEditToggle';
-  editButton.className = 'statutesEditToggle';
-  editButton.setAttribute('aria-pressed', 'false');
-  editButton.textContent = '編集 OFF';
-  (currentLabel || header.querySelector('.globalShellBrand'))?.after(editButton);
 
   const syncButton = document.createElement('button');
   syncButton.type = 'button';
@@ -51,7 +43,7 @@
   syncStatus.id = 'statutesSyncStatus';
   syncStatus.setAttribute('role', 'status');
   syncStatus.style.cssText = 'font-size:12px;opacity:.8;max-width:200px';
-  editButton.after(syncButton, syncStatus);
+  (currentLabel || header.querySelector('.globalShellBrand'))?.after(syncButton, syncStatus);
   const guestMode = window.TestCodeGuest?.isActive() === true;
   function setSyncStatus(text) { syncStatus.textContent = text; }
   if (guestMode) {
@@ -225,7 +217,7 @@
   }
 
   function updateSelectionPopup() {
-    if (!editMode || !side.inert) return;
+    if (!side.inert) return;
     const data = selectionCandidate();
     if (!data) {
       if (!selectedDefinition) closePopup();
@@ -295,22 +287,13 @@
     if (!entry) return;
     pending = null;
     selectedDefinition = entry;
-    openDefinition(entry, editMode);
+    openDefinition(entry, true);
   }
-
-  editButton.addEventListener('click', () => {
-    editMode = !editMode;
-    editButton.setAttribute('aria-pressed', String(editMode));
-    editButton.textContent = editMode ? '編集 ON' : '編集 OFF';
-    closePopup();
-    closeSide();
-    window.getSelection()?.removeAllRanges();
-  });
 
   popup.addEventListener('pointerdown', e => e.preventDefault());
   popup.addEventListener('click', () => {
     const entry = selectedDefinition || pending;
-    if (entry) openDefinition(entry, editMode);
+    if (entry) openDefinition(entry, true);
   });
 
   document.addEventListener('click', event => {
