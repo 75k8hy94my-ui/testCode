@@ -7,6 +7,7 @@
   let section = new URLSearchParams(location.search).get('section') || 'civil-general';
   let notes = read();
   let activeCard = null;
+  let activeSelection = null;
   const style = document.createElement('style');
   style.textContent = `
     .statuteNoteMenu{position:fixed;z-index:12000;min-width:140px;padding:5px;border:1px solid var(--border, #aaa);border-radius:9px;background:var(--bg,#fff);color:var(--text,#222);box-shadow:0 8px 24px #0003}
@@ -27,7 +28,7 @@
   const menu = document.createElement('div');
   menu.className = 'statuteNoteMenu';
   menu.hidden = true;
-  menu.innerHTML = '<button type="button">メモを編集</button>';
+  menu.innerHTML = '<button type="button" data-action="note">メモを編集</button><button type="button" data-action="definition">定義</button>';
   document.body.append(menu);
   const overlay = document.createElement('div');
   overlay.className = 'statuteNoteEditor';
@@ -80,11 +81,18 @@
     if (!card || !page.contains(card) || !article(card)) return;
     event.preventDefault();
     activeCard = card;
+    activeSelection = window.StatutesDefinitions?.selectionForContext?.() || null;
+    menu.querySelector('[data-action="note"]').hidden = !!activeSelection;
+    menu.querySelector('[data-action="definition"]').hidden = !activeSelection;
     menu.hidden = false;
     menu.style.left = Math.max(8, Math.min(event.clientX, innerWidth - menu.offsetWidth - 8)) + 'px';
     menu.style.top = Math.max(8, Math.min(event.clientY, innerHeight - menu.offsetHeight - 8)) + 'px';
   });
-  menu.querySelector('button').addEventListener('click', edit);
+  menu.querySelector('[data-action="note"]').addEventListener('click', edit);
+  menu.querySelector('[data-action="definition"]').addEventListener('click', () => {
+    hideMenu();
+    window.StatutesDefinitions?.openContextDefinition?.(activeSelection);
+  });
   document.addEventListener('pointerdown', event => { if (!menu.contains(event.target)) hideMenu(); });
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape') { hideMenu(); overlay.hidden = true; }
