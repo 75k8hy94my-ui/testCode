@@ -12,6 +12,28 @@
   css.textContent = '#statutesReturnLastEdit{position:fixed;right:18px;bottom:24px;z-index:1100;max-width:min(250px,calc(100vw - 35px));padding:9px 13px;border:1px solid var(--line,#aaa);border-radius:24px;box-shadow:0 3px 14px #0003;background:var(--bg,#fff);color:var(--text,#222);font:inherit;font-size:12px;cursor:pointer}#statutesReturnLastEdit[hidden]{display:none}@media(max-width:899px){#statutesReturnLastEdit{right:10px;bottom:calc(88px + env(safe-area-inset-bottom))}}';
   document.head.appendChild(css);
   document.body.appendChild(button);
+  // Keep the return shortcut above the floating search results, including
+  // when the search list grows or shrinks. Do not change search opacity.
+  const searchPanel = document.getElementById('statutesSearchPanel');
+  function positionButton() {
+    button.style.bottom = '';
+    if (button.hidden || !searchPanel || searchPanel.hidden) return;
+    const panel = searchPanel.getBoundingClientRect();
+    if (!panel.width || !panel.height) return;
+    // The two right-aligned controls overlap horizontally, so place the
+    // last-edit shortcut just above the actual top of the search panel.
+    const bottom = Math.ceil(window.innerHeight - panel.top + 10);
+    button.style.bottom = bottom + 'px';
+  }
+  if (searchPanel) {
+    const observer = new MutationObserver(() => requestAnimationFrame(positionButton));
+    observer.observe(searchPanel, { attributes:true, attributeFilter:['hidden','style','data-query-active'], childList:true, subtree:true });
+    if (typeof ResizeObserver === 'function') {
+      const resizeObserver = new ResizeObserver(positionButton);
+      resizeObserver.observe(searchPanel);
+    }
+  }
+  window.addEventListener('resize', positionButton);
   function lastEdit() {
     try {const data=JSON.parse(localStorage.getItem(KEY)||'null');return data && typeof data.section==='string' && typeof data.article==='string' ? data : null;} catch (_) {return null;}
   }
@@ -19,6 +41,7 @@
     const last=lastEdit();
     button.hidden=!last;
     if (last) button.textContent='最後の編集：'+last.article+'へ戻る';
+    requestAnimationFrame(positionButton);
   }
   document.addEventListener('statutes-last-edit',event => {
     const data=event.detail;
