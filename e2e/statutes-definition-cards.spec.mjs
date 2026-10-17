@@ -38,3 +38,44 @@ test('mobile Home gives access to a standalone cards page', async ({ page }) => 
   await page.getByRole('link', { name:'逐条集へ' }).click();
   await expect(page).toHaveURL(/statutes\.html$/);
 });
+
+test('the whole article can be saved as the statutory definition of 親族', async ({ page }) => {
+  await enterGuest(page);
+  await page.goto('statutes.html?section=civil-family');
+  const card = page.locator('.statuteCard').filter({ has: page.locator('.statuteNumber', { hasText: '７２５条' }) }).first();
+  await expect(card).toBeVisible();
+  await page.locator('.statutesModeSwitch').click();
+  await page.evaluate(() => {
+    const card = Array.from(document.querySelectorAll('.statuteCard'))
+      .find(c => c.querySelector('.statuteNumber')?.textContent.trim() === '７２５条');
+    const span = card.querySelector('.statuteSelectable');
+    const node = span.firstChild;
+    const start = node.textContent.indexOf('親族');
+    if (start < 0) throw new Error('Could not select 親族 in Article 725');
+    const range = document.createRange();
+    range.setStart(node, start);
+    range.setEnd(node, start + 2);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    document.dispatchEvent(new Event('selectionchange'));
+  });
+  const popup = page.locator('#statuteSelectionPopup');
+  await expect(popup).toHaveAttribute('data-visible', 'true');
+  await popup.click();
+  const form = page.locator('.statutesDefinitionForm');
+  await form.locator('.statutesDefinitionStatuteToggle').check();
+  await expect(form.locator('textarea')).toBeHidden();
+  await expect(form.locator('.statutesDefinitionStatutePreview')).toContainText('三親等内の姻族');
+  await form.getByRole('button', { name: '保存' }).click();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('testCode.statutes.definitions.v1')));
+  expect(saved).toHaveLength(1);
+  expect(saved[0].definitionKind).toBe('statute');
+  expect(saved[0].quote).toBe('親族');
+  expect(saved[0].definition).toContain('三親等内の姻族');
+  await page.goto('definition-cards.html');
+  await expect(page.locator('#definitionCardsTerm')).toHaveText('親族');
+  await expect(page.locator('#definitionCardsSource')).toContainText('条文による定義');
+  await page.locator('#definitionCardsFlip').click();
+  await expect(page.locator('#definitionCardsAnswer')).toContainText('三親等内の姻族');
+});
