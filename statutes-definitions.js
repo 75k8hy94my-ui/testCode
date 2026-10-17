@@ -51,32 +51,97 @@
   const syncStatus = document.createElement('span');
   syncStatus.id = 'statutesSyncStatus';
   syncStatus.setAttribute('role', 'status');
-  syncStatus.style.cssText = 'font-size:12px;opacity:.8;max-width:200px';
-  (currentLabel || header.querySelector('.globalShellBrand'))?.after(editSwitch, syncStatus);
+  syncStatus.style.cssText = 'font-size:12px;max-width:min(48vw,340px);white-space:normal;overflow-wrap:anywhere';
+  const retryButton = document.createElement('button');
+  retryButton.type = 'button';
+  retryButton.textContent = '再試行';
+  retryButton.title = '逐条集のクラウド同期を再試行';
+  retryButton.style.cssText = 'font:inherit;font-size:12px;color:inherit;background:transparent;border:1px solid currentColor;border-radius:5px;padding:3px 5px;cursor:pointer';
+  retryButton.hidden = true;
+  (currentLabel || header.querySelector('.globalShellBrand'))?.after(editSwitch, syncStatus, retryButton);
   const guestMode = window.TestCodeGuest?.isActive() === true;
-  function setSyncStatus(text) { syncStatus.textContent = text; }
+  let syncTimer = null;
+  let syncInFlight = null;
+  let retryCount = 0;
+  function setSyncStatus(text, detail = '') {
+    syncStatus.textContent = text;
+    syncStatus.title = detail || text;
+  }
+  function scheduleRetry() {
+    if (guestMode || syncTimer !== null || document.visibilityState === 'hidden') return;
+    const delay = Math.min(300000, 10000 * Math.pow(2, Math.min(retryCount++, 5)));
+    syncTimer = setTimeout(() => { syncTimer = null; void performSync(); }, delay);
+  }
+  function clearRetry() {
+    if (syncTimer !== null) clearTimeout(syncTimer);
+    syncTimer = null;
+  }
+  function describeFailure(error) {
+    const message = String(error?.message || '原因を取得できませんでした').replace(/\s+/g, ' ').slice(0, 180);
+    const status = Number(error?.status);
+    if (navigator.onLine === false) return 'オフライン';
+    if (status === 401 || status === 403) return '認証エラー：' + message;
+    if (status === 409) return '競合：' + message;
+    return message;
+  }
+  function describeDeferred(reason) {
+    return ({
+      offline:'オフライン', locked:'保管庫がロックされています',
+      unauthenticated:'認証が必要です', 'local-conflict':'端末とクラウドの内容が競合しています（自動上書きしません）',
+      guest:'ゲストモード'
+    })[reason] || (reason || '同期保留');
+  }
   if (guestMode) {
     setSyncStatus('ゲスト：端末保存のみ');
-  } else setSyncStatus(window.MangaVault?.hasPendingLocalChanges?.() ? 'クラウド同期待ち' : 'クラウド同期可能');
-  async function performSync() {
-    if (guestMode) return;
-    setSyncStatus('同期中…');
-    try {
-      const result = await window.MangaVault.syncStatutesLatest();
-      if (result?.state === 'success') {
-        setSyncStatus('同期完了');
-      } else {
-        setSyncStatus(result?.reason === 'local-conflict' ? '別端末の登録と競合・端末保存済み' : 'クラウド同期待ち' + (result?.reason ? '（' + result.reason + '）' : ''));
-      }
-    } catch (error) {
-      setSyncStatus('同期失敗・端末保存済み');
-    }
+  } else {
+    setSyncStatus(window.MangaVault?.hasPendingLocalChanges?.() ? '端末保存済み・クラウド同期待ち' : 'クラウド同期未確認');
   }
+  function performSync() {
+    if (guestMode) return Promise.resolve();
+    if (syncInFlight) return syncInFlight;
+    clearRetry();
+    retryButton.hidden = true;
+    setSyncStatus('クラウド同期中…');
+    syncInFlight = (async () => {
+      try {
+        const result = await window.MangaVault.syncStatutesLatest();
+        if (result?.state === 'success') {
+          retryCount = 0;
+          setSyncStatus('クラウド同期完了');
+        } else {
+          const reason = describeDeferred(result?.reason);
+          const conflict = result?.reason === 'local-conflict';
+          setSyncStatus((conflict ? '同期競合' : 'クラウド同期待ち') + '（' + reason + '）');
+          retryButton.hidden = false;
+          // Conflicts and locked/unauthenticated states require intervention.
+          if (!conflict && !['locked','unauthenticated','guest'].includes(result?.reason)) scheduleRetry();
+        }
+      } catch (error) {
+        const reason = describeFailure(error);
+        setSyncStatus('クラウド同期失敗・端末保存済み（' + reason + '）', reason);
+        retryButton.hidden = false;
+        if (![401,403].includes(Number(error?.status)) && !/認証情報が更新|revisionを検証|保管庫が見つかりません/.test(reason)) scheduleRetry();
+      }
+    })().finally(() => { syncInFlight = null; });
+    return syncInFlight;
+  }
+  retryButton.addEventListener('click', () => { retryCount = 0; void performSync(); });
   document.addEventListener('manga-vault-sync-state', event => {
-    if (guestMode) return;
+    if (guestMode || syncInFlight) return;
     const state = event.detail?.state;
-    if (state === 'success') setSyncStatus('同期完了');
-    else if (state === 'error' || state === 'failed') setSyncStatus('同期失敗・端末保存済み');
+    if (state === 'error' || state === 'failed') {
+      const reason = String(event.detail?.message || '原因不明').slice(0, 180);
+      setSyncStatus('クラウド同期失敗・端末保存済み（' + reason + '）', reason);
+      retryButton.hidden = false;
+      scheduleRetry();
+    }
+  });
+  window.addEventListener('online', () => { if (!guestMode) {retryCount = 0; void performSync();} });
+  document.addEventListener('visibilitychange', () => {
+    if (!guestMode && document.visibilityState === 'visible' && !syncInFlight) {
+      retryCount = 0;
+      void performSync();
+    } else if (document.visibilityState === 'hidden') clearRetry();
   });
 
   const side = document.createElement('aside');
