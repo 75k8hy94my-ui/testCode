@@ -8,7 +8,7 @@
   const popup = document.getElementById('statuteSelectionPopup');
   if (!root.classList.contains('statutes-page') || !page || !host || !header || !popup) return;
 
-  const { STORAGE_KEY, enrichDefinition, loadDefinitions } = window.StatutesDefinitionStore;
+  const { STORAGE_KEY, enrichDefinition, definitionFromArticle, loadDefinitions } = window.StatutesDefinitionStore;
   const originals = new Map();
   const spansByArticle = new Map();
   function indexEditableText() {
@@ -149,7 +149,7 @@
   side.className = 'statutesDefinitionSide';
   side.setAttribute('aria-label', '定義');
   side.setAttribute('aria-hidden', 'true');
-  side.innerHTML = '<div class="statutesDefinitionHeader"><strong>定義</strong><button type="button" class="statutesDefinitionClose" aria-label="閉じる">×</button></div><div class="statutesDefinitionBody"><p class="statutesDefinitionQuote"></p><p class="statutesDefinitionSource"></p><div class="statutesDefinitionValue"></div><form class="statutesDefinitionForm" hidden><textarea aria-label="定義の内容" rows="6" required></textarea><div class="statutesDefinitionActions"><button type="submit">保存</button><button type="button" class="statutesDefinitionDelete" hidden>削除</button><button type="button" class="statutesDefinitionCancel">キャンセル</button><button type="button" class="statutesDefinitionSyncToggle">同期ブロック</button></div><div class="statutesDefinitionSyncPicker" hidden><input type="search" aria-label="定義を検索" placeholder="定義を検索"><div class="statutesDefinitionSyncResults"></div></div><p class="statutesDefinitionStatus" role="status"></p></form></div>';
+  side.innerHTML = '<div class="statutesDefinitionHeader"><strong>定義</strong><button type="button" class="statutesDefinitionClose" aria-label="閉じる">×</button></div><div class="statutesDefinitionBody"><p class="statutesDefinitionQuote"></p><p class="statutesDefinitionSource"></p><div class="statutesDefinitionValue"></div><form class="statutesDefinitionForm" hidden><label class="statutesDefinitionStatuteMode"><input class="statutesDefinitionStatuteToggle" type="checkbox">条文から明らか（本文を定義に使う）</label><p class="statutesDefinitionStatutePreview" hidden></p><textarea aria-label="定義の内容" rows="6" required></textarea><div class="statutesDefinitionActions"><button type="submit">保存</button><button type="button" class="statutesDefinitionDelete" hidden>削除</button><button type="button" class="statutesDefinitionCancel">キャンセル</button><button type="button" class="statutesDefinitionSyncToggle">同期ブロック</button></div><div class="statutesDefinitionSyncPicker" hidden><input type="search" aria-label="定義を検索" placeholder="定義を検索"><div class="statutesDefinitionSyncResults"></div></div><p class="statutesDefinitionStatus" role="status"></p></form></div>';
   host.appendChild(side);
   side.inert = true;
   const headerTitle = side.querySelector('.statutesDefinitionHeader strong');
@@ -159,6 +159,8 @@
   const value = side.querySelector('.statutesDefinitionValue');
   const form = side.querySelector('.statutesDefinitionForm');
   const textarea = form.querySelector('textarea');
+  const statutoryToggle = form.querySelector('.statutesDefinitionStatuteToggle');
+  const statutoryPreview = form.querySelector('.statutesDefinitionStatutePreview');
   const status = form.querySelector('.statutesDefinitionStatus');
   const deleteButton = form.querySelector('.statutesDefinitionDelete');
   const closeButton = side.querySelector('.statutesDefinitionClose');
@@ -168,6 +170,7 @@
   const syncResults = syncPicker.querySelector('.statutesDefinitionSyncResults');
   const syncStyle = document.createElement('style');
   syncStyle.textContent = '.statutesDefinitionSyncPicker{margin-top:12px}.statutesDefinitionSyncPicker[hidden]{display:none}.statutesDefinitionSyncPicker input{box-sizing:border-box;width:100%;padding:8px;border:1px solid #8888;border-radius:6px;background:transparent;color:inherit;font:inherit}.statutesDefinitionSyncResults{max-height:35vh;overflow:auto;margin-top:8px}.statutesDefinitionSyncResults button{display:block;box-sizing:border-box;width:100%;padding:8px;text-align:left;border:0;border-bottom:1px solid #8884;background:transparent;color:inherit;cursor:pointer}.statutesDefinitionSyncResults button:hover{background:#8882}.statutesDefinitionSyncResults small{display:block;opacity:.75;white-space:normal;overflow-wrap:anywhere}';
+  syncStyle.textContent += '.statutesDefinitionStatuteMode{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;cursor:pointer}.statutesDefinitionStatuteMode input{width:16px;height:16px;margin:0;accent-color:var(--accent,#1769aa)}.statutesDefinitionStatutePreview{white-space:pre-wrap;overflow-wrap:anywhere;padding:10px 12px;line-height:1.65;font-size:13px;background:rgba(128,128,128,.08);border-radius:6px}.statutesDefinitionStatutePreview[hidden],.statutesDefinitionForm textarea[hidden]{display:none!important}';
   document.head.appendChild(syncStyle);
   function resolveDefinition(entry, visited = new Set()) {
     const id = definitionId(entry);
@@ -227,6 +230,21 @@
     if (!syncPicker.hidden) {syncSearch.value = '';renderSyncCandidates();syncSearch.focus();}
   });
   syncSearch.addEventListener('input',renderSyncCandidates);
+
+  function articleDefinitionText(entry) {
+    if (!entry || entry.subject !== subjectId) return '';
+    const card = Array.from(page.querySelectorAll('.statuteCard'))
+      .find(c => c.querySelector('.statuteNumber')?.textContent?.trim() === entry.article);
+    return card?.querySelector('.statuteText')?.textContent?.trim() || '';
+  }
+  function updateStatutoryMode() {
+    const usesArticle = statutoryToggle.checked;
+    textarea.hidden = usesArticle;
+    textarea.required = !usesArticle;
+    statutoryPreview.hidden = !usesArticle;
+    if (usesArticle) statutoryPreview.textContent = articleDefinitionText(pending) || 'この条文の本文を取得できません。';
+  }
+  statutoryToggle.addEventListener('change', updateStatutoryMode);
 
   function closePopup() {
     popup.dataset.visible = 'false';
@@ -385,7 +403,7 @@
       panel.className = 'statuteInlineDefinition';
       panel.dataset.definitionId = definitionId(entry);
       const heading = document.createElement('strong');
-      heading.textContent = entry.quote;
+      heading.textContent = entry.quote + (entry.definitionKind === 'statute' ? '（条文による定義）' : '');
       const body = document.createElement('div');
       body.textContent = resolveDefinition(entry);
       panel.append(heading, body);
@@ -402,11 +420,13 @@
       start: entry.start, end: entry.end, quote: entry.quote
     };
     quote.textContent = entry.quote;
-    definitionSource.textContent = entry.source;
+    definitionSource.textContent = entry.source + (entry.definitionKind === 'statute' ? ' ・ 条文による定義' : '');
     form.hidden = !editing;
     value.hidden = editing;
     value.textContent = resolveDefinition(entry);
     textarea.value = resolveDefinition(entry);
+    statutoryToggle.checked = entry.definitionKind === 'statute';
+    updateStatutoryMode();
     syncPicker.hidden = true;
     syncToggle.hidden = !editing;
     deleteButton.hidden = !entry.definition;
@@ -414,7 +434,7 @@
     popup.dataset.visible = 'false';
     window.getSelection()?.removeAllRanges();
     showSide();
-    if (editing) textarea.focus({ preventScroll: true });
+    if (editing) (statutoryToggle.checked ? statutoryToggle : textarea).focus({ preventScroll: true });
     else closeButton.focus({ preventScroll: true });
   }
 
@@ -507,9 +527,11 @@
   form.addEventListener('submit', event => {
     event.preventDefault();
     if (!pending) return;
-    const text = textarea.value.trim();
-    if (!text) return;
-    const entry = enrichDefinition({ ...pending, definition: text });
+    const text = statutoryToggle.checked ? articleDefinitionText(pending) : textarea.value.trim();
+    if (!text) { status.textContent = '条文本文または定義文を取得できませんでした'; return; }
+    const entry = statutoryToggle.checked
+      ? definitionFromArticle(pending, text)
+      : enrichDefinition({ ...pending, definition: text });
     const id = definitionId(entry);
     const updated = definitions.filter(d => definitionId(d) !== id);
     updated.push(entry);
