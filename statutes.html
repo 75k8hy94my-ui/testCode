@@ -150,6 +150,26 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
 }
 
 
+/* WebKit may resolve the selection callout from ancestor or inline child nodes.
+   Keep native text selection enabled while suppressing callouts across the statute subtree. */
+@supports (-webkit-touch-callout:none){
+  html.statutes-page,
+  html.statutes-page body,
+  html.statutes-page #homeApp,
+  html.statutes-page #routeContent,
+  html.statutes-page #routeContent .statuteCard,
+  html.statutes-page #routeContent .statuteText,
+  html.statutes-page #routeContent .statuteSelectable,
+  html.statutes-page #routeContent .statuteSelectable *{
+    -webkit-touch-callout:none!important;
+  }
+  html.statutes-page #routeContent .statuteSelectable,
+  html.statutes-page #routeContent .statuteSelectable *{
+    -webkit-user-select:text!important;
+    user-select:text!important;
+  }
+}
+
 /* Phone editor: stack the statute and definition panes vertically.
    Keep both scrollable and leave the bottom navigation unobstructed. */
 @media(max-width:620px){
