@@ -168,6 +168,21 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
 .statutesSearchResult strong,.statutesSearchResult span{white-space:normal;overflow-wrap:anywhere;word-break:break-word;display:block;-webkit-line-clamp:unset}
 @media(max-width:899px){html.statutes-page #statutesSearchPanel{max-height:190px}}
 @media(min-width:900px){#statutesSearchToggle{display:none!important}}
+
+/* Keep the mobile toolbar usable without vertical text wrapping. */
+@media(max-width:899px){
+  .statutes-page #appGlobalHeader{gap:5px!important;min-width:0}
+  .statutes-page #appGlobalHeader .globalShellBrand{flex:1 1 0!important;min-width:0!important;overflow:hidden}
+  .statutes-page .statutesLawMenu{min-width:0;max-width:100%;overscroll-behavior-x:contain}
+  .statutes-page .statutesCurrentSection{flex:0 1 auto;max-width:25vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .statutes-page #statutesSyncStatus{display:none!important}
+  .statutes-page #statutesEditToggle,.statutes-page #statutesSyncButton{flex:0 0 auto;white-space:nowrap}
+}
+@media(max-width:420px){
+  .statutes-page #appGlobalHeader{gap:4px!important}
+  .statutes-page .statutesCurrentSection{max-width:18vw;font-size:11px}
+  .statutes-page #statutesEditToggle,.statutes-page #statutesSyncButton{font-size:11px;padding:4px 5px}
+}
 </style>
 </head>
 <body>
@@ -511,7 +526,7 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
 </script>
 <button id="statuteSelectionPopup" class="statuteSelectionPopup" type="button">定義</button>
 
-<script src="statutes-data-loader.js?v=20261016-numbered-item-linebreaks"></script>
+<script src="statutes-data-loader.js?v=20261017-mobile-retry"></script>
 <script src="statutes-references.js?v=20261015-cross-law-refs-v5"></script>
 <script src="statutes-law-menu.js?v=20261016-cross-section-search"></script>
 <script src="statutes-definition-store.js?v=20261016-definition-cards"></script>
