@@ -945,6 +945,9 @@
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return { state: 'deferred', reason: 'offline' };
     if (hasPendingLocalChanges()) await saveLocalChanges();
     const key = 'testCode.statutes.definitions.v1';
+    const noteKey = 'testCode.statutes.articleNotes.v1';
+    const historyKey = 'testCode.statutes.articleNoteHistory.v1';
+    const readObject = k => { try { const value = JSON.parse(localStorage.getItem(k) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; } catch (_) { return {}; } };
     const readLocal = () => {
       try { const value = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(value) ? value : []; }
       catch (_) { return []; }
@@ -957,11 +960,22 @@
       if (!active || stableJson(record.payload?.keyWraps || {}) !== stableJson(active.keyWraps || {}))
         throw new Error('認証情報が更新されています。保管庫を開き直してください。');
       const before = readLocal();
+      const localNotes = readObject(noteKey);
+      const localHistory = readObject(historyKey);
       const known = getMeta(user.id);
       const baseline = known?.encryptedBaseline ? await decryptBaseline(known.encryptedBaseline, user.id) : null;
       const remote = await decryptPayload(record.payload);
       const remoteNotes = Array.isArray(remote.statuteDefinitions) ? remote.statuteDefinitions : [];
       const previousNotes = baseline && Array.isArray(baseline.statuteDefinitions) ? baseline.statuteDefinitions : [];
+      const remoteArticleNotes = remote.articleNotes || {};
+      const remoteHistory = remote.articleNoteHistory || {};
+      const previousArticleNotes = baseline?.articleNotes || {};
+      const previousHistory = baseline?.articleNoteHistory || {};
+      const changedLocally = !samePayload(localNotes, previousArticleNotes) || !samePayload(localHistory, previousHistory);
+      if (!baseline && (Object.keys(localNotes).length || Object.keys(localHistory).length) && (!samePayload(localNotes, remoteArticleNotes) || !samePayload(localHistory, remoteHistory)))
+        return {state:'deferred',reason:'local-conflict'};
+      if (baseline && changedLocally && (!samePayload(localNotes, remoteArticleNotes) || !samePayload(localHistory, remoteHistory)))
+        return {state:'deferred',reason:'local-conflict'};
       // Without a trustworthy common baseline, never overwrite divergent
       // unsynced local annotations. Other Vault fields stay completely untouched.
       if (!baseline && before.length && !samePayload(before, remoteNotes))
@@ -972,9 +986,14 @@
         if (hasPendingLocalChanges() || !samePayload(before, readLocal()))
           return { state: 'deferred', reason: 'local-conflict' };
         localStorage.setItem(key, JSON.stringify(remoteNotes));
-        emitPayloadApplied();
       }
-      return { state: 'success', applied: !samePayload(before, remoteNotes) };
+      const applyArticleNotes = !samePayload(localNotes, remoteArticleNotes) || !samePayload(localHistory, remoteHistory);
+      if (applyArticleNotes) {
+        localStorage.setItem(noteKey, JSON.stringify(remoteArticleNotes));
+        localStorage.setItem(historyKey, JSON.stringify(remoteHistory));
+      }
+      if (!samePayload(before, remoteNotes) || applyArticleNotes) emitPayloadApplied();
+      return { state: 'success', applied: !samePayload(before, remoteNotes) || applyArticleNotes };
     }));
   }
   function syncLatest() {
