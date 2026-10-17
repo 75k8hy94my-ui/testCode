@@ -3,7 +3,7 @@
 if (typeof window === 'undefined' || typeof document === 'undefined') return;
 const Home=window.MangaReaderHome;
 const config=window.MANGA_READER_SUPABASE||{};
-const marks={manga:'漫',video:'動',statutes:'法'};
+const marks={manga:'漫',video:'動',statutes:'法',definitions:'定'};
 const PROFILE_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg>';
 function profileHeaderButtonMarkup(){return '<button class="headerProfileButton" type="button" data-profile-menu-trigger aria-label="アカウント" aria-haspopup="menu" aria-expanded="false">'+PROFILE_ICON+'</button>';}
 function ensureProfileOnlyHeader(app){
@@ -86,7 +86,7 @@ async function runHomeSync(okMessage){if(guestMode){setSyncStatus('端末内に�
 function cardTop(card){const top=document.createElement('div');top.className='cardTop';const mark=document.createElement('span');mark.className='cardMark';mark.textContent=marks[card.id]||'・';const badge=document.createElement('span');badge.className='cardBadge';badge.textContent=card.badge||'';top.append(mark,badge);return top;}
 function addCardText(root,card){root.append(cardTop(card));const title=document.createElement('h2');title.textContent=card.title;root.append(title);}
 function buildCard(id){const card=Home.CARD_CATALOG[id];if(!card)return null;const article=document.createElement('article');article.className='homeCard';article.dataset.kind=card.kind;const link=document.createElement('a');link.className='homeCardLink';link.href=card.href;addCardText(link,card);const hint=document.createElement('span');hint.className='openHint';hint.textContent='開く →';link.append(hint);article.append(link);return article;}
-function renderHome(){const target=getMount();if(!target)return;setTitle('home');layout=Home.DEFAULT_CARD_IDS.slice();target.innerHTML='<nav class="homeStudyMenu" aria-label="学習メニュー"><a href="definition-cards.html">定義カード</a></nav><section id="homeGrid" class="homeGrid" aria-label="ホームカード"></section>';const grid=$('homeGrid');layout.forEach(id=>{const node=buildCard(id);if(node)grid.append(node);});const edit=$('editHomeBtn');if(edit)edit.hidden=true;syncHeaderRoute();}
+function renderHome(){const target=getMount();if(!target)return;setTitle('home');layout=Home.DEFAULT_CARD_IDS.slice();target.innerHTML='<section id="homeGrid" class="homeGrid" aria-label="ホームカード"></section>';const grid=$('homeGrid');layout.forEach(id=>{const node=buildCard(id);if(node)grid.append(node);});const edit=$('editHomeBtn');if(edit)edit.hidden=true;syncHeaderRoute();}
 function currentTheme(){try{const raw=String(localStorage.getItem('mangaReaderTheme')||'').replace(/^"|"$/g,'').trim();return raw==='light'?'light':'dark'}catch(_){return'dark'}}
 function applyTheme(theme){const selected=theme==='light'?'light':'dark';document.documentElement.dataset.theme=selected;const meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.setAttribute('content',selected==='light'?'#f4f6f8':'#0a0c11');try{localStorage.setItem('mangaReaderTheme',selected)}catch(_){}}
 function loadFixedNonVpnIps(){try{const value=JSON.parse(localStorage.getItem('testCode.manualNonVpnIps')||'[]');return Array.isArray(value)?value.map((ip)=>String(ip||'').trim()).filter(Boolean):[];}catch(_){return[];}}
