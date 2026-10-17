@@ -28,6 +28,7 @@
   }
   indexEditableText();
 
+  let subjectId = new URLSearchParams(location.search).get('section') || 'civil-general';
   let definitions = loadDefinitions();
   let pending = null;
   let selectedDefinition = null;
