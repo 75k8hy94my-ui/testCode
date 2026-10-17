@@ -82,6 +82,7 @@
     event.preventDefault();
     activeCard = card;
     activeSelection = window.StatutesDefinitions?.selectionForContext?.() || null;
+    menu.querySelector('[data-action="note"]').textContent = article(card) + 'のメモ';
     menu.querySelector('[data-action="note"]').hidden = !!activeSelection;
     menu.querySelector('[data-action="definition"]').hidden = !activeSelection;
     menu.hidden = false;
