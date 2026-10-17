@@ -60,6 +60,7 @@
   };
 
   function open() {
+    region.dataset.queryActive = String(Boolean(input.value.trim()));
     region.hidden = false;
     trigger.setAttribute('aria-expanded', 'true');
     position();
@@ -79,7 +80,7 @@
   }
   trigger.addEventListener('click', () => region.hidden ? open() : close());
   window.addEventListener('resize', position);
-  input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(search, 100); });
+  input.addEventListener('input', () => { region.dataset.queryActive = String(Boolean(input.value.trim())); clearTimeout(timer); timer = setTimeout(search, 100); });
   input.addEventListener('compositionstart', () => { composing = true; });
   input.addEventListener('compositionend', () => { composing = false; });
   input.addEventListener('keydown', async event => {
@@ -109,6 +110,7 @@
   async function search() {
     const serial = ++version;
     const query = normalize(input.value);
+    region.dataset.queryActive = String(Boolean(query));
     list.replaceChildren();
     if (!query) return;
     let rows = getRows();
