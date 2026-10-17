@@ -31,6 +31,12 @@
     // Every saved definition is a flashcard. Retain card:true so older Vault payloads stay compatible.
     return { ...item, law, source, card: true };
   }
+  // A statute may define a term by listing its elements rather than by a prose definition.
+  // Save the complete article wording as the answer so flashcards work offline, too.
+  function definitionFromArticle(item, articleText) {
+    const definition = typeof articleText === 'string' ? articleText.trim() : '';
+    return definition ? enrichDefinition({ ...item, definition, definitionKind: 'statute' }) : null;
+  }
   function normalizeDefinitions(data) {
     if (!Array.isArray(data)) return [];
     return data.filter(item =>
@@ -54,7 +60,7 @@
       return valid;
     } catch (_) { return []; }
   }
-  const api = { STORAGE_KEY, lawForSubject, enrichDefinition, normalizeDefinitions, loadDefinitions };
+  const api = { STORAGE_KEY, lawForSubject, enrichDefinition, definitionFromArticle, normalizeDefinitions, loadDefinitions };
   if (typeof window !== 'undefined') window.StatutesDefinitionStore = api;
   if (typeof module !== 'undefined') module.exports = api;
 })();
