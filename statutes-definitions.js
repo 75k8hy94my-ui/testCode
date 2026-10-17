@@ -483,8 +483,8 @@
     },
     openContextDefinition(data) {
       if (!data) return;
-      if (!editMode) return;
-      openDefinition(data.existing || data.candidate, true);
+      if (!editMode && !data.existing) return;
+      openDefinition(data.existing || data.candidate, editMode);
     },
     refresh(section) {
       subjectId = section || 'civil-general';
