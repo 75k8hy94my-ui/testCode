@@ -149,7 +149,7 @@
           }
           const card = [...main.querySelectorAll('.statuteCard')].find(el => el.querySelector('.statuteNumber')?.textContent?.trim() === row.number);
           if (!card) return;
-          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          card.scrollIntoView({ behavior: 'instant', block: 'center' });
           card.classList.add('statutesSearchHit');
           setTimeout(() => card.classList.remove('statutesSearchHit'), 1800);
         })();
