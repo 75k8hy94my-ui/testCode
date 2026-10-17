@@ -73,10 +73,6 @@
       notes = next;
       overlay.hidden = true;
       render();
-      if (!window.TestCodeGuest?.isActive()) {
-        const vault = window.MangaVault;
-        if (vault?.markLocalChangesPending?.()) Promise.resolve(vault.saveLocalChanges?.()).catch(() => {});
-      }
     } catch (_) { textarea.setCustomValidity('保存できませんでした'); textarea.reportValidity(); textarea.setCustomValidity(''); }
   }
   page.addEventListener('contextmenu', event => {
