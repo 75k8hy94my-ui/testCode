@@ -29,7 +29,7 @@ test('normalization preserves all valid annotations and marks them as cards', ()
 
 test('statute-derived definitions save the article wording without a manual answer', () => {
   const source = { subject:'civil-family', article:'７２５条', part:0, start:8, end:10, quote:'親族' };
-  const wording = '次に掲げる者は、親族とする。\\n一　六親等内の血族\\n二　配偶者\\n三　三親等内の姻族';
+  const wording = '次に掲げる者は、親族とする。\n一　六親等内の血族\n二　配偶者\n三　三親等内の姻族';
   const entry = store.definitionFromArticle(source, wording);
   assert.equal(entry.definitionKind, 'statute');
   assert.equal(entry.definition, wording);
@@ -43,8 +43,8 @@ test('statute-derived edit mode and flashcard labelling are wired', () => {
   const ui = read('statutes-definitions.js');
   const cards = read('definition-cards.js');
   assert.match(ui, /statutesDefinitionStatuteToggle/);
-  assert.match(ui, /articleDefinitionText\\(pending\\)/);
-  assert.match(ui, /definitionFromArticle\\(pending, text\\)/);
+  assert.match(ui, /articleDefinitionText\(pending\)/);
+  assert.match(ui, /definitionFromArticle\(pending, text\)/);
   assert.match(ui, /textarea.required = !usesArticle/);
   assert.match(cards, /entry.definitionKind === 'statute'/);
 });
