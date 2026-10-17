@@ -70,7 +70,7 @@
   side.className = 'statutesDefinitionSide';
   side.setAttribute('aria-label', '定義');
   side.setAttribute('aria-hidden', 'true');
-  side.innerHTML = '<div class="statutesDefinitionHeader"><strong>定義</strong><button type="button" class="statutesDefinitionClose" aria-label="閉じる">×</button></div><div class="statutesDefinitionBody"><p class="statutesDefinitionQuote"></p><p class="statutesDefinitionSource"></p><div class="statutesDefinitionValue"></div><form class="statutesDefinitionForm" hidden><textarea aria-label="定義の内容" rows="6" required></textarea><div class="statutesDefinitionActions"><button type="submit">保存</button><button type="button" class="statutesDefinitionDelete" hidden>削除</button><button type="button" class="statutesDefinitionCancel">キャンセル</button></div><p class="statutesDefinitionStatus" role="status"></p></form></div>';
+  side.innerHTML = '<div class="statutesDefinitionHeader"><strong>定義</strong><button type="button" class="statutesDefinitionClose" aria-label="閉じる">×</button></div><div class="statutesDefinitionBody"><p class="statutesDefinitionQuote"></p><p class="statutesDefinitionSource"></p><div class="statutesDefinitionValue"></div><form class="statutesDefinitionForm" hidden><textarea aria-label="定義の内容" rows="6" required></textarea><div class="statutesDefinitionActions"><button type="submit">保存</button><button type="button" class="statutesDefinitionDelete" hidden>削除</button><button type="button" class="statutesDefinitionCancel">キャンセル</button><button type="button" class="statutesDefinitionSyncToggle">同期ブロック</button></div><div class="statutesDefinitionSyncPicker" hidden><input type="search" aria-label="定義を検索" placeholder="定義を検索"><div class="statutesDefinitionSyncResults"></div></div><p class="statutesDefinitionStatus" role="status"></p></form></div>';
   host.appendChild(side);
   side.inert = true;
   const headerTitle = side.querySelector('.statutesDefinitionHeader strong');
@@ -83,6 +83,71 @@
   const status = form.querySelector('.statutesDefinitionStatus');
   const deleteButton = form.querySelector('.statutesDefinitionDelete');
   const closeButton = side.querySelector('.statutesDefinitionClose');
+  const syncToggle = form.querySelector('.statutesDefinitionSyncToggle');
+  const syncPicker = form.querySelector('.statutesDefinitionSyncPicker');
+  const syncSearch = syncPicker.querySelector('input');
+  const syncResults = syncPicker.querySelector('.statutesDefinitionSyncResults');
+  const syncStyle = document.createElement('style');
+  syncStyle.textContent = '.statutesDefinitionSyncPicker{margin-top:12px}.statutesDefinitionSyncPicker[hidden]{display:none}.statutesDefinitionSyncPicker input{box-sizing:border-box;width:100%;padding:8px;border:1px solid #8888;border-radius:6px;background:transparent;color:inherit;font:inherit}.statutesDefinitionSyncResults{max-height:35vh;overflow:auto;margin-top:8px}.statutesDefinitionSyncResults button{display:block;box-sizing:border-box;width:100%;padding:8px;text-align:left;border:0;border-bottom:1px solid #8884;background:transparent;color:inherit;cursor:pointer}.statutesDefinitionSyncResults button:hover{background:#8882}.statutesDefinitionSyncResults small{display:block;opacity:.75;white-space:normal;overflow-wrap:anywhere}';
+  document.head.appendChild(syncStyle);
+  function resolveDefinition(entry, visited = new Set()) {
+    const id = definitionId(entry);
+    if (visited.has(id)) return entry.definition || '';
+    visited.add(id);
+    if (!entry.syncSourceId) return entry.definition || '';
+    const source = definitions.find(d => definitionId(d) === entry.syncSourceId);
+    return source ? resolveDefinition(source, visited) : (entry.definition || '');
+  }
+  function scoreMatch(a, b) {
+    const normalize = s => String(s || '').replace(/\s/g, '').toLocaleLowerCase('ja');
+    a = normalize(a); b = normalize(b);
+    if (a === b) return 100;
+    if (!a || !b) return 0;
+    if (a.includes(b) || b.includes(a)) return 70 + Math.floor(20 * Math.min(a.length,b.length) / Math.max(a.length,b.length));
+    const grams = s => [...s].flatMap((ch,i,arr) => i < arr.length - 1 ? [ch + arr[i+1]] : []);
+    const aa = grams(a), bb = grams(b), remaining = new Map();
+    bb.forEach(v => remaining.set(v,(remaining.get(v)||0)+1));
+    let common = 0;
+    aa.forEach(v => { if (remaining.get(v)>0) {common++;remaining.set(v,remaining.get(v)-1);} });
+    return Math.round(70 * 2 * common / Math.max(1,aa.length+bb.length));
+  }
+  function renderSyncCandidates() {
+    const target = pending;
+    if (!target) return;
+    const query = syncSearch.value.trim().toLocaleLowerCase('ja');
+    const targetId = definitionId(target);
+    syncResults.replaceChildren();
+    const items = definitions.filter(d => definitionId(d) !== targetId && resolveDefinition(d).trim())
+      .filter(d => !query || [d.quote,d.source,resolveDefinition(d)].some(v => String(v||'').toLocaleLowerCase('ja').includes(query)))
+      .map(d => ({entry:d,score:scoreMatch(target.quote,d.quote)}))
+      .sort((a,b) => b.score-a.score || a.entry.quote.localeCompare(b.entry.quote,'ja'));
+    items.forEach(({entry}) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = entry.quote;
+      const detail = document.createElement('small');
+      detail.textContent = (entry.source || '') + '　' + resolveDefinition(entry);
+      button.append(detail);
+      button.addEventListener('click', () => {
+        const sourceId = definitionId(entry);
+        const targetId = definitionId(target);
+        const updated = definitions.filter(d => definitionId(d) !== targetId);
+        // Link to the selected entry, preserving its current value for offline fallback.
+        const linked = enrichDefinition({...target,definition:resolveDefinition(entry),syncSourceId:sourceId});
+        updated.push(linked);
+        if (saveDefinitions(updated)) {
+          selectedDefinition = linked;
+          closeSide();
+        }
+      });
+      syncResults.append(button);
+    });
+  }
+  syncToggle.addEventListener('click', () => {
+    syncPicker.hidden = !syncPicker.hidden;
+    if (!syncPicker.hidden) {syncSearch.value = '';renderSyncCandidates();syncSearch.focus();}
+  });
+  syncSearch.addEventListener('input',renderSyncCandidates);
 
   function closePopup() {
     popup.dataset.visible = 'false';
@@ -232,8 +297,10 @@
     definitionSource.textContent = entry.source;
     form.hidden = !editing;
     value.hidden = editing;
-    value.textContent = entry.definition || '';
-    textarea.value = entry.definition || '';
+    value.textContent = resolveDefinition(entry);
+    textarea.value = resolveDefinition(entry);
+    syncPicker.hidden = true;
+    syncToggle.hidden = !editing;
     deleteButton.hidden = !entry.definition;
     status.textContent = '';
     popup.dataset.visible = 'false';
@@ -246,6 +313,21 @@
   function saveDefinitions(next) {
     try {
       const normalized = next.map(enrichDefinition);
+      const byId = new Map(normalized.map(d => [definitionId(d),d]));
+      const effective = (entry, seen=new Set()) => {
+        const id=definitionId(entry);
+        if (seen.has(id)) return entry.definition || '';
+        seen.add(id);
+        const src=entry.syncSourceId && byId.get(entry.syncSourceId);
+        return src ? effective(src,seen) : (entry.definition || '');
+      };
+      normalized.forEach(d => {
+        if (d.syncSourceId) {
+          const source=byId.get(d.syncSourceId);
+          if (source) d.definition=effective(source);
+          else delete d.syncSourceId;
+        }
+      });
       localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
       definitions = normalized;
       redraw();
