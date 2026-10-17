@@ -198,7 +198,6 @@
   }
 
   function selectionCandidate() {
-    if (!editMode) return null;
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || !selection.toString().trim() || selection.rangeCount !== 1) return null;
     const range = selection.getRangeAt(0);
@@ -343,7 +342,7 @@
   form.querySelector('.statutesDefinitionCancel').addEventListener('click', closeSide);
   form.addEventListener('submit', event => {
     event.preventDefault();
-    if (!editMode || !pending) return;
+    if (!pending) return;
     const text = textarea.value.trim();
     if (!text) return;
     const entry = enrichDefinition({ ...pending, definition: text });
@@ -356,7 +355,7 @@
     }
   });
   deleteButton.addEventListener('click', () => {
-    if (!editMode || !selectedDefinition) return;
+    if (!selectedDefinition) return;
     const id = definitionId(selectedDefinition);
     if (saveDefinitions(definitions.filter(d => definitionId(d) !== id))) closeSide();
   });
@@ -390,7 +389,7 @@
       return selectionCandidate();
     },
     openContextDefinition(data) {
-      if (!data || !editMode) return;
+      if (!data) return;
       openDefinition(data.existing || data.candidate, true);
     },
     refresh(section) {
