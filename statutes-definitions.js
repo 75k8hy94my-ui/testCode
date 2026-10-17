@@ -34,26 +34,18 @@
   let selectedDefinition = null;
 
 
-  const syncButton = document.createElement('button');
-  syncButton.type = 'button';
-  syncButton.id = 'statutesSyncButton';
-  syncButton.className = 'statutesEditToggle';
-  syncButton.textContent = '同期';
-  syncButton.setAttribute('aria-label', '逐条集を同期');
   const syncStatus = document.createElement('span');
   syncStatus.id = 'statutesSyncStatus';
   syncStatus.setAttribute('role', 'status');
   syncStatus.style.cssText = 'font-size:12px;opacity:.8;max-width:200px';
-  (currentLabel || header.querySelector('.globalShellBrand'))?.after(syncButton, syncStatus);
+  (currentLabel || header.querySelector('.globalShellBrand'))?.after(syncStatus);
   const guestMode = window.TestCodeGuest?.isActive() === true;
   function setSyncStatus(text) { syncStatus.textContent = text; }
   if (guestMode) {
-    syncButton.disabled = true;
     setSyncStatus('ゲスト：端末保存のみ');
   } else setSyncStatus(window.MangaVault?.hasPendingLocalChanges?.() ? 'クラウド同期待ち' : 'クラウド同期可能');
   async function performSync() {
-    if (guestMode || syncButton.disabled) return;
-    syncButton.disabled = true;
+    if (guestMode) return;
     setSyncStatus('同期中…');
     try {
       const result = await window.MangaVault.syncStatutesLatest();
@@ -64,11 +56,8 @@
       }
     } catch (error) {
       setSyncStatus('同期失敗・端末保存済み');
-    } finally {
-      syncButton.disabled = false;
     }
   }
-  syncButton.addEventListener('click', performSync);
   document.addEventListener('manga-vault-sync-state', event => {
     if (guestMode) return;
     const state = event.detail?.state;
