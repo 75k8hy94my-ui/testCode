@@ -170,6 +170,23 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
   }
 }
 
+/* Phone divider is draggable and stays inside the editor pane. */
+.statutesPhoneResize{display:none}
+@media(max-width:620px){
+  html.statutes-page.statutes-definition-open .statutesPhoneResize{
+    display:flex;flex:0 0 20px;align-items:center;justify-content:center;
+    width:100%;padding:0;border:0;background:var(--bg,#fff);
+    color:var(--muted,#94a3b8);touch-action:none;cursor:row-resize;
+  }
+  .statutesPhoneResize::before{content:"";display:block;width:44px;height:4px;border-radius:99px;background:currentColor;opacity:.65}
+  html.statutes-page.statutes-definition-open .statutesDefinitionBody{
+    min-height:0;overflow-y:auto;overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;padding-bottom:calc(24px + env(safe-area-inset-bottom));
+  }
+  html.statutes-page.statutes-definition-open .statutesDefinitionForm{padding-bottom:12px}
+  html.statutes-page.statutes-definition-open .statutesDefinitionActions{padding-bottom:8px}
+}
+
 /* Phone editor: stack the statute and definition panes vertically.
    Keep both scrollable and leave the bottom navigation unobstructed. */
 @media(max-width:620px){
@@ -177,7 +194,7 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
     display:grid!important;
     box-sizing:border-box;
     grid-template-columns:minmax(0,1fr);
-    grid-template-rows:minmax(150px,45%) minmax(0,1fr);
+    grid-template-rows:minmax(0,var(--statutes-phone-top,45%)) minmax(0,1fr);
     padding-top:54px;
     height:calc(100dvh - var(--statutes-split-bottom))!important;
     min-height:0!important;
@@ -599,6 +616,52 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
       event.preventDefault();
     }
   }, { capture: true });
+})();
+</script>
+<script>
+/* Resize the two stacked panes on iPhone without affecting native selection. */
+(() => {
+  const root = document.documentElement;
+  const host = document.getElementById('homeApp');
+  const side = host?.querySelector('.statutesDefinitionSide');
+  if (!host || !side || !root.classList.contains('statutes-page')) return;
+  const grip = document.createElement('button');
+  grip.type = 'button';
+  grip.className = 'statutesPhoneResize';
+  grip.setAttribute('aria-label', '条文と定義の表示高さを調整');
+  side.prepend(grip);
+  const mobile = window.matchMedia('(max-width:620px)');
+  const storageKey = 'statutes:phone-pane-ratio';
+  let saved = .45;
+  try {
+    const n = Number(localStorage.getItem(storageKey));
+    if (n >= .2 && n <= .8) saved = n;
+  } catch (_) {}
+  function setRatio(ratio) {
+    saved = Math.max(.2, Math.min(.8, ratio));
+    host.style.setProperty('--statutes-phone-top', (saved * 100).toFixed(2) + '%');
+  }
+  setRatio(saved);
+  let dragging = false;
+  grip.addEventListener('pointerdown', (event) => {
+    if (!mobile.matches || !root.classList.contains('statutes-definition-open')) return;
+    event.preventDefault();
+    dragging = true;
+    grip.setPointerCapture(event.pointerId);
+  });
+  grip.addEventListener('pointermove', (event) => {
+    if (!dragging) return;
+    const rect = host.getBoundingClientRect();
+    setRatio((event.clientY - rect.top - 54) / Math.max(1, rect.height - 54));
+  });
+  function finish() {
+    if (!dragging) return;
+    dragging = false;
+    try { localStorage.setItem(storageKey, String(saved)); } catch (_) {}
+  }
+  grip.addEventListener('pointerup', finish);
+  grip.addEventListener('pointercancel', finish);
+  grip.addEventListener('lostpointercapture', finish);
 })();
 </script>
 <script src="statutes-search.js?v=20261017-search-opacity-results"></script>
