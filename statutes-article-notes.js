@@ -17,6 +17,7 @@
     .statuteNoteMenu{position:fixed;z-index:12000;min-width:140px;padding:5px;border:1px solid var(--border, #aaa);border-radius:9px;background:var(--bg,#fff);color:var(--text,#222);box-shadow:0 8px 24px #0003}
     .statuteNoteMenu[hidden]{display:none}
     .statuteNoteMenu button{display:block;width:100%;padding:9px 12px;border:0;border-radius:5px;background:transparent;color:inherit;text-align:left;cursor:pointer}
+    .statuteNoteMenu button[hidden]{display:none}
     .statuteNoteMenu button:hover{background:rgba(128,128,128,.17)}
     .statuteNoteEditor{position:fixed;z-index:12001;inset:0;display:grid;place-items:center;background:#0006}
     .statuteNoteEditor[hidden]{display:none}
