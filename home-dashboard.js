@@ -3,11 +3,12 @@
 const HOME_LAYOUT_KEY = 'mangaReaderHomeCards';
 const STATUTES_CARD_MIGRATION_KEY = 'mangaReaderHomeStatutesCardAddedV1';
 const LEGACY_DEFAULT_CARD_IDS = ['bookshelf'];
-const DEFAULT_CARD_IDS = ['manga','video','statutes'];
+const DEFAULT_CARD_IDS = ['manga','video','statutes','definitions'];
 const CARD_CATALOG = Object.freeze({
   manga: Object.freeze({ id: 'manga', title: '漫画', kind: 'internal', href: 'manga.html', badge: 'APP' }),
   video: Object.freeze({ id: 'video', title: '動画', kind: 'internal', href: 'video.html', badge: 'APP' }),
   statutes: Object.freeze({ id: 'statutes', title: '逐条集', kind: 'internal', href: 'statutes.html', badge: 'APP' }),
+  definitions: Object.freeze({ id: 'definitions', title: '定義カード', kind: 'internal', href: 'definition-cards.html', badge: 'APP' }),
 });
 const isKnownCard = (id) => Object.prototype.hasOwnProperty.call(CARD_CATALOG, id);
 // Home navigation is fixed. Vault-restored legacy card layouts must not hide routes.
