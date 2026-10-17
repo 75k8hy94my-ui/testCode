@@ -31,6 +31,7 @@
   let subjectId = new URLSearchParams(location.search).get('section') || 'civil-general';
   let definitions = loadDefinitions();
   let editMode = false;
+  root.dataset.statutesEditMode = 'off';
   let pending = null;
   let inlineDefinition = null;
   const editSwitch = document.createElement('button');
@@ -42,6 +43,7 @@
   editSwitch.innerHTML = '<span>編集</span><i aria-hidden="true"></i>';
   const modeStyle = document.createElement('style');
   modeStyle.textContent = '.statutesModeSwitch{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:inherit;font:inherit;font-size:12px;cursor:pointer;white-space:nowrap}.statutesModeSwitch i{position:relative;display:block;width:41px;height:25px;border-radius:15px;background:#9da3aa;transition:background .18s}.statutesModeSwitch i:after{content:"";position:absolute;top:2px;left:2px;width:21px;height:21px;background:#fff;border-radius:50%;box-shadow:0 1px 3px #0003;transition:transform .18s}.statutesModeSwitch[aria-checked="true"] i{background:#34c759}.statutesModeSwitch[aria-checked="true"] i:after{transform:translateX(16px)}.statuteInlineDefinition{margin:9px 0 4px;padding:10px 12px;border-left:2px solid var(--accent,#1769aa);background:rgba(128,128,128,.07);white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.65}.statuteInlineDefinition[hidden]{display:none}.statuteInlineDefinition strong{display:block;font-size:12px;margin-bottom:5px}';
+  modeStyle.textContent += '.statutes-page[data-statutes-edit-mode="off"] .statuteCard,.statutes-page[data-statutes-edit-mode="off"] .statuteCard *{user-select:none!important;-webkit-user-select:none!important}.statutes-page[data-statutes-edit-mode="on"] .statuteSelectable{user-select:text!important;-webkit-user-select:text!important}';
   document.head.append(modeStyle);
   let selectedDefinition = null;
 
@@ -170,6 +172,9 @@
   editSwitch.addEventListener('click', () => {
     editMode = !editMode;
     editSwitch.setAttribute('aria-checked', String(editMode));
+    root.dataset.statutesEditMode = editMode ? 'on' : 'off';
+    window.getSelection()?.removeAllRanges();
+    closePopup();
     closeInline();
     closeSide();
   });
@@ -264,6 +269,7 @@
   }
 
   function selectionCandidate() {
+    if (!editMode) return null;
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || !selection.toString().trim() || selection.rangeCount !== 1) return null;
     const range = selection.getRangeAt(0);
