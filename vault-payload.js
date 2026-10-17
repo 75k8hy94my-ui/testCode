@@ -85,3 +85,48 @@ const api={DATA_KEYS,LOCAL_ONLY_KEYS,pointerPath,defaults,normalize:normalizeWit
     return apply(normalizeCustomProperties(value), storage);
   };
 }(typeof window !== 'undefined' ? window : globalThis));
+
+;(function(root) {
+  const payload = typeof module !== 'undefined' && module.exports ? module.exports : root.MangaVaultPayload;
+  if (!payload) return;
+  const key = 'testCode.statutes.articleNotes.v1';
+  const historyKey = 'testCode.statutes.articleNoteHistory.v1';
+  const normalizeObject = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const normalizeNotes = value => Object.fromEntries(Object.entries(normalizeObject(value)).filter(([k,v]) => typeof k === 'string' && typeof v === 'string' && v.trim()));
+  const normalizeHistory = value => Object.fromEntries(Object.entries(normalizeObject(value)).filter(([k,v]) => v && typeof v === 'object' && typeof v.key === 'string' && typeof v.before === 'string' && typeof v.after === 'string' && Number.isFinite(v.at)).sort((a,b) => b[1].at-a[1].at).slice(0,50));
+  const read = (storage,k) => { try { return JSON.parse(storage.getItem(k) || '{}'); } catch (_) { return {}; } };
+  const write = (storage,k,value) => storage.setItem(k,JSON.stringify(value));
+  const originalNormalize = payload.normalize;
+  const originalBuild = payload.buildFromLocalStorage;
+  const originalApply = payload.applyToLocalStorage;
+  const originalClear = payload.clearDeviceData;
+  payload.DATA_KEYS.articleNotes = key;
+  payload.DATA_KEYS.articleNoteHistory = historyKey;
+  payload.normalize = function(value) {
+    const result = originalNormalize(value);
+    result.articleNotes = normalizeNotes(value && value.articleNotes);
+    result.articleNoteHistory = normalizeHistory(value && value.articleNoteHistory);
+    return result;
+  };
+  payload.buildFromLocalStorage = function(storage = globalThis.localStorage) {
+    return payload.normalize({...originalBuild(storage),articleNotes:read(storage,key),articleNoteHistory:read(storage,historyKey)});
+  };
+  payload.applyToLocalStorage = function(value,storage = globalThis.localStorage) {
+    const previousNotes=storage.getItem(key),previousHistory=storage.getItem(historyKey);
+    try {
+      const result=originalApply(value,storage);
+      write(storage,key,normalizeNotes(value && value.articleNotes));
+      write(storage,historyKey,normalizeHistory(value && value.articleNoteHistory));
+      return {...result,articleNotes:normalizeNotes(value && value.articleNotes),articleNoteHistory:normalizeHistory(value && value.articleNoteHistory)};
+    } catch(error) {
+      if(previousNotes==null)storage.removeItem(key);else storage.setItem(key,previousNotes);
+      if(previousHistory==null)storage.removeItem(historyKey);else storage.setItem(historyKey,previousHistory);
+      throw error;
+    }
+  };
+  payload.clearDeviceData = function(storage = globalThis.localStorage) {
+    originalClear(storage);
+    storage.removeItem(key);
+    storage.removeItem(historyKey);
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
