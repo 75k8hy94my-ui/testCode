@@ -22,7 +22,7 @@
     count.textContent = entry ? (index + 1) + ' / ' + cards.length : '0 / 0';
     if (!entry) return;
     term.textContent = entry.quote;
-    source.textContent = entry.source;
+    source.textContent = entry.source + (entry.definitionKind === 'statute' ? ' ・ 条文による定義' : '');
     answer.textContent = entry.definition;
     answer.hidden = true;
     flip.textContent = '答えを見る';
