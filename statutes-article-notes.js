@@ -8,6 +8,10 @@
   let notes = read();
   let activeCard = null;
   let activeSelection = null;
+  let selectionBeforeRightClick = null;
+  page.addEventListener('pointerdown', event => {
+    if (event.button === 2) selectionBeforeRightClick = window.StatutesDefinitions?.selectionForContext?.() || null;
+  }, true);
   const style = document.createElement('style');
   style.textContent = `
     .statuteNoteMenu{position:fixed;z-index:12000;min-width:140px;padding:5px;border:1px solid var(--border, #aaa);border-radius:9px;background:var(--bg,#fff);color:var(--text,#222);box-shadow:0 8px 24px #0003}
@@ -81,9 +85,12 @@
     if (!card || !page.contains(card) || !article(card)) return;
     event.preventDefault();
     activeCard = card;
-    activeSelection = window.StatutesDefinitions?.selectionForContext?.() || null;
+    const currentSelection = window.StatutesDefinitions?.selectionForContext?.() || null;
+    const savedSelection = selectionBeforeRightClick;
+    activeSelection = currentSelection || (savedSelection?.candidate?.article === article(card) ? savedSelection : null);
+    selectionBeforeRightClick = null;
     menu.querySelector('[data-action="note"]').textContent = article(card) + 'のメモ';
-    menu.querySelector('[data-action="note"]').hidden = !!activeSelection;
+    menu.querySelector('[data-action="note"]').hidden = false;
     menu.querySelector('[data-action="definition"]').hidden = !activeSelection;
     menu.hidden = false;
     menu.style.left = Math.max(8, Math.min(event.clientX, innerWidth - menu.offsetWidth - 8)) + 'px';
