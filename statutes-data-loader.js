@@ -4,6 +4,7 @@
   if (!page || !document.documentElement.classList.contains('statutes-page')) return;
   const originalMarkup = page.innerHTML;
   const store = new Map();
+  const requests = new Map();
   let generation = 0;
   const sections = {
     constitution:['constitution'],
@@ -141,8 +142,9 @@
     }
   }
   function refresh(section) {
-    window.StatutesReferences?.refresh?.();
-    window.StatutesDefinitions?.refresh?.(section);
+    // Annotation errors must not erase successfully loaded statutory text.
+    try { window.StatutesReferences?.refresh?.(); } catch (error) { console.error('Statutes references:',error); }
+    try { window.StatutesDefinitions?.refresh?.(section); } catch (error) { console.error('Statutes definitions:',error); }
   }
   function displayMessage(message) {
     const p=document.createElement('p');
@@ -154,18 +156,34 @@
     const generationId=++generation;
     const config=sections[section];
     if (!config) { displayMessage('法令を選択してください。');return; }
-    if(section==='civil-general' && !store.has('civil')) {
-      // Keep the existing article list until the full dataset is ready.
-    } else displayMessage('条文を読み込み中…');
+    // Do not replace existing text with a transient loading/error screen.
+    if (!page.querySelector('.statuteCard')) displayMessage('条文を読み込み中…');
     try {
       const [key,start,end]=config;
       let data=store.get(key);
       if (!data) {
-        const res=await fetch('statutes-data/'+encodeURIComponent(key)+'.json?v=20261016-article-captions-2',{cache:'no-cache'});
-        if (!res.ok) throw Error('HTTP '+res.status);
-        data=await res.json();
-        if (!Array.isArray(data.articles)) throw Error('Invalid law data');
-        store.set(key,data);
+        if (!requests.has(key)) {
+          const url='statutes-data/'+encodeURIComponent(key)+'.json?v=20261017-reload';
+          const request=(async()=>{
+            let lastError;
+            for (let attempt=0;attempt<2;attempt++) {
+              try {
+                const res=await fetch(url,{cache:attempt===0?'no-cache':'reload'});
+                if (!res.ok) throw Error('HTTP '+res.status+' ('+key+')');
+                const result=await res.json();
+                if (!Array.isArray(result.articles)) throw Error('Invalid law data: '+key);
+                store.set(key,result);
+                return result;
+              } catch(error) {
+                lastError=error;
+                if(attempt===0) console.warn('Retrying statute data:',key,error);
+              }
+            }
+            throw lastError;
+          })().finally(()=>requests.delete(key));
+          requests.set(key,request);
+        }
+        data=await requests.get(key);
       }
       if (generationId!==generation) return;
       activeKey=key;
@@ -193,10 +211,19 @@
       refresh(section);
     } catch(error) {
       if(generationId!==generation)return;
-      // Never present another subject's text as if it belonged to this subject.
+      console.error('Statute data load failed:',section,error);
+      // Keep existing text when possible, but never show a different law as the selected law.
       if (section==='civil-general' && page.innerHTML===originalMarkup) return;
-      displayMessage('条文データを読み込めませんでした。');
-      refresh(section);
+      const message=document.createElement('div');
+      message.className='statuteDataMessage';
+      message.textContent='条文データを読み込めませんでした。';
+      const retry=document.createElement('button');
+      retry.type='button';
+      retry.textContent='再読み込み';
+      retry.style.cssText='margin-left:12px;padding:6px 10px;font:inherit;cursor:pointer';
+      retry.addEventListener('click',()=>load(section));
+      message.appendChild(retry);
+      page.replaceChildren(message);
     }
   }
   window.StatutesData={load,hasReferencedArticle,createReferencedCard};
