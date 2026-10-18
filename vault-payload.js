@@ -130,3 +130,38 @@ const api={DATA_KEYS,LOCAL_ONLY_KEYS,pointerPath,defaults,normalize:normalizeWit
     storage.removeItem(historyKey);
   };
 })(typeof window !== 'undefined' ? window : globalThis);
+
+;(function(root) {
+  'use strict';
+  const payload = typeof module !== 'undefined' && module.exports ? module.exports : root.MangaVaultPayload;
+  if (!payload) return;
+  const key = 'testCode.statutes.definitionReviews.v1';
+  const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const normalize = value => Object.fromEntries(Object.entries(object(value)).filter(([id,entry]) =>
+    typeof id === 'string' && entry && typeof entry === 'object' && Number.isFinite(entry.lastReviewed) && Number.isFinite(entry.due)));
+  const read = storage => { try { return JSON.parse(storage.getItem(key) || '{}'); } catch (_) { return {}; } };
+  const originalNormalize = payload.normalize;
+  const originalBuild = payload.buildFromLocalStorage;
+  const originalApply = payload.applyToLocalStorage;
+  const originalClear = payload.clearDeviceData;
+  payload.DATA_KEYS.definitionReviews = key;
+  payload.normalize = value => ({ ...originalNormalize(value), definitionReviews: normalize(value && value.definitionReviews) });
+  payload.buildFromLocalStorage = function(storage = globalThis.localStorage) {
+    return payload.normalize({ ...originalBuild(storage), definitionReviews: read(storage) });
+  };
+  payload.applyToLocalStorage = function(value, storage = globalThis.localStorage) {
+    const old = storage.getItem(key);
+    try {
+      const result = originalApply(value, storage);
+      storage.setItem(key, JSON.stringify(normalize(value && value.definitionReviews)));
+      return { ...result, definitionReviews: normalize(value && value.definitionReviews) };
+    } catch(error) {
+      if (old == null) storage.removeItem(key); else storage.setItem(key, old);
+      throw error;
+    }
+  };
+  payload.clearDeviceData = function(storage = globalThis.localStorage) {
+    originalClear(storage);
+    storage.removeItem(key);
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
