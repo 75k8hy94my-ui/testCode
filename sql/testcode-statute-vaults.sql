@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS public.testcode_statute_vaults (
 );
 ALTER TABLE public.testcode_statute_vaults ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.testcode_statute_vaults FROM anon;
-GRANT SELECT, INSERT, UPDATE ON public.testcode_statute_vaults TO authenticated;
+GRANT SELECT, INSERT ON public.testcode_statute_vaults TO authenticated;
+GRANT UPDATE(revision,ciphertext,updated_at) ON public.testcode_statute_vaults TO authenticated;
 DROP POLICY IF EXISTS "statute_owner_select" ON public.testcode_statute_vaults;
 DROP POLICY IF EXISTS "statute_owner_insert" ON public.testcode_statute_vaults;
 DROP POLICY IF EXISTS "statute_owner_update" ON public.testcode_statute_vaults;
