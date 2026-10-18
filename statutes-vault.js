@@ -75,7 +75,7 @@
         try {
           await api('/rest/v1/testcode_statute_vaults',{
             method:'POST',
-            headers:{Prefer:'resolution=ignore-duplicates,return=minimal'},
+            headers:{Prefer:'resolution=ignore-duplicates,return=representation'},
             body:JSON.stringify({user_id:user,revision:1,ciphertext:cipher,wrapped_key:wrapped})
           });
         } catch (error) {
