@@ -91,6 +91,7 @@
       // A remembered statutes-only local access grant must never outlive logout
       // or a change to a different account.
       try { localStorage.removeItem('testCode.statutes.localAccess.v1'); } catch (_) {}
+      try { localStorage.removeItem('testCode.statutes.deviceKey.v1'); localStorage.removeItem('testCode.statutes.independentBase.v1'); } catch (_) {}
     }
     if (session) localStorage.setItem(SESSION_KEY, JSON.stringify(session)); else localStorage.removeItem(SESSION_KEY);
   }
