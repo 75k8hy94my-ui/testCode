@@ -17,22 +17,22 @@ test('statute definitions round trip through Vault payload without losing other 
   assert.deepEqual(JSON.parse(another.get(payload.DATA_KEYS.statuteDefinitions)), sample);
   assert.deepEqual(payload.normalize({}).statuteDefinitions, []);
 });
-test('statutes route bootstraps encrypted Vault sync and refreshes annotations', () => {
-  for (const src of ['vault-sync-merge.js', 'vault-session.js', 'vault-payload.js', 'statutes-definitions.js'])
+test('statutes route bootstraps independent encrypted sync and refreshes annotations', () => {
+  for (const src of ['vault-sync-merge.js', 'vault-session.js', 'vault-payload.js', 'statutes-vault.js', 'statutes-definitions.js'])
     assert.ok(page.includes('src="' + src + '?'), src);
-  assert.ok(page.indexOf('vault-payload.js') < page.indexOf('statutes-definitions.js'));
+  assert.ok(page.indexOf('vault-session.js') < page.indexOf('statutes-vault.js'));
   assert.match(definitions, /manga-vault-payload-applied/);
-  assert.match(definitions, /markLocalChangesPending/);
-  assert.match(definitions, /saveLocalChanges/);
-  assert.match(definitions, /syncStatutesLatest/);
+  assert.match(definitions, /StatutesVault\\?\\.changed/);
+  assert.match(definitions, /window\\.StatutesVault\\.sync\\(\\)/);
+  assert.doesNotMatch(definitions, /markLocalChangesPending/);
 });
 
-test('VPN-free statute sync only applies statuteDefinitions and never bypasses media gates', () => {
-  const vault = fs.readFileSync(new URL('../vault-session.js', import.meta.url), 'utf8');
-  const scope = vault.slice(vault.indexOf('async function syncStatutesLatest()'), vault.indexOf('function syncLatest()', vault.indexOf('async function syncStatutesLatest()')));
-  assert.match(scope, /remote\.statuteDefinitions/);
-  assert.match(scope, /localStorage\.setItem\(key, JSON\.stringify\(remoteNotes\)\)/);
-  assert.doesNotMatch(scope, /applyToLocalStorage\(remote/);
-  assert.doesNotMatch(scope, /canReceiveVaultPayload\(\)/);
-  assert.match(definitions, /await window\.MangaVault\.syncStatutesLatest\(\)/);
+test('statute-only sync never imports media fields and does not require VPN', () => {
+  const independent = fs.readFileSync(new URL('../statutes-vault.js', import.meta.url), 'utf8');
+  assert.match(independent, /testcode_statute_vaults/);
+  assert.match(independent, /AES-GCM/);
+  assert.match(independent, /revision=eq\\./);
+  assert.match(independent, /local-conflict/);
+  assert.doesNotMatch(independent, /canReceiveVaultPayload/);
+  assert.match(definitions, /window\\.StatutesVault\\.sync\\(\\)/);
 });
