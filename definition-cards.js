@@ -113,6 +113,9 @@
     const old = history[id];
     history[id] = schedule(old, grade);
     if (!saveHistory()) { history[id] = old; alert('学習履歴を保存できませんでした。'); return; }
+    if (!window.TestCodeGuest?.isActive()) {
+      try { window.MangaVault?.markLocalChangesPending?.(); window.MangaVault?.saveLocalChanges?.(); } catch (_) { /* retry on next Vault sync */ }
+    }
     if (allToggle.checked) {
       const nextId = queue[index + 1] && cardId(queue[index + 1]);
       rebuild(nextId);
