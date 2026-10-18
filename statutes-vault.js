@@ -135,6 +135,31 @@
     pending = op.finally(() => {pending=null;});
     return pending;
   }
+  async function resolveConflict(choice) {
+    if (!['cloud','local'].includes(choice)) throw new Error('不明な競合解決方法です。');
+    const user = current(), raw = deviceKey();
+    if (!user || !raw) throw new Error('逐条集の認証が必要です。');
+    const row = await remote(user);
+    if (!row) throw new Error('クラウドの逐条集が見つかりません。');
+    const incoming = await unseal(raw,row.ciphertext);
+    if (!valid(incoming)) throw new Error('クラウドデータが不正です。');
+    if (choice === 'cloud') {
+      apply(incoming);
+      save(BASE,{user,revision:row.revision,data:incoming});
+      return {state:'success',applied:true};
+    }
+    const local = snapshot();
+    const cipher = await seal(raw,local);
+    const result = await api(endpoint(user)+'&revision=eq.'+encodeURIComponent(row.revision)+'&select=revision',{
+      method:'PATCH',
+      headers:{Prefer:'return=representation'},
+      body:JSON.stringify({revision:Number(row.revision)+1,ciphertext:cipher,updated_at:new Date().toISOString()})
+    });
+    if (!Array.isArray(result) || result.length !== 1)
+      throw new Error('別の端末で更新されました。再確認してください。');
+    save(BASE,{user,revision:Number(row.revision)+1,data:local});
+    return {state:'success'};
+  }
   // Called only after local statutes edits; never triggers a shared Vault upload.
   let timer;
   function changed() {
@@ -145,5 +170,5 @@
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && hasDeviceKey()) sync().catch(() => {});
   });
-  window.StatutesVault = {hasDeviceKey, sync,changed,wipe};
+  window.StatutesVault = {hasDeviceKey, sync,changed,wipe,resolveConflict};
 })();
