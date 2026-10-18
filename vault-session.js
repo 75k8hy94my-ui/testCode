@@ -86,7 +86,12 @@
     const previous = loadSession();
     const previousUser = previous && previous.user && previous.user.id;
     const nextUser = session && session.user && session.user.id;
-    if (!session || previousUser !== nextUser) clearHistoryRestorePreview();
+    if (!session || previousUser !== nextUser) {
+      clearHistoryRestorePreview();
+      // A remembered statutes-only local access grant must never outlive logout
+      // or a change to a different account.
+      try { localStorage.removeItem('testCode.statutes.localAccess.v1'); } catch (_) {}
+    }
     if (session) localStorage.setItem(SESSION_KEY, JSON.stringify(session)); else localStorage.removeItem(SESSION_KEY);
   }
   function serializeVault(vault) { return vault && vault.rawKey && vault.keyWraps ? { rawKey: b64url(vault.rawKey), keyWraps: vault.keyWraps } : null; }
