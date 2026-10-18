@@ -104,7 +104,7 @@
     setSyncStatus('クラウド同期中…');
     syncInFlight = (async () => {
       try {
-        const result = await window.MangaVault.syncStatutesLatest();
+        const result = await window.StatutesVault.sync();
         if (result?.state === 'success') {
           retryCount = 0;
           setSyncStatus('クラウド同期完了');
@@ -574,7 +574,7 @@
   window.addEventListener('storage', event => {
     if (event.key === STORAGE_KEY) reloadAfterVaultApply();
   });
-  if (!window.TestCodeGuest?.isActive() && window.MangaVault?.loadActive?.()) {
+  if (!window.TestCodeGuest?.isActive() && window.StatutesVault?.hasDeviceKey?.() || window.MangaVault?.loadActive?.()) {
     void performSync();
   }
   window.StatutesDefinitions = {
