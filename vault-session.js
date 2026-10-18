@@ -947,6 +947,7 @@
     const key = 'testCode.statutes.definitions.v1';
     const noteKey = 'testCode.statutes.articleNotes.v1';
     const historyKey = 'testCode.statutes.articleNoteHistory.v1';
+    const reviewsKey = 'testCode.statutes.definitionReviews.v1';
     const readObject = k => { try { const value = JSON.parse(localStorage.getItem(k) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; } catch (_) { return {}; } };
     const readLocal = () => {
       try { const value = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(value) ? value : []; }
@@ -962,6 +963,7 @@
       const before = readLocal();
       const localNotes = readObject(noteKey);
       const localHistory = readObject(historyKey);
+      const localReviews = readObject(reviewsKey);
       const known = getMeta(user.id);
       const baseline = known?.encryptedBaseline ? await decryptBaseline(known.encryptedBaseline, user.id) : null;
       const remote = await decryptPayload(record.payload);
@@ -969,8 +971,15 @@
       const previousNotes = baseline && Array.isArray(baseline.statuteDefinitions) ? baseline.statuteDefinitions : [];
       const remoteArticleNotes = remote.articleNotes || {};
       const remoteHistory = remote.articleNoteHistory || {};
+      const remoteReviews = remote.definitionReviews || {};
       const previousArticleNotes = baseline?.articleNotes || {};
       const previousHistory = baseline?.articleNoteHistory || {};
+      const previousReviews = baseline?.definitionReviews || {};
+      // Preserve the most recently reviewed version of each card across devices.
+      const mergedReviews = { ...remoteReviews };
+      for (const [id, entry] of Object.entries(localReviews)) {
+        if (entry && Number.isFinite(entry.lastReviewed) && (!mergedReviews[id] || entry.lastReviewed > Number(mergedReviews[id].lastReviewed || 0))) mergedReviews[id] = entry;
+      }
       const changedLocally = !samePayload(localNotes, previousArticleNotes) || !samePayload(localHistory, previousHistory);
       if (!baseline && (Object.keys(localNotes).length || Object.keys(localHistory).length) && (!samePayload(localNotes, remoteArticleNotes) || !samePayload(localHistory, remoteHistory)))
         return {state:'deferred',reason:'local-conflict'};
@@ -992,8 +1001,9 @@
         localStorage.setItem(noteKey, JSON.stringify(remoteArticleNotes));
         localStorage.setItem(historyKey, JSON.stringify(remoteHistory));
       }
-      if (!samePayload(before, remoteNotes) || applyArticleNotes) emitPayloadApplied();
-      return { state: 'success', applied: !samePayload(before, remoteNotes) || applyArticleNotes };
+      if (!samePayload(localReviews, mergedReviews)) localStorage.setItem(reviewsKey, JSON.stringify(mergedReviews));
+      if (!samePayload(before, remoteNotes) || applyArticleNotes || !samePayload(localReviews, mergedReviews)) emitPayloadApplied();
+      return { state: 'success', applied: !samePayload(before, remoteNotes) || applyArticleNotes || !samePayload(localReviews, mergedReviews) };
     }));
   }
   function syncLatest() {
