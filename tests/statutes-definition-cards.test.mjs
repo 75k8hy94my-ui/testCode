@@ -64,3 +64,35 @@ test('standalone cards UI replaces statute-header shortcut and its checkbox', ()
   assert.match(rail, /href: 'definition-cards\.html'/);
   assert.match(home, /class="homeStudyMenu"/);
 });
+
+test('definition review history is included in vault payload lifecycle', () => {
+  const payload = require('../vault-payload.js');
+  const key = 'testCode.statutes.definitionReviews.v1';
+  const map = new Map();
+  const storage = {
+    getItem: k => map.get(k) ?? null,
+    setItem: (k,v) => map.set(k,v),
+    removeItem: k => map.delete(k),
+  };
+  const review = { 'civil-general:１条:0:0:2': { ease:2.5, due:1700000000000, lastReviewed:1699999990000, reviews:[] } };
+  storage.setItem(key, JSON.stringify(review));
+  const snapshot = payload.buildFromLocalStorage(storage);
+  assert.deepEqual(snapshot.definitionReviews, review);
+  const restored = new Map();
+  const target = { getItem:k => restored.get(k) ?? null, setItem:(k,v)=>restored.set(k,v), removeItem:k=>restored.delete(k) };
+  payload.applyToLocalStorage(snapshot,target);
+  assert.deepEqual(JSON.parse(target.getItem(key)),review);
+  payload.clearDeviceData(target);
+  assert.equal(target.getItem(key), null);
+});
+
+test('definition card scheduling and rating controls are wired', () => {
+  const ui = read('definition-cards.js');
+  const page = read('definition-cards.html');
+  assert.match(ui,/function schedule\(/);
+  assert.match(ui,/lastReviewed: now/);
+  assert.match(ui,/data-grade/);
+  assert.match(page,/id="definitionCardsRating"/);
+  assert.match(page,/data-grade="0"/);
+  assert.match(page,/data-grade="3"/);
+});
