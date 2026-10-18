@@ -65,7 +65,20 @@
   if (!session?.refresh_token || !config.url || !config.publishableKey) {
     location.replace('index.html'); return;
   }
-  if (!vault.loadActive?.()) { location.replace('sync.html'); return; }
+  // Persist authorization for the statutes UI only; never persist a Vault key.
+  // This does NOT authorize decrypting or syncing the shared Vault.
+  const grantKey = 'testCode.statutes.localAccess.v1';
+  const userId = String(session.user?.id || '');
+  let remembered = false;
+  try {
+    const grant = JSON.parse(localStorage.getItem(grantKey) || 'null');
+    remembered = Boolean(userId && grant?.userId === userId);
+  } catch (_) {}
+  if (vault.loadActive?.() && userId) {
+    try { localStorage.setItem(grantKey, JSON.stringify({ userId })); } catch (_) {}
+    remembered = true;
+  }
+  if (!vault.loadActive?.() && !remembered) { location.replace('sync.html'); return; }
   try {
     await vault.ensureSession();
     // Cards are part of the VPN-free statutes corpus.
