@@ -5,12 +5,16 @@
   const BASE = 'testCode.statutes.independentBase.v1';
   const FIELDS = ['testCode.statutes.definitions.v1','testCode.statutes.articleNotes.v1','testCode.statutes.articleNoteHistory.v1'];
   const encoder = new TextEncoder(), decoder = new TextDecoder();
-  const encode = bytes => btoa(String.fromCharCode(...bytes));
+  const encode = bytes => {
+    let output = '';
+    for (let i=0; i<bytes.length; i+=8192)
+      output += String.fromCharCode(...bytes.subarray(i,i+8192));
+    return btoa(output);
+  };
   const decode = value => Uint8Array.from(atob(value), c => c.charCodeAt(0));
   const bytes = n => crypto.getRandomValues(new Uint8Array(n));
   const read = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } };
   const save = (k,v) => localStorage.setItem(k,JSON.stringify(v));
-  const stable = x => JSON.stringify(x, Object.keys(x || {}).sort());
   const current = () => {
     const session = window.MangaVault?.loadSession?.();
     return session?.user?.id && session?.refresh_token ? String(session.user.id) : null;
@@ -137,5 +141,9 @@
     clearTimeout(timer);
     timer = setTimeout(() => { sync().catch(() => {}); },250);
   }
+  window.addEventListener('online', () => { if (hasDeviceKey()) sync().catch(() => {}); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && hasDeviceKey()) sync().catch(() => {});
+  });
   window.StatutesVault = {hasDeviceKey, sync,changed,wipe};
 })();
