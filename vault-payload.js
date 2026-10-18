@@ -130,3 +130,30 @@ const api={DATA_KEYS,LOCAL_ONLY_KEYS,pointerPath,defaults,normalize:normalizeWit
     storage.removeItem(historyKey);
   };
 })(typeof window !== 'undefined' ? window : globalThis);
+
+/* After independent enrollment, legacy media Vault restores must not overwrite
+   the statutes-only corpus with stale copies retained in older Vault snapshots. */
+;(function(root) {
+  'use strict';
+  const payload = root.MangaVaultPayload;
+  if (!payload) return;
+  const oldApply = payload.applyToLocalStorage;
+  const keys = ['testCode.statutes.definitions.v1','testCode.statutes.articleNotes.v1','testCode.statutes.articleNoteHistory.v1'];
+  payload.applyToLocalStorage = function(value, storage = root.localStorage) {
+    let key = null, session = null;
+    try {
+      key = JSON.parse(storage.getItem('testCode.statutes.deviceKey.v1') || 'null');
+      session = root.MangaVault?.loadSession?.();
+    } catch (_) {}
+    if (!key || !session?.user?.id || key.user !== session.user.id) return oldApply(value,storage);
+    const before = keys.map(k => storage.getItem(k));
+    try {
+      const result = oldApply(value,storage);
+      keys.forEach((k,i) => before[i] === null ? storage.removeItem(k) : storage.setItem(k,before[i]));
+      return result;
+    } catch(error) {
+      keys.forEach((k,i) => before[i] === null ? storage.removeItem(k) : storage.setItem(k,before[i]));
+      throw error;
+    }
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
