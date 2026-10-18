@@ -467,20 +467,7 @@
       definitions = normalized;
       redraw();
       if (!guestMode) setSyncStatus('クラウド同期待ち');
-      if (!window.TestCodeGuest?.isActive()) {
-        const vault = window.MangaVault;
-        try {
-          if (vault?.markLocalChangesPending?.()) {
-            Promise.resolve(vault.saveLocalChanges()).catch(error => {
-              status.textContent = '端末に保存済み・クラウド同期待ち：' + (error?.message || '接続を確認してください');
-            });
-          } else {
-            status.textContent = '端末に保存済み・クラウド同期待ち';
-          }
-        } catch (error) {
-          status.textContent = '端末に保存済み・クラウド同期待ち';
-        }
-      }
+      if (!window.TestCodeGuest?.isActive()) window.StatutesVault?.changed?.();
       return true;
     } catch (_) {
       status.textContent = '保存できませんでした';
