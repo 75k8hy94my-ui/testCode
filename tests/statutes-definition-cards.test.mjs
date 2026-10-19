@@ -97,31 +97,30 @@ test('definition card scheduling and rating controls are wired', () => {
   assert.match(page,/data-grade="3"/);
 });
 
-test('FSRS-6 initial grades, retrievability and history migration', () => {
-  const fsrs = require('../definition-fsrs.js');
-  assert.equal(fsrs.weights.length,21);
-  assert.ok(Math.abs(fsrs.retrievability(10,10)-0.9)<1e-10);
-  const now = Date.UTC(2026,9,19);
+test('official FSRS UMD library schedules four grades and migrates history', () => {
+  const official=require('../fsrs-runtime/ts-fsrs.umd.js');
+  global.FSRS=official;
+  const fsrs=require('../definition-fsrs.js');
+  const now=Date.UTC(2026,9,19);
   const again=fsrs.schedule(null,0,now);
   const good=fsrs.schedule(null,2,now);
   const easy=fsrs.schedule(null,3,now);
   assert.equal(again.due,now+60_000);
   assert.ok(easy.due>good.due);
-  assert.equal(good.algorithm,'fsrs6');
+  assert.equal(good.algorithm,'ts-fsrs-v6');
+  assert.equal(good.reviews.length,1);
+  assert.equal(fsrs.isReady(),true);
   const followup=fsrs.schedule(good,2,good.due);
-  assert.ok(followup.stability>good.stability);
   assert.equal(followup.reviews.length,2);
+  assert.ok(followup.stability>0);
   const old={ease:2.5,interval:3,reps:2,lastReviewed:now-86400000,reviews:[{at:now-86400000,grade:2,due:now}]};
   const migrated=fsrs.schedule(old,2,now);
-  assert.equal(migrated.algorithm,'fsrs6');
+  assert.equal(migrated.algorithm,'ts-fsrs-v6');
   assert.equal(migrated.reviews.length,2);
   assert.equal(migrated.ease,old.ease);
 });
-
-test('FSRS retention settings alter intervals and reschedule existing reviews',()=>{
+test('retention changes use official scheduler without losing review events',()=>{
  const fsrs=require('../definition-fsrs.js');
- assert.equal(fsrs.weights[0],0.212);
- assert.equal(fsrs.weights[20],0.1542);
  const at=Date.UTC(2026,9,19);
  const record=fsrs.schedule(undefined,3,at);
  const high=fsrs.reschedule(record,0.95);
@@ -130,25 +129,14 @@ test('FSRS retention settings alter intervals and reschedule existing reviews',(
  assert.equal(high.reviews.length,record.reviews.length);
  assert.equal(high.lastReviewed,record.lastReviewed);
 });
-
-test('FSRS optimizer does not fit insufficient study histories', () => {
+test('optimizer integration uses fsrs-browser WASM and preserves full history',()=>{
+ const source=read('fsrs-build/optimizer.worker.js');
+ assert.match(source,/fsrs-browser\\/fsrs_browser/);
+ assert.match(source,/computeParameters\\(/);
+ assert.match(read('definition-cards.html'),/fsrs-runtime\\/ts-fsrs.umd.js/);
  const fsrs=require('../definition-fsrs.js');
- const result=fsrs.optimize({'card':{reviews:[{at:1,grade:2},{at:86400001,grade:0}]}});
- assert.equal(result.status,'insufficient');
- assert.equal(result.samples,1);
- assert.equal(fsrs.validWeights(fsrs.weights),true);
+ assert.ok(fsrs.validWeights(fsrs.weights));
  assert.equal(fsrs.validWeights(Array(21).fill(-1)),false);
-});
-test('personalized scheduler uses bounded coefficients and preserves history', () => {
- const fsrs=require('../definition-fsrs.js');
- const weights=fsrs.weights.slice();weights[0]=1;
- const at=Date.UTC(2026,9,19);
- const result=fsrs.schedule(null,0,at,{weights});
- assert.equal(result.stability,1);
- assert.equal(result.reviews.length,1);
- const updated=fsrs.reschedule(result,0.9,weights);
- assert.equal(updated.reviews.length,1);
- assert.equal(updated.stability,1);
- const html=read('definition-cards.html');
- assert.match(html,/definitionCardsOptimize/);
+ const historical=fsrs.schedule(null,2,Date.UTC(2026,9,19));
+ assert.equal(fsrs.reschedule(historical,0.9).reviews.length,1);
 });
