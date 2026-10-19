@@ -16,6 +16,8 @@
   const summary = document.getElementById('definitionCardsSummary');
   const allToggle = document.getElementById('definitionCardsAll');
   const progressKey = 'testCode.statutes.definitionReviews.v1';
+  const calibrationFlag = 'testCode.statutes.fsrsPendingSync.v1';
+  const exportButton = document.getElementById('definitionCardsExport');
   const retentionKey = 'testCode.statutes.definitionRetention.v1';
   const weightsKey = 'testCode.statutes.definitionFSRSWeights.v1';
   const optimizeButton = document.getElementById('definitionCardsOptimize');
@@ -69,6 +71,9 @@
     answer.hidden = true;
     flip.textContent = '答えを見る';
     rating.hidden = true;
+    const ready=window.DefinitionFSRS.isReady();
+    flip.disabled=!ready;
+    if(!ready)summary.textContent+=' ・ 公式FSRSの読込待ち';
     prev.disabled = index === 0;
     next.disabled = index === queue.length - 1;
   }
@@ -85,7 +90,8 @@
     if (!Number.isInteger(grade) || grade < 0 || grade > 3) return;
     const id = cardId(queue[index]);
     const old = history[id];
-    history[id] = schedule(old, grade);
+    try { history[id] = schedule(old, grade); }
+    catch(error) { alert(error.message || 'FSRSの計算に失敗しました。'); return; }
     if (!saveHistory()) { history[id] = old; alert('学習履歴を保存できませんでした。'); return; }
     if (!window.TestCodeGuest?.isActive()) {
       try { window.MangaVault?.markLocalChangesPending?.(); window.MangaVault?.saveLocalChanges?.(); } catch (_) { /* retry on next Vault sync */ }
@@ -109,7 +115,7 @@
     try {
       localStorage.setItem(retentionKey,String(value));
       history=loadHistory();
-      for (const [id, record] of Object.entries(history)) history[id]=window.DefinitionFSRS.reschedule(record,value,customWeights()||window.DefinitionFSRS.weights);
+      for (const [id, record] of Object.entries(history)) history[id]=window.DefinitionFSRS.reschedule(record,value,customWeights());
       if (!saveHistory()) throw Error('save failed');
       if (!window.TestCodeGuest?.isActive()) { window.MangaVault?.markLocalChangesPending?.(); Promise.resolve(window.MangaVault?.saveLocalChanges?.()).catch(()=>{}); }
       rebuild();
@@ -117,7 +123,8 @@
   });
   // Export immutable review events, preserving timestamps and four-grade values.
   // Do not claim that the former local coordinate-descent fit is Anki-equivalent.
-  optimizeButton?.addEventListener('click', () => {
+  optimizeButton?.addEventListener('click', () => { location.href='fsrs-trainer/index.html'; });
+  exportButton?.addEventListener('click', () => {
     const entries=Object.entries(loadHistory()).flatMap(([cardId,record]) => (
       Array.isArray(record?.reviews) ? record.reviews.filter(e=>Number.isFinite(e.at)&&Number.isInteger(e.grade)&&e.grade>=0&&e.grade<=3).map(e=>({
         card_id:cardId,review_time:new Date(e.at).toISOString(),rating:e.grade+1
@@ -134,10 +141,20 @@
     setTimeout(()=>URL.revokeObjectURL(url),1000);
     optimizeStatus.textContent=entries.length+'件の復習記録をCSVで出力しました。公式最適化には形式変換が必要です。';
   });
+
+  function applyPendingCalibration() {
+    if(!localStorage.getItem(calibrationFlag))return false;
+    if(!window.DefinitionFSRS.isReady())throw Error('公式FSRSスケジューラーを読み込めませんでした。');
+    const current=loadHistory(),weights=customWeights();
+    for(const [id,record] of Object.entries(current))current[id]=window.DefinitionFSRS.reschedule(record,desiredRetention(),weights);
+    localStorage.setItem(progressKey,JSON.stringify(current));
+    refresh();
+    return true;
+  }
   window.addEventListener('storage', event => {
     if (event.key === store.STORAGE_KEY || event.key === progressKey) refresh();
   });
   document.addEventListener('manga-vault-payload-applied', refresh);
-  window.DefinitionCards = { refresh, schedule, progressKey };
+  window.DefinitionCards = { refresh, schedule, progressKey, applyPendingCalibration, calibrationFlag };
   refresh();
 })();
