@@ -27,8 +27,9 @@ test('official ts-fsrs grades cards and persists official state', async ({page})
 
 test('FSRS trainer isolates only its own route on localhost', async ({page}) => {
   await page.goto('fsrs-trainer/index.html');
-  await expect.poll(async()=>page.evaluate(()=>globalThis.crossOriginIsolated),{timeout:15000}).toBe(true);
-  await expect(page.locator('#fsrsTrainerRun')).toBeEnabled();
+  // The isolation service worker reloads this document once. Waiting on
+  // an element avoids evaluating inside a page whose context was replaced.
+  await expect(page.locator('#fsrsTrainerRun')).toBeEnabled({timeout:20000});
   await page.locator('#fsrsTrainerRun').click();
   await expect(page.locator('#fsrsTrainerStatus')).toContainText('学習履歴が不足');
 });
@@ -57,8 +58,7 @@ test('official Rust optimizer trains locally and saves 21 coefficients', async (
     localStorage.setItem('testCode.statutes.definitionReviews.v1',JSON.stringify(records));
   });
   await page.goto('fsrs-trainer/index.html');
-  await expect.poll(async()=>page.evaluate(()=>globalThis.crossOriginIsolated),{timeout:20000}).toBe(true);
-  await expect(page.locator('#fsrsTrainerRun')).toBeEnabled();
+  await expect(page.locator('#fsrsTrainerRun')).toBeEnabled({timeout:20000});
   await page.locator('#fsrsTrainerRun').click();
   await expect(page.locator('#fsrsTrainerStatus')).toContainText(/最適化が完了しました|最適化に失敗しました/,{timeout:90000});
   await expect(page.locator('#fsrsTrainerStatus')).toContainText('最適化が完了しました');
