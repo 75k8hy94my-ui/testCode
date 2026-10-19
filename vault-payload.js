@@ -165,3 +165,43 @@ const api={DATA_KEYS,LOCAL_ONLY_KEYS,pointerPath,defaults,normalize:normalizeWit
     storage.removeItem(key);
   };
 })(typeof window !== 'undefined' ? window : globalThis);
+
+;(function(root){
+ 'use strict';
+ const payload=typeof module!=='undefined'&&module.exports?module.exports:root.MangaVaultPayload;
+ if(!payload)return;
+ const weightsKey='testCode.statutes.definitionFSRSWeights.v1';
+ const retentionKey='testCode.statutes.definitionRetention.v1';
+ const read=(storage,key)=>storage.getItem(key);
+ const parse=(raw)=>{try{return JSON.parse(raw)}catch(_){return null}};
+ const validWeights=value=>Array.isArray(value)&&value.length===21&&value.every(v=>Number.isFinite(v)&&v>0&&v<100);
+ const retention=value=>Number.isFinite(Number(value))&&Number(value)>=0.7&&Number(value)<=0.97?Number(value):0.9;
+ const oldNormalize=payload.normalize,oldBuild=payload.buildFromLocalStorage,oldApply=payload.applyToLocalStorage,oldClear=payload.clearDeviceData;
+ payload.DATA_KEYS.definitionFSRSWeights=weightsKey;
+ payload.DATA_KEYS.definitionRetention=retentionKey;
+ payload.normalize=function(value){
+   const result=oldNormalize(value);
+   const weights=value&&value.definitionFSRSWeights;
+   return {...result,definitionFSRSWeights:validWeights(weights)?weights:null,definitionRetention:retention(value&&value.definitionRetention)};
+ };
+ payload.buildFromLocalStorage=function(storage=globalThis.localStorage){
+   const base=oldBuild(storage);
+   return payload.normalize({...base,definitionFSRSWeights:parse(read(storage,weightsKey)),definitionRetention:read(storage,retentionKey)});
+ };
+ payload.applyToLocalStorage=function(value,storage=globalThis.localStorage){
+   const priorW=read(storage,weightsKey),priorR=read(storage,retentionKey);
+   try {
+     const result=oldApply(value,storage);
+     const config=payload.normalize(value);
+     if(config.definitionFSRSWeights) storage.setItem(weightsKey,JSON.stringify(config.definitionFSRSWeights));
+     else storage.removeItem(weightsKey);
+     storage.setItem(retentionKey,String(config.definitionRetention));
+     return {...result,definitionFSRSWeights:config.definitionFSRSWeights,definitionRetention:config.definitionRetention};
+   }catch(error){
+     if(priorW==null)storage.removeItem(weightsKey);else storage.setItem(weightsKey,priorW);
+     if(priorR==null)storage.removeItem(retentionKey);else storage.setItem(retentionKey,priorR);
+     throw error;
+   }
+ };
+ payload.clearDeviceData=function(storage=globalThis.localStorage){oldClear(storage);storage.removeItem(weightsKey);storage.removeItem(retentionKey);};
+})(typeof window!=='undefined'?window:globalThis);
