@@ -1,0 +1,30 @@
+name: Verify statutes persistent access
+on:
+  push:
+    branches:
+      - main
+      - integration/statutes-session-persistence-pr281
+      - feature/statutes-persistent-local-access-20261018
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  independent-statutes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Verify independent encrypted vault and FSRS migrations
+        run: |
+          node --check statutes-vault.js
+          node --check definition-cards.js
+          node --check statutes-definitions.js
+          node --test tests/statutes-independent-vault.test.mjs tests/statutes-persistent-local-access.test.mjs tests/statutes-vault-sync.test.mjs tests/statutes-definition-cards.test.mjs
+      - name: Smoke test official FSRS UI
+        run: |
+          npx playwright install --with-deps chromium
+          npx playwright test e2e/fsrs-official.spec.mjs

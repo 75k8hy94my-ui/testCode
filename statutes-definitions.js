@@ -58,7 +58,25 @@
   retryButton.title = '逐条集のクラウド同期を再試行';
   retryButton.style.cssText = 'font:inherit;font-size:12px;color:inherit;background:transparent;border:1px solid currentColor;border-radius:5px;padding:3px 5px;cursor:pointer';
   retryButton.hidden = true;
-  (currentLabel || header.querySelector('.globalShellBrand'))?.after(editSwitch, syncStatus, retryButton);
+  const cloudChoice = document.createElement('button');
+  const localChoice = document.createElement('button');
+  for (const [button,label] of [[cloudChoice,'クラウドを採用'],[localChoice,'この端末を採用']]) {
+    button.type='button';
+    button.textContent=label;
+    button.hidden=true;
+    button.style.cssText='font:inherit;font-size:12px;padding:3px 5px;cursor:pointer';
+    button.addEventListener('click', async () => {
+      if (!confirm(label+'します。選ばなかった側の変更は復元できない場合があります。よろしいですか？')) return;
+      button.disabled=true;
+      try {
+        await window.StatutesVault.resolveConflict(button===cloudChoice?'cloud':'local');
+        cloudChoice.hidden=localChoice.hidden=true;
+        await performSync();
+      } catch(error) { setSyncStatus('競合の解決に失敗：'+String(error.message||error)); }
+      finally { button.disabled=false; }
+    });
+  }
+  (currentLabel || header.querySelector('.globalShellBrand'))?.after(editSwitch, syncStatus, retryButton, cloudChoice, localChoice);
   const guestMode = window.TestCodeGuest?.isActive() === true;
   let syncTimer = null;
   let syncInFlight = null;
@@ -104,13 +122,15 @@
     setSyncStatus('クラウド同期中…');
     syncInFlight = (async () => {
       try {
-        const result = await window.MangaVault.syncStatutesLatest();
+        const result = await window.StatutesVault.sync();
         if (result?.state === 'success') {
           retryCount = 0;
           setSyncStatus('クラウド同期完了');
+          cloudChoice.hidden = localChoice.hidden = true;
         } else {
           const reason = describeDeferred(result?.reason);
           const conflict = result?.reason === 'local-conflict';
+          cloudChoice.hidden = localChoice.hidden = !conflict;
           setSyncStatus((conflict ? '同期競合' : 'クラウド同期待ち') + '（' + reason + '）');
           retryButton.hidden = false;
           // Conflicts and locked/unauthenticated states require intervention.
@@ -467,20 +487,7 @@
       definitions = normalized;
       redraw();
       if (!guestMode) setSyncStatus('クラウド同期待ち');
-      if (!window.TestCodeGuest?.isActive()) {
-        const vault = window.MangaVault;
-        try {
-          if (vault?.markLocalChangesPending?.()) {
-            Promise.resolve(vault.saveLocalChanges()).catch(error => {
-              status.textContent = '端末に保存済み・クラウド同期待ち：' + (error?.message || '接続を確認してください');
-            });
-          } else {
-            status.textContent = '端末に保存済み・クラウド同期待ち';
-          }
-        } catch (error) {
-          status.textContent = '端末に保存済み・クラウド同期待ち';
-        }
-      }
+      if (!window.TestCodeGuest?.isActive()) window.StatutesVault?.changed?.();
       return true;
     } catch (_) {
       status.textContent = '保存できませんでした';
@@ -574,7 +581,7 @@
   window.addEventListener('storage', event => {
     if (event.key === STORAGE_KEY) reloadAfterVaultApply();
   });
-  if (!window.TestCodeGuest?.isActive() && window.MangaVault?.loadActive?.()) {
+  if (!window.TestCodeGuest?.isActive() && (window.StatutesVault?.hasDeviceKey?.() || window.MangaVault?.loadActive?.())) {
     void performSync();
   }
   window.StatutesDefinitions = {

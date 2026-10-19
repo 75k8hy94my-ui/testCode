@@ -104,7 +104,7 @@
     catch(error) { alert(error.message || 'FSRSの計算に失敗しました。'); return; }
     if (!saveHistory()) { history[id] = old; alert('学習履歴を保存できませんでした。'); return; }
     if (!window.TestCodeGuest?.isActive()) {
-      try { window.MangaVault?.markLocalChangesPending?.(); window.MangaVault?.saveLocalChanges?.(); } catch (_) { /* retry on next Vault sync */ }
+      try { window.StatutesVault?.changed?.(); } catch (_) { /* retry on next Vault sync */ }
     }
     if (allToggle.checked) {
       const nextId = queue[index + 1] && cardId(queue[index + 1]);
@@ -127,7 +127,7 @@
       history=loadHistory();
       for (const [id, record] of Object.entries(history)) history[id]=window.DefinitionFSRS.reschedule(record,value,customWeights());
       if (!saveHistory()) throw Error('save failed');
-      if (!window.TestCodeGuest?.isActive()) { window.MangaVault?.markLocalChangesPending?.(); Promise.resolve(window.MangaVault?.saveLocalChanges?.()).catch(()=>{}); }
+      if (!window.TestCodeGuest?.isActive()) { window.StatutesVault?.changed?.(); }
       rebuild();
     } catch (_) { alert('復習設定を保存できませんでした。'); }
   });
