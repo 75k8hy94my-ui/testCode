@@ -38,11 +38,21 @@ test('official Rust optimizer trains locally and saves 21 coefficients', async (
   await page.goto('index.html');
   await page.evaluate(() => {
     const records={},day=86400000,now=Date.UTC(2026,9,19);
-    for(let i=0;i<120;i++){
-      const base=now-(120+i%18)*day;
-      const grades=[i%4===0?0:i%4===1?1:i%4===2?2:3, i%3===0?0:2, i%4===0?1:2, i%5===0?0:3, i%5===0?0:2];
-      const dates=[base,base+3*day,base+13*day,base+30*day,base+60*day];
-      records['synthetic:'+i]={reviews:grades.map((grade,j)=>({at:dates[j],grade,due:dates[j]+day}))};
+    // Vary first ratings, intervals and successes. Constant recall rates
+    // cannot initialize a personalized FSRS curve (NotEnoughData).
+    for(let i=0;i<640;i++){
+      const base=now-(280+i%50)*day;
+      let t=base;
+      const reviews=[];
+      const count=3+(i%5);
+      for(let j=0;j<count;j++){
+        const interval=j===0?0:1+((i*17+j*29+(i>>2))%75);
+        t+=interval*day;
+        const seed=(i*73+j*109+i*j*13)%101;
+        const grade=j===0?i%4:(seed<23?0:seed<36?1:seed<85?2:3);
+        reviews.push({at:t,grade,due:t+day});
+      }
+      records['synthetic:'+i]={reviews};
     }
     localStorage.setItem('testCode.statutes.definitionReviews.v1',JSON.stringify(records));
   });
