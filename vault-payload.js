@@ -174,7 +174,7 @@ const api={DATA_KEYS,LOCAL_ONLY_KEYS,pointerPath,defaults,normalize:normalizeWit
  const retentionKey='testCode.statutes.definitionRetention.v1';
  const read=(storage,key)=>storage.getItem(key);
  const parse=(raw)=>{try{return JSON.parse(raw)}catch(_){return null}};
- const validWeights=value=>Array.isArray(value)&&value.length===21&&value.every(v=>Number.isFinite(v)&&v>0&&v<100);
+ const validWeights=value=>Array.isArray(value)&&value.length===21&&value.every(v=>Number.isFinite(v)&&v>=0&&v<100)&&value[0]>0&&value[20]>=0.1&&value[20]<=0.8;
  const retention=value=>Number.isFinite(Number(value))&&Number(value)>=0.7&&Number(value)<=0.97?Number(value):0.9;
  const oldNormalize=payload.normalize,oldBuild=payload.buildFromLocalStorage,oldApply=payload.applyToLocalStorage,oldClear=payload.clearDeviceData;
  payload.DATA_KEYS.definitionFSRSWeights=weightsKey;
