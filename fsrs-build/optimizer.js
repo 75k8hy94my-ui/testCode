@@ -6,7 +6,7 @@ const WEIGHTS='testCode.statutes.definitionFSRSWeights.v1';
 const RETENTION='testCode.statutes.definitionRetention.v1';
 const DIRTY='testCode.statutes.fsrsPendingSync.v1';
 const DAY=86400000;
-const validWeights=x=>Array.isArray(x)&&x.length===21&&x.every(v=>Number.isFinite(v)&&v>0&&v<100);
+const validWeights=x=>Array.isArray(x)&&x.length===21&&x.every(v=>Number.isFinite(v)&&v>=0&&v<100)&&x[0]>0&&x[20]>=0.1&&x[20]<=0.8;
 
 function studyDay(epoch) {
   const date=new Date(epoch-4*3600000);
