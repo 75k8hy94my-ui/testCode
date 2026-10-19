@@ -107,10 +107,17 @@
     const rect = button.getBoundingClientRect();
     const width = dropdown.offsetWidth;
     const x = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
-    const y = Math.min(rect.bottom, window.innerHeight - 48);
+    const mobile = window.matchMedia('(max-width:899px)').matches;
     dropdown.style.left = x + 'px';
-    dropdown.style.top = y + 'px';
-    dropdown.style.maxHeight = Math.max(90, window.innerHeight - y - 10) + 'px';
+    if (mobile) {
+      const available = Math.max(90, rect.top - 12);
+      dropdown.style.maxHeight = available + 'px';
+      dropdown.style.top = Math.max(8, rect.top - Math.min(dropdown.scrollHeight, available) - 6) + 'px';
+    } else {
+      const y = Math.min(rect.bottom, window.innerHeight - 48);
+      dropdown.style.top = y + 'px';
+      dropdown.style.maxHeight = Math.max(90, window.innerHeight - y - 10) + 'px';
+    }
   }
 
   function renderCategory(id) {
