@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+      - feature/manual-study-cards-20261019
       - integration/statutes-session-persistence-pr281
       - feature/statutes-persistent-local-access-20261018
   workflow_dispatch:
@@ -22,9 +23,10 @@ jobs:
         run: |
           node --check statutes-vault.js
           node --check definition-cards.js
+          node --check manual-study-cards.js
           node --check statutes-definitions.js
-          node --test tests/statutes-independent-vault.test.mjs tests/statutes-persistent-local-access.test.mjs tests/statutes-vault-sync.test.mjs tests/statutes-definition-cards.test.mjs
+          node --test tests/statutes-independent-vault.test.mjs tests/statutes-persistent-local-access.test.mjs tests/statutes-vault-sync.test.mjs tests/statutes-definition-cards.test.mjs tests/manual-study-cards.test.mjs
       - name: Smoke test official FSRS UI
         run: |
           npx playwright install --with-deps chromium
-          npx playwright test e2e/fsrs-official.spec.mjs
+          npx playwright test e2e/fsrs-official.spec.mjs e2e/manual-study-cards.spec.mjs
