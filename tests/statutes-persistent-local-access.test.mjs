@@ -44,6 +44,6 @@ test('FSRS history and optimizer settings live in the separate encrypted statute
  const independent=root('statutes-vault.js');
  const cards=root('definition-cards.js');
  for(const key of ['definitionReviews.v1','definitionFSRSWeights.v1','definitionRetention.v1'])assert.ok(independent.includes(key));
- assert.match(cards,/StatutesVault\\?\\.changed/);
+ assert.ok(cards.includes('StatutesVault?.changed'));
  assert.doesNotMatch(cards,/markLocalChangesPending/);
 });
