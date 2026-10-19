@@ -1,0 +1,31 @@
+name: Verify official FSRS integration
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'definition-fsrs.js'
+      - 'definition-cards.js'
+      - 'definition-cards.html'
+      - 'vault-payload.js'
+      - 'fsrs-build/**'
+      - 'fsrs-runtime/**'
+      - 'fsrs-trainer/**'
+      - 'tests/statutes-definition-cards.test.mjs'
+      - 'e2e/fsrs-official.spec.mjs'
+      - '.github/workflows/verify-fsrs.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node --test tests/statutes-definition-cards.test.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test e2e/fsrs-official.spec.mjs
