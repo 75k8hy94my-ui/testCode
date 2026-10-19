@@ -8,6 +8,9 @@ on:
       - 'fsrs-trainer/coi-sw.js'
       - '.github/workflows/build-official-fsrs.yml'
   workflow_dispatch:
+concurrency:
+  group: official-fsrs-runtime-main
+  cancel-in-progress: true
 permissions:
   contents: write
 jobs:
@@ -34,12 +37,21 @@ jobs:
           find fsrs-trainer/build -type f -name '*.wasm' | grep -q .
       - name: Commit self-hosted FSRS assets
         run: |
+          mkdir -p /tmp/official-fsrs-artifacts
+          cp -R fsrs-trainer/build /tmp/official-fsrs-artifacts/build
+          cp fsrs-runtime/ts-fsrs.umd.js /tmp/official-fsrs-artifacts/ts-fsrs.umd.js
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f fsrs-trainer/build fsrs-runtime/ts-fsrs.umd.js
-          if ! git diff --cached --quiet; then
-            git commit -m "Vendor official FSRS browser runtime artifacts"
+          for attempt in 1 2 3; do
             git fetch origin main
-            git rebase origin/main
-            git push
-          fi
+            git reset --hard origin/main
+            rm -rf fsrs-trainer/build
+            mkdir -p fsrs-trainer fsrs-runtime
+            cp -R /tmp/official-fsrs-artifacts/build fsrs-trainer/build
+            cp /tmp/official-fsrs-artifacts/ts-fsrs.umd.js fsrs-runtime/ts-fsrs.umd.js
+            git add -f fsrs-trainer/build fsrs-runtime/ts-fsrs.umd.js
+            if git diff --cached --quiet; then exit 0; fi
+            git commit -m "Vendor official FSRS browser runtime artifacts"
+            if git push origin HEAD:main; then exit 0; fi
+          done
+          exit 1
