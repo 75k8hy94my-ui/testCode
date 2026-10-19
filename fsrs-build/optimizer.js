@@ -17,21 +17,37 @@ function trainingInput() {
   let raw;
   try{raw=JSON.parse(localStorage.getItem(STORAGE)||'{}');}catch(_){raw={};}
   const ratings=[],deltaTs=[],lengths=[];
+  let reviewCount=0,cardCount=0;
   for(const record of Object.values(raw||{})){
     const reviews=Array.isArray(record?.reviews)?record.reviews:[];
     const valid=reviews.filter(e=>e&&Number.isFinite(e.at)&&Number.isInteger(e.grade)&&e.grade>=0&&e.grade<=3)
       .sort((a,b)=>a.at-b.at);
-    if(!valid.length)continue;
-    let prev=null;
+    if(valid.length<2)continue;
+    const grades=[],deltas=[];
+    let previous=null;
     for(const event of valid){
       const day=studyDay(event.at);
-      ratings.push(event.grade+1);
-      deltaTs.push(prev===null?0:Math.max(0,day-prev));
-      prev=day;
+      grades.push(event.grade+1);
+      deltas.push(previous===null?0:Math.max(0,day-previous));
+      previous=day;
     }
-    lengths.push(valid.length);
+    reviewCount+=grades.length;
+    cardCount++;
+    // fsrs-rs trains from all successive review prefixes, not one
+    // complete history per card. Its initial-stability dataset requires
+    // prefixes with exactly one long-term review (at least two events).
+    // Prefixes ending on a same-day step have no new long-term review;
+    // keep those for training only when a long-term review exists.
+    for(let count=2;count<=grades.length;count++){
+      if(!deltas.slice(1,count).some(delta=>delta>0))continue;
+      for(let i=0;i<count;i++){
+        ratings.push(grades[i]);
+        deltaTs.push(deltas[i]);
+      }
+      lengths.push(count);
+    }
   }
-  return {ratings:new Uint32Array(ratings),deltaTs:new Uint32Array(deltaTs),lengths:new Uint32Array(lengths)};
+  return {ratings:new Uint32Array(ratings),deltaTs:new Uint32Array(deltaTs),lengths:new Uint32Array(lengths),reviewCount,cardCount};
 }
 function setStatus(message){status.textContent=message;}
 run.addEventListener('click',()=>{
@@ -39,7 +55,7 @@ run.addEventListener('click',()=>{
     setStatus('ブラウザの分離環境を利用できません。再読み込みするか、対応ブラウザでお試しください。');return;
   }
   const input=trainingInput();
-  if(input.ratings.length<400||input.lengths.length<50){setStatus('学習履歴が不足しています（現在 '+input.ratings.length+' 回・'+input.lengths.length+' 枚）。目安は400回・50枚以上です。');return;}
+  if(input.reviewCount<400||input.cardCount<50||input.lengths.length<50){setStatus('学習履歴が不足しています（現在 '+input.ratings.length+' 回・'+input.lengths.length+' 枚）。目安は400回・50枚以上です。');return;}
   run.disabled=true;setStatus('公式fsrs-rsで最適化しています。');
   const worker=new Worker(new URL('./optimizer.worker.js',import.meta.url),{type:'module'});
   worker.onmessage=event=>{
@@ -61,4 +77,4 @@ run.addEventListener('click',()=>{
   worker.postMessage({ratings:input.ratings,deltaTs:input.deltaTs,lengths:input.lengths});
 });
 const count=trainingInput();
-setStatus('保存済みの評価 '+count.ratings.length+' 回・カード '+count.lengths.length+' 枚。入力データは端末内で処理し、外部に送信しません。');
+setStatus('保存済みの評価 '+count.reviewCount+' 回・カード '+count.cardCount+' 枚。入力データは端末内で処理し、外部に送信しません。');
