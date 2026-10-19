@@ -40,7 +40,7 @@ test('official Rust optimizer trains locally and saves 21 coefficients', async (
     const records={},day=86400000,now=Date.UTC(2026,9,19);
     for(let i=0;i<120;i++){
       const base=now-(120+i%18)*day;
-      const grades=[2, i%3===0?0:2, i%4===0?1:2, i%5===0?0:3, 2];
+      const grades=[i%4===0?0:i%4===1?1:i%4===2?2:3, i%3===0?0:2, i%4===0?1:2, i%5===0?0:3, i%5===0?0:2];
       const dates=[base,base+3*day,base+13*day,base+30*day,base+60*day];
       records['synthetic:'+i]={reviews:grades.map((grade,j)=>({at:dates[j],grade,due:dates[j]+day}))};
     }
