@@ -9,11 +9,13 @@ self.onmessage=async ({data})=>{
     }
     self.postMessage({type:'ready'});
     const model=new Fsrs();
-    try{
-      const parameters=model.computeParameters(
-        data.ratings,data.deltaTs,data.lengths,null,true,null,1,null
-      );
-      self.postMessage({type:'success',weights:Array.from(parameters)});
-    }finally{model.free();}
+    // A wasm-bindgen panic can leave a mutable borrow active. Freeing the
+    // object in that case masks the original diagnostic with a borrow error.
+    const parameters=model.computeParameters(
+      data.ratings,data.deltaTs,data.lengths,undefined,true,undefined,1,undefined
+    );
+    const weights=Array.from(parameters);
+    model.free();
+    self.postMessage({type:'success',weights});
   }catch(error){self.postMessage({type:'error',message:String(error?.message||error)});}
 };
