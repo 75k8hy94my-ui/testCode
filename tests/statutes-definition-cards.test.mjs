@@ -131,9 +131,9 @@ test('retention changes use official scheduler without losing review events',()=
 });
 test('optimizer integration uses fsrs-browser WASM and preserves full history',()=>{
  const source=read('fsrs-build/optimizer.worker.js');
- assert.match(source,/fsrs-browser\\/fsrs_browser/);
- assert.match(source,/computeParameters\\(/);
- assert.match(read('definition-cards.html'),/fsrs-runtime\\/ts-fsrs.umd.js/);
+ assert.ok(source.includes('fsrs-browser/fsrs_browser'));
+ assert.ok(source.includes('computeParameters('));
+ assert.ok(read('definition-cards.html').includes('fsrs-runtime/ts-fsrs.umd.js'));
  const fsrs=require('../definition-fsrs.js');
  assert.ok(fsrs.validWeights(fsrs.weights));
  assert.equal(fsrs.validWeights(Array(21).fill(-1)),false);
