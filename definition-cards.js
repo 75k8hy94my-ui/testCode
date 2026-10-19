@@ -115,19 +115,24 @@
       rebuild();
     } catch (_) { alert('復習設定を保存できませんでした。'); }
   });
+  // Export immutable review events, preserving timestamps and four-grade values.
+  // Do not claim that the former local coordinate-descent fit is Anki-equivalent.
   optimizeButton?.addEventListener('click', () => {
-    const result=window.DefinitionFSRS.optimize(loadHistory());
-    if(result.status==='insufficient') {optimizeStatus.textContent='学習データ不足：有効な復習 '+result.samples+' / 150件（30枚以上必要）';return;}
-    if(result.status!=='optimized'){optimizeStatus.textContent='標準パラメータの方が同等以上のため変更しませんでした。';return;}
-    try {
-      localStorage.setItem(weightsKey,JSON.stringify(result.weights));
-      history=loadHistory();
-      for(const [id,record] of Object.entries(history)) history[id]=window.DefinitionFSRS.reschedule(record,desiredRetention(),result.weights);
-      if(!saveHistory())throw Error('save failed');
-      if (!window.TestCodeGuest?.isActive()){window.MangaVault?.markLocalChangesPending?.();Promise.resolve(window.MangaVault?.saveLocalChanges?.()).catch(()=>{});}
-      optimizeStatus.textContent='最適化を適用しました（有効復習 '+result.samples+'件）。';
-      rebuild();
-    }catch(_){optimizeStatus.textContent='設定の保存に失敗しました。';}
+    const entries=Object.entries(loadHistory()).flatMap(([cardId,record]) => (
+      Array.isArray(record?.reviews) ? record.reviews.filter(e=>Number.isFinite(e.at)&&Number.isInteger(e.grade)&&e.grade>=0&&e.grade<=3).map(e=>({
+        card_id:cardId,review_time:new Date(e.at).toISOString(),rating:e.grade+1
+      })) : []
+    ));
+    if(!entries.length){optimizeStatus.textContent='出力できる復習履歴がありません。';return;}
+    const header='card_id,review_time,rating';
+    const csv=[header,...entries.map(e=>[e.card_id,e.review_time,e.rating].map(x=>'"'+String(x).replaceAll('"','""')+'"').join(','))].join('\\n');
+    const blob=new Blob(['\\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const anchor=document.createElement('a');
+    anchor.href=url;anchor.download='definition-fsrs-reviews.csv';
+    document.body.appendChild(anchor);anchor.click();anchor.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    optimizeStatus.textContent=entries.length+'件の復習記録をCSVで出力しました。公式最適化には形式変換が必要です。';
   });
   window.addEventListener('storage', event => {
     if (event.key === store.STORAGE_KEY || event.key === progressKey) refresh();
