@@ -63,6 +63,25 @@
     return Boolean(activeData()?.articles.some(row=>row[0]===number));
   }
 
+  // e-Gov's markdown export encodes ruby as fullwidth-space-delimited
+  // base text and kana: e.g. "　昏　こん　酔" => <ruby>昏<rt>こん</rt></ruby>酔.
+  // Only convert this explicit pattern; never guess readings for ordinary kanji.
+  const officialRubyPattern = /　([一-龯々〆ヵヶ]{1,12})　([ぁ-ゖー]{1,24})　/g;
+  function appendOfficialRuby(target, source) {
+    const value = String(source);
+    let offset = 0;
+    for (const match of value.matchAll(officialRubyPattern)) {
+      if (match.index > offset) target.appendChild(document.createTextNode(value.slice(offset,match.index)));
+      const ruby=document.createElement('ruby');
+      ruby.appendChild(document.createTextNode(match[1]));
+      const rt=document.createElement('rt');
+      rt.textContent=match[2];
+      ruby.appendChild(rt);
+      target.appendChild(ruby);
+      offset=match.index+match[0].length;
+    }
+    if (offset<value.length) target.appendChild(document.createTextNode(value.slice(offset)));
+  }
   // Official captions are stored as the fourth entry in each static article row.
   function buildCard(row) {
     const [number,_chapter,body,articleCaption]=row;
@@ -101,7 +120,7 @@
       }
       const span=document.createElement('span');
       span.className='statuteSelectable';
-      span.textContent=normalizeReferences(m?line.slice(m[0].length):line);
+      appendOfficialRuby(span,normalizeReferences(m?line.slice(m[0].length):line));
       paragraph.appendChild(span);
     });
     card.append(title,paragraph);
