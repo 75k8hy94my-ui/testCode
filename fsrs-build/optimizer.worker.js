@@ -20,5 +20,5 @@ self.onmessage=async ({data})=>{
     const weights=Array.from(parameters);
     model.free();
     self.postMessage({type:'success',weights});
-  }catch(error){self.postMessage({type:'error',message:(String(error?.message||error)+' '+diagnostics.slice(-2).join(' ')).slice(0,900)});}
+  }catch(error){self.postMessage({type:'error',message:(diagnostics.some(x=>x.includes('NotEnoughData'))?'学習データに十分な正誤・復習間隔の変化がありません。':(String(error?.message||error)+' '+diagnostics.slice(-2).join(' ')).slice(0,900))});}
 };
