@@ -117,3 +117,16 @@ test('FSRS-6 initial grades, retrievability and history migration', () => {
   assert.equal(migrated.reviews.length,2);
   assert.equal(migrated.ease,old.ease);
 });
+
+test('FSRS retention settings alter intervals and reschedule existing reviews',()=>{
+ const fsrs=require('../definition-fsrs.js');
+ assert.equal(fsrs.weights[0],0.212);
+ assert.equal(fsrs.weights[20],0.1542);
+ const at=Date.UTC(2026,9,19);
+ const record=fsrs.schedule(undefined,3,at);
+ const high=fsrs.reschedule(record,0.95);
+ const low=fsrs.reschedule(record,0.85);
+ assert.ok(high.interval<=low.interval);
+ assert.equal(high.reviews.length,record.reviews.length);
+ assert.equal(high.lastReviewed,record.lastReviewed);
+});
