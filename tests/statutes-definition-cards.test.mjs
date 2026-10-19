@@ -90,7 +90,7 @@ test('definition card scheduling and rating controls are wired', () => {
   const ui = read('definition-cards.js');
   const page = read('definition-cards.html');
   assert.match(ui,/DefinitionFSRS.schedule/);
-  assert.match(ui,/lastReviewed: now/);
+  assert.match(read('definition-fsrs.js'),/lastReviewed:now/);
   assert.match(ui,/data-grade/);
   assert.match(page,/id="definitionCardsRating"/);
   assert.match(page,/data-grade="0"/);
