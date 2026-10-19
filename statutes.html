@@ -593,13 +593,14 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
     location.replace('sync.html'); return;
   }
   try {
-    await vault.ensureSession();
+    if (navigator.onLine !== false) await vault.ensureSession();
     const statutesResult = await window.StatutesVault.sync();
     if (statutesResult?.reason === 'locked' && !window.StatutesVault.hasDeviceKey()) {
       location.replace('sync.html'); return;
     }
     show();
   } catch (error) {
+    if (navigator.onLine === false && window.StatutesVault?.hasDeviceKey?.()) { show(); return; }
     if (vault.isSessionAuthError?.(error)) vault.saveSession(null);
     location.replace('index.html');
   }
@@ -611,7 +612,7 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
 <script src="statutes-references.js?v=20261015-cross-law-refs-v5"></script>
 <script src="statutes-law-menu.js?v=20261016-cross-section-search"></script>
 <script src="statutes-definition-store.js?v=20261017-statutory-definitions"></script>
-<script src="statutes-definitions.js?v=20261017-statutory-definitions"></script>
+<script src="statutes-definitions.js?v=20261019-independent-statutory-definitions"></script>
 <script>
 // iOS native selection menu suppression: preserve WebKit selection handles and
 // Selection API for the definition editor; affect statute text only.
@@ -672,7 +673,7 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
 })();
 </script>
 <script src="statutes-search.js?v=20261017-search-opacity-results"></script>
-<script src="statutes-article-notes.js?v=20261017-last-edit"></script>
+<script src="statutes-article-notes.js?v=20261019-independent"></script>
 <script src="statutes-last-edit.js?v=20261017-scroll-restore"></script>
 </body>
 </html>

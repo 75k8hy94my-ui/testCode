@@ -47,8 +47,9 @@
 <script src="app-desktop-rail.js?v=20261016-definition-cards"></script>
 <script src="supabase-config.js"></script>
 <script src="vault-sync-merge.js?v=20261010-vault-sync-audit"></script>
-<script src="vault-session.js?v=20261016-statute-vpn-free"></script>
-<script src="vault-payload.js?v=20261016-statute-sync"></script>
+<script src="vault-session.js?v=20261019-statutes-independent-v1"></script>
+<script src="statutes-vault.js?v=20261019-statutes-independent-v1"></script>
+<script src="vault-payload.js?v=20261019-statutes-independent-v1"></script>
 <script src="profile-avatar.js?v=20261008-profile-avatar"></script>
 <script src="profile-menu.js?v=20261011-nongame-audit"></script>
 <script src="app-global-shell.js?v=20261015-statutes"></script>
@@ -56,7 +57,7 @@
 <script src="statutes-definition-store.js?v=20261017-statutory-definitions"></script>
 <script src="fsrs-runtime/ts-fsrs.umd.js?v=20261019-official"></script>
 <script src="definition-fsrs.js?v=20261019-official"></script>
-<script src="definition-cards.js?v=20261019-official"></script>
+<script src="definition-cards.js?v=20261019-independent-v1"></script>
 <script>
 (async () => {
   const show = () => document.documentElement.classList.remove('auth-pending');
@@ -67,20 +68,20 @@
   if (!session?.refresh_token || !config.url || !config.publishableKey) {
     location.replace('index.html'); return;
   }
-  if (!vault.loadActive?.()) { location.replace('sync.html'); return; }
+  if (!vault.loadActive?.() && !window.StatutesVault?.hasDeviceKey?.()) { location.replace('sync.html'); return; }
   try {
-    await vault.ensureSession();
+    if (navigator.onLine !== false) await vault.ensureSession();
     const calibration=window.DefinitionCards?.applyPendingCalibration?.();
-    if(calibration){
-      vault.markLocalChangesPending?.();
-      await vault.saveLocalChanges?.();
-      localStorage.removeItem(window.DefinitionCards.calibrationFlag);
+    const result=await window.StatutesVault.sync();
+    if (result?.reason === 'locked' && !window.StatutesVault.hasDeviceKey()) {
+      location.replace('sync.html'); return;
     }
-    // Cards are part of the VPN-free statutes corpus.
-    try { await vault.syncStatutesLatest?.(); } catch (_) { /* keep locally saved cards visible */ }
+    if (calibration && result?.state === 'success')
+      localStorage.removeItem(window.DefinitionCards.calibrationFlag);
     window.DefinitionCards?.refresh?.();
     show();
   } catch (error) {
+    if (navigator.onLine === false && window.StatutesVault?.hasDeviceKey?.()) { show(); return; }
     if (vault.isSessionAuthError?.(error)) vault.saveSession(null);
     location.replace('index.html');
   }
