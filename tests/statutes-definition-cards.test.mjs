@@ -62,7 +62,7 @@ test('standalone cards UI replaces statute-header shortcut and its checkbox', ()
   assert.match(cardPage, /id="definitionCardsFlip"/);
   assert.match(rail, /desktopNavDefinitionCards/);
   assert.match(rail, /href: 'definition-cards\.html'/);
-  assert.match(home, /class="homeStudyMenu"/);
+  assert.match(home, /definitions:'定'/);
 });
 
 test('definition review history is included in vault payload lifecycle', () => {
