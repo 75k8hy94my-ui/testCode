@@ -126,3 +126,24 @@ test('Companies Act article 2 numbered definitions wrap to separate lines', asyn
   await expect(article.locator('.statuteText')).toContainText(/\n一　会社/);
   await expect(article.locator('.statuteText')).toContainText(/\n二　外国会社/);
 });
+
+test('mobile statute search does not trigger iOS auto-zoom font sizing', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('index.html');
+  await page.getByRole('button', { name:'ログインせずに使う' }).click();
+  await page.goto('statutes.html?section=civil-general');
+  await page.locator('#statutesSearchToggle').click();
+  const input=page.locator('#statutesSearchInput');
+  await expect(input).toBeVisible();
+  await expect(input).toHaveCSS('font-size','16px');
+  await input.fill('９７２');
+  await expect(page.locator('.statutesSearchResult strong')).toContainText('９７２条');
+});
+
+test('desktop statute search keeps the original compact font', async ({ page }) => {
+  await page.setViewportSize({width:1280,height:800});
+  await page.goto('index.html');
+  await page.getByRole('button',{name:'ログインせずに使う'}).click();
+  await page.goto('statutes.html?section=civil-general');
+  await expect(page.locator('#statutesSearchInput')).toHaveCSS('font-size','13px');
+});
