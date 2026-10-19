@@ -31,39 +31,7 @@
     try { localStorage.setItem(progressKey, JSON.stringify(history)); return true; }
     catch (_) { return false; }
   }
-  function schedule(previous, grade, now = Date.now()) {
-    const p = previous || {};
-    const ease = Math.max(1.3, Math.min(3, Number(p.ease) || 2.5));
-    const interval = Math.max(0, Number(p.interval) || 0);
-    const reps = Math.max(0, Number(p.reps) || 0);
-    const lapses = Math.max(0, Number(p.lapses) || 0);
-    let nextEase = ease, days = 0, nextReps = reps, due;
-    if (grade === 0) {
-      nextEase = Math.max(1.3, ease - 0.2);
-      nextReps = 0;
-      due = now + MINUTE;
-    } else if (grade === 1) {
-      nextEase = Math.max(1.3, ease - 0.15);
-      nextReps += 1;
-      days = reps === 0 ? 1 : Math.max(1, Math.round(interval * 1.2));
-      due = now + days * DAY;
-    } else if (grade === 2) {
-      nextReps += 1;
-      days = reps === 0 ? 1 : reps === 1 ? 3 : Math.max(1, Math.round(interval * ease));
-      due = now + days * DAY;
-    } else {
-      nextEase = Math.min(3, ease + 0.15);
-      nextReps += 1;
-      days = reps === 0 ? 4 : Math.max(4, Math.round(interval * nextEase * 1.3));
-      due = now + days * DAY;
-    }
-    return {
-      ease: nextEase, interval: days, reps: nextReps,
-      lapses: lapses + (grade === 0 ? 1 : 0), due,
-      lastReviewed: now, lastGrade: grade,
-      reviews: [...(Array.isArray(p.reviews) ? p.reviews : []).slice(-199), { at: now, grade, due }]
-    };
-  }
+  const schedule = (previous, grade, now = Date.now()) => window.DefinitionFSRS.schedule(previous, grade, now);
   function isDue(entry) {
     const due = Number(history[cardId(entry)]?.due);
     return !Number.isFinite(due) || due <= Date.now();
