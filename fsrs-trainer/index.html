@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>定義カード・FSRS公式最適化</title>
+<style>body{font:16px/1.75 system-ui,-apple-system,sans-serif;max-width:700px;padding:24px;margin:auto}button,a{font:inherit;padding:10px 18px}#fsrsTrainerStatus{min-height:3em}p{overflow-wrap:anywhere}button:disabled{opacity:.5}</style>
+</head>
+<body>
+<h1>FSRS公式最適化</h1>
+<p>AnkiのFSRSで使われるRust製 <code>fsrs-rs</code> の学習処理を、端末内のWebAssemblyで実行します。履歴はネットワークに送信しません。履歴が少ない場合は最適化しません。</p>
+<p id="fsrsTrainerStatus" role="status">最適化器を準備しています…</p>
+<button id="fsrsTrainerRun" type="button" disabled>学習履歴から最適化</button>
+<a href="../definition-cards.html" id="fsrsTrainerBack">定義カードへ戻る</a>
+<script>
+(async()=>{
+ const status=document.getElementById('fsrsTrainerStatus');
+ if(globalThis.crossOriginIsolated){document.getElementById('fsrsTrainerRun').disabled=false;return;}
+ if(!('serviceWorker' in navigator)){status.textContent='このブラウザは必要なWebAssembly実行環境に対応していません。';return;}
+ try{
+   await navigator.serviceWorker.register('./coi-sw.js',{scope:'./'});
+   await navigator.serviceWorker.ready;
+   if(!navigator.serviceWorker.controller){
+     if(sessionStorage.getItem('fsrsCoiReloaded')){status.textContent='安全な実行環境を有効にできませんでした。';return;}
+     sessionStorage.setItem('fsrsCoiReloaded','1');
+     navigator.serviceWorker.addEventListener('controllerchange',()=>location.reload(),{once:true});
+   }else{
+     if(sessionStorage.getItem('fsrsCoiReloaded')){status.textContent='ブラウザが分離環境に対応していません。';return;}
+     sessionStorage.setItem('fsrsCoiReloaded','1');location.reload();
+   }
+ }catch(error){status.textContent='最適化器の準備に失敗しました：'+error.message;}
+})();
+</script>
+<script type="module" src="./build/optimizer.js"></script>
+</body></html>
