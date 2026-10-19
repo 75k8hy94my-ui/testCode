@@ -17,6 +17,10 @@
   const allToggle = document.getElementById('definitionCardsAll');
   const progressKey = 'testCode.statutes.definitionReviews.v1';
   const retentionKey = 'testCode.statutes.definitionRetention.v1';
+  const weightsKey = 'testCode.statutes.definitionFSRSWeights.v1';
+  const optimizeButton = document.getElementById('definitionCardsOptimize');
+  const optimizeStatus = document.getElementById('definitionCardsOptimizeStatus');
+  const customWeights = () => {try { const value=JSON.parse(localStorage.getItem(weightsKey)||'null');return window.DefinitionFSRS.validWeights(value)?value:null;}catch(_){return null;}};
   const retentionSelect = document.getElementById('definitionCardsRetention');
   const desiredRetention = () => { const x=Number(localStorage.getItem(retentionKey)); return x>=0.7&&x<=0.97?x:0.9; };
   if (retentionSelect) retentionSelect.value=String(desiredRetention());
@@ -33,7 +37,7 @@
     try { localStorage.setItem(progressKey, JSON.stringify(history)); return true; }
     catch (_) { return false; }
   }
-  const schedule = (previous, grade, now = Date.now()) => window.DefinitionFSRS.schedule(previous, grade, now, {retention: desiredRetention()});
+  const schedule = (previous, grade, now = Date.now()) => window.DefinitionFSRS.schedule(previous, grade, now, {retention: desiredRetention(),weights: customWeights()});
   function isDue(entry) {
     const due = Number(history[cardId(entry)]?.due);
     return !Number.isFinite(due) || due <= Date.now();
@@ -105,11 +109,25 @@
     try {
       localStorage.setItem(retentionKey,String(value));
       history=loadHistory();
-      for (const [id, record] of Object.entries(history)) history[id]=window.DefinitionFSRS.reschedule(record,value);
+      for (const [id, record] of Object.entries(history)) history[id]=window.DefinitionFSRS.reschedule(record,value,customWeights()||window.DefinitionFSRS.weights);
       if (!saveHistory()) throw Error('save failed');
       if (!window.TestCodeGuest?.isActive()) { window.MangaVault?.markLocalChangesPending?.(); Promise.resolve(window.MangaVault?.saveLocalChanges?.()).catch(()=>{}); }
       rebuild();
     } catch (_) { alert('復習設定を保存できませんでした。'); }
+  });
+  optimizeButton?.addEventListener('click', () => {
+    const result=window.DefinitionFSRS.optimize(loadHistory());
+    if(result.status==='insufficient') {optimizeStatus.textContent='学習データ不足：有効な復習 '+result.samples+' / 150件（30枚以上必要）';return;}
+    if(result.status!=='optimized'){optimizeStatus.textContent='標準パラメータの方が同等以上のため変更しませんでした。';return;}
+    try {
+      localStorage.setItem(weightsKey,JSON.stringify(result.weights));
+      history=loadHistory();
+      for(const [id,record] of Object.entries(history)) history[id]=window.DefinitionFSRS.reschedule(record,desiredRetention(),result.weights);
+      if(!saveHistory())throw Error('save failed');
+      if (!window.TestCodeGuest?.isActive()){window.MangaVault?.markLocalChangesPending?.();Promise.resolve(window.MangaVault?.saveLocalChanges?.()).catch(()=>{});}
+      optimizeStatus.textContent='最適化を適用しました（有効復習 '+result.samples+'件）。';
+      rebuild();
+    }catch(_){optimizeStatus.textContent='設定の保存に失敗しました。';}
   });
   window.addEventListener('storage', event => {
     if (event.key === store.STORAGE_KEY || event.key === progressKey) refresh();
