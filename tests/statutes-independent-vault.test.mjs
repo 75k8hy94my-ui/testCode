@@ -98,3 +98,23 @@ test('divergent edits are not overwritten automatically',async()=>{
   assert.equal((await b.api.resolveConflict('cloud')).state,'success');
   assert.deepEqual(JSON.parse(bLocal.getItem(definitionKey)),[{word:'device-a'}]);
 });
+
+test('Anki FSRS history, custom weights and retention migrate across independent vault devices',async()=>{
+  const db={},weights=Array.from({length:21},(_,i)=>i===0?0.2:i===20?0.1542:0.4);
+  const source=storage({
+    [definitionKey]:JSON.stringify([{word:'刑法１９９条'}]),
+    'testCode.statutes.definitionReviews.v1':JSON.stringify({'刑法199条':{reviews:[{at:1700000000000,grade:2}],lastReviewed:1700000000000,due:1700086400000}}),
+    'testCode.statutes.definitionFSRSWeights.v1':JSON.stringify(weights),
+    'testCode.statutes.definitionRetention.v1':'0.95',
+  });
+  const first=createEnv(db,source);
+  assert.equal((await first.api.sync()).state,'success');
+  const other=storage();
+  const enrolled=createEnv(db,other);
+  assert.equal((await enrolled.api.sync()).state,'success');
+  assert.equal(JSON.parse(other.getItem('testCode.statutes.definitionReviews.v1'))['刑法199条'].reviews[0].grade,2);
+  assert.deepEqual(JSON.parse(other.getItem('testCode.statutes.definitionFSRSWeights.v1')),weights);
+  assert.equal(JSON.parse(other.getItem('testCode.statutes.definitionRetention.v1')),0.95);
+  const restarted=createEnv(db,other,{active:false});
+  assert.equal((await restarted.api.sync()).state,'success');
+});

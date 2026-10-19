@@ -6,13 +6,17 @@ const require = createRequire(import.meta.url);
 const payload = require('../vault-payload.js');
 const page = fs.readFileSync(new URL('../statutes.html', import.meta.url), 'utf8');
 const definitions = fs.readFileSync(new URL('../statutes-definitions.js', import.meta.url), 'utf8');
+const storage = (entries=[]) => {
+  const map=new Map(entries);
+  return {getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,String(v)),removeItem:k=>map.delete(k),get:k=>map.get(k)};
+};
 const sample = [{ subject:'labor-standards', article:'３２条', part:0, start:0, end:2, quote:'使用', definition:'テスト', card:true }];
 test('statute definitions round trip through Vault payload without losing other data', () => {
-  const map = new Map([[payload.DATA_KEYS.statuteDefinitions, JSON.stringify(sample)]]);
+  const map = storage([[payload.DATA_KEYS.statuteDefinitions, JSON.stringify(sample)]]);
   const saved = payload.buildFromLocalStorage(map);
   assert.deepEqual(saved.statuteDefinitions, sample);
   assert.equal(saved.statuteNotes && typeof saved.statuteNotes, 'object');
-  const another = new Map();
+  const another = storage();
   payload.applyToLocalStorage(saved, another);
   assert.deepEqual(JSON.parse(another.get(payload.DATA_KEYS.statuteDefinitions)), sample);
   assert.deepEqual(payload.normalize({}).statuteDefinitions, []);

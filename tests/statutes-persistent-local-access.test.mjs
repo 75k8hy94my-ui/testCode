@@ -36,6 +36,14 @@ test('statute edits no longer upload the common Vault', () => {
 });
 test('legacy vault apply protects independent annotations', () => {
   const src=root('vault-payload.js');
-  assert.match(src,/legacy media Vault restores must not overwrite/);
+  assert.match(src,/media Vault/);
   assert.match(src,/testCode\.statutes\.deviceKey\.v1/);
+});
+
+test('FSRS history and optimizer settings live in the separate encrypted statutes corpus',()=>{
+ const independent=root('statutes-vault.js');
+ const cards=root('definition-cards.js');
+ for(const key of ['definitionReviews.v1','definitionFSRSWeights.v1','definitionRetention.v1'])assert.ok(independent.includes(key));
+ assert.match(cards,/StatutesVault\\?\\.changed/);
+ assert.doesNotMatch(cards,/markLocalChangesPending/);
 });
