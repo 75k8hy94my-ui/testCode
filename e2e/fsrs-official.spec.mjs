@@ -46,7 +46,7 @@ test('official Rust optimizer trains locally and saves 21 coefficients', async (
       const reviews=[];
       const count=3+(i%5);
       for(let j=0;j<count;j++){
-        const interval=j===0?0:1+((i*17+j*29+(i>>2))%75);
+        const interval=j===0?0:[1,3,7,14,30][(i+j)%5];
         t+=interval*day;
         const seed=(i*73+j*109+i*j*13)%101;
         const grade=j===0?i%4:(seed<23?0:seed<36?1:seed<85?2:3);
