@@ -80,6 +80,17 @@
       if (!row) {
         const active = window.MangaVault.loadActive?.();
         if (!active?.rawKey) return {state:'deferred',reason:'locked'};
+        // On the first enrolment of an existing account, do not create an
+        // empty independent vault until the previous shared vault has had
+        // a chance to supply the user's original legal annotations.
+        if (equal(snapshot(),empty()) && typeof window.MangaVault.syncStatutesLatest === 'function') {
+          try {
+            const migration = await window.MangaVault.syncStatutesLatest();
+            if (migration?.state !== 'success') return {state:'deferred',reason:'legacy-migration'};
+          } catch (_) {
+            return {state:'deferred',reason:'legacy-migration'};
+          }
+        }
         raw = bytes(32);
         const wrapped = await seal(active.rawKey, {raw:encode(raw)});
         const cipher = await seal(raw,snapshot());
