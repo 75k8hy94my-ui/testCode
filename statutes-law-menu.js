@@ -136,6 +136,7 @@
       if (rootId === currentRoot) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     });
+    if (window.matchMedia('(max-width:899px)').matches) roots.get(currentRoot)?.scrollIntoView({ block:'nearest', inline:'nearest' });
     // Keep an open submenu available when its category is selected.
     if (openRoot && openRoot.id !== currentRoot) closeDropdown();
     if (!dropdown.hidden) {
@@ -238,8 +239,24 @@
     currentSection() { return currentCategory; }
   };
 
-  brand.replaceChildren(menuBar);
+  const lawDock = document.createElement('div');
+  lawDock.id = 'statutesLawDock';
+  lawDock.setAttribute('aria-label', '科目の選択');
+  document.body.appendChild(lawDock);
+  const mobileLayout = window.matchMedia('(max-width:899px)');
+  function mountMenu() {
+    closeDropdown();
+    if (mobileLayout.matches) {
+      lawDock.appendChild(menuBar);
+      const active = roots.get(currentRoot);
+      active?.scrollIntoView({ block:'nearest', inline:'nearest', behavior:'instant' });
+    } else {
+      brand.replaceChildren(menuBar);
+    }
+  }
   brand.after(currentSectionLabel);
+  mountMenu();
+  mobileLayout.addEventListener('change', mountMenu);
   // Restore the selected category on reload, direct URL visits, Back, and Forward.
   renderCategory(sectionFromUrl());
   window.addEventListener('popstate', () => {
