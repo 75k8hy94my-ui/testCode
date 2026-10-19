@@ -118,3 +118,22 @@ test('Anki FSRS history, custom weights and retention migrate across independent
   const restarted=createEnv(db,other,{active:false});
   assert.equal((await restarted.api.sync()).state,'success');
 });
+
+test('independently entered study cards survive account encryption, restart and new device',async()=>{
+  const database={};
+  const manualKey='testCode.statutes.manualCards.v1';
+  const original=[{id:'manual-1',front:'民法９４条２項の類推適用',back:'虚偽の外観と帰責性、第三者の信頼',category:'民法',createdAt:1,updatedAt:1}];
+  const userLocal=storage({[manualKey]:JSON.stringify(original)});
+  const primary=createEnv(database,userLocal);
+  assert.equal((await primary.api.sync()).state,'success');
+  assert.equal(JSON.stringify(database.row).includes('虚偽の外観'),false);
+  const otherStorage=storage();
+  const secondary=createEnv(database,otherStorage);
+  assert.equal((await secondary.api.sync()).state,'success');
+  assert.deepEqual(JSON.parse(otherStorage.getItem(manualKey)),original);
+  const reopened=createEnv(database,otherStorage,{active:false});
+  assert.equal((await reopened.api.sync()).state,'success');
+  otherStorage.setItem(manualKey,JSON.stringify([...original,{...original,id:'manual-2',front:'商法の問題'}]));
+  assert.equal((await reopened.api.sync()).state,'success');
+  assert.equal(database.row.revision,2);
+});
