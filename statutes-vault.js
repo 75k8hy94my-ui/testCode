@@ -3,8 +3,8 @@
   'use strict';
   const KEY = 'testCode.statutes.deviceKey.v1';
   const BASE = 'testCode.statutes.independentBase.v1';
-  const FIELDS = ['testCode.statutes.definitions.v1','testCode.statutes.articleNotes.v1','testCode.statutes.articleNoteHistory.v1','testCode.statutes.definitionReviews.v1','testCode.statutes.definitionFSRSWeights.v1','testCode.statutes.definitionRetention.v1'];
-  const DEFAULTS = [[],{},{},{},null,0.9];
+  const FIELDS = ['testCode.statutes.definitions.v1','testCode.statutes.articleNotes.v1','testCode.statutes.articleNoteHistory.v1','testCode.statutes.definitionReviews.v1','testCode.statutes.definitionFSRSWeights.v1','testCode.statutes.definitionRetention.v1','testCode.statutes.manualCards.v1'];
+  const DEFAULTS = [[],{},{},{},null,0.9,[]];
   const empty = () => Object.fromEntries(FIELDS.map((k,i)=>[k, Array.isArray(DEFAULTS[i])?[]:(DEFAULTS[i]&&typeof DEFAULTS[i]==='object'?{}:DEFAULTS[i])]));
   const normalized = value => {
     const out=empty();
@@ -50,7 +50,9 @@
   const valid = value => value && isObject(value) && Array.isArray(value[FIELDS[0]])
     && FIELDS.slice(1,4).every(k => isObject(value[k]))
     && (value[FIELDS[4]] == null || (Array.isArray(value[FIELDS[4]]) && value[FIELDS[4]].length===21 && value[FIELDS[4]].every(Number.isFinite)))
-    && (value[FIELDS[5]] == null || (Number.isFinite(value[FIELDS[5]]) && value[FIELDS[5]]>=0.7 && value[FIELDS[5]]<=0.97));
+    && (value[FIELDS[5]] == null || (Number.isFinite(value[FIELDS[5]]) && value[FIELDS[5]]>=0.7 && value[FIELDS[5]]<=0.97))
+    && Array.isArray(value[FIELDS[6]])
+    && value[FIELDS[6]].every(card => isObject(card) && typeof card.id === 'string' && typeof card.front === 'string' && typeof card.back === 'string');
   const equal = (a,b) => JSON.stringify(a) === JSON.stringify(b);
   function apply(value) {
     if (!valid(value)) throw new Error('逐条集データの形式が不正です。');
