@@ -34,7 +34,7 @@
 <header class="homeHeader" data-profile-only-header="1"><div><span class="eyebrow">LAW</span><h1 id="shellTitle">定義カード</h1></div><button class="headerProfileButton" type="button" data-profile-menu-trigger aria-label="アカウント" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg></button></header>
 <section class="definitionCardsMain" id="definitionCardsRoot">
   <div class="definitionCardsToolbar"><h2>定義カード</h2><a href="statutes.html" class="definitionCardsBack">逐条集へ</a></div>
-  <div class="definitionCardsReviewSettings"><span id="definitionCardsSummary" role="status"></span><label><input id="definitionCardsAll" type="checkbox"> 全カードを表示</label><label>目標保持率 <select id="definitionCardsRetention" aria-label="目標保持率"><option value="0.85">85%</option><option value="0.9">90%</option><option value="0.95">95%</option></select></label></div><p class="definitionCardsCount" id="definitionCardsCount" role="status"></p>
+  <div class="definitionCardsReviewSettings"><span id="definitionCardsSummary" role="status"></span><label><input id="definitionCardsAll" type="checkbox"> 全カードを表示</label><label>目標保持率 <select id="definitionCardsRetention" aria-label="目標保持率"><option value="0.85">85%</option><option value="0.9">90%</option><option value="0.95">95%</option></select></label></div><div class="definitionCardsReviewSettings"><button type="button" id="definitionCardsOptimize">学習履歴から最適化</button><span id="definitionCardsOptimizeStatus" role="status"></span></div><p class="definitionCardsCount" id="definitionCardsCount" role="status"></p>
   <div class="definitionCardsStudy" id="definitionCardsStudy" hidden>
     <div class="definitionCardsFront"><strong id="definitionCardsTerm"></strong><span class="definitionCardsSource" id="definitionCardsSource"></span></div>
     <div class="definitionCardsAnswer" id="definitionCardsAnswer" hidden></div>
@@ -54,8 +54,8 @@
 <script src="app-global-shell.js?v=20261015-statutes"></script>
 <script src="mobile-bottom-nav.js?v=20261016-definition-cards"></script>
 <script src="statutes-definition-store.js?v=20261017-statutory-definitions"></script>
-<script src="definition-fsrs.js?v=20261019-fsrs6-defaults"></script>
-<script src="definition-cards.js?v=20261019-fsrs6-retention"></script>
+<script src="definition-fsrs.js?v=20261019-fsrs6-optimize"></script>
+<script src="definition-cards.js?v=20261019-fsrs6-optimize"></script>
 <script>
 (async () => {
   const show = () => document.documentElement.classList.remove('auth-pending');
