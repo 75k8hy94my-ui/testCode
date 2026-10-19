@@ -140,3 +140,10 @@ test('optimizer integration uses fsrs-browser WASM and preserves full history',(
  const historical=fsrs.schedule(null,2,Date.UTC(2026,9,19));
  assert.equal(fsrs.reschedule(historical,0.9).reviews.length,1);
 });
+
+test('Rust optimizer receives every long-term review prefix rather than one whole history', () => {
+ const source=read('fsrs-build/optimizer.js');
+ assert.ok(source.includes('for(let count=2;count<=grades.length;count++)'));
+ assert.ok(source.includes('lengths.push(count)'));
+ assert.ok(read('fsrs-trainer/build/optimizer.js').includes('testCode.statutes.definitionReviews.v1'));
+});
