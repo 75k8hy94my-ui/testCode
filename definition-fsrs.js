@@ -4,12 +4,13 @@
  */
 (function(root) {
 'use strict';
-const W=[0.2172,1.1771,3.2602,16.1507,7.0114,0.57,2.0966,0.0069,1.5261,0.112,1.0178,1.849,0.1133,0.3127,2.2934,0.2191,3.0004,0.7536,0.3332,0.1437,0.2];
-const DAY=86400000, RETENTION=0.9, FACTOR=Math.pow(RETENTION,-1/W[20])-1;
+const W=[0.212,1.2931,2.3065,8.2956,6.4133,0.8334,3.0194,0.001,1.8722,0.1666,0.796,1.4835,0.0614,0.2629,1.6483,0.6014,1.8729,0.5425,0.0912,0.0658,0.1542];
+const DAY=86400000, DEFAULT_RETENTION=0.9, FACTOR=Math.pow(DEFAULT_RETENTION,-1/W[20])-1;
+const validRetention = x => Number.isFinite(x) && x>=0.7 && x<=0.97 ? x : DEFAULT_RETENTION;
 const clamp=(x,min,max)=>Math.min(max,Math.max(min,x));
 const initD=g=>clamp(W[4]-Math.exp(W[5]*(g-1))+1,1,10);
 const retrievability=(days,s)=>Math.pow(1+FACTOR*Math.max(0,days)/s,-W[20]);
-const interval=s=>Math.max(1,Math.round(s/FACTOR*(Math.pow(RETENTION,-1/W[20])-1)));
+const interval=(s,retention=DEFAULT_RETENTION)=>Math.max(1,Math.round(s/FACTOR*(Math.pow(validRetention(retention),-1/W[20])-1)));
 function nextState(s,d,lastAt,grade,at) {
  const g=grade+1;
  if (!s || !d || !Number.isFinite(lastAt)) return {s:Math.max(0.1,W[g-1]),d:initD(g)};
@@ -31,7 +32,8 @@ function nextState(s,d,lastAt,grade,at) {
  }
  return {s:clamp(nextS,0.1,36500),d:nextD};
 }
-function schedule(previous,grade,now=Date.now()) {
+function schedule(previous,grade,now=Date.now(),options={}) {
+ const retention=validRetention(options.retention);
  if (!Number.isInteger(grade)||grade<0||grade>3) throw Error('Invalid rating');
  const p=previous&&typeof previous==='object'?previous:{};
  const reviews=Array.isArray(p.reviews)?p.reviews:[];
@@ -47,14 +49,19 @@ function schedule(previous,grade,now=Date.now()) {
    state={s:p.stability,d:p.difficulty};lastAt=p.lastReviewed;
  }
  const current=nextState(state?.s,state?.d,lastAt,grade,now);
- const days=grade===0?0:interval(current.s);
+ const days=grade===0?0:interval(current.s,retention);
  const due=grade===0?now+60000:now+days*DAY;
- return {...p,algorithm:'fsrs6',stability:current.s,difficulty:current.d,retention:RETENTION,
+ return {...p,algorithm:'fsrs6',stability:current.s,difficulty:current.d,retention,
    interval:days,due,lastReviewed:now,lastGrade:grade,
    reps:(Number(p.reps)||0)+(grade===0?0:1),lapses:(Number(p.lapses)||0)+(grade===0?1:0),
    reviews:[...reviews,{at:now,grade,due}]};
 }
-const api={schedule,retrievability,interval,weights:W};
+function reschedule(record,retention=DEFAULT_RETENTION) {
+ if (!record || record.algorithm!=='fsrs6'||!Number.isFinite(record.stability)||!Number.isFinite(record.lastReviewed)) return record;
+ const target=validRetention(retention),days=record.lastGrade===0?0:interval(record.stability,target);
+ return {...record,retention:target,interval:days,due:record.lastReviewed+(record.lastGrade===0?60000:days*DAY)};
+}
+const api={schedule,reschedule,retrievability,interval,weights:W};
 if (typeof module!=='undefined') module.exports=api;
 root.DefinitionFSRS=api;
 })(typeof window!=='undefined'?window:globalThis);
