@@ -205,3 +205,27 @@ const api={DATA_KEYS,LOCAL_ONLY_KEYS,pointerPath,defaults,normalize:normalizeWit
  };
  payload.clearDeviceData=function(storage=globalThis.localStorage){oldClear(storage);storage.removeItem(weightsKey);storage.removeItem(retentionKey);};
 })(typeof window!=='undefined'?window:globalThis);
+
+/* Keep enrolled statutes and spaced-repetition progress independent from the media Vault.
+ * Old media snapshots must not roll back the encrypted statutes corpus on restore. */
+;(function(root) {
+  'use strict';
+  const payload = typeof module !== 'undefined' && module.exports ? module.exports : root.MangaVaultPayload;
+  if (!payload) return;
+  const apply = payload.applyToLocalStorage;
+  const fields=['testCode.statutes.definitions.v1','testCode.statutes.articleNotes.v1','testCode.statutes.articleNoteHistory.v1','testCode.statutes.definitionReviews.v1','testCode.statutes.definitionFSRSWeights.v1','testCode.statutes.definitionRetention.v1'];
+  payload.applyToLocalStorage=function(value,storage=root.localStorage){
+    let user=null, key=null;
+    try {user=root.MangaVault?.loadSession?.()?.user?.id; key=JSON.parse(storage.getItem('testCode.statutes.deviceKey.v1')||'null');}catch(_){}
+    if(!user||key?.user!==user||typeof key.raw!=='string')return apply(value,storage);
+    const saved=fields.map(field=>storage.getItem(field));
+    try {
+      const result=apply(value,storage);
+      fields.forEach((field,i)=>saved[i]===null?storage.removeItem(field):storage.setItem(field,saved[i]));
+      return result;
+    } catch(error) {
+      fields.forEach((field,i)=>saved[i]===null?storage.removeItem(field):storage.setItem(field,saved[i]));
+      throw error;
+    }
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
