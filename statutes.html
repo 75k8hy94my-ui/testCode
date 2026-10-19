@@ -261,6 +261,50 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
   .statutes-page .statutesCurrentSection{max-width:18vw;font-size:11px}
   .statutes-page #statutesEditToggle,.statutes-page #statutesSyncButton{font-size:11px;padding:4px 5px}
 }
+
+/* Statutes-only mobile navigation: global destinations above, law subjects below. */
+@media(max-width:899px){
+  html.statutes-page #mobileBottomNav.liquidGlassNav{
+    top:max(6px,env(safe-area-inset-top))!important;
+    bottom:auto!important;
+    transform-origin:50% 0%!important;
+  }
+  html.statutes-page #mobileBottomNav.liquidGlassNav.liquidNavCompact{
+    transform:translateX(-50%) translateY(-5px) scale(.94)!important;
+  }
+  html.statutes-page #homeApp > #appGlobalHeader{
+    margin-top:calc(78px + env(safe-area-inset-top));
+  }
+  html.statutes-page #appGlobalHeader .globalShellBrand{
+    flex:0 0 0!important;width:0!important;overflow:visible!important;
+  }
+  html.statutes-page #statutesLawMenu{
+    position:fixed!important;
+    z-index:1250!important;
+    left:50%!important;
+    top:auto!important;
+    bottom:max(10px,env(safe-area-inset-bottom))!important;
+    transform:translateX(-50%);
+    width:min(520px,calc(100vw - 20px))!important;
+    max-width:none!important;
+    box-sizing:border-box;
+    min-height:62px;
+    padding:8px 7px;
+    border:1px solid var(--shell-button-border,rgba(128,128,128,.3));
+    border-radius:26px;
+    background:var(--shell-header-bg,rgba(248,249,252,.94));
+    color:var(--shell-header-text,inherit);
+    box-shadow:0 8px 26px rgba(0,0,0,.16);
+    -webkit-backdrop-filter:blur(24px) saturate(150%);
+    backdrop-filter:blur(24px) saturate(150%);
+  }
+  html.statutes-page #statutesLawMenu .statutesLawRoot{
+    min-height:44px;
+    padding:7px 11px;
+    flex:0 0 auto;
+  }
+  html.statutes-page .statutesCurrentSection{max-width:48vw}
+}
 </style>
 </head>
 <body>
