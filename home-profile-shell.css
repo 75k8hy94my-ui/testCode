@@ -432,3 +432,8 @@ html[data-theme="dark"] .iosSwitch input:checked + .iosSwitchTrack{background:#3
   }
   .homeShell:has(#homeGrid) .openHint {padding-top:3px}
 }
+
+/* Prevent automatic input-focus zoom on iPhone Safari; desktop typography is unchanged. */
+@media(max-width:899px){
+  input[type="search"],input[role="searchbox"]{font-size:16px!important}
+}
