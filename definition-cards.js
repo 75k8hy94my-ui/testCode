@@ -27,7 +27,7 @@
   const desiredRetention = () => { const x=Number(localStorage.getItem(retentionKey)); return x>=0.7&&x<=0.97?x:0.9; };
   if (retentionSelect) retentionSelect.value=String(desiredRetention());
   const cardId = entry => [entry.subject, entry.article, entry.part, entry.start, entry.end].join(':');
-  let cards = [], queue = [], index = 0, history = {};
+  let cards = [], queue = [], index = 0, history = {}, nextDueTimer = null;
 
   function loadHistory() {
     try {
@@ -57,6 +57,7 @@
     render();
   }
   function render() {
+    if(nextDueTimer!==null){clearTimeout(nextDueTimer);nextDueTimer=null;}
     const entry = queue[index];
     const dueCount = cards.filter(isDue).length;
     summary.textContent = '復習待ち ' + dueCount + '枚 / 全' + cards.length + '枚';
@@ -64,7 +65,16 @@
     study.hidden = !entry;
     empty.hidden = !!entry;
     empty.textContent = cards.length ? '今日の復習は完了しました。' : '定義はまだ登録されていません。逐条集で定義を登録してください。';
-    if (!entry) return;
+    if (!entry) {
+      const now=Date.now();
+      const due=cards.map(e=>Number(history[cardId(e)]?.due)).filter(t=>Number.isFinite(t)&&t>now).sort((a,b)=>a-b)[0];
+      if(due && !allToggle.checked){
+        const mins=Math.max(1,Math.ceil((due-now)/60000));
+        empty.textContent=mins<60?'次の復習まで約'+mins+'分です。':'今日の復習は完了しました。次回：'+new Date(due).toLocaleString('ja-JP');
+        nextDueTimer=setTimeout(refresh,Math.max(1000,Math.min(60000,due-now+50)));
+      }
+      return;
+    }
     term.textContent = entry.quote;
     source.textContent = entry.source + (entry.definitionKind === 'statute' ? ' ・ 条文による定義' : '');
     answer.textContent = entry.definition;
@@ -155,6 +165,7 @@
     if (event.key === store.STORAGE_KEY || event.key === progressKey) refresh();
   });
   document.addEventListener('manga-vault-payload-applied', refresh);
+  window.addEventListener('focus',()=>{if(!queue.length)refresh();});
   window.DefinitionCards = { refresh, schedule, progressKey, applyPendingCalibration, calibrationFlag };
   refresh();
 })();
