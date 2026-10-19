@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex,nofollow,noarchive,nosnippet">
 <title>逐条集</title>
 <link rel="stylesheet" href="app-global-shell.css?v=20260924-theme-unified">
-<link rel="stylesheet" href="home-profile-shell.css?v=20261012-video-width-stable">
+<link rel="stylesheet" href="home-profile-shell.css?v=20261019-mobile-search-focus">
 <link rel="stylesheet" href="mobile-bottom-nav.css?v=20260925-instagram-drag-lock">
 <style>
 .statutesMain{width:100%;max-width:none;margin:0;padding:12px 14px 12px;color:var(--text,#e5e7eb)}
@@ -240,7 +240,11 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
 #statutesSearchInput{box-sizing:border-box;min-width:0;padding:7px;font-size:13px}
 .statutesSearchResult{min-width:0;padding:7px 5px}
 .statutesSearchResult strong,.statutesSearchResult span{white-space:normal;overflow-wrap:anywhere;word-break:break-word;display:block;-webkit-line-clamp:unset}
-@media(max-width:899px){html.statutes-page #statutesSearchPanel{max-height:190px}}
+@media(max-width:899px){
+  html.statutes-page #statutesSearchPanel{max-height:190px}
+  /* iOS Safari zooms the page when a focused search field uses text below 16px. */
+  #statutesSearchInput{font-size:16px;line-height:1.4}
+}
 @media(min-width:900px){#statutesSearchToggle{display:none!important}}
 
 /* Keep the mobile toolbar usable without vertical text wrapping. */
