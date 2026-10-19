@@ -89,10 +89,31 @@ test('definition review history is included in vault payload lifecycle', () => {
 test('definition card scheduling and rating controls are wired', () => {
   const ui = read('definition-cards.js');
   const page = read('definition-cards.html');
-  assert.match(ui,/function schedule\(/);
+  assert.match(ui,/DefinitionFSRS.schedule/);
   assert.match(ui,/lastReviewed: now/);
   assert.match(ui,/data-grade/);
   assert.match(page,/id="definitionCardsRating"/);
   assert.match(page,/data-grade="0"/);
   assert.match(page,/data-grade="3"/);
+});
+
+test('FSRS-6 initial grades, retrievability and history migration', () => {
+  const fsrs = require('../definition-fsrs.js');
+  assert.equal(fsrs.weights.length,21);
+  assert.ok(Math.abs(fsrs.retrievability(10,10)-0.9)<1e-10);
+  const now = Date.UTC(2026,9,19);
+  const again=fsrs.schedule(null,0,now);
+  const good=fsrs.schedule(null,2,now);
+  const easy=fsrs.schedule(null,3,now);
+  assert.equal(again.due,now+60_000);
+  assert.ok(easy.due>good.due);
+  assert.equal(good.algorithm,'fsrs6');
+  const followup=fsrs.schedule(good,2,good.due);
+  assert.ok(followup.stability>good.stability);
+  assert.equal(followup.reviews.length,2);
+  const old={ease:2.5,interval:3,reps:2,lastReviewed:now-86400000,reviews:[{at:now-86400000,grade:2,due:now}]};
+  const migrated=fsrs.schedule(old,2,now);
+  assert.equal(migrated.algorithm,'fsrs6');
+  assert.equal(migrated.reviews.length,2);
+  assert.equal(migrated.ease,old.ease);
 });
