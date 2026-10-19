@@ -1,0 +1,27 @@
+name: Verify mobile search focus sizing
+on:
+  push:
+    branches:
+      - main
+      - fix/mobile-search-input-focus-zoom-20261019
+    paths:
+      - 'statutes.html'
+      - 'home-profile-shell.css'
+      - 'e2e/statutes-search.spec.mjs'
+      - '.github/workflows/verify-mobile-search.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Verify mobile and desktop search field font sizes
+        run: npx playwright test e2e/statutes-search.spec.mjs --grep "mobile statute search does not trigger iOS auto-zoom font sizing|desktop statute search keeps the original compact font"
