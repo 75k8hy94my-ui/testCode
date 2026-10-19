@@ -2,6 +2,7 @@ name: Verify statutes persistent access
 on:
   push:
     branches:
+      - main
       - integration/statutes-session-persistence-pr281
       - feature/statutes-persistent-local-access-20261018
   workflow_dispatch:
