@@ -21,7 +21,7 @@
     { id: 'desktopNavManga', key: 'manga', label: '漫画', href: 'manga.html' },
     { id: 'desktopNavImages', key: 'images', label: '画像', href: 'images.html' },
     { id: 'desktopNavVideo', key: 'video', label: '動画', href: 'video.html' },
-    { id: 'desktopNavDefinitionCards', key: 'cards', label: '定義カード', href: 'definition-cards.html' },
+    { id: 'desktopNavDefinitionCards', key: 'cards', label: '暗記カード', href: 'definition-cards.html' },
     { id: 'desktopNavAdd', key: 'add', label: '追加', href: 'add.html' },
     { id: 'desktopNavBackup', key: 'backup', label: 'バックアップ', href: 'sync.html' },
     { id: 'desktopNavSettings', key: 'settings', label: '設定', href: 'profile.html' },

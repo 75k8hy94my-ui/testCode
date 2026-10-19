@@ -213,7 +213,7 @@ const api={DATA_KEYS,LOCAL_ONLY_KEYS,pointerPath,defaults,normalize:normalizeWit
   const payload = typeof module !== 'undefined' && module.exports ? module.exports : root.MangaVaultPayload;
   if (!payload) return;
   const apply = payload.applyToLocalStorage;
-  const fields=['testCode.statutes.definitions.v1','testCode.statutes.articleNotes.v1','testCode.statutes.articleNoteHistory.v1','testCode.statutes.definitionReviews.v1','testCode.statutes.definitionFSRSWeights.v1','testCode.statutes.definitionRetention.v1'];
+  const fields=['testCode.statutes.definitions.v1','testCode.statutes.articleNotes.v1','testCode.statutes.articleNoteHistory.v1','testCode.statutes.definitionReviews.v1','testCode.statutes.definitionFSRSWeights.v1','testCode.statutes.definitionRetention.v1','testCode.statutes.manualCards.v1'];
   payload.applyToLocalStorage=function(value,storage=root.localStorage){
     let user=null, key=null;
     try {user=root.MangaVault?.loadSession?.()?.user?.id; key=JSON.parse(storage.getItem('testCode.statutes.deviceKey.v1')||'null');}catch(_){}

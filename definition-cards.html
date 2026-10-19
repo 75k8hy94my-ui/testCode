@@ -15,6 +15,23 @@
 .definitionCardsToolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px}
 .definitionCardsToolbar h2{margin:0;font-size:20px}
 .definitionCardsBack{color:inherit;text-decoration:none;font-size:13px;border:1px solid var(--border,rgba(128,128,128,.4));padding:8px 12px;border-radius:8px}
+.definitionCardsManageToggle{appearance:none;min-height:39px;padding:8px 13px;border:1px solid var(--border,rgba(128,128,128,.35));background:var(--surface,rgba(128,128,128,.08));border-radius:9px;color:inherit;font:inherit;cursor:pointer}
+.definitionCardsToolbarLinks{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+.definitionCardsManager{border:1px solid var(--border,rgba(128,128,128,.35));border-radius:14px;padding:18px;margin-bottom:24px;background:var(--surface,rgba(128,128,128,.04))}
+.definitionCardsManager[hidden]{display:none!important}
+.definitionCardsManager h3{font-size:17px;margin:0 0 12px}
+.definitionCardsForm{display:grid;gap:12px}
+.definitionCardsForm label{display:grid;gap:5px;font-size:14px}
+.definitionCardsForm input,.definitionCardsForm textarea{box-sizing:border-box;width:100%;border:1px solid var(--border,rgba(128,128,128,.45));border-radius:8px;padding:10px;background:var(--surface,#fff);color:inherit;font:inherit;resize:vertical}
+.definitionCardsFormActions{display:flex;flex-wrap:wrap;gap:10px}
+.definitionCardsFormActions button,.definitionCardsManualList button{appearance:none;min-height:38px;border:1px solid var(--border,rgba(128,128,128,.35));border-radius:8px;padding:7px 14px;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.definitionCardsFormActions button[type=submit]{background:var(--surface,rgba(128,128,128,.12));font-weight:600}
+.definitionCardsManualList{list-style:none;padding:0;margin:12px 0 0}
+.definitionCardsManualList li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--border,rgba(128,128,128,.25))}
+.definitionCardsManualTitle{font-weight:600;overflow-wrap:anywhere;min-width:0}
+.definitionCardsManualTitle small{display:block;font-weight:400;color:var(--sub,#6b7280)}
+.definitionCardsManualActions{display:flex;gap:6px;flex-shrink:0}
+.definitionCardsManagerStatus{min-height:1.2em;font-size:13px;color:var(--sub,#6b7280);margin:4px 0}
 .definitionCardsCount{margin:0 0 12px;color:var(--sub,#6b7280);font-size:13px}
 .definitionCardsFront,.definitionCardsAnswer{box-sizing:border-box;min-height:138px;padding:26px;border:1px solid var(--border,rgba(128,128,128,.35));border-radius:14px;background:var(--surface,rgba(128,128,128,.06));overflow-wrap:anywhere}
 .definitionCardsFront strong{display:block;font-size:24px;line-height:1.5}
@@ -33,14 +50,26 @@
 <main class="homeShell" id="homeApp">
 <header class="homeHeader" data-profile-only-header="1"><div><span class="eyebrow">LAW</span><h1 id="shellTitle">定義カード</h1></div><button class="headerProfileButton" type="button" data-profile-menu-trigger aria-label="アカウント" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"/></svg></button></header>
 <section class="definitionCardsMain" id="definitionCardsRoot">
-  <div class="definitionCardsToolbar"><h2>定義カード</h2><a href="statutes.html" class="definitionCardsBack">逐条集へ</a></div>
+  <div class="definitionCardsToolbar"><h2>暗記カード</h2><div class="definitionCardsToolbarLinks"><button type="button" class="definitionCardsManageToggle" id="definitionCardsManageToggle" aria-expanded="false" aria-controls="definitionCardsManager">カードを追加・管理</button><a href="statutes.html" class="definitionCardsBack">逐条集へ</a></div></div>
+  <section class="definitionCardsManager" id="definitionCardsManager" aria-label="手動カードの追加と管理" hidden>
+    <h3 id="definitionCardsFormHeading">新しいカードを作成</h3>
+    <form class="definitionCardsForm" id="definitionCardsManualForm">
+      <label>問題（表面）<textarea id="definitionCardsManualFront" required maxlength="3000" rows="3" placeholder="例：民法９４条２項の類推適用の要件"></textarea></label>
+      <label>解答（裏面）<textarea id="definitionCardsManualBack" required maxlength="12000" rows="4" placeholder="覚えたい内容を入力"></textarea></label>
+      <label>科目・分類（任意）<input type="text" id="definitionCardsManualCategory" maxlength="120" placeholder="例：民法／総則"></label>
+      <div class="definitionCardsFormActions"><button type="submit" id="definitionCardsManualSave">カードを保存</button><button type="button" id="definitionCardsManualNew">新規作成に戻す</button></div>
+    </form>
+    <p id="definitionCardsManualStatus" class="definitionCardsManagerStatus" role="status" aria-live="polite"></p>
+    <h3>手動で作成したカード <span id="definitionCardsManualTotal"></span></h3>
+    <ul id="definitionCardsManualList" class="definitionCardsManualList"></ul>
+  </section>
   <div class="definitionCardsReviewSettings"><span id="definitionCardsSummary" role="status"></span><label><input id="definitionCardsAll" type="checkbox"> 全カードを表示</label><label>目標保持率 <select id="definitionCardsRetention" aria-label="目標保持率"><option value="0.85">85%</option><option value="0.9">90%</option><option value="0.95">95%</option></select></label></div><div class="definitionCardsReviewSettings"><button type="button" id="definitionCardsOptimize">公式FSRSで最適化</button><button type="button" id="definitionCardsExport">履歴CSV出力</button><span id="definitionCardsOptimizeStatus" role="status"></span></div><p class="definitionCardsCount" id="definitionCardsCount" role="status"></p>
   <div class="definitionCardsStudy" id="definitionCardsStudy" hidden>
     <div class="definitionCardsFront"><strong id="definitionCardsTerm"></strong><span class="definitionCardsSource" id="definitionCardsSource"></span></div>
     <div class="definitionCardsAnswer" id="definitionCardsAnswer" hidden></div>
     <div class="definitionCardsRating" id="definitionCardsRating" hidden><button type="button" data-grade="0">忘れた</button><button type="button" data-grade="1">難しい</button><button type="button" data-grade="2">できた</button><button type="button" data-grade="3">簡単</button></div><div class="definitionCardsActions"><button type="button" id="definitionCardsPrev">前へ</button><button type="button" id="definitionCardsFlip">答えを見る</button><button type="button" id="definitionCardsNext">次へ</button></div>
   </div>
-  <p class="definitionCardsEmpty" id="definitionCardsEmpty" hidden>定義はまだ登録されていません。逐条集で条文の文言を選択し、定義を登録してください。</p>
+  <p class="definitionCardsEmpty" id="definitionCardsEmpty" hidden>カードはまだありません。上の「カードを追加・管理」から作成するか、逐条集で定義を登録してください。</p>
 </section>
 </main>
 <script src="guest-mode.js?v=20261009-guest"></script>
@@ -55,9 +84,10 @@
 <script src="app-global-shell.js?v=20261015-statutes"></script>
 <script src="mobile-bottom-nav.js?v=20261016-definition-cards"></script>
 <script src="statutes-definition-store.js?v=20261017-statutory-definitions"></script>
+<script src="manual-study-cards.js?v=20261019-manual-v1"></script>
 <script src="fsrs-runtime/ts-fsrs.umd.js?v=20261019-official"></script>
 <script src="definition-fsrs.js?v=20261019-official"></script>
-<script src="definition-cards.js?v=20261019-independent-v1"></script>
+<script src="definition-cards.js?v=20261019-manual-v1"></script>
 <script>
 (async () => {
   const show = () => document.documentElement.classList.remove('auth-pending');
