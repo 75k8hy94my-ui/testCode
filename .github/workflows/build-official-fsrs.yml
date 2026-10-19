@@ -1,0 +1,45 @@
+name: Build official FSRS browser runtime
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'fsrs-build/**'
+      - 'fsrs-trainer/index.html'
+      - 'fsrs-trainer/coi-sw.js'
+      - '.github/workflows/build-official-fsrs.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build official WASM and scheduler assets
+        run: |
+          cd fsrs-build
+          npm install --no-audit --no-fund
+          npm run build
+          mkdir -p ../fsrs-runtime
+          cp node_modules/ts-fsrs/dist/index.umd.js ../fsrs-runtime/ts-fsrs.umd.js
+      - name: Verify generated artifacts
+        run: |
+          test -s fsrs-trainer/build/optimizer.js
+          test -s fsrs-runtime/ts-fsrs.umd.js
+          find fsrs-trainer/build -type f -name '*.wasm' | grep -q .
+      - name: Commit self-hosted FSRS assets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f fsrs-trainer/build fsrs-runtime/ts-fsrs.umd.js
+          if ! git diff --cached --quiet; then
+            git commit -m "Vendor official FSRS browser runtime artifacts"
+            git fetch origin main
+            git rebase origin/main
+            git push
+          fi
