@@ -130,3 +130,25 @@ test('FSRS retention settings alter intervals and reschedule existing reviews',(
  assert.equal(high.reviews.length,record.reviews.length);
  assert.equal(high.lastReviewed,record.lastReviewed);
 });
+
+test('FSRS optimizer does not fit insufficient study histories', () => {
+ const fsrs=require('../definition-fsrs.js');
+ const result=fsrs.optimize({'card':{reviews:[{at:1,grade:2},{at:86400001,grade:0}]}});
+ assert.equal(result.status,'insufficient');
+ assert.equal(result.samples,1);
+ assert.equal(fsrs.validWeights(fsrs.weights),true);
+ assert.equal(fsrs.validWeights(Array(21).fill(-1)),false);
+});
+test('personalized scheduler uses bounded coefficients and preserves history', () => {
+ const fsrs=require('../definition-fsrs.js');
+ const weights=fsrs.weights.slice();weights[0]=1;
+ const at=Date.UTC(2026,9,19);
+ const result=fsrs.schedule(null,0,at,{weights});
+ assert.equal(result.stability,1);
+ assert.equal(result.reviews.length,1);
+ const updated=fsrs.reschedule(result,0.9,weights);
+ assert.equal(updated.reviews.length,1);
+ assert.equal(updated.stability,1);
+ const html=read('definition-cards.html');
+ assert.match(html,/definitionCardsOptimize/);
+});
