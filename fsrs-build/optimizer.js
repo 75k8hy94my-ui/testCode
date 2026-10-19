@@ -39,7 +39,7 @@ run.addEventListener('click',()=>{
     setStatus('ブラウザの分離環境を利用できません。再読み込みするか、対応ブラウザでお試しください。');return;
   }
   const input=trainingInput();
-  if(input.ratings.length<100){setStatus('学習履歴が不足しています（現在 '+input.ratings.length+' 回）。正確な個人最適化には、さらに復習を重ねてください。');return;}
+  if(input.ratings.length<400||input.lengths.length<50){setStatus('学習履歴が不足しています（現在 '+input.ratings.length+' 回・'+input.lengths.length+' 枚）。目安は400回・50枚以上です。');return;}
   run.disabled=true;setStatus('公式fsrs-rsで最適化しています。');
   const worker=new Worker(new URL('./optimizer.worker.js',import.meta.url),{type:'module'});
   worker.onmessage=event=>{
