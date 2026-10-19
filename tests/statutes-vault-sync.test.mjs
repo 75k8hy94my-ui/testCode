@@ -26,8 +26,8 @@ test('statutes route bootstraps independent encrypted sync and refreshes annotat
     assert.ok(page.includes('src="' + src + '?'), src);
   assert.ok(page.indexOf('vault-session.js') < page.indexOf('statutes-vault.js'));
   assert.match(definitions, /manga-vault-payload-applied/);
-  assert.match(definitions, /StatutesVault\\?\\.changed/);
-  assert.match(definitions, /window\\.StatutesVault\\.sync\\(\\)/);
+  assert.ok(definitions.includes('StatutesVault?.changed'));
+  assert.ok(definitions.includes('window.StatutesVault.sync()'));
   assert.doesNotMatch(definitions, /markLocalChangesPending/);
 });
 
@@ -35,8 +35,8 @@ test('statute-only sync never imports media fields and does not require VPN', ()
   const independent = fs.readFileSync(new URL('../statutes-vault.js', import.meta.url), 'utf8');
   assert.match(independent, /testcode_statute_vaults/);
   assert.match(independent, /AES-GCM/);
-  assert.match(independent, /revision=eq\\./);
+  assert.ok(independent.includes('revision=eq.'));
   assert.match(independent, /local-conflict/);
   assert.doesNotMatch(independent, /canReceiveVaultPayload/);
-  assert.match(definitions, /window\\.StatutesVault\\.sync\\(\\)/);
+  assert.ok(definitions.includes('window.StatutesVault.sync()'));
 });
