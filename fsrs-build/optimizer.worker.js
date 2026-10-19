@@ -1,5 +1,8 @@
 import init,{initThreadPool,Fsrs} from 'fsrs-browser/fsrs_browser';
 let initialized=false;
+const diagnostics=[];
+const originalConsoleError=console.error.bind(console);
+console.error=(...args)=>{diagnostics.push(args.map(String).join(' ').slice(0,600));originalConsoleError(...args);};
 self.onmessage=async ({data})=>{
   try{
     if(!initialized){
@@ -17,5 +20,5 @@ self.onmessage=async ({data})=>{
     const weights=Array.from(parameters);
     model.free();
     self.postMessage({type:'success',weights});
-  }catch(error){self.postMessage({type:'error',message:String(error?.message||error)});}
+  }catch(error){self.postMessage({type:'error',message:(String(error?.message||error)+' '+diagnostics.slice(-2).join(' ')).slice(0,900)});}
 };
