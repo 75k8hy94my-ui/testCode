@@ -16,8 +16,10 @@
   const summary = document.getElementById('definitionCardsSummary');
   const allToggle = document.getElementById('definitionCardsAll');
   const progressKey = 'testCode.statutes.definitionReviews.v1';
-  const DAY = 86400000;
-  const MINUTE = 60000;
+  const retentionKey = 'testCode.statutes.definitionRetention.v1';
+  const retentionSelect = document.getElementById('definitionCardsRetention');
+  const desiredRetention = () => { const x=Number(localStorage.getItem(retentionKey)); return x>=0.7&&x<=0.97?x:0.9; };
+  if (retentionSelect) retentionSelect.value=String(desiredRetention());
   const cardId = entry => [entry.subject, entry.article, entry.part, entry.start, entry.end].join(':');
   let cards = [], queue = [], index = 0, history = {};
 
@@ -31,7 +33,7 @@
     try { localStorage.setItem(progressKey, JSON.stringify(history)); return true; }
     catch (_) { return false; }
   }
-  const schedule = (previous, grade, now = Date.now()) => window.DefinitionFSRS.schedule(previous, grade, now);
+  const schedule = (previous, grade, now = Date.now()) => window.DefinitionFSRS.schedule(previous, grade, now, {retention: desiredRetention()});
   function isDue(entry) {
     const due = Number(history[cardId(entry)]?.due);
     return !Number.isFinite(due) || due <= Date.now();
@@ -97,6 +99,18 @@
   prev.addEventListener('click', () => { if (index > 0) { index--; render(); } });
   next.addEventListener('click', () => { if (index < queue.length - 1) { index++; render(); } });
   allToggle.addEventListener('change', () => { index = 0; rebuild(); });
+  retentionSelect?.addEventListener('change', () => {
+    const value=Number(retentionSelect.value);
+    if (value<0.7||value>0.97) return;
+    try {
+      localStorage.setItem(retentionKey,String(value));
+      history=loadHistory();
+      for (const [id, record] of Object.entries(history)) history[id]=window.DefinitionFSRS.reschedule(record,value);
+      if (!saveHistory()) throw Error('save failed');
+      if (!window.TestCodeGuest?.isActive()) { window.MangaVault?.markLocalChangesPending?.(); Promise.resolve(window.MangaVault?.saveLocalChanges?.()).catch(()=>{}); }
+      rebuild();
+    } catch (_) { alert('復習設定を保存できませんでした。'); }
+  });
   window.addEventListener('storage', event => {
     if (event.key === store.STORAGE_KEY || event.key === progressKey) refresh();
   });
