@@ -32,3 +32,26 @@ test('FSRS trainer isolates only its own route on localhost', async ({page}) => 
   await page.locator('#fsrsTrainerRun').click();
   await expect(page.locator('#fsrsTrainerStatus')).toContainText('学習履歴が不足');
 });
+
+test('official Rust optimizer trains locally and saves 21 coefficients', async ({page}) => {
+  test.setTimeout(120_000);
+  await page.goto('index.html');
+  await page.evaluate(() => {
+    const records={},day=86400000,now=Date.UTC(2026,9,19);
+    for(let i=0;i<120;i++){
+      const base=now-(120+i%18)*day;
+      const grades=[2, i%3===0?0:2, i%4===0?1:2, i%5===0?0:3, 2];
+      const dates=[base,base+3*day,base+13*day,base+30*day,base+60*day];
+      records['synthetic:'+i]={reviews:grades.map((grade,j)=>({at:dates[j],grade,due:dates[j]+day}))};
+    }
+    localStorage.setItem('testCode.statutes.definitionReviews.v1',JSON.stringify(records));
+  });
+  await page.goto('fsrs-trainer/index.html');
+  await expect.poll(async()=>page.evaluate(()=>globalThis.crossOriginIsolated),{timeout:20000}).toBe(true);
+  await expect(page.locator('#fsrsTrainerRun')).toBeEnabled();
+  await page.locator('#fsrsTrainerRun').click();
+  await expect(page.locator('#fsrsTrainerStatus')).toContainText('最適化が完了しました',{timeout:90000});
+  const weights=await page.evaluate(()=>JSON.parse(localStorage.getItem('testCode.statutes.definitionFSRSWeights.v1')));
+  expect(weights).toHaveLength(21);
+  expect(weights.every(x=>Number.isFinite(x))).toBe(true);
+});
