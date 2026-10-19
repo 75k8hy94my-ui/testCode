@@ -50,7 +50,8 @@ test('official Rust optimizer trains locally and saves 21 coefficients', async (
   await expect.poll(async()=>page.evaluate(()=>globalThis.crossOriginIsolated),{timeout:20000}).toBe(true);
   await expect(page.locator('#fsrsTrainerRun')).toBeEnabled();
   await page.locator('#fsrsTrainerRun').click();
-  await expect(page.locator('#fsrsTrainerStatus')).toContainText('最適化が完了しました',{timeout:90000});
+  await expect(page.locator('#fsrsTrainerStatus')).toContainText(/最適化が完了しました|最適化に失敗しました/,{timeout:90000});
+  await expect(page.locator('#fsrsTrainerStatus')).toContainText('最適化が完了しました');
   const weights=await page.evaluate(()=>JSON.parse(localStorage.getItem('testCode.statutes.definitionFSRSWeights.v1')));
   expect(weights).toHaveLength(21);
   expect(weights.every(x=>Number.isFinite(x))).toBe(true);
