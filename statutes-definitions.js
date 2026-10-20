@@ -106,6 +106,7 @@
     return ({
       offline:'オフライン', locked:'保管庫がロックされています',
       unauthenticated:'認証が必要です', 'local-conflict':'同じ箇所に両立しない変更があります（自動上書きしません）',
+      'unknown-ancestor':'共通の同期元が不明なため、自動統合の安全性を確認できません',
       'concurrent-update':'他の端末の更新が続いています（再試行します）',
       guest:'ゲストモード'
     })[reason] || (reason || '同期保留');
@@ -130,9 +131,12 @@
           cloudChoice.hidden = localChoice.hidden = true;
         } else {
           const reason = describeDeferred(result?.reason);
-          const conflict = result?.reason === 'local-conflict';
+          const unknown = result?.reason === 'unknown-ancestor';
+          const conflict = result?.reason === 'local-conflict' || unknown;
           cloudChoice.hidden = localChoice.hidden = !conflict;
-          setSyncStatus((conflict ? '同期競合' : 'クラウド同期待ち') + '（' + reason + '）');
+          cloudChoice.textContent = unknown ? 'クラウド全体を採用' : '競合箇所はクラウドを採用';
+          localChoice.textContent = unknown ? 'この端末全体を採用' : '競合箇所はこの端末を採用';
+          setSyncStatus((unknown ? '同期元不明' : conflict ? '同期競合' : 'クラウド同期待ち') + '（' + reason + '）');
           retryButton.hidden = false;
           // Conflicts and locked/unauthenticated states require intervention.
           if (!conflict && !['locked','unauthenticated','guest'].includes(result?.reason)) scheduleRetry();
