@@ -47,7 +47,12 @@ test('small-phone toolbar stays above text even when sync controls wrap', async 
 test('mobile definition and reference panes do not overlap the bottom law dock', async ({ page }) => {
   await openGuestStatutes(page, 390, 844);
   const grip = page.locator('.statutesPhoneResize');
-  await page.evaluate(() => document.documentElement.classList.add('statutes-definition-open'));
+  await page.evaluate(() => {
+    document.documentElement.classList.add('statutes-definition-open');
+    // A real editor opening also removes inert; merely toggling the CSS class
+    // leaves the divider unable to receive pointer events.
+    document.querySelector('#statutesDefinitionSide').inert = false;
+  });
   await expect(grip).toBeVisible();
   await expect.poll(() => page.evaluate(() => {
     const header = document.querySelector('#appGlobalHeader').getBoundingClientRect();
@@ -69,7 +74,12 @@ test('mobile definition and reference panes do not overlap the bottom law dock',
 
 test('dragging the phone divider uses the actual top toolbar height', async ({ page }) => {
   await openGuestStatutes(page, 390, 844);
-  await page.evaluate(() => document.documentElement.classList.add('statutes-definition-open'));
+  await page.evaluate(() => {
+    document.documentElement.classList.add('statutes-definition-open');
+    // A real editor opening also removes inert; merely toggling the CSS class
+    // leaves the divider unable to receive pointer events.
+    document.querySelector('#statutesDefinitionSide').inert = false;
+  });
   const grip = page.locator('.statutesPhoneResize');
   await expect(grip).toBeVisible();
   const initial = await page.locator('#routeContent').boundingBox();
