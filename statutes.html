@@ -322,7 +322,7 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
   html.statutes-page:not(.statutes-definition-open) #homeApp > #routeContent.statutesMain{
     position:fixed!important;
     box-sizing:border-box;
-    top:calc(141px + env(safe-area-inset-top))!important;
+    top:var(--statutes-mobile-content-top,calc(141px + env(safe-area-inset-top)))!important;
     bottom:calc(86px + env(safe-area-inset-bottom))!important;
     left:0;right:0;
     width:100%!important;
@@ -382,7 +382,7 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
     bottom:calc(86px + env(safe-area-inset-bottom));
   }
   html.statutes-page.statutes-definition-open #homeApp{
-    padding-top:calc(140px + env(safe-area-inset-top))!important;
+    padding-top:calc(var(--statutes-mobile-content-top,calc(141px + env(safe-area-inset-top))) - 1px)!important;
     height:calc(100dvh - var(--statutes-split-bottom))!important;
   }
   html.statutes-page.statutes-definition-open #homeApp > #routeContent.statutesMain{
@@ -390,6 +390,13 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
   }
   html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
     margin-top:0!important;
+  }
+}
+/* When the reference panel is also open, the mobile editor must stop above it.
+   This rule follows the general phone grid rule so its height is not overridden. */
+@media(max-width:620px){
+  html.statutes-page.statutes-definition-open.statutes-split-open #homeApp{
+    height:calc(100dvh - var(--statutes-split-bottom) - var(--statutes-split-height))!important;
   }
 }
 @media(min-width:900px){html.statutes-page #statutesLawDock{display:none}}
@@ -796,7 +803,8 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
   grip.addEventListener('pointermove', (event) => {
     if (!dragging) return;
     const rect = host.getBoundingClientRect();
-    setRatio((event.clientY - rect.top - 54) / Math.max(1, rect.height - 54));
+    const paddingTop = parseFloat(getComputedStyle(host).paddingTop) || 0;
+    setRatio((event.clientY - rect.top - paddingTop) / Math.max(1, rect.height - paddingTop));
   });
   function finish() {
     if (!dragging) return;
@@ -806,6 +814,28 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
   grip.addEventListener('pointerup', finish);
   grip.addEventListener('pointercancel', finish);
   grip.addEventListener('lostpointercapture', finish);
+})();
+</script>
+<script>
+/* The mobile action bar can wrap (small phones, large type or a sync error).
+   Measure its actual bottom edge instead of allowing it to cover article text. */
+(() => {
+  const root = document.documentElement;
+  const header = document.getElementById('appGlobalHeader');
+  if (!root.classList.contains('statutes-page') || !header) return;
+  const mobile = window.matchMedia('(max-width:899px)');
+  const measure = () => {
+    if (!mobile.matches) {
+      root.style.removeProperty('--statutes-mobile-content-top');
+      return;
+    }
+    const bottom = Math.ceil(header.getBoundingClientRect().bottom + 12);
+    root.style.setProperty('--statutes-mobile-content-top', bottom + 'px');
+  };
+  if (typeof ResizeObserver === 'function') new ResizeObserver(measure).observe(header);
+  mobile.addEventListener('change', measure);
+  window.addEventListener('resize', measure, { passive: true });
+  measure();
 })();
 </script>
 <script src="statutes-search.js?v=20261017-search-opacity-results"></script>
