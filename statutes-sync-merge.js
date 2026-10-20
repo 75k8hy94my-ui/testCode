@@ -28,7 +28,7 @@
 
   // Review records are coherent FSRS state machines: merging individual schedule
   // fields would produce a record that never existed on either device.
-  function mergeValue(base, local, remote, path, conflicts, atomic = false) {
+  function mergeValue(base, local, remote, path, conflicts, atomic = false, choice = null) {
     if (equal(local,base)) return remote;
     if (equal(remote,base) || equal(local,remote)) return local;
     if (!atomic && record(base) && record(local) && record(remote)) {
@@ -36,7 +36,7 @@
       const keys = new Set([...Object.keys(base), ...Object.keys(local), ...Object.keys(remote)]);
       for (const key of keys) {
         const merged = mergeValue(at(base,key), at(local,key), at(remote,key),
-          path + '/' + key, conflicts);
+          path + '/' + key, conflicts, false, choice);
         if (merged !== MISSING) out[key] = merged;
       }
       return out;
@@ -46,14 +46,14 @@
       return Math.max(local,remote);
     }
     conflicts.push(path);
-    return base;
+    return choice === 'local' ? local : choice === 'cloud' ? remote : base;
   }
-  function mergeMap(base,local,remote,path,conflicts,atomicEntries=true) {
+  function mergeMap(base,local,remote,path,conflicts,atomicEntries=true,choice=null) {
     const out = {};
     const keys = new Set([...Object.keys(base),...Object.keys(local),...Object.keys(remote)]);
     for (const key of keys) {
       const merged = mergeValue(at(base,key),at(local,key),at(remote,key),
-        path + '/' + key,conflicts,atomicEntries);
+        path + '/' + key,conflicts,atomicEntries,choice);
       if (merged !== MISSING) out[key] = merged;
     }
     return out;
@@ -75,13 +75,13 @@
     return indexed;
   }
   const filtered = (ids, set) => ids.filter(id => set.has(id));
-  function mergeArray(base,local,remote,path,conflicts,identity) {
+  function mergeArray(base,local,remote,path,conflicts,identity,choice=null) {
     const a=index(base,identity), b=index(local,identity), c=index(remote,identity);
     // Unknown/duplicate identities cannot be merged without risking data loss.
-    if (!a || !b || !c) return mergeValue(base,local,remote,path,conflicts,true);
+    if (!a || !b || !c) return mergeValue(base,local,remote,path,conflicts,true,choice);
     const items = new Map();
     for (const id of new Set([...a.keys(),...b.keys(),...c.keys()])) {
-      const merged = mergeValue(atMap(a,id),atMap(b,id),atMap(c,id),path + '/' + id,conflicts);
+      const merged = mergeValue(atMap(a,id),atMap(b,id),atMap(c,id),path + '/' + id,conflicts,false,choice);
       if (merged !== MISSING) items.set(id,merged);
     }
     const surviving = new Set(items.keys());
@@ -93,7 +93,7 @@
     if (localReordered && remoteReordered && !equal(localOrder,remoteOrder)) {
       conflicts.push(path + '/order');
     }
-    const preferred = localReordered && !remoteReordered ? [...b.keys()]
+    const preferred = localReordered && !remoteReordered || (localReordered && remoteReordered && choice === 'local') ? [...b.keys()]
       : [...c.keys()];
     const order = filtered(preferred,surviving);
     for (const id of [...b.keys(),...c.keys(),...a.keys()]) {
@@ -102,16 +102,16 @@
     return order.map(id => items.get(id));
   }
   const atMap = (map,key) => map.has(key) ? map.get(key) : MISSING;
-  function mergeStatutes(base, local, remote) {
+  function mergeStatutes(base, local, remote, choice=null) {
     const conflicts = [], payload = {};
     for (const field of FIELDS) {
       const a=base[field], b=local[field], c=remote[field];
       if (field === FIELDS[0] || field === FIELDS[6]) {
-        payload[field]=mergeArray(a,b,c,field,conflicts,field===FIELDS[0]?definitionId:cardId);
+        payload[field]=mergeArray(a,b,c,field,conflicts,field===FIELDS[0]?definitionId:cardId,choice);
       } else if ([FIELDS[1],FIELDS[2],FIELDS[3]].includes(field)) {
-        payload[field]=mergeMap(a,b,c,field,conflicts,true);
+        payload[field]=mergeMap(a,b,c,field,conflicts,true,choice);
       } else {
-        payload[field]=mergeValue(a,b,c,field,conflicts,true);
+        payload[field]=mergeValue(a,b,c,field,conflicts,true,choice);
       }
     }
     return {data:payload,conflicts};
