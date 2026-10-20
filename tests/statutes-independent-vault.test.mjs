@@ -147,7 +147,7 @@ test('independently entered study cards survive account encryption, restart and 
   const preview=mergedModule.default.mergeStatutes(basePayload,changedPayload,basePayload);
   assert.deepEqual(preview.conflicts,[]);
   assert.equal(preview.data[manualKey].length,2);
-  assert.equal(preview.data[manualKey].every(c=>typeof c.id==='string'&&typeof c.front==='string'&&typeof c.back==='string'),true);
+  assert.equal(preview.data[manualKey].every(c=>typeof c?.id==='string'&&typeof c?.front==='string'&&typeof c?.back==='string'),true,JSON.stringify(preview.data[manualKey]));
   assert.equal((await reopened.api.sync()).state,'success');
   assert.equal(database.row.revision,2);
 });
