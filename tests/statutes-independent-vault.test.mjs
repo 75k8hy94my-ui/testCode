@@ -141,6 +141,13 @@ test('independently entered study cards survive account encryption, restart and 
   const reopened=createEnv(database,otherStorage,{active:false});
   assert.equal((await reopened.api.sync()).state,'success');
   otherStorage.setItem(manualKey,JSON.stringify([...original,{...original,id:'manual-2',front:'商法の問題'}]));
+  const mergedModule=await import('../statutes-sync-merge.js');
+  const basePayload=JSON.parse(otherStorage.getItem('testCode.statutes.independentBase.v1')).data;
+  const changedPayload={...basePayload,[manualKey]:JSON.parse(otherStorage.getItem(manualKey))};
+  const preview=mergedModule.default.mergeStatutes(basePayload,changedPayload,basePayload);
+  assert.deepEqual(preview.conflicts,[]);
+  assert.equal(preview.data[manualKey].length,2);
+  assert.equal(preview.data[manualKey].every(c=>typeof c.id==='string'&&typeof c.front==='string'&&typeof c.back==='string'),true);
   assert.equal((await reopened.api.sync()).state,'success');
   assert.equal(database.row.revision,2);
 });
