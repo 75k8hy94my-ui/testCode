@@ -243,3 +243,33 @@ test('an edit during a pending upload stays local and is synced in the following
   assert.equal((await b.api.sync()).state,'success');
   assert.deepEqual(JSON.parse(remote.getItem(noteKey)),{'civil-general:１条':'A','criminal-special:１９９条':'B'});
 });
+
+
+test('choosing cloud for a truly conflicting definition preserves unrelated local notes',async()=>{
+  const db={}, base=definition('civil-general','９４条',0,'元の定義');
+  const first=storage({[definitionKey]:JSON.stringify([base])}), second=storage();
+  const a=createEnv(db,first), b=createEnv(db,second);
+  await a.api.sync(); await b.api.sync();
+  first.setItem(definitionKey,JSON.stringify([{...base,definition:'クラウド側の定義'}]));
+  second.setItem(definitionKey,JSON.stringify([{...base,definition:'端末側の定義'}]));
+  second.setItem(noteKey,JSON.stringify({'criminal-special:１９９条':'競合しないメモ'}));
+  assert.equal((await a.api.sync()).state,'success');
+  const deferred=await b.api.sync();
+  assert.equal(deferred.reason,'local-conflict');
+  assert.ok(deferred.conflictPaths?.length);
+  assert.equal((await b.api.resolveConflict('cloud')).state,'success');
+  assert.equal(JSON.parse(second.getItem(definitionKey))[0].definition,'クラウド側の定義');
+  assert.equal(JSON.parse(second.getItem(noteKey))['criminal-special:１９９条'],'競合しないメモ');
+  const newDevice=storage(), c=createEnv(db,newDevice);
+  assert.equal((await c.api.sync()).state,'success');
+  assert.equal(JSON.parse(newDevice.getItem(noteKey))['criminal-special:１９９条'],'競合しないメモ');
+});
+
+test('a populated new device without an ancestor is distinct from an item-level conflict',async()=>{
+  const db={}, first=createEnv(db,storage({[noteKey]:JSON.stringify({'civil-general:１条':'cloud'})}));
+  await first.api.sync();
+  const secondStorage=storage({[noteKey]:JSON.stringify({'criminal-special:１９９条':'local'})});
+  const second=createEnv(db,secondStorage);
+  assert.equal((await second.api.sync()).reason,'unknown-ancestor');
+  assert.equal(JSON.parse(secondStorage.getItem(noteKey))['criminal-special:１９９条'],'local');
+});
