@@ -105,7 +105,8 @@
   function describeDeferred(reason) {
     return ({
       offline:'オフライン', locked:'保管庫がロックされています',
-      unauthenticated:'認証が必要です', 'local-conflict':'端末とクラウドの内容が競合しています（自動上書きしません）',
+      unauthenticated:'認証が必要です', 'local-conflict':'同じ箇所に両立しない変更があります（自動上書きしません）',
+      'concurrent-update':'他の端末の更新が続いています（再試行します）',
       guest:'ゲストモード'
     })[reason] || (reason || '同期保留');
   }
