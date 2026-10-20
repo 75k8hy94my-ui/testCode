@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 async function openGuestStatutes(page, width = 390, height = 844) {
   await page.setViewportSize({ width, height });
-  await page.route(/supabase\\.co|\\/auth\\/v1\\/|\\/rest\\/v1\\//i, route => route.abort());
+  await page.route(/supabase\.co|\/auth\/v1\/|\/rest\/v1\//i, route => route.abort());
   await page.goto('index.html');
   await page.getByRole('button', { name: 'ログインせずに使う' }).click();
   await page.goto('statutes.html?section=civil-general');
