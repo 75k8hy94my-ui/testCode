@@ -128,7 +128,7 @@
       if (!sameBase) {
         if (!equal(local,incoming)) {
           const isEmpty = equal(local,empty());
-          if (!isEmpty) return {state:'deferred',reason:'local-conflict'};
+          if (!isEmpty) return {state:'deferred',reason:'unknown-ancestor'};
           apply(incoming);
         }
         save(BASE,{user,revision:row.revision,data:incoming});
@@ -136,7 +136,7 @@
         return {state:'success',applied:true};
       }
       if (!base?.data || !valid(base.data)) {
-        return {state:'deferred',reason:'local-conflict'};
+        return {state:'deferred',reason:'unknown-ancestor'};
       }
       // CAS protects a single encrypted server row; it is not evidence that
       // individual annotations conflict. Re-merge against the same ancestor
@@ -191,22 +191,37 @@
     const decoded = await unseal(raw,row.ciphertext);
     const incoming = normalized(decoded);
     if (!valid(incoming)) throw new Error('クラウドデータが不正です。');
-    if (choice === 'cloud') {
-      apply(incoming);
-      save(BASE,{user,revision:row.revision,data:incoming});
-      return {state:'success',applied:true};
+    const local = snapshot(), base = read(BASE);
+    let adopted;
+    if (base?.user === user && base?.data && valid(normalized(base.data))) {
+      // Adopt the chosen side ONLY at disputed fields. Preserve independent
+      // edits from both devices, including additions and deletions elsewhere.
+      adopted = window.StatutesSyncMerge.mergeStatutes(normalized(base.data),local,incoming,choice).data;
+    } else {
+      // No reliable ancestor: selecting a side must remain an explicit
+      // whole-snapshot decision rather than guessing whether absence=deletion.
+      adopted = choice === 'cloud' ? incoming : local;
     }
-    const local = snapshot();
-    const cipher = await seal(raw,local);
-    const result = await api(endpoint(user)+'&revision=eq.'+encodeURIComponent(row.revision)+'&select=revision',{
-      method:'PATCH',
-      headers:{Prefer:'return=representation'},
-      body:JSON.stringify({revision:Number(row.revision)+1,ciphertext:cipher,updated_at:new Date().toISOString()})
-    });
-    if (!Array.isArray(result) || result.length !== 1)
-      throw new Error('別の端末で更新されました。再確認してください。');
-    save(BASE,{user,revision:Number(row.revision)+1,data:local});
-    return {state:'success'};
+    if (!valid(adopted)) throw new Error('選択後の逐条集データの構造が不正です。');
+    let revision = row.revision;
+    if (!equal(adopted,incoming)) {
+      const cipher = await seal(raw,adopted);
+      const result = await api(endpoint(user)+'&revision=eq.'+encodeURIComponent(row.revision)+'&select=revision',{
+        method:'PATCH',
+        headers:{Prefer:'return=representation'},
+        body:JSON.stringify({revision:Number(row.revision)+1,ciphertext:cipher,updated_at:new Date().toISOString()})
+      });
+      if (!Array.isArray(result) || result.length !== 1)
+        throw new Error('別の端末で更新されました。再確認してください。');
+      revision = Number(row.revision)+1;
+    }
+    save(BASE,{user,revision,data:adopted});
+    if (equal(snapshot(),local)) {
+      if (!equal(adopted,local)) apply(adopted);
+    } else {
+      changed();
+    }
+    return {state:'success',applied:!equal(adopted,local)};
   }
   // Called only after local statutes edits; never triggers a shared Vault upload.
   let timer;
