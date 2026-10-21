@@ -7,8 +7,24 @@
   const returnPage = returnPageValue == null ? null : Number(returnPageValue);
   const validReturnPage = Number.isSafeInteger(returnPage) && returnPage > 0 ? returnPage : null;
   const RETURN_INTENT_KEY = 'testcode.video.returnIntent';
+  const RETURN_VIEW_KEY = 'testcode.video.listReturnContext';
+  function isReturnVideoHidden() {
+    if (!returnVideoId || !canReadProtectedData()) return false;
+    try {
+      const meta = JSON.parse(localStorage.getItem('mangaReaderVideoMeta') || '{}');
+      const entry = meta && meta[returnVideoId];
+      if (entry && Object.prototype.hasOwnProperty.call(entry, 'hidden')) return entry.hidden === true;
+      const videos = JSON.parse(localStorage.getItem('mangaReaderVideos') || '[]');
+      return Array.isArray(videos) && videos.some(video => String(video.id) === returnVideoId && video.hidden === true);
+    } catch (_) { return false; }
+  }
   function videoListReturnUrl(href = 'video.html') {
     const destination = new URL(href, location.href);
+    if (isReturnVideoHidden()) {
+      destination.searchParams.delete('returnVideo');
+      destination.searchParams.delete('returnPage');
+      return destination;
+    }
     if (returnVideoId) destination.searchParams.set('returnVideo', returnVideoId);
     if (validReturnPage != null) destination.searchParams.set('returnPage', String(validReturnPage));
     return destination;
@@ -23,7 +39,10 @@
     try { destination = new URL(link.href, location.href); } catch (_) { return; }
     if (destination.origin !== location.origin || destination.pathname.split('/').pop() !== 'video.html') return;
     link.href = videoListReturnUrl(destination.href).href;
-    if (returnVideoId) {
+    if (isReturnVideoHidden()) {
+      try { sessionStorage.removeItem(RETURN_INTENT_KEY); sessionStorage.removeItem(RETURN_VIEW_KEY); }
+      catch (_) { /* No stale return context will be used when storage is unavailable. */ }
+    } else if (returnVideoId) {
       try { sessionStorage.setItem(RETURN_INTENT_KEY, JSON.stringify({ id: returnVideoId, page: validReturnPage })); }
       catch (_) { /* The URL itself remains sufficient when storage is unavailable. */ }
     }
@@ -166,6 +185,8 @@
     if (canReadProtectedData()) resumePendingLocalSync();
     return nextMeta[id];
   };
+  let titleComposing = false;
+  let titleJustComposed = false;
   const beginTitleEdit = () => {
     if (!canReadProtectedData()) return;
     if (heading.contentEditable === 'true') return;
@@ -190,10 +211,22 @@
     }
   };
   heading.addEventListener('click', beginTitleEdit);
+  heading.addEventListener('compositionstart', () => { titleComposing = true; titleJustComposed = false; });
+  heading.addEventListener('compositionend', () => {
+    titleComposing = false;
+    // Some IMEs dispatch compositionend immediately before the confirming Enter.
+    // Ignore that one keydown without closing the title editor.
+    titleJustComposed = true;
+    setTimeout(() => { titleJustComposed = false; }, 0);
+  });
   heading.addEventListener('keydown', (event) => {
     if (heading.contentEditable !== 'true') { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); beginTitleEdit(); } return; }
-    if (event.key === 'Enter') { event.preventDefault(); heading.blur(); }
-    if (event.key === 'Escape') { event.preventDefault(); heading.textContent = heading.dataset.previousTitle || title; heading.contentEditable = 'false'; heading.removeAttribute('aria-multiline'); heading.setAttribute('role', 'button'); heading.setAttribute('aria-label', 'タイトルをクリックして編集'); }
+    if (event.key === 'Enter') {
+      if (event.isComposing || titleComposing || event.keyCode === 229) return;
+      if (titleJustComposed) { event.preventDefault(); return; }
+      event.preventDefault(); heading.blur();
+    }
+    if (event.key === 'Escape' && !event.isComposing && !titleComposing) { event.preventDefault(); heading.textContent = heading.dataset.previousTitle || title; heading.contentEditable = 'false'; heading.removeAttribute('aria-multiline'); heading.setAttribute('role', 'button'); heading.setAttribute('aria-label', 'タイトルをクリックして編集'); }
   });
   heading.addEventListener('blur', saveTitle);
   const frame = document.createElement('div'); frame.className = 'videoPlayerFrame'; frame.style.height = 'min(540px, calc(100svh - 150px))'; frame.style.minHeight = '240px';
