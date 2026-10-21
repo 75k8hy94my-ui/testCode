@@ -44,7 +44,7 @@ test('returning from a hidden video does not switch the list into the hidden fol
   await openGuestLibrary(page);
   await page.locator('.vl-card[data-video-id="regular-video"] .vl-open').first().click();
   await expect(page).toHaveURL(/video-player\.html\?id=regular-video/);
-  await page.locator('.videoPlayerEdit').click();
+  await page.getByRole('link', { name: '詳細を編集' }).click();
   await expect(page).toHaveURL(/video-edit\.html\?id=regular-video/);
   await page.locator('.videoEditForm input[name="hidden"]').check();
   await page.locator('.videoEditForm button[type="submit"]').click();
@@ -82,6 +82,15 @@ test('IME conversion Enter does not save a video title while editing', async ({ 
   });
   await expect(heading).toHaveAttribute('contenteditable', 'true');
   await heading.focus();
+  await page.evaluate(() => {
+    const heading = document.querySelector('.videoPlayerTitle');
+    const range = document.createRange();
+    range.selectNodeContents(heading);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  });
   await page.keyboard.insertText('タイトル');
   await page.keyboard.press('Enter');
   await expect(heading).toHaveAttribute('contenteditable', 'false');
