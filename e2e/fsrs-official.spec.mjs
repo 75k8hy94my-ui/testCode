@@ -3,11 +3,13 @@ import { test, expect } from '@playwright/test';
 test('official ts-fsrs grades cards and persists official state', async ({page}) => {
   await page.goto('index.html');
   await page.getByRole('button',{name:'ログインせずに使う'}).click();
+  await page.goto('definition-cards.html');
+  await expect(page.locator('#definitionCardsEmpty')).toBeVisible();
   await page.evaluate(() => localStorage.setItem('testCode.statutes.definitions.v1',JSON.stringify([{
     subject:'civil-general',article:'１条',part:0,start:0,end:2,
     quote:'私権',definition:'私法上の権利',card:true
   }])));
-  await page.goto('definition-cards.html');
+  await page.reload();
   await expect(page.locator('#definitionCardsFlip')).toBeEnabled();
   await expect(page.locator('#definitionCardsTerm')).toHaveText('私権');
   await page.locator('#definitionCardsFlip').click();
