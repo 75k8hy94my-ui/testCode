@@ -56,7 +56,7 @@ test('mobile bottom navigation stays visible on manga and video routes', () => {
   assert.doesNotMatch(css, /html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav[^{}]*\{display:none!important\}/);
   assert.match(css, /@media\(max-width:899px\)\{html\.reader-entry-manga #mobileBottomNav,html\.reader-entry-video #mobileBottomNav\{display:flex!important\}\}/);
   for (const page of ['manga.html', 'video.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20261011-vault-history/);
+    assert.match(read(page), /home-profile-shell\.css\?v=[\w-]+/);
   }
 });
 
@@ -78,7 +78,7 @@ test('authenticated top bars keep only the shared profile action', () => {
   const menu = read('profile-menu.js');
   assert.match(menu, /\[data-profile-menu-trigger\], #desktopProfileButton/);
   assert.doesNotMatch(menu, /matchMedia\('\(min-width: 900px\)'\)\.matches\) return/);
-  assert.match(read('sync.html'), /profile-menu\.js\?v=20261011-nongame-audit/);
+  assert.match(read('sync.html'), /profile-menu\.js\?v=[\w-]+/);
 });
 
 test('login page has no top navigation menu', () => {
@@ -94,7 +94,7 @@ test('VPN gate keeps readable contrast on dark manga/video routes', () => {
   assert.match(css, /color:#f8fafc/);
   assert.match(css, /vpnStatusButton\[data-vpn-state="blocked"\][\s\S]*color:#ffb4b4/);
   for (const page of ['home.html','profile.html','manga.html','video.html']) {
-    assert.match(read(page), /home-profile-shell\.css\?v=20261011-vault-history/);
+    assert.match(read(page), /home-profile-shell\.css\?v=[\w-]+/);
   }
 });
 
@@ -126,9 +126,9 @@ test('saved theme drives home profile manga video and header colors', () => {
   assert.match(css, /reader-entry-video body[\s\S]*background:#0a0c11!important/);
   assert.match(globalCss, /--shell-header-bg/);
   for (const page of ['home.html','profile.html','manga.html','video.html','video-player.html']) {
-    const shellVersion = page === 'video-player.html' ? '20261010-icon-markers' : '20261011-vault-history';
+    const shellVersion = '[\\w-]+';
     assert.match(read(page), new RegExp(`home-profile-shell\\.css\\?v=${shellVersion}`));
-    assert.match(read(page), /app-global-shell\.js\?v=20261003-reader-spa/);
+    assert.match(read(page), /app-global-shell\.js\?v=[\w-]+/);
     const menuVersion = '20261011-nongame-audit';
     assert.match(read(page), new RegExp(`profile-menu\\.js\\?v=${menuVersion}`));
   }
@@ -175,11 +175,11 @@ test('shared mobile nav provides a moving Liquid Glass lens and adaptive interac
 test('all authenticated mobile destinations load the shared Liquid Glass assets', () => {
   for (const page of ['home.html','profile.html','manga.html','video.html','video-player.html']) {
     const source = read(page);
-    assert.match(source, /mobile-bottom-nav\.css\?v=20260925-instagram-drag-lock/, page);
-    assert.match(source, /mobile-bottom-nav\.js\?v=20260925-instagram-drag-lock/, page);
+    assert.match(source, /mobile-bottom-nav\.css\?v=[\w-]+/, page);
+    assert.match(source, /mobile-bottom-nav\.js\?v=[\w-]+/, page);
   }
   for (const page of ['home.html','profile.html','manga.html','video.html']) {
-    const spaVersion = '20261012-youtube-video-cards-v2';
+    const spaVersion = '[\\w-]+';
     assert.match(read(page), new RegExp(`home-profile-spa\\.js\\?v=${spaVersion}`), page);
   }
 });

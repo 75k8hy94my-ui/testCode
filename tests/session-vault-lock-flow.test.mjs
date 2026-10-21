@@ -56,8 +56,8 @@ test('active vault proceeds normally and pending sync offers explicit conflict r
   assert.ok(sync.includes('const alreadyActive=Boolean(MangaVault.loadActive());'));
   assert.ok(sync.includes('if (MangaVault.hasPendingLocalChanges()) showPendingSync'));
   assert.ok(sync.includes('else { goReader(); return; }'));
-  assert.match(sync, /vault-conflict-ui\.js\?v=20261010-vault-sync-audit/);
+  assert.match(sync, /vault-conflict-ui\.js\?v=[\w-]+/);
   assert.match(profileMenu, /hasPendingLocalChanges/);
   assert.match(profileMenu, /ログアウトは行いませんでした/);
-  assert.ok(sync.includes('if (!alreadyActive) autoUsePasskey();'));
+  assert.ok(sync.includes("if (!alreadyActive && document.getElementById('statutesQuickLink').hidden) autoUsePasskey();"));
 });

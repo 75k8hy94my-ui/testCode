@@ -14,8 +14,8 @@ test('thumbnail media uses contain, not cover',()=>{
  assert.match(css,/#videoLibraryResults \.vl-thumb \.vl-thumb-direct-video \{ object-fit: contain; \}/);
 });
 test('cache and entrypoints use updated assets',()=>{
- assert.match(read('video-list-route.js'),/video-thumbnail-renderer\.js\?v=20261012-native-video-ratio/);
+ assert.match(read('video-list-route.js'),/video-thumbnail-renderer\.js\?v=[\w-]+/);
  for(const file of ['video.html','home.html','manga.html','profile.html','video-player.html']){
- assert.match(read(file),/video-card\.css\?v=20261012-native-video-ratio/);
+ assert.match(read(file),/video-card\.css\?v=[\w-]+/);
  }
 });

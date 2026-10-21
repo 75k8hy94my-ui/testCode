@@ -12,7 +12,7 @@ test('guest configures a property, saves it on a video, filters, and reads it on
   await page.getByLabel('新しい項目の種類').selectOption('single_select');
   await page.getByRole('button', { name: '項目を追加' }).click();
   await expect(page.getByLabel('項目名', { exact: true })).toHaveValue('時間帯');
-  await page.getByLabel('動画カードに表示').check();
+  await expect(page.getByLabel('入力・一覧に表示')).toBeChecked();
   await page.getByLabel('時間帯の選択肢名').fill('朝');
   await page.getByRole('button', { name: '選択肢を追加' }).click();
   await expect(page.getByLabel('朝の選択肢名')).toBeVisible();
@@ -20,7 +20,8 @@ test('guest configures a property, saves it on a video, filters, and reads it on
   await page.getByRole('button', { name: '選択肢を追加' }).click();
   await page.getByRole('link', { name: '動画一覧へ' }).click();
   await expect(page.locator('#videoLibraryApp')).toBeVisible();
-  await page.getByRole('button', { name: /追加/ }).click();
+  await page.locator('#mobileNavAdd').click();
+  await page.getByRole('link', { name: '＋ 動画を追加' }).click();
   await expect(page).toHaveURL(/video-edit\.html\?mode=add/);
   await page.locator('#videoEditTitle').fill('プロパティ検証動画');
   await page.locator('#videoEditUrl').fill('https://example.com/property-check.mp4');

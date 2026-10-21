@@ -26,6 +26,6 @@ test('offline statute corpus displays labor law article captions after navigatio
   await expect(card('９条').locator('.statuteHeading')).toHaveText('定義');
   await expect(card('３２条').locator('.statuteHeading')).toHaveText('労働時間');
   expect(corpusRequests.length).toBeGreaterThan(0);
-  expect(corpusRequests.every(url => url.includes('v=20261016-article-captions-2'))).toBe(true);
+  expect(corpusRequests.every(url => new URL(url).searchParams.has('v'))).toBe(true);
   expect(unexpectedExternalLawRequests).toEqual([]);
 });

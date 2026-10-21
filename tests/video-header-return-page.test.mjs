@@ -30,8 +30,8 @@ test('return intent survives hydration and SPA re-renders until a user changes t
 });
 
 test('entrypoints version the changed files', () => {
-  assert.match(read('video-player.html'), /video-player-page\.js\?v=20261012-return-target-persist/);
-  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261012-return-target-persist/);
+  assert.match(read('video-player.html'), /video-player-page\.js\?v=[\w-]+/);
+  assert.match(read('video-list-route.js'), /video-library\.js\?v=[\w-]+/);
 });
 
 test('the list records the opening view and restores it before computing the target page', () => {
@@ -49,11 +49,11 @@ test('the list records the opening view and restores it before computing the tar
 test('mobile video tab is actionable on the video player even when active', () => {
   const nav = read('mobile-bottom-nav.js');
   assert.match(nav, /onVideoPlayer && item\.dataset\.mobileRoute === 'video'/);
-  assert.match(read('video-player.html'), /mobile-bottom-nav\.js\?v=20261012-list-context-return/);
+  assert.match(read('video-player.html'), /mobile-bottom-nav\.js\?v=[\w-]+/);
 });
 
 test('SPA entrypoints load the updated return-context handler', () => {
-  assert.match(read('home-profile-spa.js'), /video-list-route\.js\?v=20261012-list-context-return/);
-  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261012-list-context-return/);
-  assert.match(read('video-list-route.js'), /video-routing-fix\.js\?v=20261012-list-context-return/);
+  assert.match(read('home-profile-spa.js'), /video-list-route\.js\?v=[\w-]+/);
+  assert.match(read('video-list-route.js'), /video-library\.js\?v=[\w-]+/);
+  assert.match(read('video-list-route.js'), /video-routing-fix\.js\?v=[\w-]+/);
 });

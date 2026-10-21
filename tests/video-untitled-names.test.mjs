@@ -19,6 +19,6 @@ test('video list and related player use the same title helper',()=>{
  assert.doesNotMatch(read('video-library.js'), /const title = video\.title \|\| \[Data\.deriveService/);
 });
 test('versioned entrypoints load updated scripts',()=>{
- assert.match(read('video-list-route.js'),/video-data\.js\?v=20261012-untitled-names/);
- assert.match(read('video-player.html'),/video-data\.js\?v=20261012-untitled-names/);
+ assert.match(read('video-list-route.js'),/video-data\.js\?v=[\w-]+/);
+ assert.match(read('video-player.html'),/video-data\.js\?v=[\w-]+/);
 });

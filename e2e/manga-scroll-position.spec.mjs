@@ -6,10 +6,12 @@ test('manga page turns do not snap the vertical scroll position back to the tool
   await page.goto('index.html');
   await page.getByRole('button', { name: 'ログインせずに使う' }).click();
 
-  // Populate two full pages with equal-height covers to isolate the
+  // Populate three equal-size pages with equal-height covers to isolate the
   // unintended scrollIntoView() jump from legitimate scroll clamping.
+  await page.goto('manga.html');
+  await expect(page.locator('#mangaListSection')).toBeVisible();
   await page.evaluate(() => {
-    const items = Array.from({ length: 50 }, (_, index) => ({
+    const items = Array.from({ length: 60 }, (_, index) => ({
       id: 'scroll-regression-' + index,
       title: '位置維持テスト作品 ' + index,
       url: 'https://example.invalid/page-' + index + '.jpg',
@@ -22,8 +24,6 @@ test('manga page turns do not snap the vertical scroll position back to the tool
     localStorage.setItem('mangaReaderSavedFolders', '[]');
     localStorage.setItem('mangaReaderAuthorCards', '[]');
   });
-  await page.goto('manga.html');
-  await expect(page.locator('#mangaListSection')).toBeVisible();
   // Guest route startup can rehydrate from its own storage snapshot.
   // Remount after seeding to guarantee the pagination model sees new items.
   await page.evaluate(() => window.HomeProfileSPA.renderRoute());

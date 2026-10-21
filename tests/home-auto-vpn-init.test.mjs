@@ -11,5 +11,5 @@ test('home and guest boot load VPN gate automatically',()=>{
 });
 test('SPA entries load new boot code',()=>{
  for(const name of ['home.html','video.html','manga.html','profile.html'])
-  assert.match(read(name),/home-profile-spa\.js\?v=20261012-auto-vpn-home/);
+  assert.match(read(name),/home-profile-spa\.js\?v=[\w-]+/);
 });

@@ -90,5 +90,5 @@ test('local Japan detection is never bypassed by a Proton IP or manual overrides
 
 test('reader bootstrapping and existing UI modules still use media-access-gate', () => {
   const reader = fs.readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
-  assert.match(reader, /media-access-gate\\.js/);
+  assert.match(reader, /media-access-gate\.js/);
 });

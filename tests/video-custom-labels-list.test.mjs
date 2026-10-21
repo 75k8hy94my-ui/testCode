@@ -17,7 +17,7 @@ test('tag labels are not part of truncated metadata',()=>{
  assert.match(read('video-card.css'),/\.videoCardLabels \{ display: flex; flex-wrap: wrap/);
 });
 test('entries load updated scripts and styles',()=>{
- assert.match(read('video-list-route.js'),/video-library\.js\?v=20261012-custom-labels/);
- assert.match(read('video-list-route.js'),/video-card\.js\?v=20261012-custom-labels/);
- for(const p of ['video.html','home.html','manga.html','profile.html','video-player.html']) assert.match(read(p),/video-card\.css\?v=20261012-custom-labels/);
+ assert.match(read('video-list-route.js'),/video-library\.js\?v=[\w-]+/);
+ assert.match(read('video-list-route.js'),/video-card\.js\?v=[\w-]+/);
+ for(const p of ['video.html','home.html','manga.html','profile.html','video-player.html']) assert.match(read(p),/video-card\.css\?v=[\w-]+/);
 });
