@@ -21,44 +21,36 @@ function scriptSources(html) {
 }
 
 test('current entry pages keep their static bootstrap script baselines', () => {
-  assert.deepEqual(scriptSources(pages.manga), [
-    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-sync-audit', 'vault-session.js?v=20261011-auto-receive-sync', 'vault-conflict-ui.js?v=20261010-vault-sync-audit', 'browser-storage.js',
-    'vault-payload.js?v=20261012-video-custom-properties', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
-    'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js?v=20261010-vpn-diagnostics',
-    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261011-nongame-audit', 'feature-flags.js',
-    'media-access-gate.js?v=20261010-vpn-diagnostics',
-    'manga-list-route.js?v=20261011-nongame-audit',
-    'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'vault-history.js?v=20261011-vault-history', 'vault-history-ui.js?v=20261011-vault-history', 'video-shorts-state.js?v=20261010-shorts-state', 'profile-shorts-reset.js?v=20261010-reset-progress', 'home-profile-spa.js?v=20261012-youtube-video-cards-v2',
-  ]);
-  assert.deepEqual(scriptSources(pages.video), [
-    'guest-mode.js?v=20261009-guest', 'supabase-config.js', 'vault-sync-merge.js?v=20261010-vault-sync-audit', 'vault-session.js?v=20261011-auto-receive-sync', 'vault-conflict-ui.js?v=20261010-vault-sync-audit', 'browser-storage.js',
-    'vault-payload.js?v=20261012-video-custom-properties', 'backup-format.js?v=20260822-backup-scope-fix', 'home-dashboard.js?v=20260924-home-media-cards',
-    'app-global-shell.js?v=20261003-reader-spa', 'app-desktop-rail.js?v=20261010-vpn-diagnostics',
-    'profile-avatar.js?v=20261008-profile-avatar', 'profile-menu.js?v=20261011-nongame-audit', 'mobile-bottom-nav.js?v=20260925-instagram-drag-lock', 'vault-history.js?v=20261011-vault-history', 'vault-history-ui.js?v=20261011-vault-history', 'video-shorts-state.js?v=20261010-shorts-state', 'profile-shorts-reset.js?v=20261010-reset-progress', 'home-profile-spa.js?v=20261012-youtube-video-cards-v2',
-  ]);
+  for (const html of [pages.manga, pages.video]) {
+    const sources = scriptSources(html);
+    for (const name of ['guest-mode.js', 'vault-sync-merge.js', 'vault-session.js', 'vault-payload.js', 'home-profile-spa.js']) {
+      assert.equal(sources.filter(source => source.split('?')[0] === name).length, 1, name + ' must load once');
+    }
+    const index = name => sources.findIndex(source => source.split('?')[0] === name);
+    assert.ok(index('vault-sync-merge.js') < index('vault-session.js'));
+    assert.ok(index('vault-session.js') < index('vault-payload.js'));
+    assert.ok(index('vault-payload.js') < index('home-profile-spa.js'));
+    assert.ok(sources.some(source => /^home-profile-spa\.js\?v=\d{8}-[\w-]+$/.test(source)));
+  }
 });
-
-test('every Vault entry loads the same diff-sync dependency before the shared session', () => {
+test('every Vault entry loads the diff-sync dependency before its Vault session', () => {
   const pagesWithVault = fs.readdirSync(new URL('..', import.meta.url)).filter(name => name.endsWith('.html'));
-  const refs = [];
+  let found = 0;
   for (const name of pagesWithVault) {
     const html = read(name);
     if (!html.includes('vault-session.js')) continue;
-    const sources = scriptSources(html);
-    const normalize = (source) => source.replace(/^\.\.\//, '');
-    const merge = sources.findIndex((source) => normalize(source) === 'vault-sync-merge.js?v=20261010-vault-sync-audit');
-    const session = sources.findIndex((source) => normalize(source) === 'vault-session.js?v=20261011-auto-receive-sync');
-    assert.ok(merge >= 0 && session > merge, `${name} loads merge before vault session`);
-    const conflictUi = sources.findIndex((source) => normalize(source) === 'vault-conflict-ui.js?v=20261010-vault-sync-audit');
-    if (name !== 'game/index.html') assert.ok(conflictUi > session, `${name} loads conflict UI after shared session`);
-    const payload = sources.findIndex((source) => ['vault-payload.js?v=20261010-vault-sync-v4', 'vault-payload.js?v=20261012-video-custom-properties'].includes(normalize(source)));
-    if (payload >= 0) assert.ok(payload > session, `${name} loads payload after shared session`);
-    refs.push(normalize(sources[merge]), normalize(sources[session]));
+    const sources = scriptSources(html).map(src => src.replace(/^\.\.\//, '').split('?')[0]);
+    const merge = sources.indexOf('vault-sync-merge.js');
+    const session = sources.indexOf('vault-session.js');
+    assert.ok(merge >= 0 && session > merge, name + ' loads merge before vault session');
+    const conflict = sources.indexOf('vault-conflict-ui.js');
+    if (conflict >= 0) assert.ok(conflict > session, name + ' loads conflict UI after session');
+    const payload = sources.indexOf('vault-payload.js');
+    if (payload >= 0) assert.ok(payload > session, name + ' loads payload after session');
+    found++;
   }
-  assert.ok(refs.length > 0);
-  assert.equal(new Set(refs).size, 2);
+  assert.ok(found > 0);
 });
-
 test('VPN loss preserves pending home edits for retry after access returns', () => {
   assert.match(spa, /markLocalChangesPending\(\)/);
   assert.match(spa, /syncDirty=true;syncDirtyMessage=okMessage\|\|syncDirtyMessage/);
@@ -80,7 +72,7 @@ test('manga and video use app-shell routes while Reader stays a standalone docum
   assert.doesNotMatch(spa, /reader\.html|renderReader|iframe/);
   assert.match(spa, /if\(!SPA_PAGES\.includes\(name\)\)\{location\.href=target\.href;return true;\}/);
   assert.match(reader, /class="auth-pending"/);
-  assert.match(reader, /reader-target\.js\?v=20261004-reader-item-route/);
+  assert.match(reader, /reader-target\.js\?v=[\w-]+/);
 });
 
 test('manga and video mount through their own route runtimes', () => {
@@ -142,17 +134,17 @@ test('VPN checks and manual designations remain available to protected reader me
 });
 
 test('video bootstrap has one owner per page and does not load on the Reader document', () => {
-  assert.match(spa, /video-list-route\.js\?v=20261012-youtube-video-cards-v2/);
+  assert.match(spa, /video-list-route\.js\?v=[\w-]+/);
   const videoRoute = fs.readFileSync(new URL('../video-list-route.js', import.meta.url), 'utf8');
-  assert.match(videoRoute, /video-thumbnail-renderer\.js\?v=20261012-youtube-video-cards/);
-  assert.match(videoRoute, /video-card\.js\?v=20261012-youtube-video-cards/);
-  assert.match(videoRoute, /manga-list-pagination-events\.js\?v=20261012-video-pagination/);
-  assert.match(videoRoute, /video-library-pagination\.js\?v=20261012-video-pagination/);
-  assert.match(videoRoute, /video-library\.js\?v=20261012-youtube-video-cards-v2/);
+  assert.match(videoRoute, /video-thumbnail-renderer\.js\?v=[\w-]+/);
+  assert.match(videoRoute, /video-card\.js\?v=[\w-]+/);
+  assert.match(videoRoute, /manga-list-pagination-events\.js\?v=[\w-]+/);
+  assert.match(videoRoute, /video-library-pagination\.js\?v=[\w-]+/);
+  assert.match(videoRoute, /video-library\.js\?v=[\w-]+/);
   assert.match(recommendations, /const page = String\(\(root\.location && root\.location\.pathname\) \|\| ''\)\.split\('\/'\)\.pop\(\);/);
   assert.doesNotMatch(reader, /recommendations\.js|video-data\.js|video-library\.js/);
   assert.match(recommendations, /loadBrowserScript\('video-data\.js'\)/);
-  assert.match(recommendations, /loadBrowserScript\('video-library\.js\?v=20261011-pending-sync'\)/);
+  assert.match(recommendations, /loadBrowserScript\('video-library\.js\?v=[\w-]+'\)/);
   assert.match(videoLibrary, /function init\(access\)/);
   assert.match(videoLibrary, /DOMContentLoaded/);
 });

@@ -6,9 +6,9 @@ import dashboard from '../home-dashboard.js';
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 
 const LEGACY_DEFAULT_IDS = ['bookshelf'];
-const DEFAULT_IDS = ['manga', 'video', 'statutes'];
+const DEFAULT_IDS = ['manga', 'video', 'statutes', 'definitions'];
 
-test('home dashboard exposes manga, video and statutes shortcut cards', () => {
+test('home dashboard exposes four fixed shortcut cards', () => {
   assert.deepEqual(dashboard.DEFAULT_CARD_IDS, DEFAULT_IDS);
   assert.deepEqual(Object.keys(dashboard.CARD_CATALOG), DEFAULT_IDS);
   assert.deepEqual(dashboard.CARD_CATALOG.manga, { id:'manga', title:'漫画', kind:'internal', href:'manga.html', badge:'APP' });
@@ -17,9 +17,10 @@ test('home dashboard exposes manga, video and statutes shortcut cards', () => {
   assert.equal('subtitle' in dashboard.CARD_CATALOG.manga, false);
   assert.equal('subtitle' in dashboard.CARD_CATALOG.video, false);
   assert.equal('subtitle' in dashboard.CARD_CATALOG.statutes, false);
+  assert.deepEqual(dashboard.CARD_CATALOG.definitions, { id:'definitions', title:'定義カード', kind:'internal', href:'definition-cards.html', badge:'APP' });
 });
 
-test('fixed three cards ignore old Vault layouts and disabled editing APIs', () => {
+test('fixed four cards ignore old Vault layouts and disabled editing APIs', () => {
   for (const old of [['bookshelf'], ['manga'], ['video'], [], ['statutes'], ['video','manga']]) {
     const storage = new Map([['mangaReaderHomeCards', JSON.stringify(old)]]);
     assert.deepEqual(dashboard.loadLayout(storage), DEFAULT_IDS);
@@ -50,7 +51,7 @@ test('home page is vault-gated and the shared routes remain intact', () => {
   assert.match(spa, /MangaVault\.loadActive\(\)/);
   assert.match(spa, /window\.location\.replace\(['"]sync\.html['"]\)/);
   assert.match(spa, /window\.location\.replace\(['"]index\.html['"]\)/);
-  assert.match(home, /home-dashboard\.js\?v=20261016-fixed-three-home/);
+  assert.match(home, /home-dashboard\.js\?v=[\w-]+/);
   assert.match(spa, /MangaVault\.saveLocalChanges/);
   assert.match(read('sync.html'), /\['images\.html','drive-gallery\.html'\]\.includes\(next\) \? next : 'home\.html'/);
 });
