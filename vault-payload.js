@@ -31,7 +31,7 @@ function normalizeStudyForVault(value){const x=isObject(value),base=createEmptyS
 function normalize(value){const x=value&&typeof value==='object'?value:{};return{...preserveUnknownShape(x),folders:Array.isArray(x.folders)?preserveUnknownShape(x.folders):[],items:Array.isArray(x.items)?preserveUnknownShape(x.items):[],videos:Array.isArray(x.videos)?preserveUnknownShape(x.videos):[],videoFolders:Array.isArray(x.videoFolders)?preserveUnknownShape(x.videoFolders):[],videoMeta:preserveUnknownShape(isObject(x.videoMeta)),videoMarkers:normalizeVideoMarkers(x.videoMarkers),videoShortsState:normalizeVideoShortsState(x.videoShortsState),authorCards:Array.isArray(x.authorCards)?preserveUnknownShape(x.authorCards):[],mangaInfo:preserveUnknownShape(isObject(x.mangaInfo)),toc:preserveUnknownShape(isObject(x.toc)),lastPages:preserveUnknownShape(isObject(x.lastPages)),theme:x.theme==='light'?'light':'dark',dashboardVisibility:normalizeDashboardVisibility(x.dashboardVisibility),homeCards:normalizeHomeCards(x.homeCards),study:normalizeStudyForVault(x.study),indexSearchSettings:normalizeIndexSearchSettings(x.indexSearchSettings),roppoState:normalizeRoppoState(x.roppoState),profileAvatar:normalizeProfileAvatar(x.profileAvatar),statuteNotes:normalizeStatuteNotes(x.statuteNotes),statuteDefinitions:Array.isArray(x.statuteDefinitions)?preserveUnknownShape(x.statuteDefinitions):[],driveGalleryEncrypted:normalizeDriveGalleryEncrypted(x.driveGalleryEncrypted),gameSave:x.gameSave&&typeof x.gameSave==='object'&&!Array.isArray(x.gameSave)?preserveUnknownShape(x.gameSave):null,vaultSyncTombstones:normalizeStringArray(x.vaultSyncTombstones).filter((path)=>path.startsWith('/'))}}
 function read(storage,key,fallback){try{const raw=rawValue(storage,key);return raw==null?fallback:JSON.parse(raw)}catch(_){return fallback}}function rawValue(storage,key){if(storage&&typeof storage.getItem==='function')return storage.getItem(key);if(storage&&typeof storage.get==='function')return storage.get(key)??null;if(storage&&typeof storage==='object')return Object.prototype.hasOwnProperty.call(storage,key)?storage[key]:null;return null}function setRaw(storage,key,value){if(storage&&typeof storage.setItem==='function')storage.setItem(key,value);else if(storage&&typeof storage.set==='function')storage.set(key,value);else if(storage&&typeof storage==='object')storage[key]=value;else throw new TypeError('保存領域を利用できません。')}function removeRaw(storage,key){if(storage&&typeof storage.removeItem==='function')storage.removeItem(key);else if(storage&&typeof storage.delete==='function')storage.delete(key);else if(storage&&typeof storage==='object')delete storage[key]}function write(storage,key,value){setRaw(storage,key,JSON.stringify(value))}function readTheme(storage){const raw=rawValue(storage,DATA_KEYS.theme);return String(raw??'').replace(/^"|"$/g,'').trim()==='light'?'light':'dark'}
 function buildFromStorage(storage=globalThis.localStorage){return normalize({folders:read(storage,DATA_KEYS.folders,[]),items:read(storage,DATA_KEYS.items,[]),videos:read(storage,DATA_KEYS.videos,[]),videoFolders:read(storage,DATA_KEYS.videoFolders,[]),videoMeta:read(storage,DATA_KEYS.videoMeta,{}),videoMarkers:read(storage,DATA_KEYS.videoMarkers,{}),videoShortsState:read(storage,DATA_KEYS.videoShortsState,defaultVideoShortsState),authorCards:read(storage,DATA_KEYS.authorCards,[]),mangaInfo:read(storage,DATA_KEYS.mangaInfo,{}),toc:read(storage,DATA_KEYS.toc,{}),lastPages:read(storage,DATA_KEYS.lastPages,{}),theme:readTheme(storage),dashboardVisibility:read(storage,DATA_KEYS.dashboardVisibility,{}),homeCards:read(storage,DATA_KEYS.homeCards,defaultHomeCards),study:read(storage,DATA_KEYS.study,{}),indexSearchSettings:read(storage,DATA_KEYS.indexSearchSettings,defaultIndexSearchSettings),roppoState:read(storage,DATA_KEYS.roppoState,defaultRoppoState),statuteNotes:read(storage,DATA_KEYS.statuteNotes,{}),statuteDefinitions:read(storage,DATA_KEYS.statuteDefinitions,[]),profileAvatar:rawValue(storage,DATA_KEYS.profileAvatar)||'',driveGalleryEncrypted:read(storage,DATA_KEYS.driveGalleryEncrypted,null),gameSave:read(storage,DATA_KEYS.gameSave,null),vaultSyncTombstones:[]})}
-function applyToStorage(payload,storage=globalThis.localStorage){const data=normalize(payload),snapshot=new Map(Object.values(DATA_KEYS).map((key)=>[key,rawValue(storage,key)]));try{Object.entries(DATA_KEYS).forEach(([name,key])=>{const value=name==='syncTombstones'?data.vaultSyncTombstones:data[name];name==='profileAvatar'?setRaw(storage,key,value):write(storage,key,value)});return data}catch(error){snapshot.forEach((value,key)=>{try{if(value==null)removeRaw(storage,key);else setRaw(storage,key,value)}catch(_){}});throw error}}function clearDeviceData(storage=globalThis.localStorage){[...Object.values(DATA_KEYS),...LOCAL_ONLY_KEYS].forEach((key)=>{if(storage.removeItem)storage.removeItem(key);else storage.delete(key)})}
+function applyToStorage(payload,storage=globalThis.localStorage){const data=normalize(payload),snapshot=new Map(Object.values(DATA_KEYS).map((key)=>[key,rawValue(storage,key)]));try{Object.entries(DATA_KEYS).forEach(([name,key])=>{const value=name==='syncTombstones'?data.vaultSyncTombstones:data[name];name==='profileAvatar'?setRaw(storage,key,value):write(storage,key,value)});return data}catch(error){snapshot.forEach((value,key)=>{try{if(value==null)removeRaw(storage,key);else setRaw(storage,key,value)}catch(_){}});throw error}}function clearDeviceData(storage=globalThis.localStorage){[...Object.values(DATA_KEYS),...LOCAL_ONLY_KEYS].forEach((key)=>{removeRaw(storage,key)})}
 
 const MANUAL_VPN_IPS_KEY='testCode.manualVpnIps';
 const MANUAL_NON_VPN_IPS_KEY='testCode.manualNonVpnIps';
@@ -94,8 +94,8 @@ const api={DATA_KEYS,LOCAL_ONLY_KEYS,pointerPath,defaults,normalize:normalizeWit
   const normalizeObject = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const normalizeNotes = value => Object.fromEntries(Object.entries(normalizeObject(value)).filter(([k,v]) => typeof k === 'string' && typeof v === 'string' && v.trim()));
   const normalizeHistory = value => Object.fromEntries(Object.entries(normalizeObject(value)).filter(([k,v]) => v && typeof v === 'object' && typeof v.key === 'string' && typeof v.before === 'string' && typeof v.after === 'string' && Number.isFinite(v.at)).sort((a,b) => b[1].at-a[1].at).slice(0,50));
-  const read = (storage,k) => { try { return JSON.parse(storage.getItem(k) || '{}'); } catch (_) { return {}; } };
-  const write = (storage,k,value) => storage.setItem(k,JSON.stringify(value));
+  const read = (storage,k) => { try { return JSON.parse(rawValue(storage,k) || '{}'); } catch (_) { return {}; } };
+  const write = (storage,k,value) => setRaw(storage,k,JSON.stringify(value));
   const originalNormalize = payload.normalize;
   const originalBuild = payload.buildFromLocalStorage;
   const originalApply = payload.applyToLocalStorage;
@@ -112,22 +112,22 @@ const api={DATA_KEYS,LOCAL_ONLY_KEYS,pointerPath,defaults,normalize:normalizeWit
     return payload.normalize({...originalBuild(storage),articleNotes:read(storage,key),articleNoteHistory:read(storage,historyKey)});
   };
   payload.applyToLocalStorage = function(value,storage = globalThis.localStorage) {
-    const previousNotes=storage.getItem(key),previousHistory=storage.getItem(historyKey);
+    const previousNotes=rawValue(storage,key),previousHistory=rawValue(storage,historyKey);
     try {
       const result=originalApply(value,storage);
       write(storage,key,normalizeNotes(value && value.articleNotes));
       write(storage,historyKey,normalizeHistory(value && value.articleNoteHistory));
       return {...result,articleNotes:normalizeNotes(value && value.articleNotes),articleNoteHistory:normalizeHistory(value && value.articleNoteHistory)};
     } catch(error) {
-      if(previousNotes==null)storage.removeItem(key);else storage.setItem(key,previousNotes);
-      if(previousHistory==null)storage.removeItem(historyKey);else storage.setItem(historyKey,previousHistory);
+      if(previousNotes==null)removeRaw(storage,key);else setRaw(storage,key,previousNotes);
+      if(previousHistory==null)removeRaw(storage,historyKey);else setRaw(storage,historyKey,previousHistory);
       throw error;
     }
   };
   payload.clearDeviceData = function(storage = globalThis.localStorage) {
     originalClear(storage);
-    storage.removeItem(key);
-    storage.removeItem(historyKey);
+    removeRaw(storage,key);
+    removeRaw(storage,historyKey);
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -139,7 +139,7 @@ const api={DATA_KEYS,LOCAL_ONLY_KEYS,pointerPath,defaults,normalize:normalizeWit
   const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const normalize = value => Object.fromEntries(Object.entries(object(value)).filter(([id,entry]) =>
     typeof id === 'string' && entry && typeof entry === 'object' && Number.isFinite(entry.lastReviewed) && Number.isFinite(entry.due)));
-  const read = storage => { try { return JSON.parse(storage.getItem(key) || '{}'); } catch (_) { return {}; } };
+  const read = storage => { try { return JSON.parse(rawValue(storage,key) || '{}'); } catch (_) { return {}; } };
   const originalNormalize = payload.normalize;
   const originalBuild = payload.buildFromLocalStorage;
   const originalApply = payload.applyToLocalStorage;
@@ -150,19 +150,19 @@ const api={DATA_KEYS,LOCAL_ONLY_KEYS,pointerPath,defaults,normalize:normalizeWit
     return payload.normalize({ ...originalBuild(storage), definitionReviews: read(storage) });
   };
   payload.applyToLocalStorage = function(value, storage = globalThis.localStorage) {
-    const old = storage.getItem(key);
+    const old = rawValue(storage,key);
     try {
       const result = originalApply(value, storage);
-      storage.setItem(key, JSON.stringify(normalize(value && value.definitionReviews)));
+      setRaw(storage,key, JSON.stringify(normalize(value && value.definitionReviews)));
       return { ...result, definitionReviews: normalize(value && value.definitionReviews) };
     } catch(error) {
-      if (old == null) storage.removeItem(key); else storage.setItem(key, old);
+      if (old == null) removeRaw(storage,key); else setRaw(storage,key, old);
       throw error;
     }
   };
   payload.clearDeviceData = function(storage = globalThis.localStorage) {
     originalClear(storage);
-    storage.removeItem(key);
+    removeRaw(storage,key);
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -172,7 +172,7 @@ const api={DATA_KEYS,LOCAL_ONLY_KEYS,pointerPath,defaults,normalize:normalizeWit
  if(!payload)return;
  const weightsKey='testCode.statutes.definitionFSRSWeights.v1';
  const retentionKey='testCode.statutes.definitionRetention.v1';
- const read=(storage,key)=>storage.getItem(key);
+ const read=(storage,key)=>rawValue(storage,key);
  const parse=(raw)=>{try{return JSON.parse(raw)}catch(_){return null}};
  const validWeights=value=>Array.isArray(value)&&value.length===21&&value.every(v=>Number.isFinite(v)&&v>=0&&v<100)&&value[0]>0&&value[20]>=0.1&&value[20]<=0.8;
  const retention=value=>Number.isFinite(Number(value))&&Number(value)>=0.7&&Number(value)<=0.97?Number(value):0.9;
@@ -193,17 +193,17 @@ const api={DATA_KEYS,LOCAL_ONLY_KEYS,pointerPath,defaults,normalize:normalizeWit
    try {
      const result=oldApply(value,storage);
      const config=payload.normalize(value);
-     if(config.definitionFSRSWeights) storage.setItem(weightsKey,JSON.stringify(config.definitionFSRSWeights));
-     else storage.removeItem(weightsKey);
-     storage.setItem(retentionKey,String(config.definitionRetention));
+     if(config.definitionFSRSWeights) setRaw(storage,weightsKey,JSON.stringify(config.definitionFSRSWeights));
+     else removeRaw(storage,weightsKey);
+     setRaw(storage,retentionKey,String(config.definitionRetention));
      return {...result,definitionFSRSWeights:config.definitionFSRSWeights,definitionRetention:config.definitionRetention};
    }catch(error){
-     if(priorW==null)storage.removeItem(weightsKey);else storage.setItem(weightsKey,priorW);
-     if(priorR==null)storage.removeItem(retentionKey);else storage.setItem(retentionKey,priorR);
+     if(priorW==null)removeRaw(storage,weightsKey);else setRaw(storage,weightsKey,priorW);
+     if(priorR==null)removeRaw(storage,retentionKey);else setRaw(storage,retentionKey,priorR);
      throw error;
    }
  };
- payload.clearDeviceData=function(storage=globalThis.localStorage){oldClear(storage);storage.removeItem(weightsKey);storage.removeItem(retentionKey);};
+ payload.clearDeviceData=function(storage=globalThis.localStorage){oldClear(storage);removeRaw(storage,weightsKey);removeRaw(storage,retentionKey);};
 })(typeof window!=='undefined'?window:globalThis);
 
 /* Keep enrolled statutes and spaced-repetition progress independent from the media Vault.
@@ -216,15 +216,15 @@ const api={DATA_KEYS,LOCAL_ONLY_KEYS,pointerPath,defaults,normalize:normalizeWit
   const fields=['testCode.statutes.definitions.v1','testCode.statutes.articleNotes.v1','testCode.statutes.articleNoteHistory.v1','testCode.statutes.definitionReviews.v1','testCode.statutes.definitionFSRSWeights.v1','testCode.statutes.definitionRetention.v1','testCode.statutes.manualCards.v1'];
   payload.applyToLocalStorage=function(value,storage=root.localStorage){
     let user=null, key=null;
-    try {user=root.MangaVault?.loadSession?.()?.user?.id; key=JSON.parse(storage.getItem('testCode.statutes.deviceKey.v1')||'null');}catch(_){}
+    try {user=root.MangaVault?.loadSession?.()?.user?.id; key=JSON.parse(rawValue(storage,'testCode.statutes.deviceKey.v1')||'null');}catch(_){}
     if(!user||key?.user!==user||typeof key.raw!=='string')return apply(value,storage);
-    const saved=fields.map(field=>storage.getItem(field));
+    const saved=fields.map(field=>rawValue(storage,field));
     try {
       const result=apply(value,storage);
-      fields.forEach((field,i)=>saved[i]===null?storage.removeItem(field):storage.setItem(field,saved[i]));
+      fields.forEach((field,i)=>saved[i]===null?removeRaw(storage,field):setRaw(storage,field,saved[i]));
       return result;
     } catch(error) {
-      fields.forEach((field,i)=>saved[i]===null?storage.removeItem(field):storage.setItem(field,saved[i]));
+      fields.forEach((field,i)=>saved[i]===null?removeRaw(storage,field):setRaw(storage,field,saved[i]));
       throw error;
     }
   };
