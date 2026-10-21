@@ -39,7 +39,7 @@ test('home UI has no remove, reorder, or add controls', () => {
 });
 test('home cards render without short description text', () => {
   const spa = read('home-profile-spa.js');
-  assert.match(spa, /const marks=\{manga:'漫',video:'動',statutes:'法'\}/);
+  assert.match(spa, /const marks=\{manga:'漫',video:'動',statutes:'法',definitions:'定'\}/);
   assert.doesNotMatch(spa, /card\.subtitle/);
   assert.match(spa, /title\.textContent=card\.title;root\.append\(title\)/);
 });
