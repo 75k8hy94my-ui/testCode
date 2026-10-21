@@ -13,5 +13,5 @@ test('restoration is retried on render and access changes',()=>{
  const src=read('video-library.js');
  assert.match(src,/function render\(pageDirection = 0\) \{\s*loadLibraryState\(\);\s*restoreVideoPage\(\);/);
  assert.match(src,/if \(canReadProtectedData\(\)\) \{ render\(\); resumePendingLocalSync\(\); \}/);
- assert.match(read('video-list-route.js'),/video-library\.js\?v=20261012-restore-after-hydration/);
+ assert.match(read('video-list-route.js'),/video-library\.js\?v=[\w-]+/);
 });

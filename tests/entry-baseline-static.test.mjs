@@ -143,7 +143,7 @@ test('video bootstrap has one owner per page and does not load on the Reader doc
   assert.match(videoRoute, /video-library\.js\?v=[\w-]+/);
   assert.match(recommendations, /const page = String\(\(root\.location && root\.location\.pathname\) \|\| ''\)\.split\('\/'\)\.pop\(\);/);
   assert.doesNotMatch(reader, /recommendations\.js|video-data\.js|video-library\.js/);
-  assert.match(recommendations, /loadBrowserScript\('video-data\.js'\)/);
+  assert.match(recommendations, /loadBrowserScript\('video-data\.js\?v=[\w-]+'\)/);
   assert.match(recommendations, /loadBrowserScript\('video-library\.js\?v=[\w-]+'\)/);
   assert.match(videoLibrary, /function init\(access\)/);
   assert.match(videoLibrary, /DOMContentLoaded/);

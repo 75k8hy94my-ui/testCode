@@ -59,5 +59,5 @@ test('active vault proceeds normally and pending sync offers explicit conflict r
   assert.match(sync, /vault-conflict-ui\.js\?v=[\w-]+/);
   assert.match(profileMenu, /hasPendingLocalChanges/);
   assert.match(profileMenu, /ログアウトは行いませんでした/);
-  assert.ok(sync.includes('if (!alreadyActive) autoUsePasskey();'));
+  assert.ok(sync.includes("if (!alreadyActive && document.getElementById('statutesQuickLink').hidden) autoUsePasskey();"));
 });
