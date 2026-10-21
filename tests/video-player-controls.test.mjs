@@ -55,8 +55,8 @@ function createPlayer(saved = {}, options = {}) {
   return { frame, video, frameControls, seekWrap, markerToggle, panel, choices, add, saved, documentEvents, events };
 }
 
-test('timestamp registration offers only the three canonical icons without name or seconds fields', () => {
-  assert.match(controls, /\['water', 'triangle', 'toilet'\]/);
+test('timestamp registration offers only the four canonical icons without name or seconds fields', () => {
+  assert.match(controls, /\['water', 'triangle', 'toilet', 'hand'\]/);
   assert.match(controls, /choice\.dataset\.markerIcon = icon/);
   assert.doesNotMatch(controls, /videoMarkerSeconds|videoMarkerLabel/);
   assert.match(controls, /icon:\s*selectedMarkerIcon/);
@@ -117,7 +117,7 @@ test('marker deletion records the stable identity before local persistence and s
   };
   const player = createPlayer({ mangaReaderVideoMarkers: { clip: [{ id: 'm1', seconds: 15, icon: 'water' }] } }, { guest: false, vault });
   player.markerToggle.emit('click');
-  const list = player.panel.children[2];
+  const list = player.panel.children[3];
   const row = list.children[0];
   const remove = row.children[1];
 
