@@ -24,6 +24,7 @@ function startEditor({ mode = 'add', allowed = true, videos = [], meta = {}, pro
   function element(tag) {
     const node = {
       tag, children: [], dataset: {}, className: '', hidden: false, value: '', textContent: '',
+      get options() { return this.children; },
       replaceChildren(...children) { this.children = children; },
       append(...children) { this.children.push(...children); },
       prepend(...children) { this.children.unshift(...children); },
@@ -31,7 +32,7 @@ function startEditor({ mode = 'add', allowed = true, videos = [], meta = {}, pro
       focus() { this.focused = true; },
     };
     if (tag === 'form') {
-      const fields = ['url', 'title', 'folder', 'status', 'tags', 'memo', 'favorite', 'hidden', 'rotate', 'service', 'legacyId', 'thumbnail', 'thumbnailTime'];
+      const fields = ['url', 'title', 'folder', 'alternateUrls', 'status', 'tags', 'memo', 'favorite', 'hidden', 'rotate', 'service', 'legacyId', 'thumbnail', 'thumbnailTime'];
       node.elements = Object.fromEntries(fields.map((key) => [key, element('input')]));
       node.querySelector = (selector) => {
         if (!nodes.has(selector)) nodes.set(selector, element('control'));
