@@ -328,7 +328,11 @@
     const tag = asText(config.tag).toLocaleLowerCase('ja');
     const service = asText(config.service).toLocaleLowerCase('ja');
     const quick = asText(config.quick);
+    // Search only the currently displayed visibility group: ordinary videos by
+    // default, or hidden videos only when explicitly browsing the hidden list.
+    const showHidden = config.showHidden === true;
     return normalizeVideos(videos).filter((video) => {
+      if (video.hidden !== showHidden) return false;
       if (query && !buildSearchText(video, config.folders).includes(query)) return false;
       if (folderId && video.folderId !== folderId) return false;
       if (tag && !video.tags.some((item) => item.toLocaleLowerCase('ja') === tag)) return false;

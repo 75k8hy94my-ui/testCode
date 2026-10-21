@@ -24,7 +24,7 @@
       if (!bootPromise) {
         bootPromise = (async () => {
           await deps.loadMediaGate();
-          await deps.loadScript('video-data.js?v=20261012-alternate-urls', 'spaVideoData');
+          await deps.loadScript('video-data.js?v=20261021-hidden-search', 'spaVideoData');
           await deps.loadScript('manga-list-pagination-events.js?v=20261012-video-pagination', 'spaMangaPaginationEvents');
           await deps.loadScript('video-library-pagination.js?v=20261012-video-pagination', 'spaVideoLibraryPagination');
           await deps.loadScript('video-thumbnail-cache.js?v=20261012-indexeddb-thumbs', 'spaVideoThumbnailCache');
@@ -32,7 +32,7 @@
           await deps.loadScript('video-card.js?v=20261012-custom-labels', 'spaVideoCard');
           await deps.loadScript('video-custom-properties.js?v=20261012-video-custom-properties', 'spaVideoCustomProperties');
           await deps.loadScript('video-custom-property-store.js?v=20261012-video-custom-properties', 'spaVideoCustomPropertyStore');
-          await deps.loadScript('video-library.js?v=20261013-safe-leave', 'spaVideoLibrary');
+          await deps.loadScript('video-library.js?v=20261021-hidden-return', 'spaVideoLibrary');
         })().catch((error) => {
           bootPromise = null;
           throw error;

@@ -121,6 +121,17 @@ test('filters across title memo tags folder service and quick status', () => {
   assert.deepEqual(filterVideos(videos,{ quick:'watched', folders }).map(v=>v.id), ['2']);
 });
 
+test('search respects the active visibility group, including the hidden-only list', () => {
+  const videos = [
+    normalizeVideo({ id: 'normal', title: 'keyword normal', hidden: false }),
+    normalizeVideo({ id: 'private', title: 'keyword private', hidden: true }),
+  ];
+  assert.deepEqual(filterVideos(videos, { query: 'keyword' }).map(video => video.id), ['normal']);
+  assert.deepEqual(filterVideos(videos, { query: 'private' }).map(video => video.id), []);
+  assert.deepEqual(filterVideos(videos, { showHidden: true, query: 'keyword' }).map(video => video.id), ['private']);
+  assert.deepEqual(filterVideos(videos, { showHidden: true, query: 'normal' }).map(video => video.id), []);
+});
+
 test('sorts videos by recent open, open count, title, added and oldest', () => {
   const videos = [
     normalizeVideo({ id:'a', title:'Zulu', addedAt:10, lastOpenedAt:20, openCount:1 }),
