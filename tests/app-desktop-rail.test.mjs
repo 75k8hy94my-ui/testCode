@@ -34,7 +34,6 @@ test('shared rail provides global destinations and page-aware active state', () 
   const destinations = [
     ['desktopNavHome','home.html'],
     ['desktopNavManga','manga.html'],
-    ['desktopNavImages','images.html'],
     ['desktopNavVideo','video.html'],
     ['desktopNavBackup','sync.html'],
     ['desktopNavSettings','profile.html'],
@@ -50,6 +49,8 @@ test('shared rail provides global destinations and page-aware active state', () 
   assert.doesNotMatch(rail, /page === 'reader\.html'/);
   assert.match(rail, /page === 'sync\.html'/);
   assert.match(rail, /aria-current/);
+  assert.doesNotMatch(rail, /desktopNavImages/);
+  assert.doesNotMatch(rail, /href: 'images\.html'/);
   assert.doesNotMatch(rail, /desktopNavVault/);
   assert.doesNotMatch(rail, /desktopNavAuthor/);
   assert.doesNotMatch(rail, /label: '保管庫'/);
