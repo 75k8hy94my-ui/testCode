@@ -23,14 +23,14 @@ test('desktop home menu opens cards and migrates unchecked definitions', async (
   await expect(page.locator('#definitionCardsAnswer')).toHaveText('私法上の権利');
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('testCode.statutes.definitions.v1'))[0].card)).toBe(true);
   await page.goto('statutes.html');
-  await expect(page.locator('#statutesEditToggle')).toBeVisible();
+  await expect(page.locator('.statutesModeSwitch')).toBeVisible();
   await expect(page.locator('#statutesCardsOpen')).toHaveCount(0);
   await expect(page.locator('.statutesDefinitionCardCheckbox')).toHaveCount(0);
 });
 
 test('mobile Home gives access to a standalone cards page', async ({ page }) => {
   await enterGuest(page);
-  const link = page.getByRole('navigation', { name:'学習メニュー' }).getByRole('link', { name:'定義カード' });
+  const link = page.locator('.homeCardLink[href="definition-cards.html"]');
   await expect(link).toBeVisible();
   await link.click();
   await expect(page).toHaveURL(/definition-cards\.html$/);

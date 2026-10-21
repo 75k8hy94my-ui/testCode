@@ -1,5 +1,15 @@
 import { test, expect } from '@playwright/test';
 
+async function openStatuteSearch(page) {
+  const panel = page.locator('#statutesSearchPanel');
+  if (!(await panel.isVisible())) {
+    if (await page.locator('#desktopNavSearch').isVisible()) await page.locator('#desktopNavSearch').click();
+    else await page.locator('#statutesSearchToggle').click();
+  }
+  await expect(panel).toBeVisible();
+}
+
+
 test('statutes common header searches article numbers and article text', async ({ page }) => {
   await page.route(/supabase\.co|\/auth\/v1\/|\/rest\/v1\//i, route => route.abort());
   await page.goto('index.html');
@@ -7,7 +17,7 @@ test('statutes common header searches article numbers and article text', async (
   await page.goto('statutes.html?section=labor-standards');
   await expect(page.locator('#statutesCurrentSection')).toHaveText('労働基準法');
   await expect(page.locator('.statuteNumber').filter({ hasText: /^３２条$/ })).toHaveCount(1);
-  await expect(page.locator('#statutesSearchPanel')).toBeVisible();
+  await openStatuteSearch(page);
   const input = page.getByRole('searchbox', { name: '条番号または条文の文字列' });
   await input.fill('32条');
   await expect(page.locator('.statutesSearchResult')).toHaveCount(1);
@@ -27,7 +37,7 @@ test('civil general article 972 search opens family law and scrolls to the corre
   await page.getByRole('button', { name: 'ログインせずに使う' }).click();
   await page.goto('statutes.html?section=civil-general');
   await expect(page.locator('#statutesCurrentSection')).toHaveText('民法総則');
-  await expect(page.locator('#statutesSearchPanel')).toBeVisible();
+  await openStatuteSearch(page);
   await page.getByRole('searchbox', { name: '条番号または条文の文字列' }).fill('９７２');
   await expect(page.locator('.statutesSearchResult strong')).toContainText('９７２条');
   await page.locator('.statutesSearchResult').first().click();
@@ -53,7 +63,7 @@ test('desktop statutes search uses the shared sidebar magnifier, not the top bar
   await expect(page.locator('.statutesSearchResult strong')).toContainText('９７２条');
 });
 
-test('search dock does not overlap statute text and wraps long results on desktop', async ({ page }) => {
+test('floating search dock stays within the viewport and wraps long results on desktop', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.route(/supabase\.co|\/auth\/v1\/|\/rest\/v1\//i, route => route.abort());
   await page.goto('index.html');
@@ -62,9 +72,8 @@ test('search dock does not overlap statute text and wraps long results on deskto
   const dock = page.locator('#statutesSearchPanel');
   await expect(dock).toBeVisible();
   await expect.poll(async () => {
-    const a = await page.locator('#routeContent').boundingBox();
     const b = await dock.boundingBox();
-    return a && b ? a.x + a.width <= b.x : false;
+    return b ? b.x >= 0 && b.y >= 0 && b.x + b.width <= 1280 : false;
   }).toBe(true);
   await expect.poll(async () => (await dock.boundingBox()).width).toBeLessThan(250);
   await page.locator('#statutesSearchInput').fill('法律行為');
@@ -78,6 +87,7 @@ test('Enter navigates to the first statute search result', async ({ page }) => {
   await page.goto('index.html');
   await page.getByRole('button', { name: 'ログインせずに使う' }).click();
   await page.goto('statutes.html?section=civil-general');
+  await openStatuteSearch(page);
   const input = page.locator('#statutesSearchInput');
   await input.fill('９７２');
   await input.press('Enter');
