@@ -38,7 +38,7 @@
   function captureReturnContext(videoId) {
     if (!videoId) return;
     const scoped = effectiveVideos().filter(video => video.hidden === state.showHidden);
-    const visible = Data.filterVideos(scoped, { query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
+    const visible = Data.filterVideos(effectiveVideos(), { showHidden: state.showHidden, query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
     const filtered = CustomProperties ? visible.filter(video => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, Object.values(state.customFilters))) : visible;
     const ordered = Data.sortVideos(filtered, state.sort);
     const context = {
@@ -658,15 +658,27 @@
     readReturnIntent();
     const targetId = returnIntent && returnIntent.id;
     if (!targetId || !canReadProtectedData()) return;
-    // Reapply after loadPrefs() as well as async Vault/SPA remounts.
-    restoreReturnContext(targetId);
     const all = effectiveVideos();
     // Initial local/Vault hydration can be asynchronous. Do not lose the
     // return intent when the target is not yet available.
-    if (!all.some(video => String(video.id) === targetId)) return;
+    const target = all.find(video => String(video.id) === targetId);
+    if (!target) return;
+    // A hidden video is no longer in the ordinary list. Do not jump to the
+    // hidden folder to manufacture a page containing it. Return to page 1 of
+    // the regular list instead, even when it was opened from the hidden list.
+    if (target.hidden) {
+      clearReturnIntent();
+      state.showHidden = false;
+      state.page = 1;
+      state.query = ''; state.quick = 'all'; state.folderId = ''; state.tag = ''; state.service = ''; state.customFilters = {};
+      if (dom.search) dom.search.value = '';
+      return;
+    }
+    // Reapply only for videos that still belong to the regular list.
+    restoreReturnContext(targetId);
     const findInCurrentView = () => {
       const scoped = all.filter(video => video.hidden === state.showHidden);
-      const visible = Data.filterVideos(scoped, { query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
+      const visible = Data.filterVideos(effectiveVideos(), { showHidden: state.showHidden, query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
       const filtered = CustomProperties ? visible.filter(video => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, Object.values(state.customFilters))) : visible;
       return sortForReturn(filtered);
     };
@@ -675,7 +687,7 @@
     if (index < 0) {
       const target = all.find(video => String(video.id) === targetId);
       if (target) {
-        state.showHidden = !!target.hidden;
+        state.showHidden = false;
         state.query = ''; state.quick = 'all'; state.folderId = ''; state.tag = ''; state.service = ''; state.customFilters = {};
         if (dom.search) dom.search.value = '';
         list = findInCurrentView();
@@ -699,7 +711,7 @@
     const scoped = all.filter((video) => video.hidden === state.showHidden);
     renderFilterOptions(scoped);
     renderCustomFilters();
-    const baseFiltered = Data.filterVideos(scoped, { query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
+    const baseFiltered = Data.filterVideos(effectiveVideos(), { showHidden: state.showHidden, query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
     const filters = Object.values(state.customFilters);
     const filtered = CustomProperties ? baseFiltered.filter((video) => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, filters)) : baseFiltered;
     const videos = sortForReturn(filtered);
