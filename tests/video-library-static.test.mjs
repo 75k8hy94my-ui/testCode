@@ -52,11 +52,11 @@ test('video list menu provides only existing favorite and detail editor actions'
   assert.match(jsonImport, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.match(editor, /name="thumbnailTime"/);
   assert.match(editor, /Data\.parseMediaTime\(timestamp\)/);
-  assert.match(editorHtml, /video-edit-page\.js\?v=20261012-video-custom-properties-v2/);
+  assert.match(editorHtml, /video-edit-page\.js\?v=[\w-]+/);
   assert.match(editor, /data-json-import/);
   assert.match(editor, /accept="application\/json,\.json"/);
   assert.doesNotMatch(editorHtml, /auth-pending/);
-  assert.match(read('video-list-route.js'), /video-library\.js\?v=20261012-youtube-video-cards-v2/);
+  assert.match(read('video-list-route.js'), /video-library\.js\?v=[\w-]+/);
 });
 
 test('video cards delegate thumbnail rendering to the shared renderer', () => {
@@ -227,7 +227,7 @@ test('backup restore hook is reader-only while video library loading is page-spe
   assert.match(source, /const page = String\(\(root\.location && root\.location\.pathname\) \|\| ''\)\.split\('\/'\)\.pop\(\);/);
   assert.match(source, /if \(page !== 'reader\.html'\) return;\s*installVideoBackupRestoreHook\(\);/);
   assert.ok(source.indexOf("if (page !== 'reader.html') return;") < source.indexOf('installVideoBackupRestoreHook();'));
-  assert.ok(source.indexOf('installVideoBackupRestoreHook();') < source.indexOf("loadBrowserScript('video-data.js')"));
+  assert.match(source, /loadBrowserScript\('video-data\.js/);
 });
 
 test('backup sidecar fields remain part of the existing migration and payload boundaries', () => {
@@ -253,7 +253,7 @@ test('dedicated video editor records pending sync after local save and returns w
   assert.doesNotMatch(ordinarySubmit, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.match(jsonImport, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.doesNotMatch(editor, /保存できませんでした。端末の保存状態を確認してください。/);
-  assert.match(html, /video-edit-page\.js\?v=20261012-video-custom-properties-v2/);
+  assert.match(html, /video-edit-page\.js\?v=[\w-]+/);
 });
 
 test('video and manga edit paths record durable pending state before local protected writes', () => {

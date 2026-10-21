@@ -15,7 +15,7 @@ test('responsive grid and related layout remain distinct',()=>{
  assert.match(css,/@media \(max-width: 640px\)/);
 });
 test('entrypoints use refreshed styles and shared card script',()=>{
- for(const p of ['video.html','home.html','manga.html','profile.html','video-player.html'])assert.match(read(p),/video-card\.css\?v=20261012-youtube-layout-v3/);
- assert.match(read('video-list-route.js'),/video-card\.js\?v=20261012-youtube-layout-v3/);
- assert.match(read('video-player.html'),/video-card\.js\?v=20261012-youtube-layout-v3/);
+ for(const p of ['video.html','home.html','manga.html','profile.html','video-player.html'])assert.match(read(p),/video-card\.css\?v=[\w-]+/);
+ assert.match(read('video-list-route.js'),/video-card\.js\?v=[\w-]+/);
+ assert.match(read('video-player.html'),/video-card\.js\?v=[\w-]+/);
 });

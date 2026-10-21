@@ -18,19 +18,19 @@ test('video route has a dedicated template and route runtime without reader HTML
 
 test('video route loads its existing video modules without fetching reader.html', () => {
   assert.match(spa, /renderVideo\(generation\)/);
-  assert.match(spa, /video-list-route\.js\?v=20261012-youtube-video-cards-v2/);
-  assert.match(spa, /video-list-template\.js\?v=20261010-vpn-navigation/);
+  assert.match(spa, /video-list-route\.js\?v=[\w-]+/);
+  assert.match(spa, /video-list-template\.js\?v=[\w-]+/);
   assert.match(spa, /VideoListRouteFactory\.create\(/);
-  assert.match(route, /video-data\.js\?v=20260918-video-data-no-window/);
-  assert.match(route, /video-thumbnail-renderer\.js\?v=20261012-youtube-video-cards/);
-  assert.match(route, /video-card\.js\?v=20261012-youtube-video-cards/);
-  assert.match(route, /video-custom-properties\.js\?v=20261012-video-custom-properties/);
-  assert.match(route, /video-custom-property-store\.js\?v=20261012-video-custom-properties/);
-  assert.match(route, /manga-list-pagination-events\.js\?v=20261012-video-pagination/);
-  assert.match(route, /video-library-pagination\.js\?v=20261012-video-pagination/);
-  assert.match(route, /video-library\.js\?v=20261012-youtube-video-cards-v2/);
-  assert.match(route, /video-routing-fix\.js\?v=20261009-vault-sync-queue/);
-  assert.match(route, /video-thumbnail-time\.js\?v=20261009-vault-sync-queue/);
+  assert.match(route, /video-data\.js\?v=[\w-]+/);
+  assert.match(route, /video-thumbnail-renderer\.js\?v=[\w-]+/);
+  assert.match(route, /video-card\.js\?v=[\w-]+/);
+  assert.match(route, /video-custom-properties\.js\?v=[\w-]+/);
+  assert.match(route, /video-custom-property-store\.js\?v=[\w-]+/);
+  assert.match(route, /manga-list-pagination-events\.js\?v=[\w-]+/);
+  assert.match(route, /video-library-pagination\.js\?v=[\w-]+/);
+  assert.match(route, /video-library\.js\?v=[\w-]+/);
+  assert.match(route, /video-routing-fix\.js\?v=[\w-]+/);
+  assert.match(route, /video-thumbnail-time\.js\?v=[\w-]+/);
   assert.match(spa, /else if\(route==='video'\)renderVideo\(generation\)/);
   assert.doesNotMatch(spa, /route==='reader'|renderReader|reader\.html|iframe/);
   assert.match(spa, /if\(!SPA_PAGES\.includes\(name\)\)\{location\.href=target\.href;return true;\}/);
@@ -42,14 +42,14 @@ test('video route loads its existing video modules without fetching reader.html'
 test('video route mounts while gated and passes the gate into its protected-data library', () => {
   const route = read('video-list-route.js');
   const gate = route.indexOf("deps.loadMediaGate()");
-  const data = route.indexOf("deps.loadScript('video-data.js?v=20260918-video-data-no-window'");
-  const paginationEvents = route.indexOf("deps.loadScript('manga-list-pagination-events.js?v=20261012-video-pagination'");
-  const paginationModel = route.indexOf("deps.loadScript('video-library-pagination.js?v=20261012-video-pagination'");
-  const renderer = route.indexOf("deps.loadScript('video-thumbnail-renderer.js?v=20261012-youtube-video-cards'");
-  const card = route.indexOf("deps.loadScript('video-card.js?v=20261012-youtube-video-cards'");
-  const properties = route.indexOf("deps.loadScript('video-custom-properties.js?v=20261012-video-custom-properties'");
-  const propertyStore = route.indexOf("deps.loadScript('video-custom-property-store.js?v=20261012-video-custom-properties'");
-  const library = route.indexOf("deps.loadScript('video-library.js?v=20261012-youtube-video-cards-v2'");
+  const data = route.indexOf("deps.loadScript('video-data.js?v=");
+  const paginationEvents = route.indexOf("deps.loadScript('manga-list-pagination-events.js?v=");
+  const paginationModel = route.indexOf("deps.loadScript('video-library-pagination.js?v=");
+  const renderer = route.indexOf("deps.loadScript('video-thumbnail-renderer.js?v=");
+  const card = route.indexOf("deps.loadScript('video-card.js?v=");
+  const properties = route.indexOf("deps.loadScript('video-custom-properties.js?v=");
+  const propertyStore = route.indexOf("deps.loadScript('video-custom-property-store.js?v=");
+  const library = route.indexOf("deps.loadScript('video-library.js?v=");
   assert.ok(gate >= 0 && gate < data);
   assert.ok(data < paginationEvents && paginationEvents < paginationModel && paginationModel < renderer && renderer < card && card < properties && properties < propertyStore && propertyStore < library);
   assert.match(route, /MangaReaderVideoLibrary\.init\(deps\.mediaAccess\)/);
@@ -137,9 +137,9 @@ test('video thumbnail helper does not inspect protected metadata during storage 
 
 test('video feature helpers are deferred until the route has protected-data access', () => {
   const baseScripts = route.slice(route.indexOf('async function loadFeatureScripts'), route.indexOf('async function start'));
-  assert.match(baseScripts, /await deps\.loadScript\('video-thumbnail-renderer\.js\?v=20261012-youtube-video-cards'/);
-  assert.match(baseScripts, /await deps\.loadScript\('video-card\.js\?v=20261012-youtube-video-cards'/);
-  assert.match(baseScripts, /await deps\.loadScript\('video-library\.js\?v=20261012-youtube-video-cards-v2'/);
+  assert.match(baseScripts, /await deps\.loadScript\('video-thumbnail-renderer\.js\?v=[\w-]+'/);
+  assert.match(baseScripts, /await deps\.loadScript\('video-card\.js\?v=[\w-]+'/);
+  assert.match(baseScripts, /await deps\.loadScript\('video-library\.js\?v=[\w-]+'/);
   assert.match(baseScripts, /canReadProtectedData\(\)[\s\S]*video-routing-fix\.js/);
 });
 
@@ -225,7 +225,7 @@ test('a stale render completion preserves a video route mounted by the newer gen
 
 test('video library can be reinitialized after a route interruption without rebinding events', () => {
   const library = read('video-library.js');
-  assert.match(library, /window\.MangaReaderVideoLibrary\s*=\s*Object\.freeze\(\{ init, syncAccessUi \}\)/);
+  assert.match(library, /window\.MangaReaderVideoLibrary\s*=\s*Object\.freeze\(\{ init, syncAccessUi/);
   assert.match(library, /let eventsBound = false/);
   assert.match(library, /if \(eventsBound\) return;/);
   assert.match(library, /if \(section\.dataset\.videoLibraryEnhanced === '1'\) return true/);

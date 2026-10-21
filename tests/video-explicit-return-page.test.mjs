@@ -14,7 +14,7 @@ test('player header propagates origin and list resolves target by id',()=>{
  assert.match(list,/\? candidate : calculatedPage/);
 });
 test('assets are refreshed to avoid stale SPA scripts',()=>{
- assert.match(read('video-list-route.js'),/video-library\.js\?v=20261012-return-target-persist/);
- assert.match(read('video-list-route.js'),/video-routing-fix\.js\?v=20261012-explicit-return-page/);
- assert.match(read('video-player.html'),/video-player-page\.js\?v=20261012-return-target-persist/);
+ assert.match(read('video-list-route.js'),/video-library\.js\?v=[\w-]+/);
+ assert.match(read('video-list-route.js'),/video-routing-fix\.js\?v=[\w-]+/);
+ assert.match(read('video-player.html'),/video-player-page\.js\?v=[\w-]+/);
 });

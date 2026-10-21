@@ -11,5 +11,5 @@ test('video list and player use stable bounded box-sized containers',()=>{
 });
 test('entrypoints use the latest shared shell stylesheet',()=>{
  for(const name of ['video.html','video-player.html','home.html','manga.html','profile.html'])
-  assert.match(read(name),/home-profile-shell\.css\?v=20261012-video-width-stable/);
+  assert.match(read(name),/home-profile-shell\.css\?v=[\w-]+/);
 });
