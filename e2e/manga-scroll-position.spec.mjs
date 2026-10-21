@@ -28,7 +28,7 @@ test('manga page turns do not snap the vertical scroll position back to the tool
   // Remount after seeding to guarantee the pagination model sees new items.
   await page.evaluate(() => window.HomeProfileSPA.renderRoute());
   await expect(page.locator('#bookshelfPageLabel')).toHaveText('1 / 3');
-  await expect(page.locator('.book-card')).toHaveCount(20);
+  await expect(page.locator('.book-card')).toHaveCount(25);
 
   await page.evaluate(() => window.scrollTo(0, 500));
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(400);
