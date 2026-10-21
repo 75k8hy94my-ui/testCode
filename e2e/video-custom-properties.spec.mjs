@@ -20,7 +20,8 @@ test('guest configures a property, saves it on a video, filters, and reads it on
   await page.getByRole('button', { name: '選択肢を追加' }).click();
   await page.getByRole('link', { name: '動画一覧へ' }).click();
   await expect(page.locator('#videoLibraryApp')).toBeVisible();
-  await page.getByRole('button', { name: /追加/ }).click();
+  await page.locator('#mobileNavAdd').click();
+  await page.getByRole('link', { name: '＋ 動画を追加' }).click();
   await expect(page).toHaveURL(/video-edit\.html\?mode=add/);
   await page.locator('#videoEditTitle').fill('プロパティ検証動画');
   await page.locator('#videoEditUrl').fill('https://example.com/property-check.mp4');
