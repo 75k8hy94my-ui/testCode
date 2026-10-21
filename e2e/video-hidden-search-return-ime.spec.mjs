@@ -92,6 +92,8 @@ test('IME conversion Enter does not save a video title while editing', async ({ 
     selection.addRange(range);
   });
   await page.keyboard.insertText('タイトル');
+  // The next deliberate Enter is a separate keystroke from IME confirmation.
+  await page.waitForTimeout(30);
   await page.keyboard.press('Enter');
   await expect(heading).toHaveAttribute('contenteditable', 'false');
   await expect(heading).toHaveText('日本語タイトル');
