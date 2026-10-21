@@ -161,12 +161,12 @@ test('video playback and thumbnail helpers honor access loss before protected re
   assert.match(thumbnail, /setTimeout\(async \(\) => \{\s*if \(!canReadProtectedData\(\)\) return/);
 });
 
-test('video URL additions reject an exact duplicate without writing another record', () => {
-  const library = read('video-library.js');
-  assert.match(library, /list\.some\(\(item\)\s*=>\s*Data\.normalizeVideo\(item\)\.url\s*===\s*url\)/);
-  assert.match(library, /同じ動画URLはすでに追加されています/);
+test('video URL additions reuse an existing URL identity without duplicate records', () => {
+  const editor = read('video-edit-page.js');
+  assert.match(editor,/Data\.videoUrlIdentity\(url\)/);
+  assert.match(editor,/Data\.promoteVideoUrl\(matching, url\)/);
+  assert.match(editor,/matching \? savedVideos\.map\(/);
 });
-
 test('video library supports hiding videos and restoring them from the hidden list', () => {
   const library = read('video-library.js');
   assert.match(library, /videoLibraryHidden/);

@@ -91,7 +91,8 @@ test('add screen rejects duplicate URLs and invalid URLs without a write', async
   const app = startEditor({ videos: [existing] });
   app.form.elements.url.value = 'https://example.com/clip.mp4';
   await app.form.events.submit({ preventDefault() {} });
-  assert.match(app.nodes.get('.videoEditError').textContent, /すでに登録/);
+  assert.equal(app.nodes.get('.videoEditError').textContent, '');
+  assert.equal(JSON.parse(app.stored.get(VIDEO_KEY))[0].id, 'other');
   assert.equal(JSON.parse(app.stored.get(VIDEO_KEY)).length, 1);
   app.form.elements.url.value = 'javascript:alert(1)';
   await app.form.events.submit({ preventDefault() {} });
