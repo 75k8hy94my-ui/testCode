@@ -29,6 +29,21 @@ test('guest can navigate home, manga, video, and profile without protected backe
   expect(uncaught).toEqual([]);
 });
 
+test('desktop image upload is reached from profile, not the sidebar', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.route(/supabase\.co|\/auth\/v1\/|\/rest\/v1\//i, route => route.abort());
+  await page.goto('index.html');
+  await page.getByRole('button', { name: 'ログインせずに使う' }).click();
+  await expect(page.getByRole('navigation', { name: 'デスクトップナビ' })).toBeVisible();
+  await expect(page.locator('#desktopNavImages')).toHaveCount(0);
+  await page.locator('#desktopNavSettings').click();
+  await expect(page).toHaveURL(/profile\.html$/);
+  await page.getByRole('link', { name: '画像アップロードを開く' }).click();
+  await expect(page).toHaveURL(/images\.html$/);
+  await expect(page.locator('#imageUploadForm')).toBeVisible();
+  await expect(page.locator('#desktopNavImages')).toHaveCount(0);
+});
+
 for (const startRoute of ['manga', 'video']) {
   test(`${startRoute} shell preloads the profile Shorts dependency before SPA navigation`, async ({ page }) => {
     await page.route(/supabase\.co|\/auth\/v1\/|\/rest\/v1\//i, route => route.abort());

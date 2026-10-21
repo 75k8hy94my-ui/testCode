@@ -81,7 +81,8 @@ test('manga keeps normal works; encrypted image UI is isolated to images.html', 
   assert.match(manga,/!item\.encryptedAssets\?\.pages\?\.length/);
   assert.doesNotMatch(template,/encryptedImageAddForm|encryptedImageAddDialog|addCustomBtn/);
   assert.doesNotMatch(manga,/bind\(importForm, 'submit'/);
-  assert.match(read('app-desktop-rail.js'),/desktopNavImages/);
+  assert.doesNotMatch(read('app-desktop-rail.js'),/desktopNavImages/);
+  assert.match(read('home-profile-spa.js'),/href="images.html">画像アップロードを開く/);
   assert.match(read('mobile-bottom-nav.js'),/mobileNavImages/);
   assert.match(read('sync.html'),/\['images\.html','drive-gallery\.html'\]\.includes\(next\)/);
 });
