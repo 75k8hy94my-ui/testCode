@@ -29,14 +29,15 @@
 <a class="mediaAddButton" href="video-edit.html?mode=add&amp;return=list">＋ 動画を追加</a>
 </div>
 <section id="mangaAddSection" hidden aria-label="漫画を追加">
-<form class="mediaAddForm" id="mangaAddForm">
+<form class="mediaAddForm" id="mangaAddForm" novalidate>
 <h3>漫画を追加</h3>
 <label>タイトル <input name="title" required maxlength="240"></label>
 <label>作者 <input name="author"></label>
 <label>シリーズ <input name="series"></label>
 <label>巻数（任意） <input name="volume" type="number" min="1"></label>
 <label>タグ（カンマ区切り） <input name="tags"></label>
-<label>画像URLまたはページURL <input name="url" type="url" placeholder="https://..." required></label>
+<label>画像URLまたはページURL（必須） <input name="url" type="url" placeholder="https://..." required aria-describedby="mangaAddUrlHelp"></label>
+<p id="mangaAddUrlHelp">保存するにはHTTP(S)の画像URLまたはページURLが必要です。</p>
 <label>各ページの画像URL（任意・1行1URL）<textarea name="pages" placeholder="https://example.com/1.jpg"></textarea></label>
 <p class="mediaAddMessage" id="mangaAddStatus" role="status" aria-live="polite"></p>
 <div><button class="mediaAddButton primary" type="submit">漫画を保存</button></div>
