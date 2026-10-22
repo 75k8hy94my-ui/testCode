@@ -22,6 +22,60 @@ async function readingAreaGap(page) {
   });
 }
 
+test('mobile app navigation sits inside the same header band as the statute controls', async ({ page }) => {
+  await openGuestStatutes(page, 320, 720);
+  for (const width of [320, 375, 390, 480, 620, 899]) {
+    await page.setViewportSize({ width, height: 780 });
+    await expect.poll(() => page.evaluate(() => {
+      const header = document.getElementById('appGlobalHeader');
+      const nav = document.getElementById('mobileBottomNav');
+      return nav?.parentElement === header;
+    })).toBe(true);
+
+    const layout = await page.evaluate(() => {
+      const header = document.getElementById('appGlobalHeader');
+      const nav = document.getElementById('mobileBottomNav');
+      const title = document.getElementById('statutesCurrentSection');
+      const edit = document.querySelector('.statutesModeSwitch');
+      const search = document.getElementById('statutesSearchToggle');
+      const h = header.getBoundingClientRect();
+      const n = nav.getBoundingClientRect();
+      const t = title.getBoundingClientRect();
+      const actions = [title, edit, search].map(node => node.getBoundingClientRect());
+      const items = [...nav.querySelectorAll('[data-mobile-route]')].map(node => node.getBoundingClientRect());
+      const columns = getComputedStyle(nav).gridTemplateColumns.split(' ').map(Number.parseFloat);
+      return {
+        headerTop:h.top,
+        navWithinHeader:n.left >= h.left && n.right <= h.right && n.top >= h.top && n.bottom <= h.bottom,
+        navAboveTitle:n.bottom <= t.top,
+        actionsInsideHeader:actions.every(rect => rect.top >= h.top && rect.bottom <= h.bottom),
+        itemsFit:items.length === 6 && items.every(rect => rect.left >= n.left && rect.right <= n.right),
+        sixEqualColumns:columns.length === 6 && columns.every(value => Math.abs(value - columns[0]) < 1),
+        horizontalOverflow:document.documentElement.scrollWidth > window.innerWidth,
+      };
+    });
+    expect(layout).toMatchObject({
+      headerTop:0,
+      navWithinHeader:true,
+      navAboveTitle:true,
+      actionsInsideHeader:true,
+      itemsFit:true,
+      sixEqualColumns:true,
+      horizontalOverflow:false,
+    });
+    await expect.poll(async () => (await readingAreaGap(page)).top).toBeGreaterThanOrEqual(10);
+    await expect(page.locator('#statutesSearchToggle')).toBeVisible();
+    await expect(page.locator('.statutesModeSwitch')).toBeVisible();
+  }
+
+  // Restoring desktop width puts the hidden mobile nav back in its old parent.
+  await page.setViewportSize({ width:1024, height:768 });
+  await expect.poll(() => page.evaluate(() =>
+    document.getElementById('mobileBottomNav')?.parentElement === document.getElementById('homeApp')
+  )).toBe(true);
+  await expect(page.locator('#mobileBottomNav')).toBeHidden();
+});
+
 test('small-phone toolbar stays above text even when sync controls wrap', async ({ page }) => {
   await openGuestStatutes(page, 320, 720);
   await expect.poll(async () => (await readingAreaGap(page)).top).toBeGreaterThanOrEqual(10);
