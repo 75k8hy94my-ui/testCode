@@ -262,31 +262,46 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
   .statutes-page #statutesEditToggle,.statutes-page #statutesSyncButton{font-size:11px;padding:4px 5px}
 }
 
-/* Statutes phone-specific chrome: separate app navigation, action toolbar and subject dock. */
+/* Statutes phone chrome: one fixed header with an absolutely positioned
+   six-column app navigation above the subject, edit and search controls.
+   The fixed header is also the positioning container for its nav; keeping
+   it fixed preserves the article/definition split-pane viewport contract. */
 @media(max-width:899px){
-  html.statutes-page #mobileBottomNav.liquidGlassNav{
-    top:max(6px,env(safe-area-inset-top))!important;
-    bottom:auto!important;
-    transform-origin:50% 0%!important;
-  }
-  html.statutes-page #mobileBottomNav.liquidGlassNav.liquidNavCompact{
-    transform:translateX(-50%) translateY(-5px) scale(.94)!important;
-  }
   html.statutes-page #appGlobalHeader.globalAppHeader{
     position:fixed!important;
     z-index:1150;
-    top:calc(83px + env(safe-area-inset-top))!important;
+    top:0!important;
     left:0;right:0;
     margin:0!important;
     box-sizing:border-box;
-    min-height:46px!important;
+    min-height:0!important;
     height:auto;
-    padding:5px 10px!important;
+    padding:calc(61px + env(safe-area-inset-top)) 10px 6px!important;
     display:flex!important;
     align-items:center;
     justify-content:flex-start;
     gap:8px!important;
     flex-wrap:wrap;
+  }
+  html.statutes-page #appGlobalHeader #mobileBottomNav.liquidGlassNav{
+    position:absolute!important;
+    top:calc(4px + env(safe-area-inset-top))!important;
+    left:50%!important;
+    right:auto!important;
+    bottom:auto!important;
+    width:min(calc(100vw - 24px),520px)!important;
+    max-width:calc(100% - 24px)!important;
+    min-height:52px!important;
+    padding:4px!important;
+    display:grid!important;
+    grid-template-columns:repeat(6,minmax(0,1fr))!important;
+    grid-auto-flow:row!important;
+    grid-auto-columns:auto!important;
+    gap:2px!important;
+    transform-origin:50% 0%!important;
+  }
+  html.statutes-page #appGlobalHeader #mobileBottomNav.liquidGlassNav.liquidNavCompact{
+    transform:translateX(-50%) scale(.94)!important;
   }
   html.statutes-page #appGlobalHeader .globalShellBrand{display:none!important}
   html.statutes-page #appGlobalHeader .statutesCurrentSection{
@@ -391,6 +406,29 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
   html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
     margin-top:0!important;
   }
+}
+/* Narrow phones retain six equal tappable navigation cells within the header. */
+@media(max-width:480px){
+  html.statutes-page #appGlobalHeader.globalAppHeader{
+    padding-top:calc(55px + env(safe-area-inset-top))!important;
+    padding-left:8px!important;
+    padding-right:8px!important;
+    gap:5px!important;
+  }
+  html.statutes-page #appGlobalHeader #mobileBottomNav.liquidGlassNav{
+    min-height:48px!important;
+    padding:3px!important;
+  }
+  html.statutes-page #appGlobalHeader #mobileBottomNav .liquidGlassNavItem{
+    min-height:40px!important;
+    padding:0 2px!important;
+  }
+  html.statutes-page #appGlobalHeader #mobileBottomNav .mobileNavGlyph{
+    width:21px;
+    height:21px;
+    flex-basis:21px;
+  }
+  html.statutes-page #appGlobalHeader .statutesCurrentSection{font-size:11px}
 }
 /* When the reference panel is also open, the mobile editor must stop above it.
    This rule follows the general phone grid rule so its height is not overridden. */
@@ -814,6 +852,29 @@ html.statutes-page.statutes-definition-open #homeApp > .statutesDefinitionSide{
   grip.addEventListener('pointerup', finish);
   grip.addEventListener('pointercancel', finish);
   grip.addEventListener('lostpointercapture', finish);
+})();
+</script>
+<script>
+/* On the statutes route only, put the existing six-item app nav inside the
+   action header so that its absolute position belongs to the same header band.
+   Restore the normal DOM parent on desktop; other routes are unaffected. */
+(() => {
+  const root = document.documentElement;
+  const header = document.getElementById('appGlobalHeader');
+  const host = document.getElementById('homeApp');
+  if (!root.classList.contains('statutes-page') || !header || !host) return;
+  const mobile = window.matchMedia('(max-width:899px)');
+  const mount = () => {
+    const nav = document.getElementById('mobileBottomNav');
+    if (!nav) return;
+    const target = mobile.matches ? header : host;
+    if (nav.parentElement !== target) target.appendChild(nav);
+  };
+  document.addEventListener('mobile-bottom-nav-ready', mount);
+  mobile.addEventListener('change', mount);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mount, { once:true });
+  } else mount();
 })();
 </script>
 <script>
