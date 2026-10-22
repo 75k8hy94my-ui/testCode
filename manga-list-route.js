@@ -610,7 +610,7 @@
           onClear: () => { setState({ shelfFilters: { series: '', author: '', tags: '', source: '' }, bookshelfPage: 1 }); renderList(); },
         }, { filterButton: filter, applyButton: apply, clearButton: clear });
         bindFactory(MangaListFolderEventsFactory, {
-          onCreateStart: () => { newFolderRow.style.display = ''; if (newFolderInput) newFolderInput.focus(); },
+          onCreateStart: () => { newFolderRow.style.display = 'flex'; if (newFolderInput) newFolderInput.focus(); },
           onCreateConfirm: () => {
             if (!canReadProtectedData()) return;
             const name = newFolderInput && newFolderInput.value.trim();
