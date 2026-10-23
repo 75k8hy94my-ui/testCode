@@ -53,7 +53,7 @@
     && (value[FIELDS[5]] == null || (Number.isFinite(value[FIELDS[5]]) && value[FIELDS[5]]>=0.7 && value[FIELDS[5]]<=0.97))
     && Array.isArray(value[FIELDS[6]])
     && value[FIELDS[6]].every(card => isObject(card) && typeof card.id === 'string' && typeof card.front === 'string' && typeof card.back === 'string');
-  const equal = (a,b) => JSON.stringify(a) === JSON.stringify(b);
+  const equal = (a,b) => window.StatutesSyncMerge.equal(a,b);
   function apply(value) {
     if (!valid(value)) throw new Error('逐条集データの形式が不正です。');
     for (const k of FIELDS) save(k,normalized(value)[k]);
@@ -117,46 +117,67 @@
         save(KEY,{user,raw:encode(raw)});
       }
       const decoded = await unseal(raw,row.ciphertext);
-      const incoming = normalized(decoded);
+      let incoming = normalized(decoded);
       if (!valid(incoming)) throw new Error('同期データの構造が不正です。');
       const local = snapshot();
       const base = read(BASE);
       if (base?.data) base.data=normalized(base.data);
       const sameBase = base?.user === user;
-      // Never silently replace unsynced or divergent data.
+      // Without a common ancestor it is impossible to distinguish a missing
+      // record from a deletion. Keep the conservative first-device safeguard.
       if (!sameBase) {
         if (!equal(local,incoming)) {
           const isEmpty = equal(local,empty());
-          if (!isEmpty) return {state:'deferred',reason:'local-conflict'};
+          if (!isEmpty) return {state:'deferred',reason:'unknown-ancestor'};
           apply(incoming);
         }
         save(BASE,{user,revision:row.revision,data:incoming});
         save(KEY,{user,raw:encode(raw)});
         return {state:'success',applied:true};
       }
-      const localChanged = !equal(local,base.data);
-      const remoteChanged = !equal(incoming,base.data);
-      if (remoteChanged && localChanged && !equal(local,incoming))
-        return {state:'deferred',reason:'local-conflict'};
-      if (remoteChanged) {
-        if (!equal(local,incoming)) apply(incoming);
-        save(BASE,{user,revision:row.revision,data:incoming});
-        return {state:'success',applied:true};
+      if (!base?.data || !valid(base.data)) {
+        return {state:'deferred',reason:'unknown-ancestor'};
       }
-      if (localChanged) {
-        const cipher = await seal(raw,local);
+      // CAS protects a single encrypted server row; it is not evidence that
+      // individual annotations conflict. Re-merge against the same ancestor
+      // after a simultaneous write by another device.
+      for (let attempt=0; attempt<4; attempt++) {
+        const {data:merged,conflicts} = window.StatutesSyncMerge.mergeStatutes(base.data,local,incoming);
+        if (conflicts.length) return {state:'deferred',reason:'local-conflict',conflictPaths:conflicts};
+        if (!valid(merged)) throw new Error('統合後の逐条集データの構造が不正です。');
+        if (equal(merged,incoming)) {
+          if (equal(snapshot(),local)) {
+            if (!equal(local,incoming)) apply(incoming);
+          } else {
+            // Never overwrite an edit made while the remote row was loading.
+            changed();
+          }
+          save(BASE,{user,revision:row.revision,data:incoming});
+          return {state:'success',applied:!equal(local,incoming)};
+        }
+        const cipher = await seal(raw,merged);
         const result = await api(endpoint(user)+'&revision=eq.'+encodeURIComponent(row.revision)+'&select=revision',{
           method:'PATCH',
           headers:{Prefer:'return=representation'},
           body:JSON.stringify({revision:Number(row.revision)+1,ciphertext:cipher,updated_at:new Date().toISOString()})
         });
-        if (!Array.isArray(result) || result.length !== 1)
-          return {state:'deferred',reason:'local-conflict'};
-        save(BASE,{user,revision:Number(row.revision)+1,data:local});
-      } else if (base.revision !== row.revision) {
-        save(BASE,{user,revision:row.revision,data:incoming});
+        if (!Array.isArray(result) || result.length !== 1) {
+          row = await remote(user);
+          if (!row) throw new Error('逐条集の同期行が消失しました。');
+          incoming = normalized(await unseal(raw,row.ciphertext));
+          if (!valid(incoming)) throw new Error('同期データの構造が不正です。');
+          continue;
+        }
+        save(BASE,{user,revision:Number(row.revision)+1,data:merged});
+        if (equal(snapshot(),local)) {
+          if (!equal(merged,local)) apply(merged);
+        } else {
+          // The newer edit remains local and will be uploaded in the next pass.
+          changed();
+        }
+        return {state:'success',applied:!equal(merged,local)};
       }
-      return {state:'success'};
+      return {state:'deferred',reason:'concurrent-update'};
     })();
     pending = op.finally(() => {pending=null;});
     return pending;
@@ -170,22 +191,37 @@
     const decoded = await unseal(raw,row.ciphertext);
     const incoming = normalized(decoded);
     if (!valid(incoming)) throw new Error('クラウドデータが不正です。');
-    if (choice === 'cloud') {
-      apply(incoming);
-      save(BASE,{user,revision:row.revision,data:incoming});
-      return {state:'success',applied:true};
+    const local = snapshot(), base = read(BASE);
+    let adopted;
+    if (base?.user === user && base?.data && valid(normalized(base.data))) {
+      // Adopt the chosen side ONLY at disputed fields. Preserve independent
+      // edits from both devices, including additions and deletions elsewhere.
+      adopted = window.StatutesSyncMerge.mergeStatutes(normalized(base.data),local,incoming,choice).data;
+    } else {
+      // No reliable ancestor: selecting a side must remain an explicit
+      // whole-snapshot decision rather than guessing whether absence=deletion.
+      adopted = choice === 'cloud' ? incoming : local;
     }
-    const local = snapshot();
-    const cipher = await seal(raw,local);
-    const result = await api(endpoint(user)+'&revision=eq.'+encodeURIComponent(row.revision)+'&select=revision',{
-      method:'PATCH',
-      headers:{Prefer:'return=representation'},
-      body:JSON.stringify({revision:Number(row.revision)+1,ciphertext:cipher,updated_at:new Date().toISOString()})
-    });
-    if (!Array.isArray(result) || result.length !== 1)
-      throw new Error('別の端末で更新されました。再確認してください。');
-    save(BASE,{user,revision:Number(row.revision)+1,data:local});
-    return {state:'success'};
+    if (!valid(adopted)) throw new Error('選択後の逐条集データの構造が不正です。');
+    let revision = row.revision;
+    if (!equal(adopted,incoming)) {
+      const cipher = await seal(raw,adopted);
+      const result = await api(endpoint(user)+'&revision=eq.'+encodeURIComponent(row.revision)+'&select=revision',{
+        method:'PATCH',
+        headers:{Prefer:'return=representation'},
+        body:JSON.stringify({revision:Number(row.revision)+1,ciphertext:cipher,updated_at:new Date().toISOString()})
+      });
+      if (!Array.isArray(result) || result.length !== 1)
+        throw new Error('別の端末で更新されました。再確認してください。');
+      revision = Number(row.revision)+1;
+    }
+    save(BASE,{user,revision,data:adopted});
+    if (equal(snapshot(),local)) {
+      if (!equal(adopted,local)) apply(adopted);
+    } else {
+      changed();
+    }
+    return {state:'success',applied:!equal(adopted,local)};
   }
   // Called only after local statutes edits; never triggers a shared Vault upload.
   let timer;
