@@ -1122,29 +1122,19 @@
     });
     return retryPendingLocalChanges(result);
   }
-  async function persistCredentialUpdate(token, user, expectedPayload) {
-    const meta = getMeta(user.id);
-    if (meta && meta.pendingSync) {
-      // A pending local edit may be committed only against its recorded revision.
-      // CAS failure leaves the local change pending and aborts the credential update.
-      await saveLocalChanges();
-      return true;
-    }
+  async function persistCredentialUpdate(token, user, expectedPayload, expectedKeyWraps) {
+    // Updating key wrappers must not upload the device's local payload. The
+    // encrypted cloud data remains unchanged, and pending edits retain their
+    // sync marker/baseline for a later ordinary three-way merge.
     const record = await fetchRecord(token, user);
     const currentMeta = getMeta(user.id);
     if (!record || !currentMeta || Number(currentMeta.revision) !== Number(record.revision)) {
       throw new Error('別の端末で保管庫が更新されています。端末データを保持したまま認証方法の変更を停止しました。再読込して確認してください。');
     }
-    const remotePayload = await decryptPayload(record.payload);
-    const localPayload = window.MangaVaultPayload && typeof window.MangaVaultPayload.buildFromLocalStorage === 'function'
-      ? window.MangaVaultPayload.buildFromLocalStorage() : null;
-    if (!localPayload || stableJson(localPayload) !== stableJson(remotePayload)) {
-      if (getMeta(user.id) && getMeta(user.id).pendingSync) {
-        await saveLocalChanges();
-        return true;
-      }
-      throw new Error('端末とクラウドのデータが一致しないため、認証方法だけを変更できません。同期状態を確認してください。');
+    if (stableJson(expectedKeyWraps || {}) !== stableJson(record.payload && record.payload.keyWraps || {})) {
+      throw new Error('別の端末で保管庫の認証情報が更新されています。保管庫を開き直してから再設定してください。');
     }
+    const remotePayload = await decryptPayload(record.payload);
     if (expectedPayload && stableJson(expectedPayload) !== stableJson(remotePayload)) {
       throw new Error('保管庫の内容が処理中に更新されました。データを保持したまま認証方法の変更を停止しました。');
     }
@@ -1166,8 +1156,16 @@
       assertSyncAccess();
       if (!rows || !rows.length) throw new Error('認証情報の保存中に保管庫が更新されました。認証情報は変更せず、保管庫を再読込してください。');
       const updated = Object.assign({}, record, rows[0]);
-      const encryptedBaseline = await encryptBaseline(remotePayload, user.id, updated.revision);
-      setMeta(user.id, { revision: updated.revision, updatedAt: updated.updated_at, encryptedBaseline });
+      // Never invent a sync baseline for a device that did not have one.
+      // Otherwise unknown local edits could be mistaken for safe merged changes.
+      const currentMeta = getMeta(user.id);
+      const nextMeta = { revision: updated.revision, updatedAt: updated.updated_at };
+      if (currentMeta && currentMeta.encryptedBaseline) {
+        nextMeta.encryptedBaseline = await encryptBaseline(remotePayload, user.id, updated.revision);
+      }
+      // setMeta intentionally receives no completedPendingToken: pending edits
+      // are still pending even though the credential-only CAS succeeded.
+      setMeta(user.id, nextMeta);
       return true;
     });
   }
@@ -1183,11 +1181,13 @@
         const vault = loadActive();
         const existing = Array.isArray(vault.keyWraps.passkeys) ? vault.keyWraps.passkeys : (vault.keyWraps.passkey ? [vault.keyWraps.passkey] : []);
         if (existing.some((entry) => entry.id === wrapper.id)) throw new Error('このパスキーは既に登録されています。');
-        vault.keyWraps.passkeys = existing.concat(wrapper); delete vault.keyWraps.passkey; saveActive(vault);
-        await persistCredentialUpdate(token, user, cloudPayload);
+        const nextKeyWraps = Object.assign({}, vault.keyWraps, { passkeys: existing.concat(wrapper) });
+        delete nextKeyWraps.passkey;
+        saveActive({ rawKey: vault.rawKey, keyWraps: nextKeyWraps });
+        await persistCredentialUpdate(token, user, cloudPayload, record.payload.keyWraps);
         return true;
       } catch (error) {
-        if (previous) saveActive(previous);
+        if (previous) saveActive(previous); else clearActive();
         throw error;
       }
     });
@@ -1203,12 +1203,13 @@
         const vault = loadActive();
         const existing = Array.isArray(vault.keyWraps.passkeys) ? vault.keyWraps.passkeys : (vault.keyWraps.passkey ? [vault.keyWraps.passkey] : []);
         if (!existing.length) throw new Error('解除できるパスキーが登録されていません。');
-        const nextKeyWraps = Object.assign({}, vault.keyWraps); delete nextKeyWraps.passkeys; delete nextKeyWraps.passkey;
+        const keyWrapsBeforeRemoval = vault.keyWraps;
+        const nextKeyWraps = Object.assign({}, keyWrapsBeforeRemoval); delete nextKeyWraps.passkeys; delete nextKeyWraps.passkey;
         saveActive({ rawKey: vault.rawKey, keyWraps: nextKeyWraps });
-        await persistCredentialUpdate(token, user, cloudPayload);
+        await persistCredentialUpdate(token, user, cloudPayload, keyWrapsBeforeRemoval);
         return true;
       } catch (error) {
-        if (previous) saveActive(previous);
+        if (previous) saveActive(previous); else clearActive();
         throw error;
       }
     });
@@ -1231,10 +1232,10 @@
         const salt = randomBytes(16); const passphraseKey = await derivePassphrase(nextPassphrase, salt);
         const nextKeyWraps = Object.assign({}, keyWraps, { passphrase: { kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations: ITERATIONS, salt: b64url(salt) }, encryptedKey: await encrypt(passphraseKey, rawKey) } });
         saveActive({ rawKey, keyWraps: nextKeyWraps });
-        await persistCredentialUpdate(token, user, cloudPayload);
+        await persistCredentialUpdate(token, user, cloudPayload, keyWraps);
         return true;
       } catch (error) {
-        if (previous) saveActive(previous);
+        if (previous) saveActive(previous); else clearActive();
         throw error;
       }
     });

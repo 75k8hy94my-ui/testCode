@@ -925,6 +925,66 @@ test('a failed follow-up save keeps changes made during the earlier successful s
   assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), { local: 'first edit' });
 });
 
+async function credentialRotationFixture(cloudPayload, localPayload = cloudPayload) {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const prfOutput = webcrypto.getRandomValues(new Uint8Array(32));
+  const credentialId = new Uint8Array([9, 2, 6, 4]);
+  const salt = webcrypto.getRandomValues(new Uint8Array(16));
+  const passphrase = 'valid passphrase 123';
+  const material = await webcrypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+  const passphraseKey = await webcrypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' }, material, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  const keyWraps = { passphrase: { kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations: 600000, salt: b64url(salt) }, encryptedKey: await encrypt(passphraseKey, rawKey) } };
+  const remote = { record: { payload: await encryptPayload(rawKey, cloudPayload, keyWraps, 4), revision: 1, updated_at: 'before' } };
+  const credential = { rawId: credentialId.buffer, getClientExtensionResults: () => ({ prf: { results: { first: prfOutput } } }) };
+  const setup = await fixture({
+    initialPayload: localPayload, rawKey, remote, revision: 1, capability: 4, passkeySupported: true,
+    credentials: { create: async () => credential, get: async () => credential },
+  });
+  return { ...setup, passphrase, keyWraps };
+}
+
+test('passkey registration changes wrappers only when cloud tombstones or independent local state differ', async () => {
+  const cloudPayload = { videos: [{ id: 'kept', title: 'same video' }], vaultSyncTombstones: ['/videos/old'] };
+  const localPayload = { videos: [{ id: 'kept', title: 'same video' }], statuteDefinitions: [{ id: 'offline-card', title: 'local only' }] };
+  const { vault, local, remote, rawKey, passphrase, keyWraps } = await credentialRotationFixture(cloudPayload, localPayload);
+
+  assert.equal(await vault.registerPasskey(passphrase), true);
+
+  assert.equal(remote.record.revision, 2);
+  assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), cloudPayload, 'credential change must not upload stale local data');
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')), localPayload, 'credential change must not replace local content');
+  assert.deepEqual(remote.record.payload.keyWraps.passphrase, keyWraps.passphrase);
+  assert.equal(remote.record.payload.keyWraps.passkeys.length, 1);
+  const meta = JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'];
+  assert.equal(meta.revision, 2);
+  assert.equal(meta.pendingSync, false);
+
+  assert.equal(await vault.removePasskeys(passphrase), true, 'removal must also preserve differing local content');
+  assert.equal(remote.record.revision, 3);
+  assert.equal(remote.record.payload.keyWraps.passkeys, undefined);
+  assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), cloudPayload);
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')), localPayload);
+});
+
+test('passkey registration leaves pending local edits pending and they sync with the new wrapper later', async () => {
+  const cloudPayload = { videos: [{ id: 'kept', title: 'original' }] };
+  const localPayload = { videos: [...cloudPayload.videos, { id: 'local-only', title: 'not uploaded yet' }] };
+  const { vault, local, remote, rawKey, passphrase } = await credentialRotationFixture(cloudPayload, localPayload);
+  vault.markLocalChangesPending();
+
+  assert.equal(await vault.registerPasskey(passphrase), true);
+  assert.equal(remote.record.revision, 2);
+  assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), cloudPayload);
+  assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, true);
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')), localPayload);
+
+  await vault.saveLocalChanges();
+  assert.equal(remote.record.revision, 3);
+  assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), localPayload);
+  assert.equal(remote.record.payload.keyWraps.passkeys.length, 1, 'subsequent sync must keep the new passkey');
+  assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, false);
+});
+
 test('passkey registration refuses to replace a newer cloud payload with stale local data', async () => {
   const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
   const prfOutput = webcrypto.getRandomValues(new Uint8Array(32));
