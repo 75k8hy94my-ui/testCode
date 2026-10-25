@@ -300,6 +300,15 @@ html[data-theme="dark"] .iosSwitch input:checked + .iosSwitchTrack{background:#3
 .videoPlayerFrame.videoPlayerFrameRotated{height:min(800px,calc(100dvh - 150px));aspect-ratio:auto}
 .videoPlayerFrame.videoPlayerFrameRotated:fullscreen,.videoPlayerFrame.videoPlayerFrameRotated:-webkit-full-screen{width:100vw;height:100vh;max-width:none;aspect-ratio:auto;margin:0;background:#000}
 
+.profileSecurityFields{display:grid;gap:12px}
+.profileField{display:grid;gap:6px;color:var(--sub);font-size:13px}
+.profileField input{width:100%;min-height:42px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text)}
+.profileSecurityActions{display:flex;flex-wrap:wrap;gap:8px}
+.profileSecurityActions .glassBtn{border:1px solid var(--line)}
+.profileSecurityStatus{min-height:1.5em;margin:4px 0 0;color:var(--sub);font-size:13px}
+.profileCard .profileSecurityStatus[data-state="error"]{color:var(--danger)!important}
+.profileCard .profileSecurityStatus[data-state="ok"]{color:var(--ok)!important}
+.profileSecurityCard hr{width:100%;border:0;border-top:1px solid var(--line);margin:2px 0}
 .profilePasskeyManagement{display:grid;gap:8px;min-width:0;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
 .profilePasskeyTitle{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .profilePasskeyTitle h4{margin:0;font-size:15px}
