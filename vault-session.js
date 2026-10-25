@@ -36,7 +36,22 @@
   async function decrypt(key, encrypted) { return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64url(encrypted.iv) }, key, fromB64url(encrypted.ciphertext))); }
   async function passkeyKey(output) { return importAes(new Uint8Array(await crypto.subtle.digest('SHA-256', output))); }
   function passkeySupported() { return Boolean(window.PublicKeyCredential && navigator.credentials && typeof navigator.credentials.create === 'function' && typeof navigator.credentials.get === 'function'); }
-  async function registerPasskeyCredential(user) {
+  function passkeyEntries(keyWraps) {
+    return Array.isArray(keyWraps?.passkeys) ? keyWraps.passkeys : (keyWraps?.passkey ? [keyWraps.passkey] : []);
+  }
+  function passkeyLabel(name, fallback = 'パスキー') {
+    const cleaned = String(name || '').trim();
+    if (cleaned.length > 64) throw new Error('パスキー名は64文字以内にしてください。');
+    return cleaned || fallback;
+  }
+  function publicPasskeyEntries(keyWraps) {
+    return passkeyEntries(keyWraps).map((entry, index) => ({
+      id: entry.id,
+      name: passkeyLabel(entry.name, 'パスキー ' + (index + 1)),
+      createdAt: typeof entry.createdAt === 'string' ? entry.createdAt : null,
+    }));
+  }
+  async function registerPasskeyCredential(user, existing = []) {
     if (!passkeySupported()) throw new Error('このブラウザはパスキーに対応していません。');
     const rpId = passkeyRpId();
     const salt = randomBytes(32);
@@ -46,6 +61,7 @@
       user: { id: toArrayBuffer(new TextEncoder().encode(user.id)), name: user.email, displayName: user.email },
       pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
       authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
+      excludeCredentials: existing.map((entry) => ({ type: 'public-key', id: toArrayBuffer(fromB64url(entry.id)) })),
       timeout: 60000,
       extensions: { prf: { eval: { first: toArrayBuffer(salt) } } }
     }});
@@ -1169,25 +1185,45 @@
       return true;
     });
   }
-  async function registerPasskey(passphrase) {
+  async function listPasskeys() {
+    return withSession(async (token, user) => {
+      // Only the public key-wrapper metadata is read. Media data is not decrypted.
+      const record = await fetchRecord(token, user);
+      return record ? publicPasskeyEntries(record.payload?.keyWraps) : [];
+    });
+  }
+  async function registerPasskey(passphrase, name = '') {
     const previous = loadActive();
+    let credentialCreated = false;
     return withSession(async (token, user) => {
       try {
+        // Fail before opening the OS passkey prompt; otherwise a failed Vault
+        // write leaves a usable-looking but unregistered credential on the device.
+        assertSyncAccess();
         const record = await fetchRecord(token, user);
         if (!record) throw new Error('先にパスフレーズで保管庫を作成してください。');
+        const meta = getMeta(user.id);
+        if (!meta || Number(meta.revision) !== Number(record.revision))
+          throw new Error('別の端末で保管庫が更新されています。同期状態を確認してから再度追加してください。');
         await unlock(record.payload, passphrase, '');
         const cloudPayload = await decryptPayload(record.payload);
-        const wrapper = await registerPasskeyCredential(user);
         const vault = loadActive();
-        const existing = Array.isArray(vault.keyWraps.passkeys) ? vault.keyWraps.passkeys : (vault.keyWraps.passkey ? [vault.keyWraps.passkey] : []);
+        const existing = passkeyEntries(vault.keyWraps);
+        const label = passkeyLabel(name, 'パスキー ' + (existing.length + 1));
+        assertSyncAccess();
+        const wrapper = await registerPasskeyCredential(user, existing);
+        credentialCreated = true;
         if (existing.some((entry) => entry.id === wrapper.id)) throw new Error('このパスキーは既に登録されています。');
-        const nextKeyWraps = Object.assign({}, vault.keyWraps, { passkeys: existing.concat(wrapper) });
+        const nextKeyWraps = Object.assign({}, vault.keyWraps, {
+          passkeys: existing.concat(Object.assign({}, wrapper, { name: label, createdAt: new Date().toISOString() })),
+        });
         delete nextKeyWraps.passkey;
         saveActive({ rawKey: vault.rawKey, keyWraps: nextKeyWraps });
         await persistCredentialUpdate(token, user, cloudPayload, record.payload.keyWraps);
         return true;
       } catch (error) {
         if (previous) saveActive(previous); else clearActive();
+        if (credentialCreated) throw new Error('testCodeへのパスキー登録は完了していません。端末に未登録のパスキーが残ることがあります。' + (error?.message || ''), { cause: error });
         throw error;
       }
     });
@@ -1213,6 +1249,43 @@
         throw error;
       }
     });
+  }
+  async function updateOnePasskey(passphrase, credentialId, update) {
+    if (!credentialId || typeof update !== 'function') throw new Error('変更するパスキーを指定してください。');
+    const previous = loadActive();
+    return withSession(async (token, user) => {
+      try {
+        assertSyncAccess();
+        const record = await fetchRecord(token, user);
+        if (!record) throw new Error('保管庫が見つかりません。');
+        await unlock(record.payload, passphrase, '');
+        const cloudPayload = await decryptPayload(record.payload);
+        const vault = loadActive();
+        const existing = passkeyEntries(vault.keyWraps);
+        const index = existing.findIndex((entry) => entry.id === credentialId);
+        if (index < 0) throw new Error('このパスキーは既に解除されたか、別の端末で変更されています。');
+        const nextEntries = update(existing, index);
+        const nextKeyWraps = Object.assign({}, vault.keyWraps);
+        delete nextKeyWraps.passkey;
+        if (nextEntries.length) nextKeyWraps.passkeys = nextEntries;
+        else delete nextKeyWraps.passkeys;
+        saveActive({ rawKey: vault.rawKey, keyWraps: nextKeyWraps });
+        await persistCredentialUpdate(token, user, cloudPayload, record.payload.keyWraps);
+        return true;
+      } catch (error) {
+        if (previous) saveActive(previous); else clearActive();
+        throw error;
+      }
+    });
+  }
+  async function renamePasskey(passphrase, credentialId, name) {
+    const label = passkeyLabel(name);
+    if (!String(name || '').trim()) throw new Error('新しいパスキー名を入力してください。');
+    return updateOnePasskey(passphrase, credentialId, (entries, index) =>
+      entries.map((entry, i) => i === index ? Object.assign({}, entry, { name: label }) : entry));
+  }
+  async function removePasskey(passphrase, credentialId) {
+    return updateOnePasskey(passphrase, credentialId, (entries, index) => entries.filter((_, i) => i !== index));
   }
   async function changePassphrase(nextPassphrase) {
     const previous = loadActive();
@@ -1252,6 +1325,6 @@
     });
     return retryPendingLocalChanges(result);
   }
-  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, ensureSession, refreshSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, listVaultHistory, getVaultHistorySnapshot, setVaultHistoryProtected, previewVaultHistoryRestore, confirmVaultHistoryRestore, loadPayload, initialize, initializeWithPasskey, registerPasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, syncLatest, syncStatutesLatest, resolveConflicts, recordSyncDeletion, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
+  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, ensureSession, refreshSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, listVaultHistory, getVaultHistorySnapshot, setVaultHistoryProtected, previewVaultHistoryRestore, confirmVaultHistoryRestore, loadPayload, initialize, initializeWithPasskey, registerPasskey, listPasskeys, renamePasskey, removePasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, syncLatest, syncStatutesLatest, resolveConflicts, recordSyncDeletion, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
 })();
 
