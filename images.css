@@ -22,3 +22,10 @@
 .imageUploadForm select{width:100%;min-width:0;padding:10px;border-radius:10px;border:1px solid var(--line,#434956);background:var(--bg,#11141a);color:var(--text,#eee);font:inherit}
 .imageQualityHelp{grid-column:1/-1;margin:0;color:var(--sub,#a5aebb);font-size:12px;line-height:1.7}
 #imageUploadSize{font-weight:650;overflow-wrap:anywhere}
+
+/* A separate delete control keeps the preview button keyboard- and touch-accessible. */
+.imageTile{min-width:0;display:grid;grid-template-rows:minmax(0,1fr) auto;gap:7px}
+.imageTile>.imageCard{width:100%;height:100%}
+.imageDeleteButton{width:100%;border:1px solid var(--line,#555);border-radius:10px;padding:9px 12px;background:var(--surface,#20242c);color:var(--text,#eee);cursor:pointer;font:inherit;font-size:13px}
+.imageDeleteButton:hover:not(:disabled){border-color:var(--danger,#bb5555);color:var(--danger,#db635f)}
+.imageDeleteButton:disabled{opacity:.5;cursor:default}
