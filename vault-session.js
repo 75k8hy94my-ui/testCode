@@ -73,7 +73,7 @@
       const fallbackResult = fallback && fallback.getClientExtensionResults && fallback.getClientExtensionResults();
       prfOutput = fallbackResult && fallbackResult.prf && fallbackResult.prf.results && fallbackResult.prf.results.first;
     }
-    if (!prfOutput) throw new Error('このパスキーまたはブラウザは保管庫解除用PRFに対応していません。');
+    if (!prfOutput) throw new Error('このパスキーまたはブラウザは保管庫解除用PRFに対応していません。testCodeへの登録は完了していません。端末のパスキー管理画面に作成済みのパスキーが残る場合があります。');
     const key = await passkeyKey(new Uint8Array(prfOutput));
     return { id: b64url(new Uint8Array(credential.rawId)), salt: b64url(salt), encryptedKey: await encrypt(key, loadActive().rawKey) };
   }
@@ -1167,9 +1167,11 @@
         protocolVersion = await probeSyncProtocol(token);
         if (protocolVersion !== SYNC_PROTOCOL_VERSION) throw error;
         encrypted = await envelope(remotePayload, protocolVersion);
+        assertSyncAccess();
         rows = await api('/rest/v1/rpc/update_manga_reader_vault_v4', { method: 'POST', token, body: JSON.stringify({ expected_revision: record.revision, new_payload: encrypted }) });
       }
-      assertSyncAccess();
+      // A completed CAS is authoritative even if VPN status changes while the
+      // response arrives. Do not report an already-committed passkey as failed.
       if (!rows || !rows.length) throw new Error('認証情報の保存中に保管庫が更新されました。認証情報は変更せず、保管庫を再読込してください。');
       const updated = Object.assign({}, record, rows[0]);
       // Never invent a sync baseline for a device that did not have one.
@@ -1189,7 +1191,8 @@
     return withSession(async (token, user) => {
       // Only the public key-wrapper metadata is read. Media data is not decrypted.
       const record = await fetchRecord(token, user);
-      return record ? publicPasskeyEntries(record.payload?.keyWraps) : [];
+      if (!record) throw new Error('クラウド保管庫が見つかりません。');
+      return publicPasskeyEntries(record.payload?.keyWraps);
     });
   }
   async function registerPasskey(passphrase, name = '') {
