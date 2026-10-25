@@ -284,20 +284,30 @@
       return Array.isArray(entries) ? entries : [];
     } catch (_) { return []; }
   }
-  function enqueueCleanup(assetId, revision) {
+  function enqueueCleanup(assetId, revision, objectIds) {
     const userId = currentUserId();
-    if (!userId) return;
+    if (!userId) throw new Error('ログイン情報がありません。');
     const entries = readCleanup();
-    if (entries.some(item => item.userId === userId && item.assetId === assetId && item.revision === revision)) return;
-    localStorage.setItem(CLEANUP_KEY, JSON.stringify([...entries, {userId, assetId, revision}].slice(-2000)));
+    const existing = entries.find(item => item.userId === userId && item.assetId === assetId && item.revision === revision);
+    if (existing) {
+      if (objectIds?.length) existing.objectIds = objectIds;
+    } else {
+      entries.push({userId, assetId, revision, ...(objectIds?.length ? {objectIds} : {})});
+    }
+    localStorage.setItem(CLEANUP_KEY, JSON.stringify(entries.slice(-2000)));
   }
-  async function discard({assetId, revision}) {
+  function forgetCleanup({assetId, revision}) {
+    const userId = currentUserId();
+    localStorage.setItem(CLEANUP_KEY, JSON.stringify(readCleanup().filter(item =>
+      !(item?.userId === userId && item.assetId === assetId && item.revision === revision))));
+  }
+  async function discard({assetId, revision, objectIds}) {
     try {
       await window.EncryptedAssetSync.discardImportedAsset({
-        vault: api, storage: transport, cache, assetId, expectedRevision: revision
+        vault: api, storage: transport, cache, assetId, expectedRevision: revision, objectIds
       });
     } catch (error) {
-      enqueueCleanup(assetId, revision);
+      enqueueCleanup(assetId, revision, objectIds);
       throw error;
     }
   }
@@ -307,8 +317,7 @@
     for (const record of readCleanup().filter(item => item?.userId === userId)) {
       try {
         await discard(record);
-        localStorage.setItem(CLEANUP_KEY, JSON.stringify(readCleanup().filter(item =>
-          !(item?.userId === userId && item.assetId === record.assetId && item.revision === record.revision))));
+        forgetCleanup(record);
       } catch (_) { /* Try again after network availability returns. */ }
     }
   }
@@ -320,6 +329,9 @@
       ['sync', 'cleanup', 'done', 'error'].includes(uploadProgress?.snapshot()?.phase);
     $('imageRetrySync').hidden = !pendingSync;
     $('imageRetrySync').disabled = busy;
+    document.querySelectorAll('.imageDeleteButton').forEach(button => {
+      button.disabled = busy || pendingSync;
+    });
   }
   async function syncMetadata() {
     requireUnlock();
@@ -404,6 +416,66 @@
     void showPage(0);
     $('imageViewerClose').focus();
   }
+  async function deleteImage(id) {
+    if (busy || pendingSync || mediaAccess?.canReadProtectedData?.() !== true) return;
+    const current = imageItems().find(item => item.id === id);
+    if (!current) { status('削除対象の画像が見つかりません。', true); return; }
+    const title = current.title || '無題';
+    if (!window.confirm('「' + title + '」（' + current.encryptedAssets.pages.length +
+      'ページ）をクラウドと端末から削除しますか？この操作は取り消せません。')) return;
+    if (busy || pendingSync) return;
+    busy = true;
+    updateButtons();
+    let removedLocally = false;
+    try {
+      requireUnlock();
+      const raw = JSON.parse(localStorage.getItem(ITEM_KEY) || '[]');
+      if (!Array.isArray(raw)) throw new Error('保存済み作品データが不正です。');
+      status('暗号化画像を削除しています…');
+      const { pages } = await window.EncryptedImageDeletion.deleteWork({
+        id, items: raw, cryptoApi: window.EncryptedAssetCrypto,
+        getPages: window.EncryptedAssetItem.encryptedAssetPagesForItem,
+        lookupRemote: page => window.EncryptedAssetBackend.fetchRemoteAsset(api, page.assetId),
+        tombstoneRemote: page => window.EncryptedAssetSync.tombstoneAsset({
+          vault: api, assetId: page.assetId, expectedRevision: page.revision
+        }),
+        rememberCleanup: page => enqueueCleanup(page.assetId, page.revision, page.objectIds),
+        persistLocal: nextItems => {
+          localStorage.setItem(RETRY_KEY, currentUserId());
+          pendingSync = true;
+          localStorage.setItem(ITEM_KEY, JSON.stringify(nextItems));
+          removedLocally = true;
+        }
+      });
+      if (selected?.id === id) closeViewer();
+      previewLoader?.retain([]);
+      await renderGallery();
+      status('作品一覧から削除しました。クラウドの一覧を同期しています…');
+      await syncMetadata();
+      let cleanupPending = false;
+      for (const page of pages) {
+        try {
+          await discard(page);
+          forgetCleanup(page);
+        } catch (_) { cleanupPending = true; }
+      }
+      status(cleanupPending
+        ? '画像は削除・同期済みです。暗号化ファイルの後片付けは次回の接続時にも再試行します。'
+        : '画像を削除し、クラウド同期と暗号化ファイルの整理を完了しました。');
+    } catch (error) {
+      if (removedLocally) {
+        pendingSync = true;
+        status('画像は一覧から削除されましたが、クラウドの一覧同期が完了していません。再試行してください：' +
+          (error?.message || '通信エラー'), true);
+      } else {
+        status('削除を完了できませんでした。一部のページは削除済みの可能性があります。もう一度削除してください：' +
+          (error?.message || '通信エラー'), true);
+      }
+    } finally {
+      busy = false;
+      updateButtons();
+    }
+  }
   async function renderGallery() {
     const generation = ++galleryGeneration;
     const grid = $('imageGrid');
@@ -411,6 +483,8 @@
     const items = imageItems().slice().sort((a,b) => (Number(b.addedAt)||0) - (Number(a.addedAt)||0));
     $('imageEmpty').hidden = items.length > 0;
     for (const item of items) {
+      const tile = document.createElement('div');
+      tile.className = 'imageTile';
       const card = document.createElement('button');
       card.type = 'button'; card.className = 'imageCard';
       const img = document.createElement('img');
@@ -423,7 +497,15 @@
       count.textContent = item.encryptedAssets.pages.length + 'ページ';
       card.append(img,name,count);
       card.addEventListener('click', () => openViewer(item));
-      grid.appendChild(card);
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'imageDeleteButton';
+      del.textContent = '削除';
+      del.setAttribute('aria-label', '「' + (item.title || '無題') + '」を削除');
+      del.disabled = busy || pendingSync;
+      del.addEventListener('click', () => { void deleteImage(item.id); });
+      tile.append(card, del);
+      grid.appendChild(tile);
       try {
         const page = window.EncryptedAssetItem.encryptedAssetPagesForItem(item)[0];
         const opts = accessOptions(page);
