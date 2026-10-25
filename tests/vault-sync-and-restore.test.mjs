@@ -1181,3 +1181,33 @@ test('focus, visibility, and online events trigger one throttled receive sync', 
   await new Promise((resolve) => setTimeout(resolve, 10));
   assert.equal(fetchCounts.records, readsBefore + 1, 'repeated activation is throttled');
 });
+
+test('passkey list reflects cloud, supports rename and selective revocation, and leaves media payload untouched', async () => {
+  const payload = { videos: [{ id: 'protected-video' }], items: [{ id: 'local' }] };
+  const { vault, remote, rawKey, passphrase } = await credentialRotationFixture(payload);
+  assert.equal((await vault.listPasskeys()).length, 0);
+  assert.equal(await vault.registerPasskey(passphrase, '自宅PC'), true);
+  const first = await vault.listPasskeys();
+  assert.equal(first.length, 1);
+  assert.equal(first[0].name, '自宅PC');
+  assert.ok(first[0].createdAt);
+  assert.equal(first[0].encryptedKey, undefined, 'UI must not receive cryptographic wrapper data');
+  assert.equal(await vault.renamePasskey(passphrase, first[0].id, 'ノートPC'), true);
+  assert.equal((await vault.listPasskeys())[0].name, 'ノートPC');
+  await assert.rejects(vault.renamePasskey(passphrase, 'absent', 'wrong'), /既に解除されたか/);
+  assert.equal(await vault.removePasskey(passphrase, first[0].id), true);
+  assert.equal((await vault.listPasskeys()).length, 0);
+  assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), payload);
+});
+
+test('VPN block rejects registration before opening the platform passkey dialog', async () => {
+  const { vault, context, passphrase, remote } = await credentialRotationFixture({ videos: [] });
+  let createCalls = 0;
+  context.navigator.credentials.create = async () => { createCalls += 1; throw new Error('must not open'); };
+  context.window.MangaReaderMediaAccess = { canReadProtectedData: () => false };
+  const beforeRevision = remote.record.revision;
+  await assert.rejects(vault.registerPasskey(passphrase), /VPN接続を確認できるまで/);
+  assert.equal(createCalls, 0);
+  assert.equal(remote.record.revision, beforeRevision);
+  assert.equal((await vault.listPasskeys()).length, 0);
+});

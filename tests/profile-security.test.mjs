@@ -41,3 +41,18 @@ test('vault session exposes passkey removal and passphrase rewrapping APIs', () 
   assert.match(removal, /delete nextKeyWraps\.passkeys/);
   assert.match(removal, /delete nextKeyWraps\.passkey/);
 });
+
+test('profile lists named passkeys and supports individual rename/removal with server confirmation', () => {
+  const spa = read('home-profile-spa.js');
+  const vault = read('vault-session.js');
+  assert.match(spa, /id="profilePasskeyList"/);
+  assert.match(spa, /id="profilePasskeyCount"/);
+  assert.match(spa, /id="profileNewPasskeyName"/);
+  assert.match(spa, /MangaVault\.listPasskeys\(/);
+  assert.match(spa, /MangaVault\.renamePasskey\(/);
+  assert.match(spa, /MangaVault\.removePasskey\(/);
+  assert.match(vault, /async function listPasskeys\(/);
+  assert.match(vault, /async function renamePasskey\(/);
+  assert.match(vault, /async function removePasskey\(/);
+  assert.match(vault, /assertSyncAccess\(\);[\s\S]*?registerPasskeyCredential\(user, existing\)/);
+});
