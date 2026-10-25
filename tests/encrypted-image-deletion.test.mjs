@@ -85,7 +85,8 @@ test('cache-free deletion removes all manifest objects after server tombstone', 
   const removed=[], cacheRemovals=[];
   const backend={
     fetchRemoteAsset:async()=>({revision:1,deletedAt:'deleted'}),
-    buildStorageObjectPath:(user,id,rev,obj)=>[user,id,rev,obj].join('/')
+    buildStorageObjectPath:(user,id,rev,obj)=>[user,id,rev,obj].join('/'),
+    objectId:id=>id
   };
   const module = { exports:{} };
   vm.runInNewContext(read('encrypted-asset-sync.js'), {
@@ -106,7 +107,8 @@ test('cache-free deletion removes all manifest objects after server tombstone', 
 
 test('storage deletion failure retains local encrypted cache for retry', async () => {
   const backend={fetchRemoteAsset:async()=>({revision:1,deletedAt:'deleted'}),
-    buildStorageObjectPath:(_user,_id,_rev,obj)=>obj};
+    buildStorageObjectPath:(_user,_id,_rev,obj)=>obj,
+    objectId:id=>id};
   const module={exports:{}};
   vm.runInNewContext(read('encrypted-asset-sync.js'),{
     module,require:path=>path==='./encrypted-asset-backend.js'?backend:({})
