@@ -294,7 +294,7 @@
 
   // Roll back every object of a newly-created page, including files uploaded before
   // metadata creation. Keep local records if remote cleanup fails so a retry is possible.
-  async function discardImportedAsset({ vault, storage, cache, assetId, expectedRevision = 1 }) {
+  async function discardImportedAsset({ vault, storage, cache, assetId, expectedRevision = 1, objectIds }) {
     if (!cache || typeof cache.list !== 'function' || typeof cache.removeAsset !== 'function' || typeof storage?.remove !== 'function') {
       throw new TypeError('encrypted asset cleanup dependencies are missing');
     }
@@ -305,14 +305,18 @@
       if (!tombstone?.deletedAt) throw new Error('encrypted asset tombstone failed');
     }
     const records = (await cache.list()).filter((record) => record.assetId === assetId && record.revision === expectedRevision);
+    // A gallery deletion may happen on a device that has no cached copies.
+    // Always remove the complete published object set from its manifest.
+    if (objectIds !== undefined) validateObjectIds(objectIds);
+    const ids = [...new Set([...records.map(record => record.objectId), ...(objectIds || [])])];
     await session(vault, async (token, user) => {
-      for (const record of records) {
-        const path = backendApi.buildStorageObjectPath(user.id, assetId, expectedRevision, record.objectId);
+      for (const objectId of ids) {
+        const path = backendApi.buildStorageObjectPath(user.id, assetId, expectedRevision, objectId);
         await storage.remove(path, token);
       }
     });
     await cache.removeAsset(assetId);
-    return { ok: true, removedObjects: records.length };
+    return { ok: true, removedObjects: ids.length };
   }
 
   const api = { equalBytes, stageProcessedRevision, publishPendingRevision, loadEncryptedObject, loadDecryptedObject, tombstoneAsset, discardImportedAsset };
