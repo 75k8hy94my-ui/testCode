@@ -125,12 +125,12 @@ test('storage deletion failure retains local encrypted cache for retry', async (
 
 test('signed-in image gallery exposes a separate deletion action and guarded sync retry', () => {
   const html=read('images.html'),js=read('images.js'),css=read('images.css');
-  assert.match(html,/encrypted-image-deletion\\.js/);
+  assert.match(html,/encrypted-image-deletion\.js/);
   assert.match(js,/imageDeleteButton/);
-  assert.match(js,/window\\.confirm/);
-  assert.match(js,/EncryptedImageDeletion\\.deleteWork/);
+  assert.match(js,/window\.confirm/);
+  assert.match(js,/EncryptedImageDeletion\.deleteWork/);
   assert.match(js,/retryCleanup/);
-  assert.match(js,/await syncMetadata\\(\\)/);
+  assert.match(js,/await syncMetadata\(\)/);
   assert.match(js,/pendingSync = true/);
-  assert.match(css,/\\.imageDeleteButton:disabled/);
+  assert.match(css,/\.imageDeleteButton:disabled/);
 });
