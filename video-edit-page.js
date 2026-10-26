@@ -73,28 +73,27 @@
       : Data.normalizeVideo({ ...base, ...originalMeta, id: base.id, a: base.a, b: base.b, addedAt: base.addedAt });
     const folders = Data.normalizeFolders(read(FOLDER_KEY, []));
     const heading = document.createElement('h2'); heading.className = 'videoEditHeading'; heading.textContent = isAddMode ? '動画を追加' : '動画を編集';
-    const lead = document.createElement('p'); lead.className = 'videoEditLead'; lead.textContent = isAddMode ? '動画URLと情報を入力してください。' : (current.title || current.url || '動画情報を変更できます。');
-    const form = document.createElement('form'); form.className = 'videoEditForm';
+    const lead = document.createElement('p'); lead.className = 'videoEditLead'; lead.textContent = isAddMode ? '動画URLと情報を入力してください。' : '変更内容は自動的に保存されます。';
+    const form = document.createElement('form'); form.className = 'videoEditForm ' + (isAddMode ? 'isAddMode' : 'isEditMode');
     form.innerHTML = `
       ${isAddMode ? '<details class="videoEditField videoEditJsonImport"><summary>JSONからURLを一括追加</summary><p class="videoEditHelp">URL文字列の配列を含むJSONファイルを選択します。例: ["https://example.com/1.mp4"]</p><label for="videoEditJsonFile">JSONファイル</label><input id="videoEditJsonFile" type="file" accept="application/json,.json" data-json-import></details>' : ''}
-      <div class="videoEditUrlRow"><div class="videoEditField"><label for="videoEditUrl">動画URL</label><input id="videoEditUrl" name="url" type="url" autocomplete="off" required readonly></div><button class="videoEditButton" type="button" data-edit-url>URLを変更</button></div>
-      <div class="videoEditField"><label for="videoEditTitle">タイトル</label><input id="videoEditTitle" name="title" type="text" maxlength="240" autocomplete="off"></div>
-      <div class="videoEditField"><label for="videoEditFolder">フォルダ</label><select id="videoEditFolder" name="folder"></select><div class="videoEditUrlRow" style="margin-top:9px"><input id="videoEditNewFolder" type="text" maxlength="100" placeholder="新しいフォルダ名" autocomplete="off"><button class="videoEditButton" type="button" data-create-folder>新規作成</button></div><p class="videoEditHelp" data-folder-feedback role="status" aria-live="polite"></p></div>
-      <div class="videoEditField"><label for="videoEditAlternates">サブURL（１行につき１つ）</label><textarea id="videoEditAlternates" name="alternateUrls" placeholder="サブURLを入力"></textarea><div class="videoEditUrlRow"><select id="videoEditAlternateChoice" aria-label="切替先のサブURL"></select><button type="button" class="videoEditButton" data-promote-alternate>サブをメインに切替</button></div><p class="videoEditHelp">切替後に「保存」を押すと、選んだURLを通常再生に使用します。</p></div>
-       <div class="videoEditField"><label for="videoEditStatus">状態</label><select id="videoEditStatus" name="status"><option value="">未設定</option><option value="later">あとで見る</option><option value="watching">視聴中</option><option value="watched">視聴済み</option></select></div>
-      <div class="videoEditField"><label for="videoEditTags">タグ（カンマ区切り）</label><input id="videoEditTags" name="tags" type="text" autocomplete="off"></div>
-      <div class="videoEditField"><label for="videoEditMemo">メモ</label><textarea id="videoEditMemo" name="memo"></textarea></div>
-      <label class="videoEditCheck"><input name="favorite" type="checkbox"> お気に入り</label>
-      <label class="videoEditCheck"><input name="hidden" type="checkbox"> 動画を非表示</label>
-      <div class="videoEditField"><label for="videoEditRotate">再生時の回転</label><select id="videoEditRotate" name="rotate"><option value="none">回転なし</option><option value="left">常に左90°回転</option><option value="right">常に右90°回転</option></select></div>
-      <details class="videoEditField"><summary>再生情報・サムネイル</summary><div class="videoEditField"><label for="videoEditService">サービス名</label><input id="videoEditService" name="service" type="text" autocomplete="off"></div><div class="videoEditField"><label for="videoEditLegacyId">動画ID</label><input id="videoEditLegacyId" name="legacyId" type="text" autocomplete="off"></div><div class="videoEditField"><label for="videoEditThumbnail">サムネイルURL（任意）</label><input id="videoEditThumbnail" name="thumbnail" type="url" autocomplete="off"></div><div class="videoEditField"><label for="videoEditThumbnailTime">サムネイル時刻（mm:ss）</label><input id="videoEditThumbnailTime" name="thumbnailTime" type="text" inputmode="numeric" placeholder="0:00" autocomplete="off"></div></details>
-      <p class="videoEditError" role="status" aria-live="polite"></p><div class="videoEditActions"><button class="videoEditButton danger" type="button" data-delete>動画を削除</button><a class="videoEditButton" data-cancel>キャンセル</a><button class="videoEditButton save" type="submit">保存</button></div>`;
+      <div class="videoEditUrlRow videoEditMainUrl"><div class="videoEditField"><label for="videoEditUrl">動画URL</label><input id="videoEditUrl" name="url" type="url" autocomplete="off" required readonly></div><button class="videoEditButton" type="button" data-edit-url>URLを変更</button></div>
+      <div class="videoEditField videoEditTitleField"><label for="videoEditTitle">タイトル</label><input id="videoEditTitle" name="title" type="text" maxlength="240" autocomplete="off"></div>
+      <div class="videoEditField videoEditFolderField"><label for="videoEditFolder">フォルダ</label><select id="videoEditFolder" name="folder"></select><details class="videoEditFolderCreate"><summary>＋ 新しいフォルダ</summary><div class="videoEditUrlRow"><input id="videoEditNewFolder" type="text" maxlength="100" placeholder="フォルダ名" autocomplete="off"><button class="videoEditButton" type="button" data-create-folder>作成</button></div><p class="videoEditHelp" data-folder-feedback role="status" aria-live="polite"></p></details></div>
+      <details class="videoEditField videoEditAlternates"><summary>サブURLの管理</summary><div class="videoEditFieldBody"><label for="videoEditAlternates">サブURL（１行につき１つ）</label><textarea id="videoEditAlternates" name="alternateUrls" placeholder="サブURLを入力"></textarea><div class="videoEditUrlRow"><select id="videoEditAlternateChoice" aria-label="切替先のサブURL"></select><button type="button" class="videoEditButton" data-promote-alternate>サブをメインに切替</button></div><p class="videoEditHelp">切替後はメインURLを自動保存します。</p></div></details>
+       <div class="videoEditField videoEditStatusField"><label for="videoEditStatus">状態</label><select id="videoEditStatus" name="status"><option value="">未設定</option><option value="later">あとで見る</option><option value="watching">視聴中</option><option value="watched">視聴済み</option></select></div>
+      <div class="videoEditField videoEditTagsField"><label for="videoEditTags">タグ（カンマ区切り）</label><input id="videoEditTags" name="tags" type="text" autocomplete="off"></div>
+      <div class="videoEditField videoEditMemoField"><label for="videoEditMemo">メモ</label><textarea id="videoEditMemo" name="memo"></textarea></div>
+      <div class="videoEditToggles"><label class="videoEditCheck"><input name="favorite" type="checkbox"> お気に入り</label><label class="videoEditCheck"><input name="hidden" type="checkbox"> 動画を非表示</label></div>
+      <div class="videoEditField videoEditRotateField"><label for="videoEditRotate">再生時の回転</label><select id="videoEditRotate" name="rotate"><option value="none">回転なし</option><option value="left">常に左90°回転</option><option value="right">常に右90°回転</option></select></div>
+      <details class="videoEditField videoEditPlaybackMeta"><summary>再生情報・サムネイル</summary><div class="videoEditPlaybackFields"><div class="videoEditField"><label for="videoEditService">サービス名</label><input id="videoEditService" name="service" type="text" autocomplete="off"></div><div class="videoEditField"><label for="videoEditLegacyId">動画ID</label><input id="videoEditLegacyId" name="legacyId" type="text" autocomplete="off"></div><div class="videoEditField"><label for="videoEditThumbnail">サムネイルURL（任意）</label><input id="videoEditThumbnail" name="thumbnail" type="url" autocomplete="off"></div><div class="videoEditField"><label for="videoEditThumbnailTime">サムネイル時刻（mm:ss）</label><input id="videoEditThumbnailTime" name="thumbnailTime" type="text" inputmode="numeric" placeholder="0:00" autocomplete="off"></div></div></details>
+      <p class="videoEditError" role="status" aria-live="polite"></p><div class="videoEditActions"><button class="videoEditButton danger" type="button" data-delete>動画を削除</button><span class="videoEditSaveStatus" role="status" aria-live="polite" ${isAddMode ? "hidden" : ""}>変更は自動保存されます</span><a class="videoEditButton" data-cancel>${isAddMode ? "キャンセル" : "戻る"}</a>${isAddMode ? '<button class="videoEditButton save" type="submit">追加</button>' : ""}</div>`;
     const elements = form.elements;
     const customValueInputs = new Map();
     if (PropertyStore && CustomProperties) {
       const customState = PropertyStore.read();
-      const customSection = document.createElement('section'); customSection.className = 'videoEditCustomProperties';
-      const customHeading = document.createElement('h3'); customHeading.textContent = 'カスタムプロパティ'; customSection.append(customHeading);
+      const customSection = document.createElement('details'); customSection.className = 'videoEditCustomProperties';
+      const customHeading = document.createElement('summary'); customHeading.textContent = 'カスタムプロパティ'; customSection.append(customHeading);
       const savedValues = customState.values[String(videoId)] || {};
       Object.values(customState.definitions.properties).filter((property) => property && property.deleted !== true && property.hidden !== true).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)).forEach((property) => {
         const wrapper = document.createElement('div'); wrapper.className = 'videoEditField';
@@ -111,7 +110,7 @@
             options.forEach((option) => { const choice = document.createElement('button'); choice.type = 'button'; choice.textContent = option.name; choice.dataset.optionId = option.id; choice.setAttribute('aria-pressed', previous === option.id ? 'true' : 'false'); control.append(choice); });
             const archived = property.options && property.options[previous];
             if (typeof previous === 'string' && archived && archived.deleted === true) { const choice = document.createElement('button'); choice.type = 'button'; choice.disabled = true; choice.textContent = archived.name + '（削除済み）'; choice.dataset.optionId = previous; choice.setAttribute('aria-pressed', 'true'); control.append(choice); }
-            control.addEventListener('click', (event) => { const choice = event.target.closest('button[data-option-id]'); if (!choice) return; control.querySelectorAll('button').forEach((item) => item.setAttribute('aria-pressed', item === choice ? 'true' : 'false')); });
+            control.addEventListener('click', (event) => { const choice = event.target.closest('button[data-option-id]'); if (!choice) return; control.querySelectorAll('button').forEach((item) => item.setAttribute('aria-pressed', item === choice ? 'true' : 'false')); queueAutoSave(true); });
           } else {
             control = document.createElement(property.type === 'single_select' ? 'select' : 'div');
             if (property.type === 'single_select') { const empty = document.createElement('option'); empty.value = ''; empty.textContent = '未設定'; control.append(empty); }
@@ -131,6 +130,7 @@
         wrapper.append(control); customSection.append(wrapper);
         customValueInputs.set(property.id, { property, control, previous });
       });
+      customSection.open = customValueInputs.size > 0;
       if (!customValueInputs.size) { const hint = document.createElement('p'); hint.textContent = '動画プロパティ設定から項目を追加できます。'; const settings = document.createElement('a'); settings.href = 'video-properties.html'; settings.textContent = 'プロパティ設定'; hint.append(' ', settings); customSection.append(hint); }
       const anchor = form.querySelector('.videoEditError'); form.insertBefore(customSection, anchor);
     }
@@ -210,7 +210,8 @@
         elements.folder.append(option);
         elements.folder.value = newFolder.id;
         input.value = '';
-        feedback.textContent = 'フォルダを作成しました。動画への割当ては「保存」で確定します。';
+        feedback.textContent = isAddMode ? 'フォルダを作成しました。「追加」で動画に割り当てます。' : 'フォルダを作成しました。割当ても自動保存します。';
+        if (!isAddMode) queueAutoSave(true);
         if (!window.TestCodeGuest?.isActive()) {
           try { await window.MangaVault.saveLocalChanges(); }
           catch (_) { feedback.textContent += ' クラウドには未同期として保持しています。'; }
@@ -309,10 +310,89 @@
       elements.legacyId.value = fields.b;
     });
     let saving = false;
+    let needsFollowUpSave = false;
+    let autoSaveTimer = null;
+    let syncTimer = null;
+    let syncing = false;
+    let syncRequested = false;
+    let composing = false;
+    const saveStatus = form.querySelector('.videoEditSaveStatus');
+    function formSnapshot() {
+      return JSON.stringify({
+        fields: [elements.url.value, elements.title.value, elements.folder.value, elements.alternateUrls.value,
+          elements.status.value, elements.tags.value, elements.memo.value, !!elements.favorite.checked,
+          !!elements.hidden.checked, elements.rotate.value, elements.service.value, elements.legacyId.value,
+          elements.thumbnail.value, elements.thumbnailTime.value],
+        custom: [...customValueInputs.values()].map(({ property, control }) => {
+          if (property.type === 'checkbox') return !!control.checked;
+          if (property.type === 'single_select' && !control.matches('select')) return control.querySelector('button[aria-pressed="true"]')?.dataset.optionId || null;
+          if (property.type === 'multi_select') return [...control.querySelectorAll('input:checked')].map(item => item.value);
+          return control.value;
+        }),
+      });
+    }
+    let lastSavedSnapshot = formSnapshot();
+    function setSaveStatus(message) { if (saveStatus && !isAddMode) saveStatus.textContent = message; }
+    function scheduleCloudSync() {
+      if (isAddMode || window.TestCodeGuest?.isActive()) return;
+      clearTimeout(syncTimer);
+      syncTimer = setTimeout(async () => {
+        if (syncing) { syncRequested = true; return; }
+        if (!canReadProtectedData() || typeof window.MangaVault?.saveLocalChanges !== 'function') {
+          setSaveStatus('端末保存済み・クラウド同期保留中'); return;
+        }
+        syncing = true;
+        try {
+          await window.MangaVault.saveLocalChanges();
+          if (formSnapshot() === lastSavedSnapshot) setSaveStatus('端末・クラウドに保存済み');
+        } catch (_) {
+          setSaveStatus('端末保存済み・クラウド未同期（再接続後に再試行）');
+        } finally {
+          syncing = false;
+          if (syncRequested) { syncRequested = false; scheduleCloudSync(); }
+        }
+      }, 900);
+    }
+    function flushAutoSave() {
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = null;
+      if (!isAddMode && canReadProtectedData() && formSnapshot() !== lastSavedSnapshot) {
+        if (saving) { needsFollowUpSave = true; return; }
+        form.requestSubmit();
+      }
+    }
+    function queueAutoSave(immediate = false) {
+      if (isAddMode || !canReadProtectedData()) return;
+      clearTimeout(autoSaveTimer);
+      if (formSnapshot() === lastSavedSnapshot) { setSaveStatus('保存済み'); return; }
+      setSaveStatus('未保存の変更があります');
+      autoSaveTimer = setTimeout(flushAutoSave, immediate ? 0 : 450);
+    }
+    if (!isAddMode) {
+      form.addEventListener('input', () => { if (!composing) queueAutoSave(); });
+      form.addEventListener('change', () => { if (!composing) queueAutoSave(true); });
+      form.addEventListener('compositionstart', () => { composing = true; });
+      form.addEventListener('compositionend', () => { composing = false; queueAutoSave(); });
+      form.querySelector('[data-cancel]').addEventListener('click', async (event) => {
+        if (formSnapshot() === lastSavedSnapshot) return;
+        event.preventDefault();
+        clearTimeout(autoSaveTimer);
+        await form.requestSubmit();
+        // Save is asynchronous for custom properties. Watch the in-flight operation below.
+      });
+      if (typeof window.addEventListener === 'function') {
+        window.addEventListener('pagehide', flushAutoSave);
+      }
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushAutoSave(); });
+    }
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const error = form.querySelector('.videoEditError'); error.textContent = '';
       if (!canReadProtectedData()) return;
+      if (saving) { needsFollowUpSave = true; return; }
+      const startingSnapshot = formSnapshot();
+      if (!isAddMode && startingSnapshot === lastSavedSnapshot) return;
+      setSaveStatus('自動保存中…');
       const url = elements.url.value.trim();
       const classified = Data.classifyVideoUrl(url);
       if (classified.kind === 'invalid') { error.textContent = '有効な動画URLを入力してください。'; return; }
@@ -369,7 +449,6 @@
           propertyUpdates.push({ propertyId, property, previous, value });
         }
       }
-      if (saving) return;
       saving = true;
       const submitButton = form.querySelector('[type="submit"]');
       if (submitButton) submitButton.disabled = true;
@@ -411,14 +490,20 @@
           error.textContent = '端末に保存できませんでした。ブラウザの保存容量を確認してください。';
           return;
         }
-        if (window.TestCodeGuest?.isActive()) {
+        if (!isAddMode) {
+          lastSavedSnapshot = startingSnapshot;
+          setSaveStatus(window.TestCodeGuest?.isActive() ? '端末に自動保存しました' : '端末保存済み・クラウド同期中');
+          scheduleCloudSync();
+        } else {
           location.href = returnTarget(returnKind, savedId);
-          return;
         }
-        location.href = returnTarget(returnKind, savedId);
       } finally {
         saving = false;
         if (submitButton) submitButton.disabled = false;
+        if (!isAddMode && needsFollowUpSave) {
+          needsFollowUpSave = false;
+          queueAutoSave(true);
+        }
       }
     });
     if (!isAddMode) form.querySelector('[data-delete]').addEventListener('click', async () => {
