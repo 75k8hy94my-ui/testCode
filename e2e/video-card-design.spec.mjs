@@ -12,7 +12,7 @@ test('shared video cards keep the YouTube layout and menu behavior on desktop an
     const videos = Array.from({ length: 3 }, (_, index) => ({
       id: `card-${index + 1}`,
       title: `YouTube風の表示確認用タイトル ${index + 1} とても長いタイトルの折り返しを確認します`,
-      url: `https://www.youtube.com/watch?v=sample${index + 1}`,
+      url: `https://cdn.example.com/video/sample${index + 1}.mp4`,
       a: 'youtube',
       b: `sample${index + 1}`,
       addedAt: index + 1,
@@ -64,4 +64,48 @@ test('shared video cards keep the YouTube layout and menu behavior on desktop an
   await expect(page).toHaveURL(/return=player/);
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test('ordinary video-page URL renders as a compact bookmark, filters separately, and opens its original address', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route(/supabase\.co|\/auth\/v1\/|\/rest\/v1\//i, (route) => route.abort());
+  await page.goto('index.html');
+  await page.getByRole('button', { name: 'ログインせずに使う' }).click();
+  await page.goto('video.html');
+  await expect(page.locator('#videoLibraryApp')).toBeVisible();
+
+  const bookmarkUrl = 'https://example.com/video/111.html?key=abc#part';
+  await page.evaluate((url) => {
+    localStorage.setItem('mangaReaderVideos', JSON.stringify([
+      { id: 'page', url, title: '外部サイトの動画ページ', addedAt: 2 },
+      { id: 'mp4', url: 'https://cdn.example.com/clip.mp4', title: '直接再生動画', addedAt: 1 },
+    ]));
+    localStorage.setItem('mangaReaderVideoMeta', '{}');
+    localStorage.setItem('mangaReaderVideoFolders', '[]');
+    window.MangaReaderVideoLibrary.init(window.MangaReaderMediaAccess);
+  }, bookmarkUrl);
+
+  const bookmark = page.locator('.vl-card[data-video-id="page"]');
+  const direct = page.locator('.vl-card[data-video-id="mp4"]');
+  await expect(bookmark).toHaveClass(/videoCard--bookmark/);
+  await expect(bookmark.locator('.videoCardThumb')).toHaveCount(0);
+  await expect(bookmark.locator('.videoCardBookmarkDomain')).toHaveText('example.com');
+  await expect(bookmark.locator('.videoCardTitle')).toHaveAttribute('href', bookmarkUrl);
+  await expect(direct.locator('.videoCardThumb')).toHaveCount(1);
+  const bookmarkHeight = await bookmark.evaluate((node) => node.getBoundingClientRect().height);
+  const directHeight = await direct.evaluate((node) => node.getBoundingClientRect().height);
+  expect(bookmarkHeight).toBeLessThan(directHeight);
+  await page.locator('#videoLibraryKind').selectOption('bookmark');
+  await expect(page.locator('.vl-card')).toHaveCount(1);
+  await expect(bookmark).toBeVisible();
+  await page.locator('#videoLibraryKind').selectOption('direct');
+  await expect(page.locator('.vl-card')).toHaveCount(1);
+  await expect(direct).toBeVisible();
+  await page.locator('#videoLibraryKind').selectOption('all');
+
+  // Intercept the remote destination so no external network is required.
+  await page.route('https://example.com/video/111.html?key=abc', (route) =>
+    route.fulfill({ status: 200, contentType: 'text/html', body: '<title>Bookmark destination</title>' }));
+  await bookmark.locator('.videoCardTitle').click();
+  await expect(page).toHaveURL(bookmarkUrl);
 });
