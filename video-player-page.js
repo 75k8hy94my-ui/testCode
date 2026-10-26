@@ -316,7 +316,7 @@
       windowCleanups.push(cleanupRotation);
     }
   }
-  else if (base.a && base.b) { const iframe = document.createElement('iframe'); iframe.src = 'https://www.' + base.a + '.com/embed/' + base.b; iframe.title = title; iframe.allowFullscreen = true; frame.append(iframe); }
+  else if (base.a && base.b) { const iframe = document.createElement('iframe'); iframe.src = 'https://www.' + base.a + '.com/embed/' + base.b; iframe.title = window.TestCodeVideoPlaybackPrivacy?.getSettings()?.maskMetadata ? '動画' : title; listenWindow('testcode-video-playback-privacy-change', () => { iframe.title = window.TestCodeVideoPlaybackPrivacy?.getSettings()?.maskMetadata ? '動画' : title; }); iframe.allowFullscreen = true; frame.append(iframe); }
   else { const link = document.createElement('a'); link.className = 'glassBtn'; link.href = sourceUrl || '#'; link.target = '_blank'; link.rel = 'noopener'; link.textContent = '元ページを開く'; frame.append(link); }
 
   const markerList = document.createElement('div'); markerList.className = 'videoPlayerMarkerList'; markerList.innerHTML = '<h3>登録した秒数</h3><div class="videoMarkerList"></div>';
