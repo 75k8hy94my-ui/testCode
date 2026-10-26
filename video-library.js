@@ -584,6 +584,7 @@
     const service = Data.deriveService(video.url, video.a);
     if (service && !isBookmark) metadata.push(service);
     if (video.folderId && folderName(video.folderId)) metadata.push(folderName(video.folderId));
+    if (video.seriesId && effectiveVideos().some(item => item.id !== video.id && item.seriesId === video.seriesId)) metadata.push('シリーズ');
     if (video.watchStatus && STATUS_LABELS[video.watchStatus]) metadata.push(STATUS_LABELS[video.watchStatus]);
     if (video.lastOpenedAt) metadata.push(formatDate(video.lastOpenedAt));
     if (video.openCount) metadata.push(video.openCount + '回');
@@ -623,12 +624,117 @@
       thumbnailRenderer: window.MangaReaderVideoThumbnailRenderer,
       thumbnailOptions: { fallbackClass: 'vl-thumb-fallback', videoClass: 'vl-thumb-direct-video', serviceLabel: service || 'VIDEO' },
       onOpen: () => openVideo(video.id),
-      menuActions: [{ label: video.favorite ? 'お気に入りを解除' : 'お気に入りに追加', onSelect: () => { updateMeta(video.id, { favorite: !video.favorite }); render(); } }],
+      menuActions: [{ label: video.favorite ? 'お気に入りを解除' : 'お気に入りに追加', onSelect: () => { updateMeta(video.id, { favorite: !video.favorite }); render(); } },
+        ...(video.seriesId && effectiveVideos().some(item => item.id !== video.id && item.seriesId === video.seriesId)
+          ? [{ label: 'シリーズから外す', onSelect: () => commitSeries('remove', [video.id]) }] : [])],
       editHref: 'video-edit.html?id=' + encodeURIComponent(video.id) + '&return=list',
     });
     card.classList.add('vl-card');
     card.dataset.videoId = String(video.id);
+    if (state.seriesSelecting) {
+      const pick = document.createElement('label');
+      pick.className = 'vl-series-pick';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = state.seriesSelected.has(String(video.id));
+      checkbox.setAttribute('aria-label', title + 'をシリーズ用に選択');
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) state.seriesSelected.add(String(video.id));
+        else state.seriesSelected.delete(String(video.id));
+        render();
+      });
+      pick.append(checkbox, document.createTextNode('選択'));
+      card.append(pick);
+    }
     return card;
+  }
+
+  function createSeriesCard(group) {
+    const section = document.createElement('section');
+    section.className = 'vl-series';
+    section.dataset.seriesId = group.id;
+    const heading = document.createElement('div');
+    heading.className = 'vl-series-heading';
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'vl-series-toggle';
+    const expanded = state.expandedSeries.has(group.id);
+    toggle.setAttribute('aria-expanded', String(expanded));
+    toggle.textContent = (expanded ? '▾ ' : '▸ ') + 'シリーズ · ' + group.videos.length + '本';
+    toggle.addEventListener('click', () => {
+      if (expanded) state.expandedSeries.delete(group.id);
+      else state.expandedSeries.add(group.id);
+      render();
+    });
+    heading.append(toggle);
+    if (state.seriesSelecting) {
+      const label = document.createElement('label');
+      label.className = 'vl-series-select-all';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = group.videos.every(video => state.seriesSelected.has(String(video.id)));
+      checkbox.setAttribute('aria-label', 'このシリーズ内の動画をすべて選択');
+      checkbox.addEventListener('change', () => {
+        group.videos.forEach(video => {
+          if (checkbox.checked) state.seriesSelected.add(String(video.id));
+          else state.seriesSelected.delete(String(video.id));
+        });
+        render();
+      });
+      label.append(checkbox, document.createTextNode('まとめて選択'));
+      heading.append(label);
+    }
+    section.append(heading);
+    if (expanded) {
+      const grid = document.createElement('div');
+      grid.className = 'vl-series-videos';
+      group.videos.forEach(video => grid.append(createCard(video)));
+      section.append(grid);
+    }
+    return section;
+  }
+
+  function commitSeries(action, videoIds) {
+    if (!canReadProtectedData()) return false;
+    // Rebase grouping on the latest local snapshot, including edits made on
+    // the standalone video details page.
+    loadLibraryState();
+    const plan = Data.planSeriesChanges(effectiveVideos(), videoIds, action, () => id('vs'));
+    const errors = {
+      selection: '動画を選択してください。',
+      minimum: 'シリーズにまとめるには2本以上選んでください。',
+      multiple: '別々のシリーズの動画を同時にまとめることはできません。',
+      id: 'シリーズを作成できませんでした。',
+      action: '操作を確認してください。',
+    };
+    if (plan.error) { setStatus(errors[plan.error] || 'シリーズを変更できませんでした。', true); return false; }
+    if (!Object.keys(plan.changes).length) { setStatus('シリーズの変更はありません。'); return false; }
+    const original = state.meta;
+    state.meta = { ...original };
+    const now = Date.now();
+    Object.entries(plan.changes).forEach(([videoId, seriesId]) => {
+      state.meta[videoId] = { ...(state.meta[videoId] || {}), seriesId, updatedAt: now };
+    });
+    if (!persistAux()) {
+      state.meta = original;
+      setStatus('シリーズを保存できませんでした。端末の保存状態を確認してください。', true);
+      return false;
+    }
+    state.seriesSelected.clear();
+    state.seriesSelecting = false;
+    render();
+    setStatus(action === 'group' ? 'シリーズにまとめました。' : 'シリーズから外しました。');
+    return true;
+  }
+
+  function updateSeriesControls() {
+    const allowed = canReadProtectedData();
+    dom.seriesMode.textContent = state.seriesSelecting ? '選択を終了' : 'シリーズ';
+    dom.seriesMode.setAttribute('aria-pressed', String(state.seriesSelecting));
+    dom.seriesBar.hidden = !state.seriesSelecting;
+    dom.seriesCount.textContent = state.seriesSelected.size + '本選択中';
+    dom.seriesGroup.disabled = !allowed || state.seriesSelected.size < 2;
+    dom.seriesRemove.disabled = !allowed || !state.seriesSelected.size;
   }
 
   function renderFilterOptions(videos) {
