@@ -23,3 +23,15 @@ html[data-video-mask-metadata="1"] #videoPlayerPage .videoRelated .videoCardLabe
   border-color: #000 !important;
 }
 /* Do not black out playback controls, buttons, status messages, or section names. */
+
+/* Selecting masked words must not reveal them via the selection foreground. */
+html[data-video-mask-metadata="1"] #videoPlayerPage :is(
+  .videoPlayerTitle, .videoPlayerCategory, .videoPlayerTags,
+  .videoPlayerDescription p, .videoPlayerDescription p *,
+  .videoRelated .videoCardTitle, .videoRelated .videoCardMeta,
+  .videoRelated .videoCardLabels, .videoRelated .videoCardLabels *
+)::selection {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  background: #000 !important;
+}
