@@ -150,7 +150,8 @@
     let result;
     if (frame.requestFullscreen) result = frame.requestFullscreen();
     else if (frame.webkitRequestFullscreen) result = frame.webkitRequestFullscreen();
-    else if (video.webkitEnterFullscreen) result = video.webkitEnterFullscreen();
+    // Native iOS fullscreen escapes page-level CSS and could reveal a masked video.
+    else if (video.webkitEnterFullscreen && document.documentElement.getAttribute('data-video-mask-video') !== '1') result = video.webkitEnterFullscreen();
     if (result && typeof result.catch === 'function') result.catch(() => {});
   };
   full.addEventListener('click', toggleFullscreen);
