@@ -301,14 +301,16 @@
         event.target.value = '';
       });
     }
-    elements.url.addEventListener('change', () => {
+    const refreshUrlFields = () => {
       const classified = Data.classifyVideoUrl(elements.url.value);
       const fields = classified.kind === 'invalid' ? null : Data.storageFieldsForVideoUrl(elements.url.value);
       elements.thumbnailTime.disabled = !Data.isDirectVideoUrl(elements.url.value);
       if (!fields) return;
       elements.service.value = fields.a;
       elements.legacyId.value = fields.b;
-    });
+    };
+    elements.url.addEventListener('input', refreshUrlFields);
+    elements.url.addEventListener('change', refreshUrlFields);
     let saving = false;
     let needsFollowUpSave = false;
     let autoSaveTimer = null;
