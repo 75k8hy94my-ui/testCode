@@ -27,12 +27,12 @@
           await deps.loadScript('video-data.js?v=20261026-url-bookmarks', 'spaVideoData');
           await deps.loadScript('manga-list-pagination-events.js?v=20261012-video-pagination', 'spaMangaPaginationEvents');
           await deps.loadScript('video-library-pagination.js?v=20261012-video-pagination', 'spaVideoLibraryPagination');
-          await deps.loadScript('video-thumbnail-cache.js?v=20261012-indexeddb-thumbs', 'spaVideoThumbnailCache');
-          await deps.loadScript('video-thumbnail-renderer.js?v=20261012-uniform-size', 'spaVideoThumbnailRenderer');
+          await deps.loadScript('video-thumbnail-cache.js?v=20261026-retention', 'spaVideoThumbnailCache');
+          await deps.loadScript('video-thumbnail-renderer.js?v=20261026-retention', 'spaVideoThumbnailRenderer');
           await deps.loadScript('video-card.js?v=20261026-url-bookmarks', 'spaVideoCard');
           await deps.loadScript('video-custom-properties.js?v=20261012-video-custom-properties', 'spaVideoCustomProperties');
           await deps.loadScript('video-custom-property-store.js?v=20261012-video-custom-properties', 'spaVideoCustomPropertyStore');
-          await deps.loadScript('video-library.js?v=20261026-url-bookmarks', 'spaVideoLibrary');
+          await deps.loadScript('video-library.js?v=20261026-thumbnail-retention-url-bookmarks', 'spaVideoLibrary');
         })().catch((error) => {
           bootPromise = null;
           throw error;
@@ -41,7 +41,7 @@
       await bootPromise;
       if (canReadProtectedData() && !helperPromise) {
         helperPromise = (async () => {
-          await deps.loadScript('video-routing-fix.js?v=20261026-url-bookmarks', 'spaVideoRouting');
+          await deps.loadScript('video-routing-fix.js?v=20261026-thumbnail-retention-url-bookmarks', 'spaVideoRouting');
           await deps.loadScript('video-thumbnail-time.js?v=20261009-vault-sync-queue', 'spaVideoThumbnailTime');
         })().catch((error) => {
           helperPromise = null;

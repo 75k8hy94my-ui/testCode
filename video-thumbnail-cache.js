@@ -1,12 +1,28 @@
 (function(root){
   'use strict';
   const NAME='testCodeVideoThumbnailCache', STORE='frames', VERSION=1;
-  const MAX_ITEMS=300, MAX_BYTES=30*1024*1024;
-  let dbPromise;
-  const failed=new Set(), pending=new Map();
+  // Long-lived IndexedDB cache (no time-based expiry); recently viewed items
+  // must count as recent, even when they were originally saved months ago.
+  const MAX_ITEMS=900, MAX_BYTES=96*1024*1024;
+  const HOT_ITEMS=120, HOT_BYTES=20*1024*1024;
+  const FAILED_RETRY_MS=5*60*1000;
+  let dbPromise, hotBytes=0;
+  const hot=new Map(), failed=new Map(), pending=new Map();
+  function clearHot(){hot.clear();hotBytes=0;}
+  function remember(k,blob){
+    if(!blob||!permitted()||blob.size>HOT_BYTES)return;
+    if(hot.has(k)){hotBytes-=hot.get(k).size;hot.delete(k);}
+    hot.set(k,blob);hotBytes+=blob.size;
+    while(hot.size>HOT_ITEMS||hotBytes>HOT_BYTES){
+      const oldest=hot.keys().next().value;
+      hotBytes-=hot.get(oldest).size;hot.delete(oldest);
+    }
+  }
   function permitted(){
     const gate=root.MangaReaderMediaAccess;
-    return !!(gate && typeof gate.canReadProtectedData==='function' && gate.canReadProtectedData());
+    const allowed=!!(gate && typeof gate.canReadProtectedData==='function' && gate.canReadProtectedData());
+    if(!allowed)clearHot();
+    return allowed;
   }
   function database(){
     if(!root.indexedDB) return Promise.resolve(null);
@@ -29,35 +45,70 @@
     return Array.from(new Uint8Array(digest),x=>x.toString(16).padStart(2,'0')).join('');
   }
   async function read(url,time){
-    if(!permitted()) return null;
+    if(!permitted())return null;
     try{
-      const k=await key(url,time), db=await database();
-      if(!k||!db||!permitted())return null;
-      return await new Promise(resolve=>{
-        const tx=db.transaction(STORE,'readonly'),req=tx.objectStore(STORE).get(k);
-        req.onsuccess=()=>resolve(permitted()&&req.result&&req.result.blob||null);
-        req.onerror=()=>resolve(null);
+      const k=await key(url,time);
+      if(!k||!permitted())return null;
+      if(hot.has(k)){
+        const blob=hot.get(k);remember(k,blob);
+        // Refresh the disk LRU as well, even for memory hits.
+        touch(k);
+        return permitted()?blob:null;
+      }
+      const db=await database();
+      if(!db||!permitted())return null;
+      const blob=await new Promise(resolve=>{
+        let found=null;
+        const tx=db.transaction(STORE,'readwrite'),store=tx.objectStore(STORE),req=store.get(k);
+        req.onsuccess=()=>{
+          if(!permitted()||!req.result||!req.result.blob)return;
+          found=req.result.blob;
+          store.put({...req.result,used:Date.now()});
+        };
+        tx.oncomplete=()=>resolve(found);
+        tx.onerror=()=>resolve(null);
+        tx.onabort=()=>resolve(null);
       });
+      if(blob&&permitted()){remember(k,blob);return blob;}
+      return null;
     }catch(_){return null;}
+  }
+  async function touch(k){
+    try{
+      const db=await database();
+      if(!db||!permitted())return;
+      const tx=db.transaction(STORE,'readwrite'),store=tx.objectStore(STORE);
+      const req=store.get(k);
+      req.onsuccess=()=>{if(req.result&&permitted())store.put({...req.result,used:Date.now()});};
+    }catch(_){/* The in-memory cache is still usable. */}
   }
   async function write(url,time,blob){
     if(!permitted()||!blob||blob.size>300*1024)return;
     try{
-      const k=await key(url,time),db=await database();
-      if(!k||!db||!permitted())return;
-      await new Promise(resolve=>{
+      const k=await key(url,time);
+      if(!k||!permitted())return;
+      // Keep a short-term cache even when IndexedDB is unavailable or full.
+      remember(k,blob);
+      const db=await database();
+      if(!db||!permitted())return;
+      const saved=await new Promise(resolve=>{
         const tx=db.transaction(STORE,'readwrite');
         tx.objectStore(STORE).put({key:k,blob,bytes:blob.size,used:Date.now()});
-        tx.oncomplete=resolve;tx.onerror=resolve;tx.onabort=resolve;
+        tx.oncomplete=()=>resolve(true);tx.onerror=()=>resolve(false);tx.onabort=()=>resolve(false);
       });
+      if(!saved)return;
       // Keep the cache bounded even on browsers with generous storage quotas.
       const entries=await new Promise(resolve=>{
         const tx=db.transaction(STORE,'readonly'),req=tx.objectStore(STORE).getAll();
         req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>resolve([]);
       });
       entries.sort((a,b)=>(b.used||0)-(a.used||0));
-      let total=0;const remove=[];
-      entries.forEach((entry,i)=>{total+=entry.bytes||entry.blob&&entry.blob.size||0;if(i>=MAX_ITEMS||total>MAX_BYTES)remove.push(entry.key);});
+      let total=0,kept=0;const remove=[];
+      entries.forEach(entry=>{
+        const size=entry.bytes||(entry.blob&&entry.blob.size)||0;
+        if(kept>=MAX_ITEMS||total+size>MAX_BYTES)remove.push(entry.key);
+        else{total+=size;kept++;}
+      });
       if(remove.length)await new Promise(resolve=>{
         const tx=db.transaction(STORE,'readwrite'),os=tx.objectStore(STORE);
         remove.forEach(k=>os.delete(k));
@@ -68,7 +119,9 @@
   function capture(url,time){
     if(!permitted())return Promise.resolve(null);
     const signature=String(url)+'\n'+time;
-    if(failed.has(signature))return Promise.resolve(null);
+    const lastFailure=failed.get(signature);
+    if(lastFailure&&Date.now()-lastFailure<FAILED_RETRY_MS)return Promise.resolve(null);
+    failed.delete(signature);
     if(pending.has(signature))return pending.get(signature);
     const job=new Promise(resolve=>{
       if(!root.document||!root.document.createElement){resolve(null);return;}
@@ -78,7 +131,8 @@
       const finish=blob=>{
         if(done)return;done=true;clearTimeout(timer);video.pause();video.removeAttribute('src');
         try{video.load();}catch(_){}
-        if(!blob)failed.add(signature);
+        if(!blob)failed.set(signature,Date.now());
+        else failed.delete(signature);
         resolve(blob||null);
       };
       const timer=setTimeout(()=>finish(null),12000);
@@ -103,16 +157,23 @@
     }).finally(()=>pending.delete(signature));
     pending.set(signature,job);return job;
   }
-  async function getOrCapture(url,time){
+  async function captureAndStore(url,time){
     if(!permitted())return null;
     const t=Math.max(0,Number(time)||0.1);
-    const cached=await read(url,t);
-    if(cached)return cached;
     const blob=await capture(url,t);
     if(blob&&permitted())await write(url,t,blob);
     return permitted()?blob:null;
   }
-  const api=Object.freeze({read,getOrCapture,permitted});
+  async function getOrCapture(url,time){
+    if(!permitted())return null;
+    const t=Math.max(0,Number(time)||0.1);
+    const cached=await read(url,t);
+    return cached||captureAndStore(url,t);
+  }
+  if(root.document&&typeof root.document.addEventListener==='function'){
+    root.document.addEventListener('manga-reader-vpn-status',()=>{if(!permitted())clearHot();});
+  }
+  const api=Object.freeze({read,getOrCapture,captureAndStore,permitted});
   root.MangaReaderVideoThumbnailCache=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

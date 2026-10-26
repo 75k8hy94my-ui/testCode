@@ -200,9 +200,9 @@ test('the video overlay remains independent of seek and marker controls', () => 
 test('the centered button and hidden-controls state have accessible responsive styles', () => {
   const css = fs.readFileSync(new URL('../home-profile-shell.css', import.meta.url), 'utf8');
   const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
-  assert.match(css, /\\.customVideoPlayer\\.controlsVisible \\.customVideoCenterPlay/);
-  assert.match(css, /\\.customVideoPlayer:not\\(\\.controlsVisible\\) \\.customVideoControls/);
+  assert.match(css, /\.customVideoPlayer\.controlsVisible \.customVideoCenterPlay/);
+  assert.match(css, /\.customVideoPlayer:not\(\.controlsVisible\) \.customVideoControls/);
   assert.match(css, /pointer-events: none/);
-  assert.match(css, /\\.customVideoCenterPlay:focus-visible/);
-  assert.match(html, /video-player-controls\\.js\\?v=20261026-video-privacy/);
+  assert.match(css, /\.customVideoCenterPlay:focus-visible/);
+  assert.match(html, /video-player-controls\.js\?v=20261026-video-privacy/);
 });

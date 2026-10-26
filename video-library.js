@@ -736,7 +736,9 @@
     dom.prevPage.disabled = state.page <= 1;
     dom.nextPage.disabled = state.page >= state.totalPages;
     dom.pageLabel.textContent = state.page + ' / ' + state.totalPages;
-    const resultsKey = JSON.stringify([state.view, state.showHidden, state.page, pageModel.items]);
+    // Reuse existing thumbnail nodes when only watch-count bookkeeping changes.
+    const visibleItems = pageModel.items.map(({ openCount, lastOpenedAt, updatedAt, ...visual }) => visual);
+    const resultsKey = JSON.stringify([state.view, state.showHidden, state.page, visibleItems]);
     // Keep loaded thumbnail elements when returning to an unchanged video list.
     if (resultsKey === renderedResultsKey) { acknowledgeReturnIntent(pageModel.items); return; }
     renderedResultsKey = resultsKey;
