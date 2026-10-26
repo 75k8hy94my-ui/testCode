@@ -44,11 +44,12 @@ function createPlayer(saved = {}, options = {}) {
   video.pause = () => { video.paused = true; video.emit('pause'); };
   video.play = () => { video.paused = false; video.emit('play'); };
   const documentEvents = new Map();
+  const documentCaptureEvents = new Map();
   const document = {
     querySelector: (selector) => selector === '#videoPlayerPage video' ? video : null,
     createElement: (tag) => new Node(tag.toUpperCase()),
-    addEventListener(type, listener) { documentEvents.set(type, listener); },
-    removeEventListener(type) { documentEvents.delete(type); },
+    addEventListener(type, listener, capture) { (capture === true ? documentCaptureEvents : documentEvents).set(type, listener); },
+    removeEventListener(type, listener, capture) { (capture === true ? documentCaptureEvents : documentEvents).delete(type); },
     activeElement: null,
   };
   const events = [];
@@ -58,14 +59,19 @@ function createPlayer(saved = {}, options = {}) {
     window.MangaVault = options.vault;
   }
   class CustomEvent { constructor(type) { this.type = type; } }
-  vm.runInNewContext(controls, { window, document, location: { search: '?id=clip' }, localStorage, URLSearchParams, CustomEvent, crypto: { randomUUID: () => 'test-id' }, setTimeout: () => 1, clearTimeout() {} });
+  vm.runInNewContext(controls, {
+    window, document, location: { search: '?id=clip' }, localStorage, URLSearchParams, CustomEvent,
+    crypto: { randomUUID: () => 'test-id' },
+    setTimeout: options.timers?.setTimeout || (() => 1),
+    clearTimeout: options.timers?.clearTimeout || (() => {}),
+  });
   const centerPlay = frame.children.find((node) => node.className === 'customVideoCenterPlay');
   const frameControls = frame.children.find((node) => node.className === 'customVideoControls');
   const seekWrap = frameControls.children.find((node) => node.className === 'customVideoSeekWrap');
   const markerToggle = frameControls.children.find((node) => node.textContent === '秒数登録');
   const panel = frame.children.find((node) => node.className === 'videoMarkerPanel');
   const choices = panel.children[0]; const add = panel.children[1];
-  return { frame, video, centerPlay, frameControls, seekWrap, markerToggle, panel, choices, add, saved, documentEvents, events };
+  return { frame, video, centerPlay, frameControls, seekWrap, markerToggle, panel, choices, add, saved, document, documentEvents, documentCaptureEvents, events, window };
 }
 
 test('timestamp registration offers only the four canonical icons without name or seconds fields', () => {
@@ -205,4 +211,90 @@ test('the centered button and hidden-controls state have accessible responsive s
   assert.match(css, /pointer-events: none/);
   assert.match(css, /\.customVideoCenterPlay:focus-visible/);
   assert.match(html, /video-player-controls\.js\?v=20261026-video-privacy/);
+});
+
+
+function clock() {
+  let serial = 0;
+  const pending = new Map();
+  return {
+    setTimeout(callback, delay) { const id = ++serial; pending.set(id, { callback, delay }); return id; },
+    clearTimeout(id) { pending.delete(id); },
+    flush(delay = 2500) {
+      const due = [...pending.entries()].filter(([, entry]) => entry.delay <= delay);
+      due.forEach(([id]) => pending.delete(id));
+      due.forEach(([, entry]) => entry.callback());
+    },
+  };
+}
+
+test('playing hides both overlays after 2.5 seconds even while seek range retains focus', () => {
+  const timers = clock();
+  const player = createPlayer({}, { timers });
+  const seek = player.seekWrap.children.find((node) => node.className === 'customVideoSeek');
+  player.document.activeElement = seek;
+  player.centerPlay.emit('click', { stopPropagation() {} });
+  assert.equal(player.frame.classList.contains('controlsVisible'), true);
+  player.frameControls.emit('focusin');
+  timers.flush();
+  assert.equal(player.video.paused, false);
+  assert.equal(player.frame.classList.contains('controlsVisible'), false, 'stale range focus must not pin controls open');
+
+  player.frame.emit('mousemove');
+  assert.equal(player.frame.classList.contains('controlsVisible'), true);
+  timers.flush();
+  assert.equal(player.frame.classList.contains('controlsVisible'), false);
+
+  player.frameControls.emit('pointerdown');
+  timers.flush();
+  assert.equal(player.frame.classList.contains('controlsVisible'), true, 'dragging slider must retain controls');
+  player.frame.emit('pointerup');
+  timers.flush();
+  assert.equal(player.frame.classList.contains('controlsVisible'), false);
+
+  player.centerPlay.emit('click', { stopPropagation() {} });
+  assert.equal(player.video.paused, true);
+  timers.flush();
+  assert.equal(player.frame.classList.contains('controlsVisible'), true, 'paused state remains actionable');
+});
+
+test('Space always toggles playback over focused seek range without scrolling or changing seek position', () => {
+  const player = createPlayer();
+  const seek = player.seekWrap.children.find((node) => node.className === 'customVideoSeek');
+  const handleDown = player.documentCaptureEvents.get('keydown');
+  const handleUp = player.documentCaptureEvents.get('keyup');
+  let prevented = 0;
+  let propagated = 0;
+  const press = (target, extra = {}) => handleDown({
+    key: ' ', code: 'Space', target, repeat: false,
+    preventDefault() { prevented++; }, stopPropagation() { propagated++; },
+    ...extra,
+  });
+  const startingTime = player.video.currentTime;
+  press(seek);
+  assert.equal(player.video.paused, false);
+  assert.equal(player.video.currentTime, startingTime);
+  press(seek, { repeat: true });
+  assert.equal(player.video.paused, false, 'key repeat must not repeatedly toggle');
+  handleUp({ key: ' ', preventDefault() { prevented++; }, stopPropagation() { propagated++; } });
+  press(seek);
+  assert.equal(player.video.paused, true);
+  assert.equal(prevented, 4);
+  assert.equal(propagated, 4);
+
+  press({ tagName: 'INPUT', type: 'text' });
+  press({ tagName: 'TEXTAREA' });
+  press({ tagName: 'DIV', isContentEditable: true });
+  press({ tagName: 'BUTTON' }); // External page action retains normal Space activation.
+  assert.equal(player.video.paused, true);
+  assert.equal(prevented, 4);
+});
+
+test('capture keyboard listeners are removed on player disposal', () => {
+  const player = createPlayer();
+  assert.ok(player.documentCaptureEvents.has('keydown'));
+  assert.ok(player.documentCaptureEvents.has('keyup'));
+  player.window.MangaReaderVideoPlayerControls.destroy();
+  assert.equal(player.documentCaptureEvents.has('keydown'), false);
+  assert.equal(player.documentCaptureEvents.has('keyup'), false);
 });
