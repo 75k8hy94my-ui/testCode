@@ -19,7 +19,7 @@
   };
 
   const state = {
-    baseVideos: [], folders: [], meta: {}, query: '', quick: 'all', folderId: '', tag: '', service: '', sort: 'recent-added', view: 'card', thumbnailSize: 'normal', page: 1, totalPages: 1,
+    baseVideos: [], folders: [], meta: {}, query: '', quick: 'all', folderId: '', tag: '', service: '', kind: 'all', sort: 'recent-added', view: 'card', thumbnailSize: 'normal', page: 1, totalPages: 1,
     syncTimer: null, syncRunning: false, syncDirty: false, syncPromise: null, editorSaving: false, editorId: null, sheetMode: null, showHidden: false, customDefinitions: { schemaVersion: 1, properties: {} }, customValues: {}, customFilters: {},
   };
   const dom = {};
@@ -38,7 +38,7 @@
   function captureReturnContext(videoId) {
     if (!videoId) return;
     const scoped = effectiveVideos().filter(video => video.hidden === state.showHidden);
-    const visible = Data.filterVideos(scoped, { showHidden: state.showHidden, query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
+    const visible = Data.filterVideos(scoped, { showHidden: state.showHidden, query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, kind: state.kind, videoMeta: state.meta, folders: state.folders });
     const filtered = CustomProperties ? visible.filter(video => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, Object.values(state.customFilters))) : visible;
     const ordered = Data.sortVideos(filtered, state.sort);
     const context = {
@@ -47,7 +47,7 @@
       // list order for this one return instead of moving it to page 1.
       orderIds: ordered.length <= 10000 ? ordered.map(video => String(video.id)) : null,
       showHidden: state.showHidden, query: state.query, quick: state.quick,
-      folderId: state.folderId, tag: state.tag, service: state.service,
+      folderId: state.folderId, tag: state.tag, service: state.service, kind: state.kind,
       customFilters: state.customFilters,
     };
     try { sessionStorage.setItem(RETURN_VIEW_KEY, JSON.stringify(context)); } catch (_) {}
@@ -88,6 +88,7 @@
       state.folderId = typeof saved.folderId === 'string' ? saved.folderId : '';
       state.tag = typeof saved.tag === 'string' ? saved.tag : '';
       state.service = typeof saved.service === 'string' ? saved.service : '';
+      state.kind = ['all', 'direct', 'bookmark'].includes(saved.kind) ? saved.kind : 'all';
       state.customFilters = saved.customFilters && typeof saved.customFilters === 'object' && !Array.isArray(saved.customFilters)
         ? saved.customFilters : {};
       if (dom.search) dom.search.value = state.query;
@@ -172,8 +173,9 @@
     state.view = prefs.view === 'compact' ? 'compact' : 'card';
     state.thumbnailSize = ['small', 'normal', 'large'].includes(prefs.thumbnailSize) ? prefs.thumbnailSize : 'normal';
     state.quick = ['all', 'favorite', 'later', 'watching', 'watched'].includes(prefs.quick) ? prefs.quick : 'all';
+    state.kind = ['all', 'direct', 'bookmark'].includes(prefs.kind) ? prefs.kind : 'all';
   }
-  function savePrefs() { writeJson(PREF_KEY, { sort: state.sort, view: state.view, thumbnailSize: state.thumbnailSize, quick: state.quick }); }
+  function savePrefs() { writeJson(PREF_KEY, { sort: state.sort, view: state.view, thumbnailSize: state.thumbnailSize, quick: state.quick, kind: state.kind }); }
 
   function loadLibraryState() {
     if (!canReadProtectedData()) {
@@ -460,6 +462,7 @@
         <select id="videoLibraryFolder" aria-label="フォルダ"><option value="">全フォルダ</option></select>
         <select id="videoLibraryTag" aria-label="タグ"><option value="">全タグ</option></select>
         <select id="videoLibraryService" aria-label="サービス"><option value="">全サービス</option></select>
+        <select id="videoLibraryKind" aria-label="リンクの種類"><option value="all">すべての種類</option><option value="direct">直リンク動画</option><option value="bookmark">ブックマーク</option></select>
         <select id="videoLibrarySort" aria-label="並べ替え"></select>
         <button id="videoLibraryView" class="vl-icon-btn" type="button" aria-label="表示形式を切り替え">表示</button>
         <label class="vl-thumbnail-size-label" for="videoLibraryThumbnailSize">サムネイルサイズ <select id="videoLibraryThumbnailSize" aria-label="動画一覧のサムネイルサイズ"><option value="small">小</option><option value="normal">標準</option><option value="large">大</option></select></label>
@@ -512,7 +515,7 @@
 
     Object.assign(dom, {
       section, app, search: document.getElementById('videoLibrarySearch'), quick: document.getElementById('videoLibraryQuick'),
-      folder: document.getElementById('videoLibraryFolder'), tag: document.getElementById('videoLibraryTag'), service: document.getElementById('videoLibraryService'),
+      folder: document.getElementById('videoLibraryFolder'), tag: document.getElementById('videoLibraryTag'), service: document.getElementById('videoLibraryService'), kind: document.getElementById('videoLibraryKind'),
       sort: document.getElementById('videoLibrarySort'), view: document.getElementById('videoLibraryView'), thumbnailSize: document.getElementById('videoLibraryThumbnailSize'), foldersBtn: document.getElementById('videoLibraryFolders'),
       customFilters: document.getElementById('videoLibraryCustomFilters'),
       add: document.getElementById('videoLibraryAdd'), shorts: document.getElementById('videoLibraryShorts'), hiddenBtn: document.getElementById('videoLibraryHidden'), count: document.getElementById('videoLibraryCount'), status: document.getElementById('videoLibraryStatus'), results: document.getElementById('videoLibraryResults'),
@@ -552,9 +555,10 @@
     const VideoCard = window.MangaReaderVideoCard;
     if (!VideoCard || typeof VideoCard.create !== 'function') throw new Error('video card component is unavailable');
     const title = Data.displayTitle(video, effectiveVideos());
+    const isBookmark = Data.videoEntryKind(video, state.meta[String(video.id)]) === 'bookmark';
     const metadata = [];
     const service = Data.deriveService(video.url, video.a);
-    if (service) metadata.push(service);
+    if (service && !isBookmark) metadata.push(service);
     if (video.folderId && folderName(video.folderId)) metadata.push(folderName(video.folderId));
     if (video.watchStatus && STATUS_LABELS[video.watchStatus]) metadata.push(STATUS_LABELS[video.watchStatus]);
     if (video.lastOpenedAt) metadata.push(formatDate(video.lastOpenedAt));
@@ -589,7 +593,9 @@
     }
     const card = VideoCard.create(cardMedia, {
       documentRef: document, layout: state.view === 'compact' ? 'compact' : 'grid', openClass: 'vl-open',
-      title, metadata, tags: Array.isArray(video.tags) ? video.tags : [], customLabels, progressPercent: progressPercent(video),
+      bookmark: isBookmark, openHref: isBookmark ? video.url : null, serviceLabel: service,
+      title, metadata, tags: Array.isArray(video.tags) ? video.tags : [], customLabels,
+      progressPercent: isBookmark ? null : progressPercent(video),
       thumbnailRenderer: window.MangaReaderVideoThumbnailRenderer,
       thumbnailOptions: { fallbackClass: 'vl-thumb-fallback', videoClass: 'vl-thumb-direct-video', serviceLabel: service || 'VIDEO' },
       onOpen: () => openVideo(video.id),
@@ -608,6 +614,7 @@
     fillSelect(dom.tag, tags.map((tag) => ({ value: tag, label: '#' + tag })), currentTag, '全タグ');
     const services = [...new Set(videos.map((video) => Data.deriveService(video.url, video.a)).filter(Boolean))].sort();
     fillSelect(dom.service, services.map((service) => ({ value: service, label: service })), currentService, '全サービス');
+    dom.kind.value = state.kind;
     dom.sort.replaceChildren(); Object.entries(SORT_LABELS).forEach(([value, label]) => { const option = document.createElement('option'); option.value = value; option.textContent = label; dom.sort.append(option); }); dom.sort.value = state.sort;
     fillSelect(dom.editFolder, state.folders.map((folder) => ({ value: folder.id, label: folder.name })), dom.editFolder.value, '未分類');
   }
@@ -670,7 +677,7 @@
       clearReturnIntent();
       state.showHidden = false;
       state.page = 1;
-      state.query = ''; state.quick = 'all'; state.folderId = ''; state.tag = ''; state.service = ''; state.customFilters = {};
+      state.query = ''; state.quick = 'all'; state.folderId = ''; state.tag = ''; state.service = ''; state.kind = 'all'; state.customFilters = {};
       if (dom.search) dom.search.value = '';
       return;
     }
@@ -678,7 +685,7 @@
     restoreReturnContext(targetId);
     const findInCurrentView = () => {
       const scoped = all.filter(video => video.hidden === state.showHidden);
-      const visible = Data.filterVideos(scoped, { showHidden: state.showHidden, query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
+      const visible = Data.filterVideos(scoped, { showHidden: state.showHidden, query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, kind: state.kind, videoMeta: state.meta, folders: state.folders });
       const filtered = CustomProperties ? visible.filter(video => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, Object.values(state.customFilters))) : visible;
       return sortForReturn(filtered);
     };
@@ -688,7 +695,7 @@
       const target = all.find(video => String(video.id) === targetId);
       if (target) {
         state.showHidden = false;
-        state.query = ''; state.quick = 'all'; state.folderId = ''; state.tag = ''; state.service = ''; state.customFilters = {};
+        state.query = ''; state.quick = 'all'; state.folderId = ''; state.tag = ''; state.service = ''; state.kind = 'all'; state.customFilters = {};
         if (dom.search) dom.search.value = '';
         list = findInCurrentView();
         index = list.findIndex(video => String(video.id) === targetId);
@@ -711,7 +718,7 @@
     const scoped = all.filter((video) => video.hidden === state.showHidden);
     renderFilterOptions(scoped);
     renderCustomFilters();
-    const baseFiltered = Data.filterVideos(scoped, { showHidden: state.showHidden, query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, folders: state.folders });
+    const baseFiltered = Data.filterVideos(scoped, { showHidden: state.showHidden, query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, kind: state.kind, videoMeta: state.meta, folders: state.folders });
     const filters = Object.values(state.customFilters);
     const filtered = CustomProperties ? baseFiltered.filter((video) => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, filters)) : baseFiltered;
     const videos = sortForReturn(filtered);
@@ -1019,6 +1026,7 @@
     dom.folder.addEventListener('change', () => { clearReturnIntent(); state.folderId = dom.folder.value; render(); });
     dom.tag.addEventListener('change', () => { clearReturnIntent(); state.tag = dom.tag.value; render(); });
     dom.service.addEventListener('change', () => { clearReturnIntent(); state.service = dom.service.value; render(); });
+    dom.kind.addEventListener('change', () => { clearReturnIntent(); state.kind = dom.kind.value; state.page = 1; savePrefs(); render(); });
     dom.sort.addEventListener('change', () => { clearReturnIntent(); state.sort = dom.sort.value; savePrefs(); render(); });
     dom.view.addEventListener('click', () => { clearReturnIntent(); state.view = state.view === 'card' ? 'compact' : 'card'; savePrefs(); render(); });
     dom.thumbnailSize.addEventListener('change', () => { state.thumbnailSize = ['small', 'normal', 'large'].includes(dom.thumbnailSize.value) ? dom.thumbnailSize.value : 'normal'; savePrefs(); dom.app.dataset.thumbnailSize = state.thumbnailSize; });
