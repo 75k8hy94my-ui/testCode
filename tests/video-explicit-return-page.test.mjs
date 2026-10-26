@@ -10,7 +10,7 @@ test('player header propagates origin and list resolves target by id',()=>{
  assert.match(read('video-player-page.js'),/destination\.searchParams\.set\('returnPage', String\(validReturnPage\)\)/);
  const list=read('video-library.js');
  assert.match(list,/params\.get\('returnPage'\)/);
- assert.match(list,/list\.slice\(pageStart, pageStart \+ Pagination\.PAGE_SIZE\)\.some/);
+ assert.match(list,/boxes\.slice\(pageStart, pageStart \+ Pagination\.PAGE_SIZE\)\.some/);
  assert.match(list,/\? candidate : calculatedPage/);
 });
 test('assets are refreshed to avoid stale SPA scripts',()=>{

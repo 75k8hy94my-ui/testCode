@@ -20,6 +20,7 @@
 
   const state = {
     baseVideos: [], folders: [], meta: {}, query: '', quick: 'all', folderId: '', tag: '', service: '', kind: 'all', sort: 'recent-added', view: 'card', thumbnailSize: 'normal', page: 1, totalPages: 1,
+    seriesSelecting: false, seriesSelected: new Set(), expandedSeries: new Set(),
     syncTimer: null, syncRunning: false, syncDirty: false, syncPromise: null, editorSaving: false, editorId: null, sheetMode: null, showHidden: false, customDefinitions: { schemaVersion: 1, properties: {} }, customValues: {}, customFilters: {},
   };
   const dom = {};
@@ -130,7 +131,9 @@
   }
 
   function acknowledgeReturnIntent(pageItems) {
-    if (!returnIntent || !pageItems.some(video => String(video.id) === returnIntent.id)) return;
+    if (!returnIntent || !pageItems.some(item => item.kind === 'series'
+      ? item.videos.some(video => String(video.id) === returnIntent.id)
+      : String(item.video.id) === returnIntent.id)) return;
     // Only acknowledge a return once the matching card actually exists in the
     // displayed page. Retain returnIntent for later Vault/SPA re-render events.
     if (!Array.from(dom.results.querySelectorAll('.vl-card')).some(card => card.dataset.videoId === returnIntent.id)) return;
@@ -426,6 +429,19 @@
       @media(max-width:700px){.vl-top{flex-wrap:wrap}.vl-search{flex:1 0 100%}.vl-top #videoLibraryAdd,.vl-top #videoLibraryShorts,.vl-top #videoLibraryHidden,.vl-top #videoLibraryProperties{flex:1}.vl-filters{grid-template-columns:1fr 1fr 1fr}.vl-filters #videoLibrarySort{grid-column:span 1}.vl-grid{grid-template-columns:1fr 1fr}.vl-sheet-panel{border-radius:24px 24px 18px 18px}.vl-two{grid-template-columns:1fr}}
       @media(max-width:480px){.vl-top{align-items:stretch}.vl-primary{padding:0 12px}.vl-filters{grid-template-columns:1fr 1fr}.vl-grid{grid-template-columns:1fr}.vl-grid.compact .vl-card{grid-template-columns:104px minmax(0,1fr)}.vl-grid.compact .vl-thumb{height:72px}.vl-grid.compact .vl-body{padding-right:66px}.vl-summary{padding:0 2px}}
     `;
+    style.textContent += `
+      .vl-series-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-soft);color:var(--text);font-size:13px}
+      .vl-series-bar[hidden]{display:none!important}.vl-series-bar span{margin-right:auto}.vl-series-bar button{min-height:38px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2);color:var(--text);padding:0 12px;font-weight:700}.vl-series-bar button:disabled{opacity:.45}
+      .vl-series{grid-column:1/-1;border:1px solid var(--border);background:var(--bg-soft);border-radius:16px;padding:10px;min-width:0}
+      .vl-series-heading{display:flex;align-items:center;gap:12px;min-height:48px}
+      .vl-series-toggle{flex:1;text-align:left;border:0;background:transparent;color:var(--text);font-weight:800;font-size:15px;padding:12px;cursor:pointer}
+      .vl-series-select-all{display:inline-flex;align-items:center;gap:6px;color:var(--text);font-size:12px;white-space:nowrap;padding:8px}
+      .vl-series-videos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:8px 2px 2px}
+      .vl-card{position:relative}.vl-series-pick{position:absolute;right:8px;top:8px;z-index:8;display:inline-flex;align-items:center;gap:5px;padding:7px 9px;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:9px;font-size:12px;font-weight:700;cursor:pointer}
+      .vl-series-pick input,.vl-series-select-all input{accent-color:var(--accent);width:16px;height:16px}
+      @media(max-width:700px){.vl-series-videos{grid-template-columns:repeat(2,minmax(0,1fr))}.vl-top #videoLibrarySeriesMode{flex:1}}
+      @media(max-width:480px){.vl-series-videos{grid-template-columns:minmax(0,1fr)}.vl-series-bar button{flex:1}.vl-series-heading{gap:3px}}
+    `;
     document.head.appendChild(style);
   }
 
@@ -450,6 +466,7 @@
         <a id="videoLibraryProperties" class="vl-secondary" href="video-properties.html">プロパティ設定</a>
         <button id="videoLibraryShorts" class="vl-primary vl-shorts" type="button">縦スワイプ再生</button>
         <button id="videoLibraryHidden" class="vl-icon-btn" type="button">非表示</button>
+        <button id="videoLibrarySeriesMode" class="vl-icon-btn" type="button" aria-pressed="false">シリーズ</button>
       </div>
       <div id="videoLibraryQuick" class="vl-chips" aria-label="クイックフィルタ">
         <button class="vl-chip" data-quick="all" type="button">すべて</button>
@@ -468,6 +485,12 @@
         <label class="vl-thumbnail-size-label" for="videoLibraryThumbnailSize">サムネイルサイズ <select id="videoLibraryThumbnailSize" aria-label="動画一覧のサムネイルサイズ"><option value="small">小</option><option value="normal">標準</option><option value="large">大</option></select></label>
       </div>
       <details class="vl-custom-filter"><summary>カスタムプロパティで絞り込む</summary><div id="videoLibraryCustomFilters" class="vl-custom-filter-list"></div></details>
+      <div id="videoLibrarySeriesBar" class="vl-series-bar" hidden>
+        <span id="videoLibrarySeriesCount">0本選択中</span>
+        <button id="videoLibrarySeriesGroup" type="button">まとめる</button>
+        <button id="videoLibrarySeriesRemove" type="button">シリーズから外す</button>
+        <button id="videoLibrarySeriesCancel" type="button">キャンセル</button>
+      </div>
       <div class="vl-summary"><span id="videoLibraryCount"></span><span id="videoLibraryStatus" aria-live="polite"></span></div>
       <p id="videoLibraryAccessNotice" class="vl-access-notice" aria-live="polite" hidden>VPN接続を確認できるまで、動画データの読み込みと追加・編集を停止しています。</p>
       <div id="videoLibraryResults"></div>
@@ -518,6 +541,9 @@
       folder: document.getElementById('videoLibraryFolder'), tag: document.getElementById('videoLibraryTag'), service: document.getElementById('videoLibraryService'), kind: document.getElementById('videoLibraryKind'),
       sort: document.getElementById('videoLibrarySort'), view: document.getElementById('videoLibraryView'), thumbnailSize: document.getElementById('videoLibraryThumbnailSize'), foldersBtn: document.getElementById('videoLibraryFolders'),
       customFilters: document.getElementById('videoLibraryCustomFilters'),
+      seriesMode: document.getElementById('videoLibrarySeriesMode'), seriesBar: document.getElementById('videoLibrarySeriesBar'),
+      seriesCount: document.getElementById('videoLibrarySeriesCount'), seriesGroup: document.getElementById('videoLibrarySeriesGroup'),
+      seriesRemove: document.getElementById('videoLibrarySeriesRemove'), seriesCancel: document.getElementById('videoLibrarySeriesCancel'),
       add: document.getElementById('videoLibraryAdd'), shorts: document.getElementById('videoLibraryShorts'), hiddenBtn: document.getElementById('videoLibraryHidden'), count: document.getElementById('videoLibraryCount'), status: document.getElementById('videoLibraryStatus'), results: document.getElementById('videoLibraryResults'),
       pagination: document.getElementById('videoLibraryPagination'), prevPage: document.getElementById('videoLibraryPrevPage'), nextPage: document.getElementById('videoLibraryNextPage'), pageLabel: document.getElementById('videoLibraryPageLabel'),
       sheet, sheetTitle: document.getElementById('videoLibrarySheetTitle'), form: document.getElementById('videoLibraryForm'),
@@ -560,6 +586,7 @@
     const service = Data.deriveService(video.url, video.a);
     if (service && !isBookmark) metadata.push(service);
     if (video.folderId && folderName(video.folderId)) metadata.push(folderName(video.folderId));
+    if (video.seriesId && effectiveVideos().some(item => item.id !== video.id && item.seriesId === video.seriesId)) metadata.push('シリーズ');
     if (video.watchStatus && STATUS_LABELS[video.watchStatus]) metadata.push(STATUS_LABELS[video.watchStatus]);
     if (video.lastOpenedAt) metadata.push(formatDate(video.lastOpenedAt));
     if (video.openCount) metadata.push(video.openCount + '回');
@@ -599,12 +626,117 @@
       thumbnailRenderer: window.MangaReaderVideoThumbnailRenderer,
       thumbnailOptions: { fallbackClass: 'vl-thumb-fallback', videoClass: 'vl-thumb-direct-video', serviceLabel: service || 'VIDEO' },
       onOpen: () => openVideo(video.id),
-      menuActions: [{ label: video.favorite ? 'お気に入りを解除' : 'お気に入りに追加', onSelect: () => { updateMeta(video.id, { favorite: !video.favorite }); render(); } }],
+      menuActions: [{ label: video.favorite ? 'お気に入りを解除' : 'お気に入りに追加', onSelect: () => { updateMeta(video.id, { favorite: !video.favorite }); render(); } },
+        ...(video.seriesId && effectiveVideos().some(item => item.id !== video.id && item.seriesId === video.seriesId)
+          ? [{ label: 'シリーズから外す', onSelect: () => commitSeries('remove', [video.id]) }] : [])],
       editHref: 'video-edit.html?id=' + encodeURIComponent(video.id) + '&return=list',
     });
     card.classList.add('vl-card');
     card.dataset.videoId = String(video.id);
+    if (state.seriesSelecting) {
+      const pick = document.createElement('label');
+      pick.className = 'vl-series-pick';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = state.seriesSelected.has(String(video.id));
+      checkbox.setAttribute('aria-label', title + 'をシリーズ用に選択');
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) state.seriesSelected.add(String(video.id));
+        else state.seriesSelected.delete(String(video.id));
+        render();
+      });
+      pick.append(checkbox, document.createTextNode('選択'));
+      card.append(pick);
+    }
     return card;
+  }
+
+  function createSeriesCard(group) {
+    const section = document.createElement('section');
+    section.className = 'vl-series';
+    section.dataset.seriesId = group.id;
+    const heading = document.createElement('div');
+    heading.className = 'vl-series-heading';
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'vl-series-toggle';
+    const expanded = state.expandedSeries.has(group.id);
+    toggle.setAttribute('aria-expanded', String(expanded));
+    toggle.textContent = (expanded ? '▾ ' : '▸ ') + 'シリーズ · ' + group.videos.length + '本';
+    toggle.addEventListener('click', () => {
+      if (expanded) state.expandedSeries.delete(group.id);
+      else state.expandedSeries.add(group.id);
+      render();
+    });
+    heading.append(toggle);
+    if (state.seriesSelecting) {
+      const label = document.createElement('label');
+      label.className = 'vl-series-select-all';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = group.videos.every(video => state.seriesSelected.has(String(video.id)));
+      checkbox.setAttribute('aria-label', 'このシリーズ内の動画をすべて選択');
+      checkbox.addEventListener('change', () => {
+        group.videos.forEach(video => {
+          if (checkbox.checked) state.seriesSelected.add(String(video.id));
+          else state.seriesSelected.delete(String(video.id));
+        });
+        render();
+      });
+      label.append(checkbox, document.createTextNode('まとめて選択'));
+      heading.append(label);
+    }
+    section.append(heading);
+    if (expanded) {
+      const grid = document.createElement('div');
+      grid.className = 'vl-series-videos';
+      group.videos.forEach(video => grid.append(createCard(video)));
+      section.append(grid);
+    }
+    return section;
+  }
+
+  function commitSeries(action, videoIds) {
+    if (!canReadProtectedData()) return false;
+    // Rebase grouping on the latest local snapshot, including edits made on
+    // the standalone video details page.
+    loadLibraryState();
+    const plan = Data.planSeriesChanges(effectiveVideos(), videoIds, action, () => id('vs'));
+    const errors = {
+      selection: '動画を選択してください。',
+      minimum: 'シリーズにまとめるには2本以上選んでください。',
+      multiple: '別々のシリーズの動画を同時にまとめることはできません。',
+      id: 'シリーズを作成できませんでした。',
+      action: '操作を確認してください。',
+    };
+    if (plan.error) { setStatus(errors[plan.error] || 'シリーズを変更できませんでした。', true); return false; }
+    if (!Object.keys(plan.changes).length) { setStatus('シリーズの変更はありません。'); return false; }
+    const original = state.meta;
+    state.meta = { ...original };
+    const now = Date.now();
+    Object.entries(plan.changes).forEach(([videoId, seriesId]) => {
+      state.meta[videoId] = { ...(state.meta[videoId] || {}), seriesId, updatedAt: now };
+    });
+    if (!persistAux()) {
+      state.meta = original;
+      setStatus('シリーズを保存できませんでした。端末の保存状態を確認してください。', true);
+      return false;
+    }
+    state.seriesSelected.clear();
+    state.seriesSelecting = false;
+    render();
+    setStatus(action === 'group' ? 'シリーズにまとめました。' : 'シリーズから外しました。');
+    return true;
+  }
+
+  function updateSeriesControls() {
+    const allowed = canReadProtectedData();
+    dom.seriesMode.textContent = state.seriesSelecting ? '選択を終了' : 'シリーズ';
+    dom.seriesMode.setAttribute('aria-pressed', String(state.seriesSelecting));
+    dom.seriesBar.hidden = !state.seriesSelecting;
+    dom.seriesCount.textContent = state.seriesSelected.size + '本選択中';
+    dom.seriesGroup.disabled = !allowed || state.seriesSelected.size < 2;
+    dom.seriesRemove.disabled = !allowed || !state.seriesSelected.size;
   }
 
   function renderFilterOptions(videos) {
@@ -702,12 +834,24 @@
       }
     }
     if (index < 0) return;
-    const calculatedPage = Math.floor(index / Pagination.PAGE_SIZE) + 1;
+    // Pagination counts boxes rather than the individual grouped videos.
+    const boxes = Data.groupVideosBySeries(list);
+    const boxIndex = boxes.findIndex(item => item.kind === 'series'
+      ? item.videos.some(video => String(video.id) === targetId)
+      : String(item.video.id) === targetId);
+    if (boxIndex < 0) return;
+    // Open the returned member once, but let the user collapse it afterward.
+    if (boxes[boxIndex].kind === 'series' && !returnIntent.seriesRevealed) {
+      state.expandedSeries.add(boxes[boxIndex].id);
+      returnIntent.seriesRevealed = true;
+    }
+    const calculatedPage = Math.floor(boxIndex / Pagination.PAGE_SIZE) + 1;
     const originPage = returnIntent.page;
     const candidate = Number.isSafeInteger(originPage) && originPage > 0 ? originPage : calculatedPage;
     const pageStart = (candidate - 1) * Pagination.PAGE_SIZE;
-    state.page = list.slice(pageStart, pageStart + Pagination.PAGE_SIZE).some(video => String(video.id) === targetId)
-      ? candidate : calculatedPage;
+    state.page = boxes.slice(pageStart, pageStart + Pagination.PAGE_SIZE).some(item => item.kind === 'series'
+      ? item.videos.some(video => String(video.id) === targetId)
+      : String(item.video.id) === targetId) ? candidate : calculatedPage;
   }
 
   function render(pageDirection = 0) {
@@ -715,6 +859,8 @@
     restoreVideoPage();
     syncAccessUi();
     const all = effectiveVideos();
+    const validIds = new Set(all.map(video => String(video.id)));
+    for (const selectedId of state.seriesSelected) if (!validIds.has(selectedId)) state.seriesSelected.delete(selectedId);
     const scoped = all.filter((video) => video.hidden === state.showHidden);
     renderFilterOptions(scoped);
     renderCustomFilters();
@@ -729,7 +875,9 @@
     dom.hiddenBtn.textContent = state.showHidden ? '動画一覧' : '非表示 (' + all.filter((video) => video.hidden).length + ')';
     dom.hiddenBtn.setAttribute('aria-pressed', state.showHidden ? 'true' : 'false');
     dom.count.textContent = videos.length + ' / ' + scoped.length + '件';
-    const pageModel = Pagination.derive(videos, state.page, Pagination.PAGE_SIZE);
+    updateSeriesControls();
+    const displayItems = Data.groupVideosBySeries(videos);
+    const pageModel = Pagination.derive(displayItems, state.page, Pagination.PAGE_SIZE);
     state.page = pageModel.page;
     state.totalPages = pageModel.totalPages;
     dom.pagination.hidden = !pageModel.hasMultiplePages;
@@ -737,7 +885,13 @@
     dom.nextPage.disabled = state.page >= state.totalPages;
     dom.pageLabel.textContent = state.page + ' / ' + state.totalPages;
     // Reuse existing thumbnail nodes when only watch-count bookkeeping changes.
-    const visibleItems = pageModel.items.map(({ openCount, lastOpenedAt, updatedAt, ...visual }) => visual);
+    const visualVideo = ({ openCount, lastOpenedAt, updatedAt, ...visual }) => ({
+      ...visual, selected: state.seriesSelected.has(String(visual.id)), selectionMode: state.seriesSelecting,
+    });
+    const visibleItems = pageModel.items.map(item => item.kind === 'series'
+      ? { kind: 'series', id: item.id, expanded: state.expandedSeries.has(item.id),
+          videos: item.videos.map(visualVideo), selectionMode: state.seriesSelecting }
+      : { kind: 'video', video: visualVideo(item.video) });
     const resultsKey = JSON.stringify([state.view, state.showHidden, state.page, visibleItems]);
     // Keep loaded thumbnail elements when returning to an unchanged video list.
     if (resultsKey === renderedResultsKey) { acknowledgeReturnIntent(pageModel.items); return; }
@@ -750,7 +904,7 @@
     if (!videos.length) {
       const empty = document.createElement('div'); empty.className = 'vl-empty'; empty.innerHTML = '<strong>' + (state.showHidden ? '非表示の動画はありません' : '該当する動画がありません') + '</strong><span>共通メニューの「探す」から検索条件を変更できます。</span>'; incoming.append(empty);
     } else {
-      const grid = document.createElement('div'); grid.className = 'vl-grid' + (state.view === 'compact' ? ' compact' : ''); pageModel.items.forEach((video) => grid.append(createCard(video))); incoming.append(grid);
+      const grid = document.createElement('div'); grid.className = 'vl-grid' + (state.view === 'compact' ? ' compact' : ''); pageModel.items.forEach(item => grid.append(item.kind === 'series' ? createSeriesCard(item) : createCard(item.video))); incoming.append(grid);
     }
     const reduceMotion = document.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     if (outgoing && pageDirection && !reduceMotion) {
@@ -1006,6 +1160,7 @@
     // VideoListRoute persists across Home SPA transitions: discard transient
     // search terms when leaving the video list, even when its DOM is detached.
     document.addEventListener('manga-video-list-route-detach', () => {
+      state.seriesSelecting = false; state.seriesSelected.clear(); renderedResultsKey = null;
       state.query = '';
       if (dom.search) dom.search.value = '';
       state.page = 1;
@@ -1032,7 +1187,16 @@
     dom.sort.addEventListener('change', () => { clearReturnIntent(); state.sort = dom.sort.value; savePrefs(); render(); });
     dom.view.addEventListener('click', () => { clearReturnIntent(); state.view = state.view === 'card' ? 'compact' : 'card'; savePrefs(); render(); });
     dom.thumbnailSize.addEventListener('change', () => { state.thumbnailSize = ['small', 'normal', 'large'].includes(dom.thumbnailSize.value) ? dom.thumbnailSize.value : 'normal'; savePrefs(); dom.app.dataset.thumbnailSize = state.thumbnailSize; });
-    dom.hiddenBtn.addEventListener('click', () => { clearReturnIntent(); state.showHidden = !state.showHidden; state.query = ''; dom.search.value = ''; state.folderId = ''; state.tag = ''; state.service = ''; render(); });
+    dom.hiddenBtn.addEventListener('click', () => { clearReturnIntent(); state.showHidden = !state.showHidden; state.seriesSelected.clear(); state.query = ''; dom.search.value = ''; state.folderId = ''; state.tag = ''; state.service = ''; render(); });
+    dom.seriesMode.addEventListener('click', () => {
+      if (!canReadProtectedData()) return;
+      state.seriesSelecting = !state.seriesSelecting;
+      state.seriesSelected.clear();
+      render();
+    });
+    dom.seriesGroup.addEventListener('click', () => commitSeries('group', [...state.seriesSelected]));
+    dom.seriesRemove.addEventListener('click', () => commitSeries('remove', [...state.seriesSelected]));
+    dom.seriesCancel.addEventListener('click', () => { state.seriesSelecting = false; state.seriesSelected.clear(); render(); });
     dom.add.addEventListener('click', () => {
       if (!canReadProtectedData()) return;
       window.location.href = new URL('video-edit.html?mode=add&return=list', location.href).href;
@@ -1053,6 +1217,8 @@
     const allowed = canReadProtectedData();
     if (dom.accessNotice) dom.accessNotice.hidden = allowed;
     if (dom.add) dom.add.disabled = !allowed;
+    if (dom.seriesMode) dom.seriesMode.disabled = !allowed;
+    if (!allowed) { state.seriesSelecting = false; state.seriesSelected.clear(); }
     if (dom.deleteBtn) dom.deleteBtn.disabled = !allowed;
     if (dom.createFolder) dom.createFolder.disabled = !allowed;
     if (dom.form) dom.form.querySelectorAll('button[type="submit"]').forEach((button) => { button.disabled = !allowed; });

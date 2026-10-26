@@ -22,7 +22,7 @@ test('return intent survives hydration and SPA re-renders until a user changes t
   assert.match(library, /params\.get\('returnVideo'\)/);
   assert.match(library, /sessionStorage\.getItem\(RETURN_INTENT_KEY\)/);
   assert.match(library, /Data\.sortVideos\(filtered, state\.sort\)/);
-  assert.match(library, /Math\.floor\(index \/ Pagination\.PAGE_SIZE\) \+ 1/);
+  assert.match(library, /Math\.floor\(boxIndex \/ Pagination\.PAGE_SIZE\) \+ 1/);
   assert.match(library, /restoreVideoPage\(\);/);
   assert.match(library, /acknowledgeReturnIntent\(pageModel\.items\)/);
   assert.match(library, /dom\.results\.querySelectorAll\('\.vl-card'\)/);

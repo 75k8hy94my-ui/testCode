@@ -218,6 +218,6 @@ test('SPA detachment retains list thumbnails; routine view-count updates do not 
   const library = read('video-library.js');
   assert.match(routing, /querySelectorAll\('#videoLibraryResults \.vl-inline-player video, #videoLibraryResults \.vl-inline-player iframe'\)/);
   assert.doesNotMatch(routing, /querySelectorAll\('#videoLibraryResults video, #videoLibraryResults iframe'\)/);
-  assert.match(library, /pageModel\.items\.map\(\(\{ openCount, lastOpenedAt, updatedAt, \.\.\.visual \}\) => visual\)/);
+  assert.match(library, /const visualVideo = \(\{ openCount, lastOpenedAt, updatedAt, \.\.\.visual \}\) =>/);
   assert.match(library, /resultsKey === renderedResultsKey/);
 });

@@ -259,6 +259,8 @@
       a,
       b,
       folderId: asText(x.folderId) || null,
+      // A series is an unnamed grouping, identified only by a shared opaque ID.
+      seriesId: asText(x.seriesId) || null,
       tags: parseTags(x.tags),
       favorite: x.favorite === true,
       hidden: x.hidden === true,
@@ -370,6 +372,57 @@
     return list;
   }
 
+
+  function groupVideosBySeries(videos) {
+    const list = normalizeVideos(videos);
+    const counts = new Map();
+    list.forEach((video) => { if (video.seriesId) counts.set(video.seriesId, (counts.get(video.seriesId) || 0) + 1); });
+    const groups = new Map();
+    const result = [];
+    list.forEach((video) => {
+      if (!video.seriesId || counts.get(video.seriesId) < 2) {
+        result.push({ kind: 'video', video });
+        return;
+      }
+      let group = groups.get(video.seriesId);
+      if (!group) {
+        group = { kind: 'series', id: video.seriesId, videos: [] };
+        groups.set(video.seriesId, group);
+        result.push(group);
+      }
+      group.videos.push(video);
+    });
+    return result;
+  }
+
+  // Compute all membership changes before writing anything. A series has no
+  // separate folder object or name; the same ID on two or more videos is enough.
+  function planSeriesChanges(videos, videoIds, action, createId) {
+    const all = normalizeVideos(videos);
+    const idSet = new Set((Array.isArray(videoIds) ? videoIds : []).map(asText).filter(Boolean));
+    const selected = all.filter((video) => idSet.has(video.id));
+    if (selected.length !== idSet.size || !selected.length) return { error: 'selection', changes: {} };
+    const changes = {};
+    if (action === 'group') {
+      if (selected.length < 2) return { error: 'minimum', changes };
+      const existing = [...new Set(selected.map((video) => video.seriesId).filter(Boolean))];
+      if (existing.length > 1) return { error: 'multiple', changes };
+      const seriesId = existing[0] || (typeof createId === 'function' ? asText(createId()) : '');
+      if (!seriesId) return { error: 'id', changes };
+      selected.forEach((video) => { if (video.seriesId !== seriesId) changes[video.id] = seriesId; });
+      return { seriesId, changes };
+    }
+    if (action !== 'remove') return { error: 'action', changes };
+    selected.forEach((video) => { if (video.seriesId) changes[video.id] = null; });
+    // Do not leave a phantom series attached to its final member.
+    const affected = new Set(selected.map((video) => video.seriesId).filter(Boolean));
+    affected.forEach((seriesId) => {
+      const remaining = all.filter((video) => video.seriesId === seriesId && !Object.prototype.hasOwnProperty.call(changes, video.id));
+      if (remaining.length === 1) changes[remaining[0].id] = null;
+    });
+    return { changes };
+  }
+
   function removeFolder(folders, videos, folderId) {
     const id = asText(folderId);
     return {
@@ -387,5 +440,5 @@
     const number = Math.max(1, index + 1);
     return '名称未設定' + String(number).replace(/[0-9]/g, digit => String.fromCharCode(0xFF10 + Number(digit)));
   }
-  return { displayTitle, WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, videoEntryKind, storageFieldsForVideoUrl, stableUrlToken, videoUrlIdentity, alternateUrls, promoteVideoUrl, getRotationDirection, getDisplayDimensions };
+  return { displayTitle, WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, groupVideosBySeries, planSeriesChanges, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, videoEntryKind, storageFieldsForVideoUrl, stableUrlToken, videoUrlIdentity, alternateUrls, promoteVideoUrl, getRotationDirection, getDisplayDimensions };
 }));
