@@ -437,8 +437,10 @@
       if (!matching) nextMeta[savedId] = { ...(nextMeta[savedId] || {}), title: matching ? (nextMeta[savedId]?.title || '') : elements.title.value.trim(), folderId: matching ? (nextMeta[savedId]?.folderId || null) : elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, hidden: elements.hidden.checked, rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, thumbnailUrl: elements.thumbnail.value.trim(), thumbnailTimeSeconds: Data.isDirectVideoUrl(url) ? parsedTime : current.thumbnailTimeSeconds, updatedAt: Date.now() };
       const nextVideos = matching ? savedVideos.map(item => String(item.id) === savedId ? nextBase : item) : isAddMode ? [nextBase, ...savedVideos] : savedVideos.map((item) => String(item.id) === videoId ? nextBase : item);
       const propertyUpdates = [];
+      let propertyWritesNeeded = false;
       if (customValueInputs.size && !matching) {
         const latestPropertyState = PropertyStore.read();
+        const savedPropertyValues = latestPropertyState.values[String(savedId)] || {};
         for (const [propertyId, entry] of customValueInputs) {
           const { property, control, previous } = entry;
           let value;
@@ -457,6 +459,7 @@
           if (property.type === 'multi_select' && Array.isArray(value)) valid = value.length === new Set(value).size && value.every((optionId) => typeof optionId === 'string' && (!!options[optionId] && options[optionId].deleted !== true || Array.isArray(previous) && previous.includes(optionId)));
           if (!valid) { error.textContent = `「${property.name}」の値を確認してください。`; return; }
           propertyUpdates.push({ propertyId, property, previous, value });
+          if (JSON.stringify(savedPropertyValues[propertyId]) !== JSON.stringify(value)) propertyWritesNeeded = true;
         }
       }
       saving = true;
@@ -474,7 +477,7 @@
           }
         }
         try {
-          if (customValueInputs.size && PropertyStore && !matching) {
+          if (propertyWritesNeeded && PropertyStore && !matching) {
             await PropertyStore.mutate({
               storage: localStorage,
               guest: !!window.TestCodeGuest?.isActive(),
@@ -487,7 +490,7 @@
                 for (const update of propertyUpdates) {
                   const latestProperty = latest.definitions.properties[update.propertyId];
                   if (!latestProperty || latestProperty.deleted === true) continue;
-                  if (JSON.stringify(update.previous) === JSON.stringify(update.value)) continue;
+                  if (JSON.stringify(videoValues[update.propertyId]) === JSON.stringify(update.value)) continue;
                   videoValues[update.propertyId] = update.value;
                 }
                 values[String(savedId)] = videoValues;
