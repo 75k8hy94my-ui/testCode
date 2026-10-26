@@ -7,7 +7,7 @@ test('return intent waits for hydration and hidden videos use ordinary list',()=
   assert.match(src,/const target = all\.find\(video => String\(video\.id\) === targetId\)/);
   assert.match(src,/if \(!target\) return;/);
   assert.match(src,/if \(target\.hidden\) \{[\s\S]*?state\.showHidden = false;[\s\S]*?state\.page = 1/);
-  assert.match(src,/const calculatedPage = Math\.floor\(index \/ Pagination\.PAGE_SIZE\) \+ 1/);
+  assert.match(src,/const calculatedPage = Math\.floor\(boxIndex \/ Pagination\.PAGE_SIZE\) \+ 1/);
 });
 test('restoration is retried on render and access changes',()=>{
  const src=read('video-library.js');
