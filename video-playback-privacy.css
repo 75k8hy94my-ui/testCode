@@ -35,3 +35,54 @@ html[data-video-mask-metadata="1"] #videoPlayerPage :is(
   -webkit-text-fill-color: transparent !important;
   background: #000 !important;
 }
+
+/* Video library, including grid/compact cards and link-only bookmarks.
+   Mask presentation only: links, menus, sorting and filtering still work. */
+html[data-video-mask-video="1"] #videoListSection .videoCardThumb,
+html[data-video-mask-video="1"] #videoPlayerPage .videoRelated .videoCardThumb {
+  background: #000 !important;
+  background-image: none !important;
+}
+html[data-video-mask-video="1"] #videoListSection .videoCardThumb > :not(.videoCardDuration),
+html[data-video-mask-video="1"] #videoPlayerPage .videoRelated .videoCardThumb > :not(.videoCardDuration) {
+  visibility: hidden !important;
+}
+/* Duration is not editable content and may remain visible over black frames. */
+
+/* Never mask library controls or the card action menu. Only individual
+   per-video text, including bookmark titles and labels, is blacked out. */
+html[data-video-mask-metadata="1"] #videoListSection .videoCard :is(
+  .videoCardTitle,
+  .videoCardMeta,
+  .videoCardBookmarkDomain,
+  .videoCardLabels,
+  .videoCardLabel
+) {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+  background: #000 !important;
+  border-color: #000 !important;
+}
+html[data-video-mask-metadata="1"] #videoListSection .videoCardSourceIcon,
+html[data-video-mask-metadata="1"] #videoPlayerPage .videoRelated .videoCardSourceIcon {
+  visibility: hidden !important;
+}
+html[data-video-mask-metadata="1"] #videoListSection .videoCard :is(
+  .videoCardTitle,
+  .videoCardMeta,
+  .videoCardBookmarkDomain,
+  .videoCardLabels,
+  .videoCardLabel
+)::selection {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  background: #000 !important;
+}
+
+/* Related cards use the same editable bookmark-domain field as library cards. */
+html[data-video-mask-metadata="1"] #videoPlayerPage .videoRelated .videoCardBookmarkDomain {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  background: #000 !important;
+}
