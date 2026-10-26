@@ -539,6 +539,14 @@
     const base = videos.find((video) => text(video && video.id) === videoId);
     if (!base) return;
 
+    // Bookmark cards are ordinary HTTPS links. Let the anchor navigate to its
+    // exact URL (including query/fragment) instead of opening the video player.
+    // This listener runs in the capture phase, before the browser follows it.
+    if (card.classList.contains('videoCard--bookmark')) {
+      recordOpen(base);
+      return;
+    }
+
     const targetUrl = new URL('video-player.html', location.href);
     targetUrl.searchParams.set('id', videoId);
     const indicator = document.getElementById('videoLibraryPageLabel');
