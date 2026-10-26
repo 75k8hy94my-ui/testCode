@@ -32,6 +32,7 @@ function startEditor({ mode = 'add', allowed = true, videos = [], meta = {}, pro
       focus() { this.focused = true; },
     };
     if (tag === 'form') {
+      node.requestSubmit = () => node.events.submit({ preventDefault() {} });
       const fields = ['url', 'title', 'folder', 'alternateUrls', 'status', 'tags', 'memo', 'favorite', 'hidden', 'rotate', 'service', 'legacyId', 'thumbnail', 'thumbnailTime'];
       node.elements = Object.fromEntries(fields.map((key) => [key, element('input')]));
       node.querySelector = (selector) => {
@@ -58,7 +59,7 @@ function startEditor({ mode = 'add', allowed = true, videos = [], meta = {}, pro
   };
   if (guest) window.TestCodeGuest = { isActive: () => true };
   const location = { search: mode === 'add' ? '?mode=add&return=list' : '?id=' + encodeURIComponent(videos[0]?.id || 'existing') + '&return=list', href: 'video-edit.html' };
-  vm.runInNewContext(source, { window, document, localStorage, location, URLSearchParams, Date, Math, confirm: () => true });
+  vm.runInNewContext(source, { window, document, localStorage, location, URLSearchParams, Date, Math, confirm: () => true, setTimeout, clearTimeout });
   const form = page.children.find((child) => child.tag === 'form');
   return { page, form, nodes, location, localStorage, stored, shellTitle, get reads() { return reads; }, get syncCalls() { return syncCalls; }, get pendingCalls() { return pendingCalls; }, get deletionCalls() { return deletionCalls; }, get deletionPaths() { return deletionPaths; }, releaseSync };
 }
@@ -187,7 +188,7 @@ test('VPN-blocked add route never reads local protected data', () => {
   assert.match(app.page.children[0].children[0].textContent, /VPN接続/);
 });
 
-test('edit route still updates the existing video without adding a new record', async () => {
+test('edit route updates the existing video without leaving the editor', async () => {
   const existing = Data.normalizeVideo({ id: 'existing', title: 'Before', url: 'https://example.com/a.mp4', a: 'url', b: '12' });
   const app = startEditor({ mode: 'edit', videos: [existing] });
   assert.equal(app.shellTitle.textContent, '動画を編集');
@@ -199,10 +200,10 @@ test('edit route still updates the existing video without adding a new record', 
   assert.equal(videos.length, 1);
   assert.equal(videos[0].title, 'After');
   assert.equal(videos[0].url, 'https://example.com/after.mp4');
-  assert.equal(app.location.href, 'video.html');
+  assert.equal(app.location.href, 'video-edit.html');
 });
 
-test('guest video add and edit save locally, skip cloud sync, and leave the editor', async () => {
+test('guest add navigates and guest edit stays in place while both save locally', async () => {
   const added = startEditor({ guest: true });
   added.form.elements.url.value = 'https://example.com/guest-add.mp4';
   added.form.elements.title.value = 'Guest addition';
@@ -221,7 +222,7 @@ test('guest video add and edit save locally, skip cloud sync, and leave the edit
   assert.equal(saved.id, 'guest-existing');
   assert.equal(saved.title, 'Guest title');
   assert.equal(saved.url, 'https://example.com/guest-edited.mp4');
-  assert.equal(edited.location.href, 'video.html');
+  assert.equal(edited.location.href, 'video-edit.html');
   assert.equal(edited.syncCalls, 0);
   assert.equal(edited.pendingCalls, 0);
 });
@@ -260,4 +261,46 @@ test('normal video save returns to the list without waiting for cloud sync', asy
     app.releaseSync();
     await submit;
   }
+});
+
+test('editing a title saves automatically after typing without a submit button', async () => {
+  const existing = Data.normalizeVideo({ id: 'edit-auto', title: 'Before', url: 'https://example.com/a.mp4' });
+  const app = startEditor({ mode: 'edit', guest: true, videos: [existing] });
+  assert.match(app.form.innerHTML, /変更は自動保存されます/);
+  assert.doesNotMatch(app.form.innerHTML, /type="submit">保存/);
+  assert.equal(app.form.className, 'videoEditForm isEditMode');
+  app.form.elements.title.value = 'After typing';
+  app.form.events.input({});
+  await new Promise(resolve => setTimeout(resolve, 510));
+  assert.equal(JSON.parse(app.stored.get(VIDEO_KEY))[0].title, 'After typing');
+  assert.equal(app.location.href, 'video-edit.html');
+  assert.equal(app.pendingCalls, 0);
+  assert.equal(app.syncCalls, 0);
+});
+
+test('checkbox and folder changes auto-save immediately and unchanged values do not create writes', async () => {
+  const existing = Data.normalizeVideo({ id: 'edit-toggle', title: 'Test', url: 'https://example.com/a.mp4' });
+  const app = startEditor({ mode: 'edit', guest: true, videos: [existing] });
+  await app.form.events.submit({ preventDefault() {} });
+  assert.equal(app.pendingCalls, 0);
+  app.form.elements.hidden.checked = true;
+  app.form.elements.folder.value = 'vf-test';
+  app.form.events.change({});
+  await new Promise(resolve => setTimeout(resolve, 20));
+  const meta = JSON.parse(app.stored.get(META_KEY));
+  assert.equal(meta['edit-toggle'].hidden, true);
+  assert.equal(meta['edit-toggle'].folderId, 'vf-test');
+  assert.equal(app.location.href, 'video-edit.html');
+});
+
+test('failed pending marker blocks edit auto-save and retains previous record', async () => {
+  const existing = Data.normalizeVideo({ id: 'edit-fail', title: 'Before', url: 'https://example.com/a.mp4' });
+  const app = startEditor({ mode: 'edit', videos: [existing], failPending: true });
+  app.form.elements.title.value = 'After';
+  app.form.events.change({});
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(JSON.parse(app.stored.get(VIDEO_KEY))[0].title, 'Before');
+  assert.equal(app.pendingCalls, 1);
+  assert.equal(app.syncCalls, 0);
+  assert.match(app.nodes.get('.videoEditError').textContent, /未同期状態を記録できませんでした/);
 });

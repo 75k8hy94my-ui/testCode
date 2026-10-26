@@ -42,7 +42,13 @@ test('guest configures a property, saves it on a video, filters, and reads it on
   await expect(page).toHaveURL(/video-edit\.html\?id=/);
   await expect(page.getByRole('button', { name: '朝', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: '夜', exact: true }).click();
-  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.locator('.videoEditSaveStatus')).toContainText(/自動保存|保存済み/);
+  await expect.poll(async () => page.evaluate(() => {
+    const id = new URLSearchParams(location.search).get('id');
+    const values = JSON.parse(localStorage.getItem('mangaReaderVideoPropertyValues') || '{}');
+    return Object.values(values[id] || {}).some(value => typeof value === 'string' && value !== '');
+  })).toBe(true);
+  await page.getByRole('link', { name: '戻る' }).click();
   await expect(page).toHaveURL(/video\.html$/);
   await expect(page.getByText('時間帯: 夜')).toBeVisible();
   await page.getByText('カスタムプロパティで絞り込む').click();
