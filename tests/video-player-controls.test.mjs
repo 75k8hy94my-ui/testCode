@@ -204,5 +204,5 @@ test('the centered button and hidden-controls state have accessible responsive s
   assert.match(css, /\\.customVideoPlayer:not\\(\\.controlsVisible\\) \\.customVideoControls/);
   assert.match(css, /pointer-events: none/);
   assert.match(css, /\\.customVideoCenterPlay:focus-visible/);
-  assert.match(html, /video-player-controls\\.js\\?v=20261026-center-video-playback/);
+  assert.match(html, /video-player-controls\\.js\\?v=20261026-video-privacy/);
 });
