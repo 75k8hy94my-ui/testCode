@@ -47,7 +47,11 @@ test('returning from a hidden video does not switch the list into the hidden fol
   await page.getByRole('link', { name: '詳細を編集' }).click();
   await expect(page).toHaveURL(/video-edit\.html\?id=regular-video/);
   await page.locator('.videoEditForm input[name="hidden"]').check();
-  await page.locator('.videoEditForm button[type="submit"]').click();
+  await expect.poll(async () => page.evaluate(() => {
+    const meta = JSON.parse(localStorage.getItem('mangaReaderVideoMeta') || '{}');
+    return meta['regular-video']?.hidden;
+  })).toBe(true);
+  await page.getByRole('link', { name: '戻る' }).click();
   await expect(page).toHaveURL(/video-player\.html\?id=regular-video/);
 
   await expect(page.locator('#shellTitle a')).not.toHaveAttribute('href', /returnVideo=/);
