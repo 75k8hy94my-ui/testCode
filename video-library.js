@@ -439,7 +439,7 @@
       .vl-series-videos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:8px 2px 2px}
       .vl-card{position:relative}.vl-series-pick{position:absolute;right:8px;top:8px;z-index:8;display:inline-flex;align-items:center;gap:5px;padding:7px 9px;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:9px;font-size:12px;font-weight:700;cursor:pointer}
       .vl-series-pick input,.vl-series-select-all input{accent-color:var(--accent);width:16px;height:16px}
-      @media(max-width:700px){.vl-series-videos{grid-template-columns:repeat(2,minmax(0,1fr))}}
+      @media(max-width:700px){.vl-series-videos{grid-template-columns:repeat(2,minmax(0,1fr))}.vl-top #videoLibrarySeriesMode{flex:1}}
       @media(max-width:480px){.vl-series-videos{grid-template-columns:minmax(0,1fr)}.vl-series-bar button{flex:1}.vl-series-heading{gap:3px}}
     `;
     document.head.appendChild(style);
@@ -840,7 +840,11 @@
       ? item.videos.some(video => String(video.id) === targetId)
       : String(item.video.id) === targetId);
     if (boxIndex < 0) return;
-    if (boxes[boxIndex].kind === 'series') state.expandedSeries.add(boxes[boxIndex].id);
+    // Open the returned member once, but let the user collapse it afterward.
+    if (boxes[boxIndex].kind === 'series' && !returnIntent.seriesRevealed) {
+      state.expandedSeries.add(boxes[boxIndex].id);
+      returnIntent.seriesRevealed = true;
+    }
     const calculatedPage = Math.floor(boxIndex / Pagination.PAGE_SIZE) + 1;
     const originPage = returnIntent.page;
     const candidate = Number.isSafeInteger(originPage) && originPage > 0 ? originPage : calculatedPage;
