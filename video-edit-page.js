@@ -72,7 +72,7 @@
       ? Data.normalizeVideo({ id: 'draft', addedAt: Date.now() })
       : Data.normalizeVideo({ ...base, ...originalMeta, id: base.id, a: base.a, b: base.b, addedAt: base.addedAt });
     const folders = Data.normalizeFolders(read(FOLDER_KEY, []));
-    const heading = document.createElement('h2'); heading.className = 'videoEditHeading'; heading.textContent = isAddMode ? '動画を追加' : '動画を編集';
+    const heading = document.createElement('h2'); heading.className = 'videoEditHeading'; heading.textContent = isAddMode ? '動画を追加' : '動画を編集'; heading.hidden = !isAddMode;
     const lead = document.createElement('p'); lead.className = 'videoEditLead'; lead.textContent = isAddMode ? '動画URLと情報を入力してください。' : '変更内容は自動的に保存されます。';
     const form = document.createElement('form'); form.className = 'videoEditForm ' + (isAddMode ? 'isAddMode' : 'isEditMode');
     form.innerHTML = `
@@ -180,7 +180,7 @@
     if (!isAddMode && /^https?:\/\//i.test(current.url)) {
       const source = document.createElement('a'); source.className = 'videoEditButton videoEditSource';
       source.href = current.url; source.target = '_blank'; source.rel = 'noopener noreferrer'; source.textContent = '元ページを開く ↗';
-      form.prepend(source);
+      form.querySelector('.videoEditActions').prepend(source);
     }
     const none = document.createElement('option'); none.value = ''; none.textContent = '未分類'; elements.folder.append(none);
     folders.forEach((folder) => { const option = document.createElement('option'); option.value = folder.id; option.textContent = folder.name; elements.folder.append(option); });
@@ -373,12 +373,22 @@
       form.addEventListener('change', () => { if (!composing) queueAutoSave(true); });
       form.addEventListener('compositionstart', () => { composing = true; });
       form.addEventListener('compositionend', () => { composing = false; queueAutoSave(); });
-      form.querySelector('[data-cancel]').addEventListener('click', async (event) => {
-        if (formSnapshot() === lastSavedSnapshot) return;
+      const backLink = form.querySelector('[data-cancel]');
+      backLink.addEventListener('click', (event) => {
+        if (formSnapshot() === lastSavedSnapshot && !saving) return;
         event.preventDefault();
-        clearTimeout(autoSaveTimer);
-        await form.requestSubmit();
-        // Save is asynchronous for custom properties. Watch the in-flight operation below.
+        const destination = backLink.href;
+        flushAutoSave();
+        function finishNavigation() {
+          if (saving || needsFollowUpSave || autoSaveTimer !== null) {
+            setTimeout(finishNavigation, 40);
+          } else if (formSnapshot() === lastSavedSnapshot) {
+            location.href = destination;
+          } else {
+            setSaveStatus('変更を保存できませんでした。入力内容を確認してください。');
+          }
+        }
+        setTimeout(finishNavigation, 40);
       });
       if (typeof window.addEventListener === 'function') {
         window.addEventListener('pagehide', flushAutoSave);
@@ -395,16 +405,16 @@
       setSaveStatus('自動保存中…');
       const url = elements.url.value.trim();
       const classified = Data.classifyVideoUrl(url);
-      if (classified.kind === 'invalid') { error.textContent = '有効な動画URLを入力してください。'; return; }
+      if (classified.kind === 'invalid') { error.textContent = '有効な動画URLを入力してください。'; setSaveStatus('未保存・URLを確認してください'); return; }
       const latestVideos = read(VIDEO_KEY, []);
       const savedVideos = Array.isArray(latestVideos) ? latestVideos : [];
       const identity = Data.videoUrlIdentity(url);
       const matching = base?.virtualEdition === true || originalMeta.virtualPublishedEdit ? null : savedVideos.find(item => item.virtualEdition !== true && (isAddMode || String(item.id) !== videoId) &&
         [item.url, ...(item.alternateUrls || [])].some(candidate => Data.videoUrlIdentity(candidate) === identity));
       const variants = [...new Set([...elements.alternateUrls.value.split(/\r?\n/).map(v => v.trim()), ...(!isAddMode && current.url !== url ? [current.url] : [])])].filter(v => v && v !== url);
-      if (variants.some(v => Data.classifyVideoUrl(v).kind === 'invalid')) { error.textContent = 'サブURLを確認してください。'; return; }
+      if (variants.some(v => Data.classifyVideoUrl(v).kind === 'invalid')) { error.textContent = 'サブURLを確認してください。'; setSaveStatus('未保存・サブURLを確認してください'); return; }
       if (variants.some(v => savedVideos.some(item => String(item.id) !== videoId && String(item.id) !== String(matching?.id || '') && [item.url, ...(item.alternateUrls || [])].some(other => other === v)))) { error.textContent = '別の動画に登録されているURLをサブにできません。'; return; }
-      if (matching && !isAddMode) { error.textContent = '別の登録済み動画と同じURLです。'; return; }
+      if (matching && !isAddMode) { error.textContent = '別の登録済み動画と同じURLです。'; setSaveStatus('未保存・重複URLを確認してください'); return; }
       const fields = Data.storageFieldsForVideoUrl(url);
       const timestamp = elements.thumbnailTime.value.trim();
       const parsedTime = timestamp ? Data.parseMediaTime(timestamp) : null;
@@ -507,6 +517,8 @@
       }
     });
     if (!isAddMode) form.querySelector('[data-delete]').addEventListener('click', async () => {
+      clearTimeout(autoSaveTimer);
+      clearTimeout(syncTimer);
       if (!canReadProtectedData()) return;
       if (!confirm('「' + (current.title || 'この動画') + '」を削除しますか？')) return;
       const error = form.querySelector('.videoEditError'); error.textContent = '';
