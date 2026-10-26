@@ -6,7 +6,8 @@ const page = fs.readFileSync(new URL('../video-player-page.js', import.meta.url)
 const controls = fs.readFileSync(new URL('../video-player-controls.js', import.meta.url), 'utf8');
 
 test('video player page uses the normalized saved title and renders marker list', () => {
-  assert.match(page, /document\.title\s*=\s*title/);
+  assert.match(page, /syncTabTitle\(title\)/);
+  assert.match(page, /maskMetadata/);
   assert.match(page, /videoMarkerList/);
   assert.match(page, /videoMarker/);
 });
