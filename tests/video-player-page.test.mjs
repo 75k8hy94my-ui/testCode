@@ -83,9 +83,11 @@ test('video title edits in place and player details follow the video in a watch-
   assert.match(fs.readFileSync(new URL('../home-profile-shell.css', import.meta.url), 'utf8'), /\.videoPlayerActionBar/);
 });
 
-test('custom player defers single taps and maps double-tap zones to seek or fullscreen', () => {
+test('custom player defers surface taps to visibility and retains double-tap gestures', () => {
   assert.match(controls, /Gestures\.create\(/);
-  assert.match(controls, /onSingleTap: \(\) => \{ playback\.paused \? playback\.play\(\) : playback\.pause\(\); \}/);
+  assert.match(controls, /onSingleTap: toggleControls/);
+  assert.match(controls, /className = 'customVideoCenterPlay'/);
+  assert.match(controls, /video\.addEventListener\('click', onVideoClick\)/);
   assert.match(controls, /Gestures\.actionAt\(event\.clientX, video\.getBoundingClientRect\(\)\)/);
   assert.match(controls, /else toggleFullscreen\(\)/);
   assert.match(controls, /gestureController\.destroy\(\)/);

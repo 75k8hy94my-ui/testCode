@@ -15,7 +15,7 @@ function fakeTimers() {
   };
 }
 
-test('a single video tap toggles playback only after the double-tap window', () => {
+test('a single video tap dispatches its UI action only after the double-tap window', () => {
   const timers = fakeTimers();
   let singles = 0;
   let doubles = 0;
@@ -27,10 +27,10 @@ test('a single video tap toggles playback only after the double-tap window', () 
   assert.equal(doubles, 0);
 });
 
-test('a double tap cancels playback toggle and fires only one double-tap action', () => {
+test('a double tap cancels the pending single-tap UI action', () => {
   const timers = fakeTimers();
   const seen = [];
-  const gestures = Gestures.create({ onSingleTap: () => seen.push('play-toggle'), onDoubleTap: (event) => seen.push(event.clientX), ...timers });
+  const gestures = Gestures.create({ onSingleTap: () => seen.push('ui-toggle'), onDoubleTap: (event) => seen.push(event.clientX), ...timers });
   gestures.tap({ clientX: 40 });
   gestures.tap({ clientX: 42 });
   timers.flush();
