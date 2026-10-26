@@ -105,9 +105,9 @@
     installVideoBackupRestoreHook();
     loadBrowserScript('desktop-navigation.js')
       .catch((error) => console.warn('デスクトップナビの読み込みに失敗しました', error));
-    loadBrowserScript('video-data.js?v=20261021-hidden-search')
-      .then(() => loadBrowserScript('video-library.js?v=20261021-hidden-return'))
-      .then(() => loadBrowserScript('video-routing-fix.js'))
+    loadBrowserScript('video-data.js?v=20261026-url-bookmarks')
+      .then(() => loadBrowserScript('video-library.js?v=20261026-url-bookmarks'))
+      .then(() => loadBrowserScript('video-routing-fix.js?v=20261026-url-bookmarks'))
       .then(() => loadBrowserScript('video-thumbnail-time.js'))
       .catch((error) => console.warn('動画ライブラリの読み込みに失敗しました', error));
   }

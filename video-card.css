@@ -269,3 +269,58 @@
   #videoLibraryApp[data-thumbnail-size="normal"] .vl-grid:not(.compact),
   #videoLibraryApp[data-thumbnail-size="large"] .vl-grid:not(.compact) { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* External video pages are bookmarks: no media download, fixed thumbnail or
+   empty thumbnail column. Keep the whole card linkable without covering its menu. */
+#videoLibraryResults .vl-card.videoCard--bookmark {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+  border: 1px solid var(--border, #454950);
+  border-radius: 12px;
+  background: var(--bg-soft, var(--panel, #1d2230));
+  box-shadow: none;
+}
+#videoLibraryResults .vl-card.videoCard--bookmark .videoCardBody {
+  grid-row: auto;
+  grid-column: auto;
+  padding: 12px 14px;
+}
+#videoLibraryResults .videoCard--bookmark .videoCardInfo {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+#videoLibraryResults .videoCard--bookmark .videoCardSourceIcon { display: none; }
+#videoLibraryResults .videoCardBookmarkDomain {
+  margin-bottom: 5px;
+  overflow: hidden;
+  color: var(--accent, var(--video-card-sub));
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+#videoLibraryResults .videoCard--bookmark .videoCardTitle {
+  font-size: 14px;
+  line-height: 1.35;
+}
+#videoLibraryResults .videoCard--bookmark .videoCardTitle::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+#videoLibraryResults .videoCard--bookmark .videoCardMenuWrap {
+  position: relative;
+  z-index: 4;
+}
+#videoLibraryResults .vl-grid.compact .vl-card.videoCard--bookmark {
+  display: flex;
+  min-height: 0;
+}
+#videoLibraryResults .vl-grid.compact .vl-card.videoCard--bookmark .videoCardBody {
+  grid-row: auto;
+  grid-column: auto;
+  padding: 9px 14px;
+}

@@ -191,6 +191,16 @@
     return { kind: 'link', url, a: '', b: '' };
   }
 
+  // Older records do not store a kind. Determine it from the current URL every
+  // time so edits, imported records and existing Vault data stay compatible.
+  // Published virtual edits use an internal playback page, not an external bookmark.
+  function videoEntryKind(video, meta) {
+    if (meta && meta.virtualPublishedEdit) return 'direct';
+    const record = video && typeof video === 'object' ? video : {};
+    const kind = classifyVideoUrl(asText(record.url) || legacyUrl(record.a, record.b)).kind;
+    return kind === 'link' || kind === 'legacy' ? 'bookmark' : 'direct';
+  }
+
   function stableUrlToken(value) {
     const url = asText(value);
     let hash = 2166136261;
@@ -328,11 +338,14 @@
     const tag = asText(config.tag).toLocaleLowerCase('ja');
     const service = asText(config.service).toLocaleLowerCase('ja');
     const quick = asText(config.quick);
+    const entryKind = asText(config.kind);
+    const entryMeta = config.videoMeta && typeof config.videoMeta === 'object' ? config.videoMeta : {};
     // Search only the currently displayed visibility group: ordinary videos by
     // default, or hidden videos only when explicitly browsing the hidden list.
     const showHidden = config.showHidden === true;
     return normalizeVideos(videos).filter((video) => {
       if (video.hidden !== showHidden) return false;
+      if (['direct', 'bookmark'].includes(entryKind) && videoEntryKind(video, entryMeta[video.id]) !== entryKind) return false;
       if (query && !buildSearchText(video, config.folders).includes(query)) return false;
       if (folderId && video.folderId !== folderId) return false;
       if (tag && !video.tags.some((item) => item.toLocaleLowerCase('ja') === tag)) return false;
@@ -374,5 +387,5 @@
     const number = Math.max(1, index + 1);
     return '名称未設定' + String(number).replace(/[0-9]/g, digit => String.fromCharCode(0xFF10 + Number(digit)));
   }
-  return { displayTitle, WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, storageFieldsForVideoUrl, stableUrlToken, videoUrlIdentity, alternateUrls, promoteVideoUrl, getRotationDirection, getDisplayDimensions };
+  return { displayTitle, WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, videoEntryKind, storageFieldsForVideoUrl, stableUrlToken, videoUrlIdentity, alternateUrls, promoteVideoUrl, getRotationDirection, getDisplayDimensions };
 }));
