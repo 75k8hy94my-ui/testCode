@@ -32,6 +32,14 @@ let editing=false,syncRunning=false,syncDirty=false,syncDirtyMessage='',profileS
 let profileHistoryCleanup=null;
 let mount=null,renderGeneration=0,mangaRouteRuntime=null,mangaRouteBootPromise=null,videoRouteRuntime=null,lastVpnRouteAccess='',lastSpaUrl=location.href;
 
+window.addEventListener('testcode-video-playback-privacy-change',(event)=>{
+  const next=event?.detail||{};
+  [['profileVideoMaskMetadata','maskMetadata'],['profileVideoMaskVideo','maskVideo']].forEach(([id,field])=>{
+    const input=document.getElementById(id);
+    if(input)input.checked=next[field]===true;
+  });
+});
+
 function ensureAppShell(){
   const app=document.getElementById('homeApp')||document.querySelector('.homeShell');
   if(!app)return null;
