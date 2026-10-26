@@ -95,13 +95,16 @@
   const onVideoClick = (event) => { if (gestureController) gestureController.tap(event); else toggleControls(); };
   const onFrameMouseMove = () => { if (Date.now() - lastSurfaceTapAt > 400) showControls(); };
   const onControlsFocus = () => showControls();
-  play.addEventListener('click', (event) => {
-    event.stopPropagation();
+  const togglePlayback = () => {
     if (playback.paused) {
       const result = playback.play();
       if (result && typeof result.catch === 'function') result.catch(() => {});
     } else playback.pause();
     showControls();
+  };
+  play.addEventListener('click', (event) => {
+    event.stopPropagation();
+    togglePlayback();
   });
   video.addEventListener('play', onPlay); video.addEventListener('pause', onPause);
   video.addEventListener('loadedmetadata', onMetadata); video.addEventListener('timeupdate', onTimeUpdate);
@@ -163,16 +166,54 @@
   });
   const handleArrowSeek = (event) => { if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return; const target = event.target; if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(target.tagName || '') || target.closest?.('button,input,textarea,select,[contenteditable="true"]'))) return; event.preventDefault(); const duration = Number.isFinite(playback.duration) ? playback.duration : Infinity; playback.currentTime = Math.max(0, Math.min(duration, (Number(playback.currentTime) || 0) + (event.key === 'ArrowLeft' ? -10 : 10))); };
   document.addEventListener('keydown', handleArrowSeek);
+  // Space takes precedence over focused seek/volume ranges and buttons in this
+  // player. Only genuine text-entry fields and controls outside the player
+  // retain the browser's native Space behavior.
+  let suppressSpaceKeyUp = false;
+  const isSpace = (event) => event.key === ' ' || event.key === 'Spacebar' || event.code === 'Space';
+  const handlePlaybackSpace = (event) => {
+    if (!isSpace(event) || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+    const target = event.target;
+    const tag = String(target?.tagName || '').toUpperCase();
+    if (target?.isContentEditable || target?.closest?.('[contenteditable="true"]') ||
+        tag === 'TEXTAREA' || tag === 'SELECT' ||
+        (tag === 'INPUT' && target.type !== 'range') ||
+        (tag === 'BUTTON' && !frame.contains(target))) return;
+    event.preventDefault();
+    event.stopPropagation?.();
+    suppressSpaceKeyUp = true;
+    if (!event.repeat) togglePlayback();
+  };
+  const handlePlaybackSpaceUp = (event) => {
+    if (!suppressSpaceKeyUp || !isSpace(event)) return;
+    suppressSpaceKeyUp = false;
+    event.preventDefault();
+    event.stopPropagation?.();
+  };
+  // Capture before native button/slider keyboard activation so pressing Space
+  // cannot select the timeline or click another player button by accident.
+  document.addEventListener('keydown', handlePlaybackSpace, true);
+  document.addEventListener('keyup', handlePlaybackSpaceUp, true);
   let hideTimer;
   let lastSurfaceTapAt = 0;
-  const hideControls = () => { clearTimeout(hideTimer); frame.classList.remove('controlsVisible'); };
+  let pointerInteracting = false;
+  const hideControls = () => { clearTimeout(hideTimer); hideTimer = null; frame.classList.remove('controlsVisible'); };
   const showControls = () => {
     frame.classList.add('controlsVisible');
     clearTimeout(hideTimer);
-    if (playback.paused || !markerPanel.hidden || controls.contains(document.activeElement)) return;
+    hideTimer = null;
+    // An input[type=range] retains focus after a mouse click. That stale
+    // focus must not hold the overlay open for the entire playback session.
+    if (playback.paused || !markerPanel.hidden || pointerInteracting) return;
     hideTimer = setTimeout(() => {
-      if (!playback.paused && markerPanel.hidden && !controls.contains(document.activeElement)) hideControls();
+      if (!playback.paused && markerPanel.hidden && !pointerInteracting) hideControls();
     }, 2500);
+  };
+  const onControlsPointerDown = () => { pointerInteracting = true; showControls(); };
+  const onFramePointerUp = () => {
+    if (!pointerInteracting) return;
+    pointerInteracting = false;
+    showControls();
   };
   const toggleControls = () => {
     lastSurfaceTapAt = Date.now();
@@ -192,10 +233,17 @@
   video.addEventListener('click', onVideoClick);
   frame.addEventListener('mousemove', onFrameMouseMove);
   controls.addEventListener('focusin', onControlsFocus); controls.addEventListener('focusout', onControlsFocus);
+  controls.addEventListener('pointerdown', onControlsPointerDown);
+  frame.addEventListener('pointerup', onFramePointerUp);
+  frame.addEventListener('pointercancel', onFramePointerUp);
   renderMarkers(); update(); syncPlayState(); showControls();
   disposeCurrent = () => {
     clearTimeout(hideTimer);
-    if (document.removeEventListener) document.removeEventListener('keydown', handleArrowSeek);
+    if (document.removeEventListener) {
+      document.removeEventListener('keydown', handleArrowSeek);
+      document.removeEventListener('keydown', handlePlaybackSpace, true);
+      document.removeEventListener('keyup', handlePlaybackSpaceUp, true);
+    }
     video.removeEventListener?.('play', onPlay); video.removeEventListener?.('pause', onPause);
     video.removeEventListener?.('loadedmetadata', onMetadata); video.removeEventListener?.('timeupdate', onTimeUpdate);
     video.removeEventListener?.('virtual-edit-state', onVirtualUpdate);
@@ -203,6 +251,9 @@
     seek.removeEventListener?.('input', onSeekInput);
     frame.removeEventListener?.('mousemove', onFrameMouseMove);
     controls.removeEventListener?.('focusin', onControlsFocus); controls.removeEventListener?.('focusout', onControlsFocus);
+    controls.removeEventListener?.('pointerdown', onControlsPointerDown);
+    frame.removeEventListener?.('pointerup', onFramePointerUp);
+    frame.removeEventListener?.('pointercancel', onFramePointerUp);
     if (gestureController) gestureController.destroy();
     try { playback.pause(); } catch (_) {}
     video.controls = nativeControls;
