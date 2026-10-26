@@ -92,6 +92,7 @@
       const requestId = ++generation;
       if (controller) controller.abort();
       controller = typeof AbortController === 'function' ? new AbortController() : null;
+      const timeout = controller ? setTimeout(() => controller.abort(), 9000) : null;
       const initialTitle = titleInput.value;
       active = true;
       button.disabled = true;
@@ -113,6 +114,7 @@
         message.textContent = error && error.name === 'AbortError'
           ? '' : ((error && error.message) || '取得できませんでした。') + ' タイトルは手入力できます。';
       } finally {
+        if (timeout != null) clearTimeout(timeout);
         if (requestId === generation) { active = false; button.disabled = false; controller = null; }
       }
     }
