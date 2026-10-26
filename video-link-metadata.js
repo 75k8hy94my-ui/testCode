@@ -64,6 +64,7 @@
     let generation = 0;
     let controller = null;
     let active = false;
+    let activeTask = null;
 
     function permitted() {
       try { return storage && storage.getItem(CONSENT_KEY) || ''; } catch (_) { return ''; }
@@ -120,12 +121,13 @@
       if (controller) controller.abort();
       controller = null;
       active = false;
+      activeTask = null;
       button.disabled = false;
       updateVisibility();
     }
     function onUrlChange() {
       updateVisibility();
-      if (available() && !titleInput.value.trim()) void retrieve(false);
+      if (available() && !titleInput.value.trim()) activeTask = retrieve(false);
     }
     function onTitleInput() {
       if (!active) return;
@@ -135,19 +137,27 @@
       active = false;
       button.disabled = false;
     }
-    function onClick() { void retrieve(true); }
+    function onClick() { activeTask = retrieve(true); }
     urlInput.addEventListener('input', onUrlInput);
     urlInput.addEventListener('change', onUrlChange);
     titleInput.addEventListener('input', onTitleInput);
     button.addEventListener('click', onClick);
     updateVisibility();
-    return () => {
+    const detach = () => {
       urlInput.removeEventListener('input', onUrlInput);
       urlInput.removeEventListener('change', onUrlChange);
       titleInput.removeEventListener('input', onTitleInput);
       button.removeEventListener('click', onClick);
       if (controller) controller.abort();
     };
+    // Submitting a newly pasted bookmark waits for its in-flight title lookup.
+    detach.ensureTitle = () => {
+      if (!available() || titleInput.value.trim()) return Promise.resolve();
+      if (activeTask) return activeTask;
+      activeTask = retrieve(false);
+      return activeTask;
+    };
+    return detach;
   }
 
   return Object.freeze({ CONSENT_KEY, publicUrl, fetchMetadata, attach });
