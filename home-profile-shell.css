@@ -460,3 +460,52 @@ html[data-theme="dark"] .iosSwitch input:checked + .iosSwitchTrack{background:#3
 @media(max-width:899px){
   input[type="search"],input[role="searchbox"]{font-size:16px!important}
 }
+
+/* Video playback is intentionally separate from tapping the video surface.
+   Only the centered button changes play/pause; the surface toggles both overlays. */
+.customVideoPlayer:not(.controlsVisible) .customVideoControls {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.customVideoPlayer.controlsVisible .customVideoControls {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  z-index: 3;
+}
+.customVideoPlayer .customVideoCenterPlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: clamp(54px, 11vw, 72px);
+  height: clamp(54px, 11vw, 72px);
+  padding: 0;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 50%;
+  background: rgba(0,0,0,.63);
+  color: #fff;
+  font-size: clamp(24px, 5vw, 32px);
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .2s ease, background-color .2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.customVideoPlayer.controlsVisible .customVideoCenterPlay {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+.customVideoCenterPlay:hover { background: rgba(0,0,0,.82); }
+.customVideoCenterPlay:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.customVideoPlayer .videoMarkerNotice { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  .customVideoPlayer .customVideoCenterPlay { transition: none; }
+}
