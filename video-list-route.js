@@ -32,7 +32,7 @@
           await deps.loadScript('video-card.js?v=20261026-url-bookmarks', 'spaVideoCard');
           await deps.loadScript('video-custom-properties.js?v=20261012-video-custom-properties', 'spaVideoCustomProperties');
           await deps.loadScript('video-custom-property-store.js?v=20261012-video-custom-properties', 'spaVideoCustomPropertyStore');
-          await deps.loadScript('video-library.js?v=20261026-unnamed-series', 'spaVideoLibrary');
+          await deps.loadScript('video-library.js?v=20261026-click-title', 'spaVideoLibrary');
         })().catch((error) => {
           bootPromise = null;
           throw error;
@@ -41,7 +41,8 @@
       await bootPromise;
       if (canReadProtectedData() && !helperPromise) {
         helperPromise = (async () => {
-          await deps.loadScript('video-routing-fix.js?v=20261026-thumbnail-retention-url-bookmarks', 'spaVideoRouting');
+          await deps.loadScript('video-link-metadata.js?v=20261026-click-title', 'spaVideoLinkMetadata');
+          await deps.loadScript('video-routing-fix.js?v=20261026-click-title', 'spaVideoRouting');
           await deps.loadScript('video-thumbnail-time.js?v=20261009-vault-sync-queue', 'spaVideoThumbnailTime');
         })().catch((error) => {
           helperPromise = null;
