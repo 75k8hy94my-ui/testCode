@@ -10,7 +10,7 @@ test('each SPA entry applies the persisted video privacy preferences before moun
     const html = read(entry);
     const stylesheet = html.indexOf('video-playback-privacy.css?v=20261026-video-list-privacy');
     const settings = html.indexOf('video-playback-privacy.js?v=20261026');
-    const bootstrap = html.indexOf('home-profile-spa.js?v=20261026-unnamed-series');
+    const bootstrap = html.search(/home-profile-spa\.js\?v=[\w-]+/);
     assert.ok(stylesheet >= 0, entry + ' must load the list/player masking CSS');
     assert.ok(settings >= 0 && settings < bootstrap, entry + ' must restore settings before the SPA starts');
   }
