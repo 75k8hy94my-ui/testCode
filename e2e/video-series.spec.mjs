@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test('guest can group existing videos without a name, add a member and detach it', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.route(/supabase\\.co|\\/auth\\/v1\\/|\\/rest\\/v1\\//i, route => route.abort());
+  await page.route(/supabase\.co|\/auth\/v1\/|\/rest\/v1\//i, route => route.abort());
   await page.goto('index.html');
   await page.getByRole('button', { name: 'ログインせずに使う' }).click();
   await page.goto('video.html');
@@ -64,7 +64,7 @@ test('guest can group existing videos without a name, add a member and detach it
 });
 
 test('series membership does not expose hidden videos in the regular list', async ({ page }) => {
-  await page.route(/supabase\\.co|\\/auth\\/v1\\/|\\/rest\\/v1\\//i, route => route.abort());
+  await page.route(/supabase\.co|\/auth\/v1\/|\/rest\/v1\//i, route => route.abort());
   await page.goto('index.html');
   await page.getByRole('button', { name: 'ログインせずに使う' }).click();
   await page.goto('video.html');
