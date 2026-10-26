@@ -158,7 +158,7 @@
     if (result && typeof result.catch === 'function') result.catch(() => {});
   };
   full.addEventListener('click', toggleFullscreen);
-  markerToggle.addEventListener('click', () => { markerPanel.hidden = !markerPanel.hidden; renderMarkers(); }); add.addEventListener('click', () => { const seconds = Math.max(0, Number(playback.currentTime) || 0); const next = markers.concat({ id: newMarkerId(), seconds, icon: selectedMarkerIcon }); save(next).then((saved) => { markers.splice(0, markers.length, ...saved); renderMarkers(); window.dispatchEvent(new CustomEvent('manga-video-markers-changed')); }).catch((error) => { notice.textContent = error.message || 'マーカーを保存できませんでした。'; }); });
+  markerToggle.addEventListener('click', () => { markerPanel.hidden = !markerPanel.hidden; renderMarkers(); showControls(); }); add.addEventListener('click', () => { const seconds = Math.max(0, Number(playback.currentTime) || 0); const next = markers.concat({ id: newMarkerId(), seconds, icon: selectedMarkerIcon }); save(next).then((saved) => { markers.splice(0, markers.length, ...saved); renderMarkers(); window.dispatchEvent(new CustomEvent('manga-video-markers-changed')); }).catch((error) => { notice.textContent = error.message || 'マーカーを保存できませんでした。'; }); });
   addPeriod.addEventListener('click', () => {
     const seconds = Number(startInput.value), endSeconds = Number(endInput.value);
     if(startInput.value.trim()==='' || endInput.value.trim()==='' || !Number.isFinite(seconds) || !Number.isFinite(endSeconds) || seconds < 0 || endSeconds <= seconds || (Number.isFinite(playback.duration) && endSeconds > playback.duration)){ notice.textContent = '開始秒・終了秒を正しく指定してください。終了は開始より後、動画の長さ以内にしてください。'; return; }
@@ -236,6 +236,9 @@
   controls.addEventListener('pointerdown', onControlsPointerDown);
   frame.addEventListener('pointerup', onFramePointerUp);
   frame.addEventListener('pointercancel', onFramePointerUp);
+  // Dragging beyond the frame must still release the interaction hold.
+  document.addEventListener('pointerup', onFramePointerUp, true);
+  document.addEventListener('pointercancel', onFramePointerUp, true);
   renderMarkers(); update(); syncPlayState(); showControls();
   disposeCurrent = () => {
     clearTimeout(hideTimer);
@@ -243,6 +246,8 @@
       document.removeEventListener('keydown', handleArrowSeek);
       document.removeEventListener('keydown', handlePlaybackSpace, true);
       document.removeEventListener('keyup', handlePlaybackSpaceUp, true);
+      document.removeEventListener('pointerup', onFramePointerUp, true);
+      document.removeEventListener('pointercancel', onFramePointerUp, true);
     }
     video.removeEventListener?.('play', onPlay); video.removeEventListener?.('pause', onPause);
     video.removeEventListener?.('loadedmetadata', onMetadata); video.removeEventListener?.('timeupdate', onTimeUpdate);
