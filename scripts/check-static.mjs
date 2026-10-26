@@ -47,5 +47,5 @@ for (const file of pages) {
   }
 }
 const allSource = pages.concat(standalone, extensionFiles.filter((file) => file.endsWith('.js')).map((file) => `extensions/momon-ga-importer/${file}`)).map(read).join('\n');
-if (/service_role|BEGIN (?:RSA|OPENSSH)|\\bsk-[A-Za-z0-9]/i.test(allSource)) throw new Error('potential secret material found');
+if (/service_role|BEGIN (?:RSA|OPENSSH)|\bsk-[A-Za-z0-9]/i.test(allSource)) throw new Error('potential secret material found');
 console.log(`static verification passed: ${pages.length} HTML pages, ${standalone.length} JS files, momon:GA extension manifest and scripts`);
