@@ -131,7 +131,9 @@
   }
 
   function acknowledgeReturnIntent(pageItems) {
-    if (!returnIntent || !pageItems.some(video => String(video.id) === returnIntent.id)) return;
+    if (!returnIntent || !pageItems.some(item => item.kind === 'series'
+      ? item.videos.some(video => String(video.id) === returnIntent.id)
+      : String(item.video.id) === returnIntent.id)) return;
     // Only acknowledge a return once the matching card actually exists in the
     // displayed page. Retain returnIntent for later Vault/SPA re-render events.
     if (!Array.from(dom.results.querySelectorAll('.vl-card')).some(card => card.dataset.videoId === returnIntent.id)) return;
@@ -832,12 +834,20 @@
       }
     }
     if (index < 0) return;
-    const calculatedPage = Math.floor(index / Pagination.PAGE_SIZE) + 1;
+    // Pagination counts boxes rather than the individual grouped videos.
+    const boxes = Data.groupVideosBySeries(list);
+    const boxIndex = boxes.findIndex(item => item.kind === 'series'
+      ? item.videos.some(video => String(video.id) === targetId)
+      : String(item.video.id) === targetId);
+    if (boxIndex < 0) return;
+    if (boxes[boxIndex].kind === 'series') state.expandedSeries.add(boxes[boxIndex].id);
+    const calculatedPage = Math.floor(boxIndex / Pagination.PAGE_SIZE) + 1;
     const originPage = returnIntent.page;
     const candidate = Number.isSafeInteger(originPage) && originPage > 0 ? originPage : calculatedPage;
     const pageStart = (candidate - 1) * Pagination.PAGE_SIZE;
-    state.page = list.slice(pageStart, pageStart + Pagination.PAGE_SIZE).some(video => String(video.id) === targetId)
-      ? candidate : calculatedPage;
+    state.page = boxes.slice(pageStart, pageStart + Pagination.PAGE_SIZE).some(item => item.kind === 'series'
+      ? item.videos.some(video => String(video.id) === targetId)
+      : String(item.video.id) === targetId) ? candidate : calculatedPage;
   }
 
   function render(pageDirection = 0) {
@@ -845,6 +855,8 @@
     restoreVideoPage();
     syncAccessUi();
     const all = effectiveVideos();
+    const validIds = new Set(all.map(video => String(video.id)));
+    for (const selectedId of state.seriesSelected) if (!validIds.has(selectedId)) state.seriesSelected.delete(selectedId);
     const scoped = all.filter((video) => video.hidden === state.showHidden);
     renderFilterOptions(scoped);
     renderCustomFilters();
@@ -859,7 +871,9 @@
     dom.hiddenBtn.textContent = state.showHidden ? '動画一覧' : '非表示 (' + all.filter((video) => video.hidden).length + ')';
     dom.hiddenBtn.setAttribute('aria-pressed', state.showHidden ? 'true' : 'false');
     dom.count.textContent = videos.length + ' / ' + scoped.length + '件';
-    const pageModel = Pagination.derive(videos, state.page, Pagination.PAGE_SIZE);
+    updateSeriesControls();
+    const displayItems = Data.groupVideosBySeries(videos);
+    const pageModel = Pagination.derive(displayItems, state.page, Pagination.PAGE_SIZE);
     state.page = pageModel.page;
     state.totalPages = pageModel.totalPages;
     dom.pagination.hidden = !pageModel.hasMultiplePages;
@@ -867,7 +881,13 @@
     dom.nextPage.disabled = state.page >= state.totalPages;
     dom.pageLabel.textContent = state.page + ' / ' + state.totalPages;
     // Reuse existing thumbnail nodes when only watch-count bookkeeping changes.
-    const visibleItems = pageModel.items.map(({ openCount, lastOpenedAt, updatedAt, ...visual }) => visual);
+    const visualVideo = ({ openCount, lastOpenedAt, updatedAt, ...visual }) => ({
+      ...visual, selected: state.seriesSelected.has(String(visual.id)), selectionMode: state.seriesSelecting,
+    });
+    const visibleItems = pageModel.items.map(item => item.kind === 'series'
+      ? { kind: 'series', id: item.id, expanded: state.expandedSeries.has(item.id),
+          videos: item.videos.map(visualVideo), selectionMode: state.seriesSelecting }
+      : { kind: 'video', video: visualVideo(item.video) });
     const resultsKey = JSON.stringify([state.view, state.showHidden, state.page, visibleItems]);
     // Keep loaded thumbnail elements when returning to an unchanged video list.
     if (resultsKey === renderedResultsKey) { acknowledgeReturnIntent(pageModel.items); return; }
@@ -880,7 +900,7 @@
     if (!videos.length) {
       const empty = document.createElement('div'); empty.className = 'vl-empty'; empty.innerHTML = '<strong>' + (state.showHidden ? '非表示の動画はありません' : '該当する動画がありません') + '</strong><span>共通メニューの「探す」から検索条件を変更できます。</span>'; incoming.append(empty);
     } else {
-      const grid = document.createElement('div'); grid.className = 'vl-grid' + (state.view === 'compact' ? ' compact' : ''); pageModel.items.forEach((video) => grid.append(createCard(video))); incoming.append(grid);
+      const grid = document.createElement('div'); grid.className = 'vl-grid' + (state.view === 'compact' ? ' compact' : ''); pageModel.items.forEach(item => grid.append(item.kind === 'series' ? createSeriesCard(item) : createCard(item.video))); incoming.append(grid);
     }
     const reduceMotion = document.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     if (outgoing && pageDirection && !reduceMotion) {
