@@ -6,7 +6,7 @@
 }(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
   const CONSENT_KEY = 'testcode.video.bookmarkTitleLookupConsent.v1';
-  const SENSITIVE_KEY = /(?:^|[_-])(access[_-]?token|auth|authorization|api[_-]?key|secret|password|passwd|session|signature|signed|jwt|bearer)(?:$|[_-])/i;
+  const SENSITIVE_KEY = /(?:^|[_-])(access[_-]?token|token|auth|authorization|api[_-]?key|apikey|secret|password|passwd|session|signature|signed|jwt|bearer)(?:$|[_-])/i;
 
   function publicUrl(raw) {
     if (typeof raw !== 'string' || !raw.trim() || raw.length > 4096) return null;
@@ -103,6 +103,7 @@
           message.textContent = '取得タイトル：' + metadata.title + '（入力済みのタイトルは保持しました）';
         } else {
           titleInput.value = metadata.title;
+          active = false; // Programmatic input notifies edit-page autosave; it is not a user override.
           titleInput.dispatchEvent(new Event('input', { bubbles: true }));
           message.textContent = 'タイトルを取得しました。必要に応じて修正できます。';
         }
