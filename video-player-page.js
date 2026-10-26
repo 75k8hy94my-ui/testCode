@@ -158,13 +158,16 @@
   const videos = window.MangaReaderVideoData;
   const normalized = videos ? videos.normalizeVideo({ ...base, ...meta, id: base.id, a: base.a, b: base.b, addedAt: base.addedAt }) : { ...base, ...meta };
   const title = videos ? videos.displayTitle(normalized, baseVideos.map(item => { const entryMeta = allMeta[item.id] || {}; return videos.normalizeVideo({ ...item, ...entryMeta, id: item.id, a: item.a, b: item.b, addedAt: item.addedAt }); })) : (normalized.title || '名称未設定１');
-  document.title = title;
+  const syncTabTitle = (nextTitle) => { document.title = window.TestCodeVideoPlaybackPrivacy?.getSettings()?.maskMetadata ? '動画' : (nextTitle || '動画'); };
+  syncTabTitle(title);
   const tags = Array.isArray(normalized.tags) ? normalized.tags : [];
   const words = new Set(title.toLocaleLowerCase('ja').split(/[\s/・、,._-]+/).filter((word) => word.length >= 2));
   const related = baseVideos.filter((item) => String(item.id) !== id).map((item) => { const itemMeta = allMeta[item.id] || {}; const itemVideo = videos ? videos.normalizeVideo({ ...item, ...itemMeta, id: item.id, a: item.a, b: item.b, addedAt: item.addedAt }) : { ...item, ...itemMeta }; const itemTitle = videos ? videos.displayTitle(itemVideo, baseVideos.map(entry => { const entryMeta = allMeta[entry.id] || {}; return videos.normalizeVideo({ ...entry, ...entryMeta, id: entry.id, a: entry.a, b: entry.b, addedAt: entry.addedAt }); })) : (itemVideo.title || '名称未設定１'); const itemTags = Array.isArray(itemVideo.tags) ? itemVideo.tags : []; const sharedTags = itemTags.filter((tag) => tags.includes(tag)).length; const sharedWords = [...words].filter((word) => itemTitle.toLocaleLowerCase('ja').includes(word)).length; return { item, itemVideo, itemTitle, itemTags, score: sharedTags * 100 + sharedWords }; }).sort((a, b) => b.score - a.score).slice(0, 12);
 
   const heading = document.createElement('h2'); heading.className = 'videoPlayerTitle'; heading.textContent = title; heading.contentEditable = 'false'; heading.setAttribute('role', 'button'); heading.setAttribute('tabindex', '0'); heading.setAttribute('aria-label', 'タイトルをクリックして編集'); heading.title = 'クリックしてタイトルを編集';
-  const info = document.createElement('div'); info.className = 'videoPlayerInfo'; info.textContent = [base.a, base.b].filter(Boolean).join(' / ') || '動画';
+  listenWindow('testcode-video-playback-privacy-change', () => syncTabTitle(heading.textContent));
+  const info = document.createElement('div'); info.className = 'videoPlayerInfo';
+  const category = document.createElement('span'); category.className = 'videoPlayerCategory'; category.textContent = [base.a, base.b].filter(Boolean).join(' / ') || '動画'; info.append(category);
   syncStatusNode = document.createElement('small'); syncStatusNode.className = 'videoPlayerSyncStatus'; syncStatusNode.setAttribute('role', 'status');
   const edit = document.createElement('a'); edit.className = 'videoPlayerEdit'; edit.textContent = '詳細を編集'; edit.href = 'video-edit.html?id=' + encodeURIComponent(id) + '&return=player';
   const actionBar = document.createElement('div'); actionBar.className = 'videoPlayerActionBar'; actionBar.setAttribute('aria-label', '動画の操作'); actionBar.append(edit);
@@ -203,9 +206,9 @@
     try {
       const saved = await saveMetaPatch({ title: next });
       if (!canReadProtectedData()) return;
-      heading.textContent = saved.title; document.title = saved.title || '動画';
+      heading.textContent = saved.title; syncTabTitle(saved.title);
     } catch (error) {
-      if (error && error.localSaved && canReadProtectedData()) { heading.textContent = next; document.title = next || '動画'; info.dataset.saveError = '端末には保存しましたが、クラウド未同期です。'; }
+      if (error && error.localSaved && canReadProtectedData()) { heading.textContent = next; syncTabTitle(next); info.dataset.saveError = '端末には保存しましたが、クラウド未同期です。'; }
       else heading.textContent = previous;
       setTimeout(() => { delete info.dataset.saveError; }, 3500);
     }
@@ -313,7 +316,7 @@
       windowCleanups.push(cleanupRotation);
     }
   }
-  else if (base.a && base.b) { const iframe = document.createElement('iframe'); iframe.src = 'https://www.' + base.a + '.com/embed/' + base.b; iframe.title = title; iframe.allowFullscreen = true; frame.append(iframe); }
+  else if (base.a && base.b) { const iframe = document.createElement('iframe'); iframe.src = 'https://www.' + base.a + '.com/embed/' + base.b; iframe.title = window.TestCodeVideoPlaybackPrivacy?.getSettings()?.maskMetadata ? '動画' : title; listenWindow('testcode-video-playback-privacy-change', () => { iframe.title = window.TestCodeVideoPlaybackPrivacy?.getSettings()?.maskMetadata ? '動画' : title; }); iframe.allowFullscreen = true; frame.append(iframe); }
   else { const link = document.createElement('a'); link.className = 'glassBtn'; link.href = sourceUrl || '#'; link.target = '_blank'; link.rel = 'noopener'; link.textContent = '元ページを開く'; frame.append(link); }
 
   const markerList = document.createElement('div'); markerList.className = 'videoPlayerMarkerList'; markerList.innerHTML = '<h3>登録した秒数</h3><div class="videoMarkerList"></div>';
