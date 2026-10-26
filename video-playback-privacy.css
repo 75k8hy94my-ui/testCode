@@ -1,0 +1,37 @@
+/* Player-only visual privacy settings; audio and independent controls stay active. */
+html[data-video-mask-video="1"] #videoPlayerPage .videoPlayerFrame video,
+html[data-video-mask-video="1"] #videoPlayerPage .videoPlayerFrame iframe {
+  opacity: 0 !important;
+}
+/* Keep the actual DOM content and its layout intact, but make editable
+   metadata appear as solid black bars (including child labels/properties). */
+html[data-video-mask-metadata="1"] #videoPlayerPage :is(
+  .videoPlayerTitle,
+  .videoPlayerCategory,
+  .videoPlayerTags,
+  .videoPlayerDescription p,
+  .videoRelated .videoCardTitle,
+  .videoRelated .videoCardMeta,
+  .videoRelated .videoCardLabels
+),
+html[data-video-mask-metadata="1"] #videoPlayerPage .videoPlayerCustomProperties p * ,
+html[data-video-mask-metadata="1"] #videoPlayerPage .videoRelated .videoCardLabels * {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+  background: #000 !important;
+  border-color: #000 !important;
+}
+/* Do not black out playback controls, buttons, status messages, or section names. */
+
+/* Selecting masked words must not reveal them via the selection foreground. */
+html[data-video-mask-metadata="1"] #videoPlayerPage :is(
+  .videoPlayerTitle, .videoPlayerCategory, .videoPlayerTags,
+  .videoPlayerDescription p, .videoPlayerDescription p *,
+  .videoRelated .videoCardTitle, .videoRelated .videoCardMeta,
+  .videoRelated .videoCardLabels, .videoRelated .videoCardLabels *
+)::selection {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  background: #000 !important;
+}
