@@ -67,9 +67,11 @@
     const doc = options.documentRef;
     const record = video || {};
     const layout = options.layout === 'related' ? 'related' : options.layout === 'compact' ? 'compact' : 'grid';
-    const card = doc.createElement('article'); card.className = 'videoCard videoCard--' + layout;
+    const isBookmark = options.bookmark === true;
+    const card = doc.createElement('article'); card.className = 'videoCard videoCard--' + layout + (isBookmark ? ' videoCard--bookmark' : '');
     if (record.id != null) card.dataset.id = String(record.id);
 
+    if (!isBookmark) {
     const thumbTarget = options.openHref ? doc.createElement('a') : doc.createElement('button');
     if (options.openHref) thumbTarget.href = options.openHref;
     else {
@@ -99,14 +101,21 @@
       fallback.append(mark, service); thumb.append(fallback);
     }
     thumb.append(duration); thumbTarget.append(thumb); card.append(thumbTarget);
+    }
 
     const body = doc.createElement('div'); body.className = 'videoCardBody';
     const info = doc.createElement('div'); info.className = 'videoCardInfo';
     const icon = doc.createElement('span'); icon.className = 'videoCardSourceIcon'; icon.setAttribute('aria-hidden', 'true');
     const sourceName = String(options.serviceLabel || record.service || record.a || 'VIDEO');
-    icon.textContent = sourceName.slice(0, 1).toUpperCase();
+    icon.textContent = isBookmark ? '↗' : sourceName.slice(0, 1).toUpperCase();
     info.append(icon);
     const details = doc.createElement('div'); details.className = 'videoCardDetails';
+    if (isBookmark) {
+      const domain = doc.createElement('div');
+      domain.className = 'videoCardBookmarkDomain';
+      domain.textContent = options.serviceLabel || record.service || '';
+      details.append(domain);
+    }
     const titleRow = doc.createElement('div'); titleRow.className = 'videoCardTitleRow';
     const titleTarget = options.openHref ? doc.createElement('a') : doc.createElement('button');
     if (options.openHref) titleTarget.href = options.openHref;
@@ -115,7 +124,7 @@
       titleTarget.addEventListener('click', (event) => { if (typeof options.onOpen === 'function') options.onOpen(event, record); });
     }
     titleTarget.className = 'videoCardTitle videoCardOpen' + (options.openClass ? ' ' + options.openClass : ''); titleTarget.textContent = options.title || record.title || '動画';
-    titleTarget.setAttribute('aria-label', titleTarget.textContent + 'を開く');
+    titleTarget.setAttribute('aria-label', titleTarget.textContent + (isBookmark ? 'のリンク先を開く' : 'を開く'));
     titleRow.append(titleTarget);
     addMenu(card, titleRow, record, options, doc);
     details.append(titleRow);
