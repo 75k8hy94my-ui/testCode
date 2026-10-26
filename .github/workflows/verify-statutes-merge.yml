@@ -1,0 +1,19 @@
+name: Statutes sync focused tests
+on:
+  push:
+    branches: [fix/statutes-granular-sync-conflicts]
+  pull_request:
+    paths:
+      - 'statutes-sync-merge.js'
+      - 'statutes-vault.js'
+      - 'tests/statutes-independent-vault.test.mjs'
+  workflow_dispatch:
+jobs:
+  statute-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/statutes-independent-vault.test.mjs
