@@ -564,7 +564,8 @@
   document.addEventListener('manga-video-list-route-detach', () => {
     persistActivePlayback(true);
     closeActivePlayer();
-    document.querySelectorAll('#videoLibraryResults video, #videoLibraryResults iframe').forEach((media) => {
+    // Preserve decoded list thumbnail previews across SPA route changes.
+    document.querySelectorAll('#videoLibraryResults .vl-inline-player video, #videoLibraryResults .vl-inline-player iframe').forEach((media) => {
       try { media.pause?.(); } catch (_) {}
       if (media.tagName === 'VIDEO') {
         media.removeAttribute('src');

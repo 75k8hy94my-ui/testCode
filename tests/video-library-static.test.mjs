@@ -180,7 +180,7 @@ test('video library supports hiding videos and restoring them from the hidden li
 test('video list reuses thumbnail DOM when the visible records do not change', () => {
   const library = read('video-library.js');
   assert.match(library, /let renderedResultsKey = null/);
-  assert.match(library, /const resultsKey = JSON\.stringify\(\[state\.view, state\.showHidden, state\.page, pageModel\.items\]\)/);
+  assert.match(library, /const resultsKey = JSON\.stringify\(\[state\.view, state\.showHidden, state\.page, visibleItems\]\)/);
   assert.match(library, /if \(resultsKey === renderedResultsKey\) \{ acknowledgeReturnIntent\(pageModel\.items\); return; \}[\s\S]*dom\.results\.replaceChildren\(frame\)/);
 });
 

@@ -20,7 +20,7 @@ test('existing remote thumbnail is still prioritized',()=>{
 });
 test('direct videos use cache read, capture, and fallback',()=>{
   assert.match(source,/cache\.read\(record\.url/);
-  assert.match(source,/cache\.getOrCapture\(record\.url/);
+  assert.match(source,/cache\.captureAndStore\(record\.url/);
   assert.match(source,/addDirectPreview\(\)/);
 });
 test('library and related-video page load cache before renderer',()=>{
@@ -29,8 +29,8 @@ test('library and related-video page load cache before renderer',()=>{
 });
 test('cache has bounded storage and does not store raw URLs as keys',()=>{
   const content=fs.readFileSync(new URL('../video-thumbnail-cache.js',import.meta.url),'utf8');
-  assert.match(content,/MAX_ITEMS=300/);
-  assert.match(content,/MAX_BYTES=30\*1024\*1024/);
+  assert.match(content,/MAX_ITEMS=900/);
+  assert.match(content,/MAX_BYTES=96\*1024\*1024/);
   assert.match(content,/SHA-256/);
   assert.match(content,/crossOrigin='anonymous'/);
 });

@@ -62,6 +62,7 @@
     };
     const addDirectPreview = () => {
       if (preview || !isDirectVideo(record.url)) return;
+      let captureRequested = false;
       preview = doc.createElement('video'); preview.className = options && options.videoClass || 'vl-thumb-direct-video';
       preview.muted = true; preview.playsInline = true; preview.preload = 'metadata'; preview.src = record.url;
       preview.style.visibility = 'hidden'; preview.addEventListener('loadedmetadata', () => {
@@ -73,9 +74,12 @@
       });
       preview.addEventListener('seeked', () => {
         show(preview);
-        if (cache && cache.permitted()) {
+        // The initial IndexedDB read has already confirmed a miss. Do not
+        // read it a second time or launch multiple capture jobs for one card.
+        if (!captureRequested && cache && cache.permitted()) {
+          captureRequested = true;
           const time = Math.max(0, Number(record.thumbnailTimeSeconds) || 0.1);
-          cache.getOrCapture(record.url, time).then(blob => {
+          cache.captureAndStore(record.url, time).then(blob => {
             if (!blob || !preview || !preview.isConnected || !cache.permitted() || !root.URL || !root.URL.createObjectURL) return;
             const objectUrl = root.URL.createObjectURL(blob);
             const cached = doc.createElement('img');
