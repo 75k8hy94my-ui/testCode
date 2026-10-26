@@ -612,9 +612,9 @@
     // open-in-new-tab, query strings and fragments. Untitled bookmarks only
     // fetch once the user actually clicks the link (never in bulk).
     if (card.classList.contains('videoCard--bookmark')) {
-      const sourceUrl = text(base.url);
       const meta = readJson(META_KEY, {});
       const saved = meta && typeof meta === 'object' ? meta[videoId] || {} : {};
+      const sourceUrl = text(saved.url || base.url);
       const lookup = window.TestCodeVideoLinkMetadata;
       const plainClick = !event.defaultPrevented && event.button === 0 &&
         !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey &&
