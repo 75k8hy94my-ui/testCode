@@ -38,9 +38,10 @@ test('video pagination keeps one logical page for zero items and clamps after fi
   assert.equal(filtered.items.length, 25);
 });
 
-test('video library renders one 25-video slice with manga pager controls and slide animation', () => {
-  assert.match(library, /Pagination\.derive\(videos, state\.page, Pagination\.PAGE_SIZE\)/);
-  assert.match(library, /pageModel\.items\.forEach\(\(video\) => grid\.append\(createCard\(video\)\)\)/);
+test('video library paginates 25 boxes (single videos or series) with manga pager controls and slide animation', () => {
+  assert.match(library, /const displayItems = Data\.groupVideosBySeries\(videos\)/);
+  assert.match(library, /Pagination\.derive\(displayItems, state\.page, Pagination\.PAGE_SIZE\)/);
+  assert.match(library, /pageModel\.items\.forEach\(item => grid\.append\(item\.kind === 'series' \? createSeriesCard\(item\) : createCard\(item\.video\)\)\)/);
   assert.match(library, /id="videoLibraryPagination" class="bookshelf-pagination vl-pagination"/);
   assert.match(library, /videoLibraryPrevPage/);
   assert.match(library, /videoLibraryNextPage/);
