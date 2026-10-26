@@ -109,3 +109,56 @@ test('ordinary video-page URL renders as a compact bookmark, filters separately,
   await bookmark.locator('.videoCardTitle').click();
   await expect(page).toHaveURL(bookmarkUrl);
 });
+
+
+test('untitled existing bookmark fetches on click, saves its title, and never refetches a saved title', async ({ page }) => {
+  await page.route(/supabase\.co|\/auth\/v1\/|\/rest\/v1\//i, (route) => route.abort());
+  const outsideUrl = 'https://example.com/title-test?ref=one#section';
+  const outsideWithTitle = 'https://example.com/pre-titled?ref=two';
+  let lookupCalls = 0;
+  await page.route(/^https:\/\/api\.microlink\.io\//, async (route) => {
+    lookupCalls += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify({ status: 'success', data: { title: '自動取得されたタイトル' } }),
+    });
+  });
+  await page.route(/^https:\/\/example\.com\/(title-test|pre-titled)/, (route) =>
+    route.fulfill({ status: 200, contentType: 'text/html', body: '<title>External destination</title>' }));
+
+  await page.goto('index.html');
+  await page.getByRole('button', { name: 'ログインせずに使う' }).click();
+  await page.goto('video.html');
+  await expect(page.locator('#videoLibraryApp')).toBeVisible();
+  await page.evaluate(({ outsideUrl, outsideWithTitle }) => {
+    localStorage.setItem('testcode.video.bookmarkTitleLookupConsent.v1', 'allow');
+    localStorage.removeItem('testcode.video.bookmarkTitleLookupDaily.v1');
+    localStorage.setItem('mangaReaderVideos', JSON.stringify([
+      { id: 'missing-title', url: outsideUrl, title: '', addedAt: 2 },
+      { id: 'existing-title', url: outsideWithTitle, title: '手入力タイトル', addedAt: 1 },
+    ]));
+    localStorage.setItem('mangaReaderVideoMeta', '{}');
+    localStorage.setItem('mangaReaderVideoFolders', '[]');
+    window.MangaReaderVideoLibrary.init(window.MangaReaderMediaAccess);
+  }, { outsideUrl, outsideWithTitle });
+  await expect(page.locator('.vl-card[data-video-id="missing-title"]')).toBeVisible();
+  expect(lookupCalls).toBe(0); // No bulk lookup when rendering existing bookmarks.
+
+  await page.locator('.vl-card[data-video-id="missing-title"] .videoCardTitle').click();
+  await expect(page).toHaveURL(outsideUrl);
+  expect(lookupCalls).toBe(1);
+
+  await page.goto('video.html');
+  await expect(page.locator('.vl-card[data-video-id="missing-title"] .videoCardTitle')).toHaveText('自動取得されたタイトル');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('mangaReaderVideoMeta'))['missing-title'].title)).toBe('自動取得されたタイトル');
+  await page.locator('.vl-card[data-video-id="missing-title"] .videoCardTitle').click();
+  await expect(page).toHaveURL(outsideUrl);
+  expect(lookupCalls).toBe(1); // Saved title suppresses future calls.
+
+  await page.goto('video.html');
+  await page.locator('.vl-card[data-video-id="existing-title"] .videoCardTitle').click();
+  await expect(page).toHaveURL(outsideWithTitle);
+  expect(lookupCalls).toBe(1); // Manually titled bookmarks are never overwritten.
+});

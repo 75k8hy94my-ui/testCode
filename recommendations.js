@@ -106,8 +106,9 @@
     loadBrowserScript('desktop-navigation.js')
       .catch((error) => console.warn('デスクトップナビの読み込みに失敗しました', error));
     loadBrowserScript('video-data.js?v=20261026-url-bookmarks')
-      .then(() => loadBrowserScript('video-library.js?v=20261026-url-bookmarks'))
-      .then(() => loadBrowserScript('video-routing-fix.js?v=20261026-url-bookmarks'))
+      .then(() => loadBrowserScript('video-library.js?v=20261026-click-title'))
+      .then(() => loadBrowserScript('video-link-metadata.js?v=20261026-click-title'))
+      .then(() => loadBrowserScript('video-routing-fix.js?v=20261026-click-title'))
       .then(() => loadBrowserScript('video-thumbnail-time.js'))
       .catch((error) => console.warn('動画ライブラリの読み込みに失敗しました', error));
   }

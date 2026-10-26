@@ -6,6 +6,10 @@
 }(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
   const CONSENT_KEY = 'testcode.video.bookmarkTitleLookupConsent.v1';
+  const DAILY_KEY = 'testcode.video.bookmarkTitleLookupDaily.v1';
+  // Leave margin within the service's stated free-tier daily allowance.
+  const DAILY_LIMIT = 20;
+  const CONSENT_MESSAGE = 'ブックマーク先のタイトルを取得するため、URLを外部サービス（Microlink）に送信します。公開ページのURLだけに使用してください。許可すると、動画追加時と未取得のリンクを開いた時にタイトルを自動取得します。';
   const SENSITIVE_KEY = /(?:^|[_-])(access[_-]?token|token|auth|authorization|api[_-]?key|apikey|secret|password|passwd|session|signature|signed|jwt|bearer)(?:$|[_-])/i;
 
   function publicUrl(raw) {
@@ -49,6 +53,46 @@
     return { title, description };
   }
 
+  function dailyAllowance(storage, now = new Date()) {
+    if (!storage || typeof storage.getItem !== 'function' || typeof storage.setItem !== 'function') return false;
+    const day = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
+    try {
+      let value;
+      try { value = JSON.parse(storage.getItem(DAILY_KEY) || 'null'); } catch (_) { value = null; }
+      const used = value && value.day === day && Number.isSafeInteger(value.used)
+        ? Math.max(0, value.used) : 0;
+      if (used >= DAILY_LIMIT) return false;
+      storage.setItem(DAILY_KEY, JSON.stringify({ day, used: used + 1 }));
+      return true;
+    } catch (_) { return false; }
+  }
+
+  // Only call this for explicit bookmark creation or a click on an untitled
+  // bookmark. Never invoke it while loading or rendering a video list.
+  async function lookupWithConsent(rawUrl, options) {
+    const settings = options || {};
+    if (!publicUrl(rawUrl)) return { status: 'unsafe' };
+    const storage = settings.storage || (typeof localStorage !== 'undefined' ? localStorage : null);
+    const ask = settings.confirm || (typeof confirm === 'function' ? confirm : () => false);
+    let consent = '';
+    try { consent = storage?.getItem(CONSENT_KEY) || ''; } catch (_) {}
+    if (consent !== 'allow') {
+      if (consent === 'decline' && settings.manual !== true) return { status: 'declined' };
+      const allowed = ask(CONSENT_MESSAGE);
+      try { storage?.setItem(CONSENT_KEY, allowed ? 'allow' : 'decline'); } catch (_) {}
+      if (!allowed) return { status: 'declined' };
+    }
+    if (!dailyAllowance(storage, settings.now || new Date())) return { status: 'quota' };
+    const info = await fetchMetadata(rawUrl, settings);
+    return { status: 'success', ...info };
+  }
+
+  function skippedMessage(status) {
+    if (status === 'quota') return '本日の自動取得回数の上限に達しました。タイトルは手入力できます。';
+    if (status === 'unsafe') return 'このURLは外部サービスに送信しません。タイトルは手入力できます。';
+    return '取得せずに登録できます。必要ならタイトルを手入力してください。';
+  }
+
   function attach(options) {
     const settings = options || {};
     const urlInput = settings.urlInput;
@@ -66,12 +110,6 @@
     let active = false;
     let activeTask = null;
 
-    function permitted() {
-      try { return storage && storage.getItem(CONSENT_KEY) || ''; } catch (_) { return ''; }
-    }
-    function remember(value) {
-      try { if (storage) storage.setItem(CONSENT_KEY, value); } catch (_) {}
-    }
     function available() {
       return isBookmark(urlInput.value.trim()) && !!publicUrl(urlInput.value.trim());
     }
@@ -82,13 +120,6 @@
     async function retrieve(manual) {
       const url = urlInput.value.trim();
       if (!available() || (!manual && titleInput.value.trim())) return;
-      const consent = permitted();
-      if (consent !== 'allow') {
-        if (!manual && consent === 'decline') return;
-        const accepted = ask('ブックマーク先のタイトルを取得するため、URLを外部サービス（Microlink）に送信します。公開ページのURLだけに使用してください。許可すると今後のブックマーク追加時にも自動取得します。');
-        remember(accepted ? 'allow' : 'decline');
-        if (!accepted) { message.textContent = '取得せずに登録できます。必要ならタイトルを手入力してください。'; return; }
-      }
       const requestId = ++generation;
       if (controller) controller.abort();
       controller = typeof AbortController === 'function' ? new AbortController() : null;
@@ -98,8 +129,14 @@
       button.disabled = true;
       message.textContent = 'ページのタイトルを取得中…';
       try {
-        const metadata = await fetchMetadata(url, { fetchImpl: fetcher, signal: controller && controller.signal });
+        const metadata = await lookupWithConsent(url, {
+          storage, confirm: ask, fetchImpl: fetcher, signal: controller && controller.signal, manual,
+        });
         if (requestId !== generation || urlInput.value.trim() !== url || !available() || titleInput.value !== initialTitle) return;
+        if (metadata.status !== 'success') {
+          message.textContent = skippedMessage(metadata.status);
+          return;
+        }
         // Never overwrite a title the user has already entered.
         if (titleInput.value.trim()) {
           message.textContent = '取得タイトル：' + metadata.title + '（入力済みのタイトルは保持しました）';
@@ -162,5 +199,5 @@
     return detach;
   }
 
-  return Object.freeze({ CONSENT_KEY, publicUrl, fetchMetadata, attach });
+  return Object.freeze({ CONSENT_KEY, DAILY_KEY, DAILY_LIMIT, publicUrl, fetchMetadata, lookupWithConsent, dailyAllowance, attach });
 }));

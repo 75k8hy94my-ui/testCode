@@ -1231,7 +1231,13 @@
     injectStyles(); loadPrefs(); loadLibraryState(); if (!setupMarkup()) return; bindEvents(); if (dom.search) dom.search.value = state.query; render(); resumePendingLocalSync(); migrateExistingVideoUrls();
   }
 
-  window.MangaReaderVideoLibrary = Object.freeze({ init, syncAccessUi, captureReturnContext });
+  function refreshFromStorage() {
+    if (!canReadProtectedData() || !dom.results) return;
+    loadLibraryState();
+    render();
+  }
+
+  window.MangaReaderVideoLibrary = Object.freeze({ init, syncAccessUi, captureReturnContext, refreshFromStorage });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(init, 0), { once: true });
   else setTimeout(init, 0);
 })();
