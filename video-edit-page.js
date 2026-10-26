@@ -180,6 +180,7 @@
     // External page bookmarks can receive the page's public title without
     // altering MP4 entries or the user's existing notes and tags.
     const metadataLookup = window.TestCodeVideoLinkMetadata;
+    let bookmarkTitleLookup = null;
     if (metadataLookup && typeof metadataLookup.attach === 'function') {
       const panel = document.createElement('div');
       panel.className = 'videoEditLinkLookup';
@@ -192,7 +193,7 @@
       message.setAttribute('aria-live', 'polite');
       panel.append(button, message);
       form.querySelector('.videoEditTitleField').insertAdjacentElement('afterend', panel);
-      metadataLookup.attach({
+      bookmarkTitleLookup = metadataLookup.attach({
         urlInput: elements.url, titleInput: elements.title, panel, button, message,
         isBookmark: (url) => ['link', 'legacy'].includes(Data.classifyVideoUrl(url).kind),
       });
@@ -332,6 +333,7 @@
     elements.url.addEventListener('input', refreshUrlFields);
     elements.url.addEventListener('change', refreshUrlFields);
     let saving = false;
+    let lookupSubmissionPending = false;
     let needsFollowUpSave = false;
     let autoSaveTimer = null;
     let syncTimer = null;
@@ -422,6 +424,12 @@
       const error = form.querySelector('.videoEditError'); error.textContent = '';
       if (!canReadProtectedData()) return;
       if (saving) { needsFollowUpSave = true; return; }
+      if (isAddMode && bookmarkTitleLookup && bookmarkTitleLookup.ensureTitle) {
+        if (lookupSubmissionPending) return;
+        lookupSubmissionPending = true;
+        try { await bookmarkTitleLookup.ensureTitle(); }
+        finally { lookupSubmissionPending = false; }
+      }
       const startingSnapshot = formSnapshot();
       if (!isAddMode && startingSnapshot === lastSavedSnapshot) return;
       setSaveStatus('自動保存中…');
