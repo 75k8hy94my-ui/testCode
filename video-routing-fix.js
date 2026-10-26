@@ -14,6 +14,7 @@
   let activePlayback = null;
   let editorObserver = null;
   let thumbnailObserver = null;
+  const activeBookmarkOpens = new Set();
 
   function canReadProtectedData() {
     const gate = window.MangaReaderMediaAccess;
@@ -525,6 +526,74 @@
     editorObserver.observe(document.documentElement, { childList: true, subtree: true });
   }
 
+  // Enrichment is event-driven. Existing bookmarks are never fetched merely
+  // because they appear on screen, nor during a migration/sync.
+  async function saveOpenedBookmarkTitle(videoId, sourceUrl, title) {
+    if (!canReadProtectedData() || !text(title)) return false;
+    const storedVideos = readJson(VIDEO_KEY, []);
+    const latest = Array.isArray(storedVideos)
+      ? storedVideos.find((item) => text(item?.id) === videoId) : null;
+    if (!latest) return false;
+    const allMeta = readJson(META_KEY, {});
+    if (!allMeta || typeof allMeta !== 'object' || Array.isArray(allMeta)) return false;
+    const existing = allMeta[videoId] && typeof allMeta[videoId] === 'object' ? allMeta[videoId] : {};
+    if (text(existing.title) || text(latest.title) ||
+      text(existing.url || latest.url) !== sourceUrl ||
+      Data.videoEntryKind(latest, existing) !== 'bookmark') return false;
+    const guest = window.TestCodeGuest?.isActive() === true;
+    const vault = window.MangaVault;
+    if (!guest && vault?.loadSession?.()?.user?.id &&
+      (typeof vault.markLocalChangesPending !== 'function' || vault.markLocalChangesPending() !== true)) {
+      throw new Error('クラウド同期の保留状態を記録できません。');
+    }
+    allMeta[videoId] = { ...existing, title: text(title).slice(0, 240), updatedAt: Date.now() };
+    if (!writeJson(META_KEY, allMeta)) throw new Error('タイトルを保存できませんでした。');
+    // Reflect the title immediately when opening the destination in another tab
+    // or returning through an SPA route.
+    window.MangaReaderVideoLibrary?.refreshFromStorage?.();
+    if (!guest && vault && typeof vault.saveLocalChanges === 'function') {
+      clearTimeout(syncTimer);
+      // A deferred cloud sync remains marked pending if the user navigates
+      // before the operation finishes or the network is disconnected.
+      try {
+        let timeout = null;
+        await Promise.race([
+          Promise.resolve().then(() => vault.saveLocalChanges()),
+          new Promise((resolve) => { timeout = setTimeout(resolve, 3000); }),
+        ]).finally(() => { if (timeout !== null) clearTimeout(timeout); });
+      } catch (_) {
+        // The local title and Vault pending marker survive a failed sync.
+      }
+    }
+    return true;
+  }
+
+  function startBookmarkLookup(base, url, href) {
+    const lookup = window.TestCodeVideoLinkMetadata;
+    if (!lookup || typeof lookup.lookupWithConsent !== 'function') {
+      window.location.href = href;
+      return;
+    }
+    const id = text(base.id);
+    if (activeBookmarkOpens.has(id)) return;
+    activeBookmarkOpens.add(id);
+    const status = document.getElementById('videoLibraryStatus');
+    if (status) status.textContent = 'リンク先のタイトルを確認しています…';
+    void (async () => {
+      try {
+        const result = await lookup.lookupWithConsent(url);
+        if (result.status === 'success') await saveOpenedBookmarkTitle(id, url, result.title);
+      } catch (error) {
+        // Metadata is optional: a blocked site, rate limit, or storage failure
+        // must never prevent the original bookmark from opening.
+        if (status) status.textContent = 'タイトルを取得できませんでした。';
+      } finally {
+        activeBookmarkOpens.delete(id);
+        window.location.href = href;
+      }
+    })();
+  }
+
   function handleEnhancedOpen(event) {
     if (!canReadProtectedData()) return;
     const target = event.target && typeof event.target.closest === 'function' ? event.target : null;
@@ -539,10 +608,26 @@
     const base = videos.find((video) => text(video && video.id) === videoId);
     if (!base) return;
 
-    // Bookmark cards are ordinary HTTPS links. Let the anchor navigate to its
-    // exact URL (including query/fragment) instead of opening the video player.
-    // This listener runs in the capture phase, before the browser follows it.
+    // Keep ordinary titled bookmarks as native links, including modifiers,
+    // open-in-new-tab, query strings and fragments. Untitled bookmarks only
+    // fetch once the user actually clicks the link (never in bulk).
     if (card.classList.contains('videoCard--bookmark')) {
+      const sourceUrl = text(base.url);
+      const meta = readJson(META_KEY, {});
+      const saved = meta && typeof meta === 'object' ? meta[videoId] || {} : {};
+      const lookup = window.TestCodeVideoLinkMetadata;
+      const plainClick = !event.defaultPrevented && event.button === 0 &&
+        !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey &&
+        !openButton.target && typeof openButton.href === 'string';
+      if (plainClick && !text(saved.title) && !text(base.title) &&
+        lookup && typeof lookup.publicUrl === 'function' && lookup.publicUrl(sourceUrl)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (activeBookmarkOpens.has(videoId)) return;
+        recordOpen(base);
+        startBookmarkLookup(base, sourceUrl, openButton.href);
+        return;
+      }
       recordOpen(base);
       return;
     }
