@@ -298,3 +298,18 @@ test('capture keyboard listeners are removed on player disposal', () => {
   assert.equal(player.documentCaptureEvents.has('keydown'), false);
   assert.equal(player.documentCaptureEvents.has('keyup'), false);
 });
+
+
+test('marker editing keeps overlays visible but closing marker panel restarts the idle timer', () => {
+  const timers = clock();
+  const player = createPlayer({}, { timers });
+  player.centerPlay.emit('click', { stopPropagation() {} });
+  player.markerToggle.emit('click');
+  assert.equal(player.panel.hidden, false);
+  timers.flush();
+  assert.equal(player.frame.classList.contains('controlsVisible'), true);
+  player.markerToggle.emit('click');
+  assert.equal(player.panel.hidden, true);
+  timers.flush();
+  assert.equal(player.frame.classList.contains('controlsVisible'), false);
+});
