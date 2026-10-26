@@ -177,6 +177,27 @@
     elements.thumbnail.value = current.thumbnailUrl;
     elements.thumbnailTime.value = current.thumbnailTimeSeconds == null ? '' : Data.formatMediaTime(current.thumbnailTimeSeconds);
     elements.thumbnailTime.disabled = !Data.isDirectVideoUrl(current.url);
+    // External page bookmarks can receive the page's public title without
+    // altering MP4 entries or the user's existing notes and tags.
+    const metadataLookup = window.TestCodeVideoLinkMetadata;
+    let bookmarkTitleLookup = null;
+    if (metadataLookup && typeof metadataLookup.attach === 'function') {
+      const panel = document.createElement('div');
+      panel.className = 'videoEditLinkLookup';
+      panel.hidden = true;
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'videoEditButton';
+      button.textContent = 'リンク先からタイトル取得';
+      const message = document.createElement('p');
+      message.className = 'videoEditHelp'; message.setAttribute('role', 'status');
+      message.setAttribute('aria-live', 'polite');
+      panel.append(button, message);
+      form.querySelector('.videoEditTitleField').insertAdjacentElement('afterend', panel);
+      bookmarkTitleLookup = metadataLookup.attach({
+        urlInput: elements.url, titleInput: elements.title, panel, button, message,
+        isBookmark: (url) => ['link', 'legacy'].includes(Data.classifyVideoUrl(url).kind),
+      });
+    }
     if (!isAddMode && /^https?:\/\//i.test(current.url)) {
       const source = document.createElement('a'); source.className = 'videoEditButton videoEditSource';
       source.href = current.url; source.target = '_blank'; source.rel = 'noopener noreferrer'; source.textContent = '元ページを開く ↗';
@@ -312,6 +333,7 @@
     elements.url.addEventListener('input', refreshUrlFields);
     elements.url.addEventListener('change', refreshUrlFields);
     let saving = false;
+    let lookupSubmissionPending = false;
     let needsFollowUpSave = false;
     let autoSaveTimer = null;
     let syncTimer = null;
@@ -402,6 +424,12 @@
       const error = form.querySelector('.videoEditError'); error.textContent = '';
       if (!canReadProtectedData()) return;
       if (saving) { needsFollowUpSave = true; return; }
+      if (isAddMode && bookmarkTitleLookup && bookmarkTitleLookup.ensureTitle) {
+        if (lookupSubmissionPending) return;
+        lookupSubmissionPending = true;
+        try { await bookmarkTitleLookup.ensureTitle(); }
+        finally { lookupSubmissionPending = false; }
+      }
       const startingSnapshot = formSnapshot();
       if (!isAddMode && startingSnapshot === lastSavedSnapshot) return;
       setSaveStatus('自動保存中…');
