@@ -20,6 +20,7 @@
 
   const state = {
     baseVideos: [], folders: [], meta: {}, query: '', quick: 'all', folderId: '', tag: '', service: '', kind: 'all', sort: 'recent-added', view: 'card', thumbnailSize: 'normal', page: 1, totalPages: 1,
+    seriesSelecting: false, seriesSelected: new Set(), expandedSeries: new Set(),
     syncTimer: null, syncRunning: false, syncDirty: false, syncPromise: null, editorSaving: false, editorId: null, sheetMode: null, showHidden: false, customDefinitions: { schemaVersion: 1, properties: {} }, customValues: {}, customFilters: {},
   };
   const dom = {};
@@ -426,6 +427,19 @@
       @media(max-width:700px){.vl-top{flex-wrap:wrap}.vl-search{flex:1 0 100%}.vl-top #videoLibraryAdd,.vl-top #videoLibraryShorts,.vl-top #videoLibraryHidden,.vl-top #videoLibraryProperties{flex:1}.vl-filters{grid-template-columns:1fr 1fr 1fr}.vl-filters #videoLibrarySort{grid-column:span 1}.vl-grid{grid-template-columns:1fr 1fr}.vl-sheet-panel{border-radius:24px 24px 18px 18px}.vl-two{grid-template-columns:1fr}}
       @media(max-width:480px){.vl-top{align-items:stretch}.vl-primary{padding:0 12px}.vl-filters{grid-template-columns:1fr 1fr}.vl-grid{grid-template-columns:1fr}.vl-grid.compact .vl-card{grid-template-columns:104px minmax(0,1fr)}.vl-grid.compact .vl-thumb{height:72px}.vl-grid.compact .vl-body{padding-right:66px}.vl-summary{padding:0 2px}}
     `;
+    style.textContent += `
+      .vl-series-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-soft);color:var(--text);font-size:13px}
+      .vl-series-bar[hidden]{display:none!important}.vl-series-bar span{margin-right:auto}.vl-series-bar button{min-height:38px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2);color:var(--text);padding:0 12px;font-weight:700}.vl-series-bar button:disabled{opacity:.45}
+      .vl-series{grid-column:1/-1;border:1px solid var(--border);background:var(--bg-soft);border-radius:16px;padding:10px;min-width:0}
+      .vl-series-heading{display:flex;align-items:center;gap:12px;min-height:48px}
+      .vl-series-toggle{flex:1;text-align:left;border:0;background:transparent;color:var(--text);font-weight:800;font-size:15px;padding:12px;cursor:pointer}
+      .vl-series-select-all{display:inline-flex;align-items:center;gap:6px;color:var(--text);font-size:12px;white-space:nowrap;padding:8px}
+      .vl-series-videos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:8px 2px 2px}
+      .vl-card{position:relative}.vl-series-pick{position:absolute;right:8px;top:8px;z-index:8;display:inline-flex;align-items:center;gap:5px;padding:7px 9px;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:9px;font-size:12px;font-weight:700;cursor:pointer}
+      .vl-series-pick input,.vl-series-select-all input{accent-color:var(--accent);width:16px;height:16px}
+      @media(max-width:700px){.vl-series-videos{grid-template-columns:repeat(2,minmax(0,1fr))}}
+      @media(max-width:480px){.vl-series-videos{grid-template-columns:minmax(0,1fr)}.vl-series-bar button{flex:1}.vl-series-heading{gap:3px}}
+    `;
     document.head.appendChild(style);
   }
 
@@ -450,6 +464,7 @@
         <a id="videoLibraryProperties" class="vl-secondary" href="video-properties.html">プロパティ設定</a>
         <button id="videoLibraryShorts" class="vl-primary vl-shorts" type="button">縦スワイプ再生</button>
         <button id="videoLibraryHidden" class="vl-icon-btn" type="button">非表示</button>
+        <button id="videoLibrarySeriesMode" class="vl-icon-btn" type="button" aria-pressed="false">シリーズ</button>
       </div>
       <div id="videoLibraryQuick" class="vl-chips" aria-label="クイックフィルタ">
         <button class="vl-chip" data-quick="all" type="button">すべて</button>
@@ -468,6 +483,12 @@
         <label class="vl-thumbnail-size-label" for="videoLibraryThumbnailSize">サムネイルサイズ <select id="videoLibraryThumbnailSize" aria-label="動画一覧のサムネイルサイズ"><option value="small">小</option><option value="normal">標準</option><option value="large">大</option></select></label>
       </div>
       <details class="vl-custom-filter"><summary>カスタムプロパティで絞り込む</summary><div id="videoLibraryCustomFilters" class="vl-custom-filter-list"></div></details>
+      <div id="videoLibrarySeriesBar" class="vl-series-bar" hidden>
+        <span id="videoLibrarySeriesCount">0本選択中</span>
+        <button id="videoLibrarySeriesGroup" type="button">まとめる</button>
+        <button id="videoLibrarySeriesRemove" type="button">シリーズから外す</button>
+        <button id="videoLibrarySeriesCancel" type="button">キャンセル</button>
+      </div>
       <div class="vl-summary"><span id="videoLibraryCount"></span><span id="videoLibraryStatus" aria-live="polite"></span></div>
       <p id="videoLibraryAccessNotice" class="vl-access-notice" aria-live="polite" hidden>VPN接続を確認できるまで、動画データの読み込みと追加・編集を停止しています。</p>
       <div id="videoLibraryResults"></div>
@@ -518,6 +539,9 @@
       folder: document.getElementById('videoLibraryFolder'), tag: document.getElementById('videoLibraryTag'), service: document.getElementById('videoLibraryService'), kind: document.getElementById('videoLibraryKind'),
       sort: document.getElementById('videoLibrarySort'), view: document.getElementById('videoLibraryView'), thumbnailSize: document.getElementById('videoLibraryThumbnailSize'), foldersBtn: document.getElementById('videoLibraryFolders'),
       customFilters: document.getElementById('videoLibraryCustomFilters'),
+      seriesMode: document.getElementById('videoLibrarySeriesMode'), seriesBar: document.getElementById('videoLibrarySeriesBar'),
+      seriesCount: document.getElementById('videoLibrarySeriesCount'), seriesGroup: document.getElementById('videoLibrarySeriesGroup'),
+      seriesRemove: document.getElementById('videoLibrarySeriesRemove'), seriesCancel: document.getElementById('videoLibrarySeriesCancel'),
       add: document.getElementById('videoLibraryAdd'), shorts: document.getElementById('videoLibraryShorts'), hiddenBtn: document.getElementById('videoLibraryHidden'), count: document.getElementById('videoLibraryCount'), status: document.getElementById('videoLibraryStatus'), results: document.getElementById('videoLibraryResults'),
       pagination: document.getElementById('videoLibraryPagination'), prevPage: document.getElementById('videoLibraryPrevPage'), nextPage: document.getElementById('videoLibraryNextPage'), pageLabel: document.getElementById('videoLibraryPageLabel'),
       sheet, sheetTitle: document.getElementById('videoLibrarySheetTitle'), form: document.getElementById('videoLibraryForm'),
@@ -1006,6 +1030,7 @@
     // VideoListRoute persists across Home SPA transitions: discard transient
     // search terms when leaving the video list, even when its DOM is detached.
     document.addEventListener('manga-video-list-route-detach', () => {
+      state.seriesSelecting = false; state.seriesSelected.clear(); renderedResultsKey = null;
       state.query = '';
       if (dom.search) dom.search.value = '';
       state.page = 1;
@@ -1032,7 +1057,16 @@
     dom.sort.addEventListener('change', () => { clearReturnIntent(); state.sort = dom.sort.value; savePrefs(); render(); });
     dom.view.addEventListener('click', () => { clearReturnIntent(); state.view = state.view === 'card' ? 'compact' : 'card'; savePrefs(); render(); });
     dom.thumbnailSize.addEventListener('change', () => { state.thumbnailSize = ['small', 'normal', 'large'].includes(dom.thumbnailSize.value) ? dom.thumbnailSize.value : 'normal'; savePrefs(); dom.app.dataset.thumbnailSize = state.thumbnailSize; });
-    dom.hiddenBtn.addEventListener('click', () => { clearReturnIntent(); state.showHidden = !state.showHidden; state.query = ''; dom.search.value = ''; state.folderId = ''; state.tag = ''; state.service = ''; render(); });
+    dom.hiddenBtn.addEventListener('click', () => { clearReturnIntent(); state.showHidden = !state.showHidden; state.seriesSelected.clear(); state.query = ''; dom.search.value = ''; state.folderId = ''; state.tag = ''; state.service = ''; render(); });
+    dom.seriesMode.addEventListener('click', () => {
+      if (!canReadProtectedData()) return;
+      state.seriesSelecting = !state.seriesSelecting;
+      state.seriesSelected.clear();
+      render();
+    });
+    dom.seriesGroup.addEventListener('click', () => commitSeries('group', [...state.seriesSelected]));
+    dom.seriesRemove.addEventListener('click', () => commitSeries('remove', [...state.seriesSelected]));
+    dom.seriesCancel.addEventListener('click', () => { state.seriesSelecting = false; state.seriesSelected.clear(); render(); });
     dom.add.addEventListener('click', () => {
       if (!canReadProtectedData()) return;
       window.location.href = new URL('video-edit.html?mode=add&return=list', location.href).href;
@@ -1053,6 +1087,8 @@
     const allowed = canReadProtectedData();
     if (dom.accessNotice) dom.accessNotice.hidden = allowed;
     if (dom.add) dom.add.disabled = !allowed;
+    if (dom.seriesMode) dom.seriesMode.disabled = !allowed;
+    if (!allowed) { state.seriesSelecting = false; state.seriesSelected.clear(); }
     if (dom.deleteBtn) dom.deleteBtn.disabled = !allowed;
     if (dom.createFolder) dom.createFolder.disabled = !allowed;
     if (dom.form) dom.form.querySelectorAll('button[type="submit"]').forEach((button) => { button.disabled = !allowed; });
