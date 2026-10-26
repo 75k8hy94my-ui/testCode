@@ -15,7 +15,17 @@ function createPlayer(saved = {}, options = {}) {
       this.style = {};
       this.events = new Map();
       this.attributes = {};
-      this.classList = { add() {}, remove() {}, toggle() {} };
+      const classes = new Set();
+      this.classList = {
+        add(...names) { names.forEach((name) => classes.add(name)); },
+        remove(...names) { names.forEach((name) => classes.delete(name)); },
+        contains(name) { return classes.has(name); },
+        toggle(name, forced) {
+          const shouldAdd = forced === undefined ? !classes.has(name) : Boolean(forced);
+          if (shouldAdd) classes.add(name); else classes.delete(name);
+          return shouldAdd;
+        },
+      };
       this.hidden = false;
       this.value = '';
     }
@@ -30,7 +40,9 @@ function createPlayer(saved = {}, options = {}) {
   }
   const frame = new Node();
   const video = new Node('VIDEO'); Object.assign(video, { volume: .8, muted: false, currentTime: 11.25, duration: 60, paused: true });
-  video.closest = () => frame; video.pause = () => { video.paused = true; }; video.play = () => { video.paused = false; };
+  video.closest = () => frame;
+  video.pause = () => { video.paused = true; video.emit('pause'); };
+  video.play = () => { video.paused = false; video.emit('play'); };
   const documentEvents = new Map();
   const document = {
     querySelector: (selector) => selector === '#videoPlayerPage video' ? video : null,
@@ -47,12 +59,13 @@ function createPlayer(saved = {}, options = {}) {
   }
   class CustomEvent { constructor(type) { this.type = type; } }
   vm.runInNewContext(controls, { window, document, location: { search: '?id=clip' }, localStorage, URLSearchParams, CustomEvent, crypto: { randomUUID: () => 'test-id' }, setTimeout: () => 1, clearTimeout() {} });
+  const centerPlay = frame.children.find((node) => node.className === 'customVideoCenterPlay');
   const frameControls = frame.children.find((node) => node.className === 'customVideoControls');
   const seekWrap = frameControls.children.find((node) => node.className === 'customVideoSeekWrap');
   const markerToggle = frameControls.children.find((node) => node.textContent === '秒数登録');
   const panel = frame.children.find((node) => node.className === 'videoMarkerPanel');
   const choices = panel.children[0]; const add = panel.children[1];
-  return { frame, video, frameControls, seekWrap, markerToggle, panel, choices, add, saved, documentEvents, events };
+  return { frame, video, centerPlay, frameControls, seekWrap, markerToggle, panel, choices, add, saved, documentEvents, events };
 }
 
 test('timestamp registration offers only the four canonical icons without name or seconds fields', () => {
@@ -141,4 +154,55 @@ test('left and right arrow keys seek ten seconds while editable controls retain 
   listener({ key: 'ArrowRight', target: { tagName: 'INPUT' }, preventDefault() { prevented += 1; } });
   assert.equal(player.video.currentTime, 11.25);
   assert.equal(prevented, 2);
+});
+
+test('center play/pause is the only playback toggle; video taps hide or show controls without pausing', () => {
+  const player = createPlayer();
+  const { frame, video, centerPlay, frameControls } = player;
+  assert.ok(centerPlay);
+  assert.ok(!frameControls.children.includes(centerPlay), 'play button must not be in the bottom bar');
+  assert.equal(centerPlay.getAttribute('aria-label'), '再生');
+  assert.equal(frame.classList.contains('controlsVisible'), true);
+
+  centerPlay.emit('click', { stopPropagation() {} });
+  assert.equal(video.paused, false);
+  assert.equal(centerPlay.getAttribute('aria-label'), '一時停止');
+
+  video.emit('click', { clientX: 100 });
+  assert.equal(frame.classList.contains('controlsVisible'), false);
+  assert.equal(video.paused, false, 'tapping the picture cannot pause playback');
+
+  video.emit('click', { clientX: 100 });
+  assert.equal(frame.classList.contains('controlsVisible'), true);
+  assert.equal(video.paused, false, 'revealing the UI cannot restart or pause playback');
+
+  centerPlay.emit('click', { stopPropagation() {} });
+  assert.equal(video.paused, true);
+  assert.equal(centerPlay.getAttribute('aria-label'), '再生');
+  video.emit('click', { clientX: 100 });
+  assert.equal(frame.classList.contains('controlsVisible'), false);
+  assert.equal(video.paused, true, 'the UI can be dismissed even when paused');
+});
+
+test('the video overlay remains independent of seek and marker controls', () => {
+  const player = createPlayer();
+  player.centerPlay.emit('click', { stopPropagation() {} });
+  player.markerToggle.emit('click');
+  assert.equal(player.panel.hidden, false);
+  assert.equal(player.video.paused, false);
+  const seek = player.seekWrap.children.find((node) => node.className === 'customVideoSeek');
+  seek.value = '33';
+  seek.emit('input');
+  assert.equal(player.video.currentTime, 33);
+  assert.equal(player.video.paused, false);
+});
+
+test('the centered button and hidden-controls state have accessible responsive styles', () => {
+  const css = fs.readFileSync(new URL('../home-profile-shell.css', import.meta.url), 'utf8');
+  const html = fs.readFileSync(new URL('../video-player.html', import.meta.url), 'utf8');
+  assert.match(css, /\\.customVideoPlayer\\.controlsVisible \\.customVideoCenterPlay/);
+  assert.match(css, /\\.customVideoPlayer:not\\(\\.controlsVisible\\) \\.customVideoControls/);
+  assert.match(css, /pointer-events: none/);
+  assert.match(css, /\\.customVideoCenterPlay:focus-visible/);
+  assert.match(html, /video-player-controls\\.js\\?v=20261026-center-video-playback/);
 });
