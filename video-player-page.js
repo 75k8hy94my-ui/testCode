@@ -310,6 +310,11 @@
             Number.isFinite(video.duration) ? video.duration : startTime);
         }, { once: true });
       }
+      // Native media events expose buffered playback time without fetching the
+      // external URL ourselves or changing the existing streaming/seek behavior.
+      if (window.TestCodeVideoLoading) {
+        windowCleanups.push(window.TestCodeVideoLoading.attach(video, frame));
+      }
       video.src = sourceUrl;
       const cleanupRotation = window.MangaReaderVideoRotation.install(
         frame, video, normalized.rotate90Direction, { expandFrame: true });
