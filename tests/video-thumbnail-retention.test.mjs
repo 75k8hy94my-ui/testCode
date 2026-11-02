@@ -158,7 +158,7 @@ function loadRenderer(root) {
     createObjectURL: () => 'blob:cached-frame',
     revokeObjectURL() {},
   };
-  vm.runInNewContext(rendererSource, { window: root, URL });
+  vm.runInNewContext(rendererSource, { window: root, URL, setTimeout, clearTimeout });
   const container = new Node('div', stats);
   return { renderer: root.MangaReaderVideoThumbnailRenderer, container, documentRef, stats };
 }
