@@ -43,7 +43,9 @@ test('image load hides fallback and failure restores it before direct-video fall
 
 test('missing image and failed direct video leave the play fallback visible', async () => {
   const container = new Element('span');
-  const result = Renderer.render(container, { url: 'https://cdn.example/movie.mp4' }, { documentRef });
+  // Use a distinct origin so an earlier test's CORS-negative memory cannot
+  // change the initial retry behavior of this independent test.
+  const result = Renderer.render(container, { url: 'https://independent-cors-test.example/movie.mp4' }, { documentRef });
   await new Promise(resolve => setTimeout(resolve, 5));
   result.video.dispatch('error');
   result.video.dispatch('error');
