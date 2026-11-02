@@ -1,6 +1,30 @@
 (function (root) {
   'use strict';
 
+  // Limit simultaneous MP4 seeks/decoders. Mobile WebKit can stall when a
+  // full page of video cards starts loading at once.
+  const corsBlockedOrigins = new Set();
+  const previewJobs = [];
+  let activePreviews = 0;
+  function drainPreviews() {
+    while (activePreviews < 2 && previewJobs.length) {
+      const job = previewJobs.shift();
+      if (job.container.isConnected === false) continue;
+      activePreviews += 1;
+      let released = false;
+      job.start(() => {
+        if (released) return;
+        released = true;
+        activePreviews -= 1;
+        drainPreviews();
+      });
+    }
+  }
+  function schedulePreview(container, start) {
+    previewJobs.push({ container, start });
+    drainPreviews();
+  }
+
   function imageUrl(video) {
     if (video && video.thumbnailUrl) return String(video.thumbnailUrl);
     try {
@@ -60,46 +84,124 @@
       if (!isDirectVideo(record.url) || !(width > 0 && height > 0)) return;
       container.style.aspectRatio = width + ' / ' + height;
     };
-    const addDirectPreview = () => {
-      if (preview || !isDirectVideo(record.url)) return;
+    const addDirectPreview = (releaseSlot) => {
+      if (preview || !isDirectVideo(record.url)) { releaseSlot(); return; }
+      const time = Math.max(0, Number(record.thumbnailTimeSeconds) || 0.1);
+      let target = time;
       let captureRequested = false;
-      preview = doc.createElement('video'); preview.className = options && options.videoClass || 'vl-thumb-direct-video';
-      preview.muted = true; preview.playsInline = true; preview.preload = 'metadata'; preview.src = record.url;
-      preview.style.visibility = 'hidden'; preview.addEventListener('loadedmetadata', () => {
+      let settled = false;
+      let sourceOrigin = '';
+      try { sourceOrigin = new URL(record.url).origin; } catch (_) {}
+      const ownOrigin = root.location && root.location.origin || '';
+      let corsEnabled = !sourceOrigin || !corsBlockedOrigins.has(sourceOrigin);
+
+      preview = doc.createElement('video');
+      preview.className = options && options.videoClass || 'vl-thumb-direct-video';
+      preview.muted = true;
+      preview.playsInline = true;
+      preview.preload = 'metadata';
+      if (corsEnabled) preview.crossOrigin = 'anonymous';
+      preview.style.visibility = 'hidden';
+
+      const release = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        releaseSlot();
+      };
+      const fail = () => { release(); revealFallback(preview); preview = null; };
+      const displayFrame = () => {
+        if (!preview || !preview.isConnected || (cache && !cache.permitted())) { release(); return; }
+        applyNativeRatio(Number(preview.videoWidth), Number(preview.videoHeight));
+        applyMediaRotation(preview, Number(preview.videoWidth), Number(preview.videoHeight));
+        show(preview);
+        release();
+        if (captureRequested || !corsEnabled || !cache || !cache.permitted()
+          || typeof cache.captureFromVideoAndStore !== 'function' || Number(preview.readyState) < 2) return;
+        captureRequested = true;
+        const sourceVideo = preview;
+        cache.captureFromVideoAndStore(record.url, time, sourceVideo).then(blob => {
+          if (!blob || preview !== sourceVideo || !preview.isConnected
+            || !cache.permitted() || !root.URL || !root.URL.createObjectURL) return;
+          const objectUrl = root.URL.createObjectURL(blob);
+          const cached = doc.createElement('img');
+          cached.alt = ''; cached.className = 'videoThumbnailCached';
+          cached.onload = () => {
+            if (preview === sourceVideo && sourceVideo.isConnected && cache.permitted()) {
+              applyNativeRatio(cached.naturalWidth, cached.naturalHeight);
+              applyMediaRotation(cached, cached.naturalWidth, cached.naturalHeight);
+              preview = null;
+              sourceVideo.pause();
+              sourceVideo.removeAttribute('src');
+              sourceVideo.remove();
+              container.append(cached);
+              show(cached);
+            }
+            root.URL.revokeObjectURL(objectUrl);
+          };
+          cached.onerror = () => root.URL.revokeObjectURL(objectUrl);
+          cached.src = objectUrl;
+        }).catch(() => {});
+      };
+      const timer = setTimeout(() => {
+        if (!preview) { release(); return; }
+        // A decoded initial frame is preferable to a blank card if iOS never
+        // fires seeked after seeking an MP4.
+        if (Number(preview.readyState) >= 2) displayFrame();
+        else fail();
+      }, 12000);
+      preview.addEventListener('loadedmetadata', () => {
+        if (!preview) return;
         applyNativeRatio(Number(preview.videoWidth), Number(preview.videoHeight));
         applyMediaRotation(preview, Number(preview.videoWidth), Number(preview.videoHeight));
         const duration = Number(preview.duration);
-        if (Number.isFinite(duration) && duration > 0 && options && typeof options.onDuration === 'function') options.onDuration(duration);
-        try { preview.currentTime = Math.max(0, Number(record.thumbnailTimeSeconds) || 0.1); } catch (_) {}
-      });
-      preview.addEventListener('seeked', () => {
-        show(preview);
-        // The initial IndexedDB read has already confirmed a miss. Do not
-        // read it a second time or launch multiple capture jobs for one card.
-        if (!captureRequested && cache && cache.permitted()) {
-          captureRequested = true;
-          const time = Math.max(0, Number(record.thumbnailTimeSeconds) || 0.1);
-          cache.captureAndStore(record.url, time).then(blob => {
-            if (!blob || !preview || !preview.isConnected || !cache.permitted() || !root.URL || !root.URL.createObjectURL) return;
-            const objectUrl = root.URL.createObjectURL(blob);
-            const cached = doc.createElement('img');
-            cached.alt = ''; cached.className = 'videoThumbnailCached';
-            cached.onload = () => {
-              applyNativeRatio(cached.naturalWidth, cached.naturalHeight);
-              applyMediaRotation(cached, cached.naturalWidth, cached.naturalHeight);
-              if (preview && preview.isConnected && cache.permitted()) {
-                preview.pause(); preview.removeAttribute('src'); preview.remove(); preview = null;
-                container.append(cached); show(cached);
-              }
-              root.URL.revokeObjectURL(objectUrl);
-            };
-            cached.onerror = () => root.URL.revokeObjectURL(objectUrl);
-            cached.src = objectUrl;
-          }).catch(() => {});
+        if (Number.isFinite(duration) && duration > 0) {
+          target = Math.min(time, Math.max(0, duration - 0.05));
+          if (options && typeof options.onDuration === 'function') options.onDuration(duration);
         }
+        try { preview.currentTime = target; } catch (_) { /* loadeddata can still supply a frame */ }
       });
-      preview.addEventListener('loadeddata', () => { if (!preview.currentTime) show(preview); });
-      preview.addEventListener('error', () => revealFallback(preview)); container.append(preview);
+      preview.addEventListener('seeked', displayFrame);
+      preview.addEventListener('loadeddata', () => {
+        if (!preview) return;
+        // Seeking to the first few milliseconds does not consistently emit
+        // seeked on iOS, but loadeddata still supplies a real decoded frame.
+        if (Math.abs((Number(preview.currentTime) || 0) - target) < 0.15) displayFrame();
+      });
+      preview.addEventListener('error', () => {
+        if (!preview) return;
+        // Many public MP4 hosts permit playback but not CORS pixel access.
+        // Retry ordinary playback once, then skip CORS on this origin for
+        // subsequent cards instead of repeatedly failing every video.
+        if (corsEnabled && sourceOrigin && sourceOrigin !== ownOrigin) {
+          corsEnabled = false;
+          corsBlockedOrigins.add(sourceOrigin);
+          preview.removeAttribute('src');
+          preview.removeAttribute('crossorigin');
+          preview.src = record.url;
+          try { preview.load(); } catch (_) {}
+          return;
+        }
+        fail();
+      });
+      container.append(preview);
+      preview.src = record.url;
+    };
+    const queueDirectPreview = () => {
+      let scheduled = false;
+      const start = () => {
+        if (scheduled || container.isConnected === false || (cache && !cache.permitted())) return;
+        scheduled = true;
+        schedulePreview(container, addDirectPreview);
+      };
+      // Read IndexedDB first; only start remote MP4 downloads near the viewport.
+      if (typeof root.IntersectionObserver === 'function') {
+        const observer = new root.IntersectionObserver(entries => {
+          if (entries.some(entry => entry.isIntersecting)) { observer.disconnect(); start(); }
+        }, { rootMargin: '280px 0px' });
+        observer.observe(container);
+      } else if (typeof root.setTimeout === 'function') root.setTimeout(start, 0);
+      else Promise.resolve().then(start);
     };
     const src = imageUrl(record);
     if (src) {
@@ -112,17 +214,17 @@
         }
         show(image);
       });
-      image.addEventListener('error', () => { revealFallback(image); image = null; addDirectPreview(); }); container.append(image);
+      image.addEventListener('error', () => { revealFallback(image); image = null; queueDirectPreview(); }); container.append(image);
     } else if (cache && cache.permitted() && isDirectVideo(record.url)) {
       cache.read(record.url, Math.max(0, Number(record.thumbnailTimeSeconds) || 0.1)).then(blob => {
-        if (!blob || !root.URL || !root.URL.createObjectURL || !cache.permitted()) { addDirectPreview(); return; }
+        if (!blob || !root.URL || !root.URL.createObjectURL || !cache.permitted()) { queueDirectPreview(); return; }
         const url = root.URL.createObjectURL(blob), cached = doc.createElement('img');
         cached.className = 'videoThumbnailCached'; cached.alt = '';
         cached.onload = () => { applyNativeRatio(cached.naturalWidth, cached.naturalHeight); applyMediaRotation(cached, cached.naturalWidth, cached.naturalHeight); if (cache.permitted()) show(cached); root.URL.revokeObjectURL(url); };
-        cached.onerror = () => { cached.remove(); root.URL.revokeObjectURL(url); addDirectPreview(); };
+        cached.onerror = () => { cached.remove(); root.URL.revokeObjectURL(url); queueDirectPreview(); };
         cached.src = url; container.append(cached);
-      }).catch(addDirectPreview);
-    } else addDirectPreview();
+      }).catch(queueDirectPreview);
+    } else queueDirectPreview();
     return { fallback, get image() { return image; }, get video() { return preview; } };
   }
 
