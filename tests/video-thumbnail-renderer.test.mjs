@@ -6,12 +6,15 @@ const require = createRequire(import.meta.url);
 const Renderer = require('../video-thumbnail-renderer.js');
 
 class Element {
-  constructor(tagName) { this.tagName = tagName; this.children = []; this.listeners = {}; this.dataset = {}; this.style = {}; this.hidden = false; }
+  constructor(tagName) { this.tagName = tagName; this.children = []; this.listeners = {}; this.dataset = {}; this.style = {}; this.hidden = false; this.isConnected = true; this.readyState = 3; }
   append(...nodes) { nodes.forEach((node) => { node.parentNode = this; this.children.push(node); }); }
   replaceChildren(...nodes) { this.children = []; this.append(...nodes); }
   addEventListener(type, listener) { (this.listeners[type] ||= []).push(listener); }
   dispatch(type) { (this.listeners[type] || []).forEach((listener) => listener({ type, target: this })); }
-  remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((node) => node !== this); }
+  remove() { this.isConnected = false; if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((node) => node !== this); }
+  pause() {}
+  load() {}
+  removeAttribute() {}
 }
 const documentRef = { createElement: (tagName) => new Element(tagName) };
 
@@ -22,23 +25,29 @@ test('saved thumbnails take precedence and YouTube URLs derive a thumbnail', () 
   assert.equal(Renderer.imageUrl({ url: 'https://example.com/watch/123' }), '');
 });
 
-test('image load hides fallback and failure restores it before direct-video fallback', () => {
+test('image load hides fallback and failure restores it before direct-video fallback', async () => {
   const container = new Element('span');
   const result = Renderer.render(container, { thumbnailUrl: 'https://cdn.example/missing.jpg', url: 'https://cdn.example/movie.mp4', thumbnailTimeSeconds: 12 }, { documentRef });
   result.image.dispatch('error');
+  await new Promise(resolve => setTimeout(resolve, 5));
   assert.equal(result.video.tagName, 'video');
   result.video.dispatch('loadedmetadata');
   assert.equal(result.video.currentTime, 12);
   result.video.dispatch('seeked');
   assert.equal(result.video.dataset.frameReady, '1');
   assert.equal(result.fallback.hidden, true);
-  result.video.dispatch('error');
+  result.video.dispatch('error'); // CORS fallback starts ordinary playback
+  result.video.dispatch('error'); // actual media failure
   assert.equal(result.fallback.hidden, false);
 });
 
-test('missing image and failed direct video leave the play fallback visible', () => {
+test('missing image and failed direct video leave the play fallback visible', async () => {
   const container = new Element('span');
-  const result = Renderer.render(container, { url: 'https://cdn.example/movie.mp4' }, { documentRef });
+  // Use a distinct origin so an earlier test's CORS-negative memory cannot
+  // change the initial retry behavior of this independent test.
+  const result = Renderer.render(container, { url: 'https://independent-cors-test.example/movie.mp4' }, { documentRef });
+  await new Promise(resolve => setTimeout(resolve, 5));
+  result.video.dispatch('error');
   result.video.dispatch('error');
   assert.equal(result.fallback.hidden, false);
   assert.equal(container.children.includes(result.video), false);

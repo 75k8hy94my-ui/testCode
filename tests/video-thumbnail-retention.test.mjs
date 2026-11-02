@@ -103,6 +103,7 @@ class Node {
     this.videoWidth = 640;
     this.videoHeight = 360;
     this.duration = 30;
+    this.readyState = 3;
     this.naturalWidth = 320;
     this.naturalHeight = 180;
   }
@@ -157,7 +158,7 @@ function loadRenderer(root) {
     createObjectURL: () => 'blob:cached-frame',
     revokeObjectURL() {},
   };
-  vm.runInNewContext(rendererSource, { window: root, URL });
+  vm.runInNewContext(rendererSource, { window: root, URL, setTimeout, clearTimeout });
   const container = new Node('div', stats);
   return { renderer: root.MangaReaderVideoThumbnailRenderer, container, documentRef, stats };
 }
@@ -196,7 +197,7 @@ test('a missing frame starts one preview and at most one capture despite repeate
     MangaReaderVideoThumbnailCache: {
       permitted: () => true,
       read: async () => { reads++; return null; },
-      captureAndStore: async () => { captures++; return { size: 2000 }; },
+      captureFromVideoAndStore: async () => { captures++; return { size: 2000 }; },
     },
   };
   const page = loadRenderer(root);
@@ -211,6 +212,57 @@ test('a missing frame starts one preview and at most one capture despite repeate
   await tick();
   assert.equal(reads, 1, 'cache should be checked only once on the miss path');
   assert.equal(captures, 1, 'multiple seeked events should not recapture');
+});
+
+test('cache stores a frame from the same decoded preview without loading a second MP4', async () => {
+  const records = new Map();
+  let videoElements = 0;
+  const documentRef = {
+    addEventListener() {},
+    createElement(tag) {
+      if (tag === 'video') videoElements += 1;
+      if (tag !== 'canvas') throw new Error('unexpected element ' + tag);
+      return {
+        getContext() { return { drawImage() {} }; },
+        toBlob(callback, type) { queueMicrotask(() => callback({ size: 1600, type })); },
+      };
+    },
+  };
+  const { cache } = loadCache(fakeIndexedDB(records), documentRef);
+  const url = 'https://example.test/clip-from-preview.mp4';
+  const frame = await cache.captureFromVideoAndStore(url, 0.1, { videoWidth: 640, videoHeight: 360, readyState: 3 });
+  assert.equal(frame.size, 1600);
+  assert.equal(videoElements, 0);
+  assert.ok(await cache.read(url, 0.1));
+});
+
+test('remote MP4 previews remain dormant until they approach the viewport', async () => {
+  const root = { MangaReaderVideoThumbnailCache: { permitted: () => true, read: async () => null } };
+  const page = loadRenderer(root);
+  let observer;
+  root.IntersectionObserver = class {
+    constructor(callback) { this.callback = callback; observer = this; }
+    observe() {}
+    disconnect() {}
+  };
+  page.renderer.render(page.container, { url: 'https://example.test/lazy.mp4' }, { documentRef: page.documentRef });
+  await tick();
+  assert.equal(page.stats.networkVideoRequests, 0);
+  observer.callback([{ isIntersecting: true }]);
+  assert.equal(page.stats.networkVideoRequests, 1);
+});
+
+test('a CORS-blocked MP4 retries as ordinary playback without endless retries', async () => {
+  const root = { MangaReaderVideoThumbnailCache: { permitted: () => true, read: async () => null } };
+  const page = loadRenderer(root);
+  page.renderer.render(page.container, { url: 'https://blocked.test/cors.mp4' }, { documentRef: page.documentRef });
+  await tick();
+  const preview = page.stats.videos[0];
+  assert.equal(page.stats.networkVideoRequests, 1);
+  preview.fire('error');
+  assert.equal(page.stats.networkVideoRequests, 2);
+  preview.fire('error');
+  assert.equal(page.stats.networkVideoRequests, 2, 'a second error must not create a retry loop');
 });
 
 test('SPA detachment retains list thumbnails; routine view-count updates do not rebuild them', () => {
