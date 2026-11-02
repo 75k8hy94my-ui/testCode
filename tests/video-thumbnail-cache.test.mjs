@@ -20,8 +20,8 @@ test('existing remote thumbnail is still prioritized',()=>{
 });
 test('direct videos use cache read, capture, and fallback',()=>{
   assert.match(source,/cache\.read\(record\.url/);
-  assert.match(source,/cache\.captureAndStore\(record\.url/);
-  assert.match(source,/addDirectPreview\(\)/);
+  assert.match(source,/cache\.captureFromVideoAndStore\(record\.url/);
+  assert.match(source,/queueDirectPreview\(\)/);
 });
 test('library and related-video page load cache before renderer',()=>{
   assert.ok(route.indexOf('video-thumbnail-cache.js') < route.indexOf('video-thumbnail-renderer.js'));
