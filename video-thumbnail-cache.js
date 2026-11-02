@@ -157,6 +157,39 @@
     }).finally(()=>pending.delete(signature));
     pending.set(signature,job);return job;
   }
+  // Capture the frame from the *already loaded* list preview. Previously a
+  // second hidden video downloaded the same MP4 just to create the cache entry.
+  // Cross-origin videos require the media server's CORS permission; never try
+  // to bypass a tainted canvas.
+  function encodeFrame(canvas,type,quality){
+    return new Promise(resolve=>{
+      let completed=false;
+      const finish=blob=>{if(completed)return;completed=true;clearTimeout(timer);resolve(blob&&blob.size>0?blob:null);};
+      const timer=setTimeout(()=>finish(null),2500);
+      try{canvas.toBlob(finish,type,quality);}catch(_){finish(null);}
+    });
+  }
+  async function captureFromVideoAndStore(url,time,video){
+    if(!permitted()||!video||Number(video.readyState)<2)return null;
+    const t=Math.max(0,Number(time)||0.1);
+    try{
+      const w=Number(video.videoWidth),h=Number(video.videoHeight);
+      if(!(w>0&&h>0))return null;
+      const canvas=root.document.createElement('canvas');
+      const scale=Math.min(1,320/w,180/h);
+      canvas.width=Math.max(1,Math.round(w*scale));
+      canvas.height=Math.max(1,Math.round(h*scale));
+      const ctx=canvas.getContext('2d');
+      if(!ctx)return null;
+      ctx.drawImage(video,0,0,canvas.width,canvas.height);
+      let blob=await encodeFrame(canvas,'image/webp',0.7);
+      // Older iOS versions can reject WebP encoding or return a large PNG.
+      if(!blob||blob.size>300*1024)blob=await encodeFrame(canvas,'image/jpeg',0.72);
+      if(!blob||blob.size>300*1024||!permitted())return null;
+      await write(url,t,blob);
+      return permitted()?blob:null;
+    }catch(_){return null;}
+  }
   async function captureAndStore(url,time){
     if(!permitted())return null;
     const t=Math.max(0,Number(time)||0.1);
@@ -173,7 +206,7 @@
   if(root.document&&typeof root.document.addEventListener==='function'){
     root.document.addEventListener('manga-reader-vpn-status',()=>{if(!permitted())clearHot();});
   }
-  const api=Object.freeze({read,getOrCapture,captureAndStore,permitted});
+  const api=Object.freeze({read,getOrCapture,captureAndStore,captureFromVideoAndStore,permitted});
   root.MangaReaderVideoThumbnailCache=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
