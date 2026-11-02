@@ -109,7 +109,16 @@
         clearTimeout(timer);
         releaseSlot();
       };
-      const fail = () => { release(); revealFallback(preview); preview = null; };
+      const fail = () => {
+        const failedVideo = preview;
+        preview = null;
+        release();
+        if (!failedVideo) return;
+        failedVideo.pause();
+        failedVideo.removeAttribute('src');
+        try { failedVideo.load(); } catch (_) {}
+        revealFallback(failedVideo);
+      };
       const displayFrame = () => {
         if (!preview || !preview.isConnected || (cache && !cache.permitted())) { release(); return; }
         applyNativeRatio(Number(preview.videoWidth), Number(preview.videoHeight));
@@ -127,12 +136,15 @@
           const cached = doc.createElement('img');
           cached.alt = ''; cached.className = 'videoThumbnailCached';
           cached.onload = () => {
+            cached.onload = null;
+            cached.onerror = null;
             if (preview === sourceVideo && sourceVideo.isConnected && cache.permitted()) {
               applyNativeRatio(cached.naturalWidth, cached.naturalHeight);
               applyMediaRotation(cached, cached.naturalWidth, cached.naturalHeight);
               preview = null;
               sourceVideo.pause();
               sourceVideo.removeAttribute('src');
+              try { sourceVideo.load(); } catch (_) {}
               sourceVideo.remove();
               container.append(cached);
               show(cached);
