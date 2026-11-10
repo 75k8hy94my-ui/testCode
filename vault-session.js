@@ -1051,10 +1051,14 @@
           delete meta[user.id].pendingToken;
           localStorage.setItem(META_KEY, JSON.stringify(meta));
         } catch (error) {
+          let rolledBack = true;
           for (const [key, value] of previousValues) {
-            try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch (_) {}
+            try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); }
+            catch (_) { rolledBack = false; }
           }
-          throw new Error('端末への反映に失敗しました。元のデータを復元しました。' + (error?.message || ''));
+          throw new Error(rolledBack
+            ? '端末への反映に失敗しました。元のデータを復元しました。' + (error?.message || '')
+            : '端末への反映と巻き戻しの一部に失敗しました。暗号化バックアップを保管し、端末のデータを確認してください。');
         }
         pendingCloudRecovery = null;
         pendingConflictChoices = null;
