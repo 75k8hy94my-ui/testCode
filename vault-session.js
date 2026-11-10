@@ -953,6 +953,117 @@
     }
     return result;
   }
+  // A cloud recovery is deliberately separate from normal merge/sync. The
+  // device's unsubmitted changes are never sent to the server by this path.
+  let pendingCloudRecovery = null;
+  async function prepareCloudRecovery() {
+    return enqueueSave(async () => {
+      assertSyncAccess();
+      if (window.TestCodeGuest?.isActive() || !loadActive()) throw new Error('ログインして保管庫を開いてください。');
+      const session = loadSession();
+      const userId = session && session.user && session.user.id;
+      if (!userId) throw new Error('ログイン状態を確認できません。');
+      if (!window.MangaVaultPayload?.buildFromLocalStorage || !window.MangaVaultPayload?.applyToLocalStorage)
+        throw new Error('端末データの読み取り機能を確認できません。');
+      return withVaultSaveLock(userId, () => withSession(async (token, user) => {
+        assertSyncAccess();
+        const record = await fetchRecord(token, user);
+        if (!record || record.legacyRevision) throw new Error('クラウド保管庫のrevisionを確認できません。');
+        if (Number(record.payload?.syncProtocolVersion || LEGACY_SYNC_PROTOCOL_VERSION) > SYNC_PROTOCOL_VERSION)
+          throw new Error('アプリを再読み込みして、新しい同期方式に対応してください。');
+        const active = loadActive();
+        if (!active || stableJson(record.payload?.keyWraps || {}) !== stableJson(active.keyWraps || {}))
+          throw new Error('保管庫の認証情報が変更されています。再度開き直してください。');
+        await decryptPayload(record.payload); // Do not prepare a reset against an unreadable cloud vault.
+        const localPayload = window.MangaVaultPayload.buildFromLocalStorage();
+        const localOnlyKeys = window.MangaVaultPayload.LOCAL_ONLY_KEYS || [];
+        const localOnly = Object.fromEntries(localOnlyKeys.map((key) => [key, localStorage.getItem(key)]));
+        const metaRaw = localStorage.getItem(META_KEY);
+        const backup = {
+          format: 'testcode-encrypted-device-recovery',
+          version: 1,
+          createdAt: new Date().toISOString(),
+          vault: await envelope({
+            format: 'testcode-device-snapshot',
+            version: 1,
+            userId: user.id,
+            localPayload,
+            syncMeta: getMeta(user.id),
+            localOnly,
+          }),
+        };
+        const recoveryToken = b64url(randomBytes(16));
+        pendingCloudRecovery = {
+          token: recoveryToken, userId: user.id, createdAt: Date.now(),
+          localPayload, metaRaw, localOnly,
+        };
+        return { recoveryToken, backup };
+      }));
+    });
+  }
+  async function confirmCloudRecovery(recoveryToken) {
+    return enqueueSave(async () => {
+      const preview = pendingCloudRecovery;
+      if (!preview || !recoveryToken || preview.token !== recoveryToken || Date.now() - preview.createdAt > 10 * 60 * 1000)
+        throw new Error('復旧の準備が期限切れです。端末データをもう一度バックアップしてください。');
+      assertSyncAccess();
+      const session = loadSession();
+      if (!loadActive() || session?.user?.id !== preview.userId)
+        throw new Error('保管庫のログイン状態が変わりました。復旧をやり直してください。');
+      return withVaultSaveLock(preview.userId, () => withSession(async (token, user) => {
+        assertSyncAccess();
+        if (user.id !== preview.userId) throw new Error('アカウントが変更されました。');
+        const payloadApi = window.MangaVaultPayload;
+        if (!payloadApi?.buildFromLocalStorage || !payloadApi?.applyToLocalStorage || !payloadApi?.DATA_KEYS)
+          throw new Error('端末データの読み書き機能を確認できません。');
+        const localOnlyKeys = payloadApi.LOCAL_ONLY_KEYS || [];
+        const currentLocalOnly = Object.fromEntries(localOnlyKeys.map((key) => [key, localStorage.getItem(key)]));
+        if (!samePayload(payloadApi.buildFromLocalStorage(), preview.localPayload)
+            || localStorage.getItem(META_KEY) !== preview.metaRaw
+            || !samePayload(currentLocalOnly, preview.localOnly)) {
+          throw new Error('バックアップ後に端末データが変更されました。新しいバックアップを保存してからやり直してください。');
+        }
+        const record = await fetchRecord(token, user);
+        if (!record || record.legacyRevision) throw new Error('クラウド保管庫のrevisionを確認できません。');
+        if (Number(record.payload?.syncProtocolVersion || LEGACY_SYNC_PROTOCOL_VERSION) > SYNC_PROTOCOL_VERSION)
+          throw new Error('新しい同期方式が必要です。ページを更新してください。');
+        const active = loadActive();
+        if (!active || stableJson(record.payload?.keyWraps || {}) !== stableJson(active.keyWraps || {}))
+          throw new Error('クラウド保管庫の認証情報が変更されました。再度開き直してください。');
+        const remotePayload = await decryptPayload(record.payload);
+        assertSyncAccess();
+        if (!samePayload(payloadApi.buildFromLocalStorage(), preview.localPayload)
+            || localStorage.getItem(META_KEY) !== preview.metaRaw
+            || !samePayload(Object.fromEntries(localOnlyKeys.map((key) => [key, localStorage.getItem(key)])), preview.localOnly))
+          throw new Error('復旧処理中に端末データが更新されました。上書きせず停止しました。');
+        const encryptedBaseline = await encryptBaseline(remotePayload, user.id, record.revision);
+        const affectedKeys = [...new Set([...Object.values(payloadApi.DATA_KEYS), 'testCode.manualVpnIps',
+          'testCode.manualNonVpnIps', ...localOnlyKeys, META_KEY])];
+        const previousValues = new Map(affectedKeys.map((key) => [key, localStorage.getItem(key)]));
+        try {
+          payloadApi.applyToLocalStorage(remotePayload);
+          localOnlyKeys.forEach((key) => localStorage.removeItem(key));
+          const meta = readJSON(META_KEY, {});
+          meta[user.id] = Object.assign({}, meta[user.id], {
+            revision: record.revision, updatedAt: record.updated_at, encryptedBaseline, pendingSync: false,
+          });
+          delete meta[user.id].pendingGeneration;
+          delete meta[user.id].pendingToken;
+          localStorage.setItem(META_KEY, JSON.stringify(meta));
+        } catch (error) {
+          for (const [key, value] of previousValues) {
+            try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch (_) {}
+          }
+          throw new Error('端末への反映に失敗しました。元のデータを復元しました。' + (error?.message || ''));
+        }
+        pendingCloudRecovery = null;
+        pendingConflictChoices = null;
+        emitPayloadApplied();
+        emitVaultSyncState('success', { applied: true, recovered: true });
+        return { revision: record.revision };
+      }));
+    });
+  }
   let syncLatestPromise = null;
   let lastAutoSyncAt = 0;
   let autoSyncTimer = null;
@@ -1328,6 +1439,6 @@
     });
     return retryPendingLocalChanges(result);
   }
-  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, ensureSession, refreshSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, listVaultHistory, getVaultHistorySnapshot, setVaultHistoryProtected, previewVaultHistoryRestore, confirmVaultHistoryRestore, loadPayload, initialize, initializeWithPasskey, registerPasskey, listPasskeys, renamePasskey, removePasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, syncLatest, syncStatutesLatest, resolveConflicts, recordSyncDeletion, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
+  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, ensureSession, refreshSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, listVaultHistory, getVaultHistorySnapshot, setVaultHistoryProtected, previewVaultHistoryRestore, confirmVaultHistoryRestore, loadPayload, initialize, initializeWithPasskey, registerPasskey, listPasskeys, renamePasskey, removePasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, syncLatest, syncStatutesLatest, prepareCloudRecovery, confirmCloudRecovery, resolveConflicts, recordSyncDeletion, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
 })();
 
