@@ -246,8 +246,10 @@
     }
     ui.email.textContent=session.user.email;
     const alreadyActive=Boolean(MangaVault.loadActive());
+    const recoveryMode=new URLSearchParams(location.search).get('recovery')==='1';
     if (alreadyActive) {
-      if (MangaVault.hasPendingLocalChanges()) showPendingSync({pendingSync:true,syncError:'端末の未同期データを自動同期します。'});
+      if (MangaVault.hasPendingLocalChanges()) showPendingSync({pendingSync:true,syncError:'端末データを開くか、下の操作から復旧できます。'});
+      else if (recoveryMode) showPendingSync({pendingSync:false});
       else { goReader(); return; }
     }
     const DEVICE_DATA_KEYS=[...Object.values(MangaVaultPayload.DATA_KEYS||{}),'testCode.manualVpnIps','testCode.manualNonVpnIps','mangaReaderLastUrl','mangaReaderSavedUrls','mangaReaderGithubSync','mangaReaderVaultSyncMeta'];
@@ -321,7 +323,7 @@
           ui.recoveryCode.textContent=result.recoveryCode;
           ui.recoveryBox.hidden=false;
           setTimeout(goReader,5500);
-        } else if (result.pendingSync) {
+        } else if (result.pendingSync || recoveryMode) {
           showPendingSync(result);
         } else {
           goReader();
@@ -346,7 +348,7 @@
       const attempt=(async()=>{
         try {
           const result=await MangaVault.initializeWithPasskey(applyPayload,{signal:controller.signal});
-          if (result && result.pendingSync) {
+          if (result && (result.pendingSync || recoveryMode)) {
             showPendingSync(result);
             return false;
           }
