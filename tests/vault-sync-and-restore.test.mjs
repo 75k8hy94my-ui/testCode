@@ -76,7 +76,7 @@ async function fixture({ initialPayload = {}, rawKey = webcrypto.getRandomValues
       document: documentRef,
       CustomEvent: class CustomEvent { constructor(type, options = {}) { this.type = type; this.detail = options.detail; } },
       dispatchEvent(event) { dispatchedEvents.push(event); },
-      MangaVaultPayload: { LOCAL_ONLY_KEYS: ['mangaReaderVaultDeletionJournal', 'mangaReaderVaultSyncTombstones'], buildFromLocalStorage: () => JSON.parse(local.getItem('testPayload') || '{}'), applyToLocalStorage: payload => local.setItem('testPayload', JSON.stringify(payload)) },
+      MangaVaultPayload: { DATA_KEYS: { items: 'testPayload' }, LOCAL_ONLY_KEYS: ['mangaReaderVaultDeletionJournal', 'mangaReaderVaultSyncTombstones'], buildFromLocalStorage: () => JSON.parse(local.getItem('testPayload') || '{}'), applyToLocalStorage: payload => local.setItem('testPayload', JSON.stringify(payload)) },
       MangaVaultSyncMerge: mergeModule,
     },
     navigator: { locks, credentials: credentials || {}, onLine: true },
