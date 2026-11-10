@@ -36,6 +36,11 @@
     #recoveryBox code { display:block; margin:12px 0; padding:12px; border:1px solid #d1d5db; overflow-wrap:anywhere; user-select:all; }
     #recoveryBox button { width:100%; min-height:44px; }
     #unlockForm > button { width:100%; min-height:44px; margin-top:10px; background:#fff; color:var(--text); border:1px solid var(--line); cursor:pointer; }
+    #unlockForm.has-recovery { top:50%; max-height:calc(100dvh - 100px); overflow-y:auto; padding:6px; }
+    #cloudRecoveryActions { display:grid; gap:10px; margin-top:14px; }
+    #cloudRecoveryActions button, #cloudRecoveryActions a { display:block; padding:11px 12px; min-height:44px; border:1px solid var(--line); background:#fff; color:var(--text); font:inherit; text-align:center; text-decoration:none; cursor:pointer; }
+    #cloudRecoveryActions button:disabled { opacity:.5; cursor:default; }
+    #cloudRecoveryActions p { font-size:13px; line-height:1.55; margin:0; }
     [hidden] { display:none!important; }
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
       #accountMenu { background:#fff; }
@@ -125,19 +130,105 @@
     };
     function setStatus(text) { ui.status.textContent=text || ''; }
     let pendingContinueButton=null;
+    let cloudRecoveryActions=null;
+    let cloudBackupUrl=null;
+    let cloudRecoveryBusy=false;
     function showPendingSync(result) {
-      setStatus(['端末には未同期の変更があります。',result && result.syncError].filter(Boolean).join(' '));
+      setStatus(result && result.pendingSync
+        ? ['端末には未同期の変更があります。',result.syncError].filter(Boolean).join(' ')
+        : 'クラウドのデータでこの端末を復旧できます。端末独自の変更は置き換えられます。');
+      ui.unlockForm.classList.add('has-recovery');
+      ui.credential.hidden=true;
+      $('passphraseLoginBtn').hidden=true;
+      ui.passkeyLoginBtn.hidden=true;
       if (!pendingContinueButton) {
         pendingContinueButton=document.createElement('button');
         pendingContinueButton.type='button';
-        pendingContinueButton.textContent='端末データを開く';
+        pendingContinueButton.textContent='端末データを開く（現状維持）';
         pendingContinueButton.addEventListener('click',goReader);
         ui.unlockForm.appendChild(pendingContinueButton);
       }
+      if (cloudRecoveryActions) return;
+      const actions=document.createElement('div');
+      actions.id='cloudRecoveryActions';
+      const hint=document.createElement('p');
+      hint.textContent='クラウド側のデータは変更しません。端末の暗号化バックアップを保存してから、最新版に置き換えられます。';
+      const prepare=document.createElement('button');
+      prepare.type='button';
+      prepare.textContent='① 暗号化バックアップを準備';
+      const download=document.createElement('a');
+      download.textContent='② 暗号化バックアップを保存';
+      download.hidden=true;
+      download.download='testcode-device-backup-'+new Date().toISOString().slice(0,10)+'.json';
+      const adopt=document.createElement('button');
+      adopt.type='button';
+      adopt.textContent='③ クラウドの最新版を採用';
+      adopt.disabled=true;
+      let token=null;
+      let downloadClicked=false;
+      prepare.addEventListener('click',async()=>{
+        if (cloudRecoveryBusy) return;
+        cloudRecoveryBusy=true;
+        prepare.disabled=true;
+        download.hidden=true;
+        adopt.disabled=true;
+        token=null;
+        downloadClicked=false;
+        if (cloudBackupUrl) { URL.revokeObjectURL(cloudBackupUrl); cloudBackupUrl=null; }
+        try {
+          setStatus('暗号化バックアップを準備しています…');
+          const result=await MangaVault.prepareCloudRecovery();
+          cloudBackupUrl=URL.createObjectURL(new Blob([JSON.stringify(result.backup)],{type:'application/json'}));
+          download.href=cloudBackupUrl;
+          token=result.recoveryToken;
+          download.hidden=false;
+          setStatus('②から暗号化ファイルを保存してください。保管庫パスフレーズ・復旧キーも保管してください。');
+        } catch (error) {
+          setStatus(error?.message || '復旧準備に失敗しました。端末データは保持しています。');
+        } finally {
+          prepare.disabled=false;
+          cloudRecoveryBusy=false;
+        }
+      });
+      download.addEventListener('click',()=>{
+        if (!token) return;
+        downloadClicked=true;
+        adopt.disabled=false;
+        setStatus('実際にファイルが保存されたことを確認してから③を選んでください。');
+      });
+      adopt.addEventListener('click',async()=>{
+        if (!token || !downloadClicked || cloudRecoveryBusy) return;
+        if (!confirm('バックアップファイルを保存しましたか？\nこの端末の未同期データと削除履歴はクラウドの最新版に置き換わります。クラウド側のデータは変更されません。')) return;
+        cloudRecoveryBusy=true;
+        adopt.disabled=true;
+        prepare.disabled=true;
+        try {
+          setStatus('クラウドの最新版を取得しています…');
+          await MangaVault.confirmCloudRecovery(token);
+          goReader();
+        } catch (error) {
+          setStatus(error?.message || '復旧に失敗しました。端末データは保持しています。');
+          token=null;
+          download.hidden=true;
+        } finally {
+          cloudRecoveryBusy=false;
+          prepare.disabled=false;
+        }
+      });
+      actions.append(hint,prepare,download,adopt);
+      ui.unlockForm.appendChild(actions);
+      cloudRecoveryActions=actions;
     }
     function clearPendingSyncNotice() {
       if (pendingContinueButton) pendingContinueButton.remove();
       pendingContinueButton=null;
+      if (cloudRecoveryActions) cloudRecoveryActions.remove();
+      cloudRecoveryActions=null;
+      ui.unlockForm.classList.remove('has-recovery');
+      ui.credential.hidden=false;
+      $('passphraseLoginBtn').hidden=false;
+      ui.passkeyLoginBtn.hidden=false;
+      if (cloudBackupUrl) { URL.revokeObjectURL(cloudBackupUrl); cloudBackupUrl=null; }
     }
     function goReader() { const next = new URLSearchParams(location.search).get('next'); window.location.replace(['images.html','drive-gallery.html'].includes(next) ? next : 'home.html'); }
     let session = MangaVault.loadSession();
