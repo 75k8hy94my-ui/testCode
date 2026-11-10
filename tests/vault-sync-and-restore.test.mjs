@@ -76,7 +76,7 @@ async function fixture({ initialPayload = {}, rawKey = webcrypto.getRandomValues
       document: documentRef,
       CustomEvent: class CustomEvent { constructor(type, options = {}) { this.type = type; this.detail = options.detail; } },
       dispatchEvent(event) { dispatchedEvents.push(event); },
-      MangaVaultPayload: { LOCAL_ONLY_KEYS: ['mangaReaderVaultDeletionJournal', 'mangaReaderVaultSyncTombstones'], buildFromLocalStorage: () => JSON.parse(local.getItem('testPayload') || '{}'), applyToLocalStorage: payload => local.setItem('testPayload', JSON.stringify(payload)) },
+      MangaVaultPayload: { DATA_KEYS: { items: 'testPayload' }, LOCAL_ONLY_KEYS: ['mangaReaderVaultDeletionJournal', 'mangaReaderVaultSyncTombstones'], buildFromLocalStorage: () => JSON.parse(local.getItem('testPayload') || '{}'), applyToLocalStorage: payload => local.setItem('testPayload', JSON.stringify(payload)) },
       MangaVaultSyncMerge: mergeModule,
     },
     navigator: { locks, credentials: credentials || {}, onLine: true },
@@ -1210,4 +1210,77 @@ test('VPN block rejects registration before opening the platform passkey dialog'
   assert.equal(createCalls, 0);
   assert.equal(remote.record.revision, beforeRevision);
   assert.equal((await vault.listPasskeys()).length, 0);
+});
+
+test('stale browser can back up local-only edits and explicitly adopt cloud without uploading old data', async () => {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const oldDevice = { items: [{ id: 'old', title: 'OLD DEVICE ONLY' }] };
+  const cloud = { items: [{ id: 'new', title: 'Cloud latest' }] };
+  const remote = { record: { payload: await encryptPayload(rawKey, cloud), revision: 7, updated_at: 'cloud-now' } };
+  const local = makeStorage({
+    mangaReaderSupabaseSyncMeta: JSON.stringify({ 'user-1': { revision: 1, pendingSync: true, pendingToken: 'old-pending' } }),
+    mangaReaderVaultDeletionJournal: 'old-encrypted-journal',
+  });
+  const { vault } = await fixture({ localStorage: local, rawKey, remote, initialPayload: oldDevice });
+  assert.equal(vault.hasPendingLocalChanges(), true);
+
+  const prepared = await vault.prepareCloudRecovery();
+  const serializedBackup = JSON.stringify(prepared.backup);
+  assert.equal(serializedBackup.includes('OLD DEVICE ONLY'), false, 'portable backup is encrypted');
+  const backup = await decryptPayload(rawKey, prepared.backup.vault);
+  assert.deepEqual(backup.localPayload, oldDevice);
+  assert.equal(backup.localOnly.mangaReaderVaultDeletionJournal, 'old-encrypted-journal');
+  assert.equal(remote.record.revision, 7, 'backup does not write to cloud');
+
+  const restored = await vault.confirmCloudRecovery(prepared.recoveryToken);
+  assert.equal(restored.revision, 7);
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')), cloud);
+  assert.equal(local.getItem('mangaReaderVaultDeletionJournal'), null);
+  assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, false);
+  assert.equal(vault.hasPendingLocalChanges(), false);
+  assert.equal(remote.record.revision, 7, 'cloud remains untouched by recovery');
+});
+
+test('cloud recovery refuses a changed local snapshot or pending metadata after backup', async () => {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const cloud = { items: [{ id: 'cloud' }] };
+  const remote = { record: { payload: await encryptPayload(rawKey, cloud), revision: 3, updated_at: 'now' } };
+  const local = makeStorage({
+    mangaReaderSupabaseSyncMeta: JSON.stringify({ 'user-1': { pendingSync: true, pendingToken: 'old' } }),
+  });
+  const { vault } = await fixture({ initialPayload: { items: [{ id: 'old' }] }, rawKey, remote, localStorage: local });
+  const prepared = await vault.prepareCloudRecovery();
+  local.setItem('testPayload', JSON.stringify({ items: [{ id: 'new-local-edit' }] }));
+  await assert.rejects(vault.confirmCloudRecovery(prepared.recoveryToken), /変更されました/);
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')).items, [{ id: 'new-local-edit' }]);
+  assert.equal(remote.record.revision, 3);
+
+  const retry = await vault.prepareCloudRecovery();
+  local.setItem('mangaReaderSupabaseSyncMeta', JSON.stringify({ 'user-1': { pendingSync: true, pendingToken: 'newer-pending' } }));
+  await assert.rejects(vault.confirmCloudRecovery(retry.recoveryToken), /変更されました/);
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')).items, [{ id: 'new-local-edit' }]);
+});
+
+test('cloud recovery requires protected read access and rolls back a failed device application', async () => {
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const remote = { record: { payload: await encryptPayload(rawKey, { items: [{ id: 'cloud' }] }), revision: 3, updated_at: 'now' } };
+  let accessAllowed = true;
+  const local = makeStorage({ mangaReaderSupabaseSyncMeta: JSON.stringify({ 'user-1': { pendingSync: true, pendingToken: 'pending' } }) });
+  const { vault, context } = await fixture({
+    initialPayload: { items: [{ id: 'local' }] }, rawKey, remote, localStorage: local,
+    gate: { canReadProtectedData: () => accessAllowed },
+  });
+  const prepared = await vault.prepareCloudRecovery();
+  accessAllowed = false;
+  await assert.rejects(vault.confirmCloudRecovery(prepared.recoveryToken), /VPN/);
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')).items, [{ id: 'local' }]);
+  accessAllowed = true;
+  context.window.MangaVaultPayload.applyToLocalStorage = (payload) => {
+    local.setItem('testPayload', JSON.stringify(payload));
+    throw new Error('synthetic storage failure');
+  };
+  await assert.rejects(vault.confirmCloudRecovery(prepared.recoveryToken), /元のデータを復元しました/);
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')).items, [{ id: 'local' }]);
+  assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, true);
+  assert.equal(remote.record.revision, 3);
 });

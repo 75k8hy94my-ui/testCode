@@ -81,3 +81,14 @@ test('passkey registration uses the existing credential field without adding ano
   assert.match(sync, /MangaVault\.registerPasskey\(credential\)/);
   assert.match(sync, /passkeyRegisterBtn\.addEventListener\('click',registerPasskey\)/);
 });
+
+test('stale browser exposes a deliberate backup-first cloud recovery route', () => {
+  assert.match(sync, /const recoveryMode=new URLSearchParams\(location.search\).get\('recovery'\)==='1'/);
+  assert.match(sync, /MangaVault\.prepareCloudRecovery\(\)/);
+  assert.match(sync, /downloadClicked=true/);
+  assert.match(sync, /if \(!token \|\| !downloadClicked \|\| cloudRecoveryBusy\) return/);
+  assert.match(sync, /MangaVault\.confirmCloudRecovery\(token\)/);
+  assert.match(sync, /端末データを開く（現状維持）/);
+  const profile = fs.readFileSync(new URL('../home-profile-spa.js', import.meta.url), 'utf8');
+  assert.match(profile, /href="sync\.html\?recovery=1"/);
+});
