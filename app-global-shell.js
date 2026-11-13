@@ -34,6 +34,19 @@
 
   window.AppShell = { SPA_PAGES, labels, currentPage, isSpaPage, storedTheme, applyStoredTheme };
   applyStoredTheme();
+  // Shared, in-page notification center (no OS notifications).
+  if (!document.querySelector('link[data-notice-style]')) {
+    const style = document.createElement('link');
+    style.rel = 'stylesheet';
+    style.href = 'notice-center.css?v=20261113';
+    style.dataset.noticeStyle = '1';
+    document.head.appendChild(style);
+  }
+  const noticeScript = document.createElement('script');
+  noticeScript.src = 'notice-center.js?v=20261113';
+  noticeScript.defer = true;
+  document.head.appendChild(noticeScript);
+
 
   // Home-family routes keep a persistent header via home-profile-spa.js.
   // Do not rewrite that chrome or intercept those clicks.
