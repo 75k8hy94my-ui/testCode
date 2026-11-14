@@ -31,7 +31,7 @@ function element(name = 'div') {
   return obj;
 }
 
-function setup({ resume = 1, vertical = false, url = 'https://example.test/xxx.html?edition=1#1' } = {}) {
+function setup({ resume = 1, vertical = false, safeMode = false, url = 'https://example.test/xxx.html?edition=1#1' } = {}) {
   const ids = [
     'readerStatus', 'readerMessage', 'retryPageBtn', 'pageSlider', 'pageLabel',
     'currentTitle', 'pageStage', 'viewer', 'topbar', 'controls', 'tocBtn',
@@ -41,7 +41,7 @@ function setup({ resume = 1, vertical = false, url = 'https://example.test/xxx.h
   ];
   const elements = Object.fromEntries(ids.map(id => [id, element()]));
   const body = element('body');
-  const local = new Map([['mangaReaderVerticalScroll', vertical ? '1' : '0']]);
+  const local = new Map([['mangaReaderVerticalScroll', vertical ? '1' : '0'], ['mangaReaderSafeMode', safeMode ? '1' : '0']]);
   const localStorage = {
     getItem(key) { return local.get(key) ?? null; },
     setItem(key, value) { local.set(key, String(value)); },
@@ -199,4 +199,42 @@ test('hash-page vertical CSS avoids scroll anchoring and refreshes the runtime a
   const html = readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
   assert.match(html, /body\.hash-page-reader\.vertical-scroll #viewer[\s\S]*overflow-anchor:none/);
   assert.match(html, /reader-runtime\.js\?v=20261114-hash-scroll-fix/);
+});
+
+
+test('safe mode can be disabled on a touch-style reader after being restored from storage', async () => {
+  const { runtime, elements, body, localStorage } = setup({ safeMode: true });
+  await runtime.start('hash-work');
+  const button = elements.safeModeBtn;
+  assert.equal(body.classList.contains('safe-mode'), true);
+  assert.equal(button.attributes['aria-pressed'], 'true');
+  assert.equal(button.attributes['aria-label'], 'セーフモードを解除');
+
+  let stopped = 0;
+  button.dispatch('click', { stopPropagation() { stopped += 1; } });
+  assert.equal(body.classList.contains('safe-mode'), false);
+  assert.equal(button.attributes['aria-pressed'], 'false');
+  assert.equal(button.attributes['aria-label'], 'セーフモードを有効化');
+  assert.equal(localStorage.getItem('mangaReaderSafeMode'), '0');
+
+  button.dispatch('click', { stopPropagation() { stopped += 1; } });
+  assert.equal(body.classList.contains('safe-mode'), true);
+  assert.equal(localStorage.getItem('mangaReaderSafeMode'), '1');
+  button.dispatch('click', { stopPropagation() { stopped += 1; } });
+  assert.equal(body.classList.contains('safe-mode'), false);
+  assert.equal(localStorage.getItem('mangaReaderSafeMode'), '0');
+  assert.equal(stopped, 3);
+  runtime.destroy();
+});
+
+test('reader mobile CSS keeps the header at top and the privacy veil removable', () => {
+  const html = readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
+  const mobileCss = readFileSync(new URL('../reader-liquid-glass.css', import.meta.url), 'utf8');
+  assert.match(html, /class="readerHeaderPrimary"/);
+  assert.match(html, /class="readerHeaderSecondary"/);
+  assert.match(html, /body\.safe-mode #viewer::after/);
+  assert.doesNotMatch(html, /body\.safe-mode #pageStage > \* \{ filter:/);
+  assert.match(mobileCss, /\(hover: none\) and \(pointer: coarse\)/);
+  assert.match(mobileCss, /#readerApp #topbar\s*\{\s*position: fixed;/);
+  assert.match(mobileCss, /#readerApp #topbar #safeModeBtn/);
 });
