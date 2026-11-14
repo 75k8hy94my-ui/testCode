@@ -1,22 +1,413 @@
+/* One material system for testCode. The same tokens, lens and rim are used
+   by Reader, SPA chrome, mobile navigation, menus and opt-in controls. */
 :root {
-  --glass-highlight: rgba(255, 255, 255, .34);
-  --glass-edge: rgba(0, 0, 0, .26);
-  --glass-shadow-soft: rgba(0, 0, 0, .16);
-  --glass-refraction: rgba(255, 255, 255, .72);
-  --glass-refraction-tail: rgba(255, 255, 255, .42);
-  --glass-border-optical: rgba(255, 255, 255, .26);
+  --glass-highlight: rgba(255,255,255,.65);
+  --glass-edge: rgba(188,222,255,.36);
+  --glass-shadow-soft: rgba(0,0,0,.28);
+  --glass-refraction: rgba(255,255,255,.78);
+  --glass-refraction-tail: rgba(197,229,255,.35);
+  --glass-border-optical: rgba(239,249,255,.46);
+  --lg-blur: 23px;
+  --lg-saturation: 175%;
 }
 
-.glass {
-  border: 1px solid var(--glass-border-optical);
-  background: color-mix(in srgb, var(--glass-refraction) 44%, transparent);
-  box-shadow: inset 0 1px 1px var(--glass-highlight), 0 8px 18px -13px var(--glass-shadow-soft);
-  -webkit-backdrop-filter: blur(18px) saturate(150%);
-  backdrop-filter: blur(18px) saturate(150%);
+.lg-definitions {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass {
-    background: var(--surface-strong, var(--glass-refraction));
+:is(
+  #readerApp #topbar,
+  #readerApp #controls,
+  #readerApp #nextVolumeBanner,
+  #readerApp .ctrlBtn,
+  #mobileBottomNav.liquidGlassNav,
+  #mobileBottomNav .liquidGlassSelection,
+  #mobileUtilityMenu,
+  #appGlobalHeader.globalAppHeader,
+  #mangaListSection .bookshelf-pagination,
+  #statutesLawMenu,
+  #accountMenu,
+  .vl-round,
+  #gameShell .hud-card,
+  #gameShell .ios-widget,
+  #gameShell .ios-live-card,
+  #gameShell .ios-glass-card,
+  #gameShell .ios-lock-notification,
+  #gameShell .ios-notification,
+  #gameShell .ios-overlay-panel,
+  #gameShell .ios-dock,
+  .glass,
+  .glassBtn,
+  [data-liquid-glass],
+  [data-lg-material]
+).lg-surface {
+  --lg-light-x: 50%;
+  --lg-light-y: 0%;
+  --lg-fill: rgba(23, 31, 47, .48);
+  --lg-border: rgba(219, 239, 255, .46);
+  --lg-bottom: rgba(75, 125, 176, .21);
+  --lg-shadow: rgba(0, 0, 0, .34);
+  --lg-top-light: rgba(255,255,255,.39);
+  --lg-caustic: rgba(184,224,255,.23);
+  isolation: isolate;
+  border: 1px solid var(--lg-border) !important;
+  background:
+    radial-gradient(ellipse 85% 140% at var(--lg-light-x) -28%, rgba(255,255,255,.21), transparent 75%),
+    linear-gradient(155deg, rgba(255,255,255,.12), transparent 42%, rgba(5,15,34,.10) 88%),
+    var(--lg-fill) !important;
+  box-shadow:
+    0 13px 35px -6px var(--lg-shadow),
+    0 2px 7px rgba(0,0,0,.12),
+    inset 0 1px 1px var(--lg-top-light),
+    inset 0 -1px 0 var(--lg-bottom),
+    inset 1px 0 0 rgba(255,255,255,.17) !important;
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturation)) contrast(106%) !important;
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturation)) contrast(106%) !important;
+}
+
+html:not([data-theme="dark"]) :is(
+  #mobileBottomNav.liquidGlassNav,
+  #mobileBottomNav .liquidGlassSelection,
+  #mobileUtilityMenu,
+  #appGlobalHeader.globalAppHeader,
+  #mangaListSection .bookshelf-pagination,
+  #statutesLawMenu,
+  #accountMenu,
+  .vl-round,
+  #gameShell .hud-card,
+  #gameShell .ios-widget,
+  #gameShell .ios-live-card,
+  #gameShell .ios-glass-card,
+  #gameShell .ios-lock-notification,
+  #gameShell .ios-notification,
+  #gameShell .ios-overlay-panel,
+  #gameShell .ios-dock,
+  .glass,
+  .glassBtn,
+  [data-liquid-glass],
+  [data-lg-material]
+).lg-surface {
+  --lg-fill: rgba(238,245,254,.33);
+  --lg-border: rgba(255,255,255,.84);
+  --lg-bottom: rgba(91,119,151,.15);
+  --lg-shadow: rgba(50,66,84,.17);
+  --lg-top-light: rgba(255,255,255,.86);
+  --lg-caustic: rgba(255,255,255,.72);
+}
+
+/* Every material has the same moving caustic and edge Fresnel reflection. */
+:is(
+  #readerApp #topbar,
+  #readerApp #controls,
+  #readerApp #nextVolumeBanner,
+  #readerApp .ctrlBtn,
+  #mobileBottomNav.liquidGlassNav,
+  #mobileBottomNav .liquidGlassSelection,
+  #mobileUtilityMenu,
+  #appGlobalHeader.globalAppHeader,
+  #mangaListSection .bookshelf-pagination,
+  #statutesLawMenu,
+  #accountMenu,
+  .vl-round,
+  #gameShell .hud-card,
+  #gameShell .ios-widget,
+  #gameShell .ios-live-card,
+  #gameShell .ios-glass-card,
+  #gameShell .ios-lock-notification,
+  #gameShell .ios-notification,
+  #gameShell .ios-overlay-panel,
+  #gameShell .ios-dock,
+  .glass,
+  .glassBtn,
+  [data-liquid-glass],
+  [data-lg-material]
+).lg-surface::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+  border: 0 !important;
+  border-radius: inherit !important;
+  height: auto !important;
+  width: auto !important;
+  pointer-events: none !important;
+  opacity: 1 !important;
+  background:
+    radial-gradient(ellipse 58% 98% at var(--lg-light-x) var(--lg-light-y),
+      var(--lg-caustic), rgba(255,255,255,.045) 44%, transparent 80%),
+    linear-gradient(135deg, rgba(255,255,255,.12), transparent 32%, rgba(8,20,39,.07) 85%) !important;
+  mix-blend-mode: screen !important;
+  -webkit-mask: none !important;
+  mask: none !important;
+}
+
+:is(
+  #readerApp #topbar,
+  #readerApp #controls,
+  #readerApp #nextVolumeBanner,
+  #readerApp .ctrlBtn,
+  #mobileBottomNav.liquidGlassNav,
+  #mobileBottomNav .liquidGlassSelection,
+  #mobileUtilityMenu,
+  #appGlobalHeader.globalAppHeader,
+  #mangaListSection .bookshelf-pagination,
+  #statutesLawMenu,
+  #accountMenu,
+  .vl-round,
+  #gameShell .hud-card,
+  #gameShell .ios-widget,
+  #gameShell .ios-live-card,
+  #gameShell .ios-glass-card,
+  #gameShell .ios-lock-notification,
+  #gameShell .ios-notification,
+  #gameShell .ios-overlay-panel,
+  #gameShell .ios-dock,
+  .glass,
+  .glassBtn,
+  [data-liquid-glass],
+  [data-lg-material]
+).lg-surface::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 4 !important;
+  width: auto !important;
+  height: auto !important;
+  border: 0 !important;
+  padding: 1.5px !important;
+  border-radius: inherit !important;
+  pointer-events: none !important;
+  opacity: 1 !important;
+  background:
+    radial-gradient(ellipse 80% 92% at var(--lg-light-x) var(--lg-light-y),
+      rgba(255,255,255,.94), rgba(174,218,253,.20) 60%, transparent 93%),
+    linear-gradient(150deg,
+      rgba(255,255,255,.86), rgba(255,255,255,.05) 30%,
+      rgba(124,195,254,.22) 62%, rgba(255,255,255,.64)) !important;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0) !important;
+  -webkit-mask-composite: xor !important;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0) !important;
+  mask-composite: exclude !important;
+}
+
+/* Preserve link/touch hit targets above the non-interactive optical skin. */
+.lg-surface[data-lg-material="panel"] > :not(.liquidGlassSelection),
+.lg-surface[data-lg-material="lens"] > * {
+  z-index: 1;
+}
+
+/* All browsers use the same material. Blink additionally displaces the
+   real backdrop at the curved rim; Safari retains the native glass blur. */
+:is(
+  #readerApp #topbar,
+  #readerApp #controls,
+  #readerApp #nextVolumeBanner,
+  #readerApp .ctrlBtn,
+  #mobileBottomNav.liquidGlassNav,
+  #mobileBottomNav .liquidGlassSelection,
+  #mobileUtilityMenu,
+  #appGlobalHeader.globalAppHeader,
+  #mangaListSection .bookshelf-pagination,
+  #statutesLawMenu,
+  #accountMenu,
+  .vl-round,
+  #gameShell .hud-card,
+  #gameShell .ios-widget,
+  #gameShell .ios-live-card,
+  #gameShell .ios-glass-card,
+  #gameShell .ios-lock-notification,
+  #gameShell .ios-notification,
+  #gameShell .ios-overlay-panel,
+  #gameShell .ios-dock,
+  .glass,
+  .glassBtn,
+  [data-liquid-glass],
+  [data-lg-material]
+).lg-surface.lg-optical {
+  -webkit-backdrop-filter: var(--lg-material-filter) !important;
+  backdrop-filter: var(--lg-material-filter) !important;
+}
+
+#mobileBottomNav.liquidGlassNav.lg-surface {
+  --lg-blur: 30px;
+  border-radius: 30px;
+}
+#mobileBottomNav .liquidGlassSelection.lg-surface {
+  --lg-blur: 9px;
+  --lg-fill: rgba(186,217,245,.08) !important;
+  --lg-border: rgba(238,249,255,.61) !important;
+  --lg-bottom: rgba(91,148,210,.24) !important;
+  --lg-shadow: rgba(12,27,47,.13) !important;
+  border-radius: 22px;
+}
+html:not([data-theme="dark"]) #mobileBottomNav .liquidGlassSelection.lg-surface {
+  --lg-fill: rgba(222,239,255,.06) !important;
+  --lg-border: rgba(255,255,255,.90) !important;
+  --lg-bottom: rgba(85,110,140,.16) !important;
+}
+#mobileUtilityMenu.lg-surface { --lg-blur: 26px; border-radius: 20px; }
+#appGlobalHeader.globalAppHeader.lg-surface {
+  --lg-blur: 21px;
+  border-radius: 0 !important;
+  box-shadow: 0 3px 15px -8px var(--lg-shadow), inset 0 -1px 0 var(--lg-bottom) !important;
+}
+#mangaListSection .bookshelf-pagination.lg-surface { --lg-blur: 27px; }
+
+#readerApp #topbar.lg-surface,
+#readerApp #controls.lg-surface,
+#readerApp #nextVolumeBanner.lg-surface {
+  --lg-blur: 25px;
+  --lg-fill: rgba(20,29,46,.46);
+  color: #f4f8ff;
+}
+#readerApp .ctrlBtn.lg-surface,
+.glassBtn.lg-surface,
+.glass.lg-surface {
+  --lg-blur: 12px;
+  --lg-fill: rgba(172,202,234,.10);
+  --lg-shadow: rgba(0,0,0,.13);
+  --lg-border: rgba(214,235,255,.35);
+  --lg-top-light: rgba(255,255,255,.28);
+  border-radius: 13px;
+  transition: transform .2s ease, opacity .2s ease, border-color .2s ease;
+}
+#readerApp .ctrlBtn.lg-surface:hover:not(:disabled),
+.glassBtn.lg-surface:hover:not(:disabled) {
+  border-color: rgba(241,250,255,.75) !important;
+  transform: translateY(-1px);
+}
+#readerApp .ctrlBtn.lg-surface:active:not(:disabled),
+.glassBtn.lg-surface:active:not(:disabled) { transform: scale(.975); }
+#readerApp .ctrlBtn.lg-surface:disabled,
+.glassBtn.lg-surface:disabled { opacity: .49; cursor: not-allowed; }
+#readerApp .ctrlBtn.lg-surface:focus-visible,
+.glassBtn.lg-surface:focus-visible,
+#readerApp #pageSlider:focus-visible { outline: 2px solid #9ed8ff; outline-offset: 3px; }
+
+/* The selected mobile pill keeps legacy interaction geometry, but its optical
+   paint comes from this same shared material, not from mobile-bottom-nav.css. */
+html.statutes-page #appGlobalHeader #mobileBottomNav.liquidGlassNav.lg-surface,
+html[data-theme="light"] #mobileBottomNav.liquidGlassNav.lg-surface,
+html[data-theme="dark"] #mobileBottomNav.liquidGlassNav.lg-surface,
+#mobileBottomNav.liquidGlassNav.liquidNavCompact.lg-surface,
+#mobileBottomNav.liquidGlassNav.glassPressed.lg-surface {
+  background:
+    radial-gradient(ellipse 85% 140% at var(--lg-light-x) -28%,rgba(255,255,255,.21),transparent 75%),
+    linear-gradient(155deg,rgba(255,255,255,.12),transparent 42%,rgba(5,15,34,.10) 88%),
+    var(--lg-fill) !important;
+  border-color: var(--lg-border) !important;
+  box-shadow:
+    0 13px 35px -6px var(--lg-shadow),
+    0 2px 7px rgba(0,0,0,.12),
+    inset 0 1px 1px var(--lg-top-light),
+    inset 0 -1px 0 var(--lg-bottom) !important;
+}
+html[data-theme="light"] .liquidGlassSelection.lg-surface,
+html[data-theme="dark"] .liquidGlassSelection.lg-surface,
+#mobileBottomNav.liquidGlassNav.liquidLensMoving .liquidGlassSelection.lg-surface,
+#mobileBottomNav.liquidGlassNav.liquidDragMode .liquidGlassSelection.lg-surface {
+  background:
+    radial-gradient(ellipse 85% 140% at var(--lg-light-x) -28%,rgba(255,255,255,.19),transparent 74%),
+    var(--lg-fill) !important;
+  border-color: var(--lg-border) !important;
+  box-shadow: 0 3px 12px var(--lg-shadow), inset 0 1px 0 var(--lg-top-light), inset 0 -1px 0 var(--lg-bottom) !important;
+}
+
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  .lg-surface { background: rgba(27,35,50,.94) !important; -webkit-backdrop-filter:none!important; backdrop-filter:none!important; }
+  html:not([data-theme="dark"]) :is(#mobileBottomNav.lg-surface, #mobileUtilityMenu.lg-surface, #appGlobalHeader.lg-surface, .glass.lg-surface, .glassBtn.lg-surface) { background:rgba(244,247,253,.96)!important; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .lg-surface { -webkit-backdrop-filter:none!important; backdrop-filter:none!important; background:rgba(24,30,43,.96)!important; }
+  html:not([data-theme="dark"]) .lg-surface:not(#readerApp *) { background:rgba(248,250,254,.98)!important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lg-surface { transition:none!important; }
+}
+
+/* Small icons are self-contained. Preserve fixed/absolute positioning of bars. */
+.lg-surface[data-lg-material="button"] { position: relative; }
+#statutesLawMenu.lg-surface { --lg-blur: 23px; }
+#accountMenu.lg-surface { --lg-blur: 20px; }
+#gameShell .lg-surface {
+  --lg-fill: rgba(20,27,33,.66) !important;
+  --lg-border: rgba(218,238,246,.31) !important;
+  --lg-shadow: rgba(0,0,0,.29) !important;
+  --lg-top-light: rgba(255,255,255,.30) !important;
+}
+#gameShell .ios-dock.lg-surface { --lg-blur: 28px; }
+#gameShell .ios-widget.lg-surface,
+#gameShell .ios-live-card.lg-surface,
+#gameShell .ios-glass-card.lg-surface,
+#gameShell .ios-notification.lg-surface { position: relative; }
+
+/* Accessibility fallbacks use the SAME selector weight as the normal paint;
+   legacy mobile !important rules cannot force translucency back on. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  :is(
+  #readerApp #topbar,
+  #readerApp #controls,
+  #readerApp #nextVolumeBanner,
+  #readerApp .ctrlBtn,
+  #mobileBottomNav.liquidGlassNav,
+  #mobileBottomNav .liquidGlassSelection,
+  #mobileUtilityMenu,
+  #appGlobalHeader.globalAppHeader,
+  #mangaListSection .bookshelf-pagination,
+  #statutesLawMenu,
+  #accountMenu,
+  .vl-round,
+  #gameShell .hud-card,
+  #gameShell .ios-widget,
+  #gameShell .ios-live-card,
+  #gameShell .ios-glass-card,
+  #gameShell .ios-lock-notification,
+  #gameShell .ios-notification,
+  #gameShell .ios-overlay-panel,
+  #gameShell .ios-dock,
+  .glass,
+  .glassBtn,
+  [data-liquid-glass],
+  [data-lg-material]
+).lg-surface {
+    --lg-fill: rgba(21,29,42,.97) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :is(
+  #readerApp #topbar,
+  #readerApp #controls,
+  #readerApp #nextVolumeBanner,
+  #readerApp .ctrlBtn,
+  #mobileBottomNav.liquidGlassNav,
+  #mobileBottomNav .liquidGlassSelection,
+  #mobileUtilityMenu,
+  #appGlobalHeader.globalAppHeader,
+  #mangaListSection .bookshelf-pagination,
+  #statutesLawMenu,
+  #accountMenu,
+  .vl-round,
+  #gameShell .hud-card,
+  #gameShell .ios-widget,
+  #gameShell .ios-live-card,
+  #gameShell .ios-glass-card,
+  #gameShell .ios-lock-notification,
+  #gameShell .ios-notification,
+  #gameShell .ios-overlay-panel,
+  #gameShell .ios-dock,
+  .glass,
+  .glassBtn,
+  [data-liquid-glass],
+  [data-lg-material]
+).lg-surface {
+    --lg-fill: rgba(21,29,42,.97) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
   }
 }
