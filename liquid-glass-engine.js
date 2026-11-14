@@ -14,6 +14,10 @@
     { selector: '#mobileUtilityMenu', kind: 'panel', optical: true },
     { selector: '#appGlobalHeader.globalAppHeader', kind: 'panel', optical: true },
     { selector: '#mangaListSection .bookshelf-pagination', kind: 'panel', optical: true },
+    { selector: '#statutesLawMenu, #accountMenu', kind: 'panel', optical: true },
+    { selector: '.vl-round', kind: 'button', optical: false },
+    { selector: '#gameShell .hud-card, #gameShell .ios-widget, #gameShell .ios-live-card, #gameShell .ios-glass-card, #gameShell .ios-lock-notification, #gameShell .ios-notification, #gameShell .ios-overlay-panel', kind: 'panel', optical: false },
+    { selector: '#gameShell .ios-dock', kind: 'panel', optical: true },
     { selector: '.glass, .glassBtn', kind: 'button', optical: false },
   ]);
 
