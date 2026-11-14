@@ -3,6 +3,7 @@
 
   const STYLESHEET_URL = 'manga-list.css?v=20261009-guest-mode';
   const SCRIPT_URLS = [
+    ['manga-source-type.js?v=20261114-embed-source', 'mangaSourceType'],
     ['manga-list-template.js?v=20261114-json-import', 'mangaRouteTemplate'],
     ['manga-import-author-sync.js?v=20261007-momon-import', 'mangaImportAuthorSync'],
     ['manga-json-import.js?v=20261114-json-import', 'mangaJsonImport'],
@@ -43,7 +44,7 @@
     ['manga-list-cover-cache.js?v=20261008-cover-cache', 'mangaRouteCoverCache'],
     ['manga-list-image-cache.js?v=20261011-encrypted-cache', 'mangaRouteImageCache'],
     ['reader-target.js?v=20261003-reader-launch-contract', 'mangaReaderTarget'],
-    ['manga-list-host-runtime.js?v=20261011-nongame-audit', 'mangaRouteHost'],
+    ['manga-list-host-runtime.js?v=20261114-embed-source', 'mangaRouteHost'],
     ['manga-list-runtime.js?v=20261010-vault-sync-v4-delete', 'mangaRouteRuntime'],
     ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
   ];
