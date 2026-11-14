@@ -339,3 +339,68 @@ html[data-theme="dark"] .liquidGlassSelection.lg-surface,
 #gameShell .ios-live-card.lg-surface,
 #gameShell .ios-glass-card.lg-surface,
 #gameShell .ios-notification.lg-surface { position: relative; }
+
+/* Accessibility fallbacks use the SAME selector weight as the normal paint;
+   legacy mobile !important rules cannot force translucency back on. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  :is(
+  #readerApp #topbar,
+  #readerApp #controls,
+  #readerApp #nextVolumeBanner,
+  #readerApp .ctrlBtn,
+  #mobileBottomNav.liquidGlassNav,
+  #mobileBottomNav .liquidGlassSelection,
+  #mobileUtilityMenu,
+  #appGlobalHeader.globalAppHeader,
+  #mangaListSection .bookshelf-pagination,
+  #statutesLawMenu,
+  #accountMenu,
+  .vl-round,
+  #gameShell .hud-card,
+  #gameShell .ios-widget,
+  #gameShell .ios-live-card,
+  #gameShell .ios-glass-card,
+  #gameShell .ios-lock-notification,
+  #gameShell .ios-notification,
+  #gameShell .ios-overlay-panel,
+  #gameShell .ios-dock,
+  .glass,
+  .glassBtn,
+  [data-liquid-glass]
+).lg-surface {
+    --lg-fill: rgba(21,29,42,.97) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :is(
+  #readerApp #topbar,
+  #readerApp #controls,
+  #readerApp #nextVolumeBanner,
+  #readerApp .ctrlBtn,
+  #mobileBottomNav.liquidGlassNav,
+  #mobileBottomNav .liquidGlassSelection,
+  #mobileUtilityMenu,
+  #appGlobalHeader.globalAppHeader,
+  #mangaListSection .bookshelf-pagination,
+  #statutesLawMenu,
+  #accountMenu,
+  .vl-round,
+  #gameShell .hud-card,
+  #gameShell .ios-widget,
+  #gameShell .ios-live-card,
+  #gameShell .ios-glass-card,
+  #gameShell .ios-lock-notification,
+  #gameShell .ios-notification,
+  #gameShell .ios-overlay-panel,
+  #gameShell .ios-dock,
+  .glass,
+  .glassBtn,
+  [data-liquid-glass]
+).lg-surface {
+    --lg-fill: rgba(21,29,42,.97) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
