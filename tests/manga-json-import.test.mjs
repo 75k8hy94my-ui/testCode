@@ -21,7 +21,7 @@ test('JSON import parses valid works and returns independent normalized arrays',
   const parsed = importer.parse(json([item, { ...item, url: 'https://images.example.org/other/1.webp' }]));
   assert.equal(parsed.length, 2);
   assert.equal(parsed[0].url, item.url);
-  assert.deepEqual(parsed[0].tags, item.tags);
+  assert.deepEqual(Array.from(parsed[0].tags), item.tags);
   assert.notEqual(parsed[0].tags, item.tags);
 });
 test('JSON import rejects invalid protocol, page number, malformed metadata, and oversized collections', () => {
