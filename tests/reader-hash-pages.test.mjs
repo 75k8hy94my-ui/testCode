@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 const Source = require('../manga-source-type.js');
 const Runtime = require('../reader-runtime.js');
@@ -133,6 +134,43 @@ test('hash frames use normal reader controls, restore progress and cannot receiv
   assert.equal(elements.pageStage.children.length, 0, 'destroy removes protected remote frames');
 });
 
+test('enabling vertical mode does not scan pages or react to programmatic browser scroll events', async () => {
+  const { runtime, elements, body, commits } = setup({ resume: 2 });
+  await runtime.start('hash-work');
+  const before = commits.length;
+  elements.verticalBtn.dispatch('click');
+  assert.equal(body.classList.contains('vertical-scroll'), true);
+  assert.equal(runtime.getPageState().displayedPage, 2);
+  assert.equal(elements.pageStage.children.length, 4);
+
+  // Browser-generated scrolls (initial positioning, anchoring, iframe focus)
+  // must neither load more URLs nor change the reader progress.
+  for (let i = 0; i < 6; i += 1) {
+    elements.viewer.scrollTop = i * 800;
+    elements.viewer.dispatch('scroll');
+  }
+  assert.equal(runtime.getPageState().displayedPage, 2);
+  assert.equal(elements.pageStage.children.length, 4);
+  assert.equal(commits.length, before, 'layout-only scroll must not persist new page progress');
+
+  // A genuine touch gesture is allowed to advance the same scroll container.
+  elements.viewer.dispatch('touchmove');
+  elements.viewer.scrollTop = 3 * 800;
+  elements.viewer.dispatch('scroll');
+  assert.equal(runtime.getPageState().displayedPage, 4);
+
+  // Switching the layout must reset any old scroll-gesture permission.
+  elements.verticalBtn.dispatch('click');
+  elements.verticalBtn.dispatch('click');
+  const stablePage = runtime.getPageState().displayedPage;
+  const stableSlots = elements.pageStage.children.length;
+  elements.viewer.scrollTop = 5 * 800;
+  elements.viewer.dispatch('scroll');
+  assert.equal(runtime.getPageState().displayedPage, stablePage);
+  assert.equal(elements.pageStage.children.length, stableSlots);
+  runtime.destroy();
+});
+
 test('hash-page vertical reading creates bounded iframe windows and preserves page index', async () => {
   const { runtime, elements, body, commits } = setup({ resume: 2 });
   await runtime.start('hash-work');
@@ -142,6 +180,7 @@ test('hash-page vertical reading creates bounded iframe windows and preserves pa
   const active = () => elements.pageStage.children.filter(slot => !!slot.firstChild);
   assert.ok(active().length <= 3);
   assert.ok(active().every(slot => slot.firstChild.firstChild.style.pointerEvents === 'none'));
+  elements.viewer.dispatch('wheel'); // Only a real gesture may advance the page.
   elements.viewer.scrollTop = 3 * 800;
   elements.viewer.dispatch('scroll');
   assert.equal(runtime.getPageState().displayedPage, 4);
@@ -153,4 +192,11 @@ test('hash-page vertical reading creates bounded iframe windows and preserves pa
   assert.equal(body.classList.contains('vertical-scroll'), false);
   assert.equal(elements.pageStage.firstChild.firstChild.src, 'https://example.test/xxx.html?edition=1#4');
   runtime.destroy();
+});
+
+
+test('hash-page vertical CSS avoids scroll anchoring and refreshes the runtime asset', () => {
+  const html = readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
+  assert.match(html, /body\.hash-page-reader\.vertical-scroll #viewer[\s\S]*overflow-anchor:none/);
+  assert.match(html, /reader-runtime\.js\?v=20261114-hash-scroll-fix/);
 });
