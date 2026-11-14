@@ -59,6 +59,7 @@
       if (embeddedFrame) { embeddedFrame.remove?.(); embeddedFrame = null; }
       if (hashPageBase) byId('pageStage')?.replaceChildren?.();
       hashIframe = null;
+      hashUserScrollUntil = 0;
       hashVerticalSlots.length = 0;
       lifecycle?.destroy();
       try { dependencies.onDestroy?.(); } catch (_) {}
@@ -88,6 +89,10 @@
     let hashPageBase = '';
     let hashIframe = null;
     let hashMaxVisited = 1;
+    // A scroll event also fires after programmatic scrollTop writes, iframe
+    // layout changes and browser scroll anchoring. None of those can advance
+    // the reader unless a real scroll gesture was observed first.
+    let hashUserScrollUntil = 0;
     const hashVerticalSlots = [];
     let pageUrls = [];
     let encryptedPages = [];
@@ -525,6 +530,7 @@
       bind('verticalBtn', 'click', () => {
         if (split || encryptedPages.length) return;
         if (hashPageBase) {
+          hashUserScrollUntil = 0;
           vertical = !vertical;
           doc.body.classList.toggle('vertical-scroll', vertical);
           win.localStorage.setItem('mangaReaderVerticalScroll', vertical ? '1' : '0');
@@ -560,6 +566,13 @@
         if (vertical) return;
         if (x < win.innerWidth * 0.35) previous(); else if (x > win.innerWidth * 0.65) next();
       });
+      const markHashScrollIntent = () => {
+        if (hashPageBase && vertical) hashUserScrollUntil = Date.now() + 1500;
+      };
+      bind('viewer', 'wheel', markHashScrollIntent, { passive: true });
+      bind('viewer', 'touchmove', markHashScrollIntent, { passive: true });
+      // Includes scrollbar dragging and touch gestures that scroll after pointerdown.
+      bind('viewer', 'pointerdown', markHashScrollIntent, { passive: true });
       bind('viewer', 'scroll', () => {
         if (hashPageBase) { onHashVerticalScroll(); return; }
         if (!vertical) return;
@@ -603,7 +616,13 @@
         const itemId = event.currentTarget?.dataset?.nextItemId;
         if (itemId) location.assign(target.buildReaderUrl(itemId, 'reader.html'));
       });
-      lifecycle.listen(win, 'keydown', (event) => { if (event.key === 'ArrowRight' || event.key === ' ') next(); else if (event.key === 'ArrowLeft') previous(); });
+      lifecycle.listen(win, 'keydown', (event) => {
+        if (hashPageBase && vertical && ['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End'].includes(event.key)) {
+          hashUserScrollUntil = Date.now() + 1500;
+        }
+        if (event.key === 'ArrowRight' || event.key === ' ') next();
+        else if (event.key === 'ArrowLeft') previous();
+      });
       if (vertical) doc.body.classList.add('vertical-scroll');
       imageEnhanceEnabled = win.localStorage.getItem('mangaReaderImageEnhance') !== '0';
       doc.body.classList.toggle('image-enhance', imageEnhanceEnabled);
@@ -678,6 +697,9 @@
     function renderHashLayout() {
       const stage = byId('pageStage'), viewer = byId('viewer');
       if (!stage || !viewer) return;
+      // Reset intent before a DOM rebuild: its scroll/anchor events are not
+      // equivalent to a fresh wheel, touch or scrollbar-drag gesture.
+      hashUserScrollUntil = 0;
       stage.replaceChildren();
       hashVerticalSlots.length = 0;
       hashIframe = null;
@@ -700,6 +722,9 @@
     function showHashPage(value) {
       const number = Math.floor(Number(value));
       if (!Number.isSafeInteger(number) || !hashUrl(number) || destroyed) return false;
+      // A button/slider jump sets scrollTop deliberately. Its resulting
+      // scroll events must not trigger a new page-discovery cycle.
+      hashUserScrollUntil = 0;
       if (number === page && byId('pageStage')?.firstChild) return true;
       if (vertical) {
         hashMaxVisited = Math.max(hashMaxVisited, number);
@@ -720,7 +745,7 @@
       return true;
     }
     function onHashVerticalScroll() {
-      if (!vertical || !hashPageBase || destroyed) return;
+      if (!vertical || !hashPageBase || destroyed || Date.now() > hashUserScrollUntil) return;
       const viewer = byId('viewer');
       if (!viewer) return;
       const height = viewer.clientHeight || win.innerHeight || 800;
@@ -737,6 +762,7 @@
       updateHashVerticalWindow(visible);
     }
     function mountHashReader() {
+      doc.body.classList.add('hash-page-reader');
       const controls = byId('controls'); if (controls) controls.hidden = false;
       const link = byId('openSourceBtn');
       if (link) { link.href = hashUrl(page); link.hidden = false; }
