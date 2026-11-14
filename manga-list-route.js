@@ -3,7 +3,7 @@
 
   const STYLESHEET_URL = 'manga-list.css?v=20261009-guest-mode';
   const SCRIPT_URLS = [
-    ['manga-source-type.js?v=20261114-embed-source', 'mangaSourceType'],
+    ['manga-source-type.js?v=20261114-hash-pages', 'mangaSourceType'],
     ['manga-list-template.js?v=20261114-json-import', 'mangaRouteTemplate'],
     ['manga-import-author-sync.js?v=20261007-momon-import', 'mangaImportAuthorSync'],
     ['manga-json-import.js?v=20261114-json-import', 'mangaJsonImport'],

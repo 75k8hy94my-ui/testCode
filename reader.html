@@ -41,6 +41,10 @@
     #controls[hidden] { display:none; }
     .readerEmbedFrame { width:100%; height:100%; background:#fff; }
     .readerEmbedFrame iframe { display:block; width:100%; height:100%; border:0; background:#fff; }
+    .readerHashFrame { width:100%; height:100%; overflow:hidden; background:#fff; pointer-events:none; }
+    .readerHashFrame iframe { display:block; width:100%; height:100%; border:0; background:#fff; pointer-events:none!important; }
+    .readerHashVerticalSlot { width:min(100%, 960px); height:100dvh; min-height:100dvh; flex:none; overflow:hidden; }
+    body.image-enhance:not(.safe-mode) .readerHashFrame iframe { filter:contrast(1.12) brightness(1.04) saturate(.96); }
     body.reader-chrome-hidden #topbar { transform:translateY(-105%); opacity:0; pointer-events:none; }
     body.reader-chrome-hidden #controls { transform:translateY(105%); opacity:0; pointer-events:none; }
     #pageSlider { flex:1; min-width:50px; accent-color:var(--accent); }
@@ -93,7 +97,7 @@
 <script src="vault-session.js?v=20261018-statutes-independent-vault"></script><script src="vault-conflict-ui.js?v=20261017-readable-conflicts"></script>
   <script src="browser-storage.js"></script>
   <script src="reader-target.js?v=20261004-reader-item-route"></script>
-  <script src="manga-source-type.js?v=20261114-embed-source"></script>
+  <script src="manga-source-type.js?v=20261114-hash-pages"></script>
   <script src="vault-payload.js?v=20261018-statutes-independent-vault"></script>
   <script src="feature-flags.js"></script>
   <script src="media-access-gate.js?v=20261010-vpn-diagnostics"></script>
@@ -115,7 +119,7 @@
   <script src="reader-progress-repository.js?v=20261011-pending-sync"></script>
   <script src="reader-item-repository.js"></script>
   <script src="reader-sync-scheduler.js?v=20261008-reader-close-sync"></script>
-  <script src="reader-runtime.js?v=20261114-embed-source"></script>
+  <script src="reader-runtime.js?v=20261114-hash-pages"></script>
   <script>
     window.MangaReaderBootPromise = (async () => {
       const sessionKey = 'mangaReaderSupabaseSession';

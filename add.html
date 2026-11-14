@@ -39,7 +39,7 @@
 <label>巻数（任意） <input name="volume" type="number" min="1"></label>
 <label>タグ（カンマ区切り） <input name="tags"></label>
 <label>画像URLまたはページURL（必須） <input name="url" type="url" placeholder="https://..." required aria-describedby="mangaAddUrlHelp"></label>
-<p id="mangaAddUrlHelp">画像への直リンク（.jpg / .png / .webp 等）は画像リーダーで開き、通常のWebページURLは埋め込み表示します。埋め込みを禁止しているサイトは元ページを別タブで開けます。</p>
+<p id="mangaAddUrlHelp">画像への直リンクは画像リーダー、通常のWebページURLは埋め込み表示で開きます。URL末尾が「#1」の場合は「#2」「#3」…をページ送りする漫画として扱います。外部サイトが埋め込みを禁止している場合は元ページを別タブで開けます。</p>
 <label>各ページの画像URL（任意・1行1URL）<textarea name="pages" placeholder="https://example.com/1.jpg"></textarea></label>
 <p class="mediaAddMessage" id="mangaAddStatus" role="status" aria-live="polite"></p>
 <div><button class="mediaAddButton primary" type="submit">漫画を保存</button></div>
@@ -74,6 +74,6 @@
 <script src="mobile-bottom-nav.js?v=20261012-shared-add"></script>
 <script src="manga-import-author-sync.js?v=20261007-momon-import"></script>
 <script src="manga-json-import.js?v=20261114-json-import"></script>
-<script src="manga-source-type.js?v=20261114-embed-source"></script>
+<script src="manga-source-type.js?v=20261114-hash-pages"></script>
 <script src="media-add.js?v=20261114-embed-source"></script>
 </body></html>

@@ -2,6 +2,7 @@
   'use strict';
 
   const IMAGE_PATH = /\.(?:avif|bmp|gif|jpe?g|png|webp)$/i;
+  const MAX_HASH_PAGE = 2000;
   const EMBED_COVER_URL = 'data:image/svg+xml,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 340">' +
     '<rect width="240" height="340" rx="18" fill="#1b2432"/>' +
@@ -32,13 +33,30 @@
       || (Array.isArray(item?.pages) && item.pages.length > 0);
   }
 
+  // Hash-page works are identified solely by the URL's exact trailing "#1".
+  // Explicit image lists and local/encrypted works remain authoritative.
+  function getHashPageBase(item) {
+    if (!item || typeof item !== 'object' || item.localSync || item.encryptedAssets?.pages?.length || hasPageList(item)) return '';
+    const href = safeHttpUrl(item.url);
+    return href.endsWith('#1') ? href.slice(0, -2) : '';
+  }
+
+  function hashPageUrl(base, page) {
+    if (!Number.isSafeInteger(page) || page < 1 || page > MAX_HASH_PAGE) return '';
+    const href = safeHttpUrl(base);
+    if (!href) return '';
+    const parsed = new URL(href);
+    parsed.hash = '';
+    return parsed.href + '#' + page;
+  }
+
   function getEmbedUrl(item) {
     if (!item || typeof item !== 'object' || item.localSync || item.encryptedAssets?.pages?.length || hasPageList(item)) return '';
     const href = safeHttpUrl(item.url);
-    return href && !isDirectImageUrl(href) ? href : '';
+    return href && (getHashPageBase(item) || !isDirectImageUrl(href)) ? href : '';
   }
 
-  const api = Object.freeze({ safeHttpUrl, isDirectImageUrl, hasPageList, getEmbedUrl, EMBED_COVER_URL });
+  const api = Object.freeze({ safeHttpUrl, isDirectImageUrl, hasPageList, getHashPageBase, hashPageUrl, MAX_HASH_PAGE, getEmbedUrl, EMBED_COVER_URL });
   if (typeof self !== 'undefined') self.MangaSourceType = api;
   if (typeof window !== 'undefined') window.MangaSourceType = api;
   if (typeof module !== 'undefined') module.exports = api;
