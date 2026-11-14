@@ -88,7 +88,7 @@
     const urls = String(data.get('pages') || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     if (!title || !validUrl(initialUrl) || urls.some(url => !validUrl(url))) {
       message.dataset.error = 'true';
-      message.textContent = 'タイトルと有効なHTTP(S)の画像URLを入力してください。';
+      message.textContent = 'タイトルと有効なHTTP(S)のURLを入力してください。';
       return;
     }
     const existing = getArray(ITEMS);

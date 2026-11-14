@@ -56,6 +56,7 @@
       pageTransition?.destroy();
       try { encryptedRenderer?.destroy?.(); } catch (_) {}
       encryptedRenderer = null;
+      if (byId('pageStage')?.querySelector('.readerEmbedFrame')) byId('pageStage').replaceChildren();
       lifecycle?.destroy();
       try { dependencies.onDestroy?.(); } catch (_) {}
     }
@@ -595,22 +596,52 @@
       if (!imageEnhanceEnabled || doc.body.classList.contains('safe-mode')) return;
       byId('pageStage')?.querySelectorAll('.readerPageImage').forEach((image) => win.ReaderImageEnhancement?.enhanceElement(image, { documentRef: doc, windowRef: win }));
     }
+    function mountEmbeddedPage(url) {
+      const stage = byId('pageStage');
+      const viewer = byId('viewer');
+      if (!stage || !viewer) throw new Error('埋め込み表示領域がありません。');
+      const frame = doc.createElement('div');
+      frame.className = 'readerEmbedFrame';
+      const iframe = doc.createElement('iframe');
+      iframe.src = url;
+      iframe.title = currentItem?.title || '外部漫画ページ';
+      iframe.loading = 'eager';
+      iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+      iframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox');
+      iframe.allowFullscreen = true;
+      frame.appendChild(iframe);
+      stage.classList.remove('vertical-scroll');
+      viewer.classList.remove('vertical-scroll');
+      stage.replaceChildren(frame);
+      const link = byId('openSourceBtn');
+      if (link) { link.href = url; link.hidden = false; }
+      const controls = byId('controls'); if (controls) controls.hidden = true;
+      for (const id of ['verticalBtn', 'enhanceBtn', 'tocAddBtn', 'tocBtn', 'retryPageBtn']) {
+        const button = byId(id); if (button) button.hidden = true;
+      }
+      const message = byId('readerMessage'); if (message) message.textContent = '';
+      status('Webページを埋め込んでいます。表示されない場合は「元ページを開く」を使用してください。');
+      updateControls();
+      return true;
+    }
     async function mountItem(item) {
       currentItem = item;
+      const embeddedUrl = win.MangaSourceType?.getEmbedUrl(item) || '';
       split = Boolean(item.splitSpreads);
       updateControls();
-      page = resumePage(item);
+      page = embeddedUrl ? 1 : resumePage(item);
       requestedPage = page;
       lastFailedRequest = null;
       verticalSlots = [];
       pendingVerticalScrollPage = null;
-      vertical = !split && !item.encryptedAssets && win.localStorage.getItem('mangaReaderVerticalScroll') === '1';
+      vertical = !embeddedUrl && !split && !item.encryptedAssets && win.localStorage.getItem('mangaReaderVerticalScroll') === '1';
       const verticalButton = byId('verticalBtn');
-      if (verticalButton) verticalButton.hidden = split || Boolean(item.encryptedAssets);
+      if (verticalButton) verticalButton.hidden = !!embeddedUrl || split || Boolean(item.encryptedAssets);
       doc.body.classList.toggle('vertical-scroll', vertical);
       const closeButton = byId('closeBtn'); if (closeButton) closeButton.hidden = false;
       const favoriteButton = byId('favToggleBtn'); if (favoriteButton) favoriteButton.hidden = false;
       bindControls(); renderFavorite();
+      if (embeddedUrl) return mountEmbeddedPage(embeddedUrl);
       const generationAtStart = ++generation;
       const resume = page;
       if (item.encryptedAssets) {
