@@ -76,7 +76,20 @@ html:not([data-theme="dark"]) :is(
 }
 
 /* Every material has the same moving caustic and edge Fresnel reflection. */
-.lg-surface::before {
+:is(
+  #readerApp #topbar,
+  #readerApp #controls,
+  #readerApp #nextVolumeBanner,
+  #readerApp .ctrlBtn,
+  #mobileBottomNav.liquidGlassNav,
+  #mobileBottomNav .liquidGlassSelection,
+  #mobileUtilityMenu,
+  #appGlobalHeader.globalAppHeader,
+  #mangaListSection .bookshelf-pagination,
+  .glass,
+  .glassBtn,
+  [data-liquid-glass]
+).lg-surface::before {
   content: "" !important;
   position: absolute !important;
   inset: 0 !important;
@@ -96,7 +109,20 @@ html:not([data-theme="dark"]) :is(
   mask: none !important;
 }
 
-.lg-surface::after {
+:is(
+  #readerApp #topbar,
+  #readerApp #controls,
+  #readerApp #nextVolumeBanner,
+  #readerApp .ctrlBtn,
+  #mobileBottomNav.liquidGlassNav,
+  #mobileBottomNav .liquidGlassSelection,
+  #mobileUtilityMenu,
+  #appGlobalHeader.globalAppHeader,
+  #mangaListSection .bookshelf-pagination,
+  .glass,
+  .glassBtn,
+  [data-liquid-glass]
+).lg-surface::after {
   content: "" !important;
   position: absolute !important;
   inset: 0 !important;
@@ -128,7 +154,20 @@ html:not([data-theme="dark"]) :is(
 
 /* All browsers use the same material. Blink additionally displaces the
    real backdrop at the curved rim; Safari retains the native glass blur. */
-.lg-surface.lg-optical {
+:is(
+  #readerApp #topbar,
+  #readerApp #controls,
+  #readerApp #nextVolumeBanner,
+  #readerApp .ctrlBtn,
+  #mobileBottomNav.liquidGlassNav,
+  #mobileBottomNav .liquidGlassSelection,
+  #mobileUtilityMenu,
+  #appGlobalHeader.globalAppHeader,
+  #mangaListSection .bookshelf-pagination,
+  .glass,
+  .glassBtn,
+  [data-liquid-glass]
+).lg-surface.lg-optical {
   -webkit-backdrop-filter: var(--lg-material-filter) !important;
   backdrop-filter: var(--lg-material-filter) !important;
 }
@@ -139,16 +178,16 @@ html:not([data-theme="dark"]) :is(
 }
 #mobileBottomNav .liquidGlassSelection.lg-surface {
   --lg-blur: 9px;
-  --lg-fill: rgba(186,217,245,.08);
-  --lg-border: rgba(238,249,255,.61);
-  --lg-bottom: rgba(91,148,210,.24);
-  --lg-shadow: rgba(12,27,47,.13);
+  --lg-fill: rgba(186,217,245,.08) !important;
+  --lg-border: rgba(238,249,255,.61) !important;
+  --lg-bottom: rgba(91,148,210,.24) !important;
+  --lg-shadow: rgba(12,27,47,.13) !important;
   border-radius: 22px;
 }
 html:not([data-theme="dark"]) #mobileBottomNav .liquidGlassSelection.lg-surface {
-  --lg-fill: rgba(222,239,255,.06);
-  --lg-border: rgba(255,255,255,.90);
-  --lg-bottom: rgba(85,110,140,.16);
+  --lg-fill: rgba(222,239,255,.06) !important;
+  --lg-border: rgba(255,255,255,.90) !important;
+  --lg-bottom: rgba(85,110,140,.16) !important;
 }
 #mobileUtilityMenu.lg-surface { --lg-blur: 26px; border-radius: 20px; }
 #appGlobalHeader.globalAppHeader.lg-surface {
@@ -220,7 +259,7 @@ html[data-theme="dark"] .liquidGlassSelection.lg-surface,
 
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
   .lg-surface { background: rgba(27,35,50,.94) !important; -webkit-backdrop-filter:none!important; backdrop-filter:none!important; }
-  html:not([data-theme="dark"]) .lg-surface:not(#readerApp *) { background:rgba(244,247,253,.96)!important; }
+  html:not([data-theme="dark"]) :is(#mobileBottomNav.lg-surface, #mobileUtilityMenu.lg-surface, #appGlobalHeader.lg-surface, .glass.lg-surface, .glassBtn.lg-surface) { background:rgba(244,247,253,.96)!important; }
 }
 @media (prefers-reduced-transparency: reduce) {
   .lg-surface { -webkit-backdrop-filter:none!important; backdrop-filter:none!important; background:rgba(24,30,43,.96)!important; }
