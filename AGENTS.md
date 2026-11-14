@@ -21,7 +21,7 @@ npm run verify:static
 git diff --check
 ```
 
-For UI or browser-behavior changes, also exercise the affected flow in a real browser or browser automation. Unit tests alone are not sufficient for visual lifecycle, navigation, loading, focus, or rendering behavior.
+For UI or browser-behavior changes, browser testing is recommended when practical, but is not a mandatory condition for publishing unless the user specifically requests it. Run available automated checks and disclose anything not tested.
 
 If a required check cannot be run, report the exact blocker and what was verified instead.
 
@@ -63,36 +63,27 @@ When security-sensitive storage or sync behavior changes, add or update tests fo
 - Do not remove a legacy read path until existing persisted user data has a safe migration path.
 - Avoid speculative backwards-compatibility code for formats that never existed in production.
 
-## Repository work lifecycle
+## Default implementation and publishing workflow
 
-- Before starting repository work, check for updates on the target remote branch. Fetch and inspect the upstream changes before editing; if terminal fetch is unavailable, inspect the current remote branch through an authenticated GitHub integration and base the work on that revision. Integrate remote changes deliberately and preserve existing local/user work.
-- Do not end repository work until the deployment for the intended change has visibly started. Identify the deployment mechanism at the start, then after publishing verify that a deployment run exists for the intended commit and has entered a running or later state. A passing test workflow, pull request creation, or merge alone does not confirm deployment. If no deployment mechanism or status is available, report the exact blocker and leave the work explicitly incomplete rather than claiming deployment started.
+Unless the user explicitly specifies otherwise, every testCode code-change request includes completing publication to the production branch/site, not merely creating a draft, branch, or pull request.
+
+1. Inspect the latest upstream `main` and preserve unrelated changes. Implement the requested changes and run relevant feasible checks.
+2. Commit and push the changes. If using a pull request, merge it into `main` as part of the same task; do not stop after PR creation.
+3. Use the existing GitHub Pages deployment mechanism. Publishing to the production branch and completing any explicitly required deployment-triggering steps are part of the task.
+4. **A definitive live-site confirmation is not required by default.** Do not block completion on inspecting the production URL, observing a Pages deployment run, browser-based acceptance testing, or verifying the new content is actually served. Do not claim those unperformed checks happened or that propagation is confirmed.
+5. If a push, merge, or required deployment-triggering step fails, report the precise failure and what was actually completed rather than claiming production publication.
+6. If GitHub push fails because of local credentials but the authenticated GitHub connector has repository write access, use that connector to publish. Never force-push or discard unrelated work to overcome conflicts.
+
+This is the default for future testCode tasks; an explicit user instruction for a branch-only change, PR-only delivery, additional testing, or deployment confirmation takes precedence.
 
 ## Git and GitHub workflow
 
-Do not report that publishing is impossible merely because the shell credential path fails.
-
-## Repository work lifecycle
-
-- Before starting repository work, check for updates on the target remote branch. Fetch and inspect the upstream changes before editing; if terminal fetch is unavailable, inspect the current remote branch through an authenticated GitHub integration and base the work on that revision. Integrate remote changes deliberately and preserve existing local/user work.
-- Do not end repository work until the deployment for the intended change has visibly started. Identify the deployment mechanism at the start, then after publishing verify that a deployment run exists for the intended commit and has entered a running or later state. A passing test workflow, pull request creation, or merge alone does not confirm deployment. If no deployment mechanism or status is available, report the exact blocker and leave the work explicitly incomplete rather than claiming deployment started.
-
-1. Inspect the repository state:
-   ```bash
-   git status
-   git branch --show-current
-   git rev-parse HEAD
-   git remote -v
-   git branch -vv
-   ```
-2. If the requested work should be published, try the normal path: `git push` when an upstream exists, otherwise `git push -u origin <current-branch>`.
-3. If push fails, classify the actual error: missing upstream, non-fast-forward, authentication failure, permission denial, protected branch, detached HEAD, or network failure.
-4. For non-fast-forward failures, fetch and inspect divergence before integrating remote work. Do not force-push simply to make the command succeed.
-5. If terminal HTTPS/SSH credentials are unavailable but an authenticated GitHub integration/tool has write access to this repository, use that integration to publish the same intended change to the remote branch instead of declaring the task blocked.
-6. After publishing, verify the remote branch and resulting commit/content. When possible compare the local and remote commit/tree.
-7. A message such as `could not read Username for 'https://github.com': Device not configured` means the shell credential path failed; it does not prove that GitHub publishing itself is unavailable.
-
-Never discard unrelated work to make Git operations easier. Avoid `git reset --hard`, `git clean -fd`, `git push --force`, and `git push --force-with-lease` unless destructive history rewriting is explicitly required and its consequences have been checked.
+- Before editing, inspect the current remote revision and integrate newer upstream changes deliberately.
+- If using a local checkout, inspect `git status`, current branch and upstream before committing or pushing.
+- Resolve non-fast-forward updates by inspecting divergence; do not rewrite history as a shortcut.
+- After publishing, verify the remote branch or merged commit where feasible. Remote commit verification is not the same as confirming live-site deployment and does not replace it when the user specifically requests deployment confirmation.
+- Do not interpret a local `could not read Username` credential error as proof that authenticated publishing is unavailable.
+- Avoid `git reset --hard`, `git clean -fd`, `git push --force`, and `git push --force-with-lease` unless destructive history rewriting is explicitly required and its consequences have been checked.
 
 ## Maintaining this file
 
