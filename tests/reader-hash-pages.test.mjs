@@ -279,7 +279,7 @@ test('the first #1- is normal; a redirected sequential next page fixes the final
   assert.equal(updates.at(-1).hashPageCount, 3);
   assert.equal(updates.at(-1).hashPageCountSource, 'https://example.test/xxx.html?edition=1');
   assert.equal(item.hashPageCount, 3);
-  assert.equal(runtime.goTo(4), false, 'a proven final page is not navigable past the end');
+  assert.equal(await runtime.goTo(4), false, 'a proven final page is not navigable past the end');
   runtime.next();
   assert.equal(runtime.getPageState().displayedPage, 3);
   assert.ok(commits.every(entry => entry.count === 0), 'progress must still resume on the last displayed page');
@@ -297,7 +297,7 @@ test('an invalid far page does not falsely claim the previous page exists', asyn
   assert.equal(elements.pageLabel.textContent, '1 / ?');
   assert.equal(updates.length, 0);
   assert.match(elements.readerStatus.textContent, /60ページは先頭へ戻されました/);
-  assert.equal(runtime.goTo(60), false, 'already rejected page should not reopen');
+  assert.equal(await runtime.goTo(60), false, 'already rejected page should not reopen');
   runtime.next();
   iframe = elements.pageStage.firstChild.firstChild;
   assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#2');
