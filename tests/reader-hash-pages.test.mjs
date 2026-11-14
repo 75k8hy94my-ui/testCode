@@ -1,0 +1,156 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const Source = require('../manga-source-type.js');
+const Runtime = require('../reader-runtime.js');
+
+function element(name = 'div') {
+  const listeners = new Map();
+  const classes = new Set();
+  const obj = {
+    name, dataset: {}, style: {}, attributes: {}, hidden: false, inert: false,
+    children: [], clientHeight: 800, scrollTop: 0,
+    classList: {
+      add: (...tokens) => tokens.forEach(t => classes.add(t)),
+      remove: (...tokens) => tokens.forEach(t => classes.delete(t)),
+      contains: t => classes.has(t),
+      toggle(t, force) { const on = force === undefined ? !classes.has(t) : !!force; on ? classes.add(t) : classes.delete(t); return on; },
+    },
+    addEventListener(type, fn) { listeners.set(type, fn); },
+    removeEventListener(type) { listeners.delete(type); },
+    dispatch(type, data = {}) { listeners.get(type)?.({ currentTarget: obj, ...data }); },
+    setAttribute(key, value) { obj.attributes[key] = String(value); },
+    appendChild(child) { child.parentNode = obj; obj.children.push(child); return child; },
+    replaceChildren(...children) { obj.children.forEach(child => child.parentNode = null); obj.children = []; children.forEach(child => obj.appendChild(child)); },
+    querySelectorAll() { return []; },
+    remove() { if (obj.parentNode) obj.parentNode.children = obj.parentNode.children.filter(n => n !== obj); obj.parentNode = null; },
+    get firstChild() { return obj.children[0] || null; },
+  };
+  return obj;
+}
+
+function setup({ resume = 1, vertical = false, url = 'https://example.test/xxx.html?edition=1#1' } = {}) {
+  const ids = [
+    'readerStatus', 'readerMessage', 'retryPageBtn', 'pageSlider', 'pageLabel',
+    'currentTitle', 'pageStage', 'viewer', 'topbar', 'controls', 'tocBtn',
+    'favToggleBtn', 'closeBtn', 'firstBtn', 'prevBtn', 'nextBtn', 'lastBtn',
+    'tocAddBtn', 'safeModeBtn', 'enhanceBtn', 'verticalBtn', 'nextVolumeBanner',
+    'nextVolumeText', 'nextVolumeBtn', 'nextVolumeDismissBtn', 'openSourceBtn',
+  ];
+  const elements = Object.fromEntries(ids.map(id => [id, element()]));
+  const body = element('body');
+  const local = new Map([['mangaReaderVerticalScroll', vertical ? '1' : '0']]);
+  const localStorage = {
+    getItem(key) { return local.get(key) ?? null; },
+    setItem(key, value) { local.set(key, String(value)); },
+  };
+  const doc = {
+    body,
+    getElementById(id) { return elements[id] || null; },
+    createElement: element,
+    createDocumentFragment() { return element('fragment'); },
+  };
+  const item = { id: 'hash-work', title: 'Hash manga', url };
+  const commits = [], updates = [];
+  const repository = {
+    loadItem(id) { return id === item.id ? item : null; },
+    saveItem(value) { return value; },
+    updateItem(id, patch) { assert.equal(id, item.id); Object.assign(item, patch); updates.push(patch); return item; },
+    findNextVolume() { return { id: 'next' }; },
+    scheduleSync() {},
+  };
+  const progressRepository = {
+    load() { return { page: resume, wasLast: false }; },
+    commit(id, page, count) { commits.push({ id, page, count }); return true; },
+  };
+  const win = {
+    MangaSourceType: Source, localStorage, location: { href: 'https://testcode.test/reader.html?item=hash-work' },
+    innerWidth: 1000, innerHeight: 800, addEventListener() {}, removeEventListener() {},
+  };
+  const runtime = Runtime.create({ repository, target: { itemResumeKey: id => 'item:' + id }, location: { replace() {} }, document: doc, window: win, progressRepository });
+  return { runtime, elements, body, item, commits, updates, localStorage };
+}
+
+test('only an exact terminal #1 opts into hash-page mode', () => {
+  const ok = ['https://example.test/xxx.html#1', 'http://example.test/xxx.html?q=a#1', 'https://example.test/1.webp#1'];
+  for (const url of ok) {
+    const base = Source.getHashPageBase({ url });
+    assert.equal(base, url.slice(0, -2));
+    assert.equal(Source.hashPageUrl(base, 2), base + '#2');
+    assert.equal(Source.getEmbedUrl({ url }), url);
+  }
+  for (const url of [
+    'https://example.test/xxx.html#01', 'https://example.test/xxx.html#2',
+    'https://example.test/xxx.html#1extra', 'https://example.test/xxx.html?x=#1&y',
+    'javascript:alert(1)#1',
+  ]) assert.equal(Source.getHashPageBase({ url }), '');
+  assert.equal(Source.getHashPageBase({ url: ok[0], pages: ['https://images.test/1.webp'] }), '');
+  assert.equal(Source.getHashPageBase({ url: ok[0], localSync: true }), '');
+  assert.equal(Source.getHashPageBase({ url: ok[0], encryptedAssets: { pages: [{}] } }), '');
+  assert.equal(Source.hashPageUrl('https://example.test/a', 0), '');
+  assert.equal(Source.hashPageUrl('https://example.test/a', Source.MAX_HASH_PAGE + 1), '');
+});
+
+test('hash frames use normal reader controls, restore progress and cannot receive pointer or keyboard input', async () => {
+  const { runtime, elements, body, item, commits, updates } = setup({ resume: 3 });
+  await runtime.start(item.id);
+  const frame = elements.pageStage.firstChild, iframe = frame.firstChild;
+  assert.equal(frame.className, 'readerHashFrame');
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#3');
+  assert.equal(frame.style.pointerEvents, 'none');
+  assert.equal(iframe.style.pointerEvents, 'none');
+  assert.equal(iframe.inert, true);
+  assert.equal(iframe.attributes.tabindex, '-1');
+  assert.equal(elements.controls.hidden, false);
+  assert.equal(elements.pageLabel.textContent, '3 / ?');
+  assert.equal(elements.pageSlider.value, '3');
+  assert.equal(elements.pageSlider.max, '4');
+  assert.equal(elements.openSourceBtn.href, iframe.src);
+  assert.ok(commits.every(commit => commit.count === 0), 'unknown length must never mark a final page');
+
+  runtime.next();
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#4');
+  assert.equal(elements.pageLabel.textContent, '4 / ?');
+  assert.equal(elements.pageSlider.max, '5');
+  assert.equal(elements.openSourceBtn.href, iframe.src);
+  runtime.previous();
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#3');
+  elements.firstBtn.dispatch('click');
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#1');
+  elements.lastBtn.dispatch('click');
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#4');
+
+  elements.safeModeBtn.dispatch('click');
+  assert.equal(body.classList.contains('safe-mode'), true);
+  elements.favToggleBtn.dispatch('click');
+  assert.deepEqual(updates, [{ favorite: true }]);
+  assert.equal(item.favorite, true);
+  assert.equal(runtime.getPageState().displayedPage, 4);
+  assert.ok(commits.length >= 4);
+  assert.ok(commits.every(commit => commit.count === 0));
+  runtime.destroy();
+  assert.equal(elements.pageStage.children.length, 0, 'destroy removes protected remote frames');
+});
+
+test('hash-page vertical reading creates bounded iframe windows and preserves page index', async () => {
+  const { runtime, elements, body, commits } = setup({ resume: 2 });
+  await runtime.start('hash-work');
+  elements.verticalBtn.dispatch('click');
+  assert.equal(body.classList.contains('vertical-scroll'), true);
+  assert.ok(elements.pageStage.children.length >= 4);
+  const active = () => elements.pageStage.children.filter(slot => !!slot.firstChild);
+  assert.ok(active().length <= 3);
+  assert.ok(active().every(slot => slot.firstChild.firstChild.style.pointerEvents === 'none'));
+  elements.viewer.scrollTop = 3 * 800;
+  elements.viewer.dispatch('scroll');
+  assert.equal(runtime.getPageState().displayedPage, 4);
+  assert.equal(elements.pageLabel.textContent, '4 / ?');
+  assert.equal(elements.openSourceBtn.href, 'https://example.test/xxx.html?edition=1#4');
+  assert.ok(active().length <= 3, 'distant embedded documents must be released');
+  assert.equal(commits.at(-1).page, 4);
+  elements.verticalBtn.dispatch('click');
+  assert.equal(body.classList.contains('vertical-scroll'), false);
+  assert.equal(elements.pageStage.firstChild.firstChild.src, 'https://example.test/xxx.html?edition=1#4');
+  runtime.destroy();
+});
