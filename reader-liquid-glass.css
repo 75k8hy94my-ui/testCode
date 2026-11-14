@@ -1,5 +1,10 @@
 /* Reader geometry only. Optical material and all glass painting live in
    liquid-glass.css / liquid-glass-engine.js, shared with every other page. */
+/* Keep a single desktop flex-row while mobile uses two explicitly arranged
+   rows. The shared glass engine continues painting the same controls. */
+#readerApp .readerHeaderPrimary,
+#readerApp .readerHeaderSecondary { display: contents; }
+
 @media (min-width: 801px) {
   #readerApp #topbar,
   #readerApp #controls {
@@ -138,12 +143,102 @@
   #readerApp #topbar { width: calc(100% - 28px); padding: 9px 10px; gap: 5px; }
   #readerApp #topbar .ctrlBtn { padding-inline: 9px; font-size: 13px; }
 }
-@media (max-width: 800px) {
+/* Portrait phones AND landscape touch devices must never inherit the
+   centered floating desktop bar, even when the CSS viewport exceeds 800px. */
+@media (max-width: 800px), (hover: none) and (pointer: coarse) {
+  #readerApp #topbar {
+    position: fixed;
+    inset: 0 0 auto 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+    width: 100%;
+    max-width: 100%;
+    min-height: 0;
+    transform: none;
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: 8px;
+    row-gap: 5px;
+    padding: calc(6px + env(safe-area-inset-top, 0px))
+             max(8px, env(safe-area-inset-right, 0px))
+             6px
+             max(8px, env(safe-area-inset-left, 0px));
+    border-radius: 0;
+    z-index: 10;
+  }
   #readerApp #topbar.lg-surface,
   #readerApp #controls.lg-surface { border-radius: 0; }
-  #readerApp .ctrlBtn { flex-shrink: 0; }
+  #readerApp #topbar .readerHeaderPrimary {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    align-items: center;
+    gap: 5px;
+  }
+  #readerApp #topbar .readerHeaderSecondary {
+    display: flex;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    min-width: 0;
+    align-items: center;
+    gap: 5px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+  #readerApp #topbar .readerHeaderSecondary::-webkit-scrollbar { display: none; }
+  #readerApp #topbar .readerHeaderPrimary .ctrlBtn,
+  #readerApp #topbar .readerHeaderSecondary .ctrlBtn {
+    flex: 0 0 auto;
+    min-height: 36px;
+    touch-action: manipulation;
+  }
+  #readerApp #topbar #safeModeBtn { white-space: nowrap; }
+  #readerApp #readerMeta {
+    grid-column: 2;
+    grid-row: 1;
+    flex: none;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin-left: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  #readerApp #currentTitle { max-width: 100%; }
+  #readerApp #readerStatus {
+    display: block;
+    max-height: 2.6em;
+    overflow: hidden;
+    line-height: 1.3;
+  }
+  #readerApp #controls {
+    position: fixed;
+    inset: auto 0 0 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    min-height: 52px;
+    transform: none;
+    padding: 7px max(8px, env(safe-area-inset-right, 0px))
+             calc(7px + env(safe-area-inset-bottom, 0px))
+             max(8px, env(safe-area-inset-left, 0px));
+    gap: 5px;
+    border-radius: 0;
+  }
   #readerApp #pageSlider { min-width: 42px; }
   #readerApp #nextVolumeBanner { border-radius: 16px; }
+  body.reader-chrome-hidden #readerApp #topbar { transform: translateY(-105%); }
+  body.reader-chrome-hidden #readerApp #controls { transform: translateY(105%); }
 }
 @media (prefers-reduced-motion: reduce) {
   #readerApp #topbar,
