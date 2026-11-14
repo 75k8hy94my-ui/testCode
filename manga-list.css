@@ -128,6 +128,48 @@
   transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
 }
 .book-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Live cover of #1 for external hash-page comics. This is a viewport-sized
+   iframe scaled into the card, not a cross-origin canvas screenshot.
+   Keep the entire browsing context inert and behind bookshelf controls. */
+.book-cover-hash-preview {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  overflow: hidden;
+  background: transparent;
+  pointer-events: none !important;
+  contain: paint;
+}
+.book-cover-hash-preview[hidden] { display: none !important; }
+.book-cover-hash-preview iframe {
+  position: absolute;
+  inset: 0 auto auto 0;
+  display: block;
+  width: 700%;
+  height: 700%;
+  border: 0;
+  margin: 0;
+  background: #fff;
+  transform: scale(0.142857142857);
+  transform-origin: top left;
+  pointer-events: none !important;
+  user-select: none;
+}
+.folder-preview-cell {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.folder-preview-cell > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .book-card:not(.reorder-card):hover .book-cover { transform: translateY(-3px); border-color: #3a4156; }
 .book-card:not(.reorder-card):active .book-cover { transform: scale(.96); }
 .book-title { color: var(--manga-text); font-size: 11.5px; text-align: center; overflow-wrap: anywhere; }
@@ -257,7 +299,8 @@ html[data-theme="light"] .folder-cover { background: linear-gradient(145deg, #ee
 }
 
 #mangaListSection .book-cover > img,
-#mangaListSection .folder-preview > img {
+#mangaListSection .folder-preview > img,
+#mangaListSection .folder-preview-cell > img {
   display: block;
   width: 100% !important;
   max-width: 100% !important;

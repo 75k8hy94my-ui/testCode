@@ -1,7 +1,7 @@
 (function (root) {
   'use strict';
 
-  const STYLESHEET_URL = 'manga-list.css?v=20261009-guest-mode';
+  const STYLESHEET_URL = 'manga-list.css?v=20261114-hash-cover-preview';
   const SCRIPT_URLS = [
     ['manga-source-type.js?v=20261114-hash-pages', 'mangaSourceType'],
     ['manga-list-template.js?v=20261114-json-import', 'mangaRouteTemplate'],
@@ -44,7 +44,8 @@
     ['manga-list-cover-cache.js?v=20261008-cover-cache', 'mangaRouteCoverCache'],
     ['manga-list-image-cache.js?v=20261011-encrypted-cache', 'mangaRouteImageCache'],
     ['reader-target.js?v=20261003-reader-launch-contract', 'mangaReaderTarget'],
-    ['manga-list-host-runtime.js?v=20261114-embed-source', 'mangaRouteHost'],
+    ['manga-hash-cover-preview.js?v=20261114-hash-cover-preview', 'mangaHashCoverPreview'],
+    ['manga-list-host-runtime.js?v=20261114-hash-cover-preview', 'mangaRouteHost'],
     ['manga-list-runtime.js?v=20261010-vault-sync-v4-delete', 'mangaRouteRuntime'],
     ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
   ];
@@ -164,6 +165,7 @@
     let lifecycle = 0;
     let encryptedCoverLoader = null;
     let encryptedCoverCache = null;
+    let hashCoverPreview = null;
 
     async function start(input) {
       if (!input || !input.mountElement) throw new TypeError('MangaListRouteFactory requires mountElement');
@@ -174,6 +176,8 @@
       }
       encryptedCoverLoader?.destroy();
       encryptedCoverLoader = null;
+      hashCoverPreview?.destroy();
+      hashCoverPreview = null;
       await Promise.all([ensureStylesheet(documentRef), loadDependencies(documentRef)]);
       if (token !== lifecycle) return null;
       const storage = windowRef.localStorage;
@@ -326,6 +330,9 @@
         crypto: windowRef.crypto,
         getEncryptionKey: () => windowRef.MangaVault?.loadActive?.()?.rawKey || null,
       });
+      hashCoverPreview = windowRef.MangaHashCoverPreview.create({
+        documentRef, windowRef, canReadProtectedData
+      });
       const host = MangaListHostRuntimeFactory.create({
         safeWriteJson, getState: data.get, persistVideos() { return canReadProtectedData() && markLocalChangesPending() && safeWriteJson(keys.savedVideos, data.get().savedVideos) !== false; }, canReadProtectedData, keys,
         sync: {
@@ -359,6 +366,7 @@
         images: {
           parseInputUrl, getCachedMangaInfo, getCoverSourceCache: coverCache.getSourceCache,
           getCoverFailedCache: () => coverFailedCache, pageUrlFor, extCandidates, loadTimeoutMs: 60000,
+          mountHashCover: (img, url) => hashCoverPreview?.attach(img, url),
           sessionKey: 'mangaReaderSupabaseSession', readStorageItem: (key) => storage.getItem(key),
           getSupabaseConfig: () => windowRef.MANGA_READER_SUPABASE || {}, getLocalStoragePathFromUrl, loadEncryptedCover,
           loadCachedLocalImage: imageCache.loadCachedLocalImage,
@@ -393,9 +401,12 @@
         const preview = items.slice(0, 4); if (!preview.length) { const img = documentRef.createElement('img'); img.src = emptyIcon; img.alt = emptyAlt; cover.appendChild(img); return; }
         const box = documentRef.createElement('div'); box.className = 'folder-preview preview-count-' + preview.length;
         preview.forEach((item) => {
+          const cell = documentRef.createElement('div');
+          cell.className = 'folder-preview-cell';
           const img = documentRef.createElement('img');
           img.alt = title(item);
           img.fetchPriority = 'auto';
+          cell.appendChild(img);
           const first = item.pageManifest?.version === 1 && item.pageManifest.pages?.[0]
             || item.pages?.[0] || '';
           if (item.encryptedAssets?.pages?.length || item.localSync) {
@@ -403,7 +414,7 @@
             img.addEventListener('error', () => { if (img.dataset) img.dataset.coverState = 'failed'; });
             void host.loadLocalCover(item, img);
           } else host.setupFeedImage(img, item.url, item.numberWidth, item.pagePattern, item.id, first);
-          box.appendChild(img);
+          box.appendChild(cell);
         });
         cover.appendChild(box); const badge = documentRef.createElement('span'); badge.className = 'folder-kind-badge'; badge.textContent = kindLabel || 'フォルダ'; cover.appendChild(badge);
       };
@@ -673,6 +684,8 @@
       const result = entry.start({ mountElement: input.mountElement });
       if (token !== lifecycle) {
         entry.cleanup();
+        hashCoverPreview?.destroy();
+        hashCoverPreview = null;
         return null;
       }
       const notice = documentRef.createElement('p');
@@ -704,6 +717,8 @@
     }
     function cleanup() {
       lifecycle += 1;
+      hashCoverPreview?.destroy();
+      hashCoverPreview = null;
       if (encryptedCoverLoader) {
         encryptedCoverLoader.destroy();
         encryptedCoverLoader = null;
