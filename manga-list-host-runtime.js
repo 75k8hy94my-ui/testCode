@@ -215,9 +215,18 @@
     function setupFeedImage(imgEl, baseUrlForItem, numberWidth, itemPattern, itemId, exactUrl = '') {
       if (!canReadProtectedData()) return;
       activeFeedImages.get(imgEl)?.();
-      // A webpage has no sequential image pages to probe. Render a local
-      // placeholder rather than requesting speculative /1.jpg URLs.
-      if (root.MangaSourceType?.getEmbedUrl({ url: baseUrlForItem, pages: exactUrl ? [exactUrl] : [] })) {
+      // A trailing #1 is a sequence of external *pages*, not a standalone
+      // image. Show the first page as a scaled, non-interactive live preview.
+      // Never probe speculative /1.jpg URLs or fetch #2 / #3 for a cover.
+      const sourceItem = { url: baseUrlForItem, pages: exactUrl ? [exactUrl] : [] };
+      const hashBase = root.MangaSourceType?.getHashPageBase(sourceItem) || '';
+      if (hashBase) {
+        imgEl.src = root.MangaSourceType.EMBED_COVER_URL;
+        markCover(imgEl, 'loaded');
+        deps.images.mountHashCover?.(imgEl, root.MangaSourceType.hashPageUrl(hashBase, 1));
+        return;
+      }
+      if (root.MangaSourceType?.getEmbedUrl(sourceItem)) {
         imgEl.src = root.MangaSourceType.EMBED_COVER_URL;
         markCover(imgEl, 'loaded');
         return;
