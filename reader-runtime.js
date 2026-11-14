@@ -58,6 +58,7 @@
       encryptedRenderer = null;
       if (embeddedFrame) { embeddedFrame.remove?.(); embeddedFrame = null; }
       if (hashPageBase) byId('pageStage')?.replaceChildren?.();
+      for (const iframe of Array.from(hashFrameChecks.keys())) disposeHashObservation(iframe);
       hashIframe = null;
       hashUserScrollUntil = 0;
       hashVerticalSlots.length = 0;
@@ -89,6 +90,11 @@
     let hashPageBase = '';
     let hashIframe = null;
     let hashMaxVisited = 1;
+    let hashKnownTotal = 0;
+    const hashConfirmedPages = new Set([1]);
+    const hashRejectedPages = new Set();
+    const hashFrameChecks = new Map();
+    let hashPreviousPage = 1;
     // A scroll event also fires after programmatic scrollTop writes, iframe
     // layout changes and browser scroll anchoring. None of those can advance
     // the reader unless a real scroll gesture was observed first.
@@ -158,15 +164,29 @@
     }
 
     function status(message) { const node = byId('readerStatus'); if (node) node.textContent = message || ''; }
-    function displayCount() { return hashPageBase ? hashMaxVisited : encryptedPages.length || pageUrls.length * (split ? 2 : 1); }
+    function displayCount() { return hashPageBase ? (hashKnownTotal || hashMaxVisited) : encryptedPages.length || pageUrls.length * (split ? 2 : 1); }
     function updateControls() {
       const slider = byId('pageSlider');
       const label = byId('pageLabel');
       if (slider) {
-        slider.max = String(hashPageBase ? Math.min(win.MangaSourceType.MAX_HASH_PAGE, Math.max(2, hashMaxVisited + 1)) : Math.max(1, displayCount()));
+        slider.max = String(hashPageBase
+          ? (hashKnownTotal || Math.min(win.MangaSourceType.MAX_HASH_PAGE, Math.max(2, hashMaxVisited + 1)))
+          : Math.max(1, displayCount()));
         slider.value = String(page);
       }
-      if (label) label.textContent = hashPageBase ? `${page} / ?` : `${page} / ${Math.max(1, displayCount())}`;
+      if (label) label.textContent = hashPageBase ? `${page} / ${hashKnownTotal || '?'}` : `${page} / ${Math.max(1, displayCount())}`;
+      if (hashPageBase) {
+        const nextButton = byId('nextBtn');
+        if (nextButton) nextButton.disabled = !!hashKnownTotal && page >= hashKnownTotal;
+        const lastButton = byId('lastBtn');
+        if (lastButton) {
+          const description = hashKnownTotal
+            ? '最後のページ'
+            : '最後に閲覧したページ（総ページ数は未確定）';
+          lastButton.title = description;
+          lastButton.setAttribute('aria-label', description);
+        }
+      }
       const title = byId('currentTitle'); if (title) title.textContent = currentItem?.title || currentItem?.url || '漫画';
     }
     function readMap(key) {
@@ -502,7 +522,7 @@
     }
     function next() {
       if (hashPageBase) {
-        if (requestedPage < win.MangaSourceType.MAX_HASH_PAGE) goTo(requestedPage + 1);
+        if (requestedPage < (hashKnownTotal || win.MangaSourceType.MAX_HASH_PAGE)) goTo(requestedPage + 1);
         return;
       }
       if (requestedPage < displayCount()) goTo(requestedPage + 1);
@@ -649,10 +669,121 @@
       byId('pageStage')?.querySelectorAll('.readerPageImage').forEach((image) => win.ReaderImageEnhancement?.enhanceElement(image, { documentRef: doc, windowRef: win }));
     }
     // A trailing #1 declares a sequence of non-interactive external frames.
-    // Cross-origin hash navigation does not expose a trustworthy page count,
-    // so each numbered URL is loaded on demand and progress has no "last" flag.
+    // A site may normalize #1 to #1-; that alone is never an end marker.
+    // For other requested pages, #1- means the target fell back to the start.
+    // Cross-origin iframe URL reads are forbidden, so only readable frames
+    // can participate in this on-demand end-of-book detection.
     function hashUrl(number) {
       return win.MangaSourceType?.hashPageUrl(hashPageBase, number) || '';
+    }
+    function disposeHashObservation(iframe) {
+      const entry = hashFrameChecks.get(iframe);
+      if (!entry) return;
+      for (const timer of entry.timers) win.clearTimeout?.(timer);
+      entry.timers.clear();
+      try {
+        entry.childWindow?.removeEventListener?.('hashchange', entry.inspect);
+        entry.childWindow?.removeEventListener?.('popstate', entry.inspect);
+      } catch (_) {}
+      iframe.removeEventListener?.('load', entry.onLoad);
+      hashFrameChecks.delete(iframe);
+    }
+    function truncateHashVerticalSlots() {
+      if (!hashKnownTotal) return;
+      while (hashVerticalSlots.length > hashKnownTotal) {
+        const entry = hashVerticalSlots.pop();
+        const iframe = entry.frame?.firstChild;
+        if (iframe) disposeHashObservation(iframe);
+        entry.slot.remove?.();
+      }
+    }
+    function onHashFallback(number) {
+      if (destroyed || number <= 1 || hashRejectedPages.has(number)) return;
+      hashRejectedPages.add(number);
+      hashConfirmedPages.delete(number);
+      if (hashConfirmedPages.has(number - 1)) {
+        // Only a validated immediately preceding page establishes the end.
+        hashKnownTotal = number - 1;
+        hashMaxVisited = Math.min(hashMaxVisited, hashKnownTotal);
+        truncateHashVerticalSlots();
+        if (currentItem && (currentItem.hashPageCount !== hashKnownTotal || currentItem.hashPageCountSource !== hashPageBase)) {
+          const updated = repository.updateItem?.(currentItem.id, {
+            hashPageCount: hashKnownTotal, hashPageCountSource: hashPageBase
+          });
+          if (updated) currentItem = updated;
+        }
+      } else {
+        // Jumping straight to #60 proves #60 is invalid, not that #59 exists.
+        hashMaxVisited = Math.max(1, ...hashConfirmedPages);
+      }
+      if (page === number) {
+        const fallback = hashKnownTotal || Math.min(hashPreviousPage, hashMaxVisited);
+        if (fallback > 0 && fallback !== number) showHashPage(fallback);
+      }
+      updateControls();
+      status(hashKnownTotal
+        ? `最終ページは${hashKnownTotal}ページです。`
+        : `${number}ページは先頭へ戻されました。前のページから順番に読むと最終ページを判定できます。`);
+    }
+    function inspectHashObservation(entry) {
+      if (destroyed || !hashFrameChecks.has(entry.iframe)) return false;
+      let observed;
+      try { observed = entry.iframe.contentWindow?.location?.hash; }
+      catch (_) { return false; } // A cross-origin iframe exposes no URL.
+      if (typeof observed !== 'string') return false;
+      const number = entry.number;
+      if (number > 1 && observed === '#1-') {
+        if (entry.resetPage !== number) {
+          entry.resetPage = number;
+          onHashFallback(number);
+        }
+      } else if (observed === '#' + number || observed === '#' + number + '-') {
+        hashConfirmedPages.add(number);
+      }
+      return true;
+    }
+    function scheduleHashChecks(entry) {
+      if (typeof win.setTimeout !== 'function') return;
+      for (const timer of entry.timers) win.clearTimeout?.(timer);
+      entry.timers.clear();
+      // hashchange misses history.replaceState; a short bounded series of
+      // reads also catches that normalization without scanning other pages.
+      for (const delay of [150, 500, 1200]) {
+        const timer = win.setTimeout(() => {
+          entry.timers.delete(timer);
+          inspectHashObservation(entry);
+        }, delay);
+        entry.timers.add(timer);
+      }
+    }
+    function observeHashFrame(iframe, number) {
+      let entry = hashFrameChecks.get(iframe);
+      if (!entry) {
+        entry = { iframe, number, childWindow: null, timers: new Set(), resetPage: 0, onLoad: null, inspect: null };
+        entry.inspect = () => inspectHashObservation(entry);
+        entry.onLoad = () => {
+          // A full document load replaces listeners inside the child window.
+          try {
+            entry.childWindow?.removeEventListener?.('hashchange', entry.inspect);
+            entry.childWindow?.removeEventListener?.('popstate', entry.inspect);
+            const child = iframe.contentWindow;
+            void child.location.hash;
+            child.addEventListener('hashchange', entry.inspect);
+            child.addEventListener('popstate', entry.inspect);
+            entry.childWindow = child;
+          } catch (_) { entry.childWindow = null; }
+          entry.inspect();
+          if (entry.childWindow) scheduleHashChecks(entry);
+        };
+        hashFrameChecks.set(iframe, entry);
+        iframe.addEventListener?.('load', entry.onLoad);
+      } else {
+        entry.number = number;
+        entry.resetPage = 0;
+        // Changing only the hash may not fire iframe.onload. The existing
+        // child's hashchange listener and delayed inspection cover that case.
+        if (entry.childWindow) scheduleHashChecks(entry);
+      }
     }
     function createHashFrame(number) {
       const url = hashUrl(number);
@@ -670,13 +801,14 @@
       iframe.setAttribute('aria-hidden', 'true');
       iframe.inert = true;
       iframe.style.pointerEvents = 'none';
+      observeHashFrame(iframe, number);
       frame.appendChild(iframe);
       return { frame, iframe };
     }
     function ensureHashVerticalSlots(count) {
       const stage = byId('pageStage');
       if (!stage) return;
-      const max = Math.min(win.MangaSourceType.MAX_HASH_PAGE, count);
+      const max = Math.min(hashKnownTotal || win.MangaSourceType.MAX_HASH_PAGE, count);
       while (hashVerticalSlots.length < max) {
         const slot = doc.createElement('div');
         slot.className = 'readerHashVerticalSlot';
@@ -688,12 +820,14 @@
     function updateHashVerticalWindow(center) {
       for (let i = 0; i < hashVerticalSlots.length; i += 1) {
         const entry = hashVerticalSlots[i];
-        if (Math.abs(i + 1 - center) <= 1) {
+        if ((!hashKnownTotal || i + 1 <= hashKnownTotal) && Math.abs(i + 1 - center) <= 1) {
           if (!entry.frame) {
             const candidate = createHashFrame(i + 1);
             if (candidate) { entry.slot.replaceChildren(candidate.frame); entry.frame = candidate.frame; }
           }
         } else if (entry.frame) {
+          const iframe = entry.frame.firstChild;
+          if (iframe) disposeHashObservation(iframe);
           entry.slot.replaceChildren();
           entry.frame = null;
         }
@@ -705,6 +839,7 @@
       // Reset intent before a DOM rebuild: its scroll/anchor events are not
       // equivalent to a fresh wheel, touch or scrollbar-drag gesture.
       hashUserScrollUntil = 0;
+      for (const iframe of Array.from(hashFrameChecks.keys())) disposeHashObservation(iframe);
       stage.replaceChildren();
       hashVerticalSlots.length = 0;
       hashIframe = null;
@@ -726,11 +861,13 @@
     }
     function showHashPage(value) {
       const number = Math.floor(Number(value));
-      if (!Number.isSafeInteger(number) || !hashUrl(number) || destroyed) return false;
+      if (!Number.isSafeInteger(number) || !hashUrl(number) || destroyed
+        || (hashKnownTotal && number > hashKnownTotal) || hashRejectedPages.has(number)) return false;
       // A button/slider jump sets scrollTop deliberately. Its resulting
       // scroll events must not trigger a new page-discovery cycle.
       hashUserScrollUntil = 0;
       if (number === page && byId('pageStage')?.firstChild) return true;
+      hashPreviousPage = page;
       if (vertical) {
         hashMaxVisited = Math.max(hashMaxVisited, number);
         ensureHashVerticalSlots(Math.max(number + 2, hashMaxVisited + 1));
@@ -738,6 +875,7 @@
         const viewer = byId('viewer');
         if (viewer) viewer.scrollTop = (number - 1) * (viewer.clientHeight || win.innerHeight || 800);
       } else if (hashIframe) {
+        observeHashFrame(hashIframe, number);
         hashIframe.src = hashUrl(number);
       } else return false;
       page = requestedPage = number;
@@ -756,6 +894,7 @@
       const height = viewer.clientHeight || win.innerHeight || 800;
       const visible = Math.max(1, Math.min(hashVerticalSlots.length, Math.floor((viewer.scrollTop + height * 0.5) / height) + 1));
       if (visible !== page) {
+        hashPreviousPage = page;
         page = requestedPage = visible;
         hashMaxVisited = Math.max(hashMaxVisited, visible);
         const link = byId('openSourceBtn'); if (link) link.href = hashUrl(visible);
@@ -771,18 +910,15 @@
       const controls = byId('controls'); if (controls) controls.hidden = false;
       const link = byId('openSourceBtn');
       if (link) { link.href = hashUrl(page); link.hidden = false; }
-      const last = byId('lastBtn');
-      if (last) {
-        last.title = '最後に閲覧したページへ（総ページ数は不明）';
-        last.setAttribute('aria-label', '最後に閲覧したページ');
-      }
       const message = byId('readerMessage'); if (message) message.textContent = '';
       renderHashLayout();
       updateControls();
       updateTocButton();
       showNextVolume();
       persistPage();
-      status('外部ページの総ページ数は取得できません。表示できないときは「元ページを開く」を使用してください。');
+      status(hashKnownTotal
+        ? `全${hashKnownTotal}ページ`
+        : 'ページ送りの際に最終ページを判定します。外部サイトのURL変化は取得できない場合があります。');
       return true;
     }
     function mountEmbeddedPage(url) {
@@ -822,7 +958,18 @@
       updateControls();
       page = embeddedUrl ? 1 : resumePage(item);
       if (hashPageBase) page = Math.min(win.MangaSourceType.MAX_HASH_PAGE, Math.max(1, page));
+      hashKnownTotal = hashPageBase
+        && item.hashPageCountSource === hashPageBase
+        && Number.isSafeInteger(item.hashPageCount)
+        && item.hashPageCount >= 1 && item.hashPageCount <= win.MangaSourceType.MAX_HASH_PAGE
+        ? item.hashPageCount : 0;
+      if (hashKnownTotal) page = Math.min(page, hashKnownTotal);
+      hashConfirmedPages.clear();
+      hashConfirmedPages.add(1);
+      if (hashKnownTotal) hashConfirmedPages.add(hashKnownTotal);
+      hashRejectedPages.clear();
       hashMaxVisited = hashPageBase ? page : 1;
+      hashPreviousPage = page;
       requestedPage = page;
       lastFailedRequest = null;
       verticalSlots = [];
