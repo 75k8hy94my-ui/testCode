@@ -29,6 +29,17 @@
   #mobileUtilityMenu,
   #appGlobalHeader.globalAppHeader,
   #mangaListSection .bookshelf-pagination,
+  #statutesLawMenu,
+  #accountMenu,
+  .vl-round,
+  #gameShell .hud-card,
+  #gameShell .ios-widget,
+  #gameShell .ios-live-card,
+  #gameShell .ios-glass-card,
+  #gameShell .ios-lock-notification,
+  #gameShell .ios-notification,
+  #gameShell .ios-overlay-panel,
+  #gameShell .ios-dock,
   .glass,
   .glassBtn,
   [data-liquid-glass]
@@ -63,6 +74,17 @@ html:not([data-theme="dark"]) :is(
   #mobileUtilityMenu,
   #appGlobalHeader.globalAppHeader,
   #mangaListSection .bookshelf-pagination,
+  #statutesLawMenu,
+  #accountMenu,
+  .vl-round,
+  #gameShell .hud-card,
+  #gameShell .ios-widget,
+  #gameShell .ios-live-card,
+  #gameShell .ios-glass-card,
+  #gameShell .ios-lock-notification,
+  #gameShell .ios-notification,
+  #gameShell .ios-overlay-panel,
+  #gameShell .ios-dock,
   .glass,
   .glassBtn,
   [data-liquid-glass]
@@ -86,6 +108,17 @@ html:not([data-theme="dark"]) :is(
   #mobileUtilityMenu,
   #appGlobalHeader.globalAppHeader,
   #mangaListSection .bookshelf-pagination,
+  #statutesLawMenu,
+  #accountMenu,
+  .vl-round,
+  #gameShell .hud-card,
+  #gameShell .ios-widget,
+  #gameShell .ios-live-card,
+  #gameShell .ios-glass-card,
+  #gameShell .ios-lock-notification,
+  #gameShell .ios-notification,
+  #gameShell .ios-overlay-panel,
+  #gameShell .ios-dock,
   .glass,
   .glassBtn,
   [data-liquid-glass]
@@ -119,6 +152,17 @@ html:not([data-theme="dark"]) :is(
   #mobileUtilityMenu,
   #appGlobalHeader.globalAppHeader,
   #mangaListSection .bookshelf-pagination,
+  #statutesLawMenu,
+  #accountMenu,
+  .vl-round,
+  #gameShell .hud-card,
+  #gameShell .ios-widget,
+  #gameShell .ios-live-card,
+  #gameShell .ios-glass-card,
+  #gameShell .ios-lock-notification,
+  #gameShell .ios-notification,
+  #gameShell .ios-overlay-panel,
+  #gameShell .ios-dock,
   .glass,
   .glassBtn,
   [data-liquid-glass]
@@ -164,6 +208,17 @@ html:not([data-theme="dark"]) :is(
   #mobileUtilityMenu,
   #appGlobalHeader.globalAppHeader,
   #mangaListSection .bookshelf-pagination,
+  #statutesLawMenu,
+  #accountMenu,
+  .vl-round,
+  #gameShell .hud-card,
+  #gameShell .ios-widget,
+  #gameShell .ios-live-card,
+  #gameShell .ios-glass-card,
+  #gameShell .ios-lock-notification,
+  #gameShell .ios-notification,
+  #gameShell .ios-overlay-panel,
+  #gameShell .ios-dock,
   .glass,
   .glassBtn,
   [data-liquid-glass]
@@ -268,3 +323,19 @@ html[data-theme="dark"] .liquidGlassSelection.lg-surface,
 @media (prefers-reduced-motion: reduce) {
   .lg-surface { transition:none!important; }
 }
+
+/* Small icons are self-contained. Preserve fixed/absolute positioning of bars. */
+.lg-surface[data-lg-material="button"] { position: relative; }
+#statutesLawMenu.lg-surface { --lg-blur: 23px; }
+#accountMenu.lg-surface { --lg-blur: 20px; }
+#gameShell .lg-surface {
+  --lg-fill: rgba(20,27,33,.66) !important;
+  --lg-border: rgba(218,238,246,.31) !important;
+  --lg-shadow: rgba(0,0,0,.29) !important;
+  --lg-top-light: rgba(255,255,255,.30) !important;
+}
+#gameShell .ios-dock.lg-surface { --lg-blur: 28px; }
+#gameShell .ios-widget.lg-surface,
+#gameShell .ios-live-card.lg-surface,
+#gameShell .ios-glass-card.lg-surface,
+#gameShell .ios-notification.lg-surface { position: relative; }
