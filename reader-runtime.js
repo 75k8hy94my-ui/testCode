@@ -521,7 +521,10 @@
         if (updated) { currentItem = updated; renderFavorite(); }
       });
       bind('tocAddBtn', 'click', saveTocEntry); bind('tocBtn', 'click', renderToc);
-      bind('safeModeBtn', 'click', () => {
+      bind('safeModeBtn', 'click', (event) => {
+        // The button must toggle in either direction on mobile; do not let a
+        // touch-generated click propagate to any reader gesture handlers.
+        event?.stopPropagation?.();
         const active = !doc.body.classList.contains('safe-mode');
         setSafeMode(active);
         try { win.localStorage.setItem('mangaReaderSafeMode', active ? '1' : '0'); } catch (_) {}
@@ -634,7 +637,9 @@
       const button = byId('safeModeBtn');
       if (button) {
         button.setAttribute('aria-pressed', active ? 'true' : 'false');
-        button.title = active ? 'セーフモードを解除' : 'セーフモードを有効化';
+        const actionLabel = active ? 'セーフモードを解除' : 'セーフモードを有効化';
+        button.setAttribute('aria-label', actionLabel);
+        button.title = actionLabel;
       }
       if (active) restorePageEnhancements();
       else applyPageEnhancements();
