@@ -20,10 +20,10 @@ const requiredIds = [
   'filterRow', 'filterSeriesInput', 'filterAuthorInput', 'filterTagsInput',
   'filterSourceInput', 'applyFilterBtn', 'clearFilterBtn', 'listNewFolderRow',
   'listNewFolderInput', 'listNewFolderConfirmBtn', 'savedListItems',
-  'mangaImportDialog', 'mangaImportRows', 'mangaImportStatus', 'mangaImportCancelButton', 'mangaImportRegisterButton',
+  'mangaJsonImportDialog', 'mangaJsonImportRows', 'mangaJsonImportStatus', 'mangaJsonImportCancelButton', 'mangaJsonImportRegisterButton',
   'savedListEmpty', 'bookshelfPagination', 'bookshelfPrevBtn',
   'bookshelfNextBtn', 'bookshelfPageLabel', 'exportImportRow', 'newBtn',
-  'bulkDetectBtn', 'editShelfBtn', 'undoBulkEditBtn',
+  'jsonImportButton', 'jsonImportFile', 'editShelfBtn', 'undoBulkEditBtn',
 ];
 
 test('manga list template exposes one frozen markup API without side effects', () => {
@@ -66,22 +66,20 @@ test('manga route mounts the manga template and Reader has no shelf template dep
   assert.doesNotMatch(fs.readFileSync('reader.html', 'utf8'), /manga-list-template|reader-saved-list-template/);
 });
 
-test('momon import template provides an accessible review dialog and route wires the typed bridge and batch service', () => {
+test('manga JSON import UI replaces momon bulk import and uses validated registration', () => {
   const markup = loadTemplate().createMarkup();
-  assert.match(markup, /id="mangaImportDialog" role="dialog" aria-modal="true"/);
-  assert.match(markup, /id="mangaImportStatus" role="status" aria-live="polite"/);
-  assert.match(route, /manga-import-bridge\.js\?v=/);
-  assert.match(route, /manga-import-dialog\.js\?v=/);
-  assert.match(route, /manga-import-batch\.js\?v=/);
-  assert.match(route, /bind\(bulkDetect, 'click'/);
-  assert.match(route, /bind\(mangaImportRegister, 'click'/);
+  assert.match(markup, /id="mangaJsonImportDialog" role="dialog" aria-modal="true"/);
+  assert.match(markup, /id="mangaJsonImportStatus" role="status" aria-live="polite"/);
+  assert.match(markup, /id="jsonImportFile" type="file" accept="\.json,application\/json"/);
+  assert.doesNotMatch(markup, /momon:GA|bulkDetectBtn/);
+  assert.match(route, /manga-json-import\.js\?v=/);
+  assert.doesNotMatch(route, /manga-import-bridge\.js\?v=/);
+  assert.match(route, /bind\(jsonFile, 'change'/);
+  assert.match(route, /bind\(jsonRegister, 'click'/);
   assert.match(route, /persistItems: host\.persistItems/);
   assert.match(route, /persistAuthorCards: host\.persistAuthorCards/);
   assert.match(route, /render: renderList/);
-  assert.match(route, /requestQueuedCandidates\(\)/);
-  assert.match(route, /importBatch\.register\(selection\)/);
-  assert.match(route, /キューから削除する場合は拡張機能のポップアップを開いてください/);
-  assert.doesNotMatch(route, /removeQueuedCandidates|登録済みの拡張機能キューから削除/);
+  assert.match(route, /jsonController\.register\(\)/);
   assert.doesNotMatch(route, /localStorage\.setItem\([^)]*savedItems/);
-  assert.doesNotMatch(fs.readFileSync('manga-import-dialog.js', 'utf8'), /innerHTML|insertAdjacentHTML/);
+  assert.doesNotMatch(fs.readFileSync('manga-json-import.js', 'utf8'), /innerHTML|insertAdjacentHTML/);
 });
