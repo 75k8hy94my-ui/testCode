@@ -27,10 +27,10 @@ test('manga route skips protected store reads and legacy migration without VPN a
 });
 
 test('manga mutation callbacks remain protected while image uploads move out', () => {
-  const extensionImport = route.slice(route.indexOf("bind(bulkDetect, 'click'"), route.indexOf("bind(mangaImportRegister, 'click'"));
-  const registerImport = route.slice(route.indexOf("bind(mangaImportRegister, 'click'"), route.indexOf('bindFactory(MangaListSearchEventsFactory'));
-  assert.match(extensionImport, /if \(!canReadProtectedData\(\)\)/);
-  assert.match(registerImport, /if \(!canReadProtectedData\(\)\)/);
+  const fileImport = route.slice(route.indexOf("bind(jsonFile, 'change'"), route.indexOf("bindFactory(MangaListSearchEventsFactory"));
+  assert.match(fileImport, /if \(!file \|\| !canReadProtectedData\(\)\) return/);
+  assert.match(fileImport, /if \(!canReadProtectedData\(\) \|\| startedAtLifecycle !== lifecycle\) return/);
+  assert.match(fileImport, /jsonController\.register\(\)/);
   assert.doesNotMatch(route, /bind\(importForm, 'submit'/);
   assert.match(route, /!item\.encryptedAssets\?\.pages\?\.length/);
 });
