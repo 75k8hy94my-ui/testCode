@@ -42,7 +42,8 @@
   #gameShell .ios-dock,
   .glass,
   .glassBtn,
-  [data-liquid-glass]
+  [data-liquid-glass],
+  [data-lg-material]
 ).lg-surface {
   --lg-light-x: 50%;
   --lg-light-y: 0%;
@@ -87,7 +88,8 @@ html:not([data-theme="dark"]) :is(
   #gameShell .ios-dock,
   .glass,
   .glassBtn,
-  [data-liquid-glass]
+  [data-liquid-glass],
+  [data-lg-material]
 ).lg-surface {
   --lg-fill: rgba(238,245,254,.33);
   --lg-border: rgba(255,255,255,.84);
@@ -121,7 +123,8 @@ html:not([data-theme="dark"]) :is(
   #gameShell .ios-dock,
   .glass,
   .glassBtn,
-  [data-liquid-glass]
+  [data-liquid-glass],
+  [data-lg-material]
 ).lg-surface::before {
   content: "" !important;
   position: absolute !important;
@@ -165,7 +168,8 @@ html:not([data-theme="dark"]) :is(
   #gameShell .ios-dock,
   .glass,
   .glassBtn,
-  [data-liquid-glass]
+  [data-liquid-glass],
+  [data-lg-material]
 ).lg-surface::after {
   content: "" !important;
   position: absolute !important;
@@ -221,7 +225,8 @@ html:not([data-theme="dark"]) :is(
   #gameShell .ios-dock,
   .glass,
   .glassBtn,
-  [data-liquid-glass]
+  [data-liquid-glass],
+  [data-lg-material]
 ).lg-surface.lg-optical {
   -webkit-backdrop-filter: var(--lg-material-filter) !important;
   backdrop-filter: var(--lg-material-filter) !important;
@@ -366,7 +371,8 @@ html[data-theme="dark"] .liquidGlassSelection.lg-surface,
   #gameShell .ios-dock,
   .glass,
   .glassBtn,
-  [data-liquid-glass]
+  [data-liquid-glass],
+  [data-lg-material]
 ).lg-surface {
     --lg-fill: rgba(21,29,42,.97) !important;
     -webkit-backdrop-filter: none !important;
@@ -397,7 +403,8 @@ html[data-theme="dark"] .liquidGlassSelection.lg-surface,
   #gameShell .ios-dock,
   .glass,
   .glassBtn,
-  [data-liquid-glass]
+  [data-liquid-glass],
+  [data-lg-material]
 ).lg-surface {
     --lg-fill: rgba(21,29,42,.97) !important;
     -webkit-backdrop-filter: none !important;
