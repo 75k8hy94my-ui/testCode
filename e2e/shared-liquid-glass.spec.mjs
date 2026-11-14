@@ -28,7 +28,7 @@ test('one shared optical system styles Reader and mobile navigation with no imag
   await page.setViewportSize({ width: 1200, height: 800 });
   await loadMaterialFixture(page);
   for (const selector of ['#readerApp #topbar', '#readerApp #controls', '#readerApp .ctrlBtn', '#mobileBottomNav', '.liquidGlassSelection']) {
-    await expect(page.locator(selector)).toHaveClass(/lg-surface/);
+    await expect(page.locator(selector).first()).toHaveClass(/lg-surface/);
   }
   await expect(page.locator('#pageStage')).toHaveText('UNCHANGED_READER_STAGE');
 
