@@ -875,8 +875,15 @@
         const viewer = byId('viewer');
         if (viewer) viewer.scrollTop = (number - 1) * (viewer.clientHeight || win.innerHeight || 800);
       } else if (hashIframe) {
-        observeHashFrame(hashIframe, number);
-        hashIframe.src = hashUrl(number);
+        // A fresh browsing context guarantees a load event even when only
+        // the fragment changes. It also prevents stale #1- observations from
+        // a previous page from being mistaken for the new page's redirect.
+        const replacement = createHashFrame(number);
+        if (!replacement) return false;
+        const previousIframe = hashIframe;
+        byId('pageStage')?.replaceChildren(replacement.frame);
+        hashIframe = replacement.iframe;
+        disposeHashObservation(previousIframe);
       } else return false;
       page = requestedPage = number;
       hashMaxVisited = Math.max(hashMaxVisited, number);
