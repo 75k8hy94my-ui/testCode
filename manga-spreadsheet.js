@@ -558,7 +558,11 @@
       viewport.focus({ preventScroll:true });
     }
     function close() {
-      if (editor) stopEditing(true);
+      if (editor) {
+        stopEditing(true);
+        // Closing or revoking VPN access must not retain an unsaved editor.
+        if (editor) { editor.input.remove(); editor = null; }
+      }
       overlay.hidden = true;
       rows = [];
       tbody.replaceChildren();
