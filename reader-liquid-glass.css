@@ -273,3 +273,123 @@
     transition: none;
   }
 }
+
+
+/* Real optical rim for Chromium; Safari/Firefox retain the frosted style above.
+   The displacement filter belongs to the panels, never to manga images. */
+.reader-glass-filter-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+@media (min-width: 801px) {
+  #topbar,
+  #controls,
+  #nextVolumeBanner {
+    --reader-light-x: 52%;
+    --reader-light-y: 0%;
+    isolation: isolate;
+  }
+
+  /* A moving caustic lives above the glass but cannot intercept controls. */
+  #topbar::before,
+  #controls::before,
+  #nextVolumeBanner::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 270px 88px at var(--reader-light-x) var(--reader-light-y),
+        rgba(255, 255, 255, .19), rgba(165, 217, 255, .07) 45%, transparent 82%),
+      linear-gradient(155deg, rgba(255, 255, 255, .10), transparent 37%, rgba(5, 15, 34, .14) 85%);
+    mix-blend-mode: screen;
+  }
+
+  /* Continuous beveled rim rather than the earlier single top highlight. */
+  #topbar::after,
+  #controls::after,
+  #nextVolumeBanner::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: auto;
+    z-index: 2;
+    padding: 1.5px;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 420px 90px at var(--reader-light-x) var(--reader-light-y),
+        rgba(255, 255, 255, .92), rgba(187, 230, 255, .38) 50%, transparent 100%),
+      linear-gradient(150deg,
+        rgba(255, 255, 255, .69), rgba(160, 211, 255, .09) 35%,
+        rgba(255, 255, 255, .20) 57%, rgba(95, 168, 238, .32) 80%,
+        rgba(255, 255, 255, .49));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+  }
+
+  #topbar > *,
+  #controls > *,
+  #nextVolumeBanner > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  #topbar.reader-glass-refracting,
+  #controls.reader-glass-refracting,
+  #nextVolumeBanner.reader-glass-refracting {
+    /* Dynamic map + feDisplacementMap: real refraction only where supported. */
+    -webkit-backdrop-filter: var(--reader-optical-filter);
+    backdrop-filter: var(--reader-optical-filter);
+    background:
+      radial-gradient(ellipse 80% 130% at 8% -25%, rgba(232, 249, 255, .19), transparent 78%),
+      linear-gradient(145deg, rgba(76, 104, 138, .27), rgba(29, 40, 61, .40) 57%, rgba(16, 26, 43, .51));
+    box-shadow:
+      0 17px 52px rgba(0, 0, 0, .42),
+      0 2px 10px rgba(0, 0, 0, .19),
+      inset 0 1px 1px rgba(255, 255, 255, .41),
+      inset 2px -1px 1px rgba(108, 185, 255, .20),
+      inset -1px 2px 1px rgba(255, 177, 204, .13);
+  }
+
+  #topbar .ctrlBtn,
+  #controls .ctrlBtn,
+  #nextVolumeBanner .ctrlBtn {
+    background:
+      radial-gradient(ellipse 150% 110% at 48% -28%, rgba(255, 255, 255, .29), transparent 70%),
+      linear-gradient(145deg, rgba(209, 231, 255, .12), rgba(33, 64, 100, .16) 63%, rgba(7, 15, 28, .15));
+    box-shadow:
+      0 3px 10px rgba(0, 0, 0, .16),
+      inset 0 1px 0 rgba(255, 255, 255, .35),
+      inset 0 -1px 0 rgba(93, 160, 226, .16);
+  }
+
+  #topbar .ctrlBtn:hover:not(:disabled),
+  #controls .ctrlBtn:hover:not(:disabled),
+  #nextVolumeBanner .ctrlBtn:hover:not(:disabled) {
+    border-color: rgba(238, 249, 255, .72);
+    background:
+      radial-gradient(ellipse 130% 95% at 50% -10%, rgba(255, 255, 255, .38), transparent 80%),
+      linear-gradient(145deg, rgba(210, 236, 255, .26), rgba(85, 150, 204, .14) 65%, rgba(14, 29, 47, .20));
+  }
+}
+
+@media (min-width: 801px) and (prefers-reduced-motion: reduce) {
+  #topbar::before,
+  #controls::before,
+  #nextVolumeBanner::before {
+    mix-blend-mode: normal;
+  }
+}
