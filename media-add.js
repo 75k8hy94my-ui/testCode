@@ -63,7 +63,10 @@
   function updateAccess() {
     const permitted = authorized();
     if (open) open.disabled = !permitted;
-    $('mangaBatchImport').disabled = !permitted;
+    $('mangaJsonImportButton').disabled = !permitted;
+    $('mangaJsonImportFile').disabled = !permitted;
+    $('mangaJsonImportRegisterButton').disabled = !permitted;
+    if (!permitted) $('mangaJsonImportDialog').hidden = true;
     if (panel && !permitted) panel.hidden = true;
     form.querySelectorAll('input,textarea,button').forEach(el => { el.disabled = !permitted; });
     accessMessage.textContent = permitted ? '' : 'VPNまたは保管庫へのアクセス確認が必要です。';
@@ -118,55 +121,68 @@
       message.textContent = error.message || '保存に失敗しました。';
     }
   });
-  const validator = window.MangaImportValidator;
-  const candidateFactory = window.MangaImportCandidate;
-  const dialogFactory = window.MangaImportDialog;
-  const bridgeFactory = window.MangaImportBridge;
+  // JSON import uses the same local vault and author card records as manual add.
+  const jsonFactory = window.MangaJsonImport;
   const authorSync = window.MangaImportAuthorSync;
-  const importBatch = window.MangaImportBatch;
-  if (validator && candidateFactory && dialogFactory && bridgeFactory && authorSync && importBatch) {
-    const dialog = dialogFactory.create({ documentRef: document, validator, candidateFactory });
-    const bridge = bridgeFactory.create({ windowRef: window, origin: location.origin });
-    $('mangaBatchImport').addEventListener('click', async () => {
-      if (!authorized()) return;
-      batchMessage.textContent = '拡張機能から読み込んでいます…';
+  if (jsonFactory && authorSync) {
+    const jsonButton = $('mangaJsonImportButton');
+    const jsonFile = $('mangaJsonImportFile');
+    const jsonRegister = $('mangaJsonImportRegisterButton');
+    let latestItems = getArray(ITEMS);
+    let latestAuthors = getArray(AUTHORS);
+    const dialog = jsonFactory.create({
+      documentRef: document,
+      getState: () => ({ savedItems: latestItems, authorCards: latestAuthors }),
+      setState: next => { latestItems = next.savedItems; latestAuthors = next.authorCards; },
+      authorSync,
+      persistItems: () => { saveRecords(latestItems, latestAuthors); return true; },
+      persistAuthorCards: () => true,
+      render: () => {},
+      createId,
+      now: () => Date.now()
+    });
+    jsonButton.addEventListener('click', () => {
+      if (!authorized()) return updateAccess();
+      jsonFile.click();
+    });
+    jsonFile.addEventListener('change', async () => {
+      const file = jsonFile.files?.[0];
+      jsonFile.value = '';
+      if (!file || !authorized()) return updateAccess();
+      batchMessage.textContent = 'JSONを読み込んでいます…';
+      jsonButton.disabled = true;
       try {
-        const queued = await bridge.requestQueuedCandidates();
-        if (!authorized()) return;
-        if (!queued.length) { batchMessage.textContent = '読み込める作品がありません。'; return; }
-        dialog.open(queued, getArray(ITEMS), getArray(AUTHORS));
+        if (file.size > jsonFactory.MAX_BYTES) throw new Error('JSONは4MB以下にしてください。');
+        const items = jsonFactory.parse(await file.text());
+        if (!authorized()) return updateAccess();
+        latestItems = getArray(ITEMS);
+        latestAuthors = getArray(AUTHORS);
+        dialog.open(items);
         batchMessage.textContent = '';
       } catch (error) {
-        batchMessage.textContent = error.message || '拡張機能の読み込みに失敗しました。';
+        batchMessage.textContent = error.message || 'JSONを読み込めませんでした。';
+      } finally {
+        jsonButton.disabled = !authorized();
       }
     });
-    $('mangaImportCancelButton').addEventListener('click', () => dialog.close());
-    $('mangaImportRegisterButton').addEventListener('click', () => {
-      if (!authorized()) return;
-      const selection = dialog.getSelection();
-      if (!selection.items.length) return dialog.setStatus('登録する作品を選択してください。');
-      const checked = validator.validateBatch(selection.items.map(item => item.candidate));
-      if (!checked.ok) return dialog.setStatus(checked.errors.map(error => error.message).join('、'));
-      let latestItems = getArray(ITEMS);
-      let latestAuthors = getArray(AUTHORS);
-      const controller = importBatch.create({
-        getState: () => ({savedItems: latestItems, authorCards: latestAuthors}),
-        setState: next => {latestItems = next.savedItems; latestAuthors = next.authorCards;},
-        validator, candidateFactory, authorSync,
-        persistItems: () => {saveRecords(latestItems, latestAuthors); return true;},
-        persistAuthorCards: () => {saveRecords(latestItems, latestAuthors); return true;},
-        render: () => {},
-        createId, now: () => Date.now()
-      });
+    $('mangaJsonImportCancelButton').addEventListener('click', () => dialog.close());
+    jsonRegister.addEventListener('click', () => {
+      if (!authorized()) return updateAccess();
+      jsonRegister.disabled = true;
       try {
+        latestItems = getArray(ITEMS);
+        latestAuthors = getArray(AUTHORS);
         markPending();
-        const result = controller.register(selection);
-        if (!result.ok) return dialog.setStatus('登録できませんでした。');
+        const result = dialog.register();
+        if (!result.ok) return;
+        if (!result.count) { batchMessage.textContent = '新しい作品はありません。'; return; }
         dialog.close();
-        batchMessage.textContent = result.registeredQueueIds.length + '件を端末に登録しました。';
-        if (result.registeredQueueIds.length) syncAfterSave(batchMessage);
+        batchMessage.textContent = result.count + '件を端末に登録しました。';
+        syncAfterSave(batchMessage);
       } catch (error) {
         dialog.setStatus(error.message || '登録に失敗しました。');
+      } finally {
+        jsonRegister.disabled = !authorized();
       }
     });
   }
