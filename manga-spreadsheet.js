@@ -446,8 +446,13 @@
       const current = editor;
       editor = null;
       const value = current.input.value;
+      if (commit && !changeOne(current.row, current.col, value)) {
+        // Invalid data must remain editable instead of being discarded.
+        editor = current;
+        current.input.focus({ preventScroll:true });
+        return;
+      }
       current.input.remove();
-      if (commit) changeOne(current.row, current.col, value);
       if (advance) moveSelection(advance[0], advance[1], false);
       else { drawRows(true); viewport.focus({ preventScroll:true }); }
     }
@@ -497,7 +502,7 @@
       if (!rows.length) return false;
       if (!text) { announce('貼り付ける文字列がありません。', true); return false; }
       const matrix = clipboardMatrix(text);
-      if (matrix.length * Math.max(1, ...matrix.map(row => row.length)) > 10000) {
+      if (matrix.length * matrix.reduce((max, row) => Math.max(max, row.length), 1) > 10000) {
         announce('一度に貼り付ける範囲は10,000セル以下にしてください。', true);
         return false;
       }
