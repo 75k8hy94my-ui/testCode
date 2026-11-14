@@ -57,6 +57,9 @@
       try { encryptedRenderer?.destroy?.(); } catch (_) {}
       encryptedRenderer = null;
       if (embeddedFrame) { embeddedFrame.remove?.(); embeddedFrame = null; }
+      if (hashPageBase) byId('pageStage')?.replaceChildren?.();
+      hashIframe = null;
+      hashVerticalSlots.length = 0;
       lifecycle?.destroy();
       try { dependencies.onDestroy?.(); } catch (_) {}
     }
@@ -82,6 +85,10 @@
     let imageLoader = dependencies.imageLoader || null;
     let currentItem = null;
     let embeddedFrame = null;
+    let hashPageBase = '';
+    let hashIframe = null;
+    let hashMaxVisited = 1;
+    const hashVerticalSlots = [];
     let pageUrls = [];
     let encryptedPages = [];
     let page = 1; // displayed page; never advances before its frame is ready
@@ -146,12 +153,15 @@
     }
 
     function status(message) { const node = byId('readerStatus'); if (node) node.textContent = message || ''; }
-    function displayCount() { return encryptedPages.length || pageUrls.length * (split ? 2 : 1); }
+    function displayCount() { return hashPageBase ? hashMaxVisited : encryptedPages.length || pageUrls.length * (split ? 2 : 1); }
     function updateControls() {
       const slider = byId('pageSlider');
       const label = byId('pageLabel');
-      if (slider) { slider.max = String(Math.max(1, displayCount())); slider.value = String(page); }
-      if (label) label.textContent = `${page} / ${Math.max(1, displayCount())}`;
+      if (slider) {
+        slider.max = String(hashPageBase ? Math.min(win.MangaSourceType.MAX_HASH_PAGE, Math.max(2, hashMaxVisited + 1)) : Math.max(1, displayCount()));
+        slider.value = String(page);
+      }
+      if (label) label.textContent = hashPageBase ? `${page} / ?` : `${page} / ${Math.max(1, displayCount())}`;
       const title = byId('currentTitle'); if (title) title.textContent = currentItem?.title || currentItem?.url || '漫画';
     }
     function readMap(key) {
@@ -174,7 +184,7 @@
       return saved && !saved.wasLast ? saved.page : 1;
     }
     function persistPage(pageToPersist = page) {
-      if (currentItem && displayCount() && progressRepository?.commit(currentItem.id, pageToPersist, displayCount()) === false) {
+      if (currentItem && (hashPageBase || displayCount()) && progressRepository?.commit(currentItem.id, pageToPersist, hashPageBase ? 0 : displayCount()) === false) {
         status('読書位置を端末に保存できませんでした。ブラウザの保存容量を確認してください。');
       }
     }
@@ -214,9 +224,11 @@
       button.title = currentItem.favorite ? 'お気に入りから外す' : 'お気に入りに追加';
     }
     function showNextVolume() {
-      const next = repository.findNextVolume?.(currentItem);
       const banner = byId('nextVolumeBanner');
       if (!banner) return;
+      // A hash-only external frame cannot reveal the final page.
+      if (hashPageBase) { banner.hidden = true; return; }
+      const next = repository.findNextVolume?.(currentItem);
       banner.hidden = !next || page !== displayCount();
       const button = byId('nextVolumeBtn');
       if (button) button.dataset.nextItemId = next ? String(next.id) : '';
@@ -445,6 +457,7 @@
       return { ready: true, frame: host, renderer, kind: 'encrypted', destroy: () => renderer.destroy() };
     }
     function renderPage(number = requestedPage, retry = false) {
+      if (hashPageBase) return Promise.resolve(showHashPage(number));
       const targetPage = Math.max(1, Math.min(displayCount() || 1, Math.floor(Number(number) || 1)));
       const stage = byId('pageStage');
       const wantsVertical = vertical && !split && !encryptedPages.length;
@@ -482,7 +495,13 @@
       if (!Number.isFinite(Number(number))) return;
       return renderPage(number);
     }
-    function next() { if (requestedPage < displayCount()) goTo(requestedPage + 1); }
+    function next() {
+      if (hashPageBase) {
+        if (requestedPage < win.MangaSourceType.MAX_HASH_PAGE) goTo(requestedPage + 1);
+        return;
+      }
+      if (requestedPage < displayCount()) goTo(requestedPage + 1);
+    }
     function previous() { if (requestedPage > 1) goTo(requestedPage - 1); }
     function bind(id, event, callback, options) { const node = byId(id); if (node) lifecycle.listen(node, event, callback, options); }
     function bindControls() {
@@ -505,6 +524,13 @@
       bind('enhanceBtn', 'click', (event) => { imageEnhanceEnabled = !imageEnhanceEnabled; doc.body.classList.toggle('image-enhance', imageEnhanceEnabled); event.currentTarget.setAttribute('aria-pressed', imageEnhanceEnabled ? 'true' : 'false'); win.localStorage.setItem('mangaReaderImageEnhance', imageEnhanceEnabled ? '1' : '0'); if (imageEnhanceEnabled) applyPageEnhancements(); else restorePageEnhancements(); });
       bind('verticalBtn', 'click', () => {
         if (split || encryptedPages.length) return;
+        if (hashPageBase) {
+          vertical = !vertical;
+          doc.body.classList.toggle('vertical-scroll', vertical);
+          win.localStorage.setItem('mangaReaderVerticalScroll', vertical ? '1' : '0');
+          renderHashLayout();
+          return;
+        }
         vertical = !vertical;
         verticalSlots = [];
         pendingVerticalScrollPage = null;
@@ -535,6 +561,7 @@
         if (x < win.innerWidth * 0.35) previous(); else if (x > win.innerWidth * 0.65) next();
       });
       bind('viewer', 'scroll', () => {
+        if (hashPageBase) { onHashVerticalScroll(); return; }
         if (!vertical) return;
         const viewer = byId('viewer');
         const stage = byId('pageStage');
@@ -597,6 +624,136 @@
       if (!imageEnhanceEnabled || doc.body.classList.contains('safe-mode')) return;
       byId('pageStage')?.querySelectorAll('.readerPageImage').forEach((image) => win.ReaderImageEnhancement?.enhanceElement(image, { documentRef: doc, windowRef: win }));
     }
+    // A trailing #1 declares a sequence of non-interactive external frames.
+    // Cross-origin hash navigation does not expose a trustworthy page count,
+    // so each numbered URL is loaded on demand and progress has no "last" flag.
+    function hashUrl(number) {
+      return win.MangaSourceType?.hashPageUrl(hashPageBase, number) || '';
+    }
+    function createHashFrame(number) {
+      const url = hashUrl(number);
+      if (!url) return null;
+      const frame = doc.createElement('div');
+      frame.className = 'readerHashFrame';
+      frame.style.pointerEvents = 'none';
+      const iframe = doc.createElement('iframe');
+      iframe.src = url;
+      iframe.title = (currentItem?.title || '漫画') + ' - ' + number + 'ページ';
+      iframe.loading = 'eager';
+      iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+      iframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox');
+      iframe.setAttribute('tabindex', '-1');
+      iframe.setAttribute('aria-hidden', 'true');
+      iframe.inert = true;
+      iframe.style.pointerEvents = 'none';
+      frame.appendChild(iframe);
+      return { frame, iframe };
+    }
+    function ensureHashVerticalSlots(count) {
+      const stage = byId('pageStage');
+      if (!stage) return;
+      const max = Math.min(win.MangaSourceType.MAX_HASH_PAGE, count);
+      while (hashVerticalSlots.length < max) {
+        const slot = doc.createElement('div');
+        slot.className = 'readerHashVerticalSlot';
+        slot.dataset.page = String(hashVerticalSlots.length + 1);
+        stage.appendChild(slot);
+        hashVerticalSlots.push({ slot, frame: null });
+      }
+    }
+    function updateHashVerticalWindow(center) {
+      for (let i = 0; i < hashVerticalSlots.length; i += 1) {
+        const entry = hashVerticalSlots[i];
+        if (Math.abs(i + 1 - center) <= 1) {
+          if (!entry.frame) {
+            const candidate = createHashFrame(i + 1);
+            if (candidate) { entry.slot.replaceChildren(candidate.frame); entry.frame = candidate.frame; }
+          }
+        } else if (entry.frame) {
+          entry.slot.replaceChildren();
+          entry.frame = null;
+        }
+      }
+    }
+    function renderHashLayout() {
+      const stage = byId('pageStage'), viewer = byId('viewer');
+      if (!stage || !viewer) return;
+      stage.replaceChildren();
+      hashVerticalSlots.length = 0;
+      hashIframe = null;
+      if (vertical) {
+        stage.classList.add('vertical-scroll');
+        viewer.classList.add('vertical-scroll');
+        ensureHashVerticalSlots(Math.max(page + 2, hashMaxVisited + 1));
+        updateHashVerticalWindow(page);
+        viewer.scrollTop = (page - 1) * (viewer.clientHeight || win.innerHeight || 800);
+      } else {
+        stage.classList.remove('vertical-scroll');
+        viewer.classList.remove('vertical-scroll');
+        const current = createHashFrame(page);
+        if (current) {
+          stage.appendChild(current.frame);
+          hashIframe = current.iframe;
+        }
+      }
+    }
+    function showHashPage(value) {
+      const number = Math.floor(Number(value));
+      if (!Number.isSafeInteger(number) || !hashUrl(number) || destroyed) return false;
+      if (number === page && byId('pageStage')?.firstChild) return true;
+      if (vertical) {
+        hashMaxVisited = Math.max(hashMaxVisited, number);
+        ensureHashVerticalSlots(Math.max(number + 2, hashMaxVisited + 1));
+        updateHashVerticalWindow(number);
+        const viewer = byId('viewer');
+        if (viewer) viewer.scrollTop = (number - 1) * (viewer.clientHeight || win.innerHeight || 800);
+      } else if (hashIframe) {
+        hashIframe.src = hashUrl(number);
+      } else return false;
+      page = requestedPage = number;
+      hashMaxVisited = Math.max(hashMaxVisited, number);
+      const link = byId('openSourceBtn'); if (link) link.href = hashUrl(number);
+      updateControls();
+      updateTocButton();
+      persistPage();
+      showNextVolume();
+      return true;
+    }
+    function onHashVerticalScroll() {
+      if (!vertical || !hashPageBase || destroyed) return;
+      const viewer = byId('viewer');
+      if (!viewer) return;
+      const height = viewer.clientHeight || win.innerHeight || 800;
+      const visible = Math.max(1, Math.min(hashVerticalSlots.length, Math.floor((viewer.scrollTop + height * 0.5) / height) + 1));
+      if (visible !== page) {
+        page = requestedPage = visible;
+        hashMaxVisited = Math.max(hashMaxVisited, visible);
+        const link = byId('openSourceBtn'); if (link) link.href = hashUrl(visible);
+        updateControls();
+        updateTocButton();
+        persistPage();
+      }
+      ensureHashVerticalSlots(visible + 2);
+      updateHashVerticalWindow(visible);
+    }
+    function mountHashReader() {
+      const controls = byId('controls'); if (controls) controls.hidden = false;
+      const link = byId('openSourceBtn');
+      if (link) { link.href = hashUrl(page); link.hidden = false; }
+      const last = byId('lastBtn');
+      if (last) {
+        last.title = '最後に閲覧したページへ（総ページ数は不明）';
+        last.setAttribute('aria-label', '最後に閲覧したページ');
+      }
+      const message = byId('readerMessage'); if (message) message.textContent = '';
+      renderHashLayout();
+      updateControls();
+      updateTocButton();
+      showNextVolume();
+      persistPage();
+      status('外部ページの総ページ数は取得できません。表示できないときは「元ページを開く」を使用してください。');
+      return true;
+    }
     function mountEmbeddedPage(url) {
       const stage = byId('pageStage');
       const viewer = byId('viewer');
@@ -628,10 +785,13 @@
     }
     async function mountItem(item) {
       currentItem = item;
-      const embeddedUrl = win.MangaSourceType?.getEmbedUrl(item) || '';
+      hashPageBase = win.MangaSourceType?.getHashPageBase(item) || '';
+      const embeddedUrl = hashPageBase ? '' : win.MangaSourceType?.getEmbedUrl(item) || '';
       split = Boolean(item.splitSpreads);
       updateControls();
       page = embeddedUrl ? 1 : resumePage(item);
+      if (hashPageBase) page = Math.min(win.MangaSourceType.MAX_HASH_PAGE, Math.max(1, page));
+      hashMaxVisited = hashPageBase ? page : 1;
       requestedPage = page;
       lastFailedRequest = null;
       verticalSlots = [];
@@ -643,6 +803,7 @@
       const closeButton = byId('closeBtn'); if (closeButton) closeButton.hidden = false;
       const favoriteButton = byId('favToggleBtn'); if (favoriteButton) favoriteButton.hidden = false;
       bindControls(); renderFavorite();
+      if (hashPageBase) return mountHashReader();
       if (embeddedUrl) return mountEmbeddedPage(embeddedUrl);
       const generationAtStart = ++generation;
       const resume = page;
