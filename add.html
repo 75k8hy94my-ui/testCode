@@ -43,19 +43,20 @@
 <div><button class="mediaAddButton primary" type="submit">漫画を保存</button></div>
 </form>
 </section>
-<section class="mediaAddForm" aria-label="一括読み込み">
-<h3>momon:GAから一括読み込み</h3>
-<button class="mediaAddButton" id="mangaBatchImport" type="button">拡張機能のキューを確認</button>
+<section class="mediaAddForm" aria-label="漫画JSON読み込み">
+<h3>JSONから漫画を読み込む</h3>
+<button class="mediaAddButton" id="mangaJsonImportButton" type="button">JSONを読み込む</button>
+<input id="mangaJsonImportFile" type="file" accept=".json,application/json" hidden aria-label="漫画JSONファイル">
 <p class="mediaAddMessage" id="mangaBatchStatus" role="status" aria-live="polite"></p>
 </section>
-<section id="mangaImportDialog" role="dialog" aria-modal="true" aria-labelledby="mangaImportTitle" hidden style="position:fixed;inset:0;z-index:2400;background:#000b;overflow:auto;padding:16px">
+<section id="mangaJsonImportDialog" role="dialog" aria-modal="true" aria-labelledby="mangaJsonImportTitle" hidden style="position:fixed;inset:0;z-index:2400;background:#000b;overflow:auto;padding:16px">
 <div style="width:min(900px,100%);margin:4vh auto;background:var(--panel,#222833);color:var(--text,#fff);border-radius:14px;padding:20px;display:grid;gap:12px">
-<h2 id="mangaImportTitle">momon:GA作品を一括読み込み</h2>
-<div id="mangaImportRows" style="display:grid;gap:12px"></div>
-<p id="mangaImportStatus" role="status" aria-live="polite"></p>
+<h2 id="mangaJsonImportTitle">漫画JSONの読み込み内容を確認</h2>
+<div id="mangaJsonImportRows" style="display:grid;gap:12px;max-height:65vh;overflow:auto"></div>
+<p id="mangaJsonImportStatus" role="status" aria-live="polite"></p>
 <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
-<button class="mediaAddButton" id="mangaImportCancelButton" type="button">閉じる</button>
-<button class="mediaAddButton primary" id="mangaImportRegisterButton" type="button">選択した作品を登録</button>
+<button class="mediaAddButton" id="mangaJsonImportCancelButton" type="button">閉じる</button>
+<button class="mediaAddButton primary" id="mangaJsonImportRegisterButton" type="button">選択した作品を登録</button>
 </div></div></section>
 <p class="mediaAddMessage" id="mediaAddAccessMessage" role="status" aria-live="polite"></p>
 </main></div>
@@ -69,11 +70,7 @@
 <script src="app-desktop-rail.js?v=20261021-images-profile-rail"></script>
 <script src="profile-menu.js?v=20261011-nongame-audit"></script>
 <script src="mobile-bottom-nav.js?v=20261012-shared-add"></script>
-<script src="manga-import-validator.js?v=20261007-momon-import"></script>
-<script src="manga-import-candidate.js?v=20261007-momon-import"></script>
 <script src="manga-import-author-sync.js?v=20261007-momon-import"></script>
-<script src="manga-import-batch.js?v=20261007-momon-import"></script>
-<script src="manga-import-bridge.js?v=20261007-momon-import"></script>
-<script src="manga-import-dialog.js?v=20261007-momon-import"></script>
-<script src="media-add.js?v=20261012-shared-add"></script>
+<script src="manga-json-import.js?v=20261114-json-import"></script>
+<script src="media-add.js?v=20261114-json-import"></script>
 </body></html>
