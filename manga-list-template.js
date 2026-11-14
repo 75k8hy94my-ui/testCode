@@ -5,16 +5,18 @@
     return String.raw`<div id="mangaListSection">
       <div id="exportImportRow">
         <button class="textActionBtn" id="newBtn">新規</button>
-        <button class="textActionBtn" id="bulkDetectBtn">一括読み込み</button>
+        <button class="textActionBtn" id="jsonImportButton" type="button">JSONを読み込む</button>
+        <input id="jsonImportFile" type="file" accept=".json,application/json" hidden aria-label="漫画JSONファイル">
       </div>
-      <section id="mangaImportDialog" role="dialog" aria-modal="true" aria-labelledby="mangaImportTitle" hidden style="position:fixed;inset:0;z-index:1210;background:#0009;overflow:auto;padding:16px;">
+      <section id="mangaJsonImportDialog" role="dialog" aria-modal="true" aria-labelledby="mangaJsonImportTitle" hidden style="position:fixed;inset:0;z-index:1210;background:#0009;overflow:auto;padding:16px;">
         <div style="width:min(900px,100%);margin:4vh auto;background:var(--panel,#fff);color:inherit;border-radius:14px;padding:20px;display:grid;gap:12px;box-shadow:0 16px 48px #0005;">
-          <h2 id="mangaImportTitle" style="margin:0;">momon:GA作品を一括読み込み</h2>
-          <div id="mangaImportRows" style="display:grid;gap:12px;"></div>
-          <p id="mangaImportStatus" role="status" aria-live="polite" style="margin:0;min-height:1.5em;"></p>
+          <h2 id="mangaJsonImportTitle" style="margin:0;">漫画のJSONを読み込む</h2>
+          <p style="margin:0;">作品のタイトル・作者・保存URLを確認してから登録します。重複作品は初期状態で選択解除されています。</p>
+          <div id="mangaJsonImportRows" style="display:grid;gap:12px;max-height:65vh;overflow:auto;"></div>
+          <p id="mangaJsonImportStatus" role="status" aria-live="polite" style="margin:0;min-height:1.5em;"></p>
           <div style="display:flex;justify-content:flex-end;gap:8px;">
-            <button id="mangaImportCancelButton" class="ctrlBtn" type="button">閉じる</button>
-            <button id="mangaImportRegisterButton" class="ctrlBtn" type="button">選択した作品を登録</button>
+            <button id="mangaJsonImportCancelButton" class="ctrlBtn" type="button">閉じる</button>
+            <button id="mangaJsonImportRegisterButton" class="ctrlBtn" type="button">選択した作品を登録</button>
           </div>
         </div>
       </section>
