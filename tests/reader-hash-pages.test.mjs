@@ -97,6 +97,7 @@ test('hash frames use normal reader controls, restore progress and cannot receiv
   const { runtime, elements, body, item, commits, updates } = setup({ resume: 3 });
   await runtime.start(item.id);
   const frame = elements.pageStage.firstChild, iframe = frame.firstChild;
+  const shownIframe = () => elements.pageStage.firstChild?.firstChild;
   assert.equal(frame.className, 'readerHashFrame');
   assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#3');
   assert.equal(frame.style.pointerEvents, 'none');
@@ -111,16 +112,16 @@ test('hash frames use normal reader controls, restore progress and cannot receiv
   assert.ok(commits.every(commit => commit.count === 0), 'unknown length must never mark a final page');
 
   runtime.next();
-  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#4');
+  assert.equal(shownIframe().src, 'https://example.test/xxx.html?edition=1#4');
   assert.equal(elements.pageLabel.textContent, '4 / ?');
   assert.equal(elements.pageSlider.max, '5');
   assert.equal(elements.openSourceBtn.href, iframe.src);
   runtime.previous();
-  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#3');
+  assert.equal(shownIframe().src, 'https://example.test/xxx.html?edition=1#3');
   elements.firstBtn.dispatch('click');
-  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#1');
+  assert.equal(shownIframe().src, 'https://example.test/xxx.html?edition=1#1');
   elements.lastBtn.dispatch('click');
-  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#4');
+  assert.equal(shownIframe().src, 'https://example.test/xxx.html?edition=1#4');
 
   elements.safeModeBtn.dispatch('click');
   assert.equal(body.classList.contains('safe-mode'), true);
@@ -198,7 +199,7 @@ test('hash-page vertical reading creates bounded iframe windows and preserves pa
 test('hash-page vertical CSS avoids scroll anchoring and refreshes the runtime asset', () => {
   const html = readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
   assert.match(html, /body\.hash-page-reader\.vertical-scroll #viewer[\s\S]*overflow-anchor:none/);
-  assert.match(html, /reader-runtime\.js\?v=20261114-safe-mode-toggle-fix/);
+  assert.match(html, /reader-runtime\.js\?v=20261114-hash-end-on-demand/);
 });
 
 
@@ -237,4 +238,121 @@ test('reader mobile CSS keeps the header at top and the privacy veil removable',
   assert.match(mobileCss, /\(hover: none\) and \(pointer: coarse\)/);
   assert.match(mobileCss, /#readerApp #topbar\s*\{\s*position: fixed;/);
   assert.match(mobileCss, /#readerApp #topbar #safeModeBtn/);
+});
+
+function readableHashWindow(hash) {
+  const child = element('iframe-window');
+  child.location = { hash };
+  return child;
+}
+
+test('the first #1- is normal; a redirected sequential next page fixes the final count', async () => {
+  const { runtime, elements, item, updates, commits } = setup();
+  await runtime.start('hash-work');
+
+  let iframe = elements.pageStage.firstChild.firstChild;
+  iframe.contentWindow = readableHashWindow('#1-');
+  iframe.dispatch('load');
+  assert.equal(elements.pageLabel.textContent, '1 / ?');
+  assert.equal(updates.length, 0, 'opening #1- cannot imply end of book');
+
+  for (const number of [2, 3]) {
+    runtime.next();
+    iframe = elements.pageStage.firstChild.firstChild;
+    iframe.contentWindow = readableHashWindow('#' + number);
+    iframe.dispatch('load');
+    assert.equal(elements.pageLabel.textContent, number + ' / ?');
+  }
+
+  runtime.next();
+  iframe = elements.pageStage.firstChild.firstChild;
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#4');
+  iframe.contentWindow = readableHashWindow('#1-');
+  iframe.dispatch('load');
+
+  assert.equal(runtime.getPageState().displayedPage, 3);
+  assert.equal(elements.pageLabel.textContent, '3 / 3');
+  assert.equal(elements.pageSlider.max, '3');
+  assert.equal(elements.nextBtn.disabled, true);
+  assert.equal(elements.lastBtn.attributes['aria-label'], '最後のページ');
+  assert.equal(elements.pageStage.firstChild.firstChild.src, 'https://example.test/xxx.html?edition=1#3');
+  assert.equal(updates.at(-1).hashPageCount, 3);
+  assert.equal(updates.at(-1).hashPageCountSource, 'https://example.test/xxx.html?edition=1');
+  assert.equal(item.hashPageCount, 3);
+  assert.equal(runtime.goTo(4), false, 'a proven final page is not navigable past the end');
+  runtime.next();
+  assert.equal(runtime.getPageState().displayedPage, 3);
+  assert.ok(commits.every(entry => entry.count === 0), 'progress must still resume on the last displayed page');
+  runtime.destroy();
+});
+
+test('an invalid far page does not falsely claim the previous page exists', async () => {
+  const { runtime, elements, updates } = setup();
+  await runtime.start('hash-work');
+  runtime.goTo(60);
+  let iframe = elements.pageStage.firstChild.firstChild;
+  iframe.contentWindow = readableHashWindow('#1-');
+  iframe.dispatch('load');
+  assert.equal(runtime.getPageState().displayedPage, 1);
+  assert.equal(elements.pageLabel.textContent, '1 / ?');
+  assert.equal(updates.length, 0);
+  assert.match(elements.readerStatus.textContent, /60ページは先頭へ戻されました/);
+  assert.equal(runtime.goTo(60), false, 'already rejected page should not reopen');
+  runtime.next();
+  iframe = elements.pageStage.firstChild.firstChild;
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#2');
+  runtime.destroy();
+});
+
+test('unreadable cross-origin iframe URLs do not invent a final page', async () => {
+  const { runtime, elements, updates } = setup();
+  await runtime.start('hash-work');
+  runtime.goTo(2);
+  const iframe = elements.pageStage.firstChild.firstChild;
+  iframe.contentWindow = { get location() { throw new Error('SecurityError'); } };
+  assert.doesNotThrow(() => iframe.dispatch('load'));
+  assert.equal(runtime.getPageState().displayedPage, 2);
+  assert.equal(elements.pageLabel.textContent, '2 / ?');
+  assert.equal(updates.length, 0);
+  runtime.destroy();
+});
+
+test('a discovered final page survives a new reader session for the same source URL', async () => {
+  const { runtime, elements, item } = setup({ resume: 3 });
+  item.hashPageCountSource = Source.getHashPageBase(item);
+  item.hashPageCount = 3;
+  await runtime.start('hash-work');
+  assert.equal(elements.pageLabel.textContent, '3 / 3');
+  assert.equal(elements.pageSlider.max, '3');
+  assert.equal(elements.nextBtn.disabled, true);
+  runtime.next();
+  assert.equal(runtime.getPageState().displayedPage, 3);
+  runtime.destroy();
+});
+
+test('vertical reading removes end-of-book placeholders when its next page redirects', async () => {
+  const { runtime, elements, item } = setup({ vertical: true, resume: 2 });
+  await runtime.start('hash-work');
+  assert.equal(elements.pageStage.children.length, 4);
+  let iframe = elements.pageStage.children[2].firstChild.firstChild;
+  iframe.contentWindow = readableHashWindow('#3');
+  iframe.dispatch('load'); // Prefetched page 3 is confirmed valid.
+
+  elements.viewer.dispatch('touchmove');
+  elements.viewer.scrollTop = 2 * 800;
+  elements.viewer.dispatch('scroll');
+  assert.equal(runtime.getPageState().displayedPage, 3);
+  iframe = elements.pageStage.children[3].firstChild.firstChild;
+  iframe.contentWindow = readableHashWindow('#1-');
+  iframe.dispatch('load'); // Page 4 was prefetched for a legitimate scroll.
+
+  assert.equal(runtime.getPageState().displayedPage, 3);
+  assert.equal(elements.pageLabel.textContent, '3 / 3');
+  assert.equal(elements.pageStage.children.length, 3);
+  assert.equal(item.hashPageCount, 3);
+  elements.viewer.dispatch('touchmove');
+  elements.viewer.scrollTop = 4 * 800;
+  elements.viewer.dispatch('scroll');
+  assert.equal(runtime.getPageState().displayedPage, 3);
+  runtime.destroy();
 });
