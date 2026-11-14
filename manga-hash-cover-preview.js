@@ -27,7 +27,7 @@
         entry.host.replaceChildren();
         entry.iframe = null;
       }
-      entry.host.hidden = true;
+      entry.host.style.opacity = '0';
     }
 
     function release(entry) {
@@ -71,7 +71,7 @@
       entry.iframe = iframe;
       iframe.addEventListener('load', () => {
         if (!destroyed && entry.iframe === iframe && canReadProtectedData() && entry.img.isConnected) {
-          entry.host.hidden = false;
+          entry.host.style.opacity = '1';
         }
       });
       iframe.addEventListener('error', () => {
@@ -88,7 +88,9 @@
       if (old) release(old);
       const host = documentRef.createElement('div');
       host.className = 'book-cover-hash-preview';
-      host.hidden = true;
+      // Opacity preserves the iframe's layout box so loading=lazy can fire;
+      // display:none/hidden would prevent the preview from loading at all.
+      host.style.opacity = '0';
       host.setAttribute('aria-hidden', 'true');
       host.style.pointerEvents = 'none';
       img.parentNode.appendChild(host);
