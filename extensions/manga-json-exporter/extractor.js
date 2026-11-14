@@ -1,6 +1,16 @@
 (function (root) {
   'use strict';
   function cleaned(value) { return String(value || '').replace(/\s+/g, ' ').trim(); }
+  function extractTitle(value) {
+    const raw = String(value || '');
+    const closingBracket = raw.indexOf('】');
+    // Extract between the first closing bracket and the first ASCII hyphen.
+    // If a delimiter is missing, preserve the available title text.
+    if (closingBracket < 0) return cleaned(raw);
+    const remainder = raw.slice(closingBracket + 1);
+    const separator = remainder.indexOf('-');
+    return cleaned(separator < 0 ? remainder : remainder.slice(0, separator));
+  }
   function section(description, name) {
     const text = String(description || '');
     const label = '【' + name + '】';
@@ -43,7 +53,7 @@
     return '';
   }
   function extract(documentRef, pageUrl) {
-    const title = cleaned(documentRef?.querySelector('title')?.textContent);
+    const title = extractTitle(documentRef?.querySelector('title')?.textContent);
     const imageUrl = findFirstPage(documentRef?.querySelector('#post-meta'), pageUrl);
     const description = documentRef?.querySelector('meta[name="description"]')?.getAttribute('content') || '';
     const author = section(description, '作者');
@@ -72,5 +82,5 @@
       },
     };
   }
-  root.TestCodeMangaJsonExtractor = Object.freeze({ section, findFirstPage, extract });
+  root.TestCodeMangaJsonExtractor = Object.freeze({ extractTitle, section, findFirstPage, extract });
 })(typeof self !== 'undefined' ? self : globalThis);

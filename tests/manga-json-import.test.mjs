@@ -47,7 +47,7 @@ test('extension extracts title, first image URL, and author without tag spillove
   };
   const doc = {
     querySelector: selector => ({
-      title: { textContent: '作品A' },
+      title: { textContent: '【オリジナル】 作品A - 同人誌 - サイト名' },
       '#post-meta': meta,
       'meta[name="description"]': { getAttribute: () => '【パロディ】原作【サークル】丸【作者】作者A【タグ】漫画' }
     })[selector]
@@ -57,6 +57,13 @@ test('extension extracts title, first image URL, and author without tag spillove
   assert.equal(result.item.author, '作者A');
   assert.equal(result.item.url, item.url);
   assert.equal(result.item.title, item.title);
+});
+test('extension extracts title only between first 】 and first ASCII hyphen', () => {
+  assert.equal(extractor.extractTitle('【オリジナル】タイトル - 同人誌 - サイト名'), 'タイトル');
+  assert.equal(extractor.extractTitle(' 【二次創作】 作品名（前編） - 同人誌 '), '作品名（前編）');
+  assert.equal(extractor.extractTitle('【オリジナル】作品名'), '作品名');
+  assert.equal(extractor.extractTitle('作品名のみ'), '作品名のみ');
+  assert.equal(extractor.extractTitle('【オリジナル】 - 同人誌'), '');
 });
 test('both manga pages use JSON import instead of the old extension queue UI', () => {
   const add = read('add.html');

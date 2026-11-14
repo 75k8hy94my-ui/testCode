@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "testCode 漫画 JSON エクスポーター",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "作品ページのタイトル、1.webp、descriptionの作者を抽出しtestCode用JSONを保存します。",
   "permissions": ["activeTab", "scripting", "storage", "downloads"],
   "action": { "default_title": "testCode用JSONに保存", "default_popup": "popup.html" }

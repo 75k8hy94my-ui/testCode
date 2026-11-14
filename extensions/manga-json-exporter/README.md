@@ -8,6 +8,6 @@ ChromiumブラウザのManifest V3拡張機能です。
 4. 複数作品を収集したら「JSONを保存」を押す。
 5. testCodeの漫画ページの「JSONを読み込む」でファイルを選び、作品一覧を確認して登録する。
 
-タイトルはtitle要素、画像URLは#post-meta内の/1.webp、作者はdescription要素の【作者】の内容から取得します。
+タイトルは `<title>` の最初の `】` の直後から、最初の半角ハイフン `-` の手前までを抽出し、前後の空白を取り除きます。例：`【オリジナル】タイトル - 同人誌…` → `タイトル`。区切りがない場合は取得できた範囲をタイトルとします。画像URLは#post-meta内の/1.webp、作者はdescription要素の【作者】の内容から取得します。
 JSON形式は format="testcode-manga-import"、version=1、items=[{title,author,url,sourceUrl,circleName,sourceWork,tags}] です。
 testCodeのReaderは1.webpから連番ページを探索します。作品データはブラウザの拡張機能ストレージに保持され、外部サーバーには送信しません。
