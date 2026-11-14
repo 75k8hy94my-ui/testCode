@@ -495,7 +495,11 @@
         if (updated) { currentItem = updated; renderFavorite(); }
       });
       bind('tocAddBtn', 'click', saveTocEntry); bind('tocBtn', 'click', renderToc);
-      bind('safeModeBtn', 'click', () => { const active = doc.body.classList.toggle('safe-mode'); win.localStorage.setItem('mangaReaderSafeMode', active ? '1' : '0'); if (active) restorePageEnhancements(); else applyPageEnhancements(); });
+      bind('safeModeBtn', 'click', () => {
+        const active = !doc.body.classList.contains('safe-mode');
+        setSafeMode(active);
+        try { win.localStorage.setItem('mangaReaderSafeMode', active ? '1' : '0'); } catch (_) {}
+      });
       bind('enhanceBtn', 'click', (event) => { imageEnhanceEnabled = !imageEnhanceEnabled; doc.body.classList.toggle('image-enhance', imageEnhanceEnabled); event.currentTarget.setAttribute('aria-pressed', imageEnhanceEnabled ? 'true' : 'false'); win.localStorage.setItem('mangaReaderImageEnhance', imageEnhanceEnabled ? '1' : '0'); if (imageEnhanceEnabled) applyPageEnhancements(); else restorePageEnhancements(); });
       bind('verticalBtn', 'click', () => {
         if (split || encryptedPages.length) return;
@@ -572,10 +576,20 @@
       });
       lifecycle.listen(win, 'keydown', (event) => { if (event.key === 'ArrowRight' || event.key === ' ') next(); else if (event.key === 'ArrowLeft') previous(); });
       if (vertical) doc.body.classList.add('vertical-scroll');
-      if (win.localStorage.getItem('mangaReaderSafeMode') === '1') doc.body.classList.add('safe-mode');
       imageEnhanceEnabled = win.localStorage.getItem('mangaReaderImageEnhance') !== '0';
       doc.body.classList.toggle('image-enhance', imageEnhanceEnabled);
       byId('enhanceBtn')?.setAttribute('aria-pressed', imageEnhanceEnabled ? 'true' : 'false');
+      setSafeMode(win.localStorage.getItem('mangaReaderSafeMode') === '1');
+    }
+    function setSafeMode(active) {
+      doc.body.classList.toggle('safe-mode', active);
+      const button = byId('safeModeBtn');
+      if (button) {
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+        button.title = active ? 'セーフモードを解除' : 'セーフモードを有効化';
+      }
+      if (active) restorePageEnhancements();
+      else applyPageEnhancements();
     }
     function applyPageEnhancements() {
       if (!imageEnhanceEnabled || doc.body.classList.contains('safe-mode')) return;
