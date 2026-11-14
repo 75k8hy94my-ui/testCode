@@ -271,9 +271,12 @@
       disposed = true;
       observer?.disconnect();
       watcher?.disconnect();
+      reducedTransparency?.removeEventListener?.('change', scheduleResize);
+      win.removeEventListener?.('resize', scheduleResize);
       for (const node of surfaces.keys()) removeElement(node);
       svg?.remove();
       custom.clear();
+      if (win.TestCodeLiquidGlass?.destroy === destroy) delete win.TestCodeLiquidGlass;
     }
 
     if (optical) watcher = new win.ResizeObserver(scheduleResize);
@@ -299,5 +302,9 @@
     } else {
       init();
     }
+    // pagehide tears down filter URLs; a bfcache restoration needs fresh ones.
+    window.addEventListener('pageshow', () => {
+      if (!window.TestCodeLiquidGlass) init();
+    });
   }
 })();
