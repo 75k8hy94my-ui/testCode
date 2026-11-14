@@ -73,7 +73,7 @@ test('hash #1 has a lazy, inert first-page preview, and offscreen cards unload i
   assert.equal(cover.children.length, 2);
   const host = cover.children[1];
   assert.equal(host.className, 'book-cover-hash-preview');
-  assert.equal(host.hidden, true);
+  assert.equal(host.style.opacity, '0');
   assert.equal(host.style.pointerEvents, 'none');
   assert.equal(f.visibleObserver.observed.has(img), true);
   assert.equal(host.children.length, 0, 'detached cards do not load iframes');
@@ -91,11 +91,11 @@ test('hash #1 has a lazy, inert first-page preview, and offscreen cards unload i
   assert.equal(iframe.inert, true);
   assert.equal(iframe.style.pointerEvents, 'none');
   iframe.dispatch('load');
-  assert.equal(host.hidden, false);
+  assert.equal(host.style.opacity, '1');
 
   f.visibleObserver.emit(img, false);
   assert.equal(host.children.length, 0, 'off-screen frame must be removed');
-  assert.equal(host.hidden, true);
+  assert.equal(host.style.opacity, '0');
   f.visibleObserver.emit(img, true);
   assert.equal(host.children.length, 1, 'returning card can load its first page again');
 
@@ -128,7 +128,7 @@ test('thumbnail previews refuse other URLs and respect VPN access revocation', (
   assert.equal(host.children.length, 1);
   f.setAllowed(false);
   assert.equal(host.children.length, 0);
-  assert.equal(host.hidden, true);
+  assert.equal(host.style.opacity, '0');
   f.setAllowed(true);
   assert.equal(f.visibleObserver.observed.has(img), true);
   f.visibleObserver.emit(img, true);
