@@ -57,7 +57,7 @@
     }
 
     function mount(entry) {
-      if (destroyed || entry.iframe || !canReadProtectedData() || !entry.img.isConnected) return;
+      if (destroyed || entry.iframe || !canReadProtectedData() || (visibleObserver && !entry.img.isConnected)) return;
       const iframe = documentRef.createElement('iframe');
       iframe.src = entry.url;
       iframe.title = entry.title + ' の表紙プレビュー';
@@ -102,6 +102,15 @@
     function onAccessChange() {
       if (!canReadProtectedData()) {
         for (const entry of entries.values()) unload(entry);
+        return;
+      }
+      // When access returns, refresh visibility rather than loading every
+      // stored cover regardless of whether it is on screen.
+      for (const entry of entries.values()) {
+        if (visibleObserver) {
+          visibleObserver.unobserve(entry.img);
+          visibleObserver.observe(entry.img);
+        } else mount(entry);
       }
     }
     documentRef.addEventListener?.('manga-reader-vpn-status', onAccessChange);
