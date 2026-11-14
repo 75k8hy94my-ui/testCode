@@ -3,13 +3,9 @@
 
   const STYLESHEET_URL = 'manga-list.css?v=20261009-guest-mode';
   const SCRIPT_URLS = [
-    ['manga-list-template.js?v=20261009-desktop-liquid-pager', 'mangaRouteTemplate'],
-    ['manga-import-validator.js?v=20261007-momon-import', 'mangaImportValidator'],
-    ['manga-import-candidate.js?v=20261007-momon-import', 'mangaImportCandidate'],
+    ['manga-list-template.js?v=20261114-json-import', 'mangaRouteTemplate'],
     ['manga-import-author-sync.js?v=20261007-momon-import', 'mangaImportAuthorSync'],
-    ['manga-import-batch.js?v=20261007-momon-import', 'mangaImportBatch'],
-    ['manga-import-bridge.js?v=20261007-momon-import', 'mangaImportBridge'],
-    ['manga-import-dialog.js?v=20261007-momon-import', 'mangaImportDialog'],
+    ['manga-json-import.js?v=20261114-json-import', 'mangaJsonImport'],
     ['image-transfer-settings.js?v=20261004-encrypted-image-import', 'encryptedImageImportSettings'],
     ['image-remote-access.js?v=20261004-encrypted-image-import', 'encryptedImageImportRemoteAccess'],
     ['encrypted-asset-crypto.js?v=20261004-encrypted-image-import', 'encryptedImageImportCrypto'],
@@ -541,16 +537,14 @@
         bind(documentRef, 'manga-reader-vpn-status', (event) => {
           if (event?.detail?.status === 'allowed') void retryPendingCleanup();
         });
-        const bulkDetect = rootElement.querySelector('#bulkDetectBtn');
-        const mangaImportRegister = rootElement.querySelector('#mangaImportRegisterButton');
-        const mangaImportCancel = rootElement.querySelector('#mangaImportCancelButton');
-        const importBridge = windowRef.MangaImportBridge.create({ windowRef, origin: windowRef.location.origin });
-        const mangaImportController = windowRef.MangaImportDialog.create({ documentRef, validator: windowRef.MangaImportValidator, candidateFactory: windowRef.MangaImportCandidate });
-        const importBatch = windowRef.MangaImportBatch.create({
+        const jsonButton = rootElement.querySelector('#jsonImportButton');
+        const jsonFile = rootElement.querySelector('#jsonImportFile');
+        const jsonCancel = rootElement.querySelector('#mangaJsonImportCancelButton');
+        const jsonRegister = rootElement.querySelector('#mangaJsonImportRegisterButton');
+        const jsonController = windowRef.MangaJsonImport.create({
+          documentRef,
           getState: state,
           setState,
-          validator: windowRef.MangaImportValidator,
-          candidateFactory: windowRef.MangaImportCandidate,
           authorSync: windowRef.MangaImportAuthorSync,
           persistItems: host.persistItems,
           persistAuthorCards: host.persistAuthorCards,
@@ -558,42 +552,33 @@
           createId: () => 'i-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10),
           now: () => Date.now(),
         });
-        bind(mangaImportCancel, 'click', () => mangaImportController.close());
-        bind(bulkDetect, 'click', async () => {
+        bind(jsonButton, 'click', () => {
           if (!canReadProtectedData()) return;
-          bulkDetect.disabled = true;
+          jsonFile.click();
+        });
+        bind(jsonFile, 'change', async () => {
+          const file = jsonFile.files?.[0];
+          jsonFile.value = '';
+          if (!file || !canReadProtectedData()) return;
+          const startedAtLifecycle = lifecycle;
+          jsonButton.disabled = true;
           try {
-            const queued = await importBridge.requestQueuedCandidates();
-            if (!canReadProtectedData()) return;
-            if (!queued.length) { windowRef.alert('拡張機能のキューに作品がありません。'); return; }
-            mangaImportController.open(queued, state().savedItems, state().authorCards);
+            if (file.size > windowRef.MangaJsonImport.MAX_BYTES) throw new Error('JSONファイルは4MB以下にしてください。');
+            const items = windowRef.MangaJsonImport.parse(await file.text());
+            if (!canReadProtectedData() || startedAtLifecycle !== lifecycle) return;
+            jsonController.open(items);
           } catch (error) {
-            windowRef.alert(error?.message || '拡張機能からキューを読み込めませんでした。');
+            if (startedAtLifecycle === lifecycle) windowRef.alert(error?.message || 'JSONを読み込めませんでした。');
           } finally {
-            bulkDetect.disabled = !canReadProtectedData();
+            if (startedAtLifecycle === lifecycle) jsonButton.disabled = !canReadProtectedData();
           }
         });
-        bind(mangaImportRegister, 'click', async () => {
+        bind(jsonCancel, 'click', () => jsonController.close());
+        bind(jsonRegister, 'click', () => {
           if (!canReadProtectedData()) return;
-          const selection = mangaImportController.getSelection();
-          if (!selection.items.length) { mangaImportController.setStatus('登録する作品を選択してください。'); return; }
-          const checked = windowRef.MangaImportValidator.validateBatch(selection.items.map((item) => item.candidate));
-          if (!checked.ok) {
-            mangaImportController.setStatus('入力内容を確認してください：' + checked.errors.map((error) => error.message).join('、'));
-            return;
-          }
-          mangaImportRegister.disabled = true;
-          try {
-            if (!canReadProtectedData()) return;
-            const result = importBatch.register(selection);
-            if (!result.ok) { mangaImportController.setStatus('登録を中止しました：' + result.errors.map((error) => error.message || error).join('、')); return; }
-            if (!result.registeredQueueIds.length) { mangaImportController.setStatus('新しい作品はありません。重複作品は登録されませんでした。'); return; }
-            mangaImportController.setStatus(`${result.registeredQueueIds.length}作品を本棚へ登録しました。キューから削除する場合は拡張機能のポップアップを開いてください。`);
-          } catch (error) {
-            mangaImportController.setStatus(error?.message || '登録できませんでした。');
-          } finally {
-            mangaImportRegister.disabled = !canReadProtectedData();
-          }
+          jsonRegister.disabled = true;
+          try { jsonController.register(); }
+          finally { jsonRegister.disabled = !canReadProtectedData(); }
         });
         bindFactory(MangaListSearchEventsFactory, { onSearchChange: (value) => { setState({ shelfSearchQuery: value, bookshelfPage: 1 }); renderList(); } }, { searchInput: search });
         bind(documentRef, 'testcode-context-search-change', (event) => {
