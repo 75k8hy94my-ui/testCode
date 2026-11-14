@@ -475,6 +475,7 @@
     }
     function pasteText(text) {
       if (!rows.length) return false;
+      if (!text) { announce('貼り付ける文字列がありません。', true); return false; }
       const matrix = clipboardMatrix(text);
       if (matrix.length * Math.max(1, ...matrix.map(row => row.length)) > 10000) {
         announce('一度に貼り付ける範囲は10,000セル以下にしてください。', true);
@@ -536,6 +537,8 @@
       overlay.hidden = true;
       rows = [];
       tbody.replaceChildren();
+      search.value = '';
+      one('name').value = '';
       formula.value = '';
       if (!destroyed && launch.isConnected) launch.focus({ preventScroll:true });
     }
@@ -543,8 +546,8 @@
       if (overlay.hidden || !accessible() || editor || event.target !== viewport && event.target.closest('input,button')) return;
       const mod = event.ctrlKey || event.metaKey;
       if (mod) {
-        if (event.key.toLowerCase() === 'z') { event.preventDefault(); timeTravel(history, redoHistory, true); }
-        else if (event.key.toLowerCase() === 'y' || (event.key.toLowerCase() === 'z' && event.shiftKey)) { event.preventDefault(); timeTravel(redoHistory, history, false); }
+        if (event.key.toLowerCase() === 'z' && event.shiftKey || event.key.toLowerCase() === 'y') { event.preventDefault(); timeTravel(redoHistory, history, false); }
+        else if (event.key.toLowerCase() === 'z') { event.preventDefault(); timeTravel(history, redoHistory, true); }
         else if (event.key.toLowerCase() === 'f') { event.preventDefault(); search.focus(); }
         else if (event.key.toLowerCase() === 'a') {
           event.preventDefault();
