@@ -177,7 +177,6 @@
     let selection = { row:0, col:0, anchorRow:0, anchorCol:0 };
     let sort = { key:'', direction:1 };
     let editor = null;
-    let lastRange = '';
     let history = [];
     let redoHistory = [];
     let destroyed = false;
@@ -268,9 +267,10 @@
       const visibleTop = Math.max(0, viewport.scrollTop - LABEL_ROWS_HEIGHT);
       const start = Math.max(0, Math.floor(visibleTop / HEIGHT) - 10);
       const end = Math.min(rows.length, start + Math.ceil((viewport.clientHeight || 550) / HEIGHT) + 24);
-      const rangeCode = [selection.row,selection.col,selection.anchorRow,selection.anchorCol].join(':');
-      if (!force && start === currentStart && end === currentEnd && lastRange === rangeCode) return;
-      currentStart = start; currentEnd = end; lastRange = rangeCode;
+      // Keep existing cell nodes when only the active selection moves. This
+      // preserves native double-click and text-editor interactions.
+      if (!force && start === currentStart && end === currentEnd) return;
+      currentStart = start; currentEnd = end;
       const fragment = doc.createDocumentFragment();
       if (start) fragment.appendChild(spacer(start * HEIGHT));
       const selected = currentSelectedRange();
@@ -322,13 +322,33 @@
       formula.disabled = !item || COLUMNS[selection.col].readOnly;
       if (item) viewport.setAttribute('aria-label', '登録済み漫画の表、選択セル ' + cellAddress(selection.row, selection.col));
     }
+    function paintSelection() {
+      const range = currentSelectedRange();
+      tbody.querySelectorAll('td[data-row][data-col]').forEach(td => {
+        const row = Number(td.dataset.row), col = Number(td.dataset.col);
+        const inside = row >= range.r0 && row <= range.r1 && col >= range.c0 && col <= range.c1;
+        td.classList.toggle('ms-selected', inside);
+        td.classList.toggle('ms-active', row === selection.row && col === selection.col);
+        td.setAttribute('aria-selected', inside ? 'true' : 'false');
+      });
+      tbody.querySelectorAll('tr').forEach(tr => {
+        const number = tr.querySelector('th.ms-rownum');
+        const td = tr.querySelector('td[data-row]');
+        if (number && td) {
+          const row = Number(td.dataset.row);
+          number.classList.toggle('ms-selected', row >= range.r0 && row <= range.r1);
+        }
+      });
+      updateFormula();
+    }
     function ensureVisible() {
       if (!rows.length) return;
       const top = selection.row * HEIGHT + LABEL_ROWS_HEIGHT;
       const bottom = top + HEIGHT;
       if (top < viewport.scrollTop + LABEL_ROWS_HEIGHT) viewport.scrollTop = Math.max(0, top - LABEL_ROWS_HEIGHT);
       else if (bottom > viewport.scrollTop + viewport.clientHeight) viewport.scrollTop = bottom - viewport.clientHeight;
-      drawRows(true);
+      drawRows(false);
+      paintSelection();
       const active = tbody.querySelector('td[data-row="' + selection.row + '"][data-col="' + selection.col + '"]');
       if (active) {
         const left = active.offsetLeft;
@@ -554,7 +574,7 @@
           if (rows.length) {
             selection.anchorRow = 0; selection.anchorCol = 0;
             selection.row = rows.length - 1; selection.col = COLUMNS.length - 1;
-            drawRows(true);
+            paintSelection();
           }
         }
         return;
@@ -575,6 +595,7 @@
       }
     }
     function onClickCell(event, extend) {
+      if (event.target.closest('.ms-editor')) return;
       const cell = event.target.closest('td[data-row][data-col]');
       if (!cell || !viewport.contains(cell)) return;
       if (editor) stopEditing(true);
