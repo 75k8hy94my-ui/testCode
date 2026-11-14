@@ -215,6 +215,13 @@
     function setupFeedImage(imgEl, baseUrlForItem, numberWidth, itemPattern, itemId, exactUrl = '') {
       if (!canReadProtectedData()) return;
       activeFeedImages.get(imgEl)?.();
+      // A webpage has no sequential image pages to probe. Render a local
+      // placeholder rather than requesting speculative /1.jpg URLs.
+      if (root.MangaSourceType?.getEmbedUrl({ url: baseUrlForItem, pages: exactUrl ? [exactUrl] : [] })) {
+        imgEl.src = root.MangaSourceType.EMBED_COVER_URL;
+        markCover(imgEl, 'loaded');
+        return;
+      }
       const sourceCache = deps.images.getCoverSourceCache();
       const failedCache = deps.images.getCoverFailedCache();
       const directUrl = String(exactUrl || '').trim();
