@@ -44,6 +44,11 @@
     .readerHashFrame { width:100%; height:100%; overflow:hidden; background:#fff; pointer-events:none; }
     .readerHashFrame iframe { display:block; width:100%; height:100%; border:0; background:#fff; pointer-events:none!important; }
     .readerHashVerticalSlot { width:min(100%, 960px); height:100dvh; min-height:100dvh; flex:none; overflow:hidden; }
+    /* Embedded documents and lazy slot changes must never scroll-anchor the reader. */
+    body.hash-page-reader.vertical-scroll #viewer,
+    body.hash-page-reader.vertical-scroll #pageStage,
+    .readerHashVerticalSlot { overflow-anchor:none; }
+    body.hash-page-reader.vertical-scroll #viewer { overscroll-behavior-y:contain; scroll-behavior:auto; }
     body.image-enhance:not(.safe-mode) .readerHashFrame iframe { filter:contrast(1.12) brightness(1.04) saturate(.96); }
     body.reader-chrome-hidden #topbar { transform:translateY(-105%); opacity:0; pointer-events:none; }
     body.reader-chrome-hidden #controls { transform:translateY(105%); opacity:0; pointer-events:none; }
@@ -119,7 +124,7 @@
   <script src="reader-progress-repository.js?v=20261011-pending-sync"></script>
   <script src="reader-item-repository.js"></script>
   <script src="reader-sync-scheduler.js?v=20261008-reader-close-sync"></script>
-  <script src="reader-runtime.js?v=20261114-hash-pages"></script>
+  <script src="reader-runtime.js?v=20261114-hash-scroll-fix"></script>
   <script>
     window.MangaReaderBootPromise = (async () => {
       const sessionKey = 'mangaReaderSupabaseSession';
