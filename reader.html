@@ -51,7 +51,7 @@
     @media(max-width:700px) { #topbar { gap:4px; padding:6px; } .ctrlBtn { padding:5px 7px; font-size:12px; } #readerMeta { max-width:35vw; } #nextVolumeBanner { left:8px; right:8px; bottom:64px; } }
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { #topbar,#controls { background:rgba(20,24,32,.98); } }
   </style>
-  <link rel="stylesheet" href="reader-liquid-glass.css?v=20261114-desktop-glass">
+  <link rel="stylesheet" href="reader-liquid-glass.css?v=20261114-optical">
 </head>
 <body>
   <main id="readerApp" aria-label="漫画リーダー">
@@ -78,6 +78,7 @@
     <aside id="nextVolumeBanner" hidden><span id="nextVolumeText"></span><button class="ctrlBtn" id="nextVolumeDismissBtn" type="button" aria-label="閉じる">×</button><button class="ctrlBtn" id="nextVolumeBtn" type="button">次の巻を読む</button></aside>
   </main>
 
+  <script src="reader-liquid-glass.js?v=20261114-optical"></script>
   <script src="guest-mode.js?v=20261009-guest"></script>
 <script src="supabase-config.js"></script>
   <script src="vault-sync-merge.js?v=20261010-vault-sync-audit"></script>
