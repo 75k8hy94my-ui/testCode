@@ -6,6 +6,7 @@
     ['manga-list-template.js?v=20261114-json-import', 'mangaRouteTemplate'],
     ['manga-import-author-sync.js?v=20261007-momon-import', 'mangaImportAuthorSync'],
     ['manga-json-import.js?v=20261114-json-import', 'mangaJsonImport'],
+    ['manga-spreadsheet.js?v=20261114-excel-sheet-1', 'mangaSpreadsheet'],
     ['image-transfer-settings.js?v=20261004-encrypted-image-import', 'encryptedImageImportSettings'],
     ['image-remote-access.js?v=20261004-encrypted-image-import', 'encryptedImageImportRemoteAccess'],
     ['encrypted-asset-crypto.js?v=20261004-encrypted-image-import', 'encryptedImageImportCrypto'],
@@ -580,6 +581,19 @@
           try { jsonController.register(); }
           finally { jsonRegister.disabled = !canReadProtectedData(); }
         });
+        const spreadsheet = windowRef.MangaSpreadsheet.create({
+          documentRef,
+          mountElement: rootElement,
+          getState: state,
+          setState,
+          persistItems: host.persistItems,
+          persistAuthorCards: host.persistAuthorCards,
+          authorSync: windowRef.MangaImportAuthorSync,
+          render: renderList,
+          openReader: host.navigateToReader,
+          canReadProtectedData,
+        });
+        cleanups.push(() => spreadsheet.destroy());
         bindFactory(MangaListSearchEventsFactory, { onSearchChange: (value) => { setState({ shelfSearchQuery: value, bookshelfPage: 1 }); renderList(); } }, { searchInput: search });
         bind(documentRef, 'testcode-context-search-change', (event) => {
           if (event.detail?.page !== 'manga') return;
