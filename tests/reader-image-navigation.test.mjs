@@ -67,13 +67,16 @@ class ControlledImage {
   static reset() { ControlledImage.instances = []; }
 }
 
-function fixture({ item = null, vertical = false } = {}) {
+function fixture({ item = null, vertical = false, safeStored = false } = {}) {
   ControlledImage.reset();
   const ids = ['readerStatus', 'retryPageBtn', 'pageSlider', 'pageLabel', 'currentTitle', 'pageStage', 'viewer', 'topbar', 'controls', 'tocBtn', 'favToggleBtn', 'closeBtn', 'firstBtn', 'prevBtn', 'nextBtn', 'lastBtn', 'tocAddBtn', 'safeModeBtn', 'enhanceBtn', 'verticalBtn', 'nextVolumeBanner', 'nextVolumeText', 'nextVolumeBtn', 'nextVolumeDismissBtn'];
   const elements = Object.fromEntries(ids.map((id) => [id, new FakeElement()]));
   const body = new FakeElement('body');
   const document = { body, getElementById(id) { return elements[id] || null; }, createElement(tag) { return new FakeElement(tag); }, createDocumentFragment() { return new FakeFragment(); } };
-  const values = new Map(vertical ? [['mangaReaderVerticalScroll', '1']] : []);
+  const values = new Map([
+    ...(vertical ? [['mangaReaderVerticalScroll', '1']] : []),
+    ...(safeStored ? [['mangaReaderSafeMode', '1']] : []),
+  ]);
   const localStorage = { getItem(key) { return values.get(key) ?? null; }, setItem(key, value) { values.set(key, String(value)); } };
   const encryptedReadiness = [];
   const window = { Image: ControlledImage, ReaderImageLoaderFactory: imageLoaderFactory, ReaderLifecycleFactory: lifecycleFactory, ReaderPageTransitionFactory: transitionFactory, ReaderPageSourceFactory: pageSourceFactory, ReaderProgressRepositoryFactory: progressRepositoryFactory, localStorage, location: { href: 'https://reader.test/reader.html?item=book' }, innerWidth: 1200, addEventListener() {}, prompt() {}, URL,
@@ -94,7 +97,7 @@ function fixture({ item = null, vertical = false } = {}) {
     findNextVolume() { return null; }, scheduleSync() {},
   };
   const runtime = runtimeFactory.create({ repository, target: { consumeLaunch() { return null; }, itemResumeKey: (id) => `item:${id}`, buildReaderUrl: (id) => `reader.html?item=${id}` }, sessionStorage: { getItem() { return null; }, setItem() {} }, location: { replace() {} }, document, window });
-  return { runtime, elements, storedItem, window, values, encryptedReadiness };
+  return { runtime, elements, storedItem, window, document, values, encryptedReadiness };
 }
 
 async function findImage(suffix) {
@@ -321,4 +324,43 @@ test('encrypted failure keeps progress and frame, and the retry control can comm
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(elements.pageLabel.textContent, '2 / 3');
   assert.equal(JSON.parse(values.get('mangaReaderLastPage'))['item:retry-encrypted'].page, 2);
+});
+
+test('safe mode blurs the whole rendered frame regardless of image enhancement', () => {
+  const html = fs.readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
+  assert.match(html, /body\.safe-mode\s+#pageStage\s*>\s*\*\s*\{\s*filter:\s*blur\(/);
+  assert.doesNotMatch(html, /body\.safe-mode\s+\.readerPageImage/);
+});
+
+test('safe mode toggles, persists, and survives navigation and image enhancement changes', async () => {
+  const { runtime, elements, document, values } = fixture();
+  const firstLoad = runtime.start('book');
+  await settleLoad(await findImage('/1.jpg'));
+  await firstLoad;
+  assert.equal(elements.safeModeBtn.attributes['aria-pressed'], 'false');
+
+  elements.safeModeBtn.dispatch('click');
+  assert.equal(document.body.classList.contains('safe-mode'), true);
+  assert.equal(elements.safeModeBtn.attributes['aria-pressed'], 'true');
+  assert.equal(values.get('mangaReaderSafeMode'), '1');
+
+  elements.enhanceBtn.dispatch('click');
+  assert.equal(document.body.classList.contains('safe-mode'), true);
+  elements.nextBtn.dispatch('click');
+  await settleLoad(await findImage('/2.jpg'));
+  assert.equal(document.body.classList.contains('safe-mode'), true);
+
+  elements.safeModeBtn.dispatch('click');
+  assert.equal(document.body.classList.contains('safe-mode'), false);
+  assert.equal(elements.safeModeBtn.attributes['aria-pressed'], 'false');
+  assert.equal(values.get('mangaReaderSafeMode'), '0');
+  runtime.close();
+
+  const restored = fixture({ safeStored: true });
+  const restoreLoad = restored.runtime.start('book');
+  await settleLoad(await findImage('/1.jpg'));
+  await restoreLoad;
+  assert.equal(restored.document.body.classList.contains('safe-mode'), true);
+  assert.equal(restored.elements.safeModeBtn.attributes['aria-pressed'], 'true');
+  restored.runtime.close();
 });
