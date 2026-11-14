@@ -115,7 +115,7 @@ test('hash frames use normal reader controls, restore progress and cannot receiv
   assert.equal(shownIframe().src, 'https://example.test/xxx.html?edition=1#4');
   assert.equal(elements.pageLabel.textContent, '4 / ?');
   assert.equal(elements.pageSlider.max, '5');
-  assert.equal(elements.openSourceBtn.href, iframe.src);
+  assert.equal(elements.openSourceBtn.href, shownIframe().src);
   runtime.previous();
   assert.equal(shownIframe().src, 'https://example.test/xxx.html?edition=1#3');
   elements.firstBtn.dispatch('click');
