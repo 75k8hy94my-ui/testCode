@@ -7,7 +7,7 @@ const layout = fs.readFileSync(new URL('../reader-liquid-glass.css', import.meta
 const material = fs.readFileSync(new URL('../liquid-glass.css', import.meta.url), 'utf8');
 
 test('Reader preserves its geometry but uses the shared glass engine', () => {
-  assert.match(reader, /reader-liquid-glass\.css\?v=20261114-layout-only/);
+  assert.match(reader, /reader-liquid-glass\.css\?v=20261114-mobile-header-fix/);
   assert.match(reader, /liquid-glass\.css\?v=20261114-shared-material/);
   assert.match(reader, /liquid-glass-engine\.js\?v=20261114-shared-material/);
   assert.ok(reader.indexOf('reader-liquid-glass.css') < reader.indexOf('liquid-glass.css'));

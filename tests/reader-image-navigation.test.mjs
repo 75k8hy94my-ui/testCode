@@ -326,9 +326,11 @@ test('encrypted failure keeps progress and frame, and the retry control can comm
   assert.equal(JSON.parse(values.get('mangaReaderLastPage'))['item:retry-encrypted'].page, 2);
 });
 
-test('safe mode blurs the whole rendered frame regardless of image enhancement', () => {
+test('safe mode uses a removable non-interactive privacy veil rather than blurring the iframe surface', () => {
   const html = fs.readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
-  assert.match(html, /body\.safe-mode\s+#pageStage\s*>\s*\*\s*\{\s*filter:\s*blur\(/);
+  assert.match(html, /body\.safe-mode #viewer::after[^\n]*pointer-events:none/);
+  assert.match(html, /body\.safe-mode #viewer::after[^\n]*backdrop-filter:blur\(/);
+  assert.doesNotMatch(html, /body\.safe-mode\s+#pageStage\s*>\s*\*\s*\{\s*filter:\s*blur\(/);
   assert.doesNotMatch(html, /body\.safe-mode\s+\.readerPageImage/);
 });
 

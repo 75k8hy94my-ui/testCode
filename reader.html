@@ -34,9 +34,12 @@
     body.vertical-scroll #pageStage { height:auto; min-height:100%; flex-direction:column; align-items:center; overflow:visible; }
     body.vertical-scroll .readerPageImage { width:min(100%, 960px); height:auto; max-height:none; margin-inline:auto; }
     body.image-enhance .readerPageImage:not([data-local-enhanced="true"]) { filter:contrast(1.12) brightness(1.04) saturate(.96); }
-    /* Blur the frame, not the image: enhancement styles and encrypted canvases cannot bypass it. */
-    body.safe-mode #pageStage > * { filter:blur(16px); }
+    /* A single removable privacy veil avoids iOS Safari retaining GPU blur on
+       iframe layers after safe mode is switched OFF. It cannot intercept taps. */
+    body.safe-mode #viewer::after { content:""; position:absolute; inset:0; z-index:2; pointer-events:none; background:rgba(8,12,20,.84); -webkit-backdrop-filter:blur(22px); backdrop-filter:blur(22px); }
     body.safe-mode #safeModeBtn { background:var(--accent); border-color:var(--accent); color:#090b10; }
+    body.safe-mode #readerApp #safeModeBtn.lg-surface { --lg-fill:rgba(255,107,74,.79); --lg-border:rgba(255,172,142,.96); color:#fff; }
+    @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) { body.safe-mode #viewer::after { background:rgba(8,12,20,.98); } }
     #controls { inset:auto 0 0; min-height:52px; border-top:1px solid rgba(255,255,255,.12); }
     #controls[hidden] { display:none; }
     .readerEmbedFrame { width:100%; height:100%; background:#fff; }
@@ -65,21 +68,25 @@
     @media(max-width:700px) { #topbar { gap:4px; padding:6px; } .ctrlBtn { padding:5px 7px; font-size:12px; } #readerMeta { max-width:35vw; } #nextVolumeBanner { left:8px; right:8px; bottom:64px; } }
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { #topbar,#controls { background:rgba(20,24,32,.98); } }
   </style>
-  <link rel="stylesheet" href="reader-liquid-glass.css?v=20261114-layout-only">
+  <link rel="stylesheet" href="reader-liquid-glass.css?v=20261114-mobile-header-fix">
   <link rel="stylesheet" href="liquid-glass.css?v=20261114-shared-material">
   <script defer src="liquid-glass-engine.js?v=20261114-shared-material"></script>
 </head>
 <body>
   <main id="readerApp" aria-label="漫画リーダー">
     <header id="topbar">
-      <button class="ctrlBtn" id="closeBtn" type="button" aria-label="本棚に戻る">閉じる</button>
-      <a class="ctrlBtn" id="openSourceBtn" target="_blank" rel="noopener noreferrer" hidden>元ページを開く</a>
-      <button class="ctrlBtn" id="favToggleBtn" type="button" aria-label="お気に入りを切り替える" hidden></button>
-      <button class="ctrlBtn" id="safeModeBtn" type="button" aria-pressed="false">セーフモード</button>
-      <button class="ctrlBtn" id="enhanceBtn" type="button" aria-pressed="false">画像補正</button>
-      <button class="ctrlBtn" id="verticalBtn" type="button">縦スクロール</button>
-      <button class="ctrlBtn" id="tocAddBtn" type="button">目次追加</button>
-      <button class="ctrlBtn" id="tocBtn" type="button" hidden>目次</button>
+      <div class="readerHeaderPrimary">
+        <button class="ctrlBtn" id="closeBtn" type="button" aria-label="本棚に戻る">閉じる</button>
+        <button class="ctrlBtn" id="safeModeBtn" type="button" aria-pressed="false" aria-label="セーフモードを有効化">セーフモード</button>
+      </div>
+      <div class="readerHeaderSecondary" aria-label="読書オプション">
+        <a class="ctrlBtn" id="openSourceBtn" target="_blank" rel="noopener noreferrer" hidden>元ページを開く</a>
+        <button class="ctrlBtn" id="favToggleBtn" type="button" aria-label="お気に入りを切り替える" hidden></button>
+        <button class="ctrlBtn" id="enhanceBtn" type="button" aria-pressed="false">画像補正</button>
+        <button class="ctrlBtn" id="verticalBtn" type="button">縦スクロール</button>
+        <button class="ctrlBtn" id="tocAddBtn" type="button">目次追加</button>
+        <button class="ctrlBtn" id="tocBtn" type="button" hidden>目次</button>
+      </div>
       <div id="readerMeta"><span id="currentTitle">読み込み中…</span><span id="readerStatus"></span><button class="ctrlBtn" id="retryPageBtn" type="button" hidden>再試行</button></div>
     </header>
     <section id="viewer" aria-label="ページ表示"><div id="pageStage"></div></section>
@@ -124,7 +131,7 @@
   <script src="reader-progress-repository.js?v=20261011-pending-sync"></script>
   <script src="reader-item-repository.js"></script>
   <script src="reader-sync-scheduler.js?v=20261008-reader-close-sync"></script>
-  <script src="reader-runtime.js?v=20261114-hash-scroll-fix"></script>
+  <script src="reader-runtime.js?v=20261114-safe-mode-toggle-fix"></script>
   <script>
     window.MangaReaderBootPromise = (async () => {
       const sessionKey = 'mangaReaderSupabaseSession';
