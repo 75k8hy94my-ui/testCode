@@ -31,6 +31,7 @@ test('a #1 manga shows the first external page as an inert thumbnail; ordinary w
   await expect(frame).toHaveAttribute('tabindex', '-1');
   await expect(frame).toHaveAttribute('aria-hidden', 'true');
   await expect(preview).toBeVisible();
+  await expect(preview).toHaveCSS('opacity', '1');
   await expect(hashCard.frameLocator('.book-cover-hash-preview iframe').locator('#page-one')).toHaveText('第一ページ');
   const behavior = await preview.evaluate(node => ({
     previewPointer: getComputedStyle(node).pointerEvents,
