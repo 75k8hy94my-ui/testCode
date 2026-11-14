@@ -6,7 +6,7 @@ test('a #1 manga shows the first external page as an inert thumbnail; ordinary w
   await page.route('https://hash-cover-fixture.test/**', route => route.fulfill({
     status: 200,
     contentType: 'text/html',
-    body: '<!doctype html><html><head><meta name="viewport" content="width=device-width"></head><body style="background:#eff2fa;margin:0"><div id="page-one" style="background:#446ca8;color:white;font:48px sans-serif;height:85vh">第一ページ</div></body></html>',
+    body: '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head><body style="background:#eff2fa;margin:0"><div id="page-one" style="background:#446ca8;color:white;font:48px sans-serif;height:85vh">第一ページ</div></body></html>',
   }));
 
   await page.goto('index.html');
