@@ -33,8 +33,10 @@
     body.vertical-scroll #viewer { align-items:flex-start; overflow-y:auto; }
     body.vertical-scroll #pageStage { height:auto; min-height:100%; flex-direction:column; align-items:center; overflow:visible; }
     body.vertical-scroll .readerPageImage { width:min(100%, 960px); height:auto; max-height:none; margin-inline:auto; }
-    body.safe-mode .readerPageImage,body.safe-mode .encryptedAssetHost img { filter:blur(12px); transform:scale(1.08); }
     body.image-enhance .readerPageImage:not([data-local-enhanced="true"]) { filter:contrast(1.12) brightness(1.04) saturate(.96); }
+    /* Blur the frame, not the image: enhancement styles and encrypted canvases cannot bypass it. */
+    body.safe-mode #pageStage > * { filter:blur(16px); }
+    body.safe-mode #safeModeBtn { background:var(--accent); border-color:var(--accent); color:#090b10; }
     #controls { inset:auto 0 0; min-height:52px; border-top:1px solid rgba(255,255,255,.12); }
     body.reader-chrome-hidden #topbar { transform:translateY(-105%); opacity:0; pointer-events:none; }
     body.reader-chrome-hidden #controls { transform:translateY(105%); opacity:0; pointer-events:none; }
@@ -60,7 +62,7 @@
     <header id="topbar">
       <button class="ctrlBtn" id="closeBtn" type="button" aria-label="本棚に戻る">閉じる</button>
       <button class="ctrlBtn" id="favToggleBtn" type="button" aria-label="お気に入りを切り替える" hidden></button>
-      <button class="ctrlBtn" id="safeModeBtn" type="button">セーフモード</button>
+      <button class="ctrlBtn" id="safeModeBtn" type="button" aria-pressed="false">セーフモード</button>
       <button class="ctrlBtn" id="enhanceBtn" type="button" aria-pressed="false">画像補正</button>
       <button class="ctrlBtn" id="verticalBtn" type="button">縦スクロール</button>
       <button class="ctrlBtn" id="tocAddBtn" type="button">目次追加</button>
@@ -108,7 +110,7 @@
   <script src="reader-progress-repository.js?v=20261011-pending-sync"></script>
   <script src="reader-item-repository.js"></script>
   <script src="reader-sync-scheduler.js?v=20261008-reader-close-sync"></script>
-  <script src="reader-runtime.js?v=20261011-pending-sync"></script>
+  <script src="reader-runtime.js?v=20261114-safe-mode"></script>
   <script>
     window.MangaReaderBootPromise = (async () => {
       const sessionKey = 'mangaReaderSupabaseSession';
