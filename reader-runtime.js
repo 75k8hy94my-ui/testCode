@@ -56,7 +56,7 @@
       pageTransition?.destroy();
       try { encryptedRenderer?.destroy?.(); } catch (_) {}
       encryptedRenderer = null;
-      if (byId('pageStage')?.querySelector('.readerEmbedFrame')) byId('pageStage').replaceChildren();
+      if (embeddedFrame) { embeddedFrame.remove?.(); embeddedFrame = null; }
       lifecycle?.destroy();
       try { dependencies.onDestroy?.(); } catch (_) {}
     }
@@ -81,6 +81,7 @@
     const win = dependencies.window;
     let imageLoader = dependencies.imageLoader || null;
     let currentItem = null;
+    let embeddedFrame = null;
     let pageUrls = [];
     let encryptedPages = [];
     let page = 1; // displayed page; never advances before its frame is ready
@@ -610,6 +611,7 @@
       iframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox');
       iframe.allowFullscreen = true;
       frame.appendChild(iframe);
+      embeddedFrame = frame;
       stage.classList.remove('vertical-scroll');
       viewer.classList.remove('vertical-scroll');
       stage.replaceChildren(frame);
