@@ -3,25 +3,33 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const reader = fs.readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
-const css = fs.readFileSync(new URL('../reader-liquid-glass.css', import.meta.url), 'utf8');
+const layout = fs.readFileSync(new URL('../reader-liquid-glass.css', import.meta.url), 'utf8');
+const material = fs.readFileSync(new URL('../liquid-glass.css', import.meta.url), 'utf8');
 
-test('Reader loads the dedicated desktop glass stylesheet after its inline defaults', () => {
-  assert.match(reader, /<link rel="stylesheet" href="reader-liquid-glass\.css\?v=[^"]+">/);
-  assert.ok(reader.indexOf('</style>') < reader.indexOf('reader-liquid-glass.css'));
+test('Reader preserves its geometry but uses the shared glass engine', () => {
+  assert.match(reader, /reader-liquid-glass\.css\?v=20261114-layout-only/);
+  assert.match(reader, /liquid-glass\.css\?v=20261114-shared-material/);
+  assert.match(reader, /liquid-glass-engine\.js\?v=20261114-shared-material/);
+  assert.ok(reader.indexOf('reader-liquid-glass.css') < reader.indexOf('liquid-glass.css'));
+  assert.doesNotMatch(reader, /reader-liquid-glass\.js/);
 });
 
-test('glass visual overrides are desktop-scoped and do not replace the image stage', () => {
-  assert.match(css, /^@media \(min-width: 801px\)/);
-  assert.match(css, /#topbar,\s*#controls,\s*#nextVolumeBanner/);
-  assert.match(css, /backdrop-filter: blur\(30px\)/);
-  assert.doesNotMatch(css, /#viewer|#pageStage|\.readerPageImage/);
+test('Reader layout has no optical filter or material painting implementation', () => {
+  assert.match(layout, /@media \(min-width: 801px\)/);
+  assert.match(layout, /#readerApp #topbar/);
+  assert.match(layout, /#readerApp #controls/);
+  assert.doesNotMatch(layout, /backdrop-filter|feDisplacementMap|--lg-fill/);
+  assert.doesNotMatch(layout, /#viewer|#pageStage|\.readerPageImage/);
+  assert.match(material, /#readerApp #topbar/);
+  assert.match(material, /backdrop-filter:/);
+});
+
+test('Chrome hide, touch layout, keyboard accessibility, and fallback remain', () => {
+  assert.match(layout, /body\.reader-chrome-hidden #readerApp #topbar/);
+  assert.match(layout, /body\.reader-chrome-hidden #readerApp #controls/);
+  assert.match(layout, /@media \(max-width: 800px\)/);
+  assert.match(material, /#readerApp #pageSlider:focus-visible/);
+  assert.match(material, /prefers-reduced-transparency: reduce/);
+  assert.match(material, /prefers-reduced-motion: reduce/);
   assert.match(reader, /@media\(max-width:700px\)/);
-});
-
-test('floating controls retain chrome-hide behavior, keyboard focus, and fallback', () => {
-  assert.match(css, /body\.reader-chrome-hidden #topbar/);
-  assert.match(css, /body\.reader-chrome-hidden #controls/);
-  assert.match(css, /#pageSlider:focus-visible/);
-  assert.match(css, /@supports not \(\(backdrop-filter: blur\(1px\)\)/);
-  assert.match(css, /prefers-reduced-motion: reduce/);
 });
