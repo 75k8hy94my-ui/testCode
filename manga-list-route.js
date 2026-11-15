@@ -47,7 +47,7 @@
     ['manga-list-image-cache.js?v=20261011-encrypted-cache', 'mangaRouteImageCache'],
     ['reader-target.js?v=20261003-reader-launch-contract', 'mangaReaderTarget'],
     ['manga-hash-cover-preview.js?v=20261114-hash-cover-preview', 'mangaHashCoverPreview'],
-    ['manga-list-host-runtime.js?v=20261115-directory-image-detect', 'mangaRouteHost'],
+    ['manga-list-host-runtime.js?v=20261115-page-range-cover', 'mangaRouteHost'],
     ['manga-list-runtime.js?v=20261115-finger-drag', 'mangaRouteRuntime'],
     ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
   ];
