@@ -20,7 +20,9 @@ test('reader resolves numbered pages and clamps hash page navigation to requeste
   const source = read('reader-page-source.js');
   assert.match(reader, /hashRangeStart/);
   assert.match(reader, /hashRangeEnd/);
-  assert.match(reader, /slider\.min = String\(hashPageBase \? hashRangeStart : 1\)/);
+  assert.match(reader, /slider\.min = '1'/);
+  assert.match(reader, /function hashSourceNumber\(readerPage\)/);
+  assert.match(reader, /hashSourceNumber\(number\)/);
   assert.match(reader, /number > hashUpperLimit\(\)/);
   assert.match(source, /for \(let number = firstPage; number <= lastPage;/);
   assert.match(source, /rangeSignature/);
@@ -40,7 +42,7 @@ test('all relevant entry pages reference range-aware assets', () => {
   const manga = read('manga-list-route.js');
   assert.match(add, /manga-source-type\.js\?v=20261115-page-range/);
   assert.match(add, /media-add\.js\?v=20261115-page-range/);
-  assert.match(reader, /reader-runtime\.js\?v=20261115-page-range/);
+  assert.match(reader, /reader-runtime\.js\?v=20261115-reader-relative-pages/);
   assert.match(reader, /reader-page-source\.js\?v=20261115-page-range/);
   assert.match(manga, /manga-spreadsheet\.js\?v=20261115-page-range/);
   assert.match(manga, /manga-item-editor\.js\?v=20261115-page-range/);
