@@ -1376,7 +1376,19 @@
       const needsDirectoryProbe = sourceCandidates.length === 1
         && !win.MangaSourceType?.hasPageList(item)
         && (win.MangaSourceType?.getDirectoryImageCandidates(sourceCandidates[0])?.length || 0) > 0;
-      if (sourceCandidates.length < 2 && !needsDirectoryProbe) return mountSingleSource(item);
+      if (sourceCandidates.length < 2 && !needsDirectoryProbe) {
+        // A legacy image manifest can outlive edits to the saved URL. When
+        // the user explicitly supplies #1, its hash reader must win over
+        // page URLs previously discovered for a different source.
+        const onlyUrl = sourceCandidates[0] || item.url;
+        if (!item.localSync && !item.encryptedAssets?.pages?.length && onlyUrl?.endsWith('#1')) {
+          const hashItem = { ...item, url: onlyUrl };
+          delete hashItem.pages;
+          delete hashItem.pageManifest;
+          return mountSingleSource(hashItem);
+        }
+        return mountSingleSource(item);
+      }
       return activateSources(0);
     }
 
