@@ -75,3 +75,13 @@ test('both manga pages use JSON import instead of the old extension queue UI', (
   assert.match(route, /manga-json-import\.js/);
   assert.match(template, /jsonImportButton/);
 });
+
+
+test('optional custom image-page ranges survive JSON validation and reject inverted bounds', () => {
+  const result = importer.parse(json([{...item,pageRangeStart:2,pageRangeEnd:19}]))[0];
+  assert.equal(result.pageRangeStart,2);
+  assert.equal(result.pageRangeEnd,19);
+  assert.throws(()=>importer.parse(json([{...item,pageRangeStart:20,pageRangeEnd:19}])),/終了ページ/);
+  assert.throws(()=>importer.parse(json([{...item,pageRangeStart:-1}])),/1～2000/);
+  assert.equal(importer.parse(json([item]))[0].pageRangeStart,undefined);
+});
