@@ -1281,7 +1281,13 @@
       const ready = await renderPage(page);
       if (destroyed) return;
       showNextVolume();
-      if (ready) status(`${pageUrls.length}ページ`);
+      if (ready) {
+        const bounds = win.MangaSourceType?.getPageRange?.(item) || { start:1, end:null };
+        const hasCustomRange = bounds.start !== 1 || bounds.end != null;
+        status(hasCustomRange && win.MangaSourceType?.supportsPageRange?.(item.url)
+          ? '指定範囲 ' + bounds.start + '～' + (bounds.end || bounds.start + pageUrls.length - 1) + '（全' + pageUrls.length + 'ページ）'
+          : pageUrls.length + 'ページ');
+      }
       return ready;
     }
 
