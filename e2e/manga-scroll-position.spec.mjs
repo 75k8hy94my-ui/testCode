@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
 
+function assertNoPageErrors(errors) {
+  expect(errors).toEqual([]);
+}
+
 test('manga page turns do not snap the vertical scroll position back to the toolbar', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route(/supabase\.co|\/auth\/v1\/|\/rest\/v1\//i, route => route.abort());
@@ -39,6 +43,8 @@ test('manga page turns do not snap the vertical scroll position back to the tool
   await expect(page.locator('#bookshelfPageLabel')).toHaveText('2 / 3');
   await expect.poll(async () => Math.abs((await page.evaluate(() => window.scrollY)) - firstY)).toBeLessThan(20);
 
+  const swipeErrors = [];
+  page.on('pageerror', (error) => swipeErrors.push(error.message));
   await page.locator('#savedListItems').evaluate(surface => {
     const card = surface.querySelector('.book-card');
     const touch = (x, y) => new Touch({ identifier: 5, target: card, clientX: x, clientY: y });
@@ -49,8 +55,16 @@ test('manga page turns do not snap the vertical scroll position back to the tool
     }));
     send('touchstart', 115, 230);
     send('touchmove', 260, 234);
+    const track = surface.querySelector('.bookshelf-slide-track');
+    if (!track?.style.transform) {
+      throw new Error('The shelf did not follow touchmove: ' + JSON.stringify({
+        track: !!track, transform: track?.style.transform,
+        html: surface.innerHTML.slice(0, 300),
+      }));
+    }
     send('touchend', 260, 234);
   });
+  assertNoPageErrors(swipeErrors);
   await expect(page.locator('#bookshelfPageLabel')).toHaveText('1 / 3');
   await expect.poll(async () => Math.abs((await page.evaluate(() => window.scrollY)) - firstY)).toBeLessThan(20);
 });
