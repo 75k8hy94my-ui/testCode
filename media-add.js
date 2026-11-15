@@ -84,16 +84,21 @@
     if (!authorized()) return updateAccess();
     const data = new FormData(form);
     const title = String(data.get('title') || '').trim();
-    const initialUrl = String(data.get('url') || '').trim();
+    const sourceUrls = [...new Set(String(data.get('url') || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean))];
     const urls = String(data.get('pages') || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    if (!title || !validUrl(initialUrl) || urls.some(url => !validUrl(url))) {
+    if (!title || !sourceUrls.length || sourceUrls.length > 40 ||
+        sourceUrls.some(url => !validUrl(url) || !window.MangaSourceType?.safeHttpUrl(url)) ||
+        urls.some(url => !validUrl(url))) {
       message.dataset.error = 'true';
       message.textContent = 'タイトルと有効なHTTP(S)のURLを入力してください。';
       return;
     }
     const existing = getArray(ITEMS);
-    const canonicalUrl = urls[0] || initialUrl;
-    if (existing.some(item => item.url === canonicalUrl || item.sourceUrl === initialUrl)) {
+    const canonicalUrl = sourceUrls[0];
+    if (existing.some(item => {
+      const saved = window.MangaSourceType?.getSourceUrls(item) || [item.url];
+      return sourceUrls.some(url => saved.includes(url));
+    })) {
       message.dataset.error = 'true';
       message.textContent = 'このURLの漫画はすでに登録されています。';
       return;
@@ -103,7 +108,7 @@
       author: String(data.get('author') || '').trim(),
       series: String(data.get('series') || '').trim(),
       tags: String(data.get('tags') || '').split(',').map(x => x.trim()).filter(Boolean),
-      folderId: null, sourceUrl: initialUrl, url: canonicalUrl, addedAt: Date.now()
+      folderId: null, sourceUrl: '', url: canonicalUrl, sourceUrls, addedAt: Date.now()
     };
     const volume = Number(data.get('volume'));
     if (Number.isSafeInteger(volume) && volume > 0) item.volume = volume;
