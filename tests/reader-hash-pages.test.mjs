@@ -868,3 +868,38 @@ test('start-only hash ranges show 1 / ? while source starts at #18', async () =>
   assert.equal(elements.pageLabel.textContent,'2 / ?');
   runtime.destroy();
 });
+
+
+test('reverse hash navigation uses the source #18 offset while displaying page 1', async () => {
+  const {runtime,item,elements}=setup({resume:1});
+  item.pageRangeStart=18;
+  item.pageRangeEnd=29;
+  await runtime.start(item.id);
+  const iframe=elements.pageStage.firstChild.firstChild;
+  const child=readableHashWindow('#18');
+  iframe.contentWindow=child;
+  iframe.dispatch('load');
+  child.location.hash='#17'; // external site's reversed Right arrow
+  child.dispatch('hashchange');
+  assert.equal(runtime.getPageState().displayedPage,2);
+  assert.equal(elements.pageLabel.textContent,'2 / 12');
+  assert.equal(iframe.src,'https://example.test/xxx.html?edition=1#19');
+  runtime.destroy();
+});
+
+test('custom hash range end detection saves source count but displays relative total', async () => {
+  const {runtime,item,elements}=setup({resume:1});
+  item.pageRangeStart=18;
+  await runtime.start(item.id);
+  let iframe=elements.pageStage.firstChild.firstChild;
+  iframe.contentWindow=readableHashWindow('#18');
+  iframe.dispatch('load'); // source page 18 = reader page 1
+  runtime.next();
+  iframe=elements.pageStage.firstChild.firstChild;
+  iframe.contentWindow=readableHashWindow('#1-');
+  iframe.dispatch('load'); // external reader fell back instead of showing #19
+  assert.equal(item.hashPageCount,18,'source count remains the absolute # number');
+  assert.equal(elements.pageLabel.textContent,'1 / 1','reader count is relative');
+  assert.equal(runtime.getPageState().displayedPage,1);
+  runtime.destroy();
+});
