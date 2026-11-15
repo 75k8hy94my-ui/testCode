@@ -96,16 +96,19 @@
 
   function create(deps) {
     const doc = deps.documentRef;
-    const toolbar = deps.mountElement.querySelector('#exportImportRow');
+    // The export/import row is intentionally hidden by the bookshelf layout.
+    // Place the worksheet entry among the always-visible bookshelf controls.
+    const toolbar = deps.mountElement.querySelector('#listToolbar');
     if (!toolbar || !doc) throw new Error('Manga spreadsheet mount is unavailable');
 
     const launch = doc.createElement('button');
     launch.id = 'mangaSpreadsheetBtn';
     launch.type = 'button';
-    launch.className = 'textActionBtn';
+    launch.className = 'ctrlBtn';
     launch.textContent = 'Excel風の表で編集';
     launch.title = '登録済み漫画を表計算ソフト風の画面で編集';
-    toolbar.appendChild(launch);
+    const bulkEdit = toolbar.querySelector('#bulkEditBtn');
+    toolbar.insertBefore(launch, bulkEdit || null);
 
     const linkId = 'testcodeMangaSpreadsheetStyles';
     if (!doc.getElementById(linkId)) {
