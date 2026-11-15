@@ -19,6 +19,20 @@
   const HEIGHT = 30;
   const LABEL_ROWS_HEIGHT = 61;
   const MAX_UNDO = 50;
+  const VIEW_QUERY = 'view';
+  const VIEW_NAME = 'spreadsheet';
+  const HISTORY_FLAG = 'testcodeMangaSpreadsheet';
+
+  function isSpreadsheetUrl(href) {
+    try { return new URL(href).searchParams.get(VIEW_QUERY) === VIEW_NAME; }
+    catch (_) { return false; }
+  }
+  function spreadsheetUrl(href, active) {
+    const url = new URL(href);
+    if (active) url.searchParams.set(VIEW_QUERY, VIEW_NAME);
+    else if (url.searchParams.get(VIEW_QUERY) === VIEW_NAME) url.searchParams.delete(VIEW_QUERY);
+    return url.href;
+  }
 
   // The sheet exposes one URL collection cell; the legacy item.url is only
   // a compatibility mirror and never a user-visible main/sub designation.
@@ -110,6 +124,7 @@
 
   function create(deps) {
     const doc = deps.documentRef;
+    const win = deps.windowRef || doc?.defaultView || (typeof window !== 'undefined' ? window : null);
     // The export/import row is intentionally hidden by the bookshelf layout.
     // Place the worksheet entry among the always-visible bookshelf controls.
     const toolbar = deps.mountElement.querySelector('#listToolbar');
@@ -568,8 +583,11 @@
       currentStart = -1;
       drawRows(true);
     }
-    function open() {
-      if (!accessible()) return;
+    // The worksheet is a sub-view of manga.html with its own history entry.
+    // The SPA ignores changes to this one query parameter, keeping the shelf
+    // (including scroll position and search filters) mounted behind the sheet.
+    function showSheet() {
+      if (!accessible()) return false;
       overlay.hidden = false;
       search.value = '';
       sort = { key:'', direction:1 };
@@ -580,20 +598,36 @@
       updateButtons();
       announce('セルをダブルクリック、または Enter / F2 で編集できます。自動保存が有効です。');
       viewport.focus({ preventScroll:true });
+      return true;
     }
-    function openItem(itemId) {
-      if (!accessible()) return false;
+    function selectItem(itemId) {
       const id = String(itemId || '');
-      if (!deps.getState().savedItems.some((item) => String(item.id) === id)) return false;
-      open();
+      if (!id) return true;
       const row = rows.findIndex((item) => String(item.id) === id);
-      if (row < 0) { close(); return false; }
+      if (row < 0) return false;
       selection = { row, col:0, anchorRow:row, anchorCol:0 };
       ensureVisible();
       announce('対象作品を選択しました。セルをダブルクリック、または Enter / F2 で編集できます。');
       return true;
     }
-    function close() {
+    function navigateToSheet(itemId = '') {
+      if (!accessible()) return false;
+      const id = String(itemId || '');
+      if (id && !deps.getState().savedItems.some(item => String(item.id) === id)) return false;
+      if (win?.history && win?.location) {
+        const state = { ...(win.history.state || {}), [HISTORY_FLAG]: true, mangaSpreadsheetSelectedId: id };
+        if (!isSpreadsheetUrl(win.location.href)) {
+          state.mangaSpreadsheetOpenedFromShelf = true;
+          win.history.pushState(state, '', spreadsheetUrl(win.location.href, true));
+        } else if (id && win.history.state?.[HISTORY_FLAG]) {
+          win.history.replaceState(state, '', win.location.href);
+        }
+      }
+      return showSheet() && selectItem(id);
+    }
+    function open() { return navigateToSheet(); }
+    function openItem(itemId) { return navigateToSheet(itemId); }
+    function hideSheet() {
       if (editor) {
         stopEditing(true);
         // Closing or revoking VPN access must not retain an unsaved editor.
@@ -606,6 +640,36 @@
       one('name').value = '';
       formula.value = '';
       if (!destroyed && launch.isConnected) launch.focus({ preventScroll:true });
+    }
+    function close() {
+      if (overlay.hidden) return;
+      hideSheet();
+      if (!win?.history || !win?.location || !isSpreadsheetUrl(win.location.href)) return;
+      if (win.history.state?.[HISTORY_FLAG] && win.history.state.mangaSpreadsheetOpenedFromShelf) {
+        // Back consumes the entry introduced by opening the sheet; Forward
+        // naturally restores it via onHistoryChange below.
+        win.history.back();
+      } else {
+        // Direct links to manga.html?view=spreadsheet have no guaranteed
+        // bookshelf entry behind them. Remove only the view parameter.
+        const { [HISTORY_FLAG]: _sheet, mangaSpreadsheetOpenedFromShelf: _opened, mangaSpreadsheetSelectedId: _selected, ...previous } = win.history.state || {};
+        win.history.replaceState(previous, '', spreadsheetUrl(win.location.href, false));
+      }
+    }
+    function onHistoryChange() {
+      if (destroyed || !win?.location) return;
+      if (!isSpreadsheetUrl(win.location.href)) {
+        if (!overlay.hidden) hideSheet();
+        return;
+      }
+      if (!accessible()) {
+        if (!overlay.hidden) hideSheet();
+        return;
+      }
+      if (overlay.hidden) {
+        showSheet();
+        selectItem(win.history?.state?.mangaSpreadsheetSelectedId);
+      }
     }
     function onGridKeydown(event) {
       if (overlay.hidden || !accessible() || editor || event.target !== viewport && event.target.closest('input,button')) return;
@@ -659,7 +723,13 @@
       announce(entry.label + 'で' + (sort.direction === 1 ? '昇順' : '降順') + 'に並べ替えました。');
     }
     function onVpnStatus(event) {
-      if (event?.detail?.status !== 'allowed') close();
+      if (event?.detail?.status !== 'allowed') {
+        hideSheet();
+        if (win?.history && win?.location && isSpreadsheetUrl(win.location.href)) {
+          const { [HISTORY_FLAG]: _sheet, mangaSpreadsheetOpenedFromShelf: _opened, mangaSpreadsheetSelectedId: _selected, ...previous } = win.history.state || {};
+          win.history.replaceState(previous, '', spreadsheetUrl(win.location.href, false));
+        }
+      }
     }
 
     launch.addEventListener('click', open);
@@ -704,15 +774,19 @@
       pasteText(event.clipboardData?.getData('text/plain') || '');
     });
     doc.addEventListener('manga-reader-vpn-status', onVpnStatus);
+    win?.addEventListener?.('popstate', onHistoryChange);
+    // Restore browser Forward, or a page opened directly in sheet view.
+    if (win?.location && isSpreadsheetUrl(win.location.href)) onHistoryChange();
     overlay.addEventListener('keydown', event => { if (event.key === 'Escape' && !editor) { event.preventDefault(); close(); } });
 
     return Object.freeze({
       open, openItem, close, refresh,
       destroy() {
         if (destroyed) return;
-        close();
+        hideSheet();
         destroyed = true;
         doc.removeEventListener('manga-reader-vpn-status', onVpnStatus);
+        win?.removeEventListener?.('popstate', onHistoryChange);
         overlay.remove();
         launch.remove();
         rows = [];
@@ -721,6 +795,6 @@
     });
   }
 
-  root.MangaSpreadsheetModel = Object.freeze({ COLUMNS, formatValue, parseValue, clipboardMatrix, cellAddress });
+  root.MangaSpreadsheetModel = Object.freeze({ COLUMNS, formatValue, parseValue, clipboardMatrix, cellAddress, isSpreadsheetUrl, spreadsheetUrl });
   root.MangaSpreadsheet = Object.freeze({ create });
 })(typeof self !== 'undefined' ? self : globalThis);
