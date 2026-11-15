@@ -83,7 +83,11 @@
       if (!canReadProtectedData()) return;
       event.preventDefault();
       cancelTimer();
-      touchStart = null;
+      if (coarse) {
+        suppressClickId = card.getAttribute('data-manga-item-id');
+        suppressClickUntil = Date.now() + 1300;
+        touchStart = { card, activated:true };
+      } else touchStart = null;
       showForCard(card, coarse ? 'sheet' : 'desktop', event.clientX, event.clientY);
     }
     function onTouchStart(event) {
