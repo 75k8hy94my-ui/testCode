@@ -44,7 +44,15 @@
     left: 0 !important;
   }
 
-  /* Explicit browser fullscreen should still use the entire screen. */
+  /* A fullscreen shell must outrank the normal shell boundary too. */
+  html.app-content-width-page body > :is(main, .homeShell, #app):fullscreen,
+  html.app-content-width-page body > :is(main, .homeShell, #app):-webkit-full-screen {
+    width: 100vw !important;
+    max-width: none !important;
+    margin-inline: 0 !important;
+  }
+
+  /* Nested players may also request fullscreen independently. */
   html.app-content-width-page :fullscreen,
   html.app-content-width-page :-webkit-full-screen {
     max-width: none !important;
