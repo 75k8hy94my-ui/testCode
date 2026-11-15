@@ -789,9 +789,9 @@
         hashKnownTotal = number - 1;
         hashMaxVisited = Math.min(hashMaxVisited, hashKnownTotal);
         truncateHashVerticalSlots();
-        if (currentItem && (currentItem.hashPageCount !== hashKnownTotal || currentItem.hashPageCountSource !== hashPageBase)) {
+        if (currentItem && (currentItem.hashPageCount !== hashKnownTotal || currentItem.hashPageCountSource !== hashPageBase || currentItem.hashPageCountVersion !== 2)) {
           const updated = repository.updateItem?.(currentItem.id, {
-            hashPageCount: hashKnownTotal, hashPageCountSource: hashPageBase
+            hashPageCount: hashKnownTotal, hashPageCountSource: hashPageBase, hashPageCountVersion: 2
           });
           if (updated) currentItem = updated;
         }
@@ -842,11 +842,12 @@
     function observeHashFrame(iframe, number) {
       let entry = hashFrameChecks.get(iframe);
       if (!entry) {
-        entry = { iframe, number, childWindow: null, timers: new Set(), resetPage: 0, onLoad: null, onFocus: null, onChildKeydown: null, inspect: null };
+        entry = { iframe, number, childWindow: null, loaded: false, timers: new Set(), resetPage: 0, onLoad: null, onFocus: null, onChildKeydown: null, inspect: null };
         entry.inspect = () => inspectHashObservation(entry);
         entry.onFocus = () => restoreHashReaderFocus(iframe);
         entry.onChildKeydown = (event) => interceptHashChildArrow(entry, event);
         entry.onLoad = () => {
+          entry.loaded = true;
           // A full document load replaces listeners inside the child window.
           try {
             entry.childWindow?.removeEventListener?.('hashchange', entry.inspect);
@@ -1070,7 +1071,10 @@
       updateControls();
       page = embeddedUrl ? 1 : (Number.isSafeInteger(desiredPage) && desiredPage > 0 ? desiredPage : resumePage(item));
       if (hashPageBase) page = Math.min(win.MangaSourceType.MAX_HASH_PAGE, Math.max(1, page));
+      // Legacy metadata could be poisoned by the iframe-recreation bug.
+      // Only trust counts discovered by the repaired navigation pipeline.
       hashKnownTotal = hashPageBase
+        && item.hashPageCountVersion === 2
         && item.hashPageCountSource === hashPageBase
         && Number.isSafeInteger(item.hashPageCount)
         && item.hashPageCount >= 1 && item.hashPageCount <= win.MangaSourceType.MAX_HASH_PAGE
@@ -1163,6 +1167,9 @@
     function awaitFrameLoad(timeoutMs) {
       const frame = hashIframe || hashVerticalSlots[page - 1]?.frame?.firstChild || embeddedFrame?.querySelector?.('iframe');
       if (!frame || typeof frame.addEventListener !== 'function') return Promise.resolve(true);
+      // The load event can occur before mountHashReader() is awaited, so
+      // a late listener must not falsely discard a working source.
+      if (hashFrameChecks.get(frame)?.loaded) return Promise.resolve(true);
       return new Promise((resolve) => {
         let done = false;
         let timer;
