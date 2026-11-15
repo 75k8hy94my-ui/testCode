@@ -1079,7 +1079,7 @@
     // timeout are best-effort checks; the manual switch remains available for
     // providers that fire load even when their X-Frame-Options blocks display.
     function awaitFrameLoad(timeoutMs) {
-      const frame = hashIframe || embeddedFrame?.querySelector?.('iframe');
+      const frame = hashIframe || hashVerticalSlots[page - 1]?.frame?.firstChild || embeddedFrame?.querySelector?.('iframe');
       if (!frame || typeof frame.addEventListener !== 'function') return Promise.resolve(true);
       return new Promise((resolve) => {
         let done = false;
