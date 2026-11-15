@@ -106,6 +106,11 @@
     // the reader unless a real scroll gesture was observed first.
     let hashUserScrollUntil = 0;
     const hashVerticalSlots = [];
+    // Keep a small, bounded set of already visited external documents alive.
+    // Detaching an iframe destroys its browsing context, so the old +/-1
+    // window reloaded the same pages whenever scrolling changed direction.
+    const HASH_VERTICAL_FRAME_LIMIT = 10;
+    const HASH_VERTICAL_PRELOAD_RADIUS = 1;
     let pageUrls = [];
     let sourceCandidates = [];
     const directoryDetectionCache = new Map();
@@ -591,6 +596,7 @@
         if (split || encryptedPages.length) return;
         if (hashPageBase) {
           hashUserScrollUntil = 0;
+          cancelHashCorrections();
           vertical = !vertical;
           doc.body.classList.toggle('vertical-scroll', vertical);
           win.localStorage.setItem('mangaReaderVerticalScroll', vertical ? '1' : '0');
@@ -905,7 +911,7 @@
       // the observed hash. This is available only to same-origin frames.
       const currentHashPage = /^#([1-9]\d*)(?:-)?$/.exec(observed);
       const observedPage = currentHashPage ? Number(currentHashPage[1]) : 0;
-      if (number === page && observedPage > 0 && Math.abs(observedPage - number) === 1
+      if (!vertical && number === page && observedPage > 0 && Math.abs(observedPage - number) === 1
           && (hashConfirmedPages.has(number) || Date.now() - (entry.lastRequestedAt || 0) > 450)) {
         const corrected = observedPage < number ? number + 1 : number - 1;
         if (hashUrl(corrected) && (!hashKnownTotal || corrected <= hashKnownTotal)
@@ -1033,20 +1039,42 @@
         hashVerticalSlots.push({ slot, frame: null });
       }
     }
+    function releaseHashVerticalFrame(entry) {
+      if (!entry?.frame) return;
+      const iframe = entry.frame.firstChild;
+      if (iframe) disposeHashObservation(iframe);
+      entry.slot.replaceChildren();
+      entry.frame = null;
+    }
     function updateHashVerticalWindow(center) {
+      // Preload only the visible page and its immediate neighbors. Previously
+      // every other iframe was destroyed on each scroll, causing constant
+      // re-requests when the reader crossed the same page boundary.
       for (let i = 0; i < hashVerticalSlots.length; i += 1) {
         const entry = hashVerticalSlots[i];
-        if ((!hashKnownTotal || i + 1 <= hashKnownTotal) && Math.abs(i + 1 - center) <= 1) {
-          if (!entry.frame) {
-            const candidate = createHashFrame(i + 1);
-            if (candidate) { entry.slot.replaceChildren(candidate.frame); entry.frame = candidate.frame; }
-          }
-        } else if (entry.frame) {
-          const iframe = entry.frame.firstChild;
-          if (iframe) disposeHashObservation(iframe);
-          entry.slot.replaceChildren();
-          entry.frame = null;
+        const number = i + 1;
+        if (hashKnownTotal && number > hashKnownTotal) {
+          releaseHashVerticalFrame(entry);
+          continue;
         }
+        if (Math.abs(number - center) > HASH_VERTICAL_PRELOAD_RADIUS || entry.frame) continue;
+        const candidate = createHashFrame(number);
+        if (candidate) { entry.slot.replaceChildren(candidate.frame); entry.frame = candidate.frame; }
+      }
+      // Preserve the browsing contexts of pages already read. Only reclaim
+      // the farthest frames when this fixed memory budget is exceeded. Never
+      // evict the currently displayed page or a neighbor.
+      const retained = hashVerticalSlots
+        .map((entry, i) => ({ entry, pageNumber: i + 1 }))
+        .filter(({ entry }) => Boolean(entry.frame));
+      if (retained.length <= HASH_VERTICAL_FRAME_LIMIT) return;
+      const removable = retained
+        .filter(({ pageNumber }) => Math.abs(pageNumber - center) > HASH_VERTICAL_PRELOAD_RADIUS)
+        .sort((a, b) => Math.abs(b.pageNumber - center) - Math.abs(a.pageNumber - center));
+      let excess = retained.length - HASH_VERTICAL_FRAME_LIMIT;
+      for (const { entry } of removable) {
+        if (excess-- <= 0) break;
+        releaseHashVerticalFrame(entry);
       }
     }
     function renderHashLayout() {
