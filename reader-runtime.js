@@ -694,9 +694,16 @@
       // focus() after loading or a browser makes the frame active.
       lifecycle.listen(doc, 'focusin', (event) => restoreHashReaderFocus(event.target), { capture: true });
       lifecycle.listen(win, 'blur', () => {
-        if (hashPageBase && hashFrameChecks.has(doc.activeElement)) {
-          restoreHashReaderFocus(doc.activeElement);
-        }
+        // Some engines update document.activeElement only *after* the parent
+        // blur event. Re-check after that focus transition has settled.
+        const reclaim = () => {
+          if (hashPageBase && hashFrameChecks.has(doc.activeElement)) {
+            restoreHashReaderFocus(doc.activeElement);
+          }
+        };
+        reclaim();
+        win.setTimeout?.(reclaim, 0);
+        win.setTimeout?.(reclaim, 120);
       });
       if (vertical) doc.body.classList.add('vertical-scroll');
       imageEnhanceEnabled = win.localStorage.getItem('mangaReaderImageEnhance') !== '0';
@@ -863,6 +870,12 @@
           entry.inspect();
           if (entry.childWindow) scheduleHashChecks(entry);
           if (doc.activeElement === iframe) restoreHashReaderFocus(iframe);
+          // External readers may auto-focus after their load handler runs.
+          win.setTimeout?.(() => {
+            if (!destroyed && hashFrameChecks.has(iframe) && doc.activeElement === iframe) {
+              restoreHashReaderFocus(iframe);
+            }
+          }, 120);
         };
         hashFrameChecks.set(iframe, entry);
         iframe.addEventListener?.('load', entry.onLoad);
