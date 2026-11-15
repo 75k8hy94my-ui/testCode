@@ -28,6 +28,33 @@
     return !!href && IMAGE_PATH.test(new URL(href).pathname);
   }
 
+  const MAX_SEQUENCE_PAGE = 2000;
+  function parsePageRange(startValue, endValue) {
+    const bound = (value, label) => {
+      if (value == null || String(value).trim() === '') return null;
+      const text = String(value).trim();
+      if (!/^[0-9]+$/.test(text)) throw new Error(label + 'は1～2000の整数で入力してください。');
+      const number = Number(text);
+      if (!Number.isSafeInteger(number) || number < 1 || number > MAX_SEQUENCE_PAGE)
+        throw new Error(label + 'は1～2000の整数で入力してください。');
+      return number;
+    };
+    const start = bound(startValue, '開始ページ') ?? 1;
+    const end = bound(endValue, '終了ページ');
+    if (end != null && end < start) throw new Error('終了ページは開始ページ以上にしてください。');
+    return { start, end };
+  }
+  function getPageRange(item) {
+    try { return parsePageRange(item?.pageRangeStart, item?.pageRangeEnd); }
+    catch (_) { return { start: 1, end: null }; }
+  }
+  function supportsPageRange(url) {
+    const href = safeHttpUrl(url);
+    if (!href) return false;
+    if (href.endsWith('#1')) return true;
+    return /\/[^/]*\d+[^/]*\.(?:jpe?g|png|webp|avif|gif)$/i.test(new URL(href).pathname);
+  }
+
   // A source is a complete alternative location for one work, NOT a page in a
   // numbered image list. All locations have equal standing in saved metadata.
   function getSourceUrls(item) {
@@ -96,7 +123,7 @@
     return href && (getHashPageBase(item) || !isDirectImageUrl(href)) ? href : '';
   }
 
-  const api = Object.freeze({ safeHttpUrl, isDirectImageUrl, getSourceUrls, getSourceCandidates, sourcePriority, getDirectoryImageCandidates, hasPageList, getHashPageBase, hashPageUrl, MAX_HASH_PAGE, getEmbedUrl, EMBED_COVER_URL });
+  const api = Object.freeze({ safeHttpUrl, isDirectImageUrl, getSourceUrls, getSourceCandidates, sourcePriority, getDirectoryImageCandidates, hasPageList, getHashPageBase, hashPageUrl, MAX_HASH_PAGE, MAX_SEQUENCE_PAGE, parsePageRange, getPageRange, supportsPageRange, getEmbedUrl, EMBED_COVER_URL });
   if (typeof self !== 'undefined') self.MangaSourceType = api;
   if (typeof window !== 'undefined') window.MangaSourceType = api;
   if (typeof module !== 'undefined') module.exports = api;
