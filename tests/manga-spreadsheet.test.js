@@ -42,21 +42,35 @@ test('URL fields cannot be changed to executable schemes or malformed URLs', () 
   assert.equal(model.parseValue(sample, column('url'), 'https://example.com/1.webp', folders), 'https://example.com/1.webp');
   assert.throws(() => model.parseValue(sample, column('url'), 'javascript:alert(1)', folders), /http/);
   assert.throws(() => model.parseValue(sample, column('sourceUrl'), 'http://user:pass@example.com', folders), /http/);
-  assert.throws(() => model.parseValue(sample, column('url'), '', folders), /空欄/);
+  assert.equal(model.parseValue(sample, column('url'), '', folders), '', 'an empty URL cell is allowed when another URL remains; final persistence validates the whole collection');
   assert.equal(model.parseValue({id:'encrypted',encryptedAssets:{pages:[{}]}}, column('url'), '', folders), '');
 });
 
-test('the URL cell edits an unordered collection without a primary/subordinate label', () => {
+test('every manga URL occupies one column and additional URL columns are expandable', () => {
   const item = { ...sample, sourceUrls: [
     'https://example.com/1.webp', 'https://example.com/book#1'
   ] };
-  assert.equal(model.formatValue(item, column('url'), folders),
-    'https://example.com/1.webp | https://example.com/book#1');
-  assert.equal(model.parseValue(item, column('url'),
-    'https://example.com/book#1 | https://example.com/1.webp | https://example.com/book#1', folders),
-    'https://example.com/book#1 | https://example.com/1.webp');
-  assert.throws(() => model.parseValue(item, column('url'),
-    'https://example.com/1.webp | javascript:alert(1)', folders), /http/);
+  assert.equal(model.formatValue(item, column('url'), folders), 'https://example.com/1.webp');
+  model.ensureUrlColumns(3);
+  assert.equal(model.formatValue(item, column('url2'), folders), 'https://example.com/book#1');
+  assert.equal(model.formatValue(item, column('url3'), folders), '');
+  assert.equal(model.parseValue(item, column('url2'), 'https://example.com/new#1', folders), 'https://example.com/new#1');
+  assert.throws(() => model.parseValue(item, column('url'), 'https://example.com/1.webp | https://example.com/2.webp', folders), /1セルに1件/);
+  assert.throws(() => model.parseValue(item, column('url2'), 'javascript:alert(1)', folders), /http/);
+  assert.equal(model.COLUMNS.findIndex(col => col.key === 'url3'), model.COLUMNS.findIndex(col => col.key === 'url2') + 1);
+  assert.equal(model.cellAddress(0, 26), 'AA2');
+  assert.equal(model.ensureUrlColumns(40), 40);
+  assert.equal(model.COLUMNS.filter(col => col.type === 'url' && col.key !== 'sourceUrl').length, 40);
+  assert.equal(model.ensureUrlColumns(45), 40);
+});
+
+test('URL changes retain the entire source array for atomic undo and redo', () => {
+  const { readFileSync } = require('node:fs');
+  const sheet = readFileSync(require.resolve('../manga-spreadsheet.js'), 'utf8');
+  assert.match(sheet, /patches\.push\(\{ id, key:'sourceUrls', before, after:next \}\)/);
+  assert.match(sheet, /if \(changes\.has\('sourceUrls'\)\) updated\.url = updated\.sourceUrls\[0\]/);
+  assert.match(sheet, /data-ms="addUrl"/);
+  assert.match(sheet, /Pasting multiple URLs horizontally/);
 });
 
 test('multi-cell clipboard paste normalizes line endings without an extra row', () => {
