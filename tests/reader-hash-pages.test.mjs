@@ -762,3 +762,40 @@ test('vertical reading removes end-of-book placeholders when its next page redir
   assert.equal(runtime.getPageState().displayedPage, 3);
   runtime.destroy();
 });
+
+
+test('configured #1 interval opens at #2 and stops at #19', async () => {
+  const {runtime,item,elements} = setup({resume:1});
+  item.pageRangeStart = 2;
+  item.pageRangeEnd = 19;
+  await runtime.start(item.id);
+  assert.equal(elements.pageStage.firstChild.firstChild.src,'https://example.test/xxx.html?edition=1#2');
+  assert.equal(elements.pageSlider.min,'2');
+  assert.equal(elements.pageSlider.max,'19');
+  assert.equal(elements.pageLabel.textContent,'2 / 19');
+  runtime.previous();
+  assert.equal(elements.pageStage.firstChild.firstChild.src,'https://example.test/xxx.html?edition=1#2');
+  elements.lastBtn.dispatch('click');
+  assert.equal(elements.pageStage.firstChild.firstChild.src,'https://example.test/xxx.html?edition=1#19');
+  runtime.next();
+  assert.equal(elements.pageStage.firstChild.firstChild.src,'https://example.test/xxx.html?edition=1#19');
+  elements.firstBtn.dispatch('click');
+  assert.equal(elements.pageStage.firstChild.firstChild.src,'https://example.test/xxx.html?edition=1#2');
+  runtime.destroy();
+});
+
+test('vertical hash interval has no blank slots before custom start and no beyond-end frames', async () => {
+  const {runtime,item,elements}=setup({vertical:true,resume:1});
+  item.pageRangeStart=2;
+  item.pageRangeEnd=3;
+  await runtime.start(item.id);
+  assert.equal(elements.pageStage.children.length,2);
+  assert.equal(elements.pageStage.children[0].dataset.page,'2');
+  assert.equal(elements.pageStage.children[1].dataset.page,'3');
+  assert.equal(elements.viewer.scrollTop,0);
+  runtime.goTo(3);
+  assert.equal(elements.viewer.scrollTop,800);
+  runtime.next();
+  assert.equal(elements.pageLabel.textContent,'3 / 3');
+  runtime.destroy();
+});
