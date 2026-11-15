@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 
-test('manga list runtime module exposes the four context-aware operations', () => {
+test('manga list runtime module exposes the context-aware operations', () => {
   const source = read('manga-list-runtime.js');
   const context = { self: {} };
   vm.runInNewContext(source, context, { filename: 'manga-list-runtime.js' });
@@ -13,6 +13,8 @@ test('manga list runtime module exposes the four context-aware operations', () =
   const runtime = context.self.MangaListRuntimeFactory.create(new Proxy({}, { get: () => () => {} }));
   assert.deepEqual(Object.keys(runtime), [
     'renderSavedList',
+    'previewPageSwipe',
+    'finishPageSwipe',
     'buildBookCard',
     'buildFolderCard',
     'handleMangaCardOpen'
@@ -105,6 +107,7 @@ function createSlidingShelfHarness({ mobile = true, reducedMotion = false } = {}
   const makeNode = (tag = 'div') => {
     const node = {
       tag, children: [], parentElement: null, className: '', textContent: '', style: {},
+      getBoundingClientRect() { return { width: 360 }; },
       classList: { add() {}, toggle() {} },
       appendChild(child) {
         if (child.parentElement) child.parentElement.removeChild(child);
@@ -152,6 +155,7 @@ function createSlidingShelfHarness({ mobile = true, reducedMotion = false } = {}
   };
   const doc = {
     createElement: makeNode,
+    createDocumentFragment: () => makeNode('fragment'),
     defaultView: { matchMedia(q) { return { matches: q.includes('max-width') ? mobile : reducedMotion }; } }
   };
   const ctx = new Proxy({
@@ -163,10 +167,15 @@ function createSlidingShelfHarness({ mobile = true, reducedMotion = false } = {}
     }),
     getSavedVideos: () => [], shelfVisibleItems: () => [], unreadOrderItems: () => [],
     renderDashboard() {}, renderAuthorDashboard() {}, updateBulkEditButton() {},
-    deriveViewModel: () => ({
-      itemsList: [], folderCards: [], totalPages: 2, normalizedPage: state.bookshelfPage,
-      totalEntries: 1, visibleEntries: [{ type: 'item', item: { id: 'page-' + state.bookshelfPage } }]
+    deriveViewModel: ({ page }) => ({
+      itemsList: [], folderCards: [], totalPages: 2, normalizedPage: page,
+      totalEntries: 2, visibleEntries: page === state.bookshelfPage
+        ? [{ type: 'item', item: { id: 'page-' + page } }]
+        : [{ type: 'favorites' }]
     }),
+    buildFavoritesFolderCard() {
+      const card = makeNode(); card.textContent = 'adjacent-page-preview'; return card;
+    },
     renderCards({ elements: e, items }) {
       for (const entry of items) {
         const card = makeNode();
@@ -244,6 +253,60 @@ test('sliding pages are clipped, preserve mobile grid density, and do not change
   assert.match(css, /\.bookshelf-slide-track > \.bookshelf-page\s*\{[^}]*flex:\s*0 0 50%/);
   assert.match(css, /\.bookshelf-page\s*\{[^}]*grid-template-columns:\s*repeat\(3,/);
   assert.match(route, /runtime\.renderSavedList\(delta\)/);
-  assert.match(route, /manga-list-runtime\.js\?v=20261010-vault-sync-v4-delete/);
+  assert.match(route, /manga-list-runtime\.js\?v=20261115-finger-drag/);
   assert.doesNotMatch(read('reader.html'), /bookshelf-slide-track|bookshelf-page-frame/);
+});
+
+test('touch drag follows the finger, previews adjacent cards, then snaps from release position', async () => {
+  const { runtime, state, elements, animations } = createSlidingShelfHarness();
+  runtime.renderSavedList();
+  const outgoing = elements.savedListItems.children[0].children[0];
+  assert.equal(runtime.previewPageSwipe(-85), true);
+  const frame = elements.savedListItems.children[0];
+  const track = frame.children[0];
+  assert.equal(track.className, 'bookshelf-slide-track');
+  assert.strictEqual(track.children[0], outgoing);
+  assert.equal(track.children[1].children[0].children[0].textContent, 'adjacent-page-preview');
+  assert.equal(track.style.transform, 'translate3d(-85px,0,0)');
+  assert.equal(animations.length, 0, 'dragging should not start any animation');
+  runtime.previewPageSwipe(-173);
+  assert.strictEqual(frame.children[0], track, 'repeated moves reuse the same page grids');
+  assert.equal(track.style.transform, 'translate3d(-173px,0,0)');
+
+  const committed = [];
+  assert.equal(runtime.finishPageSwipe(true, (delta) => committed.push(delta)), true);
+  assert.deepEqual(Array.from(animations[0].frames, frame => frame.transform),
+    ['translate3d(-173px,0,0)', 'translate3d(-360px,0,0)']);
+  assert.deepEqual(committed, [], 'the page state must not change during the snap');
+  animations[0].complete();
+  await animations[0].finished;
+  await Promise.resolve();
+  assert.deepEqual(committed, [1]);
+  state.bookshelfPage += committed[0];
+  runtime.renderSavedList();
+  assert.equal(elements.savedListItems.children[0].children[0].children[0].textContent, 'page-2');
+  assert.equal(animations.length, 1, 'commit must not trigger another slide');
+
+  assert.equal(runtime.previewPageSwipe(120), true);
+  const backwards = elements.savedListItems.children[0].children[0];
+  assert.equal(backwards.style.transform, 'translate3d(-240px,0,0)');
+  assert.equal(runtime.finishPageSwipe(false), true);
+  assert.deepEqual(Array.from(animations[1].frames, frame => frame.transform),
+    ['translate3d(-240px,0,0)', 'translate3d(-360px,0,0)']);
+  animations[1].complete();
+  await animations[1].finished;
+  await Promise.resolve();
+  assert.equal(state.bookshelfPage, 2, 'cancelled drag must not change the selected page');
+  assert.equal(elements.savedListItems.children[0].children[0].className, 'bookshelf-page');
+});
+
+test('preview refuses page boundaries and another render cancels an unfinished swipe', () => {
+  const { runtime, elements } = createSlidingShelfHarness();
+  runtime.renderSavedList();
+  elements.bookshelfPrevBtn.disabled = true;
+  assert.equal(runtime.previewPageSwipe(100), false);
+  assert.equal(runtime.previewPageSwipe(-120), true);
+  runtime.renderSavedList();
+  assert.equal(runtime.finishPageSwipe(true), false);
+  assert.equal(elements.savedListItems.children[0].children[0].className, 'bookshelf-page');
 });
