@@ -47,7 +47,7 @@ test('home cards render without short description text', () => {
 test('home page is vault-gated and the shared routes remain intact', () => {
   const home = read('home.html');
   const spa = read('home-profile-spa.js');
-  assert.match(home, /class=["']auth-pending["']/);
+  assert.match(home, /class=["'][^"']*\bauth-pending\b[^"']*["']/);
   assert.match(spa, /MangaVault\.loadActive\(\)/);
   assert.match(spa, /window\.location\.replace\(['"]sync\.html['"]\)/);
   assert.match(spa, /window\.location\.replace\(['"]index\.html['"]\)/);
