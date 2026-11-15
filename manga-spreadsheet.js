@@ -633,7 +633,7 @@
       }
     }
     function refresh() {
-      const maxUrls = Math.max(1, ...deps.getState().savedItems.map(item => sourceUrls(item).length));
+      const maxUrls = deps.getState().savedItems.reduce((max, item) => Math.max(max, sourceUrls(item).length), 1);
       ensureUrlColumns(maxUrls);
       computeRows();
       drawHeader();
