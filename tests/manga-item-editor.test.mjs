@@ -43,3 +43,19 @@ test('right-click Edit opens the individual editor, not the spreadsheet', () => 
   assert.match(route, /spreadsheet\.destroy\(\)/);
   assert.match(route, /individualEditor\.destroy\(\)/);
 });
+
+
+test('individual editor preserves or removes optional numbered-page limits', () => {
+  const bounded = editor.normalize(
+    { ...sample, sourceUrls:['https://example.com/chapter#1'], url:'https://example.com/chapter#1' },
+    form({ sourceUrls:['https://example.com/chapter#1'], pageRangeStart:'2', pageRangeEnd:'19' }), folders
+  );
+  assert.equal(bounded.pageRangeStart, 2);
+  assert.equal(bounded.pageRangeEnd, 19);
+  const reset = editor.normalize(bounded, form({ sourceUrls:['https://example.com/chapter#1'], pageRangeStart:'', pageRangeEnd:'' }), folders);
+  assert.equal(reset.pageRangeStart, undefined);
+  assert.equal(reset.pageRangeEnd, undefined);
+  assert.throws(() => editor.normalize(sample, form({pageRangeStart:'20',pageRangeEnd:'19'}), folders), /終了ページ/);
+  assert.throws(() => editor.normalize(sample, form({pageRangeStart:'0'}), folders), /1～2000/);
+  assert.throws(() => editor.normalize(sample, form({sourceUrls:['https://example.com/cover'],pageRangeStart:'2'}), folders), /#1/);
+});
