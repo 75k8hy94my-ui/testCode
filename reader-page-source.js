@@ -24,6 +24,23 @@
     const formatted = String(number).padStart(source.width, '0');
     return `${source.base}${source.pattern?.prefix || ''}${formatted}${source.pattern?.suffix || ''}.${extension}${source.query || ''}`;
   }
+  function pageBounds(item, maxPages = 2000) {
+    const rawStart = Number(item?.pageRangeStart);
+    const rawEnd = Number(item?.pageRangeEnd);
+    const start = Number.isSafeInteger(rawStart) && rawStart >= 1 ? Math.min(rawStart, maxPages) : 1;
+    const end = Number.isSafeInteger(rawEnd) && rawEnd >= start ? Math.min(rawEnd, maxPages) : maxPages;
+    return { start, end };
+  }
+  function rangeSignature(item) {
+    const { start, end } = pageBounds(item);
+    return String(item?.url || '') + '|' + start + '|' + (item?.pageRangeEnd == null || item.pageRangeEnd === '' ? '' : end);
+  }
+  function isNumberedImageSource(item) {
+    try {
+      const pathname = new URL(String(item?.url || '')).pathname;
+      return /\/[^/]*\d+[^/]*\.(?:jpe?g|png|webp|avif|gif)$/i.test(pathname);
+    } catch (_) { return false; }
+  }
   function createLegacyResolver({ probe, maxPages = 2000, extensions = EXTENSIONS, baseHref, getCachedInfo } = {}) {
     if (typeof probe !== 'function') throw new TypeError('legacy page resolver requires an isolated probe');
     return Object.freeze({ async resolve(item, { signal } = {}) {
@@ -39,6 +56,7 @@
       };
       const source = parseSequentialSource(item?.url, enrichedItem, baseHref);
       const pages = [];
+      const { start: firstPage, end: lastPage } = pageBounds(item, maxPages);
       // Existing works often provide the exact first page; trust that link
       // before guessing alternative formats (and keep any required URL query).
       const initialUrl = String(item?.url || '').trim();
@@ -54,9 +72,9 @@
         // subsequent pages in bounded parallel batches, preserving order and
         // stopping at the first missing page rather than scanning a huge range.
         const batchSize = 6;
-        for (let start = 1; start <= maxPages; start += batchSize) {
+        for (let start = firstPage; start <= lastPage; start += batchSize) {
           if (signal?.aborted) throw Object.assign(new Error('Page discovery cancelled'), { name: 'AbortError' });
-          const numbers = Array.from({ length: Math.min(batchSize, maxPages - start + 1) }, (_, i) => start + i);
+          const numbers = Array.from({ length: Math.min(batchSize, lastPage - start + 1) }, (_, i) => start + i);
           const urls = numbers.map((number) => number === 1 ? initialUrl : numbered(source, number, initialFormat));
           const available = await Promise.all(urls.map((url) => probe(url, { signal })));
           if (signal?.aborted) throw Object.assign(new Error('Page discovery cancelled'), { name: 'AbortError' });
@@ -70,7 +88,7 @@
         }
         return { version: 1, pages, splitSpreads: Boolean(item?.splitSpreads) };
       }
-      for (let number = 1; number <= maxPages; number += 1) {
+      for (let number = firstPage; number <= lastPage; number += 1) {
         if (signal?.aborted) throw Object.assign(new Error('Page discovery cancelled'), { name: 'AbortError' });
         let found = '';
         // The original link is the strongest candidate only when it names page 1.
@@ -95,6 +113,20 @@
     async function resolve(item, options = {}) {
       if (!item || typeof item !== 'object') throw new TypeError('saved item required');
       const manifest = item.pageManifest;
+      // A range edit must supersede a manifest generated for the old range.
+      // Imported explicit page lists remain unchanged unless the user explicitly
+      // requests a custom range on a numbered image source.
+      const numbered = isNumberedImageSource(item);
+      const customRange = item.pageRangeStart != null || item.pageRangeEnd != null;
+      const signature = rangeSignature(item);
+      if (numbered && legacyResolver &&
+          (customRange && manifest?.rangeSignature !== signature ||
+           !customRange && !!manifest?.rangeSignature)) {
+        const regenerated = await legacyResolver.resolve(item, options);
+        const enrichedManifest = { ...regenerated, ...(customRange ? { rangeSignature: signature } : {}) };
+        const migratedItem = { ...item, pageManifest: enrichedManifest, pages: enrichedManifest.pages.slice() };
+        return { item:migratedItem, manifest:enrichedManifest, urls:enrichedManifest.pages.slice(), migrated:true };
+      }
       const manifestUrls = manifest?.version === 1 && Array.isArray(manifest.pages) && manifest.pages.length
         ? manifest.pages : null;
       if (manifestUrls) return { item, manifest, urls: manifestUrls.slice(), migrated: false };
@@ -112,13 +144,14 @@
         };
       }
       if (!legacyResolver) throw new Error('作品のページ一覧がありません');
-      const migratedManifest = await legacyResolver.resolve(item, options);
+      const discovered = await legacyResolver.resolve(item, options);
+      const migratedManifest = { ...discovered, ...(numbered && customRange ? { rangeSignature:signature } : {}) };
       const migratedItem = { ...item, pageManifest: migratedManifest, pages: migratedManifest.pages.slice() };
       return { item: migratedItem, manifest: migratedManifest, urls: migratedManifest.pages.slice(), migrated: true };
     }
     return Object.freeze({ resolve });
   }
-  const api = Object.freeze({ EXTENSIONS, parseSequentialSource, numberedPageUrl: numbered, createLegacyResolver, create });
+  const api = Object.freeze({ EXTENSIONS, parseSequentialSource, numberedPageUrl: numbered, pageBounds, rangeSignature, createLegacyResolver, create });
   if (typeof self !== 'undefined') self.ReaderPageSourceFactory = api;
   if (typeof window !== 'undefined') window.ReaderPageSourceFactory = api;
   if (typeof module !== 'undefined') module.exports = api;
