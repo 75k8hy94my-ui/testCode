@@ -7,7 +7,7 @@
     ['manga-list-template.js?v=20261114-json-import', 'mangaRouteTemplate'],
     ['manga-import-author-sync.js?v=20261007-momon-import', 'mangaImportAuthorSync'],
     ['manga-json-import.js?v=20261114-json-import', 'mangaJsonImport'],
-    ['manga-spreadsheet.js?v=20261115-card-context-menu', 'mangaSpreadsheet'],
+    ['manga-spreadsheet.js?v=20261115-sheet-history', 'mangaSpreadsheet'],
     ['manga-card-context-menu.js?v=20261115-card-context-menu', 'mangaCardContextMenu'],
     ['image-transfer-settings.js?v=20261004-encrypted-image-import', 'encryptedImageImportSettings'],
     ['image-remote-access.js?v=20261004-encrypted-image-import', 'encryptedImageImportRemoteAccess'],
@@ -598,6 +598,7 @@
           finally { jsonRegister.disabled = !canReadProtectedData(); }
         });
         const spreadsheet = windowRef.MangaSpreadsheet.create({
+          windowRef,
           documentRef,
           mountElement: rootElement,
           getState: state,
