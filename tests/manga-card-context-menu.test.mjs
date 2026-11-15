@@ -21,6 +21,7 @@ function setup({ desktop = true, allowed = true } = {}) {
   const context = { self: {} };
   vm.runInNewContext(fs.readFileSync(new URL('../manga-card-context-menu.js', import.meta.url), 'utf8'), context);
   const doc = new FakeNode();
+  doc.createElement = () => new FakeNode();
   doc.body = new FakeNode();
   const win = new FakeNode();
   win.innerWidth = 400; win.innerHeight = 270;
