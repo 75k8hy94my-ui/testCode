@@ -1,0 +1,33 @@
+.manga-item-edit-overlay[hidden] {display:none!important}
+.manga-item-edit-overlay {position:fixed;inset:0;z-index:8501;display:grid;place-items:center;padding:16px;background:rgba(8,12,18,.72);color:#f2f5fa}
+.manga-item-edit-panel {width:min(680px,100%);max-height:min(90dvh,920px);display:flex;flex-direction:column;min-height:0;border:1px solid #3d4555;border-radius:18px;background:#171c26;box-shadow:0 20px 65px #0009;overflow:hidden}
+.manga-item-edit-panel * {box-sizing:border-box}
+.manga-item-edit-panel header,.manga-item-edit-panel footer {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 19px}
+.manga-item-edit-panel header {border-bottom:1px solid #394253}
+.manga-item-edit-panel h2 {margin:0;font-size:19px;color:#fff}
+.manga-item-edit-panel form {display:flex;flex-direction:column;min-height:0}
+.manga-item-edit-body {overflow-y:auto;overscroll-behavior:contain;padding:18px;flex:1}
+.manga-item-edit-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.manga-item-edit-field {display:flex;flex-direction:column;gap:6px;font-size:12px;color:#c2cede;min-width:0}
+.manga-item-edit-field input:not([type=checkbox]),.manga-item-edit-field select,.manga-item-edit-url-row input {width:100%;height:40px;min-width:0;padding:8px 10px;font:inherit;font-size:14px;border:1px solid #4c5669;border-radius:9px;background:#242c3b;color:#fff}
+.manga-item-edit-check {display:flex;flex-direction:row;align-items:center;gap:8px}
+.manga-item-edit-check input {width:20px;height:20px;accent-color:#679df5}
+.manga-item-edit-urls {margin-top:22px;padding-top:14px;border-top:1px solid #3d4555}
+.manga-item-edit-urls h3 {margin:0 0 12px;font-size:15px;color:#fff}
+.manga-item-edit-url-list {display:grid;gap:9px}
+.manga-item-edit-url-row {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.manga-item-edit-panel button {min-height:38px;padding:7px 13px;border-radius:9px;border:1px solid #586278;color:#e5eefb;background:#2b3444;cursor:pointer;font:inherit}
+.manga-item-edit-panel button:hover {background:#394861}
+.manga-item-edit-urls>button {margin-top:11px}
+.manga-item-edit-panel button:disabled {opacity:.4;cursor:default}
+.manga-item-edit-notice {min-height:1.5em;color:#ffb9aa;line-height:1.4}
+.manga-item-edit-panel footer {border-top:1px solid #394253;justify-content:flex-end}
+.manga-item-edit-panel .manga-item-edit-save {background:#2d70d5;border-color:#2d70d5;color:#fff}
+@media(max-width:700px) {
+ .manga-item-edit-overlay {padding:0;align-items:end}
+ .manga-item-edit-panel {width:100%;max-height:calc(100dvh - env(safe-area-inset-top,0px) - 18px);border-radius:19px 19px 0 0}
+ .manga-item-edit-body {padding:15px}
+ .manga-item-edit-grid {grid-template-columns:1fr}
+ .manga-item-edit-panel footer {padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+ .manga-item-edit-field input:not([type=checkbox]),.manga-item-edit-url-row input {font-size:16px}
+}
