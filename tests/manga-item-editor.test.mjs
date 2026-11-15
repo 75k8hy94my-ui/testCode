@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const source = fs.readFileSync(new URL('../manga-item-editor.js', import.meta.url), 'utf8');
-const context = { self: {} };
+const context = { self: {}, URL };
 vm.runInNewContext(source, context);
 const { MangaItemEditor: editor } = context.self;
 const sample = { id:'one', title:'旧題', url:'https://example.com/a', sourceUrls:['https://example.com/a'], addedAt:123 };
