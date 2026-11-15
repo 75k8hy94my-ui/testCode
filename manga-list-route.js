@@ -1,7 +1,7 @@
 (function (root) {
   'use strict';
 
-  const STYLESHEET_URL = 'manga-list.css?v=20261114-hash-cover-preview';
+  const STYLESHEET_URL = 'manga-list.css?v=20261115-finger-drag';
   const SCRIPT_URLS = [
     ['manga-source-type.js?v=20261114-hash-pages', 'mangaSourceType'],
     ['manga-list-template.js?v=20261114-json-import', 'mangaRouteTemplate'],
@@ -26,7 +26,7 @@
     ['manga-list-filter-events.js?v=20260922-filter-events', 'mangaRouteFilterEvents'],
     ['manga-list-folder-events.js?v=20260922-folder-events', 'mangaRouteFolderEvents'],
     ['manga-list-smart-list-events.js?v=20260922-smart-events', 'mangaRouteSmartEvents'],
-    ['manga-list-pagination-events.js?v=20261009-touch-swipe', 'mangaRoutePaginationEvents'],
+    ['manga-list-pagination-events.js?v=20261115-finger-drag', 'mangaRoutePaginationEvents'],
     ['manga-list-navigation-events.js?v=20260922-navigation-events', 'mangaRouteNavigationEvents'],
     ['manga-list-bulk-events.js?v=20260922-bulk-events', 'mangaRouteBulkEvents'],
     ['manga-list-dom-resolver.js?v=20260922-dom-resolver', 'mangaRouteResolver'],
@@ -46,7 +46,7 @@
     ['reader-target.js?v=20261003-reader-launch-contract', 'mangaReaderTarget'],
     ['manga-hash-cover-preview.js?v=20261114-hash-cover-preview', 'mangaHashCoverPreview'],
     ['manga-list-host-runtime.js?v=20261114-hash-cover-preview', 'mangaRouteHost'],
-    ['manga-list-runtime.js?v=20261010-vault-sync-v4-delete', 'mangaRouteRuntime'],
+    ['manga-list-runtime.js?v=20261115-finger-drag', 'mangaRouteRuntime'],
     ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
   ];
 
@@ -656,7 +656,15 @@
             // swipes sideways or uses the page buttons. Keep their vertical
             // scroll position; only the bookshelf page changes.
             runtime.renderSavedList(delta);
-          }
+          },
+          onSwipeMove: (dx) => runtime.previewPageSwipe(dx),
+          onSwipeFinish: (direction) => runtime.finishPageSwipe(direction !== 0, (delta) => {
+            if ((delta < 0 && prev.disabled) || (delta > 0 && next.disabled)) return;
+            setState({ bookshelfPage: state().bookshelfPage + delta });
+            // The two live pages already slid with the finger. Re-render
+            // without starting a second, release-only animation.
+            runtime.renderSavedList();
+          })
         }, { prevButton: prev, nextButton: next, swipeSurface: elements.savedListItems });
         bindFactory(MangaListNavigationEventsFactory, { onBack: () => { setState({ currentFolderView: null, currentSeriesView: null, currentAuthorView: null, bookshelfPage: 1 }); renderList(); } }, { backButton: back });
         bindFactory(MangaListBulkEventsFactory, {
