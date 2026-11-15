@@ -46,11 +46,19 @@ function setup({ resume = 1, vertical = false, safeMode = false, url = 'https://
     getItem(key) { return local.get(key) ?? null; },
     setItem(key, value) { local.set(key, String(value)); },
   };
+  const documentListeners = new Map();
   const doc = {
-    body,
+    body, activeElement: null,
     getElementById(id) { return elements[id] || null; },
     createElement: element,
     createDocumentFragment() { return element('fragment'); },
+    addEventListener(type, fn) { documentListeners.set(type, fn); },
+    removeEventListener(type) { documentListeners.delete(type); },
+    dispatch(type, data = {}) { documentListeners.get(type)?.(data); },
+  };
+  elements.viewer.focus = (options) => {
+    doc.activeElement = elements.viewer;
+    elements.viewer.focusOptions = options;
   };
   const item = { id: 'hash-work', title: 'Hash manga', url };
   const commits = [], updates = [];
@@ -65,12 +73,16 @@ function setup({ resume = 1, vertical = false, safeMode = false, url = 'https://
     load() { return { page: resume, wasLast: false }; },
     commit(id, page, count) { commits.push({ id, page, count }); return true; },
   };
+  const windowListeners = new Map();
   const win = {
     MangaSourceType: Source, localStorage, location: { href: 'https://testcode.test/reader.html?item=hash-work' },
-    innerWidth: 1000, innerHeight: 800, addEventListener() {}, removeEventListener() {},
+    innerWidth: 1000, innerHeight: 800,
+    addEventListener(type, fn) { windowListeners.set(type, fn); },
+    removeEventListener(type) { windowListeners.delete(type); },
+    dispatch(type, data = {}) { windowListeners.get(type)?.(data); },
   };
   const runtime = Runtime.create({ repository, target: { itemResumeKey: id => 'item:' + id }, location: { replace() {} }, document: doc, window: win, progressRepository });
-  return { runtime, elements, body, item, commits, updates, localStorage };
+  return { runtime, elements, body, item, commits, updates, localStorage, doc, win };
 }
 
 test('only an exact terminal #1 opts into hash-page mode', () => {
@@ -133,6 +145,58 @@ test('hash frames use normal reader controls, restore progress and cannot receiv
   assert.ok(commits.every(commit => commit.count === 0));
   runtime.destroy();
   assert.equal(elements.pageStage.children.length, 0, 'destroy removes protected remote frames');
+});
+
+test('hash iframe focus and left/right keyboard input remain owned by the reader', async () => {
+  const { runtime, elements, doc, win } = setup();
+  await runtime.start('hash-work');
+  let iframe = elements.pageStage.firstChild.firstChild;
+
+  // The reader catches keys at the same-origin child window before the
+  // page's keyboard listeners and browser navigation can act on them.
+  const child = readableHashWindow('#1');
+  iframe.contentWindow = child;
+  iframe.dispatch('load');
+  const events = [];
+  child.dispatch('keydown', {
+    key: 'ArrowRight',
+    preventDefault() { events.push('preventDefault'); },
+    stopImmediatePropagation() { events.push('stopImmediatePropagation'); },
+    stopPropagation() { events.push('stopPropagation'); },
+  });
+  assert.deepEqual(events, ['preventDefault', 'stopImmediatePropagation', 'stopPropagation']);
+  assert.equal(runtime.getPageState().displayedPage, 2);
+
+  // A cross-origin frame does not allow injection. Its own focus event
+  // should still return keyboard focus to the parent reader.
+  iframe = elements.pageStage.firstChild.firstChild;
+  iframe.contentWindow = { get location() { throw new Error('SecurityError'); } };
+  assert.doesNotThrow(() => iframe.dispatch('load'));
+  doc.activeElement = iframe;
+  iframe.dispatch('focus');
+  assert.equal(doc.activeElement, elements.viewer);
+  assert.deepEqual(elements.viewer.focusOptions, { preventScroll: true });
+
+  const parentEvents = [];
+  win.dispatch('keydown', {
+    key: 'ArrowRight',
+    preventDefault() { parentEvents.push('preventDefault'); },
+  });
+  assert.deepEqual(parentEvents, ['preventDefault']);
+  assert.equal(runtime.getPageState().displayedPage, 3);
+  win.dispatch('keydown', { key: 'ArrowLeft', preventDefault() {} });
+  assert.equal(runtime.getPageState().displayedPage, 2);
+
+  iframe = elements.pageStage.firstChild.firstChild;
+  doc.activeElement = iframe;
+  win.dispatch('blur');
+  assert.equal(doc.activeElement, elements.viewer);
+
+  // Other controls may retain focus; the trap is only for hash frames.
+  doc.activeElement = elements.pageSlider;
+  win.dispatch('blur');
+  assert.equal(doc.activeElement, elements.pageSlider);
+  runtime.destroy();
 });
 
 test('enabling vertical mode does not scan pages or react to programmatic browser scroll events', async () => {
@@ -199,7 +263,7 @@ test('hash-page vertical reading creates bounded iframe windows and preserves pa
 test('hash-page vertical CSS avoids scroll anchoring and refreshes the runtime asset', () => {
   const html = readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
   assert.match(html, /body\.hash-page-reader\.vertical-scroll #viewer[\s\S]*overflow-anchor:none/);
-  assert.match(html, /reader-runtime\.js\?v=20\d{6}-[a-z0-9-]+/);
+  assert.match(html, /reader-runtime\.js\?v=20\d{6}-[a-z0-9-]+/);\n  assert.match(html, /id="viewer"[^>]*tabindex="-1"/);
 });
 
 
