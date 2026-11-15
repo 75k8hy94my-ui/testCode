@@ -81,6 +81,7 @@
       </div>
       <div class="readerHeaderSecondary" aria-label="読書オプション">
         <a class="ctrlBtn" id="openSourceBtn" target="_blank" rel="noopener noreferrer" hidden>元ページを開く</a>
+        <button class="ctrlBtn" id="switchSourceBtn" type="button" title="登録された次の漫画URLを試す" hidden>別のURL</button>
         <button class="ctrlBtn" id="favToggleBtn" type="button" aria-label="お気に入りを切り替える" hidden></button>
         <button class="ctrlBtn" id="enhanceBtn" type="button" aria-pressed="false">画像補正</button>
         <button class="ctrlBtn" id="verticalBtn" type="button">縦スクロール</button>
@@ -109,7 +110,7 @@
 <script src="vault-session.js?v=20261018-statutes-independent-vault"></script><script src="vault-conflict-ui.js?v=20261017-readable-conflicts"></script>
   <script src="browser-storage.js"></script>
   <script src="reader-target.js?v=20261004-reader-item-route"></script>
-  <script src="manga-source-type.js?v=20261114-hash-pages"></script>
+  <script src="manga-source-type.js?v=20261115-multi-url"></script>
   <script src="vault-payload.js?v=20261018-statutes-independent-vault"></script>
   <script src="feature-flags.js"></script>
   <script src="media-access-gate.js?v=20261010-vpn-diagnostics"></script>
@@ -131,7 +132,7 @@
   <script src="reader-progress-repository.js?v=20261011-pending-sync"></script>
   <script src="reader-item-repository.js"></script>
   <script src="reader-sync-scheduler.js?v=20261008-reader-close-sync"></script>
-  <script src="reader-runtime.js?v=20261114-hash-end-on-demand"></script>
+  <script src="reader-runtime.js?v=20261115-multi-url"></script>
   <script>
     window.MangaReaderBootPromise = (async () => {
       const sessionKey = 'mangaReaderSupabaseSession';
