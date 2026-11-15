@@ -168,8 +168,8 @@ test('hash iframe focus and left/right keyboard input remain owned by the reader
   await runtime.start('hash-work');
   let iframe = elements.pageStage.firstChild.firstChild;
 
-  // The reader catches keys at the same-origin child window before the
-  // page's keyboard listeners and browser navigation can act on them.
+  // The embedded handler may run first. The reader applies the opposite
+  // interpretation afterward, without consuming the child's key event.
   const child = readableHashWindow('#1');
   iframe.contentWindow = child;
   iframe.dispatch('load');
@@ -180,7 +180,8 @@ test('hash iframe focus and left/right keyboard input remain owned by the reader
     stopImmediatePropagation() { events.push('stopImmediatePropagation'); },
     stopPropagation() { events.push('stopPropagation'); },
   });
-  assert.deepEqual(events, ['preventDefault', 'stopImmediatePropagation', 'stopPropagation']);
+  assert.deepEqual(events, [], 'reader must reconcile after the embedded key handler');
+  await Promise.resolve();
   assert.equal(runtime.getPageState().displayedPage, 2);
 
   // A cross-origin frame does not allow injection. Its own focus event
@@ -212,6 +213,107 @@ test('hash iframe focus and left/right keyboard input remain owned by the reader
   doc.activeElement = elements.pageSlider;
   win.dispatch('blur');
   assert.equal(doc.activeElement, elements.pageSlider);
+  runtime.destroy();
+});
+
+test('page two, right key: embedded page goes to one, reader then corrects to three', async () => {
+  const { runtime, elements, updates } = setup({ resume:2 });
+  await runtime.start('hash-work');
+  const iframe = elements.pageStage.firstChild.firstChild;
+  const child = readableHashWindow('#2');
+  iframe.contentWindow = child;
+  iframe.dispatch('load');
+
+  // Child receives ArrowRight and moves in the reverse direction.
+  child.dispatch('keydown', { key:'ArrowRight' });
+  child.location.hash = '#1';
+  child.dispatch('hashchange');
+  assert.equal(runtime.getPageState().displayedPage, 2, 'before deferred correction, reader state is still two');
+  await Promise.resolve();
+  assert.equal(runtime.getPageState().displayedPage, 3);
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#3');
+  assert.equal(elements.pageLabel.textContent, '3 / ?');
+  assert.equal(updates.length, 0, 'reverse key must not be mistaken for a last-page fallback');
+  runtime.destroy();
+});
+
+test('page two, left key: embedded page goes to three, reader then corrects to one', async () => {
+  const { runtime, elements } = setup({ resume:2 });
+  await runtime.start('hash-work');
+  const iframe = elements.pageStage.firstChild.firstChild;
+  const child = readableHashWindow('#2');
+  iframe.contentWindow = child;
+  iframe.dispatch('load');
+  child.dispatch('keydown', { key:'ArrowLeft' });
+  child.location.hash = '#3';
+  child.dispatch('hashchange');
+  await Promise.resolve();
+  assert.equal(runtime.getPageState().displayedPage, 1);
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#1');
+  runtime.destroy();
+});
+
+test('right key on page one advances even when embedded handler does nothing', async () => {
+  const { runtime, elements } = setup();
+  await runtime.start('hash-work');
+  const iframe = elements.pageStage.firstChild.firstChild;
+  const child = readableHashWindow('#1');
+  iframe.contentWindow = child;
+  iframe.dispatch('load');
+  child.dispatch('keydown', { key:'ArrowRight' });
+  // The external page cannot navigate to zero and therefore does nothing.
+  await Promise.resolve();
+  assert.equal(runtime.getPageState().displayedPage, 2);
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#2');
+  runtime.destroy();
+});
+
+test('external reverse hash navigation is detected after a confirmed page, even without key event', async () => {
+  const { runtime, elements, item } = setup({ resume:2 });
+  await runtime.start('hash-work');
+  const iframe = elements.pageStage.firstChild.firstChild;
+  const child = readableHashWindow('#2');
+  iframe.contentWindow = child;
+  iframe.dispatch('load'); // Confirms that page two actually exists.
+  child.location.hash = '#1-';
+  child.dispatch('hashchange');
+  assert.equal(runtime.getPageState().displayedPage, 3);
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#3');
+  assert.equal(item.hashPageCount, undefined, 'the key-induced reversal is not an end-of-book redirect');
+  runtime.destroy();
+});
+
+test('cross-origin correction reasserts the reader target after a delayed reverse navigation', async () => {
+  const { runtime, elements, win } = setup({ resume:2 });
+  await runtime.start('hash-work');
+  const iframe = elements.pageStage.firstChild.firstChild;
+  iframe.contentWindow = { get location() { throw new Error('SecurityError'); } };
+  const pending = new Map();
+  let timerId = 0;
+  win.setTimeout = (fn, delay) => { const id = ++timerId; pending.set(id, { fn, delay }); return id; };
+  win.clearTimeout = (id) => pending.delete(id);
+  let actual = iframe.src, writes = 0;
+  Object.defineProperty(iframe, 'src', {
+    get() { return actual; },
+    set(url) { actual = url; writes++; },
+    configurable: true,
+  });
+  win.dispatch('keydown', { key:'ArrowRight', preventDefault() {} });
+  assert.equal(runtime.getPageState().displayedPage, 3);
+  actual = 'https://example.test/xxx.html?edition=1#1'; // remote site processed the opposite direction
+  assert.ok([...pending.values()].some(entry => entry.delay === 0));
+  for (const [id, entry] of [...pending.entries()]) {
+    pending.delete(id);
+    entry.fn();
+  }
+  assert.equal(actual, 'https://example.test/xxx.html?edition=1#3');
+  assert.ok(writes >= 2, 'the target is explicitly re-applied after the embedded handler');
+
+  // A subsequent left key cancels obsolete right-key corrections.
+  win.dispatch('keydown', { key:'ArrowLeft', preventDefault() {} });
+  assert.equal(runtime.getPageState().displayedPage, 2);
+  for (const [id, entry] of [...pending.entries()]) { pending.delete(id); entry.fn(); }
+  assert.equal(actual, 'https://example.test/xxx.html?edition=1#2');
   runtime.destroy();
 });
 
