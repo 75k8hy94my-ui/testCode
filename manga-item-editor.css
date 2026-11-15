@@ -31,3 +31,6 @@
  .manga-item-edit-panel footer {padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
  .manga-item-edit-field input:not([type=checkbox]),.manga-item-edit-url-row input {font-size:16px}
 }
+.manga-item-edit-range {margin-top:20px;padding-top:15px;border-top:1px solid #3d4555}
+.manga-item-edit-range h3 {margin:0 0 12px;font-size:15px;color:#fff}
+.manga-item-edit-range p {font-size:12px;line-height:1.6;color:#b7c6db;margin:10px 0 2px}
