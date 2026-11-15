@@ -515,7 +515,7 @@ test('hash-page vertical reading creates bounded iframe windows and preserves pa
   assert.equal(body.classList.contains('vertical-scroll'), true);
   assert.ok(elements.pageStage.children.length >= 4);
   const active = () => elements.pageStage.children.filter(slot => !!slot.firstChild);
-  assert.ok(active().length <= 3);
+  assert.ok(active().length <= 10);
   assert.ok(active().every(slot => slot.firstChild.firstChild.style.pointerEvents === 'none'));
   elements.viewer.dispatch('wheel'); // Only a real gesture may advance the page.
   elements.viewer.scrollTop = 3 * 800;
@@ -523,7 +523,7 @@ test('hash-page vertical reading creates bounded iframe windows and preserves pa
   assert.equal(runtime.getPageState().displayedPage, 4);
   assert.equal(elements.pageLabel.textContent, '4 / ?');
   assert.equal(elements.openSourceBtn.href, 'https://example.test/xxx.html?edition=1#4');
-  assert.ok(active().length <= 3, 'distant embedded documents must be released');
+  assert.ok(active().length <= 10, 'vertical iframe cache must stay bounded');
   assert.equal(commits.at(-1).page, 4);
   elements.verticalBtn.dispatch('click');
   assert.equal(body.classList.contains('vertical-scroll'), false);
@@ -531,6 +531,71 @@ test('hash-page vertical reading creates bounded iframe windows and preserves pa
   runtime.destroy();
 });
 
+
+test('vertical #1 reader preserves iframe identity across repeated forward and backward scrolling', async () => {
+  const { runtime, elements } = setup({ vertical:true, resume:2 });
+  await runtime.start('hash-work');
+  const slotFrame = (n) => elements.pageStage.children[n - 1]?.firstChild?.firstChild || null;
+  const first = slotFrame(1), second = slotFrame(2), third = slotFrame(3);
+  assert.ok(first && second && third);
+  let secondLoads = 0, thirdLoads = 0;
+  second.addEventListener('load', () => { secondLoads++; });
+  third.addEventListener('load', () => { thirdLoads++; });
+  const move = (n) => {
+    elements.viewer.dispatch('wheel');
+    elements.viewer.scrollTop = (n - 1) * 800;
+    elements.viewer.dispatch('scroll');
+    assert.equal(runtime.getPageState().displayedPage, n);
+  };
+  for (const n of [3, 2, 3, 2, 1, 2, 3, 4, 3, 2]) move(n);
+  assert.equal(slotFrame(1), first, 'nearby older iframe must not be recreated');
+  assert.equal(slotFrame(2), second, 'repeated scroll must reuse page 2 browsing context');
+  assert.equal(slotFrame(3), third, 'repeated scroll must reuse page 3 browsing context');
+  assert.equal(secondLoads, 0, 'the same page must not re-emit load on revisits');
+  assert.equal(thirdLoads, 0, 'the same page must not re-emit load on revisits');
+  assert.equal(second.src, 'https://example.test/xxx.html?edition=1#2');
+  assert.equal(third.src, 'https://example.test/xxx.html?edition=1#3');
+  runtime.destroy();
+});
+
+test('vertical #1 reader retains a bounded iframe cache without evicting visible neighbors', async () => {
+  const { runtime, elements } = setup({ vertical:true, resume:1 });
+  await runtime.start('hash-work');
+  const frames = () => elements.pageStage.children
+    .map((slot, index) => ({ n:index + 1, iframe:slot.firstChild?.firstChild }))
+    .filter(entry => Boolean(entry.iframe));
+  const move = (n) => {
+    elements.viewer.dispatch('touchmove');
+    elements.viewer.scrollTop = (n - 1) * 800;
+    elements.viewer.dispatch('scroll');
+    assert.equal(runtime.getPageState().displayedPage, n);
+    assert.ok(frames().length <= 10, 'external iframe budget must not be exceeded');
+    assert.ok(frames().some(entry => entry.n === n), 'current iframe must stay loaded');
+    assert.ok(frames().some(entry => entry.n === n - 1) || n === 1, 'previous neighbor must stay loaded');
+  };
+  for (let n = 2; n <= 19; n++) move(n);
+  assert.equal(frames().length, 10);
+  assert.equal(elements.pageStage.children[0].firstChild, null, 'far away frame may be reclaimed');
+  const recent = elements.pageStage.children[17].firstChild.firstChild;
+  for (const n of [18, 17, 18, 19, 18]) move(n);
+  assert.equal(elements.pageStage.children[17].firstChild.firstChild, recent,
+    'nearby frame should survive reverse scrolling even at capacity');
+  runtime.destroy();
+});
+
+test('vertical #1 reader ignores remote reverse hash activity rather than jumping reader scroll', async () => {
+  const { runtime, elements } = setup({ vertical:true, resume:2 });
+  await runtime.start('hash-work');
+  const frame = elements.pageStage.children[1].firstChild.firstChild;
+  const child = readableHashWindow('#2');
+  frame.contentWindow = child;
+  frame.dispatch('load'); // Valid page 2
+  child.location.hash = '#1';
+  child.dispatch('hashchange'); // Site keyboard logic may reverse itself
+  assert.equal(runtime.getPageState().displayedPage, 2, 'passive remote navigation is not a reader scroll gesture');
+  assert.equal(elements.viewer.scrollTop, 800, 'remote hash changes must not jump to another slot');
+  runtime.destroy();
+});
 
 test('hash-page vertical CSS avoids scroll anchoring and refreshes the runtime asset', () => {
   const html = readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
