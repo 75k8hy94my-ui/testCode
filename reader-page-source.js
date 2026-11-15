@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const EXTENSIONS = Object.freeze(['jpg', 'jpeg', 'png', 'webp']);
+  const EXTENSIONS = Object.freeze(['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif']);
   function parseSequentialSource(url, item = {}, baseHref = globalThis.location?.href || 'https://reader.invalid/') {
     try {
       const parsed = new URL(String(url || '').trim(), baseHref);
@@ -43,12 +43,12 @@
       // before guessing alternative formats (and keep any required URL query).
       const initialUrl = String(item?.url || '').trim();
       const initialPath = (() => { try { return new URL(initialUrl, baseHref).pathname; } catch (_) { return ''; } })();
-      const initialMatch = initialPath.match(/(\d+)(?:[^/]*)\.(jpe?g|png|webp|avif)$/i);
+      const initialMatch = initialPath.match(/(\d+)(?:[^/]*)\.(jpe?g|png|webp|avif|gif)$/i);
       const initialFormat = initialPath.match(/\.(jpe?g|png|webp|avif)$/i)?.[1]?.toLowerCase();
       const cachedExtension = Number.isInteger(hints.ext) && hints.ext >= 0
         ? EXTENSIONS[hints.ext]
         : typeof hints.ext === 'string' ? hints.ext.toLowerCase() : null;
-      const formats = [...new Set([initialFormat, cachedExtension, ...extensions].filter((ext) => ext && /^(jpe?g|png|webp|avif)$/.test(ext)))];
+      const formats = [...new Set([initialFormat, ...(item?.autoDetectedDirectory ? [] : [cachedExtension, ...extensions])].filter((ext) => ext && /^(jpe?g|png|webp|avif|gif)$/.test(ext)))];
       for (let number = 1; number <= maxPages; number += 1) {
         if (signal?.aborted) throw Object.assign(new Error('Page discovery cancelled'), { name: 'AbortError' });
         let found = '';
