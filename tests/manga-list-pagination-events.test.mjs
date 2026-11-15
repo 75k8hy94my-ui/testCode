@@ -235,7 +235,45 @@ test('disabled page boundaries suppress accidental clicks without navigating pas
 test('bookshelf route binds swipe only inside its grid and loads the updated event module', () => {
   const route = fs.readFileSync('manga-list-route.js', 'utf8');
   const reader = fs.readFileSync('reader.html', 'utf8');
-  assert.match(route, /manga-list-pagination-events\.js\?v=20261009-touch-swipe/);
+  assert.match(route, /manga-list-pagination-events\.js\?v=20261115-finger-drag/);
   assert.match(route, /swipeSurface: elements\.savedListItems/);
   assert.doesNotMatch(reader, /manga-list-pagination-events/);
+});
+
+test('live shelf gestures report every drag coordinate, then snap or cancel on release', () => {
+  const moves = [];
+  const finishes = [];
+  const pages = [];
+  const surface = touchSurface();
+  const prev = button(); const next = button();
+  const cleanup = loadFactory().create({
+    onPageChange(delta) { pages.push(delta); },
+    onSwipeMove(dx) { moves.push(dx); },
+    onSwipeFinish(direction) { finishes.push(direction); return true; }
+  }).bind({ prevButton: prev, nextButton: next, swipeSurface: surface });
+  assert.equal(surface.options('touchmove').passive, false);
+  surface.fire('touchstart', { x: 230, y: 130 });
+  assert.equal(surface.fire('touchmove', { x: 210, y: 131 }), true);
+  assert.equal(surface.fire('touchmove', { x: 145, y: 134 }), true);
+  assert.equal(surface.fire('touchend', { x: 130, y: 134 }), true);
+  assert.deepEqual(moves, [-20, -85, -100], 'each touch position reaches the live preview');
+  assert.deepEqual(finishes, [1]);
+  assert.deepEqual(pages, [], 'committing a preview is handled after its snap');
+
+  surface.fire('touchstart', { x: 230, y: 100 });
+  surface.fire('touchmove', { x: 190, y: 100 });
+  surface.fire('touchend', { x: 195, y: 100 });
+  assert.deepEqual(finishes, [1, 0], 'a short swipe snaps back without changing pages');
+
+  surface.fire('touchstart', { x: 200, y: 100 });
+  assert.equal(surface.fire('touchmove', { x: 199, y: 145 }), false);
+  surface.fire('touchmove', { x: 95, y: 145 });
+  surface.fire('touchend', { x: 95, y: 145 });
+  assert.deepEqual(finishes, [1, 0], 'vertical scrolling stays native and never starts preview');
+
+  surface.fire('touchstart', { x: 230, y: 130 });
+  surface.fire('touchmove', { x: 170, y: 130 });
+  surface.fire('touchcancel');
+  assert.deepEqual(finishes, [1, 0, 0], 'cancelled touches return to the original page');
+  cleanup();
 });
