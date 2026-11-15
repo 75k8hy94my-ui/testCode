@@ -268,6 +268,37 @@ test('right key on page one advances even when embedded handler does nothing', a
   runtime.destroy();
 });
 
+test('rapid repeated child keys use the original reader position cumulatively', async () => {
+  const { runtime, elements } = setup();
+  await runtime.start('hash-work');
+  const iframe = elements.pageStage.firstChild.firstChild;
+  const child = readableHashWindow('#1');
+  iframe.contentWindow = child;
+  iframe.dispatch('load');
+  child.dispatch('keydown', { key:'ArrowRight' });
+  child.dispatch('keydown', { key:'ArrowRight' });
+  await Promise.resolve();
+  assert.equal(runtime.getPageState().displayedPage, 3, 'two right keys must go from page one to three');
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#3');
+  runtime.destroy();
+});
+
+test('the first-page left boundary never navigates to page zero', async () => {
+  const { runtime, elements } = setup();
+  await runtime.start('hash-work');
+  const iframe = elements.pageStage.firstChild.firstChild;
+  const child = readableHashWindow('#1');
+  iframe.contentWindow = child;
+  iframe.dispatch('load');
+  child.dispatch('keydown', { key:'ArrowLeft' });
+  child.location.hash = '#2'; // remote site reacts in the opposite direction
+  child.dispatch('hashchange');
+  await Promise.resolve();
+  assert.equal(runtime.getPageState().displayedPage, 1);
+  assert.equal(elements.pageLabel.textContent, '1 / ?');
+  runtime.destroy();
+});
+
 test('external reverse hash navigation is detected after a confirmed page, even without key event', async () => {
   const { runtime, elements, item } = setup({ resume:2 });
   await runtime.start('hash-work');
