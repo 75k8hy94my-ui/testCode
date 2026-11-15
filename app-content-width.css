@@ -1,0 +1,52 @@
+/*
+ * Shared desktop content boundary.
+ * Keep the width policy here instead of reproducing it in individual pages.
+ * app-desktop-rail-page is also present in initial HTML so the bound applies
+ * before the navigation script mounts (no first-paint width jump).
+ */
+:root { --app-content-max-width: 920px; }
+
+@media (min-width: 900px) {
+  html.app-content-width-page.app-desktop-rail-page {
+    /* The actual desktop navigation is a 58px fixed sidebar. */
+    --app-desktop-rail-offset: 58px !important;
+    --app-desktop-content-max: var(--app-content-max-width) !important;
+  }
+
+  html.app-content-width-page.app-desktop-rail-page body {
+    box-sizing: border-box !important;
+    padding-left: var(--app-desktop-rail-offset) !important;
+  }
+
+  /*
+   * Real pages use both <main class="homeShell"> and
+   * <div class="homeShell"><main id="routeContent">.
+   * Constrain their common outer shell rather than relying on body > main.
+   * This also covers standalone views, including the reader and login.
+   */
+  html.app-content-width-page body > :is(main, .homeShell, #app) {
+    box-sizing: border-box !important;
+    width: min(100%, var(--app-content-max-width)) !important;
+    max-width: var(--app-content-max-width) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  html.app-content-width-page body > .homeShell > #routeContent {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* The SPA reader canvas is already inside the bounded shell. Avoid
+     reserving the sidebar a second time inside that shell. */
+  html.app-content-width-page.app-desktop-rail-page
+    .homeShell.reader-route[data-reader-route="reader"] > #routeContent {
+    left: 0 !important;
+  }
+
+  /* Explicit browser fullscreen should still use the entire screen. */
+  html.app-content-width-page :fullscreen,
+  html.app-content-width-page :-webkit-full-screen {
+    max-width: none !important;
+  }
+}
