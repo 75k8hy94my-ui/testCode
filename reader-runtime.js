@@ -51,6 +51,7 @@
     function destroy() {
       if (destroyed) return;
       destroyed = true;
+      stopHashKeyboardGuard();
       activeDiscoveryController?.abort?.();
       navigationGeneration += 1;
       verticalWindowGeneration += 1;
@@ -95,6 +96,7 @@
     const hashConfirmedPages = new Set([1]);
     const hashRejectedPages = new Set();
     const hashFrameChecks = new Map();
+    let hashFocusGuardTimer = null;
     let hashPreviousPage = 1;
     // A scroll event also fires after programmatic scrollTop writes, iframe
     // layout changes and browser scroll anchoring. None of those can advance
@@ -682,6 +684,8 @@
         if (hashPageBase && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
           if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
           event.preventDefault?.();
+          event.stopImmediatePropagation?.();
+          event.stopPropagation?.();
           if (event.key === 'ArrowRight') next();
           else previous();
           return;
@@ -693,13 +697,13 @@
       // Keep keyboard focus in the reader even if the embedded site calls
       // focus() after loading or a browser makes the frame active.
       lifecycle.listen(doc, 'focusin', (event) => restoreHashReaderFocus(event.target), { capture: true });
+      lifecycle.listen(win, 'focus', reclaimHashKeyboardFocus);
+      lifecycle.listen(doc, 'visibilitychange', reclaimHashKeyboardFocus);
       lifecycle.listen(win, 'blur', () => {
         // Some engines update document.activeElement only *after* the parent
         // blur event. Re-check after that focus transition has settled.
         const reclaim = () => {
-          if (hashPageBase && hashFrameChecks.has(doc.activeElement)) {
-            restoreHashReaderFocus(doc.activeElement);
-          }
+          reclaimHashKeyboardFocus();
         };
         reclaim();
         win.setTimeout?.(reclaim, 0);
@@ -733,12 +737,35 @@
     function restoreHashReaderFocus(iframe) {
       if (destroyed || !hashPageBase || !hashFrameChecks.has(iframe)) return false;
       const viewer = byId('viewer');
-      // The frame is inert, but sites can still auto-focus their own browsing
-      // context. Give focus back to a non-scrolling parent target.
+      // Tabindex, inert, and an input shield prevent user-initiated focus but
+      // do not reliably prevent a third-party document from auto-focusing
+      // itself after load or fragment navigation. Never leave it the key target.
       if (!viewer || typeof viewer.focus !== 'function') return false;
+      try { iframe.blur?.(); } catch (_) {}
       try { viewer.focus({ preventScroll: true }); }
-      catch (_) { viewer.focus(); }
-      return true;
+      catch (_) { try { viewer.focus(); } catch (_) {} }
+      return doc.activeElement !== iframe;
+    }
+    function reclaimHashKeyboardFocus() {
+      if (destroyed || !hashPageBase || doc.visibilityState === 'hidden') return;
+      const active = doc.activeElement;
+      if (hashFrameChecks.has(active)) restoreHashReaderFocus(active);
+    }
+    function stopHashKeyboardGuard() {
+      if (hashFocusGuardTimer == null) return;
+      try { (win.clearInterval || globalThis.clearInterval)?.(hashFocusGuardTimer); } catch (_) {}
+      hashFocusGuardTimer = null;
+    }
+    function startHashKeyboardGuard() {
+      if (hashFocusGuardTimer != null || !hashPageBase || destroyed) return;
+      // Cross-origin keyboard events never reach the parent window. Maintain
+      // focus ownership for the lifetime of the #1 reader, not merely for
+      // 120 ms after an iframe load. Check only the active element; never
+      // steal focus from toolbar buttons, sliders, or a background tab.
+      if (typeof win.setInterval === 'function') {
+        hashFocusGuardTimer = win.setInterval(reclaimHashKeyboardFocus, 80);
+      }
+      reclaimHashKeyboardFocus();
     }
 
     function interceptHashChildArrow(entry, event) {
@@ -1032,10 +1059,11 @@
       if (link) { link.href = hashUrl(page); link.hidden = false; }
       const message = byId('readerMessage'); if (message) message.textContent = '';
       renderHashLayout();
+      startHashKeyboardGuard();
       // Ensure keys are directed at the reader rather than an auto-focused
       // embedded frame, without disrupting a user-focused toolbar control.
       const active = doc.activeElement;
-      if (!active || active === doc.body || hashFrameChecks.has(active)) {
+      if (!active || active === doc.body || active === doc.documentElement || hashFrameChecks.has(active)) {
         try { byId('viewer')?.focus?.({ preventScroll: true }); } catch (_) {}
       }
       updateControls();
@@ -1148,6 +1176,7 @@
     // A failed source must not leave a delayed image request or an iframe
     // observation capable of replacing the next candidate's page.
     function resetSourcePresentation() {
+      stopHashKeyboardGuard();
       activeAutoDetectedDirectory = false;
       generation += 1;
       navigationGeneration += 1;
