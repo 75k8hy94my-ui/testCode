@@ -157,3 +157,19 @@ test('a start-only bound continues until the first missing numbered image', asyn
   })}).resolve({url:prefix+'1.webp',pageRangeStart:3});
   assert.deepEqual(results.urls,[prefix+'3.webp',prefix+'4.webp',prefix+'5.webp']);
 });
+
+
+test('source images 18.webp–29.webp are returned as reader slots 1–12', async () => {
+  const base='https://images.test/volume/';
+  const requests=[];
+  const source=create({legacyResolver:createLegacyResolver({
+    extensions:['webp'],
+    probe:async url=>{ requests.push(url); return true; }
+  })});
+  const resolved=await source.resolve({id:'bounded-book',url:base+'1.webp',pageRangeStart:18,pageRangeEnd:29});
+  assert.equal(resolved.urls.length,12);
+  assert.equal(resolved.urls[0],base+'18.webp','reader page 1');
+  assert.equal(resolved.urls[11],base+'29.webp','reader page 12');
+  assert.ok(!requests.includes(base+'17.webp'));
+  assert.ok(!requests.includes(base+'30.webp'));
+});
