@@ -799,3 +799,18 @@ test('vertical hash interval has no blank slots before custom start and no beyon
   assert.equal(elements.pageLabel.textContent,'3 / 3');
   runtime.destroy();
 });
+
+
+test('explicit range end overrides an older cached automatic hash-page count', async () => {
+  const {runtime,item,elements}=setup({resume:1});
+  item.pageRangeStart=2;
+  item.pageRangeEnd=19;
+  item.hashPageCount=12;
+  item.hashPageCountSource='https://example.test/xxx.html?edition=1';
+  item.hashPageCountVersion=2;
+  await runtime.start(item.id);
+  assert.equal(elements.pageSlider.max,'19');
+  runtime.goTo(19);
+  assert.equal(elements.pageStage.firstChild.firstChild.src,'https://example.test/xxx.html?edition=1#19');
+  runtime.destroy();
+});
