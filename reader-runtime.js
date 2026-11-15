@@ -1185,10 +1185,11 @@
       sourceReady = false;
       try {
         for (let index = startIndex; index < sourceCandidates.length && !destroyed; index += 1) {
-          if (!directoryPreflightDone && sourceCandidates[index]?.endsWith('#1')) {
+          if (!directoryPreflightDone && sourceCandidates.length > 1
+              && (win.MangaSourceType?.sourcePriority(sourceCandidates[index]) ?? 2) >= 1) {
             directoryPreflightDone = true;
-            // Delay speculative folder checks until a hash fallback is about
-            // to be used. A working explicit direct image opens immediately.
+            // Delay speculative folder checks until a non-direct fallback
+            // would be used. A working explicit direct image opens immediately.
             const seen = new Set(sourceCandidates);
             for (const url of sourceCandidates) {
               if (destroyed) return false;
