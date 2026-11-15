@@ -107,6 +107,7 @@
     let sourceIndex = 0;
     let sourceReady = false;
     let sourceSwitching = false;
+    let activeAutoDetectedDirectory = false;
     let controlsBound = false;
     let activeDiscoveryController = null;
     let encryptedPages = [];
@@ -491,9 +492,13 @@
       return { ready: true, frame: host, renderer, kind: 'encrypted', destroy: () => renderer.destroy() };
     }
     function onSourcePageFailure(failedPage) {
-      if (!sourceReady || sourceSwitching || sourceIndex >= sourceCandidates.length - 1) return;
+      if (!sourceReady || sourceSwitching) return;
+      // An image discovered under /manga/ is a temporary interpretation of
+      // that saved URL. Try the original web page if a later image breaks.
+      const tryOriginal = activeAutoDetectedDirectory;
+      if (!tryOriginal && sourceIndex >= sourceCandidates.length - 1) return;
       sourceReady = false;
-      void activateSources(sourceIndex + 1, failedPage).then((ready) => {
+      void activateSources(tryOriginal ? sourceIndex : sourceIndex + 1, failedPage, tryOriginal).then((ready) => {
         if (!ready && !destroyed) status('すべての漫画URLでページを読み込めませんでした。');
       }).catch((error) => { if (!destroyed) status(error?.message || '代替URLを読み込めませんでした。'); });
     }
@@ -1037,7 +1042,7 @@
       if (destroyed || generationAtStart !== generation) return;
       pageUrls = resolved.urls;
       if (!pageUrls.length) { status('画像を見つけられませんでした。'); return false; }
-      if (sourceCandidates.length < 2 && (resolved.migrated || !item.pageManifest)) {
+      if (sourceCandidates.length < 2 && !item.autoDetectedDirectory && (resolved.migrated || !item.pageManifest)) {
         currentItem = repository.saveItem(resolved.item) || resolved.item;
       }
       page = Math.min(resume, displayCount());
@@ -1053,6 +1058,7 @@
     // A failed source must not leave a delayed image request or an iframe
     // observation capable of replacing the next candidate's page.
     function resetSourcePresentation() {
+      activeAutoDetectedDirectory = false;
       generation += 1;
       navigationGeneration += 1;
       verticalWindowGeneration += 1;
@@ -1109,7 +1115,68 @@
       });
     }
 
-    async function activateSources(startIndex, desiredPage) {
+    // Image probes are isolated from the saved URL and the normal page
+    // discovery. An image must actually decode before its URL is accepted.
+    function probeDirectoryImage(url, signal) {
+      return new Promise((resolve) => {
+        if (destroyed || signal?.aborted || typeof win.Image !== 'function') { resolve(false); return; }
+        const image = new win.Image();
+        let finished = false;
+        let timer;
+        const done = (ok) => {
+          if (finished) return;
+          finished = true;
+          win.clearTimeout?.(timer);
+          signal?.removeEventListener?.('abort', onAbort);
+          image.onload = null;
+          image.onerror = null;
+          if (!ok) image.src = '';
+          resolve(ok);
+        };
+        const onAbort = () => done(false);
+        image.onload = () => done(image.naturalWidth > 0 && image.naturalHeight > 0);
+        image.onerror = () => done(false);
+        signal?.addEventListener?.('abort', onAbort, { once: true });
+        timer = win.setTimeout(() => done(false), 1800);
+        image.src = url;
+      });
+    }
+
+    async function detectDirectoryFirstPage(url) {
+      const groups = win.MangaSourceType?.getDirectoryImageCandidates(url) || [];
+      if (!groups.length || typeof win.Image !== 'function') return '';
+      status('連番画像（1.webp・1.jpgなど）を確認しています…');
+      const Controller = win.AbortController || globalThis.AbortController;
+      const controller = typeof Controller === 'function' ? new Controller() : null;
+      activeDiscoveryController = controller;
+      try {
+        for (const group of groups) {
+          if (destroyed || controller?.signal?.aborted) return '';
+          const groupController = typeof Controller === 'function' ? new Controller() : null;
+          const signal = groupController?.signal || controller?.signal;
+          const abortGroup = () => groupController?.abort();
+          controller?.signal?.addEventListener?.('abort', abortGroup, { once: true });
+          try {
+            const winner = await Promise.any(group.map((candidate) =>
+              probeDirectoryImage(candidate, signal).then((ok) => {
+                if (!ok) throw new Error('not an image');
+                return candidate;
+              })
+            )).catch(() => '');
+            if (winner) return winner;
+          } finally {
+            groupController?.abort();
+            controller?.signal?.removeEventListener?.('abort', abortGroup);
+          }
+        }
+        return '';
+      } finally {
+        controller?.abort();
+        if (activeDiscoveryController === controller) activeDiscoveryController = null;
+      }
+    }
+
+    async function activateSources(startIndex, desiredPage, skipDirectoryForFirst = false) {
       if (sourceSwitching || destroyed) return false;
       sourceSwitching = true;
       sourceReady = false;
@@ -1117,35 +1184,47 @@
         for (let index = startIndex; index < sourceCandidates.length && !destroyed; index += 1) {
           resetSourcePresentation();
           sourceIndex = index;
-          const url = sourceCandidates[index];
-          const candidate = { ...sourceOriginalItem, url };
-          // The saved pages array is a list of images, not substitute URLs.
-          // Do not accidentally reuse an old candidate's discovered pages.
-          if (sourceCandidates.length > 1) {
-            delete candidate.pages;
-            delete candidate.pageManifest;
-          }
-          const isDirect = win.MangaSourceType?.isDirectImageUrl(url);
-          const hasHashBackup = sourceCandidates.slice(index + 1).some((value) => value.endsWith('#1'));
-          const deadline = isDirect && hasHashBackup ? 3500 : isDirect ? 16000 : 10000;
-          let timer;
-          const timeout = new Promise((resolve) => {
-            timer = win.setTimeout(() => resolve(false), deadline);
-          });
-          let ready = false;
-          try {
-            const result = await Promise.race([mountSingleSource(candidate, desiredPage), timeout]);
-            ready = result === true;
-            if (ready && (hashPageBase || embeddedFrame)) ready = await awaitFrameLoad(7000);
-          } catch (error) {
-            if (error?.name === 'AbortError' && destroyed) return false;
-            ready = false;
-          } finally { win.clearTimeout?.(timer); }
+          const savedUrl = sourceCandidates[index];
+          const mayDetect = !(skipDirectoryForFirst && index === startIndex)
+            && (sourceCandidates.length > 1 || !win.MangaSourceType?.hasPageList(sourceOriginalItem));
+          const discoveredUrl = mayDetect ? await detectDirectoryFirstPage(savedUrl) : '';
           if (destroyed) return false;
-          if (ready) {
-            sourceReady = true;
-            status(index ? '代替URLで表示しています。' : '');
-            return true;
+          // If the detected direct sequence later fails, the same original
+          // URL is still available as a normal embedded page.
+          const attempts = discoveredUrl
+            ? [{ url: discoveredUrl, detected: true }, { url: savedUrl, detected: false }]
+            : [{ url: savedUrl, detected: false }];
+          for (let attemptIndex = 0; attemptIndex < attempts.length && !destroyed; attemptIndex += 1) {
+            if (attemptIndex) resetSourcePresentation();
+            const attempt = attempts[attemptIndex];
+            const candidate = { ...sourceOriginalItem, url: attempt.url };
+            if (sourceCandidates.length > 1 || attempt.detected) {
+              delete candidate.pages;
+              delete candidate.pageManifest;
+            }
+            if (attempt.detected) candidate.autoDetectedDirectory = true;
+            const isDirect = win.MangaSourceType?.isDirectImageUrl(attempt.url);
+            const hasHashBackup = sourceCandidates.slice(index + 1).some((value) => value.endsWith('#1'));
+            const deadline = attempt.detected ? 30000 : isDirect && hasHashBackup ? 3500 : isDirect ? 16000 : 10000;
+            let timer;
+            const timeout = new Promise((resolve) => { timer = win.setTimeout(() => resolve(false), deadline); });
+            let ready = false;
+            try {
+              ready = (await Promise.race([mountSingleSource(candidate, desiredPage), timeout])) === true;
+              if (ready && (hashPageBase || embeddedFrame)) ready = await awaitFrameLoad(7000);
+            } catch (error) {
+              if (error?.name === 'AbortError' && destroyed) return false;
+              ready = false;
+            } finally { win.clearTimeout?.(timer); }
+            if (destroyed) return false;
+            if (ready) {
+              sourceReady = true;
+              activeAutoDetectedDirectory = attempt.detected;
+              status(attempt.detected
+                ? '連番画像を自動検出して表示しています。'
+                : index ? '代替URLで表示しています。' : '');
+              return true;
+            }
           }
         }
         return false;
@@ -1160,7 +1239,10 @@
         ? [] : (win.MangaSourceType?.getSourceCandidates(item) || []);
       const button = byId('switchSourceBtn');
       if (button) button.hidden = sourceCandidates.length < 2;
-      if (sourceCandidates.length < 2) return mountSingleSource(item);
+      const needsDirectoryProbe = sourceCandidates.length === 1
+        && !win.MangaSourceType?.hasPageList(item)
+        && (win.MangaSourceType?.getDirectoryImageCandidates(sourceCandidates[0])?.length || 0) > 0;
+      if (sourceCandidates.length < 2 && !needsDirectoryProbe) return mountSingleSource(item);
       return activateSources(0);
     }
 
