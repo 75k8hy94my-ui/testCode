@@ -49,6 +49,27 @@
         ? EXTENSIONS[hints.ext]
         : typeof hints.ext === 'string' ? hints.ext.toLowerCase() : null;
       const formats = [...new Set([initialFormat, ...(item?.autoDetectedDirectory ? [] : [cachedExtension, ...extensions])].filter((ext) => ext && /^(jpe?g|png|webp|avif|gif)$/.test(ext)))];
+      if (item?.autoDetectedDirectory && initialFormat) {
+        // The first file has already been checked by the reader. Discover
+        // subsequent pages in bounded parallel batches, preserving order and
+        // stopping at the first missing page rather than scanning a huge range.
+        const batchSize = 6;
+        for (let start = 1; start <= maxPages; start += batchSize) {
+          if (signal?.aborted) throw Object.assign(new Error('Page discovery cancelled'), { name: 'AbortError' });
+          const numbers = Array.from({ length: Math.min(batchSize, maxPages - start + 1) }, (_, i) => start + i);
+          const urls = numbers.map((number) => number === 1 ? initialUrl : numbered(source, number, initialFormat));
+          const available = await Promise.all(urls.map((url) => probe(url, { signal })));
+          if (signal?.aborted) throw Object.assign(new Error('Page discovery cancelled'), { name: 'AbortError' });
+          for (let i = 0; i < urls.length; i += 1) {
+            if (!available[i]) {
+              if (!pages.length) throw new Error('画像を見つけられませんでした');
+              return { version: 1, pages, splitSpreads: Boolean(item?.splitSpreads) };
+            }
+            pages.push(urls[i]);
+          }
+        }
+        return { version: 1, pages, splitSpreads: Boolean(item?.splitSpreads) };
+      }
       for (let number = 1; number <= maxPages; number += 1) {
         if (signal?.aborted) throw Object.assign(new Error('Page discovery cancelled'), { name: 'AbortError' });
         let found = '';
