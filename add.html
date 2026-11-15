@@ -17,7 +17,7 @@
 .mediaAddMessage{min-height:1.5em;line-height:1.5}
 .mediaAddMessage[data-error="true"]{color:#f67c7c}
 #mediaAddPage .mediaAddButton[disabled]{opacity:.45;cursor:not-allowed}
-@media(max-width:540px){.mediaAddChoices{grid-template-columns:1fr}#mediaAddPage{padding:18px 12px 110px}}
+@media(max-width:540px){.mediaAddPageRange{grid-template-columns:1fr!important}.mediaAddChoices{grid-template-columns:1fr}#mediaAddPage{padding:18px 12px 110px}}
 </style>  <link rel="stylesheet" href="liquid-glass.css?v=20261114-shared-material">
   <script defer src="liquid-glass-engine.js?v=20261114-shared-material"></script>
 <link rel="stylesheet" href="app-content-width.css?v=20261115-shared-width">
@@ -41,6 +41,11 @@
 <label>タグ（カンマ区切り） <input name="tags"></label>
 <label>漫画URL（1行に1URL・複数登録可） <textarea name="url" required placeholder="https://example.com/1.webp&#10;https://example.com/book.html#1" aria-describedby="mangaAddUrlHelp"></textarea></label>
 <p id="mangaAddUrlHelp">すべて同等の候補として登録します。表示時は画像直URL → 末尾が #1 のページ送り形式 → その他のWebページURLの順に試します。読み込みに失敗した場合は次のURLへ切り替えます。複数ページの画像リストは下欄に入力してください。</p>
+<div class="mediaAddPageRange" role="group" aria-label="連番漫画の読み込み範囲" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+<label>開始ページ（任意）<input name="pageRangeStart" type="number" min="1" max="2000" step="1" inputmode="numeric" placeholder="1"></label>
+<label>終了ページ（任意）<input name="pageRangeEnd" type="number" min="1" max="2000" step="1" inputmode="numeric" placeholder="例：19"></label>
+</div>
+<p>末尾が #1 のURLや 1.webp・001.jpg などの連番画像に適用します。未指定なら1ページ目から自動判定します。例えば開始2・終了19なら2～19ページのみ読み込みます。候補URLすべてに共通です。</p>
 <label>各ページの画像URL（任意・1行1URL）<textarea name="pages" placeholder="https://example.com/1.jpg"></textarea></label>
 <p class="mediaAddMessage" id="mangaAddStatus" role="status" aria-live="polite"></p>
 <div><button class="mediaAddButton primary" type="submit">漫画を保存</button></div>
@@ -75,6 +80,6 @@
 <script src="mobile-bottom-nav.js?v=20261012-shared-add"></script>
 <script src="manga-import-author-sync.js?v=20261007-momon-import"></script>
 <script src="manga-json-import.js?v=20261114-json-import"></script>
-<script src="manga-source-type.js?v=20261115-multi-url"></script>
-<script src="media-add.js?v=20261115-multi-url"></script>
+<script src="manga-source-type.js?v=20261115-page-range"></script>
+<script src="media-add.js?v=20261115-page-range"></script>
 </body></html>
