@@ -63,3 +63,26 @@ test('multi-cell clipboard paste normalizes line endings without an extra row', 
   assert.deepEqual(model.clipboardMatrix('作品A\t作者A\r\n作品B\t作者B\r\n'),
     [['作品A','作者A'],['作品B','作者B']]);
 });
+
+test('worksheet URL has a distinct browser-history state without dropping manga filters', () => {
+  const shelf = 'https://site.test/manga.html?sort=recent&page=2#shelf';
+  const sheet = model.spreadsheetUrl(shelf, true);
+  assert.equal(sheet, 'https://site.test/manga.html?sort=recent&page=2&view=spreadsheet#shelf');
+  assert.equal(model.isSpreadsheetUrl(shelf), false);
+  assert.equal(model.isSpreadsheetUrl(sheet), true);
+  assert.equal(model.spreadsheetUrl(sheet, true), sheet, 'opening twice must not duplicate the view parameter');
+  assert.equal(model.spreadsheetUrl(sheet, false), shelf);
+  assert.equal(model.spreadsheetUrl('https://site.test/manga.html?view=custom', false),
+    'https://site.test/manga.html?view=custom');
+});
+
+test('spreadsheet registers browser Back/Forward without rebuilding the shelf route', () => {
+  const { readFileSync } = require('node:fs');
+  const sheet = readFileSync(require.resolve('../manga-spreadsheet.js'), 'utf8');
+  const spa = readFileSync(require.resolve('../home-profile-spa.js'), 'utf8');
+  assert.match(sheet, /win\.history\.pushState\(state/);
+  assert.match(sheet, /win\.history\.back\(\)/);
+  assert.match(sheet, /win\?\.addEventListener\?\.\('popstate', onHistoryChange\)/);
+  assert.match(sheet, /win\?\.removeEventListener\?\.\('popstate', onHistoryChange\)/);
+  assert.match(spa, /isWorksheetHistoryChange\(previous,lastSpaUrl\)/);
+});
