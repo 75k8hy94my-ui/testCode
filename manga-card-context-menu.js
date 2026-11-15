@@ -36,7 +36,7 @@
     const safe = makeAction('セーフモードで開く', onSafeOpen);
     doc.body.appendChild(menu);
 
-    const isCoarse = () => !!win.matchMedia?.('(hover: none), (pointer: coarse)')?.matches;
+    const isCoarse = () => !!win.matchMedia && !win.matchMedia('(hover: hover) and (pointer: fine)').matches;
     let touchTimer = null;
     let touchStart = null;
     let suppressClickId = '';
@@ -59,7 +59,7 @@
       const item = getItem(card.getAttribute('data-manga-item-id'));
       if (!item) return false;
       selectedId = String(item.id);
-      menu.dataset.mode = mode;
+      menu.setAttribute('data-mode', mode);
       menu.hidden = false;
       if (mode === 'sheet') {
         menu.style.left = '0px';
@@ -143,7 +143,7 @@
     function suppressNativeMenu(event) { event.preventDefault(); }
     function onScroll() {
       if (!touchStart?.activated) { cancelTimer(); touchStart = null; }
-      if (menu.dataset.mode !== 'sheet') hide();
+      if (menu.getAttribute('data-mode') !== 'sheet') hide();
     }
     function onResize() { cancelTimer(); touchStart = null; hide(); }
 
