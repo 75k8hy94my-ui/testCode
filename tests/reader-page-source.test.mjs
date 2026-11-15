@@ -114,3 +114,46 @@ test('legacy books recover zero-padding and extension from saved image metadata'
   assert.equal(tried[0], url + '001.webp');
   assert.equal(result.item.pageManifest.version, 1);
 });
+
+
+test('numbered image interval 2–19 loads exactly its 18 requested images', async () => {
+  const prefix = 'https://example.test/chapter/';
+  const requested = [];
+  const resolver = createLegacyResolver({
+    extensions:['webp'],
+    probe: async url => { requested.push(url); return true; }
+  });
+  const result = await create({legacyResolver:resolver}).resolve({
+    id:'range', url:prefix+'1.webp', pageRangeStart:2, pageRangeEnd:19
+  });
+  assert.equal(result.urls.length, 18);
+  assert.equal(result.urls[0], prefix+'2.webp');
+  assert.equal(result.urls[17], prefix+'19.webp');
+  assert.ok(!requested.includes(prefix+'1.webp'));
+  assert.ok(!requested.includes(prefix+'20.webp'));
+  assert.equal(result.manifest.rangeSignature, prefix+'1.webp|2|19');
+});
+
+test('changing or clearing an existing range regenerates stale auto-discovered pages', async () => {
+  const prefix = 'https://img.test/book/';
+  const resolver = createLegacyResolver({ extensions:['webp'], probe:async url =>
+    /^https:\/\/img\.test\/book\/[1-5]\.webp$/.test(url)
+  });
+  const source = create({legacyResolver:resolver});
+  const original = await source.resolve({url:prefix+'1.webp',pageRangeStart:2,pageRangeEnd:4});
+  assert.deepEqual(original.urls, [prefix+'2.webp',prefix+'3.webp',prefix+'4.webp']);
+  const next = await source.resolve({...original.item,pageRangeStart:3,pageRangeEnd:5});
+  assert.deepEqual(next.urls, [prefix+'3.webp',prefix+'4.webp',prefix+'5.webp']);
+  const reset = await source.resolve({...next.item,pageRangeStart:undefined,pageRangeEnd:undefined});
+  assert.deepEqual(reset.urls, [prefix+'1.webp',prefix+'2.webp',prefix+'3.webp',prefix+'4.webp',prefix+'5.webp']);
+  assert.equal(reset.manifest.rangeSignature, undefined);
+});
+
+test('a start-only bound continues until the first missing numbered image', async () => {
+  const prefix='https://img.test/series/';
+  const results=await create({legacyResolver:createLegacyResolver({
+    extensions:['webp'],
+    probe:async url=>[3,4,5].some(n=>url===prefix+n+'.webp'),
+  })}).resolve({url:prefix+'1.webp',pageRangeStart:3});
+  assert.deepEqual(results.urls,[prefix+'3.webp',prefix+'4.webp',prefix+'5.webp']);
+});
