@@ -34,7 +34,7 @@ function element(name = 'div') {
 function setup({ resume = 1, vertical = false, safeMode = false, guard = false, url = 'https://example.test/xxx.html?edition=1#1' } = {}) {
   const ids = [
     'readerStatus', 'readerMessage', 'retryPageBtn', 'pageSlider', 'pageLabel',
-    'currentTitle', 'pageStage', 'viewer', 'topbar', 'controls', 'tocBtn',
+    'currentTitle', 'pageStage', 'viewer', 'readerKeyboardSink', 'topbar', 'controls', 'tocBtn',
     'favToggleBtn', 'closeBtn', 'firstBtn', 'prevBtn', 'nextBtn', 'lastBtn',
     'tocAddBtn', 'safeModeBtn', 'enhanceBtn', 'verticalBtn', 'nextVolumeBanner',
     'nextVolumeText', 'nextVolumeBtn', 'nextVolumeDismissBtn', 'openSourceBtn',
@@ -59,6 +59,10 @@ function setup({ resume = 1, vertical = false, safeMode = false, guard = false, 
   elements.viewer.focus = (options) => {
     doc.activeElement = elements.viewer;
     elements.viewer.focusOptions = options;
+  };
+  elements.readerKeyboardSink.focus = (options) => {
+    doc.activeElement = elements.readerKeyboardSink;
+    elements.readerKeyboardSink.focusOptions = options;
   };
   const item = { id: 'hash-work', title: 'Hash manga', url };
   const commits = [], updates = [];
@@ -186,8 +190,8 @@ test('hash iframe focus and left/right keyboard input remain owned by the reader
   assert.doesNotThrow(() => iframe.dispatch('load'));
   doc.activeElement = iframe;
   iframe.dispatch('focus');
-  assert.equal(doc.activeElement, elements.viewer);
-  assert.deepEqual(elements.viewer.focusOptions, { preventScroll: true });
+  assert.equal(doc.activeElement, elements.readerKeyboardSink);
+  assert.deepEqual(elements.readerKeyboardSink.focusOptions, { preventScroll: true });
 
   const parentEvents = [];
   win.dispatch('keydown', {
@@ -202,7 +206,7 @@ test('hash iframe focus and left/right keyboard input remain owned by the reader
   iframe = elements.pageStage.firstChild.firstChild;
   doc.activeElement = iframe;
   win.dispatch('blur');
-  assert.equal(doc.activeElement, elements.viewer);
+  assert.equal(doc.activeElement, elements.readerKeyboardSink);
 
   // Other controls may retain focus; the trap is only for hash frames.
   doc.activeElement = elements.pageSlider;
@@ -221,14 +225,14 @@ test('recurring focus guard reclaims delayed cross-origin iframe autofocus throu
   const iframe = elements.pageStage.firstChild.firstChild;
   doc.activeElement = iframe;
   tick();
-  assert.equal(doc.activeElement, elements.viewer);
+  assert.equal(doc.activeElement, elements.readerKeyboardSink);
 
   // Repeat after page navigation; keeping the iframe alive must not weaken
   // the keyboard ownership policy.
   runtime.next();
   doc.activeElement = iframe;
   tick();
-  assert.equal(doc.activeElement, elements.viewer);
+  assert.equal(doc.activeElement, elements.readerKeyboardSink);
   assert.equal(runtime.getPageState().displayedPage, 2);
 
   // Keyboard events on the parent belong only to the manga reader.
@@ -252,7 +256,7 @@ test('recurring focus guard reclaims delayed cross-origin iframe autofocus throu
   assert.equal(doc.activeElement, iframe, 'background tabs must not try to regain keyboard focus');
   doc.visibilityState = 'visible';
   doc.dispatch('visibilitychange');
-  assert.equal(doc.activeElement, elements.viewer);
+  assert.equal(doc.activeElement, elements.readerKeyboardSink);
 
   runtime.destroy();
   assert.equal(intervals.size, 0, 'cleanup must stop the guard and avoid background polling');
@@ -326,11 +330,11 @@ test('delayed cross-origin focus transfer is reclaimed after the parent blur eve
   await runtime.start('hash-work');
   const pending = [];
   win.setTimeout = (callback) => { pending.push(callback); return pending.length; };
-  doc.activeElement = elements.viewer;
+  doc.activeElement = elements.readerKeyboardSink;
   win.dispatch('blur');
   doc.activeElement = elements.pageStage.firstChild.firstChild;
   pending.forEach((callback) => callback());
-  assert.equal(doc.activeElement, elements.viewer);
+  assert.equal(doc.activeElement, elements.readerKeyboardSink);
   runtime.destroy();
 });
 
@@ -401,6 +405,8 @@ test('hash-page vertical CSS avoids scroll anchoring and refreshes the runtime a
   assert.match(html, /reader-runtime\.js\?v=20\d{6}-[a-z0-9-]+/);
   assert.match(html, /id="viewer"[^>]*tabindex="-1"/);
   assert.match(html, /readerHashInputShield/);
+  assert.match(html, /id="readerKeyboardSink" tabindex="-1"/);
+  assert.match(html, /#readerKeyboardSink \{ position:fixed/);
 });
 
 
