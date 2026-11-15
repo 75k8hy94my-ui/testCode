@@ -32,7 +32,22 @@
     if (title == null || author == null || !url || sourceUrl == null || circleName == null || sourceWork == null || !Array.isArray(tags) || tags.length > 200 || tags.some(t => field(t, 200, { required: true }) == null)) {
       throw new Error((index + 1) + '件目: タイトル・作者・HTTPSの /1.webp URL・その他の形式を確認してください。');
     }
-    return { title, author, url, sourceUrl, circleName, sourceWork, tags: tags.map(t => t.trim()) };
+    const readBound = (value, label) => {
+      if (value == null || value === '') return null;
+      if (!/^[0-9]+$/.test(String(value)) || !Number.isSafeInteger(Number(value)) ||
+          Number(value) < 1 || Number(value) > 2000) {
+        throw new Error((index + 1) + '件目: ' + label + 'は1～2000の整数で入力してください。');
+      }
+      return Number(value);
+    };
+    const start = readBound(item.pageRangeStart, '開始ページ') ?? 1;
+    const end = readBound(item.pageRangeEnd, '終了ページ');
+    if (end != null && end < start) throw new Error((index + 1) + '件目: 終了ページは開始ページ以上にしてください。');
+    return {
+      title, author, url, sourceUrl, circleName, sourceWork, tags: tags.map(t => t.trim()),
+      ...(start !== 1 ? { pageRangeStart:start } : {}),
+      ...(end != null ? { pageRangeEnd:end } : {}),
+    };
   }
   function parse(text) {
     if (typeof text !== 'string' || new TextEncoder().encode(text).byteLength > MAX_BYTES) throw new Error('JSONファイルが大きすぎます（上限4MB）。');
@@ -98,6 +113,8 @@
           id: createId(), title: item.title, author: item.author, circleName: item.circleName,
           sourceWork: item.sourceWork, isDoujin: Boolean(item.sourceWork), tags: [...item.tags],
           sourceUrl: item.sourceUrl, url: item.url, folderId: null, addedAt: now(),
+          ...(item.pageRangeStart != null ? { pageRangeStart:item.pageRangeStart } : {}),
+          ...(item.pageRangeEnd != null ? { pageRangeEnd:item.pageRangeEnd } : {}),
           // Reader discovers subsequent pages using the existing sequential URL resolver.
         });
       }
