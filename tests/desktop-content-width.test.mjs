@@ -6,6 +6,6 @@ const read = (name) => fs.readFileSync(new URL(`../${name}`, import.meta.url), '
 
 test('desktop app pages use the shared 920px content width', () => {
   const rail = read('app-desktop-rail.js');
-  assert.match(rail, /--app-desktop-content-max:\s*920px/);
+  assert.match(rail, /--app-desktop-content-max:\s*var\(--app-content-max-width,\s*920px\)/);
   assert.match(rail, /max-width:\s*var\(--app-desktop-content-max\)/);
 });
