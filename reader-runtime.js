@@ -671,12 +671,30 @@
         const itemId = event.currentTarget?.dataset?.nextItemId;
         if (itemId) location.assign(target.buildReaderUrl(itemId, 'reader.html'));
       });
+      // Capture the host's arrow keys before the browser's default scroll
+      // behavior or any bubble-phase handler can interpret them.
       lifecycle.listen(win, 'keydown', (event) => {
         if (hashPageBase && vertical && ['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End'].includes(event.key)) {
           hashUserScrollUntil = Date.now() + 1500;
         }
+        if (hashPageBase && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
+          if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+          event.preventDefault?.();
+          if (event.key === 'ArrowRight') next();
+          else previous();
+          return;
+        }
         if (event.key === 'ArrowRight' || event.key === ' ') next();
         else if (event.key === 'ArrowLeft') previous();
+      }, { capture: true });
+      // Events inside a cross-origin iframe do not bubble into the parent.
+      // Keep keyboard focus in the reader even if the embedded site calls
+      // focus() after loading or a browser makes the frame active.
+      lifecycle.listen(doc, 'focusin', (event) => restoreHashReaderFocus(event.target), { capture: true });
+      lifecycle.listen(win, 'blur', () => {
+        if (hashPageBase && hashFrameChecks.has(doc.activeElement)) {
+          restoreHashReaderFocus(doc.activeElement);
+        }
       });
       if (vertical) doc.body.classList.add('vertical-scroll');
       imageEnhanceEnabled = win.localStorage.getItem('mangaReaderImageEnhance') !== '0';
@@ -703,6 +721,32 @@
       if (!imageEnhanceEnabled || doc.body.classList.contains('safe-mode')) return;
       byId('pageStage')?.querySelectorAll('.readerPageImage').forEach((image) => win.ReaderImageEnhancement?.enhanceElement(image, { documentRef: doc, windowRef: win }));
     }
+    function restoreHashReaderFocus(iframe) {
+      if (destroyed || !hashPageBase || !hashFrameChecks.has(iframe)) return false;
+      const viewer = byId('viewer');
+      // The frame is inert, but sites can still auto-focus their own browsing
+      // context. Give focus back to a non-scrolling parent target.
+      if (!viewer || typeof viewer.focus !== 'function') return false;
+      try { viewer.focus({ preventScroll: true }); }
+      catch (_) { viewer.focus(); }
+      return true;
+    }
+
+    function interceptHashChildArrow(entry, event) {
+      if (destroyed || !hashPageBase || !hashFrameChecks.has(entry.iframe)) return;
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      // Same-origin frames are available for capture-phase interception.
+      // On cross-origin frames this listener cannot be installed; focus
+      // containment above keeps keyboard input in the host instead.
+      event.preventDefault?.();
+      event.stopImmediatePropagation?.();
+      event.stopPropagation?.();
+      restoreHashReaderFocus(entry.iframe);
+      if (event.key === 'ArrowRight') next();
+      else previous();
+    }
+
     // A trailing #1 declares a sequence of non-interactive external frames.
     // A site may normalize #1 to #1-; that alone is never an end marker.
     // For other requested pages, #1- means the target fell back to the start.
@@ -719,8 +763,10 @@
       try {
         entry.childWindow?.removeEventListener?.('hashchange', entry.inspect);
         entry.childWindow?.removeEventListener?.('popstate', entry.inspect);
+        entry.childWindow?.removeEventListener?.('keydown', entry.onChildKeydown, true);
       } catch (_) {}
       iframe.removeEventListener?.('load', entry.onLoad);
+      iframe.removeEventListener?.('focus', entry.onFocus);
       hashFrameChecks.delete(iframe);
     }
     function truncateHashVerticalSlots() {
@@ -794,24 +840,30 @@
     function observeHashFrame(iframe, number) {
       let entry = hashFrameChecks.get(iframe);
       if (!entry) {
-        entry = { iframe, number, childWindow: null, timers: new Set(), resetPage: 0, onLoad: null, inspect: null };
+        entry = { iframe, number, childWindow: null, timers: new Set(), resetPage: 0, onLoad: null, onFocus: null, onChildKeydown: null, inspect: null };
         entry.inspect = () => inspectHashObservation(entry);
+        entry.onFocus = () => restoreHashReaderFocus(iframe);
+        entry.onChildKeydown = (event) => interceptHashChildArrow(entry, event);
         entry.onLoad = () => {
           // A full document load replaces listeners inside the child window.
           try {
             entry.childWindow?.removeEventListener?.('hashchange', entry.inspect);
             entry.childWindow?.removeEventListener?.('popstate', entry.inspect);
+            entry.childWindow?.removeEventListener?.('keydown', entry.onChildKeydown, true);
             const child = iframe.contentWindow;
             void child.location.hash;
             child.addEventListener('hashchange', entry.inspect);
             child.addEventListener('popstate', entry.inspect);
+            child.addEventListener('keydown', entry.onChildKeydown, true);
             entry.childWindow = child;
           } catch (_) { entry.childWindow = null; }
           entry.inspect();
           if (entry.childWindow) scheduleHashChecks(entry);
+          if (doc.activeElement === iframe) restoreHashReaderFocus(iframe);
         };
         hashFrameChecks.set(iframe, entry);
         iframe.addEventListener?.('load', entry.onLoad);
+        iframe.addEventListener?.('focus', entry.onFocus);
       } else {
         entry.number = number;
         entry.resetPage = 0;
