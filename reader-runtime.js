@@ -103,6 +103,7 @@
     const hashVerticalSlots = [];
     let pageUrls = [];
     let sourceCandidates = [];
+    const directoryDetectionCache = new Map();
     let sourceOriginalItem = null;
     let sourceIndex = 0;
     let sourceReady = false;
@@ -1187,7 +1188,11 @@
           const savedUrl = sourceCandidates[index];
           const mayDetect = !(skipDirectoryForFirst && index === startIndex)
             && (sourceCandidates.length > 1 || !win.MangaSourceType?.hasPageList(sourceOriginalItem));
-          const discoveredUrl = mayDetect ? await detectDirectoryFirstPage(savedUrl) : '';
+          const discoveredUrl = mayDetect
+            ? directoryDetectionCache.has(savedUrl)
+              ? directoryDetectionCache.get(savedUrl)
+              : await detectDirectoryFirstPage(savedUrl)
+            : '';
           if (destroyed) return false;
           // If the detected direct sequence later fails, the same original
           // URL is still available as a normal embedded page.
@@ -1202,7 +1207,13 @@
               delete candidate.pages;
               delete candidate.pageManifest;
             }
-            if (attempt.detected) candidate.autoDetectedDirectory = true;
+            if (attempt.detected) {
+              candidate.autoDetectedDirectory = true;
+              // A pattern saved for another registered URL must not corrupt
+              // the detected filename and its inferred zero-padding width.
+              delete candidate.pagePattern;
+              delete candidate.numberWidth;
+            }
             const isDirect = win.MangaSourceType?.isDirectImageUrl(attempt.url);
             const hasHashBackup = sourceCandidates.slice(index + 1).some((value) => value.endsWith('#1'));
             const deadline = attempt.detected ? 30000 : isDirect && hasHashBackup ? 3500 : isDirect ? 16000 : 10000;
@@ -1237,6 +1248,22 @@
       sourceOriginalItem = item;
       sourceCandidates = item.localSync || item.encryptedAssets?.pages?.length
         ? [] : (win.MangaSourceType?.getSourceCandidates(item) || []);
+      directoryDetectionCache.clear();
+      // A successful /1.webp discovery is effectively another direct image
+      // source. Rank it ahead of #1 sources even if the saved directory URL
+      // was originally in the miscellaneous category.
+      if (sourceCandidates.some((url) => url.endsWith('#1'))) {
+        for (const url of sourceCandidates) {
+          if (destroyed) return false;
+          if (!(win.MangaSourceType?.getDirectoryImageCandidates(url)?.length)) continue;
+          directoryDetectionCache.set(url, await detectDirectoryFirstPage(url));
+        }
+        sourceCandidates.sort((a, b) => {
+          const rank = (url) => directoryDetectionCache.get(url)
+            ? 0 : win.MangaSourceType?.sourcePriority(url) ?? 2;
+          return rank(a) - rank(b);
+        });
+      }
       const button = byId('switchSourceBtn');
       if (button) button.hidden = sourceCandidates.length < 2;
       const needsDirectoryProbe = sourceCandidates.length === 1
