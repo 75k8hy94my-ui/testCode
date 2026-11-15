@@ -226,7 +226,8 @@
         deps.images.mountHashCover?.(imgEl, root.MangaSourceType.hashPageUrl(hashBase, 1));
         return;
       }
-      if (root.MangaSourceType?.getEmbedUrl(sourceItem)) {
+      const directoryImageUrls = exactUrl ? [] : (root.MangaSourceType?.getDirectoryImageCandidates(baseUrlForItem)?.[0] || []);
+      if (root.MangaSourceType?.getEmbedUrl(sourceItem) && !directoryImageUrls.length) {
         imgEl.src = root.MangaSourceType.EMBED_COVER_URL;
         markCover(imgEl, 'loaded');
         return;
@@ -247,10 +248,12 @@
         : deps.images.extCandidates.map((_, index) => index);
       const firstPageUrl = /^https?:\/\//i.test(String(baseUrlForItem || '')) && /\.(?:jpe?g|png|webp|avif)(?:[?#]|$)/i.test(String(baseUrlForItem))
         ? String(baseUrlForItem) : '';
-      const possibleUrls = directUrl ? [directUrl] : [
-        firstPageUrl,
-        ...extOrder.map((index) => deps.images.pageUrlFor(folderUrl, 1, index, resolvedWidth, pattern)),
-      ];
+      const possibleUrls = directUrl ? [directUrl] : directoryImageUrls.length
+        ? directoryImageUrls
+        : [
+          firstPageUrl,
+          ...extOrder.map((index) => deps.images.pageUrlFor(folderUrl, 1, index, resolvedWidth, pattern)),
+        ];
       const urls = [...new Set([rememberedUrl, ...possibleUrls].filter(Boolean))];
       let index = 0;
       let timer = null;
@@ -275,14 +278,20 @@
         if (index >= urls.length) {
           stopped = true;
           failedCache.add(cacheKey);
-          imgEl.src = '';
-          markCover(imgEl, 'failed');
+          if (directoryImageUrls.length) {
+            // This is a real web-page URL if no numbered image exists.
+            imgEl.src = root.MangaSourceType.EMBED_COVER_URL;
+            markCover(imgEl, 'loaded');
+          } else {
+            imgEl.src = '';
+            markCover(imgEl, 'failed');
+          }
           return;
         }
         imgEl.src = urls[index++];
         // A deadline is per candidate, not shared by every extension. A slow
         // response can be retried from the card instead of being blacklisted.
-        timer = deps.images.setTimer(() => next(), deps.images.loadTimeoutMs);
+        timer = deps.images.setTimer(() => next(), directoryImageUrls.length ? 1600 : deps.images.loadTimeoutMs);
       };
       const onError = () => {
         if (stopped || ready) return;
