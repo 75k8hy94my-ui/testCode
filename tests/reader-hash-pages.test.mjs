@@ -263,7 +263,8 @@ test('hash-page vertical reading creates bounded iframe windows and preserves pa
 test('hash-page vertical CSS avoids scroll anchoring and refreshes the runtime asset', () => {
   const html = readFileSync(new URL('../reader.html', import.meta.url), 'utf8');
   assert.match(html, /body\.hash-page-reader\.vertical-scroll #viewer[\s\S]*overflow-anchor:none/);
-  assert.match(html, /reader-runtime\.js\?v=20\d{6}-[a-z0-9-]+/);\n  assert.match(html, /id="viewer"[^>]*tabindex="-1"/);
+  assert.match(html, /reader-runtime\.js\?v=20\d{6}-[a-z0-9-]+/);
+  assert.match(html, /id="viewer"[^>]*tabindex="-1"/);
 });
 
 
