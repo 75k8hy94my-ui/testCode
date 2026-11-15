@@ -947,6 +947,7 @@ test('vertical scroll state requires actual scrolling input, not a pointerdown o
     'opposite direction is not used to incorrectly infer a forward page');
   elements.viewer.scrollTop=3200;
   elements.viewer.dispatch('scroll');
-  assert.equal(runtime.getPageState().displayedPage,5);
+  assert.equal(runtime.getPageState().displayedPage,4,
+    'new vertical slots must be allocated on demand instead of skipping ahead');
   runtime.destroy();
 });
