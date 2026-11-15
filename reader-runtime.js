@@ -903,10 +903,10 @@
       // If the page itself moved in its REVERSED keyboard direction and the
       // reader did not request that navigation, infer the physical key from
       // the observed hash. This is available only to same-origin frames.
-      const currentHashPage = /^#([1-9]\\d*)(?:-)?$/.exec(observed);
+      const currentHashPage = /^#([1-9]\d*)(?:-)?$/.exec(observed);
       const observedPage = currentHashPage ? Number(currentHashPage[1]) : 0;
       if (number === page && observedPage > 0 && Math.abs(observedPage - number) === 1
-          && Date.now() - (entry.lastRequestedAt || 0) > 450) {
+          && (hashConfirmedPages.has(number) || Date.now() - (entry.lastRequestedAt || 0) > 450)) {
         const corrected = observedPage < number ? number + 1 : number - 1;
         if (hashUrl(corrected) && (!hashKnownTotal || corrected <= hashKnownTotal)
             && !hashRejectedPages.has(corrected)) {
@@ -914,6 +914,13 @@
           scheduleHashCorrections(corrected);
           return true;
         }
+      }
+      // An asynchronous reverse navigation must never be treated as proof
+      // that the reader's newly requested page does not exist.
+      if (entry.iframe === hashIframe && hashCorrectionTimers.size > 0
+          && observedPage !== number && observed !== '#' + number + '-') {
+        scheduleHashCorrections(number);
+        return true;
       }
       if (number > 1 && observed === '#1-') {
         if (entry.resetPage !== number) {
