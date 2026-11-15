@@ -93,6 +93,18 @@
       message.textContent = 'タイトルと有効なHTTP(S)のURLを入力してください。';
       return;
     }
+    let range;
+    try {
+      range = window.MangaSourceType.parsePageRange(data.get('pageRangeStart'), data.get('pageRangeEnd'));
+      if ((range.start !== 1 || range.end != null) &&
+          !sourceUrls.some(url => window.MangaSourceType.supportsPageRange(url))) {
+        throw new Error('ページ範囲は #1 形式または 1.webp などの連番画像URLに指定してください。');
+      }
+    } catch (error) {
+      message.dataset.error = 'true';
+      message.textContent = error.message || 'ページ範囲を確認してください。';
+      return;
+    }
     const existing = getArray(ITEMS);
     const canonicalUrl = sourceUrls[0];
     if (existing.some(item => {
@@ -108,7 +120,9 @@
       author: String(data.get('author') || '').trim(),
       series: String(data.get('series') || '').trim(),
       tags: String(data.get('tags') || '').split(',').map(x => x.trim()).filter(Boolean),
-      folderId: null, sourceUrl: '', url: canonicalUrl, sourceUrls, addedAt: Date.now()
+      folderId: null, sourceUrl: '', url: canonicalUrl, sourceUrls, addedAt: Date.now(),
+      ...(range.start !== 1 ? { pageRangeStart: range.start } : {}),
+      ...(range.end != null ? { pageRangeEnd: range.end } : {})
     };
     const volume = Number(data.get('volume'));
     if (Number.isSafeInteger(volume) && volume > 0) item.volume = volume;
