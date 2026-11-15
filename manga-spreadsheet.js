@@ -595,6 +595,8 @@
         if (needed > COLUMNS.filter(isMangaUrlColumn).length) {
           ensureUrlColumns(needed);
           drawHeader();
+          currentStart = -1;
+          drawRows(true);
         }
       }
       const edits = [];
