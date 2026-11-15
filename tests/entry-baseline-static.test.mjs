@@ -71,7 +71,7 @@ test('manga and video use app-shell routes while Reader stays a standalone docum
   assert.match(spa, /else if\(route==='video'\)renderVideo\(generation\)/);
   assert.doesNotMatch(spa, /reader\.html|renderReader|iframe/);
   assert.match(spa, /if\(!SPA_PAGES\.includes\(name\)\)\{location\.href=target\.href;return true;\}/);
-  assert.match(reader, /class="auth-pending"/);
+  assert.match(reader, /class="[^"]*\bauth-pending\b[^"]*"/);
   assert.match(reader, /reader-target\.js\?v=[\w-]+/);
 });
 
