@@ -424,13 +424,18 @@ test('viewer clicks and arrow keys navigate #1 pages in the original iframe', as
   runtime.destroy();
 });
 
-test('#1 clicks can advance while vertical scrolling is enabled', async () => {
-  const { runtime, elements } = setup({ vertical:true });
+test('vertical hash reader ignores side taps and never jumps pages on touch-generated click', async () => {
+  const { runtime, elements, commits } = setup({ vertical:true });
   await runtime.start('hash-work');
+  const initial = commits.length;
   assert.equal(runtime.getPageState().displayedPage, 1);
-  elements.viewer.dispatch('click', { clientX: 900 });
-  assert.equal(runtime.getPageState().displayedPage, 2);
-  assert.equal(elements.pageLabel.textContent, '2 / ?');
+  elements.viewer.dispatch('pointerdown', { pointerType:'touch', clientX:900 });
+  elements.viewer.dispatch('click', { clientX:900 });
+  elements.viewer.dispatch('click', { clientX:100 });
+  assert.equal(runtime.getPageState().displayedPage, 1);
+  assert.equal(elements.viewer.scrollTop, 0);
+  assert.equal(elements.pageLabel.textContent, '1 / ?');
+  assert.equal(commits.length, initial, 'taps should not persist additional reading progress');
   runtime.destroy();
 });
 
@@ -901,5 +906,47 @@ test('custom hash range end detection saves source count but displays relative t
   assert.equal(item.hashPageCount,18,'source count remains the absolute # number');
   assert.equal(elements.pageLabel.textContent,'1 / 1','reader count is relative');
   assert.equal(runtime.getPageState().displayedPage,1);
+  runtime.destroy();
+});
+
+
+test('iframe size and mobile viewport changes do not shift the frozen vertical scroll grid', async () => {
+  const { runtime, elements } = setup({ vertical:true, resume:2 });
+  elements.viewer.clientHeight = 730;
+  await runtime.start('hash-work');
+  assert.equal(elements.pageStage.children[0].style.height, '730px');
+  assert.equal(elements.pageStage.children[2].style.minHeight, '730px');
+  assert.equal(elements.viewer.scrollTop, 730);
+  elements.viewer.clientHeight = 615; // iOS address bar or toolbar changed viewport
+  elements.viewer.dispatch('wheel', { deltaY:250 });
+  elements.viewer.scrollTop = 2*730;
+  elements.viewer.dispatch('scroll');
+  assert.equal(runtime.getPageState().displayedPage, 3);
+  assert.equal(elements.pageStage.children[2].style.height, '730px');
+  runtime.goTo(4);
+  assert.equal(elements.viewer.scrollTop, 3*730);
+  assert.equal(elements.pageStage.children[3].style.height, '730px');
+  runtime.destroy();
+});
+
+test('vertical scroll state requires actual scrolling input, not a pointerdown on iframe', async () => {
+  const { runtime, elements, commits } = setup({ vertical:true, resume:2 });
+  await runtime.start('hash-work');
+  const before=commits.length;
+  elements.viewer.dispatch('pointerdown', {pointerType:'touch',clientX:900});
+  elements.viewer.scrollTop=2400;
+  elements.viewer.dispatch('scroll');
+  assert.equal(runtime.getPageState().displayedPage,2);
+  assert.equal(commits.length,before);
+  // Real touch motion permits the transition.
+  elements.viewer.dispatch('touchstart', {touches:[{clientY:500}]});
+  elements.viewer.dispatch('touchmove', {touches:[{clientY:300}]});
+  elements.viewer.scrollTop=1600;
+  elements.viewer.dispatch('scroll');
+  assert.equal(runtime.getPageState().displayedPage,2,
+    'opposite direction is not used to incorrectly infer a forward page');
+  elements.viewer.scrollTop=3200;
+  elements.viewer.dispatch('scroll');
+  assert.equal(runtime.getPageState().displayedPage,5);
   runtime.destroy();
 });
