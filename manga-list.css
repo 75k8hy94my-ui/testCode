@@ -582,3 +582,49 @@ html[data-theme="light"] .folder-cover { background: linear-gradient(145deg, #ee
   background: var(--manga-accent-dim);
   outline: none;
 }
+
+
+/* Long-pressing a cover on touch devices opens a bottom action sheet. */
+.manga-card-context-menu[data-mode="sheet"] {
+  position: fixed;
+  inset: auto 0 0 0 !important;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  max-height: 65dvh;
+  overflow-y: auto;
+  padding: 14px 14px calc(18px + env(safe-area-inset-bottom, 0px));
+  border-radius: 22px 22px 0 0;
+  border-bottom: 0;
+  box-shadow: 0 0 0 100vmax rgba(0,0,0,.52), 0 -10px 40px #0008;
+  z-index: 4200;
+  animation: manga-card-menu-rise .19s ease-out both;
+}
+.manga-card-context-menu[data-mode="sheet"]::before {
+  content: "漫画の操作";
+  display:block;
+  color:var(--manga-sub);
+  font-size:12px;
+  padding: 4px 10px 12px;
+}
+.manga-card-context-menu[data-mode="sheet"] button {
+  min-height: 51px;
+  padding: 13px 15px;
+  border-radius: 12px;
+  font-size: 15px;
+}
+@keyframes manga-card-menu-rise {
+  from { transform: translateY(100%); opacity:.5; }
+  to { transform: translateY(0); opacity:1; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .manga-card-context-menu[data-mode="sheet"] { animation:none; }
+}
+@media(hover:none), (pointer:coarse) {
+  #mangaListSection .book-card[data-manga-item-id] .book-cover,
+  #mangaListSection .book-card[data-manga-item-id] .book-cover > img {
+    -webkit-touch-callout:none;
+    -webkit-user-select:none;
+    user-select:none;
+  }
+}
