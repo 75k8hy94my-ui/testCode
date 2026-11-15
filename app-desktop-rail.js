@@ -92,8 +92,8 @@
       }
       @media (min-width: 900px) {
         html.app-desktop-rail-page {
-          --app-desktop-content-max: 920px;
-          --app-desktop-rail-offset: 144px;
+          --app-desktop-content-max: var(--app-content-max-width, 920px);
+          --app-desktop-rail-offset: 58px;
         }
         html.app-desktop-rail-page body {
           padding-left: var(--app-desktop-rail-offset) !important;
