@@ -389,7 +389,10 @@
       const setState = data.set;
       const renderList = () => runtime.renderSavedList();
       const title = (item) => item.title || item.url || '無題';
-      const itemSubtext = (item) => item.url || '';
+      const itemSubtext = (item) => {
+        const urls = windowRef.MangaSourceType?.getSourceUrls(item) || [];
+        return urls.length > 1 ? '登録URL ' + urls.length + '件' : urls[0] || item.url || '';
+      };
       const readingRecordText = (item) => item.lastReadAt ? '既読' : '未読';
       const pageCount = (item) => Array.isArray(item.encryptedAssets?.pages)
         ? item.encryptedAssets.pages.length + 'ページ'
@@ -448,7 +451,7 @@
       const buildSeriesFolderCard = () => buildVirtualCard('シリーズ', iconBooks, visibleItems().filter((item) => item.series), () => setState({ currentFolderView: config.SERIES_FOLDER_ID, currentSeriesView: null, bookshelfPage: 1 }));
       const buildSeriesGroupCard = (group) => buildVirtualCard(group.name, iconBooks, group.items, () => setState({ currentFolderView: config.SERIES_FOLDER_ID, currentSeriesView: group.name, bookshelfPage: 1 }));
       const buildAuthorGroupCard = (group) => buildVirtualCard(group.name, iconFolder, group.items, () => setState({ currentAuthorView: group.name, bookshelfPage: 1 }));
-      const buildSearchText = (item) => [title(item), item.author, item.series, ...(Array.isArray(item.tags) ? item.tags : []), item.url].filter(Boolean).join(' ');
+      const buildSearchText = (item) => [title(item), item.author, item.series, ...(Array.isArray(item.tags) ? item.tags : []), ...(windowRef.MangaSourceType?.getSourceUrls(item) || [item.url])].filter(Boolean).join(' ');
       const reportDeletionError = (message) => {
         let notice = documentRef.getElementById('mangaDeletionError');
         if (!notice) {
