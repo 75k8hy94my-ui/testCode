@@ -736,14 +736,15 @@
     }
     function restoreHashReaderFocus(iframe) {
       if (destroyed || !hashPageBase || !hashFrameChecks.has(iframe)) return false;
-      const viewer = byId('viewer');
-      // Tabindex, inert, and an input shield prevent user-initiated focus but
-      // do not reliably prevent a third-party document from auto-focusing
-      // itself after load or fragment navigation. Never leave it the key target.
-      if (!viewer || typeof viewer.focus !== 'function') return false;
+      // Do not focus #viewer: it is an ANCESTOR of the iframe. Chromium can
+      // report viewer as active while still routing keys into the child.
+      // A focus target outside the embedded subtree actually changes the
+      // active browsing context, including for cross-origin frames.
+      const sink = byId('readerKeyboardSink');
+      if (!sink || typeof sink.focus !== 'function') return false;
       try { iframe.blur?.(); } catch (_) {}
-      try { viewer.focus({ preventScroll: true }); }
-      catch (_) { try { viewer.focus(); } catch (_) {} }
+      try { sink.focus({ preventScroll: true }); }
+      catch (_) { try { sink.focus(); } catch (_) {} }
       return doc.activeElement !== iframe;
     }
     function reclaimHashKeyboardFocus() {
@@ -941,7 +942,7 @@
       shield.setAttribute('aria-hidden', 'true');
       shield.addEventListener('pointerdown', () => {
         if (destroyed || !hashPageBase) return;
-        try { byId('viewer')?.focus?.({ preventScroll: true }); } catch (_) {}
+        try { byId('readerKeyboardSink')?.focus?.({ preventScroll: true }); } catch (_) {}
       }, { passive: true });
       frame.appendChild(shield);
       return { frame, iframe };
@@ -1063,8 +1064,8 @@
       // Ensure keys are directed at the reader rather than an auto-focused
       // embedded frame, without disrupting a user-focused toolbar control.
       const active = doc.activeElement;
-      if (!active || active === doc.body || active === doc.documentElement || hashFrameChecks.has(active)) {
-        try { byId('viewer')?.focus?.({ preventScroll: true }); } catch (_) {}
+      if (!active || active === doc.body || active === doc.documentElement || active === byId('viewer') || hashFrameChecks.has(active)) {
+        try { byId('readerKeyboardSink')?.focus?.({ preventScroll: true }); } catch (_) {}
       }
       updateControls();
       updateTocButton();
