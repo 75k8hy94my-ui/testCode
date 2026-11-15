@@ -10,6 +10,8 @@
     { key: 'sourceWork', label: '元ネタ・原作', width:190, max:300 },
     { key: 'url', label: '漫画URL 1', width:400, type:'url' },
     { key: 'sourceUrl', label: '元ページURL', width:340, type:'url' },
+    { key: 'pageRangeStart', label: '開始ページ（任意）', width:138, type:'pageBound' },
+    { key: 'pageRangeEnd', label: '終了ページ（任意）', width:138, type:'pageBound' },
     { key: 'folderId', label: 'フォルダ', width:155, type:'folder' },
     { key: 'favorite', label: 'お気に入り', width:110, type:'boolean' },
     { key: 'isDoujin', label: '同人誌', width:90, type:'boolean' },
@@ -66,6 +68,7 @@
     const index = urlIndex(column);
     if (index >= 0) return sourceUrls(item)[index] || '';
     const value = item[column.key];
+    if (column.type === 'pageBound') return value == null || value === 0 ? '' : String(value);
     if (column.type === 'tags') return Array.isArray(value) ? value.join(', ') : '';
     if (column.type === 'folder') {
       if (!value) return '';
@@ -100,6 +103,13 @@
         throw new Error('タグは200件以下・各200文字以下にしてください。');
       }
       return Array.from(new Set(values));
+    }
+    if (column.type === 'pageBound') {
+      if (!text) return null;
+      const number = Number(text);
+      if (!/^[0-9]+$/.test(text) || !Number.isSafeInteger(number) || number < 1 || number > 2000)
+        throw new Error(column.label + 'は1～2000の整数で入力してください。');
+      return column.key === 'pageRangeStart' && number === 1 ? null : number;
     }
     if (column.type === 'url') {
       if (!text) return '';
@@ -463,6 +473,26 @@
           if (!replacement.has(id)) replacement.set(id, new Map());
           replacement.get(id).set('sourceUrls', next);
           patches.push({ id, key:'sourceUrls', before, after:next });
+        }
+        // Validate the final row, not each cell independently, so pasting both
+        // start and end at once behaves as an atomic Excel-style transaction.
+        for (const [id, changes] of replacement) {
+          const source = byId.get(id);
+          const start = changes.has('pageRangeStart') ? changes.get('pageRangeStart') : source.pageRangeStart;
+          const end = changes.has('pageRangeEnd') ? changes.get('pageRangeEnd') : source.pageRangeEnd;
+          const first = start == null ? 1 : Number(start);
+          const last = end == null ? null : Number(end);
+          if ((last != null && last < first) ||
+              !Number.isSafeInteger(first) || first < 1 || first > 2000 ||
+              (last != null && (!Number.isSafeInteger(last) || last < 1 || last > 2000)))
+            throw new Error('終了ページは開始ページ以上、かつ1～2000の範囲にしてください。');
+          const urls = changes.has('sourceUrls') ? changes.get('sourceUrls') : sourceUrls(source);
+          const supports = urls.some(url => {
+            try { return String(url).endsWith('#1') || /\/[^/]*\d+[^/]*\.(?:jpe?g|png|webp|avif|gif)$/i.test(new URL(url).pathname); }
+            catch (_) { return false; }
+          });
+          if ((first !== 1 || last != null) && !supports)
+            throw new Error('ページ範囲は #1 または 1.webp などの連番画像URLに指定してください。');
         }
         for (const [id, changes] of replacement) {
           const source = byId.get(id);
