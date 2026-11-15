@@ -7,8 +7,9 @@
     ['manga-list-template.js?v=20261114-json-import', 'mangaRouteTemplate'],
     ['manga-import-author-sync.js?v=20261007-momon-import', 'mangaImportAuthorSync'],
     ['manga-json-import.js?v=20261114-json-import', 'mangaJsonImport'],
-    ['manga-spreadsheet.js?v=20261115-sheet-history', 'mangaSpreadsheet'],
-    ['manga-card-context-menu.js?v=20261115-card-context-menu', 'mangaCardContextMenu'],
+    ['manga-spreadsheet.js?v=20261115-url-cells', 'mangaSpreadsheet'],
+    ['manga-item-editor.js?v=20261115-individual-editor', 'mangaItemEditor'],
+    ['manga-card-context-menu.js?v=20261115-touch-sheet', 'mangaCardContextMenu'],
     ['image-transfer-settings.js?v=20261004-encrypted-image-import', 'encryptedImageImportSettings'],
     ['image-remote-access.js?v=20261004-encrypted-image-import', 'encryptedImageImportRemoteAccess'],
     ['encrypted-asset-crypto.js?v=20261004-encrypted-image-import', 'encryptedImageImportCrypto'],
@@ -611,11 +612,21 @@
           canReadProtectedData,
         });
         cleanups.push(() => spreadsheet.destroy());
+        const individualEditor = windowRef.MangaItemEditor.create({
+          documentRef, windowRef,
+          getState: state, setState,
+          persistItems: host.persistItems,
+          persistAuthorCards: host.persistAuthorCards,
+          authorSync: windowRef.MangaImportAuthorSync,
+          render: renderList,
+          canReadProtectedData,
+        });
+        cleanups.push(() => individualEditor.destroy());
         const cardContextMenu = windowRef.MangaCardContextMenu.create({
           documentRef, windowRef, mountElement: rootElement,
           getItem: (id) => state().savedItems.find((item) => String(item.id) === String(id)),
           canReadProtectedData,
-          onEdit: (item) => spreadsheet.openItem(item.id),
+          onEdit: (item) => individualEditor.open(item.id),
           onSafeOpen: (item) => host.navigateToReader(item, { safeMode: true }),
         });
         cleanups.push(() => cardContextMenu.destroy());
