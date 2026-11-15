@@ -98,6 +98,8 @@ test('reader and cover attempt numbered directory images and preserve the origin
   assert.match(reader, /detectDirectoryFirstPage\(savedUrl\)/);
   assert.match(reader, /\{ url: savedUrl, detected: false \}/);
   assert.match(reader, /activeAutoDetectedDirectory/);
+  assert.match(reader, /virtualDetectedSources\.set\(found, url\)/);
+  assert.match(reader, /sourceCandidates\.push\(\.\.\.virtualDetectedSources\.keys\(\)\)/);
   assert.match(cover, /directoryImageUrls/);
   assert.match(cover, /EMBED_COVER_URL/);
 });
