@@ -8,7 +8,7 @@
     { key: 'series', label: 'シリーズ', width:165, max:300 },
     { key: 'tags', label: 'タグ（カンマ区切り）', width:250, type:'tags' },
     { key: 'sourceWork', label: '元ネタ・原作', width:190, max:300 },
-    { key: 'url', label: '漫画URL', width:340, type:'url' },
+    { key: 'url', label: '漫画URL（複数は | 区切り）', width:400, type:'url' },
     { key: 'sourceUrl', label: '元ページURL', width:340, type:'url' },
     { key: 'folderId', label: 'フォルダ', width:155, type:'folder' },
     { key: 'favorite', label: 'お気に入り', width:110, type:'boolean' },
@@ -20,9 +20,19 @@
   const LABEL_ROWS_HEIGHT = 61;
   const MAX_UNDO = 50;
 
+  // The sheet exposes one URL collection cell; the legacy item.url is only
+  // a compatibility mirror and never a user-visible main/sub designation.
+  function sourceUrls(item) {
+    return Array.isArray(item?.sourceUrls) && item.sourceUrls.length
+      ? item.sourceUrls : item?.url ? [item.url] : [];
+  }
+  function splitSourceUrls(raw) {
+    return [...new Set(String(raw || '').split(/\\r?\\n|\\s+\\|\\s+/).map(v => v.trim()).filter(Boolean))];
+  }
   function formatValue(item, column, folders) {
     if (!item) return '';
     const value = item[column.key];
+    if (column.key === 'url') return sourceUrls(item).join(' | ');
     if (column.type === 'tags') return Array.isArray(value) ? value.join(', ') : '';
     if (column.type === 'folder') {
       if (!value) return '';
@@ -59,18 +69,22 @@
       return Array.from(new Set(values));
     }
     if (column.type === 'url') {
-      if (!text) {
+      const values = column.key === 'url' ? splitSourceUrls(text) : (text ? [text] : []);
+      if (column.key === 'url' && values.length > 40) throw new Error('漫画URLは40件以下にしてください。');
+      if (!values.length) {
         if (column.key === 'url' && !item.localSync && !item.encryptedAssets?.pages?.length &&
             !item.pages?.length && !item.pageManifest?.pages?.length) {
           throw new Error('この作品の漫画URLは空欄にできません。');
         }
         return '';
       }
-      if (text.length > 4096) throw new Error('URLは4096文字以下にしてください。');
       try {
-        const url = new URL(text);
-        if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password) throw new Error('invalid');
-        return text;
+        for (const value of values) {
+          if (value.length > 4096) throw new Error('invalid');
+          const url = new URL(value);
+          if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password) throw new Error('invalid');
+        }
+        return column.key === 'url' ? values.join(' | ') : text;
       } catch (_) { throw new Error('URLには http:// または https:// から始まる正しいアドレスを入力してください。'); }
     }
     if (column.required && !text) throw new Error(column.label + 'は空欄にできません。');
@@ -388,7 +402,7 @@
           if (!source || !column || column.readOnly) throw new Error('編集先の作品または列が見つかりません。');
           const key = id + '\u0000' + column.key;
           const next = edit.preparsed ? edit.value : parseValue(source, column, edit.value, folders);
-          const old = source[column.key];
+          const old = column.key === 'url' ? formatValue(source, column, folders) : source[column.key];
           if (sameValue(old, next)) { replacement.get(id)?.hasOwnProperty(column.key) && replacement.get(id).delete(column.key); patchMap.delete(key); continue; }
           if (!replacement.has(id)) replacement.set(id, new Map());
           replacement.get(id).set(column.key, next);
@@ -402,7 +416,14 @@
       if (!patches.length) { announce('変更はありません。'); return true; }
       const savedItems = itemsBefore.map(item => {
         const changes = replacement.get(String(item.id));
-        return changes?.size ? Object.assign({}, item, Object.fromEntries(changes)) : item;
+        if (!changes?.size) return item;
+        const updated = Object.assign({}, item, Object.fromEntries(changes));
+        if (changes.has('url')) {
+          const urls = splitSourceUrls(changes.get('url'));
+          updated.sourceUrls = urls;
+          updated.url = urls[0] || '';
+        }
+        return updated;
       });
       const authorsBefore = current.authorCards;
       const synced = deps.authorSync.synchronize({
