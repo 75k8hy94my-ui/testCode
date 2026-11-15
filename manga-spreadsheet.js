@@ -27,7 +27,7 @@
       ? item.sourceUrls : item?.url ? [item.url] : [];
   }
   function splitSourceUrls(raw) {
-    return [...new Set(String(raw || '').split(/\\r?\\n|\\s+\\|\\s+/).map(v => v.trim()).filter(Boolean))];
+    return [...new Set(String(raw || '').split(/\r?\n|\s+\|\s+/).map(v => v.trim()).filter(Boolean))];
   }
   function formatValue(item, column, folders) {
     if (!item) return '';
