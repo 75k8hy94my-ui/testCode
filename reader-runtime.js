@@ -104,6 +104,7 @@
     let pageUrls = [];
     let sourceCandidates = [];
     const directoryDetectionCache = new Map();
+    let directoryPreflightDone = false;
     let sourceOriginalItem = null;
     let sourceIndex = 0;
     let sourceReady = false;
@@ -1183,6 +1184,21 @@
       sourceReady = false;
       try {
         for (let index = startIndex; index < sourceCandidates.length && !destroyed; index += 1) {
+          if (!directoryPreflightDone && sourceCandidates[index]?.endsWith('#1')) {
+            directoryPreflightDone = true;
+            // Delay speculative folder checks until a hash fallback is about
+            // to be used. A working explicit direct image opens immediately.
+            for (const url of sourceCandidates) {
+              if (destroyed) return false;
+              if (!(win.MangaSourceType?.getDirectoryImageCandidates(url)?.length)) continue;
+              directoryDetectionCache.set(url, await detectDirectoryFirstPage(url));
+            }
+            sourceCandidates.sort((a, b) => {
+              const rank = (url) => directoryDetectionCache.get(url)
+                ? 0 : (win.MangaSourceType?.sourcePriority(url) ?? 2);
+              return rank(a) - rank(b);
+            });
+          }
           resetSourcePresentation();
           sourceIndex = index;
           const savedUrl = sourceCandidates[index];
@@ -1249,21 +1265,7 @@
       sourceCandidates = item.localSync || item.encryptedAssets?.pages?.length
         ? [] : (win.MangaSourceType?.getSourceCandidates(item) || []);
       directoryDetectionCache.clear();
-      // A successful /1.webp discovery is effectively another direct image
-      // source. Rank it ahead of #1 sources even if the saved directory URL
-      // was originally in the miscellaneous category.
-      if (sourceCandidates.some((url) => url.endsWith('#1'))) {
-        for (const url of sourceCandidates) {
-          if (destroyed) return false;
-          if (!(win.MangaSourceType?.getDirectoryImageCandidates(url)?.length)) continue;
-          directoryDetectionCache.set(url, await detectDirectoryFirstPage(url));
-        }
-        sourceCandidates.sort((a, b) => {
-          const rank = (url) => directoryDetectionCache.get(url)
-            ? 0 : win.MangaSourceType?.sourcePriority(url) ?? 2;
-          return rank(a) - rank(b);
-        });
-      }
+      directoryPreflightDone = false;
       const button = byId('switchSourceBtn');
       if (button) button.hidden = sourceCandidates.length < 2;
       const needsDirectoryProbe = sourceCandidates.length === 1
