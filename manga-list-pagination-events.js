@@ -95,7 +95,7 @@
         const dy = point.clientY - started.y;
         const recognized = Math.abs(dx) >= 70 && Math.abs(dy) <= Math.abs(dx) * 0.6;
         const horizontal = started.axis === 'horizontal';
-        if (horizontal && event.cancelable) event.preventDefault();
+        if (horizontal && typeof deps.onSwipeMove === 'function' && event.cancelable) event.preventDefault();
         if (horizontal && typeof deps.onSwipeMove === 'function') deps.onSwipeMove(dx);
         // The real neighbour may already be following the finger. Snap it
         // back for a short drag, or snap forward then commit the new page.
