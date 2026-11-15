@@ -15,7 +15,10 @@ const standalonePages = [
 ];
 
 test('every app HTML entry uses the same desktop width stylesheet before first paint', () => {
-  for (const file of [...appPages, ...standalonePages]) {
+  // Automatically include any future root HTML route, not only the current list.
+  const rootPages = fs.readdirSync(new URL('../', import.meta.url)).filter(file => file.endsWith('.html'));
+  const allPages = [...new Set([...rootPages, ...appPages, ...standalonePages])];
+  for (const file of allPages) {
     const html = read(file);
     assert.match(html, /<html[^>]*class=["'][^"']*\bapp-content-width-page\b[^"']*["']/i, file);
     const relative = file.includes('/') ? '../' : '';
