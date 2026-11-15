@@ -626,5 +626,6 @@ html[data-theme="light"] .folder-cover { background: linear-gradient(145deg, #ee
     -webkit-touch-callout:none;
     -webkit-user-select:none;
     user-select:none;
+    -webkit-user-drag:none;
   }
 }
