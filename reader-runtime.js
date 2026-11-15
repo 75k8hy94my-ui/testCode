@@ -919,7 +919,8 @@
       // that the reader's newly requested page does not exist.
       if (entry.iframe === hashIframe && hashCorrectionTimers.size > 0
           && observedPage !== number && observed !== '#' + number + '-') {
-        scheduleHashCorrections(number);
+        const desired = hashUrl(number);
+        if (desired) entry.iframe.src = desired;
         return true;
       }
       if (number > 1 && observed === '#1-') {
