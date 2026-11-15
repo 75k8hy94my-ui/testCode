@@ -218,12 +218,14 @@
       // A trailing #1 is a sequence of external *pages*, not a standalone
       // image. Show the first page as a scaled, non-interactive live preview.
       // Never probe speculative /1.jpg URLs or fetch #2 / #3 for a cover.
+      const savedWork = itemId ? deps.getState().savedItems?.find(item => String(item.id) === String(itemId)) : null;
+      const coverStart = !exactUrl ? (root.MangaSourceType?.getPageRange?.(savedWork)?.start || 1) : 1;
       const sourceItem = { url: baseUrlForItem, pages: exactUrl ? [exactUrl] : [] };
       const hashBase = root.MangaSourceType?.getHashPageBase(sourceItem) || '';
       if (hashBase) {
         imgEl.src = root.MangaSourceType.EMBED_COVER_URL;
         markCover(imgEl, 'loaded');
-        deps.images.mountHashCover?.(imgEl, root.MangaSourceType.hashPageUrl(hashBase, 1));
+        deps.images.mountHashCover?.(imgEl, root.MangaSourceType.hashPageUrl(hashBase, coverStart));
         return;
       }
       const directoryImageUrls = exactUrl ? [] : (root.MangaSourceType?.getDirectoryImageCandidates(baseUrlForItem)?.[0] || []);
@@ -241,18 +243,27 @@
       const cached = directUrl ? null : deps.images.getCachedMangaInfo(identityKey, folderUrl);
       const pattern = itemPattern || (parsed && parsed.pattern) || (cached && cached.pattern) || null;
       const resolvedWidth = numberWidth || (cached && cached.numberWidth) || 1;
-      const cacheKey = directUrl || [identityKey, folderUrl, String(resolvedWidth), JSON.stringify(pattern || null), String(cached && cached.ext != null ? cached.ext : '')].join('|');
+      const cacheKey = (directUrl || [identityKey, folderUrl, String(resolvedWidth), JSON.stringify(pattern || null), String(cached && cached.ext != null ? cached.ext : '')].join('|')) + (coverStart !== 1 ? '|page-start:' + coverStart : '');
       const rememberedUrl = sourceCache.get(cacheKey);
       const extOrder = cached && Number.isInteger(cached.ext) && cached.ext >= 0 && cached.ext < deps.images.extCandidates.length
         ? [cached.ext, ...deps.images.extCandidates.map((_, index) => index)]
         : deps.images.extCandidates.map((_, index) => index);
-      const firstPageUrl = /^https?:\/\//i.test(String(baseUrlForItem || '')) && /\.(?:jpe?g|png|webp|avif)(?:[?#]|$)/i.test(String(baseUrlForItem))
-        ? String(baseUrlForItem) : '';
+      const firstPageUrl = (() => {
+        if (!/^https?:\/\//i.test(String(baseUrlForItem || '')) || !/\.(?:jpe?g|png|webp|avif)(?:[?#]|$)/i.test(String(baseUrlForItem))) return '';
+        if (coverStart === 1) return String(baseUrlForItem);
+        try {
+          const parsedImage = new URL(baseUrlForItem);
+          const match = parsedImage.pathname.match(/^(.*\/[^/]*?)(\d+)([^/]*)\.(jpe?g|png|webp|avif)$/i);
+          if (!match) return '';
+          parsedImage.pathname = match[1] + String(coverStart).padStart(match[2].length, '0') + match[3] + '.' + match[4];
+          return parsedImage.href;
+        } catch (_) { return ''; }
+      })();
       const possibleUrls = directUrl ? [directUrl] : directoryImageUrls.length
         ? directoryImageUrls
         : [
           firstPageUrl,
-          ...extOrder.map((index) => deps.images.pageUrlFor(folderUrl, 1, index, resolvedWidth, pattern)),
+          ...extOrder.map((index) => deps.images.pageUrlFor(folderUrl, coverStart, index, resolvedWidth, pattern)),
         ];
       const urls = [...new Set([rememberedUrl, ...possibleUrls].filter(Boolean))];
       let index = 0;
