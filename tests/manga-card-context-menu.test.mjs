@@ -13,7 +13,16 @@ class FakeNode {
   contains(node) { return this === node || this.children.some(child => child.contains(node)); }
   setAttribute(name, value) { this.attrs[name] = value; }
   getAttribute(name) { return this.attrs[name]; }
-  closest(selector) { return selector === '.book-card[data-manga-item-id]' && this.attrs['data-manga-item-id'] ? this : null; }
+  closest(selector) {
+    if (selector === 'button,input,a,select,textarea') return null;
+    let node = this;
+    while (node) {
+      if (selector === '.book-cover' && node.className === 'book-cover') return node;
+      if (selector === '.book-card[data-manga-item-id]' && node.attrs['data-manga-item-id']) return node;
+      node = node.parent;
+    }
+    return null;
+  }
   getBoundingClientRect() { return { width: 200, height: 96 }; }
   focus() { this.focused = true; }
 }
@@ -26,10 +35,18 @@ function setup({ desktop = true, allowed = true } = {}) {
   const win = new FakeNode();
   win.innerWidth = 400; win.innerHeight = 270;
   win.matchMedia = () => ({ matches: desktop });
+  const timers = new Map();
+  let nextTimer = 0;
+  win.setTimeout = fn => { const id = ++nextTimer; timers.set(id, fn); return id; };
+  win.clearTimeout = id => timers.delete(id);
+  const runTimers = () => { const all = [...timers.values()]; timers.clear(); all.forEach(fn => fn()); };
   const shelf = new FakeNode();
   const card = new FakeNode();
   card.setAttribute('data-manga-item-id', 'book-1');
   shelf.appendChild(card);
+  const cover = new FakeNode(); cover.className = 'book-cover';
+  const img = new FakeNode();
+  card.appendChild(cover); cover.appendChild(img);
   const actions = [];
   const controller = context.self.MangaCardContextMenu.create({
     documentRef: doc, windowRef: win, mountElement: shelf,
@@ -44,7 +61,7 @@ function setup({ desktop = true, allowed = true } = {}) {
     shelf.dispatch('contextmenu', { target, clientX: 390, clientY: 265, preventDefault() { prevented = true; } });
     return prevented;
   };
-  return { doc, shelf, card, menu, actions, controller, rightClick };
+  return { doc, shelf, card, cover, img, menu, actions, controller, rightClick, runTimers, timers };
 }
 test('right-clicking a card shows two actions instead of the browser menu', () => {
   const s = setup();
@@ -80,4 +97,34 @@ test('no override on empty shelf, coarse pointer, or blocked data', () => {
     assert.equal(s.menu.hidden, true);
     s.controller.destroy();
   }
+});
+
+
+test('holding a mobile cover opens the bottom sheet without launching the reader', () => {
+  const s = setup({ desktop:false });
+  const finger = { clientX: 50, clientY: 95 };
+  s.shelf.dispatch('touchstart', { target:s.img, touches:[finger] });
+  assert.equal(s.menu.hidden, true, 'short tap does not open the menu');
+  s.runTimers();
+  assert.equal(s.menu.hidden, false);
+  assert.equal(s.menu.getAttribute('data-mode'), 'sheet');
+  assert.equal(s.menu.style.bottom, '0px');
+  let prevented = false;
+  s.shelf.dispatch('touchend', { target:s.img, preventDefault(){ prevented = true; } });
+  assert.equal(prevented, true, 'long press must suppress the following tap');
+  let clickPrevented = false;
+  s.shelf.dispatch('click', { target:s.img, preventDefault(){ clickPrevented = true; } });
+  assert.equal(clickPrevented, true, 'cover click must not open reader after the sheet');
+  s.menu.children[0].dispatch('click');
+  assert.deepEqual(s.actions, [['edit', 'book-1']]);
+  s.controller.destroy();
+});
+
+test('scrolling a mobile cover cancels a pending long press', () => {
+  const s = setup({ desktop:false });
+  s.shelf.dispatch('touchstart', { target:s.img, touches:[{clientX:10, clientY:10}] });
+  s.shelf.dispatch('touchmove', { target:s.img, touches:[{clientX:35, clientY:65}] });
+  s.runTimers();
+  assert.equal(s.menu.hidden, true);
+  s.controller.destroy();
 });
