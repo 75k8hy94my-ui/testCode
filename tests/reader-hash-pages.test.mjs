@@ -114,6 +114,7 @@ test('hash frames use normal reader controls, restore progress and cannot receiv
   assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#3');
   assert.equal(frame.style.pointerEvents, 'none');
   assert.equal(iframe.style.pointerEvents, 'none');
+  assert.equal(frame.children[1].className, 'readerHashInputShield');
   assert.equal(iframe.inert, true);
   assert.equal(iframe.attributes.tabindex, '-1');
   assert.equal(elements.controls.hidden, false);
@@ -199,6 +200,56 @@ test('hash iframe focus and left/right keyboard input remain owned by the reader
   runtime.destroy();
 });
 
+test('viewer clicks and arrow keys navigate #1 pages in the original iframe', async () => {
+  const { runtime, elements, win } = setup();
+  await runtime.start('hash-work');
+  const iframe = elements.pageStage.firstChild.firstChild;
+  assert.equal(elements.pageStage.firstChild.children[1].className, 'readerHashInputShield');
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#1');
+
+  elements.viewer.dispatch('click', { clientX: 900 });
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#2');
+  assert.equal(elements.pageStage.firstChild.firstChild, iframe, 'click navigation must not reload the embedded document');
+
+  let prevented = 0;
+  win.dispatch('keydown', { key: 'ArrowRight', preventDefault() { prevented++; } });
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#3');
+  assert.equal(elements.pageStage.firstChild.firstChild, iframe, 'arrow navigation must preserve the same iframe');
+  assert.equal(prevented, 1);
+
+  elements.viewer.dispatch('click', { clientX: 100 });
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#2');
+  win.dispatch('keydown', { key: 'ArrowLeft', preventDefault() { prevented++; } });
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#1');
+  assert.equal(prevented, 2);
+
+  // The middle of the image toggles chrome without advancing the page.
+  elements.viewer.dispatch('click', { clientX: 500 });
+  assert.equal(iframe.src, 'https://example.test/xxx.html?edition=1#1');
+  runtime.destroy();
+});
+
+test('#1 clicks can advance while vertical scrolling is enabled', async () => {
+  const { runtime, elements } = setup({ vertical:true });
+  await runtime.start('hash-work');
+  assert.equal(runtime.getPageState().displayedPage, 1);
+  elements.viewer.dispatch('click', { clientX: 900 });
+  assert.equal(runtime.getPageState().displayedPage, 2);
+  assert.equal(elements.pageLabel.textContent, '2 / ?');
+  runtime.destroy();
+});
+
+test('legacy cached last-page hints cannot lock the #1 reader at page one', async () => {
+  const { runtime, item, elements } = setup();
+  item.hashPageCount = 1;
+  item.hashPageCountSource = Source.getHashPageBase(item);
+  await runtime.start('hash-work');
+  assert.equal(elements.pageLabel.textContent, '1 / ?');
+  runtime.next();
+  assert.equal(runtime.getPageState().displayedPage, 2);
+  runtime.destroy();
+});
+
 test('enabling vertical mode does not scan pages or react to programmatic browser scroll events', async () => {
   const { runtime, elements, body, commits } = setup({ resume: 2 });
   await runtime.start('hash-work');
@@ -265,6 +316,7 @@ test('hash-page vertical CSS avoids scroll anchoring and refreshes the runtime a
   assert.match(html, /body\.hash-page-reader\.vertical-scroll #viewer[\s\S]*overflow-anchor:none/);
   assert.match(html, /reader-runtime\.js\?v=20\d{6}-[a-z0-9-]+/);
   assert.match(html, /id="viewer"[^>]*tabindex="-1"/);
+  assert.match(html, /readerHashInputShield/);
 });
 
 
@@ -386,6 +438,7 @@ test('a discovered final page survives a new reader session for the same source 
   const { runtime, elements, item } = setup({ resume: 3 });
   item.hashPageCountSource = Source.getHashPageBase(item);
   item.hashPageCount = 3;
+  item.hashPageCountVersion = 2;
   await runtime.start('hash-work');
   assert.equal(elements.pageLabel.textContent, '3 / 3');
   assert.equal(elements.pageSlider.max, '3');
