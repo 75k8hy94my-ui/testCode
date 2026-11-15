@@ -46,6 +46,19 @@ test('URL fields cannot be changed to executable schemes or malformed URLs', () 
   assert.equal(model.parseValue({id:'encrypted',encryptedAssets:{pages:[{}]}}, column('url'), '', folders), '');
 });
 
+test('the URL cell edits an unordered collection without a primary/subordinate label', () => {
+  const item = { ...sample, sourceUrls: [
+    'https://example.com/1.webp', 'https://example.com/book#1'
+  ] };
+  assert.equal(model.formatValue(item, column('url'), folders),
+    'https://example.com/1.webp | https://example.com/book#1');
+  assert.equal(model.parseValue(item, column('url'),
+    'https://example.com/book#1 | https://example.com/1.webp | https://example.com/book#1', folders),
+    'https://example.com/book#1 | https://example.com/1.webp');
+  assert.throws(() => model.parseValue(item, column('url'),
+    'https://example.com/1.webp | javascript:alert(1)', folders), /http/);
+});
+
 test('multi-cell clipboard paste normalizes line endings without an extra row', () => {
   assert.deepEqual(model.clipboardMatrix('作品A\t作者A\r\n作品B\t作者B\r\n'),
     [['作品A','作者A'],['作品B','作者B']]);
