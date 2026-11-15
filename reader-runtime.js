@@ -51,6 +51,7 @@
     function destroy() {
       if (destroyed) return;
       destroyed = true;
+      activeDiscoveryController?.abort?.();
       navigationGeneration += 1;
       verticalWindowGeneration += 1;
       pageTransition?.destroy();
@@ -101,6 +102,13 @@
     let hashUserScrollUntil = 0;
     const hashVerticalSlots = [];
     let pageUrls = [];
+    let sourceCandidates = [];
+    let sourceOriginalItem = null;
+    let sourceIndex = 0;
+    let sourceReady = false;
+    let sourceSwitching = false;
+    let controlsBound = false;
+    let activeDiscoveryController = null;
     let encryptedPages = [];
     let page = 1; // displayed page; never advances before its frame is ready
     let requestedPage = 1;
@@ -430,6 +438,7 @@
         lastFailedRequest = { page: targetPage, url: targetUrl };
         status('画像を読み込めませんでした。表示中のページは維持されています。');
         if (retryButton) retryButton.hidden = false;
+        onSourcePageFailure(targetPage);
         return false;
       });
     }
@@ -481,6 +490,13 @@
       catch (error) { renderer.destroy(); throw error; }
       return { ready: true, frame: host, renderer, kind: 'encrypted', destroy: () => renderer.destroy() };
     }
+    function onSourcePageFailure(failedPage) {
+      if (!sourceReady || sourceSwitching || sourceIndex >= sourceCandidates.length - 1) return;
+      sourceReady = false;
+      void activateSources(sourceIndex + 1, failedPage).then((ready) => {
+        if (!ready && !destroyed) status('すべての漫画URLでページを読み込めませんでした。');
+      }).catch((error) => { if (!destroyed) status(error?.message || '代替URLを読み込めませんでした。'); });
+    }
     function renderPage(number = requestedPage, retry = false) {
       if (hashPageBase) return Promise.resolve(showHashPage(number));
       const targetPage = Math.max(1, Math.min(displayCount() || 1, Math.floor(Number(number) || 1)));
@@ -512,6 +528,7 @@
             lastFailedRequest = { page: targetPage, url };
             status('画像を読み込めませんでした。表示中のページは維持されています。');
             const retryButton = byId('retryPageBtn'); if (retryButton) retryButton.hidden = false;
+            onSourcePageFailure(targetPage);
           }
           return false;
         });
@@ -536,6 +553,13 @@
       bind('firstBtn', 'click', () => goTo(1)); bind('lastBtn', 'click', () => goTo(displayCount()));
       bind('pageSlider', 'change', (event) => goTo(Number(event.target.value)));
       bind('retryPageBtn', 'click', () => { if (lastFailedRequest) renderPage(lastFailedRequest.page, true); });
+      bind('switchSourceBtn', 'click', () => {
+        if (!sourceOriginalItem || sourceCandidates.length < 2 || sourceSwitching) return;
+        sourceReady = false;
+        void activateSources((sourceIndex + 1) % sourceCandidates.length, page).then((ready) => {
+          if (!ready && !destroyed) status('ほかのURLにも接続できませんでした。');
+        });
+      });
       bind('favToggleBtn', 'click', () => {
         const updated = repository.updateItem(currentItem.id, { favorite: !currentItem.favorite });
         if (updated) { currentItem = updated; renderFavorite(); }
@@ -957,13 +981,13 @@
       updateControls();
       return true;
     }
-    async function mountItem(item) {
+    async function mountSingleSource(item, desiredPage) {
       currentItem = item;
       hashPageBase = win.MangaSourceType?.getHashPageBase(item) || '';
       const embeddedUrl = hashPageBase ? '' : win.MangaSourceType?.getEmbedUrl(item) || '';
       split = Boolean(item.splitSpreads);
       updateControls();
-      page = embeddedUrl ? 1 : resumePage(item);
+      page = embeddedUrl ? 1 : (Number.isSafeInteger(desiredPage) && desiredPage > 0 ? desiredPage : resumePage(item));
       if (hashPageBase) page = Math.min(win.MangaSourceType.MAX_HASH_PAGE, Math.max(1, page));
       hashKnownTotal = hashPageBase
         && item.hashPageCountSource === hashPageBase
@@ -987,7 +1011,8 @@
       doc.body.classList.toggle('vertical-scroll', vertical);
       const closeButton = byId('closeBtn'); if (closeButton) closeButton.hidden = false;
       const favoriteButton = byId('favToggleBtn'); if (favoriteButton) favoriteButton.hidden = false;
-      bindControls(); renderFavorite();
+      if (!controlsBound) { bindControls(); controlsBound = true; }
+      renderFavorite();
       if (hashPageBase) return mountHashReader();
       if (embeddedUrl) return mountEmbeddedPage(embeddedUrl);
       const generationAtStart = ++generation;
@@ -1003,12 +1028,13 @@
       status(Array.isArray(item.pages) || item.pageManifest ? 'ページを準備しています…' : 'ページ一覧を初回確認しています…');
       const AbortControllerRef = win.AbortController || globalThis.AbortController;
       const discoveryController = typeof AbortControllerRef === 'function' ? new AbortControllerRef() : null;
+      activeDiscoveryController = discoveryController;
       if (discoveryController) lifecycle.own({ destroy: () => discoveryController.abort() });
       const resolved = await pageSource.resolve(item, { signal: discoveryController?.signal });
       if (destroyed || generationAtStart !== generation) return;
       pageUrls = resolved.urls;
       if (!pageUrls.length) { status('画像を見つけられませんでした。'); return false; }
-      if (resolved.migrated || !item.pageManifest) {
+      if (sourceCandidates.length < 2 && (resolved.migrated || !item.pageManifest)) {
         currentItem = repository.saveItem(resolved.item) || resolved.item;
       }
       page = Math.min(resume, displayCount());
@@ -1018,6 +1044,121 @@
       showNextVolume();
       if (ready) status(`${pageUrls.length}ページ`);
       return ready;
+    }
+
+
+    // A failed source must not leave a delayed image request or an iframe
+    // observation capable of replacing the next candidate's page.
+    function resetSourcePresentation() {
+      generation += 1;
+      navigationGeneration += 1;
+      verticalWindowGeneration += 1;
+      activeDiscoveryController?.abort?.();
+      activeDiscoveryController = null;
+      pageTransition?.invalidate?.();
+      for (const iframe of Array.from(hashFrameChecks.keys())) disposeHashObservation(iframe);
+      embeddedFrame?.remove?.();
+      embeddedFrame = null;
+      hashIframe = null;
+      hashPageBase = '';
+      hashVerticalSlots.length = 0;
+      pageUrls = [];
+      encryptedPages = [];
+      verticalSlots = [];
+      lastFailedRequest = null;
+      doc.body.classList.remove('hash-page-reader', 'vertical-scroll');
+      byId('pageStage')?.replaceChildren?.();
+      const controls = byId('controls'); if (controls) controls.hidden = false;
+      const link = byId('openSourceBtn'); if (link) link.hidden = true;
+      for (const id of ['enhanceBtn', 'tocAddBtn', 'tocBtn', 'retryPageBtn']) {
+        const button = byId(id); if (button) button.hidden = id === 'retryPageBtn';
+      }
+    }
+
+    // Cross-origin frames do not expose HTTP status. Load/error and a bounded
+    // timeout are best-effort checks; the manual switch remains available for
+    // providers that fire load even when their X-Frame-Options blocks display.
+    function awaitFrameLoad(timeoutMs) {
+      const frame = hashIframe || embeddedFrame?.querySelector?.('iframe');
+      if (!frame || typeof frame.addEventListener !== 'function') return Promise.resolve(true);
+      return new Promise((resolve) => {
+        let done = false;
+        let timer;
+        const finish = (value) => {
+          if (done) return;
+          done = true;
+          win.clearTimeout?.(timer);
+          frame.removeEventListener?.('load', onLoad);
+          frame.removeEventListener?.('error', onError);
+          resolve(value);
+        };
+        const onLoad = () => {
+          try {
+            const child = frame.contentDocument;
+            if (child && child.URL === 'about:blank') { finish(false); return; }
+          } catch (_) { /* normal cross-origin frame */ }
+          finish(true);
+        };
+        const onError = () => finish(false);
+        frame.addEventListener('load', onLoad);
+        frame.addEventListener('error', onError);
+        timer = win.setTimeout(() => finish(false), timeoutMs);
+      });
+    }
+
+    async function activateSources(startIndex, desiredPage) {
+      if (sourceSwitching || destroyed) return false;
+      sourceSwitching = true;
+      sourceReady = false;
+      try {
+        for (let index = startIndex; index < sourceCandidates.length && !destroyed; index += 1) {
+          resetSourcePresentation();
+          sourceIndex = index;
+          const url = sourceCandidates[index];
+          const candidate = { ...sourceOriginalItem, url };
+          // The saved pages array is a list of images, not substitute URLs.
+          // Do not accidentally reuse an old candidate's discovered pages.
+          if (sourceCandidates.length > 1) {
+            delete candidate.pages;
+            delete candidate.pageManifest;
+          }
+          const isDirect = win.MangaSourceType?.isDirectImageUrl(url);
+          const hasHashBackup = sourceCandidates.slice(index + 1).some((value) => value.endsWith('#1'));
+          const deadline = isDirect && hasHashBackup ? 3500 : isDirect ? 16000 : 10000;
+          let timer;
+          const timeout = new Promise((resolve) => {
+            timer = win.setTimeout(() => resolve(false), deadline);
+          });
+          let ready = false;
+          try {
+            const result = await Promise.race([mountSingleSource(candidate, desiredPage), timeout]);
+            ready = result === true;
+            if (ready && (hashPageBase || embeddedFrame)) ready = await awaitFrameLoad(7000);
+          } catch (error) {
+            if (error?.name === 'AbortError' && destroyed) return false;
+            ready = false;
+          } finally { win.clearTimeout?.(timer); }
+          if (destroyed) return false;
+          if (ready) {
+            sourceReady = true;
+            status(index ? '代替URLで表示しています。' : '');
+            return true;
+          }
+        }
+        return false;
+      } finally {
+        sourceSwitching = false;
+      }
+    }
+
+    async function mountItem(item) {
+      sourceOriginalItem = item;
+      sourceCandidates = item.localSync || item.encryptedAssets?.pages?.length
+        ? [] : (win.MangaSourceType?.getSourceCandidates(item) || []);
+      const button = byId('switchSourceBtn');
+      if (button) button.hidden = sourceCandidates.length < 2;
+      if (sourceCandidates.length < 2) return mountSingleSource(item);
+      return activateSources(0);
     }
 
     return Object.freeze({
