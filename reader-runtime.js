@@ -1226,7 +1226,8 @@
       if (hashPageBase) page = Math.min(hashRangeEnd || win.MangaSourceType.MAX_HASH_PAGE, Math.max(hashRangeStart, page));
       // Legacy metadata could be poisoned by the iframe-recreation bug.
       // Only trust counts discovered by the repaired navigation pipeline.
-      hashKnownTotal = hashPageBase
+      // A manually chosen end overrides any older auto-detected count.
+      hashKnownTotal = hashPageBase && !hashRangeEnd
         && item.hashPageCountVersion === 2
         && item.hashPageCountSource === hashPageBase
         && Number.isSafeInteger(item.hashPageCount)
