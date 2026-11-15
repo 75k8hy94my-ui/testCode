@@ -413,7 +413,7 @@
             img.addEventListener('load', () => { if (img.dataset) img.dataset.coverState = 'loaded'; });
             img.addEventListener('error', () => { if (img.dataset) img.dataset.coverState = 'failed'; });
             void host.loadLocalCover(item, img);
-          } else host.setupFeedImage(img, windowRef.MangaSourceType?.getSourceCandidates(item)?.[0] || item.url, item.numberWidth, item.pagePattern, item.id, first);
+          } else host.setupFeedImage(img, windowRef.MangaSourceType?.getSourceCandidates(item)?.[0] || item.url, item.numberWidth, item.pagePattern, item.id, windowRef.MangaSourceType?.getSourceUrls(item)?.length > 1 ? '' : first);
           box.appendChild(cell);
         });
         cover.appendChild(box); const badge = documentRef.createElement('span'); badge.className = 'folder-kind-badge'; badge.textContent = kindLabel || 'フォルダ'; cover.appendChild(badge);
