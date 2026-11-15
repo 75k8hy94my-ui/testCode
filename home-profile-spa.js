@@ -356,7 +356,24 @@ function handleVpnStatusChange(event){
 document.addEventListener('manga-reader-vpn-diagnostics',refreshProfileVpnDiagnostics);
 function navigate(path,{replace=false}={}){const target=new URL(path,location.href),name=target.pathname.split('/').pop();if(!SPA_PAGES.includes(name)){location.href=target.href;return true;}if(replace)history.replaceState({appShellSPA:true},'',target.href);else history.pushState({appShellSPA:true},'',target.href);lastSpaUrl=location.href;renderRoute();return true;}
 function intercept(event){if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;const link=event.target.closest('a[href]');if(!link||link.target||link.hasAttribute('download'))return;const target=new URL(link.href,location.href),name=target.pathname.split('/').pop();if(target.origin===location.origin&&SPA_PAGES.includes(name)){event.preventDefault();navigate(target.href);}}
-function handleRoutePopstate(){if(location.href===lastSpaUrl)return;lastSpaUrl=location.href;renderRoute();}
+function isWorksheetHistoryChange(beforeHref,afterHref){
+  try{
+    const before=new URL(beforeHref),after=new URL(afterHref);
+    if(before.pathname!==after.pathname||before.pathname.split('/').pop()!=='manga.html'||before.hash!==after.hash)return false;
+    // The worksheet owns just this URL parameter. Do not unmount the shelf
+    // when Back/Forward changes the Excel overlay's history entry.
+    if(before.searchParams.get('view')==='spreadsheet')before.searchParams.delete('view');
+    if(after.searchParams.get('view')==='spreadsheet')after.searchParams.delete('view');
+    return before.href===after.href;
+  }catch(_){return false;}
+}
+function handleRoutePopstate(){
+  if(location.href===lastSpaUrl)return;
+  const previous=lastSpaUrl;
+  lastSpaUrl=location.href;
+  if(isWorksheetHistoryChange(previous,lastSpaUrl))return;
+  renderRoute();
+}
 async function start(){
   ensureAppShell();
   if(guestMode){
