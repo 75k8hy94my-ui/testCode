@@ -25,6 +25,154 @@
 
     let activePage = null;
     let activeAnimation = null;
+    let swipePreview = null;
+    let activeSwipeAnimation = null;
+
+    // The page model is pure: previewing a neighbour must never mutate the
+    // selected page, pagination controls, or the reader's state.
+    function derivePageModel(page) {
+      const state = context.getState();
+      const config = context.getConfig();
+      return context.deriveViewModel({
+        items: context.shelfVisibleItems(),
+        folders: state.savedFolders,
+        authorCards: state.authorCards,
+        videos: context.getSavedVideos(),
+        folderView: state.currentFolderView,
+        seriesView: state.currentSeriesView,
+        authorView: state.currentAuthorView,
+        filters: state.shelfFilters,
+        searchQuery: state.shelfSearchQuery,
+        sort: state.shelfSort,
+        reorderMode: state.reorderMode,
+        groupByAuthor: state.groupByAuthorEnabled,
+        bulkEditMode: state.bulkEditMode,
+        page,
+        pageSize: config.BOOKSHELF_PAGE_SIZE,
+        ids: {
+          favorites: config.FAVORITES_FOLDER_ID,
+          unread: config.UNREAD_FOLDER_ID,
+          synced: config.SYNCED_FOLDER_ID,
+          history: config.HISTORY_FOLDER_ID,
+          series: config.SERIES_FOLDER_ID
+        },
+        searchText: context.buildSearchText,
+        title: context.itemDisplayTitle,
+        unreadItems: context.unreadOrderItems()
+      });
+    }
+
+    function buildEntryCard(entry, viewModel, organize) {
+      if (entry.type === 'favorites') return context.buildFavoritesFolderCard();
+      if (entry.type === 'series') return context.buildSeriesFolderCard();
+      if (entry.type === 'folder') return buildFolderCard(entry.folder, viewModel.folderCards, organize);
+      if (entry.type === 'series-group') return context.buildSeriesGroupCard(entry.group);
+      if (entry.type === 'author-group') return context.buildAuthorGroupCard(entry.group);
+      return buildBookCard(entry.item, viewModel.itemsList, organize);
+    }
+
+    function cancelPageSwipe() {
+      if (!swipePreview) return;
+      if (activeSwipeAnimation) {
+        activeSwipeAnimation.cancel();
+        activeSwipeAnimation = null;
+      }
+      swipePreview.frame.replaceChildren(swipePreview.outgoing);
+      swipePreview = null;
+    }
+
+    // Called continuously during horizontal touchmove. Build an adjacent real
+    // page only once per direction, then follow the finger without a transition.
+    function previewPageSwipe(dx) {
+      if (!Number.isFinite(dx) || !dx) return false;
+      const direction = dx < 0 ? 1 : -1;
+      const elements = context.getElements();
+      if (!activePage || !elements.savedListItems.contains(activePage)) return false;
+      if ((direction > 0 && elements.bookshelfNextBtn.disabled) ||
+          (direction < 0 && elements.bookshelfPrevBtn.disabled)) {
+        cancelPageSwipe();
+        return false;
+      }
+      if (swipePreview && swipePreview.direction !== direction) cancelPageSwipe();
+      if (!swipePreview) {
+        if (activeAnimation) {
+          activeAnimation.cancel();
+          activeAnimation = null;
+        }
+        const frame = elements.savedListItems.children[0];
+        if (!frame) return false;
+        // If a button-initiated slide was interrupted, restore its active page.
+        frame.replaceChildren(activePage);
+        const doc = context.getDocument();
+        const width = frame.getBoundingClientRect?.().width ||
+          elements.savedListItems.getBoundingClientRect?.().width ||
+          elements.savedListItems.clientWidth;
+        if (!width) return false;
+        const model = derivePageModel(context.getState().bookshelfPage + direction);
+        const incoming = doc.createElement('div');
+        incoming.className = 'bookshelf-page';
+        const fragment = doc.createDocumentFragment();
+        const state = context.getState();
+        const config = context.getConfig();
+        const atRoot = !state.currentFolderView && !state.currentAuthorView;
+        const isRealFolder = !!state.currentFolderView &&
+          ![config.FAVORITES_FOLDER_ID, config.UNREAD_FOLDER_ID, config.SYNCED_FOLDER_ID,
+            config.HISTORY_FOLDER_ID, config.SERIES_FOLDER_ID].includes(state.currentFolderView);
+        const organize = (atRoot || isRealFolder) && state.reorderMode;
+        for (const entry of model.visibleEntries) {
+          fragment.appendChild(buildEntryCard(entry, model, organize));
+        }
+        incoming.appendChild(fragment);
+        const track = doc.createElement('div');
+        track.className = 'bookshelf-slide-track';
+        if (direction > 0) track.append(activePage, incoming);
+        else track.append(incoming, activePage);
+        frame.replaceChildren(track);
+        swipePreview = {
+          frame, track, outgoing: activePage, incoming, direction, width,
+          origin: direction > 0 ? 0 : -width, x: direction > 0 ? 0 : -width
+        };
+      }
+      const preview = swipePreview;
+      preview.x = Math.min(0, Math.max(-preview.width, preview.origin + dx));
+      preview.track.style.transform = 'translate3d(' + preview.x + 'px,0,0)';
+      return true;
+    }
+
+    // Snap from the finger's exact release position. Only after a successful
+    // snap is the selected page committed and the temporary two-page DOM freed.
+    function finishPageSwipe(commit, onCommitted) {
+      const preview = swipePreview;
+      if (!preview) return false;
+      if (activeSwipeAnimation) activeSwipeAnimation.cancel();
+      const targetX = commit ? (preview.direction > 0 ? -preview.width : 0) : preview.origin;
+      const complete = () => {
+        if (swipePreview !== preview) return;
+        swipePreview = null;
+        activeSwipeAnimation = null;
+        preview.frame.replaceChildren(commit ? preview.incoming : preview.outgoing);
+        activePage = commit ? preview.incoming : preview.outgoing;
+        if (commit && typeof onCommitted === 'function') onCommitted(preview.direction);
+      };
+      const view = context.getDocument().defaultView;
+      if (Math.abs(targetX - preview.x) < 1 ||
+          view?.matchMedia?.('(prefers-reduced-motion: reduce)').matches ||
+          typeof preview.track.animate !== 'function') {
+        complete();
+      } else {
+        const animation = preview.track.animate([
+          { transform: 'translate3d(' + preview.x + 'px,0,0)' },
+          { transform: 'translate3d(' + targetX + 'px,0,0)' }
+        ], {
+          duration: Math.min(240, Math.max(100, Math.abs(targetX - preview.x) / preview.width * 260)),
+          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+          fill: 'forwards'
+        });
+        activeSwipeAnimation = animation;
+        animation.finished.then(complete, complete);
+      }
+      return true;
+    }
 
     function slideBetweenPages(doc, frame, outgoing, incoming, direction) {
       const view = doc.defaultView;
@@ -289,6 +437,7 @@
 
       // Preserve the currently displayed DOM page only for a user-triggered
       // page turn; ordinary rerenders (search, folders, edits) stay immediate.
+      cancelPageSwipe();
       const outgoingPage = direction && activePage && elements.savedListItems.contains(activePage)
         ? activePage : null;
       if (activeAnimation) {
@@ -305,33 +454,7 @@
       elements.savedListItems.appendChild(frame);
       activePage = incomingPage;
 
-      const viewModel = context.deriveViewModel({
-        items: context.shelfVisibleItems(),
-        folders: state.savedFolders,
-        authorCards: state.authorCards,
-        videos: context.getSavedVideos(),
-        folderView: state.currentFolderView,
-        seriesView: state.currentSeriesView,
-        authorView: state.currentAuthorView,
-        filters: state.shelfFilters,
-        searchQuery: state.shelfSearchQuery,
-        sort: state.shelfSort,
-        reorderMode: state.reorderMode,
-        groupByAuthor: state.groupByAuthorEnabled,
-        bulkEditMode: state.bulkEditMode,
-        page: state.bookshelfPage,
-        pageSize: config.BOOKSHELF_PAGE_SIZE,
-        ids: {
-          favorites: config.FAVORITES_FOLDER_ID,
-          unread: config.UNREAD_FOLDER_ID,
-          synced: config.SYNCED_FOLDER_ID,
-          history: config.HISTORY_FOLDER_ID,
-          series: config.SERIES_FOLDER_ID
-        },
-        searchText: context.buildSearchText,
-        title: context.itemDisplayTitle,
-        unreadItems: context.unreadOrderItems()
-      });
+      const viewModel = derivePageModel(state.bookshelfPage);
       const { itemsList, folderCards, visibleEntries, totalPages } = viewModel;
       context.setState({ bookshelfPage: viewModel.normalizedPage });
       const isEmpty = viewModel.totalEntries === 0;
@@ -356,14 +479,7 @@
           bookshelfPageLabel: elements.bookshelfPageLabel
         },
         items: visibleEntries,
-        createCard: (entry, list, organizeMode) => {
-          if (entry.type === 'favorites') return context.buildFavoritesFolderCard();
-          if (entry.type === 'series') return context.buildSeriesFolderCard();
-          if (entry.type === 'folder') return buildFolderCard(entry.folder, folderCards, organizeMode);
-          if (entry.type === 'series-group') return context.buildSeriesGroupCard(entry.group);
-          if (entry.type === 'author-group') return context.buildAuthorGroupCard(entry.group);
-          return buildBookCard(entry.item, list, organizeMode);
-        },
+        createCard: (entry, list, organizeMode) => buildEntryCard(entry, viewModel, organizeMode),
         list: itemsList,
         reorderMode: showOrganizeControls,
         empty: isEmpty,
@@ -387,7 +503,7 @@
       }
     }
 
-    return Object.freeze({ renderSavedList, buildBookCard, buildFolderCard, handleMangaCardOpen });
+    return Object.freeze({ renderSavedList, previewPageSwipe, finishPageSwipe, buildBookCard, buildFolderCard, handleMangaCardOpen });
   }
 
   root.MangaListRuntimeFactory = Object.freeze({ create });
