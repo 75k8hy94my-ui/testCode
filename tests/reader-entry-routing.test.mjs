@@ -8,7 +8,8 @@ const reader = read('reader.html');
 test("the bookshelf launches a standalone reader document using the saved item's stable id", () => {
   assert.match(read('manga-list-host-runtime.js'), /buildReaderUrl\(itemId, deps\.navigation\.readerUrl\)/);
   assert.doesNotMatch(read('manga-list-host-runtime.js'), /prepareLaunch|lastUrlKey|mangaReaderLastUrl/);
-  assert.match(read('manga-list-host-runtime.js'), /navigate\(deps\.navigation\.buildReaderUrl/);
+  assert.match(read('manga-list-host-runtime.js'), /deps\.navigation\.navigate\(options\.safeMode === true/);
+  assert.match(read('manga-list-host-runtime.js'), /'safe=1'/);
   assert.match(read('reader-target.js'), /function buildReaderUrl\(itemId/);
   assert.match(read('reader-target.js'), /itemIdFromLocation/);
 });

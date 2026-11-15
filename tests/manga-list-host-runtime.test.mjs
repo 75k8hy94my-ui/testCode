@@ -249,6 +249,19 @@ test('host checkpoints the shelf then performs standalone Reader document naviga
   assert.deepEqual(calls, []);
 });
 
+test('safe-mode launch affects only the reader URL, not the saved default', () => {
+  const calls = [];
+  const host = loadFactory().create(deps(calls));
+  assert.equal(host.navigateToReader({ id: 'item-1' }, { safeMode: true }), true);
+  assert.deepEqual(calls, [
+    'state',
+    ['write', 'items-key', ['items']],
+    ['build-reader-url', 'item-1', 'reader.html'],
+    ['navigate', 'reader.html?item=item-1&safe=1'],
+  ]);
+  assert.equal(calls.some(call => Array.isArray(call) && call[0] === 'write' && call[1] === 'mangaReaderSafeMode'), false);
+});
+
 test('host rejects Reader navigation while protected-data access is blocked', async () => {
   const calls = [];
   const access = deps(calls);
