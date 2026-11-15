@@ -55,43 +55,67 @@
           ? swipeSurface.getBoundingClientRect() : null;
         // Preserve browser history gestures at the sides of the viewport.
         if (rect && (point.clientX < rect.left + 18 || point.clientX > rect.right - 18)) return;
-        gesture = { identifier: point.identifier, x: point.clientX, y: point.clientY };
+        gesture = { identifier: point.identifier, x: point.clientX, y: point.clientY, axis: null };
       };
       const onTouchMove = (event) => {
         if (!gesture) return;
         if (event.touches?.length !== 1 || event.touches[0]?.identifier !== gesture.identifier) {
+          if (gesture.axis === 'horizontal') deps.onSwipeFinish?.(0);
           gesture = null;
           return;
         }
         const point = event.touches[0];
         const dx = point.clientX - gesture.x;
         const dy = point.clientY - gesture.y;
-        // Once the user begins scrolling vertically, never reinterpret the
-        // rest of that gesture as a page turn.
-        if (Math.abs(dy) > 24 && Math.abs(dy) > Math.abs(dx)) gesture = null;
+        // Lock the direction once, so vertical page scrolling cannot turn
+        // into a horizontal page swipe partway through the gesture.
+        if (!gesture.axis && Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) {
+          gesture = null;
+          return;
+        }
+        if (!gesture.axis && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.25) {
+          gesture.axis = 'horizontal';
+        }
+        if (gesture.axis === 'horizontal' && typeof deps.onSwipeMove === 'function') {
+          if (event.cancelable) event.preventDefault();
+          deps.onSwipeMove(dx);
+        }
       };
       const onTouchEnd = (event) => {
         const started = gesture;
         gesture = null;
-        if (!started || event.changedTouches?.length !== 1) return;
+        if (!started) return;
+        if (event.changedTouches?.length !== 1 ||
+            event.changedTouches[0]?.identifier !== started.identifier) {
+          if (started.axis === 'horizontal') deps.onSwipeFinish?.(0);
+          return;
+        }
         const point = event.changedTouches[0];
-        if (point?.identifier !== started.identifier) return;
         const dx = point.clientX - started.x;
         const dy = point.clientY - started.y;
-        if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
-        // Cancel the synthetic click following a recognized swipe, including
-        // a swipe at the first/last page that cannot change the current page.
+        const recognized = Math.abs(dx) >= 70 && Math.abs(dy) <= Math.abs(dx) * 0.6;
+        const horizontal = started.axis === 'horizontal';
+        if (horizontal && event.cancelable) event.preventDefault();
+        // The real neighbour may already be following the finger. Snap it
+        // back for a short drag, or snap forward then commit the new page.
+        const direction = recognized ? (dx < 0 ? 1 : -1) : 0;
+        const handled = horizontal && typeof deps.onSwipeFinish === 'function'
+          ? deps.onSwipeFinish(direction) : false;
+        if (!recognized) return;
         if (event.cancelable) event.preventDefault();
         const targetButton = dx < 0 ? nextButton : prevButton;
-        if (!targetButton.disabled) deps.onPageChange(dx < 0 ? 1 : -1);
+        if (!handled && !targetButton.disabled) deps.onPageChange(direction);
       };
-      const onTouchCancel = () => { gesture = null; };
+      const onTouchCancel = () => {
+        if (gesture?.axis === 'horizontal') deps.onSwipeFinish?.(0);
+        gesture = null;
+      };
       if (swipeSurface) {
         if (typeof swipeSurface.addEventListener !== 'function' || typeof swipeSurface.removeEventListener !== 'function') {
           throw new TypeError('MangaListPaginationEventsFactory requires swipeSurface event methods');
         }
         swipeSurface.addEventListener('touchstart', onTouchStart, { passive: true });
-        swipeSurface.addEventListener('touchmove', onTouchMove, { passive: true });
+        swipeSurface.addEventListener('touchmove', onTouchMove, { passive: typeof deps.onSwipeMove !== 'function' });
         swipeSurface.addEventListener('touchend', onTouchEnd, { passive: false });
         swipeSurface.addEventListener('touchcancel', onTouchCancel);
       }
@@ -107,6 +131,7 @@
           swipeSurface.removeEventListener('touchend', onTouchEnd);
           swipeSurface.removeEventListener('touchcancel', onTouchCancel);
         }
+        if (gesture?.axis === 'horizontal') deps.onSwipeFinish?.(0);
         gesture = null;
         cleaned = true;
       };
