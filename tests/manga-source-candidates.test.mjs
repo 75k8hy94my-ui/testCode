@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 const sources = require('../manga-source-type.js');
 const spreadsheet = require('../manga-spreadsheet.js');
+const pageSource = require('../reader-page-source.js');
 const read = name => readFileSync(new URL('../' + name, import.meta.url), 'utf8');
 
 test('alternative manga URLs are ranked by format, not by input position', () => {
@@ -54,4 +55,49 @@ test('new and existing manga use the same source URL collection UI', () => {
   assert.match(reader, /MangaSourceType\?\.getSourceCandidates\(item\)/);
   assert.match(reader, /onSourcePageFailure\(targetPage\)/);
   assert.match(read('reader.html'), /id="switchSourceBtn"/);
+});
+
+test('directory-style sources probe common extensions and zero-padded first pages before web embed', () => {
+  const candidates = sources.getDirectoryImageCandidates('https://site.test/manga/?auth=ok');
+  assert.equal(candidates.length, 4);
+  assert.deepEqual(candidates[0].slice(0, 3), [
+    'https://site.test/manga/1.webp?auth=ok',
+    'https://site.test/manga/1.jpg?auth=ok',
+    'https://site.test/manga/1.jpeg?auth=ok',
+  ]);
+  assert.ok(candidates[0].includes('https://site.test/manga/1.png?auth=ok'));
+  assert.ok(candidates[0].includes('https://site.test/manga/1.avif?auth=ok'));
+  assert.ok(candidates[0].includes('https://site.test/manga/1.gif?auth=ok'));
+  assert.ok(candidates[1].includes('https://site.test/manga/01.webp?auth=ok'));
+  assert.ok(candidates[2].includes('https://site.test/manga/001.webp?auth=ok'));
+  assert.ok(candidates[3].includes('https://site.test/manga/0001.webp?auth=ok'));
+  assert.equal(sources.getDirectoryImageCandidates('https://site.test/book.html').length, 0);
+  assert.equal(sources.getDirectoryImageCandidates('https://site.test/book#1').length, 0);
+  assert.equal(sources.getDirectoryImageCandidates('https://site.test/manga/1.webp').length, 0);
+  assert.equal(sources.getDirectoryImageCandidates('javascript:alert(1)').length, 0);
+});
+
+test('detected image folders discover ordered pages without changing the saved directory', async () => {
+  const original = 'https://site.test/manga/';
+  const source = original + '001.webp?auth=ok';
+  const existing = [source, original + '002.webp?auth=ok'];
+  const probed = [];
+  const resolver = pageSource.createLegacyResolver({
+    maxPages: 20,
+    probe: async (url) => { probed.push(url); return existing.includes(url); },
+  });
+  const result = await resolver.resolve({ url: source, autoDetectedDirectory: true });
+  assert.deepEqual(result.pages, existing);
+  assert.ok(probed.includes(original + '003.webp?auth=ok'));
+  assert.ok(!probed.some((url) => url.endsWith('.jpg?auth=ok')), 'chosen extension remains consistent');
+});
+
+test('reader and cover attempt numbered directory images and preserve the original URL fallback', () => {
+  const reader = read('reader-runtime.js');
+  const cover = read('manga-list-host-runtime.js');
+  assert.match(reader, /detectDirectoryFirstPage\(savedUrl\)/);
+  assert.match(reader, /\{ url: savedUrl, detected: false \}/);
+  assert.match(reader, /activeAutoDetectedDirectory/);
+  assert.match(cover, /directoryImageUrls/);
+  assert.match(cover, /EMBED_COVER_URL/);
 });
