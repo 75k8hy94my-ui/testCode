@@ -39,6 +39,18 @@
       // whole document. Keep normal vertical scrolling and card taps intact.
       const swipeSurface = elements.swipeSurface;
       let gesture = null;
+      let activeTouchTarget = null;
+      let lastMoveEvent = null;
+      // During a button animation an outgoing card can be detached while it
+      // still owns the active touch. Keep receiving that touch on its original
+      // target even after it leaves the shelf's DOM subtree.
+      const clearTouchTarget = () => {
+        if (!activeTouchTarget) return;
+        activeTouchTarget.removeEventListener('touchmove', onTouchMove);
+        activeTouchTarget.removeEventListener('touchend', onTouchEnd);
+        activeTouchTarget.removeEventListener('touchcancel', onTouchCancel);
+        activeTouchTarget = null;
+      };
       const interactiveTarget = (target) => {
         const node = target?.nodeType === 3 ? target.parentElement : target;
         if (typeof deps.allowSwipeTarget === 'function' && deps.allowSwipeTarget(node)) return false;
@@ -47,7 +59,9 @@
         );
       };
       const onTouchStart = (event) => {
+        clearTouchTarget();
         gesture = null;
+        lastMoveEvent = null;
         if (event.touches?.length !== 1 || interactiveTarget(event.target)) return;
         const point = event.touches[0];
         if (!Number.isFinite(point?.clientX) || !Number.isFinite(point?.clientY)) return;
@@ -56,12 +70,22 @@
         // Preserve browser history gestures at the sides of the viewport.
         if (rect && (point.clientX < rect.left + 18 || point.clientX > rect.right - 18)) return;
         gesture = { identifier: point.identifier, x: point.clientX, y: point.clientY, axis: null };
+        const target = event.target;
+        if (target !== swipeSurface && typeof target?.addEventListener === 'function' &&
+            typeof target?.removeEventListener === 'function') {
+          activeTouchTarget = target;
+          target.addEventListener('touchmove', onTouchMove, { passive: typeof deps.onSwipeMove !== 'function' });
+          target.addEventListener('touchend', onTouchEnd, { passive: false });
+          target.addEventListener('touchcancel', onTouchCancel);
+        }
       };
       const onTouchMove = (event) => {
-        if (!gesture) return;
+        if (!gesture || lastMoveEvent === event) return;
+        lastMoveEvent = event;
         if (event.touches?.length !== 1 || event.touches[0]?.identifier !== gesture.identifier) {
           if (gesture.axis === 'horizontal') deps.onSwipeFinish?.(0);
           gesture = null;
+          clearTouchTarget();
           return;
         }
         const point = event.touches[0];
@@ -71,6 +95,7 @@
         // into a horizontal page swipe partway through the gesture.
         if (!gesture.axis && Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) {
           gesture = null;
+          clearTouchTarget();
           return;
         }
         if (!gesture.axis && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.25) {
@@ -84,6 +109,7 @@
       const onTouchEnd = (event) => {
         const started = gesture;
         gesture = null;
+        clearTouchTarget();
         if (!started) return;
         if (event.changedTouches?.length !== 1 ||
             event.changedTouches[0]?.identifier !== started.identifier) {
@@ -110,6 +136,7 @@
       const onTouchCancel = () => {
         if (gesture?.axis === 'horizontal') deps.onSwipeFinish?.(0);
         gesture = null;
+        clearTouchTarget();
       };
       if (swipeSurface) {
         if (typeof swipeSurface.addEventListener !== 'function' || typeof swipeSurface.removeEventListener !== 'function') {
@@ -134,6 +161,7 @@
         }
         if (gesture?.axis === 'horizontal') deps.onSwipeFinish?.(0);
         gesture = null;
+        clearTouchTarget();
         cleaned = true;
       };
     }
