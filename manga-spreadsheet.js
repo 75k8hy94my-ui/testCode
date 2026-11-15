@@ -1,21 +1,21 @@
 (function (root) {
   'use strict';
 
-  const COLUMNS = Object.freeze([
+  const COLUMNS = [
     { key: 'title', label: 'タイトル', width:290, max:500, required:true },
     { key: 'author', label: '作者', width:155, max:300 },
     { key: 'circleName', label: 'サークル', width:155, max:300 },
     { key: 'series', label: 'シリーズ', width:165, max:300 },
     { key: 'tags', label: 'タグ（カンマ区切り）', width:250, type:'tags' },
     { key: 'sourceWork', label: '元ネタ・原作', width:190, max:300 },
-    { key: 'url', label: '漫画URL（複数は | 区切り）', width:400, type:'url' },
+    { key: 'url', label: '漫画URL 1', width:400, type:'url' },
     { key: 'sourceUrl', label: '元ページURL', width:340, type:'url' },
     { key: 'folderId', label: 'フォルダ', width:155, type:'folder' },
     { key: 'favorite', label: 'お気に入り', width:110, type:'boolean' },
     { key: 'isDoujin', label: '同人誌', width:90, type:'boolean' },
     { key: 'id', label: '作品ID（変更不可）', width:210, readOnly:true },
     { key: 'addedAt', label: '登録日時（変更不可）', width:175, readOnly:true }
-  ]);
+  ];
   const HEIGHT = 30;
   const LABEL_ROWS_HEIGHT = 61;
   const MAX_UNDO = 50;
@@ -34,19 +34,38 @@
     return url.href;
   }
 
-  // The sheet exposes one URL collection cell; the legacy item.url is only
-  // a compatibility mirror and never a user-visible main/sub designation.
+  // Each URL is edited in its own worksheet cell. The legacy item.url remains
+  // the first URL mirror so existing readers and importers continue to work.
   function sourceUrls(item) {
     return Array.isArray(item?.sourceUrls) && item.sourceUrls.length
-      ? item.sourceUrls : item?.url ? [item.url] : [];
+      ? item.sourceUrls.slice() : item?.url ? [item.url] : [];
   }
-  function splitSourceUrls(raw) {
-    return [...new Set(String(raw || '').split(/\r?\n|\s+\|\s+/).map(v => v.trim()).filter(Boolean))];
+  function urlIndex(column) {
+    if (column?.key === 'url') return 0;
+    const match = /^url([2-9]|[1-3][0-9]|40)$/.exec(column?.key || '');
+    return match ? Number(match[1]) - 1 : -1;
+  }
+  function isMangaUrlColumn(column) { return urlIndex(column) >= 0; }
+  function ensureUrlColumns(count) {
+    const limit = Math.min(40, Math.max(1, Number(count) || 1));
+    let current = COLUMNS.filter(isMangaUrlColumn).length;
+    while (current < limit) {
+      const number = ++current;
+      const insert = COLUMNS.findIndex(column => column.key === 'sourceUrl');
+      COLUMNS.splice(insert, 0, { key:'url' + number, label:'漫画URL ' + number, width:400, type:'url' });
+    }
+    return current;
+  }
+  function columnLetter(col) {
+    let n = col + 1, result = '';
+    while (n > 0) { n -= 1; result = String.fromCharCode(65 + n % 26) + result; n = Math.floor(n / 26); }
+    return result;
   }
   function formatValue(item, column, folders) {
     if (!item) return '';
+    const index = urlIndex(column);
+    if (index >= 0) return sourceUrls(item)[index] || '';
     const value = item[column.key];
-    if (column.key === 'url') return sourceUrls(item).join(' | ');
     if (column.type === 'tags') return Array.isArray(value) ? value.join(', ') : '';
     if (column.type === 'folder') {
       if (!value) return '';
@@ -83,22 +102,15 @@
       return Array.from(new Set(values));
     }
     if (column.type === 'url') {
-      const values = column.key === 'url' ? splitSourceUrls(text) : (text ? [text] : []);
-      if (column.key === 'url' && values.length > 40) throw new Error('漫画URLは40件以下にしてください。');
-      if (!values.length) {
-        if (column.key === 'url' && !item.localSync && !item.encryptedAssets?.pages?.length &&
-            !item.pages?.length && !item.pageManifest?.pages?.length) {
-          throw new Error('この作品の漫画URLは空欄にできません。');
-        }
-        return '';
+      if (!text) return '';
+      if (text.includes('|') || /[\r\n]/.test(text)) {
+        throw new Error('漫画URLは区切らず、1セルに1件ずつ入力してください。');
       }
       try {
-        for (const value of values) {
-          if (value.length > 4096) throw new Error('invalid');
-          const url = new URL(value);
-          if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password) throw new Error('invalid');
-        }
-        return column.key === 'url' ? values.join(' | ') : text;
+        if (text.length > 4096) throw new Error('invalid');
+        const url = new URL(text);
+        if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password) throw new Error('invalid');
+        return text;
       } catch (_) { throw new Error('URLには http:// または https:// から始まる正しいアドレスを入力してください。'); }
     }
     if (column.required && !text) throw new Error(column.label + 'は空欄にできません。');
@@ -109,7 +121,7 @@
   function sameValue(a, b) {
     return Array.isArray(a) || Array.isArray(b) ? JSON.stringify(a) === JSON.stringify(b) : a === b;
   }
-  function cellAddress(row, col) { return String.fromCharCode(65 + col) + String(row + 2); }
+  function cellAddress(row, col) { return columnLetter(col) + String(row + 2); }
   function getRange(selection) {
     return {
       r0: Math.min(selection.row, selection.anchorRow), r1: Math.max(selection.row, selection.anchorRow),
@@ -172,6 +184,7 @@
           '</div>',
           '<label for="msSearchInput">検索</label>',
           '<input id="msSearchInput" type="search" placeholder="全列から作品を探す" autocomplete="off">',
+          '<button type="button" data-ms="addUrl">＋ 漫画URL列</button>',
           '<button type="button" data-ms="resetSort">並び順を戻す</button>',
           '<span class="ms-count" data-ms="count"></span>',
         '</div>',
@@ -230,7 +243,8 @@
       const q = search.value.trim().toLocaleLowerCase('ja-JP');
       rows = deps.getState().savedItems.filter(item => {
         if (!q) return true;
-        return COLUMNS.some(column => formatValue(item, column, getFolders()).toLocaleLowerCase('ja-JP').includes(q));
+        return COLUMNS.some(column => formatValue(item, column, getFolders()).toLocaleLowerCase('ja-JP').includes(q)) ||
+          sourceUrls(item).some(url => url.toLocaleLowerCase('ja-JP').includes(q));
       });
       if (sort.key) {
         const column = COLUMNS.find(entry => entry.key === sort.key);
@@ -271,7 +285,7 @@
       labels.appendChild(rownum);
       COLUMNS.forEach((column, index) => {
         const letter = doc.createElement('th');
-        letter.textContent = String.fromCharCode(65 + index);
+        letter.textContent = columnLetter(index);
         letter.dataset.sortColumn = String(index);
         letters.appendChild(letter);
         const label = doc.createElement('th');
@@ -408,36 +422,65 @@
       const folders = getFolders();
       const byId = new Map(itemsBefore.map(item => [String(item.id), item]));
       const replacement = new Map();
-      const patchMap = new Map();
+      const patches = [];
+      const urlDrafts = new Map();
       try {
         for (const edit of edits) {
           const id = String(edit.id);
           const source = byId.get(id);
+          if (!source) throw new Error('編集先の作品が見つかりません。');
+          if (edit.key === 'sourceUrls' && edit.preparsed) {
+            if (!Array.isArray(edit.value) || edit.value.length > 40) throw new Error('漫画URLは40件以下にしてください。');
+            urlDrafts.set(id, edit.value.map(value => parseValue(source, { key:'url', type:'url' }, value, folders)));
+            continue;
+          }
           const column = COLUMNS.find(entry => entry.key === edit.key);
-          if (!source || !column || column.readOnly) throw new Error('編集先の作品または列が見つかりません。');
-          const key = id + '\u0000' + column.key;
+          if (!column || column.readOnly) throw new Error('編集先の作品または列が見つかりません。');
           const next = edit.preparsed ? edit.value : parseValue(source, column, edit.value, folders);
-          const old = column.key === 'url' ? formatValue(source, column, folders) : source[column.key];
-          if (sameValue(old, next)) { replacement.get(id)?.hasOwnProperty(column.key) && replacement.get(id).delete(column.key); patchMap.delete(key); continue; }
+          const index = urlIndex(column);
+          if (index >= 0) {
+            const draft = urlDrafts.get(id) || sourceUrls(source);
+            while (draft.length <= index) draft.push('');
+            draft[index] = next;
+            urlDrafts.set(id, draft);
+            continue;
+          }
+          const before = source[column.key];
+          if (sameValue(before, next)) continue;
           if (!replacement.has(id)) replacement.set(id, new Map());
           replacement.get(id).set(column.key, next);
-          patchMap.set(key, { id, key:column.key, before:old, after:next });
+        }
+        for (const [id, draft] of urlDrafts) {
+          const source = byId.get(id);
+          if (draft.length > 40) throw new Error('漫画URLは40件以下にしてください。');
+          const next = [...new Set(draft.filter(Boolean))];
+          if (!next.length && !source.localSync && !source.encryptedAssets?.pages?.length &&
+              !source.pages?.length && !source.pageManifest?.pages?.length) {
+            throw new Error('この作品の漫画URLは空欄にできません。');
+          }
+          const before = sourceUrls(source);
+          if (sameValue(before, next)) continue;
+          if (!replacement.has(id)) replacement.set(id, new Map());
+          replacement.get(id).set('sourceUrls', next);
+          patches.push({ id, key:'sourceUrls', before, after:next });
+        }
+        for (const [id, changes] of replacement) {
+          const source = byId.get(id);
+          for (const [key, after] of changes) {
+            if (key === 'sourceUrls') continue;
+            patches.push({ id, key, before:source[key], after });
+          }
         }
       } catch (error) {
         announce(error?.message || '入力値を確認してください。', true);
         return false;
       }
-      const patches = [...patchMap.values()];
       if (!patches.length) { announce('変更はありません。'); return true; }
       const savedItems = itemsBefore.map(item => {
         const changes = replacement.get(String(item.id));
         if (!changes?.size) return item;
         const updated = Object.assign({}, item, Object.fromEntries(changes));
-        if (changes.has('url')) {
-          const urls = splitSourceUrls(changes.get('url'));
-          updated.sourceUrls = urls;
-          updated.url = urls[0] || '';
-        }
+        if (changes.has('sourceUrls')) updated.url = updated.sourceUrls[0] || '';
         return updated;
       });
       const authorsBefore = current.authorCards;
@@ -452,8 +495,6 @@
         if (synced.changed && deps.persistAuthorCards() === false) throw new Error('作者データの保存に失敗しました。');
       } catch (error) {
         deps.setState({ savedItems:itemsBefore, authorCards:authorsBefore });
-        // If an author-card write failed after the item write, restore both
-        // local storage and the pending cloud snapshot to their prior values.
         try { deps.persistItems(); } catch (_) {}
         if (synced.changed) { try { deps.persistAuthorCards(); } catch (_) {} }
         announce('変更を保存できず、編集を元に戻しました。' + (error?.message || ''), true);
@@ -466,9 +507,10 @@
       }
       deps.render();
       computeRows();
+      drawHeader();
       drawRows(true);
       updateButtons();
-      announce(patches.length + 'セルを端末に保存しました。クラウドには通常の同期処理で反映します。');
+      announce(patches.length + '項目を端末に保存しました。クラウドには通常の同期処理で反映します。');
       return true;
     }
 
@@ -545,6 +587,16 @@
         announce('一度に貼り付ける範囲は10,000セル以下にしてください。', true);
         return false;
       }
+      // Pasting multiple URLs horizontally from a URL cell expands URL columns
+      // instead of accidentally overwriting the source-page/other metadata.
+      if (isMangaUrlColumn(COLUMNS[selection.col])) {
+        const needed = urlIndex(COLUMNS[selection.col]) + matrix.reduce((max, line) => Math.max(max, line.length), 0);
+        if (needed > 40) { announce('漫画URLは40件以下にしてください。', true); return false; }
+        if (needed > COLUMNS.filter(isMangaUrlColumn).length) {
+          ensureUrlColumns(needed);
+          drawHeader();
+        }
+      }
       const edits = [];
       matrix.forEach((line, r) => {
         line.forEach((value, c) => {
@@ -579,7 +631,10 @@
       }
     }
     function refresh() {
+      const maxUrls = Math.max(1, ...deps.getState().savedItems.map(item => sourceUrls(item).length));
+      ensureUrlColumns(maxUrls);
       computeRows();
+      drawHeader();
       currentStart = -1;
       drawRows(true);
     }
@@ -593,7 +648,6 @@
       sort = { key:'', direction:1 };
       selection = { row:0, col:0, anchorRow:0, anchorCol:0 };
       viewport.scrollTop = 0; viewport.scrollLeft = 0;
-      drawHeader();
       refresh();
       updateButtons();
       announce('セルをダブルクリック、または Enter / F2 で編集できます。自動保存が有効です。');
@@ -735,6 +789,17 @@
     launch.addEventListener('click', open);
     one('close').addEventListener('click', close);
     one('reader').addEventListener('click', () => { if (accessible() && rows[selection.row]) deps.openReader(rows[selection.row]); });
+    one('addUrl').addEventListener('click', () => {
+      const count = COLUMNS.filter(isMangaUrlColumn).length;
+      if (count >= 40) { announce('漫画URLは40列までです。', true); return; }
+      const activeKey = COLUMNS[selection.col].key;
+      const anchorKey = COLUMNS[selection.anchorCol].key;
+      ensureUrlColumns(count + 1);
+      selection.col = COLUMNS.findIndex(column => column.key === activeKey);
+      selection.anchorCol = COLUMNS.findIndex(column => column.key === anchorKey);
+      refresh();
+      announce('漫画URL ' + (count + 1) + ' 列を追加しました。1セルに1件ずつ入力できます。');
+    });
     one('resetSort').addEventListener('click', () => { sort = { key:'', direction:1 }; refresh(); announce('元の登録順で表示しています。'); });
     one('copy').addEventListener('click', async () => {
       try {
@@ -795,6 +860,6 @@
     });
   }
 
-  root.MangaSpreadsheetModel = Object.freeze({ COLUMNS, formatValue, parseValue, clipboardMatrix, cellAddress, isSpreadsheetUrl, spreadsheetUrl });
+  root.MangaSpreadsheetModel = Object.freeze({ COLUMNS, formatValue, parseValue, clipboardMatrix, cellAddress, isSpreadsheetUrl, spreadsheetUrl, ensureUrlColumns, sourceUrls, urlIndex });
   root.MangaSpreadsheet = Object.freeze({ create });
 })(typeof self !== 'undefined' ? self : globalThis);
