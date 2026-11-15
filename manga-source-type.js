@@ -41,7 +41,7 @@
     });
   }
   function sourcePriority(url) {
-    return isDirectImageUrl(url) ? 0 : url.endsWith('#1') ? 1 : 2;
+    return url.endsWith('#1') ? 1 : isDirectImageUrl(url) ? 0 : 2;
   }
   function getSourceCandidates(item) {
     return getSourceUrls(item).sort((a, b) => sourcePriority(a) - sourcePriority(b));
