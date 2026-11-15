@@ -64,6 +64,9 @@
       for (const iframe of Array.from(hashFrameChecks.keys())) disposeHashObservation(iframe);
       hashIframe = null;
       hashUserScrollUntil = 0;
+      hashSlotHeight = 0;
+      hashTouchY = null;
+      hashSuppressScrollUntil = 0;
       hashVerticalSlots.length = 0;
       lifecycle?.destroy();
       try { dependencies.onDestroy?.(); } catch (_) {}
@@ -107,6 +110,11 @@
     // layout changes and browser scroll anchoring. None of those can advance
     // the reader unless a real scroll gesture was observed first.
     let hashUserScrollUntil = 0;
+    let hashSlotHeight = 0;
+    let hashLastScrollTop = 0;
+    let hashScrollDirection = 0;
+    let hashTouchY = null;
+    let hashSuppressScrollUntil = 0;
     const hashVerticalSlots = [];
     // Keep a small, bounded set of already visited external documents alive.
     // Detaching an iframe destroys its browsing context, so the old +/-1
@@ -640,18 +648,43 @@
           });
           return;
         }
-        // The #1 reader also accepts tap navigation when vertical layout is
-        // enabled; scrolling gestures do not generate a click.
-        if (vertical && !hashPageBase) return;
+        // Vertical mode must be native scrolling only. Touch taps (including
+        // momentum/gesture-end synthetic clicks) cannot force a page jump.
+        if (vertical) return;
         if (x < win.innerWidth * 0.35) previous(); else if (x > win.innerWidth * 0.65) next();
       });
-      const markHashScrollIntent = () => {
-        if (hashPageBase && vertical) hashUserScrollUntil = Date.now() + 1500;
+      const markHashScrollIntent = (direction) => {
+        if (!hashPageBase || !vertical) return;
+        hashUserScrollUntil = Date.now() + 1200;
+        hashScrollDirection = direction < 0 ? -1 : direction > 0 ? 1 : 0;
       };
-      bind('viewer', 'wheel', markHashScrollIntent, { passive: true });
-      bind('viewer', 'touchmove', markHashScrollIntent, { passive: true });
-      // Includes scrollbar dragging and touch gestures that scroll after pointerdown.
-      bind('viewer', 'pointerdown', markHashScrollIntent, { passive: true });
+      bind('viewer', 'wheel', (event) => {
+        const delta = Number(event?.deltaY);
+        if (Number.isFinite(delta) && delta === 0) return;
+        markHashScrollIntent(Number.isFinite(delta) ? delta : 0);
+      }, { passive: true });
+      bind('viewer', 'touchstart', (event) => {
+        const y = Number(event?.touches?.[0]?.clientY);
+        hashTouchY = Number.isFinite(y) ? y : null;
+      }, { passive: true });
+      bind('viewer', 'touchmove', (event) => {
+        const y = Number(event?.touches?.[0]?.clientY);
+        const delta = Number.isFinite(y) && hashTouchY != null ? hashTouchY - y : 0;
+        if (Number.isFinite(y)) hashTouchY = y;
+        if (delta !== 0 || hashTouchY == null) markHashScrollIntent(delta);
+      }, { passive: true });
+      bind('viewer', 'touchend', () => { hashTouchY = null; }, { passive: true });
+      bind('viewer', 'touchcancel', () => { hashTouchY = null; hashUserScrollUntil = 0; }, { passive: true });
+      // A generic pointerdown on the iframe shield is not scrolling intent.
+      // Only mouse/pen dragging the scrollbar should authorize scroll changes.
+      bind('viewer', 'pointerdown', (event) => {
+        if (event?.pointerType !== 'mouse' && event?.pointerType !== 'pen') return;
+        const viewer = byId('viewer');
+        if (!viewer) return;
+        const rect = viewer.getBoundingClientRect?.();
+        const x = Number(event.clientX);
+        if (rect && Number.isFinite(x) && x >= rect.right - 22) markHashScrollIntent(0);
+      }, { passive: true });
       bind('viewer', 'scroll', () => {
         if (hashPageBase) { onHashVerticalScroll(); return; }
         if (!vertical) return;
@@ -699,7 +732,7 @@
       // behavior or any bubble-phase handler can interpret them.
       lifecycle.listen(win, 'keydown', (event) => {
         if (hashPageBase && vertical && ['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End'].includes(event.key)) {
-          hashUserScrollUntil = Date.now() + 1500;
+          markHashScrollIntent(event.key === 'ArrowUp' || event.key === 'PageUp' || event.key === 'Home' ? -1 : 1);
         }
         if (hashPageBase && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
           if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
@@ -1047,6 +1080,12 @@
       while (hashVerticalSlots.length < max) {
         const slot = doc.createElement('div');
         slot.className = 'readerHashVerticalSlot';
+        // Freeze each slot at the size recorded when vertical mode started.
+        // 100dvh changes on Safari when browser chrome hides or returns.
+        if (hashSlotHeight > 0) {
+          slot.style.height = hashSlotHeight + 'px';
+          slot.style.minHeight = hashSlotHeight + 'px';
+        }
         slot.dataset.page = String(hashVerticalSlots.length + 1);
         stage.appendChild(slot);
         hashVerticalSlots.push({ slot, frame: null });
@@ -1096,6 +1135,10 @@
       // Reset intent before a DOM rebuild: its scroll/anchor events are not
       // equivalent to a fresh wheel, touch or scrollbar-drag gesture.
       hashUserScrollUntil = 0;
+      hashTouchY = null;
+      hashScrollDirection = 0;
+      hashSuppressScrollUntil = 0;
+      hashSlotHeight = vertical ? (viewer.clientHeight || win.innerHeight || 800) : 0;
       for (const iframe of Array.from(hashFrameChecks.keys())) disposeHashObservation(iframe);
       stage.replaceChildren();
       hashVerticalSlots.length = 0;
@@ -1105,7 +1148,8 @@
         viewer.classList.add('vertical-scroll');
         ensureHashVerticalSlots(Math.max(page + 2, hashMaxVisited + 1));
         updateHashVerticalWindow(page);
-        viewer.scrollTop = (page - 1) * (viewer.clientHeight || win.innerHeight || 800);
+        viewer.scrollTop = (page - 1) * hashSlotHeight;
+        hashLastScrollTop = viewer.scrollTop;
       } else {
         stage.classList.remove('vertical-scroll');
         viewer.classList.remove('vertical-scroll');
@@ -1123,6 +1167,7 @@
       // A button/slider jump sets scrollTop deliberately. Its resulting
       // scroll events must not trigger a new page-discovery cycle.
       hashUserScrollUntil = 0;
+      hashScrollDirection = 0;
       if (number === page && byId('pageStage')?.firstChild) return true;
       cancelHashCorrections();
       hashPreviousPage = page;
@@ -1131,7 +1176,12 @@
         ensureHashVerticalSlots(Math.max(number + 2, hashMaxVisited + 1));
         updateHashVerticalWindow(number);
         const viewer = byId('viewer');
-        if (viewer) viewer.scrollTop = (number - 1) * (viewer.clientHeight || win.innerHeight || 800);
+        if (viewer) {
+          viewer.scrollTop = (number - 1) * (hashSlotHeight || viewer.clientHeight || win.innerHeight || 800);
+          hashLastScrollTop = viewer.scrollTop;
+          // Ignore the matching synthetic scroll event from this explicit jump.
+          hashSuppressScrollUntil = Date.now() + 100;
+        }
       } else if (hashIframe) {
         // Keep the same embedded document alive. Recreating an iframe for
         // every click reloads the source site and can reset its hash router
@@ -1152,11 +1202,20 @@
       return true;
     }
     function onHashVerticalScroll() {
-      if (!vertical || !hashPageBase || destroyed || Date.now() > hashUserScrollUntil) return;
+      if (!vertical || !hashPageBase || destroyed) return;
       const viewer = byId('viewer');
       if (!viewer) return;
-      const height = viewer.clientHeight || win.innerHeight || 800;
-      const visible = Math.max(1, Math.min(hashVerticalSlots.length, Math.floor((viewer.scrollTop + height * 0.5) / height) + 1));
+      const now = Date.now();
+      const top = viewer.scrollTop;
+      const delta = top - hashLastScrollTop;
+      hashLastScrollTop = top;
+      if (!Number.isFinite(top) || Math.abs(delta) < 0.5 ||
+          now < hashSuppressScrollUntil || now > hashUserScrollUntil) return;
+      // Layout shifts and iframe loads can dispatch scroll after an unrelated
+      // gesture. Only follow the direction of a real scrolling input.
+      if (hashScrollDirection !== 0 && Math.sign(delta) !== hashScrollDirection) return;
+      const height = hashSlotHeight || viewer.clientHeight || win.innerHeight || 800;
+      const visible = Math.max(1, Math.min(hashVerticalSlots.length, Math.floor((top + height * 0.5) / height) + 1));
       if (visible !== page) {
         hashPreviousPage = page;
         page = requestedPage = visible;
@@ -1168,6 +1227,12 @@
       }
       ensureHashVerticalSlots(visible + 2);
       updateHashVerticalWindow(visible);
+      // Creating/removing a distant iframe must not re-position the reader.
+      if (Math.abs(viewer.scrollTop - top) > 0.5) {
+        viewer.scrollTop = top;
+        hashLastScrollTop = top;
+        hashSuppressScrollUntil = Date.now() + 100;
+      }
     }
     function mountHashReader() {
       doc.body.classList.add('hash-page-reader');
@@ -1335,6 +1400,11 @@
       hashPageBase = '';
       hashRangeStart = 1;
       hashRangeEnd = null;
+      hashSlotHeight = 0;
+      hashTouchY = null;
+      hashUserScrollUntil = 0;
+      hashScrollDirection = 0;
+      hashSuppressScrollUntil = 0;
       hashVerticalSlots.length = 0;
       pageUrls = [];
       encryptedPages = [];
