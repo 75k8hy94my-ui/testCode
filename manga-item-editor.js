@@ -53,6 +53,13 @@
     if (!doc || !getState || !setState || !persistItems || !authorSync || !canReadProtectedData) {
       throw new Error('漫画個別編集を初期化できません。');
     }
+    if (!doc.getElementById('mangaItemEditorStyles')) {
+      const link = doc.createElement('link');
+      link.id = 'mangaItemEditorStyles';
+      link.rel = 'stylesheet';
+      link.href = 'manga-item-editor.css?v=20261115-individual-editor';
+      doc.head.appendChild(link);
+    }
     const overlay = doc.createElement('section');
     overlay.className = 'manga-item-edit-overlay';
     overlay.hidden = true;
