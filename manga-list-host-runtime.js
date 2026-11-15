@@ -306,7 +306,7 @@
       next();
     }
 
-    function navigateToReader(item) {
+    function navigateToReader(item, options = {}) {
       if (!canReadProtectedData()) return false;
       if (!item || !item.id) throw new Error('saved manga item id is required');
       const itemId = String(item.id);
@@ -321,7 +321,10 @@
       // The saved-item id is the canonical reader identity. Page/base URLs are
       // source locations and may be shared, replaced, or reordered; they must
       // never be used as the route identity for a saved manga.
-      deps.navigation.navigate(deps.navigation.buildReaderUrl(itemId, deps.navigation.readerUrl));
+      const readerUrl = deps.navigation.buildReaderUrl(itemId, deps.navigation.readerUrl);
+      deps.navigation.navigate(options.safeMode === true
+        ? readerUrl + (readerUrl.includes('?') ? '&' : '?') + 'safe=1'
+        : readerUrl);
       return true;
     }
 

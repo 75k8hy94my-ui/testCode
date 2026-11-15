@@ -7,7 +7,8 @@
     ['manga-list-template.js?v=20261114-json-import', 'mangaRouteTemplate'],
     ['manga-import-author-sync.js?v=20261007-momon-import', 'mangaImportAuthorSync'],
     ['manga-json-import.js?v=20261114-json-import', 'mangaJsonImport'],
-    ['manga-spreadsheet.js?v=20261115-multi-url', 'mangaSpreadsheet'],
+    ['manga-spreadsheet.js?v=20261115-card-context-menu', 'mangaSpreadsheet'],
+    ['manga-card-context-menu.js?v=20261115-card-context-menu', 'mangaCardContextMenu'],
     ['image-transfer-settings.js?v=20261004-encrypted-image-import', 'encryptedImageImportSettings'],
     ['image-remote-access.js?v=20261004-encrypted-image-import', 'encryptedImageImportRemoteAccess'],
     ['encrypted-asset-crypto.js?v=20261004-encrypted-image-import', 'encryptedImageImportCrypto'],
@@ -32,7 +33,7 @@
     ['manga-list-dom-resolver.js?v=20260922-dom-resolver', 'mangaRouteResolver'],
     ['manga-list-elements.js?v=20260922-elements', 'mangaRouteElements'],
     ['manga-list-mount.js?v=20260922-mount', 'mangaRouteMount'],
-    ['manga-list-card.js?v=20261009-cover-controls', 'mangaRouteCard'],
+    ['manga-list-card.js?v=20261115-card-context-menu', 'mangaRouteCard'],
     ['manga-list-state.js?v=20260922-state', 'mangaRouteState'],
     ['manga-list-view-model.js?v=20261009-shelf-pagination', 'mangaRouteViewModel'],
     ['manga-list-renderer.js?v=20261009-desktop-liquid-pager', 'mangaRouteRenderer'],
@@ -45,7 +46,7 @@
     ['manga-list-image-cache.js?v=20261011-encrypted-cache', 'mangaRouteImageCache'],
     ['reader-target.js?v=20261003-reader-launch-contract', 'mangaReaderTarget'],
     ['manga-hash-cover-preview.js?v=20261114-hash-cover-preview', 'mangaHashCoverPreview'],
-    ['manga-list-host-runtime.js?v=20261114-hash-cover-preview', 'mangaRouteHost'],
+    ['manga-list-host-runtime.js?v=20261115-card-context-menu', 'mangaRouteHost'],
     ['manga-list-runtime.js?v=20261115-finger-drag', 'mangaRouteRuntime'],
     ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
   ];
@@ -609,6 +610,14 @@
           canReadProtectedData,
         });
         cleanups.push(() => spreadsheet.destroy());
+        const cardContextMenu = windowRef.MangaCardContextMenu.create({
+          documentRef, windowRef, mountElement: rootElement,
+          getItem: (id) => state().savedItems.find((item) => String(item.id) === String(id)),
+          canReadProtectedData,
+          onEdit: (item) => spreadsheet.openItem(item.id),
+          onSafeOpen: (item) => host.navigateToReader(item, { safeMode: true }),
+        });
+        cleanups.push(() => cardContextMenu.destroy());
         bindFactory(MangaListSearchEventsFactory, { onSearchChange: (value) => { setState({ shelfSearchQuery: value, bookshelfPage: 1 }); renderList(); } }, { searchInput: search });
         bind(documentRef, 'testcode-context-search-change', (event) => {
           if (event.detail?.page !== 'manga') return;

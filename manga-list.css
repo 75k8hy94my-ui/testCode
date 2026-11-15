@@ -550,3 +550,35 @@ html[data-theme="light"] .folder-cover { background: linear-gradient(145deg, #ee
 
 /* Entry/import and quick actions live on add.html; search is a shared nav overlay. */
 #mangaListSection #exportImportRow,#mangaListSection #smartListRow,#mangaListSection #shelfSearchInput{display:none!important}
+
+/* Context menu belongs to saved manga cards only, not blank shelf space. */
+.manga-card-context-menu {
+  position: fixed;
+  z-index: 2100;
+  min-width: 206px;
+  padding: 6px;
+  border: 1px solid var(--manga-border);
+  border-radius: 12px;
+  background: var(--manga-panel);
+  color: var(--manga-text);
+  box-shadow: 0 16px 48px rgba(0,0,0,.42);
+}
+.manga-card-context-menu[hidden] { display: none !important; }
+.manga-card-context-menu button {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.manga-card-context-menu button:hover,
+.manga-card-context-menu button:focus-visible {
+  background: var(--manga-accent-dim);
+  outline: none;
+}

@@ -6,6 +6,7 @@
       const card = documentRef.createElement('div');
       card.className = 'book-card' + (reorderMode ? ' reorder-card' : '') + (item.id === recentlyClosed ? ' just-closed' : '');
       card.title = itemSubtext(item);
+      card.setAttribute('data-manga-item-id', String(item.id));
 
       let select = null;
       if (bulkEditMode) {

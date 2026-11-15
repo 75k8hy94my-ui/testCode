@@ -674,7 +674,10 @@
       imageEnhanceEnabled = win.localStorage.getItem('mangaReaderImageEnhance') !== '0';
       doc.body.classList.toggle('image-enhance', imageEnhanceEnabled);
       byId('enhanceBtn')?.setAttribute('aria-pressed', imageEnhanceEnabled ? 'true' : 'false');
-      setSafeMode(win.localStorage.getItem('mangaReaderSafeMode') === '1');
+      // Right-click launch is temporary: it does not change the stored
+      // default unless the reader's own safe-mode button is pressed.
+      const launchSafeMode = /(?:^|[?&])safe=1(?:&|$)/.test(String(win.location?.search || ''));
+      setSafeMode(launchSafeMode || win.localStorage.getItem('mangaReaderSafeMode') === '1');
     }
     function setSafeMode(active) {
       doc.body.classList.toggle('safe-mode', active);

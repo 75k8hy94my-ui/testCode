@@ -581,6 +581,18 @@
       announce('セルをダブルクリック、または Enter / F2 で編集できます。自動保存が有効です。');
       viewport.focus({ preventScroll:true });
     }
+    function openItem(itemId) {
+      if (!accessible()) return false;
+      const id = String(itemId || '');
+      if (!deps.getState().savedItems.some((item) => String(item.id) === id)) return false;
+      open();
+      const row = rows.findIndex((item) => String(item.id) === id);
+      if (row < 0) { close(); return false; }
+      selection = { row, col:0, anchorRow:row, anchorCol:0 };
+      ensureVisible();
+      announce('対象作品を選択しました。セルをダブルクリック、または Enter / F2 で編集できます。');
+      return true;
+    }
     function close() {
       if (editor) {
         stopEditing(true);
@@ -695,7 +707,7 @@
     overlay.addEventListener('keydown', event => { if (event.key === 'Escape' && !editor) { event.preventDefault(); close(); } });
 
     return Object.freeze({
-      open, close, refresh,
+      open, openItem, close, refresh,
       destroy() {
         if (destroyed) return;
         close();
