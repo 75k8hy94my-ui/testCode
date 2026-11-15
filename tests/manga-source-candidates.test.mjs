@@ -51,7 +51,7 @@ test('new and existing manga use the same source URL collection UI', () => {
   const reader = read('reader-runtime.js');
   assert.match(add, /<textarea name="url" required/);
   assert.match(media, /sourceUrls,/);
-  assert.match(sheet, /updated\.sourceUrls = urls/);
+  assert.match(sheet, /updated\.url = updated\.sourceUrls\[0\]/);
   assert.match(reader, /MangaSourceType\?\.getSourceCandidates\(item\)/);
   assert.match(reader, /onSourcePageFailure\(targetPage\)/);
   assert.match(read('reader.html'), /id="switchSourceBtn"/);
@@ -102,4 +102,18 @@ test('reader and cover attempt numbered directory images and preserve the origin
   assert.match(reader, /sourceCandidates\.push\(\.\.\.virtualDetectedSources\.keys\(\)\)/);
   assert.match(cover, /directoryImageUrls/);
   assert.match(cover, /EMBED_COVER_URL/);
+});
+
+
+test('page interval metadata accepts optional bounds for hash or numbered image sources', () => {
+  assert.deepEqual(sources.parsePageRange('', ''), {start:1,end:null});
+  assert.deepEqual(sources.parsePageRange('2', '19'), {start:2,end:19});
+  assert.deepEqual(sources.parsePageRange('', '19'), {start:1,end:19});
+  assert.deepEqual(sources.getPageRange({pageRangeStart:2,pageRangeEnd:19}), {start:2,end:19});
+  assert.equal(sources.supportsPageRange('https://site.test/book.html#1'), true);
+  assert.equal(sources.supportsPageRange('https://site.test/book/001.webp?token=ok'), true);
+  assert.equal(sources.supportsPageRange('https://site.test/book.html'), false);
+  assert.throws(() => sources.parsePageRange('20','19'), /終了ページ/);
+  assert.throws(() => sources.parsePageRange('0','19'), /1～2000/);
+  assert.throws(() => sources.parsePageRange('2.5','19'), /1～2000/);
 });
