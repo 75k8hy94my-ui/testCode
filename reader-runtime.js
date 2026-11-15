@@ -618,7 +618,9 @@
           });
           return;
         }
-        if (vertical) return;
+        // The #1 reader also accepts tap navigation when vertical layout is
+        // enabled; scrolling gestures do not generate a click.
+        if (vertical && !hashPageBase) return;
         if (x < win.innerWidth * 0.35) previous(); else if (x > win.innerWidth * 0.65) next();
       });
       const markHashScrollIntent = () => {
@@ -890,6 +892,17 @@
       iframe.style.pointerEvents = 'none';
       observeHashFrame(iframe, number);
       frame.appendChild(iframe);
+      // Cross-origin iframe events never bubble up to the host. A real
+      // transparent hit target above the iframe makes left/right taps and
+      // clicks reliable on all browsers while allowing vertical gestures.
+      const shield = doc.createElement('div');
+      shield.className = 'readerHashInputShield';
+      shield.setAttribute('aria-hidden', 'true');
+      shield.addEventListener('pointerdown', () => {
+        if (destroyed || !hashPageBase) return;
+        try { byId('viewer')?.focus?.({ preventScroll: true }); } catch (_) {}
+      }, { passive: true });
+      frame.appendChild(shield);
       return { frame, iframe };
     }
     function ensureHashVerticalSlots(count) {
@@ -962,15 +975,14 @@
         const viewer = byId('viewer');
         if (viewer) viewer.scrollTop = (number - 1) * (viewer.clientHeight || win.innerHeight || 800);
       } else if (hashIframe) {
-        // A fresh browsing context guarantees a load event even when only
-        // the fragment changes. It also prevents stale #1- observations from
-        // a previous page from being mistaken for the new page's redirect.
-        const replacement = createHashFrame(number);
-        if (!replacement) return false;
-        const previousIframe = hashIframe;
-        byId('pageStage')?.replaceChildren(replacement.frame);
-        hashIframe = replacement.iframe;
-        disposeHashObservation(previousIframe);
+        // Keep the same embedded document alive. Recreating an iframe for
+        // every click reloads the source site and can reset its hash router
+        // back to #1, making both keyboard and click navigation appear broken.
+        // Updating src with a fragment is a same-document navigation when
+        // the provider supports it, including cross-origin frames.
+        const nextUrl = hashUrl(number);
+        observeHashFrame(hashIframe, number);
+        hashIframe.src = nextUrl;
       } else return false;
       page = requestedPage = number;
       hashMaxVisited = Math.max(hashMaxVisited, number);
@@ -1006,6 +1018,12 @@
       if (link) { link.href = hashUrl(page); link.hidden = false; }
       const message = byId('readerMessage'); if (message) message.textContent = '';
       renderHashLayout();
+      // Ensure keys are directed at the reader rather than an auto-focused
+      // embedded frame, without disrupting a user-focused toolbar control.
+      const active = doc.activeElement;
+      if (!active || active === doc.body || hashFrameChecks.has(active)) {
+        try { byId('viewer')?.focus?.({ preventScroll: true }); } catch (_) {}
+      }
       updateControls();
       updateTocButton();
       showNextVolume();
