@@ -8,9 +8,9 @@ const sample = { id:'i-123', title:'本', url:'https://example.com/1.webp' };
 const folders = [{id:'folder-a',name:'漫画'},{id:'folder-b',name:'資料'}];
 
 test('worksheet columns include editable metadata and protected identity', () => {
-  assert.equal(model.COLUMNS.length, 13);
+  assert.equal(model.COLUMNS.length, 15);
   assert.equal(model.cellAddress(0, 0), 'A2');
-  assert.equal(model.cellAddress(4, 12), 'M6');
+  assert.equal(model.cellAddress(4, 14), 'O6');
   assert.equal(column('id').readOnly, true);
   assert.equal(column('addedAt').readOnly, true);
   assert.throws(() => model.parseValue(sample, column('id'), 'changed', folders), /変更できません/);
@@ -99,4 +99,18 @@ test('spreadsheet registers browser Back/Forward without rebuilding the shelf ro
   assert.match(sheet, /win\?\.addEventListener\?\.\('popstate', onHistoryChange\)/);
   assert.match(sheet, /win\?\.removeEventListener\?\.\('popstate', onHistoryChange\)/);
   assert.match(spa, /isWorksheetHistoryChange\(previous,lastSpaUrl\)/);
+});
+
+
+test('worksheet range cells allow blank defaults and validate integers', () => {
+  assert.equal(model.formatValue(sample, column('pageRangeStart'), folders), '');
+  assert.equal(model.parseValue(sample, column('pageRangeStart'), '2', folders), 2);
+  assert.equal(model.parseValue(sample, column('pageRangeEnd'), '19', folders), 19);
+  assert.equal(model.parseValue(sample, column('pageRangeStart'), '', folders), null);
+  assert.equal(model.parseValue(sample, column('pageRangeStart'), '1', folders), null);
+  assert.throws(() => model.parseValue(sample, column('pageRangeStart'), '-1', folders), /1～2000/);
+  assert.throws(() => model.parseValue(sample, column('pageRangeEnd'), '2.5', folders), /1～2000/);
+  const sheet = require('node:fs').readFileSync(require.resolve('../manga-spreadsheet.js'), 'utf8');
+  assert.match(sheet, /終了ページは開始ページ以上/);
+  assert.match(sheet, /changes\.get\('pageRangeStart'\)/);
 });
