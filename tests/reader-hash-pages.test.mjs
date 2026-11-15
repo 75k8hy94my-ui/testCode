@@ -31,7 +31,7 @@ function element(name = 'div') {
   return obj;
 }
 
-function setup({ resume = 1, vertical = false, safeMode = false, url = 'https://example.test/xxx.html?edition=1#1' } = {}) {
+function setup({ resume = 1, vertical = false, safeMode = false, guard = false, url = 'https://example.test/xxx.html?edition=1#1' } = {}) {
   const ids = [
     'readerStatus', 'readerMessage', 'retryPageBtn', 'pageSlider', 'pageLabel',
     'currentTitle', 'pageStage', 'viewer', 'topbar', 'controls', 'tocBtn',
@@ -74,6 +74,8 @@ function setup({ resume = 1, vertical = false, safeMode = false, url = 'https://
     commit(id, page, count) { commits.push({ id, page, count }); return true; },
   };
   const windowListeners = new Map();
+  const intervals = new Map();
+  let nextIntervalId = 0;
   const win = {
     MangaSourceType: Source, localStorage, location: { href: 'https://testcode.test/reader.html?item=hash-work' },
     innerWidth: 1000, innerHeight: 800,
@@ -81,8 +83,17 @@ function setup({ resume = 1, vertical = false, safeMode = false, url = 'https://
     removeEventListener(type) { windowListeners.delete(type); },
     dispatch(type, data = {}) { windowListeners.get(type)?.(data); },
   };
+  if (guard) {
+    win.setInterval = (callback, delay) => {
+      assert.ok(delay <= 150, 'focus guard must re-check promptly');
+      const id = ++nextIntervalId;
+      intervals.set(id, callback);
+      return id;
+    };
+    win.clearInterval = (id) => intervals.delete(id);
+  }
   const runtime = Runtime.create({ repository, target: { itemResumeKey: id => 'item:' + id }, location: { replace() {} }, document: doc, window: win, progressRepository });
-  return { runtime, elements, body, item, commits, updates, localStorage, doc, win };
+  return { runtime, elements, body, item, commits, updates, localStorage, doc, win, intervals };
 }
 
 test('only an exact terminal #1 opts into hash-page mode', () => {
@@ -198,6 +209,53 @@ test('hash iframe focus and left/right keyboard input remain owned by the reader
   win.dispatch('blur');
   assert.equal(doc.activeElement, elements.pageSlider);
   runtime.destroy();
+});
+
+test('recurring focus guard reclaims delayed cross-origin iframe autofocus throughout reading', async () => {
+  const { runtime, elements, doc, win, intervals } = setup({ guard: true });
+  await runtime.start('hash-work');
+  assert.equal(intervals.size, 1, 'the reader must supervise focus for as long as #1 is open');
+  const tick = () => [...intervals.values()].forEach(callback => callback());
+
+  // Simulate a remote page calling focus() long after its load handler.
+  const iframe = elements.pageStage.firstChild.firstChild;
+  doc.activeElement = iframe;
+  tick();
+  assert.equal(doc.activeElement, elements.viewer);
+
+  // Repeat after page navigation; keeping the iframe alive must not weaken
+  // the keyboard ownership policy.
+  runtime.next();
+  doc.activeElement = iframe;
+  tick();
+  assert.equal(doc.activeElement, elements.viewer);
+  assert.equal(runtime.getPageState().displayedPage, 2);
+
+  // Keyboard events on the parent belong only to the manga reader.
+  const stopped = [];
+  win.dispatch('keydown', {
+    key: 'ArrowRight',
+    preventDefault() { stopped.push('preventDefault'); },
+    stopImmediatePropagation() { stopped.push('stopImmediatePropagation'); },
+    stopPropagation() { stopped.push('stopPropagation'); },
+  });
+  assert.deepEqual(stopped, ['preventDefault', 'stopImmediatePropagation', 'stopPropagation']);
+  assert.equal(runtime.getPageState().displayedPage, 3);
+
+  // Buttons and form controls must not be stolen from.
+  doc.activeElement = elements.pageSlider;
+  tick();
+  assert.equal(doc.activeElement, elements.pageSlider);
+  doc.visibilityState = 'hidden';
+  doc.activeElement = iframe;
+  tick();
+  assert.equal(doc.activeElement, iframe, 'background tabs must not try to regain keyboard focus');
+  doc.visibilityState = 'visible';
+  doc.dispatch('visibilitychange');
+  assert.equal(doc.activeElement, elements.viewer);
+
+  runtime.destroy();
+  assert.equal(intervals.size, 0, 'cleanup must stop the guard and avoid background polling');
 });
 
 test('viewer clicks and arrow keys navigate #1 pages in the original iframe', async () => {
