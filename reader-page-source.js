@@ -44,7 +44,7 @@
       const initialUrl = String(item?.url || '').trim();
       const initialPath = (() => { try { return new URL(initialUrl, baseHref).pathname; } catch (_) { return ''; } })();
       const initialMatch = initialPath.match(/(\d+)(?:[^/]*)\.(jpe?g|png|webp|avif|gif)$/i);
-      const initialFormat = initialPath.match(/\.(jpe?g|png|webp|avif)$/i)?.[1]?.toLowerCase();
+      const initialFormat = initialPath.match(/\.(jpe?g|png|webp|avif|gif)$/i)?.[1]?.toLowerCase();
       const cachedExtension = Number.isInteger(hints.ext) && hints.ext >= 0
         ? EXTENSIONS[hints.ext]
         : typeof hints.ext === 'string' ? hints.ext.toLowerCase() : null;
