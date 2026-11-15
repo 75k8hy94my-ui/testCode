@@ -47,6 +47,27 @@
     return getSourceUrls(item).sort((a, b) => sourcePriority(a) - sourcePriority(b));
   }
 
+  // Probe likely first-page image files before treating a directory-like URL
+  // as an embedded web page. Group by zero-padding width so a normal /1.webp
+  // is tried before speculative /01.webp, /001.webp and /0001.webp.
+  function getDirectoryImageCandidates(value) {
+    const href = safeHttpUrl(value);
+    if (!href || href.endsWith('#1') || isDirectImageUrl(href)) return [];
+    const parsed = new URL(href);
+    const last = parsed.pathname.split('/').pop();
+    if (last && /\.[a-z0-9]{1,8}$/i.test(last)) return [];
+    if (!parsed.pathname.endsWith('/')) parsed.pathname += '/';
+    parsed.hash = '';
+    return [1, 2, 3, 4].map((width) => {
+      const filename = String(1).padStart(width, '0');
+      return ['webp', 'jpg', 'jpeg', 'png', 'avif', 'gif'].map((ext) => {
+        const candidate = new URL(parsed.href);
+        candidate.pathname += filename + '.' + ext;
+        return candidate.href;
+      });
+    });
+  }
+
   function hasPageList(item) {
     return (Array.isArray(item?.pageManifest?.pages) && item.pageManifest.pages.length > 0 && item.pageManifest.version === 1)
       || (Array.isArray(item?.pages) && item.pages.length > 0);
@@ -75,7 +96,7 @@
     return href && (getHashPageBase(item) || !isDirectImageUrl(href)) ? href : '';
   }
 
-  const api = Object.freeze({ safeHttpUrl, isDirectImageUrl, getSourceUrls, getSourceCandidates, sourcePriority, hasPageList, getHashPageBase, hashPageUrl, MAX_HASH_PAGE, getEmbedUrl, EMBED_COVER_URL });
+  const api = Object.freeze({ safeHttpUrl, isDirectImageUrl, getSourceUrls, getSourceCandidates, sourcePriority, getDirectoryImageCandidates, hasPageList, getHashPageBase, hashPageUrl, MAX_HASH_PAGE, getEmbedUrl, EMBED_COVER_URL });
   if (typeof self !== 'undefined') self.MangaSourceType = api;
   if (typeof window !== 'undefined') window.MangaSourceType = api;
   if (typeof module !== 'undefined') module.exports = api;
