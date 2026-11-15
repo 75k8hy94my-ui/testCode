@@ -7,7 +7,7 @@
     ['manga-list-template.js?v=20261114-json-import', 'mangaRouteTemplate'],
     ['manga-import-author-sync.js?v=20261007-momon-import', 'mangaImportAuthorSync'],
     ['manga-json-import.js?v=20261114-json-import', 'mangaJsonImport'],
-    ['manga-spreadsheet.js?v=20261114-excel-sheet-1', 'mangaSpreadsheet'],
+    ['manga-spreadsheet.js?v=20261115-visible-toolbar', 'mangaSpreadsheet'],
     ['image-transfer-settings.js?v=20261004-encrypted-image-import', 'encryptedImageImportSettings'],
     ['image-remote-access.js?v=20261004-encrypted-image-import', 'encryptedImageImportRemoteAccess'],
     ['encrypted-asset-crypto.js?v=20261004-encrypted-image-import', 'encryptedImageImportCrypto'],
