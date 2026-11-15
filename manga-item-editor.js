@@ -21,6 +21,27 @@
     return Array.isArray(item?.sourceUrls) && item.sourceUrls.length
       ? item.sourceUrls.slice() : item?.url ? [item.url] : [];
   }
+  function parseRange(startValue, endValue) {
+    const parse = (value, label) => {
+      if (value == null || String(value).trim() === '') return null;
+      const text = String(value).trim();
+      const number = Number(text);
+      if (!/^[0-9]+$/.test(text) || !Number.isSafeInteger(number) || number < 1 || number > 2000)
+        throw new Error(label + 'は1～2000の整数で入力してください。');
+      return number;
+    };
+    const start = parse(startValue, '開始ページ') ?? 1;
+    const end = parse(endValue, '終了ページ');
+    if (end != null && end < start) throw new Error('終了ページは開始ページ以上にしてください。');
+    return { start, end };
+  }
+  function supportsRange(url) {
+    try {
+      const parsed = new URL(url);
+      return String(url).endsWith('#1') ||
+        /\/[^/]*\d+[^/]*\.(?:jpe?g|png|webp|avif|gif)$/i.test(parsed.pathname);
+    } catch (_) { return false; }
+  }
   function normalize(source, input, folders) {
     const result = { ...source };
     for (const [key, label, required] of FIELDS) {
@@ -45,6 +66,13 @@
       throw new Error('この作品の漫画URLは空欄にできません。');
     }
     result.url = result.sourceUrls[0] || '';
+    const range = parseRange(input.pageRangeStart, input.pageRangeEnd);
+    if ((range.start !== 1 || range.end != null) && !result.sourceUrls.some(supportsRange))
+      throw new Error('ページ範囲は #1 形式または 1.webp などの連番画像URLに指定してください。');
+    delete result.pageRangeStart;
+    delete result.pageRangeEnd;
+    if (range.start !== 1) result.pageRangeStart = range.start;
+    if (range.end != null) result.pageRangeEnd = range.end;
     return result;
   }
 
@@ -57,7 +85,7 @@
       const link = doc.createElement('link');
       link.id = 'mangaItemEditorStyles';
       link.rel = 'stylesheet';
-      link.href = 'manga-item-editor.css?v=20261115-individual-editor';
+      link.href = 'manga-item-editor.css?v=20261115-page-range';
       doc.head.appendChild(link);
     }
     const overlay = doc.createElement('section');
@@ -123,6 +151,25 @@
     const addUrl = doc.createElement('button');
     addUrl.type = 'button'; addUrl.textContent = '＋ URLを追加';
     urlSection.append(urlHeading, urlList, addUrl);
+    const range = doc.createElement('section');
+    range.className = 'manga-item-edit-range';
+    const rangeHeading = doc.createElement('h3');
+    rangeHeading.textContent = '連番ページの範囲（任意）';
+    const rangeInputs = doc.createElement('div');
+    rangeInputs.className = 'manga-item-edit-grid';
+    for (const [key, label, placeholder] of [
+      ['pageRangeStart', '開始ページ', '1'],
+      ['pageRangeEnd', '終了ページ', '例：19']
+    ]) {
+      const input = doc.createElement('input');
+      input.type = 'number'; input.min = '1'; input.max = '2000'; input.step = '1';
+      input.inputMode = 'numeric'; input.name = key; input.placeholder = placeholder;
+      controls[key] = input;
+      rangeInputs.appendChild(makeLabel(label, input));
+    }
+    const rangeHelp = doc.createElement('p');
+    rangeHelp.textContent = '未指定なら1ページ目から自動取得。開始2・終了19なら #2～#19、2.webp～19.webp だけを読み込みます。すべての候補URLに共通です。';
+    range.append(rangeHeading, rangeInputs, rangeHelp);
     const notice = doc.createElement('p');
     notice.className = 'manga-item-edit-notice';
     notice.setAttribute('role', 'status');
@@ -134,7 +181,7 @@
     save.type = 'submit'; save.textContent = '変更を保存';
     save.className = 'manga-item-edit-save';
     foot.append(cancel, save);
-    body.append(grid, urlSection, notice);
+    body.append(grid, urlSection, range, notice);
     form.append(body, foot);
     panel.append(head, form);
     overlay.appendChild(panel);
@@ -202,6 +249,8 @@
       });
       folder.value = item.folderId || '';
       displayUrls(urls(item));
+      controls.pageRangeStart.value = item.pageRangeStart ?? '';
+      controls.pageRangeEnd.value = item.pageRangeEnd ?? '';
       notice.textContent = '';
       overlay.hidden = false;
       controls.title.focus({ preventScroll: true });
@@ -227,6 +276,8 @@
         values.isDoujin = controls.isDoujin.checked;
         values.folderId = folder.value;
         values.sourceUrls = [...urlList.querySelectorAll('input')].map(input => input.value);
+        values.pageRangeStart = controls.pageRangeStart.value;
+        values.pageRangeEnd = controls.pageRangeEnd.value;
         updated = normalize(before, values, original.savedFolders || []);
       } catch (error) { notice.textContent = error.message || '入力内容を確認してください。'; return; }
       const savedItems = original.savedItems.map(item => String(item.id) === activeId ? updated : item);
@@ -268,5 +319,5 @@
       }
     });
   }
-  root.MangaItemEditor = Object.freeze({ create, normalize, urls, safeUrl, MAX_URLS });
+  root.MangaItemEditor = Object.freeze({ create, normalize, urls, safeUrl, parseRange, MAX_URLS });
 })(typeof self !== 'undefined' ? self : globalThis);
