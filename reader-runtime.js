@@ -52,6 +52,7 @@
       if (destroyed) return;
       destroyed = true;
       stopHashKeyboardGuard();
+      cancelHashCorrections();
       activeDiscoveryController?.abort?.();
       navigationGeneration += 1;
       verticalWindowGeneration += 1;
@@ -97,6 +98,8 @@
     const hashRejectedPages = new Set();
     const hashFrameChecks = new Map();
     let hashFocusGuardTimer = null;
+    let hashCorrectionGeneration = 0;
+    const hashCorrectionTimers = new Set();
     let hashPreviousPage = 1;
     // A scroll event also fires after programmatic scrollTop writes, iframe
     // layout changes and browser scroll anchoring. None of those can advance
@@ -686,8 +689,12 @@
           event.preventDefault?.();
           event.stopImmediatePropagation?.();
           event.stopPropagation?.();
+          // The reader's page number is authoritative. Correct any reverse
+          // hash navigation by the external site after this key event.
+          const before = page;
           if (event.key === 'ArrowRight') next();
           else previous();
+          if (page !== before) scheduleHashCorrections(page);
           return;
         }
         if (event.key === 'ArrowRight' || event.key === ' ') next();
@@ -773,15 +780,24 @@
       if (destroyed || !hashPageBase || !hashFrameChecks.has(entry.iframe)) return;
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-      // Same-origin frames are available for capture-phase interception.
-      // On cross-origin frames this listener cannot be installed; focus
-      // containment above keeps keyboard input in the host instead.
-      event.preventDefault?.();
-      event.stopImmediatePropagation?.();
-      event.stopPropagation?.();
-      restoreHashReaderFocus(entry.iframe);
-      if (event.key === 'ArrowRight') next();
-      else previous();
+      // If the child's window is accessible, allow its own keyboard handler
+      // to run first. In the next microtask overwrite the reverse navigation
+      // using the reader's ORIGINAL page (not the page the site moved to).
+      const limit = hashKnownTotal || win.MangaSourceType.MAX_HASH_PAGE;
+      const base = entry.pendingKeyTarget || page;
+      const delta = event.key === 'ArrowRight' ? 1 : -1;
+      entry.pendingKeyTarget = Math.max(1, Math.min(limit, base + delta));
+      const sequence = ++entry.keySequence;
+      Promise.resolve().then(() => {
+        if (destroyed || !hashPageBase || !hashFrameChecks.has(entry.iframe) || entry.keySequence !== sequence) return;
+        const target = entry.pendingKeyTarget;
+        entry.pendingKeyTarget = 0;
+        if (target !== page) showHashPage(target);
+        // Also correct the boundary case (e.g. ArrowLeft at page 1) if
+        // the child did something unexpected. Never attempt page zero.
+        scheduleHashCorrections(target);
+        restoreHashReaderFocus(entry.iframe);
+      });
     }
 
     // A trailing #1 declares a sequence of non-interactive external frames.
@@ -791,6 +807,39 @@
     // can participate in this on-demand end-of-book detection.
     function hashUrl(number) {
       return win.MangaSourceType?.hashPageUrl(hashPageBase, number) || '';
+    }
+    function cancelHashCorrections() {
+      hashCorrectionGeneration += 1;
+      const cancel = win.clearTimeout || globalThis.clearTimeout;
+      for (const timer of hashCorrectionTimers) cancel?.(timer);
+      hashCorrectionTimers.clear();
+    }
+    function scheduleHashCorrections(target) {
+      cancelHashCorrections();
+      const iframe = hashIframe;
+      if (!hashPageBase || destroyed || vertical || !iframe || !hashUrl(target)) return;
+      const ownGeneration = hashCorrectionGeneration;
+      const schedule = win.setTimeout || globalThis.setTimeout;
+      // First pass happens just after the site's own key handler. Follow-up
+      // passes catch async hash routers; later requests cancel older passes.
+      for (const delay of [0, 45, 150, 360]) {
+        const timer = schedule(() => {
+          hashCorrectionTimers.delete(timer);
+          if (destroyed || ownGeneration !== hashCorrectionGeneration
+              || iframe !== hashIframe || page !== target) return;
+          const expected = '#' + target;
+          let actual = null;
+          try { actual = iframe.contentWindow?.location?.hash; }
+          catch (_) { /* Cross-origin child URL cannot be read. */ }
+          if (actual === expected || actual === expected + '-') return;
+          // For an unreadable cross-origin child we cannot tell if it moved;
+          // explicitly navigate it back to the reader's desired URL. This
+          // also works when the site ignored the key at a page boundary.
+          const url = hashUrl(target);
+          if (url) iframe.src = url;
+        }, delay);
+        hashCorrectionTimers.add(timer);
+      }
     }
     function disposeHashObservation(iframe) {
       const entry = hashFrameChecks.get(iframe);
@@ -850,6 +899,22 @@
       catch (_) { return false; } // A cross-origin iframe exposes no URL.
       if (typeof observed !== 'string') return false;
       const number = entry.number;
+      if (entry.pendingKeyTarget) return true;
+      // If the page itself moved in its REVERSED keyboard direction and the
+      // reader did not request that navigation, infer the physical key from
+      // the observed hash. This is available only to same-origin frames.
+      const currentHashPage = /^#([1-9]\\d*)(?:-)?$/.exec(observed);
+      const observedPage = currentHashPage ? Number(currentHashPage[1]) : 0;
+      if (number === page && observedPage > 0 && Math.abs(observedPage - number) === 1
+          && Date.now() - (entry.lastRequestedAt || 0) > 450) {
+        const corrected = observedPage < number ? number + 1 : number - 1;
+        if (hashUrl(corrected) && (!hashKnownTotal || corrected <= hashKnownTotal)
+            && !hashRejectedPages.has(corrected)) {
+          showHashPage(corrected);
+          scheduleHashCorrections(corrected);
+          return true;
+        }
+      }
       if (number > 1 && observed === '#1-') {
         if (entry.resetPage !== number) {
           entry.resetPage = number;
@@ -877,7 +942,7 @@
     function observeHashFrame(iframe, number) {
       let entry = hashFrameChecks.get(iframe);
       if (!entry) {
-        entry = { iframe, number, childWindow: null, loaded: false, timers: new Set(), resetPage: 0, onLoad: null, onFocus: null, onChildKeydown: null, inspect: null };
+        entry = { iframe, number, childWindow: null, loaded: false, timers: new Set(), resetPage: 0, lastRequestedAt: Date.now(), pendingKeyTarget: 0, keySequence: 0, onLoad: null, onFocus: null, onChildKeydown: null, inspect: null };
         entry.inspect = () => inspectHashObservation(entry);
         entry.onFocus = () => restoreHashReaderFocus(iframe);
         entry.onChildKeydown = (event) => interceptHashChildArrow(entry, event);
@@ -911,6 +976,7 @@
       } else {
         entry.number = number;
         entry.resetPage = 0;
+        entry.lastRequestedAt = Date.now();
         // Changing only the hash may not fire iframe.onload. The existing
         // child's hashchange listener and delayed inspection cover that case.
         if (entry.childWindow) scheduleHashChecks(entry);
@@ -1009,6 +1075,7 @@
       // scroll events must not trigger a new page-discovery cycle.
       hashUserScrollUntil = 0;
       if (number === page && byId('pageStage')?.firstChild) return true;
+      cancelHashCorrections();
       hashPreviousPage = page;
       if (vertical) {
         hashMaxVisited = Math.max(hashMaxVisited, number);
@@ -1178,6 +1245,7 @@
     // observation capable of replacing the next candidate's page.
     function resetSourcePresentation() {
       stopHashKeyboardGuard();
+      cancelHashCorrections();
       activeAutoDetectedDirectory = false;
       generation += 1;
       navigationGeneration += 1;
