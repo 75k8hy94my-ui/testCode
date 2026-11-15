@@ -250,6 +250,32 @@ test('legacy cached last-page hints cannot lock the #1 reader at page one', asyn
   runtime.destroy();
 });
 
+test('old image manifests cannot override a newly selected #1 URL', async () => {
+  const { runtime, item, elements } = setup();
+  item.pageManifest = { version:1, pages:['https://images.test/1.webp'] };
+  item.pages = ['https://images.test/1.webp'];
+  await runtime.start(item.id);
+  assert.equal(elements.pageStage.firstChild.className, 'readerHashFrame');
+  assert.equal(elements.pageStage.firstChild.firstChild.src, 'https://example.test/xxx.html?edition=1#1');
+  runtime.next();
+  assert.equal(elements.pageStage.firstChild.firstChild.src, 'https://example.test/xxx.html?edition=1#2');
+  assert.equal(item.pages.length, 1, 'saved page metadata is not deleted by selecting the hash reader');
+  runtime.destroy();
+});
+
+test('delayed cross-origin focus transfer is reclaimed after the parent blur event', async () => {
+  const { runtime, elements, doc, win } = setup();
+  await runtime.start('hash-work');
+  const pending = [];
+  win.setTimeout = (callback) => { pending.push(callback); return pending.length; };
+  doc.activeElement = elements.viewer;
+  win.dispatch('blur');
+  doc.activeElement = elements.pageStage.firstChild.firstChild;
+  pending.forEach((callback) => callback());
+  assert.equal(doc.activeElement, elements.viewer);
+  runtime.destroy();
+});
+
 test('enabling vertical mode does not scan pages or react to programmatic browser scroll events', async () => {
   const { runtime, elements, body, commits } = setup({ resume: 2 });
   await runtime.start('hash-work');
