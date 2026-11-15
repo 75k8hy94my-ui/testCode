@@ -1,7 +1,7 @@
 (function (root) {
   'use strict';
 
-  const STYLESHEET_URL = 'manga-list.css?v=20261115-finger-drag';
+  const STYLESHEET_URL = 'manga-list.css?v=20261115-touch-sheet-v2';
   const SCRIPT_URLS = [
     ['manga-source-type.js?v=20261115-directory-image-detect', 'mangaSourceType'],
     ['manga-list-template.js?v=20261114-json-import', 'mangaRouteTemplate'],
