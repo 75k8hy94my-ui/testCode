@@ -104,6 +104,7 @@
     let pageUrls = [];
     let sourceCandidates = [];
     const directoryDetectionCache = new Map();
+    const virtualDetectedSources = new Map();
     let directoryPreflightDone = false;
     let sourceOriginalItem = null;
     let sourceIndex = 0;
@@ -497,7 +498,7 @@
       if (!sourceReady || sourceSwitching) return;
       // An image discovered under /manga/ is a temporary interpretation of
       // that saved URL. Try the original web page if a later image breaks.
-      const tryOriginal = activeAutoDetectedDirectory;
+      const tryOriginal = activeAutoDetectedDirectory && !virtualDetectedSources.has(sourceCandidates[sourceIndex]);
       if (!tryOriginal && sourceIndex >= sourceCandidates.length - 1) return;
       sourceReady = false;
       void activateSources(tryOriginal ? sourceIndex : sourceIndex + 1, failedPage, tryOriginal).then((ready) => {
@@ -1188,33 +1189,45 @@
             directoryPreflightDone = true;
             // Delay speculative folder checks until a hash fallback is about
             // to be used. A working explicit direct image opens immediately.
+            const seen = new Set(sourceCandidates);
             for (const url of sourceCandidates) {
               if (destroyed) return false;
               if (!(win.MangaSourceType?.getDirectoryImageCandidates(url)?.length)) continue;
-              directoryDetectionCache.set(url, await detectDirectoryFirstPage(url));
+              const found = await detectDirectoryFirstPage(url);
+              // The original link remains in the "other" category; its found
+              // direct image is a temporary earlier source, not saved data.
+              directoryDetectionCache.set(url, '');
+              if (found && !seen.has(found)) {
+                virtualDetectedSources.set(found, url);
+                seen.add(found);
+              }
             }
-            sourceCandidates.sort((a, b) => {
-              const rank = (url) => directoryDetectionCache.get(url)
-                ? 0 : (win.MangaSourceType?.sourcePriority(url) ?? 2);
-              return rank(a) - rank(b);
-            });
+            sourceCandidates.push(...virtualDetectedSources.keys());
+            sourceCandidates.sort((a, b) =>
+              (win.MangaSourceType?.sourcePriority(a) ?? 2)
+              - (win.MangaSourceType?.sourcePriority(b) ?? 2)
+            );
           }
           resetSourcePresentation();
           sourceIndex = index;
           const savedUrl = sourceCandidates[index];
-          const mayDetect = !(skipDirectoryForFirst && index === startIndex)
+          const virtualDetected = virtualDetectedSources.has(savedUrl);
+          const mayDetect = !virtualDetected
+            && !(skipDirectoryForFirst && index === startIndex)
             && (sourceCandidates.length > 1 || !win.MangaSourceType?.hasPageList(sourceOriginalItem));
-          const discoveredUrl = mayDetect
+          const discoveredUrl = virtualDetected ? savedUrl : mayDetect
             ? directoryDetectionCache.has(savedUrl)
               ? directoryDetectionCache.get(savedUrl)
               : await detectDirectoryFirstPage(savedUrl)
             : '';
           if (destroyed) return false;
-          // If the detected direct sequence later fails, the same original
-          // URL is still available as a normal embedded page.
-          const attempts = discoveredUrl
-            ? [{ url: discoveredUrl, detected: true }, { url: savedUrl, detected: false }]
-            : [{ url: savedUrl, detected: false }];
+          // A preflight-discovered image sits ahead of the hash readers;
+          // the original web embed remains at its normal later position.
+          const attempts = virtualDetected
+            ? [{ url: savedUrl, detected: true }]
+            : discoveredUrl
+              ? [{ url: discoveredUrl, detected: true }, { url: savedUrl, detected: false }]
+              : [{ url: savedUrl, detected: false }];
           for (let attemptIndex = 0; attemptIndex < attempts.length && !destroyed; attemptIndex += 1) {
             if (attemptIndex) resetSourcePresentation();
             const attempt = attempts[attemptIndex];
@@ -1232,7 +1245,7 @@
             }
             const isDirect = win.MangaSourceType?.isDirectImageUrl(attempt.url);
             const hasHashBackup = sourceCandidates.slice(index + 1).some((value) => value.endsWith('#1'));
-            const deadline = attempt.detected ? 30000 : isDirect && hasHashBackup ? 3500 : isDirect ? 16000 : 10000;
+            const deadline = attempt.detected ? (hasHashBackup ? 9000 : 30000) : isDirect && hasHashBackup ? 3500 : isDirect ? 16000 : 10000;
             let timer;
             const timeout = new Promise((resolve) => { timer = win.setTimeout(() => resolve(false), deadline); });
             let ready = false;
@@ -1265,6 +1278,7 @@
       sourceCandidates = item.localSync || item.encryptedAssets?.pages?.length
         ? [] : (win.MangaSourceType?.getSourceCandidates(item) || []);
       directoryDetectionCache.clear();
+      virtualDetectedSources.clear();
       directoryPreflightDone = false;
       const button = byId('switchSourceBtn');
       if (button) button.hidden = sourceCandidates.length < 2;
