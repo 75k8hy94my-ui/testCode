@@ -764,53 +764,107 @@ test('vertical reading removes end-of-book placeholders when its next page redir
 });
 
 
-test('configured #1 interval opens at #2 and stops at #19', async () => {
-  const {runtime,item,elements} = setup({resume:1});
-  item.pageRangeStart = 2;
-  item.pageRangeEnd = 19;
+test('URL #18–#29 is displayed as reader pages 1–12, including first/last/slider', async () => {
+  const {runtime,item,elements,commits} = setup({resume:1});
+  item.pageRangeStart = 18;
+  item.pageRangeEnd = 29;
   await runtime.start(item.id);
-  assert.equal(elements.pageStage.firstChild.firstChild.src,'https://example.test/xxx.html?edition=1#2');
-  assert.equal(elements.pageSlider.min,'2');
-  assert.equal(elements.pageSlider.max,'19');
-  assert.equal(elements.pageLabel.textContent,'2 / 19');
+  const iframe = () => elements.pageStage.firstChild.firstChild;
+  assert.equal(iframe().src, 'https://example.test/xxx.html?edition=1#18');
+  assert.equal(elements.pageSlider.min, '1');
+  assert.equal(elements.pageSlider.max, '12');
+  assert.equal(elements.pageSlider.value, '1');
+  assert.equal(elements.pageLabel.textContent, '1 / 12');
+  assert.equal(elements.readerStatus.textContent, '全12ページ');
   runtime.previous();
-  assert.equal(elements.pageStage.firstChild.firstChild.src,'https://example.test/xxx.html?edition=1#2');
-  elements.lastBtn.dispatch('click');
-  assert.equal(elements.pageStage.firstChild.firstChild.src,'https://example.test/xxx.html?edition=1#19');
+  assert.equal(iframe().src, 'https://example.test/xxx.html?edition=1#18');
   runtime.next();
-  assert.equal(elements.pageStage.firstChild.firstChild.src,'https://example.test/xxx.html?edition=1#19');
+  assert.equal(iframe().src, 'https://example.test/xxx.html?edition=1#19');
+  assert.equal(elements.pageLabel.textContent, '2 / 12');
+  elements.pageSlider.dispatch('change',{target:{value:'6'}});
+  assert.equal(iframe().src, 'https://example.test/xxx.html?edition=1#23');
+  assert.equal(elements.pageLabel.textContent, '6 / 12');
+  elements.lastBtn.dispatch('click');
+  assert.equal(iframe().src, 'https://example.test/xxx.html?edition=1#29');
+  assert.equal(elements.pageLabel.textContent, '12 / 12');
+  assert.equal(elements.nextBtn.disabled,true);
+  runtime.next();
+  assert.equal(iframe().src, 'https://example.test/xxx.html?edition=1#29');
   elements.firstBtn.dispatch('click');
-  assert.equal(elements.pageStage.firstChild.firstChild.src,'https://example.test/xxx.html?edition=1#2');
+  assert.equal(iframe().src, 'https://example.test/xxx.html?edition=1#18');
+  assert.equal(elements.pageLabel.textContent, '1 / 12');
+  assert.ok(commits.every(({page}) => page >= 1 && page <= 12), 'progress must use reader-relative pages');
   runtime.destroy();
 });
 
-test('vertical hash interval has no blank slots before custom start and no beyond-end frames', async () => {
-  const {runtime,item,elements}=setup({vertical:true,resume:1});
-  item.pageRangeStart=2;
-  item.pageRangeEnd=3;
+test('vertical hash interval uses relative slot numbers and offsets', async () => {
+  const {runtime,item,elements} = setup({vertical:true,resume:1});
+  item.pageRangeStart=18;
+  item.pageRangeEnd=20;
   await runtime.start(item.id);
-  assert.equal(elements.pageStage.children.length,2);
-  assert.equal(elements.pageStage.children[0].dataset.page,'2');
-  assert.equal(elements.pageStage.children[1].dataset.page,'3');
+  assert.equal(elements.pageStage.children.length,3);
+  assert.deepEqual(elements.pageStage.children.map(slot=>slot.dataset.page),['1','2','3']);
+  assert.equal(elements.pageStage.children[0].firstChild.firstChild.src, 'https://example.test/xxx.html?edition=1#18');
   assert.equal(elements.viewer.scrollTop,0);
-  runtime.goTo(3);
+  runtime.goTo(2);
   assert.equal(elements.viewer.scrollTop,800);
+  assert.equal(elements.pageStage.children[1].firstChild.firstChild.src, 'https://example.test/xxx.html?edition=1#19');
+  runtime.goTo(3);
+  assert.equal(elements.viewer.scrollTop,1600);
+  assert.equal(elements.pageLabel.textContent,'3 / 3');
   runtime.next();
   assert.equal(elements.pageLabel.textContent,'3 / 3');
   runtime.destroy();
 });
 
-
-test('explicit range end overrides an older cached automatic hash-page count', async () => {
+test('manual range end overrides a previous shorter auto-detected count', async () => {
   const {runtime,item,elements}=setup({resume:1});
-  item.pageRangeStart=2;
-  item.pageRangeEnd=19;
-  item.hashPageCount=12;
+  item.pageRangeStart=18;
+  item.pageRangeEnd=29;
+  item.hashPageCount=20;
   item.hashPageCountSource='https://example.test/xxx.html?edition=1';
   item.hashPageCountVersion=2;
   await runtime.start(item.id);
-  assert.equal(elements.pageSlider.max,'19');
-  runtime.goTo(19);
+  assert.equal(elements.pageSlider.max,'12');
+  runtime.goTo(12);
+  assert.equal(elements.pageStage.firstChild.firstChild.src,'https://example.test/xxx.html?edition=1#29');
+  runtime.destroy();
+});
+
+test('legacy absolute bookmark #19 migrates once to relative page 2', async () => {
+  const {runtime,item,elements,updates,commits}=setup({resume:19});
+  item.pageRangeStart=18;
+  item.pageRangeEnd=29;
+  await runtime.start(item.id);
   assert.equal(elements.pageStage.firstChild.firstChild.src,'https://example.test/xxx.html?edition=1#19');
+  assert.equal(elements.pageLabel.textContent,'2 / 12');
+  assert.equal(item.hashPageIndexMode,'relative-v1');
+  assert.ok(updates.some(patch=>patch.hashPageIndexMode==='relative-v1'));
+  assert.equal(commits.at(-1).page,2);
+  runtime.destroy();
+});
+
+test('already migrated relative bookmark uses reader number without a second conversion', async () => {
+  const {runtime,item,elements,updates}=setup({resume:5});
+  item.pageRangeStart=18;
+  item.pageRangeEnd=29;
+  item.hashPageIndexMode='relative-v1';
+  await runtime.start(item.id);
+  assert.equal(elements.pageStage.firstChild.firstChild.src,'https://example.test/xxx.html?edition=1#22');
+  assert.equal(elements.pageLabel.textContent,'5 / 12');
+  assert.equal(updates.length,0);
+  runtime.destroy();
+});
+
+test('start-only hash ranges show 1 / ? while source starts at #18', async () => {
+  const {runtime,item,elements}=setup({resume:1});
+  item.pageRangeStart=18;
+  await runtime.start(item.id);
+  assert.equal(elements.pageStage.firstChild.firstChild.src,'https://example.test/xxx.html?edition=1#18');
+  assert.equal(elements.pageLabel.textContent,'1 / ?');
+  assert.equal(elements.pageSlider.min,'1');
+  runtime.next();
+  assert.equal(elements.pageStage.firstChild.firstChild.src,'https://example.test/xxx.html?edition=1#19');
+  assert.equal(elements.pageLabel.textContent,'2 / ?');
   runtime.destroy();
 });
