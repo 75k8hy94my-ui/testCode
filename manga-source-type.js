@@ -28,6 +28,25 @@
     return !!href && IMAGE_PATH.test(new URL(href).pathname);
   }
 
+  // A source is a complete alternative location for one work, NOT a page in a
+  // numbered image list. All locations have equal standing in saved metadata.
+  function getSourceUrls(item) {
+    const values = Array.isArray(item?.sourceUrls) && item.sourceUrls.length
+      ? item.sourceUrls : [item?.url];
+    const seen = new Set();
+    return values.map(safeHttpUrl).filter((url) => {
+      if (!url || seen.has(url)) return false;
+      seen.add(url);
+      return true;
+    });
+  }
+  function sourcePriority(url) {
+    return isDirectImageUrl(url) ? 0 : url.endsWith('#1') ? 1 : 2;
+  }
+  function getSourceCandidates(item) {
+    return getSourceUrls(item).sort((a, b) => sourcePriority(a) - sourcePriority(b));
+  }
+
   function hasPageList(item) {
     return (Array.isArray(item?.pageManifest?.pages) && item.pageManifest.pages.length > 0 && item.pageManifest.version === 1)
       || (Array.isArray(item?.pages) && item.pages.length > 0);
@@ -56,7 +75,7 @@
     return href && (getHashPageBase(item) || !isDirectImageUrl(href)) ? href : '';
   }
 
-  const api = Object.freeze({ safeHttpUrl, isDirectImageUrl, hasPageList, getHashPageBase, hashPageUrl, MAX_HASH_PAGE, getEmbedUrl, EMBED_COVER_URL });
+  const api = Object.freeze({ safeHttpUrl, isDirectImageUrl, getSourceUrls, getSourceCandidates, sourcePriority, hasPageList, getHashPageBase, hashPageUrl, MAX_HASH_PAGE, getEmbedUrl, EMBED_COVER_URL });
   if (typeof self !== 'undefined') self.MangaSourceType = api;
   if (typeof window !== 'undefined') window.MangaSourceType = api;
   if (typeof module !== 'undefined') module.exports = api;
