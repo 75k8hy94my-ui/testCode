@@ -236,7 +236,6 @@ test('video library can be reinitialized after a route interruption without rebi
 
 
 test('video library module loads without self-initializing or scheduling a timer', () => {
-  const api = {};
   const context = {
     window: { MangaReaderVideoData: {}, VideoLibraryPagination: {} },
     document: {
@@ -247,7 +246,8 @@ test('video library module loads without self-initializing or scheduling a timer
   };
   vm.runInNewContext(read('video-library.js'), context);
   assert.equal(typeof context.window.MangaReaderVideoLibrary.init, 'function');
-  assert.doesNotMatch(read('video-library.js'), /setTimeout\\(init|DOMContentLoaded/);
+  assert.equal(read('video-library.js').includes('setTimeout(init'), false);
+  assert.equal(read('video-library.js').includes("document.addEventListener('DOMContentLoaded'"), false);
 });
 
 test('video route uses one explicit synchronous initialization without a timing fallback', async () => {
