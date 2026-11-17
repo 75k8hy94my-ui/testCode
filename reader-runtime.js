@@ -861,7 +861,8 @@
     }
     function cancelHashCorrections() {
       hashCorrectionGeneration += 1;
-      const cancel = win.clearTimeout || globalThis.clearTimeout;
+      // close()/destroy() may precede mounting a browser window.
+      const cancel = win?.clearTimeout || globalThis.clearTimeout;
       for (const timer of hashCorrectionTimers) cancel?.(timer);
       hashCorrectionTimers.clear();
     }

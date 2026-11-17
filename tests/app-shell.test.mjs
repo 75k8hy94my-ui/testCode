@@ -188,7 +188,11 @@ test('SPA navigation and browser back do not block locally saved pending cloud s
   const spa = read('home-profile-spa.js');
   assert.doesNotMatch(spa, /confirmPendingSyncLeave|window\.confirm\('クラウド同期が完了していません/);
   assert.doesNotMatch(spa, /skipNextPopstate|history\.forward\(\)/);
-  assert.match(spa, /function handleRoutePopstate\(\)\{if\(location\.href===lastSpaUrl\)return;lastSpaUrl=location\.href;renderRoute\(\);\}/);
+  assert.match(spa, /function handleRoutePopstate\(\)\{/);
+  assert.match(spa, /if\(location\.href===lastSpaUrl\)return/);
+  assert.match(spa, /lastSpaUrl=location\.href/);
+  assert.match(spa, /if\(isWorksheetHistoryChange\(previous,lastSpaUrl\)\)return/);
+  assert.match(spa, /renderRoute\(\);/);
   assert.match(spa, /history\.pushState/);
   assert.match(spa, /function intercept\(event\)\{[^}]*event\.preventDefault\(\);navigate\(target\.href\)/);
 });

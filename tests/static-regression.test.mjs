@@ -12,7 +12,8 @@ test('recommendation picker rotates fallback works and excludes disabled local m
 test('bookshelf cover cache remains item-specific and recovers stale sources', () => {
   const body = read('manga-list-host-runtime.js');
   assert.match(body, /const identityKey = itemId \? 'item:' \+ String\(itemId\) : folderUrl/);
-  assert.match(body, /const cacheKey = directUrl \|\| \[identityKey, folderUrl, String\(resolvedWidth\), JSON\.stringify\(pattern \|\| null\)/);
+  assert.match(body, /const cacheKey = \(directUrl \|\| \[identityKey, folderUrl, String\(resolvedWidth\), JSON\.stringify\(pattern \|\| null\)/);
+  assert.match(body, /page-start:/);
   assert.match(body, /sourceCache\.delete\(cacheKey\)/);
   assert.match(body, /failedCache\.delete\(cacheKey\)/);
 });

@@ -22,6 +22,16 @@ function memoryStorage() {
   return { getItem(key) { return values.get(key) ?? null; }, setItem(key, value) { values.set(key, String(value)); }, removeItem(key) { values.delete(key); } };
 }
 
+test('Reader destroy is safe before mounting DOM/window', () => {
+  const runtime = factory.create({
+    repository: { loadItem() { return null; }, saveItem() {} },
+    target: {},
+    location: { replace() {} },
+  });
+  assert.doesNotThrow(() => runtime.destroy());
+  assert.doesNotThrow(() => runtime.destroy());
+});
+
 test('Reader close waits for cloud flush and stays open on failure for retry', async () => {
   const redirects = [];
   let finish;
