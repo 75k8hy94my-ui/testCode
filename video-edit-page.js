@@ -76,7 +76,7 @@
     const lead = document.createElement('p'); lead.className = 'videoEditLead'; lead.textContent = isAddMode ? '動画URLと情報を入力してください。' : '変更内容は自動的に保存されます。';
     const form = document.createElement('form'); form.className = 'videoEditForm ' + (isAddMode ? 'isAddMode' : 'isEditMode');
     form.innerHTML = `
-      ${isAddMode ? '<details class="videoEditField videoEditJsonImport"><summary>JSONからURLを一括追加</summary><p class="videoEditHelp">URL文字列の配列を含むJSONファイルを選択します。例: ["https://example.com/1.mp4"]</p><label for="videoEditJsonFile">JSONファイル</label><input id="videoEditJsonFile" type="file" accept="application/json,.json" data-json-import></details>' : ''}
+      ${isAddMode ? '<details class="videoEditField videoEditJsonImport"><summary>複数の動画を一括追加</summary><p class="videoEditHelp">URLを1行につき1つ貼り付けるか、URL配列のJSONを選択してください。埋め込みONは外部ページのURLにのみ適用されます。</p><label for="videoEditBulkUrls">動画URL（改行区切り）</label><textarea id="videoEditBulkUrls" rows="6" placeholder="https://example.com/watch/1&#10;https://example.com/watch/2" data-bulk-urls></textarea><label class="videoEditCheck"><input id="videoEditBulkEmbed" type="checkbox" data-bulk-embed> 外部ページを埋め込む（全件共通）</label><button class="videoEditButton" type="button" data-bulk-add>このURLを一括追加</button><p class="videoEditHelp">またはJSONファイル</p><input id="videoEditJsonFile" type="file" accept="application/json,.json" data-json-import></details>' : ''}
       <div class="videoEditUrlRow videoEditMainUrl"><div class="videoEditField"><label for="videoEditUrl">動画URL</label><input id="videoEditUrl" name="url" type="url" autocomplete="off" required readonly></div><button class="videoEditButton" type="button" data-edit-url>URLを変更</button></div>
       <div class="videoEditField videoEditTitleField"><label for="videoEditTitle">タイトル</label><input id="videoEditTitle" name="title" type="text" maxlength="240" autocomplete="off"></div>
       <div class="videoEditField videoEditFolderField"><label for="videoEditFolder">フォルダ</label><select id="videoEditFolder" name="folder"></select><details class="videoEditFolderCreate"><summary>＋ 新しいフォルダ</summary><div class="videoEditUrlRow"><input id="videoEditNewFolder" type="text" maxlength="100" placeholder="フォルダ名" autocomplete="off"><button class="videoEditButton" type="button" data-create-folder>作成</button></div><p class="videoEditHelp" data-folder-feedback role="status" aria-live="polite"></p></details></div>
@@ -84,7 +84,7 @@
        <div class="videoEditField videoEditStatusField"><label for="videoEditStatus">状態</label><select id="videoEditStatus" name="status"><option value="">未設定</option><option value="later">あとで見る</option><option value="watching">視聴中</option><option value="watched">視聴済み</option></select></div>
       <div class="videoEditField videoEditTagsField"><label for="videoEditTags">タグ（カンマ区切り）</label><input id="videoEditTags" name="tags" type="text" autocomplete="off"></div>
       <div class="videoEditField videoEditMemoField"><label for="videoEditMemo">メモ</label><textarea id="videoEditMemo" name="memo"></textarea></div>
-      <div class="videoEditToggles"><label class="videoEditCheck"><input name="favorite" type="checkbox"> お気に入り</label><label class="videoEditCheck"><input name="hidden" type="checkbox"> 動画を非表示</label></div>
+      <div class="videoEditToggles"><label class="videoEditCheck"><input name="embedPage" type="checkbox"> 外部ページを埋め込む（直リンク以外）</label><label class="videoEditCheck"><input name="favorite" type="checkbox"> お気に入り</label><label class="videoEditCheck"><input name="hidden" type="checkbox"> 動画を非表示</label></div>
       <div class="videoEditField videoEditRotateField"><label for="videoEditRotate">再生時の回転</label><select id="videoEditRotate" name="rotate"><option value="none">回転なし</option><option value="left">常に左90°回転</option><option value="right">常に右90°回転</option></select></div>
       <details class="videoEditField videoEditPlaybackMeta"><summary>再生情報・サムネイル</summary><div class="videoEditPlaybackFields"><div class="videoEditField"><label for="videoEditService">サービス名</label><input id="videoEditService" name="service" type="text" autocomplete="off"></div><div class="videoEditField"><label for="videoEditLegacyId">動画ID</label><input id="videoEditLegacyId" name="legacyId" type="text" autocomplete="off"></div><div class="videoEditField"><label for="videoEditThumbnail">サムネイルURL（任意）</label><input id="videoEditThumbnail" name="thumbnail" type="url" autocomplete="off"></div><div class="videoEditField"><label for="videoEditThumbnailTime">サムネイル時刻（mm:ss）</label><input id="videoEditThumbnailTime" name="thumbnailTime" type="text" inputmode="numeric" placeholder="0:00" autocomplete="off"></div></div></details>
       <p class="videoEditError" role="status" aria-live="polite"></p><div class="videoEditActions"><button class="videoEditButton danger" type="button" data-delete>動画を削除</button><span class="videoEditSaveStatus" role="status" aria-live="polite" ${isAddMode ? "hidden" : ""}>変更は自動保存されます</span><a class="videoEditButton" data-cancel>${isAddMode ? "キャンセル" : "戻る"}</a>${isAddMode ? '<button class="videoEditButton save" type="submit">追加</button>' : ""}</div>`;
@@ -165,6 +165,7 @@
     elements.memo.value = current.memo;
     elements.favorite.checked = current.favorite;
     elements.hidden.checked = current.hidden;
+    elements.embedPage.checked = current.embedPage === true;
     elements.rotate.value = current.rotate90Direction;
     elements.service.value = base ? (base.a || '') : '';
     elements.legacyId.value = base ? (base.b || '') : '';
@@ -245,15 +246,10 @@
     form.querySelector('[data-edit-url]').addEventListener('click', () => { if (!canReadProtectedData()) return; elements.url.readOnly = false; elements.url.focus(); });
     if (isAddMode) {
       const jsonImport = form.querySelector('[data-json-import]');
-      jsonImport.addEventListener('change', async (event) => {
-        const file = event.target.files && event.target.files[0];
-        const error = form.querySelector('.videoEditError');
-        error.textContent = '';
-        if (!file || !canReadProtectedData()) return;
-        let parsed;
-        try { parsed = JSON.parse(await file.text()); }
-        catch (_) { error.textContent = 'JSONを読み込めませんでした。形式を確認してください。'; return; }
-        if (!Array.isArray(parsed)) { error.textContent = 'JSONはURL文字列の配列にしてください。'; return; }
+      const bulkUrlsInput = form.querySelector('[data-bulk-urls]');
+      const bulkEmbed = form.querySelector('[data-bulk-embed]');
+      const bulkAddButton = form.querySelector('[data-bulk-add]');
+      async function importUrls(parsed, eventTarget) {
 
         const urls = [];
         for (let index = 0; index < parsed.length; index += 1) {
@@ -268,6 +264,7 @@
         const updatedVideos = savedVideos.map(v => ({ ...v }));
         const newVideos = [];
         const newMeta = {};
+        const embedPage = bulkEmbed.checked;
         const now = Date.now();
         let promoted = 0;
         urls.forEach((url) => {
@@ -283,11 +280,11 @@
           const added = Data.normalizeVideo({ id: videoId, title: '', url, ...fields, addedAt: now, updatedAt: now });
           newVideos.push(added);
           updatedVideos.push(added);
-          newMeta[videoId] = { title: '', folderId: null, watchStatus: '', tags: [], memo: '', favorite: false, hidden: false, rotate90: false, rotate90Direction: 'none', thumbnailUrl: '', thumbnailTimeSeconds: null, updatedAt: now };
+          newMeta[videoId] = { embedPage: embedPage && Data.classifyVideoUrl(url).kind === 'link', title: '', folderId: null, watchStatus: '', tags: [], memo: '', favorite: false, hidden: false, rotate90: false, rotate90Direction: 'none', thumbnailUrl: '', thumbnailTimeSeconds: null, updatedAt: now };
         });
         if (!newVideos.length && !promoted) {
           error.textContent = '追加・切り替えできるURLがありません。';
-          event.target.value = '';
+          if (eventTarget) eventTarget.value = '';
           return;
         }
         const currentMeta = read(META_KEY, {});
@@ -295,12 +292,12 @@
         if (!window.TestCodeGuest?.isActive()) {
           if (!window.MangaVault || typeof window.MangaVault.markLocalChangesPending !== 'function') {
             error.textContent = '未同期状態を管理できません。動画は変更していません。保管庫を開いて再試行してください。';
-            event.target.value = '';
+            if (eventTarget) eventTarget.value = '';
             return;
           }
           if (!window.MangaVault.markLocalChangesPending()) {
             error.textContent = '未同期状態を記録できませんでした。動画は変更していません。保存領域を確認してください。';
-            event.target.value = '';
+            if (eventTarget) eventTarget.value = '';
             return;
           }
         }
@@ -308,7 +305,7 @@
           writeVideoRecordsAtomically([...newVideos, ...updatedVideos.filter(v => !newVideos.some(n => n.id === v.id))], nextMeta);
         } catch (_) {
           error.textContent = '端末に保存できませんでした。ブラウザの保存容量を確認してください。';
-          event.target.value = '';
+          if (eventTarget) eventTarget.value = '';
           return;
         }
         let syncMessage = '端末に保存しました。';
@@ -319,7 +316,24 @@
           } else syncMessage = 'VPN未許可のため未同期として保持しました。';
         } else syncMessage = 'ゲスト端末内に保存しました。';
         error.textContent = newVideos.length + '件追加、' + promoted + '件をメインURLに変更しました。' + syncMessage;
-        event.target.value = '';
+        if (eventTarget) eventTarget.value = '';
+      }
+      bulkAddButton.addEventListener('click', async () => {
+        if (!canReadProtectedData()) return;
+        const lines = bulkUrlsInput.value.split(/\r?\n/).map(url => url.trim()).filter(Boolean);
+        if (!lines.length) { form.querySelector('.videoEditError').textContent = 'URLを入力してください。'; return; }
+        bulkAddButton.disabled = true;
+        try { await importUrls(lines, null); }
+        finally { bulkAddButton.disabled = false; }
+      });
+      jsonImport.addEventListener('change', async (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file || !canReadProtectedData()) return;
+        const error = form.querySelector('.videoEditError');
+        let parsed;
+        try { parsed = JSON.parse(await file.text()); }
+        catch (_) { error.textContent = 'JSONを読み込めませんでした。形式を確認してください。'; return; }
+        await importUrls(parsed, event.target);
       });
     }
     const refreshUrlFields = () => {
@@ -345,7 +359,7 @@
       return JSON.stringify({
         fields: [elements.url.value, elements.title.value, elements.folder.value, elements.alternateUrls.value,
           elements.status.value, elements.tags.value, elements.memo.value, !!elements.favorite.checked,
-          !!elements.hidden.checked, elements.rotate.value, elements.service.value, elements.legacyId.value,
+          !!elements.hidden.checked, !!elements.embedPage.checked, elements.rotate.value, elements.service.value, elements.legacyId.value,
           elements.thumbnail.value, elements.thumbnailTime.value],
         custom: [...customValueInputs.values()].map(({ property, control }) => {
           if (property.type === 'checkbox') return !!control.checked;
@@ -464,7 +478,7 @@
       if (matching) nextBase.alternateUrls = [...new Set([...(nextBase.alternateUrls || []), ...variants])].filter(v => v !== url);
       const storedMeta = read(META_KEY, {});
       const nextMeta = storedMeta && typeof storedMeta === 'object' && !Array.isArray(storedMeta) ? storedMeta : {};
-      if (!matching) nextMeta[savedId] = { ...(nextMeta[savedId] || {}), title: matching ? (nextMeta[savedId]?.title || '') : elements.title.value.trim(), folderId: matching ? (nextMeta[savedId]?.folderId || null) : elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, hidden: elements.hidden.checked, rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, thumbnailUrl: elements.thumbnail.value.trim(), thumbnailTimeSeconds: Data.isDirectVideoUrl(url) ? parsedTime : current.thumbnailTimeSeconds, updatedAt: Date.now() };
+      if (!matching) nextMeta[savedId] = { ...(nextMeta[savedId] || {}), title: matching ? (nextMeta[savedId]?.title || '') : elements.title.value.trim(), folderId: matching ? (nextMeta[savedId]?.folderId || null) : elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, hidden: elements.hidden.checked, embedPage: elements.embedPage.checked && classified.kind === 'link', rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, thumbnailUrl: elements.thumbnail.value.trim(), thumbnailTimeSeconds: Data.isDirectVideoUrl(url) ? parsedTime : current.thumbnailTimeSeconds, updatedAt: Date.now() };
       const nextVideos = matching ? savedVideos.map(item => String(item.id) === savedId ? nextBase : item) : isAddMode ? [nextBase, ...savedVideos] : savedVideos.map((item) => String(item.id) === videoId ? nextBase : item);
       const propertyUpdates = [];
       let propertyWritesNeeded = false;
