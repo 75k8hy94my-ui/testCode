@@ -66,7 +66,7 @@ URLやデータの実際の操作経路は、必ず入口HTMLと呼出し元か�
 - `docs/superpowers/specs/2026-10-04-reader-lifecycle-redesign.md`：文書内の「Current route」は当時の旧構成。そこから独立Readerに再設計した経緯の記録
 - `docs/entry-regression-baseline.md`：以前の入口構造を前提にした回帰基準
 
-同様に `reader-entry-page.js` のような旧Reader読込方式に見えるコードが残っていても、それだけで現行のページが利用しているとはみなさない。**現在のHTMLから到達可能かを検証してから**再利用・削除を判断する。
+旧Reader埋め込みコード `reader-entry-page.js` は、現行HTML・JavaScript内に参照元がなく、`readerEntryMount` / `ReaderShell.setScreen` もそのファイル内にしか存在しないことを確認して削除した。
 
 ## 今後の構造改善の順番
 
@@ -87,3 +87,28 @@ URLやデータの実際の操作経路は、必ず入口HTMLと呼出し元か�
 4. 新規の共通処理を作る前に、既存の共通処理（特にVault、VPN、Liquid Glass）を再利用できるか調べる。
 5. 動作を変える場合は回帰テストを更新。検証と本番反映は `AGENTS.md` の規則に従う。
 6. 本書の責任範囲とコードがずれた場合、同じ変更で修正する。
+
+## 動的依存と初期化の責任主体（2026-11-17 コード照合）
+
+- 共通ページ：`home-profile-spa.js` がホーム・プロフィール・漫画・動画のルートを切り替え、`app-global-shell.js` が `notice-center.js` を読み込む。
+- 漫画本棚：`manga.html` → `home-profile-spa.js` → `manga-list-route.js` → `manga-list-entry.js`、`manga-list-host-runtime.js` 等。`SCRIPT_URLS` に並んだ旧来型scriptの実行順序を推測で変更しない。
+- 動画一覧：`video.html` → `home-profile-spa.js` → `video-list-route.js` → `video-data.js`、`video-library-pagination.js`、`video-library.js` 等。VPN許可後にのみ一部の動画補助処理をロードする。
+- 動画UI：`video-list-route.js` が唯一の起動主体。同期的な `video-library.js.init()` の完了を直接確認し、タイマーによる初期化レースを設けない。`detach()` は未完了の起動を無効化する。
+- Reader：`reader.html?item=...` が静的に `reader-target.js`、`reader-page-source.js`、`reader-progress-repository.js`、`reader-runtime.js` をロードする。本棚の動的ローダーやSPAとは独立する。
+
+## データ・セキュリティの正本
+
+| データ・境界 | 最初に確認する責任主体 |
+| --- | --- |
+| 本棚の作品・フォルダ・作者、Vault対象キー | `manga-list-host-runtime.js` / `manga-list-route.js`、`vault-payload.js` |
+| Reader表示確定済み進捗（`mangaReaderLastPage`） | `reader-progress-repository.js` |
+| 動画・メタデータ・カスタムプロパティ | `video-data.js`、`video-library.js`、`vault-payload.js` |
+| 暗号化・ローカル保留・CAS・tombstone | `vault-session.js`、`vault-sync-merge.js`、`vault-payload.js` |
+| 逐条集独立暗号化 | `statutes-vault.js` |
+| ユーザー向け保護データへのVPN権限 | `media-access-gate.js` |
+
+## 構造検証と限界
+
+`scripts/check-architecture.mjs` は、現行の動的ローダー5ファイルで**文字列から確定できる**JS/CSS参照先の存在、およびReader・本棚のscript境界を検査する。`npm run verify:static` に組み込む。
+
+これは全依存関係解析ではなく、動的に計算したURL、グローバル関数参照、イベント経由の依存、実際の循環依存、ユーザーデータの移行可能性までは保証しない。動的ローダーを新設する際は `DYNAMIC_OWNERS` の更新と実際の呼出し経路の確認が必要。

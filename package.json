@@ -2,7 +2,8 @@
   "scripts": {
     "test": "node --test",
     "verify:static": "node scripts/check-static.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "verify:architecture": "node scripts/check-architecture.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1"

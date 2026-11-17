@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { verifyArchitecture } from './check-architecture.mjs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
@@ -48,4 +49,5 @@ for (const file of pages) {
 }
 const allSource = pages.concat(standalone, extensionFiles.filter((file) => file.endsWith('.js')).map((file) => `extensions/momon-ga-importer/${file}`)).map(read).join('\n');
 if (/service_role|BEGIN (?:RSA|OPENSSH)|\bsk-[A-Za-z0-9]/i.test(allSource)) throw new Error('potential secret material found');
+verifyArchitecture(root);
 console.log(`static verification passed: ${pages.length} HTML pages, ${standalone.length} JS files, momon:GA extension manifest and scripts`);
