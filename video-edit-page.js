@@ -170,6 +170,7 @@
     elements.rotate.value = current.rotate90Direction;
     const rotationRows = form.querySelector('[data-rotation-rows]');
     const rotationOptions = [['none', '回転なし'], ['right', '右90°'], ['left', '左90°'], ['half', '180°']];
+    let rotationRowsInitializing = true;
     function addRotationRow(seconds = '', direction = 'none') {
       const row = document.createElement('div');
       row.className = 'videoEditRotationRow';
@@ -189,11 +190,11 @@
       remove.type = 'button'; remove.className = 'videoEditButton'; remove.textContent = '削除';
       remove.addEventListener('click', () => {
         row.remove();
-        if (!isAddMode) queueAutoSave(true);
+        if (!isAddMode && !rotationRowsInitializing) queueAutoSave(true);
       });
       row.append(at, select, remove);
       rotationRows.append(row);
-      if (!isAddMode) queueAutoSave(true);
+      if (!isAddMode && !rotationRowsInitializing) queueAutoSave(true);
     }
     function readRotationRows() {
       const rows = [];
@@ -209,6 +210,7 @@
       return rows.sort((a, b) => a.seconds - b.seconds);
     }
     (current.rotationKeyframes || []).forEach(row => addRotationRow(row.seconds, row.direction));
+    rotationRowsInitializing = false;
     form.querySelector('[data-add-rotation]').addEventListener('click', () => {
       if (rotationRows.children.length >= 200) return;
       addRotationRow();
