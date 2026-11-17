@@ -261,8 +261,9 @@
     });
     actionBar.append(restore);
   }
-  const directVideo = /\.(?:mp4|webm|ogg|ogv|m4v|mov)(?:[?#].*)?$/i.test(sourceUrl);
-  if (publishedEdit || directVideo) {
+  const tsSequence = window.TestCodeTsSequence?.parse(sourceUrl);
+  const directVideo = /\.(?:mp4|webm|ogg|ogv|m4v|mov)(?:[?#].*)?$/i.test(sourceUrl); 
+  if (publishedEdit || directVideo || tsSequence) {
     const video = document.createElement('video');
     video.controls = true; video.playsInline = true; video.preload = 'metadata';
     video.style.display = 'block'; video.style.width = '100%'; video.style.height = '100%';
@@ -301,6 +302,24 @@
         feedback.className = 'videoPlayerVirtualStatus';
         feedback.setAttribute('role', 'alert');
         feedback.textContent = '編集版の再生に失敗しました：' + (error.message || '参照元MP4を確認してください。');
+        frame.replaceChildren(feedback);
+      }
+    } else if (tsSequence) {
+      try {
+        if (!window.TestCodeTsSequence || !window.Hls) throw new Error('TS再生ライブラリを読み込めません。');
+        const cleanup = window.TestCodeTsSequence.attach(video, sourceUrl, window.Hls);
+        windowCleanups.push(cleanup);
+        if (window.TestCodeVideoLoading) windowCleanups.push(window.TestCodeVideoLoading.attach(video, frame));
+        if (Number.isFinite(startTime) && startTime >= 0) {
+          video.addEventListener('loadedmetadata', () => { video.currentTime = startTime; }, { once: true });
+        }
+        windowCleanups.push(window.MangaReaderVideoRotation.install(
+          frame, video, normalized.rotate90Direction, { expandFrame: true }));
+      } catch (error) {
+        const feedback = document.createElement('p');
+        feedback.className = 'videoPlayerVirtualStatus';
+        feedback.setAttribute('role', 'alert');
+        feedback.textContent = 'TS動画を再生できません：' + error.message;
         frame.replaceChildren(feedback);
       }
     } else {
