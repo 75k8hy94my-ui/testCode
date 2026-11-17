@@ -3,11 +3,12 @@
 
   function install(frame, media, direction, options) {
     const className = direction === 'left' ? 'videoPlayerRotatedLeft'
-      : direction === 'right' ? 'videoPlayerRotatedRight' : '';
+      : direction === 'right' ? 'videoPlayerRotatedRight'
+      : direction === 'half' ? 'videoPlayerRotatedHalf' : '';
     if (!frame || !media || !className) return () => {};
 
     const config = options || {};
-    const expandFrame = config.expandFrame === true;
+    const expandFrame = config.expandFrame === true && direction !== 'half';
     const previousFrameHeight = frame.style ? frame.style.height : '';
     const requestFrame = config.requestFrame || (typeof root.requestAnimationFrame === 'function'
       ? (callback) => root.requestAnimationFrame(callback)
@@ -18,7 +19,7 @@
     let resizeObserver = null;
 
     function resize() {
-      if (disposed || !metadataReady) return;
+      if (disposed || !metadataReady || direction === 'half') return;
       requestFrame(() => {
         if (disposed) return;
         const width = Number(frame.clientWidth) || 0;
