@@ -1094,7 +1094,7 @@
     const title = text(dom.title.value);
     const url = text(dom.url.value) || Data.legacyUrl(a, b);
     const patch = {
-      title, url, folderId: text(dom.editFolder.value) || null, tags: Data.parseTags(dom.tags.value), memo: text(dom.memo.value), favorite: !!dom.favorite.checked, embedPage: dom.embedPage.checked && classified.kind === 'link',
+      title, url, folderId: text(dom.editFolder.value) || null, tags: Data.parseTags(dom.tags.value), memo: text(dom.memo.value), favorite: !!dom.favorite.checked, embedPage: dom.embedPage.checked && classified.kind !== 'direct',
       watchStatus: text(dom.statusSelect.value), thumbnailUrl: text(dom.thumbnail.value),
       rotate90: Data.isDirectVideoUrl(url) && dom.rotate90Direction.value !== 'none', rotate90Direction: Data.isDirectVideoUrl(url) ? dom.rotate90Direction.value : 'none',
     };
