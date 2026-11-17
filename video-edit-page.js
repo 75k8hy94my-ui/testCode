@@ -284,7 +284,7 @@
           const added = Data.normalizeVideo({ id: videoId, title: '', url, ...fields, addedAt: now, updatedAt: now });
           newVideos.push(added);
           updatedVideos.push(added);
-          newMeta[videoId] = { embedPage: embedPage && Data.classifyVideoUrl(url).kind === 'link', title: '', folderId: null, watchStatus: '', tags: [], memo: '', favorite: false, hidden: false, rotate90: false, rotate90Direction: 'none', thumbnailUrl: '', thumbnailTimeSeconds: null, updatedAt: now };
+          newMeta[videoId] = { embedPage: embedPage && !Data.isDirectVideoUrl(url), title: '', folderId: null, watchStatus: '', tags: [], memo: '', favorite: false, hidden: false, rotate90: false, rotate90Direction: 'none', thumbnailUrl: '', thumbnailTimeSeconds: null, updatedAt: now };
         });
         if (!newVideos.length && !promoted) {
           error.textContent = '追加・切り替えできるURLがありません。';
@@ -482,7 +482,7 @@
       if (matching) nextBase.alternateUrls = [...new Set([...(nextBase.alternateUrls || []), ...variants])].filter(v => v !== url);
       const storedMeta = read(META_KEY, {});
       const nextMeta = storedMeta && typeof storedMeta === 'object' && !Array.isArray(storedMeta) ? storedMeta : {};
-      if (!matching) nextMeta[savedId] = { ...(nextMeta[savedId] || {}), title: matching ? (nextMeta[savedId]?.title || '') : elements.title.value.trim(), folderId: matching ? (nextMeta[savedId]?.folderId || null) : elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, hidden: elements.hidden.checked, embedPage: elements.embedPage.checked && classified.kind === 'link', rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, thumbnailUrl: elements.thumbnail.value.trim(), thumbnailTimeSeconds: Data.isDirectVideoUrl(url) ? parsedTime : current.thumbnailTimeSeconds, updatedAt: Date.now() };
+      if (!matching) nextMeta[savedId] = { ...(nextMeta[savedId] || {}), title: matching ? (nextMeta[savedId]?.title || '') : elements.title.value.trim(), folderId: matching ? (nextMeta[savedId]?.folderId || null) : elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, hidden: elements.hidden.checked, embedPage: elements.embedPage.checked && classified.kind !== 'direct', rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, thumbnailUrl: elements.thumbnail.value.trim(), thumbnailTimeSeconds: Data.isDirectVideoUrl(url) ? parsedTime : current.thumbnailTimeSeconds, updatedAt: Date.now() };
       const nextVideos = matching ? savedVideos.map(item => String(item.id) === savedId ? nextBase : item) : isAddMode ? [nextBase, ...savedVideos] : savedVideos.map((item) => String(item.id) === videoId ? nextBase : item);
       const propertyUpdates = [];
       let propertyWritesNeeded = false;
