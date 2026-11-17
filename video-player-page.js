@@ -305,23 +305,43 @@
         frame.replaceChildren(feedback);
       }
     } else if (tsSequence) {
-      try {
-        if (!window.TestCodeTsSequence || !window.Hls) throw new Error('TS再生ライブラリを読み込めません。');
-        const cleanup = window.TestCodeTsSequence.attach(video, sourceUrl, window.Hls);
-        windowCleanups.push(cleanup);
-        if (window.TestCodeVideoLoading) windowCleanups.push(window.TestCodeVideoLoading.attach(video, frame));
-        if (Number.isFinite(startTime) && startTime >= 0) {
-          video.addEventListener('loadedmetadata', () => { video.currentTime = startTime; }, { once: true });
+      const abortController = new AbortController();
+      let active = true;
+      let playbackCleanup = null;
+      windowCleanups.push(() => {
+        active = false;
+        abortController.abort();
+        if (playbackCleanup) playbackCleanup();
+      });
+      const feedback = document.createElement('p');
+      feedback.className = 'videoPlayerVirtualStatus';
+      feedback.setAttribute('role', 'status');
+      feedback.setAttribute('aria-live', 'polite');
+      feedback.textContent = 'TS動画の終端を確認しています…';
+      frame.append(feedback);
+      (async () => {
+        try {
+          if (!window.TestCodeTsSequence || !window.Hls) throw new Error('TS再生ライブラリを読み込めません。');
+          const cleanup = await window.TestCodeTsSequence.attach(
+            video, sourceUrl, window.Hls, { signal: abortController.signal });
+          if (!active || !canReadProtectedData()) {
+            cleanup();
+            return;
+          }
+          playbackCleanup = cleanup;
+          feedback.textContent = '';
+          if (window.TestCodeVideoLoading) windowCleanups.push(window.TestCodeVideoLoading.attach(video, frame));
+          if (Number.isFinite(startTime) && startTime >= 0) {
+            video.addEventListener('loadedmetadata', () => { video.currentTime = startTime; }, { once: true });
+          }
+          windowCleanups.push(window.MangaReaderVideoRotation.install(
+            frame, video, normalized.rotate90Direction, { expandFrame: true }));
+        } catch (error) {
+          if (!active || abortController.signal.aborted) return;
+          feedback.setAttribute('role', 'alert');
+          feedback.textContent = 'TS動画を再生できません：' + error.message;
         }
-        windowCleanups.push(window.MangaReaderVideoRotation.install(
-          frame, video, normalized.rotate90Direction, { expandFrame: true }));
-      } catch (error) {
-        const feedback = document.createElement('p');
-        feedback.className = 'videoPlayerVirtualStatus';
-        feedback.setAttribute('role', 'alert');
-        feedback.textContent = 'TS動画を再生できません：' + error.message;
-        frame.replaceChildren(feedback);
-      }
+      })();
     } else {
       if (Number.isFinite(startTime) && startTime >= 0) {
         video.addEventListener('loadedmetadata', () => {
