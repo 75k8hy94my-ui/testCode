@@ -77,7 +77,7 @@
       }
       const next = { ...raw };
       const previous = existing[id] && typeof existing[id] === 'object' && !Array.isArray(existing[id]) ? existing[id] : null;
-      const preservedFields = ['thumbnailTimeSeconds', 'rotate90', 'rotate90Direction', 'durationSeconds', 'videoWidth', 'videoHeight', 'shortsMediaInfoUrlKey', 'virtualPublishedEdit', 'virtualPublishedPrevious'];
+      const preservedFields = ['thumbnailTimeSeconds', 'rotate90', 'rotate90Direction', 'rotationKeyframes', 'durationSeconds', 'videoWidth', 'videoHeight', 'shortsMediaInfoUrlKey', 'virtualPublishedEdit', 'virtualPublishedPrevious'];
       preservedFields.forEach((field) => {
         if (!Object.prototype.hasOwnProperty.call(next, field) && previous && Object.prototype.hasOwnProperty.call(previous, field)) {
           next[field] = previous[field];
@@ -273,6 +273,7 @@
       shortsMediaInfoUrlKey: asText(x.shortsMediaInfoUrlKey),
       rotate90: x.rotate90 === true,
       rotate90Direction,
+      rotationKeyframes: Array.isArray(x.rotationKeyframes) ? x.rotationKeyframes.filter(row => row && Number.isFinite(Number(row.seconds)) && Number(row.seconds) >= 0 && Number(row.seconds) <= 864000 && ['none', 'left', 'right', 'half'].includes(row.direction)).slice(0, 200).map(row => ({ seconds: Number(row.seconds), direction: row.direction })).sort((a, b) => a.seconds - b.seconds) : [],
       watchStatus,
       progressSeconds: x.progressSeconds == null ? null : asTime(x.progressSeconds, 0),
       durationSeconds: x.durationSeconds == null ? null : asTime(x.durationSeconds, 0),
