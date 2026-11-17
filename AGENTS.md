@@ -11,6 +11,14 @@ If the implementation and this file disagree, inspect the current code first and
 - Prefer root-cause fixes over timing workarounds, CSS masking, duplicated state, or compatibility layers that preserve a broken design.
 - Keep changes scoped to the requested work. Do not rewrite unrelated files or absorb unrelated local/user changes into a commit.
 
+## Locate the current owner before editing
+
+- Start with `README.md` and `docs/ARCHITECTURE.md` to find the current page boundary, responsible modules, data owner, and tests. Verify the map against the current `main` implementation.
+- Treat dated plans and specs under `docs/superpowers/` and prior architecture regression notes as historical context, **not** as instructions to restore an older architecture.
+- When several files seem to implement the same behavior, trace the live HTML/script load path, runtime callers, current persistence format, and tests before changing or deleting any of them.
+- Keep one authoritative implementation and one canonical data representation per responsibility. Extend existing shared services rather than adding a second version, unless a deliberate migration is part of the change.
+- If a change moves a responsibility, alters a page boundary, or replaces a canonical implementation, update `docs/ARCHITECTURE.md` and relevant regression tests in the same change.
+
 ## Required verification
 
 For repository changes, run the checks relevant to the modified area. Before considering a general code change complete, normally run:
