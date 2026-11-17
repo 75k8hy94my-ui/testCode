@@ -18,14 +18,14 @@ test('editor exposes per-video embedding and bulk shared setting', () => {
   assert.match(edit, /data-bulk-embed/);
   assert.match(edit, /data-bulk-urls/);
   assert.match(edit, /async function importUrls/);
-  assert.match(edit, /embedPage: embedPage && Data\.classifyVideoUrl\(url\)\.kind === 'link'/);
+  assert.match(edit, /embedPage: embedPage && !Data\.isDirectVideoUrl\(url\)/);
   assert.match(edit, /!!elements\.embedPage\.checked/);
   assert.match(library, /videoLibraryEmbedPage/);
 });
 
 test('player only embeds external pages when the user explicitly opted in', () => {
   assert.match(player, /normalized\.embedPage === true/);
-  assert.match(player, /classifyVideoUrl\(sourceUrl\)\.kind === 'link'/);
+  assert.match(player, /classifyVideoUrl\(sourceUrl\)\.kind !== 'direct'/);
   assert.match(player, /iframe\.setAttribute\('sandbox'/);
   assert.match(player, /埋め込み表示できない場合は元ページを開く/);
 });
