@@ -250,11 +250,15 @@
       const bulkEmbed = form.querySelector('[data-bulk-embed]');
       const bulkAddButton = form.querySelector('[data-bulk-add]');
       async function importUrls(parsed, eventTarget) {
-
+        const error = form.querySelector('.videoEditError');
+        error.textContent = '';
+        if (!canReadProtectedData()) return;
+        if (!Array.isArray(parsed)) { error.textContent = 'URLの配列を指定してください。'; return; }
+        if (!parsed.length) { error.textContent = '追加するURLがありません。'; return; }
         const urls = [];
         for (let index = 0; index < parsed.length; index += 1) {
           if (typeof parsed[index] !== 'string' || Data.classifyVideoUrl(parsed[index].trim()).kind === 'invalid') {
-            error.textContent = 'JSONの' + (index + 1) + '件目に無効な動画URLがあります。';
+            error.textContent = (index + 1) + '件目に無効な動画URLがあります。';
             return;
           }
           urls.push(parsed[index].trim());
