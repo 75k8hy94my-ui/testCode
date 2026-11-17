@@ -621,7 +621,7 @@
     }
     const card = VideoCard.create(cardMedia, {
       documentRef: document, layout: state.view === 'compact' ? 'compact' : 'grid', openClass: 'vl-open',
-      bookmark: isBookmark, openHref: isBookmark ? video.url : null, serviceLabel: service,
+      bookmark: isBookmark, openHref: isBookmark && video.embedPage !== true ? video.url : null, serviceLabel: service,
       title, metadata, tags: Array.isArray(video.tags) ? video.tags : [], customLabels,
       progressPercent: isBookmark ? null : progressPercent(video),
       thumbnailRenderer: window.MangaReaderVideoThumbnailRenderer,
