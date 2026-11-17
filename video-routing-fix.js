@@ -611,7 +611,9 @@
     // Keep ordinary titled bookmarks as native links, including modifiers,
     // open-in-new-tab, query strings and fragments. Untitled bookmarks only
     // fetch once the user actually clicks the link (never in bulk).
-    if (card.classList.contains('videoCard--bookmark')) {
+    const latestMeta = readJson(META_KEY, {});
+    const embeddedPage = latestMeta && latestMeta[videoId]?.embedPage === true;
+    if (card.classList.contains('videoCard--bookmark') && !embeddedPage) {
       const meta = readJson(META_KEY, {});
       const saved = meta && typeof meta === 'object' ? meta[videoId] || {} : {};
       const sourceUrl = text(saved.url || base.url);
