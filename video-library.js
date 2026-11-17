@@ -518,6 +518,7 @@
           <div class="vl-field"><label for="videoLibraryTags">タグ（カンマ区切り）</label><input id="videoLibraryTags" type="text" autocomplete="off"></div><div id="videoLibrarySuggestedTags" class="vl-suggested-tags" aria-label="既存のタグ"></div>
           <div class="vl-field"><label for="videoLibraryMemo">メモ</label><textarea id="videoLibraryMemo"></textarea></div>
           <label class="vl-check"><input id="videoLibraryFavorite" type="checkbox"> お気に入り</label>
+          <label class="vl-check"><input id="videoLibraryEmbedPage" type="checkbox"> 外部ページを埋め込む（直リンク以外）</label>
           <div class="vl-field"><label for="videoLibraryRotate90Direction">再生時の回転</label><select id="videoLibraryRotate90Direction"><option value="none">回転なし</option><option value="left">常に左90°回転</option><option value="right">常に右90°回転</option></select></div>
           <details class="vl-advanced"><summary>再生情報・サムネイル</summary>
             <div class="vl-two">
@@ -548,7 +549,7 @@
       pagination: document.getElementById('videoLibraryPagination'), prevPage: document.getElementById('videoLibraryPrevPage'), nextPage: document.getElementById('videoLibraryNextPage'), pageLabel: document.getElementById('videoLibraryPageLabel'),
       sheet, sheetTitle: document.getElementById('videoLibrarySheetTitle'), form: document.getElementById('videoLibraryForm'),
       formError: document.getElementById('videoLibraryFormError'), url: document.getElementById('videoLibraryUrl'), urlEdit: document.getElementById('videoLibraryUrlEdit'), suggestedTags: document.getElementById('videoLibrarySuggestedTags'), title: document.getElementById('videoLibraryTitle'), editFolder: document.getElementById('videoLibraryEditFolder'),
-      statusSelect: document.getElementById('videoLibraryStatusSelect'), tags: document.getElementById('videoLibraryTags'), memo: document.getElementById('videoLibraryMemo'), favorite: document.getElementById('videoLibraryFavorite'),
+      statusSelect: document.getElementById('videoLibraryStatusSelect'), tags: document.getElementById('videoLibraryTags'), memo: document.getElementById('videoLibraryMemo'), favorite: document.getElementById('videoLibraryFavorite'), embedPage: document.getElementById('videoLibraryEmbedPage'),
       legacyService: document.getElementById('videoLibraryLegacyService'), legacyId: document.getElementById('videoLibraryLegacyId'), thumbnail: document.getElementById('videoLibraryThumbnail'),
       rotate90Direction: document.getElementById('videoLibraryRotate90Direction'),
       deleteBtn: document.getElementById('videoLibraryDelete'), cancel: document.getElementById('videoLibraryCancel'), folderManager: document.getElementById('videoLibraryFolderManager'),
@@ -1048,6 +1049,7 @@
     renderSuggestedTags(dom.tags.value);
     dom.memo.value = videoId ? video.memo : '';
     dom.favorite.checked = videoId ? video.favorite : false;
+    dom.embedPage.checked = videoId ? video.embedPage === true : false;
     dom.legacyService.value = base ? text(base.a) : '';
     dom.legacyId.value = base ? text(base.b) : '';
     dom.thumbnail.value = videoId ? video.thumbnailUrl : '';
@@ -1092,7 +1094,7 @@
     const title = text(dom.title.value);
     const url = text(dom.url.value) || Data.legacyUrl(a, b);
     const patch = {
-      title, url, folderId: text(dom.editFolder.value) || null, tags: Data.parseTags(dom.tags.value), memo: text(dom.memo.value), favorite: !!dom.favorite.checked,
+      title, url, folderId: text(dom.editFolder.value) || null, tags: Data.parseTags(dom.tags.value), memo: text(dom.memo.value), favorite: !!dom.favorite.checked, embedPage: dom.embedPage.checked && classified.kind === 'link',
       watchStatus: text(dom.statusSelect.value), thumbnailUrl: text(dom.thumbnail.value),
       rotate90: Data.isDirectVideoUrl(url) && dom.rotate90Direction.value !== 'none', rotate90Direction: Data.isDirectVideoUrl(url) ? dom.rotate90Direction.value : 'none',
     };
