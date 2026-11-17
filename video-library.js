@@ -1237,7 +1237,7 @@
     render();
   }
 
+  // video-list-route.js is the sole bootstrap owner. This module exposes the
+  // API without scheduling an independent DOMContentLoaded/timer initialization.
   window.MangaReaderVideoLibrary = Object.freeze({ init, syncAccessUi, captureReturnContext, refreshFromStorage });
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(init, 0), { once: true });
-  else setTimeout(init, 0);
 })();

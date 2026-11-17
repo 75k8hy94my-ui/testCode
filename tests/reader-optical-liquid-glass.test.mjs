@@ -45,6 +45,7 @@ test('Reader and mobile navigation are registered in the one engine', () => {
   for (const s of ['#readerApp #topbar', '#readerApp #controls', '#mobileBottomNav.liquidGlassNav', '.liquidGlassSelection', '#mobileUtilityMenu', '#statutesLawMenu']) {
     assert.ok(selectors.includes(s), s);
   }
-  assert.match(reader, /<section id="viewer" aria-label="ページ表示"><div id="pageStage"><\/div><\/section>/);
+  assert.match(reader, /<div id="readerKeyboardSink" tabindex="-1" aria-hidden="true"><\/div>/);
+  assert.match(reader, /<section id="viewer" aria-label="ページ表示" tabindex="-1"><div id="pageStage"><\/div><\/section>/);
   assert.doesNotMatch(source, /drawImage\(|html2canvas|\.readerPageImage/);
 });

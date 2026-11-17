@@ -152,7 +152,8 @@ test('bookshelf wires hash previews without loading numbered image URLs', () => 
   const route = fs.readFileSync(new URL('../manga-list-route.js', import.meta.url), 'utf8');
   const css = fs.readFileSync(new URL('../manga-list.css', import.meta.url), 'utf8');
   assert.match(host, /getHashPageBase\(sourceItem\)/);
-  assert.match(host, /mountHashCover\?\.\(imgEl, root\.MangaSourceType\.hashPageUrl\(hashBase, 1\)\)/);
+  assert.match(host, /const coverStart = !exactUrl \? \(root\.MangaSourceType\?\.getPageRange\?\.\(savedWork\)\?\.start \|\| 1\) : 1/);
+  assert.match(host, /mountHashCover\?\.\(imgEl, root\.MangaSourceType\.hashPageUrl\(hashBase, coverStart\)\)/);
   assert.match(route, /manga-hash-cover-preview\.js\?v=/);
   assert.match(route, /mountHashCover: \(img, url\) => hashCoverPreview\?\.attach/);
   assert.match(route, /hashCoverPreview\?\.destroy\(\)/);
