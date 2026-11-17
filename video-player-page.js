@@ -360,7 +360,7 @@
       windowCleanups.push(cleanupRotation);
     }
   }
-  else if (normalized.embedPage === true && sourceUrl && /^https?:\/\//i.test(sourceUrl) && videos?.classifyVideoUrl(sourceUrl).kind === 'link') {
+  else if (normalized.embedPage === true && sourceUrl && /^https?:\/\//i.test(sourceUrl) && videos?.classifyVideoUrl(sourceUrl).kind !== 'direct') {
     const iframe = document.createElement('iframe');
     iframe.src = sourceUrl;
     iframe.title = window.TestCodeVideoPlaybackPrivacy?.getSettings()?.maskMetadata ? '動画' : title;
