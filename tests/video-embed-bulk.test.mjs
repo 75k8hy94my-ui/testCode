@@ -6,6 +6,7 @@ import data from '../video-data.js';
 const edit = fs.readFileSync(new URL('../video-edit-page.js', import.meta.url), 'utf8');
 const player = fs.readFileSync(new URL('../video-player-page.js', import.meta.url), 'utf8');
 const library = fs.readFileSync(new URL('../video-library.js', import.meta.url), 'utf8');
+const routing = fs.readFileSync(new URL('../video-routing-fix.js', import.meta.url), 'utf8');
 
 test('embed option survives canonical video normalization', () => {
   const enabled = data.normalizeVideo({ id: 'a', url: 'https://example.org/watch', embedPage: true });
@@ -28,4 +29,11 @@ test('player only embeds external pages when the user explicitly opted in', () =
   assert.match(player, /classifyVideoUrl\(sourceUrl\)\.kind !== 'direct'/);
   assert.match(player, /iframe\.setAttribute\('sandbox'/);
   assert.match(player, /埋め込み表示できない場合は元ページを開く/);
+});
+
+test('embed ON routes bookmark card to internal player instead of source URL', () => {
+  assert.match(library, /openHref: isBookmark && video\.embedPage !== true \? video\.url : null/);
+  assert.match(routing, /embeddedPage = latestMeta && latestMeta\[videoId\]\?\.embedPage === true/);
+  assert.match(routing, /card\.classList\.contains\('videoCard--bookmark'\) && !embeddedPage/);
+  assert.match(routing, /window\.location\.href = targetUrl\.href/);
 });
