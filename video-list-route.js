@@ -15,9 +15,10 @@
     if (!root.MangaReaderVideoTemplate || typeof root.MangaReaderVideoTemplate.createMarkup !== 'function') throw new TypeError('video template is required');
 
     let rootElement = null;
-    let scriptsLoaded = false;
     let bootPromise = null;
     let helperPromise = null;
+    // Detaching or restarting invalidates any earlier asynchronous startup.
+    let activation = 0;
     const canReadProtectedData = () => !!deps.mediaAccess && typeof deps.mediaAccess.canReadProtectedData === 'function' && deps.mediaAccess.canReadProtectedData() === true;
 
     async function loadFeatureScripts() {
@@ -50,12 +51,12 @@
         });
       }
       if (helperPromise) await helperPromise;
-      scriptsLoaded = true;
     }
 
     async function start(options) {
       if (!options || !options.mountElement || typeof options.mountElement.insertAdjacentHTML !== 'function') throw new TypeError('mountElement must be an Element');
       const mountElement = options.mountElement;
+      const token = ++activation;
       if (!rootElement) {
         mountElement.insertAdjacentHTML('beforeend', root.MangaReaderVideoTemplate.createMarkup());
         const matches = mountElement.querySelectorAll('#videoListSection');
@@ -65,16 +66,17 @@
         mountElement.append(rootElement);
       }
       await loadFeatureScripts();
+      // Only the current, attached route may initialize the shared library.
+      if (token !== activation || rootElement.parentNode !== mountElement) return null;
       if (!root.MangaReaderVideoLibrary || typeof root.MangaReaderVideoLibrary.init !== 'function') throw new Error('video library runtime is unavailable');
+      // init() mounts synchronously. Do not race a second, timer-based auto-init.
       root.MangaReaderVideoLibrary.init(deps.mediaAccess);
-      if (!scriptsLoaded || !documentRef.getElementById('videoLibraryApp')) {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
       if (!documentRef.getElementById('videoLibraryApp')) throw new Error('video library did not initialize');
       return Object.freeze({ root: rootElement });
     }
 
     function detach() {
+      activation += 1;
       if (documentRef.dispatchEvent && typeof root.CustomEvent === 'function') {
         documentRef.dispatchEvent(new root.CustomEvent('manga-video-list-route-detach'));
       }

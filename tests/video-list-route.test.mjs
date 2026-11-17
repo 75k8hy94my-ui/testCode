@@ -234,3 +234,73 @@ test('video library can be reinitialized after a route interruption without rebi
   assert.match(route, /bootPromise = null/);
 });
 
+
+test('video library module loads without self-initializing or scheduling a timer', () => {
+  const api = {};
+  const context = {
+    window: { MangaReaderVideoData: {}, VideoLibraryPagination: {} },
+    document: {
+      addEventListener() { throw new Error('module registered a startup event'); },
+      getElementById() { throw new Error('module attempted early initialization'); },
+    },
+    setTimeout() { throw new Error('module scheduled delayed startup'); },
+  };
+  vm.runInNewContext(read('video-library.js'), context);
+  assert.equal(typeof context.window.MangaReaderVideoLibrary.init, 'function');
+  assert.doesNotMatch(read('video-library.js'), /setTimeout\\(init|DOMContentLoaded/);
+});
+
+test('video route uses one explicit synchronous initialization without a timing fallback', async () => {
+  let initialized = 0;
+  const section = { parentNode: null };
+  const mountElement = {
+    insertAdjacentHTML() { section.parentNode = this; },
+    querySelectorAll() { return [section]; },
+    append(node) { node.parentNode = this; },
+  };
+  const windowRef = {
+    MangaReaderVideoTemplate: { createMarkup: () => '<section id="videoListSection"></section>' },
+    MangaReaderVideoLibrary: { init() { initialized += 1; } },
+  };
+  vm.runInNewContext(route, { window: windowRef, setTimeout() { throw new Error('timing fallback used'); } });
+  const runtime = windowRef.VideoListRouteFactory.create({
+    documentRef: { createElement() {}, getElementById(id) { return id === 'videoLibraryApp' && initialized ? {} : null; } },
+    loadScript: async () => {},
+    loadMediaGate: async () => {},
+    mediaAccess: { canReadProtectedData: () => false },
+  });
+  const mounted = await runtime.start({ mountElement });
+  assert.equal(mounted.root, section);
+  assert.equal(initialized, 1);
+});
+
+test('detaching the video route cancels an in-flight startup before library init', async () => {
+  let releaseGate;
+  const pendingGate = new Promise(resolve => { releaseGate = resolve; });
+  let initialized = 0;
+  const section = {
+    parentNode: null,
+    remove() { this.parentNode = null; },
+  };
+  const mountElement = {
+    insertAdjacentHTML() { section.parentNode = this; },
+    querySelectorAll() { return [section]; },
+    append(node) { node.parentNode = this; },
+  };
+  const windowRef = {
+    MangaReaderVideoTemplate: { createMarkup: () => '<section id="videoListSection"></section>' },
+    MangaReaderVideoLibrary: { init() { initialized += 1; } },
+  };
+  vm.runInNewContext(route, { window: windowRef });
+  const runtime = windowRef.VideoListRouteFactory.create({
+    documentRef: { createElement() {}, getElementById() { return null; } },
+    loadScript: async () => {},
+    loadMediaGate: () => pendingGate,
+    mediaAccess: { canReadProtectedData: () => false },
+  });
+  const starting = runtime.start({ mountElement });
+  runtime.detach();
+  releaseGate();
+  assert.equal(await starting, null);
+  assert.equal(initialized, 0);
+});
