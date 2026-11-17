@@ -19,7 +19,7 @@
       if (params.has('ts') && !range) return null;
       const start = range ? Number(range[1]) : Number(match[2]);
       const end = range ? Number(range[2]) : null;
-      const seconds = Number(params.get('seconds') || 6);
+      const seconds = params.has('seconds') ? Number(params.get('seconds')) : 6;
       if (!Number.isSafeInteger(start) || (end !== null && (!Number.isSafeInteger(end) || end < start || end - start > 9999))
         || Number(match[2]) !== start || !(seconds > 0 && seconds <= 120)) return null;
       const digits = match[2].length;
