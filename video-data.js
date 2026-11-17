@@ -171,7 +171,7 @@
     try {
       const parsed = new URL(url);
       if (!/^https?:$/.test(parsed.protocol)) return false;
-      return /\.(?:mp4|webm|ogg|ogv|m4v|mov)$/i.test(parsed.pathname);
+      return /\.(?:mp4|webm|ogg|ogv|m4v|mov)$/i.test(parsed.pathname) || (/\/\d+\.ts$/i.test(parsed.pathname) && /^#ts=\d+-\d+(?:&seconds=\d+(?:\.\d+)?)?$/.test(parsed.hash));
     } catch (_) {
       return false;
     }
