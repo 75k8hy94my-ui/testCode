@@ -11,7 +11,8 @@ permissions:
   contents: read
 jobs:
   independent-statutes:
-    runs-on: ubuntu-latest
+    # Playwright 1.56 --with-deps is unsupported on Ubuntu 26.04.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
