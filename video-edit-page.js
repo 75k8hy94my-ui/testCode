@@ -85,6 +85,7 @@
       <div class="videoEditField videoEditTagsField"><label for="videoEditTags">タグ（カンマ区切り）</label><input id="videoEditTags" name="tags" type="text" autocomplete="off"></div>
       <div class="videoEditField videoEditMemoField"><label for="videoEditMemo">メモ</label><textarea id="videoEditMemo" name="memo"></textarea></div>
       <div class="videoEditToggles"><label class="videoEditCheck"><input name="embedPage" type="checkbox"> 外部ページを埋め込む（直リンク以外）</label><label class="videoEditCheck"><input name="favorite" type="checkbox"> お気に入り</label><label class="videoEditCheck"><input name="hidden" type="checkbox"> 動画を非表示</label></div>
+      <details class="videoEditField videoEditRotationTimeline"><summary>区間ごとの回転（切替時点を設定）</summary><p class="videoEditHelp">各時刻以降の回転方向を指定します。複数登録でき、元の動画は変更されません。</p><div data-rotation-rows></div><button class="videoEditButton" type="button" data-add-rotation>＋ 回転時点を追加</button></details>
       <div class="videoEditField videoEditRotateField"><label for="videoEditRotate">再生時の回転</label><select id="videoEditRotate" name="rotate"><option value="none">回転なし</option><option value="left">常に左90°回転</option><option value="right">常に右90°回転</option></select></div>
       <details class="videoEditField videoEditPlaybackMeta"><summary>再生情報・サムネイル</summary><div class="videoEditPlaybackFields"><div class="videoEditField"><label for="videoEditService">サービス名</label><input id="videoEditService" name="service" type="text" autocomplete="off"></div><div class="videoEditField"><label for="videoEditLegacyId">動画ID</label><input id="videoEditLegacyId" name="legacyId" type="text" autocomplete="off"></div><div class="videoEditField"><label for="videoEditThumbnail">サムネイルURL（任意）</label><input id="videoEditThumbnail" name="thumbnail" type="url" autocomplete="off"></div><div class="videoEditField"><label for="videoEditThumbnailTime">サムネイル時刻（mm:ss）</label><input id="videoEditThumbnailTime" name="thumbnailTime" type="text" inputmode="numeric" placeholder="0:00" autocomplete="off"></div></div></details>
       <p class="videoEditError" role="status" aria-live="polite"></p><div class="videoEditActions"><button class="videoEditButton danger" type="button" data-delete>動画を削除</button><span class="videoEditSaveStatus" role="status" aria-live="polite" ${isAddMode ? "hidden" : ""}>変更は自動保存されます</span><a class="videoEditButton" data-cancel>${isAddMode ? "キャンセル" : "戻る"}</a>${isAddMode ? '<button class="videoEditButton save" type="submit">追加</button>' : ""}</div>`;
@@ -167,6 +168,51 @@
     elements.hidden.checked = current.hidden;
     elements.embedPage.checked = current.embedPage === true;
     elements.rotate.value = current.rotate90Direction;
+    const rotationRows = form.querySelector('[data-rotation-rows]');
+    const rotationOptions = [['none', '回転なし'], ['right', '右90°'], ['left', '左90°'], ['half', '180°']];
+    function addRotationRow(seconds = '', direction = 'none') {
+      const row = document.createElement('div');
+      row.className = 'videoEditRotationRow';
+      row.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0';
+      const at = document.createElement('input');
+      at.type = 'text'; at.inputMode = 'decimal'; at.placeholder = '例：1:30';
+      at.setAttribute('aria-label', '回転切替時刻（分:秒）'); at.style.cssText = 'flex:1;min-width:100px';
+      at.value = seconds === '' ? '' : Data.formatMediaTime(seconds);
+      const select = document.createElement('select');
+      select.setAttribute('aria-label', '指定時刻以降の回転方向');
+      select.style.cssText = 'flex:1;min-width:120px';
+      for (const [value, label] of rotationOptions) {
+        const option = document.createElement('option'); option.value = value; option.textContent = label; select.append(option);
+      }
+      select.value = direction;
+      const remove = document.createElement('button');
+      remove.type = 'button'; remove.className = 'videoEditButton'; remove.textContent = '削除';
+      remove.addEventListener('click', () => {
+        row.remove();
+        if (!isAddMode) queueAutoSave(true);
+      });
+      row.append(at, select, remove);
+      rotationRows.append(row);
+      if (!isAddMode) queueAutoSave(true);
+    }
+    function readRotationRows() {
+      const rows = [];
+      for (const row of rotationRows.children) {
+        const input = row.querySelector('input');
+        const select = row.querySelector('select');
+        const time = Data.parseMediaTime(input.value);
+        if (time == null || time > 864000) throw new Error('回転時刻は 0:00 や 1:30 の形式で入力してください。');
+        rows.push({ seconds: time, direction: select.value });
+      }
+      if (rows.length > 200) throw new Error('回転の切替時点は最大200件までです。');
+      if (new Set(rows.map(row => row.seconds)).size !== rows.length) throw new Error('同じ回転時刻が重複しています。');
+      return rows.sort((a, b) => a.seconds - b.seconds);
+    }
+    (current.rotationKeyframes || []).forEach(row => addRotationRow(row.seconds, row.direction));
+    form.querySelector('[data-add-rotation]').addEventListener('click', () => {
+      if (rotationRows.children.length >= 200) return;
+      addRotationRow();
+    });
     elements.service.value = base ? (base.a || '') : '';
     elements.legacyId.value = base ? (base.b || '') : '';
     if (isAddMode) {
@@ -365,6 +411,7 @@
           elements.status.value, elements.tags.value, elements.memo.value, !!elements.favorite.checked,
           !!elements.hidden.checked, !!elements.embedPage.checked, elements.rotate.value, elements.service.value, elements.legacyId.value,
           elements.thumbnail.value, elements.thumbnailTime.value],
+        rotationRows: [...rotationRows.children].map(row => [row.querySelector('input').value, row.querySelector('select').value]),
         custom: [...customValueInputs.values()].map(({ property, control }) => {
           if (property.type === 'checkbox') return !!control.checked;
           if (property.type === 'single_select' && !control.matches('select')) return control.querySelector('button[aria-pressed="true"]')?.dataset.optionId || null;
@@ -454,6 +501,9 @@
       const url = elements.url.value.trim();
       const classified = Data.classifyVideoUrl(url);
       if (classified.kind === 'invalid') { error.textContent = '有効な動画URLを入力してください。'; setSaveStatus('未保存・URLを確認してください'); return; }
+      let rotationKeyframes;
+      try { rotationKeyframes = readRotationRows(); }
+      catch (error) { error.textContent = error.message; setSaveStatus('未保存・回転時刻を確認してください'); return; }
       const latestVideos = read(VIDEO_KEY, []);
       const savedVideos = Array.isArray(latestVideos) ? latestVideos : [];
       const identity = Data.videoUrlIdentity(url);
@@ -482,7 +532,7 @@
       if (matching) nextBase.alternateUrls = [...new Set([...(nextBase.alternateUrls || []), ...variants])].filter(v => v !== url);
       const storedMeta = read(META_KEY, {});
       const nextMeta = storedMeta && typeof storedMeta === 'object' && !Array.isArray(storedMeta) ? storedMeta : {};
-      if (!matching) nextMeta[savedId] = { ...(nextMeta[savedId] || {}), title: matching ? (nextMeta[savedId]?.title || '') : elements.title.value.trim(), folderId: matching ? (nextMeta[savedId]?.folderId || null) : elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, hidden: elements.hidden.checked, embedPage: elements.embedPage.checked && classified.kind !== 'direct', rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, thumbnailUrl: elements.thumbnail.value.trim(), thumbnailTimeSeconds: Data.isDirectVideoUrl(url) ? parsedTime : current.thumbnailTimeSeconds, updatedAt: Date.now() };
+      if (!matching) nextMeta[savedId] = { ...(nextMeta[savedId] || {}), title: matching ? (nextMeta[savedId]?.title || '') : elements.title.value.trim(), folderId: matching ? (nextMeta[savedId]?.folderId || null) : elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, hidden: elements.hidden.checked, embedPage: elements.embedPage.checked && classified.kind !== 'direct', rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, rotationKeyframes, thumbnailUrl: elements.thumbnail.value.trim(), thumbnailTimeSeconds: Data.isDirectVideoUrl(url) ? parsedTime : current.thumbnailTimeSeconds, updatedAt: Date.now() };
       const nextVideos = matching ? savedVideos.map(item => String(item.id) === savedId ? nextBase : item) : isAddMode ? [nextBase, ...savedVideos] : savedVideos.map((item) => String(item.id) === videoId ? nextBase : item);
       const propertyUpdates = [];
       let propertyWritesNeeded = false;
