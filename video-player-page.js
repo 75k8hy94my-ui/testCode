@@ -261,6 +261,13 @@
     });
     actionBar.append(restore);
   }
+  const rotationTimeline = window.TestCodeVideoRotationTimeline;
+  function installPlaybackRotation(video) {
+    if (rotationTimeline && Array.isArray(normalized.rotationKeyframes) && normalized.rotationKeyframes.length) {
+      return rotationTimeline.attach(frame, video, normalized.rotationKeyframes, normalized.rotate90Direction, window.MangaReaderVideoRotation);
+    }
+    return window.MangaReaderVideoRotation.install(frame, video, normalized.rotate90Direction, { expandFrame: true });
+  }
   const tsSequence = window.TestCodeTsSequence?.parse(sourceUrl);
   const directVideo = /\.(?:mp4|webm|ogg|ogv|m4v|mov)(?:[?#].*)?$/i.test(sourceUrl); 
   if (publishedEdit || directVideo || tsSequence) {
@@ -297,6 +304,7 @@
             : snapshot.phase === 'loading' || snapshot.phase === 'seeking' ? snapshot.message : '';
         });
         playback.currentTime = Number.isFinite(startTime) && startTime >= 0 ? startTime : 0;
+        windowCleanups.push(installPlaybackRotation(video));
       } catch (error) {
         const feedback = document.createElement('p');
         feedback.className = 'videoPlayerVirtualStatus';
@@ -334,8 +342,7 @@
           if (Number.isFinite(startTime) && startTime >= 0) {
             video.addEventListener('loadedmetadata', () => { video.currentTime = startTime; }, { once: true });
           }
-          windowCleanups.push(window.MangaReaderVideoRotation.install(
-            frame, video, normalized.rotate90Direction, { expandFrame: true }));
+          windowCleanups.push(installPlaybackRotation(video));
         } catch (error) {
           if (!active || abortController.signal.aborted) return;
           feedback.setAttribute('role', 'alert');
@@ -355,8 +362,7 @@
         windowCleanups.push(window.TestCodeVideoLoading.attach(video, frame));
       }
       video.src = sourceUrl;
-      const cleanupRotation = window.MangaReaderVideoRotation.install(
-        frame, video, normalized.rotate90Direction, { expandFrame: true });
+      const cleanupRotation = installPlaybackRotation(video);
       windowCleanups.push(cleanupRotation);
     }
   }
