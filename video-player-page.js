@@ -360,7 +360,27 @@
       windowCleanups.push(cleanupRotation);
     }
   }
-  else if (base.a && base.b) { const iframe = document.createElement('iframe'); iframe.src = 'https://www.' + base.a + '.com/embed/' + base.b; iframe.title = window.TestCodeVideoPlaybackPrivacy?.getSettings()?.maskMetadata ? '動画' : title; listenWindow('testcode-video-playback-privacy-change', () => { iframe.title = window.TestCodeVideoPlaybackPrivacy?.getSettings()?.maskMetadata ? '動画' : title; }); iframe.allowFullscreen = true; frame.append(iframe); }
+  else if (normalized.embedPage === true && sourceUrl && /^https?:\/\//i.test(sourceUrl) && videos?.classifyVideoUrl(sourceUrl).kind === 'link') {
+    const iframe = document.createElement('iframe');
+    iframe.src = sourceUrl;
+    iframe.title = window.TestCodeVideoPlaybackPrivacy?.getSettings()?.maskMetadata ? '動画' : title;
+    iframe.loading = 'eager';
+    iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-presentation allow-popups');
+    iframe.allow = 'autoplay; fullscreen; picture-in-picture';
+    iframe.allowFullscreen = true;
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.border = '0';
+    frame.append(iframe);
+    windowCleanups.push(() => { iframe.src = 'about:blank'; iframe.remove(); });
+    const external = document.createElement('a');
+    external.href = sourceUrl; external.target = '_blank'; external.rel = 'noopener noreferrer';
+    external.textContent = '埋め込み表示できない場合は元ページを開く';
+    external.className = 'videoPlayerEdit';
+    actionBar.append(external);
+  }
+  else if (base.a && base.b && base.a !== 'url') { const iframe = document.createElement('iframe'); iframe.src = 'https://www.' + base.a + '.com/embed/' + base.b; iframe.title = window.TestCodeVideoPlaybackPrivacy?.getSettings()?.maskMetadata ? '動画' : title; listenWindow('testcode-video-playback-privacy-change', () => { iframe.title = window.TestCodeVideoPlaybackPrivacy?.getSettings()?.maskMetadata ? '動画' : title; }); iframe.allowFullscreen = true; frame.append(iframe); }
   else { const link = document.createElement('a'); link.className = 'glassBtn'; link.href = sourceUrl || '#'; link.target = '_blank'; link.rel = 'noopener'; link.textContent = '元ページを開く'; frame.append(link); }
 
   const markerList = document.createElement('div'); markerList.className = 'videoPlayerMarkerList'; markerList.innerHTML = '<h3>登録した秒数</h3><div class="videoMarkerList"></div>';
