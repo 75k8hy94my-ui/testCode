@@ -37,8 +37,8 @@ test('video list menu provides only existing favorite and detail editor actions'
   const library = read('video-library.js');
   const editor = read('video-edit-page.js');
   const editorHtml = read('video-edit.html');
-  assert.match(library, /menuActions: \[\{ label: video\.favorite/);
-  assert.match(library, /editHref: 'video-edit\.html\?id=' \+ encodeURIComponent\(video\.id\) \+ '&return=list'/);
+  assert.match(read('video-library-view.js'), /menuActions: \[\{ label: video\.favorite/);
+  assert.match(read('video-library-view.js'), /editHref: 'video-edit\.html\?id=' \+ encodeURIComponent\(video\.id\) \+ '&return=list'/);
   assert.match(editor, /name="hidden" type="checkbox"/);
   assert.match(editor, /name="status"/);
   assert.match(editor, /data-delete/);
@@ -64,8 +64,8 @@ test('video list menu provides only existing favorite and detail editor actions'
 test('video cards delegate thumbnail rendering to the shared renderer', () => {
   const library = read('video-library.js');
   const route = read('video-list-route.js');
-  assert.match(library, /MangaReaderVideoCard/);
-  assert.match(library, /MangaReaderVideoThumbnailRenderer/);
+  assert.match(read('video-library-view.js'), /MangaReaderVideoCard/);
+  assert.match(read('video-library-view.js'), /MangaReaderVideoThumbnailRenderer/);
   assert.match(route, /video-card\.js/);
   assert.match(route, /video-thumbnail-renderer\.js/);
 });

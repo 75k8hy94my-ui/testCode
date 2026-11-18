@@ -13,7 +13,7 @@ test('unnamed videos receive full width numbered labels, independent of list ord
  assert.equal(Data.displayTitle(videos[3], videos),'名称未設定３');
 });
 test('video list and related player use the same title helper',()=>{
- assert.match(read('video-library.js'), /Data\.displayTitle\(video, effectiveVideos\(\)\)/);
+ assert.match(read('video-library-view.js'), /Data\.displayTitle\(video, effectiveVideos\(\)\)/);
  assert.match(read('video-player-page.js'), /videos\.displayTitle\(normalized,/);
  assert.match(read('video-player-page.js'), /videos\.displayTitle\(itemVideo,/);
  assert.doesNotMatch(read('video-library.js'), /const title = video\.title \|\| \[Data\.deriveService/);

@@ -1,7 +1,7 @@
 (function (root) {
   'use strict';
 
-  // Owns only DOM construction and element references, never list data or sync.
+  // Owns DOM construction, card presentation and element references, never list persistence or sync.
   // Called exclusively from MangaReaderVideoLibrary.init() after route boot.
   function setupMarkup(documentRef, dom) {
     const document = documentRef;
@@ -120,5 +120,131 @@
   }
 
 
-  root.MangaReaderVideoLibraryView = Object.freeze({ setupMarkup });
+  // Presentational cards only. Library state remains authoritative and actions
+  // return to the library; this factory never installs document listeners or starts routes.
+  function createCardRenderer(deps) {
+    if (!deps?.documentRef || !deps?.data || !deps?.state || !deps?.actions) {
+      throw new TypeError('video card presentation dependencies are required');
+    }
+    const { documentRef: document, data: Data, customProperties: CustomProperties, state,
+      effectiveVideos, folderName, canReadProtectedData, actions } = deps;
+    const STATUS_LABELS = { '': '', later: 'あとで見る', watching: '視聴中', watched: '視聴済み' };
+  function formatDate(value) {
+    if (!value) return '';
+    try { return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric' }).format(new Date(value)); }
+    catch (_) { return ''; }
+  }
+  function progressPercent(video) {
+    if (!video.durationSeconds || video.progressSeconds == null) return null;
+    return Math.max(0, Math.min(100, Math.round((video.progressSeconds / video.durationSeconds) * 100)));
+  }
+
+  function createCard(video) {
+    const VideoCard = root.MangaReaderVideoCard;
+    if (!VideoCard || typeof VideoCard.create !== 'function') throw new Error('video card component is unavailable');
+    const title = Data.displayTitle(video, effectiveVideos());
+    const isBookmark = Data.videoEntryKind(video, state.meta[String(video.id)]) === 'bookmark';
+    const metadata = [];
+    const service = Data.deriveService(video.url, video.a);
+    if (service && !isBookmark) metadata.push(service);
+    if (video.folderId && folderName(video.folderId)) metadata.push(folderName(video.folderId));
+    if (video.seriesId && effectiveVideos().some(item => item.id !== video.id && item.seriesId === video.seriesId)) metadata.push('シリーズ');
+    if (video.watchStatus && STATUS_LABELS[video.watchStatus]) metadata.push(STATUS_LABELS[video.watchStatus]);
+    if (video.lastOpenedAt) metadata.push(formatDate(video.lastOpenedAt));
+    if (video.openCount) metadata.push(video.openCount + '回');
+    const customLabels = [];
+    if (canReadProtectedData() && CustomProperties) {
+      const stored = state.customValues[String(video.id)] || {};
+      const shown = Object.values(state.customDefinitions.properties || {}).filter((property) => property && property.deleted !== true && property.hidden !== true && Object.prototype.hasOwnProperty.call(stored, property.id) && stored[property.id] !== null && stored[property.id] !== '').sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+      shown.forEach((property) => {
+        const value = CustomProperties.formatValue(property, stored[property.id], state.customDefinitions);
+        if (value !== '') customLabels.push(property.name + ': ' + value);
+      });
+    }
+    // Legacy publications used a link to a special player as their stored
+    // URL. Give them the exact same MP4 thumbnail and dimensions as all new
+    // published video cards, without rewriting saved IDs or metadata.
+    let cardMedia = video;
+    if (state.meta[String(video.id)]?.virtualPublishedEdit) {
+      const publication = state.meta[String(video.id)].virtualPublishedEdit;
+      const first = publication.edit?.clips?.[0];
+      const source = first && state.baseVideos.find((item) => String(item.id) === first.sourceVideoId);
+      if (source) {
+        const sourceMeta = state.meta[String(source.id)] || {};
+        const mediaUrl = typeof sourceMeta.url === 'string' ? sourceMeta.url : source.url;
+        if (Data.isDirectVideoUrl(mediaUrl)) {
+          cardMedia = { ...video, url: mediaUrl,
+            thumbnailTimeSeconds: video.thumbnailTimeSeconds == null ? first.startSeconds : video.thumbnailTimeSeconds,
+            rotate90Direction: first.rotation === 90 ? 'right' : first.rotation === -90 ? 'left' : 'none',
+            virtualThumbRotation: first.rotation || 0 };
+        }
+      }
+    }
+    const card = VideoCard.create(cardMedia, {
+      documentRef: document, layout: state.view === 'compact' ? 'compact' : 'grid', openClass: 'vl-open',
+      bookmark: isBookmark, openHref: isBookmark && video.embedPage !== true ? video.url : null, serviceLabel: service,
+      title, metadata, tags: Array.isArray(video.tags) ? video.tags : [], customLabels,
+      progressPercent: isBookmark ? null : progressPercent(video),
+      thumbnailRenderer: root.MangaReaderVideoThumbnailRenderer,
+      thumbnailOptions: { fallbackClass: 'vl-thumb-fallback', videoClass: 'vl-thumb-direct-video', serviceLabel: service || 'VIDEO' },
+      onOpen: () => actions.openVideo(video.id),
+      menuActions: [{ label: video.favorite ? 'お気に入りを解除' : 'お気に入りに追加', onSelect: () => actions.toggleFavorite(video.id, !video.favorite) },
+        ...(video.seriesId && effectiveVideos().some(item => item.id !== video.id && item.seriesId === video.seriesId)
+          ? [{ label: 'シリーズから外す', onSelect: () => actions.removeSeries([video.id]) }] : [])],
+      editHref: 'video-edit.html?id=' + encodeURIComponent(video.id) + '&return=list',
+    });
+    card.classList.add('vl-card');
+    card.dataset.videoId = String(video.id);
+    if (state.seriesSelecting) {
+      const pick = document.createElement('label');
+      pick.className = 'vl-series-pick';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = state.seriesSelected.has(String(video.id));
+      checkbox.setAttribute('aria-label', title + 'をシリーズ用に選択');
+      checkbox.addEventListener('change', () => actions.selectVideo(video.id, checkbox.checked));
+      pick.append(checkbox, document.createTextNode('選択'));
+      card.append(pick);
+    }
+    return card;
+  }
+
+  function createSeriesCard(group) {
+    const section = document.createElement('section');
+    section.className = 'vl-series';
+    section.dataset.seriesId = group.id;
+    const heading = document.createElement('div');
+    heading.className = 'vl-series-heading';
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'vl-series-toggle';
+    const expanded = state.expandedSeries.has(group.id);
+    toggle.setAttribute('aria-expanded', String(expanded));
+    toggle.textContent = (expanded ? '▾ ' : '▸ ') + 'シリーズ · ' + group.videos.length + '本';
+    toggle.addEventListener('click', () => actions.toggleSeries(group.id, !expanded));
+    heading.append(toggle);
+    if (state.seriesSelecting) {
+      const label = document.createElement('label');
+      label.className = 'vl-series-select-all';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = group.videos.every(video => state.seriesSelected.has(String(video.id)));
+      checkbox.setAttribute('aria-label', 'このシリーズ内の動画をすべて選択');
+      checkbox.addEventListener('change', () => actions.selectSeries(group.videos.map(video => video.id), checkbox.checked));
+      label.append(checkbox, document.createTextNode('まとめて選択'));
+      heading.append(label);
+    }
+    section.append(heading);
+    if (expanded) {
+      const grid = document.createElement('div');
+      grid.className = 'vl-series-videos';
+      group.videos.forEach(video => grid.append(createCard(video)));
+      section.append(grid);
+    }
+    return section;
+  }
+    return Object.freeze({ createCard, createSeriesCard });
+  }
+
+  root.MangaReaderVideoLibraryView = Object.freeze({ setupMarkup, createCardRenderer });
 }(typeof window !== 'undefined' ? window : globalThis));

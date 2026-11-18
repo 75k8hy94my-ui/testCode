@@ -12,6 +12,6 @@ test('return intent waits for hydration and hidden videos use ordinary list',()=
 test('restoration is retried on render and access changes',()=>{
  const src=read('video-library.js');
  assert.match(src,/function render\(pageDirection = 0\) \{\s*loadLibraryState\(\);\s*restoreVideoPage\(\);/);
- assert.match(src,/if \(canReadProtectedData\(\)\) \{ render\(\); resumePendingLocalSync\(\); \}/);
+ assert.match(src,/document\.addEventListener\('manga-reader-vpn-status'[\s\S]*?if \(!canReadProtectedData\(\)\) return;[\s\S]*?if \(isListMounted\(\)\) render\(\);[\s\S]*?resumePendingLocalSync\(\)/);
  assert.match(read('video-list-route.js'),/video-library\.js\?v=[\w-]+/);
 });

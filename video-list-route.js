@@ -57,8 +57,8 @@
           await deps.loadScript('video-card.js?v=20261026-url-bookmarks', 'spaVideoCard');
           await deps.loadScript('video-custom-properties.js?v=20261012-video-custom-properties', 'spaVideoCustomProperties');
           await deps.loadScript('video-custom-property-store.js?v=20261012-video-custom-properties', 'spaVideoCustomPropertyStore');
-          await deps.loadScript('video-library-view.js?v=20261118-architecture', 'spaVideoLibraryView');
-          await deps.loadScript('video-library.js?v=20261117-embed-routing', 'spaVideoLibrary');
+          await deps.loadScript('video-library-view.js?v=20261118-card-owner', 'spaVideoLibraryView');
+          await deps.loadScript('video-library.js?v=20261118-card-owner', 'spaVideoLibrary');
         })().catch((error) => {
           bootPromise = null;
           throw error;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 test('cards show all assigned visible custom properties and tags',()=>{
- const library=read('video-library.js');
+ const library=read('video-library-view.js');
  assert.doesNotMatch(library,/property\.showInCard === true/);
  assert.match(library,/const customLabels = \[\]/);
  assert.match(library,/customLabels\.push\(property\.name/);

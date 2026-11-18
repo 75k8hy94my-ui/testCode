@@ -31,7 +31,7 @@ test('normal watch-page URL and controls are shared across raw and edited MP4s',
 });
 
 test('all normal video cards retain title, favorites, tags, folders, metadata and custom properties', () => {
-  assert.match(library, /VideoCard\.create\(cardMedia/);
+  assert.match(read('video-library-view.js'), /VideoCard\.create\(cardMedia/);
   assert.match(library, /video\.virtualEdition === true/);
   assert.match(library, /state\.meta\[String\(video\.id\)\]/);
   assert.match(library, /function openVideo\(videoId\)/);

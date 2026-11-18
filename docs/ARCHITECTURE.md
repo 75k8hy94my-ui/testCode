@@ -152,3 +152,27 @@ URLやデータの実際の操作経路は、必ず入口HTMLと呼出し元か�
 
 - [Readerの外部ハッシュ形式](reader-hash-embedding.md)：同一オリジン/クロスオリジン制約、矢印キー・ハッシュ補正の所有者、有限タイマーと終了処理。
 - [Vault・本棚・プロフィールの再構成判断](refactor-risk-boundaries.md)：保存・暗号・CAS・tombstoneの責任と、今回機械的な分割を見送った理由。
+
+
+## 動画一覧の表示責任を追加分離（2026-11-18）
+
+前回の `video-library-view.js`（一覧と編集シートのDOM構築）を拡張し、同ファイルの `createCardRenderer(deps)` が**カード1件・シリーズグループの表示を唯一管理**する。新たなグローバル公開名や追加スクリプトは設けない。`video-card.js` は共通のカード本体・サムネイル表示の正規実装を引き続き担当する。
+
+- **表示モデル**：`video-library-view.js` は、カスタムラベル・フォルダ名・再生済み情報・お気に入りメニュー・仮想編集済み動画のサムネイル情報を組み立て、`MangaReaderVideoCard.create` を呼ぶ。独立してlocalStorageやVaultにアクセスしない。
+- **変更可能な状態の唯一の所有者**：`video-library.js` が `state` を保有し、Viewが発生させた `openVideo`、`toggleFavorite`、`removeSeries`、`selectVideo`、`selectSeries`、`toggleSeries` の各イベントを**注入コールバック**として受け取る。View自体が保存・同期・シリーズ選択状態を変更しない。
+- **絞り込みの単一経路**：`video-library.js` の `filterVisibleVideos(scoped)` に「通常表示」「動画再生直前の戻りコンテキスト」「再生後に対象ページを復元する処理」を統合した。カスタムプロパティを含め、同一の条件を利用する。
+- **初期化・終了の責任**：`video-list-route.js` が唯一 `MangaReaderVideoLibrary.init` を呼び、Viewのカード描画はその後にのみ実行。新しいDOMイベントは生成したカード要素内に限定し、グローバルイベント・タイマーを追加しない。保存データ形式、VPN許可判定、Vaultのpending/CAS/tombstone、プレーヤーのURL・進捗処理は従来どおり。
+
+### 変更先の特定
+
+カードの見た目・シリーズの折りたたみUI・カード表示項目は `video-library-view.js`。共通カードメニューの基本DOMやサムネイルは `video-card.js` / `video-thumbnail-renderer.js`。動画の一覧フィルタ/ページ復元・状態/イベント・保存同期は `video-library.js`。専用編集ページは `video-edit-page.js`。画面起動と読み込み順序は `video-list-route.js`。
+
+### SPA切替時のイベント後始末
+
+`video-library.js` はルート再訪時に同じDOMとイベント結線を使うため、ページ全体のイベント登録は起動ごとに増やさず1回のみ保持する。`video-list-route.js.detach()` が画面DOMを除去した後は、`isListMounted()` によってグローバル検索通知・VPN状態通知・外部からのリスト再読込から**切断された一覧を再描画しない**。一方、既に発行済みのデータ移行や暗号化Vaultの未同期キュー処理は途中で停止・破棄せず、安全に完了/再試行させる。再訪時の `init()` が通常描画を再開する。
+
+## 動画関連ファイルの詳細マップ
+
+[docs/VIDEO-ARCHITECTURE.md](VIDEO-ARCHITECTURE.md) に動画一覧・編集/再生・短尺再生・仮想編集・サムネイル・メタデータ・Vault/VPN境界の**現行実装の責任一覧**と主要なHTMLスクリプトロード関係をまとめた。今後の動画改修は必ずこのマップと実際のエントリコード・対象テストを照合する。
+
+静的ホスティングではロードするスクリプトのバージョン付きURLを変更時に更新する。今回のカード所有者の再構成は動画ルートのView/library URLと、そのルートを読むSPA、および4つのSPA入口HTMLを同時に更新して、旧キャッシュとのバージョン混在を抑制した。
