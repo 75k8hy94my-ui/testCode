@@ -9,19 +9,19 @@ test('presentation is independent of the protected video library state and sync'
   const css = read('video-library.css');
   const library = read('video-library.js');
   const route = read('video-list-route.js');
-  assert.match(view, /MangaReaderVideoLibraryView = Object\.freeze\(\{ setupMarkup \}\)/);
-  assert.doesNotMatch(view, /localStorage|sessionStorage|MangaVault|setTimeout|addEventListener/);
+  assert.match(view, /MangaReaderVideoLibraryView = Object\.freeze\(\{ setupMarkup, createCardRenderer \}\)/);
+  assert.doesNotMatch(view, /localStorage|sessionStorage|MangaVault|setTimeout|\.dispatchEvent/);
   assert.match(library, /View\.setupMarkup\(document, dom\)/);
   assert.doesNotMatch(library, /style\.textContent|function setupMarkup\(|function injectStyles\(/);
   assert.match(css, /#videoLibraryResults|#videoLibrarySheet/);
   assert.match(route, /await ensureStylesheet\(\)/);
   assert.ok(route.indexOf("deps.loadScript('video-library-view.js") < route.indexOf("deps.loadScript('video-library.js"));
 });
-test('view exposes mount only and declines a missing route element without changing state', () => {
+test('view exposes two presentation factories and declines a missing route element without changing state', () => {
   const windowRef = {};
   vm.runInNewContext(read('video-library-view.js'), { window: windowRef });
   const view = windowRef.MangaReaderVideoLibraryView;
-  assert.deepEqual(Object.keys(view), ['setupMarkup']);
+  assert.deepEqual(Object.keys(view), ['setupMarkup', 'createCardRenderer']);
   assert.equal(view.setupMarkup({ getElementById: () => null }, {}), false);
 });
 test('stylesheet is extracted without any rule, theme or responsive breakpoint changes', () => {
