@@ -14,7 +14,6 @@
   const CustomProperties = window.MangaReaderVideoCustomProperties;
   const PREF_KEY = 'mangaReaderVideoLibraryView';
   const PROTECTED_DATA_KEYS = new Set([VIDEO_KEY, FOLDER_KEY, META_KEY]);
-  const STATUS_LABELS = { '': '', later: 'あとで見る', watching: '視聴中', watched: '視聴済み' };
   const SORT_LABELS = {
     'recent-added': '最近追加', oldest: '古い順', 'recent-opened': '最近開いた', 'most-opened': 'よく開く', title: 'タイトル'
   };
@@ -31,6 +30,7 @@
   let pageAnimation = null;
   let activePage = null;
   let paginationEventsBound = false;
+  let cardRenderer = null;
   const RETURN_INTENT_KEY = 'testcode.video.returnIntent';
   const RETURN_VIEW_KEY = 'testcode.video.listReturnContext';
   let returnIntent = null;
@@ -40,8 +40,7 @@
   function captureReturnContext(videoId) {
     if (!videoId) return;
     const scoped = effectiveVideos().filter(video => video.hidden === state.showHidden);
-    const visible = Data.filterVideos(scoped, { showHidden: state.showHidden, query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, kind: state.kind, videoMeta: state.meta, folders: state.folders });
-    const filtered = CustomProperties ? visible.filter(video => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, Object.values(state.customFilters))) : visible;
+    const filtered = filterVisibleVideos(scoped);
     const ordered = Data.sortVideos(filtered, state.sort);
     const context = {
       id: String(videoId), page: state.page, sort: state.sort, view: state.view,
@@ -305,6 +304,13 @@
     return Data.normalizeVideo({ ...base, ...meta, id: base.id, a: base.a, b: base.b, addedAt: base.addedAt });
   }
   function effectiveVideos() { return state.baseVideos.map(effectiveVideo); }
+  // A single filter contract is used for capture, restored-page lookup, and
+  // ordinary rendering. Never allow return navigation to bypass custom filters.
+  function filterVisibleVideos(scoped) {
+    const visible = Data.filterVideos(scoped, { showHidden: state.showHidden, query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, kind: state.kind, videoMeta: state.meta, folders: state.folders });
+    return CustomProperties ? visible.filter(video => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, Object.values(state.customFilters))) : visible;
+  }
+
   function baseById(videoId) { return state.baseVideos.find((video) => String(video.id) === String(videoId)) || null; }
   function folderName(folderId) { return (state.folders.find((folder) => folder.id === folderId) || {}).name || ''; }
 
@@ -413,134 +419,10 @@
     select.value = value;
   }
 
-  function formatDate(value) {
-    if (!value) return '';
-    try { return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric' }).format(new Date(value)); }
-    catch (_) { return ''; }
-  }
-  function progressPercent(video) {
-    if (!video.durationSeconds || video.progressSeconds == null) return null;
-    return Math.max(0, Math.min(100, Math.round((video.progressSeconds / video.durationSeconds) * 100)));
-  }
-
-  function createCard(video) {
-    const VideoCard = window.MangaReaderVideoCard;
-    if (!VideoCard || typeof VideoCard.create !== 'function') throw new Error('video card component is unavailable');
-    const title = Data.displayTitle(video, effectiveVideos());
-    const isBookmark = Data.videoEntryKind(video, state.meta[String(video.id)]) === 'bookmark';
-    const metadata = [];
-    const service = Data.deriveService(video.url, video.a);
-    if (service && !isBookmark) metadata.push(service);
-    if (video.folderId && folderName(video.folderId)) metadata.push(folderName(video.folderId));
-    if (video.seriesId && effectiveVideos().some(item => item.id !== video.id && item.seriesId === video.seriesId)) metadata.push('シリーズ');
-    if (video.watchStatus && STATUS_LABELS[video.watchStatus]) metadata.push(STATUS_LABELS[video.watchStatus]);
-    if (video.lastOpenedAt) metadata.push(formatDate(video.lastOpenedAt));
-    if (video.openCount) metadata.push(video.openCount + '回');
-    const customLabels = [];
-    if (canReadProtectedData() && CustomProperties) {
-      const stored = state.customValues[String(video.id)] || {};
-      const shown = Object.values(state.customDefinitions.properties || {}).filter((property) => property && property.deleted !== true && property.hidden !== true && Object.prototype.hasOwnProperty.call(stored, property.id) && stored[property.id] !== null && stored[property.id] !== '').sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
-      shown.forEach((property) => {
-        const value = CustomProperties.formatValue(property, stored[property.id], state.customDefinitions);
-        if (value !== '') customLabels.push(property.name + ': ' + value);
-      });
-    }
-    // Legacy publications used a link to a special player as their stored
-    // URL. Give them the exact same MP4 thumbnail and dimensions as all new
-    // published video cards, without rewriting saved IDs or metadata.
-    let cardMedia = video;
-    if (state.meta[String(video.id)]?.virtualPublishedEdit) {
-      const publication = state.meta[String(video.id)].virtualPublishedEdit;
-      const first = publication.edit?.clips?.[0];
-      const source = first && state.baseVideos.find((item) => String(item.id) === first.sourceVideoId);
-      if (source) {
-        const sourceMeta = state.meta[String(source.id)] || {};
-        const mediaUrl = typeof sourceMeta.url === 'string' ? sourceMeta.url : source.url;
-        if (Data.isDirectVideoUrl(mediaUrl)) {
-          cardMedia = { ...video, url: mediaUrl,
-            thumbnailTimeSeconds: video.thumbnailTimeSeconds == null ? first.startSeconds : video.thumbnailTimeSeconds,
-            rotate90Direction: first.rotation === 90 ? 'right' : first.rotation === -90 ? 'left' : 'none',
-            virtualThumbRotation: first.rotation || 0 };
-        }
-      }
-    }
-    const card = VideoCard.create(cardMedia, {
-      documentRef: document, layout: state.view === 'compact' ? 'compact' : 'grid', openClass: 'vl-open',
-      bookmark: isBookmark, openHref: isBookmark && video.embedPage !== true ? video.url : null, serviceLabel: service,
-      title, metadata, tags: Array.isArray(video.tags) ? video.tags : [], customLabels,
-      progressPercent: isBookmark ? null : progressPercent(video),
-      thumbnailRenderer: window.MangaReaderVideoThumbnailRenderer,
-      thumbnailOptions: { fallbackClass: 'vl-thumb-fallback', videoClass: 'vl-thumb-direct-video', serviceLabel: service || 'VIDEO' },
-      onOpen: () => openVideo(video.id),
-      menuActions: [{ label: video.favorite ? 'お気に入りを解除' : 'お気に入りに追加', onSelect: () => { updateMeta(video.id, { favorite: !video.favorite }); render(); } },
-        ...(video.seriesId && effectiveVideos().some(item => item.id !== video.id && item.seriesId === video.seriesId)
-          ? [{ label: 'シリーズから外す', onSelect: () => commitSeries('remove', [video.id]) }] : [])],
-      editHref: 'video-edit.html?id=' + encodeURIComponent(video.id) + '&return=list',
-    });
-    card.classList.add('vl-card');
-    card.dataset.videoId = String(video.id);
-    if (state.seriesSelecting) {
-      const pick = document.createElement('label');
-      pick.className = 'vl-series-pick';
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.checked = state.seriesSelected.has(String(video.id));
-      checkbox.setAttribute('aria-label', title + 'をシリーズ用に選択');
-      checkbox.addEventListener('change', () => {
-        if (checkbox.checked) state.seriesSelected.add(String(video.id));
-        else state.seriesSelected.delete(String(video.id));
-        render();
-      });
-      pick.append(checkbox, document.createTextNode('選択'));
-      card.append(pick);
-    }
-    return card;
-  }
-
-  function createSeriesCard(group) {
-    const section = document.createElement('section');
-    section.className = 'vl-series';
-    section.dataset.seriesId = group.id;
-    const heading = document.createElement('div');
-    heading.className = 'vl-series-heading';
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.className = 'vl-series-toggle';
-    const expanded = state.expandedSeries.has(group.id);
-    toggle.setAttribute('aria-expanded', String(expanded));
-    toggle.textContent = (expanded ? '▾ ' : '▸ ') + 'シリーズ · ' + group.videos.length + '本';
-    toggle.addEventListener('click', () => {
-      if (expanded) state.expandedSeries.delete(group.id);
-      else state.expandedSeries.add(group.id);
-      render();
-    });
-    heading.append(toggle);
-    if (state.seriesSelecting) {
-      const label = document.createElement('label');
-      label.className = 'vl-series-select-all';
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.checked = group.videos.every(video => state.seriesSelected.has(String(video.id)));
-      checkbox.setAttribute('aria-label', 'このシリーズ内の動画をすべて選択');
-      checkbox.addEventListener('change', () => {
-        group.videos.forEach(video => {
-          if (checkbox.checked) state.seriesSelected.add(String(video.id));
-          else state.seriesSelected.delete(String(video.id));
-        });
-        render();
-      });
-      label.append(checkbox, document.createTextNode('まとめて選択'));
-      heading.append(label);
-    }
-    section.append(heading);
-    if (expanded) {
-      const grid = document.createElement('div');
-      grid.className = 'vl-series-videos';
-      group.videos.forEach(video => grid.append(createCard(video)));
-      section.append(grid);
-    }
-    return section;
-  }
+  // Visual card construction lives in video-library-view.js. Only the
+  // library changes selection, favorites, series membership and storage.
+  function createCard(video) { return cardRenderer.createCard(video); }
+  function createSeriesCard(group) { return cardRenderer.createSeriesCard(group); }
 
   function commitSeries(action, videoIds) {
     if (!canReadProtectedData()) return false;
@@ -663,8 +545,7 @@
     restoreReturnContext(targetId);
     const findInCurrentView = () => {
       const scoped = all.filter(video => video.hidden === state.showHidden);
-      const visible = Data.filterVideos(scoped, { showHidden: state.showHidden, query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, kind: state.kind, videoMeta: state.meta, folders: state.folders });
-      const filtered = CustomProperties ? visible.filter(video => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, Object.values(state.customFilters))) : visible;
+      const filtered = filterVisibleVideos(scoped);
       return sortForReturn(filtered);
     };
     let list = findInCurrentView();
@@ -710,9 +591,7 @@
     const scoped = all.filter((video) => video.hidden === state.showHidden);
     renderFilterOptions(scoped);
     renderCustomFilters();
-    const baseFiltered = Data.filterVideos(scoped, { showHidden: state.showHidden, query: state.query, quick: state.quick === 'all' ? '' : state.quick, folderId: state.folderId, tag: state.tag, service: state.service, kind: state.kind, videoMeta: state.meta, folders: state.folders });
-    const filters = Object.values(state.customFilters);
-    const filtered = CustomProperties ? baseFiltered.filter((video) => CustomProperties.matchesFilters(video, state.customDefinitions, state.customValues, filters)) : baseFiltered;
+    const filtered = filterVisibleVideos(scoped);
     const videos = sortForReturn(filtered);
     dom.quick.querySelectorAll('[data-quick]').forEach((button) => button.classList.toggle('active', button.dataset.quick === state.quick));
     dom.thumbnailSize.value = state.thumbnailSize;
@@ -1075,7 +954,34 @@
   function init(access) {
     if (access) mediaAccess = access;
     if (!document.getElementById('videoListSection')) return;
-    loadPrefs(); loadLibraryState(); if (!View.setupMarkup(document, dom)) return; bindEvents(); if (dom.search) dom.search.value = state.query; render(); resumePendingLocalSync(); migrateExistingVideoUrls();
+    loadPrefs(); loadLibraryState(); if (!View.setupMarkup(document, dom)) return;
+    if (!cardRenderer) cardRenderer = View.createCardRenderer({
+      documentRef: document, data: Data, customProperties: CustomProperties, state,
+      effectiveVideos, folderName, canReadProtectedData,
+      actions: {
+        openVideo,
+        toggleFavorite(videoId, favorite) { updateMeta(videoId, { favorite }); render(); },
+        removeSeries(videoIds) { return commitSeries('remove', videoIds); },
+        selectVideo(videoId, selected) {
+          if (selected) state.seriesSelected.add(String(videoId));
+          else state.seriesSelected.delete(String(videoId));
+          render();
+        },
+        selectSeries(videoIds, selected) {
+          videoIds.forEach(videoId => {
+            if (selected) state.seriesSelected.add(String(videoId));
+            else state.seriesSelected.delete(String(videoId));
+          });
+          render();
+        },
+        toggleSeries(seriesId, expanded) {
+          if (expanded) state.expandedSeries.add(seriesId);
+          else state.expandedSeries.delete(seriesId);
+          render();
+        },
+      },
+    });
+    bindEvents(); if (dom.search) dom.search.value = state.query; render(); resumePendingLocalSync(); migrateExistingVideoUrls();
   }
 
   function refreshFromStorage() {
