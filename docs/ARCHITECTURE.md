@@ -147,3 +147,8 @@ URLやデータの実際の操作経路は、必ず入口HTMLと呼出し元か�
 最新のリポジトリで `npm run architecture:report` を実行すると、HTMLのscript/style参照、JSに埋め込まれた固定文字列の動的ロード、ES/CJSのimport、グローバルAPIの定義候補を自動的に表示する。`npm run architecture:report -- --json` はファイル別にイベントの発行/購読、storage識別子、明示的importの循環候補も出す。静的な生成レポートを古い状態のまま正本として残さない方式とする。
 
 **限界：** グローバルAPI名やイベント、storageキーは文字列からの抽出であり、実際の呼出し・存続期間や保存責任を証明しない。循環解析も明示的なES/CJS依存のみであり、classic scriptや動的URLを介した依存を含まない。疑わしい関係は実行経路と回帰テストで確認する。重要な3つの公開singleton（動画ルート、動画ライブラリ、動画ビュー）は `verify:architecture` で明示的な定義重複を防ぐ。
+
+## 高リスク領域の現在の判断資料
+
+- [Readerの外部ハッシュ形式](reader-hash-embedding.md)：同一オリジン/クロスオリジン制約、矢印キー・ハッシュ補正の所有者、有限タイマーと終了処理。
+- [Vault・本棚・プロフィールの再構成判断](refactor-risk-boundaries.md)：保存・暗号・CAS・tombstoneの責任と、今回機械的な分割を見送った理由。
