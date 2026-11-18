@@ -21,7 +21,7 @@ test('editor exposes per-video embedding and bulk shared setting', () => {
   assert.match(edit, /async function importUrls/);
   assert.match(edit, /embedPage: embedPage && !Data\.isDirectVideoUrl\(url\)/);
   assert.match(edit, /!!elements\.embedPage\.checked/);
-  assert.match(library, /videoLibraryEmbedPage/);
+  assert.match(fs.readFileSync(new URL('../video-library-view.js', import.meta.url), 'utf8'), /videoLibraryEmbedPage/);
 });
 
 test('player only embeds external pages when the user explicitly opted in', () => {

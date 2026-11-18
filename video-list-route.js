@@ -19,7 +19,7 @@
     let helperPromise = null;
     let stylesheetPromise = null;
     // Load the route-scoped stylesheet before mounting any video UI. The
-    // Promise is owned by this route, not by video-library.js or a timer.
+    // Promise is owned by the route lifecycle, never by the library or a timer.
     function ensureStylesheet() {
       if (stylesheetPromise) return stylesheetPromise;
       if (!documentRef.head) return Promise.resolve(); // Minimal test documents.

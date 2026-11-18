@@ -42,10 +42,10 @@ test('video library paginates 25 boxes (single videos or series) with manga page
   assert.match(library, /const displayItems = Data\.groupVideosBySeries\(videos\)/);
   assert.match(library, /Pagination\.derive\(displayItems, state\.page, Pagination\.PAGE_SIZE\)/);
   assert.match(library, /pageModel\.items\.forEach\(item => grid\.append\(item\.kind === 'series' \? createSeriesCard\(item\) : createCard\(item\.video\)\)\)/);
-  assert.match(library, /id="videoLibraryPagination" class="bookshelf-pagination vl-pagination"/);
-  assert.match(library, /videoLibraryPrevPage/);
-  assert.match(library, /videoLibraryNextPage/);
-  assert.match(library, /videoLibraryPageLabel/);
+  assert.match(fs.readFileSync(new URL('../video-library-view.js', import.meta.url), 'utf8'), /id="videoLibraryPagination" class="bookshelf-pagination vl-pagination"/);
+  assert.match(fs.readFileSync(new URL('../video-library-view.js', import.meta.url), 'utf8'), /videoLibraryPrevPage/);
+  assert.match(fs.readFileSync(new URL('../video-library-view.js', import.meta.url), 'utf8'), /videoLibraryNextPage/);
+  assert.match(fs.readFileSync(new URL('../video-library-view.js', import.meta.url), 'utf8'), /videoLibraryPageLabel/);
   assert.match(library, /duration: 300/);
   assert.match(library, /state\.page = pageModel\.page/);
   assert.match(library, /dom\.pagination\.hidden = !pageModel\.hasMultiplePages/);

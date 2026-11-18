@@ -84,9 +84,9 @@ test('list applies the kind selector and opens bookmark anchors without player r
   const library = read('video-library.js');
   const routing = read('video-routing-fix.js');
   const css = read('video-card.css');
-  assert.match(library, /id="videoLibraryKind"/);
+  assert.match(read('video-library-view.js'), /id="videoLibraryKind"/);
   assert.match(library, /videoMeta: state\.meta/);
-  assert.match(library, /bookmark: isBookmark, openHref: isBookmark \? video\.url : null/);
+  assert.match(library, /bookmark: isBookmark, openHref: isBookmark && video\.embedPage !== true \? video\.url : null/);
   assert.match(library, /state\.kind = dom\.kind\.value; state\.page = 1; savePrefs\(\); render\(\)/);
   const branch = routing.slice(routing.indexOf('function handleEnhancedOpen'), routing.indexOf("document.addEventListener('click', handleEnhancedOpen"));
   assert.ok(branch.indexOf("card.classList.contains('videoCard--bookmark')") > -1);
