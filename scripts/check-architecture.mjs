@@ -68,9 +68,27 @@ export function assertPageBoundaries(root) {
   if (manga.includes('reader-runtime.js')) throw new Error('bookshelf must not load reader-runtime.js');
 }
 
+export function assertCanonicalGlobalOwners(root) {
+  // Check only these known singleton public APIs for literal duplicate writes.
+  const owners = [
+    ['MangaReaderVideoLibrary', 'video-library.js'],
+    ['MangaReaderVideoLibraryView', 'video-library-view.js'],
+    ['VideoListRouteFactory', 'video-list-route.js'],
+  ];
+  for (const [name, owner] of owners) {
+    const pattern = new RegExp('\\b(?:window|self|root|globalThis)\\.' + name + '\\s*=(?!=)');
+    const found = fs.readdirSync(root).filter(file => file.endsWith('.js'))
+      .filter(file => pattern.test(fs.readFileSync(path.join(root, file), 'utf8')));
+    if (found.length !== 1 || found[0] !== owner) {
+      throw new Error(name + ' must have one owner: ' + owner + ' (found: ' + found.join(', ') + ')');
+    }
+  }
+}
+
 export function verifyArchitecture(root = ROOT) {
   assertDynamicAssets(root);
   assertPageBoundaries(root);
+  assertCanonicalGlobalOwners(root);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

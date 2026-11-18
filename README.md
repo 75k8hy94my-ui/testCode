@@ -13,6 +13,7 @@ Static HTML/CSS/JavaScript application hosted through GitHub Pages. There is no 
 - `npm test` — unit and static regression tests
 - `npm run verify:static` — JS syntax, local assets and architecture boundary checks
 - `npm run verify:architecture` — dynamic script/style references and independent Reader boundary
+- `npm run architecture:report` (or `npm run architecture:report -- --json`) — live dependency, global API, storage and event inventory
 - `npm run test:e2e` — Playwright browser tests (requires the browser runtime)
 - `git diff --check` — whitespace/error check
 
