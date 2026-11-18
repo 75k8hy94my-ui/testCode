@@ -32,7 +32,8 @@ test('player only embeds external pages when the user explicitly opted in', () =
 });
 
 test('embed ON routes bookmark card to internal player instead of source URL', () => {
-  assert.match(library, /openHref: isBookmark && video\.embedPage !== true \? video\.url : null/);
+  // Bookmark routing is presentation behavior; the library still owns navigation state.
+  assert.match(fs.readFileSync(new URL('../video-library-view.js', import.meta.url), 'utf8'), /openHref: isBookmark && video\.embedPage !== true \? video\.url : null/);
   assert.match(routing, /embeddedPage = latestMeta && latestMeta\[videoId\]\?\.embedPage === true/);
   assert.match(routing, /card\.classList\.contains\('videoCard--bookmark'\) && !embeddedPage/);
   assert.match(routing, /window\.location\.href = targetUrl\.href/);
