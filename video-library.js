@@ -4,7 +4,8 @@
 
   const Data = window.MangaReaderVideoData;
   const Pagination = window.VideoLibraryPagination;
-  if (!Data || !Pagination) return;
+  const View = window.MangaReaderVideoLibraryView;
+  if (!Data || !Pagination || !View) return;
 
   const VIDEO_KEY = 'mangaReaderVideos';
   const FOLDER_KEY = 'mangaReaderVideoFolders';
@@ -401,162 +402,6 @@
       if (previous === undefined) delete state.meta[videoId]; else state.meta[videoId] = previous;
       return false;
     }
-    return true;
-  }
-
-  function injectStyles() {
-    if (document.getElementById('videoLibraryStyles')) return;
-    const style = document.createElement('style');
-    style.id = 'videoLibraryStyles';
-    style.textContent = `
-      #videoListSection[data-video-library-enhanced="1"]{overflow:hidden!important}#videoListSection[data-video-library-enhanced="1"] #videoListToolbar,#videoListSection[data-video-library-enhanced="1"] #videoListItems,#videoListSection[data-video-library-enhanced="1"] #videoListEmpty{display:none!important}
-      #videoLibraryApp{display:flex;flex-direction:column;min-height:0;flex:1;gap:10px}
-      .vl-top{display:flex;gap:8px;align-items:center}#videoLibraryApp .vl-search,#videoLibraryApp #videoLibraryAdd{display:none!important}.vl-search{position:relative;flex:1}.vl-search input{width:100%;min-height:44px;border:1px solid var(--border);border-radius:14px;background:var(--bg-soft);color:var(--text);padding:10px 13px 10px 38px;font-size:16px}.vl-search::before{content:'⌕';position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--sub);font-size:20px}.vl-primary{min-height:44px;border:0;border-radius:14px;padding:0 14px;background:var(--accent);color:#fff;font-weight:750;cursor:pointer}.vl-top #videoLibraryProperties{display:inline-flex;align-items:center;min-height:42px;padding:0 12px;border:1px solid var(--border);border-radius:12px;color:var(--text);background:var(--panel-2);font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap}.vl-custom-properties{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}.vl-custom-properties .vl-tag{max-width:100%;overflow-wrap:anywhere}.vl-chips{display:flex;gap:7px;overflow-x:auto;padding:1px 0 3px;scrollbar-width:none}.vl-chips::-webkit-scrollbar{display:none}.vl-chip{flex:0 0 auto;border:1px solid var(--border);border-radius:999px;background:var(--bg-soft);color:var(--sub);padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer}.vl-chip.active{color:var(--text);border-color:color-mix(in srgb,var(--accent) 55%,var(--border));background:var(--accent-dim)}
-      #videoLibraryShorts{white-space:nowrap;background:var(--panel-2);color:var(--text);border:1px solid var(--border)}
-      .vl-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto auto;gap:7px}.vl-filters select,.vl-icon-btn{min-height:39px;min-width:0;border:1px solid var(--border);border-radius:11px;background:var(--bg-soft);color:var(--text);padding:0 9px}.vl-icon-btn{cursor:pointer;font-weight:700}.vl-custom-filter{border:1px solid var(--border);border-radius:12px;padding:0 10px;background:var(--bg-soft)}.vl-custom-filter summary{padding:10px 0;color:var(--text);font-size:12px;font-weight:700;cursor:pointer}.vl-custom-filter-list{display:grid;gap:7px;padding:0 0 10px}.vl-custom-filter-row{display:grid;grid-template-columns:minmax(90px,.7fr) minmax(100px,.8fr) minmax(110px,1fr) auto;align-items:center;gap:6px;color:var(--text);font-size:12px}.vl-custom-filter-row select,.vl-custom-filter-row input,.vl-custom-filter-row textarea{box-sizing:border-box;min-width:0;width:100%;min-height:38px;border:1px solid var(--border);border-radius:9px;background:var(--panel);color:var(--text);padding:7px}.vl-summary{display:flex;justify-content:space-between;gap:10px;color:var(--sub);font-size:11px;min-height:18px}.vl-summary [data-error="1"]{color:#ef6464}
-      #videoLibraryResults{overflow:auto;min-height:0;flex:1;padding:1px 1px 18px}.vl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:11px}.vl-grid.compact{display:flex;flex-direction:column;gap:6px}.vl-card{position:relative;min-width:0;border:1px solid var(--border);border-radius:16px;background:var(--bg-soft);overflow:visible;box-shadow:0 5px 18px rgba(0,0,0,.08)}.vl-open{display:block;width:100%;border:0;background:transparent;color:inherit;padding:0;text-align:left;cursor:pointer}.vl-thumb{position:relative;aspect-ratio:16/9;display:grid;place-items:center;border-radius:15px 15px 0 0;overflow:hidden;background:linear-gradient(135deg,var(--panel-2),var(--bg));color:var(--sub)}.vl-thumb img,.vl-thumb video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.vl-thumb-fallback{display:grid;place-items:center;text-align:center;gap:5px;font-size:11px}.vl-thumb-fallback b{font-size:27px;color:var(--text)}.vl-body{padding:11px 12px 12px}.vl-title{font-weight:750;font-size:14px;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.vl-meta{margin-top:6px;color:var(--sub);font-size:11px;display:flex;gap:6px;flex-wrap:wrap}.vl-tags{margin-top:7px;display:flex;gap:5px;flex-wrap:wrap}.vl-tag{font-size:10px;border:1px solid var(--border);border-radius:999px;padding:3px 6px;color:var(--sub)}.vl-card-actions{position:absolute;right:8px;top:8px;display:flex;gap:4px;z-index:3}.vl-round{width:34px;height:34px;border:1px solid rgba(255,255,255,.24);border-radius:50%;display:grid;place-items:center;background:rgba(10,12,17,.76);color:#fff;backdrop-filter:blur(14px);cursor:pointer}.vl-round.active{color:#ffd35a}.vl-edit-link{text-decoration:none;font-size:22px;line-height:1}.vl-progress{height:3px;background:var(--panel-2);margin-top:9px;border-radius:99px;overflow:hidden}.vl-progress i{display:block;height:100%;background:var(--accent)}
-      .vl-page-frame{min-width:0;overflow:hidden}.vl-page{min-width:0;width:100%}.vl-slide-track{display:flex;align-items:flex-start;width:200%;will-change:transform}.vl-slide-track>.vl-page{flex:0 0 50%;width:50%;pointer-events:none}
-      .vl-pagination{display:flex;justify-content:center;align-items:center;gap:10px;width:100%;margin:4px 0 0;padding:8px 10px;min-height:54px;border:1px solid rgba(255,255,255,.3);border-radius:16px;background:rgba(29,35,49,.96)}.vl-pagination[hidden]{display:none!important}.vl-pagination span{min-width:74px;color:var(--text);text-align:center;font-variant-numeric:tabular-nums}.vl-pagination .bookshelfPagerButton{display:flex;align-items:center;justify-content:center;min-width:50px;min-height:44px;border:1px solid var(--border);border-radius:999px;background:var(--panel-2);color:var(--text);cursor:pointer}.vl-pagination .bookshelfPagerButton:disabled{opacity:.38;cursor:not-allowed}.bookshelfPagerGlyph{width:22px;height:22px;pointer-events:none}
-      @media(min-width:900px){.vl-pagination{--pager-glass-fill:rgba(19,22,28,.52);--pager-glass-edge:rgba(255,255,255,.28);--pager-glass-shine:rgba(255,255,255,.43);--pager-glass-shadow:rgba(0,0,0,.3);position:fixed;z-index:850;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:auto;min-width:232px;max-width:calc(100vw - 48px);height:68px;padding:8px 11px;gap:10px;isolation:isolate;border:1px solid var(--pager-glass-edge);border-radius:999px;color:#f7f9fe;background:radial-gradient(110% 175% at 24% 0%,rgba(255,255,255,.18),transparent 48%),linear-gradient(180deg,rgba(255,255,255,.07),transparent 55%),var(--pager-glass-fill);-webkit-backdrop-filter:blur(30px) saturate(180%) contrast(106%);backdrop-filter:blur(30px) saturate(180%) contrast(106%);box-shadow:0 18px 46px var(--pager-glass-shadow),0 2px 6px rgba(0,0,0,.12),inset 0 1.5px 0 var(--pager-glass-shine),inset 0 -1px 0 rgba(255,255,255,.08)}.vl-pagination:before{content:'';position:absolute;z-index:-1;inset:3px;border-radius:inherit;border:1px solid rgba(255,255,255,.09);pointer-events:none}.vl-pagination .bookshelfPagerButton{flex:0 0 50px;width:50px;height:50px;min-height:50px;padding:0;border-color:rgba(255,255,255,.2);border-radius:50%;color:#f7f9fe;background:linear-gradient(165deg,rgba(255,255,255,.2),rgba(255,255,255,.035)),rgba(255,255,255,.035);box-shadow:inset 0 1px 0 rgba(255,255,255,.23),0 2px 10px rgba(0,0,0,.13)}.vl-pagination .bookshelfPagerButton:focus-visible{outline:2px solid #9ac9ff;outline-offset:3px}.vl-pagination span{min-width:84px;color:#f7f9fe;font-size:13px;font-weight:650;letter-spacing:.035em;text-shadow:0 1px 5px rgba(0,0,0,.16);white-space:nowrap}html.app-desktop-rail-page .vl-pagination{left:calc(50% + 29px)}html[data-theme="light"] .vl-pagination{--pager-glass-fill:rgba(240,245,252,.63);--pager-glass-edge:rgba(255,255,255,.8);--pager-glass-shine:rgba(255,255,255,.94);--pager-glass-shadow:rgba(48,61,77,.16);color:#202834;background:radial-gradient(110% 175% at 24% 0%,rgba(255,255,255,.58),transparent 50%),linear-gradient(180deg,rgba(255,255,255,.23),rgba(214,227,245,.1)),var(--pager-glass-fill)}html[data-theme="light"] .vl-pagination .bookshelfPagerButton{border-color:rgba(255,255,255,.76);color:#202834;background:linear-gradient(165deg,rgba(255,255,255,.8),rgba(207,220,239,.27));box-shadow:inset 0 1px 0 rgba(255,255,255,.96),0 2px 10px rgba(49,61,80,.09)}html[data-theme="light"] .vl-pagination span{color:#202834}}
-      @media(max-width:899px){.vl-pagination{margin:8px 0 0;padding:6px 8px;min-height:42px}.vl-pagination span{min-width:52px}.vl-pagination .bookshelfPagerButton{min-width:64px;min-height:44px}}
-      .vl-grid.compact .vl-card{display:grid;grid-template-columns:116px minmax(0,1fr);min-height:76px;overflow:visible}.vl-grid.compact .vl-open{display:contents}.vl-grid.compact .vl-thumb{aspect-ratio:auto;height:76px;border-radius:15px 0 0 15px}.vl-grid.compact .vl-body{padding:10px 70px 8px 10px}.vl-grid.compact .vl-title{-webkit-line-clamp:1}.vl-grid.compact .vl-card-actions{top:50%;transform:translateY(-50%)}.vl-empty{padding:48px 18px;text-align:center;color:var(--sub);border:1px dashed var(--border);border-radius:16px}.vl-empty strong{display:block;color:var(--text);font-size:17px;margin-bottom:6px}
-      /* This sheet is appended to body, outside .homeShell's theme variables. */
-      #videoLibrarySheet{--bg-soft:#fff;--panel:#fff;--panel-2:#eef1f5;--text:#202124;--sub:#59616e;--border:#dfe3e8;--accent:#1769aa;color-scheme:light}
-      html[data-theme="dark"] #videoLibrarySheet{--bg-soft:#10141c;--panel:#161a23;--panel-2:#1d2230;--text:#f1f2f6;--sub:#9aa3b5;--border:#2b3240;--accent:#6aa9ff;color-scheme:dark}
-      #videoLibrarySheet .vl-sheet-panel{background:var(--panel)!important;color:var(--text)!important}
-      #videoLibrarySheet{position:fixed;inset:0;z-index:180;background:rgba(0,0,0,.58);display:grid;align-items:end;padding:12px;backdrop-filter:blur(10px)}#videoLibrarySheet[hidden]{display:none!important}.vl-sheet-panel{width:min(680px,100%);max-height:min(90dvh,820px);margin:0 auto;overflow:auto;border:1px solid color-mix(in srgb,var(--accent) 30%,var(--border));border-radius:24px;background:var(--panel);color:var(--text);box-shadow:0 24px 70px rgba(0,0,0,.55);padding:18px}.vl-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:var(--panel);padding:16px 0 12px;z-index:2;border-bottom:1px solid var(--border);margin-bottom:4px}.vl-sheet-head h2{margin:0;font-size:20px}.vl-close{border:1px solid var(--border);border-radius:999px;background:var(--panel-2);color:var(--text);width:38px;height:38px}.vl-form{display:grid;gap:14px}.vl-field{padding:10px 11px 11px;border:1px solid var(--border);border-radius:14px;background:color-mix(in srgb,var(--bg-soft) 72%,var(--panel))}.vl-field:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 22%,transparent)}.vl-field label{display:block;color:var(--text);font-size:13px;font-weight:750;margin:0 0 7px}.vl-field input,.vl-field select,.vl-field textarea{width:100%;border:1px solid color-mix(in srgb,var(--sub) 48%,var(--border));border-radius:10px;background:var(--panel);color:var(--text);padding:12px;font-size:16px;min-height:46px}.vl-field input::placeholder,.vl-field textarea::placeholder{color:var(--sub);opacity:.9}.vl-field input:focus,.vl-field select:focus,.vl-field textarea:focus{outline:2px solid color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:1px}.vl-field textarea{min-height:90px;resize:vertical}.vl-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.vl-check{display:flex;gap:10px;align-items:center;min-height:46px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-soft);font-weight:700}.vl-sheet-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px;padding-top:12px;border-top:1px solid var(--border)}.vl-sheet-actions button{min-height:44px;border-radius:12px;padding:0 14px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-weight:700}.vl-sheet-actions .save{border:0;background:var(--accent);color:#fff}.vl-sheet-actions .danger{margin-right:auto;color:#ff7777}.vl-advanced{border:1px solid var(--border);border-radius:12px;padding:0 11px;background:var(--bg-soft)}.vl-advanced summary{padding:13px 0;cursor:pointer;color:var(--text);font-size:13px;font-weight:700}.vl-help{margin:-4px 0 2px;color:var(--sub);font-size:11px;line-height:1.5}.vl-folder-create{display:flex;gap:8px}.vl-folder-create input{flex:1}.vl-folder-list{display:grid;gap:7px;margin-top:12px}.vl-folder-row{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:12px;padding:9px 10px}.vl-folder-row span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}.vl-folder-row button{border:0;background:var(--panel-2);color:var(--text);border-radius:8px;padding:7px 9px}.vl-folder-row .danger{color:#ff7777}
-      .vl-access-notice{margin:10px 0;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--bg-soft);color:var(--text);font-size:13px;line-height:1.6}
-      @media(max-width:700px){.vl-top{flex-wrap:wrap}.vl-search{flex:1 0 100%}.vl-top #videoLibraryAdd,.vl-top #videoLibraryShorts,.vl-top #videoLibraryHidden,.vl-top #videoLibraryProperties{flex:1}.vl-filters{grid-template-columns:1fr 1fr 1fr}.vl-filters #videoLibrarySort{grid-column:span 1}.vl-grid{grid-template-columns:1fr 1fr}.vl-sheet-panel{border-radius:24px 24px 18px 18px}.vl-two{grid-template-columns:1fr}}
-      @media(max-width:480px){.vl-top{align-items:stretch}.vl-primary{padding:0 12px}.vl-filters{grid-template-columns:1fr 1fr}.vl-grid{grid-template-columns:1fr}.vl-grid.compact .vl-card{grid-template-columns:104px minmax(0,1fr)}.vl-grid.compact .vl-thumb{height:72px}.vl-grid.compact .vl-body{padding-right:66px}.vl-summary{padding:0 2px}}
-    `;
-    style.textContent += `
-      .vl-series-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--border);border-radius:12px;background:var(--bg-soft);color:var(--text);font-size:13px}
-      .vl-series-bar[hidden]{display:none!important}.vl-series-bar span{margin-right:auto}.vl-series-bar button{min-height:38px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2);color:var(--text);padding:0 12px;font-weight:700}.vl-series-bar button:disabled{opacity:.45}
-      .vl-series{grid-column:1/-1;border:1px solid var(--border);background:var(--bg-soft);border-radius:16px;padding:10px;min-width:0}
-      .vl-series-heading{display:flex;align-items:center;gap:12px;min-height:48px}
-      .vl-series-toggle{flex:1;text-align:left;border:0;background:transparent;color:var(--text);font-weight:800;font-size:15px;padding:12px;cursor:pointer}
-      .vl-series-select-all{display:inline-flex;align-items:center;gap:6px;color:var(--text);font-size:12px;white-space:nowrap;padding:8px}
-      .vl-series-videos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:8px 2px 2px}
-      .vl-card{position:relative}.vl-series-pick{position:absolute;right:8px;top:8px;z-index:8;display:inline-flex;align-items:center;gap:5px;padding:7px 9px;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:9px;font-size:12px;font-weight:700;cursor:pointer}
-      .vl-series-pick input,.vl-series-select-all input{accent-color:var(--accent);width:16px;height:16px}
-      @media(max-width:700px){.vl-series-videos{grid-template-columns:repeat(2,minmax(0,1fr))}.vl-top #videoLibrarySeriesMode{flex:1}}
-      @media(max-width:480px){.vl-series-videos{grid-template-columns:minmax(0,1fr)}.vl-series-bar button{flex:1}.vl-series-heading{gap:3px}}
-    `;
-    document.head.appendChild(style);
-  }
-
-  function setupMarkup() {
-    const section = document.getElementById('videoListSection');
-    if (!section) return false;
-    if (section.dataset.videoLibraryEnhanced === '1') return true;
-    section.dataset.videoLibraryEnhanced = '1';
-    const legacyToolbar = document.getElementById('videoListToolbar');
-    const legacyItems = document.getElementById('videoListItems');
-    const legacyEmpty = document.getElementById('videoListEmpty');
-    if (legacyToolbar) legacyToolbar.style.display = 'none';
-    if (legacyItems) legacyItems.style.display = 'none';
-    if (legacyEmpty) legacyEmpty.style.display = 'none';
-
-    const app = document.createElement('div');
-    app.id = 'videoLibraryApp';
-    app.innerHTML = `
-      <div class="vl-top">
-        <div class="vl-search"><input id="videoLibrarySearch" type="search" inputmode="search" autocomplete="off" placeholder="動画を検索"></div>
-        <button id="videoLibraryAdd" class="vl-primary" type="button">＋ 追加</button>
-        <a id="videoLibraryProperties" class="vl-secondary" href="video-properties.html">プロパティ設定</a>
-        <button id="videoLibraryShorts" class="vl-primary vl-shorts" type="button">縦スワイプ再生</button>
-        <button id="videoLibraryHidden" class="vl-icon-btn" type="button">非表示</button>
-        <button id="videoLibrarySeriesMode" class="vl-icon-btn" type="button" aria-pressed="false">シリーズ</button>
-      </div>
-      <div id="videoLibraryQuick" class="vl-chips" aria-label="クイックフィルタ">
-        <button class="vl-chip" data-quick="all" type="button">すべて</button>
-        <button class="vl-chip" data-quick="favorite" type="button">★ お気に入り</button>
-        <button class="vl-chip" data-quick="later" type="button">あとで見る</button>
-        <button class="vl-chip" data-quick="watching" type="button">視聴中</button>
-        <button class="vl-chip" data-quick="watched" type="button">視聴済み</button>
-      </div>
-      <div class="vl-filters">
-        <select id="videoLibraryFolder" aria-label="フォルダ"><option value="">全フォルダ</option></select>
-        <select id="videoLibraryTag" aria-label="タグ"><option value="">全タグ</option></select>
-        <select id="videoLibraryService" aria-label="サービス"><option value="">全サービス</option></select>
-        <select id="videoLibraryKind" aria-label="リンクの種類"><option value="all">すべての種類</option><option value="direct">直リンク動画</option><option value="bookmark">ブックマーク</option></select>
-        <select id="videoLibrarySort" aria-label="並べ替え"></select>
-        <button id="videoLibraryView" class="vl-icon-btn" type="button" aria-label="表示形式を切り替え">表示</button>
-        <label class="vl-thumbnail-size-label" for="videoLibraryThumbnailSize">サムネイルサイズ <select id="videoLibraryThumbnailSize" aria-label="動画一覧のサムネイルサイズ"><option value="small">小</option><option value="normal">標準</option><option value="large">大</option></select></label>
-      </div>
-      <details class="vl-custom-filter"><summary>カスタムプロパティで絞り込む</summary><div id="videoLibraryCustomFilters" class="vl-custom-filter-list"></div></details>
-      <div id="videoLibrarySeriesBar" class="vl-series-bar" hidden>
-        <span id="videoLibrarySeriesCount">0本選択中</span>
-        <button id="videoLibrarySeriesGroup" type="button">まとめる</button>
-        <button id="videoLibrarySeriesRemove" type="button">シリーズから外す</button>
-        <button id="videoLibrarySeriesCancel" type="button">キャンセル</button>
-      </div>
-      <div class="vl-summary"><span id="videoLibraryCount"></span><span id="videoLibraryStatus" aria-live="polite"></span></div>
-      <p id="videoLibraryAccessNotice" class="vl-access-notice" aria-live="polite" hidden>VPN接続を確認できるまで、動画データの読み込みと追加・編集を停止しています。</p>
-      <div id="videoLibraryResults"></div>
-      <nav id="videoLibraryPagination" class="bookshelf-pagination vl-pagination" aria-label="動画一覧のページ移動" hidden>
-        <button id="videoLibraryPrevPage" class="bookshelfPagerButton" type="button" aria-label="前のページ"><svg class="bookshelfPagerGlyph" viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-        <span id="videoLibraryPageLabel" aria-live="polite">1 / 1</span>
-        <button id="videoLibraryNextPage" class="bookshelfPagerButton" type="button" aria-label="次のページ"><svg class="bookshelfPagerGlyph" viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      </nav>`;
-    section.prepend(app);
-
-    const sheet = document.createElement('section');
-    sheet.id = 'videoLibrarySheet';
-    sheet.hidden = true;
-    sheet.setAttribute('aria-hidden', 'true');
-    sheet.innerHTML = `
-      <div class="vl-sheet-panel" role="dialog" aria-modal="true" aria-labelledby="videoLibrarySheetTitle">
-        <div class="vl-sheet-head"><h2 id="videoLibrarySheetTitle">動画</h2></div>
-        <form id="videoLibraryForm" class="vl-form">
-          <div class="vl-url-row"><div class="vl-field"><label for="videoLibraryUrl">動画URL</label><input id="videoLibraryUrl" type="url" autocomplete="off" placeholder="https://..."></div><button id="videoLibraryUrlEdit" class="vl-url-edit" type="button">編集</button></div>
-          <div class="vl-field"><label for="videoLibraryTitle">タイトル</label><input id="videoLibraryTitle" type="text" autocomplete="off"></div>
-          <div class="vl-two">
-            <div class="vl-field"><label for="videoLibraryEditFolder">フォルダ</label><select id="videoLibraryEditFolder"></select></div>
-            <div class="vl-field"><label for="videoLibraryStatusSelect">状態（任意）</label><select id="videoLibraryStatusSelect"><option value="">未設定</option><option value="later">あとで見る</option><option value="watching">視聴中</option><option value="watched">視聴済み</option></select></div>
-          </div>
-          <div class="vl-field"><label for="videoLibraryTags">タグ（カンマ区切り）</label><input id="videoLibraryTags" type="text" autocomplete="off"></div><div id="videoLibrarySuggestedTags" class="vl-suggested-tags" aria-label="既存のタグ"></div>
-          <div class="vl-field"><label for="videoLibraryMemo">メモ</label><textarea id="videoLibraryMemo"></textarea></div>
-          <label class="vl-check"><input id="videoLibraryFavorite" type="checkbox"> お気に入り</label>
-          <label class="vl-check"><input id="videoLibraryEmbedPage" type="checkbox"> 外部ページを埋め込む（直リンク以外）</label>
-          <div class="vl-field"><label for="videoLibraryRotate90Direction">再生時の回転</label><select id="videoLibraryRotate90Direction"><option value="none">回転なし</option><option value="left">常に左90°回転</option><option value="right">常に右90°回転</option></select></div>
-          <details class="vl-advanced"><summary>再生情報・サムネイル</summary>
-            <div class="vl-two">
-              <div class="vl-field"><label for="videoLibraryLegacyService">サービス名</label><input id="videoLibraryLegacyService" type="text" autocomplete="off"></div>
-              <div class="vl-field"><label for="videoLibraryLegacyId">動画ID</label><input id="videoLibraryLegacyId" type="text" inputmode="numeric" autocomplete="off"></div>
-            </div>
-            <div class="vl-field"><label for="videoLibraryThumbnail">サムネイルURL（任意）</label><input id="videoLibraryThumbnail" type="url" autocomplete="off"></div>
-          </details>
-          <div id="videoLibraryFormError" class="vl-summary" aria-live="polite"></div>
-          <div class="vl-sheet-actions"><button id="videoLibraryDelete" class="danger" type="button">削除</button><button id="videoLibraryCancel" type="button">キャンセル</button><button class="save" type="submit">保存</button></div>
-        </form>
-        <div id="videoLibraryFolderManager" hidden>
-          <div class="vl-folder-create"><input id="videoLibraryNewFolder" type="text" placeholder="新しいフォルダ名"><button id="videoLibraryCreateFolder" class="vl-primary" type="button">追加</button></div>
-          <div id="videoLibraryFolderList" class="vl-folder-list"></div>
-        </div>
-      </div>`;
-    document.body.appendChild(sheet);
-
-    Object.assign(dom, {
-      section, app, search: document.getElementById('videoLibrarySearch'), quick: document.getElementById('videoLibraryQuick'),
-      folder: document.getElementById('videoLibraryFolder'), tag: document.getElementById('videoLibraryTag'), service: document.getElementById('videoLibraryService'), kind: document.getElementById('videoLibraryKind'),
-      sort: document.getElementById('videoLibrarySort'), view: document.getElementById('videoLibraryView'), thumbnailSize: document.getElementById('videoLibraryThumbnailSize'), foldersBtn: document.getElementById('videoLibraryFolders'),
-      customFilters: document.getElementById('videoLibraryCustomFilters'),
-      seriesMode: document.getElementById('videoLibrarySeriesMode'), seriesBar: document.getElementById('videoLibrarySeriesBar'),
-      seriesCount: document.getElementById('videoLibrarySeriesCount'), seriesGroup: document.getElementById('videoLibrarySeriesGroup'),
-      seriesRemove: document.getElementById('videoLibrarySeriesRemove'), seriesCancel: document.getElementById('videoLibrarySeriesCancel'),
-      add: document.getElementById('videoLibraryAdd'), shorts: document.getElementById('videoLibraryShorts'), hiddenBtn: document.getElementById('videoLibraryHidden'), count: document.getElementById('videoLibraryCount'), status: document.getElementById('videoLibraryStatus'), results: document.getElementById('videoLibraryResults'),
-      pagination: document.getElementById('videoLibraryPagination'), prevPage: document.getElementById('videoLibraryPrevPage'), nextPage: document.getElementById('videoLibraryNextPage'), pageLabel: document.getElementById('videoLibraryPageLabel'),
-      sheet, sheetTitle: document.getElementById('videoLibrarySheetTitle'), form: document.getElementById('videoLibraryForm'),
-      formError: document.getElementById('videoLibraryFormError'), url: document.getElementById('videoLibraryUrl'), urlEdit: document.getElementById('videoLibraryUrlEdit'), suggestedTags: document.getElementById('videoLibrarySuggestedTags'), title: document.getElementById('videoLibraryTitle'), editFolder: document.getElementById('videoLibraryEditFolder'),
-      statusSelect: document.getElementById('videoLibraryStatusSelect'), tags: document.getElementById('videoLibraryTags'), memo: document.getElementById('videoLibraryMemo'), favorite: document.getElementById('videoLibraryFavorite'), embedPage: document.getElementById('videoLibraryEmbedPage'),
-      legacyService: document.getElementById('videoLibraryLegacyService'), legacyId: document.getElementById('videoLibraryLegacyId'), thumbnail: document.getElementById('videoLibraryThumbnail'),
-      rotate90Direction: document.getElementById('videoLibraryRotate90Direction'),
-      deleteBtn: document.getElementById('videoLibraryDelete'), cancel: document.getElementById('videoLibraryCancel'), folderManager: document.getElementById('videoLibraryFolderManager'),
-      newFolder: document.getElementById('videoLibraryNewFolder'), createFolder: document.getElementById('videoLibraryCreateFolder'), folderList: document.getElementById('videoLibraryFolderList'),
-      legacyItems,
-      accessNotice: document.getElementById('videoLibraryAccessNotice'),
-    });
     return true;
   }
 
@@ -1230,7 +1075,7 @@
   function init(access) {
     if (access) mediaAccess = access;
     if (!document.getElementById('videoListSection')) return;
-    injectStyles(); loadPrefs(); loadLibraryState(); if (!setupMarkup()) return; bindEvents(); if (dom.search) dom.search.value = state.query; render(); resumePendingLocalSync(); migrateExistingVideoUrls();
+    loadPrefs(); loadLibraryState(); if (!View.setupMarkup(document, dom)) return; bindEvents(); if (dom.search) dom.search.value = state.query; render(); resumePendingLocalSync(); migrateExistingVideoUrls();
   }
 
   function refreshFromStorage() {

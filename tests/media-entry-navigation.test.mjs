@@ -7,7 +7,7 @@ test('shared add page supports manga/video entry while lists hide legacy add but
   assert.match(source('add.html'), /video-edit\.html\?mode=add/);
   assert.match(source('add.html'), /id="mangaJsonImportButton"/);
   assert.match(source('manga-list.css'), /#exportImportRow/);
-  assert.match(source('video-library.js'), /#videoLibraryAdd\{display:none!important\}/);
+  assert.match(source('video-library.css'), /#videoLibraryAdd\{display:none!important\}/);
   assert.match(source('media-add.js'), /markLocalChangesPending/);
 });
 test('shared nav search only targets current manga or video page', () => {

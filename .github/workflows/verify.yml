@@ -12,6 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Reject whitespace errors in changed lines
+        run: git diff --check HEAD^ HEAD
       - uses: actions/setup-node@v4
         with:
           node-version: 22

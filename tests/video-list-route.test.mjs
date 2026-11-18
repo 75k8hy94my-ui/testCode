@@ -29,6 +29,7 @@ test('video route loads its existing video modules without fetching reader.html'
   assert.match(route, /manga-list-pagination-events\.js\?v=[\w-]+/);
   assert.match(route, /video-library-pagination\.js\?v=[\w-]+/);
   assert.match(route, /video-library\.js\?v=[\w-]+/);
+  assert.match(route, /video-library-view\.js\?v=[\w-]+/);
   assert.match(route, /video-routing-fix\.js\?v=[\w-]+/);
   assert.match(route, /video-thumbnail-time\.js\?v=[\w-]+/);
   assert.match(spa, /else if\(route==='video'\)renderVideo\(generation\)/);
@@ -228,7 +229,7 @@ test('video library can be reinitialized after a route interruption without rebi
   assert.match(library, /window\.MangaReaderVideoLibrary\s*=\s*Object\.freeze\(\{ init, syncAccessUi/);
   assert.match(library, /let eventsBound = false/);
   assert.match(library, /if \(eventsBound\) return;/);
-  assert.match(library, /if \(section\.dataset\.videoLibraryEnhanced === '1'\) return true/);
+  assert.match(read('video-library-view.js'), /if \(section\.dataset\.videoLibraryEnhanced === '1'\) return true/);
   assert.match(library, /if \(dom\.search\) dom\.search\.value = state\.query/);
   assert.match(route, /MangaReaderVideoLibrary\.init\(deps\.mediaAccess\)/);
   assert.match(route, /bootPromise = null/);
@@ -237,7 +238,7 @@ test('video library can be reinitialized after a route interruption without rebi
 
 test('video library module loads without self-initializing or scheduling a timer', () => {
   const context = {
-    window: { MangaReaderVideoData: {}, VideoLibraryPagination: {} },
+    window: { MangaReaderVideoData: {}, VideoLibraryPagination: {}, MangaReaderVideoLibraryView: {} },
     document: {
       addEventListener() { throw new Error('module registered a startup event'); },
       getElementById() { throw new Error('module attempted early initialization'); },

@@ -21,7 +21,7 @@ test('recommendations bootstrap loads the video enhancement after existing reade
 });
 
 test('video library provides search filters sorting view modes folders and editor hooks', () => {
-  const source = read('video-library.js');
+  const source = read('video-library.js') + read('video-library-view.js');
   for (const marker of ['videoLibrarySearch','videoLibraryQuick','videoLibraryFolder','videoLibraryTag','videoLibraryService','videoLibrarySort','videoLibraryView','videoLibrarySheet','videoLibraryFolders']) {
     assert.match(source, new RegExp(marker));
   }
@@ -48,8 +48,10 @@ test('video list menu provides only existing favorite and detail editor actions'
   assert.match(editor, /recordSyncDeletion\(\[pointerPath\('videos', videoId\), pointerPath\('videoMeta', videoId\), pointerPath\('videoPropertyValues', videoId\)\]/);
   const ordinarySubmit = editor.slice(editor.indexOf("form.addEventListener('submit'"), editor.indexOf("if (!isAddMode) form.querySelector('[data-delete]')"));
   const jsonImport = editor.slice(editor.indexOf("jsonImport.addEventListener('change'"), editor.indexOf("elements.url.addEventListener('change'"));
+  const importUrls = editor.slice(editor.indexOf('async function importUrls'), editor.indexOf("bulkAddButton.addEventListener('click'"));
   assert.doesNotMatch(ordinarySubmit, /await window\.MangaVault\.saveLocalChanges\(\)/);
-  assert.match(jsonImport, /await window\.MangaVault\.saveLocalChanges\(\)/);
+  assert.match(jsonImport, /await importUrls\(parsed, event\.target\)/);
+  assert.match(importUrls, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.match(editor, /name="thumbnailTime"/);
   assert.match(editor, /Data\.parseMediaTime\(timestamp\)/);
   assert.match(editorHtml, /video-edit-page\.js\?v=[\w-]+/);
@@ -69,7 +71,7 @@ test('video cards delegate thumbnail rendering to the shared renderer', () => {
 });
 
 test('video add and edit fields use stronger contrast, spacing, and visible focus treatment', () => {
-  const library = read('video-library.js');
+  const library = read('video-library.css');
   assert.match(library, /\.vl-field\{padding:10px 11px 11px/);
   assert.match(library, /\.vl-field label\{display:block;color:var\(--text\)/);
   assert.match(library, /\.vl-field:focus-within/);
@@ -77,7 +79,7 @@ test('video add and edit fields use stronger contrast, spacing, and visible focu
 });
 
 test('enhanced editor presents URL as the only playback locator while legacy fields stay internal', () => {
-  const library = read('video-library.js');
+  const library = read('video-library-view.js');
   const bridge = read('video-routing-fix.js');
   assert.match(library, /id=["']videoLibraryUrl["']/);
   assert.match(bridge, /videoLibraryLegacyService/);
@@ -89,9 +91,9 @@ test('enhanced editor presents URL as the only playback locator while legacy fie
 
 test('video editor locks URL until the explicit edit button and exposes one-click existing tags', () => {
   const library = read('video-library.js');
-  assert.match(library, /videoLibraryUrlEdit/);
+  assert.match(read('video-library-view.js'), /videoLibraryUrlEdit/);
   assert.match(library, /readOnly/);
-  assert.match(library, /videoLibrarySuggestedTags/);
+  assert.match(read('video-library-view.js'), /videoLibrarySuggestedTags/);
   assert.match(library, /suggestedTag\.addEventListener\(['"]click['"]/);
 });
 
@@ -110,8 +112,8 @@ test('adding a video navigates to the dedicated form with opaque surfaces', () =
   const html = read('video-edit.html');
   assert.match(library, /video-edit\.html\?mode=add&return=list/);
   assert.doesNotMatch(library, /dom\.add\.addEventListener\('click', \(\) => openEditor\(null\)/);
-  assert.match(library, /#videoLibrarySheet\{--bg-soft:#fff;--panel:#fff/);
-  assert.match(library, /html\[data-theme="dark"\] #videoLibrarySheet\{--bg-soft:#10141c/);
+  assert.match(read('video-library.css'), /#videoLibrarySheet\{--bg-soft:#fff;--panel:#fff/);
+  assert.match(read('video-library.css'), /html\[data-theme="dark"\] #videoLibrarySheet\{--bg-soft:#10141c/);
   assert.match(html, /\.videoEditForm\{display:grid;gap:13px;padding:20px;[^}]*background:var\(--panel,#fff\)/);
   assert.match(editor, /const isAddMode = new URLSearchParams\(location\.search\)\.get\('mode'\) === 'add'/);
   assert.match(editor, /isAddMode \? \[nextBase, \.\.\.savedVideos\]/);
@@ -169,7 +171,7 @@ test('video URL additions reuse an existing URL identity without duplicate recor
 });
 test('video library supports hiding videos and restoring them from the hidden list', () => {
   const library = read('video-library.js');
-  assert.match(library, /videoLibraryHidden/);
+  assert.match(read('video-library-view.js'), /videoLibraryHidden/);
   const editor = read('video-edit-page.js');
   assert.match(editor, /name="hidden" type="checkbox"/);
   assert.match(editor, /elements\.hidden\.checked = current\.hidden/);
@@ -186,9 +188,9 @@ test('video list reuses thumbnail DOM when the visible records do not change', (
 
 test('video editor exposes a persistent 90-degree rotation setting', () => {
   const library = read('video-library.js');
-  assert.match(library, /videoLibraryRotate90Direction/);
+  assert.match(read('video-library-view.js'), /videoLibraryRotate90Direction/);
   assert.match(library, /rotate90/);
-  assert.match(library, /videoLibraryRotate90Direction/);
+  assert.match(read('video-library-view.js'), /videoLibraryRotate90Direction/);
   assert.doesNotMatch(library, /videoLibraryRotateLeftStart|videoLibraryRotateLeftEnd|左90°回転 開始秒|左90°回転 終了秒/);
   assert.match(library, /rotate90Direction\.disabled = !Data\.isDirectVideoUrl\(video\.url\)/);
   assert.match(library, /rotate90Direction: Data\.isDirectVideoUrl\(url\) \? dom\.rotate90Direction\.value : 'none'/);
@@ -250,8 +252,10 @@ test('dedicated video editor records pending sync after local save and returns w
   assert.match(editor, /markLocalChangesPending\(\)/);
   const ordinarySubmit = editor.slice(editor.indexOf("form.addEventListener('submit'"), editor.indexOf("if (!isAddMode) form.querySelector('[data-delete]')"));
   const jsonImport = editor.slice(editor.indexOf("jsonImport.addEventListener('change'"), editor.indexOf("elements.url.addEventListener('change'"));
+  const importUrls = editor.slice(editor.indexOf('async function importUrls'), editor.indexOf("bulkAddButton.addEventListener('click'"));
   assert.doesNotMatch(ordinarySubmit, /await window\.MangaVault\.saveLocalChanges\(\)/);
-  assert.match(jsonImport, /await window\.MangaVault\.saveLocalChanges\(\)/);
+  assert.match(jsonImport, /await importUrls\(parsed, event\.target\)/);
+  assert.match(importUrls, /await window\.MangaVault\.saveLocalChanges\(\)/);
   assert.doesNotMatch(editor, /保存できませんでした。端末の保存状態を確認してください。/);
   assert.match(html, /video-edit-page\.js\?v=[\w-]+/);
 });
@@ -261,8 +265,9 @@ test('video and manga edit paths record durable pending state before local prote
   const library = read('video-library.js');
   const ordinarySubmit = editor.slice(editor.indexOf("form.addEventListener('submit'"), editor.indexOf("if (!isAddMode) form.querySelector('[data-delete]')"));
   const jsonImport = editor.slice(editor.indexOf("jsonImport.addEventListener('change'"), editor.indexOf("elements.url.addEventListener('change'"));
+  const importUrls = editor.slice(editor.indexOf('async function importUrls'), editor.indexOf("bulkAddButton.addEventListener('click'"));
   assert.ok(ordinarySubmit.indexOf('markLocalChangesPending()') < ordinarySubmit.indexOf('writeVideoRecordsAtomically('));
-  assert.ok(jsonImport.indexOf('markLocalChangesPending()') < jsonImport.indexOf('writeVideoRecordsAtomically('));
+  assert.ok(importUrls.indexOf('markLocalChangesPending()') < importUrls.indexOf('writeVideoRecordsAtomically('));
   assert.match(library, /function persistAux[\s\S]*markLocalChangesPending\(\)[\s\S]*writeJson\(FOLDER_KEY/);
   assert.match(library, /function invokeUrlAdd[\s\S]*markLocalChangesPending\(\)[\s\S]*writeJson\(VIDEO_KEY/);
 });

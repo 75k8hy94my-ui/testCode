@@ -116,3 +116,39 @@ URLやデータの実際の操作経路は、必ず入口HTMLと呼出し元か�
 ### 基準テストの修復
 
 2026-11-17の変更前 `main` ではNodeテスト1828件中7件が失敗。4件は古いDOM属性・漫画表紙開始ページ・キャッシュキー構造・SPA履歴形式を固定していたため、現行の振る舞いを守るテストへ更新した。残る3件はReaderが描画前に終了すると `win.clearTimeout` で例外が発生する問題で、未マウント時もタイマー後始末が安全に動くようにした。Vaultデータ形式は変更していない。
+
+
+## 第2次整理：動画ライブラリの責任境界（2026-11-18）
+
+- `video-list-route.js`：唯一の初期化責任主体。VPNゲート、非同期スクリプトと `video-library.css` の先行ロード、画面のmount/detachを管理する。`video-library-view.js` を `video-library.js` より先に評価する。
+- `video-library-view.js`：動画一覧・編集シートの静的DOM構築と要素参照の設定のみを担当する。`setupMarkup(documentRef, dom)` は副作用をDOMに限定し、Vault・保存データ・セッション・VPN判断を持たない。独立した自動起動も行わない。
+- `video-library.css`：動画UI・ページャー・レスポンシブとテーマ別スタイルの正規定義。以前のJS内注入styleを移したもの。Liquid Glass光学エンジンを複製しない。
+- `video-library.js`：動画一覧の状態、編集・保存・同期、描画イベントとアクセス制御を担当。DOM生成は `MangaReaderVideoLibraryView.setupMarkup(document, dom)` を呼び、同じ `dom` を共有する。`init()` の起動主体は従来どおりルートのみ。
+
+### 動的依存関係の注意
+
+ルートの依存順序は `video-data.js` などの共通データ・表示補助→`video-library-view.js`→`video-library.js`。スタイルシートはルートが読み込み完了を待つ。外部ページの `reader.html` にUIモジュールを読み込ませない。保存キー・Vaultデータ表現は今回変更しない。
+
+### 現行 main に存在した回帰テストの更新
+
+作業開始時点の main（bdbb8ceb）で Node テスト1847件中18件が失敗していた。動画編集フォームに追加された埋め込み項目が単体テストの仮想DOMに存在せず14件が同じTypeErrorとなる問題と、埋め込み再生や一括登録時の正規共有処理へ移動したコードを古い文字列配置で検査していたテストを検出。フォーム項目と実装の正規経路をテストで保護する。動画データ形式や保存処理自体には変更を加えない。
+
+## 逐条集ページの表示責任の分離（第2次整理）
+
+- `statutes.html`：ページ入口・認証/アクセスゲート・コンテンツのHTML、外部モジュールの読み込み順序を維持する。
+- `statutes-page.css`：従来の単一インラインstyleをそのまま移した逐条集専用レイアウト・レスポンシブCSS。共通Liquid Glassは既存 `liquid-glass.css` / `liquid-glass-engine.js` が担当する。
+- `statutes-page-interactions.js`：旧HTML末尾の連続4個のIIFEを順序を変えず移した、コンテキストメニュー抑制、スマホペイン比率、モバイルナビの配置、上部ヘッダー計測。永続データの書込みは表示比率 `statutes:phone-pane-ratio` のみ。
+- `statutes-vault.js`：独立暗号化の正規所有者。今回の移動はそのAPI、保存内容・読込順を変更しない。
+
+これらは永続化処理とは別の表示責任であり、HTMLのスタイルやUI操作を修正する場合は上記2つを優先して確認する。
+
+## 実装から更新できる全ファイル依存関係インベントリ
+
+最新のリポジトリで `npm run architecture:report` を実行すると、HTMLのscript/style参照、JSに埋め込まれた固定文字列の動的ロード、ES/CJSのimport、グローバルAPIの定義候補を自動的に表示する。`npm run architecture:report -- --json` はファイル別にイベントの発行/購読、storage識別子、明示的importの循環候補も出す。静的な生成レポートを古い状態のまま正本として残さない方式とする。
+
+**限界：** グローバルAPI名やイベント、storageキーは文字列からの抽出であり、実際の呼出し・存続期間や保存責任を証明しない。循環解析も明示的なES/CJS依存のみであり、classic scriptや動的URLを介した依存を含まない。疑わしい関係は実行経路と回帰テストで確認する。重要な3つの公開singleton（動画ルート、動画ライブラリ、動画ビュー）は `verify:architecture` で明示的な定義重複を防ぐ。
+
+## 高リスク領域の現在の判断資料
+
+- [Readerの外部ハッシュ形式](reader-hash-embedding.md)：同一オリジン/クロスオリジン制約、矢印キー・ハッシュ補正の所有者、有限タイマーと終了処理。
+- [Vault・本棚・プロフィールの再構成判断](refactor-risk-boundaries.md)：保存・暗号・CAS・tombstoneの責任と、今回機械的な分割を見送った理由。

@@ -51,7 +51,7 @@ test('new videos invalidate saved ordering and storage event regenerates after m
 });
 
 test('library adds a Shorts action beside add and the page uses only direct-linked videos', () => {
-  assert.match(read('video-library.js'), /videoLibraryShorts/);
+  assert.match(read('video-library-view.js'), /videoLibraryShorts/);
   assert.match(read('video-library.js'), /video-shorts\.html/);
   assert.match(page, /isDirectVideoUrl/);
 });

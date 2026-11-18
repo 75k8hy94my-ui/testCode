@@ -17,6 +17,29 @@
     let rootElement = null;
     let bootPromise = null;
     let helperPromise = null;
+    let stylesheetPromise = null;
+    // Load the route-scoped stylesheet before mounting any video UI. The
+    // Promise is owned by the route lifecycle, never by the library or a timer.
+    function ensureStylesheet() {
+      if (stylesheetPromise) return stylesheetPromise;
+      if (!documentRef.head) return Promise.resolve(); // Minimal test documents.
+      stylesheetPromise = new Promise((resolve, reject) => {
+        const existing = documentRef.getElementById('videoLibraryStyles');
+        if (existing?.dataset?.loaded === '1') { resolve(); return; }
+        const link = existing || documentRef.createElement('link');
+        const loaded = () => { link.dataset.loaded = '1'; resolve(); };
+        const failed = (error) => { link.remove?.(); reject(error); };
+        link.addEventListener('load', loaded, { once: true });
+        link.addEventListener('error', failed, { once: true });
+        if (!existing) {
+          link.id = 'videoLibraryStyles';
+          link.rel = 'stylesheet';
+          link.href = 'video-library.css?v=20261118-architecture';
+          documentRef.head.appendChild(link);
+        }
+      }).catch((error) => { stylesheetPromise = null; throw error; });
+      return stylesheetPromise;
+    }
     // Detaching or restarting invalidates any earlier asynchronous startup.
     let activation = 0;
     const canReadProtectedData = () => !!deps.mediaAccess && typeof deps.mediaAccess.canReadProtectedData === 'function' && deps.mediaAccess.canReadProtectedData() === true;
@@ -25,6 +48,7 @@
       if (!bootPromise) {
         bootPromise = (async () => {
           await deps.loadMediaGate();
+          await ensureStylesheet();
           await deps.loadScript('video-data.js?v=20261117-embed-routing', 'spaVideoData');
           await deps.loadScript('manga-list-pagination-events.js?v=20261012-video-pagination', 'spaMangaPaginationEvents');
           await deps.loadScript('video-library-pagination.js?v=20261012-video-pagination', 'spaVideoLibraryPagination');
@@ -33,6 +57,7 @@
           await deps.loadScript('video-card.js?v=20261026-url-bookmarks', 'spaVideoCard');
           await deps.loadScript('video-custom-properties.js?v=20261012-video-custom-properties', 'spaVideoCustomProperties');
           await deps.loadScript('video-custom-property-store.js?v=20261012-video-custom-properties', 'spaVideoCustomPropertyStore');
+          await deps.loadScript('video-library-view.js?v=20261118-architecture', 'spaVideoLibraryView');
           await deps.loadScript('video-library.js?v=20261117-embed-routing', 'spaVideoLibrary');
         })().catch((error) => {
           bootPromise = null;

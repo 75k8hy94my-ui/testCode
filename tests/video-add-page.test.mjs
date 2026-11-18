@@ -33,7 +33,7 @@ function startEditor({ mode = 'add', allowed = true, videos = [], meta = {}, pro
     };
     if (tag === 'form') {
       node.requestSubmit = () => node.events.submit({ preventDefault() {} });
-      const fields = ['url', 'title', 'folder', 'alternateUrls', 'status', 'tags', 'memo', 'favorite', 'hidden', 'rotate', 'service', 'legacyId', 'thumbnail', 'thumbnailTime'];
+      const fields = ['url', 'title', 'folder', 'alternateUrls', 'status', 'tags', 'memo', 'embedPage', 'favorite', 'hidden', 'rotate', 'service', 'legacyId', 'thumbnail', 'thumbnailTime'];
       node.elements = Object.fromEntries(fields.map((key) => [key, element('input')]));
       node.querySelector = (selector) => {
         if (!nodes.has(selector)) nodes.set(selector, element('control'));
