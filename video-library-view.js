@@ -1,7 +1,7 @@
 (function (root) {
   'use strict';
 
-  // Owns only DOM construction and element references, never list data or sync.
+  // Owns DOM construction, card presentation and element references, never list persistence or sync.
   // Called exclusively from MangaReaderVideoLibrary.init() after route boot.
   function setupMarkup(documentRef, dom) {
     const document = documentRef;

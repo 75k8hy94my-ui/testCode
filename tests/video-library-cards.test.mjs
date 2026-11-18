@@ -72,7 +72,7 @@ test('video card factory preserves metadata, bookmark embed routing, and library
   assert.equal(card.dataset.videoId, 'a');
   assert.equal(config.bookmark, true);
   assert.equal(config.openHref, null); // embedded bookmarks route through the player
-  assert.deepEqual(config.customLabels, ['Rating: 4']);
+  assert.deepEqual([...config.customLabels], ['Rating: 4']);
   assert.deepEqual(config.tags, ['tag']);
   assert.ok(config.metadata.includes('Folder'));
   assert.ok(config.metadata.includes('視聴中'));
@@ -115,4 +115,12 @@ test('video library has one canonical filtering path for render and return navig
   assert.match(source, /View\.createCardRenderer/);
   assert.match(source, /function createCard\(video\) \{ return cardRenderer\.createCard\(video\); \}/);
   assert.doesNotMatch(read('video-library-view.js'), /\b(?:localStorage|sessionStorage|MangaVault|markLocalChangesPending|runVaultSync)\b/);
+});
+
+test('global video events skip detached list presentation while preserving pending sync', () => {
+  const source = read('video-library.js');
+  assert.match(source, /function isListMounted\(\) \{ return dom\.section\?\.isConnected === true; \}/);
+  assert.match(source, /if \(isListMounted\(\)\) render\(\);\s*resumePendingLocalSync\(\)/);
+  assert.match(source, /if \(!canReadProtectedData\(\) \|\| !dom\.results \|\| !isListMounted\(\)\) return/);
+  assert.match(source, /event\.detail\?\.page !== 'video' \|\| !isListMounted\(\)/);
 });

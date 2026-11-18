@@ -145,6 +145,8 @@
     history.replaceState(history.state, '', location.pathname + (params.toString() ? '?' + params : '') + location.hash);
   }
 
+  function isListMounted() { return dom.section?.isConnected === true; }
+
   function canReadProtectedData() {
     return !!mediaAccess && typeof mediaAccess.canReadProtectedData === 'function' && mediaAccess.canReadProtectedData() === true;
   }
@@ -291,7 +293,8 @@
         await vault.recordSyncDeletion(paths, commit);
       }
       loadLibraryState();
-      render();
+      // Finish the already-started storage migration, but never paint a detached route.
+      if (isListMounted()) render();
       scheduleVaultSync();
     } catch (error) {
       console.error('Video URL migration failed; original records retained where possible', error);
@@ -876,7 +879,7 @@
     eventsBound = true;
     dom.search.addEventListener('input', () => { clearReturnIntent(); state.query = dom.search.value; render(); });
     document.addEventListener('testcode-context-search-change', (event) => {
-      if (event.detail?.page !== 'video') return;
+      if (event.detail?.page !== 'video' || !isListMounted()) return;
       clearReturnIntent();
       state.query = String(event.detail.query || '');
       dom.search.value = state.query;
@@ -934,7 +937,10 @@
     dom.sheet.addEventListener('click', (event) => { if (event.target === dom.sheet) return; });
     window.addEventListener('online', resumePendingLocalSync);
     document.addEventListener('manga-reader-vpn-status', () => {
-      if (canReadProtectedData()) { render(); resumePendingLocalSync(); }
+      if (!canReadProtectedData()) return;
+      // Global listeners survive SPA transitions, but detached UI must not redraw.
+      if (isListMounted()) render();
+      resumePendingLocalSync(); // Encrypted queued sync remains permitted off-route.
     });
     window.addEventListener('popstate', () => { if (!(history.state && history.state.videoLibrarySheet)) setSheetVisible(false); });
   }
@@ -985,7 +991,7 @@
   }
 
   function refreshFromStorage() {
-    if (!canReadProtectedData() || !dom.results) return;
+    if (!canReadProtectedData() || !dom.results || !isListMounted()) return;
     loadLibraryState();
     render();
   }
