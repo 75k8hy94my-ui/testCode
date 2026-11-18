@@ -116,3 +116,15 @@ URLやデータの実際の操作経路は、必ず入口HTMLと呼出し元か�
 ### 基準テストの修復
 
 2026-11-17の変更前 `main` ではNodeテスト1828件中7件が失敗。4件は古いDOM属性・漫画表紙開始ページ・キャッシュキー構造・SPA履歴形式を固定していたため、現行の振る舞いを守るテストへ更新した。残る3件はReaderが描画前に終了すると `win.clearTimeout` で例外が発生する問題で、未マウント時もタイマー後始末が安全に動くようにした。Vaultデータ形式は変更していない。
+
+
+## 第2次整理：動画ライブラリの責任境界（2026-11-18）
+
+- `video-list-route.js`：唯一の初期化責任主体。VPNゲート、非同期スクリプトと `video-library.css` の先行ロード、画面のmount/detachを管理する。`video-library-view.js` を `video-library.js` より先に評価する。
+- `video-library-view.js`：動画一覧・編集シートの静的DOM構築と要素参照の設定のみを担当する。`setupMarkup(documentRef, dom)` は副作用をDOMに限定し、Vault・保存データ・セッション・VPN判断を持たない。独立した自動起動も行わない。
+- `video-library.css`：動画UI・ページャー・レスポンシブとテーマ別スタイルの正規定義。以前のJS内注入styleを移したもの。Liquid Glass光学エンジンを複製しない。
+- `video-library.js`：動画一覧の状態、編集・保存・同期、描画イベントとアクセス制御を担当。DOM生成は `MangaReaderVideoLibraryView.setupMarkup(document, dom)` を呼び、同じ `dom` を共有する。`init()` の起動主体は従来どおりルートのみ。
+
+### 動的依存関係の注意
+
+ルートの依存順序は `video-data.js` などの共通データ・表示補助→`video-library-view.js`→`video-library.js`。スタイルシートはルートが読み込み完了を待つ。外部ページの `reader.html` にUIモジュールを読み込ませない。保存キー・Vaultデータ表現は今回変更しない。

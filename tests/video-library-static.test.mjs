@@ -21,7 +21,7 @@ test('recommendations bootstrap loads the video enhancement after existing reade
 });
 
 test('video library provides search filters sorting view modes folders and editor hooks', () => {
-  const source = read('video-library.js');
+  const source = read('video-library.js') + read('video-library-view.js');
   for (const marker of ['videoLibrarySearch','videoLibraryQuick','videoLibraryFolder','videoLibraryTag','videoLibraryService','videoLibrarySort','videoLibraryView','videoLibrarySheet','videoLibraryFolders']) {
     assert.match(source, new RegExp(marker));
   }
@@ -69,7 +69,7 @@ test('video cards delegate thumbnail rendering to the shared renderer', () => {
 });
 
 test('video add and edit fields use stronger contrast, spacing, and visible focus treatment', () => {
-  const library = read('video-library.js');
+  const library = read('video-library.css');
   assert.match(library, /\.vl-field\{padding:10px 11px 11px/);
   assert.match(library, /\.vl-field label\{display:block;color:var\(--text\)/);
   assert.match(library, /\.vl-field:focus-within/);
@@ -77,7 +77,7 @@ test('video add and edit fields use stronger contrast, spacing, and visible focu
 });
 
 test('enhanced editor presents URL as the only playback locator while legacy fields stay internal', () => {
-  const library = read('video-library.js');
+  const library = read('video-library-view.js');
   const bridge = read('video-routing-fix.js');
   assert.match(library, /id=["']videoLibraryUrl["']/);
   assert.match(bridge, /videoLibraryLegacyService/);
@@ -89,9 +89,9 @@ test('enhanced editor presents URL as the only playback locator while legacy fie
 
 test('video editor locks URL until the explicit edit button and exposes one-click existing tags', () => {
   const library = read('video-library.js');
-  assert.match(library, /videoLibraryUrlEdit/);
+  assert.match(read('video-library-view.js'), /videoLibraryUrlEdit/);
   assert.match(library, /readOnly/);
-  assert.match(library, /videoLibrarySuggestedTags/);
+  assert.match(read('video-library-view.js'), /videoLibrarySuggestedTags/);
   assert.match(library, /suggestedTag\.addEventListener\(['"]click['"]/);
 });
 
@@ -110,8 +110,8 @@ test('adding a video navigates to the dedicated form with opaque surfaces', () =
   const html = read('video-edit.html');
   assert.match(library, /video-edit\.html\?mode=add&return=list/);
   assert.doesNotMatch(library, /dom\.add\.addEventListener\('click', \(\) => openEditor\(null\)/);
-  assert.match(library, /#videoLibrarySheet\{--bg-soft:#fff;--panel:#fff/);
-  assert.match(library, /html\[data-theme="dark"\] #videoLibrarySheet\{--bg-soft:#10141c/);
+  assert.match(read('video-library.css'), /#videoLibrarySheet\{--bg-soft:#fff;--panel:#fff/);
+  assert.match(read('video-library.css'), /html\[data-theme="dark"\] #videoLibrarySheet\{--bg-soft:#10141c/);
   assert.match(html, /\.videoEditForm\{display:grid;gap:13px;padding:20px;[^}]*background:var\(--panel,#fff\)/);
   assert.match(editor, /const isAddMode = new URLSearchParams\(location\.search\)\.get\('mode'\) === 'add'/);
   assert.match(editor, /isAddMode \? \[nextBase, \.\.\.savedVideos\]/);
