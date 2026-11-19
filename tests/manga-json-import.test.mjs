@@ -85,3 +85,63 @@ test('optional custom image-page ranges survive JSON validation and reject inver
   assert.throws(()=>importer.parse(json([{...item,pageRangeStart:-1}])),/1～2000/);
   assert.equal(importer.parse(json([item]))[0].pageRangeStart,undefined);
 });
+
+test('JSON import accepts arbitrary HTTPS image filenames as one ordered explicit page list', () => {
+  const pages = [
+    'https://wimg.rule34.xxx/thumbnails/2116/thumbnail_e962f268c244fd66e0501d459fa6bafd.jpg?18516056',
+    'https://wimg.rule34.xxx/thumbnails/106/thumbnail_0edd0973ece6a7a2dc79cf9e065dfc80.jpg?18185117',
+    'https://img.example.org/another-picture.png'
+  ];
+  const result = importer.parse(json([{...item, url: undefined, pages}]))[0];
+  assert.equal(result.url, pages[0]);
+  assert.deepEqual(Array.from(result.pages), pages);
+  assert.notEqual(result.pages, pages);
+  assert.equal(importer.MAX_PAGES, 2000);
+});
+
+test('JSON import prevents malformed explicit pages, mixing range and pages, and first-page mismatch', () => {
+  const pages = ['https://img.example.org/a.jpg', 'https://img.example.org/b.png?cache=1'];
+  for (const change of [
+    { pages: [] },
+    { pages: Array(2001).fill(pages[0]) },
+    { pages: [pages[0], pages[0]] },
+    { pages: ['http://img.example.org/a.jpg'] },
+    { pages: ['https://img.example.org/no-extension'] },
+    { pages, pageRangeStart: 2 },
+    { pages, pageRangeEnd: 10 },
+    { pages, url: 'https://img.example.org/wrong.jpg' }
+  ]) {
+    assert.throws(() => importer.parse(json([{ ...item, url: undefined, ...change }])));
+  }
+});
+
+test('JSON import register persists explicit pages and a versioned reader manifest', () => {
+  function el() {
+    return {
+      children: [], hidden: true, textContent: '',
+      append(...items) { this.children.push(...items); },
+      appendChild(child) { this.children.push(child); },
+      prepend(child) { this.children.unshift(child); },
+      replaceChildren(...items) { this.children = items; },
+      addEventListener() {},
+    };
+  }
+  const elements = new Map(['#mangaJsonImportDialog', '#mangaJsonImportRows', '#mangaJsonImportStatus'].map(id => [id, el()]));
+  const documentRef = { querySelector: key => elements.get(key), createElement: () => el() };
+  let state = { savedItems: [], authorCards: [] };
+  const importerUI = importer.create({
+    documentRef, getState: () => state, setState: next => { state = next; },
+    authorSync: { synchronize: ({ authorCards }) => ({ authorCards, changed: false }) },
+    persistItems: () => true, persistAuthorCards: () => true, render: () => {},
+    createId: () => 'test-id', now: () => 123
+  });
+  const pages = ['https://example.com/a.jpg', 'https://example.com/x.png'];
+  importerUI.open(importer.parse(json([{ ...item, url: pages[0], pages }])));
+  const result = importerUI.register();
+  assert.equal(result.ok, true);
+  assert.equal(result.count, 1);
+  assert.deepEqual(Array.from(state.savedItems[0].pages), pages);
+  assert.equal(state.savedItems[0].pageManifest.version, 1);
+  assert.deepEqual(Array.from(state.savedItems[0].pageManifest.pages), pages);
+  assert.equal(state.savedItems[0].pageManifest.splitSpreads, false);
+});
