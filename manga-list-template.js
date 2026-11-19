@@ -11,7 +11,7 @@
       <section id="mangaJsonImportDialog" role="dialog" aria-modal="true" aria-labelledby="mangaJsonImportTitle" hidden style="position:fixed;inset:0;z-index:1210;background:#0009;overflow:auto;padding:16px;">
         <div style="width:min(900px,100%);margin:4vh auto;background:var(--panel,#fff);color:inherit;border-radius:14px;padding:20px;display:grid;gap:12px;box-shadow:0 16px 48px #0005;">
           <h2 id="mangaJsonImportTitle" style="margin:0;">漫画のJSONを読み込む</h2>
-          <p style="margin:0;">作品のタイトル・作者・保存URLを確認してから登録します。重複作品は初期状態で選択解除されています。</p>
+          <p style="margin:0;">作品のタイトル・作者・保存URLとページ数を確認してから登録します。JSONのpages配列で連番ではない画像も1冊にできます。重複作品は初期状態で選択解除されています。</p>
           <div id="mangaJsonImportRows" style="display:grid;gap:12px;max-height:65vh;overflow:auto;"></div>
           <p id="mangaJsonImportStatus" role="status" aria-live="polite" style="margin:0;min-height:1.5em;"></p>
           <div style="display:flex;justify-content:flex-end;gap:8px;">
