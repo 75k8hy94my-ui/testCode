@@ -40,10 +40,10 @@ test('all relevant entry pages reference range-aware assets', () => {
   const add = read('add.html');
   const reader = read('reader.html');
   const manga = read('manga-list-route.js');
-  assert.match(add, /manga-source-type\.js\?v=20261115-page-range/);
+  assert.match(add, /manga-source-type\.js\?v=20261119-remote-pages/);
   assert.match(add, /media-add\.js\?v=20261115-page-range/);
-  assert.match(reader, /reader-runtime\.js\?v=20261115-hash-scroll-stability/);
-  assert.match(reader, /reader-page-source\.js\?v=20261115-page-range/);
+  assert.match(reader, /reader-runtime\.js\?v=20261119-remote-pages/);
+  assert.match(reader, /reader-page-source\.js\?v=20261119-remote-pages/);
   assert.match(manga, /manga-spreadsheet\.js\?v=20261115-page-range/);
-  assert.match(manga, /manga-item-editor\.js\?v=20261115-page-range/);
+  assert.match(manga, /manga-item-editor\.js\?v=20261119-remote-pages/);
 });
