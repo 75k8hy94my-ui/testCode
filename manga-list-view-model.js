@@ -1,7 +1,12 @@
 (function (root) {
   'use strict';
 
+  function isPreviewOnly(item) {
+    return item?.imageQuality === 'preview';
+  }
+
   root.MangaListViewModel = Object.freeze({
+    isPreviewOnly,
     derive(input) {
       const {
         items, folders, authorCards, videos, folderView, seriesView, authorView, filters,
