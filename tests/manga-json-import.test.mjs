@@ -145,3 +145,54 @@ test('JSON import register persists explicit pages and a versioned reader manife
   assert.deepEqual(Array.from(state.savedItems[0].pageManifest.pages), pages);
   assert.equal(state.savedItems[0].pageManifest.splitSpreads, false);
 });
+
+test('preview-only export metadata is validated and retained in saved works', () => {
+  function el() {
+    return {
+      children: [], hidden: true, textContent: '',
+      append(...items) { this.children.push(...items); },
+      appendChild(child) { this.children.push(child); },
+      prepend(child) { this.children.unshift(child); },
+      replaceChildren(...items) { this.children = items; },
+      addEventListener() {}
+    };
+  }
+  const elements = new Map(['#mangaJsonImportDialog', '#mangaJsonImportRows', '#mangaJsonImportStatus'].map(id => [id, el()]));
+  let state = { savedItems: [], authorCards: [] };
+  const ui = importer.create({
+    documentRef: { querySelector: key => elements.get(key), createElement: () => el() },
+    getState: () => state, setState: next => { state = next; },
+    authorSync: { synchronize: ({ authorCards }) => ({ authorCards, changed: false }) },
+    persistItems: () => true, persistAuthorCards: () => true, render: () => {},
+    createId: () => 'preview-test', now: () => 123
+  });
+  const pages = ['https://img.pawchive.pw/thumbnail/data/aa/bb/one.png', 'https://img.pawchive.pw/thumbnail/data/aa/bb/two.jpg'];
+  const [preview] = importer.parse(json([{ ...item, url: pages[0], pages, imageQuality: 'preview', previewCount: 2 }]));
+  assert.equal(preview.imageQuality, 'preview');
+  assert.equal(preview.previewCount, 2);
+  ui.open([preview]);
+  const result = ui.register();
+  assert.equal(result.ok, true);
+  assert.equal(state.savedItems[0].imageQuality, 'preview');
+  assert.equal(state.savedItems[0].previewCount, 2);
+  assert.deepEqual(Array.from(state.savedItems[0].pageManifest.pages), pages);
+});
+
+test('preview provenance rejects inconsistent counts and preserves legacy imports', () => {
+  const pages = ['https://img.example.org/a.jpg', 'https://img.example.org/b.jpg'];
+  const legacy = importer.parse(json([item]))[0];
+  assert.equal(legacy.imageQuality, undefined);
+  assert.equal(legacy.previewCount, undefined);
+  for (const invalid of [
+    { imageQuality: 'unknown', previewCount: 0 },
+    { imageQuality: 'original', previewCount: 1 },
+    { imageQuality: 'preview', previewCount: 1 },
+    { imageQuality: 'mixed', previewCount: 0 },
+    { imageQuality: 'mixed', previewCount: 2 },
+    { imageQuality: 'preview', previewCount: -1 },
+    { previewCount: 2 },
+  ]) assert.throws(() => importer.parse(json([{ ...item, url: pages[0], pages, ...invalid }])));
+  const mixed = importer.parse(json([{ ...item, url: pages[0], pages, imageQuality: 'mixed', previewCount: 1 }]))[0];
+  assert.equal(mixed.imageQuality, 'mixed');
+  assert.equal(mixed.previewCount, 1);
+});

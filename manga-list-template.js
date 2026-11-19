@@ -34,6 +34,7 @@
         <button class="ctrlBtn" id="bulkEditBtn" type="button">一括編集</button>
         <button class="ctrlBtn" id="undoBulkEditBtn" type="button" style="display:none;">もとに戻す</button>
         <button class="ctrlBtn" id="filterBtn" type="button">絞り込み</button>
+        <button class="ctrlBtn" id="previewWorksToggleBtn" type="button" aria-pressed="false" title="プレビュー画像のみの作品を本棚に表示するか切り替えます">プレビュー作品を表示</button>
         <select class="ctrlBtn" id="shelfSortSelect" aria-label="本棚の並び順">
           <option value="added-desc">新しい順</option>
           <option value="title-asc">タイトル順</option>

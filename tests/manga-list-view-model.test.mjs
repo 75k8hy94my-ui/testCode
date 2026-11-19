@@ -128,3 +128,23 @@ test('mobile page navigation remains visible and all cards render from one page 
   assert.match(pageTurn, /runtime\.renderSavedList\(delta\)/);
   assert.doesNotMatch(pageTurn, /scrollIntoView|scrollTo|scrollTop/);
 });
+
+test('preview-only works are hidden by default and can be shown without affecting originals', () => {
+  const onlyPreview = { id: 'preview', title: 'Preview', folderId: 'folder', imageQuality: 'preview', previewCount: 2 };
+  const mixed = { id: 'mixed', title: 'Mixed', folderId: 'folder', imageQuality: 'mixed', previewCount: 1 };
+  const original = { id: 'original', title: 'Original', folderId: 'folder', imageQuality: 'original', previewCount: 0 };
+  const legacy = { id: 'legacy', title: 'Legacy', folderId: 'folder' };
+  const model = context.MangaListViewModel;
+  assert.equal(model.isPreviewOnly(onlyPreview), true);
+  assert.equal(model.isPreviewOnly(mixed), false);
+  assert.equal(model.isPreviewOnly(original), false);
+  assert.equal(model.isPreviewOnly(legacy), false);
+  const selected = [onlyPreview, mixed, original, legacy].filter(item => !model.isPreviewOnly(item));
+  assert.deepEqual(selected.map(it => it.id), ['mixed', 'original', 'legacy']);
+  assert.deepEqual([onlyPreview, mixed, original, legacy].filter(item => true).map(it => it.id),
+    ['preview', 'mixed', 'original', 'legacy']);
+  assert.match(route, /showPreviewWorks:\s*false/);
+  assert.match(route, /mangaReaderShowPreviewWorks/);
+  assert.match(route, /!MangaListViewModel\.isPreviewOnly\(item\)/);
+  assert.match(read('manga-list-template.js'), /previewWorksToggleBtn/);
+});
