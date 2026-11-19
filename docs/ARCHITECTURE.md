@@ -37,7 +37,7 @@ URLやデータの実際の操作経路は、必ず入口HTMLと呼出し元か�
 | --- | --- |
 | 本棚の表示・カード・並べ替え・ページング・編集 | `manga-list-route.js` → `manga-list-*.js`、`manga-item-editor.js`、`manga-spreadsheet.js` |
 | 漫画登録JSON（連番画像・個別ページURL配列） | `manga-json-import.js`、`manga-list-route.js`。個別URL配列は `pages` と `pageManifest` に保存し、Readerでは `reader-page-source.js` がその順序を尊重する |
-| ReaderのURL・読み込み・ページ進捗 | `reader-target.js`、`reader-page-source.js`、`reader-runtime.js`、`reader-progress-repository.js` |
+| ReaderのURL・読み込み・ページ進捗 | `reader-target.js`、`reader-page-source.js`、`reader-hitomi-source.js`、`reader-runtime.js`、`reader-progress-repository.js` |
 | 動画一覧・情報編集 | `video-list-route.js`、`video-library.js`、関連する `video-*.js` |
 | ページ遷移・プロフィール・共通ヘッダー | `home-profile-spa.js`、`app-global-shell.js`、`profile-menu.js` |
 | Liquid Glass 表現 | `liquid-glass-engine.js`（共通の光学表現）、`liquid-glass.css`、対象コンポーネントのスタイル |
@@ -180,3 +180,11 @@ URLやデータの実際の操作経路は、必ず入口HTMLと呼出し元か�
 静的ホスティングではロードするスクリプトのバージョン付きURLを変更時に更新する。今回のカード所有者の再構成は動画ルートのView/library URLと、そのルートを読むSPA、および4つのSPA入口HTMLを同時に更新して、旧キャッシュとのバージョン混在を抑制した。
 
 動画永続化では `vault-payload.js` のキー定義を使い、URL統合は同じスナップショットから対象IDと保存内容を計算する。Vaultの暗号化ジャーナルを公開する直前にアクセス権・元データ・既存削除意図を再照合し、競合時は最新状態から計画を作り直す。専用編集、プレーヤー、一覧の対象限定メタデータ更新とカスタムプロパティストアは、同一オリジンの短い保存ロックを共有する。経路別の責任と適用範囲は [動画アーキテクチャ](VIDEO-ARCHITECTURE.md#persistence-and-concurrent-writers) を参照。
+
+## 外部漫画の動的ページ取得（2026-11-19）
+
+- `https://hitomi.la/reader/<ID>.html`、`/imageset/...-<ID>.html`、`/galleries/<ID>.html`（末尾ハッシュなし）を独立Readerで一時的なリモートページ一覧として解決する。末尾 `#1` の既存iframe方式は変更しない。
+- `reader-hitomi-source.js` は外部サイトの `gg.js` と `galleries/<ID>.js` を opaque-origin のsandbox iframe（`allow-scripts` のみ）で読み込み、CDN画像URLを生成する。外部スクリプトをtestCodeの主文書で実行しない。`postMessage` はsource、opaque origin、nonce、ページURL形式を検証する。サイト側の公開JavaScriptの形式に依存する。
+- `reader-page-source.js` は明示的に登録済みのページ一覧を優先し、それがない場合だけ動的に解決する。戻り値の `volatile` を確認し、`reader-runtime.js` は画像URL一覧を本棚・Vault・Supabaseに書き戻さない。作品の元URLと読書位置だけ従来どおり保存する。
+- `manga-source-type.js` と `manga-item-editor.js` は外部ギャラリーURLのページ範囲指定を許可する。画像本体は既存リーダーのメモリ内プリロードを使用する。
+- 配信元によるスクリプト埋め込み制限、画像のホットリンク拒否、サイト側のJS形式変更時は表示できない場合がある。別ドメインへのプロキシ転送・認証回避は行わない。Chrome/Firefox/Safariの実機受入れ確認は別途必要。

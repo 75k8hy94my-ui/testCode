@@ -179,7 +179,8 @@
           return keys.map((key) => records[key]).find((value) => value && typeof value === 'object' && !Array.isArray(value)) || null;
         } catch (_) { return null; }
       } });
-      pageSource = win.ReaderPageSourceFactory.create({ legacyResolver });
+      const dynamicResolver = win.ReaderHitomiSourceFactory?.create?.({ documentRef: doc, windowRef: win });
+      pageSource = win.ReaderPageSourceFactory.create({ legacyResolver, dynamicResolver });
     }
     pageTransition = win?.ReaderPageTransitionFactory?.create
       ? win.ReaderPageTransitionFactory.create({ initialPage: page, commit: commitPreparedPage })
@@ -1290,7 +1291,8 @@
     async function mountSingleSource(item, desiredPage) {
       currentItem = item;
       hashPageBase = win.MangaSourceType?.getHashPageBase(item) || '';
-      const embeddedUrl = hashPageBase ? '' : win.MangaSourceType?.getEmbedUrl(item) || '';
+      const isRemoteGallery = !!win.ReaderHitomiSourceFactory?.galleryIdFromUrl?.(item.url);
+      const embeddedUrl = hashPageBase || isRemoteGallery ? '' : win.MangaSourceType?.getEmbedUrl(item) || '';
       split = Boolean(item.splitSpreads);
       updateControls();
       page = embeddedUrl ? 1 : (Number.isSafeInteger(desiredPage) && desiredPage > 0 ? desiredPage : resumePage(item));
@@ -1361,11 +1363,19 @@
       const discoveryController = typeof AbortControllerRef === 'function' ? new AbortControllerRef() : null;
       activeDiscoveryController = discoveryController;
       if (discoveryController) lifecycle.own({ destroy: () => discoveryController.abort() });
-      const resolved = await pageSource.resolve(item, { signal: discoveryController?.signal });
+      let resolved;
+      try {
+        resolved = await pageSource.resolve(item, { signal: discoveryController?.signal });
+      } catch (error) {
+        if (!destroyed && generationAtStart === generation) status('外部ページ情報を取得できませんでした: ' + (error?.message || error));
+        throw error;
+      } finally {
+        if (activeDiscoveryController === discoveryController) activeDiscoveryController = null;
+      }
       if (destroyed || generationAtStart !== generation) return;
       pageUrls = resolved.urls;
       if (!pageUrls.length) { status('画像を見つけられませんでした。'); return false; }
-      if (sourceCandidates.length < 2 && !item.autoDetectedDirectory && (resolved.migrated || !item.pageManifest)) {
+      if (!resolved.volatile && sourceCandidates.length < 2 && !item.autoDetectedDirectory && (resolved.migrated || !item.pageManifest)) {
         currentItem = repository.saveItem(resolved.item) || resolved.item;
       }
       page = Math.min(resume, displayCount());

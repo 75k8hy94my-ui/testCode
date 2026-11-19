@@ -38,7 +38,7 @@
   function supportsRange(url) {
     try {
       const parsed = new URL(url);
-      return String(url).endsWith('#1') ||
+      return String(url).endsWith('#1') || (typeof root.MangaSourceType?.isHitomiGalleryUrl === 'function' && root.MangaSourceType.isHitomiGalleryUrl(url)) ||
         /\/[^/]*\d+[^/]*\.(?:jpe?g|png|webp|avif|gif)$/i.test(parsed.pathname);
     } catch (_) { return false; }
   }
@@ -68,7 +68,7 @@
     result.url = result.sourceUrls[0] || '';
     const range = parseRange(input.pageRangeStart, input.pageRangeEnd);
     if ((range.start !== 1 || range.end != null) && !result.sourceUrls.some(supportsRange))
-      throw new Error('ページ範囲は #1 形式または 1.webp などの連番画像URLに指定してください。');
+      throw new Error('ページ範囲は #1・連番画像・対応する外部漫画URLに指定してください。');
     delete result.pageRangeStart;
     delete result.pageRangeEnd;
     if (range.start !== 1) result.pageRangeStart = range.start;

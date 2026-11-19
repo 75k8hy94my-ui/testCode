@@ -3,12 +3,12 @@
 
   const STYLESHEET_URL = 'manga-list.css?v=20261115-touch-sheet-v2';
   const SCRIPT_URLS = [
-    ['manga-source-type.js?v=20261115-page-range', 'mangaSourceType'],
+    ['manga-source-type.js?v=20261119-remote-pages', 'mangaSourceType'],
     ['manga-list-template.js?v=20261119-preview-visibility', 'mangaRouteTemplate'],
     ['manga-import-author-sync.js?v=20261007-momon-import', 'mangaImportAuthorSync'],
     ['manga-json-import.js?v=20261119-preview-visibility', 'mangaJsonImport'],
     ['manga-spreadsheet.js?v=20261115-page-range', 'mangaSpreadsheet'],
-    ['manga-item-editor.js?v=20261115-page-range', 'mangaItemEditor'],
+    ['manga-item-editor.js?v=20261119-remote-pages', 'mangaItemEditor'],
     ['manga-card-context-menu.js?v=20261115-touch-sheet', 'mangaCardContextMenu'],
     ['image-transfer-settings.js?v=20261004-encrypted-image-import', 'encryptedImageImportSettings'],
     ['image-remote-access.js?v=20261004-encrypted-image-import', 'encryptedImageImportRemoteAccess'],

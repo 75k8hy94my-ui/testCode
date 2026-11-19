@@ -109,7 +109,7 @@
       return { version: 1, pages, splitSpreads: Boolean(item?.splitSpreads) };
     } });
   }
-  function create({ legacyResolver } = {}) {
+  function create({ legacyResolver, dynamicResolver } = {}) {
     async function resolve(item, options = {}) {
       if (!item || typeof item !== 'object') throw new TypeError('saved item required');
       const manifest = item.pageManifest;
@@ -142,6 +142,12 @@
           urls: savedUrls.slice(),
           migrated: requiresRepair,
         };
+      }
+      // Remote gallery page URLs must be resolved afresh on every opening.
+      // Never write these ephemeral signed/CDN URLs into a saved manifest.
+      if (dynamicResolver?.supports?.(item.url)) {
+        const urls = await dynamicResolver.resolve(item, options);
+        return { item, manifest: null, urls, migrated: false, volatile: true };
       }
       if (!legacyResolver) throw new Error('作品のページ一覧がありません');
       const discovered = await legacyResolver.resolve(item, options);
