@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { galleryIdFromUrl, validateUrls, create, isolatedPageLookup } = require('../reader-hitomi-source.js');
@@ -63,6 +64,9 @@ test('opaque sandbox lookup accepts only its own response and cleans up', async 
       assert.ok(!value.attributes.sandbox.includes('allow-same-origin'));
       assert.match(value.srcdoc, /ltn\.gold-usergeneratedcontent\.net/);
       assert.match(value.srcdoc, /galleries\/.*\.js/);
+      const isolatedScript = /<script>([\s\S]*?)<\/script>/.exec(value.srcdoc)?.[1];
+      assert.ok(isolatedScript, 'sandbox script must be present');
+      assert.doesNotThrow(() => new vm.Script(isolatedScript), 'sandbox script must compile as JavaScript');
       queueMicrotask(() => {
         for (const cb of messages) cb({ source: frame.contentWindow, origin: 'https://evil.invalid', data: { channel: 'testcode-remote-gallery-v1', nonce: '', ok: true, data: [first] } });
         const nonce = /var nonce = "([^"]+)"/.exec(value.srcdoc)?.[1];
