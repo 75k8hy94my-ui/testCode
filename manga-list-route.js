@@ -6,7 +6,7 @@
     ['manga-source-type.js?v=20261115-page-range', 'mangaSourceType'],
     ['manga-list-template.js?v=20261114-json-import', 'mangaRouteTemplate'],
     ['manga-import-author-sync.js?v=20261007-momon-import', 'mangaImportAuthorSync'],
-    ['manga-json-import.js?v=20261115-page-range', 'mangaJsonImport'],
+    ['manga-json-import.js?v=20261119-explicit-pages', 'mangaJsonImport'],
     ['manga-spreadsheet.js?v=20261115-page-range', 'mangaSpreadsheet'],
     ['manga-item-editor.js?v=20261115-page-range', 'mangaItemEditor'],
     ['manga-card-context-menu.js?v=20261115-touch-sheet', 'mangaCardContextMenu'],
