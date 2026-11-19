@@ -5,6 +5,12 @@ test('Hitomi gallery metadata is resolved into reader images without persisting 
   const firstHash = 'a'.repeat(64);
   const secondHash = 'b'.repeat(64);
   let manifestReads = 0;
+  const browserErrors = [];
+  const remoteRequests = [];
+  page.on('pageerror', error => browserErrors.push('pageerror: ' + String(error.message)));
+  page.on('console', message => { if (message.type() === 'error') browserErrors.push('console: ' + message.text()); });
+  page.on('requestfailed', request => browserErrors.push('request: ' + request.url() + ' ' + (request.failure()?.errorText || '')));
+  page.on('request', request => { if (request.url().includes('gold-usergeneratedcontent.net')) remoteRequests.push(request.url()); });
   await page.route('https://ltn.gold-usergeneratedcontent.net/gg.js', route => route.fulfill({
     status: 200, contentType: 'application/javascript',
     body: 'var gg={b:"1795075201/",s:function(h){return String(parseInt(h.slice(-1)+h.slice(-3,-1),16));},m:function(g){return g%2;}};'
@@ -42,13 +48,23 @@ test('Hitomi gallery metadata is resolved into reader images without persisting 
   await expect(page).toHaveURL(/reader\.html\?item=remote-pages-test/);
 
   // Include the Reader diagnostics in CI assertion failures, not just 1 / 1.
-  await expect.poll(() => page.evaluate(() => ({
-    label: document.getElementById('pageLabel')?.textContent,
-    readerStatus: document.getElementById('readerStatus')?.textContent,
-    readerMessage: document.getElementById('readerMessage')?.textContent?.slice(0, 200),
-    runtime: !!window.MangaReaderRuntime,
-    galleryResolver: window.ReaderHitomiSourceFactory?.galleryIdFromUrl?.('https://hitomi.la/reader/3904373.html')
-  })), { timeout: 16000 }).toMatchObject({ label: '1 / 2' });
+  try {
+    await expect(page.locator('#pageLabel')).toHaveText('1 / 2', { timeout: 16000 });
+  } catch (error) {
+    const diagnostics = await page.evaluate(() => ({
+      label: document.getElementById('pageLabel')?.textContent,
+      readerStatus: document.getElementById('readerStatus')?.textContent,
+      readerMessage: document.getElementById('readerMessage')?.textContent?.slice(0, 500),
+      runtime: !!window.MangaReaderRuntime,
+      galleryResolver: window.ReaderHitomiSourceFactory?.galleryIdFromUrl?.('https://hitomi.la/reader/3904373.html'),
+      activeImages: document.querySelectorAll('.readerPageImage').length,
+      frames: document.querySelectorAll('#pageStage iframe').length
+    }));
+    console.error('REMOTE_READER_DIAGNOSTICS', JSON.stringify({
+      ...diagnostics, manifestReads, remoteRequests, browserErrors
+    }));
+    throw error;
+  }
   await expect(page.locator('.readerPageImage')).toBeVisible();
   const first = await page.locator('.readerPageImage').getAttribute('src');
   expect(first).toContain('/1795075201/2730/' + firstHash + '.webp');
