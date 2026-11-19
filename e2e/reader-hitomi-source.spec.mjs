@@ -31,8 +31,24 @@ test('Hitomi gallery metadata is resolved into reader images without persisting 
     id: 'remote-pages-test', title: 'Remote pages test',
     url: 'https://hitomi.la/reader/3904373.html', addedAt: Date.now()
   }])));
-  await page.goto('reader.html?item=remote-pages-test');
-  await expect(page.locator('#pageLabel')).toHaveText('1 / 2', { timeout: 15000 });
+  // Follow the real shelf path and verify the source type before launching Reader.
+  await page.goto('manga.html');
+  const card = page.locator('.book-card').filter({ has: page.locator('.book-title', { hasText: 'Remote pages test' }) });
+  await expect(card).toBeVisible();
+  const cover = await card.locator('.book-cover img').first().getAttribute('src');
+  expect(decodeURIComponent(cover || '')).toContain('外部画像リーダー');
+  expect(decodeURIComponent(cover || '')).not.toContain('埋め込みページ');
+  await card.locator('.book-cover').click();
+  await expect(page).toHaveURL(/reader\.html\?item=remote-pages-test/);
+
+  // Include the Reader diagnostics in CI assertion failures, not just 1 / 1.
+  await expect.poll(() => page.evaluate(() => ({
+    label: document.getElementById('pageLabel')?.textContent,
+    readerStatus: document.getElementById('readerStatus')?.textContent,
+    readerMessage: document.getElementById('readerMessage')?.textContent?.slice(0, 200),
+    runtime: !!window.MangaReaderRuntime,
+    galleryResolver: window.ReaderHitomiSourceFactory?.galleryIdFromUrl?.('https://hitomi.la/reader/3904373.html')
+  })), { timeout: 16000 }).toMatchObject({ label: '1 / 2' });
   await expect(page.locator('.readerPageImage')).toBeVisible();
   const first = await page.locator('.readerPageImage').getAttribute('src');
   expect(first).toContain('/1795075201/2730/' + firstHash + '.webp');
