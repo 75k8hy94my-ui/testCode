@@ -60,7 +60,7 @@
       '        typeof gg.b !== "string" || typeof galleryinfo === "undefined" || !galleryinfo || !Array.isArray(galleryinfo.files))',
       '      throw new Error("ページ情報の形式が変わりました。");',
       '    var base = String(gg.b);',
-      '    if (!/^[0-9]{8,12}\/$/.test(base)) throw new Error("画像配信設定の形式が変わりました。");',
+      '    if (!(new RegExp("^[0-9]{8,12}/$")).test(base)) throw new Error("画像配信設定の形式が変わりました。");',
       '    var entries = galleryinfo.files;',
       '    if (!entries.length || entries.length > 2000) throw new Error("ページ数が不正です。");',
       '    var urls = entries.map(function(file) {',
