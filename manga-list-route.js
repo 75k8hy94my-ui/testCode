@@ -119,6 +119,7 @@
       shelfSearchQuery: '', shelfFilters: { series: '', author: '', tags: '', source: '' },
       shelfSort: 'added-desc', bookshelfPage: 1, reorderMode: false,
       bulkEditMode: false, bulkSelectedIds: new Set(), recentlyClosedItemId: null,
+      showPreviewWorks: false,
       recentlyClosedFolderId: null, groupByAuthorEnabled: false,
     };
     return {
@@ -148,7 +149,10 @@
         }
         let videos = [];
         try { videos = JSON.parse(storage.getItem(keys.savedVideos) || '[]'); } catch (_) {}
-        state = Object.assign(state, loaded, { savedVideos: Array.isArray(videos) ? videos : [] });
+        state = Object.assign(state, loaded, {
+          savedVideos: Array.isArray(videos) ? videos : [],
+          showPreviewWorks: storage.getItem('mangaReaderShowPreviewWorks') === 'true',
+        });
         return state;
       },
       wasLegacyMigrated() { return legacyMigrated; },
@@ -400,7 +404,10 @@
         ? item.encryptedAssets.pages.length + 'ページ'
         : Array.isArray(item.pages) ? item.pages.length + 'ページ' : '';
       const visibleItems = () => {
-        return state().savedItems.filter((item) => !item.localSync && !item.encryptedAssets?.pages?.length).slice();
+        return state().savedItems.filter((item) =>
+          !item.localSync && !item.encryptedAssets?.pages?.length &&
+          (state().showPreviewWorks || !MangaListViewModel.isPreviewOnly(item))
+        ).slice();
       };
       const appendFolderPreview = (cover, items, emptyIcon, emptyAlt, kindLabel) => {
         const preview = items.slice(0, 4); if (!preview.length) { const img = documentRef.createElement('img'); img.src = emptyIcon; img.alt = emptyAlt; cover.appendChild(img); return; }
@@ -539,6 +546,7 @@
         const search = rootElement.querySelector('#shelfSearchInput');
         const sort = rootElement.querySelector('#shelfSortSelect');
         const filter = rootElement.querySelector('#filterBtn');
+        const previewToggle = rootElement.querySelector('#previewWorksToggleBtn');
         const apply = rootElement.querySelector('#applyFilterBtn');
         const clear = rootElement.querySelector('#clearFilterBtn');
         const newFolder = elements.listNewFolderBtn;
@@ -639,6 +647,26 @@
           renderList();
         });
         bindFactory(MangaListSortEventsFactory, { onSortChange: (value) => { setState({ shelfSort: value, bookshelfPage: 1 }); renderList(); } }, { sortSelect: sort });
+        if (previewToggle) {
+          const updatePreviewToggle = () => {
+            const showing = !!state().showPreviewWorks;
+            previewToggle.textContent = showing ? 'プレビュー作品を隠す' : 'プレビュー作品を表示';
+            previewToggle.setAttribute('aria-pressed', String(showing));
+            previewToggle.classList.toggle('active', showing);
+          };
+          updatePreviewToggle();
+          bind(previewToggle, 'click', () => {
+            const next = !state().showPreviewWorks;
+            try { storage.setItem('mangaReaderShowPreviewWorks', String(next)); }
+            catch (_) {
+              windowRef.alert('プレビュー表示設定を保存できませんでした。ブラウザの保存容量を確認してください。');
+              return;
+            }
+            setState({ showPreviewWorks: next, bookshelfPage: 1 });
+            updatePreviewToggle();
+            renderList();
+          });
+        }
         bindFactory(MangaListFilterEventsFactory, {
           onToggle: () => { rootElement.querySelector('#filterRow').style.display = ''; },
           onApply: () => { setState({ shelfFilters: { series: rootElement.querySelector('#filterSeriesInput').value, author: rootElement.querySelector('#filterAuthorInput').value, tags: rootElement.querySelector('#filterTagsInput').value, source: rootElement.querySelector('#filterSourceInput').value }, bookshelfPage: 1 }); renderList(); },
