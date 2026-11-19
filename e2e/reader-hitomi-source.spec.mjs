@@ -21,7 +21,7 @@ test('Hitomi gallery metadata is resolved into reader images without persisting 
   });
   await page.route(/^https:\/\/w\d+\.gold-usergeneratedcontent\.net\/.*\.webp$/, route => route.fulfill({
     status: 200, contentType: 'image/png',
-    body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==', 'base64')
+    body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGMM2HKJgYGBiYGBgYGBAQAVsAHaWvT9gAAAAABJRU5ErkJggg==', 'base64')
   }));
 
   await page.goto('index.html');
