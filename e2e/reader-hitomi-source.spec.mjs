@@ -33,10 +33,16 @@ test('Hitomi gallery metadata is resolved into reader images without persisting 
   await page.goto('index.html');
   await page.getByRole('button', { name: 'ログインせずに使う' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-guest-mode', 'true');
-  await page.evaluate(() => localStorage.setItem('mangaReaderSavedItems', JSON.stringify([{
-    id: 'remote-pages-test', title: 'Remote pages test',
-    url: 'https://hitomi.la/reader/3904373.html', addedAt: Date.now()
-  }])));
+  // Register through the actual user form instead of injecting a storage fixture.
+  await page.goto('add.html');
+  await page.locator('#openMangaAdd').click();
+  await page.locator('#mangaAddForm [name="title"]').fill('Remote pages test');
+  await page.locator('#mangaAddForm [name="url"]').fill('https://hitomi.la/reader/3904373.html');
+  await page.locator('#mangaAddForm [type="submit"]').click();
+  await expect(page.locator('#mangaAddStatus')).toContainText('端末に保存しました');
+  const workId = await page.evaluate(() => JSON.parse(localStorage.getItem('mangaReaderSavedItems') || '[]')
+    .find(item => item.url === 'https://hitomi.la/reader/3904373.html')?.id);
+  expect(workId).toBeTruthy();
   // Follow the real shelf path and verify the source type before launching Reader.
   await page.goto('manga.html');
   const card = page.locator('.book-card').filter({ has: page.locator('.book-title', { hasText: 'Remote pages test' }) });
@@ -45,7 +51,7 @@ test('Hitomi gallery metadata is resolved into reader images without persisting 
   expect(decodeURIComponent(cover || '')).toContain('外部画像リーダー');
   expect(decodeURIComponent(cover || '')).not.toContain('埋め込みページ');
   await card.locator('.book-cover').click();
-  await expect(page).toHaveURL(/reader\.html\?item=remote-pages-test/);
+  await expect(page).toHaveURL(/reader\.html\?item=i-/);
 
   // Include the Reader diagnostics in CI assertion failures, not just 1 / 1.
   try {
