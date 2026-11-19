@@ -358,6 +358,78 @@ test('deletion intent is encrypted and durable before the local mutation runs', 
   assert.equal(JSON.parse(local.getItem('mangaReaderSupabaseSyncMeta'))['user-1'].pendingSync, true);
 });
 
+test('guarded deletion leaves no tombstone when a second writer changes the snapshot during encryption', async () => {
+  const base = { videos: [{ id: 'keeper' }, { id: 'duplicate' }] };
+  const { vault, local, context } = await fixture({ initialPayload: base, capability: 4 });
+  const started = deferred();
+  const release = deferred();
+  context.crypto = {
+    getRandomValues: webcrypto.getRandomValues.bind(webcrypto),
+    subtle: {
+      importKey: webcrypto.subtle.importKey.bind(webcrypto.subtle),
+      async encrypt(...args) {
+        started.resolve();
+        await release.promise;
+        return webcrypto.subtle.encrypt(...args);
+      },
+    },
+  };
+  const expected = local.getItem('testPayload');
+  const next = { videos: [...base.videos, { id: 'new' }], videoMeta: { duplicate: { title: 'New edit' } } };
+  const operation = vault.recordGuardedSyncDeletion('/videos/duplicate',
+    () => local.getItem('testPayload') === expected,
+    () => local.setItem('testPayload', JSON.stringify({ videos: [base.videos[0]] })));
+  await started.promise;
+  local.setItem('testPayload', JSON.stringify(next));
+  release.resolve();
+
+  assert.equal(await operation, false);
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')), next);
+  assert.equal(local.getItem('mangaReaderVaultDeletionJournal'), null);
+  assert.equal(vault.hasPendingLocalChanges(), false);
+});
+
+test('guarded mutation failure rolls back its journal and keeps an earlier deletion and pending marker', async () => {
+  const { vault, local } = await fixture({ initialPayload: { videos: [{ id: 'duplicate' }] } });
+  const journal = 'mangaReaderVaultDeletionJournal';
+  await vault.recordSyncDeletion('/videos/prior', () => {});
+  const previous = local.getItem(journal);
+
+  await assert.rejects(vault.recordGuardedSyncDeletion('/videos/duplicate', () => true, () => {
+    assert.notEqual(local.getItem(journal), previous);
+    assert.equal(vault.hasPendingLocalChanges(), true);
+    throw new Error('local write failed');
+  }), /local write failed/);
+
+  assert.equal(local.getItem(journal), previous);
+  assert.equal(vault.hasPendingLocalChanges(), true);
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')).videos, [{ id: 'duplicate' }]);
+});
+
+test('guarded video deletion preserves ordinal neighbours of a numeric ID across failed sync and retry', async () => {
+  const base = { videos: [{ id: '1' }, { id: 'keep' }, { id: 'other' }] };
+  const rawKey = webcrypto.getRandomValues(new Uint8Array(32));
+  const remote = { record: { payload: await encryptPayload(rawKey, base), revision: 1, updated_at: 'base' } };
+  let offline = true;
+  const { vault, local } = await fixture({ initialPayload: base, rawKey, remote, capability: 4,
+    v4rpc(body, state) {
+      if (offline) throw new Error('offline');
+      state.record = { payload: body.new_payload, revision: 2, updated_at: 'saved' };
+      return [{ revision: 2, updated_at: 'saved' }];
+    },
+  });
+  const remaining = base.videos.slice(1);
+  await vault.recordGuardedSyncDeletion('/videos/1', () => true,
+    () => local.setItem('testPayload', JSON.stringify({ videos: remaining })));
+  await assert.rejects(vault.saveLocalChanges(), /offline/);
+  assert.equal(vault.hasPendingLocalChanges(), true);
+  assert.deepEqual(JSON.parse(local.getItem('testPayload')).videos, remaining);
+  offline = false;
+  await vault.saveLocalChanges();
+  assert.deepEqual(await decryptPayload(rawKey, remote.record.payload), { videos: remaining, vaultSyncTombstones: ['/videos/1'] });
+  assert.equal(vault.hasPendingLocalChanges(), false);
+});
+
 test('one durable deletion intent can atomically cover an entity and its metadata', async () => {
   const base = { videos: [{ id: 'v1' }], videoMeta: { v1: { memo: 'protected' } } };
   const rawKey = webcrypto.getRandomValues(new Uint8Array(32));

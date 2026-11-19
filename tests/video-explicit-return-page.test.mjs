@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 test('both video opening paths record origin page',()=>{
- assert.match(read('video-library.js'),/target\.searchParams\.set\('fromPage', String\(state\.page\)\)/);
+ assert.match(read('video-library.js'),/const page = state\.page;[\s\S]*target\.searchParams\.set\('fromPage', String\(page\)\)/);
  assert.match(read('video-routing-fix.js'),/targetUrl\.searchParams\.set\('fromPage', String\(pageNumber\)\)/);
 });
 test('player header propagates origin and list resolves target by id',()=>{

@@ -20,6 +20,24 @@ function vault({ marker = true, syncError = null } = {}) {
   };
 }
 
+test('an async property recipe cannot restore values removed by another writer', async () => {
+  const storage = new Map([[definitionKey, JSON.stringify(initial.definitions)], [valuesKey, JSON.stringify(initial.values)]]);
+  let pause;
+  let started;
+  const waiting = new Promise(resolve => { started = resolve; });
+  const blocked = new Promise(resolve => { pause = resolve; });
+  const operation = Store.mutate({ storage, guest: true, async recipe(state) {
+    started();
+    await blocked;
+    return { ...state, values: { ...state.values, v2: { other: true } } };
+  } });
+  await waiting;
+  storage.set(valuesKey, JSON.stringify({ v2: { other: false } }));
+  pause();
+  await assert.rejects(operation, { code: 'STORAGE_CHANGED' });
+  assert.deepEqual(JSON.parse(storage.get(valuesKey)), { v2: { other: false } });
+});
+
 test('pendingMarkerFailurePreventsPropertyWrites', async () => {
   const storage = new Map([[definitionKey, JSON.stringify(initial.definitions)], [valuesKey, JSON.stringify(initial.values)]]);
   const before = [...storage];

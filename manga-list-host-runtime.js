@@ -37,7 +37,7 @@
     if (!deps || typeof deps !== 'object' || Array.isArray(deps)) {
       throw new TypeError('MangaListHostRuntimeFactory requires dependency object');
     }
-    for (const name of ['safeWriteJson', 'getState', 'persistVideos', 'canReadProtectedData']) {
+    for (const name of ['safeWriteJson', 'getState', 'canReadProtectedData']) {
       if (typeof deps[name] !== 'function') {
         throw new TypeError('MangaListHostRuntimeFactory requires function: ' + name);
       }
@@ -377,8 +377,7 @@
       const folders = persistFolders();
       const items = persistItems();
       const authors = persistAuthorCards();
-      const videos = deps.persistVideos() !== false;
-      return folders && items && authors && videos;
+      return folders && items && authors;
     }
 
     return Object.freeze({

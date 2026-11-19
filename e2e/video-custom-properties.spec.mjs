@@ -61,3 +61,37 @@ test('guest configures a property, saves it on a video, filters, and reads it on
   await expect(page.getByText('夜', { exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('a stale guest editor in a second tab cannot overwrite or recreate the saved video', async ({ page, context }) => {
+  await context.addInitScript(() => sessionStorage.setItem('testCode.guestMode.v1', '1'));
+  await page.goto('video.html');
+  await expect(page.locator('#videoLibraryApp')).toBeVisible();
+  await page.evaluate(() => localStorage.setItem('mangaReaderVideos', JSON.stringify([
+    { id: 'shared-tab', url: 'https://example.test/clip.mp4', title: 'Original', addedAt: 1 },
+  ])));
+  const editUrl = 'video-edit.html?id=shared-tab';
+  const secondTab = await context.newPage();
+  await page.goto(editUrl);
+  await secondTab.goto(editUrl);
+  await expect(secondTab.locator('#videoEditTitle')).toHaveValue('Original');
+
+  await page.locator('#videoEditTitle').fill('Saved in first tab');
+  await page.locator('form.videoEditForm').evaluate(form => form.requestSubmit());
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('mangaReaderVideoMeta') || '{}')['shared-tab']?.title))
+    .toBe('Saved in first tab');
+
+  await secondTab.locator('#videoEditMemo').fill('Unsaved second tab memo');
+  await secondTab.locator('form.videoEditForm').evaluate(form => form.requestSubmit());
+  await expect(secondTab.locator('.videoEditError')).toContainText('別の画面で動画が更新されました');
+  await expect(secondTab.locator('#videoEditMemo')).toHaveValue('Unsaved second tab memo');
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: '動画を削除' }).click();
+  await expect(page).toHaveURL(/video\.html$/);
+  await secondTab.locator('form.videoEditForm').evaluate(form => form.requestSubmit());
+  await expect(secondTab.locator('.videoEditError')).toContainText('動画が削除された');
+  expect(await secondTab.evaluate(() => [
+    JSON.parse(localStorage.getItem('mangaReaderVideos')),
+    JSON.parse(localStorage.getItem('mangaReaderVideoMeta')),
+  ])).toEqual([[], {}]);
+});

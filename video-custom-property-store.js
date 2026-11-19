@@ -95,6 +95,11 @@
       if (!definitionsChanged && !valuesChanged && typeof commit !== 'function') return { state: current.state, changed: false };
       if (definitionsChanged && !rootIsValid(current.raw.definitions, 'definitions')) throw new Error('プロパティ定義データが破損しているため、変更を保存できません。元データは保持しました。');
       if (valuesChanged && !rootIsValid(current.raw.values, 'values')) throw new Error('動画プロパティデータが破損しているため、変更を保存できません。元データは保持しました。');
+      if (getRaw(storage, DEFINITIONS_KEY) !== current.raw.definitions.raw || getRaw(storage, VALUES_KEY) !== current.raw.values.raw) {
+        const error = new Error('別の画面で動画プロパティが更新されました。入力内容は保持されています。');
+        error.code = 'STORAGE_CHANGED';
+        throw error;
+      }
 
       if (!guest && !pendingAlreadyMarked) {
         if (!vault || typeof vault.markLocalChangesPending !== 'function' || vault.markLocalChangesPending() !== true) {
