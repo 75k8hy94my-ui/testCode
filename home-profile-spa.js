@@ -284,12 +284,13 @@ async function renderVideo(generation){
   const target=getMount();
   if(!target)return;
   cleanupMangaShell();
+  videoRouteRuntime?.detach({ preserveListState: true });
   target.replaceChildren();
   try{
     const gate=await ensureVpnGate();
     if(generation!==renderGeneration)return;
     if(!gate){renderVpnGate(target,'video');setTitle('video');syncHeaderRoute();return;}
-    if(!window.VideoListRouteFactory)await loadScript('video-list-route.js?v=20261118-card-owner','spaVideoListRoute');
+    if(!window.VideoListRouteFactory)await loadScript('video-list-route.js?v=20261119-library-boundaries','spaVideoListRoute');
     if(!window.MangaReaderVideoTemplate)await loadScript('video-list-template.js?v=20261010-vpn-navigation','spaVideoListTemplate');
     if(generation!==renderGeneration)return;
     if(!videoRouteRuntime)videoRouteRuntime=window.VideoListRouteFactory.create({
@@ -298,12 +299,15 @@ async function renderVideo(generation){
       loadMediaGate:()=>window.MangaReaderMediaAccess?Promise.resolve():loadScript('media-access-gate.js?v=20261010-vpn-diagnostics','spaMediaGate'),
       mediaAccess:gate,
     });
-    await videoRouteRuntime.start({mountElement:target});
-    if(gate&&typeof gate.syncUi==='function')gate.syncUi();
+    const mounted=await videoRouteRuntime.start({mountElement:target});
     if(generation!==renderGeneration)return;
+    if(!mounted)throw new Error('video route start cancelled');
+    if(gate&&typeof gate.syncUi==='function')gate.syncUi();
     setTitle('video');syncHeaderRoute();
   }catch(_){
-    if(generation===renderGeneration)target.innerHTML='<section class="profileContent"><h2>動画一覧を読み込めませんでした</h2><p>ホームへ戻って再試行してください。</p><a class="glassBtn" href="home.html">ホームへ戻る</a></section>';
+    if(generation!==renderGeneration)return;
+    videoRouteRuntime?.detach();
+    target.innerHTML='<section class="profileContent"><h2>動画一覧を読み込めませんでした</h2><p>ホームへ戻って再試行してください。</p><a class="glassBtn" href="home.html">ホームへ戻る</a></section>';
   }
 }
 async function renderManga(generation){

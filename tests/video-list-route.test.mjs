@@ -182,7 +182,7 @@ test('video route loads its shell while blocked and loads media helpers after ac
 
 test('video route detaches its retained DOM when leaving the route', () => {
   assert.match(spa, /function cleanupVideoRoute\(\)\{if\(videoRouteRuntime\)videoRouteRuntime\.detach\(\);\}/);
-  assert.match(route, /function detach\(\)/);
+  assert.match(route, /function detach\(\{ preserveListState = false \} = \{\}\)/);
 });
 
 test('stale video startup completion never detaches the current route root', () => {
@@ -196,14 +196,14 @@ test('a stale render completion preserves a video route mounted by the newer gen
   const root = {};
   const pending = [];
   const state = { value: 1 };
-  let detachCount = 0;
+  const detachOptions = [];
   const gate = { syncUi() {} };
   const videoRouteRuntime = {
     start({ mountElement }) {
       mountElement.children = [root];
       return new Promise((resolve) => pending.push(resolve));
     },
-    detach() { detachCount += 1; target.children = []; },
+    detach(options) { detachOptions.push(options); target.children = []; },
   };
   const windowRef = { VideoListRouteFactory: {}, MangaReaderVideoTemplate: {} };
   const renderVideo = new Function(
@@ -217,11 +217,11 @@ test('a stale render completion preserves a video route mounted by the newer gen
   state.value = 2;
   const second = renderVideo(2);
   while (pending.length < 2) await new Promise((resolve) => setImmediate(resolve));
-  pending.forEach((resolve) => resolve());
+  pending.forEach((resolve) => resolve({ root }));
   await Promise.all([first, second]);
 
   assert.deepEqual(target.children, [root]);
-  assert.equal(detachCount, 0);
+  assert.deepEqual(detachOptions, [{ preserveListState: true }, { preserveListState: true }]);
 });
 
 test('video library can be reinitialized after a route interruption without rebinding events', () => {

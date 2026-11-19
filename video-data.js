@@ -229,6 +229,72 @@
       return url.origin + url.pathname + url.search;
     } catch (_) { return String(value || '').trim(); }
   }
+  function findDuplicateVideoUrls(videos, meta) {
+    const groups = new Map();
+    videos.forEach((video, index) => {
+      // Published editions have independent IDs even if they play the same MP4
+      // bytes. URL-based duplicate consolidation must never merge them.
+      if (video.virtualEdition === true || (meta[String(video.id)]?.virtualPublishedEdit)) return;
+      const key = videoUrlIdentity(video.url);
+      if (!key) return;
+      const group = groups.get(key) || [];
+      group.push({ video, index });
+      groups.set(key, group);
+    });
+    return [...groups.values()].filter(group => group.length > 1);
+  }
+
+  function planVideoUrlConsolidation({ videos, duplicates, meta, markers, properties, now = Date.now }) {
+    const nextMeta = { ...meta }, nextMarkers = { ...markers }, nextProperties = { ...properties };
+    const removed = new Set();
+    const nextVideos = videos.slice();
+    for (const group of duplicates) {
+      // The most recently added entry supplies the default playback URL.
+      const newest = group.slice().sort((a, b) =>
+        (Number(b.video.addedAt) || 0) - (Number(a.video.addedAt) || 0) || b.index - a.index)[0];
+      const keeper = { ...nextVideos[newest.index] };
+      nextVideos[newest.index] = keeper;
+      const keeperId = String(keeper.id);
+      const all = group.slice().sort((a, b) =>
+        (Number(a.video.addedAt) || 0) - (Number(b.video.addedAt) || 0) || a.index - b.index);
+      keeper.alternateUrls = [...new Set(all.flatMap(entry =>
+        [entry.video.url, ...(Array.isArray(entry.video.alternateUrls) ? entry.video.alternateUrls : [])]))]
+        .filter(url => url && url !== keeper.url);
+      let combined = { ...(nextMeta[keeperId] || {}) };
+      let mergedMarkers = Array.isArray(nextMarkers[keeperId]) ? [...nextMarkers[keeperId]] : [];
+      let mergedProps = { ...(nextProperties[keeperId] || {}) };
+      for (const entry of all) {
+        const item = entry.video;
+        if (String(item.id) === keeperId) continue;
+        const oldId = String(item.id);
+        const old = nextMeta[oldId] || {};
+        // Preserve the keeper's existing values, filling blank fields from removed entries.
+        for (const [key, value] of Object.entries(old)) {
+          if ((combined[key] == null || combined[key] === '' || (Array.isArray(combined[key]) && !combined[key].length))
+            && value != null && value !== '') combined[key] = value;
+        }
+        combined.tags = [...new Set([...(Array.isArray(combined.tags) ? combined.tags : []), ...(Array.isArray(old.tags) ? old.tags : [])])];
+        combined.favorite = combined.favorite === true || old.favorite === true;
+        combined.openCount = (Number(combined.openCount) || 0) + (Number(old.openCount) || 0);
+        combined.lastOpenedAt = Math.max(Number(combined.lastOpenedAt) || 0, Number(old.lastOpenedAt) || 0);
+        combined.progressSeconds = Math.max(Number(combined.progressSeconds) || 0, Number(old.progressSeconds) || 0);
+        if (Array.isArray(nextMarkers[oldId])) mergedMarkers.push(...nextMarkers[oldId]);
+        for (const [key, value] of Object.entries(nextProperties[oldId] || {})) {
+          if (mergedProps[key] == null || mergedProps[key] === '') mergedProps[key] = value;
+        }
+        delete nextMeta[oldId]; delete nextMarkers[oldId]; delete nextProperties[oldId];
+        removed.add(oldId);
+      }
+      combined.updatedAt = now();
+      nextMeta[keeperId] = combined;
+      nextMarkers[keeperId] = mergedMarkers.filter((marker, index, list) =>
+        list.findIndex(m => (m.id && marker.id ? m.id === marker.id : JSON.stringify(m) === JSON.stringify(marker))) === index);
+      nextProperties[keeperId] = mergedProps;
+    }
+    return { videos: nextVideos.filter(item => !removed.has(String(item.id))),
+      meta: nextMeta, markers: nextMarkers, properties: nextProperties, removedIds: [...removed] };
+  }
+
   function alternateUrls(value) {
     const x = value && typeof value === 'object' ? value : {};
     const primary = String(x.url || '').trim();
@@ -442,5 +508,5 @@
     const number = Math.max(1, index + 1);
     return '名称未設定' + String(number).replace(/[0-9]/g, digit => String.fromCharCode(0xFF10 + Number(digit)));
   }
-  return { displayTitle, WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, groupVideosBySeries, planSeriesChanges, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, videoEntryKind, storageFieldsForVideoUrl, stableUrlToken, videoUrlIdentity, alternateUrls, promoteVideoUrl, getRotationDirection, getDisplayDimensions };
+  return { displayTitle, WATCH_STATUSES, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime, parseTags, normalizeVideo, normalizeVideos, normalizeFolders, deriveService, buildSearchText, filterVideos, sortVideos, groupVideosBySeries, planSeriesChanges, removeFolder, legacyUrl, parseLegacyUrl, isDirectVideoUrl, classifyVideoUrl, videoEntryKind, storageFieldsForVideoUrl, stableUrlToken, videoUrlIdentity, findDuplicateVideoUrls, planVideoUrlConsolidation, alternateUrls, promoteVideoUrl, getRotationDirection, getDisplayDimensions };
 }));

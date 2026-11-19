@@ -131,9 +131,7 @@
   }
 
   function acknowledgeReturnIntent(pageItems) {
-    if (!returnIntent || !pageItems.some(item => item.kind === 'series'
-      ? item.videos.some(video => String(video.id) === returnIntent.id)
-      : String(item.video.id) === returnIntent.id)) return;
+    if (!returnIntent || !Pagination.containsVideo(pageItems, returnIntent.id)) return;
     // Only acknowledge a return once the matching card actually exists in the
     // displayed page. Retain returnIntent for later Vault/SPA re-render events.
     if (!Array.from(dom.results.querySelectorAll('.vl-card')).some(card => card.dataset.videoId === returnIntent.id)) return;
@@ -204,18 +202,7 @@
     if (urlMigrationRunning || !canReadProtectedData()) return;
     const videos = readJson(VIDEO_KEY, []);
     if (!Array.isArray(videos) || videos.length < 2) return;
-    const groups = new Map();
-    videos.forEach((video, index) => {
-      // Published editions have independent IDs even if they play the same MP4
-      // bytes. URL-based duplicate consolidation must never merge them.
-      if (video.virtualEdition === true || (state.meta[String(video.id)]?.virtualPublishedEdit)) return;
-      const key = Data.videoUrlIdentity(video.url);
-      if (!key) return;
-      const group = groups.get(key) || [];
-      group.push({ video, index });
-      groups.set(key, group);
-    });
-    const duplicates = [...groups.values()].filter(group => group.length > 1);
+    const duplicates = Data.findDuplicateVideoUrls(videos, state.meta);
     if (!duplicates.length) return;
     urlMigrationRunning = true;
     try {
@@ -223,54 +210,9 @@
       const markers = readJson('mangaReaderVideoMarkers', {});
       const propertyKey = 'mangaReaderVideoPropertyValues';
       const properties = readJson(propertyKey, {});
-      const nextMeta = { ...meta }, nextMarkers = { ...markers }, nextProperties = { ...properties };
-      const removed = new Set();
-      const nextVideos = videos.map(item => ({ ...item }));
-      for (const group of duplicates) {
-        // The most recently added entry supplies the default playback URL.
-        const newest = group.slice().sort((a, b) =>
-          (Number(b.video.addedAt) || 0) - (Number(a.video.addedAt) || 0) || b.index - a.index)[0];
-        const keeper = nextVideos[newest.index];
-        const keeperId = String(keeper.id);
-        const all = group.slice().sort((a, b) =>
-          (Number(a.video.addedAt) || 0) - (Number(b.video.addedAt) || 0) || a.index - b.index);
-        keeper.alternateUrls = [...new Set(all.flatMap(entry =>
-          [entry.video.url, ...(Array.isArray(entry.video.alternateUrls) ? entry.video.alternateUrls : [])]))]
-          .filter(url => url && url !== keeper.url);
-        let combined = { ...(nextMeta[keeperId] || {}) };
-        let mergedMarkers = Array.isArray(nextMarkers[keeperId]) ? [...nextMarkers[keeperId]] : [];
-        let mergedProps = { ...(nextProperties[keeperId] || {}) };
-        for (const entry of all) {
-          const item = entry.video;
-          if (String(item.id) === keeperId) continue;
-          const oldId = String(item.id);
-          const old = nextMeta[oldId] || {};
-          // Preserve the keeper's existing values, filling blank fields from removed entries.
-          for (const [key, value] of Object.entries(old)) {
-            if ((combined[key] == null || combined[key] === '' || (Array.isArray(combined[key]) && !combined[key].length))
-              && value != null && value !== '') combined[key] = value;
-          }
-          combined.tags = [...new Set([...(Array.isArray(combined.tags) ? combined.tags : []), ...(Array.isArray(old.tags) ? old.tags : [])])];
-          combined.favorite = combined.favorite === true || old.favorite === true;
-          combined.openCount = (Number(combined.openCount) || 0) + (Number(old.openCount) || 0);
-          combined.lastOpenedAt = Math.max(Number(combined.lastOpenedAt) || 0, Number(old.lastOpenedAt) || 0);
-          combined.progressSeconds = Math.max(Number(combined.progressSeconds) || 0, Number(old.progressSeconds) || 0);
-          if (Array.isArray(nextMarkers[oldId])) mergedMarkers.push(...nextMarkers[oldId]);
-          for (const [key, value] of Object.entries(nextProperties[oldId] || {})) {
-            if (mergedProps[key] == null || mergedProps[key] === '') mergedProps[key] = value;
-          }
-          delete nextMeta[oldId]; delete nextMarkers[oldId]; delete nextProperties[oldId];
-          removed.add(oldId);
-        }
-        combined.updatedAt = Date.now();
-        nextMeta[keeperId] = combined;
-        nextMarkers[keeperId] = mergedMarkers.filter((marker, index, list) =>
-          list.findIndex(m => (m.id && marker.id ? m.id === marker.id : JSON.stringify(m) === JSON.stringify(marker))) === index);
-        nextProperties[keeperId] = mergedProps;
-      }
-      const output = nextVideos.filter(item => !removed.has(String(item.id)));
+      const plan = Data.planVideoUrlConsolidation({ videos, duplicates, meta, markers, properties });
       const keys = [VIDEO_KEY, META_KEY, 'mangaReaderVideoMarkers', propertyKey];
-      const values = [output, nextMeta, nextMarkers, nextProperties];
+      const values = [plan.videos, plan.meta, plan.markers, plan.properties];
       const commit = () => {
         const before = keys.map(key => localStorage.getItem(key));
         try {
@@ -287,7 +229,7 @@
         const vault = window.MangaVault;
         const pointer = window.MangaVaultPayload?.pointerPath;
         if (!vault || typeof vault.recordSyncDeletion !== 'function' || typeof pointer !== 'function') return;
-        const paths = [...removed].flatMap(id => [
+        const paths = plan.removedIds.flatMap(id => [
           pointer('videos', id), pointer('videoMeta', id), pointer('videoMarkers', id),
           pointer('videoPropertyValues', id)]);
         await vault.recordSyncDeletion(paths, commit);
@@ -524,67 +466,55 @@
     if (!properties.length) { const empty=document.createElement('span'); empty.textContent='表示可能なプロパティがありません。'; dom.customFilters.append(empty); }
   }
 
+  function resetReturnFilters() {
+    Object.assign(state, { showHidden: false, query: '', quick: 'all', folderId: '', tag: '', service: '', kind: 'all', customFilters: {} });
+    if (dom.search) dom.search.value = '';
+  }
+
   function restoreVideoPage() {
     readReturnIntent();
     const targetId = returnIntent && returnIntent.id;
     if (!targetId || !canReadProtectedData()) return;
     const all = effectiveVideos();
-    // Initial local/Vault hydration can be asynchronous. Do not lose the
-    // return intent when the target is not yet available.
+    // Retain the intent until local or Vault hydration provides the target.
     const target = all.find(video => String(video.id) === targetId);
     if (!target) return;
-    // A hidden video is no longer in the ordinary list. Do not jump to the
-    // hidden folder to manufacture a page containing it. Return to page 1 of
-    // the regular list instead, even when it was opened from the hidden list.
+    // Returning from the hidden list always lands on the ordinary first page.
     if (target.hidden) {
       clearReturnIntent();
-      state.showHidden = false;
+      resetReturnFilters();
       state.page = 1;
-      state.query = ''; state.quick = 'all'; state.folderId = ''; state.tag = ''; state.service = ''; state.kind = 'all'; state.customFilters = {};
-      if (dom.search) dom.search.value = '';
       return;
     }
-    // Reapply only for videos that still belong to the regular list.
     restoreReturnContext(targetId);
-    const findInCurrentView = () => {
+    const resolveCurrentView = () => {
       const scoped = all.filter(video => video.hidden === state.showHidden);
       const filtered = filterVisibleVideos(scoped);
-      return sortForReturn(filtered);
+      const boxes = Data.groupVideosBySeries(sortForReturn(filtered));
+      return Pagination.resolveVideoReturn(boxes, targetId, returnIntent.page);
     };
-    let list = findInCurrentView();
-    let index = list.findIndex(video => String(video.id) === targetId);
-    if (index < 0) {
-      const target = all.find(video => String(video.id) === targetId);
-      if (target) {
-        state.showHidden = false;
-        state.query = ''; state.quick = 'all'; state.folderId = ''; state.tag = ''; state.service = ''; state.kind = 'all'; state.customFilters = {};
-        if (dom.search) dom.search.value = '';
-        list = findInCurrentView();
-        index = list.findIndex(video => String(video.id) === targetId);
-      }
+    let destination = resolveCurrentView();
+    if (!destination) {
+      resetReturnFilters();
+      destination = resolveCurrentView();
     }
-    if (index < 0) return;
-    // Pagination counts boxes rather than the individual grouped videos.
-    const boxes = Data.groupVideosBySeries(list);
-    const boxIndex = boxes.findIndex(item => item.kind === 'series'
-      ? item.videos.some(video => String(video.id) === targetId)
-      : String(item.video.id) === targetId);
-    if (boxIndex < 0) return;
+    if (!destination) return;
     // Open the returned member once, but let the user collapse it afterward.
-    if (boxes[boxIndex].kind === 'series' && !returnIntent.seriesRevealed) {
-      state.expandedSeries.add(boxes[boxIndex].id);
+    if (destination.seriesId !== null && !returnIntent.seriesRevealed) {
+      state.expandedSeries.add(destination.seriesId);
       returnIntent.seriesRevealed = true;
     }
-    const calculatedPage = Math.floor(boxIndex / Pagination.PAGE_SIZE) + 1;
-    const originPage = returnIntent.page;
-    const candidate = Number.isSafeInteger(originPage) && originPage > 0 ? originPage : calculatedPage;
-    const pageStart = (candidate - 1) * Pagination.PAGE_SIZE;
-    state.page = boxes.slice(pageStart, pageStart + Pagination.PAGE_SIZE).some(item => item.kind === 'series'
-      ? item.videos.some(video => String(video.id) === targetId)
-      : String(item.video.id) === targetId) ? candidate : calculatedPage;
+    state.page = destination.page;
+  }
+
+  function cancelPageAnimation() {
+    const animation = pageAnimation;
+    pageAnimation = null;
+    animation?.cancel();
   }
 
   function render(pageDirection = 0) {
+    if (!isListMounted()) return;
     loadLibraryState();
     restoreVideoPage();
     syncAccessUi();
@@ -625,7 +555,7 @@
     if (resultsKey === renderedResultsKey) { acknowledgeReturnIntent(pageModel.items); return; }
     renderedResultsKey = resultsKey;
     const outgoing = pageDirection && activePage && dom.results.contains(activePage) ? activePage : null;
-    if (pageAnimation) { pageAnimation.cancel(); pageAnimation = null; }
+    cancelPageAnimation();
     const frame = document.createElement('div'); frame.className = 'vl-page-frame';
     const incoming = document.createElement('div'); incoming.className = 'vl-page';
     activePage = incoming;
@@ -644,7 +574,12 @@
         const end = pageDirection > 0 ? 'translateX(-50%)' : 'translateX(0%)';
         const animation = track.animate([{ transform: start }, { transform: end }], { duration: 300, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' });
         pageAnimation = animation;
-        const finish = () => { if (pageAnimation !== animation) return; pageAnimation = null; frame.replaceChildren(incoming); animation.cancel(); };
+        const finish = () => {
+          if (pageAnimation !== animation) return;
+          pageAnimation = null;
+          if (isListMounted()) frame.replaceChildren(incoming);
+          animation.cancel();
+        };
         animation.finished.then(finish, finish);
       } else frame.replaceChildren(incoming);
     } else { frame.append(incoming); dom.results.replaceChildren(frame); }
@@ -888,8 +823,12 @@
     });
     // VideoListRoute persists across Home SPA transitions: discard transient
     // search terms when leaving the video list, even when its DOM is detached.
-    document.addEventListener('manga-video-list-route-detach', () => {
-      state.seriesSelecting = false; state.seriesSelected.clear(); renderedResultsKey = null;
+    document.addEventListener('manga-video-list-route-detach', (event) => {
+      const preserveListState = event.detail?.preserveListState;
+      if (pageAnimation || !preserveListState) renderedResultsKey = null;
+      cancelPageAnimation();
+      if (preserveListState) return;
+      state.seriesSelecting = false; state.seriesSelected.clear();
       state.query = '';
       if (dom.search) dom.search.value = '';
       state.page = 1;

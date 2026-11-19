@@ -31,9 +31,11 @@ test('normal watch-page URL and controls are shared across raw and edited MP4s',
 });
 
 test('all normal video cards retain title, favorites, tags, folders, metadata and custom properties', () => {
+  const data = read('video-data.js');
   assert.match(read('video-library-view.js'), /VideoCard\.create\(cardMedia/);
-  assert.match(library, /video\.virtualEdition === true/);
-  assert.match(library, /state\.meta\[String\(video\.id\)\]/);
+  assert.match(data, /video\.virtualEdition === true/);
+  assert.match(data, /meta\[String\(video\.id\)\]\?\.virtualPublishedEdit/);
+  assert.match(library, /Data\.findDuplicateVideoUrls\(videos, state\.meta\)/);
   assert.match(library, /function openVideo\(videoId\)/);
   assert.match(library, /lastOpenedAt: Date\.now\(\)/);
   assert.match(editor, /const matching = base\?\.virtualEdition === true/);
