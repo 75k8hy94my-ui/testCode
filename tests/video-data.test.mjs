@@ -4,6 +4,48 @@ import data from '../video-data.js';
 
 const { normalizeVideo, normalizeFolders, parseTags, filterVideos, sortVideos, removeFolder, deriveService, parseMediaTime, formatMediaTime, mergeVideoMetaPreservingThumbnailTime } = data;
 
+test('plans URL consolidation without merging published versions or mutating saved records', () => {
+  const url = 'https://media.example/a.mp4';
+  const videos = [
+    { id: 'old', url: url + '?start=1', addedAt: 1, alternateUrls: [url] },
+    { id: 'keep', url: url + '?start=2', addedAt: 2, legacy: 'preserved' },
+    { id: 'edition', url, addedAt: 3, virtualEdition: true },
+    { id: 'overwrite', url, addedAt: 4 },
+  ];
+  const meta = {
+    old: { title: 'Fill missing title', tags: ['old', 'shared'], favorite: true, openCount: 2, progressSeconds: 30 },
+    keep: { title: '', tags: ['shared'], openCount: 3, progressSeconds: 15, thumbnailTimeSeconds: 10 },
+    overwrite: { virtualPublishedEdit: {} },
+  };
+  const markers = { old: [{ id: 'same', seconds: 5 }, { seconds: 30 }], keep: [{ id: 'same', seconds: 10 }] };
+  const properties = { old: { rating: 3, notes: 'keep note' }, keep: { rating: 5, notes: '' } };
+  const before = structuredClone({ videos, meta, markers, properties });
+
+  const duplicates = data.findDuplicateVideoUrls(videos, meta);
+  const result = data.planVideoUrlConsolidation({ videos, duplicates, meta, markers, properties, now: () => 123 });
+
+  assert.deepEqual(result.removedIds, ['old']);
+  assert.deepEqual(result.videos, [
+    { ...videos[1], alternateUrls: [videos[0].url, url] }, videos[2], videos[3],
+  ]);
+  assert.deepEqual(result.meta, {
+    keep: { title: 'Fill missing title', tags: ['shared', 'old'], favorite: true, openCount: 5,
+      progressSeconds: 30, thumbnailTimeSeconds: 10, lastOpenedAt: 0, updatedAt: 123 },
+    overwrite: meta.overwrite,
+  });
+  assert.deepEqual(result.markers, { keep: [{ id: 'same', seconds: 10 }, { seconds: 30 }] });
+  assert.deepEqual(result.properties, { keep: { rating: 5, notes: 'keep note' } });
+  assert.deepEqual({ videos, meta, markers, properties }, before);
+});
+
+test('finds no URL duplicates among unrelated and separately published records', () => {
+  const url = 'https://media.example/a.mp4';
+  assert.deepEqual(data.findDuplicateVideoUrls([
+    { id: 'base', url }, { id: 'edition', url, virtualEdition: true },
+    { id: 'overwrite', url }, { id: 'different', url: 'https://media.example/b.mp4' },
+  ], { overwrite: { virtualPublishedEdit: {} } }), []);
+});
+
 test('normalizes legacy video records without losing legacy playback fields', () => {
   const video = normalizeVideo({ id:'v1', a:'example', b:'123', title:'Legacy', addedAt:100 });
   assert.equal(video.id, 'v1');

@@ -165,11 +165,13 @@ URLやデータの実際の操作経路は、必ず入口HTMLと呼出し元か�
 
 ### 変更先の特定
 
-カードの見た目・シリーズの折りたたみUI・カード表示項目は `video-library-view.js`。共通カードメニューの基本DOMやサムネイルは `video-card.js` / `video-thumbnail-renderer.js`。動画の一覧フィルタ/ページ復元・状態/イベント・保存同期は `video-library.js`。専用編集ページは `video-edit-page.js`。画面起動と読み込み順序は `video-list-route.js`。
+カードの見た目・シリーズの折りたたみUI・カード表示項目は `video-library-view.js`。共通カードメニューとサムネイルは `video-card.js` / `video-thumbnail-renderer.js`。一覧状態・フィルター・戻りコンテキスト・保存同期・既存編集シートのイベントは `video-library.js`。専用編集ページは `video-edit-page.js`。画面起動と読み込み順序は `video-list-route.js`。
+
+`video-data.js` は `findDuplicateVideoUrls` と `planVideoUrlConsolidation` で重複URLの候補と統合後の動画・メタデータ・マーカー・カスタム値を計算する。正規の保存キー、VPN確認、削除ジャーナル、ゲスト書込み、失敗時の復元は `video-library.js` が管理する。`video-library-pagination.js` の `resolveVideoReturn` はシリーズを1枠として対象IDのページを決める。`video-library.js` がフィルターとソートを適用し、戻り先の表示と状態更新を担当する。
 
 ### SPA切替時のイベント後始末
 
-`video-library.js` はルート再訪時に同じDOMとイベント結線を使うため、ページ全体のイベント登録は起動ごとに増やさず1回のみ保持する。`video-list-route.js.detach()` が画面DOMを除去した後は、`isListMounted()` によってグローバル検索通知・VPN状態通知・外部からのリスト再読込から**切断された一覧を再描画しない**。一方、既に発行済みのデータ移行や暗号化Vaultの未同期キュー処理は途中で停止・破棄せず、安全に完了/再試行させる。再訪時の `init()` が通常描画を再開する。
+`video-library.js` はルート再訪時に同じDOMとイベント結線を使い、ページ全体のイベントを1回登録する。画面離脱と同一ルートの再マウントでは `video-list-route.js.detach()` が起動を無効化し、通知を受けた一覧がページ切替アニメーションを取り消す。同一ルートの再マウントは現在の検索やページを引き継ぐ。`render()` は `isListMounted()` で切断済みの一覧への描画を防ぐ。既に発行済みのデータ移行や暗号化Vaultの未同期キュー処理は完了・再試行できる。
 
 ## 動画関連ファイルの詳細マップ
 

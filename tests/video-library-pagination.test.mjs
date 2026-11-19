@@ -9,6 +9,26 @@ vm.runInNewContext(source, { window });
 const library = fs.readFileSync(new URL('../video-library.js', import.meta.url), 'utf8');
 const route = fs.readFileSync(new URL('../video-list-route.js', import.meta.url), 'utf8');
 
+test('video return counts series boxes and falls back when the old page no longer contains the target', () => {
+  const boxes = Array.from({ length: 25 }, (_, index) => ({ kind: 'video', video: { id: index + 1 } }));
+  boxes.push({ kind: 'series', id: 'series-a', videos: [{ id: 'other' }, { id: 'target' }] });
+  const { resolveVideoReturn, containsVideo } = window.VideoLibraryPagination;
+  const result = resolveVideoReturn(boxes, 'target', 1);
+  assert.equal(result.page, 2);
+  assert.equal(result.seriesId, 'series-a');
+  assert.equal(containsVideo(boxes.slice(0, 25), 'target'), false);
+  assert.equal(containsVideo(boxes.slice(25), 'target'), true);
+  assert.equal(resolveVideoReturn(boxes, 'missing', 2), null);
+  assert.equal(resolveVideoReturn(boxes, '2', 99).page, 1);
+});
+
+test('video return honors a preferred page that still contains the target', () => {
+  const boxes = Array.from({ length: 26 }, (_, index) => ({ kind: 'video', video: { id: index === 25 ? 1 : index + 1 } }));
+  const { resolveVideoReturn } = window.VideoLibraryPagination;
+  assert.equal(resolveVideoReturn(boxes, '1', 2).page, 2);
+  assert.equal(resolveVideoReturn(boxes, '1', null).page, 1);
+});
+
 test('video pagination uses the 25-item manga page size and clamps valid pages', () => {
   const videos = Array.from({ length: 26 }, (_, index) => ({ id: String(index + 1) }));
   const first = window.VideoLibraryPagination.derive(videos, 1);

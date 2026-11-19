@@ -81,3 +81,49 @@ test('video list paginates filtered results, animates turns, and supports deskto
   await expect(pager).toBeHidden();
   await expect(page.locator('.vl-empty')).toBeVisible();
 });
+
+test('remounting and leaving the video list cancel in-flight page animations', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.route(/supabase\.co|\/auth\/v1\/|\/rest\/v1\//i, route => route.abort());
+  await page.goto('index.html');
+  await page.getByRole('button', { name: 'ログインせずに使う' }).click();
+  await page.locator('#desktopNavVideo').click();
+  await expect(page.locator('#videoLibraryApp')).toBeVisible();
+  await page.evaluate(() => {
+    localStorage.setItem('mangaReaderVideos', JSON.stringify(Array.from({ length: 26 }, (_, index) => ({
+      id: `detach-${index}`,
+      title: `Video ${index}`,
+      url: `https://example.test/video/${index}`,
+      addedAt: index + 1,
+    }))));
+    window.MangaReaderVideoLibrary.refreshFromStorage();
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (...args) {
+      const animation = animate.apply(this, args);
+      if (this.classList.contains('vl-slide-track')) {
+        animation.pause();
+        window.listPageAnimation = animation;
+      }
+      return animation;
+    };
+  });
+
+  await page.locator('#videoLibraryNextPage').click();
+  await expect.poll(() => page.evaluate(() => window.listPageAnimation?.playState)).toBe('paused');
+  await page.evaluate(() => window.HomeProfileSPA.renderRoute());
+  await expect.poll(() => page.evaluate(() => window.listPageAnimation?.playState)).toBe('idle');
+  await expect(page.locator('#videoLibraryPageLabel')).toHaveText('2 / 2');
+  await expect(page.locator('.vl-slide-track')).toHaveCount(0);
+
+  const card = await page.locator('.vl-card').elementHandle();
+  await page.evaluate(() => window.HomeProfileSPA.renderRoute());
+  await expect(page.locator('.vl-card')).toBeVisible();
+  expect(await card.evaluate(node => node === document.querySelector('.vl-card'))).toBe(true);
+
+  await page.locator('#videoLibraryPrevPage').click();
+  await expect.poll(() => page.evaluate(() => window.listPageAnimation?.playState)).toBe('paused');
+  await page.locator('#desktopNavHome').click();
+  await expect(page).toHaveURL(/home\.html$/);
+  await expect(page.locator('#videoListSection')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => window.listPageAnimation?.playState)).toBe('idle');
+});

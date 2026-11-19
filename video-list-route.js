@@ -49,16 +49,16 @@
         bootPromise = (async () => {
           await deps.loadMediaGate();
           await ensureStylesheet();
-          await deps.loadScript('video-data.js?v=20261117-embed-routing', 'spaVideoData');
+          await deps.loadScript('video-data.js?v=20261119-library-boundaries', 'spaVideoData');
           await deps.loadScript('manga-list-pagination-events.js?v=20261012-video-pagination', 'spaMangaPaginationEvents');
-          await deps.loadScript('video-library-pagination.js?v=20261012-video-pagination', 'spaVideoLibraryPagination');
+          await deps.loadScript('video-library-pagination.js?v=20261119-library-boundaries', 'spaVideoLibraryPagination');
           await deps.loadScript('video-thumbnail-cache.js?v=20261102-ios-lazy', 'spaVideoThumbnailCache');
           await deps.loadScript('video-thumbnail-renderer.js?v=20261102-ios-lazy', 'spaVideoThumbnailRenderer');
           await deps.loadScript('video-card.js?v=20261026-url-bookmarks', 'spaVideoCard');
           await deps.loadScript('video-custom-properties.js?v=20261012-video-custom-properties', 'spaVideoCustomProperties');
           await deps.loadScript('video-custom-property-store.js?v=20261012-video-custom-properties', 'spaVideoCustomPropertyStore');
           await deps.loadScript('video-library-view.js?v=20261118-card-owner', 'spaVideoLibraryView');
-          await deps.loadScript('video-library.js?v=20261118-card-owner', 'spaVideoLibrary');
+          await deps.loadScript('video-library.js?v=20261119-library-boundaries', 'spaVideoLibrary');
         })().catch((error) => {
           bootPromise = null;
           throw error;
@@ -100,14 +100,14 @@
       return Object.freeze({ root: rootElement });
     }
 
-    function detach() {
+    function detach({ preserveListState = false } = {}) {
       activation += 1;
       if (documentRef.dispatchEvent && typeof root.CustomEvent === 'function') {
-        documentRef.dispatchEvent(new root.CustomEvent('manga-video-list-route-detach'));
+        documentRef.dispatchEvent(new root.CustomEvent('manga-video-list-route-detach', { detail: { preserveListState } }));
       }
       if (rootElement && rootElement.parentNode) rootElement.remove();
       const sheet = documentRef.getElementById('videoLibrarySheet');
-      if (sheet) sheet.hidden = true;
+      if (!preserveListState && sheet) sheet.hidden = true;
     }
 
     return Object.freeze({ start, detach });
