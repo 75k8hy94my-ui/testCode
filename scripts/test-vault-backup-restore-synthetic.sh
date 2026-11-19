@@ -11,7 +11,7 @@ export PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE
 
 restore_database="vault_sync_restore_$$"
 restore_created=0
-dump_file="$(mktemp "${TMPDIR:-/tmp}/vault-sync-synthetic.XXXXXX.dump")"
+dump_file="$(mktemp "${TMPDIR:-/tmp}/vault-sync-synthetic.XXXXXX")"
 cleanup() {
   if [[ "$restore_created" == "1" ]]; then
     dropdb --maintenance-db=postgres --if-exists --force "$restore_database" >/dev/null 2>&1 || true

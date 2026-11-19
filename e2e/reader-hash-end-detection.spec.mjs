@@ -25,6 +25,7 @@ test('reader learns the last hash page only when normal sequential reading reach
   await page.goto('index.html');
   await page.getByRole('button', { name: 'ログインせずに使う' }).click();
   await expect(page).toHaveURL(/home\.html$/);
+  await expect(page.locator('html')).toHaveAttribute('data-guest-mode', 'true');
   await page.evaluate(() => localStorage.setItem('mangaReaderSavedItems', JSON.stringify([{
     id: 'hash-end-fixture',
     title: 'End detection fixture',
