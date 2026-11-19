@@ -14,6 +14,7 @@ async function openGuestReader(page) {
   await page.goto('index.html');
   await page.getByRole('button', { name: 'ログインせずに使う' }).click();
   await expect(page).toHaveURL(/home\.html$/);
+  await expect(page.locator('html')).toHaveAttribute('data-guest-mode', 'true');
   await page.evaluate(() => {
     localStorage.setItem('mangaReaderSavedItems', JSON.stringify([{
       id: 'mobile-safe-fixture', title: 'Mobile safe mode fixture',

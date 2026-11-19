@@ -69,7 +69,10 @@ test('guest publishes split clips and full edit to video list, overwrites and re
   await expect(page.getByRole('button', { name: '秒数登録' })).toBeVisible();
   await expect(page.locator('.videoRelated')).toBeVisible();
   await expect(page.getByRole('button', { name: '上書き前の動画に戻す' })).toBeVisible();
-  await page.getByRole('button', { name: '上書き前の動画に戻す' }).click();
+  await Promise.all([
+    page.waitForEvent('domcontentloaded'),
+    page.getByRole('button', { name: '上書き前の動画に戻す' }).click(),
+  ]);
   await expect(page).toHaveURL(/video-player\.html\?id=publish-original/);
   const snapshot = await page.evaluate(() => ({
     original: JSON.parse(localStorage.getItem('mangaReaderVideos')).find(video => video.id === 'publish-original'),

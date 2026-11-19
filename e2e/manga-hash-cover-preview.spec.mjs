@@ -12,6 +12,7 @@ test('a #1 manga shows the first external page as an inert thumbnail; ordinary w
   await page.goto('index.html');
   await page.getByRole('button', { name: 'ログインせずに使う' }).click();
   await expect(page).toHaveURL(/home\.html$/);
+  await expect(page.locator('html')).toHaveAttribute('data-guest-mode', 'true');
   await page.evaluate(() => {
     localStorage.setItem('mangaReaderSavedItems', JSON.stringify([
       { id: 'hash-cover', title: 'Hash Cover Fixture', url: 'https://hash-cover-fixture.test/work.html#1', addedAt: Date.now() },

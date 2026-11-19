@@ -5,6 +5,7 @@ async function enterGuest(page) {
   await page.goto('index.html');
   await page.getByRole('button', { name: 'ログインせずに使う' }).click();
   await expect(page).toHaveURL(/home\.html$/);
+  await expect(page.locator('html')).toHaveAttribute('data-guest-mode', 'true');
 }
 
 test('desktop home menu opens cards and migrates unchecked definitions', async ({ page }) => {
