@@ -56,9 +56,9 @@
           await deps.loadScript('video-thumbnail-renderer.js?v=20261102-ios-lazy', 'spaVideoThumbnailRenderer');
           await deps.loadScript('video-card.js?v=20261026-url-bookmarks', 'spaVideoCard');
           await deps.loadScript('video-custom-properties.js?v=20261012-video-custom-properties', 'spaVideoCustomProperties');
-          await deps.loadScript('video-custom-property-store.js?v=20261012-video-custom-properties', 'spaVideoCustomPropertyStore');
+          await deps.loadScript('video-custom-property-store.js?v=20261119-video-persistence', 'spaVideoCustomPropertyStore');
           await deps.loadScript('video-library-view.js?v=20261118-card-owner', 'spaVideoLibraryView');
-          await deps.loadScript('video-library.js?v=20261119-library-boundaries', 'spaVideoLibrary');
+          await deps.loadScript('video-library.js?v=20261119-video-persistence', 'spaVideoLibrary');
         })().catch((error) => {
           bootPromise = null;
           throw error;

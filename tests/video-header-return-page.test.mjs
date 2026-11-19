@@ -42,7 +42,7 @@ test('the list records the opening view and restores it before computing the tar
   assert.match(lib, /restoreReturnContext\(targetId\)/);
   assert.match(lib, /sortForReturn\(filtered\)/);
   assert.match(lib, /orderIds: ordered\.length/);
-  assert.match(lib, /captureReturnContext\(videoId\);\s*updateMeta\(videoId/);
+  assert.match(lib, /captureReturnContext\(videoId\);\s*await updateMeta\(videoId/);
   assert.match(interceptor, /captureReturnContext\?\.\(videoId\);\s*recordOpen\(base\)/);
 });
 

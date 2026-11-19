@@ -9,6 +9,7 @@ const Data = require('../video-data.js');
 require('../video-custom-properties.js');
 const PropertyStore = require('../video-custom-property-store.js');
 const source = fs.readFileSync(new URL('../video-edit-page.js', import.meta.url), 'utf8');
+const storageSource = fs.readFileSync(new URL('../browser-storage.js', import.meta.url), 'utf8');
 const VIDEO_KEY = 'mangaReaderVideos';
 const META_KEY = 'mangaReaderVideoMeta';
 const PROPERTY_VALUES_KEY = 'mangaReaderVideoPropertyValues';
@@ -19,6 +20,7 @@ function startEditor({ mode = 'add', allowed = true, videos = [], meta = {}, pro
   const localStorage = {
     getItem(key) { reads += 1; return stored.get(key) ?? null; },
     setItem(key, value) { if (failLocalWrite) throw new Error('quota'); stored.set(key, value); },
+    removeItem(key) { stored.delete(key); },
   };
   const nodes = new Map();
   function element(tag) {
@@ -53,13 +55,15 @@ function startEditor({ mode = 'add', allowed = true, videos = [], meta = {}, pro
   let syncCalls = 0; let pendingCalls = 0; let deletionCalls = 0; let deletionPaths = []; let releaseSync; const deferredSync = new Promise((resolve) => { releaseSync = resolve; });
   const window = {
     MangaReaderVideoData: Data, MangaReaderMediaAccess: gate, MangaReaderVideoCustomPropertyStore: PropertyStore,
-    MangaVaultPayload: { pointerPath(collection, id) { return '/' + collection + '/' + String(id).replace(/~/g, '~0').replace(/\//g, '~1'); } },
-    MangaVault: { markLocalChangesPending() { pendingCalls++; return !failPending; }, async saveLocalChanges() { syncCalls++; if (deferSync) return deferredSync; if (failSync) throw new Error('offline'); }, async recordSyncDeletion(paths, mutate) { deletionCalls++; deletionPaths = paths; if (failDeletionJournal) throw new Error('journal failed'); await mutate(); } },
+    MangaVaultPayload: { DATA_KEYS: { videoPropertyValues: PROPERTY_VALUES_KEY }, pointerPath(collection, id) { return '/' + collection + '/' + String(id).replace(/~/g, '~0').replace(/\//g, '~1'); } },
+    MangaVault: { markLocalChangesPending() { pendingCalls++; return !failPending; }, async saveLocalChanges() { syncCalls++; if (deferSync) return deferredSync; if (failSync) throw new Error('offline'); }, async recordGuardedSyncDeletion(paths, prepare, commit, withLock) { return withLock(() => { if (!prepare()) return false; deletionCalls++; deletionPaths = paths; if (failDeletionJournal) throw new Error('journal failed'); commit(); return true; }); } },
     crypto: { randomUUID: () => 'added-uuid' },
   };
   if (guest) window.TestCodeGuest = { isActive: () => true };
   const location = { search: mode === 'add' ? '?mode=add&return=list' : '?id=' + encodeURIComponent(videos[0]?.id || 'existing') + '&return=list', href: 'video-edit.html' };
-  vm.runInNewContext(source, { window, document, localStorage, location, URLSearchParams, Date, Math, confirm: () => true, setTimeout, clearTimeout });
+  const context = vm.createContext({ window, document, localStorage, location, URLSearchParams, Date, Math, confirm: () => true, setTimeout, clearTimeout });
+  vm.runInContext(storageSource, context);
+  vm.runInContext(source, context);
   const form = page.children.find((child) => child.tag === 'form');
   return { page, form, nodes, location, localStorage, stored, shellTitle, get reads() { return reads; }, get syncCalls() { return syncCalls; }, get pendingCalls() { return pendingCalls; }, get deletionCalls() { return deletionCalls; }, get deletionPaths() { return deletionPaths; }, releaseSync };
 }
@@ -85,6 +89,28 @@ test('video-add screen is a full-page, unlocked form without a delete action', a
   assert.deepEqual([...meta['v-added-uuid'].tags], ['study', 'demo']);
   assert.equal(meta['v-added-uuid'].favorite, true);
   assert.equal(app.location.href, 'video.html');
+});
+
+test('an open guest editor keeps a newer edit from a different screen and retains the form input', async () => {
+  const video = Data.normalizeVideo({ id: 'existing', title: 'Original', url: 'https://example.com/clip.mp4' });
+  const app = startEditor({ mode: 'edit', guest: true, videos: [video], meta: { existing: { title: 'Original' } } });
+  app.stored.set(META_KEY, JSON.stringify({ existing: { title: 'Changed in player' } }));
+  app.form.elements.memo.value = 'My unsaved input';
+  await app.form.requestSubmit();
+  assert.equal(JSON.parse(app.stored.get(META_KEY)).existing.title, 'Changed in player');
+  assert.equal(app.form.elements.memo.value, 'My unsaved input');
+  assert.match(app.nodes.get('.videoEditError').textContent, /別の画面|更新/);
+});
+
+test('an open editor never recreates metadata for a video deleted after it was opened', async () => {
+  const video = Data.normalizeVideo({ id: 'existing', title: 'Original', url: 'https://example.com/clip.mp4' });
+  const app = startEditor({ mode: 'edit', guest: true, videos: [video] });
+  app.stored.set(VIDEO_KEY, '[]');
+  app.form.elements.memo.value = 'Do not resurrect';
+  await app.form.requestSubmit();
+  assert.deepEqual(JSON.parse(app.stored.get(VIDEO_KEY)), []);
+  assert.deepEqual(JSON.parse(app.stored.get(META_KEY)), {});
+  assert.match(app.nodes.get('.videoEditError').textContent, /削除|見つかりません/);
 });
 
 test('add screen rejects duplicate URLs and invalid URLs without a write', async () => {

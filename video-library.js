@@ -200,40 +200,51 @@
   let urlMigrationRunning = false;
   async function migrateExistingVideoUrls() {
     if (urlMigrationRunning || !canReadProtectedData()) return;
-    const videos = readJson(VIDEO_KEY, []);
-    if (!Array.isArray(videos) || videos.length < 2) return;
-    const duplicates = Data.findDuplicateVideoUrls(videos, state.meta);
-    if (!duplicates.length) return;
+    const payload = window.MangaVaultPayload;
+    const storage = window.MangaReaderStorage;
+    const vault = window.MangaVault;
+    const guest = window.TestCodeGuest?.isActive() === true;
+    const collections = ['videos', 'videoMeta', 'videoMarkers', 'videoPropertyValues'];
+    const keys = collections.map(name => payload?.DATA_KEYS?.[name]);
+    if (!storage?.snapshot || keys.some(key => !key) || (!guest && !vault?.recordGuardedSyncDeletion)) return;
     urlMigrationRunning = true;
     try {
-      const meta = readJson(META_KEY, {});
-      const markers = readJson('mangaReaderVideoMarkers', {});
-      const propertyKey = 'mangaReaderVideoPropertyValues';
-      const properties = readJson(propertyKey, {});
-      const plan = Data.planVideoUrlConsolidation({ videos, duplicates, meta, markers, properties });
-      const keys = [VIDEO_KEY, META_KEY, 'mangaReaderVideoMarkers', propertyKey];
-      const values = [plan.videos, plan.meta, plan.markers, plan.properties];
-      const commit = () => {
-        const before = keys.map(key => localStorage.getItem(key));
-        try {
-          keys.forEach((key, index) => localStorage.setItem(key, JSON.stringify(values[index])));
-        } catch (error) {
-          keys.forEach((key, index) => {
-            try { before[index] == null ? localStorage.removeItem(key) : localStorage.setItem(key, before[index]); } catch (_) {}
-          });
-          throw error;
+      let committed = false;
+      for (let attempt = 0; attempt < 3 && canReadProtectedData(); attempt += 1) {
+        const snapshot = storage.snapshot(keys);
+        const [videos, meta, markers, properties] = keys.map((key, index) =>
+          JSON.parse(snapshot.get(key) ?? (index === 0 ? '[]' : '{}')));
+        if (!Array.isArray(videos) || [meta, markers, properties].some(value =>
+          !value || typeof value !== 'object' || Array.isArray(value))) {
+          throw new Error('動画の保存データ形式を確認できません。');
         }
-      };
-      if (window.TestCodeGuest?.isActive()) commit();
-      else {
-        const vault = window.MangaVault;
-        const pointer = window.MangaVaultPayload?.pointerPath;
-        if (!vault || typeof vault.recordSyncDeletion !== 'function' || typeof pointer !== 'function') return;
-        const paths = plan.removedIds.flatMap(id => [
-          pointer('videos', id), pointer('videoMeta', id), pointer('videoMarkers', id),
-          pointer('videoPropertyValues', id)]);
-        await vault.recordSyncDeletion(paths, commit);
+        const duplicates = Data.findDuplicateVideoUrls(videos, meta);
+        if (!duplicates.length) return;
+        const plan = Data.planVideoUrlConsolidation({ videos, duplicates, meta, markers, properties });
+        if (!plan.removedIds.length) return;
+        const values = [plan.videos, plan.meta, plan.markers, plan.properties];
+        const candidateIds = duplicates.flatMap(group => group.map(({ video }) => video.id));
+        const candidatePaths = candidateIds.flatMap(id => collections.map(name => payload.pointerPath(name, id)));
+        const validate = (pending = []) => canReadProtectedData() && storage.matchesSnapshot(snapshot)
+          && !pending.some(path => candidatePaths.some(candidate => path === candidate || path.startsWith(candidate + '/')));
+        const commit = () => storage.writeBatch(snapshot, keys.map((key, index) => [key, values[index]]));
+        try {
+          if (guest) {
+            committed = await storage.withWriteLock(() => {
+              if (!validate()) return false;
+              commit();
+              return true;
+            });
+          } else {
+            const paths = plan.removedIds.flatMap(id => collections.map(name => payload.pointerPath(name, id)));
+            committed = await vault.recordGuardedSyncDeletion(paths, validate, commit, storage.withWriteLock);
+          }
+        } catch (error) {
+          if (error.code !== 'STORAGE_CHANGED') throw error;
+        }
+        if (committed) break;
       }
+      if (!committed) return;
       loadLibraryState();
       // Finish the already-started storage migration, but never paint a detached route.
       if (isListMounted()) render();
@@ -344,16 +355,26 @@
     if (sync) scheduleVaultSync();
     return true;
   }
-  function updateMeta(videoId, patch, options) {
-    if (!canReadProtectedData()) return false;
-    const current = state.meta[videoId] && typeof state.meta[videoId] === 'object' ? state.meta[videoId] : {};
-    const previous = state.meta[videoId];
-    state.meta[videoId] = { ...current, ...patch, updatedAt: Date.now() };
-    if (!persistAux(options)) {
-      if (previous === undefined) delete state.meta[videoId]; else state.meta[videoId] = previous;
+  async function updateMeta(videoId, change) {
+    const storage = window.MangaReaderStorage;
+    try {
+      const saved = await storage.withWriteLock(() => {
+        if (!canReadProtectedData()) return false;
+        const before = storage.snapshot([VIDEO_KEY, META_KEY]);
+        const videos = JSON.parse(before.get(VIDEO_KEY) ?? '[]');
+        const base = videos.find(video => String(video.id) === String(videoId));
+        if (!base) return false;
+        const meta = JSON.parse(before.get(META_KEY) ?? '{}');
+        if (!meta || typeof meta !== 'object' || Array.isArray(meta) || !markLocalChangesPending()) return false;
+        meta[videoId] = { ...meta[videoId], ...change(base, meta[videoId]), updatedAt: Date.now() };
+        storage.writeBatch(before, [[META_KEY, meta]]);
+        return true;
+      });
+      if (saved) scheduleVaultSync();
+      return saved;
+    } catch (_) {
       return false;
     }
-    return true;
   }
 
   function fillSelect(select, options, current, blankLabel) {
@@ -798,14 +819,19 @@
     if (state.editorId === videoId) closeSheet();
   }
 
-  function openVideo(videoId) {
+  async function openVideo(videoId) {
     if (!canReadProtectedData()) return;
-    const base = baseById(videoId); if (!base) return; const video = effectiveVideo(base);
+    if (!baseById(videoId)) return;
+    const origin = location.href;
+    const page = state.page;
     captureReturnContext(videoId);
-    updateMeta(videoId, { openCount: (video.openCount || 0) + 1, lastOpenedAt: Date.now() });
-    const target = new URL('video-player.html', location.href);
+    await updateMeta(videoId, (base, meta) => ({
+      openCount: (Number(meta?.openCount ?? base.openCount) || 0) + 1, lastOpenedAt: Date.now(),
+    }));
+    if (location.href !== origin || !isListMounted() || !canReadProtectedData()) return;
+    const target = new URL('video-player.html', origin);
     target.searchParams.set('id', videoId);
-    target.searchParams.set('fromPage', String(state.page));
+    target.searchParams.set('fromPage', String(page));
     window.location.href = target.href;
   }
 
@@ -905,7 +931,7 @@
       effectiveVideos, folderName, canReadProtectedData,
       actions: {
         openVideo,
-        toggleFavorite(videoId, favorite) { updateMeta(videoId, { favorite }); render(); },
+        async toggleFavorite(videoId, favorite) { await updateMeta(videoId, () => ({ favorite })); render(); },
         removeSeries(videoIds) { return commitSeries('remove', videoIds); },
         selectVideo(videoId, selected) {
           if (selected) state.seriesSelected.add(String(videoId));

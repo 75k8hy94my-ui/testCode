@@ -18,7 +18,6 @@ function deps(calls) {
     canReadProtectedData() { return true; },
     safeWriteJson(key, value) { calls.push(['write', key, value]); },
     getState() { calls.push('state'); return state; },
-    persistVideos() { calls.push('videos'); },
     keys: { savedItems: 'items-key', savedFolders: 'folders-key', authorCards: 'authors-key', savedVideos: 'videos-key' },
     sync: {
       hasActiveVault() { calls.push('vault'); return true; },
@@ -91,7 +90,7 @@ test('host factory exposes the shared persistence callbacks and rejects missing 
   assert.ok(Object.isFrozen(factory));
   assert.throws(() => factory.create(), (error) => error.name === 'TypeError');
   const complete = deps([]);
-  for (const key of ['safeWriteJson', 'getState', 'persistVideos', 'keys', 'sync', 'navigation']) {
+  for (const key of ['safeWriteJson', 'getState', 'keys', 'sync', 'navigation']) {
     const missing = { ...complete };
     delete missing[key];
     assert.throws(() => factory.create(missing), (error) => error.name === 'TypeError' && error.message.includes(key === 'keys' ? 'keys' : key));
@@ -128,9 +127,11 @@ test('host accepts and invokes saveLocalChanges when savePayload is unavailable'
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'save'), false);
 });
 
-test('host persistence preserves write and sync order', () => {
+test('bookshelf persistence writes its own records in order and leaves video storage alone', () => {
   const calls = [];
-  const host = loadFactory().create(deps(calls));
+  const input = deps(calls);
+  input.persistVideos = () => { throw new Error('stale bookshelf video snapshot must never be written'); };
+  const host = loadFactory().create(input);
   assert.deepEqual(Object.keys(host), [
     'persistItems', 'persistFolders', 'persistAuthorCards', 'persistAll',
     'buildSyncPayload', 'runCloudSync', 'flushCloudSync', 'scheduleCloudSync', 'setupFeedImage', 'loadLocalCover',
@@ -142,7 +143,6 @@ test('host persistence preserves write and sync order', () => {
     'state', 'write:folders-key', 'vault', 'clear:null', 'timer:5000',
     'state', 'write:items-key', 'vault', 'clear:timer-id', 'timer:5000',
     'state', 'write:authors-key', 'vault', 'clear:timer-id', 'timer:5000',
-    'videos',
   ]);
 });
 

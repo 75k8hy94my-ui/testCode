@@ -4,9 +4,11 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const controls = fs.readFileSync(new URL('../video-player-controls.js', import.meta.url), 'utf8');
+const storageSource = fs.readFileSync(new URL('../browser-storage.js', import.meta.url), 'utf8');
 const page = fs.readFileSync(new URL('../video-player-page.js', import.meta.url), 'utf8');
 
 function createPlayer(saved = {}, options = {}) {
+  if (!('mangaReaderVideos' in saved)) saved.mangaReaderVideos = [{ id: 'clip' }];
   class Node {
     constructor(tagName = 'DIV') {
       this.tagName = tagName;
@@ -53,18 +55,20 @@ function createPlayer(saved = {}, options = {}) {
     activeElement: null,
   };
   const events = [];
-  const localStorage = { getItem: (key) => key in saved ? JSON.stringify(saved[key]) : null, setItem: (key, value) => { events.push('persist'); saved[key] = JSON.parse(value); } };
-  const window = { MangaReaderMediaAccess: { canReadProtectedData: () => true }, TestCodeGuest: { isActive: () => options.guest !== false }, MangaVaultPayload: { normalizeVideoMarkers: (value) => value, pointerPath: (...parts) => '/' + parts.join('/') }, dispatchEvent() {} };
+  const localStorage = { getItem: (key) => key in saved ? JSON.stringify(saved[key]) : null, setItem: (key, value) => { events.push('persist'); saved[key] = JSON.parse(value); }, removeItem: key => { delete saved[key]; } };
+  const window = { MangaReaderMediaAccess: { canReadProtectedData: () => true }, TestCodeGuest: { isActive: () => options.guest !== false }, MangaVaultPayload: { DATA_KEYS: { videos: 'mangaReaderVideos' }, normalizeVideoMarkers: (value) => value, pointerPath: (...parts) => '/' + parts.join('/') }, dispatchEvent() {} };
   if (options.guest === false) {
     window.MangaVault = options.vault;
   }
   class CustomEvent { constructor(type) { this.type = type; } }
-  vm.runInNewContext(controls, {
+  const context = vm.createContext({
     window, document, location: { search: '?id=clip' }, localStorage, URLSearchParams, CustomEvent,
     crypto: { randomUUID: () => 'test-id' },
     setTimeout: options.timers?.setTimeout || (() => 1),
     clearTimeout: options.timers?.clearTimeout || (() => {}),
   });
+  vm.runInContext(storageSource, context);
+  vm.runInContext(controls, context);
   const centerPlay = frame.children.find((node) => node.className === 'customVideoCenterPlay');
   const frameControls = frame.children.find((node) => node.className === 'customVideoControls');
   const seekWrap = frameControls.children.find((node) => node.className === 'customVideoSeekWrap');
@@ -89,8 +93,9 @@ test('saved timeline icons are positioned by duration and clicking one seeks to 
 });
 
 test('marker deletion journals its stable nested ID before persisting the local marker map', () => {
-  assert.match(controls, /recordSyncDeletion\(deletedMarkers\.map\(\(marker\) => pointerPath\('videoMarkers', id, marker\.id\)\), persist\)/);
-  assert.match(controls, /save\(next, \[marker\]\)/);
+  assert.match(controls, /deletedMarkers\.map\(marker => pointerPath\('videoMarkers', id, marker\.id\)\)/);
+  assert.match(controls, /recordGuardedSyncDeletion\(paths, prepare, commit, storage\.withWriteLock\)/);
+  assert.match(controls, /save\(null, \[marker\]\)/);
   assert.match(controls, /markLocalChangesPending\(\)/);
 });
 
@@ -131,7 +136,7 @@ test('marker deletion records the stable identity before local persistence and s
   const calls = [];
   const vault = {
     markLocalChangesPending() { calls.push('pending'); return true; },
-    async recordSyncDeletion(paths, mutate) { calls.push(['journal', paths]); await mutate(); },
+    async recordGuardedSyncDeletion(paths, prepare, commit, withLock) { return withLock(() => { if (!prepare()) return false; calls.push(['journal', paths]); commit(); return true; }); },
     async saveLocalChanges() { calls.push('sync'); },
   };
   const player = createPlayer({ mangaReaderVideoMarkers: { clip: [{ id: 'm1', seconds: 15, icon: 'water' }] } }, { guest: false, vault });
@@ -147,6 +152,22 @@ test('marker deletion records the stable identity before local persistence and s
   assert.ok(player.events.includes('persist'));
   assert.ok(calls.includes('sync'));
   assert.deepEqual(player.saved.mangaReaderVideoMarkers, {});
+});
+
+test('an open player appends to current markers instead of replacing markers merged by another tab', async () => {
+  const player = createPlayer();
+  player.saved.mangaReaderVideoMarkers = { clip: [{ id: 'concurrent', seconds: 3, icon: 'water' }] };
+  player.add.emit('click');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(player.saved.mangaReaderVideoMarkers.clip.map(marker => marker.id), ['concurrent', 'marker-test-id']);
+});
+
+test('an open player cannot save an orphan marker for a video removed by another tab', async () => {
+  const player = createPlayer();
+  player.saved.mangaReaderVideos = [];
+  player.add.emit('click');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(player.saved.mangaReaderVideoMarkers, undefined);
 });
 
 test('left and right arrow keys seek ten seconds while editable controls retain their keys', () => {
@@ -210,7 +231,7 @@ test('the centered button and hidden-controls state have accessible responsive s
   assert.match(css, /\.customVideoPlayer:not\(\.controlsVisible\) \.customVideoControls/);
   assert.match(css, /pointer-events: none/);
   assert.match(css, /\.customVideoCenterPlay:focus-visible/);
-  assert.match(html, /video-player-controls\.js\?v=20261026-idle-space/);
+  assert.match(html, /video-player-controls\.js\?v=20261119-video-persistence/);
 });
 
 

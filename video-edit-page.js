@@ -21,21 +21,17 @@
     if (!canReadProtectedData()) return fallback;
     try { const value = JSON.parse(localStorage.getItem(key) || 'null'); return value == null ? fallback : value; } catch (_) { return fallback; }
   }
-  function writeVideoRecordsAtomically(videos, metadata, propertyValues = null) {
-    const previousVideos = localStorage.getItem(VIDEO_KEY);
-    const previousMetadata = localStorage.getItem(META_KEY);
-    const propertyValuesKey = 'mangaReaderVideoPropertyValues';
-    const previousPropertyValues = propertyValues == null ? null : localStorage.getItem(propertyValuesKey);
-    try {
-      localStorage.setItem(VIDEO_KEY, JSON.stringify(videos));
-      localStorage.setItem(META_KEY, JSON.stringify(metadata));
-      if (propertyValues != null) localStorage.setItem(propertyValuesKey, JSON.stringify(propertyValues));
-    } catch (error) {
-      try { if (previousVideos == null) localStorage.removeItem(VIDEO_KEY); else localStorage.setItem(VIDEO_KEY, previousVideos); } catch (_) {}
-      try { if (previousMetadata == null) localStorage.removeItem(META_KEY); else localStorage.setItem(META_KEY, previousMetadata); } catch (_) {}
-      if (propertyValues != null) { try { if (previousPropertyValues == null) localStorage.removeItem(propertyValuesKey); else localStorage.setItem(propertyValuesKey, previousPropertyValues); } catch (_) {} }
-      throw error;
-    }
+  function writeVideoRecordsAtomically(videos, metadata, before) {
+    if (!canReadProtectedData()) throw new Error('VPN接続を確認できるまで動画を編集できません。');
+    const storage = window.MangaReaderStorage;
+    storage.writeBatch(before, [[VIDEO_KEY, videos], [META_KEY, metadata]]);
+  }
+  function editableFields(video, metadata) {
+    const editable = Data.normalizeVideo({ ...video, ...metadata, id: video.id, a: video.a, b: video.b });
+    return JSON.stringify([editable.url, editable.title, editable.alternateUrls, editable.a, editable.b,
+      editable.folderId, editable.watchStatus, editable.tags, editable.memo, editable.favorite, editable.hidden,
+      editable.embedPage, editable.rotate90Direction, editable.rotationKeyframes, editable.thumbnailUrl,
+      editable.thumbnailTimeSeconds, video.virtualEdition === true, metadata?.virtualPublishedEdit ?? null]);
   }
   function showGate() {
     const section = document.createElement('section'); section.className = 'videoEditNotice vpnRouteGate';
@@ -311,8 +307,13 @@
           }
           urls.push(parsed[index].trim());
         }
-        const latestVideos = read(VIDEO_KEY, []);
-        const savedVideos = Array.isArray(latestVideos) ? latestVideos : [];
+        let before, savedVideos, currentMeta;
+        try {
+          before = window.MangaReaderStorage.snapshot([VIDEO_KEY, META_KEY]);
+          savedVideos = JSON.parse(before.get(VIDEO_KEY) ?? '[]');
+          currentMeta = JSON.parse(before.get(META_KEY) ?? '{}');
+          if (!Array.isArray(savedVideos) || !currentMeta || typeof currentMeta !== 'object' || Array.isArray(currentMeta)) throw new Error();
+        } catch (_) { error.textContent = '動画の保存データを読み込めません。'; return; }
         const updatedVideos = savedVideos.map(v => ({ ...v }));
         const newVideos = [];
         const newMeta = {};
@@ -321,7 +322,7 @@
         let promoted = 0;
         urls.forEach((url) => {
           const identity = Data.videoUrlIdentity(url);
-          const found = updatedVideos.find(v => v.virtualEdition !== true && !read(META_KEY, {})[String(v.id)]?.virtualPublishedEdit && [v.url, ...(v.alternateUrls || [])].some(x => Data.videoUrlIdentity(x) === identity));
+          const found = updatedVideos.find(v => v.virtualEdition !== true && !currentMeta[String(v.id)]?.virtualPublishedEdit && [v.url, ...(v.alternateUrls || [])].some(x => Data.videoUrlIdentity(x) === identity));
           if (found) {
             if (found.url !== url) { Object.assign(found, Data.promoteVideoUrl(found, url)); promoted++; }
             return;
@@ -339,24 +340,21 @@
           if (eventTarget) eventTarget.value = '';
           return;
         }
-        const currentMeta = read(META_KEY, {});
-        const nextMeta = currentMeta && typeof currentMeta === 'object' && !Array.isArray(currentMeta) ? { ...currentMeta, ...newMeta } : newMeta;
-        if (!window.TestCodeGuest?.isActive()) {
-          if (!window.MangaVault || typeof window.MangaVault.markLocalChangesPending !== 'function') {
-            error.textContent = '未同期状態を管理できません。動画は変更していません。保管庫を開いて再試行してください。';
-            if (eventTarget) eventTarget.value = '';
-            return;
-          }
-          if (!window.MangaVault.markLocalChangesPending()) {
-            error.textContent = '未同期状態を記録できませんでした。動画は変更していません。保存領域を確認してください。';
-            if (eventTarget) eventTarget.value = '';
-            return;
-          }
-        }
+        const nextMeta = { ...currentMeta, ...newMeta };
         try {
-          writeVideoRecordsAtomically([...newVideos, ...updatedVideos.filter(v => !newVideos.some(n => n.id === v.id))], nextMeta);
-        } catch (_) {
-          error.textContent = '端末に保存できませんでした。ブラウザの保存容量を確認してください。';
+          const saved = await window.MangaReaderStorage.withWriteLock(() => {
+            if (!canReadProtectedData()) return false;
+            if (!window.TestCodeGuest?.isActive() &&
+                (!window.MangaVault || typeof window.MangaVault.markLocalChangesPending !== 'function' || !window.MangaVault.markLocalChangesPending())) {
+              error.textContent = '未同期状態を記録できませんでした。動画は変更していません。';
+              return false;
+            }
+            writeVideoRecordsAtomically([...newVideos, ...updatedVideos.filter(v => !newVideos.some(n => n.id === v.id))], nextMeta, before);
+            return true;
+          });
+          if (!saved) { if (eventTarget) eventTarget.value = ''; return; }
+        } catch (failure) {
+          error.textContent = failure.code === 'STORAGE_CHANGED' ? failure.message : '端末に保存できませんでした。ブラウザの保存容量を確認してください。';
           if (eventTarget) eventTarget.value = '';
           return;
         }
@@ -423,6 +421,7 @@
       });
     }
     let lastSavedSnapshot = formSnapshot();
+    let lastSavedFields = isAddMode ? null : editableFields(base, originalMeta);
     function setSaveStatus(message) { if (saveStatus && !isAddMode) saveStatus.textContent = message; }
     function scheduleCloudSync() {
       if (isAddMode || window.TestCodeGuest?.isActive()) return;
@@ -506,10 +505,30 @@
       let rotationKeyframes;
       try { rotationKeyframes = readRotationRows(); }
       catch (error) { error.textContent = error.message; setSaveStatus('未保存・回転時刻を確認してください'); return; }
-      const latestVideos = read(VIDEO_KEY, []);
-      const savedVideos = Array.isArray(latestVideos) ? latestVideos : [];
+      if (!canReadProtectedData()) return;
+      let before, savedVideos, storedMeta;
+      try {
+        before = window.MangaReaderStorage.snapshot([VIDEO_KEY, META_KEY]);
+        savedVideos = JSON.parse(before.get(VIDEO_KEY) ?? '[]');
+        storedMeta = JSON.parse(before.get(META_KEY) ?? '{}');
+        if (!Array.isArray(savedVideos) || !storedMeta || typeof storedMeta !== 'object' || Array.isArray(storedMeta)) throw new Error();
+      } catch (_) {
+        error.textContent = '動画の保存データを読み込めません。入力内容は保持されています。';
+        return;
+      }
+      const latestBase = isAddMode ? null : savedVideos.find(item => String(item.id) === videoId);
+      if (!isAddMode) {
+        if (!latestBase) {
+          error.textContent = '動画が削除されたか、見つかりません。入力内容は保持されています。';
+          return;
+        }
+        if (editableFields(latestBase, storedMeta?.[videoId]) !== lastSavedFields) {
+          error.textContent = '別の画面で動画が更新されました。入力内容は保持されています。';
+          return;
+        }
+      }
       const identity = Data.videoUrlIdentity(url);
-      const matching = base?.virtualEdition === true || originalMeta.virtualPublishedEdit ? null : savedVideos.find(item => item.virtualEdition !== true && (isAddMode || String(item.id) !== videoId) &&
+      const matching = latestBase?.virtualEdition === true || storedMeta?.[videoId]?.virtualPublishedEdit ? null : savedVideos.find(item => item.virtualEdition !== true && (isAddMode || String(item.id) !== videoId) &&
         [item.url, ...(item.alternateUrls || [])].some(candidate => Data.videoUrlIdentity(candidate) === identity));
       const variants = [...new Set([...elements.alternateUrls.value.split(/\r?\n/).map(v => v.trim()), ...(!isAddMode && current.url !== url ? [current.url] : [])])].filter(v => v && v !== url);
       if (variants.some(v => Data.classifyVideoUrl(v).kind === 'invalid')) { error.textContent = 'サブURLを確認してください。'; setSaveStatus('未保存・サブURLを確認してください'); return; }
@@ -530,18 +549,22 @@
         ? Data.promoteVideoUrl(matching, url)
         : isAddMode
           ? Data.normalizeVideo({ id: savedId, title: elements.title.value.trim(), url, alternateUrls: variants, a, b, addedAt: now, updatedAt: now })
-          : { ...base, title: elements.title.value.trim(), url, alternateUrls: variants, a, b, updatedAt: now };
+          : { ...latestBase, title: elements.title.value.trim(), url, alternateUrls: variants, a, b, updatedAt: now };
       if (matching) nextBase.alternateUrls = [...new Set([...(nextBase.alternateUrls || []), ...variants])].filter(v => v !== url);
-      const storedMeta = read(META_KEY, {});
-      const nextMeta = storedMeta && typeof storedMeta === 'object' && !Array.isArray(storedMeta) ? storedMeta : {};
-      if (!matching) nextMeta[savedId] = { ...(nextMeta[savedId] || {}), title: matching ? (nextMeta[savedId]?.title || '') : elements.title.value.trim(), folderId: matching ? (nextMeta[savedId]?.folderId || null) : elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, hidden: elements.hidden.checked, embedPage: elements.embedPage.checked && classified.kind !== 'direct', rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, rotationKeyframes, thumbnailUrl: elements.thumbnail.value.trim(), thumbnailTimeSeconds: Data.isDirectVideoUrl(url) ? parsedTime : current.thumbnailTimeSeconds, updatedAt: Date.now() };
+      const nextMeta = storedMeta;
+      if (!matching) nextMeta[savedId] = { ...(nextMeta[savedId] || {}), title: elements.title.value.trim(), folderId: elements.folder.value || null, watchStatus: elements.status.value, tags: Data.parseTags(elements.tags.value), memo: elements.memo.value.trim(), favorite: elements.favorite.checked, hidden: elements.hidden.checked, embedPage: elements.embedPage.checked && classified.kind !== 'direct', rotate90: elements.rotate.value !== 'none', rotate90Direction: elements.rotate.value, rotationKeyframes, thumbnailUrl: elements.thumbnail.value.trim(), thumbnailTimeSeconds: Data.isDirectVideoUrl(url) ? parsedTime : current.thumbnailTimeSeconds, updatedAt: Date.now() };
       const nextVideos = matching ? savedVideos.map(item => String(item.id) === savedId ? nextBase : item) : isAddMode ? [nextBase, ...savedVideos] : savedVideos.map((item) => String(item.id) === videoId ? nextBase : item);
       const propertyUpdates = [];
       let propertyWritesNeeded = false;
       if (customValueInputs.size && !matching) {
         const latestPropertyState = PropertyStore.read();
         const savedPropertyValues = latestPropertyState.values[String(savedId)] || {};
+        const oldControls = JSON.parse(lastSavedSnapshot).custom;
+        const submittedControls = JSON.parse(startingSnapshot).custom;
+        let controlIndex = 0;
         for (const [propertyId, entry] of customValueInputs) {
+          const index = controlIndex++;
+          if (!isAddMode && JSON.stringify(oldControls[index]) === JSON.stringify(submittedControls[index])) continue;
           const { property, control, previous } = entry;
           let value;
           if (property.type === 'checkbox') value = control.checked;
@@ -558,7 +581,11 @@
           if (property.type === 'single_select' && value === previous && value != null && options[value]?.deleted === true) valid = true;
           if (property.type === 'multi_select' && Array.isArray(value)) valid = value.length === new Set(value).size && value.every((optionId) => typeof optionId === 'string' && (!!options[optionId] && options[optionId].deleted !== true || Array.isArray(previous) && previous.includes(optionId)));
           if (!valid) { error.textContent = `「${property.name}」の値を確認してください。`; return; }
-          propertyUpdates.push({ propertyId, property, previous, value });
+          if (!isAddMode && JSON.stringify(savedPropertyValues[propertyId]) !== JSON.stringify(previous)) {
+            error.textContent = '別の画面で動画プロパティが更新されました。入力内容は保持されています。';
+            return;
+          }
+          propertyUpdates.push({ propertyId, definition: property, previous, value });
           if (JSON.stringify(savedPropertyValues[propertyId]) !== JSON.stringify(value)) propertyWritesNeeded = true;
         }
       }
@@ -566,45 +593,61 @@
       const submitButton = form.querySelector('[type="submit"]');
       if (submitButton) submitButton.disabled = true;
       try {
-        if (!window.TestCodeGuest?.isActive()) {
-          if (!window.MangaVault || typeof window.MangaVault.markLocalChangesPending !== 'function') {
-            error.textContent = '未同期状態を管理できません。動画は変更していません。保管庫を開いて再試行してください。';
-            return;
-          }
-          if (!window.MangaVault.markLocalChangesPending()) {
-            error.textContent = '未同期状態を記録できませんでした。動画は変更していません。保存領域を確認してください。';
-            return;
-          }
-        }
+        const guest = window.TestCodeGuest?.isActive() === true;
+        const saveProperties = propertyWritesNeeded && PropertyStore && !matching;
+        const markBeforeLocalWrite = () => {
+          if (guest || window.MangaVault?.markLocalChangesPending?.() === true) return true;
+          error.textContent = '未同期状態を記録できませんでした。動画は変更していません。';
+          return false;
+        };
         try {
-          if (propertyWritesNeeded && PropertyStore && !matching) {
+          if (saveProperties) {
             await PropertyStore.mutate({
               storage: localStorage,
-              guest: !!window.TestCodeGuest?.isActive(),
+              guest,
               vault: window.MangaVault,
-              pendingAlreadyMarked: !window.TestCodeGuest?.isActive(),
               sync: false,
               recipe: (latest) => {
+                if (!canReadProtectedData() || !window.MangaReaderStorage.matchesSnapshot(before)) {
+                  const conflict = new Error('動画の保存状態が変更されました。入力内容は保持されています。');
+                  conflict.code = 'STORAGE_CHANGED';
+                  throw conflict;
+                }
                 const values = { ...latest.values };
                 const videoValues = { ...(values[String(savedId)] || {}) };
                 for (const update of propertyUpdates) {
                   const latestProperty = latest.definitions.properties[update.propertyId];
-                  if (!latestProperty || latestProperty.deleted === true) continue;
+                  if (!latestProperty || latestProperty.deleted === true
+                    || JSON.stringify(latestProperty) !== JSON.stringify(update.definition)
+                    || (!isAddMode && JSON.stringify(videoValues[update.propertyId]) !== JSON.stringify(update.previous))) {
+                    const conflict = new Error('別の画面で動画プロパティが更新されました。入力内容は保持されています。');
+                    conflict.code = 'STORAGE_CHANGED';
+                    throw conflict;
+                  }
                   if (JSON.stringify(videoValues[update.propertyId]) === JSON.stringify(update.value)) continue;
                   videoValues[update.propertyId] = update.value;
                 }
                 values[String(savedId)] = videoValues;
                 return { ...latest, values };
               },
-              commit: () => writeVideoRecordsAtomically(nextVideos, nextMeta),
+              commit: () => writeVideoRecordsAtomically(nextVideos, nextMeta, before),
             });
-          } else writeVideoRecordsAtomically(nextVideos, nextMeta);
-        } catch (_) {
-          error.textContent = '端末に保存できませんでした。ブラウザの保存容量を確認してください。';
+          } else {
+            const saved = await window.MangaReaderStorage.withWriteLock(() => {
+              if (!canReadProtectedData() || !markBeforeLocalWrite()) return false;
+              writeVideoRecordsAtomically(nextVideos, nextMeta, before);
+              return true;
+            });
+            if (!saved) return;
+          }
+        } catch (failure) {
+          error.textContent = failure.code === 'STORAGE_CHANGED' ? failure.message : '端末に保存できませんでした。ブラウザの保存容量を確認してください。';
           return;
         }
         if (!isAddMode) {
           lastSavedSnapshot = startingSnapshot;
+          lastSavedFields = editableFields(nextBase, nextMeta[savedId]);
+          for (const update of propertyUpdates) customValueInputs.get(update.propertyId).previous = update.value;
           setSaveStatus(window.TestCodeGuest?.isActive() ? '端末に自動保存しました' : '端末保存済み・クラウド同期中');
           scheduleCloudSync();
         } else {
@@ -625,33 +668,46 @@
       if (!canReadProtectedData()) return;
       if (!confirm('「' + (current.title || 'この動画') + '」を削除しますか？')) return;
       const error = form.querySelector('.videoEditError'); error.textContent = '';
-      const remove = async () => {
-        const latestVideos = read(VIDEO_KEY, []);
-        const latestMeta = read(META_KEY, {});
-        if (!Array.isArray(latestVideos)) throw new Error('動画一覧を読み込めませんでした。');
-        const remaining = latestVideos.filter((item) => String(item.id) !== videoId);
-        if (remaining.length === latestVideos.length) throw new Error('動画が見つかりません。');
-        const remainingMeta = latestMeta && typeof latestMeta === 'object' && !Array.isArray(latestMeta) ? { ...latestMeta } : {};
-        delete remainingMeta[videoId];
-        try { writeVideoRecordsAtomically(remaining, remainingMeta); }
-        catch (_) { throw new Error('端末に削除を保存できませんでした。ブラウザの保存容量を確認してください。'); }
-        const propertyStore = window.MangaReaderVideoCustomPropertyStore;
-        if (propertyStore && typeof propertyStore.removeVideoValues === 'function') {
-          await propertyStore.removeVideoValues({ storage: localStorage, videoId, guest: true, alreadyJournaled: true });
+      const storage = window.MangaReaderStorage;
+      const payload = window.MangaVaultPayload;
+      const propertyKey = payload?.DATA_KEYS?.videoPropertyValues;
+      const guest = window.TestCodeGuest?.isActive() === true;
+      if (!propertyKey || !storage) { error.textContent = '動画の保存領域を確認できません。'; return; }
+      let before, updates;
+      const prepare = () => {
+        if (!canReadProtectedData()) throw new Error('VPN接続を確認できるまで動画を削除できません。');
+        before = storage.snapshot([VIDEO_KEY, META_KEY, propertyKey]);
+        const videos = JSON.parse(before.get(VIDEO_KEY) ?? '[]');
+        const meta = JSON.parse(before.get(META_KEY) ?? '{}');
+        const properties = JSON.parse(before.get(propertyKey) ?? '{}');
+        if (!Array.isArray(videos) || [meta, properties].some(value => !value || typeof value !== 'object' || Array.isArray(value))) {
+          throw new Error('動画一覧を読み込めませんでした。');
         }
+        const remaining = videos.filter(item => String(item.id) !== videoId);
+        if (remaining.length === videos.length) throw new Error('動画が見つかりません。');
+        delete meta[videoId];
+        const hadProperties = Object.hasOwn(properties, videoId);
+        delete properties[videoId];
+        updates = [[VIDEO_KEY, remaining], [META_KEY, meta]];
+        if (hadProperties) updates.push([propertyKey, properties]);
+        return true;
       };
-      if (window.TestCodeGuest?.isActive()) {
-        try { await remove(); } catch (failure) { error.textContent = failure.message; return; }
-        location.href = 'video.html';
+      const commit = () => storage.writeBatch(before, updates);
+      try {
+        if (guest) await storage.withWriteLock(() => { prepare(); commit(); });
+        else {
+          const vault = window.MangaVault;
+          const pointerPath = payload.pointerPath;
+          if (typeof vault?.recordGuardedSyncDeletion !== 'function' || typeof pointerPath !== 'function') throw new Error('保管庫を開いてから削除してください。');
+          const paths = [pointerPath('videos', videoId), pointerPath('videoMeta', videoId), pointerPath('videoPropertyValues', videoId)];
+          if (!await vault.recordGuardedSyncDeletion(paths, prepare, commit, storage.withWriteLock)) {
+            throw new Error('別の画面で削除状態が変更されました。再試行してください。');
+          }
+        }
+      } catch (failure) {
+        error.textContent = failure.message || '削除を保全できませんでした。';
         return;
       }
-      const vault = window.MangaVault;
-      const pointerPath = window.MangaVaultPayload && window.MangaVaultPayload.pointerPath;
-      if (!vault || typeof vault.recordSyncDeletion !== 'function' || typeof pointerPath !== 'function') {
-        error.textContent = '保管庫を開いてから削除してください。'; return;
-      }
-      try { await vault.recordSyncDeletion([pointerPath('videos', videoId), pointerPath('videoMeta', videoId), pointerPath('videoPropertyValues', videoId)], remove); }
-      catch (failure) { error.textContent = failure && failure.message ? failure.message : '削除を保全できませんでした。'; return; }
       location.href = 'video.html';
     });
     page.replaceChildren(heading, lead, form);

@@ -35,10 +35,10 @@ test('all normal video cards retain title, favorites, tags, folders, metadata an
   assert.match(read('video-library-view.js'), /VideoCard\.create\(cardMedia/);
   assert.match(data, /video\.virtualEdition === true/);
   assert.match(data, /meta\[String\(video\.id\)\]\?\.virtualPublishedEdit/);
-  assert.match(library, /Data\.findDuplicateVideoUrls\(videos, state\.meta\)/);
+  assert.match(library, /Data\.findDuplicateVideoUrls\(videos, meta\)/);
   assert.match(library, /function openVideo\(videoId\)/);
   assert.match(library, /lastOpenedAt: Date\.now\(\)/);
-  assert.match(editor, /const matching = base\?\.virtualEdition === true/);
+  assert.match(editor, /const matching = latestBase\?\.virtualEdition === true/);
 });
 
 test('virtual player adapter reports edited duration/time, seeks across clips and does not synthesize timeupdate', () => {

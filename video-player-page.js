@@ -175,19 +175,30 @@
   const renderTags = (nextTags) => { tagLine.textContent = nextTags.map((tag) => '#' + tag).join(' '); tagLine.hidden = !nextTags.length; };
   renderTags(tags); info.append(tagLine, syncStatusNode);
   const saveMetaPatch = async (patch) => {
-    if (!canReadProtectedData()) throw new Error('VPN接続を確認できるまで動画を編集できません。');
-    const nextMeta = read(META_KEY, {});
-    const current = nextMeta[id] && typeof nextMeta[id] === 'object' ? nextMeta[id] : {};
-    nextMeta[id] = { ...current, ...patch, updatedAt: Date.now() };
-    localStorage.setItem(META_KEY, JSON.stringify(nextMeta));
-    if (window.TestCodeGuest?.isActive()) { Object.assign(allMeta, nextMeta); return nextMeta[id]; }
-    if (!window.MangaVault || typeof window.MangaVault.markLocalChangesPending !== 'function' || !window.MangaVault.markLocalChangesPending()) {
-      const error = new Error('端末には保存しましたが、未同期状態を記録できませんでした。'); error.localSaved = true; Object.assign(allMeta, nextMeta); throw error;
-    }
-    Object.assign(allMeta, nextMeta);
-    if (canReadProtectedData()) resumePendingLocalSync();
-    return nextMeta[id];
+    const storage = window.MangaReaderStorage;
+    const guest = window.TestCodeGuest?.isActive();
+    const saved = await storage.withWriteLock(() => {
+      if (!canReadProtectedData()) throw new Error('VPN接続を確認できるまで動画を編集できません。');
+      const before = storage.snapshot([VIDEO_KEY, META_KEY]);
+      const latest = JSON.parse(before.get(VIDEO_KEY) ?? '[]').find(video => String(video.id) === id);
+      if (!latest) throw new Error('動画が削除されたか、見つかりません。');
+      const nextMeta = JSON.parse(before.get(META_KEY) ?? '{}');
+      if (!nextMeta || typeof nextMeta !== 'object' || Array.isArray(nextMeta)) throw new Error('動画メタデータを読み込めません。');
+      const current = nextMeta[id] && typeof nextMeta[id] === 'object' ? nextMeta[id] : {};
+      if (String(({ ...latest, ...current }).title ?? '').trim() !== savedTitle) throw new Error('別の画面で動画タイトルが更新されました。');
+      nextMeta[id] = { ...current, ...patch, updatedAt: Date.now() };
+      if (!guest && window.MangaVault?.markLocalChangesPending?.() !== true) {
+        throw new Error('未同期状態を記録できませんでした。動画は変更していません。');
+      }
+      storage.writeBatch(before, [[META_KEY, nextMeta]]);
+      savedTitle = nextMeta[id].title;
+      Object.assign(allMeta, nextMeta);
+      return nextMeta[id];
+    });
+    if (!guest && canReadProtectedData()) resumePendingLocalSync();
+    return saved;
   };
+  let savedTitle = String(normalized.title ?? '').trim();
   let titleComposing = false;
   let titleJustComposed = false;
   const beginTitleEdit = () => {
@@ -208,9 +219,8 @@
       if (!canReadProtectedData()) return;
       heading.textContent = saved.title; syncTabTitle(saved.title);
     } catch (error) {
-      if (error && error.localSaved && canReadProtectedData()) { heading.textContent = next; syncTabTitle(next); info.dataset.saveError = '端末には保存しましたが、クラウド未同期です。'; }
-      else heading.textContent = previous;
-      setTimeout(() => { delete info.dataset.saveError; }, 3500);
+      heading.textContent = previous;
+      if (canReadProtectedData()) setSyncStatus(error.message || '動画タイトルを保存できませんでした。', true);
     }
   };
   heading.addEventListener('click', beginTitleEdit);

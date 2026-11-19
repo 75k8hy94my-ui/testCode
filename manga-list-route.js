@@ -47,7 +47,7 @@
     ['manga-list-image-cache.js?v=20261011-encrypted-cache', 'mangaRouteImageCache'],
     ['reader-target.js?v=20261003-reader-launch-contract', 'mangaReaderTarget'],
     ['manga-hash-cover-preview.js?v=20261114-hash-cover-preview', 'mangaHashCoverPreview'],
-    ['manga-list-host-runtime.js?v=20261115-page-range-cover', 'mangaRouteHost'],
+    ['manga-list-host-runtime.js?v=20261119-video-persistence', 'mangaRouteHost'],
     ['manga-list-runtime.js?v=20261115-finger-drag', 'mangaRouteRuntime'],
     ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
   ];
@@ -336,7 +336,7 @@
         documentRef, windowRef, canReadProtectedData
       });
       const host = MangaListHostRuntimeFactory.create({
-        safeWriteJson, getState: data.get, persistVideos() { return canReadProtectedData() && markLocalChangesPending() && safeWriteJson(keys.savedVideos, data.get().savedVideos) !== false; }, canReadProtectedData, keys,
+        safeWriteJson, getState: data.get, canReadProtectedData, keys,
         sync: {
           hasActiveVault: () => !!(windowRef.MangaVault && windowRef.MangaVault.loadActive()),
           clearTimer: (timer) => { if (timer) windowRef.clearTimeout(timer); },

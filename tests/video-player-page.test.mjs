@@ -116,14 +116,16 @@ test('player saves title locally first and syncs in background without a spuriou
   assert.match(page, /listenWindow\('online',/);
   assert.match(page, /else resumePendingLocalSync\(\)/);
   assert.match(page, /videoPlayerSyncStatus/);
-  assert.match(page, /markLocalChangesPending\(\)/);
+  assert.match(page, /markLocalChangesPending\?\.\(\)/);
+  const save = page.slice(page.indexOf('const saveMetaPatch'), page.indexOf('let savedTitle'));
+  assert.ok(save.indexOf('markLocalChangesPending') < save.indexOf('storage.writeBatch'));
   assert.doesNotMatch(page, /await window\.MangaVault\.saveLocalChanges\(\)/);
 });
 
 test('marker registration defaults to the current playback position and receives a stable identity', () => {
   assert.match(controls, /playback\.currentTime/);
   assert.match(controls, /const seconds = Math\.max\(0, Number\(playback\.currentTime\) \|\| 0\)/);
-  assert.match(controls, /next = markers\.concat\(\{ id: newMarkerId\(\), seconds, icon: selectedMarkerIcon \}\)/);
+  assert.match(controls, /save\(\{ id: newMarkerId\(\), seconds, icon: selectedMarkerIcon \}\)/);
   assert.match(controls, /vault\.saveLocalChanges\(\)/);
 });
 

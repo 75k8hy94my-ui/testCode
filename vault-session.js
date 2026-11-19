@@ -653,30 +653,68 @@
     }
     return entries;
   }
-  async function writeDeletionJournal(userId, entries) {
+  async function serializeDeletionJournal(userId, entries) {
     const vault = loadActive();
     if (!vault) throw new Error('保管庫がロックされているため削除journalを暗号化できません。');
     const iv = randomBytes(12);
     const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: journalAad(userId) }, await importAes(vault.rawKey), new TextEncoder().encode(JSON.stringify(entries)));
     const envelope = { type: 'manga-reader-vault-deletion-journal', version: 1, userId, iv: b64url(iv), ciphertext: b64url(new Uint8Array(ciphertext)) };
-    localStorage.setItem(deletionJournalKey(), JSON.stringify(envelope));
+    return JSON.stringify(envelope);
   }
-  async function recordSyncDeletion(path, mutate) {
+  async function writeDeletionJournal(userId, entries) {
+    localStorage.setItem(deletionJournalKey(), await serializeDeletionJournal(userId, entries));
+  }
+  async function recordDeletion(path, mutate, validate, withLocalLock) {
     const pointers = (Array.isArray(path) ? path : [path]).map((pointer) => String(pointer || ''));
     if (!pointers.length || pointers.some((pointer) => !pointer.startsWith('/')) || typeof mutate !== 'function') throw new TypeError('削除にはJSON Pointerとデータ変更処理が必要です。');
     const session = loadSession(); const userId = session && session.user && session.user.id;
     if (!userId || !loadActive()) throw new Error('保管庫を開いてから削除してください。');
-    const entries = await readDeletionJournal(userId);
-    const recorded = pointers.map((pointer) => {
-      let entry = entries.find((candidate) => candidate.path === pointer);
-      if (!entry) { entry = { path: pointer, operationId: b64url(randomBytes(16)) }; entries.push(entry); }
-      return entry;
-    });
-    await writeDeletionJournal(userId, entries);
-    const pendingToken = markPendingSync(userId);
-    if (!pendingToken) throw new Error('未同期状態を端末に記録できないため、削除を停止しました。');
-    await mutate(recorded.map((entry) => entry.operationId));
-    return recorded.map((entry) => entry.operationId);
+    const active = sessionStorage.getItem(ACTIVE_KEY);
+    return enqueueSave(() => withVaultSaveLock(userId, async () => {
+      const key = deletionJournalKey();
+      // Finish any legacy journal migration before capturing the byte-level baseline.
+      const legacyKey = window.MangaVaultPayload?.LOCAL_ONLY_KEYS?.[1];
+      if (legacyKey && localStorage.getItem(legacyKey)) await readDeletionJournal(userId);
+      const previous = localStorage.getItem(key);
+      const entries = await readDeletionJournal(userId);
+      const pendingPaths = entries.map(entry => entry.path);
+      const ids = pointers.map((pointer) => {
+        let entry = entries.find((candidate) => candidate.path === pointer);
+        if (!entry) { entry = { path: pointer, operationId: b64url(randomBytes(16)) }; entries.push(entry); }
+        return entry.operationId;
+      });
+      const serialized = await serializeDeletionJournal(userId, entries);
+      const finish = async () => {
+        if (loadSession()?.user?.id !== userId || sessionStorage.getItem(ACTIVE_KEY) !== active) {
+          throw new Error('保管庫の状態が変更されたため、削除を停止しました。');
+        }
+        if (localStorage.getItem(key) !== previous) {
+          if (validate) return false;
+          throw new Error('別の画面が削除を更新しました。再試行してください。');
+        }
+        if (validate && validate(pendingPaths) !== true) return false;
+        localStorage.setItem(key, serialized);
+        try {
+          if (!markPendingSync(userId)) throw new Error('未同期状態を端末に記録できないため、削除を停止しました。');
+          // Guarded commits are synchronous. Finish all lock and crypto waits before publication.
+          if (validate) mutate();
+          else await mutate(ids);
+        } catch (error) {
+          if (validate && localStorage.getItem(key) === serialized) {
+            if (previous == null) localStorage.removeItem(key);
+            else localStorage.setItem(key, previous);
+          }
+          throw error;
+        }
+        return validate ? true : ids;
+      };
+      return withLocalLock ? withLocalLock(finish) : finish();
+    }));
+  }
+  function recordSyncDeletion(path, mutate) { return recordDeletion(path, mutate); }
+  function recordGuardedSyncDeletion(path, validate, commit, withLocalLock) {
+    if (typeof validate !== 'function') throw new TypeError('validate must be a synchronous function');
+    return recordDeletion(path, commit, validate, withLocalLock);
   }
   function removeAtPointer(root, pointer) {
     const parts = pointer.slice(1).split('/').map((part) => part.replace(/~1/g, '/').replace(/~0/g, '~'));
@@ -689,7 +727,9 @@
     if (!parent || typeof parent !== 'object') return;
     const key = parts.at(-1);
     if (Array.isArray(parent)) {
-      const index = parent.findIndex((item, position) => (item && String(item.id) === key) || String(position) === key);
+      const keyed = ['items', 'folders', 'videos', 'videoFolders', 'videoMarkers'].includes(parts[0]);
+      const index = parent.findIndex((item, position) => (item?.id != null && String(item.id) === key)
+        || (!keyed && String(position) === key));
       if (index >= 0) parent.splice(index, 1);
     } else delete parent[key];
   }
@@ -1328,6 +1368,6 @@
     });
     return retryPendingLocalChanges(result);
   }
-  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, ensureSession, refreshSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, listVaultHistory, getVaultHistorySnapshot, setVaultHistoryProtected, previewVaultHistoryRestore, confirmVaultHistoryRestore, loadPayload, initialize, initializeWithPasskey, registerPasskey, listPasskeys, renamePasskey, removePasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, syncLatest, syncStatutesLatest, resolveConflicts, recordSyncDeletion, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
+  window.MangaVault = { SESSION_KEY, META_KEY, ACTIVE_KEY, loadSession, saveSession, clearActive, lockVault, loadActive, waitForActive, ensureSession, refreshSession, sessionIsFresh, isSessionAuthError, api, withSession, fetchRecordForUi, listVaultHistory, getVaultHistorySnapshot, setVaultHistoryProtected, previewVaultHistoryRestore, confirmVaultHistoryRestore, loadPayload, initialize, initializeWithPasskey, registerPasskey, listPasskeys, renamePasskey, removePasskey, removePasskeys, changePassphrase, savePayload, saveLocalChanges, syncLatest, syncStatutesLatest, resolveConflicts, recordSyncDeletion, recordGuardedSyncDeletion, markLocalChangesPending, hasPendingLocalChanges, guardPendingSyncLeave };
 })();
 

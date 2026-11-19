@@ -43,9 +43,10 @@ test('video list menu provides only existing favorite and detail editor actions'
   assert.match(editor, /name="status"/);
   assert.match(editor, /data-delete/);
   assert.match(editor, /source\.href = current\.url/);
-  assert.match(editor, /remaining = latestVideos\.filter/);
-  assert.match(editor, /delete remainingMeta\[videoId\]/);
-  assert.match(editor, /recordSyncDeletion\(\[pointerPath\('videos', videoId\), pointerPath\('videoMeta', videoId\), pointerPath\('videoPropertyValues', videoId\)\]/);
+  assert.match(editor, /remaining = videos\.filter/);
+  assert.match(editor, /delete meta\[videoId\]/);
+  assert.match(editor, /const paths = \[pointerPath\('videos', videoId\), pointerPath\('videoMeta', videoId\), pointerPath\('videoPropertyValues', videoId\)\]/);
+  assert.match(editor, /recordGuardedSyncDeletion\(paths, prepare, commit, storage\.withWriteLock\)/);
   const ordinarySubmit = editor.slice(editor.indexOf("form.addEventListener('submit'"), editor.indexOf("if (!isAddMode) form.querySelector('[data-delete]')"));
   const jsonImport = editor.slice(editor.indexOf("jsonImport.addEventListener('change'"), editor.indexOf("elements.url.addEventListener('change'"));
   const importUrls = editor.slice(editor.indexOf('async function importUrls'), editor.indexOf("bulkAddButton.addEventListener('click'"));
@@ -266,7 +267,8 @@ test('video and manga edit paths record durable pending state before local prote
   const ordinarySubmit = editor.slice(editor.indexOf("form.addEventListener('submit'"), editor.indexOf("if (!isAddMode) form.querySelector('[data-delete]')"));
   const jsonImport = editor.slice(editor.indexOf("jsonImport.addEventListener('change'"), editor.indexOf("elements.url.addEventListener('change'"));
   const importUrls = editor.slice(editor.indexOf('async function importUrls'), editor.indexOf("bulkAddButton.addEventListener('click'"));
-  assert.ok(ordinarySubmit.indexOf('markLocalChangesPending()') < ordinarySubmit.indexOf('writeVideoRecordsAtomically('));
+  assert.match(ordinarySubmit, /const markBeforeLocalWrite = \(\) => \{[\s\S]*markLocalChangesPending/);
+  assert.match(ordinarySubmit, /withWriteLock\(\(\) => \{\s*if \(!canReadProtectedData\(\) \|\| !markBeforeLocalWrite\(\)\) return false;\s*writeVideoRecordsAtomically/);
   assert.ok(importUrls.indexOf('markLocalChangesPending()') < importUrls.indexOf('writeVideoRecordsAtomically('));
   assert.match(library, /function persistAux[\s\S]*markLocalChangesPending\(\)[\s\S]*writeJson\(FOLDER_KEY/);
   assert.match(library, /function invokeUrlAdd[\s\S]*markLocalChangesPending\(\)[\s\S]*writeJson\(VIDEO_KEY/);
