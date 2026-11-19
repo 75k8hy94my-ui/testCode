@@ -173,3 +173,33 @@ test('source images 18.webp–29.webp are returned as reader slots 1–12', asyn
   assert.ok(!requests.includes(base+'17.webp'));
   assert.ok(!requests.includes(base+'30.webp'));
 });
+
+
+test('remote gallery pages are ephemeral and do not become a saved manifest', async () => {
+  const item = { id: 'remote', url: 'https://hitomi.la/reader/3904373.html', title: 'remote' };
+  const urls = ['https://w2.gold-usergeneratedcontent.net/1795075201/2884/' + 'a'.repeat(64) + '.webp'];
+  const source = create({
+    legacyResolver: { async resolve() { throw new Error('legacy discovery must not run'); } },
+    dynamicResolver: { supports: (url) => url === item.url, resolve: async () => urls.slice() }
+  });
+  const resolved = await source.resolve(item);
+  assert.equal(resolved.volatile, true);
+  assert.equal(resolved.migrated, false);
+  assert.equal(resolved.manifest, null);
+  assert.strictEqual(resolved.item, item);
+  assert.deepEqual(resolved.urls, urls);
+  assert.equal('pages' in item, false);
+});
+
+test('saved explicit pages retain precedence over remote discovery', async () => {
+  const explicit = ['https://assets.example.test/page.webp'];
+  const source = create({
+    dynamicResolver: { supports: () => true, resolve: async () => { throw new Error('must not run'); } }
+  });
+  const resolved = await source.resolve({
+    url: 'https://hitomi.la/reader/3904373.html',
+    pageManifest: { version: 1, pages: explicit }
+  });
+  assert.deepEqual(resolved.urls, explicit);
+  assert.notEqual(resolved.volatile, true);
+});
