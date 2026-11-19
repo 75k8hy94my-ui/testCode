@@ -3,13 +3,15 @@
   const FORMAT = 'testcode-manga-import';
   const MAX_ITEMS = 500;
   const MAX_BYTES = 4 * 1024 * 1024;
+  const MAX_PAGES = 2000;
   function safeUrl(value, { image = false, optional = false } = {}) {
     if (optional && (value == null || value === '')) return '';
     if (typeof value !== 'string' || value.length > 4096) return null;
     try {
       const url = new URL(value);
       if (url.protocol !== 'https:' || url.username || url.password || !url.hostname || url.port) return null;
-      if (image && !/\/1\.webp$/i.test(url.pathname)) return null;
+      if (image && !/\.(?:jpe?g|png|webp|avif|gif)$/i.test(url.pathname)) return null;
+      if (image === 'sequential' && !/\/1\.webp$/i.test(url.pathname)) return null;
       url.hash = '';
       return url.href;
     } catch (_) { return null; }
@@ -24,13 +26,30 @@
     if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error((index + 1) + '件目: 作品データが不正です。');
     const title = field(item.title, 500, { required: true });
     const author = field(item.author, 300, { required: true });
-    const url = safeUrl(item.url, { image: true });
+    const hasExplicitPages = item.pages != null;
+    let pages = null;
+    if (hasExplicitPages) {
+      if (!Array.isArray(item.pages) || !item.pages.length || item.pages.length > MAX_PAGES) {
+        throw new Error((index + 1) + '件目: pagesは1～2000件の画像URL配列にしてください。');
+      }
+      pages = item.pages.map(page => safeUrl(page, { image: 'page' }));
+      if (pages.some(page => !page) || new Set(pages).size !== pages.length) {
+        throw new Error((index + 1) + '件目: pagesには重複のないHTTPS画像URLを指定してください。');
+      }
+    }
+    // Legacy imports remain restricted to /1.webp. Explicit pages permit arbitrary image names.
+    const url = pages
+      ? (item.url == null || item.url === '' ? pages[0] : safeUrl(item.url, { image: 'page' }))
+      : safeUrl(item.url, { image: 'sequential' });
+    if (pages && url !== pages[0]) {
+      throw new Error((index + 1) + '件目: urlとpagesの先頭URLを一致させてください。');
+    }
     const sourceUrl = safeUrl(item.sourceUrl, { optional: true });
     const circleName = field(item.circleName, 300);
     const sourceWork = field(item.sourceWork, 300);
     const tags = item.tags == null ? [] : item.tags;
     if (title == null || author == null || !url || sourceUrl == null || circleName == null || sourceWork == null || !Array.isArray(tags) || tags.length > 200 || tags.some(t => field(t, 200, { required: true }) == null)) {
-      throw new Error((index + 1) + '件目: タイトル・作者・HTTPSの /1.webp URL・その他の形式を確認してください。');
+      throw new Error((index + 1) + '件目: タイトル・作者・HTTPS画像URL・その他の形式を確認してください。');
     }
     const readBound = (value, label) => {
       if (value == null || value === '') return null;
@@ -43,10 +62,14 @@
     const start = readBound(item.pageRangeStart, '開始ページ') ?? 1;
     const end = readBound(item.pageRangeEnd, '終了ページ');
     if (end != null && end < start) throw new Error((index + 1) + '件目: 終了ページは開始ページ以上にしてください。');
+    if (pages && (item.pageRangeStart != null || item.pageRangeEnd != null)) {
+      throw new Error((index + 1) + '件目: pages指定と連番ページ範囲は併用できません。');
+    }
     return {
       title, author, url, sourceUrl, circleName, sourceWork, tags: tags.map(t => t.trim()),
       ...(start !== 1 ? { pageRangeStart:start } : {}),
       ...(end != null ? { pageRangeEnd:end } : {}),
+      ...(pages ? { pages } : {}),
     };
   }
   function parse(text) {
@@ -87,7 +110,7 @@
         label.prepend(checkbox);
         const title = node('h3', entry.title);
         const author = node('p', '作者: ' + entry.author);
-        const image = node('p', '保存URL: ' + entry.url, 'manga-import-source-url');
+        const image = node('p', '保存URL: ' + entry.url + (entry.pages ? '（個別画像 ' + entry.pages.length + 'ページ）' : ''), 'manga-import-source-url');
         wrapper.append(label, title, author, image);
         if (duplicate) wrapper.appendChild(node('p', '重複候補です。登録する場合はチェックしてください。', 'manga-import-warnings'));
         rows.appendChild(wrapper);
@@ -115,7 +138,11 @@
           sourceUrl: item.sourceUrl, url: item.url, folderId: null, addedAt: now(),
           ...(item.pageRangeStart != null ? { pageRangeStart:item.pageRangeStart } : {}),
           ...(item.pageRangeEnd != null ? { pageRangeEnd:item.pageRangeEnd } : {}),
-          // Reader discovers subsequent pages using the existing sequential URL resolver.
+          ...(item.pages ? {
+            pages: item.pages.slice(),
+            pageManifest: { version: 1, pages: item.pages.slice(), splitSpreads: false },
+          } : {}),
+          // Explicit pages are authoritative. Legacy /1.webp entries use page discovery.
         });
       }
       if (!additions.length) { status.textContent = '登録できる新規作品がありません。'; return { ok: true, count: 0 }; }
@@ -134,10 +161,10 @@
         return { ok: false, count: 0 };
       }
       render();
-      status.textContent = additions.length + '作品を本棚に登録しました。閲覧時に2ページ目以降のURLを探索します。';
+      status.textContent = additions.length + '作品を本棚に登録しました。個別URL一覧は指定順に読み込みます。';
       return { ok: true, count: additions.length };
     }
     return Object.freeze({ parse, open, close, register, setStatus(value) { status.textContent = String(value || ''); }, get element() { return dialog; } });
   }
-  root.MangaJsonImport = Object.freeze({ FORMAT, MAX_ITEMS, MAX_BYTES, parse, validateItem, isDuplicate, create });
+  root.MangaJsonImport = Object.freeze({ FORMAT, MAX_ITEMS, MAX_BYTES, MAX_PAGES, parse, validateItem, isDuplicate, create });
 })(typeof self !== 'undefined' ? self : globalThis);
