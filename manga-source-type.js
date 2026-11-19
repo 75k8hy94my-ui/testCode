@@ -48,10 +48,19 @@
     try { return parsePageRange(item?.pageRangeStart, item?.pageRangeEnd); }
     catch (_) { return { start: 1, end: null }; }
   }
+  function isHitomiGalleryUrl(value) {
+    try {
+      const url = new URL(String(value || ''));
+      if (url.protocol !== 'https:' || !['hitomi.la', 'www.hitomi.la'].includes(url.hostname) ||
+          url.username || url.password || url.port || url.hash) return false;
+      return /^\/(?:reader|galleries)\/\d{1,12}\.html$/.test(url.pathname) ||
+        /^\/imageset\/[^/]+-\d{1,12}\.html$/.test(url.pathname);
+    } catch (_) { return false; }
+  }
   function supportsPageRange(url) {
     const href = safeHttpUrl(url);
     if (!href) return false;
-    if (href.endsWith('#1')) return true;
+    if (href.endsWith('#1') || isHitomiGalleryUrl(href)) return true;
     return /\/[^/]*\d+[^/]*\.(?:jpe?g|png|webp|avif|gif)$/i.test(new URL(href).pathname);
   }
 
@@ -68,7 +77,7 @@
     });
   }
   function sourcePriority(url) {
-    return url.endsWith('#1') ? 1 : isDirectImageUrl(url) ? 0 : 2;
+    return url.endsWith('#1') || isHitomiGalleryUrl(url) ? 1 : isDirectImageUrl(url) ? 0 : 2;
   }
   function getSourceCandidates(item) {
     return getSourceUrls(item).sort((a, b) => sourcePriority(a) - sourcePriority(b));
@@ -123,7 +132,7 @@
     return href && (getHashPageBase(item) || !isDirectImageUrl(href)) ? href : '';
   }
 
-  const api = Object.freeze({ safeHttpUrl, isDirectImageUrl, getSourceUrls, getSourceCandidates, sourcePriority, getDirectoryImageCandidates, hasPageList, getHashPageBase, hashPageUrl, MAX_HASH_PAGE, MAX_SEQUENCE_PAGE, parsePageRange, getPageRange, supportsPageRange, getEmbedUrl, EMBED_COVER_URL });
+  const api = Object.freeze({ safeHttpUrl, isDirectImageUrl, getSourceUrls, getSourceCandidates, sourcePriority, getDirectoryImageCandidates, hasPageList, getHashPageBase, hashPageUrl, MAX_HASH_PAGE, MAX_SEQUENCE_PAGE, parsePageRange, getPageRange, supportsPageRange, isHitomiGalleryUrl, getEmbedUrl, EMBED_COVER_URL });
   if (typeof self !== 'undefined') self.MangaSourceType = api;
   if (typeof window !== 'undefined') window.MangaSourceType = api;
   if (typeof module !== 'undefined') module.exports = api;
