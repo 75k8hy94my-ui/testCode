@@ -4,9 +4,9 @@
   const STYLESHEET_URL = 'manga-list.css?v=20261115-touch-sheet-v2';
   const SCRIPT_URLS = [
     ['manga-source-type.js?v=20261115-page-range', 'mangaSourceType'],
-    ['manga-list-template.js?v=20261114-json-import', 'mangaRouteTemplate'],
+    ['manga-list-template.js?v=20261119-preview-visibility', 'mangaRouteTemplate'],
     ['manga-import-author-sync.js?v=20261007-momon-import', 'mangaImportAuthorSync'],
-    ['manga-json-import.js?v=20261119-explicit-pages', 'mangaJsonImport'],
+    ['manga-json-import.js?v=20261119-preview-visibility', 'mangaJsonImport'],
     ['manga-spreadsheet.js?v=20261115-page-range', 'mangaSpreadsheet'],
     ['manga-item-editor.js?v=20261115-page-range', 'mangaItemEditor'],
     ['manga-card-context-menu.js?v=20261115-touch-sheet', 'mangaCardContextMenu'],
@@ -36,7 +36,7 @@
     ['manga-list-mount.js?v=20260922-mount', 'mangaRouteMount'],
     ['manga-list-card.js?v=20261115-card-context-menu', 'mangaRouteCard'],
     ['manga-list-state.js?v=20260922-state', 'mangaRouteState'],
-    ['manga-list-view-model.js?v=20261009-shelf-pagination', 'mangaRouteViewModel'],
+    ['manga-list-view-model.js?v=20261119-preview-visibility', 'mangaRouteViewModel'],
     ['manga-list-renderer.js?v=20261009-desktop-liquid-pager', 'mangaRouteRenderer'],
     ['manga-list-state-runtime.js?v=20260922-state-runtime', 'mangaRouteStateRuntime'],
     ['manga-list-render-runtime.js?v=20260922-render-runtime', 'mangaRouteRenderRuntime'],
