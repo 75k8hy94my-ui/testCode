@@ -3,7 +3,7 @@
 
   const STYLESHEET_URL = 'manga-list.css?v=20261115-touch-sheet-v2';
   const SCRIPT_URLS = [
-    ['manga-source-type.js?v=20261119-remote-pages', 'mangaSourceType'],
+    ['manga-source-type.js?v=20261119-hitomi-classification', 'mangaSourceType'],
     ['manga-list-template.js?v=20261119-preview-visibility', 'mangaRouteTemplate'],
     ['manga-import-author-sync.js?v=20261007-momon-import', 'mangaImportAuthorSync'],
     ['manga-json-import.js?v=20261119-preview-visibility', 'mangaJsonImport'],
@@ -47,7 +47,7 @@
     ['manga-list-image-cache.js?v=20261011-encrypted-cache', 'mangaRouteImageCache'],
     ['reader-target.js?v=20261003-reader-launch-contract', 'mangaReaderTarget'],
     ['manga-hash-cover-preview.js?v=20261114-hash-cover-preview', 'mangaHashCoverPreview'],
-    ['manga-list-host-runtime.js?v=20261119-video-persistence', 'mangaRouteHost'],
+    ['manga-list-host-runtime.js?v=20261119-hitomi-classification', 'mangaRouteHost'],
     ['manga-list-runtime.js?v=20261115-finger-drag', 'mangaRouteRuntime'],
     ['manga-list-entry.js?v=20260922-entry', 'mangaRouteEntry'],
   ];
