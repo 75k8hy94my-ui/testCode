@@ -98,7 +98,7 @@
       range = window.MangaSourceType.parsePageRange(data.get('pageRangeStart'), data.get('pageRangeEnd'));
       if ((range.start !== 1 || range.end != null) &&
           !sourceUrls.some(url => window.MangaSourceType.supportsPageRange(url))) {
-        throw new Error('ページ範囲は #1 形式または 1.webp などの連番画像URLに指定してください。');
+        throw new Error('ページ範囲は #1 形式・対応する外部漫画URL・連番画像URLに指定してください。');
       }
     } catch (error) {
       message.dataset.error = 'true';

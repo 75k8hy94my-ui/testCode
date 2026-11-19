@@ -320,7 +320,7 @@ async function renderManga(generation){
     const gate=await ensureVpnGate();
     if(generation!==renderGeneration)return;
     if(!gate){renderVpnGate(target,'manga');setTitle('manga');syncHeaderRoute();return;}
-    if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20261119-remote-pages','spaMangaListRoute');
+    if(!window.MangaListRouteFactory) await loadScript('manga-list-route.js?v=20261119-hitomi-classification','spaMangaListRoute');
     if(generation!==renderGeneration)return;
     routeRuntime=window.MangaListRouteFactory.create({documentRef:document,windowRef:window,mediaAccess:gate});
     mangaRouteRuntime=routeRuntime;

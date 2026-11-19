@@ -222,6 +222,13 @@
       const coverStart = !exactUrl ? (root.MangaSourceType?.getPageRange?.(savedWork)?.start || 1) : 1;
       const sourceItem = { url: baseUrlForItem, pages: exactUrl ? [exactUrl] : [] };
       const hashBase = root.MangaSourceType?.getHashPageBase(sourceItem) || '';
+      // A supported remote gallery resolves to images when Reader opens.
+      // Do not mislabel its cover as a generic embedded Web page or probe /1.webp.
+      if (!exactUrl && root.MangaSourceType?.isHitomiGalleryUrl?.(baseUrlForItem)) {
+        imgEl.src = root.MangaSourceType.REMOTE_COVER_URL;
+        markCover(imgEl, 'loaded');
+        return;
+      }
       if (hashBase) {
         imgEl.src = root.MangaSourceType.EMBED_COVER_URL;
         markCover(imgEl, 'loaded');

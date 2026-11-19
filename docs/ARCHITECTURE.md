@@ -186,5 +186,5 @@ URLやデータの実際の操作経路は、必ず入口HTMLと呼出し元か�
 - `https://hitomi.la/reader/<ID>.html`、`/imageset/...-<ID>.html`、`/galleries/<ID>.html`（末尾ハッシュなし）を独立Readerで一時的なリモートページ一覧として解決する。末尾 `#1` の既存iframe方式は変更しない。
 - `reader-hitomi-source.js` は外部サイトの `gg.js` と `galleries/<ID>.js` を opaque-origin のsandbox iframe（`allow-scripts` のみ）で読み込み、CDN画像URLを生成する。外部スクリプトをtestCodeの主文書で実行しない。`postMessage` はsource、opaque origin、nonce、ページURL形式を検証する。サイト側の公開JavaScriptの形式に依存する。
 - `reader-page-source.js` は明示的に登録済みのページ一覧を優先し、それがない場合だけ動的に解決する。戻り値の `volatile` を確認し、`reader-runtime.js` は画像URL一覧を本棚・Vault・Supabaseに書き戻さない。作品の元URLと読書位置だけ従来どおり保存する。
-- `manga-source-type.js` と `manga-item-editor.js` は外部ギャラリーURLのページ範囲指定を許可する。画像本体は既存リーダーのメモリ内プリロードを使用する。
+- `manga-source-type.js` は動的ギャラリーURLと単なるWeb埋め込みURLを区別し、`getEmbedUrl` は動的ソースを埋め込みとして返さない。本棚の `manga-list-host-runtime.js` は外部画像リーダー専用のプレースホルダーを表示し、画像URLを一覧表示中に取得・推測しない。`manga-item-editor.js` は外部ギャラリーURLのページ範囲指定を許可する。画像本体は既存リーダーのメモリ内プリロードを使用する。
 - 配信元によるスクリプト埋め込み制限、画像のホットリンク拒否、サイト側のJS形式変更時は表示できない場合がある。別ドメインへのプロキシ転送・認証回避は行わない。Chrome/Firefox/Safariの実機受入れ確認は別途必要。
