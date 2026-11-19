@@ -36,7 +36,7 @@ URLやデータの実際の操作経路は、必ず入口HTMLと呼出し元か�
 | 変更対象 | 最初に確認するファイル |
 | --- | --- |
 | 本棚の表示・カード・並べ替え・ページング・編集 | `manga-list-route.js` → `manga-list-*.js`、`manga-item-editor.js`、`manga-spreadsheet.js` |
-| 漫画登録JSON | `manga-json-import.js`、`manga-list-route.js` |
+| 漫画登録JSON（連番画像・個別ページURL配列） | `manga-json-import.js`、`manga-list-route.js`。個別URL配列は `pages` と `pageManifest` に保存し、Readerでは `reader-page-source.js` がその順序を尊重する |
 | ReaderのURL・読み込み・ページ進捗 | `reader-target.js`、`reader-page-source.js`、`reader-runtime.js`、`reader-progress-repository.js` |
 | 動画一覧・情報編集 | `video-list-route.js`、`video-library.js`、関連する `video-*.js` |
 | ページ遷移・プロフィール・共通ヘッダー | `home-profile-spa.js`、`app-global-shell.js`、`profile-menu.js` |
