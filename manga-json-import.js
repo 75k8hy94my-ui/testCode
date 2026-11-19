@@ -59,6 +59,25 @@
       }
       return Number(value);
     };
+    // Preview provenance is supplied by the post exporter. Older JSON files
+    // without this metadata remain ordinary, visible works.
+    const imageQuality = item.imageQuality == null ? null : item.imageQuality;
+    if (imageQuality != null && !['original', 'preview', 'mixed'].includes(imageQuality)) {
+      throw new Error((index + 1) + '件目: imageQualityはoriginal、preview、mixedのいずれかです。');
+    }
+    if (!imageQuality && item.previewCount != null) {
+      throw new Error((index + 1) + '件目: previewCountにはimageQualityが必要です。');
+    }
+    const previewCount = item.previewCount == null
+      ? (imageQuality === 'preview' ? pages?.length || 0 : 0)
+      : item.previewCount;
+    if (!Number.isSafeInteger(previewCount) || previewCount < 0 ||
+        previewCount > (pages?.length || 0) ||
+        (imageQuality === 'original' && previewCount !== 0) ||
+        (imageQuality === 'preview' && (!pages || previewCount !== pages.length)) ||
+        (imageQuality === 'mixed' && (!pages || previewCount === 0 || previewCount === pages.length))) {
+      throw new Error((index + 1) + '件目: プレビュー画像数とpagesの指定が一致しません。');
+    }
     const start = readBound(item.pageRangeStart, '開始ページ') ?? 1;
     const end = readBound(item.pageRangeEnd, '終了ページ');
     if (end != null && end < start) throw new Error((index + 1) + '件目: 終了ページは開始ページ以上にしてください。');
@@ -70,6 +89,7 @@
       ...(start !== 1 ? { pageRangeStart:start } : {}),
       ...(end != null ? { pageRangeEnd:end } : {}),
       ...(pages ? { pages } : {}),
+      ...(imageQuality ? { imageQuality, previewCount } : {}),
     };
   }
   function parse(text) {
@@ -112,6 +132,8 @@
         const author = node('p', '作者: ' + entry.author);
         const image = node('p', '保存URL: ' + entry.url + (entry.pages ? '（個別画像 ' + entry.pages.length + 'ページ）' : ''), 'manga-import-source-url');
         wrapper.append(label, title, author, image);
+        if (entry.imageQuality === 'preview') wrapper.appendChild(node('p', 'プレビュー画像のみ：本棚では初期状態で非表示です。「プレビュー作品を表示」で確認できます。', 'manga-import-warnings'));
+        else if (entry.imageQuality === 'mixed') wrapper.appendChild(node('p', '元画像とプレビュー画像が混在しています（プレビュー ' + entry.previewCount + '枚）。', 'manga-import-warnings'));
         if (duplicate) wrapper.appendChild(node('p', '重複候補です。登録する場合はチェックしてください。', 'manga-import-warnings'));
         rows.appendChild(wrapper);
       });
@@ -136,6 +158,7 @@
           id: createId(), title: item.title, author: item.author, circleName: item.circleName,
           sourceWork: item.sourceWork, isDoujin: Boolean(item.sourceWork), tags: [...item.tags],
           sourceUrl: item.sourceUrl, url: item.url, folderId: null, addedAt: now(),
+          ...(item.imageQuality ? { imageQuality: item.imageQuality, previewCount: item.previewCount } : {}),
           ...(item.pageRangeStart != null ? { pageRangeStart:item.pageRangeStart } : {}),
           ...(item.pageRangeEnd != null ? { pageRangeEnd:item.pageRangeEnd } : {}),
           ...(item.pages ? {
